@@ -64,7 +64,7 @@ def test_review_nonmutating_exact_group_only(ready):
         {
             "Effect": "Allow",
             "Action": ["logs:FilterLogEvents"],
-            "Resource": f"arn:aws:logs:us-west-2:000000000000:log-group:/astrolift/clusters/{ready.cluster.guid}/pods",
+            "Resource": f"arn:aws:logs:us-west-2:000000000000:log-group:/astrolift/clusters/{ready.cluster.guid}/pods:*",
         }
     ]
     assert not ready.starts and not ready.server.calls
@@ -204,3 +204,69 @@ def test_dispatch_uncertain_keeps_original_tuple(ready, monkeypatch):
         "astroliftInstallClusterLogCollector"
     ]
     assert replay["data"]["id"] == result["data"]["id"] and ClusterLogCollectorOperation.objects.count() == 1
+
+
+def test_verified_legacy_account_without_declared_credential_is_not_supported(ready):
+    ready.cluster.cloud_account_id = "000000000000"
+    ready.cluster.provider_config.pop("account_id")
+    ready.cluster.save()
+    assert review(ready)["supported"] is False and review(ready)["refusalCode"] == "ACCOUNT_REQUIRED"
+    assert not ready.starts and not ready.server.calls
+
+
+def test_expired_receipt_does_not_advertise_retry(ready, monkeypatch):
+    from django.utils import timezone
+
+    from astrolift_clusters.schema.log_collector import operation_to_type
+
+    install(ready)
+    row = ClusterLogCollectorOperation.objects.get()
+    monkeypatch.setattr(timezone, "now", lambda: row.deadline)
+    assert operation_to_type(row).retryable is False
+    assert row.status == "queued"
+
+
+def test_original_request_token_cannot_be_replaced_by_wider_token(ready):
+    from django.test import Client
+
+    from astrolift_identity.api_tokens import mint_token
+    from astrolift_identity.models import ApiToken
+
+    request, result = install(ready)
+    issued = mint_token()
+    ApiToken.objects.create(
+        user=ready.actor,
+        organization=ready.org,
+        name="Replacement",
+        token_hash=issued.token_hash,
+        scopes=["admin"],
+    )
+    ready.client = Client(HTTP_AUTHORIZATION=f"Bearer {issued.plaintext}")
+    refusal = agent_cases.gql(ready, INSTALL, {"input": request})["data"][
+        "astroliftInstallClusterLogCollector"
+    ]
+    assert refusal["errors"][0]["code"] == "REQUEST_CHANGED"
+    assert ClusterLogCollectorOperation.objects.count() == 1 and len(ready.starts) == 1
+
+
+def test_outer_transaction_rollback_discards_request_and_enqueue(ready):
+    from django.db import transaction
+
+    from astrolift_clusters import agent_install
+
+    install(ready)
+    original = ClusterLogCollectorOperation.objects.get()
+    original.status = "refused"
+    original.save()
+    before = len(ready.starts)
+    with agent_install._actor(original):
+        reviewed = collector.review_collector(str(ready.cluster.guid))
+        with pytest.raises(RuntimeError), transaction.atomic():
+            collector.reserve_collector(
+                cluster_id=str(ready.cluster.guid),
+                request_id=str(uuid4()),
+                expected_version=ready.cluster.version,
+                expected_source=reviewed["source"],
+            )
+            raise RuntimeError("Rollback actual original request")
+    assert ClusterLogCollectorOperation.objects.count() == 1 and len(ready.starts) == before

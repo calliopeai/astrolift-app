@@ -141,6 +141,7 @@ def test_complete_exact_cleanup_then_atomic_activation(complete):
         == f"/astrolift/clusters/{world.cluster.guid}/pods"
     )
     assert "role_arn" not in world.cluster.provider_config["log_config"]
+    assert aws.signed and all(proven for action, proven in aws.signed)
     assert aws.assumption == {
         "role": before["credential"]["role_arn"],
         "external_id": "owned-fixture-external-id",

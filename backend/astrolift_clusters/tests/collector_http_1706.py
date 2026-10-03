@@ -18,6 +18,7 @@ class AwsSocket:
     def __init__(self, cluster, kube):
         self.cluster, self.kube = cluster, kube
         self.calls = []
+        self.signed = []
         self.role = None
         self.group = None
         self.policy = None
@@ -82,6 +83,10 @@ class AwsSocket:
                     action = params.pop("Action")
                     params.pop("Version", None)
                 owner.calls.append(action)
+                if action != "AssumeRole":
+                    owner.signed.append(
+                        (action, "Credential=ASIACOLLECTORFIXTURE/" in self.headers.get("Authorization", ""))
+                    )
                 if owner.before:
                     fn, owner.before = owner.before, None
                     fn(action)
