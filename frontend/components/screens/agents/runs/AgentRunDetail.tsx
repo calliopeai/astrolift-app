@@ -96,6 +96,7 @@ export function AgentRunDetail({
   interactions,
 }: AgentRunDetailProps) {
   const t = useTranslations("agentRecovery.run");
+  const activity = useTranslations("agentActivity");
   const [killOpen, setKillOpen] = React.useState(false);
   const [open, setOpen] = React.useState<Open>(null);
   const title = t("title", { id: taskId.slice(0, 8) });
@@ -197,7 +198,9 @@ export function AgentRunDetail({
           ) : undefined
         }
         menu={menu}
-        steps={agentRunSteps(task, interactions.interactions, now)}
+        steps={agentRunSteps(task, interactions.interactions, now, (key, values) =>
+          activity(key, values)
+        )}
         stepsError={interactions.error}
         failure={failureMessage ? { title: t("runFailed"), reason: failureMessage } : null}
         log={{

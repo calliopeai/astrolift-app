@@ -2,12 +2,13 @@
 
 import { XCircleIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { LogView } from "@/components/run/LogView";
 import { StatusDot } from "@/components/StatusDot";
 import { Button } from "@/components/ui/button";
 
-import { runDot, titleCase } from "./agent-runs-list";
+import { runDot, RUN_STATUS_DOT } from "./agent-runs-list";
 import type { AgentTask } from "./use-agent-observe";
 import type { useAgentTaskLogs } from "./use-agent-task-logs";
 
@@ -36,6 +37,9 @@ export function AgentTaskLogsView({
   liveOnly,
   windowLimited,
 }: AgentTaskLogsViewProps) {
+  const t = useTranslations("agentObservation.logs");
+  const activity = useTranslations("agentActivity");
+  const statusKey = task.status.toLowerCase();
   const failureMessage = task.failureMessage?.trim() ? task.failureMessage : null;
   const href = `/agents/runs/${encodeURIComponent(task.id)}`;
 
@@ -43,21 +47,18 @@ export function AgentTaskLogsView({
     <div className="min-w-0 space-y-2">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         {liveOnly && (
-          <span
-            className="text-muted-foreground text-xs"
-            title="Pod output is temporary and may disappear after the pod is removed."
-          >
-            Live pod logs
+          <span className="text-muted-foreground text-xs" title={t("temporary")}>
+            {t("live")}
           </span>
         )}
-        {windowLimited && <span className="text-muted-foreground text-xs">Recent log window</span>}
+        {windowLimited && <span className="text-muted-foreground text-xs">{t("window")}</span>}
         {hasMore && (
           <Button size="sm" variant="outline" disabled={loadingEarlier} onClick={onLoadEarlier}>
-            {loadingEarlier ? "Loading earlier…" : "Load earlier"}
+            {loadingEarlier ? t("loadingEarlier") : t("loadEarlier")}
           </Button>
         )}
         <Button size="sm" variant="outline" onClick={onRefresh}>
-          Refresh log
+          {t("refresh")}
         </Button>
         {pageError && (
           <span role="alert" className="text-danger-fg text-xs [overflow-wrap:anywhere]">
@@ -66,7 +67,7 @@ export function AgentTaskLogsView({
         )}
       </div>
       <LogView
-        title={`Log · run ${task.id.slice(0, 8)}`}
+        title={t("runTitle", { id: task.id.slice(0, 8) })}
         lines={lines}
         loading={loading}
         error={error}
@@ -78,11 +79,13 @@ export function AgentTaskLogsView({
             <span className="inline-flex min-w-0 items-center gap-1.5 text-xs">
               <StatusDot status={runDot(task.status)} />
               <span className="max-w-32 truncate" title={task.status}>
-                {titleCase(task.status)}
+                {Object.hasOwn(RUN_STATUS_DOT, statusKey)
+                  ? activity(`statuses.${statusKey}`)
+                  : task.status}
               </span>
             </span>
             <Link href={href} className="text-primary text-xs font-medium hover:underline">
-              Open run
+              {t("openRun")}
             </Link>
           </>
         }
@@ -91,14 +94,14 @@ export function AgentTaskLogsView({
             <span className="not-italic">
               <span className="text-danger-fg flex items-center gap-2 font-sans text-sm font-medium">
                 <XCircleIcon className="size-4 shrink-0" aria-hidden />
-                Run failed before a pod started
+                {t("spawnFailed")}
               </span>
               <span className="text-danger-fg mt-2 block [overflow-wrap:anywhere] whitespace-pre-wrap">
                 {failureMessage}
               </span>
             </span>
           ) : (
-            "No pod output is available. The run may not have written logs yet, or its pod may have been removed."
+            t("emptyOutput")
           )
         }
       />

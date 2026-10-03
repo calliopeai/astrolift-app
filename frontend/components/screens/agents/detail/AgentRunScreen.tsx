@@ -3,6 +3,7 @@
 import { ExternalLinkIcon, ListChecksIcon, MonitorPlayIcon, TerminalIcon } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
@@ -16,9 +17,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { formatRelativeAge } from "@/lib/format";
+import { useFormatters } from "@/lib/i18n/formatters";
 
-import { canWatchLive, canWatchLogs, runDot, runDuration, titleCase } from "./agent-runs-list";
+import { canWatchLive, canWatchLogs, runDot, runDuration, RUN_STATUS_DOT } from "./agent-runs-list";
 import type { AgentRunState, AgentTask } from "./use-agent-run";
 
 export interface AgentRunScreenProps extends AgentRunState {
@@ -30,51 +31,72 @@ export interface AgentRunScreenProps extends AgentRunState {
   renderLogs: (taskId: string, running: boolean) => React.ReactNode;
 }
 
-const runHref = (t: AgentTask) => `/agents/runs/${encodeURIComponent(t.id)}`;
+const runHref = (task: AgentTask) => `/agents/runs/${encodeURIComponent(task.id)}`;
 
 function Time({ at }: { at: string | null }) {
-  if (!at) return <span className="text-muted-foreground">Not yet</span>;
+  const t = useTranslations("agentRunTab");
+  const format = useFormatters();
+  if (!at) return <span className="text-muted-foreground">{t("notYet")}</span>;
   return (
     <span className="font-mono text-xs" title={at}>
-      {formatRelativeAge(at)}
+      {Number.isFinite(Date.parse(at)) ? format.formatRelativeTime(at) : t("unknownDate")}
     </span>
   );
 }
 
-const COLUMNS: Column<AgentTask>[] = [
-  {
-    id: "run",
-    header: "Run",
-    cell: (t) => (
-      <span className="block max-w-72 truncate font-mono text-xs" title={t.id}>
-        {t.id}
-      </span>
-    ),
-  },
-  {
-    id: "status",
-    header: "Status",
-    width: "w-40",
-    cell: (t) => (
-      <span className="inline-flex min-w-0 items-center gap-1.5 text-sm">
-        <StatusDot status={runDot(t.status)} />
-        <span className="truncate" title={t.status}>
-          {t.status === "running" ? "Running now" : titleCase(t.status)}
+const columnsFor = (
+  t: (key: string) => string,
+  activity: (key: string) => string
+): Column<AgentTask>[] => {
+  return [
+    {
+      id: "run",
+      header: t("run"),
+      cell: (task) => (
+        <span className="block max-w-72 truncate font-mono text-xs" title={task.id}>
+          {task.id}
         </span>
-      </span>
-    ),
-  },
-  { id: "started", header: "Started", width: "w-28", cell: (t) => <Time at={t.startedAt} /> },
-  { id: "finished", header: "Finished", width: "w-28", cell: (t) => <Time at={t.finishedAt} /> },
-  {
-    id: "took",
-    header: "Took",
-    width: "w-20",
-    align: "right",
-    cellClassName: "font-mono text-xs tabular-nums",
-    cell: (t) => runDuration(t.startedAt, t.finishedAt) ?? "",
-  },
-];
+      ),
+    },
+    {
+      id: "status",
+      header: t("status"),
+      width: "w-40",
+      cell: (task) => (
+        <span className="inline-flex min-w-0 items-center gap-1.5 text-sm">
+          <StatusDot status={runDot(task.status)} />
+          <span className="truncate" title={task.status}>
+            {task.status.toLowerCase() === "running"
+              ? t("runningNow")
+              : Object.hasOwn(RUN_STATUS_DOT, task.status.toLowerCase())
+                ? activity(`statuses.${task.status.toLowerCase()}`)
+                : task.status}
+          </span>
+        </span>
+      ),
+    },
+    {
+      id: "started",
+      header: t("started"),
+      width: "w-28",
+      cell: (task) => <Time at={task.startedAt} />,
+    },
+    {
+      id: "finished",
+      header: t("finished"),
+      width: "w-28",
+      cell: (task) => <Time at={task.finishedAt} />,
+    },
+    {
+      id: "took",
+      header: t("took"),
+      width: "w-20",
+      align: "right",
+      cellClassName: "font-mono text-xs tabular-nums",
+      cell: (task) => runDuration(task.startedAt, task.finishedAt) ?? "",
+    },
+  ];
+};
 
 /**
  * The agent's Runs tab (spec 44 §5.1, §5.2): this agent's executions on the
@@ -95,6 +117,9 @@ export function AgentRunScreen({
   totalCount,
   renderLogs,
 }: AgentRunScreenProps) {
+  const t = useTranslations("agentRunTab");
+  const activity = useTranslations("agentActivity");
+  const columns = React.useMemo(() => columnsFor(t, activity), [t, activity]);
   const [watching, setWatching] = React.useState<AgentTask | null>(null);
   const [watchingLogs, setWatchingLogs] = React.useState<AgentTask | null>(null);
 
@@ -106,10 +131,10 @@ export function AgentRunScreen({
       <ListPage<AgentTask>
         embedded
         list={list}
-        label="Runs"
-        columns={COLUMNS}
+        label={t("runs")}
+        columns={columns}
         rows={rows}
-        getRowId={(t) => t.id}
+        getRowId={(task) => task.id}
         rowHref={runHref}
         loading={loading}
         stale={stale}
@@ -120,32 +145,32 @@ export function AgentRunScreen({
         newRows={newRows}
         empty={{
           icon: <ListChecksIcon className="size-5" />,
-          title: "No runs yet",
-          description: "Use Run now above to start one. It shows here with a live status.",
+          title: t("noRuns"),
+          description: t("noRunsDescription"),
         }}
-        rowActions={(t) => (
+        rowActions={(task) => (
           <>
             <DropdownMenuItem asChild>
-              <Link href={runHref(t)}>Open run</Link>
+              <Link href={runHref(task)}>{t("openRun")}</Link>
             </DropdownMenuItem>
-            {canWatchLive(t) && (
+            {canWatchLive(task) && (
               <>
-                <DropdownMenuItem onSelect={() => setWatching(t)}>
+                <DropdownMenuItem onSelect={() => setWatching(task)}>
                   <MonitorPlayIcon className="size-4" />
-                  Watch live
+                  {t("watchLive")}
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href={`${runHref(t)}/vnc`} target="_blank" rel="noreferrer">
+                  <Link href={`${runHref(task)}/vnc`} target="_blank" rel="noreferrer">
                     <ExternalLinkIcon className="size-4" />
-                    Open live session in a new tab
+                    {t("openLive")}
                   </Link>
                 </DropdownMenuItem>
               </>
             )}
-            {canWatchLogs(t) && (
-              <DropdownMenuItem onSelect={() => setWatchingLogs(t)}>
+            {canWatchLogs(task) && (
+              <DropdownMenuItem onSelect={() => setWatchingLogs(task)}>
                 <TerminalIcon className="size-4" />
-                Watch logs
+                {t("watchLogs")}
               </DropdownMenuItem>
             )}
           </>
@@ -155,7 +180,7 @@ export function AgentRunScreen({
       <Dialog open={watching !== null} onOpenChange={(open) => !open && setWatching(null)}>
         <DialogContent className="max-w-4xl sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Live agent session</DialogTitle>
+            <DialogTitle>{t("sessionTitle")}</DialogTitle>
             <DialogDescription className="font-mono text-xs break-all">
               {watching?.id}
             </DialogDescription>
@@ -169,7 +194,7 @@ export function AgentRunScreen({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <TerminalIcon className="size-4" />
-              Live agent logs
+              {t("logsTitle")}
             </DialogTitle>
             <DialogDescription className="font-mono text-xs break-all">
               {watchingLogs?.id}

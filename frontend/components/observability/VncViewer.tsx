@@ -2,6 +2,7 @@
 
 import { Maximize2, Minimize2, Ratio, Scan } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,7 @@ export interface VncViewerProps {
  * cookie (4401/4403 close codes), so no credentials are forwarded.
  */
 export function VncViewer({ vncPath, className }: VncViewerProps) {
+  const t = useTranslations("agentObservation.viewer");
   const wrapperRef = React.useRef<HTMLDivElement | null>(null);
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const rfbRef = React.useRef<import("@novnc/novnc").default | null>(null);
@@ -118,7 +120,7 @@ export function VncViewer({ vncPath, className }: VncViewerProps) {
         if (disposed) return;
         const detail = (e as CustomEvent<{ reason?: string }>).detail;
         setState("denied");
-        setErrorMessage(detail?.reason ?? "Access denied.");
+        setErrorMessage(detail?.reason ?? null);
       });
     });
 
@@ -174,8 +176,8 @@ export function VncViewer({ vncPath, className }: VncViewerProps) {
             variant={viewMode === "fit" ? "secondary" : "ghost"}
             aria-pressed={viewMode === "fit"}
             disabled={!canControl}
-            title="Fit to window"
-            aria-label="Fit session to window"
+            title={t("fitTitle")}
+            aria-label={t("fit")}
             onClick={() => setViewMode("fit")}
           >
             <Scan />
@@ -186,8 +188,8 @@ export function VncViewer({ vncPath, className }: VncViewerProps) {
             variant={viewMode === "actual" ? "secondary" : "ghost"}
             aria-pressed={viewMode === "actual"}
             disabled={!canControl}
-            title="Actual size (1:1)"
-            aria-label="Show session at actual size"
+            title={t("actualTitle")}
+            aria-label={t("actual")}
             onClick={() => setViewMode("actual")}
           >
             <Ratio />
@@ -196,8 +198,8 @@ export function VncViewer({ vncPath, className }: VncViewerProps) {
             type="button"
             size="icon-sm"
             variant="ghost"
-            title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            title={isFullscreen ? t("exitFullscreen") : t("fullscreen")}
+            aria-label={isFullscreen ? t("exitFullscreen") : t("enterFullscreen")}
             onClick={toggleFullscreen}
           >
             {isFullscreen ? <Minimize2 /> : <Maximize2 />}
@@ -207,7 +209,7 @@ export function VncViewer({ vncPath, className }: VncViewerProps) {
       <div
         ref={containerRef}
         role="region"
-        aria-label="Live agent session"
+        aria-label={t("title")}
         // exact VNC-canvas background — must match the noVNC client.background
         // literal set above; not tokenizable.
         // eslint-disable-next-line astrolift/no-raw-design-values
@@ -222,24 +224,25 @@ export function VncViewer({ vncPath, className }: VncViewerProps) {
 }
 
 function ConnectionBanner({ state, message }: { state: ConnectionState; message: string | null }) {
+  const t = useTranslations("agentObservation.viewer");
   if (state === "connected") return null;
 
   let tone: "info" | "warn" | "error" = "info";
   let label: string;
   switch (state) {
     case "connecting":
-      label = "Connecting to live session…";
+      label = t("connecting");
       break;
     case "closed":
-      label = "Session closed.";
+      label = t("closed");
       tone = "warn";
       break;
     case "denied":
-      label = message ?? "Access denied.";
+      label = message ?? t("denied");
       tone = "error";
       break;
     case "error":
-      label = message ?? "Connection error.";
+      label = message ?? t("error");
       tone = "error";
       break;
     default:

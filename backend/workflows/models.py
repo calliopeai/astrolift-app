@@ -599,7 +599,11 @@ class WorkflowStage(BaseCoreModel):
         default=OnFailure.FAIL,
         help_text="What to do if this stage fails.",
     )
-    iteration = models.JSONField(default=dict, blank=True, help_text="Bounded serial body range or supported record formatter configuration.")
+    iteration = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Bounded serial body range or supported record formatter configuration.",
+    )
     back_edge = models.JSONField(
         default=dict,
         blank=True,
@@ -727,13 +731,17 @@ class Workflow(BaseCoreModel):
             bound = bool(binding and binding.get("agent_workload_id"))
             if not bound and stage.agent_definition_id is None and stage.agent_ref:
                 from astrolift_registry.models import Workload
+                from workflows.target_references import references_filter
 
-                bound = Workload.objects.filter(
-                    registered_app__organization_id=self.organization_id,
-                    slug=stage.agent_ref,
-                    kind=Workload.Kind.AGENT,
-                    deleted_at__isnull=True,
-                ).exists()
+                bound = (
+                    Workload.objects.filter(
+                        registered_app__organization_id=self.organization_id,
+                        kind=Workload.Kind.AGENT,
+                        deleted_at__isnull=True,
+                    )
+                    .filter(references_filter([stage.agent_ref]))
+                    .exists()
+                )
             if not bound and stage.agent_definition_id is None:
                 unbound.append((stage.order, stage.role or ""))
         return unbound
@@ -901,7 +909,9 @@ class WorkflowStageExecution(BaseCoreModel):
         related_name="fanout_children",
     )
     fanout_index = models.PositiveSmallIntegerField(null=True, blank=True)
-    collection_parent_execution = models.ForeignKey("self", null=True, blank=True, on_delete=models.PROTECT, related_name="collection_children")
+    collection_parent_execution = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.PROTECT, related_name="collection_children"
+    )
     collection_index = models.PositiveSmallIntegerField(null=True, blank=True)
     collection_workflow_id = models.CharField(max_length=512, blank=True, default="")
     attempt_number = models.IntegerField(

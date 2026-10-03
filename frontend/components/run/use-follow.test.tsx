@@ -1,5 +1,7 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import * as React from "react";
+import { NextIntlClientProvider } from "next-intl";
+import en from "@/messages/en.json";
 import { describe, expect, it } from "vitest";
 
 import { makeLines } from "./fixtures";
@@ -50,7 +52,11 @@ function sizePane(pane: HTMLElement, scrollHeight: () => number, clientHeight = 
 describe("LogView follow", () => {
   function Harness({ count }: { count: number }) {
     const lines = React.useMemo(() => makeLines(count), [count]);
-    return <LogView lines={lines} />;
+    return (
+      <NextIntlClientProvider locale="en" messages={en}>
+        <LogView lines={lines} />
+      </NextIntlClientProvider>
+    );
   }
 
   it("pins to the end, stops on scroll up, and Jump to latest follows again", () => {

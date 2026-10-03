@@ -1,3 +1,6 @@
+import { NextIntlClientProvider, useTranslations } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
@@ -14,7 +17,7 @@ import {
   RUN_NEW_ROWS,
   type RunData,
 } from "./agent-build-run.fixtures";
-import { AGENT_RUNS_LIST } from "./agent-runs-list";
+import { localizedAgentRunsList } from "./agent-runs-list";
 import { AgentRunScreen } from "./AgentRunScreen";
 
 /**
@@ -41,7 +44,9 @@ const renderLogs = (taskId: string, running: boolean) => (
 );
 
 function Runs({ data, view }: { data: RunData; view?: string }) {
-  const list = useLocalListState(AGENT_RUNS_LIST, view ? { view } : {});
+  const t = useTranslations("agentRunTab");
+  const activity = useTranslations("agentActivity");
+  const list = useLocalListState(localizedAgentRunsList(t, activity), view ? { view } : {});
   return <AgentRunScreen {...data} list={list} renderLogs={renderLogs} />;
 }
 
@@ -51,7 +56,7 @@ export const Full: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getAllByText("Running now").length).toBe(2);
-    await expect(canvas.getByText("Timed Out")).toBeInTheDocument();
+    await expect(canvas.getByText("Timed out")).toBeInTheDocument();
   },
 };
 
@@ -104,4 +109,39 @@ export const WatchLogs: Story = {
     await userEvent.click(await body.findByRole("menuitem", { name: /watch logs/i }));
     await expect(await body.findByText("Live agent logs")).toBeInTheDocument();
   },
+};
+
+export const FrenchRuns: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr} timeZone="UTC">
+      <Runs data={RUN} />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseMine: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja} timeZone="UTC">
+      <Runs data={RUN_EMPTY} view="mine" />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseUnknownRun: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja} timeZone="UTC">
+      <Runs
+        data={{
+          ...RUN,
+          rows: [
+            {
+              ...RUN.rows[0],
+              status: "future_status_v2",
+              startedAt: "malformed",
+              finishedAt: null,
+            },
+          ],
+          totalCount: 1,
+        }}
+      />
+    </NextIntlClientProvider>
+  ),
 };

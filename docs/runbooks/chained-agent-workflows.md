@@ -59,6 +59,18 @@ freezes the resolved packet before dispatch. A local `agent` slug can therefore
 be imported before its workload exists and resolves when a matching workload is
 later registered in the run's organization.
 
+For an explicitly reviewed target, use `agent = "guid:<workload-guid>"` or
+`workflow = "guid:<definition-guid>"` in TOML. GUIDs must have their canonical
+lowercase UUID spelling. Storage, TOML export/re-import and repository sync
+preserve that reference. Two apps may each have an agent called `worker`; a
+GUID reference selects the reviewed workload. A child workflow rename also
+preserves its GUID. An unavailable, deleted or foreign target is refused,
+including when a new target uses its former slug. Child project visibility and
+the current caller's workflow-trigger and agent-dispatch grants still apply.
+Configured stage binding overrides remain explicit choices in the reviewed
+plan; a conflicting default agent mapping is refused. GUID references establish
+target identity, not equivalence to an imported framework's model/tool behavior.
+
 Each agent receives its immediate predecessor at the top level for backward
 compatibility and an explicit `_astrolift_workflow` object:
 

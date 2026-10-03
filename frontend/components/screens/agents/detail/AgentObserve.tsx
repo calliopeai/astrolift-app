@@ -2,6 +2,7 @@
 
 import { ScrollTextIcon, TerminalIcon } from "lucide-react";
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 
 import { Panel } from "@/components/panel/Panel";
 
@@ -27,21 +28,21 @@ export function AgentObserveScreen({
   onRetry,
   logs,
 }: AgentObserveScreenProps) {
+  const t = useTranslations("agentObservation.logs");
   if (latest) return <>{logs}</>;
   return (
     <Panel
-      title="Log"
+      title={t("log")}
       icon={<ScrollTextIcon className="size-4" />}
       loading={loading}
       error={error}
       onRetry={onRetry}
       empty={{
         icon: <TerminalIcon className="size-5" />,
-        title: "No runs yet",
-        description:
-          "Use Run now above. The newest run's log streams here; every run is on the Runs tab.",
+        title: t("noRuns"),
+        description: t("noRunsDescription"),
         actionHref: agentTabHref(slug, "runs"),
-        actionLabel: "Runs",
+        actionLabel: t("runs"),
       }}
     />
   );

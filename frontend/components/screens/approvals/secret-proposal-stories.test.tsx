@@ -1,5 +1,6 @@
+import { runStory } from "@/test/run-story";
 import { composeStories, setProjectAnnotations } from "@storybook/react";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import * as preview from "../../../.storybook/preview";
 import * as stories from "./SecretProposalDetail.stories";
@@ -12,7 +13,7 @@ describe("Secret proposal portable stories", () => {
     const canvasElement = document.createElement("div");
     document.body.append(canvasElement);
     try {
-      await Story.run({ canvasElement, testingLibraryRender: render });
+      await runStory(Story, canvasElement);
       expect(canvasElement.childElementCount).toBeGreaterThan(0);
     } finally {
       cleanup();
@@ -30,7 +31,7 @@ for (const [screen, fixtures] of Object.entries({
       const canvasElement = document.createElement("div");
       document.body.append(canvasElement);
       try {
-        await Story.run({ canvasElement, testingLibraryRender: render });
+        await runStory(Story, canvasElement);
         expect(canvasElement.childElementCount).toBeGreaterThan(0);
       } finally {
         cleanup();

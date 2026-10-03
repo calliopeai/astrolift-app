@@ -1,4 +1,5 @@
-import { cleanup, render } from "@testing-library/react";
+import { runStory } from "@/test/run-story";
+import { cleanup } from "@testing-library/react";
 import { composeStories, setProjectAnnotations } from "@storybook/react";
 import { describe, expect, it } from "vitest";
 import * as preview from "../../../../.storybook/preview";
@@ -11,7 +12,7 @@ describe("cluster registration portable stories", () => {
       const canvasElement = document.createElement("div");
       document.body.append(canvasElement);
       try {
-        await Story.run({ canvasElement, testingLibraryRender: render });
+        await runStory(Story, canvasElement);
         expect(canvasElement.childElementCount).toBeGreaterThan(0);
       } finally {
         cleanup();

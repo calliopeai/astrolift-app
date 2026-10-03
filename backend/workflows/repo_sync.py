@@ -10,6 +10,7 @@ from django.db import transaction
 from astrolift_manifest.parser import ManifestError
 from workflows.manifest import ParsedWorkflowManifest, _fan_out_columns, parse_workflow_manifest
 from workflows.models import WorkflowDefinition, WorkflowStage
+from workflows.target_references import references_filter
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -137,12 +138,15 @@ def reconcile_repository_workflows(
                 )
             workload = None
             if spec.agent:
-                workload = Workload.objects.filter(
-                    registered_app__organization=organization,
-                    slug=spec.agent,
-                    kind=Workload.Kind.AGENT,
-                    deleted_at__isnull=True,
-                ).first()
+                workload = (
+                    Workload.objects.filter(
+                        registered_app__organization=organization,
+                        kind=Workload.Kind.AGENT,
+                        deleted_at__isnull=True,
+                    )
+                    .filter(references_filter([spec.agent]))
+                    .first()
+                )
             fan_out_count, fan_out_dynamic = _fan_out_columns(spec.fan_out)
             stage.kind = spec.kind
             stage.role = spec.role
