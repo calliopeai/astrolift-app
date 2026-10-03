@@ -1843,6 +1843,34 @@ export type AstroliftCiWorkflowSyncStatusMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftClusterAgentInstall = {
+  clusterId: Scalars['GUID']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  deploymentConfirmed: Scalars['Boolean']['output'];
+  errorCode: Scalars['String']['output'];
+  errorMessage: Scalars['String']['output'];
+  heartbeatConfirmed: Scalars['Boolean']['output'];
+  id: Scalars['GUID']['output'];
+  requestId: Scalars['String']['output'];
+  retryable: Scalars['Boolean']['output'];
+  secretConfirmed: Scalars['Boolean']['output'];
+  status: ClusterAgentInstallStatus;
+  updatedAt: Scalars['DateTime']['output'];
+  workflowId: Scalars['String']['output'];
+};
+
+export type AstroliftClusterAgentInstallMutationResult = {
+  data?: Maybe<AstroliftClusterAgentInstall>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftClusterAgentInstallReview = {
+  clusterId: Scalars['GUID']['output'];
+  source: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
 export type AstroliftClusterAuthSource = {
   providerPluginId: Scalars['GUID']['output'];
   providerPoolId: Scalars['String']['output'];
@@ -1984,6 +2012,48 @@ export type AstroliftClusterLiveState = {
   podTotal?: Maybe<Scalars['Int']['output']>;
   podsByNamespace: Scalars['JSON']['output'];
   status: Scalars['String']['output'];
+};
+
+export type AstroliftClusterLogCollectorOperation = {
+  activatedAt?: Maybe<Scalars['DateTime']['output']>;
+  activatedClusterVersion?: Maybe<Scalars['Int']['output']>;
+  cleanupPending: Scalars['Boolean']['output'];
+  clusterId: Scalars['GUID']['output'];
+  coverage: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  deadline: Scalars['DateTime']['output'];
+  errorCode: Scalars['String']['output'];
+  errorMessage: Scalars['String']['output'];
+  expectedSource: Scalars['String']['output'];
+  expectedVersion: Scalars['Int']['output'];
+  id: Scalars['GUID']['output'];
+  postLossVerifiedAt?: Maybe<Scalars['DateTime']['output']>;
+  readerPolicy: Scalars['JSON']['output'];
+  requestId: Scalars['String']['output'];
+  retentionDays: Scalars['Int']['output'];
+  retryable: Scalars['Boolean']['output'];
+  stage: Scalars['String']['output'];
+  status: ClusterLogCollectorStatus;
+  updatedAt: Scalars['DateTime']['output'];
+  workflowId: Scalars['String']['output'];
+};
+
+export type AstroliftClusterLogCollectorOperationMutationResult = {
+  data?: Maybe<AstroliftClusterLogCollectorOperation>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftClusterLogCollectorReview = {
+  clusterId: Scalars['GUID']['output'];
+  message: Scalars['String']['output'];
+  policy: Scalars['JSON']['output'];
+  readerPolicy: Scalars['JSON']['output'];
+  refusalCode: Scalars['String']['output'];
+  retentionDays: Scalars['Int']['output'];
+  source: Scalars['String']['output'];
+  supported: Scalars['Boolean']['output'];
+  version: Scalars['Int']['output'];
 };
 
 export type AstroliftClusterPodPhase = {
@@ -6091,12 +6161,33 @@ export type CloudOrphanType = {
   reason: Scalars['String']['output'];
 };
 
+export type ClusterAgentInstallStatus =
+  | 'AWAITING_HEARTBEAT'
+  | 'INSTALLING'
+  | 'QUEUED'
+  | 'REFUSED'
+  | 'SUCCEEDED'
+  | 'UNCERTAIN';
+
 export type ClusterAuthUserRefInput = {
   clusterId: Scalars['GUID']['input'];
   expectedSource: InputMaybe<ExpectedClusterAuthSourceInput>;
   expectedUserId: InputMaybe<Scalars['String']['input']>;
   username: Scalars['String']['input'];
 };
+
+export type ClusterLogCollectorStatus =
+  | 'ACTIVATED'
+  | 'INGESTION_PENDING'
+  | 'INSTALLING'
+  | 'POST_LOSS_READ_PENDING'
+  | 'PREPARING'
+  | 'PROBE_DELETION_PENDING'
+  | 'QUEUED'
+  | 'READER_GRANT_PENDING'
+  | 'READINESS_PENDING'
+  | 'REFUSED'
+  | 'UNCERTAIN';
 
 export type ClusterModelDensity = {
   capacity: ModelClusterCapacity;
@@ -6925,6 +7016,22 @@ export type ImportWorkflowManifestResult = {
   repointedSlugs: Array<Scalars['String']['output']>;
 };
 
+export type InstallClusterAgentInput = {
+  clusterId: Scalars['GUID']['input'];
+  expectedSource: Scalars['String']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  intervalSeconds: InputMaybe<Scalars['Int']['input']>;
+  requestId: Scalars['String']['input'];
+};
+
+export type InstallClusterLogCollectorInput = {
+  clusterId: Scalars['GUID']['input'];
+  expectedSource: Scalars['String']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  requestId: Scalars['String']['input'];
+  retentionDays: Scalars['Int']['input'];
+};
+
 export type InstallClusterPrereqsInputType = {
   clusterId: Scalars['GUID']['input'];
   optionOverrides: Array<BootstrapOptionOverride>;
@@ -7278,6 +7385,7 @@ export type Mutation = {
   astroliftAnonymizeUser: AstroliftAnonymizeUserPayloadMutationResult;
   astroliftConnectUserSourceProvider: AstroliftConnectUserSourceProviderPayloadMutationResult;
   astroliftDisconnectUserSourceProvider: AstroliftDisconnectUserSourceProviderPayloadMutationResult;
+  astroliftInstallClusterLogCollector: AstroliftClusterLogCollectorOperationMutationResult;
   attachAgentSecretBundle: AstroliftAgentSecretBundleAttachmentMutationResult;
   attachProjectManagedService: AstroliftManagedServiceAttachmentMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
@@ -7408,6 +7516,7 @@ export type Mutation = {
   /** Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled, org-scoped WorkflowDefinition + stages in the caller's org and returns the (possibly uniquified) slug. replace=true instead upserts the org's own definition sharing the manifest's slug: in place when the stage kinds are unchanged (configured Workflows, bindings and schedules all keep working untouched), otherwise as a new version with every configured Workflow repointed to it, or a clear refusal when a repoint would break one's bindings. */
   importWorkflowManifest: ImportWorkflowManifestResult;
   installAstroliftSourceWebhook: AstroliftInstallSourceWebhookPayloadMutationResult;
+  installClusterAgent: AstroliftClusterAgentInstallMutationResult;
   installClusterPrereqs: AstroliftTenantClusterMutationResult;
   installScmWebhook: AstroliftScmWebhookInstallationMutationResult;
   issueClusterAgentKey: ClusteragentkeyissuedpayloadMutationResult;
@@ -7789,6 +7898,11 @@ export type MutationAstroliftConnectUserSourceProviderArgs = {
 
 export type MutationAstroliftDisconnectUserSourceProviderArgs = {
   input: DisconnectUserSourceProviderInput;
+};
+
+
+export type MutationAstroliftInstallClusterLogCollectorArgs = {
+  input: InstallClusterLogCollectorInput;
 };
 
 
@@ -8428,6 +8542,11 @@ export type MutationImportWorkflowManifestArgs = {
 
 export type MutationInstallAstroliftSourceWebhookArgs = {
   input: InstallSourceWebhookInput;
+};
+
+
+export type MutationInstallClusterAgentArgs = {
+  input: InstallClusterAgentInput;
 };
 
 
@@ -10094,6 +10213,8 @@ export type Query = {
   astroliftAvailableRepos: AstroliftRemoteRepoList;
   astroliftBudgets: Array<AstroliftBudget>;
   astroliftCluster?: Maybe<AstroliftTenantCluster>;
+  astroliftClusterAgentInstall: AstroliftClusterAgentInstall;
+  astroliftClusterAgentInstallReview: AstroliftClusterAgentInstallReview;
   astroliftClusterAuthUsers?: Maybe<AstroliftClusterAuthUsers>;
   astroliftClusterBootstrapPlan?: Maybe<AstroliftClusterBootstrapPlan>;
   astroliftClusterCertificates: AstroliftClusterCertificates;
@@ -10101,6 +10222,8 @@ export type Query = {
   astroliftClusterHealth?: Maybe<AstroliftClusterHealth>;
   astroliftClusterLifecycleAudit: Array<AstroliftClusterLifecycleAuditEntry>;
   astroliftClusterLiveState?: Maybe<AstroliftClusterLiveState>;
+  astroliftClusterLogCollectorOperation: AstroliftClusterLogCollectorOperation;
+  astroliftClusterLogCollectorReview: AstroliftClusterLogCollectorReview;
   astroliftClusterModelDensity?: Maybe<ClusterModelDensity>;
   astroliftClusterPrometheusMetrics: AstroliftClusterPrometheusMetrics;
   astroliftClusterPrometheusRangeMetrics: AstroliftClusterPrometheusRangeMetrics;
@@ -11001,6 +11124,16 @@ export type QueryAstroliftClusterArgs = {
 };
 
 
+export type QueryAstroliftClusterAgentInstallArgs = {
+  installId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftClusterAgentInstallReviewArgs = {
+  clusterId: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftClusterAuthUsersArgs = {
   clusterId: Scalars['GUID']['input'];
   search?: Scalars['String']['input'];
@@ -11031,6 +11164,17 @@ export type QueryAstroliftClusterLifecycleAuditArgs = {
 
 export type QueryAstroliftClusterLiveStateArgs = {
   clusterId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftClusterLogCollectorOperationArgs = {
+  operationId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftClusterLogCollectorReviewArgs = {
+  clusterId: Scalars['GUID']['input'];
+  retentionDays?: Scalars['Int']['input'];
 };
 
 

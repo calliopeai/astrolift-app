@@ -2,6 +2,37 @@
 
 ## Unreleased
 
+
+- Install private-cluster agents from the control-plane worker using an exact
+  reviewed cluster/provider source and durable request identity. Keep the old
+  agent until a verified candidate heartbeat; refuse foreign resource adoption
+  and expose uncertain retirement without losing successful activation (#1696).
+
+- Add reviewed, durable EKS CloudWatch log-collector installation with original
+  request, credential and source fencing. Activate historical reads only after
+  owned probe ingestion, confirmed deletion and verified post-deletion reads.
+  Preserve external backends and IAM policies; report Linux EC2 coverage and
+  explicit pending or uncertain outcomes (#1706).
+
+- Render checksum-verified collector charts with a pinned Helm runtime in backend
+  images and native CI checks. Confine stream discovery and historical reader
+  grants to the exact log-group IAM ARN; retain plain physical/tagging identity
+  and explicit stream-only write grants (#1706).
+
+- Use the registered cluster's AWS role and external ID for historical reads;
+  refuse conflicting overrides or failed assumptions without ambient-credential
+  fallback. Collector installation receipts do not establish ongoing health,
+  tracing, Fargate coverage or production ingestion (#1706).
+
+- Advertise reviewed agent and collector installation API availability through
+  public capability discovery. Operator permission, provider support, required
+  configuration and collector health remain separately checked (#1696, #1706).
+
+- Settle final registered-agent dispatch exhaustion and platform timeouts through
+  the locked task/completion outbox after confirmed cleanup of original placement.
+  Preserve activity retries, original execution provenance, prior terminal results
+  and Temporal replay; uncertain cleanup remains durably pending (#2234).
+
 - Treat generated GraphQL JSON values as untrusted arbitrary JSON, including
   array-valued policy conditions. Narrow event-source records before reading
   fields and display scalar event payloads without object-only assumptions

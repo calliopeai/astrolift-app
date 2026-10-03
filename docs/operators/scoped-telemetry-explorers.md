@@ -29,6 +29,19 @@ platform's namespace/app selector contract. Transport configuration and authenti
 remain operator controlled. A zero-result query does not establish that ingestion or
 retention is configured correctly. This change adds no collector deployment (#1706).
 
+For CloudWatch, set `log_driver: cloudwatch_logs` and `log_config.log_group` plus
+`log_config.region`. The reader uses the registered cluster's `credential` declaration,
+including its assumed role and external ID; that role needs `logs:FilterLogEvents`
+on the exact group's IAM ARN ending in `:*`. Group identity and tagging retain the
+unsuffixed ARN; the suffix does not wildcard the group name. See
+[AWS log-group ARN forms](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_LogGroup.html).
+Without an explicit declaration it uses the control plane's
+ambient identity. Legacy `log_config.role_arn` remains supported on ambient registrations.
+Do not combine it with an explicit cluster credential: remove the legacy override
+before enabling the registered identity. Conflicting declarations and failed role
+assumption are refused, with no ambient fallback. A collector's write-only IRSA role
+is not a reader role.
+
 ## Trusted trace attribution
 
 Configure `trace_driver: tempo` and `trace_config.endpoint` only after the collector is
@@ -100,3 +113,9 @@ not configured collectors. Existing legacy trace array fields retain their shape
 permissions but now use the same guarded attribution path. No new CLI trace command,
 cluster-wide search, export, service map, automatic tracing setup, or completed live
 collector verification is claimed by this batch.
+
+Reviewed worker-side installation APIs advertise
+`clusters.reviewed_agent_install` and `clusters.reviewed_log_collector_install`.
+These keys indicate available API contracts; admission still checks current
+operator authority, provider support and required installation configuration.
+An installation receipt does not establish ongoing collector health or tracing.

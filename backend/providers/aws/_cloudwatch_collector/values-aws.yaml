@@ -1,0 +1,92 @@
+# Pinned upstream chart: upstream-chart.json. Full Kubernetes records are
+# required by the scoped CloudWatch reader; application JSON stays in log.
+
+image:
+  repository: cr.fluentbit.io/fluent/fluent-bit
+  tag: "5.1.2"
+
+serviceAccount:
+  create: true
+  name: fluent-bit
+  automountServiceAccountToken: true
+  annotations:
+    eks.amazonaws.com/role-arn: ""
+
+cloudwatch:
+  region: ""
+  logGroup: ""
+
+rbac:
+  create: true
+  nodeAccess: false
+  eventsAccess: false
+
+testFramework:
+  enabled: false
+
+nodeSelector:
+  kubernetes.io/os: linux
+
+tolerations:
+  - operator: Exists
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
+
+# Run as DaemonSet — one pod per node tailing /var/log/containers.
+kind: DaemonSet
+
+config:
+  service: |
+    {{- $role := required "Set serviceAccount.annotations eks.amazonaws.com/role-arn from collector_contract.irsa_role_arn" (index .Values.serviceAccount.annotations "eks.amazonaws.com/role-arn") }}
+    [SERVICE]
+        Daemon Off
+        Flush 5
+        Log_Level info
+        Parsers_File /fluent-bit/etc/parsers.conf
+        HTTP_Server On
+        HTTP_Listen 0.0.0.0
+        HTTP_Port 2020
+        Health_Check On
+
+  inputs: |
+    [INPUT]
+        Name tail
+        Path /var/log/containers/*.log
+        multiline.parser docker, cri
+        Tag kube.*
+        Mem_Buf_Limit 50MB
+        Skip_Long_Lines On
+
+  filters: |
+    [FILTER]
+        Name kubernetes
+        Match kube.*
+        Merge_Log Off
+        Keep_Log On
+        K8S-Logging.Parser Off
+        K8S-Logging.Exclude Off
+        Annotations Off
+        Labels On
+
+  outputs: |
+    [OUTPUT]
+        Name cloudwatch_logs
+        Match kube.*
+        region ${AWS_REGION}
+        log_group_name ${LOG_GROUP_NAME}
+        log_stream_prefix from-fluent-bit-
+        auto_create_group Off
+        Retry_Limit False
+        workers 4
+
+envWithTpl:
+  - name: AWS_REGION
+    value: '{{ required "Set cloudwatch.region from collector_contract.region" .Values.cloudwatch.region }}'
+  - name: LOG_GROUP_NAME
+    value: '{{ required "Set cloudwatch.logGroup from collector_contract.log_group_name" .Values.cloudwatch.logGroup }}'

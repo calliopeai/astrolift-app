@@ -111,6 +111,14 @@ def resolve_log_query_driver(cluster: TenantCluster) -> Any | None:
         )
 
     if driver_kind == "cloudwatch_logs":
+        from core.cluster_credentials import credential_for_cluster
+
+        credential = credential_for_cluster(cluster)
+        if not credential.is_ambient and log_config.get("role_arn"):
+            raise ValueError(
+                "CloudWatch logs cannot combine a cluster credential and log_config.role_arn; "
+                "remove the legacy log role override to use the registered cluster credential"
+            )
         try:
             from _sdk.observability.cloudwatch_logs import (
                 CloudWatchLogsConfig,
@@ -136,6 +144,7 @@ def resolve_log_query_driver(cluster: TenantCluster) -> Any | None:
                 region=region,
                 log_stream_name_prefix=(log_config.get("log_stream_name_prefix") or None),
                 role_arn=(log_config.get("role_arn") or None),
+                credential=credential,
             )
         )
 

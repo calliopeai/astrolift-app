@@ -20,6 +20,7 @@ from astrolift_dispatch.spawners import registry
 from astrolift_dispatch.spawners.base import SpawnResult, TaskStatus
 from astrolift_dispatch.spawners.k8s_job import K8sJobSpawner
 from astrolift_workflows.activities import agent_stage
+from astrolift_workflows.activities.agent_dispatch_finalization import finalize_agent_dispatch
 from astrolift_workflows.inputs import Actor, DispatchAgentTaskInput
 from astrolift_workflows.workflows.dispatch_agent_task import DispatchAgentTaskWorkflow
 
@@ -165,7 +166,11 @@ async def test_worker_replacement_keeps_task_and_container(
             temporal_env.client,
             task_queue=queue,
             workflows=[DispatchAgentTaskWorkflow, StageRecoveryWorkflow],
-            activities=[agent_stage.dispatch_agent_task, agent_stage.execute_agent_stage],
+            activities=[
+                agent_stage.dispatch_agent_task,
+                agent_stage.execute_agent_stage,
+                finalize_agent_dispatch,
+            ],
             max_heartbeat_throttle_interval=timedelta(milliseconds=50),
             # Require the replacement to replay durable history. The Java test
             # server can strand a sticky workflow task at the stopped worker.
@@ -177,7 +182,7 @@ async def test_worker_replacement_keeps_task_and_container(
             handle = await temporal_env.client.start_workflow(
                 DispatchAgentTaskWorkflow.run,
                 DispatchAgentTaskInput(agent_task_id=task.pk, actor=Actor(kind="system")),
-                id=queue,
+                id=f"DispatchAgentTaskWorkflow-{task.guid}",
                 task_queue=queue,
             )
         else:

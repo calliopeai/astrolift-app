@@ -17,7 +17,7 @@ import hashlib
 import logging
 import secrets
 from collections.abc import Callable, Mapping
-from typing import Any
+from typing import Any, cast
 
 import strawberry
 from django.db import transaction
@@ -709,6 +709,7 @@ class ClustersMutation:
         Permission.CLUSTER_MANAGE, scope=cluster_org_scope(Permission.CLUSTER_MANAGE, "input.cluster_id")
     )
     @tenant_scoped()
+    @transaction.atomic
     def issue_cluster_agent_key(
         self, info: Info, input: IssueClusterAgentKeyInput
     ) -> MutationResultType[_ClusterAgentKeyIssuedPayload]:
@@ -726,11 +727,15 @@ class ClustersMutation:
         """
 
         tenant = get_current_tenant()
-        cluster = TenantCluster.objects.filter(
-            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
-            guid=str(input.cluster_id),
-            deleted_at__isnull=True,
-        ).first()
+        cluster = (
+            TenantCluster.objects.select_for_update()
+            .filter(
+                Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+                guid=str(input.cluster_id),
+                deleted_at__isnull=True,
+            )
+            .first()
+        )
         _require_operator_for_shared(info, cluster, Permission.CLUSTER_MANAGE)
         if cluster is None:
             return gql_failure(
@@ -739,11 +744,40 @@ class ClustersMutation:
                 field="clusterId",
             )
 
+        from astrolift_clusters.agent_install import AgentInstallError, _caller_gate, installation_busy
+
+        try:
+            _caller_gate(cluster, _caller(info))
+        except AgentInstallError as error:
+            return gql_failure(error.code, str(error))
+        if installation_busy(cluster):
+            return cast(
+                MutationResultType[_ClusterAgentKeyIssuedPayload],
+                gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    "A server-owned installation is pending; resume its original request",
+                ),
+            )
+
         rotated = bool(cluster.agent_key_hash)
         raw_key = secrets.token_hex(32)  # 256-bit, 64 hex chars
         cluster.agent_key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
 
-        update_fields = ["agent_key_hash", "updated_at", "version"]
+        # An explicit legacy rotation switches back to the local fixed-Secret
+        # contract. Retained server-owned Secrets are never edited or deleted.
+        cluster.agent_secret_name = ""
+        cluster.agent_secret_uid = ""
+        cluster.agent_deployment_uid = ""
+        cluster.agent_deployment_name = ""
+        update_fields = [
+            "agent_key_hash",
+            "agent_secret_name",
+            "agent_secret_uid",
+            "agent_deployment_uid",
+            "agent_deployment_name",
+            "updated_at",
+            "version",
+        ]
         if input.interval_seconds is not None:
             # Clamp to the AC ceiling (<=60s) and a sane floor so a typo
             # can't make the agent hot-loop or look perpetually offline.
@@ -778,6 +812,7 @@ class ClustersMutation:
         Permission.CLUSTER_MANAGE, scope=cluster_org_scope(Permission.CLUSTER_MANAGE, "input.cluster_id")
     )
     @tenant_scoped()
+    @transaction.atomic
     def deploy_cluster_agent(
         self, info: Info, input: DeployClusterAgentInput
     ) -> MutationResultType[TenantClusterType]:
@@ -802,11 +837,15 @@ class ClustersMutation:
         from core.cluster_management import ClusterManagementError, deploy_agent_dispatch
 
         tenant = get_current_tenant()
-        cluster = TenantCluster.objects.filter(
-            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
-            guid=str(input.cluster_id),
-            deleted_at__isnull=True,
-        ).first()
+        cluster = (
+            TenantCluster.objects.select_for_update()
+            .filter(
+                Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+                guid=str(input.cluster_id),
+                deleted_at__isnull=True,
+            )
+            .first()
+        )
         _require_operator_for_shared(info, cluster, Permission.CLUSTER_MANAGE)
         if cluster is None:
             return gql_failure(
@@ -814,6 +853,21 @@ class ClustersMutation:
                 f"cluster {input.cluster_id!r} not found",
                 field="clusterId",
             )
+        from astrolift_clusters.agent_install import AgentInstallError, _caller_gate, installation_busy
+
+        try:
+            _caller_gate(cluster, _caller(info))
+        except AgentInstallError as error:
+            return gql_failure(error.code, str(error))
+        if installation_busy(cluster):
+            return cast(
+                MutationResultType[TenantClusterType],
+                gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    "A server-owned installation is pending; resume its original request",
+                ),
+            )
+
         if not cluster.agent_key_hash:
             return gql_failure(
                 ErrorCode.PRECONDITION.value,

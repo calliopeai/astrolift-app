@@ -295,6 +295,7 @@ def test_organization_grant_reaches_own_resources_with_selected_sibling_team(wor
 
 @contextmanager
 def _token(world, *, team=None, scopes=None, org=None):
+    Member.objects.get_or_create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
     token = ApiToken.objects.create(
         user=world.user,
         organization=org or world.org,
@@ -445,6 +446,24 @@ def test_org_bearer_admin_token_allows_own_cluster_write(world):
     assert result.ok, result
     world.cluster.refresh_from_db()
     assert world.cluster.agent_key_hash
+
+
+@pytest.mark.parametrize("name", ["issue_cluster_agent_key", "deploy_cluster_agent"])
+@pytest.mark.parametrize("shared", [False, True])
+def test_withdrawn_bearer_membership_refuses_legacy_agent_writes_before_effects(world, name, shared):
+    _grant(world)
+    world.user.is_superuser = shared
+    world.user.save(update_fields=["is_superuser"])
+    if shared:
+        world.cluster.organization = None
+        world.cluster.save(update_fields=["organization", "updated_at", "version"])
+    Member.objects.create(user=world.user, scope_kind="ORG", scope_id=world.org.pk, is_active=False)
+    before = _business_rows()
+    with _tenant(world), _token(world):
+        result = getattr(mut.ClustersMutation(), name)(make_info(world.user), **_kwargs(world, name))
+    assert not result.ok and result.errors[0].code == "PERMISSION_DENIED", result
+    assert _business_rows() == before
+    assert world.queued == []
 
 
 def test_foreign_org_bearer_cannot_reuse_an_active_org_role(world):

@@ -15,6 +15,14 @@ RUN pip install --upgrade pip pipenv wheel
 
 WORKDIR /astrolift
 
+# Render only verified collector archives offline. Both image architectures
+# install a checksum-pinned executable; no runtime download or local kubeconfig.
+COPY scripts/install_helm.py /tmp/install_helm.py
+COPY providers/aws/_cloudwatch_collector/helm-runtime.json /tmp/helm-runtime.json
+RUN python /tmp/install_helm.py /tmp/helm-runtime.json \
+    && helm version --short \
+    && rm /tmp/install_helm.py /tmp/helm-runtime.json
+
 COPY Pipfile Pipfile.lock ./
 RUN pipenv requirements --dev > requirements.txt && pip install -r requirements.txt
 

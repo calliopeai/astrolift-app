@@ -1,0 +1,7 @@
+{
+  "name": "fluent-bit",
+  "repository": "https://fluent.github.io/helm-charts",
+  "version": "0.58.2",
+  "appVersion": "5.1.2",
+  "archiveSha256": "2404614ace4c7dc049b76fd39d13b695f7b66332c38095327ebaa8fc91f0b046"
+}
