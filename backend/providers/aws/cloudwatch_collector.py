@@ -74,7 +74,7 @@ class CollectorStage:
                 {
                     "Effect": "Allow",
                     "Action": ["logs:FilterLogEvents"],
-                    "Resource": self.log_group_arn,
+                    "Resource": self.log_group_arn + ":*",
                 }
             ],
         }
@@ -251,7 +251,7 @@ def _prepare(spec: CollectorSpec, client_factory: Callable[..., Any]) -> Collect
     policy = {
         "Version": "2012-10-17",
         "Statement": [
-            {"Effect": "Allow", "Action": ["logs:DescribeLogStreams"], "Resource": group_arn},
+            {"Effect": "Allow", "Action": ["logs:DescribeLogStreams"], "Resource": group_arn + ":*"},
             {
                 "Effect": "Allow",
                 "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],

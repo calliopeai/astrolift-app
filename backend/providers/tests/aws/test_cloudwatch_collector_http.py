@@ -170,7 +170,7 @@ def test_native_http_uses_shared_assumed_identity_and_exact_oidc_policies(wire):
     )
     [policy] = [kwargs for action, kwargs in calls if action == "PutRolePolicy"]
     statements = json.loads(policy["PolicyDocument"])["Statement"]
-    assert statements[0]["Resource"] == stage.log_group_arn
+    assert statements[0]["Resource"] == stage.log_group_arn + ":*"
     assert statements[1]["Resource"] == stage.log_group_arn + ":log-stream:*"
     assert not stage.collector_installed and not stage.ingestion_verified
     assert stage.candidate_reader_config()["log_config"]["log_group"] == f"/astrolift/clusters/{GUID}/pods"

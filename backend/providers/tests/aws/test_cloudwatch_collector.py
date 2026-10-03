@@ -105,7 +105,7 @@ def test_prepares_exact_owned_identity_and_never_claims_installation(fixture):
     }
     policy = clients["iam"].get_role_policy(RoleName=ROLE, PolicyName=POLICY_NAME)["PolicyDocument"]
     assert policy["Statement"] == [
-        {"Effect": "Allow", "Action": ["logs:DescribeLogStreams"], "Resource": stage.log_group_arn},
+        {"Effect": "Allow", "Action": ["logs:DescribeLogStreams"], "Resource": stage.log_group_arn + ":*"},
         {
             "Effect": "Allow",
             "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
@@ -114,7 +114,7 @@ def test_prepares_exact_owned_identity_and_never_claims_installation(fixture):
     ]
     assert clients["logs"].describe_log_groups(logGroupNamePrefix=GROUP)["logGroups"][0]["retentionInDays"] == 30
     assert stage.reader_policy()["Statement"] == [
-        {"Effect": "Allow", "Action": ["logs:FilterLogEvents"], "Resource": stage.log_group_arn}
+        {"Effect": "Allow", "Action": ["logs:FilterLogEvents"], "Resource": stage.log_group_arn + ":*"}
     ]
     assert "role_arn" not in stage.candidate_reader_config()["log_config"]
     assert stage.component().default_enabled is False
