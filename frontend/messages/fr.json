@@ -5740,6 +5740,28 @@
         "servedIdentifier": "Identifiant du modèle servi",
         "manifestRevision": "SHA-256 du manifeste vérifié",
         "localLicenseReview": "J’ai examiné la licence et les droits de redistribution de ces fichiers locaux de modèle."
+      },
+      "inventory": {
+        "title": "Modèles hébergés",
+        "description": "Modèles déployés sur vos clusters. Ouvrez un modèle pour examiner les ressources, son état de disponibilité, les accès et les abonnements des apps.",
+        "addModel": "Ajouter un modèle",
+        "source": "Origine",
+        "local": "Fichiers locaux",
+        "huggingface": "Hugging Face",
+        "unknownSource": "Source inconnue",
+        "manifest": "SHA-256 du manifeste",
+        "revision": "Révision du modèle",
+        "resources": "Ressources demandées",
+        "resourceSummary": "{cpu} CPU · {memory} de mémoire · {gpu} GPU",
+        "access": "Accès des apps",
+        "shared": "Partagé",
+        "dedicated": "Dédié",
+        "dedicatedApp": "Dédié à {app}",
+        "unknownAccess": "Mode d’accès inconnu",
+        "settings": "Modifier les paramètres",
+        "settingsDescription": "Examinez les modifications du nom du modèle, des ressources et de l’accès des apps. Les modifications acceptées doivent encore être réconciliées.",
+        "overview": "Déploiement",
+        "readiness": "Dernière observation de disponibilité"
       }
     }
   },

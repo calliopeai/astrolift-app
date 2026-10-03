@@ -5817,6 +5817,28 @@
         "servedIdentifier": "Served model identifier",
         "manifestRevision": "Verified manifest SHA-256",
         "localLicenseReview": "I have reviewed the license and redistribution rights of these local model files."
+      },
+      "inventory": {
+        "title": "Hosted models",
+        "description": "Models deployed to your clusters. Open a model to review resources, readiness, access and app subscriptions.",
+        "addModel": "Add model",
+        "source": "Source",
+        "local": "Local files",
+        "huggingface": "Hugging Face",
+        "unknownSource": "Unknown source",
+        "manifest": "Manifest SHA-256",
+        "revision": "Model revision",
+        "resources": "Requested resources",
+        "resourceSummary": "{cpu} CPU · {memory} memory · {gpu} GPUs",
+        "access": "App access",
+        "shared": "Shared",
+        "dedicated": "Dedicated",
+        "dedicatedApp": "Dedicated to {app}",
+        "unknownAccess": "Access mode unknown",
+        "settings": "Edit settings",
+        "settingsDescription": "Review changes to the model name, resources and app access. Accepted changes still need reconciliation.",
+        "overview": "Deployment",
+        "readiness": "Last readiness observation"
       }
     }
   },

@@ -5740,6 +5740,28 @@
         "servedIdentifier": "Identificador del modelo servido",
         "manifestRevision": "SHA-256 del manifiesto verificado",
         "localLicenseReview": "He revisado la licencia y los derechos de redistribución de estos archivos locales del modelo."
+      },
+      "inventory": {
+        "title": "Modelos alojados",
+        "description": "Modelos desplegados en tus clústeres. Abre un modelo para revisar los recursos, su estado de disponibilidad, el acceso y las suscripciones de apps.",
+        "addModel": "Añadir modelo",
+        "source": "Origen",
+        "local": "Archivos locales",
+        "huggingface": "Hugging Face",
+        "unknownSource": "Origen desconocido",
+        "manifest": "SHA-256 del manifiesto",
+        "revision": "Revisión del modelo",
+        "resources": "Recursos solicitados",
+        "resourceSummary": "{cpu} CPU · {memory} de memoria · {gpu} GPU",
+        "access": "Acceso de apps",
+        "shared": "Compartido",
+        "dedicated": "Dedicado",
+        "dedicatedApp": "Dedicado a {app}",
+        "unknownAccess": "Modo de acceso desconocido",
+        "settings": "Editar ajustes",
+        "settingsDescription": "Revisa los cambios en el nombre del modelo, los recursos y el acceso de apps. Los cambios aceptados aún deben reconciliarse.",
+        "overview": "Despliegue",
+        "readiness": "Última observación de disponibilidad"
       }
     }
   },

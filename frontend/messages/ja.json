@@ -5737,6 +5737,28 @@
         "servedIdentifier": "配信されるモデルの識別子",
         "manifestRevision": "検証済みマニフェストの SHA-256",
         "localLicenseReview": "これらのローカルモデルファイルのライセンスと再配布権を確認しました。"
+      },
+      "inventory": {
+        "title": "ホストされたモデル",
+        "description": "クラスターにデプロイされたモデルです。モデルを開くと、リソース、稼働準備状況、アクセス、アプリのサブスクリプションを確認できます。",
+        "addModel": "モデルを追加",
+        "source": "ソース",
+        "local": "ローカルファイル",
+        "huggingface": "Hugging Face",
+        "unknownSource": "不明なソース",
+        "manifest": "マニフェストの SHA-256",
+        "revision": "モデルのリビジョン",
+        "resources": "要求リソース",
+        "resourceSummary": "CPU {cpu} · メモリ {memory} · GPU {gpu}",
+        "access": "アプリのアクセス",
+        "shared": "共有",
+        "dedicated": "専用",
+        "dedicatedApp": "{app} 専用",
+        "unknownAccess": "アクセスモード不明",
+        "settings": "設定を編集",
+        "settingsDescription": "モデル名、リソース、アプリのアクセスの変更を確認します。受理された変更は、実際の状態に反映するための調整が必要です。",
+        "overview": "デプロイ",
+        "readiness": "最新の稼働準備状況の観測"
       }
     }
   },
