@@ -10,6 +10,8 @@ operation / duration / status, fetch a single trace by id.
 
 from __future__ import annotations
 
+import json
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -94,14 +96,80 @@ class TempoTraceDriver(TraceDriver):
 
     @driver_op(driver="tempo_traces")
     def get_trace(self, trace_id: str) -> list[SpanRef]:
+        try:
+            return self._read_trace(trace_id)
+        except Exception:
+            # driver_op records exceptions. Never send provider payload-derived errors
+            # into its logs/OTel exception events (for example malformed timestamps).
+            raise RuntimeError("Tempo trace read failed") from None
+
+    def _read_trace(self, trace_id: str) -> list[SpanRef]:
         url = f"{self._config.base_url.rstrip('/')}/api/traces/{trace_id}"
         response = self._http.get(url)
         body = response.json() if hasattr(response, "json") else response
-        spans = body.get("spans", []) or self._extract_spans(body)
-        out: list[SpanRef] = []
-        for span in spans:
-            out.append(self._span_from_dict(span=span, trace_id=trace_id))
+        if body.get("spans"):
+            if len(body["spans"]) > 2000:
+                raise RuntimeError("Tempo trace exceeds the supported span bound")
+            return [self._span_from_dict(span=span, trace_id=trace_id) for span in body["spans"]]
+        out = []
+        batches = body.get("batches", []) or body.get("resourceSpans", []) or []
+        for batch in batches:
+            resource = self._attributes((batch.get("resource") or {}).get("attributes", []))
+            scopes = batch.get("scopeSpans", []) or batch.get("instrumentationLibrarySpans", []) or []
+            for scope in scopes:
+                for span in scope.get("spans", []) or []:
+                    out.append(self._span_from_dict(span=span, trace_id=trace_id, resource=resource))
+                    if len(out) > 2000:
+                        raise RuntimeError("Tempo trace exceeds the supported span bound")
         return out
+
+    def search_scoped(
+        self,
+        *,
+        resource_attributes,
+        since,
+        until,
+        limit=10,
+        service=None,
+        status=None,
+        trace_id=None,
+        operation=None,
+        min_duration_ms=None,
+    ):
+        if not resource_attributes:
+            raise ValueError("A trace search requires resource attribution")
+        predicates = [
+            f"resource.{json.dumps(key, ensure_ascii=False)} = {json.dumps(value, ensure_ascii=False)}"
+            for key, value in sorted(resource_attributes.items())
+        ]
+        if service:
+            predicates.append(f"resource.service.name = {json.dumps(service, ensure_ascii=False)}")
+        if operation:
+            predicates.append(f"span:name = {json.dumps(operation, ensure_ascii=False)}")
+        if min_duration_ms is not None:
+            predicates.append(f"span:duration >= {int(min_duration_ms)}ms")
+        if status in {"OK", "ERROR"}:
+            predicates.append(f"span:status = {status.lower()}")
+        if trace_id:
+            if not re.fullmatch(r"[0-9a-f]{32}", trace_id):
+                raise ValueError("Invalid trace identity")
+            predicates.append(f"trace:id = {json.dumps(trace_id)}")
+        response = self._http.get(
+            f"{self._config.base_url.rstrip('/')}/api/search",
+            params={
+                "q": "{ " + " && ".join(predicates) + " }",
+                "start": str(since),
+                "end": str(until),
+                "limit": str(min(max(limit, 1), 21)),
+            },
+        )
+        body = response.json() if hasattr(response, "json") else response
+        ids = []
+        for row in (body.get("traces") or [])[:21]:
+            identity = row.get("traceID", "")
+            if re.fullmatch(r"[0-9a-f]{32}", identity) and identity not in ids:
+                ids.append(identity)
+        return ids
 
     async def stream_spans(
         self,
@@ -123,40 +191,37 @@ class TempoTraceDriver(TraceDriver):
             for span in self.get_trace(trace.trace_id):
                 yield span
 
-    def _extract_spans(self, body: Any) -> list[Any]:
-        # Newer Tempo returns OTLP-shaped batches → flatten.
-        spans: list[Any] = []
-        for batch in body.get("batches", []) or []:
-            for ils in batch.get("instrumentationLibrarySpans", []) or []:
-                spans.extend(ils.get("spans", []) or [])
-        return spans
-
-    def _span_from_dict(self, *, span: dict[str, Any], trace_id: str) -> SpanRef:
+    @staticmethod
+    def _attributes(rows):
         attrs = {}
-        for attr in span.get("attributes", []) or []:
-            value = attr.get("value", {}) or {}
-            v = value.get("stringValue") or value.get("intValue") or value.get("boolValue") or ""
-            attrs[attr.get("key", "")] = str(v)
-        status_code = "UNSET"
-        status = span.get("status", {}) or {}
-        if status.get("code") == 1:
-            status_code = "OK"
-        elif status.get("code") == 2:
-            status_code = "ERROR"
+        for row in rows or []:
+            key = row.get("key", "")
+            value = row.get("value") or {}
+            values = [value[k] for k in ("stringValue", "intValue", "boolValue", "doubleValue") if k in value]
+            rendered = str(values[0]) if len(values) == 1 else ""
+            if key in attrs and attrs[key] != rendered:
+                attrs[key] = ""
+            else:
+                attrs[key] = rendered
+        return attrs
 
+    def _span_from_dict(self, *, span, trace_id, resource=None):
+        attrs = self._attributes(span.get("attributes"))
+        resource = dict(resource or {})
+        status_code = {1: "OK", 2: "ERROR"}.get((span.get("status") or {}).get("code"), "UNSET")
         start_ns = int(span.get("startTimeUnixNano", 0) or 0)
         end_ns = int(span.get("endTimeUnixNano", 0) or 0)
-        duration_ms = max((end_ns - start_ns) / 1_000_000, 0.0)
         return SpanRef(
-            trace_id=trace_id,
+            trace_id=span.get("traceId") or trace_id,
             span_id=span.get("spanId", ""),
             parent_span_id=span.get("parentSpanId") or None,
             operation=span.get("name", ""),
-            service=attrs.get("service.name", ""),
+            service=resource.get("service.name", attrs.get("service.name", "")),
             start_time=str(start_ns),
-            duration_ms=duration_ms,
+            duration_ms=max((end_ns - start_ns) / 1_000_000, 0.0),
             status_code=status_code,
             attributes=attrs,
+            resource_attributes=resource,
         )
 
 
@@ -185,14 +250,17 @@ class _DefaultHttp:
         full = url
         if params:
             full = f"{url}?{urlencode(params)}"
-        request = Request(full)
+        request = Request(full, headers={"Accept": "application/json"})
         if self._token:
             request.add_header("Authorization", f"Bearer {self._token}")
         if self._org_id:
             request.add_header("X-Scope-OrgID", self._org_id)
         try:
             with urlopen(request, timeout=self._timeout) as raw:
-                payload = raw.read().decode("utf-8")
+                payload_bytes = raw.read(8 * 1024 * 1024 + 1)
+                if len(payload_bytes) > 8 * 1024 * 1024:
+                    raise RuntimeError("Tempo response exceeds the supported size bound")
+                payload = payload_bytes.decode("utf-8")
         except HTTPError as exc:
             raise RuntimeError(
                 f"tempo HTTP {exc.code}: {exc.reason}",
