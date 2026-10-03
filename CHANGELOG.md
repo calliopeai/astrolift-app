@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Return the exact public deployment GUID in both legacy and paged timeline
+  ownership references, preserving authorization, paging and legacy limits
+  without per-row parent lookups (#2265).
+
 
 - Install private-cluster agents from the control-plane worker using an exact
   reviewed cluster/provider source and durable request identity. Keep the old
