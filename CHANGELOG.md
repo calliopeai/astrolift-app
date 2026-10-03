@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Translate pipeline lists, creation, details, secret management and run graphs
+  across all eight locales. Preserve repository, secret and stage identities,
+  drafts across language changes, raw server diagnostics and committed-write
+  recovery feedback (#2145).
+
 - Replace the static platform activity page with the permission-scoped Temporal
   execution viewer. Bind detail/history and confirmed cancel/terminate requests
   to the selected run ID, follow server cursor pages including empty authorized

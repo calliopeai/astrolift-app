@@ -2,6 +2,8 @@
 
 import { AlertTriangleIcon, KeyIcon, Loader2Icon, PlusIcon, Trash2Icon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -16,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { PipelineSecret } from "@/graphql/pipelines/pipelines.types";
 
-import { PIPELINE_SECRETS_SELECT } from "./pipelines-list";
+import { localizedPipelineList, PIPELINE_SECRETS_SELECT } from "./pipelines-list";
 import type { usePipelineSecrets } from "./use-pipeline-secrets";
 
 // ---------------------------------------------------------------------------
@@ -31,6 +33,7 @@ function AddSecretForm({
   onSave: (name: string, value: string) => Promise<boolean>;
   onDone: () => void;
 }) {
+  const t = useTranslations("PipelineUI");
   const [name, setName] = React.useState("");
   const [value, setValue] = React.useState("");
   const [saving, setSaving] = React.useState(false);
@@ -48,13 +51,11 @@ function AddSecretForm({
 
   return (
     <form onSubmit={handleSubmit} className="bg-muted/30 flex flex-col gap-3 rounded-md border p-4">
-      <p className="text-muted-foreground text-xs">
-        Secret values are write-only. Once saved, the value cannot be retrieved.
-      </p>
+      <p className="text-muted-foreground text-xs">{t("secrets.formNotice")}</p>
       <div className="flex gap-3">
         <div className="flex-1 space-y-1">
           <Label htmlFor="secret-name" className="text-xs">
-            Name
+            {t("name")}
           </Label>
           <Input
             id="secret-name"
@@ -70,7 +71,7 @@ function AddSecretForm({
         </div>
         <div className="flex-1 space-y-1">
           <Label htmlFor="secret-value" className="text-xs">
-            Value
+            {t("secrets.value")}
           </Label>
           <Input
             id="secret-value"
@@ -87,10 +88,14 @@ function AddSecretForm({
       </div>
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" size="sm" onClick={onDone} disabled={saving}>
-          Cancel
+          {t("secrets.cancel")}
         </Button>
         <Button type="submit" size="sm" disabled={saving || !name.trim() || !value}>
-          {saving ? <Loader2Icon className="size-4 animate-spin" /> : "Save secret"}
+          {saving ? (
+            <Loader2Icon className="size-4 animate-spin" aria-label={t("secrets.saving")} />
+          ) : (
+            t("secrets.save")
+          )}
         </Button>
       </div>
     </form>
@@ -114,6 +119,8 @@ export function PipelineSecretsView({
   saveSecret,
   deleteSecret,
 }: PipelineSecretsViewProps & { list: ListStateController }) {
+  const t = useTranslations("PipelineUI");
+  const fmt = useFormatters();
   const [addOpen, setAddOpen] = React.useState(false);
   const [deleteTarget, setDeleteTarget] = React.useState<PipelineSecret | null>(null);
   const { state } = list;
@@ -132,7 +139,7 @@ export function PipelineSecretsView({
   const columns: Column<PipelineSecret>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("name"),
       sortKey: "name",
       cellClassName: "max-w-80",
       cell: (s) => (
@@ -143,26 +150,26 @@ export function PipelineSecretsView({
     },
     {
       id: "value",
-      header: "Value",
+      header: t("secrets.value"),
       cell: () => (
         <Badge variant="secondary" className="text-2xs font-mono">
-          Value set
+          {t("secrets.valueSet")}
         </Badge>
       ),
     },
     {
       id: "created",
-      header: "Created",
+      header: t("secrets.created"),
       sortKey: "created",
       cellClassName: "text-muted-foreground font-mono text-xs",
-      cell: (s) => new Date(s.createdAt).toLocaleString(),
+      cell: (s) => fmt.formatDateTime(s.createdAt),
     },
     {
       id: "updated",
-      header: "Updated",
+      header: t("secrets.updated"),
       sortKey: "updated",
       cellClassName: "text-muted-foreground font-mono text-xs",
-      cell: (s) => new Date(s.updatedAt).toLocaleString(),
+      cell: (s) => fmt.formatDateTime(s.updatedAt),
     },
   ];
 
@@ -172,11 +179,13 @@ export function PipelineSecretsView({
       <div className="bg-warning/5 border-warning-border flex items-start gap-3 rounded-md border p-3">
         <AlertTriangleIcon className="text-warning-fg mt-0.5 size-4 shrink-0" />
         <div className="text-xs">
-          <p className="font-medium">Secret values are write-only.</p>
+          <p className="font-medium">{t("secrets.noticeTitle")}</p>
           <p className="text-muted-foreground mt-0.5">
-            Once saved, values cannot be retrieved. Reference secrets in your pipeline TOML using{" "}
-            <code className="bg-muted rounded px-1 font-mono">{"${secrets.NAME}"}</code>. Never
-            paste secret values directly into the TOML.
+            {t.rich("secrets.noticeDescription", {
+              reference: () => (
+                <code className="bg-muted rounded px-1 font-mono">{"${secrets.NAME}"}</code>
+              ),
+            })}
           </p>
         </div>
       </div>
@@ -186,8 +195,8 @@ export function PipelineSecretsView({
 
       <ListPage<PipelineSecret>
         embedded
-        list={list}
-        label="Secrets"
+        list={{ ...list, definition: localizedPipelineList(list.definition, t) }}
+        label={t("tabs.secrets")}
         columns={columns}
         rows={page.rows}
         getRowId={(s) => s.id}
@@ -199,7 +208,7 @@ export function PipelineSecretsView({
               onSelect={() => setDeleteTarget(s)}
             >
               <Trash2Icon className="size-4" />
-              Delete {s.name}
+              {t("secrets.deleteNamed", { name: s.name })}
             </DropdownMenuItem>
           </Can>
         )}
@@ -209,8 +218,8 @@ export function PipelineSecretsView({
         totalCount={page.totalCount}
         empty={{
           icon: <KeyIcon className="size-5" />,
-          title: "No secrets",
-          description: "Add a secret to make it available in this pipeline via ${secrets.NAME}.",
+          title: t("secrets.empty"),
+          description: t("secrets.emptyDescription", { reference: "${secrets.NAME}" }),
         }}
       />
 
@@ -219,7 +228,7 @@ export function PipelineSecretsView({
         <Can permission={{ allOf: ["pipeline.secret_manage", "secret.write"] }} loading={<></>}>
           <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
             <PlusIcon className="size-4" />
-            Add secret
+            {t("secrets.add")}
           </Button>
         </Can>
       )}
@@ -229,9 +238,13 @@ export function PipelineSecretsView({
         onOpenChange={(next) => {
           if (!next) setDeleteTarget(null);
         }}
-        title={deleteTarget ? `Delete "${deleteTarget.name}"?` : "Delete secret?"}
-        description="This will permanently remove the secret. Any pipeline jobs that reference it will fail until you set a replacement value."
-        confirmLabel="Delete"
+        title={
+          deleteTarget
+            ? t("secrets.deleteTitle", { name: deleteTarget.name })
+            : t("secrets.deleteFallback")
+        }
+        description={t("secrets.deleteDescription")}
+        confirmLabel={t("secrets.delete")}
         destructive
         onConfirm={async () => {
           if (deleteTarget) await deleteSecret(deleteTarget);

@@ -10,6 +10,7 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import type { Column } from "@/components/data-table";
@@ -35,8 +36,7 @@ import {
   type usePipelineList,
   type useRunHistory,
 } from "./use-pipelines";
-
-const TAB_LABELS: Record<PipelineTab, string> = { pipelines: "Pipelines", runs: "Run History" };
+import { localizedPipelineToken, localizedPipelineList } from "./pipelines-list";
 
 /**
  * Cells that carry their own links or buttons have to sit above
@@ -45,6 +45,7 @@ const TAB_LABELS: Record<PipelineTab, string> = { pipelines: "Pipelines", runs: 
 const ABOVE_ROW_LINK = "relative z-10";
 
 function StatusBadge({ status }: { status: string }) {
+  const t = useTranslations("PipelineUI");
   const map: Record<
     string,
     { variant: "default" | "secondary" | "destructive"; icon: React.ReactNode }
@@ -59,7 +60,7 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <Badge variant={variant} className="flex items-center gap-1">
       {icon}
-      {status}
+      {localizedPipelineToken(status, "status", t)}
     </Badge>
   );
 }
@@ -75,6 +76,7 @@ export interface PipelinesScreenProps {
 
 /** The /pipelines screen (#106, #107): tab bar, New Pipeline, and the active tab. */
 export function PipelinesScreen({ tab, onTabChange, pipelinesTab, runsTab }: PipelinesScreenProps) {
+  const copy = useTranslations("PipelineUI");
   return (
     <div className="space-y-4">
       {/* Tab bar */}
@@ -91,7 +93,7 @@ export function PipelinesScreen({ tab, onTabChange, pipelinesTab, runsTab }: Pip
                   : "text-muted-foreground hover:text-foreground border-transparent",
               ].join(" ")}
             >
-              {TAB_LABELS[t]}
+              {copy(t === "runs" ? "runHistory" : `tabs.${t}`)}
             </button>
           ))}
         </div>
@@ -99,7 +101,7 @@ export function PipelinesScreen({ tab, onTabChange, pipelinesTab, runsTab }: Pip
           <Can permission="app.update" loading={null}>
             <Button asChild size="sm">
               <Link href="/pipelines/new">
-                <PlusIcon className="mr-1 size-4" /> New Pipeline
+                <PlusIcon className="mr-1 size-4" /> {copy("newPipeline")}
               </Link>
             </Button>
           </Can>
@@ -132,10 +134,11 @@ export function PipelineListView({
   onTrigger,
   triggering,
 }: PipelineListViewProps) {
+  const t = useTranslations("PipelineUI");
   const columns: Column<Pipeline>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("name"),
       cellClassName: "max-w-64",
       cell: (p) => (
         <span className="block truncate font-medium" title={p.name}>
@@ -145,7 +148,7 @@ export function PipelineListView({
     },
     {
       id: "repo",
-      header: "Repository",
+      header: t("repository"),
       cellClassName: cn("text-muted-foreground max-w-72 text-sm", ABOVE_ROW_LINK),
       cell: (p) => (
         <a
@@ -161,13 +164,13 @@ export function PipelineListView({
     },
     {
       id: "branch",
-      header: "Default branch",
+      header: t("defaultBranch"),
       cellClassName: "font-mono text-xs",
       cell: (p) => p.defaultBranch,
     },
     {
       id: "toml",
-      header: "TOML path",
+      header: t("tomlPath"),
       cellClassName: "text-muted-foreground max-w-56",
       cell: (p) => (
         <span className="block truncate font-mono text-xs" title={p.tomlPath}>
@@ -180,8 +183,8 @@ export function PipelineListView({
   return (
     <ListPage<Pipeline>
       embedded
-      list={list}
-      label="Pipelines"
+      list={{ ...list, definition: localizedPipelineList(list.definition, t) }}
+      label={t("tabs.pipelines")}
       columns={columns}
       rows={rows}
       getRowId={(p) => p.id}
@@ -189,7 +192,7 @@ export function PipelineListView({
       rowActions={(p) => (
         <DropdownMenuItem disabled={triggering} onSelect={() => void onTrigger(p)}>
           <PlayIcon className="size-4" />
-          Run
+          {t("runAction")}
         </DropdownMenuItem>
       )}
       loading={loading}
@@ -199,10 +202,10 @@ export function PipelineListView({
       nextCursor={nextCursor}
       empty={{
         icon: <GitBranchIcon className="size-5" />,
-        title: "No pipelines yet",
-        description: "Create a pipeline TOML in your repo and register it here.",
+        title: t("noPipelines"),
+        description: t("noPipelinesDescription"),
         actionHref: "/pipelines/new",
-        actionLabel: "New Pipeline",
+        actionLabel: t("newPipeline"),
       }}
     />
   );
@@ -227,27 +230,28 @@ export function RunHistoryView({
   onSelect,
   loadingOptions,
 }: RunHistoryViewProps) {
+  const t = useTranslations("PipelineUI");
   const columns: Column<PipelineRunRow>[] = [
     {
       id: "run",
-      header: "Run",
+      header: t("run"),
       cellClassName: "font-mono text-sm",
       cell: (run) => `#${run.runNumber}`,
     },
     {
       id: "status",
-      header: "Status",
+      header: t("statusLabel"),
       cell: (run) => <StatusBadge status={run.status} />,
     },
     {
       id: "trigger",
-      header: "Trigger",
+      header: t("triggerLabel"),
       cellClassName: "text-muted-foreground text-sm capitalize",
-      cell: (run) => run.triggerKind,
+      cell: (run) => localizedPipelineToken(run.triggerKind, "trigger", t),
     },
     {
       id: "ref",
-      header: "Ref",
+      header: t("ref"),
       cellClassName: "max-w-64",
       cell: (run) => (
         <span className="block truncate font-mono text-xs" title={run.triggerRef}>
@@ -257,7 +261,7 @@ export function RunHistoryView({
     },
     {
       id: "actor",
-      header: "Actor",
+      header: t("actor"),
       cellClassName: "text-muted-foreground max-w-56 text-sm",
       cell: (run) => (
         <span className="block truncate" title={run.triggerActor ?? undefined}>
@@ -267,15 +271,17 @@ export function RunHistoryView({
     },
     {
       id: "duration",
-      header: "Duration",
+      header: t("duration"),
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (run) =>
         run.startedAt && run.finishedAt
-          ? `${Math.round(
-              (new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000
-            )}s`
+          ? t("seconds", {
+              count: Math.round(
+                (new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000
+              ),
+            })
           : run.startedAt
-            ? "running"
+            ? t("status.running")
             : "—",
     },
   ];
@@ -283,8 +289,8 @@ export function RunHistoryView({
   return (
     <div className="flex min-w-0 flex-col gap-3">
       <Select value={selected ?? ""} onValueChange={onSelect} disabled={options.length === 0}>
-        <SelectTrigger size="sm" className="w-56 max-w-full" aria-label="Pipeline">
-          <SelectValue placeholder={loadingOptions ? "Loading pipelines…" : "Select a pipeline"} />
+        <SelectTrigger size="sm" className="w-56 max-w-full" aria-label={t("pipeline")}>
+          <SelectValue placeholder={loadingOptions ? t("loadingPipelines") : t("selectPipeline")} />
         </SelectTrigger>
         <SelectContent>
           {options.map((p) => (
@@ -296,8 +302,8 @@ export function RunHistoryView({
       </Select>
       <ListPage<PipelineRunRow>
         embedded
-        list={list}
-        label="Pipeline runs"
+        list={{ ...list, definition: localizedPipelineList(list.definition, t) }}
+        label={t("pipelineRuns")}
         columns={columns}
         rows={rows}
         getRowId={(run) => run.id}
@@ -310,15 +316,15 @@ export function RunHistoryView({
           options.length === 0 && !loadingOptions
             ? {
                 icon: <GitBranchIcon className="size-5" />,
-                title: "No pipelines yet",
-                description: "Register a pipeline before there is a run history to read.",
+                title: t("noPipelines"),
+                description: t("noHistoryPipelinesDescription"),
                 actionHref: "/pipelines/new",
-                actionLabel: "New Pipeline",
+                actionLabel: t("newPipeline"),
               }
             : {
                 icon: <ClockIcon className="size-5" />,
-                title: "No pipeline runs yet",
-                description: "Trigger a run manually or connect a webhook to your repository.",
+                title: t("noPipelineRuns"),
+                description: t("noPipelineRunsDescription"),
               }
         }
       />

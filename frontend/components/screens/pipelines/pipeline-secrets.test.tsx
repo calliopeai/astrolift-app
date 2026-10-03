@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import messages from "@/messages/en.json";
 import { MockedProvider } from "@apollo/client/testing/react";
 import type { MockedResponse } from "@apollo/client/testing";
 import { act, renderHook, waitFor } from "@testing-library/react";
@@ -36,7 +38,9 @@ const remove = {
 function setup(responses: MockedResponse[]) {
   return renderHook(() => usePipelineSecrets(pipelineId), {
     wrapper: ({ children }) => (
-      <MockedProvider mocks={[initial, ...responses]}>{children}</MockedProvider>
+      <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
+        <MockedProvider mocks={[initial, ...responses]}>{children}</MockedProvider>
+      </NextIntlClientProvider>
     ),
   });
 }

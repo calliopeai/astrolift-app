@@ -9,6 +9,7 @@ import {
   type NodeTypes,
 } from "@xyflow/react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -61,28 +62,33 @@ const TONE_DOT: Record<StageTone, string> = {
   muted: "bg-muted-foreground/40",
 };
 
-function formatDuration(startedAt?: string | null, finishedAt?: string | null): string | null {
+function formatDuration(
+  startedAt: string | null | undefined,
+  finishedAt: string | null | undefined,
+  t: (key: string, values?: Record<string, string | number>) => string
+): string | null {
   if (!startedAt) return null;
   const start = Date.parse(startedAt);
   if (Number.isNaN(start)) return null;
   const end = finishedAt ? Date.parse(finishedAt) : NaN;
-  if (Number.isNaN(end)) return "running"; // started, not yet finished
+  if (Number.isNaN(end)) return t("running"); // started, not yet finished
   const ms = Math.max(0, end - start);
   const s = Math.round(ms / 1000);
-  if (s < 60) return `${s}s`;
+  if (s < 60) return t("seconds", { count: s });
   const m = Math.floor(s / 60);
   const rem = s % 60;
-  return rem ? `${m}m ${rem}s` : `${m}m`;
+  return rem ? t("minutesSeconds", { minutes: m, seconds: rem }) : t("minutes", { count: m });
 }
 
 function StageNode({ data }: NodeProps<Node<PipelineDagStage>>) {
+  const t = useTranslations("shared.pipelineGraph");
   const tone = toneFor(data.status);
-  const duration = formatDuration(data.startedAt, data.finishedAt);
+  const duration = formatDuration(data.startedAt, data.finishedAt, t);
   const topologyLabel =
     data.topologyKind === "workflow"
-      ? "Workflow"
+      ? t("workflow")
       : data.topologyKind === "subflow"
-        ? "Nested workflow"
+        ? t("nestedWorkflow")
         : null;
 
   const body = (
@@ -107,7 +113,22 @@ function StageNode({ data }: NodeProps<Node<PipelineDagStage>>) {
         <div className="min-w-0 truncate text-sm leading-tight font-medium">{data.name}</div>
       </div>
       <div className="text-muted-foreground text-2xs mt-1 flex items-center justify-between gap-2">
-        <span className="capitalize">{data.status.replace(/_/g, " ")}</span>
+        <span className="capitalize">
+          {[
+            "success",
+            "failure",
+            "running",
+            "pending",
+            "cancelled",
+            "succeeded",
+            "failed",
+            "completed",
+            "skipped",
+            "timed_out",
+          ].includes(data.status)
+            ? t(`status.${data.status}`)
+            : data.status}
+        </span>
         {duration && <span className="font-mono tabular-nums">{duration}</span>}
       </div>
     </>
@@ -120,7 +141,7 @@ function StageNode({ data }: NodeProps<Node<PipelineDagStage>>) {
     TONE_RING[tone]
   );
   return data.href ? (
-    <Link href={data.href} className={className} title={`Open ${data.name}`}>
+    <Link href={data.href} className={className} title={t("open", { name: data.name })}>
       {body}
     </Link>
   ) : (
@@ -164,6 +185,7 @@ export function PipelineDag({
   animateActiveEdges,
   ariaLabel,
 }: PipelineDagProps) {
+  const t = useTranslations("shared.pipelineGraph");
   const nodes = React.useMemo<Node<PipelineDagStage>[]>(() => {
     const ids = stages.map((s) => s.id);
     const edges = stages.flatMap((s) =>
@@ -215,7 +237,7 @@ export function PipelineDag({
       showMiniMap={false}
       fitViewOptions={{ padding: 0.25, maxZoom: 1.1 }}
       variant={variant}
-      ariaLabel={ariaLabel}
+      ariaLabel={ariaLabel ?? t("label")}
     />
   );
 }
