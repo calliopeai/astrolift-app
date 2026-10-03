@@ -5,8 +5,9 @@ export interface QueryErrorProps {
   title: string;
   error?: string | { message: string } | null;
   onRetry?: () => void;
+  retryLabel?: string;
 }
-export const QueryError = ({ title, error, onRetry }: QueryErrorProps) => {
+export const QueryError = ({ title, error, onRetry, retryLabel = "Retry" }: QueryErrorProps) => {
   const message = typeof error === "string" ? error : error?.message;
   if (!message) return null;
   return (
@@ -23,7 +24,7 @@ export const QueryError = ({ title, error, onRetry }: QueryErrorProps) => {
       </div>
       {onRetry && (
         <Button type="button" size="sm" variant="outline" className="w-fit" onClick={onRetry}>
-          Retry
+          {retryLabel}
         </Button>
       )}
     </div>

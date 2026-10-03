@@ -137,6 +137,9 @@ interface ListPageBodyProps<TRow> {
   loading?: boolean;
   /** Rows are on screen but answer the previous question: they fade. */
   stale?: boolean;
+  /** A server-bounded sample or finite detail, with no paging/search contract.
+   * Caller must explain the bound; never use this for an ordinary growing list. */
+  bounded?: boolean;
   error?: { message: string } | null;
   onRetry?: () => void;
   /** No rows in the default view with no filter: the create action and learn-more. */
@@ -180,6 +183,7 @@ export function ListPage<TRow>({
   renderCard,
   loading = false,
   stale = false,
+  bounded = false,
   error,
   onRetry,
   empty,
@@ -294,13 +298,15 @@ export function ListPage<TRow>({
 
       {!embedded && view?.note && <ViewNote note={view.note} className="-mt-2" />}
       {notice}
-      <FilterBar
-        list={list}
-        columns={barColumns}
-        cards={Boolean(renderCard)}
-        menu={menu}
-        leading={embedded && def.views.length > 1 ? <ViewPicker list={list} /> : undefined}
-      />
+      {!bounded && (
+        <FilterBar
+          list={list}
+          columns={barColumns}
+          cards={Boolean(renderCard)}
+          menu={menu}
+          leading={embedded && def.views.length > 1 ? <ViewPicker list={list} /> : undefined}
+        />
+      )}
       {embedded && view?.note && <ViewNote note={view.note} className="-mt-2" />}
 
       {newRows && newRows.count > 0 && (
@@ -343,8 +349,9 @@ export function ListPage<TRow>({
         />
       )}
 
-      {(phase === "ready" ||
-        (def.paging === "cursor" && !loading && !error && (nextCursor || list.hasNewer))) &&
+      {!bounded &&
+        (phase === "ready" ||
+          (def.paging === "cursor" && !loading && !error && (nextCursor || list.hasNewer))) &&
         (def.paging === "numbered" ? (
           <ListPagination
             mode="numbered"
