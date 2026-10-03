@@ -7,6 +7,11 @@
   or foreign cluster reads, and use complete dedicated-ALB CloudWatch evidence
   when Prometheus measurements are unavailable (#2250).
 
+- Open live-log providers and discover replicas outside the ASGI event loop,
+  including lazy cluster/provider reads. Preserve app-scoped admission and close
+  underlying streams on disconnect. Read real urllib3 log lines rather than
+  treating its chunk generator as bytes (#2254).
+
 - Read preview details by exact GUID, including older previews beyond the recent
   discovery window. Return the persisted environment identity and reviewed log
   route; retired, replaced or foreign targets never fall back to another

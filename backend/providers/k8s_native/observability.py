@@ -564,19 +564,10 @@ def _read_line_safe(resp: Any) -> bytes | None:
     means the connection is still open but had no data — caller
     will yield to the loop and try again."""
     try:
-        line = resp.read_chunked(decode_content=False)
-    except (AttributeError, TypeError):
-        line = None
-    if line is None:
-        # ``read_chunked`` isn't the right API on all urllib3
-        # versions. Fall back to ``readline``.
-        try:
-            line = resp.readline()
-        except Exception:
-            return None
-    if not line:
-        return b""
-    return line
+        # urllib3.read_chunked returns a generator, not a line of bytes.
+        return resp.readline()
+    except Exception:
+        return None
 
 
 class LiveLogBackend:
