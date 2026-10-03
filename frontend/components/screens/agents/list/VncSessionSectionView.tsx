@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { cn } from "@/lib/utils";
 
 import type { useVncSession } from "./use-vnc-session";
@@ -14,26 +16,24 @@ export type VncSessionSectionViewProps = ReturnType<typeof useVncSession>;
  * identically on both. Mirrors `ManagedModelSectionView` exactly.
  */
 export function VncSessionSectionView({ vncOn, vncBusy, onToggleVnc }: VncSessionSectionViewProps) {
+  const t = useTranslations("agentModelAccess");
   return (
     <div className="flex items-start justify-between gap-4 rounded-md border p-3">
       <div className="space-y-1">
-        <p className="text-sm font-medium">Live VNC session (watchable)</p>
-        <p className="text-muted-foreground text-xs">
-          Run this agent on a watchable VNC image so you can watch the live desktop session. Adds
-          overhead — leave off for headless runs, which stream logs instead.
-        </p>
+        <p className="text-sm font-medium">{t("vncLabel")}</p>
+        <p className="text-muted-foreground text-xs">{t("vncDescription")}</p>
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <VncSessionToggle
           checked={vncOn}
           onChange={() => void onToggleVnc()}
           disabled={vncBusy}
-          label={vncOn ? "Disable live VNC session" : "Enable live VNC session"}
+          label={t(vncOn ? "vncDisable" : "vncEnable")}
         />
         <span
           className={cn("text-xs font-medium", vncOn ? "text-foreground" : "text-muted-foreground")}
         >
-          {vncOn ? "On" : "Off"}
+          {t(vncOn ? "on" : "off")}
         </span>
       </div>
     </div>

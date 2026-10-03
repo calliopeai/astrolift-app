@@ -64,6 +64,7 @@ def test_actual_registry_region_controls_auth_and_read_preview(app, region):
 
 def test_deploy_only_uses_cluster_region_when_configured(app):
     app.registry_repo_uri = ""
+    app.build_mode = RegisteredApp.BuildMode.NONE
     auth = next(step for step in _steps(_workflow(app)) if step.get("with"))
     assert auth["with"]["aws-region"] == "eu-west-1"
     assert not any(step.get("name") == "Build and push image" for step in _steps(_workflow(app)))
@@ -72,6 +73,7 @@ def test_deploy_only_uses_cluster_region_when_configured(app):
 @pytest.mark.parametrize("unconfigured", ["no_cluster", "missing_region"])
 def test_unconfigured_deploy_only_needs_no_aws_or_invented_region(app, unconfigured):
     app.registry_repo_uri = ""
+    app.build_mode = RegisteredApp.BuildMode.NONE
     if unconfigured == "no_cluster":
         app.default_tenant_cluster = None
     else:

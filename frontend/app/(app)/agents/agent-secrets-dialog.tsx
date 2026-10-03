@@ -14,6 +14,7 @@ import { VncSessionSection } from "./vnc-session-section";
  */
 export function AgentSecretsDialog({
   envSpecSlug,
+  envSpecId,
   envSpecName,
   managedModel,
   vncEnabled,
@@ -23,6 +24,7 @@ export function AgentSecretsDialog({
   showRuntimeSettings = true,
 }: {
   envSpecSlug: string;
+  envSpecId?: string;
   envSpecName: string;
   managedModel: boolean;
   vncEnabled: boolean;
@@ -42,9 +44,17 @@ export function AgentSecretsDialog({
         showRuntimeSettings ? (
           <>
             {/* Model source — a spec-level property, independent of secret refs. */}
-            <ManagedModelSection envSpecSlug={envSpecSlug} managedModel={managedModel} />
+            <ManagedModelSection
+              envSpecSlug={envSpecSlug}
+              envSpecId={envSpecId}
+              managedModel={managedModel}
+            />
             {/* Live VNC session is another independent spec-level property. */}
-            <VncSessionSection envSpecSlug={envSpecSlug} vncEnabled={vncEnabled} />
+            <VncSessionSection
+              envSpecSlug={envSpecSlug}
+              envSpecId={envSpecId}
+              vncEnabled={vncEnabled}
+            />
           </>
         ) : undefined
       }

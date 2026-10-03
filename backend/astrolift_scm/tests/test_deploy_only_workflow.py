@@ -63,6 +63,11 @@ _NOTIFY_PATH = {
 def _app(*, registry_repo_uri: str, source_kind: str) -> SimpleNamespace:
     """An app-shaped object; ``registry_repo_uri`` toggles build vs deploy-only."""
     return SimpleNamespace(
+        guid="11111111-1111-4111-8111-111111111111",
+        build_mode="ci_pushed" if registry_repo_uri.strip() else "none",
+        dockerfile_path="Dockerfile",
+        build_context=".",
+        build_args={},
         slug="emr-bug-triage",
         deploy_branch="main",
         registry_repo_uri=registry_repo_uri,
@@ -78,7 +83,7 @@ def test_platform_built_renders_build_and_push(host, settings):
     settings.PLATFORM_API_URL = "https://platform.astrolift.test"
     body = _RENDERERS[host](_app(registry_repo_uri=_PLATFORM_URI, source_kind=host))
 
-    assert "docker build" in body
+    assert 'command = ["docker", "build"' in body if host == "github" else "docker build" in body
     assert "docker push" in body
     # The valid ``<uri>:<sha>`` tag: the registry prefix sits in front of the colon.
     assert _PLATFORM_URI in body
@@ -153,7 +158,7 @@ def test_github_managed_workflow_cancels_superseded_runs(settings):
     settings.PLATFORM_API_URL = "https://platform.astrolift.test"
     body = render_astrolift_ci_workflow(_app(registry_repo_uri=_PLATFORM_URI, source_kind="github"))
 
-    assert 'group: "astrolift-emr-bug-triage"' in body
+    assert 'group: "astrolift-11111111111141118111111111111111"' in body
     assert "cancel-in-progress: true" in body
 
 

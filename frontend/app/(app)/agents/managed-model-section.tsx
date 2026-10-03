@@ -10,10 +10,12 @@ import { useManagedModel } from "@/components/screens/agents/list/use-managed-mo
  */
 export function ManagedModelSection({
   envSpecSlug,
+  envSpecId,
   managedModel,
 }: {
   envSpecSlug: string;
+  envSpecId?: string;
   managedModel: boolean;
 }) {
-  return <ManagedModelSectionView {...useManagedModel(envSpecSlug, managedModel)} />;
+  return <ManagedModelSectionView {...useManagedModel(envSpecSlug, managedModel, envSpecId)} />;
 }
