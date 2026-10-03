@@ -1,9 +1,6 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 
-import {
-  GET_WORKFLOW_INSTANCE_DETAIL,
-  GET_WORKFLOW_INSTANCES,
-} from "./workflows.queries";
+import { GET_WORKFLOW_INSTANCE_DETAIL, GET_WORKFLOW_INSTANCES } from "./workflows.queries";
 import {
   CANCEL_WORKFLOW_INSTANCE,
   SIGNAL_WORKFLOW_INSTANCE,
@@ -31,6 +28,7 @@ export const useWorkflowInstances = (params: {
   workflowType?: string | null;
   status?: string | null;
   limit?: number;
+  after?: string | null;
 }) => {
   const { data, loading, error, refetch } = useQuery<WorkflowInstancesData>(
     GET_WORKFLOW_INSTANCES,
@@ -39,8 +37,10 @@ export const useWorkflowInstances = (params: {
         workflowType: params.workflowType ?? null,
         status: params.status ?? null,
         limit: params.limit ?? 50,
+        after: params.after ?? null,
       },
       fetchPolicy: "cache-and-network",
+      pollInterval: 15_000,
     }
   );
   return {
@@ -52,11 +52,11 @@ export const useWorkflowInstances = (params: {
   };
 };
 
-export const useWorkflowInstanceDetail = (workflowId: string | null) => {
+export const useWorkflowInstanceDetail = (workflowId: string | null, runId?: string | null) => {
   const { data, loading, error, refetch } = useQuery<WorkflowInstanceDetailData>(
     GET_WORKFLOW_INSTANCE_DETAIL,
     {
-      variables: { workflowId: workflowId ?? "" },
+      variables: { workflowId: workflowId ?? "", runId: runId ?? null },
       fetchPolicy: "cache-and-network",
       skip: !workflowId,
     }

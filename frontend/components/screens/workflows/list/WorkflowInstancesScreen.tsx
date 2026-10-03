@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { ActivityIcon } from "lucide-react";
 
 import type { Column } from "@/components/data-table";
@@ -10,6 +11,7 @@ import { PermissionNote } from "@/components/settings/Restricted";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import type { WorkflowInstance } from "@/graphql/workflows/workflows.types";
 import { useFormatters } from "@/lib/i18n/formatters";
 
@@ -25,6 +27,7 @@ export interface WorkflowInstancesListProps {
   rows: WorkflowInstance[];
   /** Instances matching the view, chips and search, within the one page read. */
   totalCount: number;
+  nextCursor?: string | null;
   loading: boolean;
   stale: boolean;
   error: { message: string } | null;
@@ -33,19 +36,22 @@ export interface WorkflowInstancesListProps {
   instanceHref: (instance: WorkflowInstance) => string;
   /** The open instance, from `?instance=`. */
   selectedWorkflowId: string | null;
+  selectedRunId?: string | null;
   onCloseInstance: () => void;
 }
 
 export type WorkflowInstancesScreenProps =
   /** The permission set is still loading. */
-  | { access: "loading" }
-  /** Without `audit_log.read`: the permission, and no list mounted. */
-  | { access: "denied" }
-  | ({
-      access: "granted";
-      /** InstanceDetailView behind its hook, for the open instance. */
-      detail: ReactNode;
-    } & WorkflowInstancesListProps);
+  (
+    | { access: "loading" }
+    /** Without `audit_log.read`: the permission, and no list mounted. */
+    | { access: "denied" }
+    | ({
+        access: "granted";
+        /** InstanceDetailView behind its hook, for the open instance. */
+        detail: ReactNode;
+      } & WorkflowInstancesListProps)
+  ) & { title?: string; crumbs?: import("@/components/shell/ShellHeader").Crumb[] };
 
 const CRUMBS = workflowsCrumbs({ label: "Platform instances" });
 const TITLE = "Platform instances";
@@ -59,7 +65,7 @@ const CONTEXT = (
  * Agents › Workflows › Platform instances (spec 44 §5.1): the Temporal
  * instances behind deploys, provisioning and drift detection, on the shared
  * list with views All · Mine · Running · Failed, Type and Status chips,
- * search, sort and numbered pages. A row opens the instance beside the list
+ * server cursor pages. A row opens the exact execution beside the list
  * (its activity feed, and cancel and terminate for a stuck one). Reached
  * from the Workflows `⋯` menu, behind `audit_log.read`. Pure.
  */
@@ -67,7 +73,11 @@ export function WorkflowInstancesScreen(props: WorkflowInstancesScreenProps) {
   if (props.access !== "granted") {
     return (
       <div className="flex min-w-0 flex-1 flex-col gap-6">
-        <ShellHeader crumbs={CRUMBS} title={TITLE} context={CONTEXT} />
+        <ShellHeader
+          crumbs={props.crumbs ?? CRUMBS}
+          title={props.title ?? TITLE}
+          context={CONTEXT}
+        />
         {props.access === "loading" ? (
           <Skeleton className="h-40 w-full rounded-md" />
         ) : (
@@ -82,17 +92,25 @@ export function WorkflowInstancesScreen(props: WorkflowInstancesScreenProps) {
 function InstancesList({
   list,
   rows,
-  totalCount,
+  nextCursor,
   loading,
   stale,
   error,
   onRetry,
   instanceHref,
   selectedWorkflowId,
+  selectedRunId,
   onCloseInstance,
   detail,
-}: WorkflowInstancesListProps & { detail: ReactNode }) {
+  title = TITLE,
+  crumbs = CRUMBS,
+}: WorkflowInstancesListProps & {
+  detail: ReactNode;
+  title?: string;
+  crumbs?: import("@/components/shell/ShellHeader").Crumb[];
+}) {
   const fmt = useFormatters();
+  const t = useTranslations("shared.versionMismatch");
 
   const columns: Column<WorkflowInstance>[] = [
     {
@@ -108,7 +126,6 @@ function InstancesList({
     {
       id: "type",
       header: "Type",
-      sortKey: "type",
       cellClassName: "max-w-64",
       cell: (i) => (
         <span className="block truncate text-sm" title={i.workflowType}>
@@ -119,20 +136,17 @@ function InstancesList({
     {
       id: "status",
       header: "Status",
-      sortKey: "status",
       cell: (i) => <InstanceStatusBadge status={i.status} />,
     },
     {
       id: "started",
       header: "Started",
-      sortKey: "started",
       cellClassName: "font-mono text-xs whitespace-nowrap",
       cell: (i) => (i.startedAt ? fmt.formatDateTime(i.startedAt) : "not started"),
     },
     {
       id: "duration",
       header: "Took",
-      sortKey: "duration",
       align: "right",
       cellClassName: "font-mono text-xs tabular-nums",
       cell: (i) => (i.durationSeconds != null ? formatInstanceDuration(i.durationSeconds) : ""),
@@ -155,14 +169,25 @@ function InstancesList({
   return (
     <>
       <ListPage<WorkflowInstance>
-        header={{ crumbs: CRUMBS, title: TITLE, context: CONTEXT }}
+        header={{
+          crumbs,
+          title,
+          context: CONTEXT,
+          primaryAction: (
+            <Button variant="outline" size="sm" onClick={onRetry} disabled={loading || stale}>
+              {t("refresh")}
+            </Button>
+          ),
+        }}
         list={list}
         label="Instances"
         columns={columns}
         rows={rows}
         getRowId={instanceKey}
         rowHref={instanceHref}
-        rowClassName={(i) => (i.workflowId === selectedWorkflowId ? "bg-accent" : undefined)}
+        rowClassName={(i) =>
+          i.workflowId === selectedWorkflowId && i.runId === selectedRunId ? "bg-accent" : undefined
+        }
         loading={loading}
         stale={stale}
         error={error}
@@ -170,10 +195,11 @@ function InstancesList({
         empty={{
           icon: <ActivityIcon className="size-5" />,
           title: "No platform instances",
-          description:
-            "Platform workflows (deploys, provisioning, drift detection) appear here while they run and after. The engine is idle, or Temporal is not enabled.",
+          description: nextCursor
+            ? "No authorized instances on this page. Choose Older to continue through the workflow engine’s pages."
+            : "No authorized instances on this page, or the workflow engine is unavailable. Refresh to check again.",
         }}
-        totalCount={totalCount}
+        nextCursor={nextCursor}
       />
       <Sheet open={selectedWorkflowId !== null} onOpenChange={(open) => !open && onCloseInstance()}>
         <SheetContent

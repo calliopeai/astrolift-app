@@ -7852,6 +7852,7 @@ export type MutationCancelTaskArgs = {
 
 
 export type MutationCancelWorkflowInstanceArgs = {
+  runId?: InputMaybe<Scalars['String']['input']>;
   workflowId: Scalars['String']['input'];
 };
 
@@ -9308,6 +9309,7 @@ export type MutationTearDownPreviewArgs = {
 
 export type MutationTerminateWorkflowInstanceArgs = {
   reason: Scalars['String']['input'];
+  runId?: InputMaybe<Scalars['String']['input']>;
   workflowId: Scalars['String']['input'];
 };
 
@@ -11932,6 +11934,7 @@ export type QueryAstroliftWorkflowInstanceArgs = {
 
 
 export type QueryAstroliftWorkflowInstanceDetailArgs = {
+  runId?: InputMaybe<Scalars['String']['input']>;
   workflowId: Scalars['String']['input'];
 };
 
@@ -16473,6 +16476,7 @@ export type TransitionWorkflowMutation = { transitionWorkflow: { ok: boolean, er
 
 export type CancelWorkflowInstanceMutationVariables = Exact<{
   workflowId: Scalars['String']['input'];
+  runId: Scalars['String']['input'];
 }>;
 
 
@@ -16480,6 +16484,7 @@ export type CancelWorkflowInstanceMutation = { cancelWorkflowInstance: { ok: boo
 
 export type TerminateWorkflowInstanceMutationVariables = Exact<{
   workflowId: Scalars['String']['input'];
+  runId: Scalars['String']['input'];
   reason: Scalars['String']['input'];
 }>;
 
@@ -16499,6 +16504,7 @@ export type GetWorkflowInstancesQueryVariables = Exact<{
   workflowType?: InputMaybe<Scalars['String']['input']>;
   status?: InputMaybe<Scalars['String']['input']>;
   limit: Scalars['Int']['input'];
+  after?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
@@ -16506,6 +16512,7 @@ export type GetWorkflowInstancesQuery = { astroliftWorkflowInstances: { nextCurs
 
 export type GetWorkflowInstanceDetailQueryVariables = Exact<{
   workflowId: Scalars['String']['input'];
+  runId?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 

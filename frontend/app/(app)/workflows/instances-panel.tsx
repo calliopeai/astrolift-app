@@ -16,25 +16,29 @@ import {
  */
 export function InstanceDetail({
   workflowId,
+  runId,
   isAdmin,
   onClose,
   onAfterMutation,
 }: {
   workflowId: string | null;
+  runId: string | null;
   isAdmin: boolean;
   onClose: () => void;
   onAfterMutation: () => void;
 }) {
-  const detail = useWorkflowInstanceDetailPanel(workflowId);
+  const detail = useWorkflowInstanceDetailPanel(workflowId, runId);
   return (
     <InstanceDetailView
       {...detail}
       isAdmin={isAdmin}
       onClose={onClose}
+      onRefresh={runId ? detail.refetch : undefined}
       adminControls={
-        workflowId ? (
+        workflowId && runId ? (
           <AdminControls
             workflowId={workflowId}
+            runId={runId}
             onAfter={() => {
               detail.refetch();
               onAfterMutation();
@@ -46,6 +50,14 @@ export function InstanceDetail({
   );
 }
 
-function AdminControls({ workflowId, onAfter }: { workflowId: string; onAfter: () => void }) {
-  return <InstanceAdminControlsView {...useInstanceAdminControls(workflowId, onAfter)} />;
+function AdminControls({
+  workflowId,
+  runId,
+  onAfter,
+}: {
+  workflowId: string;
+  runId: string;
+  onAfter: () => void;
+}) {
+  return <InstanceAdminControlsView {...useInstanceAdminControls(workflowId, runId, onAfter)} />;
 }
