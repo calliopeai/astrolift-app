@@ -20,9 +20,13 @@ def context():
 def test_preview_identity_and_cost_controls_are_discoverable_but_not_authority():
     public = schema.execute_sync("{ astroliftServerInfo { capabilities } }", context_value=context())
     assert not public.errors
-    assert {"previews.exact_identity", "previews.reviewed_routes", "previews.explicit_runtime_cost"} <= set(
-        public.data["astroliftServerInfo"]["capabilities"]
-    )
+    assert {
+        "previews.exact_identity",
+        "previews.reviewed_routes",
+        "previews.explicit_runtime_cost",
+        "previews.reviewed_live_logs",
+        "previews.reviewed_log_exports",
+    } <= set(public.data["astroliftServerInfo"]["capabilities"])
     refused = schema.execute_sync(
         """{
       astroliftPreviewEnvironment(id: "11111111-1111-4111-8111-111111111111", includeRuntimeCost: true) {

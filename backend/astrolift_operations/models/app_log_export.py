@@ -100,6 +100,10 @@ class AppLogExport(models.Model):
     # by the row itself — the input filters can drift.
     filters_snapshot = models.JSONField(default=dict, blank=True)
 
+    # Exact reviewed source and original authority; no token values or log bodies.
+    # Empty old receipts do not acquire inferred preview proof.
+    source_snapshot = models.JSONField(default=dict, blank=True)
+
     # Captured failure detail when status == FAILED. Empty on success.
     error_message = models.CharField(max_length=512, blank=True, default="")
 

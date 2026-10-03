@@ -27,6 +27,7 @@ class SpanRef:
     """OK | ERROR | UNSET — OpenTelemetry status."""
 
     attributes: dict[str, str] = field(default_factory=dict)
+    resource_attributes: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

@@ -1415,6 +1415,7 @@ type AstroliftAppLogPage {
   historicalAvailable: Boolean!
   totalCount: Int!
   reason: AstroliftObservabilityPanelReason!
+  scope: AstroliftTelemetryScope
 }
 
 type AstroliftAppLogQueryLine {
@@ -1589,6 +1590,14 @@ type AstroliftAppTrace {
   spanCount: Int!
   durationMs: Float!
   statusCode: String!
+}
+
+type AstroliftAppTracePage {
+  reason: AstroliftObservabilityPanelReason!
+  items: [AstroliftAppTrace!]!
+  scope: AstroliftTelemetryScope
+  truncated: Boolean!
+  limit: Int!
 }
 
 type AstroliftAppUptime {
@@ -5652,6 +5661,15 @@ input AstroliftTeamsListFilter {
   mine: Boolean = null
 }
 
+type AstroliftTelemetryScope {
+  organizationId: String!
+  appId: String!
+  environmentId: String!
+  environmentName: String!
+  clusterId: String!
+  namespace: String!
+}
+
 type AstroliftTemplateSendStatPoint {
   timestamp: DateTime!
   sends: Int!
@@ -5780,6 +5798,13 @@ type AstroliftTraceSpan {
   durationMs: Float!
   statusCode: String!
   attributes: JSON!
+  resourceAttributes: JSON!
+}
+
+type AstroliftTraceSpansResult {
+  reason: AstroliftObservabilityPanelReason!
+  items: [AstroliftTraceSpan!]!
+  scope: AstroliftTelemetryScope
 }
 
 type AstroliftTrigger {
@@ -7093,6 +7118,10 @@ input ExpectedClusterAuthSourceInput {
 input ExportAppLogsInput {
   appSlug: String!
   format: String!
+  previewId: GUID = null
+  expectedEnvironmentId: GUID = null
+  ifMatchPreviewVersion: Int = null
+  ifMatchEnvironmentVersion: Int = null
   environmentName: String = null
   workloadSlug: String = null
   podName: String = null
@@ -8815,7 +8844,9 @@ type Query {
   astroliftAppTraces(appSlug: String!, since: String!, until: String!, environmentName: String = null, service: String = null, operation: String = null, minDurationMs: Float = null, status: String = null, limit: Int = null): [AstroliftAppTrace!]!
   astroliftTraceSpans(appSlug: String!, traceId: String!, environmentName: String = null): [AstroliftTraceSpan!]!
   astroliftAppEndpointMetrics(appSlug: String!, environmentName: String = null, rangeSeconds: Int = null, workloadSlug: String = null): [AstroliftAppEndpointMetric!]!
-  astroliftAppLogs(appSlug: String!, since: DateTime!, until: DateTime!, environmentName: String = null, workloadSlug: String = null, level: String = null, search: String = null, limit: Int! = 500, cursor: String = null, previewId: GUID = null, expectedEnvironmentId: GUID = null, ifMatchPreviewVersion: Int = null, ifMatchEnvironmentVersion: Int = null): AstroliftAppLogPage!
+  astroliftAppLogs(appSlug: String!, since: DateTime!, until: DateTime!, environmentName: String = null, environmentId: GUID = null, workloadSlug: String = null, level: String = null, search: String = null, limit: Int! = 500, cursor: String = null, previewId: GUID = null, expectedEnvironmentId: GUID = null, ifMatchPreviewVersion: Int = null, ifMatchEnvironmentVersion: Int = null): AstroliftAppLogPage!
+  astroliftAppTracePage(appSlug: String!, since: String!, until: String!, environmentName: String = null, environmentId: GUID = null, service: String = null, status: String = null, limit: Int! = 10): AstroliftAppTracePage!
+  astroliftTraceSpansResult(appSlug: String!, traceId: String!, since: String!, until: String!, environmentName: String = null, environmentId: GUID = null): AstroliftTraceSpansResult!
   astroliftWorkflowInstances(workflowType: String = null, status: String = null, limit: Int! = 50, after: String = null): AstroliftWorkflowInstancePage!
   astroliftWorkflowInstanceDetail(workflowId: String!, runId: String = null): AstroliftWorkflowInstanceDetail
   astroliftWorkflowInstance(workflowId: String!): AstroliftWorkflowInstance
@@ -9621,8 +9652,8 @@ type Subscription {
   astroliftDeploymentLifecycleStream(appSlug: String = null): AstroliftDeploymentLifecycleEvent!
   notificationReceived: String!
   formSubmissionReceived(slug: String!): String!
-  astroliftOnAppLog(appSlug: String!, podName: String!, workloadSlug: String = null, container: String = null, follow: Boolean! = true, tailLines: Int! = 100): AstroliftAppLogLine!
-  astroliftOnAppLogs(appSlug: String!, environmentName: String = null, workloadSlug: String = null, container: String = null, follow: Boolean! = true, tailLines: Int! = 100): AstroliftAppLogLine!
+  astroliftOnAppLog(appSlug: String!, podName: String!, workloadSlug: String = null, container: String = null, follow: Boolean! = true, tailLines: Int! = 100, previewId: GUID = null, expectedEnvironmentId: GUID = null, ifMatchPreviewVersion: Int = null, ifMatchEnvironmentVersion: Int = null): AstroliftAppLogLine!
+  astroliftOnAppLogs(appSlug: String!, environmentName: String = null, workloadSlug: String = null, container: String = null, follow: Boolean! = true, tailLines: Int! = 100, previewId: GUID = null, expectedEnvironmentId: GUID = null, ifMatchPreviewVersion: Int = null, ifMatchEnvironmentVersion: Int = null): AstroliftAppLogLine!
 }
 
 type SwitchUserResult {

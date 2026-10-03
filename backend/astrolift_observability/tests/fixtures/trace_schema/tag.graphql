@@ -1,0 +1,25 @@
+# Exact observability projection of published schema at v0.1.0.
+# Source/tag compatibility; these are not two separately released minor artifacts.
+type AstroliftAppLogPage {
+  items: [AstroliftAppLogQueryLine!]!
+  nextCursor: String!
+  reachedRetention: Boolean!
+  historicalAvailable: Boolean!
+  totalCount: Int!
+}
+
+type AstroliftAppLogQueryLine {
+  podName: String!
+  container: String!
+  timestamp: String!
+  message: String!
+  level: String!
+  stream: String!
+}
+
+"""Date with time (isoformat)"""
+scalar DateTime
+
+type Query {
+  astroliftAppLogs(appSlug: String!, since: DateTime!, until: DateTime!, environmentName: String = null, workloadSlug: String = null, level: String = null, search: String = null, limit: Int! = 500, cursor: String = null): AstroliftAppLogPage!
+}

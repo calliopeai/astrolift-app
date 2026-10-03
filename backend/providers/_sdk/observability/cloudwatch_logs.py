@@ -1,10 +1,9 @@
 """CloudWatch Logs LogQueryDriver (#1111).
 
 The historical (time-range) log surface — ``LogQueryDriver`` — for AWS
-clusters that ship pod logs to CloudWatch Logs (the SteadyMD default:
-Fluent Bit / the CloudWatch agent write EKS pod logs to a Container
-Insights ``application`` log group). Loki ships the streaming side; this
-ships the paginated query side for CloudWatch.
+clusters that ship pod logs through Fluent Bit or the CloudWatch agent
+into a Container Insights ``application`` log group. Loki ships the streaming
+side; this ships the paginated query side for CloudWatch.
 
 Wired from ``core.cluster_log_query.resolve_log_query_driver`` when a
 cluster's ``provider_config`` carries::
@@ -29,20 +28,17 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-import logging
 import re
 from dataclasses import dataclass
 from typing import Any
 
 from _sdk.log_stream import LogLine, LogPage
 
-log = logging.getLogger(__name__)
-
 # Pull ``app="x"`` / ``namespace="x"`` / ``workload="x"`` back out of the
 # LogQL-flavoured selector ``core.cluster_log_query.build_app_selector``
 # emits, so the CloudWatch filter can scope to the app's pods within a
 # shared Container Insights log group.
-_SELECTOR_LABEL = re.compile(r'(\w+)="((?:[^"\\]|\\.)*)"')
+_SELECTOR_LABEL = re.compile(r'(namespace|app|workload)\s*=\s*("(?:[^"\\]|\\.)*")')
 
 
 @dataclass(frozen=True)
@@ -70,10 +66,7 @@ class CloudWatchLogsQueryDriver:
 
     def __init__(self, *, config: CloudWatchLogsConfig) -> None:
         self._config = config
-        if config.client is not None:
-            self._logs = config.client
-        else:
-            self._logs = _build_logs_client(region=config.region, role_arn=config.role_arn)
+        self._logs = config.client
 
     def query_logs(
         self,
@@ -103,27 +96,34 @@ class CloudWatchLogsQueryDriver:
         if cursor:
             kwargs["nextToken"] = cursor
 
-        # Scope to the app's pods (their names carry the app slug) plus
-        # any operator search term. Space-separated quoted terms are an
-        # AND match in CloudWatch's filter-pattern grammar.
-        pattern_terms = [t for t in (labels.get("app"), labels.get("workload"), search) if t]
-        if pattern_terms:
-            kwargs["filterPattern"] = " ".join(f'"{_escape_pattern(t)}"' for t in pattern_terms)
+        predicates = [
+            f"$.kubernetes.namespace_name = {json.dumps(labels['namespace'])}",
+            f"$.kubernetes.labels.['astrolift.io/app'] = {json.dumps(labels['app'])}",
+        ]
+        if "workload" in labels:
+            predicates.append(f"$.kubernetes.labels.['astrolift.io/workload'] = {json.dumps(labels['workload'])}")
+        kwargs["filterPattern"] = "{ " + " && ".join(predicates) + " }"
 
         try:
+            if self._logs is None:
+                self._logs = _build_logs_client(region=self._config.region, role_arn=self._config.role_arn)
             response = self._logs.filter_log_events(**kwargs)
+            items = []
+            for event in response.get("events", []):
+                line = _event_to_line(event, selector=labels)
+                if line is not None and (not search or search.casefold() in line.message.casefold()):
+                    items.append(line)
+            next_cursor = response.get("nextToken", "") or ""
+            if not isinstance(next_cursor, str):
+                raise ValueError("Invalid provider cursor")
         except Exception:
-            log.exception(
-                "cloudwatch_logs: filter_log_events failed for group %s",
-                self._config.log_group,
-            )
-            raise
+            # Callers log provider exceptions. Keep AWS response bodies, request/group
+            # identities and malformed event values out of those diagnostics.
+            raise RuntimeError("CloudWatch historical log read failed") from None
 
-        fallback_ns = labels.get("namespace", "")
-        items = [_event_to_line(ev, fallback_namespace=fallback_ns) for ev in response.get("events", [])]
         return LogPage(
             items=items,
-            next_cursor=response.get("nextToken", "") or "",
+            next_cursor=next_cursor,
             # CloudWatch doesn't cheaply report whether the window
             # predates retention; the resolver treats False as "not
             # known to be truncated", same as Loki.
@@ -263,8 +263,39 @@ def _build_logs_client(*, region: str, role_arn: str | None) -> Any:
 
 
 def _parse_selector(query: str) -> dict[str, str]:
-    """Extract label=value pairs from the LogQL-flavoured selector."""
-    return {m.group(1): m.group(2) for m in _SELECTOR_LABEL.finditer(query or "")}
+    """Accept only complete exact Kubernetes identity selectors."""
+    error = "CloudWatch logs require exact namespace and app identities"
+    if not isinstance(query, str):
+        raise ValueError(error)
+    selector = query.strip()
+    if not selector.startswith("{") or not selector.endswith("}"):
+        raise ValueError(error)
+    content = selector[1:-1].strip()
+    labels = {}
+    while content:
+        match = _SELECTOR_LABEL.match(content)
+        if match is None or match[1] in labels:
+            raise ValueError(error)
+        try:
+            value = json.loads(match[2])
+        except ValueError:
+            raise ValueError(error) from None
+        pattern = (
+            r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?"
+            if match[1] == "namespace"
+            else r"[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,61}[A-Za-z0-9])?"
+        )
+        if not re.fullmatch(pattern, value):
+            raise ValueError(error)
+        labels[match[1]] = value
+        content = content[match.end() :].strip()
+        if content:
+            if not content.startswith(",") or not content[1:].strip():
+                raise ValueError(error)
+            content = content[1:].strip()
+    if not {"namespace", "app"}.issubset(labels):
+        raise ValueError(error)
+    return labels
 
 
 def _iso_to_ms(iso: str) -> int:
@@ -275,64 +306,58 @@ def _iso_to_ms(iso: str) -> int:
     return int(parsed.timestamp() * 1000)
 
 
-def _escape_pattern(term: str) -> str:
-    """Escape a term for embedding in a double-quoted CloudWatch filter
-    pattern (only the quote + backslash are special inside quotes)."""
-    return term.replace("\\", "\\\\").replace('"', '\\"')
-
-
-def _event_to_line(event: dict[str, Any], *, fallback_namespace: str) -> LogLine:
-    """Map one CloudWatch ``FilterLogEvents`` event onto a ``LogLine``.
-
-    Container Insights ``application`` logs are JSON envelopes carrying
-    ``kubernetes`` metadata + the raw ``log`` line; plain log groups
-    carry the message verbatim with pod identity only in the stream
-    name. Handle both: parse the JSON envelope when present, else fall
-    back to the stream name for pod identity and the raw message."""
-    raw_message = event.get("message", "") or ""
-    stream = event.get("logStreamName", "") or ""
-
-    namespace = fallback_namespace
-    pod = stream
-    container = ""
-    message = raw_message
-
+def _event_to_line(event: dict[str, Any], *, selector: dict[str, str]) -> LogLine | None:
+    """Only map records admitted by exact collector-stamped Kubernetes metadata."""
+    raw_message = event.get("message", "")
     parsed = _try_json(raw_message)
-    if isinstance(parsed, dict):
-        kube = parsed.get("kubernetes")
-        if isinstance(kube, dict):
-            namespace = kube.get("namespace_name") or namespace
-            pod = kube.get("pod_name") or pod
-            container = kube.get("container_name") or container
-        # Fluent Bit stores the line under "log"; some agents use "message".
-        line = parsed.get("log")
-        if not isinstance(line, str):
-            line = parsed.get("message")
-        if isinstance(line, str):
-            message = line
-
-    # CloudWatch timestamps are epoch milliseconds. Emit ISO-8601 so the
-    # resolver's ``_ns_to_iso`` passes it through untouched (it only
-    # reinterprets all-digit strings as Loki nanoseconds).
+    if not isinstance(parsed, dict):
+        return None
+    kube = parsed.get("kubernetes")
+    if not isinstance(kube, dict):
+        return None
+    labels = kube.get("labels")
+    if not isinstance(labels, dict) or kube.get("namespace_name") != selector["namespace"]:
+        return None
+    if labels.get("astrolift.io/app") != selector["app"]:
+        return None
+    if "workload" in selector and labels.get("astrolift.io/workload") != selector["workload"]:
+        return None
+    # Pod/stream fields describe an already admitted record; neither grants ownership.
+    pod = kube.get("pod_name") or event.get("logStreamName") or ""
+    container = kube.get("container_name") or ""
+    if not isinstance(pod, str) or not isinstance(container, str):
+        return None
+    message = parsed.get("log")
+    if not isinstance(message, str):
+        message = parsed.get("message")
+    if not isinstance(message, str):
+        message = raw_message
     ts_ms = event.get("timestamp")
     if isinstance(ts_ms, int | float):
         timestamp = dt.datetime.fromtimestamp(ts_ms / 1000, tz=dt.UTC).isoformat()
     else:
         timestamp = str(ts_ms or "")
-
     return LogLine(
         timestamp=timestamp,
-        namespace=namespace,
+        namespace=kube["namespace_name"],
         pod=pod,
         container=container,
         message=message.rstrip("\n"),
         level=None,
-        labels=None,
+        labels={key: value for key, value in labels.items() if isinstance(key, str) and isinstance(value, str)},
     )
 
 
 def _try_json(text: str) -> Any:
+    def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("Ambiguous event metadata")
+            result[key] = value
+        return result
+
     try:
-        return json.loads(text)
+        return json.loads(text, object_pairs_hook=unique)
     except (ValueError, TypeError):
         return None

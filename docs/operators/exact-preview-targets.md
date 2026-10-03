@@ -76,6 +76,96 @@ foreign keys, and reads stored deployment snapshots without live pricing or
 computed deployment-status provider calls. Its cursor is scoped to that preview
 and environment. A stale or retired target is refused rather than substituted.
 
+## Exact live streams and log exports
+
+The additive #2257 contract extends the four historical-log selectors to
+`astroliftOnAppLog`, `astroliftOnAppLogs`, and `ExportAppLogsInput`. Require a
+server advertising `previews.reviewed_live_logs` and `previews.reviewed_log_exports`
+before using these fields. Capability metadata is informational; live logs still
+require `APP_READ_LOGS`, and exports require `APP_LOG_EXPORT`, at the actual app
+and preview environment operation context. Neither capability grants access.
+
+```graphql
+subscription PreviewTail(
+  $app: String!, $preview: GUID!, $environment: GUID!,
+  $previewVersion: Int!, $environmentVersion: Int!
+) {
+  astroliftOnAppLogs(
+    appSlug: $app, previewId: $preview, expectedEnvironmentId: $environment,
+    ifMatchPreviewVersion: $previewVersion,
+    ifMatchEnvironmentVersion: $environmentVersion, follow: true, tailLines: 100
+  ) { podName container timestamp message stream }
+}
+
+mutation PreviewExport($input: ExportAppLogsInput!) {
+  exportAstroliftAppLogs(input: $input) {
+    ok errors { code message field }
+    data { id status downloadUrl sha256 byteCount rowCount truncated expiresAt }
+  }
+}
+```
+
+Supply the export input with `appSlug`, `podName`, `format` (`CSV`, `NDJSON` or
+`TXT`) and all four selectors from the exact preview read. An optional
+`environmentName` must equal that read's canonical name. Single-pod live logs
+also require `podName`; plural live logs discover replicas only inside the
+reviewed namespace. Explicit pod, workload and container selections must match
+current discovery inside that namespace before log bytes open. These checks use
+existing provider pod metadata; they do not provide an atomic Kubernetes pod-UID
+lease or prove future pods by name alone.
+
+All four selectors must be present together. Missing proof for a name or route
+that identifies an actual preview is refused. Partial proof, changed versions,
+foreign ownership, deleted/replaced bindings, retirement, and invalid placement
+return a static `PRECONDITION` without trying the production/default cluster.
+Ordinary app log requests retain their existing behavior. Refresh exact metadata
+and start an explicitly reviewed new request after a refusal; never silently
+replace the target or resume an old stream onto a replacement environment.
+
+Exact streams recheck active requester membership, live credential expiry and
+revocation, current grants and operation policies, and the entire captured
+app/environment/cluster binding before provider setup, before each emitted line,
+and while idle at one-second intervals. Refusal closes underlying streams and
+returns a static GraphQL error (`PRECONDITION` or `PERMISSION_DENIED`). This is
+periodic authorization, not a permanent lease or an atomic provider-write fence.
+Exact exports cap the existing line count and add a 30-second source-read deadline;
+they perform the same checks during collection and before publishing a receipt.
+Failed or refused reads do not produce a successful artifact receipt.
+
+Preview artifacts retain only reviewed identity/version and original authority
+metadata in `source_snapshot`, alongside the existing log artifact storage.
+They retain no token value or copied log body in the receipt. Their opaque download
+URL and TTL are necessary but insufficient:
+
+- A same-origin browser must use the original requester's authenticated session.
+- A bearer client must send the same original API credential; a different token,
+  even owned by the same user, cannot widen access to the old artifact.
+- Both paths recheck the requester, present grants, original credential scopes and
+  team ceiling, live token validity when one created the export, exact source
+  lifecycle and versions, artifact status and TTL. Browser use never bypasses the
+  original token's revocation or scope ceiling.
+
+Preview downloads use `Cache-Control: private, no-store` so shared caches do not
+serve a previous authenticated response as fresh authorization. The download
+view returns opaque `404` on link, source or access refusal. An
+invalid or expired bearer can instead be rejected by the shared authentication
+middleware with generic `401` before the view runs. Each 64-KiB artifact chunk is
+checked before reading under ASGI; mid-transfer refusal closes the file and
+truncates the response. A client must verify `Content-Length` and
+`X-App-Log-Export-Sha256` rather than treat a partial transfer as success. The link
+never reruns a provider query. Old receipts remain empty and gain no inferred
+preview proof; a legacy artifact whose recorded environment currently identifies
+a preview is refused. Ordinary legacy capability-link exports retain their
+existing token-and-TTL behavior.
+
+These server contracts do not add a live WebSocket or export command to the CLI.
+The current `astro app previews logs` command uses guarded historical GraphQL
+polling, carrying all four selectors on every page and follow request. The web
+preview detail also uses the existing historical query. API clients can consume
+the new live/export fields explicitly; native mobile acceptance remains separate.
+Local PostgreSQL/provider-boundary tests establish source and authorization
+contracts, not successful log delivery from a live production preview.
+
 ## Web and CLI
 
 The web detail route reads one GUID rather than finding it in a capped catalog.

@@ -41,6 +41,10 @@ def resolve_trace_driver(*, app, environment_name: str | None = None):
     if env is None or env.tenant_cluster_id is None:
         return None
 
+    return driver_for_environment(env)
+
+
+def driver_for_environment(env):
     cfg = env.tenant_cluster.provider_config or {}
     driver_kind = (cfg.get("trace_driver") or "").strip().lower()
     if not driver_kind:

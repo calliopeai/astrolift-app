@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import datetime as dt
 import json
-import os
 from types import SimpleNamespace
 from typing import Any
 
@@ -23,6 +22,7 @@ import pytest
 from _sdk.observability.cloudwatch_logs import (
     CloudWatchLogsConfig,
     CloudWatchLogsQueryDriver,
+    CloudWatchLogsRetentionDriver,
 )
 
 
@@ -71,6 +71,7 @@ def test_maps_container_insights_json_events() -> None:
                                 "namespace_name": "acme-hello",
                                 "pod_name": "hello-obs-api-0",
                                 "container_name": "api",
+                                "labels": {"astrolift.io/app": "hello-obs"},
                             },
                         }
                     ),
@@ -99,34 +100,23 @@ def test_maps_container_insights_json_events() -> None:
     assert line.timestamp == "2026-01-01T00:00:00+00:00"
 
 
-def test_maps_plain_events_via_stream_name() -> None:
-    """A plain (non-JSON) log group carries the message verbatim; pod
-    identity falls back to the stream name."""
+def test_plain_events_are_not_attributed_by_stream_or_request_namespace() -> None:
     client = FakeLogsClient(
         {
             "events": [
                 {
                     "timestamp": 1_767_225_600_000,
-                    "logStreamName": "worker-7",
-                    "message": "plain text line",
-                },
-            ],
+                    "logStreamName": "hello-obs-worker-7",
+                    "message": "hello-obs plain text line",
+                }
+            ]
         }
     )
     since, until = _query_window()
     page = _driver(client).query_logs(
-        '{namespace="acme-hello",app="hello-obs"}',
-        since,
-        until,
-        limit=100,
-        cursor="",
-        level=None,
-        search=None,
+        '{namespace="acme-hello",app="hello-obs"}', since, until, limit=100, cursor="", level=None, search=None
     )
-    assert page.items[0].pod == "worker-7"
-    assert page.items[0].message == "plain text line"
-    # No JSON kube metadata ⇒ namespace falls back to the selector's.
-    assert page.items[0].namespace == "acme-hello"
+    assert page.items == []
 
 
 def test_request_shape_time_window_filter_and_prefix() -> None:
@@ -153,18 +143,23 @@ def test_request_shape_time_window_filter_and_prefix() -> None:
     assert kw["limit"] == 250
     assert kw["logStreamNamePrefix"] == "acme-hello_"
     assert kw["nextToken"] == "page-1"
-    # app + workload + search as AND-ed quoted terms.
-    assert kw["filterPattern"] == '"hello-obs" "api" "timeout"'
+    # Exact metadata identity predicates; search is not ownership authority.
+    assert kw["filterPattern"] == (
+        '{ $.kubernetes.namespace_name = "acme-hello" && '
+        "$.kubernetes.labels.['astrolift.io/app'] = \"hello-obs\" && "
+        "$.kubernetes.labels.['astrolift.io/workload'] = \"api\" }"
+    )
     # No-data page still carries the backend cursor forward.
     assert page.items == []
     assert page.next_cursor == "page-2"
 
 
-def test_no_filter_pattern_when_nothing_to_scope() -> None:
+def test_unscoped_selector_is_refused_before_request() -> None:
     client = FakeLogsClient({"events": []})
     since, until = _query_window()
-    _driver(client).query_logs("{}", since, until, limit=10, cursor="", level=None, search=None)
-    assert "filterPattern" not in client.last_kwargs
+    with pytest.raises(ValueError, match="exact namespace and app"):
+        _driver(client).query_logs("{}", since, until, limit=10, cursor="", level=None, search=None)
+    assert client.last_kwargs is None
 
 
 def test_query_error_propagates() -> None:
@@ -173,20 +168,22 @@ def test_query_error_propagates() -> None:
             raise RuntimeError("throttled")
 
     since, until = _query_window()
-    with pytest.raises(RuntimeError, match="throttled"):
-        _driver(Boom()).query_logs("{}", since, until, limit=10, cursor="", level=None, search=None)
+    with pytest.raises(RuntimeError, match="CloudWatch historical log read failed"):
+        _driver(Boom()).query_logs(
+            '{namespace="acme-hello",app="hello-obs"}', since, until, limit=10, cursor="", level=None, search=None
+        )
 
 
 # ---- moto end-to-end -------------------------------------------------
 
 
 @pytest.fixture
-def _aws_creds() -> None:
-    os.environ.setdefault("AWS_ACCESS_KEY_ID", "testing")
-    os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")
-    os.environ.setdefault("AWS_SECURITY_TOKEN", "testing")
-    os.environ.setdefault("AWS_SESSION_TOKEN", "testing")
-    os.environ.setdefault("AWS_DEFAULT_REGION", "us-west-2")
+def _aws_creds(monkeypatch) -> None:
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "testing")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
+    monkeypatch.setenv("AWS_SECURITY_TOKEN", "testing")
+    monkeypatch.setenv("AWS_SESSION_TOKEN", "testing")
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-west-2")
 
 
 def test_end_to_end_against_moto(_aws_creds: None) -> None:
@@ -209,8 +206,32 @@ def test_end_to_end_against_moto(_aws_creds: None) -> None:
             logGroupName=group,
             logStreamName=stream,
             logEvents=[
-                {"timestamp": t0, "message": "hello-obs started"},
-                {"timestamp": t0 + 1000, "message": "hello-obs ready"},
+                {
+                    "timestamp": t0,
+                    "message": json.dumps(
+                        {
+                            "log": "hello-obs started",
+                            "kubernetes": {
+                                "namespace_name": "acme-hello",
+                                "pod_name": stream,
+                                "labels": {"astrolift.io/app": "hello-obs"},
+                            },
+                        }
+                    ),
+                },
+                {
+                    "timestamp": t0 + 1000,
+                    "message": json.dumps(
+                        {
+                            "message": "hello-obs ready",
+                            "kubernetes": {
+                                "namespace_name": "acme-hello",
+                                "pod_name": stream,
+                                "labels": {"astrolift.io/app": "hello-obs"},
+                            },
+                        }
+                    ),
+                },
             ],
         )
 
@@ -219,12 +240,9 @@ def test_end_to_end_against_moto(_aws_creds: None) -> None:
         )
         since = (now - dt.timedelta(hours=1)).isoformat()
         until = (now + dt.timedelta(hours=1)).isoformat()
-        # Namespace-only selector ⇒ no filterPattern, so this exercises
-        # the window + event→LogLine mapping end-to-end without leaning
-        # on moto's filter-pattern parser (the pattern shape is pinned
-        # by the fake-client test above).
+        # Keep exact recorded namespace/app metadata through the real SDK request.
         page = driver.query_logs(
-            '{namespace="acme-hello"}',
+            '{namespace="acme-hello",app="hello-obs"}',
             since,
             until,
             limit=100,
@@ -269,3 +287,20 @@ def test_resolve_log_query_driver_cloudwatch_requires_group_and_region() -> None
         },
     )
     assert cluster_log_query.resolve_log_query_driver(cluster) is None
+
+
+def test_moto_native_retention_remains_idempotent_and_rounds_up(_aws_creds: None) -> None:
+    boto3 = pytest.importorskip("boto3")
+    moto = pytest.importorskip("moto")
+    with moto.mock_aws():
+        client = boto3.client("logs", region_name="us-west-2")
+        group = "/aws/containerinsights/owned-retention/application"
+        client.create_log_group(logGroupName=group)
+        retention = CloudWatchLogsRetentionDriver(
+            config=CloudWatchLogsConfig(log_group=group, region="us-west-2", client=client)
+        )
+        assert retention.current_retention_days() is None
+        assert retention.apply_retention(8) == {"changed": True, "days": 14, "previous": None}
+        assert retention.current_retention_days() == 14
+        assert retention.apply_retention(14) == {"changed": False, "days": 14}
+        assert client.describe_log_groups(logGroupNamePrefix=group)["logGroups"][0]["retentionInDays"] == 14
