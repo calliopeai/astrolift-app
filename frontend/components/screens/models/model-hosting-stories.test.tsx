@@ -7,6 +7,8 @@ import * as deployment from "./SharedModelDeploymentScreen.stories";
 import * as detail from "./SharedModelDetailScreen.stories";
 import * as local from "./LocalModelImportPanel.stories";
 import * as catalogue from "./HuggingFaceCataloguePanel.stories";
+import * as journey from "./ModelHostingJourney.stories";
+import * as choice from "./ModelHostingSourceChoice.stories";
 setProjectAnnotations(preview);
 describe("model hosting portable stories", () => {
   it.each(
@@ -16,6 +18,12 @@ describe("model hosting portable stories", () => {
       ...composeStories(local),
       ...composeStories(deployment),
       ...composeStories(detail),
+      ...Object.fromEntries(
+        Object.entries(composeStories(journey)).map(([key, story]) => [`Journey${key}`, story])
+      ),
+      ...Object.fromEntries(
+        Object.entries(composeStories(choice)).map(([key, story]) => [`Source${key}`, story])
+      ),
     })
   )("%s", async (_name, Story) => {
     const canvasElement = document.createElement("div");

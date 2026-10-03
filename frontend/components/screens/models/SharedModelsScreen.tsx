@@ -28,6 +28,7 @@ export type SharedModelsScreenProps = { page: ModelPage<SharedModelListRow> };
 
 export function SharedModelsScreen({ page }: SharedModelsScreenProps) {
   const t = useTranslations("models.shared.deployments");
+  const hosting = useTranslations("models.shared.hosting");
   const format = useFormatter();
   return (
     <ListPage
@@ -44,7 +45,7 @@ export function SharedModelsScreen({ page }: SharedModelsScreenProps) {
             <Button size="sm" asChild>
               <Link href="/models/deploy">
                 <RocketIcon className="size-4" />
-                {t("browseDeploy")}
+                {hosting("title")}
               </Link>
             </Button>
           </div>
@@ -58,7 +59,7 @@ export function SharedModelsScreen({ page }: SharedModelsScreenProps) {
         title: t("empty"),
         description: t("emptyDescription"),
         actionHref: "/models/deploy",
-        actionLabel: t("browseDeploy"),
+        actionLabel: hosting("title"),
       }}
       columns={[
         {

@@ -70,6 +70,22 @@ const keys = [
   "clusterConfiguration",
   "reviewResourceRequests",
   "hardwareConfiguration",
+  "journeyTitle",
+  "modelStep",
+  "clusterStep",
+  "reviewStep",
+  "currentStep",
+  "selectedStep",
+  "upNext",
+  "readyForReview",
+  "requestAccepted",
+  "chooseModelHelp",
+  "chooseClusterHelp",
+  "reviewChecksHelp",
+  "readyHelp",
+  "acceptedHelp",
+  "huggingFaceHelp",
+  "localSourceHelp",
 ] as const;
 
 function ConnectedCopy() {

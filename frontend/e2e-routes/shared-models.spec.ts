@@ -208,9 +208,27 @@ for (const computeMode of ["cpu", "gpu"] as const) {
     ]);
     page.setDefaultTimeout(15_000);
     await page.goto("/models");
-    await page.getByRole("link", { name: "Browse and deploy", exact: true }).click();
+    await page.getByRole("link", { name: "Host a model", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Host a model", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Qwen/Qwen3-0.6B", exact: true }).click();
+    const journey = page.getByRole("navigation", { name: "Hosting setup", exact: true });
+    await expect(journey).toContainText("Choose model");
+    await expect(journey).toContainText("Choose a model from Hugging Face or import your files.");
+    await expect(page.getByRole("button", { name: "Hugging Face", exact: true })).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
+    await expect(
+      page.getByRole("button", { name: "Local model files", exact: true })
+    ).toBeEnabled();
+    await expect(page.getByText("Runtime compatibility unknown", { exact: true })).toHaveCount(0);
+    const modelChoice = page.getByRole("button", { name: "Qwen/Qwen3-0.6B", exact: true });
+    await expect(modelChoice).toBeVisible();
+    if (computeMode === "cpu")
+      await page.screenshot({
+        path: "/tmp/astrolift-hosting-ux-source.png",
+        animations: "disabled",
+      });
+    await modelChoice.click();
     await page
       .getByRole("button", { name: "Choose cluster and check access", exact: true })
       .click();
@@ -237,6 +255,22 @@ for (const computeMode of ["cpu", "gpu"] as const) {
       })
       .check();
     await expect(review).toBeEnabled();
+    await expect(journey).toContainText("Ready for review");
+    if (computeMode === "cpu") {
+      await page
+        .getByRole("heading", { name: "3. Review hosting checks", exact: true })
+        .scrollIntoViewIfNeeded();
+      await page.screenshot({
+        path: "/tmp/astrolift-hosting-ux-checks.png",
+        animations: "disabled",
+      });
+      await page.setViewportSize({ width: 768, height: 1024 });
+      await page.screenshot({
+        path: "/tmp/astrolift-hosting-ux-checks-768.png",
+        animations: "disabled",
+      });
+      await page.setViewportSize({ width: 1440, height: 1000 });
+    }
     expect(await (await context.request.get(`${api}/observations/model-writes`)).json()).toEqual(
       []
     );
@@ -310,6 +344,8 @@ test("read-only model catalogue cannot host through a direct wizard route", asyn
     page.getByText("Controlled hosting authority refusal.", { exact: true })
   ).toBeVisible();
   await expect(page.getByRole("button", { name: "Host model", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Hugging Face", exact: true })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Local model files", exact: true })).toBeDisabled();
   expect(await (await context.request.get(`${api}/observations/model-writes`)).json()).toEqual([]);
   expect(await (await context.request.get(`${api}/observations`)).json()).toEqual({
     errors: [],

@@ -312,9 +312,9 @@ describe("shared model create Apollo boundary", () => {
     async (mode) => {
       render(<SharedModelDeploymentClient />, { wrapper: wrapper() });
       await screen.findByRole("button", { name: en.models.shared.hosting.host });
-      fireEvent.change(screen.getByLabelText(en.models.shared.localImport.selectSource), {
-        target: { value: "local" },
-      });
+      fireEvent.click(
+        screen.getByRole("button", { name: en.models.shared.localImport.localSource })
+      );
       const select = await screen.findByRole("button", {
         name: en.models.shared.localImport.select,
       });

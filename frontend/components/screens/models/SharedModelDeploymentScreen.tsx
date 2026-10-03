@@ -1,5 +1,7 @@
 "use client";
 
+import { ModelHostingJourney } from "./ModelHostingJourney";
+
 import { useLayoutEffect, useRef, useState, useId, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
@@ -201,8 +203,19 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
         </Button>
       }
     >
-      <div className="space-y-6">
-        {props.sourceControls}
+      <div className="@container space-y-8">
+        <ModelHostingJourney
+          sourceAnchor={`${id}-source`}
+          clusterAnchor={`${id}-cluster`}
+          reviewAnchor={`${id}-checks`}
+          modelSelected={Boolean(model)}
+          clusterSelected={Boolean(model && cluster)}
+          readyForReview={Boolean(eligible && !createdId)}
+          accepted={Boolean(createdId)}
+        />
+        <div id={`${id}-source`} className="scroll-mt-6">
+          {props.sourceControls}
+        </div>
         {!model && catalogue}
         {model && (
           <>
@@ -220,7 +233,7 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
               </div>
             )}
             <section aria-labelledby={`${id}-cluster`} className="space-y-3">
-              <h2 id={`${id}-cluster`} className="text-lg font-semibold">
+              <h2 id={`${id}-cluster`} className="scroll-mt-6 text-lg font-semibold">
                 {hosting("placementStep")}
               </h2>
               <ListPage
@@ -233,6 +246,7 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
                   {
                     id: "name",
                     header: t("cluster"),
+                    cellClassName: "min-w-56",
                     cell: (row) => (
                       <Button
                         type="button"
@@ -248,6 +262,7 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
                   {
                     id: "state",
                     header: t("state"),
+                    cellClassName: "min-w-48",
                     cell: (row) =>
                       row.active ? t("admissionRequired") : (row.reason ?? t("inactive")),
                   },
@@ -258,7 +273,7 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
               </p>
             </section>
             <form
-              className="grid gap-4 sm:grid-cols-2"
+              className="grid gap-4 @lg:grid-cols-2"
               onSubmit={(event) => {
                 event.preventDefault();
                 if (eligible && request && cluster) {
@@ -267,7 +282,7 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
                 }
               }}
             >
-              <div className="space-y-2 sm:col-span-2">
+              <div className="space-y-2 @lg:col-span-2">
                 <Label htmlFor={`${id}-name`}>{t("name")}</Label>
                 <Input
                   id={`${id}-name`}
@@ -277,7 +292,7 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
                   required
                 />
               </div>
-              <fieldset id={`${id}-resources`} className="space-y-2 sm:col-span-2">
+              <fieldset id={`${id}-resources`} className="space-y-2 @lg:col-span-2">
                 <legend className="text-sm font-medium">{t("compute")}</legend>
                 <div className="flex flex-wrap gap-5">
                   {(["cpu", "gpu"] as const).map((mode) => (
@@ -317,7 +332,7 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
                   <p className="text-muted-foreground text-xs">{t(`${field}Help`)}</p>
                 </div>
               ))}
-              <div className="space-y-2 sm:col-span-2">
+              <div className="space-y-2 @lg:col-span-2">
                 <Label className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -332,118 +347,122 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
                   </p>
                 )}
               </div>
-              <div className="space-y-2 sm:col-span-2">
+              <div id={`${id}-checks`} className="scroll-mt-6 space-y-2 @lg:col-span-2">
                 <h2 className="text-lg font-semibold">{hosting("checksStep")}</h2>
-                <section className="space-y-2 rounded-md border p-3">
-                  <h3 className="font-medium">{hosting("accessTitle")}</h3>
-                  <p role="status">
-                    {props.sourceAccess.loading
-                      ? hosting("accessChecking")
-                      : props.sourceAccess.confirmed
-                        ? "repoId" in model
-                          ? hosting("accessConfirmed")
-                          : local("verified")
-                        : (props.sourceAccess.reason ?? hosting("accessUnknown"))}
-                  </p>
-                  <p className="text-muted-foreground text-sm">
-                    {"repoId" in model ? hosting("accessHelp") : local("description")}
-                  </p>
-                  {"repoId" in model && (
+                <div className="grid gap-4 @xl:grid-cols-2">
+                  <section className="bg-surface-1 space-y-2 rounded-md border p-4">
+                    <h3 className="font-medium">{hosting("accessTitle")}</h3>
+                    <p role="status">
+                      {props.sourceAccess.loading
+                        ? hosting("accessChecking")
+                        : props.sourceAccess.confirmed
+                          ? "repoId" in model
+                            ? hosting("accessConfirmed")
+                            : local("verified")
+                          : (props.sourceAccess.reason ?? hosting("accessUnknown"))}
+                    </p>
+                    <p className="text-muted-foreground text-sm">
+                      {"repoId" in model ? hosting("accessHelp") : local("description")}
+                    </p>
+                    {"repoId" in model && (
+                      <a
+                        className="text-primary text-sm underline"
+                        href={`https://huggingface.co/${model.repoId}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {hosting("openModel")}
+                      </a>
+                    )}
+                    {!props.sourceAccess.confirmed && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={props.sourceAccess.loading || !props.hostingAllowed}
+                        onClick={props.sourceAccess.onRetry}
+                      >
+                        {hosting("retry")}
+                      </Button>
+                    )}
+                  </section>
+                  <section className="bg-surface-1 space-y-2 rounded-md border p-4">
+                    <h3 className="font-medium">{hosting("licenseTitle")}</h3>
+                    {props.sourceAccess.license && <p>{props.sourceAccess.license}</p>}
+                    <p className="text-muted-foreground text-sm">
+                      {"repoId" in model ? hosting("licenseHelp") : local("localLicense")}
+                    </p>
+                    <Label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={props.licenseReviewed}
+                        onChange={(event) => props.onLicenseReviewed(event.target.checked)}
+                      />
+                      {"repoId" in model ? hosting("licenseReview") : local("localLicenseReview")}
+                    </Label>
+                  </section>
+                  <section className="bg-surface-1 space-y-2 rounded-md border p-4">
+                    <h3 className="font-medium">{hosting("hardwareTitle")}</h3>
+                    <p className="text-muted-foreground text-sm">{hosting("hardwareHelp")}</p>
+                    <p className="text-muted-foreground text-sm">{hosting("hardwarePending")}</p>
+                    <a className="text-primary block text-sm underline" href={`#${id}-resources`}>
+                      {hosting("reviewResourceRequests")}
+                    </a>
+                    {cluster && (
+                      <Link
+                        className="text-primary block text-sm underline"
+                        href={`/clusters/${encodeURIComponent(cluster.slug)}/settings`}
+                      >
+                        {hosting("hardwareConfiguration")}
+                      </Link>
+                    )}
+                  </section>
+                  <section className="bg-surface-1 space-y-2 rounded-md border p-4">
+                    <h3 className="font-medium">{hosting("runtimeTitle")}</h3>
+                    <p className="text-muted-foreground text-sm">{hosting("runtimeHelp")}</p>
                     <a
                       className="text-primary text-sm underline"
-                      href={`https://huggingface.co/${model.repoId}`}
+                      href="https://docs.vllm.ai/en/v0.15.1/models/supported_models/"
                       target="_blank"
                       rel="noreferrer"
                     >
-                      {hosting("openModel")}
+                      {hosting("supportedArchitectures")}
                     </a>
-                  )}
-                  {!props.sourceAccess.confirmed && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={props.sourceAccess.loading || !props.hostingAllowed}
-                      onClick={props.sourceAccess.onRetry}
-                    >
-                      {hosting("retry")}
-                    </Button>
-                  )}
-                </section>
-                <section className="space-y-2 rounded-md border p-3">
-                  <h3 className="font-medium">{hosting("licenseTitle")}</h3>
-                  {props.sourceAccess.license && <p>{props.sourceAccess.license}</p>}
-                  <p className="text-muted-foreground text-sm">
-                    {"repoId" in model ? hosting("licenseHelp") : local("localLicense")}
-                  </p>
-                  <Label className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={props.licenseReviewed}
-                      onChange={(event) => props.onLicenseReviewed(event.target.checked)}
-                    />
-                    {"repoId" in model ? hosting("licenseReview") : local("localLicenseReview")}
-                  </Label>
-                </section>
-                <section className="space-y-2 rounded-md border p-3">
-                  <h3 className="font-medium">{hosting("hardwareTitle")}</h3>
-                  <p className="text-muted-foreground text-sm">{hosting("hardwareHelp")}</p>
-                  <p className="text-muted-foreground text-sm">{hosting("hardwarePending")}</p>
-                  <a className="text-primary block text-sm underline" href={`#${id}-resources`}>
-                    {hosting("reviewResourceRequests")}
-                  </a>
-                  {cluster && (
-                    <Link
-                      className="text-primary block text-sm underline"
-                      href={`/clusters/${encodeURIComponent(cluster.slug)}/settings`}
-                    >
-                      {hosting("hardwareConfiguration")}
-                    </Link>
-                  )}
-                </section>
-                <h3 className="font-medium">{hosting("runtimeTitle")}</h3>
-                <p className="text-muted-foreground text-sm">{hosting("runtimeHelp")}</p>
-                <a
-                  className="text-primary text-sm underline"
-                  href="https://docs.vllm.ai/en/v0.15.1/models/supported_models/"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {hosting("supportedArchitectures")}
-                </a>
-                {cluster && (
-                  <Link
-                    className="text-primary block text-sm underline"
-                    href={`/clusters/${encodeURIComponent(cluster.slug)}/settings`}
-                  >
-                    {hosting("clusterConfiguration")}
-                  </Link>
-                )}
-                {admissionLoading ? (
-                  <p role="status">{t("verifying")}</p>
-                ) : admissionError ? (
-                  <div role="alert">
-                    <p>{admissionError}</p>
-                    <Button type="button" variant="outline" onClick={onRetryAdmission}>
-                      {t("retry")}
-                    </Button>
-                  </div>
-                ) : admission?.requestKey === requestKey && admission.eligible ? (
-                  <>
-                    <p>
-                      {t("runtimeVerified", {
-                        version: admission.runtimeVersion ?? t("unknown"),
-                        architecture: admission.architecture ?? t("unknown"),
-                      })}
-                    </p>
-                    <p className="text-muted-foreground text-sm">{t("hardwareUnknown")}</p>
-                  </>
-                ) : (
-                  <p role="status">
-                    {admission?.requestKey === requestKey && admission.reason
-                      ? admission.reason
-                      : t("unverified")}
-                  </p>
-                )}
+                    {cluster && (
+                      <Link
+                        className="text-primary block text-sm underline"
+                        href={`/clusters/${encodeURIComponent(cluster.slug)}/settings`}
+                      >
+                        {hosting("clusterConfiguration")}
+                      </Link>
+                    )}
+                    {admissionLoading ? (
+                      <p role="status">{t("verifying")}</p>
+                    ) : admissionError ? (
+                      <div role="alert">
+                        <p>{admissionError}</p>
+                        <Button type="button" variant="outline" onClick={onRetryAdmission}>
+                          {t("retry")}
+                        </Button>
+                      </div>
+                    ) : admission?.requestKey === requestKey && admission.eligible ? (
+                      <>
+                        <p>
+                          {t("runtimeVerified", {
+                            version: admission.runtimeVersion ?? t("unknown"),
+                            architecture: admission.architecture ?? t("unknown"),
+                          })}
+                        </p>
+                        <p className="text-muted-foreground text-sm">{t("hardwareUnknown")}</p>
+                      </>
+                    ) : (
+                      <p role="status">
+                        {admission?.requestKey === requestKey && admission.reason
+                          ? admission.reason
+                          : t("unverified")}
+                      </p>
+                    )}
+                  </section>
+                </div>
                 <Button type="submit" disabled={!eligible || Boolean(createdId)}>
                   {t("review")}
                 </Button>

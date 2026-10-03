@@ -1,11 +1,11 @@
 "use client";
-import { useTranslations } from "next-intl";
 import { useLocalModelImport } from "./use-local-model-import";
 import type { LocalModelImportProps } from "./LocalModelImportPanel";
 import { LocalModelImportPanel } from "./LocalModelImportPanel";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { useMe } from "@/graphql/user/user.hooks";
 import { ModelHostingSourcePanel } from "./ModelHostingSourcePanel";
+import { ModelHostingSourceChoice } from "./ModelHostingSourceChoice";
 import { SharedModelDeploymentScreen } from "./SharedModelDeploymentScreen";
 import { HuggingFaceCataloguePanel } from "./HuggingFaceCataloguePanel";
 import { useSharedModelDeployment } from "./use-shared-model-deployment";
@@ -15,7 +15,6 @@ export function SharedModelDeploymentClient() {
   return <PlacementContext key={`${org?.id ?? "no-organization"}:${user?.id ?? "no-actor"}`} />;
 }
 function PlacementContext() {
-  const t = useTranslations("models.shared.localImport");
   const { catalogueProps, hostingProps, onUseLocalArtifact, sourceKind, onSourceKind, ...props } =
     useSharedModelDeployment();
   return (
@@ -23,18 +22,11 @@ function PlacementContext() {
       {...props}
       sourceControls={
         <div className="space-y-4">
-          <label className="flex flex-col gap-2">
-            {t("selectSource")}
-            <select
-              value={sourceKind}
-              onChange={(event) =>
-                onSourceKind(event.target.value === "local" ? "local" : "huggingface")
-              }
-            >
-              <option value="huggingface">{t("huggingFace")}</option>
-              <option value="local">{t("localSource")}</option>
-            </select>
-          </label>
+          <ModelHostingSourceChoice
+            value={sourceKind}
+            allowed={hostingProps.allowed}
+            onChange={onSourceKind}
+          />
           {sourceKind === "huggingface" && <ModelHostingSourcePanel {...hostingProps} />}
         </div>
       }

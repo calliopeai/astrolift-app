@@ -16,7 +16,7 @@ export const Full: Story = {
   args: sharedModelsProps,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole("link", { name: "Browse and deploy" })).toHaveAttribute(
+    await expect(canvas.getByRole("link", { name: "Host a model" })).toHaveAttribute(
       "href",
       "/models/deploy"
     );

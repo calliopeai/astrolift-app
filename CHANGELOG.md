@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Guide model hosting with visible setup steps, Hugging Face and local-file
+  source cards, a prominent Host action and grouped access, license, runtime
+  and hardware checks in all eight locales. Keep accepted requests distinct
+  from deployment readiness (#2266).
+
 - Return the exact public deployment GUID in both legacy and paged timeline
   ownership references, preserving authorization, paging and legacy limits
   without per-row parent lookups (#2265).

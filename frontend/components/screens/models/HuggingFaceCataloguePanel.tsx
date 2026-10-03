@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { SearchIcon } from "lucide-react";
 import { ListPage } from "@/components/list/ListPage";
@@ -53,6 +53,17 @@ export function HuggingFaceCataloguePanel(props: HuggingFaceCataloguePanelProps)
   const hosting = useTranslations("models.shared.hosting");
   const fmt = useFormatter();
   const id = useId();
+  const selection = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selectedRepoId) {
+      selection.current?.scrollIntoView?.({
+        block: "start",
+        behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+      });
+    }
+  }, [selectedRepoId]);
   const revisionSha = resolvedModel?.revisionSha;
   const pinned =
     !resolving &&
@@ -88,24 +99,29 @@ export function HuggingFaceCataloguePanel(props: HuggingFaceCataloguePanelProps)
           {t("title")}
         </h2>
         <p className="text-muted-foreground text-sm">{t("description")}</p>
-        <dl className="grid gap-3 rounded-md border p-3 text-sm sm:grid-cols-2">
-          <div>
-            <dt className="font-medium">{hosting("accessTitle")}</dt>
-            <dd>{hosting("accessUnknown")}</dd>
-          </div>
-          <div>
-            <dt className="font-medium">{hosting("licenseTitle")}</dt>
-            <dd>{hosting("licenseHelp")}</dd>
-          </div>
-          <div>
-            <dt className="font-medium">{hosting("runtimeTitle")}</dt>
-            <dd>{hosting("runtimePending")}</dd>
-          </div>
-          <div>
-            <dt className="font-medium">{hosting("hardwareTitle")}</dt>
-            <dd>{hosting("hardwareHelp")}</dd>
-          </div>
-        </dl>
+        <details className="text-sm">
+          <summary className="text-muted-foreground cursor-pointer">
+            {hosting("reviewStep")}
+          </summary>
+          <dl className="mt-3 grid gap-3 text-sm @lg:grid-cols-2">
+            <div>
+              <dt className="font-medium">{hosting("accessTitle")}</dt>
+              <dd>{hosting("accessUnknown")}</dd>
+            </div>
+            <div>
+              <dt className="font-medium">{hosting("licenseTitle")}</dt>
+              <dd>{hosting("licenseHelp")}</dd>
+            </div>
+            <div>
+              <dt className="font-medium">{hosting("runtimeTitle")}</dt>
+              <dd>{hosting("runtimePending")}</dd>
+            </div>
+            <div>
+              <dt className="font-medium">{hosting("hardwareTitle")}</dt>
+              <dd>{hosting("hardwareHelp")}</dd>
+            </div>
+          </dl>
+        </details>
       </div>
       {source && (
         <p className="text-muted-foreground text-xs break-all">
@@ -200,7 +216,7 @@ export function HuggingFaceCataloguePanel(props: HuggingFaceCataloguePanelProps)
         ]}
       />
       {selectedRepoId && (
-        <div className="bg-surface-1 space-y-3 rounded-md border p-4">
+        <div ref={selection} className="bg-surface-1 scroll-mt-6 space-y-3 rounded-md border p-4">
           <h3 className="font-medium break-all">{selectedRepoId}</h3>
           <Label htmlFor={`${id}-revision`}>{t("revision")}</Label>
           <Input
