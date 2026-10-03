@@ -36,7 +36,7 @@ def test_nginx_variant_registered():
     assert EDGE_METRICS_BY_VARIANT["nginx_ingress"] is NGINX_INGRESS
     assert NGINX_INGRESS.requests_total == "nginx_ingress_controller_requests"
     assert NGINX_INGRESS.duration_bucket == "nginx_ingress_controller_request_duration_seconds_bucket"
-    assert NGINX_INGRESS.namespace_label == "exported_namespace"
+    assert NGINX_INGRESS.namespace_label == "namespace"
     assert NGINX_INGRESS.status_label == "status"
 
 
@@ -80,8 +80,8 @@ def test_request_rate_edge_shape():
         edge=NGINX_INGRESS,
         namespace=_NS,
     )
-    assert plan.promql == (f'sum(rate(nginx_ingress_controller_requests{{exported_namespace="{_NS}"}}[1m]))')
-    assert plan.labels == {"exported_namespace": _NS}
+    assert plan.promql == (f'sum(rate(nginx_ingress_controller_requests{{namespace="{_NS}"}}[1m]))')
+    assert plan.labels == {"namespace": _NS}
 
 
 def test_error_rate_edge_shape_uses_variant_status_label():
@@ -108,8 +108,10 @@ def test_latency_edge_shape():
         namespace=_NS,
     )
     assert plan.promql == (
-        "histogram_quantile(0.95, sum by (le)(rate("
-        f'nginx_ingress_controller_request_duration_seconds_bucket{{exported_namespace="{_NS}"}}[1m])))'
+        "(histogram_quantile(0.95, sum by (le)(rate("
+        f'nginx_ingress_controller_request_duration_seconds_bucket{{namespace="{_NS}"}}[1m])))) '
+        "and on() (sum(rate("
+        f'nginx_ingress_controller_request_duration_seconds_bucket{{namespace="{_NS}",le="+Inf"}}[1m])) > 0)'
     )
 
 

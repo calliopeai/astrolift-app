@@ -56,3 +56,12 @@ def test_metrics_serve_monitor_still_enabled():
     controller = _ingress_component().helm_values["controller"]
     assert controller["metrics"]["enabled"] is True
     assert controller["metrics"]["serviceMonitor"]["enabled"] is True
+
+
+def test_metrics_queries_use_the_namespace_preserved_by_the_collector():
+    """Shared controller metadata must not replace the application identity."""
+    from providers._sdk.edge_metrics import NGINX_INGRESS
+
+    monitor = _ingress_component().helm_values["controller"]["metrics"]["serviceMonitor"]
+    assert monitor["honorLabels"] is True
+    assert NGINX_INGRESS.namespace_label == "namespace"
