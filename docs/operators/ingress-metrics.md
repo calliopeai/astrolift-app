@@ -29,6 +29,35 @@ The Prometheus operator must select the ServiceMonitor's namespace and labels.
 renames that label to `exported_namespace` and stamps the controller's namespace
 as `namespace`, so healthy scrapes still cannot satisfy the app's query.
 
+Older control-plane versions query `exported_namespace`. During a paired upgrade,
+keep `honorLabels: true` and copy the metric namespace to that compatibility label:
+
+```yaml
+controller:
+  metrics:
+    serviceMonitor:
+      metricRelabelings:
+        - sourceLabels: [namespace]
+          targetLabel: exported_namespace
+          regex: '(.+)'
+          replacement: '$1'
+          action: replace
+```
+
+Append this to existing metric relabel rules. It preserves the same app identity
+for both versions. Confirm the rule is loaded in Prometheus and allow at least
+two scrapes before checking rates. New label sets start new time series;
+latency quantiles require requests after the change. Retain the alias until
+all readers use `namespace`.
+
+Before and after reconciling controller values, check every app's public HTTPS
+route and the load balancer's target health. When an AWS NLB terminates TLS and
+forwards to nginx's HTTPS port, the controller Service needs
+`service.beta.kubernetes.io/aws-load-balancer-backend-protocol: ssl` in its
+persisted Helm values. A TCP backend sends plain HTTP after termination and
+nginx responds `400: The plain HTTP request was sent to HTTPS port`. Preserve
+the existing certificate, ports and annotations when enabling metrics.
+
 For a cluster registered with `ingress_class: nginx`, Astrolift selects
 `nginx_ingress_controller_requests` by the app environment's namespace and
 `nginx_ingress_controller_request_duration_seconds_bucket` for latency. A shared
