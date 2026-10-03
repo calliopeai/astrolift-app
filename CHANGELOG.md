@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add a dedicated reviewed EKS historical-log collector operation with durable
+  original request/credential/source fencing, pinned archive rendering, owned
+  resource/probe checkpoints, explicit pending/uncertain outcomes, and atomic
+  reader activation after verified post-deletion historical reads (#1706).
+  Preserve external backends and IAM policies; report Linux EC2 coverage without
+  claiming Fargate coverage, ongoing health or live ingestion from local fixtures.
+
 - Execute native collector renderer and HTTP integration checks in their CI
   jobs with checksum-verified Helm and chart artifacts. Keep the composed
   registered-reader test in the Django-backed cluster suite (#1706).

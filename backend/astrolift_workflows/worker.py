@@ -192,6 +192,7 @@ from astrolift_workflows.activities.configured_workflow_schedule_fire import (
     record_scheduled_workflow_start,
 )
 from astrolift_workflows.activities.install_cluster_agent import install_cluster_agent_attempt
+from astrolift_workflows.activities.install_cluster_log_collector import install_cluster_log_collector_attempt
 from astrolift_workflows.activities.pipeline_schedule_fire import create_scheduled_pipeline_run
 from astrolift_workflows.activities.scheduled import (
     apply_observability_retention,
@@ -266,9 +267,11 @@ from astrolift_workflows.workflows import (
     WorkflowRunReconcileTickWorkflow,
 )
 from astrolift_workflows.workflows.install_cluster_agent import InstallClusterAgentWorkflow
+from astrolift_workflows.workflows.install_cluster_log_collector import InstallClusterLogCollectorWorkflow
 
 WORKFLOWS = (
     InstallClusterAgentWorkflow,
+    InstallClusterLogCollectorWorkflow,
     AgentTaskCallbackReconcileWorkflow,
     DeliverAgentTaskCallbackWorkflow,
     SharedModelReconcileWorkflow,
@@ -337,6 +340,7 @@ WORKFLOWS = (
 
 ACTIVITIES = (
     install_cluster_agent_attempt,
+    install_cluster_log_collector_attempt,
     deliver_agent_task_callback,
     reconcile_agent_task_callbacks,
     apply_shared_model,
