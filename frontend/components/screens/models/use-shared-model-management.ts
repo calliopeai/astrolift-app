@@ -83,7 +83,19 @@ export function useSharedModelManagement(
   const request = sharedModelRequest(
       model.organizationId,
       { id: model.clusterId, providerId: model.providerId },
-      model.revisionSha ? { repoId: model.modelRepo, revisionSha: model.revisionSha } : null,
+      model.sourceKind === "local_artifact" &&
+        model.localArtifactId &&
+        model.localArtifactVersion &&
+        model.localManifestSha256
+        ? {
+            localArtifactId: model.localArtifactId,
+            expectedArtifactVersion: model.localArtifactVersion,
+            manifestSha256: model.localManifestSha256,
+            name: model.name,
+          }
+        : model.revisionSha
+          ? { repoId: model.modelRepo, revisionSha: model.revisionSha }
+          : null,
       draft
     ),
     requestKey = JSON.stringify(request);
@@ -94,6 +106,10 @@ export function useSharedModelManagement(
     variables: {
       input: request ?? {
         organizationId: "",
+        connectionId: null,
+        expectedConnectionVersion: null,
+        localArtifactId: null,
+        expectedArtifactVersion: null,
         clusterId: "",
         expectedProviderId: "",
         name: "",

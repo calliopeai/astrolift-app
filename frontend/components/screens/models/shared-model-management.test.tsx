@@ -308,6 +308,10 @@ describe("real shared model management boundary", () => {
       gpuCount: 1,
       cpuKvCacheGiB: null,
       allowSubscriptions: true,
+      connectionId: null,
+      expectedConnectionVersion: null,
+      localArtifactId: null,
+      expectedArtifactVersion: null,
     });
     expect(screen.queryByText(en.models.shared.management.completedUpdate)).not.toBeInTheDocument();
   });

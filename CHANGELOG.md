@@ -2,6 +2,57 @@
 
 ## Unreleased
 
+- Return the exact public deployment GUID in both legacy and paged timeline
+  ownership references, preserving authorization, paging and legacy limits
+  without per-row parent lookups (#2265).
+
+- Add an admin-gated model Host wizard with write-only Hugging Face connections,
+  separate access/license/runtime/resource checks and verified local-file source
+  selection. Hash files in bounded worker chunks, stream private uploads with
+  cancellation, and preserve accepted verification when source refresh fails.
+  Keep import verification and queued hosting distinct from observed health,
+  with genuine copy in all eight locales (#2266).
+
+- Assemble verified local artifacts as an explicit alternate cluster-model source,
+  pin source versions through native worker delivery, join source migrations and
+  audit import transitions with metadata only. Sanitize local delivery failures
+  before returning provider results; verified files remain distinct from runtime
+  health (#2266).
+
+- Exclude signed model-file transfer capabilities from browser error records,
+  network breadcrumbs and custom replay events. Preserve span timing without
+  private request attributes or descriptions, mask replay inputs/text and disable
+  network body capture (#2266).
+
+- Evaluate generated Envoy ingress queries in a checksum-pinned native Prometheus
+  engine, proving exact-route isolation, request rates, status/error ratios,
+  millisecond latency conversion and idle-window behavior (#2250).
+
+- Map supported Langflow serial loop bodies to explicitly reviewed native Agent
+  or WorkflowDefinition GUIDs, retaining source ports and bounded input/output
+  projections through TOML/YAML and storage. Refuse stale source digests,
+  unsupported ports and target substitutions. Source scheduling and nested
+  execution are covered; full framework and container-agent parity remain open
+  (#2156).
+
+- Add admin-scoped, checksum-verified local safetensors file imports into private
+  versioned install storage, with exact cluster-model delivery ownership and
+  read-only runtime mounts. Keep upload/delivery capabilities out of workflow
+  history and public config; verified bytes do not assert runtime health (#2266).
+
+- Add organization-scoped encrypted Hugging Face read connections and separate
+  fixed-origin account, immutable-revision and repository-access checks. Require
+  fresh organization and cluster management grants before model hosting or
+  credential reads, pin each model to its reviewed connection version, and keep
+  credentials out of public projections and Temporal inputs. Disconnect unused
+  connections locally; require model deprovision first and remove only the
+  model-owned credential copy after confirmed deprovision (#2266).
+
+- Add admin-scoped, checksum-verified local safetensors file imports into private
+  versioned install storage, with exact cluster-model delivery ownership and
+  read-only runtime mounts. Keep upload/delivery capabilities out of workflow
+  history and public config; verified bytes do not assert runtime health (#2266).
+
 
 - Install private-cluster agents from the control-plane worker using an exact
   reviewed cluster/provider source and durable request identity. Keep the old

@@ -45,14 +45,18 @@ class ProvisionClusterModelInput:
     cluster_id: GUID
     expected_provider_id: GUID
     name: str
-    model_repo: str
-    revision_sha: str
     compute_mode: str
     cpu_request: str
     memory_request: str
     gpu_count: int
     allow_subscriptions: bool
+    model_repo: str | None = None
+    revision_sha: str | None = None
+    local_artifact_id: GUID | None = None
+    expected_artifact_version: int | None = None
     cpu_kv_cache_gi_b: int | None = None
+    connection_id: GUID | None = None
+    expected_connection_version: int | None = None
 
 
 @strawberry.input

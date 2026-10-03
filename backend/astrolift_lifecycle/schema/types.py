@@ -976,10 +976,12 @@ def _self_approve_allowed_safe() -> bool:
         return False
 
 
-def deployment_log_to_type(entry) -> DeploymentLogEntryType:
+def deployment_log_to_type(entry, *, deployment) -> DeploymentLogEntryType:
+    if entry.deployment_id != deployment.pk:
+        raise ValueError("Deployment log entry does not belong to the resolved deployment.")
     return DeploymentLogEntryType(
         id=GUID(str(entry.guid)),
-        deployment_id=str(entry.deployment_id),
+        deployment_id=str(deployment.guid),
         status=entry.status,
         message=entry.message or "",
         detail=entry.detail or {},

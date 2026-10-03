@@ -104,6 +104,7 @@ export function fakeModelPage<T>(patch: Partial<ModelPage<T>> = {}): ModelPage<T
 
 import type { HuggingFaceCataloguePanelProps } from "./HuggingFaceCataloguePanel";
 export const hfCatalogueProps: HuggingFaceCataloguePanelProps = {
+  hostingAllowed: true,
   page: fakeModelPage({
     rows: [
       {
@@ -153,6 +154,18 @@ const placementModel = { repoId: "Qwen/Qwen3-8B", revisionSha: "a".repeat(40) };
 export const sharedDeploymentProps: SharedModelDeploymentScreenProps = {
   organizationId: "org",
   catalogue: null,
+  sourceControls: null,
+  sourceConnection: null,
+  sourceAccess: {
+    confirmed: true,
+    loading: false,
+    reason: null,
+    license: "apache-2.0",
+    onRetry: () => {},
+  },
+  hostingAllowed: true,
+  licenseReviewed: true,
+  onLicenseReviewed: () => {},
   model: placementModel,
   onClearModel: () => {},
   clusters: fakeModelPage({
