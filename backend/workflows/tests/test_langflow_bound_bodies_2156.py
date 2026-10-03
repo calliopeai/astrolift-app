@@ -258,6 +258,11 @@ def test_actual_http_import_retains_bound_target_and_ports_with_real_role_and_to
     target = WorkflowDefinition.objects.create(
         organization=org, name="Source target", slug="source-bound-target", model_label="", is_enabled=True
     )
+    other_org = Organization.objects.create(name="Other source tenant", slug="other-source-tenant")
+    WorkflowDefinition.objects.create(
+        organization=other_org, name="Unrelated target", slug="unrelated-source-target", model_label=""
+    )
+    definitions_before = set(WorkflowDefinition.objects.values_list("pk", flat=True))
     source = bound_source(target.guid)
     client = Client()
     query = 'mutation($payload:JSON!){importWorkflowFlow(format:"langflow",payload:$payload,preview:false){ok createdSlug stages{kind workflow iteration} gaps{code severity}}}'
@@ -276,7 +281,8 @@ def test_actual_http_import_retains_bound_target_and_ports_with_real_role_and_to
         assert response.status_code == 200
         payload = response.json()
         if scope == "read:apps":
-            assert payload.get("errors") and WorkflowDefinition.objects.count() == 1
+            assert payload.get("errors")
+            assert set(WorkflowDefinition.objects.values_list("pk", flat=True)) == definitions_before
         else:
             assert not payload.get("errors")
             result = payload["data"]["importWorkflowFlow"]
