@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Use the exact log group's IAM ARN with its required suffix for collector
+  stream discovery and historical reads. Keep physical identity and tagging
+  ARNs unchanged, and keep grants confined to the owned group (#1706).
+
 - Render the collector from its reviewed archive checksum and exact prepared
   profile with a pinned offline Helm runtime. Bundle checksum-verified Linux
   amd64/arm64 renderer binaries in backend image builds, and refuse altered

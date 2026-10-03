@@ -32,7 +32,10 @@ retention is configured correctly. This change adds no collector deployment (#17
 For CloudWatch, set `log_driver: cloudwatch_logs` and `log_config.log_group` plus
 `log_config.region`. The reader uses the registered cluster's `credential` declaration,
 including its assumed role and external ID; that role needs `logs:FilterLogEvents`
-on the exact group ARN. Without an explicit declaration it uses the control plane's
+on the exact group's IAM ARN ending in `:*`. Group identity and tagging retain the
+unsuffixed ARN; the suffix does not wildcard the group name. See
+[AWS log-group ARN forms](https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_LogGroup.html).
+Without an explicit declaration it uses the control plane's
 ambient identity. Legacy `log_config.role_arn` remains supported on ambient registrations.
 Do not combine it with an explicit cluster credential: remove the legacy override
 before enabling the registered identity. Conflicting declarations and failed role
