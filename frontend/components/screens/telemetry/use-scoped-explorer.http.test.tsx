@@ -45,6 +45,7 @@ async function fixture(mode: "logs" | "traces" = "logs") {
       })
   );
   const client = new ApolloClient({
+    devtools: { enabled: false },
     cache: new InMemoryCache(),
     link: ApolloLink.from([new HttpLink({ uri: `http://127.0.0.1:${address.port}`, fetch })]),
   });
@@ -90,6 +91,44 @@ const logs = (message: string, scope = SCOPE, cursor: string | null = null) => (
     historicalAvailable: true,
     reachedRetention: false,
     totalCount: 1,
+    scope,
+  },
+});
+const tracePage = (traceId: string, scope = SCOPE) => ({
+  astroliftAppTracePage: {
+    reason: "OK",
+    items: [
+      {
+        traceId,
+        rootService: "owned",
+        rootOperation: "RETAINED_SEARCH",
+        durationMs: 5,
+        spanCount: 1,
+        statusCode: "OK",
+      },
+    ],
+    truncated: false,
+    limit: 10,
+    scope,
+  },
+});
+const spanResult = (traceId: string, operation: string, scope = SCOPE) => ({
+  astroliftTraceSpansResult: {
+    reason: "OK",
+    items: [
+      {
+        traceId,
+        spanId: "1".repeat(16),
+        parentSpanId: null,
+        service: "owned",
+        operation,
+        startTime: "1",
+        durationMs: 5,
+        statusCode: "OK",
+        attributes: {},
+        resourceAttributes: {},
+      },
+    ],
     scope,
   },
 });
@@ -275,4 +314,159 @@ it("resets the previous organization cursor before any new chooser request and o
   f.finish(5, { astroliftAppsPage: { items: [], nextCursor: null, totalCount: 0 } });
   await waitFor(() => expect(f.hook.result.current.appsLoading).toBe(false));
   expect(f.hook.result.current.apps).toEqual([]);
+});
+
+it("back to results clears detail epoch without refetching or losing applied search and rejects its late spans", async () => {
+  const f = await fixture("traces");
+  const traceId = "a".repeat(32);
+  const payload = {
+    astroliftAppTracePage: {
+      reason: "OK",
+      items: [
+        {
+          traceId,
+          rootService: "owned",
+          rootOperation: "RETAINED_SEARCH",
+          durationMs: 5,
+          spanCount: 1,
+          statusCode: "OK",
+        },
+      ],
+      truncated: false,
+      limit: 10,
+      scope: SCOPE,
+    },
+  };
+  f.finish(2, payload);
+  await waitFor(() => expect(f.hook.result.current.traces?.items).toHaveLength(1));
+  act(() => f.hook.result.current.onSearch("retained-service"));
+  await waitFor(() => expect(f.requests).toHaveLength(4));
+  f.finish(3, payload);
+  await waitFor(() => expect(f.hook.result.current.traces?.items).toHaveLength(1));
+  const retained = f.hook.result.current.traces;
+  const range = f.hook.result.current.range;
+  const status = f.hook.result.current.status;
+  act(() => f.hook.result.current.onTrace(traceId));
+  await waitFor(() => expect(f.requests).toHaveLength(5));
+  act(() => f.hook.result.current.onTrace(null));
+  expect(f.hook.result.current.traceId).toBeNull();
+  expect(f.hook.result.current.spans).toBeNull();
+  expect(f.hook.result.current.traces).toBe(retained);
+  expect(f.hook.result.current.filter).toBe("retained-service");
+  expect(f.hook.result.current.range).toBe(range);
+  expect(f.hook.result.current.status).toBe(status);
+  expect(f.hook.result.current.app?.id).toBe(APP.id);
+  expect(f.hook.result.current.environment?.id).toBe(ENV.id);
+  f.finish(4, {
+    astroliftTraceSpansResult: {
+      reason: "OK",
+      items: [
+        {
+          traceId,
+          spanId: "1".repeat(16),
+          parentSpanId: null,
+          service: "owned",
+          operation: "OLD_DETAIL_PRIVATE",
+          startTime: "1",
+          durationMs: 5,
+          statusCode: "OK",
+          attributes: {},
+          resourceAttributes: {},
+        },
+      ],
+      scope: SCOPE,
+    },
+  });
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  });
+  expect(f.requests).toHaveLength(5);
+  expect(f.hook.result.current.spans).toBeNull();
+  expect(f.hook.result.current.traces).toBe(retained);
+  act(() => f.hook.result.current.onTrace(traceId));
+  await waitFor(() => expect(f.requests).toHaveLength(6));
+  expect(f.hook.result.current.spans).toBeNull();
+  expect(f.requests[5].variables).toMatchObject({
+    traceId,
+    environmentId: ENV.id,
+    since: f.requests[3].variables.since,
+    until: f.requests[3].variables.until,
+  });
+});
+
+it.each(["transport", "graphql", "backend"])(
+  "retries a %s detail failure for the same admitted trace and immutable search window",
+  async (failure) => {
+    const f = await fixture("traces");
+    const traceId = "b".repeat(32);
+    f.finish(2, tracePage(traceId));
+    await waitFor(() => expect(f.hook.result.current.traces?.items).toHaveLength(1));
+    const retained = f.hook.result.current.traces;
+    act(() => f.hook.result.current.onTrace(traceId));
+    await waitFor(() => expect(f.requests).toHaveLength(4));
+    if (failure === "backend") {
+      f.finish(3, { astroliftTraceSpansResult: { reason: "ERROR", items: [], scope: SCOPE } });
+      await waitFor(() => expect(f.hook.result.current.spans?.reason).toBe("ERROR"));
+    } else {
+      f.requests[3].response.statusCode = failure === "transport" ? 503 : 200;
+      f.requests[3].response.setHeader("Content-Type", "application/json");
+      f.requests[3].response.end(JSON.stringify({ errors: [{ message: "RAW_DETAIL_ERROR" }] }));
+      await waitFor(() =>
+        expect(f.hook.result.current.spansError).toContain(
+          failure === "transport" ? "503" : "RAW_DETAIL_ERROR"
+        )
+      );
+    }
+    expect(f.hook.result.current.traceId).toBe(traceId);
+    const failedRetry = f.hook.result.current.onRetryTrace;
+    act(() => failedRetry());
+    await waitFor(() => expect(f.requests).toHaveLength(5));
+    expect(f.requests[4].name).toBe(f.requests[3].name);
+    expect(f.requests[4].variables).toEqual(f.requests[3].variables);
+    expect(f.hook.result.current.traceId).toBe(traceId);
+    expect(f.hook.result.current.traces).toBe(retained);
+    expect(f.hook.result.current.spansLoading).toBe(true);
+    f.finish(4, spanResult(traceId, "RETRIED_SELECTED_SPAN"));
+    await waitFor(() =>
+      expect(f.hook.result.current.spans?.items[0].operation).toBe("RETRIED_SELECTED_SPAN")
+    );
+    act(() => failedRetry());
+    expect(f.requests).toHaveLength(5);
+    expect(f.hook.result.current.spans?.items[0].operation).toBe("RETRIED_SELECTED_SPAN");
+  }
+);
+
+it("discards a retried detail after scope ABA and refuses its old retry callback", async () => {
+  const f = await fixture("traces");
+  const traceId = "d".repeat(32);
+  f.finish(2, tracePage(traceId));
+  await waitFor(() => expect(f.hook.result.current.traces?.items).toHaveLength(1));
+  act(() => f.hook.result.current.onTrace(traceId));
+  await waitFor(() => expect(f.requests).toHaveLength(4));
+  f.finish(3, { astroliftTraceSpansResult: { reason: "ERROR", items: [], scope: SCOPE } });
+  await waitFor(() => expect(f.hook.result.current.spans?.reason).toBe("ERROR"));
+  const oldRetry = f.hook.result.current.onRetryTrace;
+  act(() => oldRetry());
+  await waitFor(() => expect(f.requests).toHaveLength(5));
+  act(() => f.hook.result.current.onPickEnvironment({ ...ENV, id: "other-env", name: "staging" }));
+  await waitFor(() => expect(f.requests).toHaveLength(6));
+  act(() => f.hook.result.current.onPickEnvironment(ENV));
+  await waitFor(() => expect(f.requests).toHaveLength(7));
+  f.finish(6, tracePage(traceId));
+  await waitFor(() => expect(f.hook.result.current.traces?.items).toHaveLength(1));
+  act(() => f.hook.result.current.onTrace(traceId));
+  await waitFor(() => expect(f.requests).toHaveLength(8));
+  f.finish(4, spanResult(traceId, "OLD_RETRY_PRIVATE"));
+  f.finish(
+    5,
+    tracePage(traceId, { ...SCOPE, environmentId: "other-env", environmentName: "staging" })
+  );
+  f.finish(7, spanResult(traceId, "CURRENT_DETAIL"));
+  await waitFor(() =>
+    expect(f.hook.result.current.spans?.items[0].operation).toBe("CURRENT_DETAIL")
+  );
+  act(() => oldRetry());
+  expect(f.requests).toHaveLength(8);
+  expect(f.hook.result.current.traceId).toBe(traceId);
+  expect(f.hook.result.current.spans?.items[0].operation).toBe("CURRENT_DETAIL");
 });

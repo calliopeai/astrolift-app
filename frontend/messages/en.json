@@ -7548,6 +7548,7 @@
       "other": "Other",
       "OK": "OK",
       "ERROR": "Error"
-    }
+    },
+    "backToResults": "Back to trace results"
   }
 }

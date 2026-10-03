@@ -73,6 +73,7 @@ export function useExplorerFixture(mode: "logs" | "traces"): ExplorerProps {
     onOlder: noop,
     traceId: null,
     onTrace: noop,
+    onRetryTrace: noop,
     spans: null,
     spansLoading: false,
     spansError: null,
