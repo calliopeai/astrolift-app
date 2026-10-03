@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from functools import wraps
+
 import strawberry
 from django.apps import apps
 from django.core.exceptions import FieldDoesNotExist, ValidationError
@@ -15,6 +17,7 @@ from astrolift_identity.operation_context import agent_region_operation, instanc
 from astrolift_identity.step_up import requires_elevation
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
+from core.mutations import MutationResult as AuditMutationResult
 from core.permissions import (
     Permission,
     PermissionDenied,
@@ -57,6 +60,21 @@ class RunWorkflowDefinitionResult(MutationResult):
     temporal_run_id: str | None = None
     request_id: str | None = None
     dispatch_status: str | None = None
+
+
+def _reviewed_start_audit(fn):
+    audited = mutation_audit(action="workflow.definition.start")(fn)
+
+    @wraps(audited)
+    def wrapped(*args, **kwargs):
+        result = audited(*args, **kwargs)
+        if isinstance(result, AuditMutationResult) and not result.ok:
+            error = result.errors[0]
+            message = "Workflow start is unavailable." if error.code == ErrorCode.INTERNAL else error.message
+            return gql_failure(str(error.code), message, field=error.field)
+        return result
+
+    return wrapped
 
 
 @strawberry.type
@@ -205,7 +223,7 @@ class Mutation:
     @strawberry.mutation(
         description="Start the exact reviewed definition with declared inputs and an actor-scoped requestId; retry the same request after an uncertain response."
     )
-    @mutation_audit(action="workflow.definition.start")
+    @_reviewed_start_audit
     @require_permission(
         Permission.WORKFLOW_TRIGGER,
         scope=definition_scope_by_guid("input.definition_id"),
@@ -981,7 +999,12 @@ class Mutation:
 
         if source.pattern_kind not in SUPPORTED_EXECUTOR_PATTERNS:
             return CloneWorkflowDefinitionResult(
-                ok=False, errors=[GQLValidationError(field="pattern_kind", messages=["This workflow pattern has no supported executor"])]
+                ok=False,
+                errors=[
+                    GQLValidationError(
+                        field="pattern_kind", messages=["This workflow pattern has no supported executor"]
+                    )
+                ],
             )
 
         new_slug = _unique_clone_slug(source.slug, org)
