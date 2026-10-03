@@ -26,7 +26,9 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
+from _sdk.physical_naming import managed_service_identity, physical_name
+from aws.managed._base import ManagedServiceError, handle_for, live_ownership_refusal, parse_handle, tags_for
+from aws.managed._sns_children import assert_listed_subscription_parent, assert_subscription_parent
 from aws.session import aws_client
 
 KIND = "sms"
@@ -86,24 +88,32 @@ class SNSSmsDriver(ManagedServiceDriver):
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_sns_sms_config"])
-        topic_name = str(cfg.get("topic_name") or self._topic_name(spec))
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            recorded_arn = self._sms_topic_arn(spec.recorded_handle)
+            topic_name = recorded_arn.rsplit(":", 1)[-1]
+            if cfg.get("topic_name") not in (None, topic_name):
+                return ProvisionResult(
+                    False,
+                    spec.recorded_handle,
+                    "configured topic_name conflicts with the recorded SMS target",
+                    ["immutable_topic_name"],
+                )
+        else:
+            topic_name = str(cfg.get("topic_name") or self._topic_name(spec))
         expected_arn = self._topic_arn(topic_name)
         try:
             existing = self._topic(expected_arn)
             if existing is not None:
-                self._assert_owned(expected_arn, topic_name)
-                # topic_name is tenant-settable: the SMS marker alone lets one
-                # tenant retag another's topic as its own (#1961).
-                owned = self._sns.list_tags_for_resource(ResourceArn=expected_arn).get("Tags") or []
-                refusal = adoption_refusal(owned, spec, resource=f"SNS SMS topic {topic_name!r}")
-                if refusal is not None:
-                    raise ManagedServiceError(refusal)
+                self._assert_owned(expected_arn, topic_name, identity=spec.managed_service_id)
                 topic_arn = expected_arn
+                subscriptions = self._subscriptions(topic_arn)
                 self._sns.tag_resource(ResourceArn=topic_arn, Tags=self._tags(spec, topic_name))
             else:
+                if spec.recorded_handle:
+                    raise ManagedServiceError("recorded SNS SMS topic is missing; refusing a replacement")
                 response = self._sns.create_topic(
                     Name=topic_name,
-                    Attributes=self._topic_attributes(cfg, creating=True),
                     Tags=self._tags(spec, topic_name),
                 )
                 topic_arn = str(response.get("TopicArn") or "")
@@ -111,8 +121,9 @@ class SNSSmsDriver(ManagedServiceDriver):
                     raise ManagedServiceError(
                         f"SNS returned unexpected topic ARN {topic_arn!r}; expected {expected_arn!r}",
                     )
-                self._assert_owned(topic_arn, topic_name)
-            self._reconcile(topic_arn, cfg)
+                self._assert_owned(topic_arn, topic_name, identity=spec.managed_service_id)
+                subscriptions = self._subscriptions(topic_arn)
+            self._reconcile(topic_arn, cfg, subscriptions=subscriptions)
             sandbox = self._sandbox_status()
         except Exception as exc:
             return ProvisionResult(False, "", f"provision SNS SMS binding: {exc}", [str(exc)])
@@ -142,8 +153,10 @@ class SNSSmsDriver(ManagedServiceDriver):
                 )
             if self._topic(topic_arn) is None:
                 return UpdateResult(False, spec.handle, "SNS SMS topic does not exist", ["not_found"])
-            self._assert_owned(topic_arn, topic_name)
+            self._assert_owned(topic_arn, topic_name, identity=spec.managed_service_id)
             self._reconcile(topic_arn, cfg)
+        except ManagedServiceError as exc:
+            return UpdateResult(False, spec.handle, str(exc), ["ownership_refused"], retryable=False)
         except Exception as exc:
             if _not_found(exc):
                 return UpdateResult(False, spec.handle, "SNS SMS topic does not exist", ["not_found"])
@@ -183,12 +196,18 @@ class SNSSmsDriver(ManagedServiceDriver):
             topic_name = topic_arn.rsplit(":", 1)[-1]
             if self._topic(topic_arn) is None:
                 return DeprovisionResult(True, spec.handle, f"SNS SMS topic {topic_name} already gone")
-            self._assert_owned(topic_arn, topic_name)
+            self._assert_owned(topic_arn, topic_name, identity=spec.managed_service_id)
             self._sns.delete_topic(TopicArn=topic_arn)
         except Exception as exc:
             if _not_found(exc):
                 return DeprovisionResult(True, spec.handle, "SNS SMS topic already gone")
-            return DeprovisionResult(False, spec.handle, f"delete SNS SMS binding: {exc}", [str(exc)])
+            return DeprovisionResult(
+                False,
+                spec.handle,
+                f"delete SNS SMS binding: {exc}",
+                [str(exc)],
+                retryable=not isinstance(exc, ManagedServiceError),
+            )
         return DeprovisionResult(True, spec.handle, f"SNS SMS topic {topic_name} deleted")
 
     @driver_op(cloud="aws", driver="sms_sns")
@@ -401,7 +420,11 @@ class SNSSmsDriver(ManagedServiceDriver):
     def editable_fields(self) -> list[str]:
         return sorted(_ALLOWED_CONFIG)
 
-    def _reconcile(self, topic_arn: str, cfg: dict[str, Any]) -> None:
+    def _reconcile(
+        self, topic_arn: str, cfg: dict[str, Any], *, subscriptions: list[dict[str, Any]] | None = None
+    ) -> None:
+        if subscriptions is None:
+            subscriptions = self._subscriptions(topic_arn)
         for name, value in self._topic_attributes(cfg, creating=False).items():
             self._sns.set_topic_attributes(
                 TopicArn=topic_arn,
@@ -427,22 +450,20 @@ class SNSSmsDriver(ManagedServiceDriver):
                     "" if policy in (None, "", {}) else _json_document(policy, field="data_protection_policy")
                 ),
             )
-        self._reconcile_phone_numbers(topic_arn, cfg)
+        self._reconcile_phone_numbers(topic_arn, cfg, existing=subscriptions)
 
-    def _reconcile_phone_numbers(self, topic_arn: str, cfg: dict[str, Any]) -> None:
+    def _reconcile_phone_numbers(self, topic_arn: str, cfg: dict[str, Any], *, existing: list[dict[str, Any]]) -> None:
         desired = set(cfg.get("phone_numbers") or [])
-        existing = {
-            str(item.get("Endpoint") or ""): item
-            for item in self._subscriptions(topic_arn)
-            if item.get("Protocol") == "sms"
-        }
+        existing = {str(item.get("Endpoint") or ""): item for item in existing if item.get("Protocol") == "sms"}
         for phone_number in sorted(desired - existing.keys()):
-            self._sns.subscribe(
+            response = self._sns.subscribe(
                 TopicArn=topic_arn,
                 Protocol="sms",
                 Endpoint=phone_number,
                 ReturnSubscriptionArn=True,
             )
+            if response.get("SubscriptionArn"):
+                assert_subscription_parent(response["SubscriptionArn"], topic_arn)
         if cfg.get("prune_phone_numbers", True):
             for phone_number in sorted(existing.keys() - desired):
                 subscription_arn = str(existing[phone_number].get("SubscriptionArn") or "")
@@ -457,7 +478,9 @@ class SNSSmsDriver(ManagedServiceDriver):
             if token:
                 request["NextToken"] = token
             response = self._sns.list_subscriptions_by_topic(**request)
-            rows.extend(dict(item) for item in response.get("Subscriptions") or [])
+            for item in response.get("Subscriptions") or []:
+                assert_listed_subscription_parent(item, topic_arn)
+                rows.append(dict(item))
             token = str(response.get("NextToken") or "")
             if not token:
                 return rows
@@ -479,19 +502,30 @@ class SNSSmsDriver(ManagedServiceDriver):
 
     def _topic(self, topic_arn: str) -> dict[str, str] | None:
         try:
-            return dict(self._sns.get_topic_attributes(TopicArn=topic_arn).get("Attributes") or {})
+            attrs = dict(self._sns.get_topic_attributes(TopicArn=topic_arn).get("Attributes") or {})
+            if attrs.get("TopicArn") != topic_arn:
+                raise ManagedServiceError("live SNS SMS topic does not match the exact target")
+            return attrs
         except Exception as exc:
             if _not_found(exc):
                 return None
             raise
 
-    def _assert_owned(self, topic_arn: str, topic_name: str) -> None:
-        tags = {
-            str(item.get("Key") or ""): str(item.get("Value") or "")
-            for item in self._sns.list_tags_for_resource(ResourceArn=topic_arn).get("Tags") or []
-        }
+    def _assert_owned(self, topic_arn: str, topic_name: str, *, identity: str | None = None) -> None:
+        tags = {}
+        for item in self._sns.list_tags_for_resource(ResourceArn=topic_arn).get("Tags") or []:
+            if (
+                not isinstance(item, dict)
+                or not isinstance(item.get("Key"), str)
+                or not isinstance(item.get("Value"), str)
+                or item["Key"] in tags
+            ):
+                raise ManagedServiceError("SNS SMS ownership tags cannot be verified")
+            tags[item["Key"]] = item["Value"]
         if tags.get(_OWNERSHIP_TAG) != topic_name:
             raise ManagedServiceError(f"refusing to adopt foreign SNS SMS topic {topic_name!r}")
+        if identity is not None and live_ownership_refusal(tags, managed_service_id=identity, resource="SNS SMS topic"):
+            raise ManagedServiceError("refusing to adopt foreign SNS SMS managed-service identity")
 
     def _sandbox_status(self) -> bool | None:
         operation = getattr(self._sns, "get_sms_sandbox_account_status", None)
@@ -511,35 +545,21 @@ class SNSSmsDriver(ManagedServiceDriver):
         return [*tags_for(spec), {"Key": _OWNERSHIP_TAG, "Value": topic_name}]
 
     def _topic_name(self, spec: ProvisionSpec) -> str:
-        raw = "-".join(
-            part
-            for part in (
-                self._config.topic_name_prefix,
-                spec.organization_slug,
-                spec.app_slug,
-                spec.environment_name,
-                spec.service_handle_hint or "sms",
-            )
-            if part
-        )
-        value = re.sub(r"[^A-Za-z0-9_-]+", "-", raw).strip("-_")
-        return (value or "astrolift-sms")[:256]
+        return physical_name(spec.managed_service_id, prefix=self._config.topic_name_prefix, max_length=256)
 
     def _topic_arn(self, topic_name: str) -> str:
-        partition = (
-            "aws-cn"
-            if self._config.region.startswith("cn-")
-            else "aws-us-gov"
-            if self._config.region.startswith("us-gov-")
-            else "aws"
-        )
+        from botocore.session import get_session
+
+        partition = get_session().get_partition_for_region(self._config.region)
         return f"arn:{partition}:sns:{self._config.region}:{self._config.account_id}:{topic_name}"
 
-    @staticmethod
-    def _sms_topic_arn(handle: str) -> str:
+    def _sms_topic_arn(self, handle: str) -> str:
         kind, topic_arn = parse_handle(handle)
         if kind != KIND:
             raise ManagedServiceError(f"expected an sms handle, got {kind!r}")
+        name = topic_arn.rsplit(":", 1)[-1]
+        if not _TOPIC_NAME_RE.fullmatch(name) or topic_arn != self._topic_arn(name):
+            raise ManagedServiceError("recorded SNS SMS ARN does not match the configured driver target")
         return topic_arn
 
     def _validate_config(self, cfg: dict[str, Any]) -> str:

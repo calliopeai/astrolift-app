@@ -6,6 +6,7 @@ pattern     = "review_loop"
 description = "Classify, decide, gate edge cases on a human, then act."
 
 [[stage]]
+output_key = "stage_0"
 kind = "agent_dispatch"
 role = "classifier"
 
@@ -15,9 +16,11 @@ role = "decider"
 
 [[stage]]
 kind      = "human_gate"
+output_key = "review"
 prompt    = "Review the edge cases flagged by the classifier?"
 approvers = ["team:moderators"]
 timeout   = 86400
+back_edge = { to = "stage_0", when = "gate_rejected", max_rounds = 3, on_exhausted = "escalate" }
 
 [[stage]]
 kind = "agent_dispatch"

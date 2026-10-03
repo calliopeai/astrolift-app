@@ -60,6 +60,9 @@ export type WorkflowTopologyStage = {
   fanOutCount: number | null;
   fanOutDynamic: boolean;
   onFailure: string;
+  maxAttempts?: number;
+  backEdge?: unknown;
+  iteration?: unknown;
   timeoutSeconds: number;
 };
 
@@ -78,6 +81,9 @@ export type WorkflowStage = {
   skillRefs: unknown;
   fanOutCount: number | null;
   onFailure: string;
+  maxAttempts?: number;
+  backEdge?: unknown;
+  iteration?: unknown;
   timeoutSeconds: number;
   createdAt: string;
   agentDefinitionGuid: string | null;
@@ -145,6 +151,14 @@ export type WorkflowStageExecution = {
   guid: string;
   status: string;
   attemptNumber: number;
+  roundNumber?: number;
+  causedBy?: { edge: string; reason: string; maxRounds: number; edgeRound: number } | null;
+  fanoutStageId?: string | null;
+  fanoutParentExecutionGuid?: string | null;
+  fanoutIndex?: number | null;
+  collectionIndex?: number | null;
+  collectionStageId?: string | null;
+  collectionParentExecutionGuid?: string | null;
   startedAt: string | null;
   endedAt: string | null;
   output: unknown;
@@ -183,6 +197,9 @@ export type WorkflowManifestStage = {
   environmentSpecSlug: string | null;
   skills: string[];
   onFailure: string;
+  maxAttempts?: number;
+  backEdge?: unknown;
+  iteration?: unknown;
   timeout: number;
   fanOut: string;
   prompt: string | null;

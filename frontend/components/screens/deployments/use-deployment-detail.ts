@@ -280,8 +280,8 @@ export function useDeploymentDetail(id: string) {
       // here, so bounce back to the list.
       toast.success(t("confirmDelete.success"));
       router.push("/deployments");
-    } else if (result) {
-      throw new Error(result.errors[0]?.message ?? t("confirmDelete.failed"));
+    } else {
+      throw new Error(result?.errors[0]?.message ?? t("confirmDelete.failed"));
     }
   }
 
@@ -308,12 +308,6 @@ export function useDeploymentDetail(id: string) {
         await fetchMoreLog({
           variables: { deploymentId: id, cursor },
           updateQuery: (previous, { fetchMoreResult }) => {
-            console.log(
-              "2176debug",
-              previous.astroliftDeploymentRunLogPage.nextCursor,
-              cursor,
-              fetchMoreResult?.astroliftDeploymentRunLogPage.items.length
-            );
             if (!fetchMoreResult || previous.astroliftDeploymentRunLogPage.nextCursor !== cursor)
               return previous;
             return {

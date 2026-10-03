@@ -30,6 +30,9 @@ class WorkflowStageType:
     skill_refs: strawberry.scalars.JSON
     fan_out_count: int | None
     on_failure: str
+    max_attempts: int
+    iteration: strawberry.scalars.JSON
+    back_edge: strawberry.scalars.JSON
     timeout_seconds: int
     created_at: datetime
 
@@ -62,17 +65,69 @@ def _gate_payload(output) -> dict:
     return payload if isinstance(payload, dict) else {}
 
 
+@strawberry.type
+class WorkflowLoopCause:
+    edge: str
+    reason: str
+    max_rounds: int
+    edge_round: int
+
+
 @strawberry_django.type(WorkflowStageExecution)
 class WorkflowStageExecutionType:
     guid: strawberry.ID
     status: str
     attempt_number: int
+    round_number: int
+    collection_index: int | None
+    fanout_index: int | None
     started_at: datetime | None
     ended_at: datetime | None
     output: strawberry.scalars.JSON | None
     failure: strawberry.scalars.JSON | None
     error_message: str
     created_at: datetime
+
+    @strawberry_django.field
+    def caused_by(self) -> WorkflowLoopCause | None:
+        cause = self.caused_by
+        if not isinstance(cause, dict) or not {"edge", "reason", "max_rounds", "edge_round"} <= cause.keys():
+            return None
+        if not isinstance(cause["edge"], str) or not isinstance(cause["reason"], str):
+            return None
+        if type(cause["max_rounds"]) is not int or type(cause["edge_round"]) is not int:
+            return None
+        if not 1 <= cause["edge_round"] <= cause["max_rounds"] <= 20:
+            return None
+        return WorkflowLoopCause(edge=cause["edge"], reason=cause["reason"], max_rounds=cause["max_rounds"], edge_round=cause["edge_round"])
+
+    @strawberry_django.field
+    def fanout_stage_id(self) -> str | None:
+        parent = self.fanout_parent_execution
+        return (
+            str(parent.stage.guid)
+            if parent is not None and parent.workflow_run_id == self.workflow_run_id and parent.stage_id == self.stage_id
+            else None
+        )
+
+    @strawberry_django.field
+    def fanout_parent_execution_guid(self) -> str | None:
+        parent = self.fanout_parent_execution
+        return (
+            str(parent.guid)
+            if parent is not None and parent.workflow_run_id == self.workflow_run_id and parent.stage_id == self.stage_id
+            else None
+        )
+
+    @strawberry_django.field
+    def collection_stage_id(self) -> str | None:
+        parent = self.collection_parent_execution
+        return str(parent.stage.guid) if parent is not None and parent.workflow_run_id == self.workflow_run_id and parent.stage.definition_id == self.stage.definition_id else None
+
+    @strawberry_django.field
+    def collection_parent_execution_guid(self) -> str | None:
+        parent = self.collection_parent_execution
+        return str(parent.guid) if parent is not None and parent.workflow_run_id == self.workflow_run_id and parent.stage.definition_id == self.stage.definition_id else None
 
     @strawberry_django.field
     def execution_id(self) -> str:

@@ -439,7 +439,12 @@ class ManagedResourceReadsQuery:
             .filter(project__organization_id=tenant.organization_id, attachments__guid=guid)
             .first()
         )
-        if owner is None or not _attachment_rows(owner).filter(guid=guid).exists():
+        if (
+            owner is None
+            or not _attachment_rows(owner)
+            .filter(guid=guid, managed_service__project__organization_id=tenant.organization_id)
+            .exists()
+        ):
             return None
         return to_context(owner)
 

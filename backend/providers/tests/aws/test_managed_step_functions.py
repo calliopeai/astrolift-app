@@ -225,7 +225,9 @@ def _config() -> StepFunctionsConfig:
     return StepFunctionsConfig(region="us-east-1", deletion_protection_default=True)
 
 
-def _spec(config: dict | None = None, *, hint: str = "workflow") -> ProvisionSpec:
+def _spec(
+    config: dict | None = None, *, hint: str = "workflow", identity: str = "11111111-1111-4111-8111-111111111111"
+) -> ProvisionSpec:
     return ProvisionSpec(
         organization_id="org-1",
         organization_slug="acme",
@@ -238,7 +240,7 @@ def _spec(config: dict | None = None, *, hint: str = "workflow") -> ProvisionSpe
         size="small",
         config=config if config is not None else {"definition": _DEFINITION, "role_arn": _ROLE_ARN},
         binding_id="binding-1",
-        managed_service_id="service-1",
+        managed_service_id=identity,
     )
 
 
@@ -357,7 +359,9 @@ def test_alias_refuses_to_take_over_external_alias() -> None:
     created = driver.provision(_spec(config))
     arn = created.handle.split("/", 1)[1]
     client.aliases[arn][0]["description"] = "customer alias"
-    result = driver.update(UpdateSpec(created.handle, config=config))
+    result = driver.update(
+        UpdateSpec(created.handle, managed_service_id="11111111-1111-4111-8111-111111111111", config=config)
+    )
     assert not result.ok and "not owned" in result.message
 
 
@@ -378,7 +382,10 @@ def test_standard_binding_scopes_machine_and_execution_actions_correctly() -> No
     assert binding.env_vars["WORKFLOW_ENGINE_ID"].literal.startswith("astrolift-")
     assert binding.env_vars["STEP_FUNCTIONS_CONSOLE_URL"].literal.startswith("https://")
     assert binding.iam_grants[0].actions == ["states:StartExecution", "states:ListExecutions"]
-    assert binding.iam_grants[1].resource.endswith(":execution:astrolift-acme-checkout-prod-workflow:*")
+    assert (
+        binding.iam_grants[1].resource
+        == provisioned.handle.split("/", 1)[1].replace(":stateMachine:", ":execution:") + ":*"
+    )
     assert binding.iam_grants[1].actions == [
         "states:DescribeExecution",
         "states:GetExecutionHistory",
@@ -437,14 +444,24 @@ def test_standard_delete_refuses_protection_and_running_executions_then_force_st
     execution_arn = f"arn:aws:states:us-east-1:123456789012:execution:{arn.rsplit(':', 1)[1]}:run-1"
     client.executions[arn] = [{"executionArn": execution_arn, "status": "RUNNING"}]
 
-    protected = driver.deprovision(DeprovisionSpec(provisioned.handle, {}))
+    protected = driver.deprovision(
+        DeprovisionSpec(provisioned.handle, {}, managed_service_id="11111111-1111-4111-8111-111111111111")
+    )
     assert not protected.ok and protected.errors == ["deletion_protection_enabled"]
     unprotected = driver.deprovision(
-        DeprovisionSpec(provisioned.handle, {"deletion_protection": False}),
+        DeprovisionSpec(
+            provisioned.handle,
+            {"deletion_protection": False},
+            managed_service_id="11111111-1111-4111-8111-111111111111",
+        ),
     )
     assert not unprotected.ok and unprotected.errors == ["running_executions"]
     deleted = driver.deprovision(
-        DeprovisionSpec(provisioned.handle, {"deletion_protection": False}),
+        DeprovisionSpec(
+            provisioned.handle,
+            {"deletion_protection": False},
+            managed_service_id="11111111-1111-4111-8111-111111111111",
+        ),
         force_destroy=True,
     )
     assert deleted.ok
@@ -456,13 +473,17 @@ def test_express_delete_never_calls_unsupported_list_executions() -> None:
     driver, client = _driver(express=True)
     provisioned = driver.provision(_spec())
     result = driver.deprovision(
-        DeprovisionSpec(provisioned.handle, {"deletion_protection": False}),
+        DeprovisionSpec(
+            provisioned.handle,
+            {"deletion_protection": False},
+            managed_service_id="11111111-1111-4111-8111-111111111111",
+        ),
     )
     assert result.ok
     assert "list_executions" not in client.names()
 
 
-def test_foreign_state_machine_is_never_updated_or_deleted_without_force() -> None:
+def test_foreign_state_machine_is_never_updated_or_deleted_even_with_force() -> None:
     driver, client = _driver()
     foreign = client.create_state_machine(
         name="foreign",
@@ -472,14 +493,27 @@ def test_foreign_state_machine_is_never_updated_or_deleted_without_force() -> No
         tags=[],
     )
     handle = f"workflow_engine/{foreign['stateMachineArn']}"
-    update = driver.update(UpdateSpec(handle, config={"definition": _DEFINITION, "role_arn": _ROLE_ARN}))
-    delete = driver.deprovision(DeprovisionSpec(handle, {"deletion_protection": False}))
+    update = driver.update(
+        UpdateSpec(
+            handle,
+            managed_service_id="11111111-1111-4111-8111-111111111111",
+            config={"definition": _DEFINITION, "role_arn": _ROLE_ARN},
+        )
+    )
+    delete = driver.deprovision(
+        DeprovisionSpec(
+            handle, {"deletion_protection": False}, managed_service_id="11111111-1111-4111-8111-111111111111"
+        )
+    )
     assert not update.ok and update.errors == ["resource_not_owned"]
     assert not delete.ok and delete.errors == ["resource_not_owned"]
-    assert driver.deprovision(
-        DeprovisionSpec(handle, {"deletion_protection": False}),
+    assert not driver.deprovision(
+        DeprovisionSpec(
+            handle, {"deletion_protection": False}, managed_service_id="11111111-1111-4111-8111-111111111111"
+        ),
         force_destroy=True,
     ).ok
+    assert "delete_state_machine" not in client.names()
 
 
 def test_status_maps_active_deleting_and_missing() -> None:
@@ -499,7 +533,7 @@ def test_snapshot_publishes_version_and_restore_clones_definition() -> None:
     source = driver.provision(_spec(hint="source"))
     snapshot = driver.snapshot(ServiceHandle(source.handle))
     assert snapshot.snapshot_id.endswith(":1")
-    restored = driver.restore(snapshot, _spec(hint="restored"))
+    restored = driver.restore(snapshot, _spec(hint="restored", identity="22222222-2222-4222-8222-222222222222"))
     assert restored.ok and restored.handle != source.handle
     restored_arn = restored.handle.split("/", 1)[1]
     assert json.loads(client.machines[restored_arn]["definition"]) == _DEFINITION

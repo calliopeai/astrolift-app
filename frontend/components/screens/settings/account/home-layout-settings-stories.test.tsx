@@ -1,3 +1,4 @@
+import { runStory } from "@/test/run-story";
 import { composeStories, setProjectAnnotations } from "@storybook/react";
 import { describe, expect, it } from "vitest";
 
@@ -11,7 +12,7 @@ describe("Home layout settings portable stories", () => {
     const canvasElement = document.createElement("div");
     document.body.appendChild(canvasElement);
     try {
-      await Story.run({ canvasElement });
+      await runStory(Story, canvasElement);
       expect(canvasElement.childElementCount).toBeGreaterThan(0);
     } finally {
       canvasElement.remove();

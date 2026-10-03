@@ -8,10 +8,12 @@ from botocore.session import Session
 from botocore.validate import validate_parameters
 
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
+from _sdk.physical_naming import physical_name
 from aws.managed._base import ManagedServiceError
 from aws.managed.event_bus_eventbridge import EventBridgeConfig, EventBridgeDriver
 
-BUS_NAME = "platform-steadymd-triage-prod-events"
+IDENTITY = "11111111-1111-4111-8111-111111111111"
+BUS_NAME = physical_name(IDENTITY, prefix="platform", max_length=40)
 BUS_ARN = f"arn:aws:events:us-west-2:123456789012:event-bus/{BUS_NAME}"
 RULE_ARN = f"arn:aws:events:us-west-2:123456789012:rule/{BUS_NAME}/route-bugs"
 
@@ -19,7 +21,7 @@ RULE_ARN = f"arn:aws:events:us-west-2:123456789012:rule/{BUS_NAME}/route-bugs"
 def _spec(**overrides) -> ProvisionSpec:
     values = {
         "organization_id": "org-1",
-        "organization_slug": "steadymd",
+        "organization_slug": "example",
         "app_id": "app-1",
         "app_slug": "triage",
         "environment_id": "env-1",
@@ -31,10 +33,20 @@ def _spec(**overrides) -> ProvisionSpec:
         "tags": {"owner": "agents"},
         "isolation": "shared",
         "binding_id": "binding-1",
-        "managed_service_id": "service-1",
+        "managed_service_id": IDENTITY,
     }
     values.update(overrides)
     return ProvisionSpec(**values)
+
+
+def _update_spec(*args, **kwargs):
+    kwargs.setdefault("managed_service_id", IDENTITY)
+    return UpdateSpec(*args, **kwargs)
+
+
+def _deprovision_spec(*args, **kwargs):
+    kwargs.setdefault("managed_service_id", IDENTITY)
+    return DeprovisionSpec(*args, **kwargs)
 
 
 def _config() -> EventBridgeConfig:
@@ -49,22 +61,32 @@ def _config() -> EventBridgeConfig:
 def _client() -> MagicMock:
     client = MagicMock()
     client.create_event_bus.return_value = {"EventBusArn": BUS_ARN}
-    client.describe_event_bus.return_value = {
+    bus = {
         "Name": BUS_NAME,
         "Arn": BUS_ARN,
         "Policy": '{"Version":"2012-10-17","Statement":[]}',
         "KmsKeyIdentifier": "arn:aws:kms:us-west-2:123456789012:key/key-1",
     }
+
+    def describe(**params):
+        if params["Name"] == BUS_NAME and not client.create_event_bus.call_count:
+            raise _not_found("DescribeEventBus")
+        return dict(bus)
+
+    client.describe_event_bus.side_effect = describe
     client.list_rules.return_value = {"Rules": []}
     client.list_targets_by_rule.return_value = {"Targets": []}
     client.list_archives.return_value = {"Archives": []}
-    client.put_rule.return_value = {"RuleArn": RULE_ARN}
+    client.put_rule.side_effect = lambda **params: {
+        "RuleArn": f"arn:aws:events:us-west-2:123456789012:rule/{params['EventBusName']}/{params['Name']}"
+    }
     client.put_targets.return_value = {"FailedEntryCount": 0, "FailedEntries": []}
     client.remove_targets.return_value = {"FailedEntryCount": 0, "FailedEntries": []}
     client.list_tags_for_resource.return_value = {
         "Tags": [
             {"Key": "astrolift.io/managed-by", "Value": "platform"},
-            {"Key": "astrolift.io/organization", "Value": "steadymd"},
+            {"Key": "astrolift.io/managed_service_id", "Value": IDENTITY},
+            {"Key": "astrolift.io/organization", "Value": "example"},
             {"Key": "astrolift.io/app", "Value": "triage"},
         ],
     }
@@ -122,7 +144,7 @@ def test_provision_reconciles_bus_permission_rule_full_target_and_archive():
                 "rules": [
                     {
                         "name": "route-bugs",
-                        "event_pattern": {"source": ["steadymd.emr"]},
+                        "event_pattern": {"source": ["example.emr"]},
                         "state": "ENABLED",
                         "targets": [
                             {
@@ -145,7 +167,7 @@ def test_provision_reconciles_bus_permission_rule_full_target_and_archive():
                 ],
                 "archive": {
                     "retention_days": 30,
-                    "event_pattern": {"source": ["steadymd.emr"]},
+                    "event_pattern": {"source": ["example.emr"]},
                     "kms_key_identifier": "arn:aws:kms:us-west-2:123456789012:key/key-1",
                 },
             },
@@ -163,7 +185,7 @@ def test_provision_reconciles_bus_permission_rule_full_target_and_archive():
     assert permission["StatementId"] == "astrolift-partner-account"
     _validate("PutPermission", permission)
     rule = client.put_rule.call_args.kwargs
-    assert rule["EventPattern"] == '{"source":["steadymd.emr"]}'
+    assert rule["EventPattern"] == '{"source":["example.emr"]}'
     _validate("PutRule", rule)
     targets = client.put_targets.call_args.kwargs
     assert targets["Targets"][0]["KinesisParameters"] == {"PartitionKeyPath": "$.detail.id"}
@@ -184,7 +206,7 @@ def test_provision_existing_bus_is_idempotently_reconciled():
 
     assert result.ok
     assert result.handle == f"event_bus/{BUS_ARN}"
-    client.describe_event_bus.assert_called_with(Name=BUS_NAME)
+    client.describe_event_bus.assert_called_with(Name=BUS_ARN)
     client.tag_resource.assert_called_once()
 
 
@@ -310,13 +332,13 @@ def test_update_prunes_stale_targets_and_only_astrolift_owned_rules():
     driver = EventBridgeDriver(config=_config(), client=client)
 
     result = driver.update(
-        UpdateSpec(
+        _update_spec(
             handle=f"event_bus/{BUS_ARN}",
             config={
                 "rules": [
                     {
                         "name": "route-bugs",
-                        "event_pattern": {"source": ["steadymd.emr"]},
+                        "event_pattern": {"source": ["example.emr"]},
                         "targets": [{"id": "keep", "arn": "arn:aws:lambda:us-west-2:123:function:keep"}],
                     },
                 ],
@@ -334,12 +356,23 @@ def test_update_prunes_stale_targets_and_only_astrolift_owned_rules():
 
 def test_update_refuses_to_overwrite_an_external_rule_with_the_same_name():
     client = _client()
-    client.list_rules.return_value = {"Rules": [{"Name": "route", "Arn": "arn:external-rule"}]}
-    client.list_tags_for_resource.return_value = {"Tags": []}
+    client.list_rules.return_value = {
+        "Rules": [{"Name": "route", "Arn": f"arn:aws:events:us-west-2:123456789012:rule/{BUS_NAME}/route"}]
+    }
+    client.list_tags_for_resource.side_effect = lambda **params: (
+        {
+            "Tags": [
+                {"Key": "astrolift.io/managed-by", "Value": "platform"},
+                {"Key": "astrolift.io/managed_service_id", "Value": IDENTITY},
+            ]
+        }
+        if params["ResourceARN"] == BUS_ARN
+        else {"Tags": []}
+    )
     driver = EventBridgeDriver(config=_config(), client=client)
 
     result = driver.update(
-        UpdateSpec(
+        _update_spec(
             handle=f"event_bus/{BUS_ARN}",
             config={"rules": [{"name": "route", "event_pattern": {"source": ["x"]}}]},
         ),
@@ -355,19 +388,20 @@ def test_archive_disable_requires_explicit_data_deletion():
     client.describe_archive.side_effect = None
     client.describe_archive.return_value = {
         "ArchiveName": f"{BUS_NAME}-archive",
+        "EventSourceArn": BUS_ARN,
         "State": "ENABLED",
         "EventCount": 42,
     }
     driver = EventBridgeDriver(config=_config(), client=client)
 
     refused = driver.update(
-        UpdateSpec(
+        _update_spec(
             handle=f"event_bus/{BUS_ARN}",
             config={"archive": {"enabled": False}},
         ),
     )
     deleted = driver.update(
-        UpdateSpec(
+        _update_spec(
             handle=f"event_bus/{BUS_ARN}",
             config={"archive": {"enabled": False, "delete_data": True}},
         ),
@@ -386,9 +420,9 @@ def test_deprovision_preflights_protection_archives_and_external_rules_before_mu
     driver = EventBridgeDriver(config=_config(), client=client)
     handle = f"event_bus/{BUS_ARN}"
 
-    protected = driver.deprovision(DeprovisionSpec(handle))
+    protected = driver.deprovision(_deprovision_spec(handle))
     archived = driver.deprovision(
-        DeprovisionSpec(handle, config={"deletion_protection": False}),
+        _deprovision_spec(handle, config={"deletion_protection": False}),
     )
 
     assert not protected.ok and protected.errors == ["deletion_protection_enabled"]
@@ -397,10 +431,21 @@ def test_deprovision_preflights_protection_archives_and_external_rules_before_mu
     client.delete_event_bus.assert_not_called()
 
     client.list_archives.return_value = {"Archives": []}
-    client.list_rules.return_value = {"Rules": [{"Name": "external", "Arn": "arn:external-rule"}]}
-    client.list_tags_for_resource.return_value = {"Tags": []}
+    client.list_rules.return_value = {
+        "Rules": [{"Name": "external", "Arn": f"arn:aws:events:us-west-2:123456789012:rule/{BUS_NAME}/external"}]
+    }
+    client.list_tags_for_resource.side_effect = lambda **params: (
+        {
+            "Tags": [
+                {"Key": "astrolift.io/managed-by", "Value": "platform"},
+                {"Key": "astrolift.io/managed_service_id", "Value": IDENTITY},
+            ]
+        }
+        if params["ResourceARN"] == BUS_ARN
+        else {"Tags": []}
+    )
     external = driver.deprovision(
-        DeprovisionSpec(handle, config={"deletion_protection": False}),
+        _deprovision_spec(handle, config={"deletion_protection": False}),
         delete_data=True,
     )
 
@@ -414,13 +459,26 @@ def test_force_destroy_removes_archives_targets_rules_and_bus():
     client.list_archives.return_value = {
         "Archives": [{"ArchiveName": "external-archive", "State": "ENABLED"}],
     }
-    client.list_rules.return_value = {"Rules": [{"Name": "external", "Arn": "arn:external-rule"}]}
+    client.list_rules.return_value = {
+        "Rules": [{"Name": "external", "Arn": f"arn:aws:events:us-west-2:123456789012:rule/{BUS_NAME}/external"}]
+    }
     client.list_targets_by_rule.return_value = {"Targets": [{"Id": "target", "Arn": "arn:target"}]}
-    client.list_tags_for_resource.return_value = {"Tags": []}
+    client.list_tags_for_resource.side_effect = lambda **params: (
+        {
+            "Tags": [
+                {"Key": "astrolift.io/managed-by", "Value": "platform"},
+                {"Key": "astrolift.io/managed_service_id", "Value": IDENTITY},
+            ]
+        }
+        if params["ResourceARN"] == BUS_ARN
+        else {"Tags": []}
+    )
     driver = EventBridgeDriver(config=_config(), client=client)
 
+    client.describe_archive.side_effect = None
+    client.describe_archive.return_value = {"ArchiveName": "external-archive", "EventSourceArn": BUS_ARN}
     result = driver.deprovision(
-        DeprovisionSpec(f"event_bus/{BUS_ARN}"),
+        _deprovision_spec(f"event_bus/{BUS_ARN}"),
         delete_data=True,
         force_destroy=True,
     )
@@ -445,7 +503,7 @@ def test_deprovision_never_claims_an_undeclared_default_named_archive():
     driver = EventBridgeDriver(config=_config(), client=client)
 
     result = driver.deprovision(
-        DeprovisionSpec(
+        _deprovision_spec(
             f"event_bus/{BUS_ARN}",
             config={"deletion_protection": False},
         ),
@@ -503,7 +561,7 @@ def test_missing_bus_status_and_update_do_not_claim_success():
     handle = f"event_bus/{BUS_ARN}"
 
     status = driver.status(ServiceHandle(handle))
-    update = driver.update(UpdateSpec(handle=handle, config={"description": "x"}))
+    update = driver.update(_update_spec(handle=handle, config={"description": "x"}))
 
     assert status.state == "deprovisioned"
     assert not update.ok and update.errors == ["not_found"]
@@ -523,6 +581,6 @@ def test_an_existing_bus_of_another_org_is_not_reconciled():
 
     result = driver.provision(_spec())
 
-    assert not result.ok and "refusing to adopt" in result.message
+    assert not result.ok and "not owned by this managed-service identity" in result.message
     client.tag_resource.assert_not_called()
     client.put_rule.assert_not_called()

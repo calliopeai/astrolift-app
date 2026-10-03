@@ -14,8 +14,13 @@ import dataclasses
 
 from django.utils.text import slugify
 
+from workflows.back_edges import (
+    LoopContractError,
+    flowise_output_key,
+    validate_loop_plan,
+)
 from workflows.importers._graph import downstream_stage_targets, topological_order
-from workflows.importers.base import FlowImportResult, ImportGap
+from workflows.importers.base import FlowImportError, FlowImportResult, ImportGap
 from workflows.manifest import (
     ParsedWorkflowManifest,
     WorkflowDefSpec,
@@ -32,12 +37,14 @@ INPUT = "input"
 OUTPUT = "output"
 ROUTING = "routing"
 OTHER = "other"
+LOOP = "loop"
 
-_STAGE_CATEGORIES = {AGENT, AGGREGATION, GATE}
+_STAGE_CATEGORIES = {AGENT, AGGREGATION, GATE, LOOP}
 _STAGE_KIND = {
     AGENT: WorkflowStage.StageKind.AGENT_DISPATCH.value,
     AGGREGATION: WorkflowStage.StageKind.AGGREGATION.value,
     GATE: WorkflowStage.StageKind.HUMAN_GATE.value,
+    LOOP: WorkflowStage.StageKind.CHECKPOINT.value,
 }
 
 
@@ -49,6 +56,7 @@ class ClassifiedNode:
     category: str  # one of the canonical categories above
     label: str  # human role / display name
     type: str  # raw source type, for gap reporting
+    loop_control: dict | None = None
 
 
 def build_result(
@@ -71,7 +79,9 @@ def build_result(
         if node.category != TOOL:
             continue
         targets = [
-            t for t in downstream_stage_targets(node.id, stage_ids, edges) if by_id[t].category == AGENT
+            t
+            for t in downstream_stage_targets(node.id, stage_ids, edges)
+            if by_id[t].category == AGENT
         ]
         if not targets:
             gaps.append(
@@ -122,14 +132,48 @@ def build_result(
 
     ordered, has_cycle = topological_order(node_ids, edges)
     if has_cycle:
-        gaps.append(
-            ImportGap(
-                code="graph_cycle",
-                message="flow graph has a cycle; stage order is approximate",
-            )
+        raise FlowImportError(
+            "flow graph has an unresolved cycle; configure an explicit bounded return instead of linearizing it"
         )
 
     ordered_stage_ids = [nid for nid in ordered if nid in stage_ids]
+    loops = [node for node in nodes if node.loop_control is not None]
+    if loops:
+        if len(loops) != 1 or ordered_stage_ids[-1] != loops[0].id:
+            raise FlowImportError(
+                "only a terminal Flowise Loop on one sequential track has verified scheduler mapping"
+            )
+        for current, following in zip(ordered_stage_ids, ordered_stage_ids[1:]):
+            if downstream_stage_targets(current, stage_ids, edges) != [following]:
+                raise FlowImportError(
+                    "Flowise bounded-loop stages must form one connected sequential track"
+                )
+        if len(by_id) != len(nodes) or any(
+            source not in by_id or target not in by_id for source, target in edges
+        ):
+            raise FlowImportError(
+                "bounded imported loops require unique nodes and complete edge identities"
+            )
+        if any(
+            len(downstream_stage_targets(node, stage_ids, edges)) > 1
+            for node in stage_ids
+        ):
+            raise FlowImportError(
+                "bounded Flowise loops with parallel or conditional routes are not supported"
+            )
+        if any(node.category == ROUTING for node in nodes):
+            raise FlowImportError(
+                "conditional routes around a Flowise loop require source scheduler support"
+            )
+        if any(any(source == node.id for source, _ in edges) for node in loops):
+            raise FlowImportError(
+                "forward routes after a Flowise loop require source scheduler support"
+            )
+    output_keys = {node: flowise_output_key(node) for node in ordered_stage_ids}
+    if loops and len(set(output_keys.values())) != len(output_keys):
+        raise FlowImportError(
+            "source node identities do not have unique stable output keys"
+        )
     stages: list[WorkflowStageSpec] = []
     pattern = WorkflowDefinition.PatternKind.SINGLE.value
     for order, nid in enumerate(ordered_stage_ids):
@@ -138,11 +182,21 @@ def build_result(
         fan_out: int | str = "dynamic" if len(fan_targets) > 1 else 0
         if fan_out == "dynamic":
             pattern = WorkflowDefinition.PatternKind.FAN_OUT.value
+        back_edge = {}
+        if node.loop_control is not None:
+            target = node.loop_control["source_target"]
+            if target not in ordered_stage_ids[:order]:
+                raise FlowImportError(
+                    "Flowise loop target must identify an earlier supported stage"
+                )
+            back_edge = {**node.loop_control, "to": output_keys[target]}
         stages.append(
             WorkflowStageSpec(
                 order=order,
                 kind=_STAGE_KIND[node.category],
                 role=node.label if node.category != AGGREGATION else "",
+                output_key=output_keys[nid] if loops else None,
+                back_edge=back_edge,
                 agent=None,
                 skills=sorted(set(tool_skills.get(nid, []))),
                 fan_out=fan_out,
@@ -152,6 +206,14 @@ def build_result(
 
     if pattern == WorkflowDefinition.PatternKind.SINGLE.value and len(stages) > 1:
         pattern = WorkflowDefinition.PatternKind.CHAINED.value
+
+    if loops:
+        try:
+            validate_loop_plan(
+                [dataclasses.asdict(stage) for stage in stages], pattern_kind=pattern
+            )
+        except LoopContractError as exc:
+            raise FlowImportError(str(exc)) from exc
 
     definition = WorkflowDefSpec(
         slug=slugify(name) or default_slug,

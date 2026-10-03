@@ -122,6 +122,7 @@ def spec(**config: Any) -> ProvisionSpec:
         size="small",
         config=config,
         isolation="dedicated",
+        managed_service_id="11111111-1111-4111-8111-111111111111",
     )
 
 
@@ -221,7 +222,7 @@ def test_source_service_only_network_policy_excludes_dashboards():
     assert network[0]["Rules"] == [
         {
             "ResourceType": "collection",
-            "Resource": ["collection/astrolift-acme-api-prod-catalog"],
+            "Resource": [f"collection/{result.handle.split('/', 1)[1]}"],
         },
     ]
 
@@ -286,13 +287,63 @@ def test_provision_does_not_adopt_or_repolicy_another_services_collection():
     import dataclasses
 
     subject, client = driver()
-    first = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-a"))
+    first = subject.provision(dataclasses.replace(spec(), managed_service_id="11111111-1111-4111-8111-111111111111"))
     policies = (dict(client.security_policies), dict(client.access_policies))
     calls = len(client.calls)
 
-    second = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-b"))
+    second = subject.provision(
+        dataclasses.replace(
+            spec(), managed_service_id="22222222-2222-4222-8222-222222222222", recorded_handle=first.handle
+        )
+    )
 
     assert first.ok, first.message
     assert not second.ok and second.handle == "" and "refusing to adopt" in second.message
     assert (client.security_policies, client.access_policies) == policies
     assert not any(name != "BatchGetCollection" for name, _ in client.calls[calls:])
+
+
+@pytest.mark.parametrize("policy_type", ["encryption", "network", "data"])
+@pytest.mark.parametrize("policy", ["foreign", "wildcard", "invalid"])
+def test_existing_policy_for_another_target_is_never_rewritten(policy_type, policy):
+    import copy
+
+    subject, client = driver()
+    first = subject.provision(spec())
+    assert first.ok
+    collection_name = first.handle.split("/", 1)[1]
+    prefix = {"encryption": "e", "network": "n", "data": "d"}[policy_type]
+    key = (policy_type, subject._policy_name(prefix, collection_name))
+    store = client.access_policies if policy_type == "data" else client.security_policies
+    if policy == "invalid":
+        store[key]["policy"] = "not-json"
+    else:
+        value = json.loads(store[key]["policy"])
+        block = value if isinstance(value, dict) else value[0]
+        block["Rules"][0]["Resource"] = ["collection/foreign" if policy == "foreign" else "collection/*"]
+        store[key]["policy"] = json.dumps(value)
+    before = copy.deepcopy((client.collections, client.security_policies, client.access_policies))
+    offset = len(client.calls)
+    refused = subject.provision(spec(public_access=True))
+    assert not refused.ok and ("different collection" in refused.message or "unverifiable" in refused.message)
+    assert before == (client.collections, client.security_policies, client.access_policies)
+    assert not any(operation.startswith(("Create", "Update", "Delete")) for operation, _ in client.calls[offset:])
+
+
+def test_compact_collection_and_policy_names_retain_complete_identity_digest():
+    import dataclasses
+    import hashlib
+
+    subject, client = driver()
+    for identity in ("11111111-1111-4111-8111-111111111111", "11111111-1111-4111-8111-111111111112"):
+        result = subject.provision(dataclasses.replace(spec(), managed_service_id=identity))
+        assert result.ok
+        name = result.handle.split("/", 1)[1]
+        from uuid import UUID
+
+        suffix = hashlib.sha256(UUID(identity).bytes).hexdigest()[:20]
+        assert name.endswith(suffix) and len(name) <= 30
+        for prefix in ("e", "n", "d"):
+            policy_name = subject._policy_name(prefix, name)
+            assert len(policy_name) <= 32 and policy_name.endswith(suffix)
+    assert len(client.collections) == 2 and len(client.security_policies) == 4 and len(client.access_policies) == 2

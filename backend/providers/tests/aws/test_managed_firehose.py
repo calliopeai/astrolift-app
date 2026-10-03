@@ -11,7 +11,8 @@ from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, 
 from aws.managed._base import ManagedServiceError
 from aws.managed.stream_firehose import FirehoseConfig, FirehoseDriver
 
-STREAM_NAME = "platform-steadymd-triage-prod-events"
+SERVICE_ID = "11111111-1111-4111-8111-111111111111"
+STREAM_NAME = "platform-11111111111141118111111111111111"
 STREAM_ARN = f"arn:aws:firehose:us-west-2:123456789012:deliverystream/{STREAM_NAME}"
 ROLE_ARN = "arn:aws:iam::123456789012:role/firehose-delivery"
 BUCKET_ARN = "arn:aws:s3:::triage-events"
@@ -22,7 +23,7 @@ DESTINATION_ID = "destinationId-000000000001"
 def _spec(**overrides) -> ProvisionSpec:
     values = {
         "organization_id": "org-1",
-        "organization_slug": "steadymd",
+        "organization_slug": "example",
         "app_id": "app-1",
         "app_slug": "triage",
         "environment_id": "env-1",
@@ -34,10 +35,18 @@ def _spec(**overrides) -> ProvisionSpec:
         "tags": {"owner": "agents"},
         "isolation": "shared",
         "binding_id": "binding-1",
-        "managed_service_id": "service-1",
+        "managed_service_id": SERVICE_ID,
     }
     values.update(overrides)
     return ProvisionSpec(**values)
+
+
+def _update_spec(handle, **kwargs) -> UpdateSpec:
+    return UpdateSpec(handle, managed_service_id=SERVICE_ID, **kwargs)
+
+
+def _deprovision_spec(handle, **kwargs) -> DeprovisionSpec:
+    return DeprovisionSpec(handle, managed_service_id=SERVICE_ID, **kwargs)
 
 
 def _config(**overrides) -> FirehoseConfig:
@@ -80,13 +89,15 @@ def _description(**overrides) -> dict:
 
 def _client(**description_overrides) -> MagicMock:
     client = MagicMock()
+    client.create_delivery_stream.return_value = {"DeliveryStreamARN": STREAM_ARN}
     client.describe_delivery_stream.return_value = {
         "DeliveryStreamDescription": _description(**description_overrides),
     }
     client.list_tags_for_delivery_stream.return_value = {
         "Tags": [
             {"Key": "astrolift.io/managed-by", "Value": "platform"},
-            {"Key": "astrolift.io/organization", "Value": "steadymd"},
+            {"Key": "astrolift.io/managed_service_id", "Value": SERVICE_ID},
+            {"Key": "astrolift.io/organization", "Value": "example"},
             {"Key": "astrolift.io/app", "Value": "triage"},
         ],
         "HasMoreTags": False,
@@ -287,7 +298,7 @@ def test_existing_managed_stream_is_reconciled_but_external_collision_is_refused
     external = driver.provision(_spec())
 
     assert managed.ok
-    assert not external.ok and "outside this resource declaration" in external.message
+    assert not external.ok and "ownership" in external.message
 
 
 def test_existing_stream_source_or_destination_identity_cannot_drift_silently():
@@ -306,7 +317,7 @@ def test_destination_update_uses_version_and_destination_identity():
     driver = FirehoseDriver(config=_config(), client=client, sleep=lambda _seconds: None)
 
     result = driver.update(
-        UpdateSpec(
+        _update_spec(
             f"stream/{STREAM_ARN}",
             config={
                 "destination_update": {
@@ -330,7 +341,7 @@ def test_destination_update_type_must_match_live_destination():
     driver = FirehoseDriver(config=_config(), client=client, sleep=lambda _seconds: None)
 
     result = driver.update(
-        UpdateSpec(
+        _update_spec(
             f"stream/{STREAM_ARN}",
             config={
                 "destination_update": {
@@ -373,7 +384,7 @@ def test_encryption_key_rotation_stops_waits_and_restarts():
     driver = FirehoseDriver(config=_config(), client=client, sleep=lambda _seconds: None)
 
     result = driver.update(
-        UpdateSpec(
+        _update_spec(
             f"stream/{STREAM_ARN}",
             config={
                 "encryption": {
@@ -418,7 +429,7 @@ def test_in_progress_encryption_is_awaited_instead_of_started_twice():
     driver = FirehoseDriver(config=_config(), client=client, sleep=lambda _seconds: None)
 
     result = driver.update(
-        UpdateSpec(
+        _update_spec(
             f"stream/{STREAM_ARN}",
             config={
                 "encryption": {
@@ -509,12 +520,12 @@ def test_deprovision_requires_protection_override_and_buffer_loss_acknowledgemen
     driver = FirehoseDriver(config=_config(), client=client, sleep=lambda _seconds: None)
     handle = f"stream/{STREAM_ARN}"
 
-    protected = driver.deprovision(DeprovisionSpec(handle))
+    protected = driver.deprovision(_deprovision_spec(handle))
     buffered = driver.deprovision(
-        DeprovisionSpec(handle, config={"deletion_protection": False}),
+        _deprovision_spec(handle, config={"deletion_protection": False}),
     )
     deleted = driver.deprovision(
-        DeprovisionSpec(handle, config={"deletion_protection": False}),
+        _deprovision_spec(handle, config={"deletion_protection": False}),
         delete_data=True,
     )
 
@@ -564,8 +575,8 @@ def test_missing_stream_paths_and_snapshot_contract_are_honest():
     handle = f"stream/{STREAM_ARN}"
 
     assert driver.status(ServiceHandle(handle)).state == "deprovisioned"
-    assert driver.deprovision(DeprovisionSpec(handle)).ok
-    assert not driver.update(UpdateSpec(handle, config={})).ok
+    assert driver.deprovision(_deprovision_spec(handle)).ok
+    assert not driver.update(_update_spec(handle, config={})).ok
     with pytest.raises(ManagedServiceError, match="no snapshot API"):
         driver.snapshot(ServiceHandle(handle))
     assert "destination" not in driver.editable_fields()
@@ -587,8 +598,45 @@ def test_a_platform_stream_of_another_org_is_not_adopted():
 
     result = driver.provision(_spec())
 
-    assert not result.ok and "outside this resource declaration" in result.message
+    assert not result.ok and "ownership" in result.message
     client.tag_delivery_stream.assert_not_called()
+
+
+@pytest.mark.parametrize("operation", ["provision", "update", "deprovision"])
+def test_ownership_cursor_cycle_refuses_before_any_existing_stream_write(operation):
+    client = _client()
+    client.list_tags_for_delivery_stream.side_effect = [
+        {"Tags": [{"Key": key, "Value": "marker"}], "HasMoreTags": True} for key in ("alpha", "beta", "alpha")
+    ] + [AssertionError("ownership cursor cycle was followed again")]
+    driver = FirehoseDriver(config=_config(), client=client, sleep=lambda _seconds: None)
+    handle = f"stream/{STREAM_ARN}"
+    if operation == "provision":
+        result = driver.provision(_spec(recorded_handle=handle))
+    elif operation == "update":
+        result = driver.update(
+            _update_spec(
+                handle,
+                config={
+                    "destination_update": {
+                        "type": "extended_s3",
+                        "configuration": {"Prefix": "changed/"},
+                    }
+                },
+            )
+        )
+    else:
+        result = driver.deprovision(_deprovision_spec(handle), force_destroy=True)
+    assert not result.ok and "ownership pagination cannot be verified" in result.message
+    assert client.list_tags_for_delivery_stream.call_count == 3
+    for method in (
+        "create_delivery_stream",
+        "tag_delivery_stream",
+        "update_destination",
+        "start_delivery_stream_encryption",
+        "stop_delivery_stream_encryption",
+        "delete_delivery_stream",
+    ):
+        getattr(client, method).assert_not_called()
 
 
 @pytest.mark.parametrize(
@@ -602,7 +650,7 @@ def test_plaintext_destination_credentials_are_refused_on_create_and_update(dest
     driver = FirehoseDriver(config=_config(), client=_client(), sleep=lambda _seconds: None)
 
     created = driver.provision(_spec(config={"destination": destination}))
-    updated = driver.update(UpdateSpec(f"stream/{STREAM_ARN}", config={"destination_update": destination}))
+    updated = driver.update(_update_spec(f"stream/{STREAM_ARN}", config={"destination_update": destination}))
 
     assert not created.ok and field in created.message and "SecretsManagerConfiguration" in created.message
     assert not updated.ok and field in updated.message

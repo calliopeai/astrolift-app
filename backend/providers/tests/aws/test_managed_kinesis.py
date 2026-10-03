@@ -11,23 +11,26 @@ from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, 
 from aws.managed._base import ManagedServiceError
 from aws.managed.stream_kinesis import KinesisConfig, KinesisDriver
 
-STREAM_NAME = "platform-steadymd-triage-prod-events"
+STREAM_NAME = "platform-11111111111141118111111111111111"
 STREAM_ARN = f"arn:aws:kinesis:us-west-2:123456789012:stream/{STREAM_NAME}"
 CONSUMER_ARN = f"{STREAM_ARN}/consumer/triage:1234"
 KEY_ARN = "arn:aws:kms:us-west-2:123456789012:key/key-1"
 
 
+SERVICE_ID = "11111111-1111-4111-8111-111111111111"
+
 _OWNED_TAGS = [
     {"Key": "astrolift.io/managed-by", "Value": "platform"},
-    {"Key": "astrolift.io/organization", "Value": "steadymd"},
+    {"Key": "astrolift.io/organization", "Value": "example"},
     {"Key": "astrolift.io/app", "Value": "triage"},
+    {"Key": "astrolift.io/managed_service_id", "Value": "11111111-1111-4111-8111-111111111111"},
 ]
 
 
 def _spec(**overrides) -> ProvisionSpec:
     values = {
         "organization_id": "org-1",
-        "organization_slug": "steadymd",
+        "organization_slug": "example",
         "app_id": "app-1",
         "app_slug": "triage",
         "environment_id": "env-1",
@@ -39,7 +42,7 @@ def _spec(**overrides) -> ProvisionSpec:
         "tags": {"owner": "agents"},
         "isolation": "shared",
         "binding_id": "binding-1",
-        "managed_service_id": "service-1",
+        "managed_service_id": "11111111-1111-4111-8111-111111111111",
     }
     values.update(overrides)
     return ProvisionSpec(**values)
@@ -183,6 +186,7 @@ def test_update_applies_warm_throughput_and_max_record_size():
     result = driver.update(
         UpdateSpec(
             f"stream/{STREAM_ARN}",
+            managed_service_id=SERVICE_ID,
             config={"warm_throughput_mibps": 4, "max_record_size_kib": 2048},
         ),
     )
@@ -209,6 +213,7 @@ def test_update_changes_mode_then_waits_and_resizes():
     result = driver.update(
         UpdateSpec(
             f"stream/{STREAM_ARN}",
+            managed_service_id=SERVICE_ID,
             config={"stream_mode": "PROVISIONED", "shard_count": 3},
         ),
     )
@@ -268,6 +273,7 @@ def test_monitoring_reconciliation_enables_and_disables_exact_delta():
     result = driver.update(
         UpdateSpec(
             f"stream/{STREAM_ARN}",
+            managed_service_id=SERVICE_ID,
             config={"enhanced_monitoring": ["IncomingBytes", "IncomingRecords"]},
         ),
     )
@@ -282,11 +288,12 @@ def test_retention_decrease_requires_explicit_data_loss_acknowledgement():
     driver = KinesisDriver(config=_config(), client=client)
 
     refused = driver.update(
-        UpdateSpec(f"stream/{STREAM_ARN}", config={"retention_hours": 24}),
+        UpdateSpec(f"stream/{STREAM_ARN}", managed_service_id=SERVICE_ID, config={"retention_hours": 24}),
     )
     allowed = driver.update(
         UpdateSpec(
             f"stream/{STREAM_ARN}",
+            managed_service_id=SERVICE_ID,
             config={"retention_hours": 24, "allow_retention_decrease": True},
         ),
     )
@@ -304,7 +311,9 @@ def test_policy_can_be_explicitly_removed_and_missing_policy_is_idempotent():
     client.delete_resource_policy.side_effect = _error("ResourceNotFoundException", "DeleteResourcePolicy")
     driver = KinesisDriver(config=_config(), client=client)
 
-    result = driver.update(UpdateSpec(f"stream/{STREAM_ARN}", config={"resource_policy": None}))
+    result = driver.update(
+        UpdateSpec(f"stream/{STREAM_ARN}", managed_service_id=SERVICE_ID, config={"resource_policy": None})
+    )
 
     assert result.ok
     client.delete_resource_policy.assert_called_once_with(ResourceARN=STREAM_ARN)
@@ -322,7 +331,7 @@ def test_consumer_pruning_never_deletes_external_consumers():
     }
 
     def tags(**request):
-        if request["ResourceARN"] == managed_arn:
+        if request["ResourceARN"] in {managed_arn, STREAM_ARN}:
             return {"Tags": _OWNED_TAGS}
         return {"Tags": []}
 
@@ -330,7 +339,9 @@ def test_consumer_pruning_never_deletes_external_consumers():
     driver = KinesisDriver(config=_config(), client=client)
 
     result = driver.update(
-        UpdateSpec(f"stream/{STREAM_ARN}", config={"consumers": [], "prune_consumers": True}),
+        UpdateSpec(
+            f"stream/{STREAM_ARN}", managed_service_id=SERVICE_ID, config={"consumers": [], "prune_consumers": True}
+        ),
     )
 
     assert result.ok
@@ -342,9 +353,9 @@ def test_deprovision_requires_protection_override_and_explicit_data_loss():
     driver = KinesisDriver(config=_config(), client=client)
     handle = f"stream/{STREAM_ARN}"
 
-    protected = driver.deprovision(DeprovisionSpec(handle))
+    protected = driver.deprovision(DeprovisionSpec(handle, managed_service_id=SERVICE_ID))
     retained = driver.deprovision(
-        DeprovisionSpec(handle, config={"deletion_protection": False}),
+        DeprovisionSpec(handle, managed_service_id=SERVICE_ID, config={"deletion_protection": False}),
     )
 
     assert not protected.ok and protected.errors == ["deletion_protection_enabled"]
@@ -357,12 +368,15 @@ def test_deprovision_refuses_external_consumer_without_force():
     client.list_stream_consumers.return_value = {
         "Consumers": [{"ConsumerName": "external", "ConsumerARN": CONSUMER_ARN}],
     }
-    client.list_tags_for_resource.return_value = {"Tags": []}
+    client.list_tags_for_resource.side_effect = lambda **params: {
+        "Tags": _OWNED_TAGS if params["ResourceARN"] == STREAM_ARN else []
+    }
     driver = KinesisDriver(config=_config(), client=client)
 
     result = driver.deprovision(
         DeprovisionSpec(
             f"stream/{STREAM_ARN}",
+            managed_service_id=SERVICE_ID,
             config={"deletion_protection": False},
         ),
         delete_data=True,
@@ -377,11 +391,13 @@ def test_force_destroy_deletes_consumers_and_stream_data():
     client.list_stream_consumers.return_value = {
         "Consumers": [{"ConsumerName": "external", "ConsumerARN": CONSUMER_ARN}],
     }
-    client.list_tags_for_resource.return_value = {"Tags": []}
+    client.list_tags_for_resource.side_effect = lambda **params: {
+        "Tags": _OWNED_TAGS if params["ResourceARN"] == STREAM_ARN else []
+    }
     driver = KinesisDriver(config=_config(), client=client)
 
     result = driver.deprovision(
-        DeprovisionSpec(f"stream/{STREAM_ARN}"),
+        DeprovisionSpec(f"stream/{STREAM_ARN}", managed_service_id=SERVICE_ID),
         delete_data=True,
         force_destroy=True,
     )
@@ -439,7 +455,7 @@ def test_missing_stream_paths_are_honest_and_snapshot_is_unsupported():
     handle = f"stream/{STREAM_ARN}"
 
     assert driver.status(ServiceHandle(handle)).state == "deprovisioned"
-    assert driver.deprovision(DeprovisionSpec(handle)).ok
+    assert driver.deprovision(DeprovisionSpec(handle, managed_service_id=SERVICE_ID)).ok
     assert not driver.update(UpdateSpec(handle, config={})).ok
     with pytest.raises(ManagedServiceError, match="no snapshot API"):
         driver.snapshot(ServiceHandle(handle))
@@ -461,3 +477,133 @@ def test_a_platform_stream_of_another_org_is_not_adopted():
 
     assert not result.ok and "outside this resource declaration" in result.message
     client.add_tags_to_stream.assert_not_called()
+
+
+@pytest.mark.parametrize("mismatch", ["name", "arn", "owner", "duplicate_owner"])
+def test_creation_response_and_live_owner_must_prove_the_exact_target_before_reconcile(mismatch):
+    client = _client()
+    if mismatch == "name":
+        client.describe_stream_summary.return_value["StreamDescriptionSummary"]["StreamName"] = "foreign-name"
+    elif mismatch == "arn":
+        client.describe_stream_summary.return_value["StreamDescriptionSummary"]["StreamARN"] = (
+            "arn:aws:kinesis:us-west-2:123456789012:stream/foreign-name"
+        )
+    else:
+        tags = [dict(row) for row in _OWNED_TAGS]
+        if mismatch == "owner":
+            tags[-1]["Value"] = "22222222-2222-4222-8222-222222222222"
+        else:
+            tags.append({"Key": "astrolift.io/managed_service_id", "Value": "22222222-2222-4222-8222-222222222222"})
+        client.list_tags_for_resource.return_value = {"Tags": tags}
+    result = KinesisDriver(config=_config(), client=client).provision(_spec())
+    assert not result.ok
+    client.add_tags_to_stream.assert_not_called()
+    client.start_stream_encryption.assert_not_called()
+    client.register_stream_consumer.assert_not_called()
+
+
+@pytest.mark.parametrize("region,partition", [("cn-north-1", "aws-cn"), ("us-gov-west-1", "aws-us-gov")])
+def test_recorded_partition_and_legacy_name_are_preserved_during_real_driver_reconcile(region, partition):
+    from dataclasses import replace
+
+    name = "Legacy.Stream_Name"
+    arn = f"arn:{partition}:kinesis:{region}:123456789012:stream/{name}"
+    client = _client(StreamName=name, StreamARN=arn, StreamModeDetails={"StreamMode": "ON_DEMAND"})
+    client.create_stream.side_effect = _error("ResourceInUseException", "CreateStream")
+    driver = KinesisDriver(config=replace(_config(), region=region), client=client)
+    result = driver.provision(_spec(recorded_handle=f"stream/{arn}"))
+    assert result.ok and result.handle == f"stream/{arn}"
+    assert client.create_stream.call_args.kwargs["StreamName"] == name
+    assert client.add_tags_to_stream.call_args.kwargs["StreamARN"] == arn
+
+
+@pytest.mark.parametrize("operation", ["update", "deprovision"])
+@pytest.mark.parametrize("mismatch", ["foreign_owner", "unknown_owner", "duplicate_owner", "live_name", "live_arn"])
+def test_foreign_or_mismatched_stream_never_changes_policy_consumers_or_data(operation, mismatch):
+    client = _client()
+    if mismatch == "foreign_owner":
+        client.list_tags_for_resource.return_value = {
+            "Tags": [
+                {"Key": "astrolift.io/managed-by", "Value": "platform"},
+                {"Key": "astrolift.io/managed_service_id", "Value": "22222222-2222-4222-8222-222222222222"},
+            ]
+        }
+    elif mismatch == "unknown_owner":
+        client.list_tags_for_resource.return_value = {"Tags": None}
+    elif mismatch == "duplicate_owner":
+        client.list_tags_for_resource.return_value = {
+            "Tags": [*_OWNED_TAGS, {"Key": "astrolift.io/managed_service_id", "Value": SERVICE_ID}]
+        }
+    elif mismatch == "live_name":
+        client.describe_stream_summary.return_value["StreamDescriptionSummary"]["StreamName"] = "different"
+    else:
+        client.describe_stream_summary.return_value["StreamDescriptionSummary"]["StreamARN"] = STREAM_ARN + "different"
+    driver = KinesisDriver(config=_config(), client=client)
+    if operation == "update":
+        result = driver.update(
+            UpdateSpec(
+                f"stream/{STREAM_ARN}",
+                managed_service_id=SERVICE_ID,
+                config={"retention_hours": 72, "resource_policy": {}, "consumers": [], "prune_consumers": True},
+            )
+        )
+    else:
+        result = driver.deprovision(
+            DeprovisionSpec(f"stream/{STREAM_ARN}", managed_service_id=SERVICE_ID), delete_data=True, force_destroy=True
+        )
+    assert not result.ok and not result.retryable
+    for method in [
+        "increase_stream_retention_period",
+        "put_resource_policy",
+        "delete_resource_policy",
+        "register_stream_consumer",
+        "deregister_stream_consumer",
+        "delete_stream",
+        "add_tags_to_stream",
+    ]:
+        getattr(client, method).assert_not_called()
+
+
+def test_update_consumer_creation_keeps_the_canonical_stream_owner_marker():
+    client = _client()
+    result = KinesisDriver(config=_config(), client=client).update(
+        UpdateSpec(f"stream/{STREAM_ARN}", managed_service_id=SERVICE_ID, config={"consumers": ["new-consumer"]})
+    )
+    assert result.ok
+    request = client.register_stream_consumer.call_args.kwargs
+    assert request["Tags"] == {"astrolift.io/managed-by": "platform", "astrolift.io/managed_service_id": SERVICE_ID}
+    _validate("RegisterStreamConsumer", request)
+
+
+@pytest.mark.parametrize("operation", ["update", "deprovision"])
+def test_foreign_platform_marked_consumers_are_not_owned_by_the_stream_service(operation):
+    client = _client()
+    client.list_stream_consumers.return_value = {
+        "Consumers": [{"ConsumerName": "foreign", "ConsumerARN": CONSUMER_ARN}]
+    }
+    foreign_tags = [
+        {"Key": "astrolift.io/managed-by", "Value": "platform"},
+        {"Key": "astrolift.io/managed_service_id", "Value": "22222222-2222-4222-8222-222222222222"},
+    ]
+    client.list_tags_for_resource.side_effect = lambda **params: {
+        "Tags": _OWNED_TAGS if params["ResourceARN"] == STREAM_ARN else foreign_tags
+    }
+    driver = KinesisDriver(config=_config(), client=client)
+    if operation == "update":
+        result = driver.update(
+            UpdateSpec(
+                f"stream/{STREAM_ARN}", managed_service_id=SERVICE_ID, config={"consumers": [], "prune_consumers": True}
+            )
+        )
+        assert result.ok
+    else:
+        result = driver.deprovision(
+            DeprovisionSpec(
+                f"stream/{STREAM_ARN}", managed_service_id=SERVICE_ID, config={"deletion_protection": False}
+            ),
+            delete_data=True,
+        )
+        assert not result.ok and not result.retryable
+        assert result.errors == ["external_consumers_present"]
+    client.deregister_stream_consumer.assert_not_called()
+    client.delete_stream.assert_not_called()

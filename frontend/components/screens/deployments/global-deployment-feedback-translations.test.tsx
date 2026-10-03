@@ -60,7 +60,7 @@ const fieldResolver: GraphQLFieldResolver<Record<string, unknown>, unknown> = (
   if (isEnumType(type)) return type.getValues()[0].name;
   return type.name === "Boolean" ? false : ["Int", "Float"].includes(type.name) ? 0 : "";
 };
-type Mode = "success" | "refused" | "fallback" | "transport" | "unknown" | "absent";
+type Mode = "success" | "refused" | "fallback" | "transport" | "unknown" | "absent" | "null";
 function harness(locale: string, initial: Mode = "success") {
   let mode = initial;
   const requests: { operationName: string; variables: Record<string, unknown> }[] = [];
@@ -88,6 +88,7 @@ function harness(locale: string, initial: Mode = "success") {
         "rollbackDeployment",
         "redeployApp",
         "startDeployment",
+        "deleteDeployment",
       ])
         rootValue[field] = {
           ok: !["refused", "fallback"].includes(mode),
@@ -105,7 +106,13 @@ function harness(locale: string, initial: Mode = "success") {
         fieldResolver,
       });
       expect("errors" in result ? result.errors : undefined).toBeUndefined();
-      return new Response(JSON.stringify(mutation && mode === "absent" ? { data: {} } : result), {
+      const response =
+        mutation && mode === "absent"
+          ? { data: {} }
+          : mutation && mode === "null"
+            ? { data: Object.fromEntries(Object.keys(result.data ?? {}).map((key) => [key, null])) }
+            : result;
+      return new Response(JSON.stringify(response), {
         headers: { "Content-Type": "application/json" },
       });
     },
@@ -191,6 +198,29 @@ describe.each(locales)("global deployment feedback in %s", (locale) => {
       unmount();
     }
   );
+  it.each(["approve", "abort", "rollback", "redeploy"] as const)(
+    "refuses %s without an acknowledgement and permits a retry",
+    async (action) => {
+      const h = harness(locale, "absent");
+      const t = translator(locale, "apps.deployments.actions");
+      const translatedAction = action === "rollback" ? "rollbackConfirm" : action;
+      const { result, unmount } = renderHook(() => useDeployments(), { wrapper: h.Wrapper });
+      for (const mode of ["absent", "null"] as const) {
+        h.mode(mode);
+        await act(async () => {
+          await expect(
+            result.current.runAction(action, DEPLOY_RUNNING, "LITERAL_USER_REASON")
+          ).rejects.toThrow(t("failed", { action: t(translatedAction) }));
+        });
+        expect(feedback.success).not.toHaveBeenCalled();
+      }
+      h.mode("success");
+      await act(() => result.current.runAction(action, DEPLOY_RUNNING, "LITERAL_USER_REASON"));
+      expect(feedback.success).toHaveBeenCalledTimes(1);
+      expect(h.intlErrors).not.toHaveBeenCalled();
+      unmount();
+    }
+  );
   it("keeps a detail mutation refusal literal, localizes fallback and preserves future statuses", async () => {
     const h = harness(locale, "unknown");
     const t = translator(locale, "apps.deployments.actions");
@@ -211,6 +241,36 @@ describe.each(locales)("global deployment feedback in %s", (locale) => {
     h.mode("transport");
     await act(() => result.current.onApprove());
     expect(feedback.error).toHaveBeenCalledWith("RAW_TRANSPORT_DIAGNOSTIC");
+    expect(h.intlErrors).not.toHaveBeenCalled();
+    unmount();
+  });
+  it("refuses deletion without acknowledgement before navigation and permits a retry", async () => {
+    const h = harness(locale, "absent");
+    const t = translator(locale, "lists.deploymentDetail");
+    const { result, unmount } = renderHook(() => useDeploymentDetail(DEPLOY_RUNNING.id), {
+      wrapper: h.Wrapper,
+    });
+    await waitFor(() => expect(result.current.deployment?.id).toBe(DEPLOY_RUNNING.id));
+    for (const mode of ["absent", "null"] as const) {
+      h.mode(mode);
+      await act(async () => {
+        await expect(result.current.onDelete()).rejects.toThrow(t("confirmDelete.failed"));
+      });
+      expect(feedback.success).not.toHaveBeenCalled();
+      expect(feedback.push).not.toHaveBeenCalled();
+    }
+    h.mode("refused");
+    await act(async () => {
+      await expect(result.current.onDelete()).rejects.toThrow("RAW_SERVER_REFUSAL");
+    });
+    h.mode("success");
+    await act(() => result.current.onDelete());
+    expect(feedback.success).toHaveBeenCalledTimes(1);
+    expect(feedback.push).toHaveBeenCalledWith("/deployments");
+    const writes = h.requests.filter((request) => request.operationName === "DeleteDeployment");
+    expect(writes).toHaveLength(4);
+    for (const write of writes)
+      expect(write.variables).toEqual({ input: { id: DEPLOY_RUNNING.id } });
     expect(h.intlErrors).not.toHaveBeenCalled();
     unmount();
   });

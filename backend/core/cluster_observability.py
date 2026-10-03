@@ -2617,6 +2617,7 @@ def _managed_config_uncredentialed(
 
         return KMSConfig(
             region=region,
+            account_id=str(pc.get("account_id", "")),
             alias_name_prefix=str(pc.get("kms_alias_name_prefix", "alias/astrolift")),
             deletion_protection_default=bool(
                 pc.get("kms_deletion_protection_default", True),

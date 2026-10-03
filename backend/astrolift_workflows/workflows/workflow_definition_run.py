@@ -75,7 +75,22 @@ with workflow.unsafe.imports_passed_through():
         snapshot_checkpoint,
         update_stage_execution,
     )
-
+    from workflows.back_edges import (
+        MAX_STAGE_VISITS,
+        SUPPORTED_EXECUTOR_PATTERNS,
+        LoopContractError,
+        edge_matches,
+        validate_back_edge,
+        validate_loop_plan,
+    )
+    from workflows.collections import (
+        CollectionContractError,
+        bounded_json,
+        collection_items,
+        collection_ranges,
+        format_record,
+        validate_iteration,
+    )
 
 # Stage / failure-policy literals — mirror workflows.models without
 # importing Django into the sandbox.
@@ -100,9 +115,8 @@ STATUS_ESCALATED = "escalated"
 RUN_COMPLETED = "completed"
 RUN_FAILED = "failed"
 
-# Default ceiling on retry attempts for an on_failure=retry stage. The
-# stage model has no per-stage attempt cap, so the executor imposes one to
-# avoid an unbounded retry loop wedging the run.
+# Compatibility ceiling for existing histories and pre-cap frozen plans.
+# New runs use the authored, validated stage max_attempts instead.
 MAX_STAGE_ATTEMPTS = 3
 
 # A human gate that hasn't been overridden to a longer window still gets a
@@ -231,8 +245,19 @@ def build_stage_dispatch_input(
         "stage": {
             "order": stage["order"],
             "output_key": stage["output_key"],
+            **(
+                {"round_number": stage["round_number"], "caused_by": stage["caused_by"]}
+                if "round_number" in stage
+                else {}
+            ),
         },
     }
+    if stage.get("caused_by"):
+        payload["_astrolift_workflow"]["loop"] = {
+            **stage["caused_by"],
+            "round_number": stage["round_number"],
+            "feedback": stage.get("loop_feedback"),
+        }
     return payload
 
 
@@ -254,6 +279,10 @@ class WorkflowDefinitionRunWorkflow:
         # execution rows without threading the run id through every call.
         self._workflow_run_id: str = ""
         self._nested_workflows_enabled: bool = False
+        self._stage_attempt_limits_enabled: bool = False
+        self._bounded_loops_enabled: bool = False
+        self._execution_context: dict = {}
+        self._current_stage_execution_id: str | None = None
 
     # ---- signals ----------------------------------------------------------
 
@@ -324,12 +353,16 @@ class WorkflowDefinitionRunWorkflow:
         # durable histories. New runs record the marker and may invoke child
         # definitions; old histories replay the exact v2 packet they started.
         self._nested_workflows_enabled = workflow.patched("nested-workflows-v1")
+        self._stage_attempt_limits_enabled = workflow.patched("workflow-stage-attempt-limits-v1")
+        self._bounded_loops_enabled = workflow.patched("workflow-bounded-back-edges-v1")
         plan_params = {
             "workflow_definition_slug": input.workflow_definition_slug,
             "workflow_definition_id": input.workflow_definition_id,
             "workflow_run_id": input.workflow_run_id,
             "stage_bindings": input.stage_bindings or {},
         }
+        if self._bounded_loops_enabled:
+            plan_params["bounded_loops"] = True
         if self._nested_workflows_enabled:
             plan_params["workflow_ancestry"] = input.workflow_ancestry or []
         plan = await workflow.execute_activity(
@@ -341,11 +374,45 @@ class WorkflowDefinitionRunWorkflow:
         pattern_kind: str = plan["pattern_kind"]
         stages: list[dict] = plan["stages"]
 
+        collection_context = (input.trigger_payload or {}).get("_astrolift_collection")
+        if (
+            self._bounded_loops_enabled
+            and input.only_stage_order is not None
+            and collection_context is not None
+        ):
+            ranges = collection_ranges(stages)
+            owner_index = next(
+                (i for i, s in enumerate(stages) if s["order"] == input.only_stage_order),
+                None,
+            )
+            if (
+                owner_index not in ranges
+                or not isinstance(collection_context, dict)
+                or collection_context.get("body_stage_ids")
+                != [s["stage_id"] for s in stages[owner_index + 1 : ranges[owner_index] + 1]]
+                or type(input.fan_out_index) is not int
+            ):
+                raise _WorkflowAbort(
+                    "collection child target is unavailable",
+                    data={"status": "unavailable"},
+                )
+            body = stages[owner_index + 1 : ranges[owner_index] + 1]
+            return await self._execute_loop_plan(input, {**plan, "stages": body, "pattern_kind": "chained"})
+
         # Child runs execute exactly one stage (the parent picks which via
         # ``only_stage_order``); they never re-fan-out.
         if input.only_stage_order is not None:
             stages = [s for s in stages if s["order"] == input.only_stage_order]
             pattern_kind = "single"
+
+        if self._bounded_loops_enabled:
+            # A branch executes only the parent's selected stage. The parent,
+            # not a branch, owns any back-edge on that stage.
+            if input.only_stage_order is not None:
+                stages = [{**stage, "back_edge": {}} for stage in stages]
+            return await self._execute_loop_plan(
+                input, {**plan, "stages": stages, "pattern_kind": pattern_kind}
+            )
 
         workflow_input = dict(input.trigger_payload or {})
         previous_output: Any = workflow_input
@@ -447,6 +514,548 @@ class WorkflowDefinitionRunWorkflow:
             "named_outputs": named_outputs,
             "final_output": previous_output,
         }
+
+    async def _open_execution(self, stage: dict, attempt: int) -> str:
+        args = [self._workflow_run_id, stage["stage_id"], attempt]
+        if self._bounded_loops_enabled:
+            args.append(self._execution_context)
+        execution_id = await workflow.execute_activity(
+            create_stage_execution,
+            args=args,
+            start_to_close_timeout=_DB_TIMEOUT,
+            retry_policy=_DB_RETRY,
+        )
+        self._current_stage_execution_id = execution_id
+        return execution_id
+
+    async def _execute_loop_plan(self, input: WorkflowDefinitionRunInput, plan: dict) -> dict:
+        stages = plan["stages"]
+        pattern = plan["pattern_kind"]
+        if pattern not in SUPPORTED_EXECUTOR_PATTERNS:
+            raise _WorkflowAbort(
+                "this workflow pattern has no supported executor",
+                data={"status": "unavailable"},
+            )
+        try:
+            validate_loop_plan(stages, pattern_kind=pattern)
+        except LoopContractError as exc:
+            raise _WorkflowAbort(str(exc), data={"status": "unavailable"}) from exc
+        workflow_input = dict(input.trigger_payload or {})
+        branch_context = {}
+        collection_context = {}
+        collection_item = None
+        if input.only_stage_order is not None and input.fan_out_index is not None:
+            collection_context = workflow_input.pop("_astrolift_collection", {})
+            if collection_context:
+                collection_item = workflow_input.pop("_astrolift_collection_item", None)
+            else:
+                branch_context = workflow_input.pop("_astrolift_fanout", {})
+        previous_output: Any = collection_item if collection_context else workflow_input
+        ranges = collection_ranges(stages)
+        named_outputs: dict[str, Any] = {}
+        records: list[dict] = []
+        current_round = 1
+        edge_returns: dict[str, int] = {}
+        indices = {stage["output_key"]: index for index, stage in enumerate(stages)}
+        first_agent = next((s["stage_id"] for s in stages if s["kind"] == KIND_AGENT_DISPATCH), None)
+        fanout_sources: list[str] = []
+        cause: dict = {}
+        loop_feedback: Any = None
+        cause_end = -1
+        index = 0
+        while index < len(stages):
+            if self._abort_requested:
+                raise _WorkflowAbort(
+                    "aborted by signal",
+                    data={"outputs": records, "status": "incomplete"},
+                )
+            if len(records) >= MAX_STAGE_VISITS:
+                raise _WorkflowAbort(
+                    "workflow stage visit budget exhausted",
+                    data={"outputs": records, "status": "incomplete"},
+                )
+            stage = stages[index]
+            kind = stage["kind"]
+            stage_id = stage["stage_id"]
+            inherited_context = collection_context or branch_context
+            round_number = inherited_context.get("round_number", 1) + current_round - 1
+            self._execution_context = {
+                "round_number": round_number,
+                "caused_by": cause or inherited_context.get("caused_by", {}),
+                "fanout_parent_execution_id": branch_context.get("parent_execution_id"),
+                "fanout_index": input.fan_out_index if branch_context else None,
+                **(
+                    {
+                        "collection_parent_execution_id": collection_context["parent_execution_id"],
+                        "collection_index": input.fan_out_index,
+                        "collection_workflow_id": workflow.info().workflow_id,
+                    }
+                    if collection_context
+                    else {}
+                ),
+            }
+            self._current_stage_execution_id = None
+            stage = {
+                **stage,
+                "round_number": round_number,
+                "caused_by": self._execution_context["caused_by"],
+                "loop_feedback": loop_feedback,
+            }
+            failure: _WorkflowAbort | None = None
+            stage_failed = False
+            output = None
+            metadata: dict = {}
+            try:
+                explicit_fanout = stage.get("fan_out_dynamic") or (stage.get("fan_out_count") or 0) > 0
+                if (
+                    kind == KIND_AGENT_DISPATCH
+                    and input.only_stage_order is None
+                    and (explicit_fanout or (pattern == PATTERN_FAN_OUT and stage_id == first_agent))
+                ):
+                    fanout = await self._run_bounded_fan_out(input, stage, previous_output)
+                    fanout_sources = fanout["fan_out_execution_ids"]
+                    output = fanout
+                    stage_failed = not fanout["complete"]
+                    if stage_failed:
+                        failure = _WorkflowAbort(
+                            "fan-out did not complete successfully",
+                            data={"status": "incomplete"},
+                        )
+                elif kind == KIND_AGENT_DISPATCH:
+                    result = await self._run_agent_stage(
+                        input,
+                        stage,
+                        build_stage_dispatch_input(
+                            workflow_input,
+                            previous_output,
+                            named_outputs,
+                            stage,
+                        ),
+                    )
+                    output = result.get("result")
+                    metadata = {key: value for key, value in result.items() if key != "result"}
+                elif kind == KIND_WORKFLOW:
+                    result = await self._run_nested_workflow(
+                        input,
+                        stage,
+                        build_stage_dispatch_input(
+                            workflow_input,
+                            previous_output,
+                            named_outputs,
+                            stage,
+                        ),
+                        plan["definition_id"],
+                    )
+                    output = result.get("result")
+                    metadata = {key: value for key, value in result.items() if key != "result"}
+                elif kind == KIND_HUMAN_GATE:
+                    output = {
+                        **await self._run_human_gate(stage),
+                        "reviewed_output": previous_output,
+                    }
+                    if output["human_gate"] != "approved":
+                        failure = _WorkflowAbort(
+                            "human gate rejected",
+                            data={"execution_id": output["execution_id"]},
+                        )
+                elif kind == KIND_CHECKPOINT:
+                    control = validate_back_edge(stage.get("back_edge") or {}, kind=kind)
+                    checkpoint_input = previous_output
+                    if control.get("source_format") == "flowise_loop_1_2":
+                        checkpoint_input = {
+                            "content": f"Loop back to {control['source_label']} ({control['source_target']})",
+                            "nodeID": control["source_target"],
+                            "maxLoopCount": control["max_rounds"],
+                            **(
+                                {"fallbackMessage": control["fallback_message"]}
+                                if "fallback_message" in control
+                                else {}
+                            ),
+                        }
+                        edge_id = f"{stage['output_key']}->{control['to']}"
+                        if edge_returns.get(edge_id, 0) + 1 >= control["max_rounds"]:
+                            checkpoint_input["content"] = control.get("fallback_message") or (
+                                f"Loop completed after reaching maximum iteration count of {control['max_rounds']}."
+                            )
+                    output = await self._run_checkpoint(input, stage, checkpoint_input)
+                elif kind == KIND_AGGREGATION:
+                    output = await self._run_aggregation(input, stage, fanout_sources)
+                    fanout_sources = []
+                elif kind == "collection":
+                    output = await self._run_serial_collection(
+                        input,
+                        stage,
+                        stages[index + 1 : ranges[index] + 1],
+                        previous_output,
+                        workflow_input,
+                    )
+                    index = ranges[index]
+                elif kind == "format_record":
+                    execution_id = await self._open_execution(stage, 1)
+                    try:
+                        output = format_record(
+                            stage["iteration"],
+                            previous_output,
+                            timestamp=workflow.now().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S.%f %Z"),
+                        )
+                    except CollectionContractError as exc:
+                        await workflow.execute_activity(
+                            update_stage_execution,
+                            args=[execution_id, STATUS_FAILED, None, str(exc)],
+                            start_to_close_timeout=_DB_TIMEOUT,
+                            retry_policy=_DB_RETRY,
+                        )
+                        raise _WorkflowAbort(str(exc), data={"status": "unavailable"}) from exc
+                    await workflow.execute_activity(
+                        update_stage_execution,
+                        args=[execution_id, STATUS_COMPLETED, output, None],
+                        start_to_close_timeout=_DB_TIMEOUT,
+                        retry_policy=_DB_RETRY,
+                    )
+                else:
+                    raise _WorkflowAbort("unknown stage kind", data={"status": "unavailable"})
+            except _WorkflowAbort as exc:
+                failure = exc
+                if kind in (KIND_AGENT_DISPATCH, KIND_WORKFLOW):
+                    stage_failed = True
+                    output = exc.data.get("stage_failure_output", exc.data)
+                else:
+                    raise
+            record = {
+                "order": stage["order"],
+                "output_key": stage["output_key"],
+                "round_number": round_number,
+                "caused_by": self._execution_context["caused_by"],
+                "execution_id": self._current_stage_execution_id,
+                "output": output,
+                **metadata,
+            }
+            records.append(record)
+            previous_output = output
+            named_outputs[stage["output_key"]] = output
+            try:
+                edge = validate_back_edge(stage.get("back_edge") or {}, kind=kind)
+                take_edge = bool(edge) and edge_matches(edge, output, stage_failed=stage_failed)
+            except LoopContractError as exc:
+                raise _WorkflowAbort(str(exc), data={"outputs": records, "status": "unavailable"}) from exc
+            if take_edge:
+                edge_id = f"{stage['output_key']}->{edge['to']}"
+                taken = edge_returns.get(edge_id, 0)
+                if taken + 1 >= edge["max_rounds"]:
+                    await self._loop_exhausted(stage, edge, edge_id, records, output)
+                else:
+                    edge_returns[edge_id] = taken + 1
+                    cause = {
+                        "edge": edge_id,
+                        "reason": edge["when"],
+                        "max_rounds": edge["max_rounds"],
+                        "edge_round": taken + 2,
+                    }
+                    current_round += 1
+                    target_index = indices[edge["to"]]
+                    # Feedback is explicit; obsolete named outputs from the
+                    # segment being revised cannot masquerade as fresh data.
+                    loop_feedback = output
+                    if edge["when"] == "gate_rejected":
+                        previous_output = output.get("reviewed_output")
+                    elif edge["when"] == "stage_failed" and isinstance(output, dict):
+                        previous_output = output.get("result", output)
+                    else:
+                        previous_output = output
+                    for obsolete in stages[target_index : index + 1]:
+                        named_outputs.pop(obsolete["output_key"], None)
+                    fanout_sources = []
+                    cause_end = index
+                    index = target_index
+                    continue
+            elif failure is not None:
+                raise _WorkflowAbort(
+                    str(failure),
+                    data={**failure.data, "outputs": records, "status": "incomplete"},
+                )
+            if index >= cause_end:
+                cause = {}
+                loop_feedback = None
+            index += 1
+        return {
+            "outputs": records,
+            "named_outputs": named_outputs,
+            "final_output": previous_output,
+        }
+
+    async def _run_serial_collection(
+        self,
+        input: WorkflowDefinitionRunInput,
+        stage: dict,
+        body: list[dict],
+        previous_output: Any,
+        workflow_input: dict,
+    ) -> dict:
+        try:
+            config = validate_iteration(stage["iteration"], kind="collection")
+            items = collection_items(config, previous_output)
+        except CollectionContractError as exc:
+            raise _WorkflowAbort(str(exc), data={"status": "unavailable"}) from exc
+        parent = await self._open_execution(stage, 1)
+        binding = {
+            "owner_order": stage["order"],
+            "body_stage_ids": [s["stage_id"] for s in body],
+            "item_count": len(items),
+            "max_items": config["max_items"],
+        }
+        await workflow.execute_activity(
+            update_stage_execution,
+            args=[parent, "running", {"collection": binding}, None],
+            start_to_close_timeout=_DB_TIMEOUT,
+            retry_policy=_DB_RETRY,
+        )
+        context = {
+            "parent_execution_id": parent,
+            "body_stage_ids": binding["body_stage_ids"],
+            "round_number": self._execution_context["round_number"],
+            "caused_by": self._execution_context["caused_by"],
+        }
+        outputs = []
+        execution_ids = []
+        for item_index, item in enumerate(items):
+            if self._abort_requested:
+                raise _WorkflowAbort("aborted by signal", data={"status": "incomplete"})
+            child_run_id = f"{input.workflow_run_id}:collection:{stage['order']}:{item_index}"
+            payload = {
+                **workflow_input,
+                "_astrolift_collection": context,
+                "_astrolift_collection_item": item,
+            }
+            try:
+                # Existing collection histories awaited the child directly.
+                # New histories observe abort while the item is blocked, and
+                # await its cancellation before settling the parent records.
+                observe_abort = workflow.patched("serial-collection-abort-v1")
+                start_child = (
+                    workflow.start_child_workflow if observe_abort else workflow.execute_child_workflow
+                )
+                child_or_result = await start_child(
+                    WorkflowDefinitionRunWorkflow.run,
+                    WorkflowDefinitionRunInput(
+                        workflow_definition_slug=input.workflow_definition_slug,
+                        workflow_definition_id=input.workflow_definition_id,
+                        workflow_run_id=child_run_id,
+                        trigger_payload=payload,
+                        actor=input.actor,
+                        only_stage_order=stage["order"],
+                        fan_out_index=item_index,
+                        stage_bindings=input.stage_bindings,
+                        workflow_ancestry=input.workflow_ancestry,
+                    ),
+                    id=f"WorkflowDefinitionRunWorkflow-{child_run_id}-parent-{parent}",
+                    execution_timeout=timedelta(
+                        seconds=500 * (max(1, max(s["timeout_seconds"] for s in body)) + 86400) + 120
+                    ),
+                )
+                if observe_abort:
+                    child = child_or_result
+                    try:
+                        await workflow.wait_condition(
+                            lambda child=child: self._abort_requested or child.done()
+                        )
+                    except asyncio.CancelledError:
+                        child.cancel()
+                        try:
+                            await child
+                        except (Exception, asyncio.CancelledError):
+                            pass
+                        raise
+                    if self._abort_requested:
+                        child.cancel()
+                        try:
+                            await child
+                        except Exception as exc:
+                            if _parent_cancelled(exc):
+                                raise asyncio.CancelledError() from exc
+                            # Expected child cancellation; parent abort is the outcome.
+                        except asyncio.CancelledError:
+                            if asyncio.current_task().cancelling():
+                                raise
+                        raise _WorkflowAbort("aborted by signal", data={"status": "incomplete"})
+                    result = await child
+                else:
+                    result = child_or_result
+                data = result.data or {}
+                records = data.get("outputs") or []
+                execution_id = records[-1].get("execution_id") if records else None
+                if not result.ok or not execution_id:
+                    raise _WorkflowAbort(
+                        "serial collection body did not complete",
+                        data={"status": "incomplete"},
+                    )
+                candidate_outputs = [*outputs, data.get("final_output")]
+                bounded_json(candidate_outputs)
+                outputs = candidate_outputs
+                execution_ids.append(str(execution_id))
+            except Exception as exc:
+                if _parent_cancelled(exc):
+                    raise asyncio.CancelledError() from exc
+                message = (
+                    exc.message
+                    if isinstance(exc, _WorkflowAbort)
+                    else "serial collection body did not complete"
+                )
+                await workflow.execute_activity(
+                    update_stage_execution,
+                    args=[
+                        parent,
+                        STATUS_FAILED,
+                        {
+                            "collection": binding,
+                            "finished_count": len(outputs),
+                            "complete": False,
+                        },
+                        message,
+                    ],
+                    start_to_close_timeout=_DB_TIMEOUT,
+                    retry_policy=_DB_RETRY,
+                )
+                raise _WorkflowAbort(
+                    message,
+                    data={"status": "incomplete", "finished_count": len(outputs)},
+                ) from exc
+        output = {
+            "results": outputs,
+            "collection": binding,
+            "item_execution_ids": execution_ids,
+            "finished_count": len(outputs),
+            "complete": True,
+        }
+        await workflow.execute_activity(
+            update_stage_execution,
+            args=[parent, STATUS_COMPLETED, output, None],
+            start_to_close_timeout=_DB_TIMEOUT,
+            retry_policy=_DB_RETRY,
+        )
+        self._current_stage_execution_id = parent
+        return output
+
+    async def _loop_exhausted(
+        self, stage: dict, edge: dict, edge_id: str, records: list, output: Any
+    ) -> None:
+        cause = {
+            "edge": edge_id,
+            "reason": "max_rounds_exhausted",
+            "max_rounds": edge["max_rounds"],
+            "edge_round": edge["max_rounds"],
+        }
+        if edge["on_exhausted"] == "continue":
+            return
+        if edge["on_exhausted"] == "escalate":
+            self._execution_context = {**self._execution_context, "caused_by": cause}
+            execution_id = await self._open_execution(stage, 1)
+            await workflow.execute_activity(
+                update_stage_execution,
+                args=[
+                    execution_id,
+                    STATUS_ESCALATED,
+                    {"loop_exhaustion": cause, "result": output},
+                    "round limit reached",
+                ],
+                start_to_close_timeout=_DB_TIMEOUT,
+                retry_policy=_DB_RETRY,
+            )
+            if await self._wait_escalation_cleared(execution_id, max(1, stage["timeout_seconds"])):
+                records.append(
+                    {
+                        "order": stage["order"],
+                        "output_key": stage["output_key"],
+                        "round_number": self._execution_context["round_number"],
+                        "caused_by": cause,
+                        "execution_id": execution_id,
+                        "escalation": "cleared",
+                    }
+                )
+                return
+        raise _WorkflowAbort(
+            "workflow round limit reached", data={"outputs": records, "status": "incomplete", "loop": cause}
+        )
+
+    async def _run_bounded_fan_out(
+        self, input: WorkflowDefinitionRunInput, stage: dict, previous_output: Any
+    ) -> dict:
+        count = stage.get("fan_out_count")
+        if count is None:
+            items = previous_output.get("items") if isinstance(previous_output, dict) else None
+            if not isinstance(items, list):
+                raise _WorkflowAbort("dynamic fan-out items are unavailable", data={"status": "unavailable"})
+            count = len(items)
+        if isinstance(count, bool) or not isinstance(count, int) or not 0 <= count <= 50:
+            raise _WorkflowAbort("fan-out exceeds its 50-branch bound", data={"status": "incomplete"})
+        parent_execution = await self._open_execution(stage, 1)
+        context = {
+            "parent_execution_id": parent_execution,
+            "round_number": self._execution_context["round_number"],
+            "caused_by": self._execution_context["caused_by"],
+        }
+        handles = []
+        for branch in range(count):
+            child_run_id = f"{input.workflow_run_id}:fanout:{stage['order']}:{branch}"
+            payload = (
+                dict(previous_output) if isinstance(previous_output, dict) else {"value": previous_output}
+            )
+            payload["_astrolift_fanout"] = context
+            handles.append(
+                await workflow.start_child_workflow(
+                    WorkflowDefinitionRunWorkflow.run,
+                    WorkflowDefinitionRunInput(
+                        workflow_definition_slug=input.workflow_definition_slug,
+                        workflow_definition_id=input.workflow_definition_id,
+                        workflow_run_id=child_run_id,
+                        trigger_payload=payload,
+                        actor=input.actor,
+                        only_stage_order=stage["order"],
+                        fan_out_index=branch,
+                        stage_bindings=input.stage_bindings,
+                        workflow_ancestry=input.workflow_ancestry,
+                    ),
+                    id=f"WorkflowDefinitionRunWorkflow-{child_run_id}-parent-{parent_execution}",
+                    execution_timeout=timedelta(
+                        seconds=(max(1, stage["timeout_seconds"]) + 86400) * self._stage_attempt_limit(stage)
+                        + 120
+                    ),
+                )
+            )
+        execution_ids = []
+        complete = True
+        for handle in handles:
+            try:
+                result = await handle
+                data = result.data or {}
+                rows = data.get("outputs") or []
+                execution_id = rows[-1].get("execution_id") if rows else data.get("execution_id")
+                if execution_id:
+                    execution_ids.append(str(execution_id))
+                if not result.ok or not execution_id:
+                    complete = False
+            except Exception as exc:  # noqa: BLE001 — fail closed after collecting siblings
+                if _parent_cancelled(exc):
+                    raise asyncio.CancelledError() from exc
+                complete = False
+        output = {
+            "fan_out_execution_ids": execution_ids,
+            "count": count,
+            "finished_count": len(execution_ids),
+            "complete": complete,
+        }
+        await workflow.execute_activity(
+            update_stage_execution,
+            args=[
+                parent_execution,
+                STATUS_COMPLETED if complete else STATUS_FAILED,
+                output,
+                None if complete else "fan-out incomplete",
+            ],
+            start_to_close_timeout=_DB_TIMEOUT,
+            retry_policy=_DB_RETRY,
+        )
+        self._current_stage_execution_id = parent_execution
+        return output
 
     async def _execute_legacy(self, input: WorkflowDefinitionRunInput) -> dict[str, Any]:
         """Replay path for histories created before the v2 stage packet.
@@ -598,6 +1207,16 @@ class WorkflowDefinitionRunWorkflow:
                 data={"execution_id": execution_id, "attempt": attempt},
             )
 
+    def _stage_attempt_limit(self, stage: dict) -> int:
+        if not self._stage_attempt_limits_enabled:
+            return MAX_STAGE_ATTEMPTS
+        # Older frozen reviewed plans lack the additive field. Their explicit
+        # compatible default remains three, never an unbounded retry policy.
+        limit = stage.get("max_attempts", MAX_STAGE_ATTEMPTS)
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 20:
+            raise _WorkflowAbort("invalid stage attempt limit")
+        return limit
+
     async def _run_agent_stage(
         self,
         input: WorkflowDefinitionRunInput,
@@ -616,12 +1235,7 @@ class WorkflowDefinitionRunWorkflow:
 
         while True:
             agent_run_id: str | None = None
-            execution_id = await workflow.execute_activity(
-                create_stage_execution,
-                args=[input.workflow_run_id, stage["stage_id"], attempt],
-                start_to_close_timeout=_DB_TIMEOUT,
-                retry_policy=_DB_RETRY,
-            )
+            execution_id = await self._open_execution(stage, attempt)
 
             try:
                 agent_run_id = await workflow.execute_activity(
@@ -648,7 +1262,9 @@ class WorkflowDefinitionRunWorkflow:
                 # The dispatch activity itself failed (e.g. spawn error).
                 run_status = "failed"
 
-            decision = decide_after_agent_run(run_status, on_failure, attempt)
+            decision = decide_after_agent_run(
+                run_status, on_failure, attempt, max_attempts=self._stage_attempt_limit(stage)
+            )
 
             if decision.proceed:
                 if agent_run_id is not None:
@@ -714,6 +1330,17 @@ class WorkflowDefinitionRunWorkflow:
                     data={"execution_id": execution_id},
                 )
 
+            failure_output = None
+            if self._bounded_loops_enabled and stage.get("back_edge", {}).get("when") == "stage_failed":
+                if agent_run_id is not None:
+                    failure_output = await workflow.execute_activity(
+                        load_agent_run_outcome,
+                        agent_run_id,
+                        start_to_close_timeout=_DB_TIMEOUT,
+                        retry_policy=_DB_RETRY,
+                    )
+                else:
+                    failure_output = {"result": None, "failure": {"message": "agent dispatch failed"}}
             # abort
             await workflow.execute_activity(
                 update_stage_execution,
@@ -723,7 +1350,11 @@ class WorkflowDefinitionRunWorkflow:
             )
             raise _WorkflowAbort(
                 f"stage {stage['order']} failed ({run_status})",
-                data={"execution_id": execution_id, "attempt": attempt},
+                data={
+                    "execution_id": execution_id,
+                    "attempt": attempt,
+                    **({"stage_failure_output": failure_output} if failure_output is not None else {}),
+                },
             )
 
     async def _poll_agent_to_terminal(self, agent_run_id: str, timeout_seconds: int) -> str:
@@ -771,12 +1402,7 @@ class WorkflowDefinitionRunWorkflow:
         attempt = 1
 
         while True:
-            execution_id = await workflow.execute_activity(
-                create_stage_execution,
-                args=[input.workflow_run_id, stage["stage_id"], attempt],
-                start_to_close_timeout=_DB_TIMEOUT,
-                retry_policy=_DB_RETRY,
-            )
+            execution_id = await self._open_execution(stage, attempt)
             child = await workflow.execute_activity(
                 create_nested_workflow_run,
                 args=[
@@ -847,7 +1473,9 @@ class WorkflowDefinitionRunWorkflow:
                 "attempt": attempt,
                 "result": final_output,
             }
-            decision = decide_after_agent_run(run_status, on_failure, attempt)
+            decision = decide_after_agent_run(
+                run_status, on_failure, attempt, max_attempts=self._stage_attempt_limit(stage)
+            )
 
             if decision.proceed:
                 await workflow.execute_activity(
@@ -889,19 +1517,23 @@ class WorkflowDefinitionRunWorkflow:
                 start_to_close_timeout=_DB_TIMEOUT,
                 retry_policy=_DB_RETRY,
             )
+            abort_data = {"execution_id": execution_id, **persisted_output}
+            if self._bounded_loops_enabled and stage.get("back_edge", {}).get("when") == "stage_failed":
+                abort_data["stage_failure_output"] = {
+                    "result": data.get("final_output"),
+                    "failure": {
+                        "message": failure_message or "nested workflow failed",
+                        "outputs": data.get("outputs"),
+                    },
+                }
             raise _WorkflowAbort(
                 f"nested workflow {child['definition_slug']!r} failed at stage {stage['order']}",
-                data={"execution_id": execution_id, **persisted_output},
+                data=abort_data,
             )
 
     async def _run_human_gate(self, stage: dict) -> dict:
         """Open a gate execution and block on the decision signal."""
-        execution_id = await workflow.execute_activity(
-            create_stage_execution,
-            args=[self._workflow_run_id, stage["stage_id"], 1],
-            start_to_close_timeout=_DB_TIMEOUT,
-            retry_policy=_DB_RETRY,
-        )
+        execution_id = await self._open_execution(stage, 1)
 
         # Gate timeout: respect an explicit per-stage override above the
         # 300s stage default; otherwise grant a full day.
@@ -935,6 +1567,12 @@ class WorkflowDefinitionRunWorkflow:
             retry_policy=_DB_RETRY,
         )
 
+        if self._bounded_loops_enabled:
+            return {
+                "human_gate": decision,
+                "execution_id": execution_id,
+                "feedback": str(decision_payload.get("note", "")),
+            }
         if decision != "approved":
             raise _WorkflowAbort(
                 f"human gate at stage {stage['order']} rejected",
@@ -948,16 +1586,21 @@ class WorkflowDefinitionRunWorkflow:
         stage: dict,
         previous_output: Any,
     ) -> dict:
-        await workflow.execute_activity(
+        checkpoint_args = [
+            input.workflow_run_id,
+            stage["stage_id"],
+            previous_output if isinstance(previous_output, dict) else {"value": previous_output},
+        ]
+        if self._bounded_loops_enabled:
+            checkpoint_args.append(self._execution_context)
+        execution_id = await workflow.execute_activity(
             snapshot_checkpoint,
-            args=[
-                input.workflow_run_id,
-                stage["stage_id"],
-                previous_output if isinstance(previous_output, dict) else {"value": previous_output},
-            ],
+            args=checkpoint_args,
             start_to_close_timeout=_DB_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
+        if self._bounded_loops_enabled:
+            self._current_stage_execution_id = execution_id
         # Checkpoints are transparent to chaining: the prior output flows on.
         return previous_output
 
@@ -982,12 +1625,17 @@ class WorkflowDefinitionRunWorkflow:
         stage: dict,
         source_execution_ids: list[str],
     ) -> dict:
+        aggregation_args = [input.workflow_run_id, stage["stage_id"], source_execution_ids]
+        if self._bounded_loops_enabled:
+            aggregation_args.append(self._execution_context)
         aggregated = await workflow.execute_activity(
             aggregate_fan_out,
-            args=[input.workflow_run_id, stage["stage_id"], source_execution_ids],
+            args=aggregation_args,
             start_to_close_timeout=_DB_TIMEOUT,
             retry_policy=_DB_RETRY,
         )
+        if self._bounded_loops_enabled:
+            self._current_stage_execution_id = aggregated.get("execution_id")
         return aggregated
 
     async def _run_fan_out(
