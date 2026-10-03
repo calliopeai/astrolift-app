@@ -26,6 +26,21 @@ workflow failure path when it runs.
 
 ## Read and download
 
+`AstroliftDeployment.id` is the deployment's public GUID. The `deploymentId`
+argument of each log read uses that same GUID, and every
+`AstroliftDeploymentLogEntry.deploymentId` returns the exact public parent GUID
+for both legacy and paged timelines (#2265). A log entry's own `id` is its
+distinct public log-entry GUID. Internal database primary/foreign keys are not
+public ownership references. Clients can compare each row's `deploymentId`
+with the selected deployment detail's `id` before displaying it.
+
+The existing GraphQL argument and parent-reference field remain `String`; this
+corrects their values without changing the schema shape. Earlier servers emitted
+a decimal internal foreign key in timeline rows. Clients must not reinterpret
+those values as GUIDs or infer ownership from them: keep an unverified timeline
+unavailable until a corrected server responds. Deployment status and separately
+authorized logs can remain independently available.
+
 `astroliftDeploymentRunLogPage(deploymentId: String!, cursor: String, limit: Int = 100)`
 returns `items`, `nextCursor`, `hasMore`, and `pageSize`. Items include the existing
 log fields plus `phase` and `event`. The first page is the newest persisted window,
@@ -51,7 +66,8 @@ environment. Selected team/project headers do not change the deployment's owner.
 Organization-confined coherent history remains available after app/environment soft
 teardown; foreign or mismatched app, environment, workload, or cluster ancestry does
 not. Each continuation and export rechecks current authorization. The legacy
-`astroliftDeploymentLog` keeps its status-only list and 1,000-entry cap.
+`astroliftDeploymentLog` keeps its status-only list, oldest-first `occurredAt`
+ordering and oldest-1,000-entry cap; it is not the newest-page API.
 All three reads retain the actual app/team/project policy chain after app or
 environment teardown and after a cluster becomes inactive or is soft-deleted.
 They use an internal history scope that cannot be selected by API callers;

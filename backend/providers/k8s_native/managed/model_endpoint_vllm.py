@@ -29,6 +29,7 @@ from uuid import UUID
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op
 from _sdk.k8s_naming import app_namespace, cluster_model_namespace, cluster_model_resource_name, dns_label
+from _sdk.local_model_artifact import local_source_identity
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -46,6 +47,7 @@ from _sdk.managed_service import (
 )
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
+from k8s_native.managed.local_model_delivery import delivery_resources, runtime_sources, validate_delivery
 from k8s_native.managed.shared_model_runtime import AUTH_REVISION, KEYS_PATH, LAUNCHER, RUNTIME_PATH, shared_runtime
 
 KIND = "model_endpoint"
@@ -101,6 +103,10 @@ _CONFIG_FIELDS = frozenset(
         "model_revision",
         "cpu_kv_cache_gib",
         "allow_subscriptions",
+        "model_source",
+        "model_artifact_id",
+        "model_artifact_version",
+        "model_artifact_manifest_sha256",
     }
 )
 
@@ -140,6 +146,8 @@ class VLLMConfig:
     opening either implicitly."""
     shared_runtimes: dict[str, Any] = field(default_factory=dict)
     """Explicit operator-certified CPU/GPU pinned Python runtimes; empty refuses sharing."""
+    local_model_delivery: dict[str, Any] = field(default_factory=dict, repr=False)
+    """Guarded worker-only private delivery; never serialize into config or workflow history."""
 
 
 @dataclass(frozen=True)
@@ -213,7 +221,12 @@ class VLLMDriver(ManagedServiceDriver):
         handle = _pack_handle(kind=KIND, cluster_id=spec.tenant_cluster_id, namespace=namespace, name=name)
         result = self._config.cluster_driver.apply_manifests(spec.tenant_cluster_id, namespace, manifests)
         if not result.ok:
-            return ProvisionResult(False, handle, "vLLM manifests were rejected", result.summary())
+            return ProvisionResult(
+                False,
+                handle,
+                "vLLM manifests were rejected",
+                ["local_model_apply_failed"] if cfg.get("model_source") == "local_artifact" else result.summary(),
+            )
         return ProvisionResult(True, handle, f"vLLM server {namespace}/{name} submitted", ready=False)
 
     @driver_op(cloud="k8s_native", driver="model_endpoint_vllm")
@@ -251,7 +264,12 @@ class VLLMDriver(ManagedServiceDriver):
             return UpdateResult(False, spec.handle, str(exc), ["invalid_vllm_config"])
         result = self._config.cluster_driver.apply_manifests(parsed.cluster_id, parsed.namespace, manifests)
         if not result.ok:
-            return UpdateResult(False, spec.handle, "vLLM update was rejected", result.summary())
+            return UpdateResult(
+                False,
+                spec.handle,
+                "vLLM update was rejected",
+                ["local_model_apply_failed"] if cfg.get("model_source") == "local_artifact" else result.summary(),
+            )
         return UpdateResult(True, spec.handle, "vLLM update submitted")
 
     @driver_op(
@@ -264,9 +282,13 @@ class VLLMDriver(ManagedServiceDriver):
         self._require()
         parsed = _unpack_handle(spec.handle)
         deployment = self._deployment(parsed.cluster_id, parsed.namespace, parsed.name)
+        owner_id = spec.managed_service_id
         if deployment is not None:
             try:
-                self._owner_id(deployment)
+                recorded_owner = self._owner_id(deployment)
+                if owner_id and owner_id != recorded_owner:
+                    raise ValueError("vLLM Deployment belongs to another managed service.")
+                owner_id = recorded_owner
             except ValueError as exc:
                 return DeprovisionResult(False, spec.handle, str(exc), ["ownership_mismatch"], retryable=False)
         doomed = [
@@ -276,6 +298,39 @@ class VLLMDriver(ManagedServiceDriver):
             self._stub("v1", "Secret", parsed.namespace, self._secret_name(parsed.name)),
             self._stub("v1", "ConfigMap", parsed.namespace, self._runtime_name(parsed.name)),
         ]
+        delivery_name = parsed.name + "-model-delivery"
+        delivery_secret = self._config.cluster_driver.get_manifest(
+            parsed.cluster_id, parsed.namespace, "v1/Secret", delivery_name
+        )
+        if delivery_secret is not None:
+            metadata = delivery_secret.get("metadata") or {}
+            if (
+                not owner_id
+                or (
+                    self._label(delivery_secret, _OWNER) != "astrolift"
+                    or self._label(delivery_secret, _OWNER_ID) != owner_id
+                )
+                or not metadata.get("uid")
+                or not metadata.get("resourceVersion")
+            ):
+                return DeprovisionResult(
+                    False,
+                    spec.handle,
+                    "Local model delivery Secret belongs to another resource.",
+                    ["ownership_mismatch"],
+                    retryable=False,
+                )
+            doomed.append(
+                {
+                    **self._stub("v1", "Secret", parsed.namespace, delivery_name),
+                    "metadata": {
+                        "name": delivery_name,
+                        "namespace": parsed.namespace,
+                        "uid": metadata["uid"],
+                        "resourceVersion": metadata["resourceVersion"],
+                    },
+                }
+            )
         if self._metrics_namespace():
             doomed.append(self._stub("monitoring.coreos.com/v1", "ServiceMonitor", parsed.namespace, parsed.name))
         if self._agent_test_namespace():
@@ -432,7 +487,18 @@ class VLLMDriver(ManagedServiceDriver):
 
     def editable_fields(self) -> list[str]:
         return sorted(
-            _CONFIG_FIELDS - {"model", "model_revision", "compute_mode", "cpu_kv_cache_gib", "allow_subscriptions"}
+            _CONFIG_FIELDS
+            - {
+                "model",
+                "model_revision",
+                "compute_mode",
+                "cpu_kv_cache_gib",
+                "allow_subscriptions",
+                "model_source",
+                "model_artifact_id",
+                "model_artifact_version",
+                "model_artifact_manifest_sha256",
+            }
         )
 
     # ---- config ---------------------------------------------------------
@@ -442,9 +508,15 @@ class VLLMDriver(ManagedServiceDriver):
         unknown = set(cfg) - _CONFIG_FIELDS
         if unknown:
             raise ValueError("unsupported vLLM config fields: " + ", ".join(sorted(unknown)))
+        if cfg.get("model_source") == "local_artifact":
+            local_source_identity(cfg)
+        elif cfg.get("model_source") not in (None, "huggingface") or any(
+            key.startswith("model_artifact_") for key in cfg
+        ):
+            raise ValueError("vLLM source must be Hugging Face or an immutable local artifact.")
         model = cfg.get("model")
         if not isinstance(model, str) or not _MODEL_RE.fullmatch(model) or ".." in model:
-            raise ValueError("model must be a Hugging Face model id such as 'Qwen/Qwen3-8B'")
+            raise ValueError("model must be a supported source's stable model identity")
         task = cfg.setdefault("task", "generate")
         if task not in TASKS:
             raise ValueError(f"task must be one of {list(TASKS)}")
@@ -516,7 +588,7 @@ class VLLMDriver(ManagedServiceDriver):
 
     def _manifests(self, *, spec: ProvisionSpec, namespace: str, name: str, cfg: dict[str, Any]) -> list[dict]:
         if spec.cluster_model is None and any(
-            key in cfg for key in ("compute_mode", "cpu_kv_cache_gib", "allow_subscriptions")
+            key in cfg for key in ("compute_mode", "cpu_kv_cache_gib", "allow_subscriptions", "model_artifact_id")
         ):
             raise ValueError("Shared model placement fields require an explicit cluster owner.")
         if not self._config.image and spec.cluster_model is None:
@@ -526,8 +598,28 @@ class VLLMDriver(ManagedServiceDriver):
         if refusal:
             raise ValueError(refusal)
         runtime = shared_runtime(self._config.shared_runtimes, cfg, frontend) if spec.cluster_model else None
+        delivery = None
         if spec.cluster_model is not None:
             self._validate_placement(spec, namespace, name)
+            if cfg.get("model_source") == "local_artifact":
+                validate_delivery(self._config.local_model_delivery, cfg, spec.cluster_model)
+                delivery = delivery_resources(
+                    namespace=namespace,
+                    name=name,
+                    service_id=spec.managed_service_id,
+                    image=runtime.image,
+                    pvc_name=self._cache_name(name),
+                    manifest_sha256=cfg["model_artifact_manifest_sha256"],
+                    private_plan=self._config.local_model_delivery,
+                )
+                existing = self._config.cluster_driver.get_manifest(
+                    spec.tenant_cluster_id, namespace, "v1/Secret", delivery["secret"]["metadata"]["name"]
+                )
+                if existing is not None and (
+                    self._label(existing, _OWNER) != "astrolift"
+                    or self._label(existing, _OWNER_ID) != spec.managed_service_id
+                ):
+                    raise ValueError("Local model delivery Secret belongs to another resource.")
             current_namespace = self._config.cluster_driver.get_manifest(
                 spec.tenant_cluster_id, None, "v1/Namespace", namespace
             )
@@ -596,6 +688,7 @@ class VLLMDriver(ManagedServiceDriver):
                 has_hf_token="hf_token" in secret_data,
                 shared_revision=spec.cluster_model.revision if spec.cluster_model else None,
                 runtime=runtime,
+                delivery=delivery,
             ),
             {
                 "apiVersion": "v1",
@@ -643,9 +736,12 @@ class VLLMDriver(ManagedServiceDriver):
                     "data": {
                         "launch.py": LAUNCHER,
                         "astrolift_shared_model_auth.py": Path(__file__).with_name("shared_model_auth.py").read_text(),
+                        **(runtime_sources() if delivery else {}),
                     },
                 }
             )
+        if delivery:
+            manifests.append(delivery["secret"])
         if self._metrics_namespace():
             manifests.append(self._service_monitor(namespace, name, labels, shared=spec.cluster_model is not None))
         return manifests
@@ -793,11 +889,12 @@ class VLLMDriver(ManagedServiceDriver):
         has_hf_token: bool,
         shared_revision: int | None = None,
         runtime: Any = None,
+        delivery: Any = None,
     ) -> dict[str, Any]:
         gpu = int(cfg["gpu"])
         args = [
             "--model",
-            str(cfg["model"]),
+            delivery["model_path"] if delivery else str(cfg["model"]),
             "--host",
             "0.0.0.0",
             "--port",
@@ -809,6 +906,8 @@ class VLLMDriver(ManagedServiceDriver):
         ]
         if runtime is not None:
             args += ["--runner", "generate", "--convert", "none"]
+        if delivery:
+            args += ["--served-model-name", str(cfg["model"]), "--load-format", "safetensors"]
         if cfg.get("model_revision"):
             args += ["--revision", str(cfg["model_revision"])]
         if runtime is not None and runtime.mode == "cpu":
@@ -899,6 +998,12 @@ class VLLMDriver(ManagedServiceDriver):
                 {"name": "ASTROLIFT_MODEL_RUNTIME_PACKAGE_VERSION", "value": runtime.package_version},
             ]
             pod["nodeSelector"] = runtime.node_selector
+        if delivery:
+            env += [{"name": "HF_HUB_OFFLINE", "value": "1"}, {"name": "TRANSFORMERS_OFFLINE", "value": "1"}]
+            mounts = pod["containers"][0]["volumeMounts"]
+            mounts[0] = delivery["model_mount"]
+            pod["initContainers"] = [delivery["init_container"]]
+            pod["volumes"].append(delivery["volume"])
         if gpu:
             pod["tolerations"] = [
                 {"key": key, "operator": "Exists", "effect": "NoSchedule"} for key in _GPU_POOL_TAINT_KEYS
@@ -942,7 +1047,9 @@ class VLLMDriver(ManagedServiceDriver):
                                     AUTH_REVISION: str(shared_revision),
                                     "astrolift.io/model-runtime-hash": hashlib.sha256(
                                         (
-                                            LAUNCHER + Path(__file__).with_name("shared_model_auth.py").read_text()
+                                            LAUNCHER
+                                            + Path(__file__).with_name("shared_model_auth.py").read_text()
+                                            + (json.dumps(runtime_sources(), sort_keys=True) if delivery else "")
                                         ).encode()
                                     ).hexdigest(),
                                 }

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { buildSchema, parse, validate } from "graphql";
 import { ApolloClient, HttpLink, InMemoryCache } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
 import { act, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
@@ -14,10 +16,14 @@ const identity = vi.hoisted(() => ({ id: "00000000-0000-4000-8000-000000000001" 
 vi.mock("@/graphql/identity/identity.hooks", () => ({
   useActiveOrg: () => ({ org: { id: identity.id }, loading: false, error: null }),
 }));
+vi.mock("@/graphql/user/user.hooks", () => ({
+  useMe: () => ({ user: { id: "actor-one" }, loading: false, error: null }),
+}));
 const clusterId = "00000000-0000-4000-8000-000000000002",
   providerId = "00000000-0000-4000-8000-000000000003",
   deploymentId = "00000000-0000-4000-8000-000000000004";
-type Request = { operationName: string; variables: Record<string, unknown> };
+const schema = buildSchema(readFileSync("../backend/schema.graphql", "utf8"));
+type Request = { query: string; operationName: string; variables: Record<string, unknown> };
 let requests: Request[], transport: (request: Request) => Promise<Response>;
 function response(data: Record<string, unknown>) {
   return new Response(JSON.stringify({ data }), {
@@ -32,6 +38,44 @@ function fixture(request: Request) {
     revisionSha: "a".repeat(40),
   };
   switch (request.operationName) {
+    case "ListLocalModelArtifacts":
+      return response({
+        astroliftLocalModelArtifactsPage: {
+          items: [
+            {
+              id: "00000000-0000-4000-8000-000000000005",
+              version: 2,
+              name: "Verified local weights",
+              state: "verified",
+              manifestSha256: "b".repeat(64),
+              fileCount: 3,
+              sizeBytes: "8",
+            },
+          ],
+          nextCursor: null,
+        },
+      });
+    case "GetModelHostingAction":
+      return response({ modelHostingAction: { allowed: true, reason: null } });
+    case "ListHuggingFaceConnections":
+      return response({
+        huggingFaceConnectionsPage: {
+          items: [],
+          totalCount: 0,
+          page: 1,
+          pageSize: 25,
+          nextCursor: null,
+        },
+      });
+    case "GetModelSourceAccess":
+      return response({
+        clusterModelSourceAccess: {
+          accessible: true,
+          reason: null,
+          observedAt: "2026-09-30T15:30:00Z",
+          model,
+        },
+      });
     case "SearchHuggingFaceModels":
       return response({
         astroliftHuggingFaceModels: {
@@ -94,7 +138,11 @@ function fixture(request: Request) {
             organizationId: input.organizationId,
             clusterId: input.clusterId,
             providerId: input.expectedProviderId,
-            modelRepo: input.modelRepo,
+            modelRepo: input.localArtifactId ? "local-" + input.localArtifactId : input.modelRepo,
+            sourceKind: input.localArtifactId ? "local_artifact" : "huggingface",
+            localArtifactId: input.localArtifactId ?? null,
+            localArtifactVersion: input.expectedArtifactVersion ?? null,
+            localManifestSha256: input.localArtifactId ? "b".repeat(64) : null,
             revisionSha: input.revisionSha,
             computeMode: input.computeMode,
             name: input.name,
@@ -123,10 +171,12 @@ function fixture(request: Request) {
 function wrapper() {
   const client = new ApolloClient({
     cache: new InMemoryCache(),
+    devtools: { enabled: false },
     link: new HttpLink({
       uri: "http://control-plane.test/app/gql/config/",
       fetch: vi.fn(async (_uri, options) => {
         const request: Request = JSON.parse(String(options?.body));
+        expect(validate(schema, parse(request.query))).toEqual([]);
         requests.push(request);
         return transport(request);
       }),
@@ -149,7 +199,7 @@ async function prepare(mode: "CPU" | "GPU" = "CPU") {
   fireEvent.click(
     await screen.findByRole("button", { name: hfCatalogueProps.page.rows[0].repoId })
   );
-  const pin = await screen.findByRole("button", { name: "Use verified revision" });
+  const pin = await screen.findByRole("button", { name: en.models.shared.hosting.continue });
   await waitFor(() => expect(pin).toBeEnabled());
   fireEvent.click(pin);
   fireEvent.click(await screen.findByRole("button", { name: "Production · production" }));
@@ -161,6 +211,7 @@ async function prepare(mode: "CPU" | "GPU" = "CPU") {
     fireEvent.change(screen.getByLabelText(en.models.shared.placement.gpuCount), {
       target: { value: "1" },
     });
+  fireEvent.click(screen.getByLabelText(en.models.shared.hosting.licenseReview));
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Review deployment" })).toBeEnabled()
   );
@@ -170,6 +221,48 @@ function writes() {
 }
 
 describe("shared model create Apollo boundary", () => {
+  it.each(["checking", "denied", "error"])(
+    "keeps catalogue readable but Host unavailable for %s authority",
+    async (kind) => {
+      transport = async (request) => {
+        if (request.operationName !== "GetModelHostingAction") return fixture(request);
+        if (kind === "checking") return new Promise<Response>(() => {});
+        if (kind === "error") throw new Error("Hosting permission read is unavailable");
+        return response({
+          modelHostingAction: { allowed: false, reason: "Hosting management grant is required" },
+        });
+      };
+      render(<SharedModelDeploymentClient />, { wrapper: wrapper() });
+      expect(
+        await screen.findByRole("button", { name: hfCatalogueProps.page.rows[0].repoId })
+      ).toBeEnabled();
+      expect(screen.getByRole("button", { name: en.models.shared.hosting.host })).toBeDisabled();
+      fireEvent.click(screen.getByRole("button", { name: hfCatalogueProps.page.rows[0].repoId }));
+      expect(
+        await screen.findByRole("button", { name: en.models.shared.hosting.continue })
+      ).toBeDisabled();
+      expect(
+        requests.filter(
+          (r) =>
+            r.operationName === "ListHuggingFaceConnections" ||
+            r.operationName === "ListModelPlacementClusters"
+        )
+      ).toHaveLength(0);
+      expect(writes()).toHaveLength(0);
+    }
+  );
+  it("Host resolves a public row without pretending catalogue access or fit is confirmed", async () => {
+    render(<SharedModelDeploymentClient />, { wrapper: wrapper() });
+    const host = await screen.findByRole("button", { name: en.models.shared.hosting.host });
+    await waitFor(() => expect(host).toBeEnabled());
+    fireEvent.click(host);
+    expect(
+      await screen.findByRole("button", { name: en.models.shared.hosting.continue })
+    ).toBeInTheDocument();
+    expect(requests.some((r) => r.operationName === "GetHuggingFaceModel")).toBe(true);
+    expect(requests.some((r) => r.operationName === "GetModelSourceAccess")).toBe(false);
+    expect(writes()).toHaveLength(0);
+  });
   it.each(["CPU", "GPU"] as const)(
     "pins HF and admits exact %s resources before the only create write",
     async (mode) => {
@@ -200,6 +293,10 @@ describe("shared model create Apollo boundary", () => {
         gpuCount: mode === "CPU" ? 0 : 1,
         cpuKvCacheGiB: null,
         allowSubscriptions: false,
+        connectionId: null,
+        expectedConnectionVersion: null,
+        localArtifactId: null,
+        expectedArtifactVersion: null,
       });
       expect(
         requests
@@ -208,6 +305,56 @@ describe("shared model create Apollo boundary", () => {
       ).toEqual(input);
       expect(screen.getByText(en.models.shared.placement.accepted)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Review deployment" })).toBeDisabled();
+    }
+  );
+  it.each(["CPU", "GPU"] as const)(
+    "hosts verified local source on %s independently of any app/HF credential",
+    async (mode) => {
+      render(<SharedModelDeploymentClient />, { wrapper: wrapper() });
+      await screen.findByRole("button", { name: en.models.shared.hosting.host });
+      fireEvent.click(
+        screen.getByRole("button", { name: en.models.shared.localImport.localSource })
+      );
+      const select = await screen.findByRole("button", {
+        name: en.models.shared.localImport.select,
+      });
+      await waitFor(() => expect(select).toBeEnabled());
+      fireEvent.click(select);
+      fireEvent.click(await screen.findByRole("button", { name: "Production · production" }));
+      fireEvent.change(screen.getByLabelText("Deployment name"), {
+        target: { value: "shared-local" },
+      });
+      fireEvent.click(screen.getByLabelText(mode));
+      if (mode === "GPU")
+        fireEvent.change(screen.getByLabelText(en.models.shared.placement.gpuCount), {
+          target: { value: "1" },
+        });
+      expect(screen.getByText(en.models.shared.localImport.localLicense)).toBeVisible();
+      expect(
+        screen.queryByRole("link", { name: en.models.shared.hosting.openModel })
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByLabelText(en.models.shared.localImport.localLicenseReview));
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Review deployment" })).toBeEnabled()
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Review deployment" }));
+      expect(screen.getByRole("alertdialog")).toHaveTextContent("b".repeat(64));
+      fireEvent.click(screen.getByRole("button", { name: "Request deployment" }));
+      await screen.findByRole("link", { name: "Open deployment" });
+      expect(writes()).toHaveLength(1);
+      expect(writes()[0].variables.input).toMatchObject({
+        organizationId: identity.id,
+        clusterId,
+        expectedProviderId: providerId,
+        localArtifactId: "00000000-0000-4000-8000-000000000005",
+        expectedArtifactVersion: 2,
+        modelRepo: null,
+        revisionSha: null,
+        connectionId: null,
+        expectedConnectionVersion: null,
+        computeMode: mode.toLowerCase(),
+      });
+      expect(requests.some((r) => r.operationName === "GetModelSourceAccess")).toBe(false);
     }
   );
   it.each(["denial", "mixed", "missing", "foreign", "premature_ready"])(
@@ -270,7 +417,7 @@ describe("shared model create Apollo boundary", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: hfCatalogueProps.page.rows[0].repoId })
     );
-    const pin = await screen.findByRole("button", { name: "Use verified revision" });
+    const pin = await screen.findByRole("button", { name: en.models.shared.hosting.continue });
     await waitFor(() => expect(pin).toBeEnabled());
     fireEvent.click(pin);
     fireEvent.click(await screen.findByRole("button", { name: "Production · production" }));
@@ -282,6 +429,13 @@ describe("shared model create Apollo boundary", () => {
   });
   it("passes later cluster pages and search to the server", async () => {
     const { result } = renderHook(useSharedModelDeployment, { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.hostingProps.allowed).toBe(true));
+    act(() =>
+      result.current.hostingProps.onManualSource({
+        repoId: hfCatalogueProps.page.rows[0].repoId,
+        revisionSha: "a".repeat(40),
+      })
+    );
     await waitFor(() => expect(result.current.clusters.rows).toHaveLength(1));
     act(() => result.current.clusters.list.setPage(3));
     await waitFor(() =>
@@ -337,10 +491,10 @@ describe("shared model create Apollo boundary", () => {
     identity.id = "00000000-0000-4000-8000-000000000001";
     rerender(<SharedModelDeploymentClient />);
     await act(async () => release(fixture(request)));
-    expect(screen.getByLabelText("Deployment name")).toHaveValue("");
+    expect(screen.queryByLabelText("Deployment name")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Open deployment" })).not.toBeInTheDocument();
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Review deployment" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Review deployment" })).not.toBeInTheDocument();
     expect(writes()).toHaveLength(1);
   });
 });

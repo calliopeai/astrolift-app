@@ -34,6 +34,7 @@ export function SharedModelDetailScreen({
   prompt,
   management,
 }: SharedModelDetailScreenProps) {
+  const local = useTranslations("models.shared.localImport");
   const t = useTranslations("models.shared.detail"),
     common = useTranslations("models.shared.deployments"),
     format = useFormatter();
@@ -105,12 +106,24 @@ export function SharedModelDetailScreen({
                     ),
                   },
                   {
-                    term: common("model"),
+                    term:
+                      model.sourceKind === "local_artifact"
+                        ? local("servedIdentifier")
+                        : common("model"),
                     description: <code className="break-all">{model.modelRepo || unknown}</code>,
                   },
                   {
-                    term: t("revision"),
-                    description: <code className="break-all">{model.revisionSha ?? unknown}</code>,
+                    term:
+                      model.sourceKind === "local_artifact"
+                        ? local("manifestRevision")
+                        : t("revision"),
+                    description: (
+                      <code className="break-all">
+                        {(model.sourceKind === "local_artifact"
+                          ? model.localManifestSha256
+                          : model.revisionSha) ?? unknown}
+                      </code>
+                    ),
                   },
                   {
                     term: common("compute"),

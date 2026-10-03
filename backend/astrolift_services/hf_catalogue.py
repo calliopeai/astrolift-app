@@ -199,13 +199,13 @@ def _counter(value):
     )
 
 
-def _model(row: object) -> HuggingFaceModel | None:
+def _model(row: object, *, allow_private: bool = False) -> HuggingFaceModel | None:
     if not isinstance(row, dict):
         raise CatalogueUnavailable()
     repo = row.get("id") or row.get("modelId")
     if not isinstance(repo, str) or not valid_repo_id(repo):
         raise CatalogueUnavailable()
-    if row.get("private") is True or row.get("disabled") is True:
+    if (row.get("private") is True and not allow_private) or row.get("disabled") is True:
         return None
     card = row.get("cardData")
     card = card if isinstance(card, dict) else {}

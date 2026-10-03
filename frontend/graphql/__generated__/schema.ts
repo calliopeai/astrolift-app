@@ -6022,6 +6022,12 @@ export type AvailableTransition = {
   toState: Scalars['String']['output'];
 };
 
+export type BeginLocalModelArtifactInput = {
+  files: Array<LocalModelFileInput>;
+  name: Scalars['String']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
 export type BootstrapOptionOverride = {
   componentKey: Scalars['String']['input'];
   optionKey: Scalars['String']['input'];
@@ -6214,6 +6220,9 @@ export type ClusterModelDeployment = {
   desiredResources: ModelResources;
   desiredSubscriptionRevision: Scalars['Int']['output'];
   id: Scalars['GUID']['output'];
+  localArtifactId?: Maybe<Scalars['GUID']['output']>;
+  localArtifactVersion?: Maybe<Scalars['Int']['output']>;
+  localManifestSha256?: Maybe<Scalars['String']['output']>;
   modelRepo: Scalars['String']['output'];
   name: Scalars['String']['output'];
   operationCompletedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -6228,6 +6237,7 @@ export type ClusterModelDeployment = {
   revisionSha?: Maybe<Scalars['String']['output']>;
   runtimeReason?: Maybe<Scalars['String']['output']>;
   runtimeSupported?: Maybe<Scalars['Boolean']['output']>;
+  sourceKind: Scalars['String']['output'];
   status: Scalars['String']['output'];
   subscriptionsEnabled: Scalars['Boolean']['output'];
   version: Scalars['Int']['output'];
@@ -6325,6 +6335,12 @@ export type ConnectExistingGithubAppInput = {
   orgLogin: InputMaybe<Scalars['String']['input']>;
   privateKeyPem: Scalars['String']['input'];
   webhookSecret: InputMaybe<Scalars['String']['input']>;
+};
+
+export type ConnectHuggingFaceInput = {
+  name: Scalars['String']['input'];
+  organizationId: Scalars['GUID']['input'];
+  token: Scalars['String']['input'];
 };
 
 export type ConnectSourceInput = {
@@ -6694,6 +6710,12 @@ export type DetachSecretBundleInput = {
   attachmentId: Scalars['GUID']['input'];
 };
 
+export type DisconnectHuggingFaceInput = {
+  connectionId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
 export type DisconnectSourceInput = {
   id: Scalars['GUID']['input'];
 };
@@ -6958,6 +6980,33 @@ export type GroupOperationInput = {
   userIds: Array<Scalars['ID']['input']>;
 };
 
+export type HuggingFaceConnectionType = {
+  accountUsername: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  verifiedAt: Scalars['DateTime']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type HuggingFaceConnectionTypeMutationResult = {
+  data?: Maybe<HuggingFaceConnectionType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type HuggingFaceConnectionTypePage = {
+  items: Array<HuggingFaceConnectionType>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type HuggingFaceModel = {
   architectures: Array<Scalars['String']['output']>;
   author?: Maybe<Scalars['String']['output']>;
@@ -7077,6 +7126,70 @@ export type LibraryRmFileResult = {
 export type LibrarySetIconResult = {
   directory?: Maybe<SharedDirectoryType>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type LocalModelArtifact = {
+  fileCount: Scalars['Int']['output'];
+  id: Scalars['GUID']['output'];
+  manifestSha256: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  sizeBytes: Scalars['String']['output'];
+  state: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type LocalModelArtifactIdentityInput = {
+  expectedVersion: Scalars['Int']['input'];
+  id: Scalars['GUID']['input'];
+};
+
+export type LocalModelArtifactMutationResult = {
+  data?: Maybe<LocalModelArtifact>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type LocalModelArtifactPage = {
+  items: Array<LocalModelArtifact>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type LocalModelFileInput = {
+  name: Scalars['String']['input'];
+  sha256: Scalars['String']['input'];
+  sizeBytes: Scalars['String']['input'];
+};
+
+export type LocalModelFileUpload = {
+  headers: Array<LocalModelUploadHeader>;
+  name: Scalars['String']['output'];
+  sizeBytes: Scalars['String']['output'];
+  uploadUrl: Scalars['String']['output'];
+};
+
+export type LocalModelUploadAuthorization = {
+  artifact: LocalModelArtifact;
+  expiresInSeconds: Scalars['Int']['output'];
+  files: Array<LocalModelFileUpload>;
+};
+
+export type LocalModelUploadAuthorizationMutationResult = {
+  data?: Maybe<LocalModelUploadAuthorization>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type LocalModelUploadHeader = {
+  name: Scalars['String']['output'];
+  value: Scalars['String']['output'];
 };
 
 export type LoginResult = {
@@ -7210,6 +7323,11 @@ export type ModelGpuCapacity = {
   resource: Scalars['String']['output'];
 };
 
+export type ModelHostingAction = {
+  allowed: Scalars['Boolean']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+};
+
 export type ModelMetricObservation = {
   aggregationWindowSeconds: Scalars['Int']['output'];
   key: Scalars['String']['output'];
@@ -7282,6 +7400,13 @@ export type ModelRuntimeAdmission = {
   hardwareAdmission: Scalars['String']['output'];
   reason?: Maybe<Scalars['String']['output']>;
   runtimeVersion?: Maybe<Scalars['String']['output']>;
+};
+
+export type ModelSourceAccess = {
+  accessible: Scalars['Boolean']['output'];
+  model?: Maybe<HuggingFaceModel>;
+  observedAt: Scalars['DateTime']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
 };
 
 export type ModelSubscription = {
@@ -7390,6 +7515,8 @@ export type Mutation = {
   attachProjectManagedService: AstroliftManagedServiceAttachmentMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
   attestSession: AstroliftAttestationResultMutationResult;
+  authorizeLocalModelUploads: LocalModelUploadAuthorizationMutationResult;
+  beginLocalModelArtifact: LocalModelArtifactMutationResult;
   bringClusterIntoManagement: AstroliftTenantClusterMutationResult;
   bulkApproveDeployments: AstroliftBulkDeploymentResultDataMutationResult;
   bulkAssignAstroliftTeamMemberRoles: AstroliftBulkAssignTeamMemberRolesPayloadMutationResult;
@@ -7413,6 +7540,7 @@ export type Mutation = {
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
   connectExistingGithubApp: AstroliftSourceConnectionMutationResult;
+  connectHuggingFace: HuggingFaceConnectionTypeMutationResult;
   connectSource: AstroliftSourceConnectionMutationResult;
   connectZentinelle: AstroliftZentinelleConnectionMutationResult;
   /** Cancel, terminate, or retry cleanup for an exact owned execution. */
@@ -7493,6 +7621,7 @@ export type Mutation = {
   detachAgentSecretBundle: AstroliftAgentSecretBundleAttachmentMutationResult;
   detachProjectManagedService: AstroliftManagedServiceAttachmentMutationResult;
   detachSecretBundle: AttachmentremovedpayloadMutationResult;
+  disconnectHuggingFace: HuggingFaceConnectionTypeMutationResult;
   disconnectSource: AstroliftSourceConnectionMutationResult;
   disconnectZentinelle: AstroliftZentinelleDisconnectMutationResult;
   elevateAdminSession: AstroliftElevatePayloadMutationResult;
@@ -7502,6 +7631,7 @@ export type Mutation = {
   extendPreviewTtl: AstroliftPreviewEnvironmentMutationResult;
   /** Upload a file and get a pre-signed URL. Creates a FileUpload wrapper around the Upload. */
   fileUpload: FileUploadResult;
+  finalizeLocalModelArtifact: LocalModelArtifactMutationResult;
   forceAstroliftRedeploy: AstroliftForceRedeployPayloadMutationResult;
   generateInstallEnrollmentQr: AstroliftEnrollmentQrPayloadMutationResult;
   /** Generate a temporary authentication token for Rocket.Chat. TTL is configured on the Rocket.Chat server. */
@@ -7930,6 +8060,16 @@ export type MutationAttestSessionArgs = {
 };
 
 
+export type MutationAuthorizeLocalModelUploadsArgs = {
+  input: LocalModelArtifactIdentityInput;
+};
+
+
+export type MutationBeginLocalModelArtifactArgs = {
+  input: BeginLocalModelArtifactInput;
+};
+
+
 export type MutationBringClusterIntoManagementArgs = {
   input: BringClusterIntoManagementInputType;
 };
@@ -8042,6 +8182,11 @@ export type MutationConfirmPreSignedUrlImageUploadArgs = {
 
 export type MutationConnectExistingGithubAppArgs = {
   input: ConnectExistingGithubAppInput;
+};
+
+
+export type MutationConnectHuggingFaceArgs = {
+  input: ConnectHuggingFaceInput;
 };
 
 
@@ -8447,6 +8592,11 @@ export type MutationDetachSecretBundleArgs = {
 };
 
 
+export type MutationDisconnectHuggingFaceArgs = {
+  input: DisconnectHuggingFaceInput;
+};
+
+
 export type MutationDisconnectSourceArgs = {
   input: DisconnectSourceInput;
 };
@@ -8490,6 +8640,11 @@ export type MutationFileUploadArgs = {
   metadata?: InputMaybe<Scalars['JSON']['input']>;
   mimetype: Scalars['String']['input'];
   name?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type MutationFinalizeLocalModelArtifactArgs = {
+  input: LocalModelArtifactIdentityInput;
 };
 
 
@@ -10044,15 +10199,19 @@ export type ProvisionClusterModelInput = {
   allowSubscriptions: Scalars['Boolean']['input'];
   clusterId: Scalars['GUID']['input'];
   computeMode: Scalars['String']['input'];
+  connectionId: InputMaybe<Scalars['GUID']['input']>;
   cpuKvCacheGiB: InputMaybe<Scalars['Int']['input']>;
   cpuRequest: Scalars['String']['input'];
+  expectedArtifactVersion: InputMaybe<Scalars['Int']['input']>;
+  expectedConnectionVersion: InputMaybe<Scalars['Int']['input']>;
   expectedProviderId: Scalars['GUID']['input'];
   gpuCount: Scalars['Int']['input'];
+  localArtifactId: InputMaybe<Scalars['GUID']['input']>;
   memoryRequest: Scalars['String']['input'];
-  modelRepo: Scalars['String']['input'];
+  modelRepo: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
   organizationId: Scalars['GUID']['input'];
-  revisionSha: Scalars['String']['input'];
+  revisionSha: InputMaybe<Scalars['String']['input']>;
 };
 
 export type ProvisionManagedDomainPayload = {
@@ -10282,6 +10441,7 @@ export type Query = {
   astroliftInvitations: Array<AstroliftInvitation>;
   astroliftInvitationsCsv: AstroliftIdentityCsvExport;
   astroliftInvitationsPage: AstroliftInvitationPage;
+  astroliftLocalModelArtifactsPage: LocalModelArtifactPage;
   astroliftManagedDomains: Array<AstroliftManagedDomain>;
   astroliftManagedService?: Maybe<AstroliftManagedServiceContext>;
   astroliftManagedServiceAttachmentsPage?: Maybe<AstroliftManagedServiceAttachmentContextPage>;
@@ -10438,6 +10598,7 @@ export type Query = {
   clusterModelDeploymentsPage: ClusterModelDeploymentPage;
   clusterModelPlacementClustersPage: ModelPlacementClusterPage;
   clusterModelRuntimeAdmission: ModelRuntimeAdmission;
+  clusterModelSourceAccess: ModelSourceAccess;
   clusterModelSubscriptionTargetsPage: ModelSubscriptionTargetPage;
   clusterModelSubscriptionsPage: ModelSubscriptionPage;
   dispatchers: Array<AstroliftDispatcherInstance>;
@@ -10448,11 +10609,13 @@ export type Query = {
   formDefinitions: Array<AstroliftFormDefinition>;
   formFieldTypes: Array<Scalars['String']['output']>;
   formSubmissions: Array<AstroliftFormSubmission>;
+  huggingFaceConnectionsPage: HuggingFaceConnectionTypePage;
   me?: Maybe<AstroliftMe>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use membersPage. */
   members: Array<OrganizationMemberType>;
   /** Cursor-paginated list of members in the caller's organizations. */
   membersPage: OrganizationMemberTypePage;
+  modelHostingAction: ModelHostingAction;
   orgSkillRepos: Array<AstroliftOrgSkillRepo>;
   orgToolDefs: Array<AstroliftToolDef>;
   orgToolDefsPage: AstroliftToolDefPage;
@@ -11515,6 +11678,13 @@ export type QueryAstroliftInvitationsPageArgs = {
 };
 
 
+export type QueryAstroliftLocalModelArtifactsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryAstroliftManagedServiceArgs = {
   expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
@@ -12265,6 +12435,15 @@ export type QueryClusterModelRuntimeAdmissionArgs = {
 };
 
 
+export type QueryClusterModelSourceAccessArgs = {
+  connectionId?: InputMaybe<Scalars['GUID']['input']>;
+  expectedConnectionVersion?: InputMaybe<Scalars['Int']['input']>;
+  modelRepo: Scalars['String']['input'];
+  organizationId: Scalars['GUID']['input'];
+  revisionSha: Scalars['String']['input'];
+};
+
+
 export type QueryClusterModelSubscriptionTargetsPageArgs = {
   modelDeploymentId: Scalars['GUID']['input'];
   organizationId: Scalars['GUID']['input'];
@@ -12310,10 +12489,22 @@ export type QueryFormSubmissionsArgs = {
 };
 
 
+export type QueryHuggingFaceConnectionsPageArgs = {
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+};
+
+
 export type QueryMembersPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryModelHostingActionArgs = {
+  organizationId: Scalars['GUID']['input'];
 };
 
 

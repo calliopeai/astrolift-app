@@ -523,7 +523,11 @@ jobs:
         run: |
           python ../scripts/prepare_collector_test_artifacts.py "$RUNNER_TEMP/collector-native"
           echo "COLLECTOR_RENDER_ARTIFACTS=$RUNNER_TEMP/collector-native" >> "$GITHUB_ENV"
+      - name: Prepare verified native Prometheus test engine
+        run: python ../scripts/prepare_promtool_test_artifacts.py "$RUNNER_TEMP/prometheus-native"
       - name: Run tests (providers)
+        env:
+          PROMTOOL_BINARY: ${{ runner.temp }}/prometheus-native/promtool
         run: pytest -x
 
   providers-no-stub-factory-gate:

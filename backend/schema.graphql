@@ -6420,6 +6420,12 @@ type AvailableTransition {
   conditionsMet: Boolean!
 }
 
+input BeginLocalModelArtifactInput {
+  organizationId: GUID!
+  name: String!
+  files: [LocalModelFileInput!]!
+}
+
 input BootstrapOptionOverride {
   componentKey: String!
   optionKey: String!
@@ -6634,6 +6640,10 @@ type ClusterModelDeployment {
   operationCompletedAt: DateTime
   desiredResources: ModelResources!
   appliedResources: ModelResources
+  sourceKind: String!
+  localArtifactId: GUID
+  localArtifactVersion: Int
+  localManifestSha256: String
 }
 
 type ClusterModelDeploymentMutationResult {
@@ -6736,6 +6746,12 @@ input ConnectExistingGithubAppInput {
   webhookSecret: String = null
   apiBaseUrl: String = null
   orgLogin: String = null
+}
+
+input ConnectHuggingFaceInput {
+  organizationId: GUID!
+  name: String!
+  token: String!
 }
 
 input ConnectSourceInput {
@@ -7113,6 +7129,12 @@ input DetachSecretBundleInput {
   attachmentId: GUID!
 }
 
+input DisconnectHuggingFaceInput {
+  organizationId: GUID!
+  connectionId: GUID!
+  expectedVersion: Int!
+}
+
 input DisconnectSourceInput {
   id: GUID!
 }
@@ -7387,6 +7409,37 @@ input GroupOperationInput {
   operation: String!
 }
 
+type HuggingFaceConnectionType {
+  id: GUID!
+  version: Int!
+  name: String!
+  accountUsername: String!
+  verifiedAt: DateTime!
+}
+
+type HuggingFaceConnectionTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: HuggingFaceConnectionType
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type HuggingFaceConnectionTypePage {
+  items: [HuggingFaceConnectionType!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
 type HuggingFaceModel {
   repoId: String!
   revisionSha: String
@@ -7511,6 +7564,74 @@ type LibraryRmFileResult {
 type LibrarySetIconResult {
   ok: Boolean!
   directory: SharedDirectoryType
+}
+
+type LocalModelArtifact {
+  id: GUID!
+  name: String!
+  version: Int!
+  state: String!
+  manifestSha256: String!
+  fileCount: Int!
+  sizeBytes: String!
+}
+
+input LocalModelArtifactIdentityInput {
+  id: GUID!
+  expectedVersion: Int!
+}
+
+type LocalModelArtifactMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: LocalModelArtifact
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type LocalModelArtifactPage {
+  items: [LocalModelArtifact!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
+input LocalModelFileInput {
+  name: String!
+  sizeBytes: String!
+  sha256: String!
+}
+
+type LocalModelFileUpload {
+  name: String!
+  sizeBytes: String!
+  uploadUrl: String!
+  headers: [LocalModelUploadHeader!]!
+}
+
+type LocalModelUploadAuthorization {
+  artifact: LocalModelArtifact!
+  files: [LocalModelFileUpload!]!
+  expiresInSeconds: Int!
+}
+
+type LocalModelUploadAuthorizationMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: LocalModelUploadAuthorization
+}
+
+type LocalModelUploadHeader {
+  name: String!
+  value: String!
 }
 
 type LoginResult {
@@ -7646,6 +7767,11 @@ type ModelGpuCapacity {
   devices: Int!
 }
 
+type ModelHostingAction {
+  allowed: Boolean!
+  reason: String
+}
+
 type ModelMetricObservation {
   key: String!
   unit: String!
@@ -7723,6 +7849,13 @@ type ModelRuntimeAdmission {
   runtimeVersion: String
   architecture: String
   hardwareAdmission: String!
+}
+
+type ModelSourceAccess {
+  accessible: Boolean!
+  reason: String
+  model: HuggingFaceModel
+  observedAt: DateTime!
 }
 
 type ModelSubscription {
@@ -8141,6 +8274,11 @@ type Mutation {
   revokeModelSubscription(input: RevokeModelSubscriptionInput!): ModelSubscriptionOperationMutationResult!
   updateClusterModel(input: UpdateClusterModelInput!): ClusterModelDeploymentMutationResult!
   deprovisionClusterModel(input: DeprovisionClusterModelInput!): ClusterModelDeploymentMutationResult!
+  disconnectHuggingFace(input: DisconnectHuggingFaceInput!): HuggingFaceConnectionTypeMutationResult!
+  connectHuggingFace(input: ConnectHuggingFaceInput!): HuggingFaceConnectionTypeMutationResult!
+  beginLocalModelArtifact(input: BeginLocalModelArtifactInput!): LocalModelArtifactMutationResult!
+  authorizeLocalModelUploads(input: LocalModelArtifactIdentityInput!): LocalModelUploadAuthorizationMutationResult!
+  finalizeLocalModelArtifact(input: LocalModelArtifactIdentityInput!): LocalModelArtifactMutationResult!
   setAppSecret(input: SetAppSecretInput!): AppsecretwritepayloadMutationResult!
   rotateAppSecret(input: RotateAppSecretInput!): AppsecretwritepayloadMutationResult!
   deleteAppSecret(input: DeleteAppSecretInput!): AppsecretwritepayloadMutationResult!
@@ -8602,14 +8740,18 @@ input ProvisionClusterModelInput {
   clusterId: GUID!
   expectedProviderId: GUID!
   name: String!
-  modelRepo: String!
-  revisionSha: String!
   computeMode: String!
   cpuRequest: String!
   memoryRequest: String!
   gpuCount: Int!
   allowSubscriptions: Boolean!
+  modelRepo: String = null
+  revisionSha: String = null
+  localArtifactId: GUID = null
+  expectedArtifactVersion: Int = null
   cpuKvCacheGiB: Int = null
+  connectionId: GUID = null
+  expectedConnectionVersion: Int = null
 }
 
 type ProvisionManagedDomainPayload {
@@ -8908,6 +9050,10 @@ type Query {
   clusterModelRuntimeAdmission(input: ProvisionClusterModelInput!): ModelRuntimeAdmission!
   clusterModelSubscriptionTargetsPage(organizationId: GUID!, modelDeploymentId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionTargetPage!
   clusterModelSubscriptionsPage(organizationId: GUID!, modelDeploymentId: GUID!, appEnvironmentId: GUID = null, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionPage!
+  modelHostingAction(organizationId: GUID!): ModelHostingAction!
+  huggingFaceConnectionsPage(organizationId: GUID!, page: Int! = 1, pageSize: Int! = 25): HuggingFaceConnectionTypePage!
+  clusterModelSourceAccess(organizationId: GUID!, modelRepo: String!, revisionSha: String!, connectionId: GUID = null, expectedConnectionVersion: Int = null): ModelSourceAccess!
+  astroliftLocalModelArtifactsPage(search: String = null, limit: Int! = 25, after: String = null): LocalModelArtifactPage!
   astroliftProjectManagedServiceAttachmentOwner(projectId: GUID!, attachmentId: GUID!): AstroliftManagedServiceContext
   astroliftProjectManagedServicesPage(projectId: GUID!, search: String = null, name: String = null, kinds: [String!] = null, statuses: [String!] = null, environmentName: String = null, clusterId: GUID = null, limit: Int! = 50, after: String = null): AstroliftManagedServiceContextPage!
   astroliftProjectManagedService(projectId: GUID!, id: GUID!, expectedContextRevision: String = null): AstroliftManagedServiceContext

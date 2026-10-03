@@ -39,8 +39,14 @@ export function provisionModelResult(
     data.organizationId !== request.organizationId ||
     data.clusterId !== request.clusterId ||
     data.providerId !== request.expectedProviderId ||
-    data.modelRepo !== request.modelRepo ||
-    data.revisionSha !== request.revisionSha ||
+    (request.localArtifactId
+      ? data.sourceKind !== "local_artifact" ||
+        data.localArtifactId !== request.localArtifactId ||
+        data.localArtifactVersion !== request.expectedArtifactVersion ||
+        !data.localManifestSha256 ||
+        !/^[a-f0-9]{64}$/.test(data.localManifestSha256) ||
+        data.revisionSha !== null
+      : data.modelRepo !== request.modelRepo || data.revisionSha !== request.revisionSha) ||
     data.computeMode !== request.computeMode ||
     data.name !== request.name ||
     data.subscriptionsEnabled !== request.allowSubscriptions ||

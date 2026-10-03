@@ -273,6 +273,7 @@ def test_provision_checks_actual_owner_provider_and_runtime_before_hf(world, que
         world.cluster.provider_plugin.save()
     world.cluster.save()
     calls = []
+    monkeypatch.setattr("astrolift_services.hf_connection._read", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         "astrolift_services.hf_catalogue.model_detail",
         lambda repo, revision: calls.append((repo, revision))
@@ -287,6 +288,7 @@ def test_provision_checks_actual_owner_provider_and_runtime_before_hf(world, que
         )
     assert not denied.ok and calls == [] and queue == []
     grant(world, Permission.CLUSTER_UPDATE)
+    grant(world, Permission.ORG_UPDATE)
     with subject(world):
         missing = ClusterModelMutations().provision_cluster_model(
             make_info(world.user),
@@ -327,6 +329,7 @@ def test_creation_refreshes_authority_after_hub_observation(world, queue, monkey
     from core.permissions import Permission
 
     binding = grant(world, Permission.CLUSTER_UPDATE)
+    grant(world, Permission.ORG_UPDATE)
     Member.objects.create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
     actual = ProviderPlugin.objects.filter(slug="k8s_native").first()
     if actual is None:
@@ -351,6 +354,7 @@ def test_creation_refreshes_authority_after_hub_observation(world, queue, monkey
         )
 
     monkeypatch.setattr("astrolift_services.hf_catalogue.model_detail", observed)
+    monkeypatch.setattr("astrolift_services.hf_connection._read", lambda *args, **kwargs: None)
     count = ManagedService.objects.count()
     with subject(world, scopes=["admin"]):
         result = ClusterModelMutations().provision_cluster_model(
@@ -533,6 +537,7 @@ def test_owner_mutations_refuse_before_persisting_or_queueing(world, monkeypatch
 
     if refusal != "no_owner_grant":
         grant(world, Permission.CLUSTER_UPDATE)
+    grant(world, Permission.ORG_UPDATE)
     if refusal == "unavailable":
         world.cluster.is_active = False
         world.cluster.save()
@@ -577,6 +582,7 @@ def test_owner_update_changes_admission_without_revoking_other_keys(world, queue
     from core.permissions import Permission
 
     grant(world, Permission.CLUSTER_UPDATE)
+    grant(world, Permission.ORG_UPDATE)
     row = ManagedServiceAttachment.objects.create(
         managed_service=world.model,
         app_environment=world.env,
@@ -612,6 +618,7 @@ def test_delete_requires_actual_revocation_then_is_accepted_pending(world, queue
     from core.permissions import Permission
 
     grant(world, Permission.CLUSTER_UPDATE)
+    grant(world, Permission.ORG_UPDATE)
     row = ManagedServiceAttachment.objects.create(
         managed_service=world.model,
         app_environment=world.env,
@@ -654,6 +661,7 @@ def test_creation_refuses_unverified_or_gated_hf_source_without_persisting(
     from core.permissions import Permission
 
     grant(world, Permission.CLUSTER_UPDATE)
+    grant(world, Permission.ORG_UPDATE)
     actual = ProviderPlugin.objects.filter(slug="k8s_native").first()
     if actual is not None:
         world.cluster.provider_plugin = actual
@@ -677,12 +685,18 @@ def test_creation_refuses_unverified_or_gated_hf_source_without_persisting(
             model=None if observation == "missing_model" else model,
         ),
     )
+    from astrolift_services.hf_connection import HuggingFaceUnavailable
+
+    def denied(*args, **kwargs):
+        raise HuggingFaceUnavailable("Hugging Face access could not be verified.")
+
+    monkeypatch.setattr("astrolift_services.hf_connection._read", denied)
     count = ManagedService.objects.count()
     with subject(world):
         result = ClusterModelMutations().provision_cluster_model(
             make_info(world.user), input=request(world, name="unverified")
         )
-    assert not result.ok and result.errors[0].code == "PRECONDITION"
+    assert not result.ok and result.errors[0].code == "VALIDATION"
     assert ManagedService.objects.count() == count and queue == []
 
 
@@ -697,6 +711,7 @@ def test_owner_permission_rechecks_locked_region_after_initial_gate(world, queue
     from core.permissions import Permission
 
     grant(world, Permission.CLUSTER_UPDATE)
+    grant(world, Permission.ORG_UPDATE)
     world.cluster.region = "us-west-2"
     world.cluster.save()
     Policy.objects.create(
@@ -754,6 +769,7 @@ def test_locked_target_rechecks_canonical_owner_actor_and_grants(world, queue, m
     from core.permissions import Permission
 
     binding = grant(world, Permission.CLUSTER_UPDATE)
+    grant(world, Permission.ORG_UPDATE)
     world.cluster.organization = None
     world.cluster.save()
     input = DeprovisionClusterModelInput(
