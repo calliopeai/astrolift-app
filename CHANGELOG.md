@@ -18,6 +18,14 @@
   read-only runtime mounts. Keep upload/delivery capabilities out of workflow
   history and public config; verified bytes do not assert runtime health (#2266).
 
+- Add organization-scoped encrypted Hugging Face read connections and separate
+  fixed-origin account, immutable-revision and repository-access checks. Require
+  fresh organization and cluster management grants before model hosting or
+  credential reads, pin each model to its reviewed connection version, and keep
+  credentials out of public projections and Temporal inputs. Disconnect unused
+  connections locally; require model deprovision first and remove only the
+  model-owned credential copy after confirmed deprovision (#2266).
+
 
 - Install private-cluster agents from the control-plane worker using an exact
   reviewed cluster/provider source and durable request identity. Keep the old

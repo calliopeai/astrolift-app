@@ -53,6 +53,8 @@ class ProvisionClusterModelInput:
     gpu_count: int
     allow_subscriptions: bool
     cpu_kv_cache_gi_b: int | None = None
+    connection_id: GUID | None = None
+    expected_connection_version: int | None = None
 
 
 @strawberry.input

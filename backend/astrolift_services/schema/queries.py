@@ -46,6 +46,7 @@ from astrolift_services.models import (
     WorkloadIdentityGrant,
 )
 from astrolift_services.schema.cluster_models import ClusterModelsQuery
+from astrolift_services.schema.hf_connections import HuggingFaceConnectionsQuery
 from astrolift_services.schema.resource_reads import (
     ManagedResourceReadsQuery,
     check_context_revision,
@@ -678,7 +679,7 @@ def _managed_services_qs(
 
 
 @strawberry.type
-class ServicesQuery(ClusterModelsQuery, ManagedResourceReadsQuery):
+class ServicesQuery(ClusterModelsQuery, HuggingFaceConnectionsQuery, ManagedResourceReadsQuery):
     @strawberry.field
     @require_permission(
         Permission.PROJECT_READ,

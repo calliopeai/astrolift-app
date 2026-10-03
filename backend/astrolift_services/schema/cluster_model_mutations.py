@@ -325,6 +325,11 @@ class ClusterModelMutations:
     @strawberry.field
     @model_mutation_audit(action="model.provision")
     @require_permission(
+        Permission.ORG_UPDATE,
+        scope=cluster_model_org_scope(Permission.ORG_UPDATE),
+        operation=shared_cluster_operation(),
+    )
+    @require_permission(
         Permission.CLUSTER_UPDATE,
         scope=cluster_model_org_scope(Permission.CLUSTER_UPDATE),
         operation=shared_cluster_operation(),
@@ -345,28 +350,31 @@ class ClusterModelMutations:
                 cluster = _locked_cluster(input.cluster_id, input.expected_provider_id)
                 if cluster is None:
                     return _refusal()
-                _recheck_authority(info, Permission.CLUSTER_UPDATE, cluster)
+                from astrolift_services.hf_connection import credential, verified_model
+                from astrolift_services.schema.hf_connections import locked_connection, require_host_admin
+
+                require_host_admin(info, cluster)
+                connection = (
+                    locked_connection(input.connection_id, input.expected_connection_version)
+                    if input.connection_id is not None
+                    else None
+                )
+                if connection is None and input.expected_connection_version is not None:
+                    return failure("PRECONDITION", "Select a current Hugging Face connection.")
+                require_host_admin(info, cluster)
                 config, _ = validate_cluster_request(input, cluster)
                 from astrolift_drivers.managed_resolution import resolve_managed_driver
 
                 resolve_managed_driver(
                     cluster_plugin_slug=cluster.provider_plugin.slug, kind="model_endpoint", variant="vllm"
                 )
-                from astrolift_services.hf_catalogue import CatalogueState, ModelGating, model_detail
-
-                observed = model_detail(input.model_repo, input.revision_sha)
-                if (
-                    observed.state != CatalogueState.AVAILABLE
-                    or observed.model is None
-                    or observed.model.repo_id != input.model_repo
-                    or observed.model.revision_sha != input.revision_sha
-                    or observed.model.gated is not ModelGating.NONE
-                ):
-                    return failure(
-                        "PRECONDITION",
-                        "The immutable public model revision is unavailable or requires access not supported by this flow.",
-                    )
-                _recheck_authority(info, Permission.CLUSTER_UPDATE, cluster)
+                verified_model(
+                    input.model_repo,
+                    input.revision_sha,
+                    token=credential(connection) if connection is not None else None,
+                    checkpoint=lambda: require_host_admin(info, cluster),
+                )
+                require_host_admin(info, cluster)
                 tenant = get_current_tenant()
                 service = ManagedService.objects.create(
                     organization_id=current_org_id(),
@@ -375,8 +383,15 @@ class ClusterModelMutations:
                     variant="vllm",
                     name=input.name.strip(),
                     config=config,
+                    model_hf_connection=connection,
+                    model_hf_connection_version=connection.version if connection else None,
                     created_by_id=tenant.actor_user_id if tenant else None,
                 )
+                if connection is not None:
+                    service.config["hf_token_secret_ref"] = (
+                        f"services/{service.organization.guid}/{service.guid}/huggingface#token"
+                    )
+                    service.save(update_fields=["config", "updated_at", "version"])
                 _enqueue(info, service)
                 return success(cluster_model_to_type(service))
         except (TypeError, ValueError) as exc:
