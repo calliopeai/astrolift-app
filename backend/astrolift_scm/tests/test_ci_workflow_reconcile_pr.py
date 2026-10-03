@@ -184,9 +184,9 @@ def test_reconcile_opens_pr_for_conflict(monkeypatch, org, permission_resolver):
     assert result.ok, result.errors
     # The reused PR machinery ran: a side branch was created + committed and a
     # PR was opened back into the deploy branch.
-    assert rec["create_ref"] == [f"astrolift/ci-workflow-{app.slug}"]
-    assert rec["put_branch"] == [f"astrolift/ci-workflow-{app.slug}"]
-    assert rec["open_pr"] == [(f"astrolift/ci-workflow-{app.slug}", "main")]
+    assert rec["create_ref"] == [f"astrolift/ci-workflow-{app.guid.hex}"]
+    assert rec["put_branch"] == [f"astrolift/ci-workflow-{app.guid.hex}"]
+    assert rec["open_pr"] == [(f"astrolift/ci-workflow-{app.guid.hex}", "main")]
     # PR opened because it was FORCED, not because the branch is protected.
     assert rec["protection_probe"] == 0
     # The review link is persisted onto the sync record and returned.
@@ -212,7 +212,7 @@ def test_reconcile_opens_pr_for_repo_drift(monkeypatch, org, permission_resolver
         )
 
     assert result.ok, result.errors
-    assert rec["open_pr"] == [(f"astrolift/ci-workflow-{app.slug}", "main")]
+    assert rec["open_pr"] == [(f"astrolift/ci-workflow-{app.guid.hex}", "main")]
     assert result.data.pr_url == "https://github.com/acme/api/pull/9"
 
 
@@ -240,8 +240,8 @@ def test_reconcile_is_idempotent_no_duplicate_pr(monkeypatch, org, permission_re
     assert first.data.pr_url == second.data.pr_url == "https://github.com/acme/api/pull/7"
     # Both calls target the identical deterministic side branch -> the host
     # dedupes to one PR; no second branch/PR is invented.
-    assert rec["create_ref"] == [f"astrolift/ci-workflow-{app.slug}"] * 2
-    assert rec["open_pr"] == [(f"astrolift/ci-workflow-{app.slug}", "main")] * 2
+    assert rec["create_ref"] == [f"astrolift/ci-workflow-{app.guid.hex}"] * 2
+    assert rec["open_pr"] == [(f"astrolift/ci-workflow-{app.guid.hex}", "main")] * 2
 
 
 def test_github_open_pr_helper_is_idempotent_on_already_exists(monkeypatch, org):

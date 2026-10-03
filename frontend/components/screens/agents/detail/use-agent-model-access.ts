@@ -17,9 +17,9 @@ interface EnvSpecsResp {
 export function useAgentModelAccess(agentSlug: string) {
   // Reactive org id (matches useAgent): the cookie read races the post-render
   // effect that sets it, so gate the query on a resolved org.
-  const { org } = useActiveOrg();
+  const { org, loading: orgLoading, error: orgError } = useActiveOrg();
   const orgId = org?.id ?? "";
-  const { data, loading } = useQuery<EnvSpecsResp>(LIST_AGENT_ENVIRONMENT_SPECS, {
+  const { data, loading, error, refetch } = useQuery<EnvSpecsResp>(LIST_AGENT_ENVIRONMENT_SPECS, {
     variables: { orgId },
     skip: !orgId,
     fetchPolicy: "cache-and-network",
@@ -27,5 +27,11 @@ export function useAgentModelAccess(agentSlug: string) {
 
   const spec = data?.agentEnvironmentSpecs?.find((s) => s.slug === agentSlug) ?? null;
 
-  return { spec, loading, orgId };
+  return {
+    spec,
+    loading: loading || orgLoading,
+    orgId,
+    error: error ? { message: error.message } : orgError ? { message: orgError.message } : null,
+    onRetry: orgId ? () => void refetch() : undefined,
+  };
 }

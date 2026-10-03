@@ -12,7 +12,7 @@ permissions:
 
 concurrency:
   # Concurrency groups are already repository-scoped by GitHub. Keep the key
-  # bounded to the app slug: refs can be arbitrarily long, and this workflow
+  # bounded to the app GUID: refs can be arbitrarily long, and this workflow
   # deploys only the configured branch (plus explicit manual dispatches).
   group: {{ concurrency_group }}
   cancel-in-progress: true
@@ -54,8 +54,18 @@ jobs:
         if: steps.image_exists.outputs.exists != 'true'
         env:
           IMAGE: {{ image }}
+          DOCKERFILE: {{ dockerfile }}
+          BUILD_CONTEXT: {{ build_context }}
+          BUILD_ARGS_JSON: {{ build_args }}
         run: |
-          docker build -t "$IMAGE" .
+          python3 - <<'PY'
+          import json, os, subprocess
+          command = ["docker", "build", "-f", os.environ["DOCKERFILE"], "-t", os.environ["IMAGE"]]
+          for name, value in json.loads(os.environ["BUILD_ARGS_JSON"]).items():
+              command.extend(["--build-arg", f"{name}={value}"])
+          command.append(os.environ["BUILD_CONTEXT"])
+          subprocess.run(command, check=True)
+          PY
           docker push "$IMAGE"
 {% endif %}
 
@@ -63,7 +73,7 @@ jobs:
         env:
           API_URL: {{ api_url }}
           APP_SLUG: {{ app_slug }}
-          TOKEN: ${{ secrets.ASTROLIFT_DEPLOY_TOKEN }}
+          TOKEN: ${{ secrets[{{ token_secret }}] }}
         run: |
           code=$(curl -sS -o /tmp/astrolift-deploy-response.json -w '%{http_code}' -X POST "$API_URL/api/cli/v1/apps/$APP_SLUG/deploy/" \
             -H "Authorization: Bearer $TOKEN" \

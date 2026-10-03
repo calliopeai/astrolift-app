@@ -70,6 +70,7 @@ def _scaffold(*, source_kind: str = "github", source_repo: str = "acme/api"):
         manifest_path="astrolift.toml",
         k8s_namespace="acme-hello-app",
         subdomain="hello-app",
+        registry_repo_uri="123456789012.dkr.ecr.us-west-2.amazonaws.com/hello-app",
     )
     return org, app
 
@@ -382,7 +383,7 @@ def test_push_ci_workflow_routes_to_sync_workflow_file_to_repo(
     assert seen["force_pr"] is False  # a wizard push is a normal sync, not a forced PR
     assert result.data.commit_sha == "deleg-sha"
     # Canonical System-B path (astrolift-ci.yml), NOT legacy astrolift-deploy.yml.
-    assert result.data.file_path == ".github/workflows/astrolift-ci.yml"
+    assert result.data.file_path == f".github/workflows/astrolift-app-{app.guid.hex}.yml"
 
 
 def test_push_ci_workflow_writes_system_b_stamped_file_github(
@@ -404,7 +405,7 @@ def test_push_ci_workflow_writes_system_b_stamped_file_github(
         )
 
     assert result.ok, result.errors
-    assert captured["path"] == ".github/workflows/astrolift-ci.yml"
+    assert captured["path"] == f".github/workflows/astrolift-app-{app.guid.hex}.yml"
     # The stamp line is System B's fingerprint — System A output carried none.
     assert "# astrolift-managed:" in captured["content"]
 

@@ -1,3 +1,7 @@
+import { NextIntlClientProvider } from "next-intl";
+import fr from "@/messages/fr.json";
+import ja from "@/messages/ja.json";
+
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { LONG, MODEL_ACCESS } from "./agent-detail-shell.fixtures";
@@ -36,8 +40,7 @@ export const NoOrg: Story = {
 };
 
 /**
- * No environment spec for this agent. The card has no error state; a failed
- * read also shows this.
+ * No environment spec was returned by a successful read.
  */
 export const Empty: Story = {
   args: { spec: null },
@@ -49,4 +52,24 @@ export const LongStrings: Story = {
     managedModel: <Slot label={LONG} />,
     vncSession: <Slot label={LONG} />,
   },
+};
+
+export const FrenchEmpty: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="fr" messages={fr}>
+      <AgentModelAccessView {...MODEL_ACCESS} spec={null} />
+    </NextIntlClientProvider>
+  ),
+};
+export const JapaneseReadFailed: Story = {
+  render: () => (
+    <NextIntlClientProvider locale="ja" messages={ja}>
+      <AgentModelAccessView
+        {...MODEL_ACCESS}
+        spec={null}
+        error="RAW_ENV_SPEC_DIAGNOSTIC"
+        onRetry={() => {}}
+      />
+    </NextIntlClientProvider>
+  ),
 };

@@ -27,12 +27,25 @@ from astrolift_lifecycle.schema.mutations import (
     LifecycleMutation,
     PushCiSecretsToRepoInput,
 )
+from astrolift_scm.ci_identity import github_ci_secret_name
 from astrolift_scm.models import SourceConnection
 from core.permissions import Permission
 from core.secrets import encrypt_at_rest
 from core.tenancy import TenantContext, tenant_context
 
 pytestmark = pytest.mark.django_db
+
+_BASE_SECRET_NAMES = (
+    "ASTROLIFT_PUSH_ROLE_ARN",
+    "ASTROLIFT_ECR_URI",
+    "ASTROLIFT_APP_SLUG",
+    "ASTROLIFT_API_URL",
+    "ASTROLIFT_DEPLOY_TOKEN",
+)
+
+
+def _secret_names(app):
+    return tuple(github_ci_secret_name(app, name) for name in _BASE_SECRET_NAMES)
 
 
 # ---------------------------------------------------------------------------
@@ -211,13 +224,8 @@ def test_push_secrets_rotates_token_and_pushes_all_five(
     payload = result.data
     assert payload.repo == "acme/api"
     # Five canonical names — the workflow YAML keys off these exactly.
-    assert payload.secret_names == [
-        "ASTROLIFT_PUSH_ROLE_ARN",
-        "ASTROLIFT_ECR_URI",
-        "ASTROLIFT_APP_SLUG",
-        "ASTROLIFT_API_URL",
-        "ASTROLIFT_DEPLOY_TOKEN",
-    ]
+    expected_names = _secret_names(app_with_repo)
+    assert payload.secret_names == list(expected_names)
     assert payload.rotated_token_last_4 != original_plaintext[-4:]
     assert len(payload.rotated_token_last_4) == 4
 
@@ -232,13 +240,7 @@ def test_push_secrets_rotates_token_and_pushes_all_five(
 
     # All five secrets PUT, no extra calls.
     assert captured["public_key_fetches"] == 1
-    assert set(captured["puts"]) == {
-        "ASTROLIFT_PUSH_ROLE_ARN",
-        "ASTROLIFT_ECR_URI",
-        "ASTROLIFT_APP_SLUG",
-        "ASTROLIFT_API_URL",
-        "ASTROLIFT_DEPLOY_TOKEN",
-    }
+    assert set(captured["puts"]) == set(expected_names)
 
     # Freshness marker stamped (#1221) — validate compares GitHub's
     # per-secret updated_at against this; without it every validate
@@ -283,16 +285,17 @@ def test_push_secrets_sealed_values_round_trip(
         assert body["key_id"] == github_keypair.key_id
         return box.decrypt(base64.b64decode(body["encrypted_value"])).decode("utf-8")
 
-    assert _decrypt("ASTROLIFT_PUSH_ROLE_ARN") == app_with_repo.push_role_ref
-    assert _decrypt("ASTROLIFT_ECR_URI") == app_with_repo.registry_repo_uri
-    assert _decrypt("ASTROLIFT_APP_SLUG") == app_with_repo.slug
-    assert _decrypt("ASTROLIFT_API_URL") == "https://api.astrolift.example.com"
+    names = dict(zip(_BASE_SECRET_NAMES, _secret_names(app_with_repo), strict=True))
+    assert _decrypt(names["ASTROLIFT_PUSH_ROLE_ARN"]) == app_with_repo.push_role_ref
+    assert _decrypt(names["ASTROLIFT_ECR_URI"]) == app_with_repo.registry_repo_uri
+    assert _decrypt(names["ASTROLIFT_APP_SLUG"]) == app_with_repo.slug
+    assert _decrypt(names["ASTROLIFT_API_URL"]) == "https://api.astrolift.example.com"
     # Deploy token plaintext: shape is alft_dt_<urlsafe>; we don't have
     # the plaintext in the response (only last4), so assert format.
     # #449: pre-canonicalisation we tolerated both ``alft_dt_`` and the
     # buggy ``alfdt_`` here; the mint now writes the canonical prefix
     # only, so the legacy fallback is gone.
-    token_plain = _decrypt("ASTROLIFT_DEPLOY_TOKEN")
+    token_plain = _decrypt(names["ASTROLIFT_DEPLOY_TOKEN"])
     assert token_plain.startswith("alft_dt_")
     assert token_plain[-4:] == result.data.rotated_token_last_4
 

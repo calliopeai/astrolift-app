@@ -10,10 +10,12 @@ import { useVncSession } from "@/components/screens/agents/list/use-vnc-session"
  */
 export function VncSessionSection({
   envSpecSlug,
+  envSpecId,
   vncEnabled,
 }: {
   envSpecSlug: string;
+  envSpecId?: string;
   vncEnabled: boolean;
 }) {
-  return <VncSessionSectionView {...useVncSession(envSpecSlug, vncEnabled)} />;
+  return <VncSessionSectionView {...useVncSession(envSpecSlug, vncEnabled, envSpecId)} />;
 }

@@ -35,6 +35,7 @@ from astrolift_lifecycle.schema.mutations import (
 )
 from astrolift_scm.models import SourceConnection
 from astrolift_scm.services.workflow_sync import (
+    github_workflow_path_for,
     render_astrolift_ci_workflow,
     render_astrolift_gitlab_ci_workflow,
 )
@@ -211,7 +212,7 @@ def test_creates_workflow_file_when_missing(
     def handler(req):
         method = req.get_method()
         url = req.full_url
-        if method == "GET" and "/contents/.github/workflows/astrolift-ci.yml" in url:
+        if method == "GET" and f"/contents/{github_workflow_path_for(app_with_repo)}" in url:
             # First call: fetch_file looking for existing — 404 means missing.
             return "error", _http_error(404, b'{"message":"Not Found"}', url)
         if method == "GET" and "/contents/.github/workflows/astrolift-agent-" in url:
@@ -220,14 +221,14 @@ def test_creates_workflow_file_when_missing(
             return "error", _http_error(404, b'{"message":"Not Found"}', url)
         if method == "GET" and "/branches/main/protection" in url:
             return "error", _http_error(404, b'{"message":"Branch not protected"}', url)
-        if method == "PUT" and "/contents/.github/workflows/astrolift-ci.yml" in url:
+        if method == "PUT" and f"/contents/{github_workflow_path_for(app_with_repo)}" in url:
             body = json.dumps(
                 {
                     "commit": {
                         "sha": "deadbeefcafe",
                         "html_url": "https://github.com/acme/api/commit/deadbeefcafe",
                     },
-                    "content": {"path": ".github/workflows/astrolift-ci.yml"},
+                    "content": {"path": github_workflow_path_for(app_with_repo)},
                 }
             ).encode()
             return "response", body
@@ -290,7 +291,7 @@ def test_a_file_astrolift_did_not_write_is_not_overwritten(
         method = req.get_method()
         url = req.full_url
         accept = req.get_header("Accept") or ""
-        if method == "GET" and "/contents/.github/workflows/astrolift-ci.yml" in url:
+        if method == "GET" and f"/contents/{github_workflow_path_for(app_with_repo)}" in url:
             if accept == "application/vnd.github.raw":
                 return "response", drift_body  # fetch_file path
             return "response", json.dumps({"sha": "oldblob"}).encode()
@@ -305,7 +306,7 @@ def test_a_file_astrolift_did_not_write_is_not_overwritten(
             return "response", json.dumps({"commit": {"sha": "headsha"}}).encode()
         if method == "POST" and "/git/refs" in url:
             return "response", json.dumps({"ref": "refs/heads/astrolift/ci-workflow"}).encode()
-        if method == "PUT" and "/contents/.github/workflows/astrolift-ci.yml" in url:
+        if method == "PUT" and f"/contents/{github_workflow_path_for(app_with_repo)}" in url:
             body = json.loads(req.data.decode()) if req.data else {}
             put_branches.append(body.get("branch", ""))
             return "response", json.dumps(
@@ -314,7 +315,7 @@ def test_a_file_astrolift_did_not_write_is_not_overwritten(
                         "sha": "newcafe1234",
                         "html_url": "https://github.com/acme/api/commit/newcafe1234",
                     },
-                    "content": {"path": ".github/workflows/astrolift-ci.yml"},
+                    "content": {"path": github_workflow_path_for(app_with_repo)},
                 }
             ).encode()
         if method == "POST" and "/pulls" in url:
@@ -355,7 +356,7 @@ def test_in_sync_when_existing_matches_rendered(
         method = req.get_method()
         url = req.full_url
         accept = req.get_header("Accept") or ""
-        if method == "GET" and "/contents/.github/workflows/astrolift-ci.yml" in url:
+        if method == "GET" and f"/contents/{github_workflow_path_for(app_with_repo)}" in url:
             assert accept == "application/vnd.github.raw"
             return "response", rendered.encode("utf-8")
         raise AssertionError(f"unexpected request after match: {method} {url}")
@@ -399,7 +400,7 @@ def test_protected_branch_opens_pull_request(
         # Initial fetch_file: file is missing on main.
         if (
             method == "GET"
-            and "/contents/.github/workflows/astrolift-ci.yml" in url
+            and f"/contents/{github_workflow_path_for(app_with_repo)}" in url
             and accept == "application/vnd.github.raw"
         ):
             return "error", _http_error(404, b"", url)
@@ -419,15 +420,15 @@ def test_protected_branch_opens_pull_request(
         # PUT contents on the side branch — needs blob-sha probe first.
         if (
             method == "GET"
-            and "/contents/.github/workflows/astrolift-ci.yml" in url
+            and f"/contents/{github_workflow_path_for(app_with_repo)}" in url
             and accept != "application/vnd.github.raw"
         ):
             return "error", _http_error(404, b"", url)
-        if method == "PUT" and "/contents/.github/workflows/astrolift-ci.yml" in url:
+        if method == "PUT" and f"/contents/{github_workflow_path_for(app_with_repo)}" in url:
             return "response", json.dumps(
                 {
                     "commit": {"sha": "siderev", "html_url": ""},
-                    "content": {"path": ".github/workflows/astrolift-ci.yml"},
+                    "content": {"path": github_workflow_path_for(app_with_repo)},
                 }
             ).encode()
         # Open the PR.
@@ -558,7 +559,7 @@ def test_fetch_failure_maps_to_precondition(
     def handler(req):
         method = req.get_method()
         url = req.full_url
-        if method == "GET" and "/contents/.github/workflows/astrolift-ci.yml" in url:
+        if method == "GET" and f"/contents/{github_workflow_path_for(app_with_repo)}" in url:
             return "error", _http_error(401, b'{"message":"Bad credentials"}', url)
         raise AssertionError(f"must not continue past auth failure: {method} {url}")
 
@@ -597,7 +598,10 @@ def test_render_substitutes_all_variables(settings, app_with_repo):
     # GitHub Actions expressions are NOT mistakenly substituted.
     assert "${{ github.sha }}" in rendered
     assert "${{ github.run_id }}" in rendered
-    assert "${{ secrets.ASTROLIFT_DEPLOY_TOKEN }}" in rendered
+    from astrolift_scm.ci_identity import github_ci_secret_name
+
+    name = github_ci_secret_name(app_with_repo, "ASTROLIFT_DEPLOY_TOKEN")
+    assert '${{ secrets["' + name + '"] }}' in rendered
     # Header marker so downstream operators don't hand-edit.
     assert "Managed by Astrolift" in rendered
 

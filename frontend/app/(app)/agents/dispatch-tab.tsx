@@ -24,6 +24,7 @@ export function DispatchTab({
       renderSecretsDialog={({ spec, open, onOpenChange }) => (
         <AgentSecretsDialog
           envSpecSlug={spec.slug}
+          envSpecId={spec.id}
           envSpecName={spec.name}
           managedModel={spec.managedModel}
           vncEnabled={spec.vncEnabled}
