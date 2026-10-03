@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Evaluate generated Envoy ingress queries in a checksum-pinned native Prometheus
+  engine, proving exact-route isolation, request rates, status/error ratios,
+  millisecond latency conversion and idle-window behavior (#2250).
+
 
 - Install private-cluster agents from the control-plane worker using an exact
   reviewed cluster/provider source and durable request identity. Keep the old
