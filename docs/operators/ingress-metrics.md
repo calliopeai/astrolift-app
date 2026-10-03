@@ -6,6 +6,30 @@ instrumentation endpoint when the ingress supplies metrics. Workload resource
 measurements and workload instrumentation remain separate from these environment
 totals.
 
+## Existing nginx ingress
+
+Enable metrics on the existing ingress controller's HelmRelease or Helm values:
+
+```yaml
+controller:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+```
+
+The native Kubernetes recipe already includes these values. Previously installed
+controllers must reconcile them too; installing Prometheus alone does not turn
+on the controller exporter. Confirm the metrics Service and ServiceMonitor exist,
+then check Prometheus targets for a healthy controller scrape. Preserve the
+existing controller chart version and other values when adding this overlay.
+The Prometheus operator must select the ServiceMonitor's namespace and labels.
+
+For a cluster registered with `ingress_class: nginx`, Astrolift selects
+`nginx_ingress_controller_requests` by the app environment's namespace and
+`nginx_ingress_controller_request_duration_seconds_bucket` for latency. A shared
+controller load balancer cannot replace these per-namespace measurements.
+
 ## Shared Envoy edge
 
 Install `kube-prometheus-stack` using the cluster recipe. Its additional PodMonitor
