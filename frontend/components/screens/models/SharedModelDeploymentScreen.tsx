@@ -37,6 +37,7 @@ export type ModelPlacementAdmission = {
   hardwareAdmission: string;
 };
 export interface SharedModelDeploymentScreenProps {
+  initialStep?: 0 | 1 | 2;
   organizationId: string;
   catalogue: ReactNode;
   sourceControls: ReactNode;
@@ -89,8 +90,36 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
   const t = useTranslations("models.shared.placement");
   const restart = useTranslations("models.shared.subscriptions");
   const hosting = useTranslations("models.shared.hosting");
+  const usability = useTranslations("models.shared.usability");
   const local = useTranslations("models.shared.localImport");
   const id = useId();
+  const modelKey = JSON.stringify(model);
+  const [navigation, setNavigation] = useState({
+    modelKey,
+    step: props.initialStep ?? (model ? 1 : 0),
+  });
+  if (navigation.modelKey !== modelKey) setNavigation({ modelKey, step: model ? 1 : 0 });
+  const step = model ? navigation.step : 0;
+  const focusTarget = useRef<string | null>(null);
+  const navigate = (next: 0 | 1 | 2, target?: string) => {
+    setNavigation({ modelKey, step: next });
+    focusTarget.current =
+      target ??
+      (next === 0
+        ? "model-hosting-source"
+        : next === 1
+          ? "model-hosting-cluster"
+          : "model-hosting-checks");
+  };
+  useLayoutEffect(() => {
+    if (!focusTarget.current) return;
+    const node = document.getElementById(focusTarget.current);
+    if (node instanceof HTMLElement) {
+      node.focus();
+      node.scrollIntoView?.({ block: "start" });
+    }
+    focusTarget.current = null;
+  });
   const cluster = clusters.rows.find((item) => item.id === selectedClusterId);
   const request = sharedModelRequest(
     organizationId,
@@ -99,6 +128,23 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
     draft,
     props.sourceConnection
   );
+  const missingFields = [
+    ...(!draft.name.trim() ? [{ key: "enterName", target: `${id}-name` }] : []),
+    ...(!cluster ? [{ key: "selectCluster", target: "model-hosting-cluster" }] : []),
+    ...(!draft.computeMode ? [{ key: "selectCompute", target: `${id}-cpu` }] : []),
+    ...(!draft.cpuRequest.trim() ? [{ key: "enterCpu", target: `${id}-cpuRequest` }] : []),
+    ...(!draft.memoryRequest.trim() ? [{ key: "enterMemory", target: `${id}-memoryRequest` }] : []),
+    ...(!/^\d+$/.test(draft.gpuCount) ||
+    (draft.computeMode === "cpu"
+      ? Number(draft.gpuCount) !== 0
+      : draft.computeMode === "gpu" && Number(draft.gpuCount) < 1)
+      ? [{ key: "enterGpu", target: `${id}-gpuCount` }]
+      : []),
+    ...(draft.computeMode === "cpu" &&
+    (!/^[1-9]\d*$/.test(draft.cpuKvCacheGiB) || Number(draft.cpuKvCacheGiB) > 1024)
+      ? [{ key: "enterCache", target: `${id}-cpuKvCacheGiB` }]
+      : []),
+  ];
   const requestKey = JSON.stringify(request);
   const scopeKey = JSON.stringify([
     requestKey,
@@ -141,6 +187,9 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
     !clusters.loading &&
     !clusters.stale &&
     !clusters.error
+  );
+  const placementComplete = Boolean(
+    request && props.hostingAllowed && !clusters.loading && !clusters.stale && !clusters.error
   );
   const reviewCurrent = Boolean(
     review &&
@@ -205,21 +254,30 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
     >
       <div className="@container space-y-8">
         <ModelHostingJourney
-          sourceAnchor={`${id}-source`}
-          clusterAnchor={`${id}-cluster`}
-          reviewAnchor={`${id}-checks`}
+          sourceAnchor="model-hosting-source"
+          clusterAnchor="model-hosting-cluster"
+          reviewAnchor="model-hosting-checks"
           modelSelected={Boolean(model)}
           clusterSelected={Boolean(model && cluster)}
           readyForReview={Boolean(eligible && !createdId)}
           accepted={Boolean(createdId)}
+          activeStep={step as 0 | 1 | 2}
+          onNavigate={(next) => navigate(next)}
         />
-        <div id={`${id}-source`} className="scroll-mt-6">
-          {props.sourceControls}
-        </div>
-        {!model && catalogue}
+        {model && (
+          <p className="text-sm font-medium break-all">
+            {"repoId" in model ? model.repoId : model.name}
+          </p>
+        )}
+        {step === 0 && (
+          <div id="model-hosting-source" tabIndex={-1} className="scroll-mt-6 space-y-4">
+            {props.sourceControls}
+            {!model && catalogue}
+          </div>
+        )}
         {model && (
           <>
-            {model && (
+            {step === 0 && (
               <div className="bg-surface-1 space-y-2 rounded-md border p-4">
                 <p className="font-medium break-all">
                   {"repoId" in model ? model.repoId : model.name}
@@ -232,57 +290,84 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
                 </Button>
               </div>
             )}
-            <section aria-labelledby={`${id}-cluster`} className="space-y-3">
-              <h2 id={`${id}-cluster`} className="scroll-mt-6 text-lg font-semibold">
-                {hosting("placementStep")}
-              </h2>
-              <ListPage
-                embedded
-                {...clusters}
-                label={t("clusters")}
-                getRowId={(row) => row.id}
-                empty={{ icon: <ServerIcon />, title: t("noClusters") }}
-                columns={[
-                  {
-                    id: "name",
-                    header: t("cluster"),
-                    cellClassName: "min-w-56",
-                    cell: (row) => (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="h-auto text-left break-all whitespace-normal"
-                        disabled={!row.active || clusters.stale || clusters.loading}
-                        onClick={() => onSelectCluster(row.id)}
-                      >
-                        {row.name} · {row.slug}
-                      </Button>
-                    ),
-                  },
-                  {
-                    id: "state",
-                    header: t("state"),
-                    cellClassName: "min-w-48",
-                    cell: (row) =>
-                      row.active ? t("admissionRequired") : (row.reason ?? t("inactive")),
-                  },
-                ]}
-              />
-              <p role="status" className="text-sm">
-                {cluster ? t("selectedCluster", { cluster: cluster.name }) : t("chooseCluster")}
-              </p>
-            </section>
+            {step === 1 && (
+              <section aria-labelledby="model-hosting-cluster" className="space-y-3">
+                <h2
+                  id="model-hosting-cluster"
+                  tabIndex={-1}
+                  className="scroll-mt-6 text-lg font-semibold"
+                >
+                  {hosting("placementStep")}
+                </h2>
+                <ListPage
+                  embedded
+                  {...clusters}
+                  label={t("clusters")}
+                  getRowId={(row) => row.id}
+                  empty={{ icon: <ServerIcon />, title: t("noClusters") }}
+                  columns={[
+                    {
+                      id: "name",
+                      header: t("cluster"),
+                      cellClassName: "min-w-56",
+                      cell: (row) => (
+                        <Button
+                          type="button"
+                          variant={row.id === selectedClusterId ? "secondary" : "ghost"}
+                          className="h-auto text-left break-all whitespace-normal"
+                          disabled={!row.active || clusters.stale || clusters.loading}
+                          onClick={() => onSelectCluster(row.id)}
+                        >
+                          {row.name} · {row.slug}
+                        </Button>
+                      ),
+                    },
+                    {
+                      id: "state",
+                      header: t("state"),
+                      cellClassName: "min-w-48",
+                      cell: (row) =>
+                        row.active ? t("admissionRequired") : (row.reason ?? t("inactive")),
+                    },
+                  ]}
+                />
+                <p role="status" className="text-sm">
+                  {cluster ? t("selectedCluster", { cluster: cluster.name }) : t("chooseCluster")}
+                </p>
+              </section>
+            )}
+            {missingFields.length > 0 && (
+              <div role="status" className="space-y-2">
+                <h3 className="font-medium">{usability("nextStep")}</h3>
+                <div className="flex flex-wrap gap-2">
+                  {missingFields.map((field) => (
+                    <Button
+                      key={field.key}
+                      type="button"
+                      variant="outline"
+                      onClick={() => navigate(1, field.target)}
+                    >
+                      {usability(field.key)}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
             <form
               className="grid gap-4 @lg:grid-cols-2"
               onSubmit={(event) => {
                 event.preventDefault();
+                if (step < 2) {
+                  if (placementComplete && step === 1) navigate(2);
+                  return;
+                }
                 if (eligible && request && cluster) {
                   setFailure(null);
                   setReview({ request, revision: scope.revision, clusterName: cluster.name });
                 }
               }}
             >
-              <div className="space-y-2 @lg:col-span-2">
+              <div hidden={step !== 1} className="space-y-2 @lg:col-span-2">
                 <Label htmlFor={`${id}-name`}>{t("name")}</Label>
                 <Input
                   id={`${id}-name`}
@@ -292,13 +377,18 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
                   required
                 />
               </div>
-              <fieldset id={`${id}-resources`} className="space-y-2 @lg:col-span-2">
+              <fieldset
+                hidden={step !== 1}
+                id="model-hosting-resources"
+                className="space-y-2 @lg:col-span-2"
+              >
                 <legend className="text-sm font-medium">{t("compute")}</legend>
                 <div className="flex flex-wrap gap-5">
                   {(["cpu", "gpu"] as const).map((mode) => (
                     <Label key={mode} className="flex items-center gap-2">
                       <input
                         type="radio"
+                        id={`${id}-${mode}`}
                         name={`${id}-compute`}
                         value={mode}
                         checked={draft.computeMode === mode}
@@ -309,30 +399,34 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
                   ))}
                 </div>
                 <p className="text-muted-foreground text-sm">{t("computeHelp")}</p>
+                {(
+                  [
+                    "cpuRequest",
+                    "memoryRequest",
+                    "gpuCount",
+                    ...(draft.computeMode === "cpu" ? (["cpuKvCacheGiB"] as const) : []),
+                  ] as const
+                ).map((field) => (
+                  <div key={field} className="space-y-2">
+                    <Label htmlFor={`${id}-${field}`}>{t(field)}</Label>
+                    <Input
+                      id={`${id}-${field}`}
+                      type={field === "gpuCount" || field === "cpuKvCacheGiB" ? "number" : "text"}
+                      min={field === "cpuKvCacheGiB" ? 1 : 0}
+                      max={field === "cpuKvCacheGiB" ? 1024 : undefined}
+                      step={1}
+                      value={draft[field]}
+                      onChange={(event) => onDraftChange(field, event.target.value)}
+                      required
+                      readOnly={field === "gpuCount" && draft.computeMode === "cpu"}
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      {field === "cpuKvCacheGiB" ? usability("cpuCacheHelp") : t(`${field}Help`)}
+                    </p>
+                  </div>
+                ))}
               </fieldset>
-              {(
-                [
-                  "cpuRequest",
-                  "memoryRequest",
-                  "gpuCount",
-                  ...(draft.computeMode === "cpu" ? (["cpuKvCacheGiB"] as const) : []),
-                ] as const
-              ).map((field) => (
-                <div key={field} className="space-y-2">
-                  <Label htmlFor={`${id}-${field}`}>{t(field)}</Label>
-                  <Input
-                    id={`${id}-${field}`}
-                    type={field === "gpuCount" || field === "cpuKvCacheGiB" ? "number" : "text"}
-                    min={field === "cpuKvCacheGiB" ? 1 : 0}
-                    step={1}
-                    value={draft[field]}
-                    onChange={(event) => onDraftChange(field, event.target.value)}
-                    required={field !== "cpuKvCacheGiB"}
-                  />
-                  <p className="text-muted-foreground text-xs">{t(`${field}Help`)}</p>
-                </div>
-              ))}
-              <div className="space-y-2 @lg:col-span-2">
+              <div hidden={step !== 1} className="space-y-2 @lg:col-span-2">
                 <Label className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -347,125 +441,173 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
                   </p>
                 )}
               </div>
-              <div id={`${id}-checks`} className="scroll-mt-6 space-y-2 @lg:col-span-2">
-                <h2 className="text-lg font-semibold">{hosting("checksStep")}</h2>
-                <div className="grid gap-4 @xl:grid-cols-2">
-                  <section className="bg-surface-1 space-y-2 rounded-md border p-4">
-                    <h3 className="font-medium">{hosting("accessTitle")}</h3>
-                    <p role="status">
-                      {props.sourceAccess.loading
-                        ? hosting("accessChecking")
-                        : props.sourceAccess.confirmed
-                          ? "repoId" in model
-                            ? hosting("accessConfirmed")
-                            : local("verified")
-                          : (props.sourceAccess.reason ?? hosting("accessUnknown"))}
+              {step === 2 && (
+                <div
+                  id="model-hosting-checks"
+                  tabIndex={-1}
+                  className="scroll-mt-6 space-y-2 @lg:col-span-2"
+                >
+                  <h2 className="text-lg font-semibold">{hosting("checksStep")}</h2>
+                  {cluster && (
+                    <p id="model-hosting-settings-help" className="text-muted-foreground text-sm">
+                      {usability("settingsNewTab")}
                     </p>
-                    <p className="text-muted-foreground text-sm">
-                      {"repoId" in model ? hosting("accessHelp") : local("description")}
-                    </p>
-                    {"repoId" in model && (
+                  )}
+                  <div className="grid gap-4 @xl:grid-cols-2">
+                    <section className="bg-surface-1 space-y-2 rounded-md border p-4">
+                      <h3 className="font-medium">{hosting("accessTitle")}</h3>
+                      <p role="status">
+                        {props.sourceAccess.loading
+                          ? hosting("accessChecking")
+                          : props.sourceAccess.confirmed
+                            ? "repoId" in model
+                              ? hosting("accessConfirmed")
+                              : local("verified")
+                            : (props.sourceAccess.reason ?? hosting("accessUnknown"))}
+                      </p>
+                      <p className="text-muted-foreground text-sm">
+                        {"repoId" in model ? hosting("accessHelp") : local("description")}
+                      </p>
+                      {"repoId" in model && (
+                        <a
+                          className="text-primary text-sm underline"
+                          href={`https://huggingface.co/${model.repoId}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {hosting("openModel")}
+                        </a>
+                      )}
+                      {!props.sourceAccess.confirmed && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={props.sourceAccess.loading || !props.hostingAllowed}
+                          onClick={props.sourceAccess.onRetry}
+                        >
+                          {hosting("retry")}
+                        </Button>
+                      )}
+                    </section>
+                    <section className="bg-surface-1 space-y-2 rounded-md border p-4">
+                      <h3 className="font-medium">{hosting("licenseTitle")}</h3>
+                      {props.sourceAccess.license && <p>{props.sourceAccess.license}</p>}
+                      <p className="text-muted-foreground text-sm">
+                        {"repoId" in model ? hosting("licenseHelp") : local("localLicense")}
+                      </p>
+                      <Label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={props.licenseReviewed}
+                          onChange={(event) => props.onLicenseReviewed(event.target.checked)}
+                        />
+                        {"repoId" in model ? hosting("licenseReview") : local("localLicenseReview")}
+                      </Label>
+                    </section>
+                    <section className="bg-surface-1 space-y-2 rounded-md border p-4">
+                      <h3 className="font-medium">{hosting("hardwareTitle")}</h3>
+                      <p className="text-muted-foreground text-sm">{hosting("hardwareHelp")}</p>
+                      <p className="text-muted-foreground text-sm">{hosting("hardwarePending")}</p>
+                      <a
+                        className="text-primary block text-sm underline"
+                        href="#model-hosting-resources"
+                        onClick={(event) => {
+                          event.preventDefault();
+                          navigate(1, `${id}-cpuRequest`);
+                        }}
+                      >
+                        {hosting("reviewResourceRequests")}
+                      </a>
+                      {cluster && (
+                        <Link
+                          className="text-primary block text-sm underline"
+                          href={`/clusters/${encodeURIComponent(cluster.slug)}/settings`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-describedby="model-hosting-settings-help"
+                        >
+                          {hosting("hardwareConfiguration")}
+                        </Link>
+                      )}
+                    </section>
+                    <section className="bg-surface-1 space-y-2 rounded-md border p-4">
+                      <h3 className="font-medium">{hosting("runtimeTitle")}</h3>
+                      <p className="text-muted-foreground text-sm">{hosting("runtimeHelp")}</p>
                       <a
                         className="text-primary text-sm underline"
-                        href={`https://huggingface.co/${model.repoId}`}
+                        href="https://docs.vllm.ai/en/v0.15.1/models/supported_models/"
                         target="_blank"
                         rel="noreferrer"
                       >
-                        {hosting("openModel")}
+                        {hosting("supportedArchitectures")}
                       </a>
-                    )}
-                    {!props.sourceAccess.confirmed && (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={props.sourceAccess.loading || !props.hostingAllowed}
-                        onClick={props.sourceAccess.onRetry}
-                      >
-                        {hosting("retry")}
-                      </Button>
-                    )}
-                  </section>
-                  <section className="bg-surface-1 space-y-2 rounded-md border p-4">
-                    <h3 className="font-medium">{hosting("licenseTitle")}</h3>
-                    {props.sourceAccess.license && <p>{props.sourceAccess.license}</p>}
-                    <p className="text-muted-foreground text-sm">
-                      {"repoId" in model ? hosting("licenseHelp") : local("localLicense")}
-                    </p>
-                    <Label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        checked={props.licenseReviewed}
-                        onChange={(event) => props.onLicenseReviewed(event.target.checked)}
-                      />
-                      {"repoId" in model ? hosting("licenseReview") : local("localLicenseReview")}
-                    </Label>
-                  </section>
-                  <section className="bg-surface-1 space-y-2 rounded-md border p-4">
-                    <h3 className="font-medium">{hosting("hardwareTitle")}</h3>
-                    <p className="text-muted-foreground text-sm">{hosting("hardwareHelp")}</p>
-                    <p className="text-muted-foreground text-sm">{hosting("hardwarePending")}</p>
-                    <a className="text-primary block text-sm underline" href={`#${id}-resources`}>
-                      {hosting("reviewResourceRequests")}
-                    </a>
-                    {cluster && (
-                      <Link
-                        className="text-primary block text-sm underline"
-                        href={`/clusters/${encodeURIComponent(cluster.slug)}/settings`}
-                      >
-                        {hosting("hardwareConfiguration")}
-                      </Link>
-                    )}
-                  </section>
-                  <section className="bg-surface-1 space-y-2 rounded-md border p-4">
-                    <h3 className="font-medium">{hosting("runtimeTitle")}</h3>
-                    <p className="text-muted-foreground text-sm">{hosting("runtimeHelp")}</p>
-                    <a
-                      className="text-primary text-sm underline"
-                      href="https://docs.vllm.ai/en/v0.15.1/models/supported_models/"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      {hosting("supportedArchitectures")}
-                    </a>
-                    {cluster && (
-                      <Link
-                        className="text-primary block text-sm underline"
-                        href={`/clusters/${encodeURIComponent(cluster.slug)}/settings`}
-                      >
-                        {hosting("clusterConfiguration")}
-                      </Link>
-                    )}
-                    {admissionLoading ? (
-                      <p role="status">{t("verifying")}</p>
-                    ) : admissionError ? (
-                      <div role="alert">
-                        <p>{admissionError}</p>
-                        <Button type="button" variant="outline" onClick={onRetryAdmission}>
-                          {t("retry")}
-                        </Button>
-                      </div>
-                    ) : admission?.requestKey === requestKey && admission.eligible ? (
-                      <>
-                        <p>
-                          {t("runtimeVerified", {
-                            version: admission.runtimeVersion ?? t("unknown"),
-                            architecture: admission.architecture ?? t("unknown"),
-                          })}
+                      {cluster && (
+                        <Link
+                          className="text-primary block text-sm underline"
+                          href={`/clusters/${encodeURIComponent(cluster.slug)}/settings`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-describedby="model-hosting-settings-help"
+                        >
+                          {hosting("clusterConfiguration")}
+                        </Link>
+                      )}
+                      {admissionLoading ? (
+                        <p role="status">{t("verifying")}</p>
+                      ) : admissionError ? (
+                        <div role="alert">
+                          <p>{admissionError}</p>
+                          <Button type="button" variant="outline" onClick={onRetryAdmission}>
+                            {t("retry")}
+                          </Button>
+                        </div>
+                      ) : admission?.requestKey === requestKey && admission.eligible ? (
+                        <>
+                          <p>
+                            {t("runtimeVerified", {
+                              version: admission.runtimeVersion ?? t("unknown"),
+                              architecture: admission.architecture ?? t("unknown"),
+                            })}
+                          </p>
+                          <p className="text-muted-foreground text-sm">{t("hardwareUnknown")}</p>
+                        </>
+                      ) : (
+                        <p role="status">
+                          {admission?.requestKey === requestKey && admission.reason
+                            ? admission.reason
+                            : t("unverified")}
                         </p>
-                        <p className="text-muted-foreground text-sm">{t("hardwareUnknown")}</p>
-                      </>
-                    ) : (
-                      <p role="status">
-                        {admission?.requestKey === requestKey && admission.reason
-                          ? admission.reason
-                          : t("unverified")}
-                      </p>
-                    )}
-                  </section>
+                      )}
+                    </section>
+                  </div>
+                  <Button type="submit" disabled={!eligible || Boolean(createdId)}>
+                    {t("review")}
+                  </Button>
                 </div>
-                <Button type="submit" disabled={!eligible || Boolean(createdId)}>
-                  {t("review")}
-                </Button>
+              )}
+              <div className="flex gap-3 @lg:col-span-2">
+                {step > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate((step - 1) as 0 | 1)}
+                  >
+                    {usability("previousStep")}
+                  </Button>
+                )}
+                {step < 2 && (
+                  <Button
+                    type="button"
+                    disabled={
+                      !props.hostingAllowed ||
+                      (step === 1 &&
+                        (!request || clusters.loading || clusters.stale || Boolean(clusters.error)))
+                    }
+                    onClick={() => navigate((step + 1) as 1 | 2)}
+                  >
+                    {usability("continueStep")}
+                  </Button>
+                )}
               </div>
             </form>
             {createdId && (

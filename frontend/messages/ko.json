@@ -5737,6 +5737,22 @@
         "servedIdentifier": "서빙 모델 식별자",
         "manifestRevision": "검증된 매니페스트 SHA-256",
         "localLicenseReview": "이 로컬 모델 파일의 라이선스와 재배포 권한을 검토했습니다."
+      },
+      "usability": {
+        "nextStep": "설정을 완료하여 호스팅 내용을 검토하세요",
+        "enterName": "배포 이름을 입력하세요",
+        "selectCluster": "클러스터를 선택하세요",
+        "selectCompute": "CPU 또는 GPU를 선택하세요",
+        "enterCpu": "CPU 요청량을 입력하세요",
+        "enterMemory": "메모리 요청량을 입력하세요",
+        "enterGpu": "CPU 모드에서는 GPU 0개, GPU 모드에서는 1개 이상을 사용하세요",
+        "enterCache": "CPU KV 캐시의 유효한 크기를 입력하세요",
+        "settingsNewTab": "클러스터 설정은 새 탭에서 열리므로 이 호스팅 설정은 여기에 유지됩니다.",
+        "smallModel": "작은 테스트 모델 선택",
+        "smallModelHelp": "Hugging Face에서 Qwen/Qwen2.5-0.5B-Instruct 정보를 조회합니다. 접근 권한, 라이선스, 런타임 및 리소스 확인은 계속 필요합니다.",
+        "previousStep": "뒤로",
+        "continueStep": "다음",
+        "cpuCacheHelp": "CPU 사용 시 필수: 1–1024 GiB. 요청 메모리는 이 캐시 크기보다 커야 합니다."
       }
     }
   },

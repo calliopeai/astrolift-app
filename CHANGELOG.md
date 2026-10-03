@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Show model hosting as three focused Source, Placement and Review steps. Suggest
+  an editable model-derived deployment name, offer a small-model catalogue preset,
+  require an explicit cluster selection and CPU KV-cache request, and move resource
+  actions to the corresponding controls. Preserve reviewed inputs through Back/Next
+  without treating queued hosting as model readiness (Refs: #2266).
+
 - Bind browser SSO step-up to the verified issuer/subject, active actor and current
   persisted authenticated session. Recheck proof freshness after admission locks,
   preserve concurrent logout and suppress stale response-session writes (#2202).
