@@ -38,7 +38,7 @@ def import_authority(org_guid=None):
     user = (
         get_user_model().objects.filter(pk=tenant.actor_user_id, is_active=True).first() if tenant else None
     )
-    if user is None or not session_may_act_in(user, tenant.organization_id):
+    if tenant is None or user is None or not session_may_act_in(user, tenant.organization_id):
         raise PermissionDenied(Permission.ORG_UPDATE, scope, "Model source authority is unavailable.")
     token = get_current_api_token()
     marker = None
@@ -153,6 +153,10 @@ def begin_artifact(*, organization_id, name, files):
     store.require_versioning()
     with transaction.atomic():
         org = import_authority(organization_id)
+        tenant = get_current_tenant()
+        if tenant is None:
+            scope = identity_organization_scope(Permission.ORG_UPDATE)({})
+            raise PermissionDenied(Permission.ORG_UPDATE, scope, "Model source authority is unavailable.")
         artifact = LocalModelArtifact.objects.create(
             organization=org,
             name=name.strip(),
@@ -160,7 +164,7 @@ def begin_artifact(*, organization_id, name, files):
             manifest_sha256=digest,
             storage_source=source,
             storage_receipt={file["name"]: {"file_id": str(uuid4())} for file in manifest},
-            created_by_id=get_current_tenant().actor_user_id,
+            created_by_id=tenant.actor_user_id,
         )
     return artifact
 

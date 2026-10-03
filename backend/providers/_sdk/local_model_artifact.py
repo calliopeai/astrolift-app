@@ -46,7 +46,7 @@ def model_manifest(files: list[ModelFile]) -> tuple[list[dict[str, Any]], str]:
     if not 1 <= len(files) <= MAX_FILES:
         raise ValueError("A local model requires 1 to 256 files.")
     names = set()
-    records = []
+    records: list[dict[str, Any]] = []
     for file in files:
         if (
             not isinstance(file.name, str)
