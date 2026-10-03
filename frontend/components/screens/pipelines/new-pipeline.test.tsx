@@ -2,13 +2,15 @@ import { MockedProvider } from "@apollo/client/testing/react";
 import { readFileSync } from "node:fs";
 import { buildSchema, validate } from "graphql";
 import type { MockedResponse } from "@apollo/client/testing";
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { CREATE_PIPELINE } from "@/graphql/pipelines/pipelines.mutations";
 import { PermissionsProvider } from "@/providers/PermissionsProvider";
 import { NewPipelineScreen } from "./NewPipelineScreen";
 import { useNewPipeline } from "./use-new-pipeline";
+
+import { renderWithIntl as render } from "@/test/render-with-intl";
 
 const mocks = vi.hoisted(() => ({ push: vi.fn(), success: vi.fn(), warning: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }));

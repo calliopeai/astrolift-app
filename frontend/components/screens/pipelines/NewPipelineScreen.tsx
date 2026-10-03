@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { PageShell } from "@/components/PageShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,27 +29,26 @@ export function NewPipelineScreen({
   error,
   createdId,
 }: NewPipelineScreenProps) {
+  const t = useTranslations("PipelineUI");
   return (
     <PageShell
-      title="New pipeline"
-      description="Create a pipeline in the active organization."
+      title={t("new.title")}
+      description={t("new.description")}
       actions={
         <Button variant="outline" asChild>
-          <Link href="/pipelines">Back to pipelines</Link>
+          <Link href="/pipelines">{t("new.back")}</Link>
         </Button>
       }
     >
       {createdId ? (
         <div role="status" className="space-y-3">
-          <p>Pipeline created.</p>
+          <p>{t("new.created")}</p>
           <Button asChild>
-            <Link href={`/pipelines/${encodeURIComponent(createdId)}`}>Open pipeline</Link>
+            <Link href={`/pipelines/${encodeURIComponent(createdId)}`}>{t("new.open")}</Link>
           </Button>
         </div>
       ) : !allowed ? (
-        <p role="status">
-          You need permission to update apps in this organization to create a pipeline.
-        </p>
+        <p role="status">{t("new.denied")}</p>
       ) : (
         <form
           className="max-w-2xl space-y-5"
@@ -59,14 +59,14 @@ export function NewPipelineScreen({
         >
           {(
             [
-              ["name", "Name", true],
-              ["repoUrl", "Repository URL", true],
-              ["defaultBranch", "Default branch", false],
-              ["tomlPath", "TOML path", false],
+              ["name", "name", true],
+              ["repoUrl", "repositoryUrl", true],
+              ["defaultBranch", "defaultBranch", false],
+              ["tomlPath", "tomlPath", false],
             ] as const
           ).map(([field, label, required]) => (
             <div key={field} className="space-y-2">
-              <Label htmlFor={`pipeline-${field}`}>{label}</Label>
+              <Label htmlFor={`pipeline-${field}`}>{t(label)}</Label>
               <Input
                 id={`pipeline-${field}`}
                 value={draft[field]}
@@ -75,14 +75,10 @@ export function NewPipelineScreen({
                 disabled={saving}
               />
               {field === "repoUrl" && (
-                <p className="text-muted-foreground text-sm">
-                  Use the repository’s HTTPS or SSH address.
-                </p>
+                <p className="text-muted-foreground text-sm">{t("new.repositoryHint")}</p>
               )}
               {field === "tomlPath" && (
-                <p className="text-muted-foreground text-sm">
-                  Leave blank to use the pipeline’s default configuration path.
-                </p>
+                <p className="text-muted-foreground text-sm">{t("new.pathHint")}</p>
               )}
             </div>
           ))}
@@ -92,7 +88,7 @@ export function NewPipelineScreen({
             </p>
           )}
           <Button type="submit" disabled={saving || !draft.name.trim() || !draft.repoUrl.trim()}>
-            {saving ? "Creating…" : "Create pipeline"}
+            {saving ? t("new.creating") : t("new.create")}
           </Button>
         </form>
       )}
