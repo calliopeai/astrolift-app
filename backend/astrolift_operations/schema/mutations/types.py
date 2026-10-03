@@ -254,13 +254,17 @@ class ExportAppLogsInput:
     Constance flag — out-of-bound exports return ``truncated=true``
     so the operator can narrow filters and retry.
 
-    Mobile-friendly: every field except ``app_slug`` + ``format`` is
-    optional, so a mobile client can fire a one-shot 'last hour, raw
-    text' export with two fields."""
+    ``app_slug``, ``format`` and ``pod_name`` are required by admission.
+    Preview sources additionally require all four exact identity/version fields."""
 
     app_slug: str
     format: str
     """``CSV`` | ``NDJSON`` | ``TXT``. Case-insensitive."""
+
+    preview_id: GUID | None = None
+    expected_environment_id: GUID | None = None
+    if_match_preview_version: int | None = None
+    if_match_environment_version: int | None = None
 
     environment_name: str | None = None
     """Scope to a single env's cluster. When null, the resolver picks

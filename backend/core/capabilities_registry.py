@@ -62,6 +62,8 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "workloads.environment_targets",
     "previews.exact_identity",
     "previews.reviewed_routes",
+    "previews.reviewed_live_logs",
+    "previews.reviewed_log_exports",
     "previews.explicit_runtime_cost",
     # Deploy pipeline (start/promote/rollback/teardown).
     "deploys.start",
