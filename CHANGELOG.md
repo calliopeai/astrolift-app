@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Settle final registered-agent dispatch exhaustion and platform timeouts through
+  the locked task/completion outbox after confirmed cleanup of original placement.
+  Preserve activity retries, original execution provenance, prior terminal results
+  and Temporal replay; uncertain cleanup remains durably pending (#2234).
+
 - Bind managed GitHub workflow creation and updates to the reviewed absence or
   blob SHA. Refuse concurrent edits, creation and deletion without advancing
   sync receipts; preserve independent edits on reconciliation PR branches.

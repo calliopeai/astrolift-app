@@ -90,4 +90,4 @@ class AgentTaskAdmin(_AllObjectsAdmin):
     )
     list_filter = ("status",)
     search_fields = ("external_id", "telemetry_key")
-    readonly_fields = ("guid", "created_at", "updated_at", "version")
+    readonly_fields = ("guid", "created_at", "updated_at", "version", "dispatch_execution")

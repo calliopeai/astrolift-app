@@ -171,6 +171,7 @@ from astrolift_workflows.activities import (
     verify_reachability,
     wait_dns,
 )
+from astrolift_workflows.activities.agent_dispatch_finalization import finalize_agent_dispatch
 from astrolift_workflows.activities.agent_stage import (
     cancel_agent_stage,
     dispatch_agent_task,
@@ -391,6 +392,7 @@ ACTIVITIES = (
     dispatch_agent_for_stage,
     dispatch_agent_loops,
     dispatch_agent_task,
+    finalize_agent_dispatch,
     dispatch_cron_deploys,
     dispatch_scale_ticks,
     drain_source_cluster,

@@ -233,10 +233,15 @@ def _create_agent_task_sync(params: dict[str, Any], *, task_guid: UUID | None = 
     return task.pk
 
 
-def _spawn_agent_task_sync(task_pk: int) -> dict[str, Any]:
+def _spawn_agent_task_sync(task_pk: int, execution: dict[str, Any] | None = None) -> dict[str, Any]:
     from astrolift_agents.services.task_target import task_control_lock
 
     with task_control_lock(task_pk):
+        if execution is not None:
+            from astrolift_agents.models import AgentTask
+            from astrolift_workflows.activities.agent_dispatch_finalization import bind_execution
+
+            bind_execution(AgentTask.all_objects.get(pk=task_pk), execution)
         return _spawn_agent_task_locked(task_pk)
 
 
@@ -391,14 +396,19 @@ def _placement_for_task(task):
     )
 
 
-def _poll_agent_task_sync(task_pk: int) -> dict[str, Any]:
+def _poll_agent_task_sync(task_pk: int, execution: dict[str, Any] | None = None) -> dict[str, Any]:
     from astrolift_agents.models import AgentTask
     from astrolift_agents.services.agent_enforcement import poll_enforcements
     from astrolift_agents.services.task_target import TaskControlBusy, task_control_lock
 
-    poll_enforcements(AgentTask.objects.select_related("model_gateway_connection").get(pk=task_pk))
     try:
         with task_control_lock(task_pk):
+            task = AgentTask.objects.select_related("model_gateway_connection").get(pk=task_pk)
+            if execution is not None:
+                from astrolift_workflows.activities.agent_dispatch_finalization import bind_execution
+
+                bind_execution(task, execution)
+            poll_enforcements(task)
             return _poll_agent_task_locked(task_pk)
     except TaskControlBusy:
         task = AgentTask.objects.get(pk=task_pk)
@@ -679,7 +689,9 @@ def _capture_cancel_signal(task, *, ok: bool, from_status: str) -> None:
         )
 
 
-def _cancel_agent_task_sync(task_guid: str, *, owner: dict | None = None) -> dict[str, Any]:
+def _cancel_agent_task_sync(
+    task_guid: str, *, owner: dict | None = None, execution: dict[str, Any] | None = None
+) -> dict[str, Any]:
     from astrolift_agents.models import AgentTask
     from astrolift_agents.services.task_target import TaskControlBusy, task_control_lock
 
@@ -688,6 +700,10 @@ def _cancel_agent_task_sync(task_guid: str, *, owner: dict | None = None) -> dic
         return {"ok": False, "status": "not_found", "error": "task not found"}
     try:
         with task_control_lock(task.pk):
+            if execution is not None:
+                from astrolift_workflows.activities.agent_dispatch_finalization import bind_execution
+
+                bind_execution(task, execution, finalizing=True)
             # Commit intent before the external delete. A crash or asynchronous
             # Kubernetes deletion must be recoverable by the next status poll.
             from django.db import transaction
@@ -709,12 +725,14 @@ def _cancel_agent_task_sync(task_guid: str, *, owner: dict | None = None) -> dic
                 if current.status not in _TERMINAL_STATUSES and not current.cancel_requested_at:
                     current.cancel_requested_at = timezone.now()
                     current.save(update_fields=["cancel_requested_at", "updated_at", "version"])
-            return _cancel_agent_task_locked(task_guid, owner=owner)
+            return _cancel_agent_task_locked(task_guid, owner=owner, safe_failure=execution is not None)
     except TaskControlBusy as exc:
         return {"ok": False, "status": task.status, "error": str(exc), "pending": True}
 
 
-def _cancel_agent_task_locked(task_guid: str, *, owner: dict | None = None) -> dict[str, Any]:
+def _cancel_agent_task_locked(
+    task_guid: str, *, owner: dict | None = None, safe_failure: bool = False
+) -> dict[str, Any]:
     """Stop the container and move the task to CANCELLED only on success.
 
     DRAFT / QUEUED / PROVISIONING / RUNNING tasks are cancellable; anything else
@@ -786,9 +804,15 @@ def _cancel_agent_task_locked(task_guid: str, *, owner: dict | None = None) -> d
                 log.warning(
                     "cancel_agent_stage: container stop failed for task %s",
                     task_guid,
-                    exc_info=True,
+                    exc_info=not safe_failure,
                 )
-                return {"ok": False, "status": task.status, "error": str(exc) or "container stop failed"}
+                return {
+                    "ok": False,
+                    "status": task.status,
+                    "error": "Agent dispatch cleanup is not yet confirmed."
+                    if safe_failure
+                    else (str(exc) or "container stop failed"),
+                }
 
         _capture_cancel_signal(task, ok=True, from_status=from_status)
         if task.status in cancellable:
@@ -907,24 +931,37 @@ async def dispatch_agent_task(task_pk: int) -> dict[str, Any]:
     workflow cancellation still stops the in-flight task.
     """
     from asgiref.sync import sync_to_async
+    from temporalio.exceptions import ApplicationError
 
+    from astrolift_workflows.activities.agent_dispatch_finalization import execution_for_activity
+
+    execution = None
     activity.heartbeat()
     try:
-        spawn = await sync_to_async(_spawn_agent_task_sync, thread_sensitive=False)(task_pk)
+        execution = await execution_for_activity(task_pk)
+        spawn = await sync_to_async(_spawn_agent_task_sync, thread_sensitive=False)(task_pk, execution)
 
         if spawn["ok"]:
             while True:
                 activity.heartbeat()
-                poll = await sync_to_async(_poll_agent_task_sync)(task_pk)
+                poll = await sync_to_async(_poll_agent_task_sync)(task_pk, execution)
                 if poll["terminal"]:
                     break
                 await asyncio.sleep(_POLL_INTERVAL_SECONDS)
     except asyncio.CancelledError:
         details = activity.cancellation_details()
-        if activity.is_worker_shutdown() and not (details is not None and details.cancel_requested):
+        # Timeouts/reset/worker replacement are dispatch-attempt boundaries,
+        # not operator cancellation. The workflow owns final exhaustion.
+        if not (details is not None and details.cancel_requested):
             raise
         outcome = await sync_to_async(_load_task_outcome_sync)(task_pk)
-        await sync_to_async(_cancel_agent_task_sync)(outcome["task_guid"])
+        if execution is not None:
+            await sync_to_async(_cancel_agent_task_sync)(outcome["task_guid"], execution=execution)
         raise
+    except Exception as exc:  # noqa: BLE001 — do not persist raw worker/provider exceptions
+        raise ApplicationError(
+            "Agent dispatch activity could not finish.",
+            non_retryable=isinstance(exc, ApplicationError) and exc.non_retryable,
+        ) from None
 
     return await sync_to_async(_load_task_outcome_sync)(task_pk)
