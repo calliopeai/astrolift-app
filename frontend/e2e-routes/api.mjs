@@ -191,6 +191,28 @@ function value(type, field, args, role) {
       architecture: "amd64",
       hardwareAdmission: "unknown",
     });
+  if (field === "modelHostingAction")
+    return object({
+      allowed: role === "owner" && args.organizationId === id,
+      reason: role === "owner" ? null : "Controlled hosting authority refusal.",
+    });
+  if (field === "huggingFaceConnectionsPage")
+    return object({ items: [], totalCount: 0, page: args.page, pageSize: args.pageSize });
+  if (field === "clusterModelSourceAccess") {
+    const accessible =
+      role === "owner" &&
+      args.organizationId === id &&
+      args.modelRepo === hubModel.repoId &&
+      args.revisionSha === hubModel.revisionSha &&
+      args.connectionId == null &&
+      args.expectedConnectionVersion == null;
+    return object({
+      accessible,
+      reason: accessible ? null : "Controlled pinned-source access refusal.",
+      observedAt,
+      model: accessible ? hubModel : null,
+    });
+  }
   if (field === "astroliftHuggingFaceModels")
     return object({
       state: "AVAILABLE",
