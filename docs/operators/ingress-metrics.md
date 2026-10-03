@@ -6,6 +6,10 @@ instrumentation endpoint when the ingress supplies metrics. Workload resource
 measurements and workload instrumentation remain separate from these environment
 totals.
 
+Idle histogram windows have no latency percentile. Astrolift excludes windows
+with zero observations, preserving real latency samples in the same range rather
+than turning undefined values into zero latency or rejecting the whole chart.
+
 ## Existing nginx ingress
 
 Enable metrics on the existing ingress controller's HelmRelease or Helm values:
@@ -95,6 +99,12 @@ Astrolift can also query CloudWatch when Prometheus is missing or a request sign
 has no samples. Existing Prometheus measurements are preserved. AWS credentials
 must allow load-balancer discovery and CloudWatch metric reads. Percentiles use
 `MetricDataQueries[].MetricStat.Stat`, including `p90`.
+
+Direct fallback requires one namespace-owned ALB. Shared, unowned, unresolved or
+multiple ALBs are refused; separate load-balancer percentiles cannot be combined
+into an environment percentile. Failed, partial, paginated or malformed
+CloudWatch responses remain provider errors. A complete empty 5xx series can
+represent zero errors only alongside measured request counts.
 
 The CloudWatch fallback is disabled for a shared Envoy edge, whose load balancer
 serves multiple apps. An absent collector stays unconfigured; empty windows and

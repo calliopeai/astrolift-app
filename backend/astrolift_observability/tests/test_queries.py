@@ -118,6 +118,36 @@ def _tenant(org):
     return tenant_context(TenantContext(organization_id=org.id))
 
 
+@pytest.mark.parametrize("invalid_binding", ["deleted", "inactive", "foreign"])
+def test_status_breakdown_refuses_invalid_cluster_before_provider_reads(permission_resolver, invalid_binding):
+    from django.utils import timezone
+
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    cluster = AppEnvironment.objects.get(registered_app=app).tenant_cluster
+    cluster.ingress_class = "envoy"
+    if invalid_binding == "deleted":
+        cluster.deleted_at = timezone.now()
+    elif invalid_binding == "inactive":
+        cluster.is_active = False
+    else:
+        cluster.organization = Organization.objects.create(name="Other", slug="other-obs")
+    cluster.save()
+    permission_resolver.grant(Permission.APP_READ)
+    with (
+        patch("core.cluster_management._driver_for_cluster") as driver,
+        patch.object(prom_client, "query_range_series") as query,
+        _tenant(org),
+    ):
+        assert prom_client.resolve_edge_metrics(app=app, environment_name="prod") is None
+        result = GoldenSignalsQuery().astrolift_app_status_code_breakdown(
+            _info(), app_slug=app.slug, environment_name="prod"
+        )
+    assert result.reason == ObservabilityPanelReason.NOT_CONFIGURED
+    assert result.series == []
+    driver.assert_not_called()
+    query.assert_not_called()
+
+
 # ----------------------------------------------------------------------
 # astroliftAppGoldenSignals
 # ----------------------------------------------------------------------
@@ -241,7 +271,7 @@ def test_signal_promql_disclosure_includes_app_label(permission_resolver):
     """The dev-mode disclosure text must scope every signal to the app so
     an operator can copy-paste the query into Grafana. Since #1224 the
     request-path signals are edge-sourced (cluster ingress_class is
-    ``nginx`` by default) and scope by ``exported_namespace="<ns>"``; the
+    ``nginx`` by default) and scope by ``namespace="<ns>``; the
     saturation pair reads cAdvisor / kube-state-metrics series and scopes
     by ``namespace="<ns>"``. Nothing scopes by app-instrumentation labels
     on a mapped variant."""
@@ -260,7 +290,7 @@ def test_signal_promql_disclosure_includes_app_label(permission_resolver):
             assert f'namespace="{ns}"' in row.promql, row.promql
             assert f'app="{app.slug}"' not in row.promql, row.promql
         else:
-            assert f'exported_namespace="{ns}"' in row.promql, row.promql
+            assert f'namespace="{ns}"' in row.promql, row.promql
             assert "http_requests_total" not in row.promql, row.promql
 
 

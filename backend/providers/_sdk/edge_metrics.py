@@ -114,16 +114,13 @@ def envoy_metrics_for_routes(routes: list[dict[str, Any]], namespace: str) -> Ed
     )
 
 
-# ingress-nginx controller metrics. The controller stamps the ingress
-# resource's namespace on every series; scraped through the
-# kube-prometheus-stack ServiceMonitor (honor_labels=false) the target's
-# own ``namespace`` (the controller's) wins the label and the metric's
-# moves to ``exported_namespace`` — which is therefore the app join key.
+# The nginx ServiceMonitor preserves the ingress resource's namespace with
+# honorLabels=true, so shared controller metadata cannot replace the app key.
 NGINX_INGRESS = EdgeMetricsMapping(
     variant="nginx_ingress",
     requests_total="nginx_ingress_controller_requests",
     duration_bucket="nginx_ingress_controller_request_duration_seconds_bucket",
-    namespace_label="exported_namespace",
+    namespace_label="namespace",
     status_label="status",
 )
 

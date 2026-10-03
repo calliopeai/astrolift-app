@@ -352,6 +352,12 @@ def build_latency_quantile_query(
             )
             if edge.latency_divisor != 1:
                 expr += f" / {edge.latency_divisor}"
+            # An idle histogram has no quantile (Prometheus returns NaN).
+            # Omit only windows with no observations, so strict transport
+            # validation can still reject malformed readings and preserve
+            # valid measurements elsewhere in the selected range.
+            count_match = match[:-1] + ',le="+Inf"}'
+            expr = f"({expr}) and on() (sum(rate({edge.duration_bucket}{count_match}[{rate_window}])) > 0)"
             return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
     labels = _build_labels(
         app_slug=app_slug,

@@ -35,7 +35,9 @@ def test_exact_routes_exclude_siblings_and_convert_envoy_milliseconds():
     assert "or vector(0)" in errors
     latency = prom_queries.build_latency_quantile_query(**kwargs, quantile=0.95).promql
     assert "envoy_cluster_upstream_rq_time_bucket" in latency
-    assert latency.endswith(" / 1000")
+    assert " / 1000) and on()" in latency
+    assert 'le="+Inf"' in latency
+    assert latency.endswith(" > 0)")
     breakdown = prom_queries.build_status_code_breakdown_query(**kwargs)
     assert breakdown.group_label == "envoy_response_code"
     assert "sum by (envoy_response_code)" in breakdown.promql

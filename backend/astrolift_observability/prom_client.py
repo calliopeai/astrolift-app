@@ -81,6 +81,7 @@ def resolve_prometheus_endpoint(
     cluster-local.
     """
     from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_lifecycle.visibility import cluster_owned_and_live
 
     qs = AppEnvironment.objects.filter(
         registered_app=app,
@@ -89,7 +90,7 @@ def resolve_prometheus_endpoint(
     if environment_name:
         qs = qs.filter(name=environment_name)
     env = qs.order_by("name").first()
-    if env is None or env.tenant_cluster_id is None:
+    if env is None or not cluster_owned_and_live(env.tenant_cluster, app.organization_id):
         return None
     # Check provider_config first (operator-set), then fall back to
     # capabilities (probe-discovered, e.g. set via bringClusterIntoManagement).
@@ -173,6 +174,7 @@ def resolve_edge_metrics(
     as a parity gap rather than silently wrong data.
     """
     from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_lifecycle.visibility import cluster_owned_and_live
 
     qs = AppEnvironment.objects.filter(
         registered_app=app,
@@ -181,7 +183,7 @@ def resolve_edge_metrics(
     if environment_name:
         qs = qs.filter(name=environment_name)
     env = qs.order_by("name").first()
-    if env is None or env.tenant_cluster is None:
+    if env is None or not cluster_owned_and_live(env.tenant_cluster, app.organization_id):
         return None
     from core.cluster_observability import namespace_for_environment
 
