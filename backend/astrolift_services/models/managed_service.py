@@ -110,6 +110,14 @@ class ManagedService(BaseCoreModel):
     model_ready_provider_guid = models.UUIDField(null=True, blank=True)
     model_operation_cluster_guid = models.UUIDField(null=True, blank=True)
     model_operation_provider_guid = models.UUIDField(null=True, blank=True)
+    model_hf_connection = models.ForeignKey(
+        "astrolift_services.HuggingFaceConnection",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="model_deployments",
+    )
+    model_hf_connection_version = models.PositiveBigIntegerField(null=True, blank=True)
     kind = models.CharField(max_length=32, choices=Kind.choices)
     name = models.CharField(max_length=128, blank=True, default="")
     variant = models.CharField(max_length=64, blank=True, default="")

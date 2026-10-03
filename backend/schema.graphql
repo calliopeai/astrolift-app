@@ -6738,6 +6738,12 @@ input ConnectExistingGithubAppInput {
   orgLogin: String = null
 }
 
+input ConnectHuggingFaceInput {
+  organizationId: GUID!
+  name: String!
+  token: String!
+}
+
 input ConnectSourceInput {
   kind: String!
   displayName: String = null
@@ -7113,6 +7119,12 @@ input DetachSecretBundleInput {
   attachmentId: GUID!
 }
 
+input DisconnectHuggingFaceInput {
+  organizationId: GUID!
+  connectionId: GUID!
+  expectedVersion: Int!
+}
+
 input DisconnectSourceInput {
   id: GUID!
 }
@@ -7387,6 +7399,37 @@ input GroupOperationInput {
   operation: String!
 }
 
+type HuggingFaceConnectionType {
+  id: GUID!
+  version: Int!
+  name: String!
+  accountUsername: String!
+  verifiedAt: DateTime!
+}
+
+type HuggingFaceConnectionTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: HuggingFaceConnectionType
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type HuggingFaceConnectionTypePage {
+  items: [HuggingFaceConnectionType!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
 type HuggingFaceModel {
   repoId: String!
   revisionSha: String
@@ -7646,6 +7689,11 @@ type ModelGpuCapacity {
   devices: Int!
 }
 
+type ModelHostingAction {
+  allowed: Boolean!
+  reason: String
+}
+
 type ModelMetricObservation {
   key: String!
   unit: String!
@@ -7723,6 +7771,13 @@ type ModelRuntimeAdmission {
   runtimeVersion: String
   architecture: String
   hardwareAdmission: String!
+}
+
+type ModelSourceAccess {
+  accessible: Boolean!
+  reason: String
+  model: HuggingFaceModel
+  observedAt: DateTime!
 }
 
 type ModelSubscription {
@@ -8141,6 +8196,8 @@ type Mutation {
   revokeModelSubscription(input: RevokeModelSubscriptionInput!): ModelSubscriptionOperationMutationResult!
   updateClusterModel(input: UpdateClusterModelInput!): ClusterModelDeploymentMutationResult!
   deprovisionClusterModel(input: DeprovisionClusterModelInput!): ClusterModelDeploymentMutationResult!
+  disconnectHuggingFace(input: DisconnectHuggingFaceInput!): HuggingFaceConnectionTypeMutationResult!
+  connectHuggingFace(input: ConnectHuggingFaceInput!): HuggingFaceConnectionTypeMutationResult!
   setAppSecret(input: SetAppSecretInput!): AppsecretwritepayloadMutationResult!
   rotateAppSecret(input: RotateAppSecretInput!): AppsecretwritepayloadMutationResult!
   deleteAppSecret(input: DeleteAppSecretInput!): AppsecretwritepayloadMutationResult!
@@ -8610,6 +8667,8 @@ input ProvisionClusterModelInput {
   gpuCount: Int!
   allowSubscriptions: Boolean!
   cpuKvCacheGiB: Int = null
+  connectionId: GUID = null
+  expectedConnectionVersion: Int = null
 }
 
 type ProvisionManagedDomainPayload {
@@ -8908,6 +8967,9 @@ type Query {
   clusterModelRuntimeAdmission(input: ProvisionClusterModelInput!): ModelRuntimeAdmission!
   clusterModelSubscriptionTargetsPage(organizationId: GUID!, modelDeploymentId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionTargetPage!
   clusterModelSubscriptionsPage(organizationId: GUID!, modelDeploymentId: GUID!, appEnvironmentId: GUID = null, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionPage!
+  modelHostingAction(organizationId: GUID!): ModelHostingAction!
+  huggingFaceConnectionsPage(organizationId: GUID!, page: Int! = 1, pageSize: Int! = 25): HuggingFaceConnectionTypePage!
+  clusterModelSourceAccess(organizationId: GUID!, modelRepo: String!, revisionSha: String!, connectionId: GUID = null, expectedConnectionVersion: Int = null): ModelSourceAccess!
   astroliftProjectManagedServiceAttachmentOwner(projectId: GUID!, attachmentId: GUID!): AstroliftManagedServiceContext
   astroliftProjectManagedServicesPage(projectId: GUID!, search: String = null, name: String = null, kinds: [String!] = null, statuses: [String!] = null, environmentName: String = null, clusterId: GUID = null, limit: Int! = 50, after: String = null): AstroliftManagedServiceContextPage!
   astroliftProjectManagedService(projectId: GUID!, id: GUID!, expectedContextRevision: String = null): AstroliftManagedServiceContext
