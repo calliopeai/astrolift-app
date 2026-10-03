@@ -20,7 +20,8 @@ import { hfCatalogueList, hfCatalogueVariables } from "./hf-catalogue-list";
 import type { HuggingFaceCataloguePanelProps } from "./HuggingFaceCataloguePanel";
 
 export function useHfCatalogue(
-  onPinned: HuggingFaceCataloguePanelProps["onUseRevision"]
+  onPinned: HuggingFaceCataloguePanelProps["onUseRevision"],
+  hostingAllowed: boolean | null = null
 ): HuggingFaceCataloguePanelProps {
   const t = useTranslations("models.shared.catalogue");
   const { org, loading: orgLoading, error: orgError } = useActiveOrg();
@@ -88,6 +89,7 @@ export function useHfCatalogue(
       ? detailResult.model
       : null;
   return {
+    hostingAllowed,
     page: {
       list,
       rows: page?.items ?? [],
@@ -135,6 +137,7 @@ export function useHfCatalogue(
     },
     onUseRevision: (model) => {
       if (
+        hostingAllowed === true &&
         resolvedModel?.repoId === model.repoId &&
         resolvedModel.revisionSha === model.revisionSha &&
         /^[a-f0-9]{40}$/i.test(model.revisionSha)

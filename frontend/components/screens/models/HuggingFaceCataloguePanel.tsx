@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useEffect, useId, useRef } from "react";
 import { useFormatter, useTranslations } from "next-intl";
 import { SearchIcon } from "lucide-react";
 import { ListPage } from "@/components/list/ListPage";
@@ -12,6 +12,7 @@ import type { ModelPage } from "./ModelSubscriptionsPanel";
 
 export interface HuggingFaceCataloguePanelProps {
   page: ModelPage<HuggingFaceModel>;
+  hostingAllowed: boolean | null;
   state: CatalogueState | null;
   source: string | null;
   observedAt: string | null;
@@ -49,8 +50,20 @@ export function HuggingFaceCataloguePanel(props: HuggingFaceCataloguePanelProps)
     onUseRevision,
   } = props;
   const t = useTranslations("models.shared.catalogue");
+  const hosting = useTranslations("models.shared.hosting");
   const fmt = useFormatter();
   const id = useId();
+  const selection = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selectedRepoId) {
+      selection.current?.scrollIntoView?.({
+        block: "start",
+        behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+      });
+    }
+  }, [selectedRepoId]);
   const revisionSha = resolvedModel?.revisionSha;
   const pinned =
     !resolving &&
@@ -86,9 +99,29 @@ export function HuggingFaceCataloguePanel(props: HuggingFaceCataloguePanelProps)
           {t("title")}
         </h2>
         <p className="text-muted-foreground text-sm">{t("description")}</p>
-        <p className="text-info-fg bg-info-bg border-info-border rounded-md border p-3 text-sm">
-          {t("compatibilityUnknown")}. {t("accessNotice")}
-        </p>
+        <details className="text-sm">
+          <summary className="text-muted-foreground cursor-pointer">
+            {hosting("reviewStep")}
+          </summary>
+          <dl className="mt-3 grid gap-3 text-sm @lg:grid-cols-2">
+            <div>
+              <dt className="font-medium">{hosting("accessTitle")}</dt>
+              <dd>{hosting("accessUnknown")}</dd>
+            </div>
+            <div>
+              <dt className="font-medium">{hosting("licenseTitle")}</dt>
+              <dd>{hosting("licenseHelp")}</dd>
+            </div>
+            <div>
+              <dt className="font-medium">{hosting("runtimeTitle")}</dt>
+              <dd>{hosting("runtimePending")}</dd>
+            </div>
+            <div>
+              <dt className="font-medium">{hosting("hardwareTitle")}</dt>
+              <dd>{hosting("hardwareHelp")}</dd>
+            </div>
+          </dl>
+        </details>
       </div>
       {source && (
         <p className="text-muted-foreground text-xs break-all">
@@ -100,6 +133,11 @@ export function HuggingFaceCataloguePanel(props: HuggingFaceCataloguePanelProps)
       )}
       {state === "RATE_LIMITED" && retryAfterSeconds !== null && (
         <p role="status">{t("retryAfter", { seconds: retryAfterSeconds })}</p>
+      )}
+      {props.hostingAllowed !== true && (
+        <p role="status">
+          {hosting(props.hostingAllowed === null ? "adminChecking" : "adminRequired")}
+        </p>
       )}
       <ListPage
         embedded
@@ -114,6 +152,20 @@ export function HuggingFaceCataloguePanel(props: HuggingFaceCataloguePanelProps)
         getRowId={(model) => model.repoId}
         empty={{ icon: <SearchIcon />, title: t("empty"), description: t("emptyDescription") }}
         columns={[
+          {
+            id: "host",
+            header: hosting("host"),
+            cell: (model) => (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!available || props.hostingAllowed !== true}
+                onClick={() => onSelect(model.repoId)}
+              >
+                {hosting("host")}
+              </Button>
+            ),
+          },
           {
             id: "repoId",
             header: t("repository"),
@@ -164,7 +216,7 @@ export function HuggingFaceCataloguePanel(props: HuggingFaceCataloguePanelProps)
         ]}
       />
       {selectedRepoId && (
-        <div className="bg-surface-1 space-y-3 rounded-md border p-4">
+        <div ref={selection} className="bg-surface-1 scroll-mt-6 space-y-3 rounded-md border p-4">
           <h3 className="font-medium break-all">{selectedRepoId}</h3>
           <Label htmlFor={`${id}-revision`}>{t("revision")}</Label>
           <Input
@@ -198,12 +250,12 @@ export function HuggingFaceCataloguePanel(props: HuggingFaceCataloguePanelProps)
           )}
           <Button
             type="button"
-            disabled={!pinned}
+            disabled={!pinned || props.hostingAllowed !== true}
             onClick={() => {
-              if (pinned) onUseRevision(pinned);
+              if (pinned && props.hostingAllowed === true) onUseRevision(pinned);
             }}
           >
-            {t("useRevision")}
+            {hosting("continue")}
           </Button>
         </div>
       )}

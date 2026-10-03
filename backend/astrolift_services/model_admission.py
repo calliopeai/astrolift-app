@@ -48,12 +48,10 @@ def shared_cluster_operation(field="input.cluster_id"):
     return load
 
 
-def request_config(input):
+def request_config(input, *, lock_source=False):
     from k8s_native.managed.model_endpoint_vllm import VLLMConfig, VLLMDriver
 
     cfg = {
-        "model": input.model_repo,
-        "model_revision": input.revision_sha,
         "compute_mode": input.compute_mode,
         "frontend": "python",
         "gpu": input.gpu_count,
@@ -64,6 +62,25 @@ def request_config(input):
         "dtype": "bfloat16" if input.compute_mode == "cpu" else "auto",
         "allow_subscriptions": input.allow_subscriptions,
     }
+    if input.local_artifact_id is not None:
+        if (
+            input.model_repo is not None
+            or input.revision_sha is not None
+            or input.connection_id is not None
+            or input.expected_connection_version is not None
+        ):
+            raise ValueError("Select either an immutable local artifact or a Hugging Face source, not both.")
+        from astrolift_services.local_model_artifacts import validate_artifact_request
+
+        cfg.update(
+            validate_artifact_request(
+                current_org_id(), input.local_artifact_id, input.expected_artifact_version, locked=lock_source
+            )
+        )
+    else:
+        if input.expected_artifact_version is not None:
+            raise ValueError("Select a current verified local model artifact.")
+        cfg.update(model=input.model_repo, model_revision=input.revision_sha)
     if input.cpu_kv_cache_gi_b is not None:
         cfg["cpu_kv_cache_gib"] = input.cpu_kv_cache_gi_b
     if (
@@ -75,10 +92,10 @@ def request_config(input):
     return VLLMDriver(config=VLLMConfig())._normalize(cfg)
 
 
-def validate_cluster_request(input, cluster):
+def validate_cluster_request(input, cluster, *, lock_source=False):
     from k8s_native.managed.shared_model_runtime import shared_runtime
 
-    config = request_config(input)
+    config = request_config(input, lock_source=lock_source)
     provider_config = cluster.provider_config if isinstance(cluster.provider_config, dict) else {}
     runtime = shared_runtime(provider_config.get("vllm_shared_runtimes", {}), config, "python")
     return config, runtime

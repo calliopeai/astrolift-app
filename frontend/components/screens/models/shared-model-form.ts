@@ -24,25 +24,38 @@ export type SharedModelDraft = {
   cpuKvCacheGiB: string;
   allowSubscriptions: boolean;
 };
+export type SharedModelSource =
+  | { repoId: string; revisionSha: string }
+  | {
+      localArtifactId: string;
+      expectedArtifactVersion: number;
+      name: string;
+      manifestSha256: string;
+    };
 export type SharedModelRequest = {
   organizationId: string;
   clusterId: string;
   expectedProviderId: string;
   name: string;
-  modelRepo: string;
-  revisionSha: string;
+  modelRepo: string | null;
+  revisionSha: string | null;
+  localArtifactId: string | null;
+  expectedArtifactVersion: number | null;
   computeMode: "cpu" | "gpu";
   cpuRequest: string;
   memoryRequest: string;
   gpuCount: number;
   cpuKvCacheGiB: number | null;
   allowSubscriptions: boolean;
+  connectionId: string | null;
+  expectedConnectionVersion: number | null;
 };
 export function sharedModelRequest(
   organizationId: string,
   cluster: { id: string; providerId: string } | null,
-  model: { repoId: string; revisionSha: string } | null,
-  draft: SharedModelDraft
+  model: SharedModelSource | null,
+  draft: SharedModelDraft,
+  connection: { connectionId: string; expectedConnectionVersion: number } | null = null
 ): SharedModelRequest | null {
   const parsed = sharedModelDraftSchema.safeParse(draft);
   if (
@@ -50,7 +63,13 @@ export function sharedModelRequest(
     !cluster?.id ||
     !cluster.providerId ||
     !model ||
-    !/^[a-f0-9]{40}$/i.test(model.revisionSha) ||
+    ("repoId" in model
+      ? !model.repoId || !/^[a-f0-9]{40}$/i.test(model.revisionSha)
+      : !model.localArtifactId ||
+        !Number.isSafeInteger(model.expectedArtifactVersion) ||
+        model.expectedArtifactVersion < 1 ||
+        !/^[a-f0-9]{64}$/.test(model.manifestSha256) ||
+        connection !== null) ||
     !parsed.success
   )
     return null;
@@ -68,13 +87,16 @@ export function sharedModelRequest(
     clusterId: cluster.id,
     expectedProviderId: cluster.providerId,
     name: value.name,
-    modelRepo: model.repoId,
-    revisionSha: model.revisionSha,
+    modelRepo: "repoId" in model ? model.repoId : null,
+    revisionSha: "repoId" in model ? model.revisionSha : null,
+    localArtifactId: "localArtifactId" in model ? model.localArtifactId : null,
+    expectedArtifactVersion: "localArtifactId" in model ? model.expectedArtifactVersion : null,
     computeMode: value.computeMode,
     cpuRequest: value.cpuRequest,
     memoryRequest: value.memoryRequest,
     gpuCount,
     cpuKvCacheGiB: value.computeMode === "cpu" ? cpuKvCacheGiB : null,
     allowSubscriptions: value.allowSubscriptions,
+    ...(connection ?? { connectionId: null, expectedConnectionVersion: null }),
   };
 }

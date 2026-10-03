@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
+from _sdk.local_model_artifact import local_source_identity
+
 SUPPORTED_VERSION = "0.15.1"
 AUTH_REVISION = "astrolift.io/model-auth-revision"
 RUNTIME_PATH = "/opt/astrolift/shared-model"
@@ -95,9 +97,14 @@ def shared_runtime(runtimes: dict[str, Any], cfg: dict[str, Any], frontend: str)
             raise ValueError("CPU runtime requires bounded explicit KV-cache space in GiB.")
         if memory_bytes <= cache * 1024**3:
             raise ValueError("CPU memory request must exceed its KV-cache space; model-fit remains unverified.")
-    revision = cfg.get("model_revision")
-    if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
-        raise ValueError("Shared models require an immutable 40-hex model revision.")
+    if cfg.get("model_source") == "local_artifact":
+        local_source_identity(cfg)
+        if "@sha256:" not in image:
+            raise ValueError("Local model delivery requires a digest-pinned certified runtime.")
+    else:
+        revision = cfg.get("model_revision")
+        if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
+            raise ValueError("Shared models require an immutable 40-hex model revision.")
     return SharedRuntime(image, mode, arch, {**selectors, "kubernetes.io/arch": arch}, package_version)
 
 

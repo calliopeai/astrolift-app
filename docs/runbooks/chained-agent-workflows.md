@@ -464,9 +464,10 @@ pattern and separator. The native engine then actually executes each Parser body
 import does not merely flatten the source feedback cycle into a stage list.
 
 Custom component code, state, routers, nested Loop graphs, Stringify mode,
-unresolved variables and other source body component types remain unsupported
-and are rejected explicitly. Broader Langflow agent/workflow source translation
-is not certified by the native agent/workflow body support. The Langflow runtime
+unresolved variables and unbound source body components remain unsupported
+and are rejected explicitly. The constrained native-body binding path below
+maps source ports and scheduling. Broader Langflow agent/workflow behavior
+is not certified by native agent/workflow body support. The Langflow runtime
 itself is not invoked by these import tests. Conditional-router message outputs
 and branch-exclusion state remain outside this supported mapping.
 
@@ -476,3 +477,84 @@ gate delivery through the actual GraphQL mutation, worker restart, malformed
 input refusal before dispatch, and exact agent preparation with bounded
 unavailable-target failures. Successful container-backed agent execution needs a
 reachable cluster and is not established by an unavailable-target proof.
+
+## Explicit native bindings for imported loop bodies
+
+A supported source loop may contain a linear sequence of Parser, Run Flow and
+stateless Agent bodies. The source item and feedback handles determine that
+sequence. Import never invents a branch order or drops an unbound body node.
+CreateList remains an ordered literal text source, the collection cap is explicit,
+and each complete body finishes before the next item starts.
+
+Run Flow uses a canonical source `flow_id_selected` and explicit
+`component~input_value` and `component~output` handles. Shared sessions, cached
+source graph state and runtime tool tweaks are refused. Agent bodies require
+`n_messages = 0`, no context ID or inline API key, and the `response` output.
+External model/tool dependencies, shared memory and structured-response source
+variants are unsupported by this path. Configure credentials on the native agent.
+
+Attach `astrolift_bindings` to the exported source JSON, keyed by its exact body
+node ID. Each binding names a native GUID, its native text input key, the dotted
+path to its native result, and `message` or `data` output mode. The source node
+digest must match the complete exported node. For example, after reviewing a
+Run Flow node and a native child that accepts `input_value` and returns `text`:
+
+```python
+import hashlib
+import json
+from pathlib import Path
+
+source = json.loads(Path("source-flow.json").read_text())
+node_id = "RunFlow-reviewed"
+node = next(node for node in source["data"]["nodes"] if node["id"] == node_id)
+source["astrolift_bindings"] = {
+    node_id: {
+        "target_guid": "<reviewed-native-definition-guid>",
+        "source_node_digest": hashlib.sha256(
+            json.dumps(node, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+        ).hexdigest(),
+        "input_key": "input_value",
+        "output_path": "text",
+        "output_mode": "message",
+    }
+}
+Path("bound-source-flow.json").write_text(json.dumps(source, indent=2) + "\n")
+```
+
+Supply the result to `importWorkflowFlow(format: "langflow", payload: ..., preview:
+true)` first. Inspect the mapped stages and warning; `preview: false` creates a
+disabled organization-owned definition. Enable and start it only after reviewing
+the native implementation and the current definition revision. Dispatch checks
+the target GUID, visibility, permissions and configured credential ceiling.
+TOML and YAML export/re-import preserve the source port contract in `iteration`.
+A configured binding that substitutes a different native GUID is refused.
+
+Native bodies receive the projected text under the declared input key; workflow
+context still records the original previous source record. Their previous record
+must contain an explicit `text` string within the 65,536-byte bound; an explicitly
+empty string is valid, but a missing field is unavailable and does not dispatch
+the native target. A `data` output feeding another native text body must also
+supply this field. A `message` projection
+requires a string at the selected native output path and supplies its execution
+timestamp. A `data` projection requires a bounded finite JSON record. A missing
+or malformed output fails the source body and collection without starting later
+items. The native child keeps its actual completion state. Responses and inputs
+are not inferred from missing data or another target with the same slug.
+
+The source endpoint must record the selected output first and declare its type.
+This matches the pinned
+[Loop output extractor](https://github.com/langflow-ai/langflow/blob/f9b283243d2fdd8502cb4ffd606c3058cff5017e/src/lfx/src/lfx/base/flow_controls/loop_utils.py#L123),
+which aggregates the first end-vertex output. Ambiguous output ordering is refused.
+The pinned
+[Run Flow port resolver](https://github.com/langflow-ai/langflow/blob/f9b283243d2fdd8502cb4ffd606c3058cff5017e/src/lfx/src/lfx/base/tools/run_flow.py#L374)
+resolves a specific child component and port; the imported contract preserves
+those identities rather than treating a flow name as an output.
+
+Import reports `explicit_native_body_binding` as a warning. The operator chooses
+and reviews the native implementation of the source body. This preserves source
+ports and serial scheduling; it does not automatically port a model, tool stack,
+instructions, provider defaults or framework internals. The native proof executes
+an imported Run Flow body and a following Parser through real PostgreSQL and
+Temporal, with authoring round-trip, ordered results, invalid-output refusal and
+family replay. It does not execute Langflow itself or establish successful
+container-backed Agent runtime parity.

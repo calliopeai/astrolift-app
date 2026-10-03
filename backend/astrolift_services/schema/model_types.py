@@ -59,6 +59,10 @@ class ClusterModelDeploymentType:
     operation_completed_at: datetime | None
     desired_resources: ModelResourcesType
     applied_resources: ModelResourcesType | None
+    source_kind: str = "unknown"
+    local_artifact_id: GUID | None = None
+    local_artifact_version: int | None = None
+    local_manifest_sha256: str | None = None
 
 
 def cluster_model_to_type(service):
@@ -85,6 +89,18 @@ def cluster_model_to_type(service):
     except (TypeError, ValueError):
         runtime_supported = False
         runtime_reason = "Supported shared model runtime admission is unavailable for the stored request."
+    source_kind, artifact_id, artifact_version, manifest_sha256 = "unknown", None, None, None
+    if config.get("model_source") == "local_artifact":
+        from _sdk.local_model_artifact import local_source_identity
+
+        try:
+            source_id, artifact_version, manifest_sha256 = local_source_identity(config)
+            artifact_id = GUID(source_id)
+            source_kind = "local_artifact"
+        except ValueError:
+            artifact_id, artifact_version, manifest_sha256 = None, None, None
+    elif not config.get("model_source") and isinstance(config.get("model"), str):
+        source_kind = "huggingface"
     revision = config.get("model_revision")
     revision = revision if isinstance(revision, str) and re.fullmatch(r"[0-9a-f]{40}", revision) else None
     ready = (
@@ -115,6 +131,10 @@ def cluster_model_to_type(service):
         cluster_name=cluster.name,
         model_repo=str(config.get("model") or ""),
         revision_sha=revision,
+        source_kind=source_kind,
+        local_artifact_id=artifact_id,
+        local_artifact_version=artifact_version,
+        local_manifest_sha256=manifest_sha256,
         compute_mode=config.get("compute_mode") if config.get("compute_mode") in ("cpu", "gpu") else None,
         subscriptions_enabled=config.get("allow_subscriptions") is True,
         runtime_supported=runtime_supported,

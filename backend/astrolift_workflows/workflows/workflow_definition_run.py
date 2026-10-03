@@ -91,6 +91,12 @@ with workflow.unsafe.imports_passed_through():
         format_record,
         validate_iteration,
     )
+    from workflows.source_ports import (
+        SOURCE_FORMAT,
+        SourcePortContractError,
+        imported_input,
+        imported_output,
+    )
 
 # Stage / failure-policy literals — mirror workflows.models without
 # importing Django into the sandbox.
@@ -235,12 +241,14 @@ def build_stage_dispatch_input(
     previous_output: Any,
     named_outputs: dict[str, Any],
     stage: dict,
+    *,
+    source_previous: dict | None = None,
 ) -> dict:
     """Preserve the prior flat payload while adding explicit chain context."""
     payload = dict(previous_output) if isinstance(previous_output, dict) else {"value": previous_output}
     payload["_astrolift_workflow"] = {
         "input": workflow_input,
-        "previous": previous_output,
+        "previous": source_previous if source_previous is not None else previous_output,
         "outputs": named_outputs,
         "stage": {
             "order": stage["order"],
@@ -531,6 +539,16 @@ class WorkflowDefinitionRunWorkflow:
     async def _execute_loop_plan(self, input: WorkflowDefinitionRunInput, plan: dict) -> dict:
         stages = plan["stages"]
         pattern = plan["pattern_kind"]
+        if any(
+            isinstance(stage.get("iteration"), dict)
+            and stage["iteration"].get("source_format") == SOURCE_FORMAT
+            for stage in stages
+        ):
+            if not workflow.patched("langflow-native-source-ports-v1"):
+                raise _WorkflowAbort(
+                    "iteration is valid only for collection and format_record stages",
+                    data={"status": "unavailable"},
+                )
         if pattern not in SUPPORTED_EXECUTOR_PATTERNS:
             raise _WorkflowAbort(
                 "this workflow pattern has no supported executor",
@@ -606,6 +624,10 @@ class WorkflowDefinitionRunWorkflow:
             output = None
             metadata: dict = {}
             try:
+                native_previous = previous_output
+                ports = stage.get("iteration") if kind in (KIND_AGENT_DISPATCH, KIND_WORKFLOW) else None
+                if ports:
+                    native_previous = imported_input(ports, previous_output)
                 explicit_fanout = stage.get("fan_out_dynamic") or (stage.get("fan_out_count") or 0) > 0
                 if (
                     kind == KIND_AGENT_DISPATCH
@@ -627,9 +649,10 @@ class WorkflowDefinitionRunWorkflow:
                         stage,
                         build_stage_dispatch_input(
                             workflow_input,
-                            previous_output,
+                            native_previous,
                             named_outputs,
                             stage,
+                            source_previous=previous_output if ports else None,
                         ),
                     )
                     output = result.get("result")
@@ -640,9 +663,10 @@ class WorkflowDefinitionRunWorkflow:
                         stage,
                         build_stage_dispatch_input(
                             workflow_input,
-                            previous_output,
+                            native_previous,
                             named_outputs,
                             stage,
+                            source_previous=previous_output if ports else None,
                         ),
                         plan["definition_id"],
                     )
@@ -714,6 +738,15 @@ class WorkflowDefinitionRunWorkflow:
                     )
                 else:
                     raise _WorkflowAbort("unknown stage kind", data={"status": "unavailable"})
+            except SourcePortContractError as exc:
+                if self._current_stage_execution_id:
+                    await workflow.execute_activity(
+                        update_stage_execution,
+                        args=[self._current_stage_execution_id, STATUS_FAILED, None, str(exc)],
+                        start_to_close_timeout=_DB_TIMEOUT,
+                        retry_policy=_DB_RETRY,
+                    )
+                raise _WorkflowAbort(str(exc), data={"status": "unavailable"}) from exc
             except _WorkflowAbort as exc:
                 failure = exc
                 if kind in (KIND_AGENT_DISPATCH, KIND_WORKFLOW):
@@ -1217,6 +1250,24 @@ class WorkflowDefinitionRunWorkflow:
             raise _WorkflowAbort("invalid stage attempt limit")
         return limit
 
+    async def _project_native_result(self, stage: dict, result: Any, execution_id: str) -> Any:
+        if not stage.get("iteration"):
+            return result
+        try:
+            return imported_output(
+                stage["iteration"],
+                result,
+                timestamp=workflow.now().replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S.%f %Z"),
+            )
+        except SourcePortContractError as exc:
+            await workflow.execute_activity(
+                update_stage_execution,
+                args=[execution_id, STATUS_FAILED, None, str(exc)],
+                start_to_close_timeout=_DB_TIMEOUT,
+                retry_policy=_DB_RETRY,
+            )
+            raise _WorkflowAbort(str(exc), data={"status": "unavailable"}) from exc
+
     async def _run_agent_stage(
         self,
         input: WorkflowDefinitionRunInput,
@@ -1288,7 +1339,7 @@ class WorkflowDefinitionRunWorkflow:
                     "agent_run_id": agent_run_id,
                     "attempt": attempt,
                     "execution_id": execution_id,
-                    "result": outcome.get("result"),
+                    "result": await self._project_native_result(stage, outcome.get("result"), execution_id),
                     "failure": outcome.get("failure"),
                     "task_guid": outcome.get("task_guid"),
                 }
@@ -1449,6 +1500,8 @@ class WorkflowDefinitionRunWorkflow:
 
             data = getattr(result, "data", None) or {}
             final_output = data.get("final_output") if run_status == "succeeded" else None
+            if run_status == "succeeded":
+                final_output = await self._project_native_result(stage, final_output, execution_id)
             if run_status != "succeeded":
                 # A child that returns ok=false finalized itself; a child that
                 # failed to start or hit its execution timeout did not. This

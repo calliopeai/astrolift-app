@@ -17,7 +17,7 @@ export const Catalogue: Story = {
   args: hfCatalogueProps,
   play: async ({ canvasElement }) => {
     const c = within(canvasElement);
-    await expect(c.getByText(/Runtime compatibility unknown/)).toBeInTheDocument();
+    await expect(c.getByText("Repository access", { selector: "dt" })).toBeInTheDocument();
     await expect(c.getByText("Qwen/Qwen3-8B")).toBeInTheDocument();
   },
 };

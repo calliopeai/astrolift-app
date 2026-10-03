@@ -61,7 +61,7 @@ function Frame({
 }: {
   onPinned: (model: { repoId: string; revisionSha: string }) => void;
 }) {
-  return <HuggingFaceCataloguePanel {...useHfCatalogue(onPinned)} />;
+  return <HuggingFaceCataloguePanel {...useHfCatalogue(onPinned, true)} />;
 }
 
 beforeEach(() => {
@@ -125,7 +125,7 @@ describe("real HF catalogue adapter", () => {
     );
   });
   it("requests publisher/task/library/license/gated/order filters without fabricating compute compatibility", async () => {
-    const { result } = renderHook(() => useHfCatalogue(vi.fn()), { wrapper: wrapper() });
+    const { result } = renderHook(() => useHfCatalogue(vi.fn(), true), { wrapper: wrapper() });
     await waitFor(() => expect(result.current.page.rows.length).toBe(1));
     act(() => {
       result.current.page.list.applySearch("qwen", {
@@ -157,7 +157,7 @@ describe("real HF catalogue adapter", () => {
     const onPinned = vi.fn();
     render(<Frame onPinned={onPinned} />, { wrapper: wrapper() });
     fireEvent.click(await screen.findByRole("button", { name: model.repoId }));
-    const use = await screen.findByRole("button", { name: "Use verified revision" });
+    const use = await screen.findByRole("button", { name: en.models.shared.hosting.continue });
     await waitFor(() => expect(use).toBeEnabled());
     expect(requests.at(-1)).toMatchObject({
       operationName: "GetHuggingFaceModel",
@@ -184,7 +184,7 @@ describe("real HF catalogue adapter", () => {
     const onPinned = vi.fn();
     render(<Frame onPinned={onPinned} />, { wrapper: wrapper() });
     fireEvent.click(await screen.findByRole("button", { name: model.repoId }));
-    const use = await screen.findByRole("button", { name: "Use verified revision" });
+    const use = await screen.findByRole("button", { name: en.models.shared.hosting.continue });
     await waitFor(() => expect(use).toBeEnabled());
     fireEvent.change(screen.getByLabelText("Revision, branch or tag"), {
       target: { value: "release" },
@@ -257,7 +257,7 @@ describe("real HF catalogue adapter", () => {
     expect(
       await screen.findByText("No immutable revision has been verified for this selection.")
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Use verified revision" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: en.models.shared.hosting.continue })).toBeDisabled();
     expect(onPinned).not.toHaveBeenCalled();
   });
   it.each(Object.keys(locales) as (keyof typeof locales)[])(
@@ -268,10 +268,12 @@ describe("real HF catalogue adapter", () => {
       render(<Frame onPinned={onPinned} />, { wrapper: wrapper(locale) });
       expect(await screen.findByPlaceholderText(messages.search)).toBeInTheDocument();
       fireEvent.click(await screen.findByRole("button", { name: model.repoId }));
-      const use = await screen.findByRole("button", { name: messages.useRevision });
+      const use = await screen.findByRole("button", {
+        name: locales[locale].models.shared.hosting.continue,
+      });
       await waitFor(() => expect(use).toBeEnabled());
       expect(
-        screen.getByText(messages.compatibilityUnknown + ". " + messages.accessNotice)
+        screen.getByText(locales[locale].models.shared.hosting.accessTitle, { selector: "dt" })
       ).toBeInTheDocument();
       fireEvent.click(use);
       expect(onPinned).toHaveBeenCalledExactlyOnceWith({
@@ -282,7 +284,9 @@ describe("real HF catalogue adapter", () => {
   );
 
   it("clears the selected revision across organization A→B→A", async () => {
-    const { result, rerender } = renderHook(() => useHfCatalogue(vi.fn()), { wrapper: wrapper() });
+    const { result, rerender } = renderHook(() => useHfCatalogue(vi.fn(), true), {
+      wrapper: wrapper(),
+    });
     await waitFor(() => expect(result.current.page.rows.length).toBe(1));
     act(() => result.current.onSelect(model.repoId));
     await waitFor(() => expect(result.current.resolvedModel?.revisionSha).toBe(model.revisionSha));

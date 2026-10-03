@@ -2,6 +2,7 @@
 
 import secrets
 from contextlib import contextmanager
+from dataclasses import replace
 
 from django.db import transaction
 from django.db.models import F
@@ -96,6 +97,9 @@ def _apply_sync(service_id, revision, action, delete_data):
                 )
                 if not result.ok:
                     raise ValueError("Shared model deletion was not confirmed.")
+            from astrolift_services.hf_connection import delete_model_token
+
+            delete_model_token(service, cfg.secrets_backend)
             service.operation_completed_at = timezone.now()
             service.save(update_fields=["operation_completed_at", "updated_at", "version"])
             service.soft_delete()
@@ -107,6 +111,18 @@ def _apply_sync(service_id, revision, action, delete_data):
         from k8s_native.managed.shared_model_runtime import shared_runtime
 
         shared_runtime(cfg.shared_runtimes, dict(service.config or {}), "python")
+        from astrolift_services.hf_connection import materialize_model_token
+
+        materialize_model_token(service, cfg.secrets_backend)
+        if service.config.get("model_source") == "local_artifact":
+            from astrolift_services.local_model_artifacts import prepare_artifact_delivery
+
+            def check_delivery():
+                _cluster_model_placement(service, cluster=cluster)
+
+            private_plan = prepare_artifact_delivery(service, checkpoint=check_delivery)
+            cfg = replace(cfg, local_model_delivery=private_plan)
+            driver = type(driver)(config=cfg)
         for consumer in placement.consumers:
             path = consumer.credential_ref.partition("#")[0]
             current = cfg.secrets_backend.get(path)

@@ -44,6 +44,10 @@ function row(
   return {
     ...sharedModelsProps.page.rows[0],
     __typename: "ClusterModelDeployment",
+    sourceKind: "huggingface",
+    localArtifactId: null,
+    localArtifactVersion: null,
+    localManifestSha256: null,
     id: `shared-${organizationId}-${page}`,
     name: page === 1 ? "First shared model" : "Later shared model",
     organizationId,
@@ -137,7 +141,7 @@ describe("actual shared model reads", () => {
       "href",
       "/models/endpoints"
     );
-    expect(screen.getByRole("link", { name: "Browse and deploy" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Host a model" })).toHaveAttribute(
       "href",
       "/models/deploy"
     );
