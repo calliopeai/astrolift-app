@@ -5838,7 +5838,21 @@
         "settings": "Edit settings",
         "settingsDescription": "Review changes to the model name, resources and app access. Accepted changes still need reconciliation.",
         "overview": "Deployment",
-        "readiness": "Last readiness observation"
+        "readiness": "Last readiness observation",
+        "connections": "Connected apps",
+        "connectionsHelp": "Visible app-environment subscriptions and their reconciliation state. A subscription does not prove traffic or runtime health.",
+        "visibleSubscriptions": "{count} visible subscriptions",
+        "shownApps": "{count} apps on this page",
+        "appTraffic": "Per-app traffic",
+        "appTrafficUnavailable": "Per-app traffic is unavailable. Deployment totals cannot identify which app made a request.",
+        "metrics": "Usage and metrics",
+        "metricsAvailable": "{count} deployment metrics available",
+        "metricsUnconfigured": "Serving metrics are not configured for this deployment.",
+        "metricsNoData": "No serving samples in this window.",
+        "metricsReadUnavailable": "Usage data could not be read.",
+        "metricsScope": "Deployment totals across consumers; not per-app traffic.",
+        "metricsSetup": "Metrics setup",
+        "costUnavailable": "Cost is unavailable without measured usage and pricing."
       }
     }
   },

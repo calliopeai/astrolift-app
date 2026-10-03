@@ -5758,7 +5758,21 @@
         "settings": "Editar configurações",
         "settingsDescription": "Revise as alterações no nome do modelo, nos recursos e no acesso de apps. As alterações aceitas ainda precisam ser reconciliadas.",
         "overview": "Implantação",
-        "readiness": "Última observação de prontidão"
+        "readiness": "Última observação de prontidão",
+        "connections": "Apps conectados",
+        "connectionsHelp": "Assinaturas visíveis de ambientes de apps e seu estado de reconciliação. Uma assinatura não comprova tráfego nem a integridade da execução.",
+        "visibleSubscriptions": "{count} assinaturas visíveis",
+        "shownApps": "{count} apps nesta página",
+        "appTraffic": "Tráfego por app",
+        "appTrafficUnavailable": "O tráfego por app está indisponível. Os totais da implantação não identificam qual app fez uma solicitação.",
+        "metrics": "Uso e métricas",
+        "metricsAvailable": "{count} métricas da implantação disponíveis",
+        "metricsUnconfigured": "As métricas de inferência não estão configuradas para esta implantação.",
+        "metricsNoData": "Nenhuma amostra de inferência neste intervalo.",
+        "metricsReadUnavailable": "Não foi possível ler os dados de uso.",
+        "metricsScope": "Totais da implantação entre consumidores; não representam tráfego por app.",
+        "metricsSetup": "Configurar métricas",
+        "costUnavailable": "O custo está indisponível sem uso medido e preços."
       }
     }
   },

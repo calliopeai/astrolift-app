@@ -36,9 +36,25 @@ const english = {
     "Review changes to the model name, resources and app access. Accepted changes still need reconciliation.",
   overview: "Deployment",
   readiness: "Last readiness observation",
+  connections: "Connected apps",
+  connectionsHelp:
+    "Visible app-environment subscriptions and their reconciliation state. A subscription does not prove traffic or runtime health.",
+  visibleSubscriptions: "{count} visible subscriptions",
+  shownApps: "{count} apps on this page",
+  appTraffic: "Per-app traffic",
+  appTrafficUnavailable:
+    "Per-app traffic is unavailable. Deployment totals cannot identify which app made a request.",
+  metrics: "Usage and metrics",
+  metricsAvailable: "{count} deployment metrics available",
+  metricsUnconfigured: "Serving metrics are not configured for this deployment.",
+  metricsNoData: "No serving samples in this window.",
+  metricsReadUnavailable: "Usage data could not be read.",
+  metricsScope: "Deployment totals across consumers; not per-app traffic.",
+  metricsSetup: "Metrics setup",
+  costUnavailable: "Cost is unavailable without measured usage and pricing.",
 } as const;
 const keys = Object.keys(english) as (keyof typeof english)[];
-const args = { cpu: "2", memory: "8Gi", gpu: "0", app: "Test <app> & team" };
+const args = { count: 3, cpu: "2", memory: "8Gi", gpu: "0", app: "Test <app> & team" };
 function Copy() {
   const t = useTranslations("models.shared.inventory");
   return (
@@ -49,12 +65,17 @@ function Copy() {
       <p>{t("resourceSummary", args)}</p>
       <p>{t("dedicatedApp", args)}</p>
       <p>{t("settingsDescription")}</p>
+      <p>{t("visibleSubscriptions", args)}</p>
+      <p>{t("shownApps", args)}</p>
+      <p>{t("metricsAvailable", args)}</p>
+      <p>{t("metricsScope")}</p>
+      <p>{t("appTrafficUnavailable")}</p>
     </>
   );
 }
 afterEach(cleanup);
 describe("hosted model inventory copy contract", () => {
-  it("keeps the exact twenty-key English map", () => {
+  it("keeps the exact thirty-four-key English map", () => {
     expect(en.models.shared.inventory).toEqual(english);
   });
   it.each(locales)("%s preserves keys and ICU arguments with genuine translations", (locale) => {
@@ -73,7 +94,9 @@ describe("hosted model inventory copy contract", () => {
           ? ["cpu", "gpu", "memory"]
           : key === "dedicatedApp"
             ? ["app"]
-            : [];
+            : ["visibleSubscriptions", "shownApps", "metricsAvailable"].includes(key)
+              ? ["count"]
+              : [];
       expect(
         ast
           .filter((part) => part.type === TYPE.argument)
@@ -84,9 +107,9 @@ describe("hosted model inventory copy contract", () => {
         true
       );
       const result = t(key, args);
-      expect(result).not.toMatch(/\{(?:cpu|memory|gpu|app)\}/);
+      expect(result).not.toMatch(/\{(?:cpu|memory|gpu|app|count)\}/);
       for (const placeholder of expected)
-        expect(result).toContain(args[placeholder as keyof typeof args]);
+        expect(result).toContain(String(args[placeholder as keyof typeof args]));
       if (locale !== "en" && key !== "huggingface") expect(copy[key]).not.toBe(english[key]);
     }
     expect(copy.huggingface).toBe("Hugging Face");
@@ -115,6 +138,10 @@ describe("hosted model inventory copy contract", () => {
     expect(screen.getByText(t("resourceSummary", args))).toBeInTheDocument();
     expect(screen.getByText(t("dedicatedApp", args))).toBeInTheDocument();
     expect(screen.getByText(copy.settingsDescription)).toBeInTheDocument();
+    for (const key of ["visibleSubscriptions", "shownApps", "metricsAvailable"] as const)
+      expect(screen.getByText(t(key, args))).toBeInTheDocument();
+    expect(screen.getByText(copy.metricsScope)).toBeInTheDocument();
+    expect(screen.getByText(copy.appTrafficUnavailable)).toBeInTheDocument();
     expect(document.querySelector("app")).toBeNull();
     expect(errors).toEqual([]);
   });

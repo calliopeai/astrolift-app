@@ -5761,7 +5761,21 @@
         "settings": "Editar ajustes",
         "settingsDescription": "Revisa los cambios en el nombre del modelo, los recursos y el acceso de apps. Los cambios aceptados aún deben reconciliarse.",
         "overview": "Despliegue",
-        "readiness": "Última observación de disponibilidad"
+        "readiness": "Última observación de disponibilidad",
+        "connections": "Apps conectadas",
+        "connectionsHelp": "Suscripciones visibles de entornos de apps y su estado de reconciliación. Una suscripción no demuestra tráfico ni el buen estado de ejecución.",
+        "visibleSubscriptions": "{count} suscripciones visibles",
+        "shownApps": "{count} apps en esta página",
+        "appTraffic": "Tráfico por app",
+        "appTrafficUnavailable": "El tráfico por app no está disponible. Los totales del despliegue no permiten identificar qué app hizo una solicitud.",
+        "metrics": "Uso y métricas",
+        "metricsAvailable": "{count} métricas del despliegue disponibles",
+        "metricsUnconfigured": "Las métricas de inferencia no están configuradas para este despliegue.",
+        "metricsNoData": "No hay muestras de inferencia en este intervalo.",
+        "metricsReadUnavailable": "No se pudieron leer los datos de uso.",
+        "metricsScope": "Totales del despliegue entre consumidores; no son tráfico por app.",
+        "metricsSetup": "Configurar métricas",
+        "costUnavailable": "El coste no está disponible sin datos de uso medidos y precios."
       }
     }
   },

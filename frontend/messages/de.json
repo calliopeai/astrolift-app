@@ -5761,7 +5761,21 @@
         "settings": "Einstellungen bearbeiten",
         "settingsDescription": "Prüfen Sie Änderungen an Modellname, Ressourcen und App-Zugriff. Akzeptierte Änderungen müssen noch mit dem tatsächlichen Zustand abgeglichen werden.",
         "overview": "Bereitstellung",
-        "readiness": "Letzte Beobachtung der Betriebsbereitschaft"
+        "readiness": "Letzte Beobachtung der Betriebsbereitschaft",
+        "connections": "Verbundene Apps",
+        "connectionsHelp": "Sichtbare Abonnements von App-Umgebungen und ihr Abgleichstatus. Ein Abonnement belegt weder Datenverkehr noch einen gesunden Laufzeitbetrieb.",
+        "visibleSubscriptions": "{count} sichtbare Abonnements",
+        "shownApps": "{count} Apps auf dieser Seite",
+        "appTraffic": "Datenverkehr je App",
+        "appTrafficUnavailable": "Datenverkehr je App ist nicht verfügbar. Aus Bereitstellungssummen lässt sich nicht erkennen, welche App eine Anfrage gestellt hat.",
+        "metrics": "Nutzung und Metriken",
+        "metricsAvailable": "{count} Bereitstellungsmetriken verfügbar",
+        "metricsUnconfigured": "Inferenzmetriken sind für diese Bereitstellung nicht konfiguriert.",
+        "metricsNoData": "Keine Inferenzmesswerte in diesem Zeitraum.",
+        "metricsReadUnavailable": "Nutzungsdaten konnten nicht gelesen werden.",
+        "metricsScope": "Bereitstellungssummen über alle Verbraucher; kein Datenverkehr je App.",
+        "metricsSetup": "Metriken einrichten",
+        "costUnavailable": "Ohne gemessene Nutzung und Preise sind keine Kosten verfügbar."
       }
     }
   },

@@ -5758,7 +5758,21 @@
         "settings": "設定を編集",
         "settingsDescription": "モデル名、リソース、アプリのアクセスの変更を確認します。受理された変更は、実際の状態に反映するための調整が必要です。",
         "overview": "デプロイ",
-        "readiness": "最新の稼働準備状況の観測"
+        "readiness": "最新の稼働準備状況の観測",
+        "connections": "接続されたアプリ",
+        "connectionsHelp": "表示可能なアプリ環境のサブスクリプションと、その反映状況です。サブスクリプションがあっても、通信量や実行時の正常性を証明するものではありません。",
+        "visibleSubscriptions": "表示可能なサブスクリプション：{count} 件",
+        "shownApps": "このページのアプリ：{count} 件",
+        "appTraffic": "アプリ別の通信量",
+        "appTrafficUnavailable": "アプリ別の通信量は取得できません。デプロイ全体の集計からは、どのアプリがリクエストしたかを特定できません。",
+        "metrics": "使用量とメトリクス",
+        "metricsAvailable": "取得可能なデプロイのメトリクス：{count} 件",
+        "metricsUnconfigured": "このデプロイには推論メトリクスが設定されていません。",
+        "metricsNoData": "この期間には推論の観測サンプルがありません。",
+        "metricsReadUnavailable": "使用量データを読み取れませんでした。",
+        "metricsScope": "利用者全体のデプロイ集計値であり、アプリ別の通信量ではありません。",
+        "metricsSetup": "メトリクスの設定",
+        "costUnavailable": "使用量の実測値と料金情報がないため、費用は取得できません。"
       }
     }
   },

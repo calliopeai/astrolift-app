@@ -5761,7 +5761,21 @@
         "settings": "Modifier les paramètres",
         "settingsDescription": "Examinez les modifications du nom du modèle, des ressources et de l’accès des apps. Les modifications acceptées doivent encore être réconciliées.",
         "overview": "Déploiement",
-        "readiness": "Dernière observation de disponibilité"
+        "readiness": "Dernière observation de disponibilité",
+        "connections": "Apps connectées",
+        "connectionsHelp": "Abonnements visibles des environnements d’apps et leur état de réconciliation. Un abonnement ne prouve ni le trafic ni le bon fonctionnement à l’exécution.",
+        "visibleSubscriptions": "{count} abonnements visibles",
+        "shownApps": "{count} apps sur cette page",
+        "appTraffic": "Trafic par app",
+        "appTrafficUnavailable": "Le trafic par app est indisponible. Les totaux du déploiement ne permettent pas d’identifier l’app à l’origine d’une requête.",
+        "metrics": "Utilisation et métriques",
+        "metricsAvailable": "{count} métriques de déploiement disponibles",
+        "metricsUnconfigured": "Les métriques d’inférence ne sont pas configurées pour ce déploiement.",
+        "metricsNoData": "Aucun échantillon d’inférence dans cette période.",
+        "metricsReadUnavailable": "Impossible de lire les données d’utilisation.",
+        "metricsScope": "Totaux du déploiement pour tous les consommateurs ; pas du trafic par app.",
+        "metricsSetup": "Configurer les métriques",
+        "costUnavailable": "Le coût est indisponible sans utilisation mesurée et sans tarifs."
       }
     }
   },

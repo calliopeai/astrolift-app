@@ -5758,7 +5758,21 @@
         "settings": "编辑设置",
         "settingsDescription": "查看模型名称、资源和应用访问的变更。已接受的变更仍需与实际状态协调。",
         "overview": "部署",
-        "readiness": "最近一次就绪状态观测"
+        "readiness": "最近一次就绪状态观测",
+        "connections": "已连接的应用",
+        "connectionsHelp": "可见的应用环境订阅及其协调状态。订阅不能证明流量或运行时健康状态。",
+        "visibleSubscriptions": "{count} 个可见订阅",
+        "shownApps": "本页有 {count} 个应用",
+        "appTraffic": "各应用流量",
+        "appTrafficUnavailable": "无法获取各应用流量。部署汇总无法识别哪个应用发出了请求。",
+        "metrics": "用量和指标",
+        "metricsAvailable": "{count} 项部署指标可用",
+        "metricsUnconfigured": "此部署尚未配置推理服务指标。",
+        "metricsNoData": "此时间范围内没有推理服务样本。",
+        "metricsReadUnavailable": "无法读取用量数据。",
+        "metricsScope": "跨所有使用方的部署汇总，并非各应用流量。",
+        "metricsSetup": "指标配置",
+        "costUnavailable": "没有实测用量和定价信息，无法获取费用。"
       }
     }
   },
