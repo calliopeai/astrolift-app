@@ -128,6 +128,8 @@ function context(locale: string, mode: Mode = "ok") {
     });
   });
   const client = new ApolloClient({
+      // Browser-extension discovery schedules a timer beyond this fixture's teardown.
+      devtools: { enabled: false },
       cache: new InMemoryCache(),
       link: new HttpLink({
         uri: "https://example.invalid/graphql",
