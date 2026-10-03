@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from types import SimpleNamespace
+from typing import cast
 
 import strawberry
 from django.db import transaction
@@ -9,6 +10,7 @@ from django.utils import timezone
 from strawberry.types import Info
 
 from astrolift_graphql import GUID, MutationResultType, PageType, failure, numbered_page, success
+from astrolift_graphql.pagination import NumberedPage
 from astrolift_services.cluster_models import cluster_model_org_scope
 from astrolift_services.hf_catalogue import HuggingFaceModel
 from astrolift_services.hf_connection import (
@@ -126,7 +128,9 @@ class HuggingFaceConnectionsQuery:
         rows = HuggingFaceConnection.objects.filter(organization_id=current_org_id())
         if not in_current_org(organization_id):
             rows = rows.none()
-        result = numbered_page(rows, order_by=["pk"], page=page, page_size=page_size, max_page_size=50)
+        result: NumberedPage[HuggingFaceConnection] = numbered_page(
+            rows, order_by=["pk"], page=page, page_size=page_size, max_page_size=50
+        )
         return PageType(
             items=[connection_to_type(row) for row in result.rows],
             page=result.page,
@@ -170,6 +174,11 @@ class HuggingFaceConnectionsQuery:
             return ModelSourceAccess(accessible=False, reason=str(exc), model=None, observed_at=now)
 
 
+def connection_failure(code: str, message: str) -> MutationResultType[HuggingFaceConnectionType]:
+    # Failure data is null in every specialized connection envelope.
+    return cast(MutationResultType[HuggingFaceConnectionType], failure(code, message))
+
+
 @strawberry.type
 class HuggingFaceConnectionsMutation:
     @strawberry.field
@@ -184,20 +193,20 @@ class HuggingFaceConnectionsMutation:
         from astrolift_services.models import ManagedService
 
         if not in_current_org(input.organization_id):
-            return failure("PRECONDITION", "Organization is unavailable.")
+            return connection_failure("PRECONDITION", "Organization is unavailable.")
         try:
             with transaction.atomic():
                 require_host_admin(info)
                 row = locked_connection(input.connection_id, input.expected_version)
                 require_host_admin(info)
                 if ManagedService.objects.filter(model_hf_connection=row).exists():
-                    return failure(
+                    return connection_failure(
                         "PRECONDITION", "Deprovision models using this connection before disconnecting it."
                     )
                 row.soft_delete(by=info.context.request.user)
                 return success(connection_to_type(row))
         except HuggingFaceUnavailable as exc:
-            return failure("PRECONDITION", str(exc))
+            return connection_failure("PRECONDITION", str(exc))
 
     @strawberry.field
     @model_mutation_audit(action="model.huggingface.connect")
@@ -209,10 +218,10 @@ class HuggingFaceConnectionsMutation:
         input: ConnectHuggingFaceInput,
     ) -> MutationResultType[HuggingFaceConnectionType]:
         if not in_current_org(input.organization_id):
-            return failure("PRECONDITION", "Organization is unavailable.")
+            return connection_failure("PRECONDITION", "Organization is unavailable.")
         name = input.name.strip()
         if not 1 <= len(name) <= 128 or any(ord(char) < 32 for char in name):
-            return failure("VALIDATION", "Enter a connection name of 1–128 printable characters.")
+            return connection_failure("VALIDATION", "Enter a connection name of 1–128 printable characters.")
         try:
             with transaction.atomic():
                 require_host_admin(info)
@@ -231,4 +240,4 @@ class HuggingFaceConnectionsMutation:
                 )
                 return success(connection_to_type(row))
         except HuggingFaceUnavailable as exc:
-            return failure("VALIDATION", str(exc))
+            return connection_failure("VALIDATION", str(exc))
