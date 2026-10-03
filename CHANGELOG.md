@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Bind browser SSO step-up to the verified issuer/subject, active actor and current
+  persisted authenticated session. Recheck proof freshness after admission locks,
+  preserve concurrent logout and suppress stale response-session writes (#2202).
+
 
 - Install private-cluster agents from the control-plane worker using an exact
   reviewed cluster/provider source and durable request identity. Keep the old
