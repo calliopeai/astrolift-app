@@ -637,13 +637,13 @@ def test_status_available_when_active():
     lam = FakeLambda()
     lam.seed_function(_FN)
     drv, _, _ = _driver(lam=lam)
-    st = drv.status(ServiceHandle(handle=f"{KIND}/{_FN}"))
+    st = drv.status(ServiceHandle(handle=f"{KIND}/{_FN}", managed_service_id=_ID))
     assert st.state == "available"
 
 
 def test_status_deprovisioned_when_missing():
     drv, _, _ = _driver()
-    st = drv.status(ServiceHandle(handle=f"{KIND}/{_FN}"))
+    st = drv.status(ServiceHandle(handle=f"{KIND}/{_FN}", managed_service_id=_ID))
     assert st.state == "deprovisioned"
 
 
@@ -651,7 +651,7 @@ def test_binding_env_and_invoke_grant_shape():
     lam = FakeLambda()
     lam.seed_function(_FN, url="https://x.lambda-url.us-east-1.on.aws/")
     drv, _, _ = _driver(lam=lam)
-    binding = drv.binding(ServiceHandle(handle=f"{KIND}/{_FN}"))
+    binding = drv.binding(ServiceHandle(handle=f"{KIND}/{_FN}", managed_service_id=_ID))
     assert binding.env_vars["FUNCTION_NAME"].literal == _FN
     assert binding.env_vars["FUNCTION_URL"].literal == "https://x.lambda-url.us-east-1.on.aws/"
     # #1402: the rest of the faas envelope. FUNCTION_ARN is the portable

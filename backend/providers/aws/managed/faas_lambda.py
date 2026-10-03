@@ -261,8 +261,9 @@ class LambdaDriver(ManagedServiceDriver):
     def status(self, handle: ServiceHandle) -> ServiceStatus:
         try:
             function_name = self._target(handle.handle)
-            resp = self._lambda.get_function_configuration(FunctionName=function_name)
-            self._validate_function_metadata(function_name, resp)
+            resp = self._owned_live_function(function_name, handle.managed_service_id)
+            if resp is None:
+                return ServiceStatus(handle.handle, "deprovisioned", f"function {function_name} does not exist")
         except self._lambda.exceptions.ResourceNotFoundException:
             return ServiceStatus(
                 handle=handle.handle,
@@ -298,8 +299,9 @@ class LambdaDriver(ManagedServiceDriver):
         config: dict[str, Any] | None = None,
     ) -> Binding:
         function_name = self._target(handle.handle)
-        resp = self._lambda.get_function_configuration(FunctionName=function_name)
-        self._validate_function_metadata(function_name, resp)
+        resp = self._owned_live_function(function_name, handle.managed_service_id)
+        if resp is None:
+            raise ManagedServiceError("recorded Lambda function is missing")
         function_arn = resp["FunctionArn"]
         url = self._function_url(function_name)
         function_url = str(url["FunctionUrl"]) if url else ""
@@ -467,6 +469,12 @@ class LambdaDriver(ManagedServiceDriver):
             raise ManagedServiceError("Lambda execution-role identity mismatch")
         self._assert_owner(role.get("Tags"), service_id, "Lambda execution role")
         return role
+
+    def _owned_live_function(self, name: str, service_id: str) -> dict[str, Any] | None:
+        function = self._owned_function(name, service_id)
+        if function is not None and self._owned_role(self._role_name_for(name), service_id) is None:
+            raise ManagedServiceError("recorded Lambda execution role is missing")
+        return function
 
     def _function_url(self, name: str) -> dict[str, Any] | None:
         try:

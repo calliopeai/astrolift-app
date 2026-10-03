@@ -6,11 +6,14 @@ from unittest.mock import patch
 
 import pytest
 from aws._naming import iam_role_name
+from aws.managed._base import ManagedServiceError
 from aws.managed.faas_lambda import LambdaDriver
 
 from astrolift_drivers.registry import PluginManifest, PluginRegistry
 from astrolift_workflows.activities.managed_service_lifecycle import (
+    _check_ready_sync,
     _deprovision_sync,
+    _managed_binding_for,
     _provision_sync,
     _update_sync,
     build_provision_spec,
@@ -119,6 +122,10 @@ def test_saved_owned_legacy_function_is_not_renamed_after_labels_change(cloud):
     row.save(update_fields=["config"])
     assert _update_sync(row.pk)["ok"]
     assert cloud.api.get_function_configuration(FunctionName=fn)["MemorySize"] == 1024
+    assert _check_ready_sync(row.pk, row.backend_ref) == "available"
+    binding = _managed_binding_for(row)
+    assert binding.env_vars["FUNCTION_ARN"].literal == driver._function_arn(fn)
+    assert binding.iam_grants[0].resource == driver._function_arn(fn)
     assert _deprovision_sync(row.pk, delete_data=True, force_destroy=True)["ok"]
     assert cloud.api.list_functions()["Functions"] == []
     assert cloud.iam.list_roles()["Roles"] == []
@@ -208,3 +215,52 @@ def test_unverifiable_historical_role_refuses_before_function_or_policy_writes(c
     assert row.backend_ref == "faas/" + fn
     role = cloud.iam.get_role(RoleName=cloud.driver._role_name_for(fn))["Role"]
     assert "astrolift.io/managed_service_id" not in {t["Key"] for t in role["Tags"]}
+
+
+@pytest.mark.parametrize("target", ["function", "role"])
+@pytest.mark.parametrize("corruption", ["foreign_guid", "missing_guid", "missing_marker"])
+def test_saved_binding_and_readiness_refuse_unverifiable_function_tree(cloud, target, corruption):
+    row = service(cloud, "read-owner")
+    fn = remember(row, _provision_sync(row.pk))
+    key = "astrolift.io/managed-by" if corruption == "missing_marker" else "astrolift.io/managed_service_id"
+    if target == "function":
+        arn = cloud.driver._function_arn(fn)
+        if corruption == "foreign_guid":
+            other = service(cloud, "read-other")
+            cloud.api.tag_resource(Resource=arn, Tags={key: str(other.guid)})
+        else:
+            cloud.api.untag_resource(Resource=arn, TagKeys=[key])
+    else:
+        role = cloud.driver._role_name_for(fn)
+        if corruption == "foreign_guid":
+            other = service(cloud, "read-other")
+            cloud.iam.tag_role(RoleName=role, Tags=[{"Key": key, "Value": str(other.guid)}])
+        else:
+            cloud.iam.untag_role(RoleName=role, TagKeys=[key])
+    stack, spies = no_effects(cloud)
+    with (
+        stack,
+        patch.object(
+            cloud.api, "get_function_url_config", wraps=cloud.api.get_function_url_config
+        ) as read_url,
+    ):
+        assert _check_ready_sync(row.pk, row.backend_ref) == "error"
+        with pytest.raises(ManagedServiceError, match="ownership"):
+            _managed_binding_for(row)
+        read_url.assert_not_called()
+        for spy in spies:
+            spy.assert_not_called()
+    row.refresh_from_db()
+    assert row.backend_ref == "faas/" + fn
+
+
+def test_second_saved_service_cannot_bind_or_report_first_services_function_ready(cloud):
+    first, second = service(cloud, "first-read"), service(cloud, "second-read")
+    fn = remember(first, _provision_sync(first.pk))
+    second.backend_ref = first.backend_ref
+    second.save(update_fields=["backend_ref"])
+    assert _check_ready_sync(second.pk, second.backend_ref) == "error"
+    with pytest.raises(ManagedServiceError, match="ownership"):
+        _managed_binding_for(second)
+    assert _check_ready_sync(first.pk, first.backend_ref) == "available"
+    assert _managed_binding_for(first).iam_grants[0].resource == cloud.driver._function_arn(fn)

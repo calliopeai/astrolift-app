@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Verify Lambda function and execution-role ownership against the saved service
+  GUID before reporting readiness or returning URLs, ARNs and invoke grants.
+  Tagged legacy names stay supported; missing or foreign ownership evidence
+  requires verified operator repair rather than automatic adoption (#2032).
+
 - Read preview details by exact GUID, including older previews beyond the recent
   discovery window. Return the persisted environment identity and reviewed log
   route; retired, replaced or foreign targets never fall back to another

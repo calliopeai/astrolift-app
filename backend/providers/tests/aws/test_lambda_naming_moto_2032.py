@@ -92,7 +92,7 @@ def test_exact_owned_legacy_function_and_role_survive_slug_changes_and_full_life
     )
     assert updated.ok, updated
     assert cloud.api.get_function_configuration(FunctionName=function_name)["MemorySize"] == 1024
-    binding = cloud.driver.binding(ServiceHandle(handle=handle))
+    binding = cloud.driver.binding(ServiceHandle(handle=handle, managed_service_id=_ID))
     assert binding.env_vars["FUNCTION_ARN"].literal == cloud.driver._function_arn(function_name)
     assert cloud.driver.deprovision(DeprovisionSpec(handle=handle, managed_service_id=_ID), force_destroy=True).ok
     assert cloud.api.list_functions()["Functions"] == []
@@ -131,6 +131,69 @@ def test_foreign_or_unverifiable_parent_blocks_every_effect_even_force(cloud, ta
             spy.assert_not_called()
     assert len(cloud.api.list_functions()["Functions"]) == 1
     assert len(cloud.iam.list_roles()["Roles"]) == 1
+
+
+@pytest.mark.parametrize("operation", ["status", "binding"])
+@pytest.mark.parametrize("target", ["function", "role"])
+@pytest.mark.parametrize("corruption", ["owner", "marker", "missing_owner"])
+def test_read_paths_refuse_foreign_or_unverifiable_parent_before_binding_material(cloud, operation, target, corruption):
+    initial = provision(cloud)
+    assert initial.ok
+    fn = name(initial.handle)
+    key = "astrolift.io/managed-by" if corruption == "marker" else "astrolift.io/managed_service_id"
+    value = "foreign" if corruption == "marker" else OTHER
+    if target == "function":
+        if corruption == "missing_owner":
+            cloud.api.untag_resource(Resource=cloud.driver._function_arn(fn), TagKeys=[key])
+        else:
+            cloud.api.tag_resource(Resource=cloud.driver._function_arn(fn), Tags={key: value})
+    else:
+        role = cloud.driver._role_name_for(fn)
+        if corruption == "missing_owner":
+            cloud.iam.untag_role(RoleName=role, TagKeys=[key])
+        else:
+            cloud.iam.tag_role(RoleName=role, Tags=[{"Key": key, "Value": value}])
+    stack, spies = no_effects(cloud)
+    with stack, patch.object(cloud.api, "get_function_url_config", wraps=cloud.api.get_function_url_config) as read_url:
+        handle = ServiceHandle(initial.handle, managed_service_id=_ID)
+        if operation == "status":
+            result = cloud.driver.status(handle)
+            assert result.state == "error" and "ownership" in result.message
+        else:
+            with pytest.raises(ManagedServiceError, match="ownership"):
+                cloud.driver.binding(handle)
+        read_url.assert_not_called()
+        for spy in spies:
+            spy.assert_not_called()
+
+
+@pytest.mark.parametrize("service_id", ["", "invalid", OTHER])
+def test_read_paths_require_the_exact_persisted_caller_identity(cloud, service_id):
+    initial = provision(cloud)
+    assert initial.ok
+    handle = ServiceHandle(initial.handle, managed_service_id=service_id)
+    assert cloud.driver.status(handle).state == "error"
+    with pytest.raises((ValueError, ManagedServiceError)):
+        cloud.driver.binding(handle)
+
+
+def test_read_paths_require_live_role_but_missing_function_is_deprovisioned(cloud):
+    initial = provision(cloud)
+    assert initial.ok
+    handle = ServiceHandle(initial.handle, managed_service_id=_ID)
+    assert cloud.driver.status(handle).state == "available"
+    binding = cloud.driver.binding(handle)
+    assert binding.env_vars["FUNCTION_ARN"].literal == binding.iam_grants[0].resource
+    role = cloud.driver._role_name_for(name(initial.handle))
+    cloud.iam.delete_role_policy(RoleName=role, PolicyName="astrolift-faas-policy")
+    cloud.iam.delete_role(RoleName=role)
+    assert cloud.driver.status(handle).state == "error"
+    with pytest.raises(ManagedServiceError, match="role is missing"):
+        cloud.driver.binding(handle)
+    cloud.api.delete_function(FunctionName=name(initial.handle))
+    assert cloud.driver.status(handle).state == "deprovisioned"
+    with pytest.raises(ManagedServiceError, match="function is missing"):
+        cloud.driver.binding(handle)
 
 
 @pytest.mark.parametrize("missing", ["function", "role"])
@@ -198,7 +261,7 @@ def test_foreign_url_parent_is_refused_before_root_or_iam_effects(cloud):
         for spy in spies:
             spy.assert_not_called()
         with pytest.raises(ManagedServiceError):
-            cloud.driver.binding(ServiceHandle(handle=initial.handle))
+            cloud.driver.binding(ServiceHandle(handle=initial.handle, managed_service_id=_ID))
 
 
 @pytest.mark.parametrize("handle", ["topic/name", "faas/a:b", "faas/a/b", "faas/" + "x" * 65, "faas/"])
@@ -343,7 +406,7 @@ def test_unverifiable_native_url_metadata_is_never_returned_or_reconciled(cloud,
     with stack, patch.object(cloud.api, "get_function_url_config", return_value=metadata):
         assert not provision(cloud, recorded_handle=initial.handle).ok
         with pytest.raises(ManagedServiceError):
-            cloud.driver.binding(ServiceHandle(handle=initial.handle))
+            cloud.driver.binding(ServiceHandle(handle=initial.handle, managed_service_id=_ID))
         for spy in spies:
             spy.assert_not_called()
 
