@@ -15704,7 +15704,7 @@ export type ExplorerSpansQueryVariables = Exact<{
 }>;
 
 
-export type ExplorerSpansQuery = { astroliftTraceSpansResult: { reason: AstroliftObservabilityPanelReason, scope?: { organizationId: string, appId: string, environmentId: string, environmentName: string, clusterId: string, namespace: string } | null, items: Array<{ traceId: string, spanId: string, parentSpanId?: string | null, operation: string, service: string, startTime: string, durationMs: number, statusCode: string, attributes: Record<string, unknown>, resourceAttributes: Record<string, unknown> }> } };
+export type ExplorerSpansQuery = { astroliftTraceSpansResult: { reason: AstroliftObservabilityPanelReason, scope?: { organizationId: string, appId: string, environmentId: string, environmentName: string, clusterId: string, namespace: string } | null, items: Array<{ traceId: string, spanId: string, parentSpanId?: string | null, operation: string, service: string, startTime: string, durationMs: number, statusCode: string, attributes: unknown, resourceAttributes: unknown }> } };
 
 export type CreateWebhookMutationVariables = Exact<{
   input: CreateWebhookSubscriptionInput;

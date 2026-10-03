@@ -422,7 +422,9 @@ describe.each(locales)("pipeline product copy (%s)", (locale) => {
                   data: {
                     setPipelineSecret: {
                       ok: false,
-                      errors: [{ code: "PERMISSION_DENIED", message: "RAW_SECRET_REFUSAL" }],
+                      errors: [
+                        { code: "PERMISSION_DENIED", message: "RAW_SECRET_REFUSAL", field: null },
+                      ],
                       data: null,
                     },
                   },
