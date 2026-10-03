@@ -739,3 +739,22 @@ def test_lost_accepted_reply_with_terminating_uid_is_observed_without_second_del
     assert second.state == "PROBE_DELETION_PENDING" and second.cleanup_pending
     assert wire["port"].state["delete_accepted"]
     assert not any(c[0] == "DELETE" for c in wire["calls"])
+
+
+def test_private_transport_disables_debug_without_emitting_auth_or_mutating_original(wire, artifact, capfd, caplog):
+    synthetic = "fixture-collector-debug-bearer-regression"
+    original = wire["kube"]._api_client.configuration
+    original.debug = True
+    original.api_key = {"authorization": "Bearer " + synthetic}
+    original_debug = original.debug
+    try:
+        executor = execution(wire, artifact)
+        assert executor.kube._api_client.configuration.debug is False
+        assert original.debug is original_debug
+        assert execution(wire, artifact).run().state == "POST_LOSS_READ_VERIFIED"
+        captured = capfd.readouterr()
+        assert synthetic not in captured.out + captured.err + caplog.text
+        assert "Authorization:" not in captured.out + captured.err
+        assert original.debug is original_debug
+    finally:
+        original.debug = False

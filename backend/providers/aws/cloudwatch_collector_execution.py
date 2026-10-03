@@ -69,6 +69,7 @@ def bounded_registered_kubernetes(registered: Any, *, checkpoints: Checkpoints) 
     config = copy.deepcopy(registered._api_client.configuration)
     if not isinstance(config.host, str) or not config.host.startswith(("https://", "http://")):
         raise ExecutionRefused("REGISTERED_KUBERNETES_REQUIRED")
+    config.debug = False
     config.retries = 0
 
     class BoundedApiClient(client.ApiClient):
