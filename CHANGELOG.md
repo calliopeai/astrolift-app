@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Execute native collector renderer and HTTP integration checks in their CI
+  jobs with checksum-verified Helm and chart artifacts. Keep the composed
+  registered-reader test in the Django-backed cluster suite (#1706).
+
 - Use the exact log group's IAM ARN with its required suffix for collector
   stream discovery and historical reads. Keep physical identity and tagging
   ARNs unchanged, and keep grants confined to the owned group (#1706).

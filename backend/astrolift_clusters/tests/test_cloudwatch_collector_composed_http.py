@@ -17,15 +17,15 @@ from pathlib import Path
 from types import SimpleNamespace
 from urllib.parse import parse_qs
 
+import aws.session as session
 import boto3
 import pytest
-from botocore.config import Config
-from core.cluster_log_query import resolve_log_query_driver
-
-import aws.session as session
 from aws.cloudwatch_collector_execution import CollectorExecutor, ReaderBinding
 from aws.cloudwatch_collector_render import render_collector
-from tests.aws import test_cloudwatch_collector_execution_http as native
+from botocore.config import Config
+
+from core.cluster_log_query import resolve_log_query_driver
+from providers.tests.aws import test_cloudwatch_collector_execution_http as native
 
 STAGE = replace(
     native.STAGE,
@@ -88,7 +88,9 @@ def registered_reader(composed_wire, monkeypatch):
 
             def signed(request, **_kwargs):
                 # Keep a boolean proof only, never authorization headers.
-                state["signed_reads"].append(b"Credential=ASIACOMPOSEDFIXTURE/" in request.headers["Authorization"])
+                state["signed_reads"].append(
+                    b"Credential=ASIACOMPOSEDFIXTURE/" in request.headers["Authorization"]
+                )
 
             sdk.meta.events.register("before-send.logs.FilterLogEvents", signed)
         state["clients"].append(sdk)

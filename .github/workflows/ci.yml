@@ -353,6 +353,11 @@ jobs:
         # the cloud plugins resolve at import time. The Docker image
         # does this in its build step; CI mirrors it.
         run: pipenv run pip install './providers[aws,gcp,azure,k8s]'
+      - name: Prepare verified native collector test artifacts
+        if: ${{ matrix.name == 'registration-clusters' }}
+        run: |
+          python scripts/prepare_collector_test_artifacts.py "$RUNNER_TEMP/collector-native"
+          echo "COLLECTOR_RENDER_ARTIFACTS=$RUNNER_TEMP/collector-native" >> "$GITHUB_ENV"
       - name: Tune disposable PostgreSQL
         env:
           PGPASSWORD: Password123
@@ -514,6 +519,10 @@ jobs:
         run: ruff check .
       - name: Format check (providers)
         run: ruff format --check .
+      - name: Prepare verified native collector test artifacts
+        run: |
+          python ../scripts/prepare_collector_test_artifacts.py "$RUNNER_TEMP/collector-native"
+          echo "COLLECTOR_RENDER_ARTIFACTS=$RUNNER_TEMP/collector-native" >> "$GITHUB_ENV"
       - name: Run tests (providers)
         run: pytest -x
 
