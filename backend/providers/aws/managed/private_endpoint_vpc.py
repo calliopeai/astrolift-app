@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from typing import Any
+
+from botocore.exceptions import ClientError
 
 from _sdk._telemetry import driver_op
 from _sdk.cloud_credentials import CredentialedConfig
@@ -24,7 +27,8 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from _sdk.physical_naming import managed_service_identity
+from aws.managed._base import ManagedServiceError, handle_for, live_ownership_refusal, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "private_endpoint"
@@ -37,7 +41,6 @@ _ENDPOINT_TYPES = {
     "servicenetwork": "ServiceNetwork",
     "service_network": "ServiceNetwork",
 }
-_TERMINAL_STATES = {"deleted", "failed", "rejected"}
 _RESERVED_CREATE = {
     "ClientToken",
     "PolicyDocument",
@@ -80,6 +83,7 @@ class VpcEndpointConfig(CredentialedConfig):
     route_table_ids: list[str] = field(default_factory=list)
     private_dns_enabled_default: bool = False
     deletion_protection_default: bool = True
+    account_id: str = ""
 
 
 class VpcEndpointDriver(ManagedServiceDriver):
@@ -104,7 +108,16 @@ class VpcEndpointDriver(ManagedServiceDriver):
             return ProvisionResult(False, "", error, ["invalid_vpc_endpoint_config"])
         endpoint_id = ""
         try:
-            endpoint = self._find_owned(spec, cfg)
+            self._identity_config()
+            managed_service_identity(spec.managed_service_id)
+            endpoint: dict[str, Any] | None
+            if spec.recorded_handle:
+                endpoint_id = self._handle_id(spec.recorded_handle)
+                endpoint = self._describe(endpoint_id)
+                if str(endpoint.get("State") or "").lower() == "deleted":
+                    raise ManagedServiceError("recorded VPC endpoint is deleted; refusing replacement")
+            else:
+                endpoint = self._find_owned(spec, cfg)
             if endpoint is None:
                 response = self._ec2.create_vpc_endpoint(**self._create_request(spec, cfg))
                 endpoint = dict(response.get("VpcEndpoint") or {})
@@ -113,6 +126,8 @@ class VpcEndpointDriver(ManagedServiceDriver):
                     raise ManagedServiceError("create_vpc_endpoint returned no VpcEndpointId")
             else:
                 endpoint_id = str(endpoint["VpcEndpointId"])
+            self._validate_metadata(endpoint, endpoint_id)
+            self._assert_owner(endpoint, spec.managed_service_id)
             self._validate_immutable(endpoint, cfg)
             self._reconcile(endpoint, cfg)
         except Exception as exc:
@@ -128,29 +143,31 @@ class VpcEndpointDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="vpc_endpoint")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        _, endpoint_id = parse_handle(spec.handle)
         cfg = spec.config or {}
+        endpoint_id = ""
         try:
+            managed_service_identity(spec.managed_service_id)
+            endpoint_id = self._handle_id(spec.handle)
             endpoint = self._describe(endpoint_id)
+            self._assert_owner(endpoint, spec.managed_service_id)
             error = self._validate_config(
-                cfg,
-                update=True,
-                existing_type=str(endpoint.get("VpcEndpointType") or "Interface"),
+                cfg, update=True, existing_type=str(endpoint.get("VpcEndpointType") or "Interface")
             )
             if error:
-                return UpdateResult(False, spec.handle, error, ["invalid_vpc_endpoint_config"])
-            if not self._is_owned(endpoint):
+                return UpdateResult(False, spec.handle, error, ["invalid_vpc_endpoint_config"], retryable=False)
+            if str(endpoint.get("State") or "").lower() == "deleted":
                 return UpdateResult(
-                    False,
-                    spec.handle,
-                    "refusing to update a VPC endpoint not owned by Astrolift",
-                    ["resource_not_owned"],
+                    False, spec.handle, "recorded VPC endpoint is deleted", ["not_found"], retryable=False
                 )
             self._validate_immutable(endpoint, cfg)
             self._reconcile(endpoint, cfg)
+        except (ManagedServiceError, ValueError) as exc:
+            return UpdateResult(False, spec.handle, str(exc), ["ownership_refused"], retryable=False)
         except Exception as exc:
             if _not_found(exc):
-                return UpdateResult(False, spec.handle, f"VPC endpoint {endpoint_id} not found", ["not_found"])
+                return UpdateResult(
+                    False, spec.handle, f"VPC endpoint {endpoint_id} not found", ["not_found"], retryable=False
+                )
             return UpdateResult(False, spec.handle, f"update VPC endpoint: {exc}", [str(exc)])
         return UpdateResult(True, spec.handle, f"VPC endpoint {endpoint_id} reconciled")
 
@@ -168,21 +185,20 @@ class VpcEndpointDriver(ManagedServiceDriver):
         force_destroy: bool = False,
     ) -> DeprovisionResult:
         del delete_data
-        _, endpoint_id = parse_handle(spec.handle)
+        endpoint_id = ""
         try:
+            managed_service_identity(spec.managed_service_id)
+            endpoint_id = self._handle_id(spec.handle)
             endpoint = self._describe(endpoint_id)
+            self._assert_owner(endpoint, spec.managed_service_id)
+        except (ManagedServiceError, ValueError) as exc:
+            return DeprovisionResult(False, spec.handle, str(exc), ["ownership_refused"], retryable=False)
         except Exception as exc:
             if _not_found(exc):
                 return DeprovisionResult(True, spec.handle, f"VPC endpoint {endpoint_id} already gone")
             return DeprovisionResult(False, spec.handle, f"describe VPC endpoint: {exc}", [str(exc)])
-        if not self._is_owned(endpoint) and not force_destroy:
-            return DeprovisionResult(
-                False,
-                spec.handle,
-                "refusing to delete a VPC endpoint not owned by Astrolift",
-                ["resource_not_owned"],
-                retryable=False,
-            )
+        if str(endpoint.get("State") or "").lower() == "deleted":
+            return DeprovisionResult(True, spec.handle, f"VPC endpoint {endpoint_id} already deleted")
         protected = bool(
             spec.config.get(
                 "deletion_protection",
@@ -210,9 +226,12 @@ class VpcEndpointDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="vpc_endpoint")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
-        _, endpoint_id = parse_handle(handle.handle)
+        endpoint_id = ""
         try:
+            endpoint_id = self._handle_id(handle.handle)
             endpoint = self._describe(endpoint_id)
+            if handle.managed_service_id:
+                self._assert_owner(endpoint, handle.managed_service_id)
         except Exception as exc:
             if _not_found(exc):
                 return ServiceStatus(handle.handle, "deprovisioned", f"VPC endpoint {endpoint_id} is gone")
@@ -234,8 +253,10 @@ class VpcEndpointDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="vpc_endpoint")
     def binding(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> Binding:
-        _, endpoint_id = parse_handle(handle.handle)
+        endpoint_id = self._handle_id(handle.handle)
         endpoint = self._describe(endpoint_id)
+        if handle.managed_service_id:
+            self._assert_owner(endpoint, handle.managed_service_id)
         dns_entries = endpoint.get("DnsEntries") or []
         dns_names = [str(item.get("DnsName") or "") for item in dns_entries if item.get("DnsName")]
         ip_addresses = self._ip_addresses(endpoint)
@@ -466,47 +487,101 @@ class VpcEndpointDriver(ManagedServiceDriver):
             request["PolicyDocument"] = _policy(cfg["policy"])
         return request
 
+    def _identity_config(self) -> None:
+        if (
+            re.fullmatch(r"[0-9]{12}", self._config.account_id) is None
+            or re.fullmatch(r"[a-z]{2}(?:-[a-z]+)+-[0-9]+", self._config.region) is None
+        ):
+            raise ManagedServiceError("VPC endpoint requires a region and 12-digit account_id")
+
+    def _handle_id(self, handle: str) -> str:
+        self._identity_config()
+        kind, endpoint_id = parse_handle(handle)
+        if kind != KIND or re.fullmatch(r"vpce-(?:[0-9a-f]{8}|[0-9a-f]{17})", endpoint_id) is None:
+            raise ManagedServiceError("invalid VPC endpoint managed-service handle")
+        return endpoint_id
+
+    def _validate_metadata(self, endpoint: dict[str, Any], endpoint_id: str) -> None:
+        self._handle_id(handle_for(kind=KIND, resource_id=endpoint_id))
+        if endpoint.get("VpcEndpointId") != endpoint_id or endpoint.get("OwnerId") != self._config.account_id:
+            raise ManagedServiceError("VPC endpoint identity or native account ownership mismatch")
+        if endpoint.get("VpcEndpointType") not in set(_ENDPOINT_TYPES.values()) or not endpoint.get("VpcId"):
+            raise ManagedServiceError("VPC endpoint parent/type metadata is unavailable")
+
+    @staticmethod
+    def _assert_owner(endpoint: dict[str, Any], service_id: str) -> None:
+        managed_service_identity(service_id)
+        refusal = live_ownership_refusal(endpoint.get("Tags"), managed_service_id=service_id, resource="VPC endpoint")
+        if refusal:
+            raise ManagedServiceError(refusal)
+
     def _find_owned(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> dict[str, Any] | None:
-        filters = [
-            {"Name": "vpc-id", "Values": [str(cfg.get("vpc_id") or self._config.vpc_id)]},
-            {"Name": "tag:astrolift.io/managed-by", "Values": ["platform"]},
-            {"Name": "tag:astrolift.io/organization", "Values": [spec.organization_slug]},
-            {"Name": "tag:astrolift.io/app", "Values": [spec.app_slug]},
-            {"Name": "tag:astrolift.io/environment", "Values": [spec.environment_name]},
-            {"Name": "tag:astrolift.io/resource-hint", "Values": [spec.service_handle_hint]},
-        ]
+        del cfg
+        # Search the native account/region by immutable owner, including an
+        # earlier VPC, so a desired-parent change refuses rather than duplicates.
+        filters = [{"Name": "tag:astrolift.io/managed_service_id", "Values": [spec.managed_service_id]}]
         candidates: list[dict[str, Any]] = []
+        seen_ids: set[str] = set()
+        seen_tokens: set[str] = set()
         next_token = ""
         while True:
             request: dict[str, Any] = {"Filters": filters, "MaxResults": 1000}
             if next_token:
                 request["NextToken"] = next_token
             response = self._ec2.describe_vpc_endpoints(**request)
-            candidates.extend(
-                dict(endpoint)
-                for endpoint in response.get("VpcEndpoints") or []
-                if str(endpoint.get("State") or "") not in _TERMINAL_STATES
-            )
+            for row in response.get("VpcEndpoints") or []:
+                endpoint = dict(row)
+                endpoint_id = str(endpoint.get("VpcEndpointId") or "")
+                self._validate_metadata(endpoint, endpoint_id)
+                self._assert_owner(endpoint, spec.managed_service_id)
+                if endpoint_id in seen_ids:
+                    raise ManagedServiceError("VPC endpoint discovery repeats a native identity")
+                seen_ids.add(endpoint_id)
+                if str(endpoint.get("State") or "").lower() != "deleted":
+                    candidates.append(endpoint)
             next_token = str(response.get("NextToken") or "")
             if not next_token:
                 break
+            if next_token in seen_tokens:
+                raise ManagedServiceError("VPC endpoint discovery repeats a pagination cursor")
+            seen_tokens.add(next_token)
         if len(candidates) > 1:
-            raise ManagedServiceError("multiple owned VPC endpoints match this binding identity")
+            raise ManagedServiceError("multiple owned VPC endpoints match this managed-service identity")
         return candidates[0] if candidates else None
 
     def _describe(self, endpoint_id: str) -> dict[str, Any]:
         endpoints = self._ec2.describe_vpc_endpoints(VpcEndpointIds=[endpoint_id]).get("VpcEndpoints") or []
         if not endpoints:
-            raise ManagedServiceError(f"VPC endpoint {endpoint_id} not found")
-        return dict(endpoints[0])
+            raise ClientError(
+                {"Error": {"Code": "InvalidVpcEndpointId.NotFound", "Message": "recorded VPC endpoint is missing"}},
+                "DescribeVpcEndpoints",
+            )
+        if len(endpoints) != 1:
+            raise ManagedServiceError("exact VPC endpoint response identity is ambiguous")
+        endpoint = dict(endpoints[0])
+        self._validate_metadata(endpoint, endpoint_id)
+        return endpoint
 
     def _ip_addresses(self, endpoint: dict[str, Any]) -> list[str]:
         interface_ids = [str(value) for value in endpoint.get("NetworkInterfaceIds") or []]
         if not interface_ids:
             return []
+        if len(set(interface_ids)) != len(interface_ids):
+            raise ManagedServiceError("VPC endpoint repeats a network-interface identity")
         response = self._ec2.describe_network_interfaces(NetworkInterfaceIds=interface_ids)
+        interfaces = response.get("NetworkInterfaces") or []
+        returned_ids = [item.get("NetworkInterfaceId") for item in interfaces]
+        if len(returned_ids) != len(interface_ids) or set(returned_ids) != set(interface_ids):
+            raise ManagedServiceError("VPC endpoint network-interface response identities do not match")
+        for interface in interfaces:
+            if (
+                interface.get("OwnerId") != self._config.account_id
+                or interface.get("VpcId") != endpoint.get("VpcId")
+                or (endpoint.get("SubnetIds") and interface.get("SubnetId") not in endpoint["SubnetIds"])
+            ):
+                raise ManagedServiceError("VPC endpoint network-interface parent ownership does not match")
         addresses: set[str] = set()
-        for interface in response.get("NetworkInterfaces") or []:
+        for interface in interfaces:
             addresses.update(
                 str(item["PrivateIpAddress"])
                 for item in interface.get("PrivateIpAddresses") or []
@@ -526,6 +601,8 @@ class VpcEndpointDriver(ManagedServiceDriver):
             "VpcId": requested_vpc,
             **requested_target,
         }
+        if cfg.get("service_region"):
+            checks["ServiceRegion"] = str(cfg["service_region"])
         for attribute, value in checks.items():
             if value and str(endpoint.get(attribute) or "") != str(value):
                 raise ManagedServiceError(
@@ -606,17 +683,11 @@ def _endpoint_type(value: Any) -> str:
 
 
 def _client_token(spec: ProvisionSpec, cfg: dict[str, Any], *, vpc_id: str) -> str:
-    identity = "|".join(
-        (
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint,
-            vpc_id,
-            json.dumps(cfg, sort_keys=True, separators=(",", ":"), default=str),
-        ),
-    )
-    return f"astrolift-{hashlib.sha256(identity.encode()).hexdigest()[:48]}"
+    identity = managed_service_identity(spec.managed_service_id)
+    desired = json.dumps([str(identity), vpc_id, cfg], sort_keys=True, separators=(",", ":"), default=str)
+    # Full persisted UUID remains visible; config distinguishes an explicitly
+    # reprovisioned target while human labels never enter the provider token.
+    return f"astrolift-{identity.hex}-{hashlib.sha256(desired.encode()).hexdigest()[:21]}"
 
 
 def _policy(value: Any) -> str:

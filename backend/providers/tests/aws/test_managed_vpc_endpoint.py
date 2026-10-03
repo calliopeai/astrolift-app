@@ -13,6 +13,8 @@ from botocore.validate import validate_parameters
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
 from aws.managed.private_endpoint_vpc import VpcEndpointConfig, VpcEndpointDriver
 
+SERVICE_ID = "11111111-1111-4111-8111-111111111111"
+
 
 class NotFound(Exception):
     response: ClassVar[dict] = {"Error": {"Code": "InvalidVpcEndpointId.NotFound"}}
@@ -40,6 +42,7 @@ class FakeEC2:
         endpoint_id = f"vpce-{self.sequence:017d}"
         endpoint = {
             "VpcEndpointId": endpoint_id,
+            "OwnerId": "123456789012",
             "VpcEndpointType": kwargs.get("VpcEndpointType", "Gateway"),
             "VpcId": kwargs["VpcId"],
             "ServiceName": kwargs.get("ServiceName", ""),
@@ -126,6 +129,9 @@ class FakeEC2:
             "NetworkInterfaces": [
                 {
                     "NetworkInterfaceId": interface_id,
+                    "OwnerId": "123456789012",
+                    "VpcId": "vpc-123",
+                    "SubnetId": "subnet-a",
                     "PrivateIpAddresses": [{"PrivateIpAddress": "10.0.1.10"}],
                     "Ipv6Addresses": [{"Ipv6Address": "2001:db8::10"}],
                 }
@@ -142,9 +148,18 @@ class FakeEC2:
         return {"Unsuccessful": []}
 
     def seed(self, *, owned: bool = True, **overrides) -> dict:
-        tags = [{"Key": "astrolift.io/managed-by", "Value": "platform"}] if owned else []
+        tags = (
+            [
+                {"Key": "astrolift.io/managed-by", "Value": "platform"},
+                {"Key": "astrolift.io/managed_service_id", "Value": SERVICE_ID},
+            ]
+            if owned
+            else []
+        )
+        self.sequence += 1
         endpoint = {
-            "VpcEndpointId": overrides.pop("VpcEndpointId", f"vpce-seed{len(self.endpoints)}"),
+            "OwnerId": "123456789012",
+            "VpcEndpointId": overrides.pop("VpcEndpointId", f"vpce-{self.sequence:017x}"),
             "VpcEndpointType": "Interface",
             "VpcId": "vpc-123",
             "ServiceName": "com.amazonaws.us-east-1.s3",
@@ -166,6 +181,7 @@ class FakeEC2:
 def _config() -> VpcEndpointConfig:
     return VpcEndpointConfig(
         region="us-east-1",
+        account_id="123456789012",
         vpc_id="vpc-123",
         subnet_ids=["subnet-a"],
         security_group_ids=["sg-a"],
@@ -181,7 +197,7 @@ def _driver(client: FakeEC2 | None = None) -> tuple[VpcEndpointDriver, FakeEC2]:
 def _spec(config: dict | None = None, *, hint: str = "private-api") -> ProvisionSpec:
     return ProvisionSpec(
         organization_id="org-id",
-        organization_slug="steady",
+        organization_slug="alpha",
         app_id="app-id",
         app_slug="triage",
         environment_id="env-id",
@@ -191,8 +207,16 @@ def _spec(config: dict | None = None, *, hint: str = "private-api") -> Provision
         size="small",
         config=config if config is not None else {"endpoint_type": "Interface", "service": "execute-api"},
         binding_id="binding-id",
-        managed_service_id="service-id",
+        managed_service_id=SERVICE_ID,
     )
+
+
+def _update_spec(*args, **kwargs):
+    return UpdateSpec(*args, **kwargs, managed_service_id=SERVICE_ID)
+
+
+def _deprovision_spec(*args, **kwargs):
+    return DeprovisionSpec(*args, **kwargs, managed_service_id=SERVICE_ID)
 
 
 def test_interface_endpoint_full_lifecycle_and_binding() -> None:
@@ -255,7 +279,7 @@ def test_update_reconciles_mutable_interface_fields() -> None:
     driver, client = _driver()
     created = driver.provision(_spec())
     update = driver.update(
-        UpdateSpec(
+        _update_spec(
             created.handle,
             config={
                 "subnet_ids": ["subnet-b"],
@@ -298,7 +322,7 @@ def test_gateway_endpoint_uses_route_tables_policy_and_prefix_list() -> None:
     binding = driver.binding(ServiceHandle(result.handle))
     assert binding.env_vars["PRIVATE_ENDPOINT_PREFIX_LIST_ID"].literal == "pl-123"
 
-    updated = driver.update(UpdateSpec(result.handle, config={"route_table_ids": ["rtb-b", "rtb-c"]}))
+    updated = driver.update(_update_spec(result.handle, config={"route_table_ids": ["rtb-b", "rtb-c"]}))
     assert updated.ok
     modify = client.kwargs_for("modify_vpc_endpoint")
     assert modify["AddRouteTableIds"] == ["rtb-c"]
@@ -373,17 +397,17 @@ def test_delete_requires_ownership_and_deletion_protection_bypass() -> None:
     driver, client = _driver()
     owned = client.seed()
     handle = f"private_endpoint/{owned['VpcEndpointId']}"
-    protected = driver.deprovision(DeprovisionSpec(handle, {}))
+    protected = driver.deprovision(_deprovision_spec(handle, {}))
     assert not protected.ok and not protected.retryable
-    deleted = driver.deprovision(DeprovisionSpec(handle, {}), force_destroy=True)
+    deleted = driver.deprovision(_deprovision_spec(handle, {}), force_destroy=True)
     assert deleted.ok and owned["VpcEndpointId"] not in client.endpoints
 
     foreign = client.seed(owned=False)
     foreign_handle = f"private_endpoint/{foreign['VpcEndpointId']}"
     refused = driver.deprovision(
-        DeprovisionSpec(foreign_handle, {"deletion_protection": False}),
+        _deprovision_spec(foreign_handle, {"deletion_protection": False}),
     )
-    assert not refused.ok and refused.errors == ["resource_not_owned"]
+    assert not refused.ok and refused.errors == ["ownership_refused"]
 
 
 def test_delete_surfaces_unsuccessful_item_and_is_idempotent() -> None:
@@ -392,12 +416,12 @@ def test_delete_surfaces_unsuccessful_item_and_is_idempotent() -> None:
     handle = f"private_endpoint/{endpoint['VpcEndpointId']}"
     client.delete_unsuccessful = [{"Error": {"Code": "DependencyViolation", "Message": "still used"}}]
     failed = driver.deprovision(
-        DeprovisionSpec(handle, {"deletion_protection": False}),
+        _deprovision_spec(handle, {"deletion_protection": False}),
     )
     assert not failed.ok and "DependencyViolation" in failed.message
     client.delete_unsuccessful = []
-    assert driver.deprovision(DeprovisionSpec(handle, {}), force_destroy=True).ok
-    assert driver.deprovision(DeprovisionSpec(handle, {}), force_destroy=True).ok
+    assert driver.deprovision(_deprovision_spec(handle, {}), force_destroy=True).ok
+    assert driver.deprovision(_deprovision_spec(handle, {}), force_destroy=True).ok
 
 
 def test_update_rejects_immutable_identity_changes() -> None:
@@ -409,7 +433,7 @@ def test_update_rejects_immutable_identity_changes() -> None:
         {"endpoint_type": "Gateway"},
         {"service": "dynamodb"},
     ):
-        result = driver.update(UpdateSpec(handle, config=config))
+        result = driver.update(_update_spec(handle, config=config))
         assert not result.ok and "immutable" in result.message
     assert "modify_vpc_endpoint" not in client.names()
 
@@ -471,9 +495,9 @@ def test_foreign_endpoint_is_not_updated_or_bound_as_owned_status() -> None:
     driver, client = _driver()
     endpoint = client.seed(owned=False)
     handle = f"private_endpoint/{endpoint['VpcEndpointId']}"
-    update = driver.update(UpdateSpec(handle, config={"private_dns_enabled": True}))
+    update = driver.update(_update_spec(handle, config={"private_dns_enabled": True}))
     status = driver.status(ServiceHandle(handle))
-    assert not update.ok and update.errors == ["resource_not_owned"]
+    assert not update.ok and update.errors == ["ownership_refused"]
     assert status.state == "error"
 
 
@@ -504,7 +528,7 @@ def test_native_create_and_modify_requests_match_botocore_shapes() -> None:
         ),
     )
     assert result.ok
-    update = driver.update(UpdateSpec(result.handle, config={"private_dns_enabled": True}))
+    update = driver.update(_update_spec(result.handle, config={"private_dns_enabled": True}))
     assert update.ok
     model = Session().get_service_model("ec2")
     validate_parameters(
@@ -537,6 +561,7 @@ def test_registration_catalogue_cost_and_runtime_config() -> None:
         provider_config={
             "region": "us-west-2",
             "vpc_endpoint_vpc_id": "vpc-config",
+            "account_id": "123456789012",
             "vpc_endpoint_subnet_ids": ["subnet-config"],
             "vpc_endpoint_security_group_ids": ["sg-config"],
             "vpc_endpoint_route_table_ids": ["rtb-config"],
@@ -548,6 +573,7 @@ def test_registration_catalogue_cost_and_runtime_config() -> None:
         region="us-west-2",
     )
     config = managed_config_for("aws", cluster, kind="private_endpoint", variant="vpc_endpoint")
+    assert config.account_id == "123456789012"
     assert config.region == "us-west-2"
     assert config.vpc_id == "vpc-config"
     assert config.subnet_ids == ["subnet-config"]

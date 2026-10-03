@@ -41,9 +41,11 @@ from __future__ import annotations
 import contextlib
 import json
 import logging
+import re
 import time
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
 
 from _sdk._telemetry import driver_op
 from _sdk.cloud_credentials import CredentialedConfig
@@ -63,12 +65,13 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.physical_naming import managed_service_identity, physical_name
 from aws._errors import map_client_error
 from aws._naming import iam_role_name
 from aws.managed._base import (
     ManagedServiceError,
-    adoption_refusal,
     handle_for,
+    live_ownership_refusal,
     parse_handle,
     tags_for,
 )
@@ -119,6 +122,7 @@ class LambdaConfig(CredentialedConfig):
     log_retention_days: int = 14
     """Retention for the function's CloudWatch log group. Reserved for the
     follow-up that pre-creates the log group; Lambda auto-creates it today."""
+    account_id: str = ""
 
 
 class LambdaDriver(ManagedServiceDriver):
@@ -157,47 +161,43 @@ class LambdaDriver(ManagedServiceDriver):
         if cfg.get("grants"):
             return ProvisionResult(ok=False, handle="", message=_GRANTS_REFUSAL, errors=[_GRANTS_REFUSAL])
 
-        function_name = self._function_name(spec)
-        role_name = self._role_name_for(function_name)
-
-        # Ownership before the exec role and code, both keyed by name (#1961).
-        existing_tags = self._function_tags(function_name)
-        if existing_tags is not None:
-            refusal = adoption_refusal(existing_tags, spec, resource=f"function {function_name}")
-            if refusal is not None:
-                return ProvisionResult(ok=False, handle="", message=refusal, errors=[refusal])
-
+        function_name = ""
         try:
-            role_arn = self._ensure_exec_role(role_name=role_name, function_name=function_name)
-        except Exception as exc:
-            return ProvisionResult(ok=False, handle="", message=f"exec-role: {exc}", errors=[str(exc)])
-
-        try:
-            if self._function_exists(function_name):
-                # Idempotent: a prior attempt created the function. Reconcile
-                # code + config in place rather than re-creating.
+            managed_service_identity(spec.managed_service_id)
+            function_name = self._function_name(spec)
+            existing = self._owned_function(function_name, spec.managed_service_id)
+            if spec.recorded_handle and existing is None:
+                raise ManagedServiceError("recorded Lambda function is missing; refusing replacement")
+            role_name = self._role_name_for(function_name)
+            role = self._owned_role(role_name, spec.managed_service_id)
+            url = self._function_url(function_name) if existing else None
+            if existing and role is None:
+                raise ManagedServiceError("recorded Lambda execution role is missing")
+            role_arn = self._ensure_exec_role(role_name=role_name, function_name=function_name, spec=spec)
+            if existing:
                 self._apply_code_then_config(function_name, cfg, role_arn=role_arn)
             else:
                 try:
-                    self._create_function(self._build_create_args(spec, function_name, role_arn))
+                    response = self._create_function(self._build_create_args(spec, function_name, role_arn))
+                    self._validate_function_metadata(function_name, response)
                 except self._lambda.exceptions.ResourceConflictException:
-                    # Concurrent provision created it between the probe and the
-                    # create — reconcile instead.
+                    # A conflict is not an ownership proof. Re-read both parents
+                    # before changing a function created by a concurrent caller.
+                    if self._owned_function(function_name, spec.managed_service_id) is None:
+                        raise ManagedServiceError("raced Lambda function is missing") from None
+                    if self._owned_role(role_name, spec.managed_service_id) is None:
+                        raise ManagedServiceError("raced Lambda execution role is missing") from None
+                    self._function_url(function_name)
                     self._apply_code_then_config(function_name, cfg, role_arn=role_arn)
             self._wait_active(function_name)
+            if self._owned_function(function_name, spec.managed_service_id) is None:
+                raise ManagedServiceError("Lambda function disappeared after readiness wait")
+            if bool(cfg.get("public", False)):
+                self._ensure_function_url(function_name, existing=url)
         except Exception as exc:
-            return ProvisionResult(ok=False, handle="", message=f"create/update function: {exc}", errors=[str(exc)])
-
-        if bool(cfg.get("public", False)):
-            try:
-                self._ensure_function_url(function_name)
-            except Exception as exc:
-                return ProvisionResult(
-                    ok=False,
-                    handle="",
-                    message=f"function-url: {exc}",
-                    errors=[str(exc)],
-                )
+            return ProvisionResult(
+                ok=False, handle=spec.recorded_handle or "", message=f"provision Lambda: {exc}", errors=[str(exc)]
+            )
 
         return ProvisionResult(
             ok=True,
@@ -207,84 +207,63 @@ class LambdaDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="faas_lambda")
     def update(self, spec: UpdateSpec) -> UpdateResult:
-        _, function_name = parse_handle(spec.handle)
-        if (spec.config or {}).get("grants"):
+        cfg = spec.config or {}
+        if cfg.get("grants"):
             return UpdateResult(ok=False, handle=spec.handle, message=_GRANTS_REFUSAL, errors=[_GRANTS_REFUSAL])
+        invalid = self._validate_packaging(cfg)
+        if invalid:
+            return UpdateResult(False, spec.handle, invalid, [invalid])
         try:
-            # The new code reference (image digest / zip key) and any
-            # env/memory/timeout changes arrive via spec.config. The role is
-            # kept, but its policy is re-asserted: one provisioned before
-            # #2087 may still carry statements a config chose.
-            self._apply_code_then_config(function_name, spec.config or {}, role_arn=None)
-            self._put_exec_policy(self._role_name_for(function_name), function_name)
+            function_name = self._target(spec.handle)
+            if self._owned_function(function_name, spec.managed_service_id) is None:
+                raise ManagedServiceError("recorded Lambda function is missing")
+            role_name = self._role_name_for(function_name)
+            role = self._owned_role(role_name, spec.managed_service_id)
+            if role is None:
+                raise ManagedServiceError("recorded Lambda execution role is missing")
+            self._function_url(function_name)
+            self._apply_code_then_config(function_name, cfg, role_arn=role["Arn"])
+            self._put_exec_policy(role_name, function_name)
+        except (ManagedServiceError, ValueError) as exc:
+            return UpdateResult(False, spec.handle, str(exc), ["ownership_refused"], retryable=False)
         except Exception as exc:
             return UpdateResult(ok=False, handle=spec.handle, message=f"update function: {exc}", errors=[str(exc)])
         return UpdateResult(ok=True, handle=spec.handle, message=f"function {function_name} updated")
 
-    @driver_op(
-        cloud="aws",
-        driver="faas_lambda",
-        audit=True,
-        sensitive_kind="managed_service_deprovision",
-    )
+    @driver_op(cloud="aws", driver="faas_lambda", audit=True, sensitive_kind="managed_service_deprovision")
     def deprovision(
-        self,
-        spec: DeprovisionSpec,
-        *,
-        delete_data: bool = False,
-        force_destroy: bool = False,
+        self, spec: DeprovisionSpec, *, delete_data: bool = False, force_destroy: bool = False
     ) -> DeprovisionResult:
-        # A function holds no persistent state, so delete_data / force_destroy
-        # take the same path (mirrors the cdn driver).
         del delete_data, force_destroy
-        _, function_name = parse_handle(spec.handle)
-
-        # Function URL config dies with the function, but delete it explicitly
-        # first so a half-torn-down resource (function gone, url config orphan)
-        # also converges. All steps NotFound-tolerant (#998).
         try:
-            self._lambda.delete_function_url_config(FunctionName=function_name)
-        except self._lambda.exceptions.ResourceNotFoundException:
-            pass
+            function_name = self._target(spec.handle)
+            # Preflight the whole tree before its first deletion. Force never
+            # bypasses live ownership, including a role left by partial create.
+            function = self._owned_function(function_name, spec.managed_service_id)
+            role_name = self._role_name_for(function_name)
+            role = self._owned_role(role_name, spec.managed_service_id)
+            url = self._function_url(function_name)
+            if url is not None:
+                self._lambda.delete_function_url_config(FunctionName=function_name)
+            if function is not None:
+                self._lambda.delete_function(FunctionName=function_name)
+            if role is not None:
+                self._delete_exec_role(role_name)
+        except (ManagedServiceError, ValueError) as exc:
+            return DeprovisionResult(False, spec.handle, str(exc), ["ownership_refused"], retryable=False)
         except Exception as exc:
-            return DeprovisionResult(
-                ok=False,
-                handle=spec.handle,
-                message=f"delete function-url: {exc}",
-                errors=[str(exc)],
-            )
-
-        try:
-            self._lambda.delete_function(FunctionName=function_name)
-        except self._lambda.exceptions.ResourceNotFoundException:
-            pass
-        except Exception as exc:
-            return DeprovisionResult(
-                ok=False,
-                handle=spec.handle,
-                message=f"delete_function: {exc}",
-                errors=[str(exc)],
-            )
-
-        try:
-            self._delete_exec_role(self._role_name_for(function_name))
-        except Exception as exc:
-            return DeprovisionResult(
-                ok=False,
-                handle=spec.handle,
-                message=f"delete exec-role: {exc}",
-                errors=[str(exc)],
-            )
-
-        return DeprovisionResult(ok=True, handle=spec.handle, message=f"function {function_name} deleted")
+            return DeprovisionResult(False, spec.handle, f"delete Lambda: {exc}", [str(exc)])
+        return DeprovisionResult(True, spec.handle, f"function {function_name} deleted")
 
     # ---- read-only ops --------------------------------------------
 
     @driver_op(cloud="aws", driver="faas_lambda")
     def status(self, handle: ServiceHandle) -> ServiceStatus:
-        _, function_name = parse_handle(handle.handle)
         try:
-            resp = self._lambda.get_function_configuration(FunctionName=function_name)
+            function_name = self._target(handle.handle)
+            resp = self._owned_live_function(function_name, handle.managed_service_id)
+            if resp is None:
+                return ServiceStatus(handle.handle, "deprovisioned", f"function {function_name} does not exist")
         except self._lambda.exceptions.ResourceNotFoundException:
             return ServiceStatus(
                 handle=handle.handle,
@@ -319,12 +298,13 @@ class LambdaDriver(ManagedServiceDriver):
         handle: ServiceHandle,
         config: dict[str, Any] | None = None,
     ) -> Binding:
-        _, function_name = parse_handle(handle.handle)
-        resp = self._lambda.get_function_configuration(FunctionName=function_name)
-        function_arn = resp.get("FunctionArn", "")
-        function_url = ""
-        with contextlib.suppress(self._lambda.exceptions.ResourceNotFoundException):
-            function_url = self._lambda.get_function_url_config(FunctionName=function_name).get("FunctionUrl", "")
+        function_name = self._target(handle.handle)
+        resp = self._owned_live_function(function_name, handle.managed_service_id)
+        if resp is None:
+            raise ManagedServiceError("recorded Lambda function is missing")
+        function_arn = resp["FunctionArn"]
+        url = self._function_url(function_name)
+        function_url = str(url["FunctionUrl"]) if url else ""
         return Binding(
             env_vars={
                 "FUNCTION_NAME": ValueRef(literal=function_name),
@@ -407,22 +387,121 @@ class LambdaDriver(ManagedServiceDriver):
 
     # ---- internals ------------------------------------------------
 
+    def _identity_config(self) -> None:
+        if (
+            re.fullmatch(r"[0-9]{12}", self._config.account_id) is None
+            or re.fullmatch(r"[a-z]{2}(?:-[a-z]+)+-[0-9]+", self._config.region) is None
+        ):
+            raise ManagedServiceError("Lambda requires a region and 12-digit account_id")
+        if (
+            len(self._config.role_path_prefix) > 512
+            or re.fullmatch(r"/(?:[!-~]+/)?", self._config.role_path_prefix) is None
+        ):
+            raise ManagedServiceError("invalid Lambda execution role path")
+
+    def _partition(self) -> str:
+        region = self._config.region
+        if region.startswith("cn-"):
+            return "aws-cn"
+        if region.startswith("us-gov-"):
+            return "aws-us-gov"
+        if region.startswith("us-iso-"):
+            return "aws-iso"
+        if region.startswith("us-isob-"):
+            return "aws-iso-b"
+        return "aws"
+
+    def _target(self, handle: str) -> str:
+        self._identity_config()
+        kind, name = parse_handle(handle)
+        if kind != KIND or re.fullmatch(r"[A-Za-z0-9_-]{1,64}", name) is None:
+            raise ManagedServiceError("invalid Lambda managed-service handle")
+        return name
+
     def _function_name(self, spec: ProvisionSpec) -> str:
-        # Deterministic, charset/length-safe, astrolift-* prefixed so it
-        # matches the control-plane function:astrolift-* grant. The
-        # service_handle_hint (the per-workload row name, e.g.
-        # ``<workload>-<env>-fn``) is folded in so two faas workloads in the
-        # same app/env get distinct functions instead of silently overwriting
-        # one another (matches object_store_s3._bucket_name_for, which scopes
-        # by the same hint).
-        return iam_role_name(
-            "astrolift",
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint,
-            max_len=64,
-        )
+        if spec.recorded_handle:
+            return self._target(spec.recorded_handle)
+        name = physical_name(spec.managed_service_id, prefix="astrolift", max_length=64)
+        return self._target(handle_for(kind=KIND, resource_id=name))
+
+    def _function_arn(self, name: str) -> str:
+        return f"arn:{self._partition()}:lambda:{self._config.region}:{self._config.account_id}:function:{name}"
+
+    def _role_arn(self, name: str) -> str:
+        return f"arn:{self._partition()}:iam::{self._config.account_id}:role{self._config.role_path_prefix}{name}"
+
+    def _validate_function_metadata(self, name: str, metadata: dict[str, Any]) -> None:
+        if (
+            metadata.get("FunctionName") != name
+            or metadata.get("FunctionArn") != self._function_arn(name)
+            or metadata.get("Role") != self._role_arn(self._role_name_for(name))
+        ):
+            raise ManagedServiceError("Lambda function identity or execution-role parent mismatch")
+
+    def _assert_owner(self, tags: Any, service_id: str, resource: str) -> None:
+        managed_service_identity(service_id)
+        refusal = live_ownership_refusal(tags, managed_service_id=service_id, resource=resource)
+        if refusal:
+            raise ManagedServiceError(refusal)
+
+    def _owned_function(self, name: str, service_id: str) -> dict[str, Any] | None:
+        managed_service_identity(service_id)
+        try:
+            response = self._lambda.get_function(FunctionName=name)
+        except self._lambda.exceptions.ResourceNotFoundException:
+            return None
+        metadata = response.get("Configuration") or {}
+        self._validate_function_metadata(name, metadata)
+        self._assert_owner(response.get("Tags"), service_id, "Lambda function")
+        return metadata
+
+    def _owned_role(self, name: str, service_id: str) -> dict[str, Any] | None:
+        managed_service_identity(service_id)
+        try:
+            role = self._iam.get_role(RoleName=name)["Role"]
+        except self._iam.exceptions.NoSuchEntityException:
+            return None
+        if (
+            role.get("RoleName") != name
+            or role.get("Path") != self._config.role_path_prefix
+            or role.get("Arn") != self._role_arn(name)
+        ):
+            raise ManagedServiceError("Lambda execution-role identity mismatch")
+        self._assert_owner(role.get("Tags"), service_id, "Lambda execution role")
+        return role
+
+    def _owned_live_function(self, name: str, service_id: str) -> dict[str, Any] | None:
+        function = self._owned_function(name, service_id)
+        if function is not None and self._owned_role(self._role_name_for(name), service_id) is None:
+            raise ManagedServiceError("recorded Lambda execution role is missing")
+        return function
+
+    def _function_url(self, name: str) -> dict[str, Any] | None:
+        try:
+            response = self._lambda.get_function_url_config(FunctionName=name)
+        except self._lambda.exceptions.ResourceNotFoundException:
+            return None
+        self._validate_url(name, response)
+        return response
+
+    def _validate_url(self, name: str, response: dict[str, Any]) -> None:
+        url = urlsplit(str(response.get("FunctionUrl") or ""))
+        if (
+            response.get("FunctionArn") != self._function_arn(name)
+            or response.get("AuthType") not in {"AWS_IAM", "NONE"}
+            or url.scheme != "https"
+            or re.fullmatch(
+                r"[a-z0-9-]+\.lambda-url\." + re.escape(self._config.region) + r"\.on\.aws", url.hostname or ""
+            )
+            is None
+            or url.username is not None
+            or url.password is not None
+            or url.port is not None
+            or url.path not in {"", "/"}
+            or url.query
+            or url.fragment
+        ):
+            raise ManagedServiceError("Lambda Function URL parent identity mismatch")
 
     def _role_name_for(self, function_name: str) -> str:
         # Reconstructible from the function name alone (which is all the
@@ -464,38 +543,32 @@ class LambdaDriver(ManagedServiceDriver):
                     "logs:CreateLogStream",
                     "logs:PutLogEvents",
                 ],
-                "Resource": f"arn:aws:logs:{self._config.region}:*:log-group:/aws/lambda/{function_name}:*",
+                "Resource": (
+                    f"arn:{self._partition()}:logs:{self._config.region}:{self._config.account_id}:"
+                    f"log-group:/aws/lambda/{function_name}:*"
+                ),
             },
         ]
         return {"Version": "2012-10-17", "Statement": statements}
 
-    def _ensure_exec_role(self, *, role_name: str, function_name: str) -> str:
+    def _ensure_exec_role(self, *, role_name: str, function_name: str, spec: ProvisionSpec) -> str:
         trust = self._service_trust_policy()
-        try:
-            resp = self._iam.create_role(
-                Path=self._config.role_path_prefix,
-                RoleName=role_name,
-                AssumeRolePolicyDocument=json.dumps(trust),
-                Description=f"Astrolift Lambda execution role for {function_name}",
-                Tags=[{"Key": "astrolift.io/managed-by", "Value": "platform"}],
-            )
-            role_arn = resp["Role"]["Arn"]
-        except self._iam.exceptions.EntityAlreadyExistsException:
-            # Idempotent + self-healing: re-assert the (correct) trust in case
-            # a prior create wrote a stale one (mirrors create_identity_role).
-            try:
-                role_arn = self._iam.get_role(RoleName=role_name)["Role"]["Arn"]
-                self._iam.update_assume_role_policy(
+        role = self._owned_role(role_name, spec.managed_service_id)
+        if role is None:
+            with contextlib.suppress(self._iam.exceptions.EntityAlreadyExistsException):
+                self._iam.create_role(
+                    Path=self._config.role_path_prefix,
                     RoleName=role_name,
-                    PolicyDocument=json.dumps(trust),
+                    AssumeRolePolicyDocument=json.dumps(trust),
+                    Description=f"Astrolift Lambda execution role for {function_name}",
+                    Tags=tags_for(spec),
                 )
-            except Exception as exc:
-                raise map_client_error(exc) from exc
-        except Exception as exc:
-            raise map_client_error(exc) from exc
-
+            role = self._owned_role(role_name, spec.managed_service_id)
+            if role is None:
+                raise ManagedServiceError("created Lambda execution role is missing")
+        self._iam.update_assume_role_policy(RoleName=role_name, PolicyDocument=json.dumps(trust))
         self._put_exec_policy(role_name, function_name)
-        return role_arn
+        return str(role["Arn"])
 
     def _put_exec_policy(self, role_name: str, function_name: str) -> None:
         try:
@@ -545,17 +618,17 @@ class LambdaDriver(ManagedServiceDriver):
             args["Handler"] = str(cfg["handler"])
         return args
 
-    def _create_function(self, create_args: dict[str, Any]) -> None:
+    def _create_function(self, create_args: dict[str, Any]) -> dict[str, Any]:
         # Bounded retry past the IAM trust-propagation race; ResourceConflict
         # propagates to the caller's reconcile path.
         for attempt in range(_ROLE_PROPAGATION_RETRIES):
             try:
-                self._lambda.create_function(**create_args)
-                return
+                return dict(self._lambda.create_function(**create_args))
             except self._lambda.exceptions.InvalidParameterValueException:
                 if attempt == _ROLE_PROPAGATION_RETRIES - 1:
                     raise
                 time.sleep(_ROLE_PROPAGATION_SLEEP)
+        raise ManagedServiceError("Lambda create retry limit exceeded")
 
     def _apply_code_then_config(
         self,
@@ -590,59 +663,47 @@ class LambdaDriver(ManagedServiceDriver):
         self._lambda.update_function_configuration(**conf_args)
         self._wait_updated(function_name)
 
-    def _function_tags(self, function_name: str) -> dict[str, str] | None:
-        """An existing function's tags, or ``None`` when there is no function."""
-        try:
-            return dict(self._lambda.get_function(FunctionName=function_name).get("Tags") or {})
-        except self._lambda.exceptions.ResourceNotFoundException:
-            return None
-
-    def _function_exists(self, function_name: str) -> bool:
-        try:
-            self._lambda.get_function(FunctionName=function_name)
-            return True
-        except self._lambda.exceptions.ResourceNotFoundException:
-            return False
-
-    def _ensure_function_url(self, function_name: str) -> str:
-        # AuthType=AWS_IAM (not NONE): public Function URLs are blocked by common
-        # org guardrails, and an IAM-auth URL fronted by CloudFront (Lambda OAC,
-        # sigv4) is the secure proxy model (#1035). The function is NOT public;
-        # the CloudFront-scoped invoke grant is added post-cdn via
-        # allow_cloudfront_invoke once the distribution ARN exists.
-        try:
-            resp = self._lambda.create_function_url_config(FunctionName=function_name, AuthType="AWS_IAM")
-            url = resp.get("FunctionUrl", "")
-        except self._lambda.exceptions.ResourceConflictException:
-            # Idempotent + self-healing: re-assert AWS_IAM in case a prior
-            # provision created the URL as AuthType=NONE (the pre-#1035 public
-            # shape) — this migrates the live function off the public URL.
-            self._lambda.update_function_url_config(FunctionName=function_name, AuthType="AWS_IAM")
-            url = self._lambda.get_function_url_config(FunctionName=function_name).get("FunctionUrl", "")
-        # Reap the legacy public ("*") invoke grant if a pre-#1035 provision left
-        # one — the function is now reachable only through CloudFront. Absent ==
-        # ResourceNotFoundException (nothing to remove).
+    def _ensure_function_url(self, function_name: str, *, existing: dict[str, Any] | None = None) -> str:
+        # Existing children were preflighted before any parent effects.
+        if existing is not None:
+            response = self._lambda.update_function_url_config(FunctionName=function_name, AuthType="AWS_IAM")
+        else:
+            try:
+                response = self._lambda.create_function_url_config(FunctionName=function_name, AuthType="AWS_IAM")
+            except self._lambda.exceptions.ResourceConflictException:
+                self._function_url(function_name)
+                response = self._lambda.update_function_url_config(FunctionName=function_name, AuthType="AWS_IAM")
+        self._validate_url(function_name, response)
         with contextlib.suppress(self._lambda.exceptions.ResourceNotFoundException):
-            self._lambda.remove_permission(
-                FunctionName=function_name,
-                StatementId=_PUBLIC_URL_STATEMENT_ID,
-            )
-        return url
+            self._lambda.remove_permission(FunctionName=function_name, StatementId=_PUBLIC_URL_STATEMENT_ID)
+        return str(response["FunctionUrl"])
 
     @driver_op(cloud="aws", driver="faas_lambda", audit=True)
-    def allow_cloudfront_invoke(self, function_name: str, distribution_arn: str) -> None:
+    def allow_cloudfront_invoke(
+        self, function_name: str, distribution_arn: str, *, managed_service_id: str = ""
+    ) -> None:
         """Grant ONLY the given CloudFront distribution permission to invoke the
         function's (AWS_IAM) Function URL (#1035).
 
         Post-cdn step: the distribution ARN doesn't exist until the cdn
         provisions, so ``ensure_faas_services`` calls this after the cdn row is
-        ACTIVE. Idempotent — a re-grant under the same StatementId raises
-        ResourceConflictException, which is swallowed (the distribution id is
-        stable per app/env, so the SourceArn doesn't drift across redeploys)."""
+        ACTIVE. Idempotency requires the existing statement to name exactly
+        this function and distribution; a conflicting statement is refused."""
         if not distribution_arn:
             return
-        with contextlib.suppress(self._lambda.exceptions.ResourceConflictException):
-            self._lambda.add_permission(
+        self._target(handle_for(kind=KIND, resource_id=function_name))
+        if self._owned_function(function_name, managed_service_id) is None:
+            raise ManagedServiceError("recorded Lambda function is missing")
+        expected = f"arn:{self._partition()}:cloudfront::{self._config.account_id}:distribution/"
+        if (
+            not distribution_arn.startswith(expected)
+            or re.fullmatch(r"[A-Z0-9]+", distribution_arn[len(expected) :]) is None
+        ):
+            raise ManagedServiceError("CloudFront distribution identity mismatch")
+        if self._cloudfront_permission(function_name, distribution_arn):
+            return
+        try:
+            response = self._lambda.add_permission(
                 FunctionName=function_name,
                 StatementId=_CLOUDFRONT_INVOKE_STATEMENT_ID,
                 Action="lambda:InvokeFunctionUrl",
@@ -650,6 +711,38 @@ class LambdaDriver(ManagedServiceDriver):
                 SourceArn=distribution_arn,
                 FunctionUrlAuthType="AWS_IAM",
             )
+        except self._lambda.exceptions.ResourceConflictException:
+            if not self._cloudfront_permission(function_name, distribution_arn):
+                raise ManagedServiceError("conflicting CloudFront invoke permission is unavailable") from None
+            return
+        self._validate_cloudfront_statement(function_name, distribution_arn, json.loads(response["Statement"]))
+
+    def _validate_cloudfront_statement(self, name: str, distribution_arn: str, statement: dict[str, Any]) -> None:
+        if (
+            not isinstance(statement, dict)
+            or statement.get("Sid") != _CLOUDFRONT_INVOKE_STATEMENT_ID
+            or statement.get("Resource") != self._function_arn(name)
+            or statement.get("Action") != "lambda:InvokeFunctionUrl"
+            or statement.get("Effect") != "Allow"
+            or statement.get("Principal") != {"Service": "cloudfront.amazonaws.com"}
+            or (statement.get("Condition") or {}).get("ArnLike", {}).get("AWS:SourceArn") != distribution_arn
+        ):
+            raise ManagedServiceError("CloudFront invoke permission parent or distribution mismatch")
+
+    def _cloudfront_permission(self, name: str, distribution_arn: str) -> bool:
+        try:
+            response = self._lambda.get_policy(FunctionName=name)
+        except self._lambda.exceptions.ResourceNotFoundException:
+            return False
+        statements = json.loads(response["Policy"]).get("Statement")
+        if not isinstance(statements, list) or any(not isinstance(row, dict) for row in statements):
+            raise ManagedServiceError("Lambda permission metadata is invalid")
+        selected = [row for row in statements if row.get("Sid") == _CLOUDFRONT_INVOKE_STATEMENT_ID]
+        if len(selected) > 1:
+            raise ManagedServiceError("Lambda permission identity is ambiguous")
+        if selected:
+            self._validate_cloudfront_statement(name, distribution_arn, selected[0])
+        return bool(selected)
 
     def _wait_active(self, function_name: str) -> None:
         self._lambda.get_waiter("function_active_v2").wait(FunctionName=function_name)

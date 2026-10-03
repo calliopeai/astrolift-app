@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Verify Lambda function and execution-role ownership against the saved service
+  GUID before reporting readiness or returning URLs, ARNs and invoke grants.
+  Tagged legacy names stay supported; missing or foreign ownership evidence
+  requires verified operator repair rather than automatic adoption (#2032).
+
 - Replace the static platform activity page with the permission-scoped Temporal
   execution viewer. Bind detail/history and confirmed cancel/terminate requests
   to the selected run ID, follow server cursor pages including empty authorized

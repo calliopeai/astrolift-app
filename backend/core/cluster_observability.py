@@ -2596,6 +2596,7 @@ def _managed_config_uncredentialed(
 
         return LambdaConfig(
             region=region,
+            account_id=str(pc.get("account_id", "")),
             role_path_prefix=str(pc.get("faas_role_path_prefix", "/")),
             default_architecture=str(pc.get("faas_default_architecture", "arm64")),
             log_retention_days=int(pc.get("faas_log_retention_days", 14)),
@@ -2676,6 +2677,7 @@ def _managed_config_uncredentialed(
                 subnet_ids = discovered_subnets
         return VpcEndpointConfig(
             region=region,
+            account_id=str(pc.get("account_id", "")),
             vpc_id=vpc_id,
             subnet_ids=subnet_ids,
             security_group_ids=list(pc.get("vpc_endpoint_security_group_ids") or []),
