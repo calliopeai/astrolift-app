@@ -169,7 +169,7 @@ def import_bound_collection(payload, nodes, edges):
             raise FlowImportError("source done conversion requires explicit JSON without automatic parsing")
         expected.add((loop_id, "done", controls["converter"], "input_data"))
     body_ids = {key for key, kind in kinds.items() if kind in {"parser", "Agent", "RunFlow"}}
-    ordered = []
+    ordered: list[WorkflowStageSpec] = []
     outgoing = [edge for edge in identities if edge[0] == loop_id and edge[1] == "item"]
     seen = set()
     while True:
