@@ -1,0 +1,18 @@
+{
+  "upstream_revision": "1892993bc18e243e2c05841314c5e9c06a80c70d",
+  "archive_sha256": "e1d6615067167106a8c157d3bbd96e46b8452c9aea3ee95e26a3af5e9df58b93",
+  "ubuntu_amd64_image": "ubuntu@sha256:08ea48a03a3e78ebc7cd526e6a275053223aadd88bfc09cc49b06d5281525fde",
+  "runtime_package": "0.15.1+cpu",
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "model_revision": "7ae557604adf67be50417f59c2c2f167def9a775",
+  "build_args": {
+    "PYTHON_VERSION": "3.12",
+    "max_jobs": "2",
+    "VLLM_CPU_DISABLE_AVX512": "true",
+    "VLLM_CPU_AVX2": "true",
+    "VLLM_CPU_AVX512": "false",
+    "VLLM_CPU_AVX512BF16": "false",
+    "VLLM_CPU_AVX512VNNI": "false",
+    "VLLM_CPU_AMXBF16": "false"
+  }
+}
