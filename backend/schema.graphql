@@ -1909,6 +1909,34 @@ type AstroliftCiWorkflowSyncStatusMutationResult {
   data: AstroliftCiWorkflowSyncStatus
 }
 
+type AstroliftClusterAgentInstall {
+  id: GUID!
+  clusterId: GUID!
+  requestId: String!
+  status: ClusterAgentInstallStatus!
+  secretConfirmed: Boolean!
+  deploymentConfirmed: Boolean!
+  heartbeatConfirmed: Boolean!
+  retryable: Boolean!
+  workflowId: String!
+  errorCode: String!
+  errorMessage: String!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type AstroliftClusterAgentInstallMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftClusterAgentInstall
+}
+
+type AstroliftClusterAgentInstallReview {
+  clusterId: GUID!
+  version: Int!
+  source: String!
+}
+
 type AstroliftClusterAuthSource {
   providerPluginId: GUID!
   providerPoolId: String!
@@ -6492,6 +6520,15 @@ type CloudOrphanType {
   reason: String!
 }
 
+enum ClusterAgentInstallStatus {
+  QUEUED
+  INSTALLING
+  AWAITING_HEARTBEAT
+  SUCCEEDED
+  REFUSED
+  UNCERTAIN
+}
+
 input ClusterAuthUserRefInput {
   clusterId: GUID!
   expectedSource: ExpectedClusterAuthSourceInput = null
@@ -7352,6 +7389,14 @@ type ImportWorkflowManifestResult {
   repointedSlugs: [String!]!
 }
 
+input InstallClusterAgentInput {
+  clusterId: GUID!
+  expectedVersion: Int!
+  expectedSource: String!
+  requestId: String!
+  intervalSeconds: Int = null
+}
+
 input InstallClusterPrereqsInputType {
   clusterId: GUID!
   selectedComponents: [String!]!
@@ -7950,6 +7995,7 @@ type Mutation {
   revalidateManagedDomain(clusterId: GUID!, zone: String!): RevalidateManagedDomainPayloadMutationResult!
   reissueManagedDomainCert(clusterId: GUID!, zone: String!): ReissueManagedDomainCertPayloadMutationResult!
   configureProviderPlugin(input: ConfigureProviderPluginInput!): ProviderpluginconfigpayloadMutationResult!
+  installClusterAgent(input: InstallClusterAgentInput!): AstroliftClusterAgentInstallMutationResult!
   createClusterAuthUser(input: CreateClusterAuthUserInput!): AstroliftClusterAuthUserMutationResult!
   setClusterAuthUserPassword(input: SetClusterAuthUserPasswordInput!): AstroliftClusterAuthUserChangeMutationResult!
   resetClusterAuthUserPassword(input: ClusterAuthUserRefInput!): AstroliftClusterAuthUserChangeMutationResult!
@@ -8773,6 +8819,8 @@ type Query {
   astroliftClusterCertificates(clusterId: GUID!): AstroliftClusterCertificates!
   astroliftDnsZones(dnsDriver: String!): AstroliftDnsZones!
   astroliftDnsCertificates(dnsDriver: String!): AstroliftClusterCertificates!
+  astroliftClusterAgentInstallReview(clusterId: GUID!): AstroliftClusterAgentInstallReview!
+  astroliftClusterAgentInstall(installId: GUID!): AstroliftClusterAgentInstall!
   astroliftClusterAuthUsers(clusterId: GUID!, search: String! = ""): AstroliftClusterAuthUsers
   astroliftQuotas: [AstroliftQuota!]!
   astroliftQuotaUsageHistory(quotaId: GUID!, windowDays: Int! = 90): [AstroliftQuotaUsagePoint!]!

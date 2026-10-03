@@ -57,6 +57,7 @@ import hashlib
 import json
 import logging
 
+from django.db import transaction
 from django.http import HttpRequest, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -122,6 +123,10 @@ def _sanitize_payload(body: dict) -> dict:
     return {k: body[k] for k in _ALLOWED_PAYLOAD_KEYS if k in body}
 
 
+def _invalid_json_constant(_value):
+    raise ValueError("Nonfinite JSON values are invalid")
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def cluster_heartbeat(request: HttpRequest, cluster_guid: str) -> JsonResponse:
@@ -138,55 +143,81 @@ def cluster_heartbeat(request: HttpRequest, cluster_guid: str) -> JsonResponse:
     # lookup hash is always 64 hex chars, never empty.
     cluster = _cluster_for_agent_key(request, cluster_guid)
     if cluster is None:
-        return JsonResponse({"error": "unauthorized"}, status=401)
+        from astrolift_clusters.models import ClusterAgentInstall
+
+        raw_key = _bearer_token(request)
+        if (
+            raw_key is None
+            or not ClusterAgentInstall.objects.filter(
+                tenant_cluster__guid=cluster_guid,
+                credential_hash=_hash_key(raw_key),
+                status="awaiting_heartbeat",
+                deployment_confirmed=True,
+            ).exists()
+        ):
+            return JsonResponse({"error": "unauthorized"}, status=401)
 
     try:
-        body = json.loads(request.body) if request.body else {}
+        body = json.loads(request.body, parse_constant=_invalid_json_constant) if request.body else {}
     except (json.JSONDecodeError, ValueError):
         return JsonResponse({"error": "invalid JSON"}, status=400)
     if not isinstance(body, dict):
         return JsonResponse({"error": "body must be a JSON object"}, status=400)
 
-    cluster.last_heartbeat_at = timezone.now()
-    cluster.last_heartbeat_payload = _sanitize_payload(body)
-    cluster.save(
-        update_fields=[
-            "last_heartbeat_at",
-            "last_heartbeat_payload",
-            "updated_at",
-            "version",
-        ]
-    )
+    raw_key = _bearer_token(request)
+    key_hash = _hash_key(raw_key) if raw_key else ""
+    # Staged keys authenticate only after installation is confirmed and a valid
+    # pulse proves possession. A malformed pulse must never rotate the active key.
+    if cluster is None:
+        from astrolift_clusters.agent_install import activate_heartbeat
 
-    logger.debug(
-        "cluster.heartbeat: cluster=%s nodes=%s agent_version=%s",
-        cluster.slug,
-        body.get("node_count"),
-        body.get("agent_version"),
-    )
+        cluster = activate_heartbeat(cluster_guid, key_hash)
+    if cluster is None:
+        return JsonResponse({"error": "unauthorized"}, status=401)
+    with transaction.atomic():
+        # Activation and telemetry serialize on the same cluster lock. An old-key
+        # request that waited behind activation cannot overwrite its telemetry or
+        # obtain newly dispatched jobs. Telemetry alone does not advance review.
+        cluster = (
+            TenantCluster.objects.select_for_update()
+            .filter(guid=cluster_guid, agent_key_hash=key_hash)
+            .first()
+        )
+        if cluster is None:
+            return JsonResponse({"error": "unauthorized"}, status=401)
+        TenantCluster.objects.filter(pk=cluster.pk, agent_key_hash=key_hash).update(
+            last_heartbeat_at=timezone.now(), last_heartbeat_payload=_sanitize_payload(body)
+        )
 
-    response = {
-        "ok": True,
-        "interval_seconds": cluster.heartbeat_interval_seconds,
-    }
-    try:
-        job = agent_test_jobs.dispatch_pending(str(cluster.guid))
-    except agent_test_jobs.AgentTestUnavailable:
-        logger.warning("cluster.model_test_dispatch_unavailable: cluster=%s", cluster.guid)
-        job = None
-    if job is not None:
-        response["test_job"] = {
-            "job_id": job["job_id"],
-            "base_url": job["base_url"],
-            "model": job["model"],
-            "prompt": job["prompt"],
-            "max_tokens": job["max_tokens"],
-            "timeout_seconds": job["timeout_seconds"],
-            "secret_namespace": job["secret_namespace"],
-            "secret_name": job["secret_name"],
-            "secret_key": job["secret_key"],
+        logger.debug(
+            "cluster.heartbeat: cluster=%s nodes=%s agent_version=%s",
+            cluster.slug,
+            body.get("node_count"),
+            body.get("agent_version"),
+        )
+
+        response = {
+            "ok": True,
+            "interval_seconds": cluster.heartbeat_interval_seconds,
         }
-    return JsonResponse(response)
+        try:
+            job = agent_test_jobs.dispatch_pending(str(cluster.guid))
+        except agent_test_jobs.AgentTestUnavailable:
+            logger.warning("cluster.model_test_dispatch_unavailable: cluster=%s", cluster.guid)
+            job = None
+        if job is not None:
+            response["test_job"] = {
+                "job_id": job["job_id"],
+                "base_url": job["base_url"],
+                "model": job["model"],
+                "prompt": job["prompt"],
+                "max_tokens": job["max_tokens"],
+                "timeout_seconds": job["timeout_seconds"],
+                "secret_namespace": job["secret_namespace"],
+                "secret_name": job["secret_name"],
+                "secret_key": job["secret_key"],
+            }
+        return JsonResponse(response)
 
 
 @csrf_exempt

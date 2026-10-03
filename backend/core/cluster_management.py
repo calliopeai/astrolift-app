@@ -420,6 +420,7 @@ def build_agent_manifests(cluster: TenantCluster) -> list[dict[str, Any]]:
     the namespace before the workload that targets it.
     """
     labels = {"app": "astrolift-agent", "astrolift.io/managed-by": "platform"}
+    deployment_name = getattr(cluster, "agent_deployment_name", "") or "astrolift-agent"
     return [
         {
             "apiVersion": "v1",
@@ -495,15 +496,15 @@ def build_agent_manifests(cluster: TenantCluster) -> list[dict[str, Any]]:
             "apiVersion": "apps/v1",
             "kind": "Deployment",
             "metadata": {
-                "name": "astrolift-agent",
+                "name": deployment_name,
                 "namespace": AGENT_NAMESPACE,
                 "labels": labels,
             },
             "spec": {
                 "replicas": 1,
-                "selector": {"matchLabels": {"app": "astrolift-agent"}},
+                "selector": {"matchLabels": {"app": deployment_name}},
                 "template": {
-                    "metadata": {"labels": labels},
+                    "metadata": {"labels": {**labels, "app": deployment_name}},
                     "spec": {
                         "serviceAccountName": "astrolift-agent",
                         "automountServiceAccountToken": True,
@@ -516,7 +517,8 @@ def build_agent_manifests(cluster: TenantCluster) -> list[dict[str, Any]]:
                                         "name": "HEARTBEAT_URL",
                                         "valueFrom": {
                                             "secretKeyRef": {
-                                                "name": AGENT_SECRET_NAME,
+                                                "name": getattr(cluster, "agent_secret_name", "")
+                                                or AGENT_SECRET_NAME,
                                                 "key": "heartbeat_url",
                                             }
                                         },
@@ -525,7 +527,8 @@ def build_agent_manifests(cluster: TenantCluster) -> list[dict[str, Any]]:
                                         "name": "AGENT_KEY",
                                         "valueFrom": {
                                             "secretKeyRef": {
-                                                "name": AGENT_SECRET_NAME,
+                                                "name": getattr(cluster, "agent_secret_name", "")
+                                                or AGENT_SECRET_NAME,
                                                 "key": "agent_key",
                                             }
                                         },
@@ -558,14 +561,26 @@ def deploy_agent_dispatch(*, cluster: TenantCluster) -> Any:
     — the resolver maps that to an INTERNAL MutationResult with the
     message persisted to ``last_management_error``.
     """
-    driver = _driver_for_cluster(cluster)
-    if not hasattr(driver, "apply_manifests"):
-        raise ClusterManagementError(
-            f"cluster {cluster.slug}: driver does not implement apply_manifests",
-        )
-    ctx = _context_for_cluster(cluster)
-    manifests = build_agent_manifests(cluster)
-    return driver.apply_manifests(ctx.slug, AGENT_NAMESPACE, manifests)
+    from django.db import transaction
+
+    from astrolift_clusters.models import TenantCluster
+
+    with transaction.atomic():
+        cluster = TenantCluster.objects.select_for_update().get(pk=cluster.pk)
+        from astrolift_clusters.agent_install import installation_busy, reconcile_installed_agent
+
+        if installation_busy(cluster):
+            raise ClusterManagementError("A server-owned agent installation is pending")
+        if cluster.agent_secret_uid:
+            return reconcile_installed_agent(cluster)
+        driver = _driver_for_cluster(cluster)
+        if not hasattr(driver, "apply_manifests"):
+            raise ClusterManagementError(
+                f"cluster {cluster.slug}: driver does not implement apply_manifests",
+            )
+        ctx = _context_for_cluster(cluster)
+        manifests = build_agent_manifests(cluster)
+        return driver.apply_manifests(ctx.slug, AGENT_NAMESPACE, manifests)
 
 
 def apply_manifests_dispatch(

@@ -177,6 +177,11 @@ class TenantCluster(NamedBaseCoreModel):
     # ``last_heartbeat_at`` + ``last_heartbeat_payload`` drive a derived
     # live-status badge (see ``heartbeat_status`` policy) that short-
     # circuits the expensive cards into a targeted offline empty-state.
+    agent_secret_name = models.CharField(max_length=128, blank=True, default="")
+    agent_secret_uid = models.CharField(max_length=128, blank=True, default="")
+    agent_deployment_name = models.CharField(max_length=128, blank=True, default="")
+    agent_deployment_uid = models.CharField(max_length=128, blank=True, default="")
+
     agent_key_hash = models.CharField(
         max_length=64,
         blank=True,
@@ -288,24 +293,56 @@ class TenantCluster(NamedBaseCoreModel):
     )
 
     def save(self, *args, **kwargs):
+        from django.db import transaction
+
         fields = kwargs.get("update_fields")
-        # Partial source writes must persist the revision used by reviewed actions.
-        if fields is not None and set(fields) & {
-            "organization_id",
-            "deleted_at",
-            "alb_auth_config",
-            "region",
-            "auth_method",
-            "auth_config",
-            "oidc_auth_config",
-            "is_active",
-            "provider_plugin",
-            "provider_config",
-            "organization",
-            "provider_plugin_id",
-        }:
+        source_write = fields is None or bool(
+            set(fields)
+            & {
+                "endpoint",
+                "ca_cert",
+                "slug",
+                "cloud_account_id",
+                "cloud_account_verified_at",
+                "heartbeat_interval_seconds",
+                "agent_key_hash",
+                "agent_secret_name",
+                "agent_secret_uid",
+                "agent_deployment_uid",
+                "agent_deployment_name",
+                "organization_id",
+                "deleted_at",
+                "alb_auth_config",
+                "region",
+                "auth_method",
+                "auth_config",
+                "oidc_auth_config",
+                "is_active",
+                "provider_plugin",
+                "provider_config",
+                "organization",
+                "provider_plugin_id",
+            }
+        )
+        if not source_write:
+            return super().save(*args, **kwargs)
+        if fields is not None:
             kwargs["update_fields"] = set(fields) | {"version", "updated_at"}
-        return super().save(*args, **kwargs)
+        # A reused stale instance must not reuse an observed review counter.
+        # Source writers and reviewed dispatch take the same canonical row lock;
+        # telemetry-only conditional updates intentionally bypass this path.
+        with transaction.atomic():
+            if self.pk is not None:
+                persisted = (
+                    type(self)
+                    .all_objects.select_for_update()
+                    .filter(pk=self.pk)
+                    .values_list("version", flat=True)
+                    .first()
+                )
+                if persisted is not None:
+                    self.version = persisted
+            return super().save(*args, **kwargs)
 
     class Meta:
         constraints = [

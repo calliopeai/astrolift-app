@@ -1843,6 +1843,34 @@ export type AstroliftCiWorkflowSyncStatusMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftClusterAgentInstall = {
+  clusterId: Scalars['GUID']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  deploymentConfirmed: Scalars['Boolean']['output'];
+  errorCode: Scalars['String']['output'];
+  errorMessage: Scalars['String']['output'];
+  heartbeatConfirmed: Scalars['Boolean']['output'];
+  id: Scalars['GUID']['output'];
+  requestId: Scalars['String']['output'];
+  retryable: Scalars['Boolean']['output'];
+  secretConfirmed: Scalars['Boolean']['output'];
+  status: ClusterAgentInstallStatus;
+  updatedAt: Scalars['DateTime']['output'];
+  workflowId: Scalars['String']['output'];
+};
+
+export type AstroliftClusterAgentInstallMutationResult = {
+  data?: Maybe<AstroliftClusterAgentInstall>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftClusterAgentInstallReview = {
+  clusterId: Scalars['GUID']['output'];
+  source: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
 export type AstroliftClusterAuthSource = {
   providerPluginId: Scalars['GUID']['output'];
   providerPoolId: Scalars['String']['output'];
@@ -6091,6 +6119,14 @@ export type CloudOrphanType = {
   reason: Scalars['String']['output'];
 };
 
+export type ClusterAgentInstallStatus =
+  | 'AWAITING_HEARTBEAT'
+  | 'INSTALLING'
+  | 'QUEUED'
+  | 'REFUSED'
+  | 'SUCCEEDED'
+  | 'UNCERTAIN';
+
 export type ClusterAuthUserRefInput = {
   clusterId: Scalars['GUID']['input'];
   expectedSource: InputMaybe<ExpectedClusterAuthSourceInput>;
@@ -6925,6 +6961,14 @@ export type ImportWorkflowManifestResult = {
   repointedSlugs: Array<Scalars['String']['output']>;
 };
 
+export type InstallClusterAgentInput = {
+  clusterId: Scalars['GUID']['input'];
+  expectedSource: Scalars['String']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  intervalSeconds: InputMaybe<Scalars['Int']['input']>;
+  requestId: Scalars['String']['input'];
+};
+
 export type InstallClusterPrereqsInputType = {
   clusterId: Scalars['GUID']['input'];
   optionOverrides: Array<BootstrapOptionOverride>;
@@ -7408,6 +7452,7 @@ export type Mutation = {
   /** Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled, org-scoped WorkflowDefinition + stages in the caller's org and returns the (possibly uniquified) slug. replace=true instead upserts the org's own definition sharing the manifest's slug: in place when the stage kinds are unchanged (configured Workflows, bindings and schedules all keep working untouched), otherwise as a new version with every configured Workflow repointed to it, or a clear refusal when a repoint would break one's bindings. */
   importWorkflowManifest: ImportWorkflowManifestResult;
   installAstroliftSourceWebhook: AstroliftInstallSourceWebhookPayloadMutationResult;
+  installClusterAgent: AstroliftClusterAgentInstallMutationResult;
   installClusterPrereqs: AstroliftTenantClusterMutationResult;
   installScmWebhook: AstroliftScmWebhookInstallationMutationResult;
   issueClusterAgentKey: ClusteragentkeyissuedpayloadMutationResult;
@@ -8428,6 +8473,11 @@ export type MutationImportWorkflowManifestArgs = {
 
 export type MutationInstallAstroliftSourceWebhookArgs = {
   input: InstallSourceWebhookInput;
+};
+
+
+export type MutationInstallClusterAgentArgs = {
+  input: InstallClusterAgentInput;
 };
 
 
@@ -10094,6 +10144,8 @@ export type Query = {
   astroliftAvailableRepos: AstroliftRemoteRepoList;
   astroliftBudgets: Array<AstroliftBudget>;
   astroliftCluster?: Maybe<AstroliftTenantCluster>;
+  astroliftClusterAgentInstall: AstroliftClusterAgentInstall;
+  astroliftClusterAgentInstallReview: AstroliftClusterAgentInstallReview;
   astroliftClusterAuthUsers?: Maybe<AstroliftClusterAuthUsers>;
   astroliftClusterBootstrapPlan?: Maybe<AstroliftClusterBootstrapPlan>;
   astroliftClusterCertificates: AstroliftClusterCertificates;
@@ -10998,6 +11050,16 @@ export type QueryAstroliftAvailableReposArgs = {
 
 export type QueryAstroliftClusterArgs = {
   slug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftClusterAgentInstallArgs = {
+  installId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftClusterAgentInstallReviewArgs = {
+  clusterId: Scalars['GUID']['input'];
 };
 
 
