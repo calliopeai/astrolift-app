@@ -32,9 +32,7 @@ REGISTERED = [
 
 
 def create_plan(*, max_rounds=3, exhausted="fail", output_test=False):
-    org = Organization.objects.create(
-        name="Bounded loop integration", slug="bounded-loop-integration"
-    )
+    org = Organization.objects.create(name="Bounded loop integration", slug="bounded-loop-integration")
     definition = WorkflowDefinition.objects.create(
         name="Review",
         slug="review",
@@ -106,9 +104,7 @@ async def wait_execution(run_id, stage_id, *, round_number=1, status="running"):
         if row:
             return row
         await asyncio.sleep(0.02)
-    pytest.fail(
-        f"The real worker did not open the expected round {round_number} {status} execution"
-    )
+    pytest.fail(f"The real worker did not open the expected round {round_number} {status} execution")
 
 
 async def wait_gate_acknowledged(handle, execution_id):
@@ -118,9 +114,7 @@ async def wait_gate_acknowledged(handle, execution_id):
         completed = None
         for event in history.events:
             if event.event_type == EventType.EVENT_TYPE_ACTIVITY_TASK_COMPLETED:
-                payloads = (
-                    event.activity_task_completed_event_attributes.result.payloads
-                )
+                payloads = event.activity_task_completed_event_attributes.result.payloads
                 if (
                     payloads
                     and payloads[0].metadata.get("encoding") == b"json/plain"
@@ -180,9 +174,7 @@ async def test_rejection_reenters_producer_and_survives_worker_restart(temporal_
     rows = await sync_to_async(list)(
         WorkflowStageExecution.objects.filter(workflow_run_id=run_id)
         .order_by("pk")
-        .values_list(
-            "stage__output_key", "round_number", "attempt_number", "status", "caused_by"
-        )
+        .values_list("stage__output_key", "round_number", "attempt_number", "status", "caused_by")
     )
     assert [(key, rnd, attempt, status) for key, rnd, attempt, status, _ in rows] == [
         ("draft", 1, 1, "completed"),
@@ -223,9 +215,7 @@ async def test_rejections_stop_at_declared_round_cap(temporal_env, exhausted):
                 },
             )
         if exhausted == "escalate":
-            escalation = await wait_execution(
-                run_id, stage_id, round_number=2, status="escalated"
-            )
+            escalation = await wait_execution(run_id, stage_id, round_number=2, status="escalated")
             assert escalation.caused_by["reason"] == "max_rounds_exhausted"
             await handle.signal(
                 "escalation_cleared",
@@ -238,9 +228,7 @@ async def test_rejections_stop_at_declared_round_cap(temporal_env, exhausted):
     assert result.ok is (exhausted == "escalate")
     assert (
         await sync_to_async(
-            lambda: WorkflowStageExecution.objects.filter(
-                workflow_run_id=run_id, round_number__gt=2
-            ).count()
+            lambda: WorkflowStageExecution.objects.filter(workflow_run_id=run_id, round_number__gt=2).count()
         )()
         == 0
     )
@@ -261,9 +249,7 @@ async def test_rejections_stop_at_declared_round_cap(temporal_env, exhausted):
     "payload, expected",
     [({"tests": {"passed": False}}, "incomplete"), ({"tests": {}}, "unavailable")],
 )
-async def test_output_condition_is_bounded_or_explicitly_unavailable(
-    temporal_env, payload, expected
-):
+async def test_output_condition_is_bounded_or_explicitly_unavailable(temporal_env, payload, expected):
     plan = await sync_to_async(create_plan)(max_rounds=2, output_test=True)
     async with temporal_worker(
         temporal_env, workflows=[WorkflowDefinitionRunWorkflow], activities=REGISTERED
@@ -294,9 +280,7 @@ async def test_final_child_failure_returns_after_attempts_and_passes_actual_feed
             slug="failed-child",
             model_label="",
         )
-        WorkflowStage.objects.create(
-            definition=child, order=0, kind="human_gate", timeout_seconds=1
-        )
+        WorkflowStage.objects.create(definition=child, order=0, kind="human_gate", timeout_seconds=1)
         stage = WorkflowStage.objects.get(pk=plan[3])
         stage.kind = "workflow"
         stage.workflow_ref = "failed-child"
@@ -322,30 +306,22 @@ async def test_final_child_failure_returns_after_attempts_and_passes_actual_feed
     rows = await sync_to_async(list)(
         WorkflowStageExecution.objects.filter(workflow_run_id=plan[1]).order_by("pk")
     )
-    assert [
-        (row.round_number, row.attempt_number)
-        for row in rows
-        if row.stage_id == plan[3]
-    ] == [(1, 1), (1, 2), (2, 1), (2, 2)]
+    assert [(row.round_number, row.attempt_number) for row in rows if row.stage_id == plan[3]] == [
+        (1, 1),
+        (1, 2),
+        (2, 1),
+        (2, 2),
+    ]
     assert rows[3].caused_by["reason"] == "stage_failed"
     children_inputs = [
-        json.loads(
-            event.start_child_workflow_execution_initiated_event_attributes.input.payloads[
-                0
-            ].data
-        )
+        json.loads(event.start_child_workflow_execution_initiated_event_attributes.input.payloads[0].data)
         for event in history.events
         if event.HasField("start_child_workflow_execution_initiated_event_attributes")
     ]
     loop = children_inputs[2]["trigger_payload"]["_astrolift_workflow"]["loop"]
     assert loop["feedback"]["failure"]["message"]
     assert loop["edge_round"] == 2 and loop["round_number"] == 2
-    assert (
-        await sync_to_async(
-            lambda: WorkflowRun.objects.filter(parent_run_id=plan[1]).count()
-        )()
-        == 4
-    )
+    assert await sync_to_async(lambda: WorkflowRun.objects.filter(parent_run_id=plan[1]).count())() == 4
     await Replayer(workflows=[WorkflowDefinitionRunWorkflow]).replay_workflow(history)
 
 
@@ -361,9 +337,7 @@ async def test_real_unconfigured_agent_fanout_records_owned_branches_and_incompl
         from astrolift_identity.models import Project, Team
         from astrolift_registry.models import RegisteredApp, Workload
 
-        team = Team.objects.create(
-            organization=definition.organization, name="Disposable", slug="disposable"
-        )
+        team = Team.objects.create(organization=definition.organization, name="Disposable", slug="disposable")
         project = Project.objects.create(
             organization=definition.organization,
             team=team,
@@ -403,9 +377,7 @@ async def test_real_unconfigured_agent_fanout_records_owned_branches_and_incompl
         history = await handle.fetch_history()
     assert not result.ok and result.data["status"] == "incomplete"
     rows = await sync_to_async(list)(
-        WorkflowStageExecution.objects.filter(
-            workflow_run_id=plan[1], stage_id=plan[3]
-        ).order_by("pk")
+        WorkflowStageExecution.objects.filter(workflow_run_id=plan[1], stage_id=plan[3]).order_by("pk")
     )
     parent = next(row for row in rows if row.fanout_parent_execution_id is None)
     branches = [row for row in rows if row.fanout_parent_execution_id == parent.pk]
@@ -417,12 +389,8 @@ async def test_real_unconfigured_agent_fanout_records_owned_branches_and_incompl
     await Replayer(workflows=[WorkflowDefinitionRunWorkflow]).replay_workflow(history)
 
 
-@pytest.mark.parametrize(
-    "cap,fallback", [(1, "Bounded import done"), (2, None), (5, ""), (2, "__absent__")]
-)
-async def test_actual_flowise_import_roundtrip_executes_and_preserves_cap_output(
-    temporal_env, cap, fallback
-):
+@pytest.mark.parametrize("cap,fallback", [(1, "Bounded import done"), (2, None), (5, ""), (2, "__absent__")])
+async def test_actual_flowise_import_roundtrip_executes_and_preserves_cap_output(temporal_env, cap, fallback):
     from workflows.importers.flowise import FlowiseImporter
     from workflows.manifest import (
         create_definition_from_manifest,
@@ -437,12 +405,8 @@ async def test_actual_flowise_import_roundtrip_executes_and_preserves_cap_output
             source["nodes"][2]["data"]["inputs"].pop("fallbackMessage")
         imported = FlowiseImporter().import_flow(source)
         parsed = parse_workflow_manifest(emit_workflow_manifest(imported.manifest))
-        org = Organization.objects.create(
-            name="Imported loop integration", slug="imported-loop-integration"
-        )
-        definition = create_definition_from_manifest(
-            parsed, organization=org, is_enabled=True
-        )
+        org = Organization.objects.create(name="Imported loop integration", slug="imported-loop-integration")
+        definition = create_definition_from_manifest(parsed, organization=org, is_enabled=True)
         run = WorkflowRun.objects.create(
             organization=org,
             workflow_definition=definition,
@@ -477,31 +441,25 @@ async def test_actual_flowise_import_roundtrip_executes_and_preserves_cap_output
         "nodeID": "humanInputAgentflow_0",
         "maxLoopCount": cap,
         "fallbackMessage": fallback,
-        "content": fallback
-        or f"Loop completed after reaching maximum iteration count of {cap}.",
+        "content": fallback or f"Loop completed after reaching maximum iteration count of {cap}.",
     }
     if fallback == "__absent__":
         expected.pop("fallbackMessage")
-        expected["content"] = (
-            f"Loop completed after reaching maximum iteration count of {cap}."
-        )
+        expected["content"] = f"Loop completed after reaching maximum iteration count of {cap}."
     assert result.data["final_output"] == expected
     rows = await sync_to_async(list)(
         WorkflowStageExecution.objects.filter(workflow_run_id=run_id)
         .order_by("pk")
         .values("stage__kind", "round_number", "status", "caused_by", "output")
     )
-    assert [
-        (row["stage__kind"], row["round_number"], row["status"]) for row in rows
-    ] == [
+    assert [(row["stage__kind"], row["round_number"], row["status"]) for row in rows] == [
         (kind, round_number, "completed")
         for round_number in range(1, cap + 1)
         for kind in ("human_gate", "checkpoint")
     ]
     assert rows[-1]["output"] == {"checkpoint": expected}
     assert all(
-        row["output"]["checkpoint"]["content"]
-        == "Loop back to Continue this round? (humanInputAgentflow_0)"
+        row["output"]["checkpoint"]["content"] == "Loop back to Continue this round? (humanInputAgentflow_0)"
         for row in rows[:-1]
         if row["stage__kind"] == "checkpoint"
     )
@@ -529,9 +487,7 @@ def prepare_stored_trailing_fanout_budget():
         username="fanout-budget", email="fanout@example.test", password="test"
     )
     team = Team.objects.create(organization=org, name="Budget", slug="budget")
-    project = Project.objects.create(
-        organization=org, team=team, name="Budget", slug="budget"
-    )
+    project = Project.objects.create(organization=org, team=team, name="Budget", slug="budget")
     app = RegisteredApp.objects.create(
         organization=org,
         team=team,
@@ -626,9 +582,7 @@ async def test_actual_frozen_budget_revalidation_refuses_before_any_dispatch(
     run = await sync_to_async(WorkflowRun.objects.get)(pk=run_id)
     assert run.status == "failed"
     assert await sync_to_async(AgentTask.objects.count)() == before_tasks
-    assert not await sync_to_async(
-        WorkflowStageExecution.objects.filter(workflow_run_id=run_id).exists
-    )()
+    assert not await sync_to_async(WorkflowStageExecution.objects.filter(workflow_run_id=run_id).exists)()
     scheduled = [
         event.activity_task_scheduled_event_attributes.activity_type.name
         for event in history.events
@@ -639,8 +593,7 @@ async def test_actual_frozen_budget_revalidation_refuses_before_any_dispatch(
         "astrolift.workflow_stage.mark_workflow_run",
     }
     assert not any(
-        event.event_type
-        == EventType.EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_INITIATED
+        event.event_type == EventType.EVENT_TYPE_START_CHILD_WORKFLOW_EXECUTION_INITIATED
         for event in history.events
     )
     await Replayer(workflows=[WorkflowDefinitionRunWorkflow]).replay_workflow(history)

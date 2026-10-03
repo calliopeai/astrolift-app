@@ -1,4 +1,5 @@
 /// <reference types="vite/client" />
+import { runStory } from "@/test/run-story";
 import { composeStories, setProjectAnnotations } from "@storybook/react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -32,7 +33,7 @@ describe.each(Object.entries(modules))("API key presentation story %s", (_file, 
     const canvasElement = document.createElement("div");
     document.body.appendChild(canvasElement);
     try {
-      await Story.run({ canvasElement });
+      await runStory(Story, canvasElement);
       expect(canvasElement.childElementCount).toBeGreaterThan(0);
     } finally {
       canvasElement.remove();

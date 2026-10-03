@@ -3,8 +3,13 @@ import { gql } from "@apollo/client";
 // ─── Temporal instance viewer (#437) ────────────────────────────────────
 
 export const GET_WORKFLOW_INSTANCES = gql`
-  query GetWorkflowInstances($workflowType: String, $status: String, $limit: Int!) {
-    astroliftWorkflowInstances(workflowType: $workflowType, status: $status, limit: $limit) {
+  query GetWorkflowInstances($workflowType: String, $status: String, $limit: Int!, $after: String) {
+    astroliftWorkflowInstances(
+      workflowType: $workflowType
+      status: $status
+      limit: $limit
+      after: $after
+    ) {
       items {
         workflowId
         workflowType
@@ -22,8 +27,8 @@ export const GET_WORKFLOW_INSTANCES = gql`
 `;
 
 export const GET_WORKFLOW_INSTANCE_DETAIL = gql`
-  query GetWorkflowInstanceDetail($workflowId: String!) {
-    astroliftWorkflowInstanceDetail(workflowId: $workflowId) {
+  query GetWorkflowInstanceDetail($workflowId: String!, $runId: String) {
+    astroliftWorkflowInstanceDetail(workflowId: $workflowId, runId: $runId) {
       instance {
         workflowId
         workflowType

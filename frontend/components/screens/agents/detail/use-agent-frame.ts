@@ -1,6 +1,7 @@
 "use client";
 
 import { useApolloClient, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { usePathname, useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
@@ -55,6 +56,7 @@ export function useAgentFrame(slug: string): {
   agent: AstroliftAgentListItem | null;
   orgId: string;
 } {
+  const t = useTranslations("agentFrame");
   const router = useRouter();
   const pathname = usePathname() ?? "";
   const client = useApolloClient();
@@ -103,10 +105,14 @@ export function useAgentFrame(slug: string): {
 
   function onCopyId() {
     if (!agent) return;
-    void navigator.clipboard?.writeText(agent.id).then(
-      () => toast.success("Agent ID copied"),
-      () => toast.error(agent.id)
-    );
+    void (async () => {
+      try {
+        await navigator.clipboard.writeText(agent.id);
+        toast.success(t("idCopied"));
+      } catch {
+        toast.error(t("copyFailed"));
+      }
+    })();
   }
 
   const spec = specsQ.data?.agentEnvironmentSpecs?.find((s) => s.slug === slug) ?? null;
@@ -125,7 +131,7 @@ export function useAgentFrame(slug: string): {
       loading: !orgId || (fleetQ.loading && !fleetQ.data),
       error: fleetQ.error && !fleetQ.data ? fleetQ.error.message : null,
       onRetry: () => void fleetQ.refetch(),
-      model: spec ? (spec.managedModel ? "managed model" : "API key") : null,
+      model: spec ? (spec.managedModel ? t("managedModel") : t("apiKey")) : null,
       clusterSlug: cluster ?? null,
       failedRun: failing ? { id: latest?.id ?? "", reason: latest?.failureMessage ?? null } : null,
       canRun: allow("agent.dispatch"),

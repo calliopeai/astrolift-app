@@ -4,6 +4,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import { Loader2Icon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import "@xterm/xterm/css/xterm.css";
 
@@ -46,6 +47,7 @@ export function LiveLogTerminal({
   loading,
   className,
 }: LiveLogTerminalProps) {
+  const t = useTranslations("agentRunTab.terminal");
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const termRef = React.useRef<Terminal | null>(null);
   const fitRef = React.useRef<FitAddon | null>(null);
@@ -144,14 +146,14 @@ export function LiveLogTerminal({
           className="border-danger-border bg-danger/10 text-danger-fg rounded-md border px-2.5 py-1.5 text-xs"
           role="status"
         >
-          Couldn&apos;t load logs: {error}
+          {t("readFailed")} {error}
         </div>
       )}
       <div className="relative min-h-0 flex-1">
         <div
           ref={containerRef}
           role="log"
-          aria-label="Agent run logs"
+          aria-label={t("label")}
           // exact terminal-canvas background — must match the xterm
           // theme.background literal above; not tokenizable.
           // eslint-disable-next-line astrolift/no-raw-design-values
@@ -162,12 +164,10 @@ export function LiveLogTerminal({
             {running || loading ? (
               <span className="text-muted-foreground inline-flex items-center gap-2 text-xs">
                 <Loader2Icon className="size-3.5 animate-spin" />
-                Waiting for output…
+                {t("waiting")}
               </span>
             ) : (
-              <span className="text-muted-foreground text-xs">
-                No output was recorded for this run.
-              </span>
+              <span className="text-muted-foreground text-xs">{t("empty")}</span>
             )}
           </div>
         )}

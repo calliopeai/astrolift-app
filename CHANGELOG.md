@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Replace the static platform activity page with the permission-scoped Temporal
+  execution viewer. Bind detail/history and confirmed cancel/terminate requests
+  to the selected run ID, follow server cursor pages including empty authorized
+  pages, and expose refresh and safe action-failure feedback (#2251).
+
+- Collect app-environment ingress metrics from exact managed Envoy routes and
+  preserved nginx namespaces. Keep idle latency windows undefined, refuse retired
+  or foreign cluster reads, and use complete dedicated-ALB CloudWatch evidence
+  when Prometheus measurements are unavailable (#2250).
+
+- Open live-log providers and discover replicas outside the ASGI event loop,
+  including lazy cluster/provider reads. Preserve app-scoped admission and close
+  underlying streams on disconnect. Read real urllib3 log lines rather than
+  treating its chunk generator as bytes (#2254).
+
 - Read preview details by exact GUID, including older previews beyond the recent
   discovery window. Return the persisted environment identity and reviewed log
   route; retired, replaced or foreign targets never fall back to another

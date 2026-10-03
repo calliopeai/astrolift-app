@@ -35,6 +35,20 @@ def _component(ctx: ClusterContext):
     return edge
 
 
+def test_prometheus_recipe_scrapes_the_owned_gateway_proxy_across_namespaces():
+    ctx = ClusterContext(slug="c", auth_method="exec_plugin", ingress_class="envoy", oidc_auth_config=COGNITO)
+    component = next(c for c in _driver().bootstrap_components(ctx) if c.key == "kube-prometheus-stack")
+    [monitor] = component.helm_values["prometheus"]["additionalPodMonitors"]
+    assert monitor["namespaceSelector"] == {"any": True}
+    assert monitor["selector"]["matchLabels"] == {
+        "app.kubernetes.io/name": "envoy",
+        "app.kubernetes.io/component": "proxy",
+        "gateway.envoyproxy.io/owning-gateway-namespace": "astrolift-edge",
+        "gateway.envoyproxy.io/owning-gateway-name": "edge",
+    }
+    assert monitor["podMetricsEndpoints"] == [{"port": "metrics", "path": "/stats/prometheus", "interval": "15s"}]
+
+
 def test_alb_only_cluster_does_not_enable_the_edge():
     ctx = ClusterContext(slug="c", auth_method="exec_plugin", ingress_class="alb")
     edge = _component(ctx)

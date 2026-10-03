@@ -488,7 +488,7 @@ export function detailProps(
     workflowId: INSTANCES[0].workflowId,
     detail: INSTANCE_DETAIL,
     loading: false,
-    error: undefined,
+    error: null,
     isAdmin: true,
     onClose: noop,
     adminControls: null,

@@ -10,6 +10,7 @@ import {
   SlidersHorizontalIcon,
   Trash2Icon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import * as React from "react";
 
@@ -34,7 +35,7 @@ import {
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AstroliftAgentListItem } from "@/graphql/agents/agents.types";
-import { formatRelativeAge } from "@/lib/format";
+import { useFormatters } from "@/lib/i18n/formatters";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 
 import { agentSectionHref, agentTabHref, agentTabs } from "./agent-tabs-model";
@@ -95,20 +96,41 @@ function titleCase(value: string): string {
 }
 
 /** `Task · Once`; one word when the mode repeats the family (`Service`). */
-export function runModeLabel(runFamily: string, runMode: string): string {
-  const family = titleCase(runFamily);
-  const mode = titleCase(runMode);
+export function runModeLabel(
+  runFamily: string,
+  runMode: string,
+  translate?: (key: string) => string
+): string {
+  const label = (value: string) =>
+    translate
+      ? ["task", "service", "once", "loop", "schedule", "trigger", "persistent"].includes(value)
+        ? translate(`modes.${value}`)
+        : value
+      : titleCase(value);
+  const family = label(runFamily);
+  const mode = label(runMode);
   return !mode || mode === family ? family : `${family} · ${mode}`;
 }
 
 /** The header's one status: running, paused, last run failed, never run, or ready. */
-export function agentStatus(agent: AgentFrameAgent): { dot: Dot; label: string } {
-  if (agent.runningCount > 0) return { dot: "pending", label: `${agent.runningCount} running` };
-  if (agent.runPaused) return { dot: "muted", label: "Paused" };
+export function agentStatus(
+  agent: AgentFrameAgent,
+  translate?: (key: string, values?: { count: number }) => string
+): { dot: Dot; label: string } {
+  const label = (key: string, fallback: string, values?: { count: number }) =>
+    translate ? translate(key, values) : fallback;
+  if (agent.runningCount > 0)
+    return {
+      dot: "pending",
+      label: label("status.running", `${agent.runningCount} running`, {
+        count: agent.runningCount,
+      }),
+    };
+  if (agent.runPaused) return { dot: "muted", label: label("status.paused", "Paused") };
   if (agent.lastRunStatus && FAILED.has(agent.lastRunStatus.toLowerCase()))
-    return { dot: "error", label: "Last run failed" };
-  if (!agent.lastRunAt) return { dot: "muted", label: "Never run" };
-  return { dot: "ok", label: "Ready" };
+    return { dot: "error", label: label("status.failed", "Last run failed") };
+  if (!agent.lastRunAt) return { dot: "muted", label: label("status.never", "Never run") };
+  return { dot: "ok", label: label("status.ready", "Ready") };
 }
 
 /**
@@ -136,19 +158,21 @@ export function AgentFrame({
   onCopyId,
   children,
 }: AgentFrameProps) {
+  const t = useTranslations("agentFrame");
+  const format = useFormatters();
   const [runOpen, setRunOpen] = React.useState(false);
-  const tabs = agentTabs(slug, pathname);
-  const agentsCrumb: Crumb = areaSwitcher(NAV, "agents", "agents");
+  const tabs = agentTabs(slug, pathname, (key) => t(`tabs.${key}`));
+  const agentsCrumb: Crumb = { ...areaSwitcher(NAV, "agents", "agents"), label: t("agents") };
   const pending = loading && !agent;
 
   if (!agent) {
     return (
       <div className="flex min-w-0 flex-1 flex-col gap-6">
         <ShellHeader
-          crumbs={[agentsCrumb, { label: pending ? slug : "Not found" }]}
-          title={pending ? <Skeleton className="h-6 w-48" /> : "Agent not found"}
+          crumbs={[agentsCrumb, { label: pending ? slug : t("notFound") }]}
+          title={pending ? <Skeleton className="h-6 w-48" /> : t("agentNotFound")}
           tabs={pending ? tabs : undefined}
-          tabsAriaLabel="Agent sections"
+          tabsAriaLabel={t("sections")}
         />
         {pending ? (
           <div className="grid min-w-0 grid-cols-12 gap-4" aria-busy>
@@ -163,32 +187,32 @@ export function AgentFrame({
           >
             <ServerCrashIcon className="text-danger size-5" aria-hidden />
             <div className="min-w-0 px-6">
-              <p className="font-medium">Could not load this agent</p>
+              <p className="font-medium">{t("loadFailed")}</p>
               <p className="text-muted-foreground mt-1 max-w-md font-mono text-xs [overflow-wrap:anywhere]">
                 {error}
               </p>
             </div>
             {onRetry && (
               <Button size="sm" variant="outline" onClick={onRetry}>
-                Retry
+                {t("retry")}
               </Button>
             )}
           </div>
         ) : (
           <EmptyState
             icon={<AlertTriangleIcon className="size-5" />}
-            title={`No agent with slug ${slug}`}
-            description="It may have been deregistered, belong to a different organization, or you may not have permission to view it."
+            title={t("noSlug", { slug })}
+            description={t("missingDescription")}
             actionHref="/agents"
-            actionLabel="Back to agents"
+            actionLabel={t("back")}
           />
         )}
       </div>
     );
   }
 
-  const status = agentStatus(agent);
-  const mode = runModeLabel(agent.runFamily, agent.runMode);
+  const status = agentStatus(agent, (key, values) => t(key, values));
+  const mode = runModeLabel(agent.runFamily, agent.runMode, (key) => t(key));
 
   const context = (
     <>
@@ -199,7 +223,7 @@ export function AgentFrame({
           {" · "}
           <Link
             href={`/clusters/${clusterSlug}`}
-            title={`Open cluster ${clusterSlug} in Admin`}
+            title={t("openCluster", { slug: clusterSlug })}
             className="hover:text-foreground font-mono underline-offset-2 hover:underline"
           >
             {clusterSlug}
@@ -212,14 +236,14 @@ export function AgentFrame({
   const primaryAction = canRun ? (
     <Button size="sm" onClick={() => setRunOpen(true)} disabled={dispatching}>
       <PlayIcon className="size-4" />
-      Run now
+      {t("runNow")}
     </Button>
   ) : null;
 
   const menu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="icon" variant="ghost" className="size-8" aria-label="More actions">
+        <Button size="icon" variant="ghost" className="size-8" aria-label={t("moreActions")}>
           <MoreHorizontalIcon className="size-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -228,25 +252,25 @@ export function AgentFrame({
           <DropdownMenuItem asChild>
             <a href={agent.sourceUrl} target="_blank" rel="noreferrer">
               <GitBranchIcon className="size-4" />
-              Open repository
+              {t("openRepo")}
             </a>
           </DropdownMenuItem>
         )}
         <DropdownMenuItem asChild>
           <Link href={agentTabHref(agent.slug, "configuration")}>
             <SlidersHorizontalIcon className="size-4" />
-            Edit configuration
+            {t("editConfig")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onCopyId}>
           <CopyIcon className="size-4" />
-          Copy agent ID
+          {t("copyId")}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild variant="destructive">
           <Link href={agentSectionHref(agent.slug, "settings", "danger-zone")}>
             <Trash2Icon className="size-4" />
-            Archive or delete
+            {t("archive")}
           </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -268,21 +292,23 @@ export function AgentFrame({
         primaryAction={primaryAction}
         menu={menu}
         tabs={tabs}
-        tabsAriaLabel="Agent sections"
+        tabsAriaLabel={t("sections")}
       />
 
       {failedRun && (
         <div role="alert" className="border-destructive/40 bg-destructive/5 rounded-md border p-3">
           <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <p className="text-destructive text-xs font-semibold">
-              Last run failed
+              {t("lastFailed")}
               {agent.lastRunAt && (
                 <span
                   className="text-muted-foreground font-mono font-normal"
                   title={agent.lastRunAt}
                 >
                   {" "}
-                  {formatRelativeAge(agent.lastRunAt)}
+                  {Number.isFinite(Date.parse(agent.lastRunAt))
+                    ? format.formatRelativeTime(agent.lastRunAt)
+                    : t("unknownDate")}
                 </span>
               )}
             </p>
@@ -291,12 +317,12 @@ export function AgentFrame({
                 href={`/agents/runs/${encodeURIComponent(failedRun.id)}`}
                 className="text-primary text-xs font-medium hover:underline"
               >
-                Open run
+                {t("openRun")}
               </Link>
             )}
           </div>
           <p className="text-muted-foreground mt-1 font-mono text-xs break-all">
-            {failedRun.reason || "The run reported no reason."}
+            {failedRun.reason || t("noReason")}
           </p>
         </div>
       )}
@@ -307,27 +333,26 @@ export function AgentFrame({
         <Sheet open={runOpen} onOpenChange={setRunOpen}>
           <SheetContent className="flex flex-col">
             <SheetHeader>
-              <SheetTitle className="[overflow-wrap:anywhere]">Run {agent.name} now</SheetTitle>
-              <SheetDescription>
-                Starts one run with the agent&apos;s saved configuration. It shows under Runs with a
-                live status.
-              </SheetDescription>
+              <SheetTitle className="[overflow-wrap:anywhere]">
+                {t("runTitle", { name: agent.name })}
+              </SheetTitle>
+              <SheetDescription>{t("runDescription")}</SheetDescription>
             </SheetHeader>
             <dl className="flex min-w-0 flex-col gap-3 px-4 text-sm">
               <div className="min-w-0">
-                <dt className="text-muted-foreground text-xs">Run mode</dt>
+                <dt className="text-muted-foreground text-xs">{t("runMode")}</dt>
                 <dd className="font-mono">{mode}</dd>
               </div>
               {clusterSlug && (
                 <div className="min-w-0">
-                  <dt className="text-muted-foreground text-xs">Cluster</dt>
+                  <dt className="text-muted-foreground text-xs">{t("cluster")}</dt>
                   <dd className="font-mono break-all">{clusterSlug}</dd>
                 </div>
               )}
             </dl>
             <SheetFooter className="mt-auto flex-row justify-end gap-2">
               <Button variant="outline" onClick={() => setRunOpen(false)}>
-                Cancel
+                {t("cancel")}
               </Button>
               <Button
                 disabled={dispatching}
@@ -336,7 +361,7 @@ export function AgentFrame({
                 }}
               >
                 <PlayIcon className="size-4" />
-                {dispatching ? "Starting…" : "Run now"}
+                {dispatching ? t("starting") : t("runNow")}
               </Button>
             </SheetFooter>
           </SheetContent>

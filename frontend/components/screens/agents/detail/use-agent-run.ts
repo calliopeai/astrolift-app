@@ -2,13 +2,15 @@
 
 import { NetworkStatus } from "@apollo/client";
 import { useQuery } from "@apollo/client/react";
+import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { useHeldRows } from "@/components/list/use-held-rows";
 import { useListState } from "@/components/list/use-list-state";
 import { LIST_AGENT_TASKS_PAGE } from "@/graphql/agents/agents.queries";
 import type { AstroliftAgentListItem } from "@/graphql/agents/agents.types";
 
-import { AGENT_RUNS_LIST, runsPageVariables } from "./agent-runs-list";
+import { localizedAgentRunsList, runsPageVariables } from "./agent-runs-list";
 
 /** One agent execution, as the page query returns it. */
 export interface AgentTask {
@@ -38,7 +40,10 @@ const POLL_MS = 5000;
  * behind the pill. Run now is the frame's; this tab only lists.
  */
 export function useAgentRun(agent: Pick<AstroliftAgentListItem, "id">, orgId: string) {
-  const list = useListState(AGENT_RUNS_LIST);
+  const t = useTranslations("agentRunTab");
+  const activity = useTranslations("agentActivity");
+  const definition = React.useMemo(() => localizedAgentRunsList(t, activity), [t, activity]);
+  const list = useListState(definition);
   const { state, filters } = list;
   const firstPage = state.after === null;
 

@@ -61,8 +61,11 @@ function Screen({ instances = INSTANCES, initial, selected = null, ...props }: P
       stale={false}
       error={null}
       onRetry={() => {}}
-      instanceHref={(i) => `?instance=${encodeURIComponent(i.workflowId)}`}
+      instanceHref={(i) =>
+        `?instance=${encodeURIComponent(i.workflowId)}&instanceRun=${encodeURIComponent(i.runId)}`
+      }
       selectedWorkflowId={open}
+      selectedRunId={openInstance?.runId ?? null}
       onCloseInstance={() => setOpen(null)}
       detail={
         openInstance ? (
@@ -81,15 +84,13 @@ function Screen({ instances = INSTANCES, initial, selected = null, ...props }: P
   );
 }
 
-/** Every instance, newest first, with the note that the browser pages them. */
+/** The server page, newest first, with cursor continuation guidance. */
 export const Full: Story = {
   render: () => <Screen />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByText("deploy-app-billing-api-7f3c")).toBeInTheDocument();
-    await expect(
-      canvas.getByText(/Search, sort and pages cover the newest 200/)
-    ).toBeInTheDocument();
+    await expect(canvas.getByText(/Temporal pages newest first/)).toBeInTheDocument();
     await expect(canvas.getByRole("link", { name: "Running" })).toBeInTheDocument();
   },
 };

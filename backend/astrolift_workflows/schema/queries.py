@@ -375,6 +375,7 @@ class TemporalWorkflowsQuery:
         self,
         info: Info,
         workflow_id: str,
+        run_id: str | None = None,
     ) -> WorkflowInstanceDetailType | None:
         """Full drill-down for one workflow execution — summary plus
         pre-shaped activity feed. ``None`` when the instance can't be
@@ -386,15 +387,16 @@ class TemporalWorkflowsQuery:
         ``AUDIT_LOG_READ`` holder can't read another org's full Temporal
         history payload. The gate checks the run's own scope (#1965). The
         platform operator sees any run."""
-        if not workflow_id:
+        if not workflow_id or (run_id is not None and not run_id.strip()):
             return None
         elevated, caller = _viewer_scope(info.context.user)
         if not _viewer_can_see(workflow_id, elevated=elevated, caller=caller):
             return None
-        row = describe_workflow_instance(workflow_id)
+        target = {"run_id": run_id} if run_id is not None else {}
+        row = describe_workflow_instance(workflow_id, **target)
         if row is None:
             return None
-        history_rows = workflow_history(workflow_id)
+        history_rows = workflow_history(workflow_id, **target)
         return WorkflowInstanceDetailType(
             instance=instance_to_type(row, _triggered_by_for(workflow_id, None if elevated else caller)),
             history=[history_event_to_type(h) for h in history_rows],

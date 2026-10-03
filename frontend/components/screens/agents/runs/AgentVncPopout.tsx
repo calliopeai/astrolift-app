@@ -3,6 +3,7 @@
 import { QueryError } from "@/components/QueryError";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { ArrowLeftIcon, BotIcon, Loader2Icon, MonitorPlayIcon } from "lucide-react";
 
@@ -32,17 +33,22 @@ export function AgentVncPopoutScreen({
   error,
   onRetry,
 }: AgentVncPopoutProps) {
+  const t = useTranslations("agentObservation.session");
   let body: React.ReactNode;
   if (loading && !task) {
     body = (
-      <div className="flex flex-1 items-center justify-center">
+      <div
+        role="status"
+        aria-label={t("loading")}
+        className="flex flex-1 items-center justify-center"
+      >
         <Loader2Icon className="text-muted-foreground size-6 animate-spin" />
       </div>
     );
   } else if (error && !task) {
     body = (
       <div className="flex flex-1 items-center justify-center">
-        <QueryError title="Could not load session" error={error} onRetry={onRetry} />
+        <QueryError title={t("loadFailed")} error={error} onRetry={onRetry} />
       </div>
     );
   } else if (!task) {
@@ -50,8 +56,8 @@ export function AgentVncPopoutScreen({
       <div className="flex flex-1 items-center justify-center">
         <EmptyState
           icon={<BotIcon className="size-5" />}
-          title="Agent not found"
-          description="This agent task doesn't exist or you don't have access to it."
+          title={t("notFound")}
+          description={t("notFoundDescription")}
         />
       </div>
     );
@@ -60,14 +66,10 @@ export function AgentVncPopoutScreen({
       <div className="flex flex-1 items-center justify-center">
         <EmptyState
           icon={<BotIcon className="size-5" />}
-          title="Session not available"
-          description={
-            task.status === "running"
-              ? "This agent isn't running a VNC-capable session."
-              : "This agent is no longer running, so its live session has closed."
-          }
+          title={t("unavailable")}
+          description={task.status === "running" ? t("notCapable") : t("ended")}
           actionHref="/agents?tab=theatre"
-          actionLabel="Back to theatre"
+          actionLabel={t("back")}
         />
       </div>
     );
@@ -80,13 +82,13 @@ export function AgentVncPopoutScreen({
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <MonitorPlayIcon className="size-4" />
-          <h1 className="text-sm font-semibold">Live agent session</h1>
+          <h1 className="text-sm font-semibold">{t("title")}</h1>
           <span className="text-muted-foreground font-mono text-xs">{taskId}</span>
         </div>
         <Button asChild variant="outline" size="sm">
           <Link href="/agents?tab=theatre">
             <ArrowLeftIcon className="size-3.5" />
-            Theatre
+            {t("theatre")}
           </Link>
         </Button>
       </div>
