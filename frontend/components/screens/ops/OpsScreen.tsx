@@ -359,7 +359,7 @@ export function OpsScreen({
                         )}
                         {r.endedAt && <> · ended {fmt.formatDateTime(r.endedAt)}</>}
                       </div>
-                      {r.failure && Object.keys(r.failure).length > 0 && (
+                      {r.failure != null && Object.keys(r.failure).length > 0 && (
                         <div className="text-destructive mt-1 truncate font-mono text-xs">
                           {JSON.stringify(r.failure)}
                         </div>

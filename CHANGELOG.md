@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Treat generated GraphQL JSON values as untrusted arbitrary JSON, including
+  array-valued policy conditions. Narrow event-source records before reading
+  fields and display scalar event payloads without object-only assumptions
+  (#2148).
+
+- Translate pipeline lists, creation, details, secret management and run graphs
+  across all eight locales. Preserve repository, secret and stage identities,
+  drafts across language changes, raw server diagnostics and committed-write
+  recovery feedback (#2145).
+
 - Scope CloudWatch historical logs with exact Kubernetes namespace/app metadata
   and the requested workload label. Exclude foreign, unattributed and ambiguous
   records, preserve server cursors, and sanitize provider failures (#2262).

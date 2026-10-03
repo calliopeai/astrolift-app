@@ -19,7 +19,7 @@ export type Scalars = {
   /** UUID v7 — the platform's external identifier. */
   GUID: { input: string; output: string; }
   /** The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf). */
-  JSON: { input: Record<string, unknown>; output: Record<string, unknown>; }
+  JSON: { input: unknown; output: unknown; }
   UUID: { input: any; output: any; }
   /** Represents NULL values */
   Void: { input: any; output: any; }
@@ -13991,7 +13991,7 @@ export type GrantPreviewQuery = { astroliftGrantPreview: { ok: boolean, errors: 
 export type PolicyConditionCatalogQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type PolicyConditionCatalogQuery = { astroliftPolicyConditionCatalog: { effects: Array<string>, scopeLevels: Array<string>, conditions: Array<{ kind: string, label: string, description: string, needs: string, example: Record<string, unknown>, fields: Array<{ name: string, type: string, label: string, description: string, required: boolean, default?: Record<string, unknown> | null, options: Array<string>, minimum?: number | null }> }>, resourceKeys: Array<{ key: string, label: string, description: string }>, actorKeys: Array<{ key: string, label: string, description: string }> } };
+export type PolicyConditionCatalogQuery = { astroliftPolicyConditionCatalog: { effects: Array<string>, scopeLevels: Array<string>, conditions: Array<{ kind: string, label: string, description: string, needs: string, example: unknown, fields: Array<{ name: string, type: string, label: string, description: string, required: boolean, default?: unknown | null, options: Array<string>, minimum?: number | null }> }>, resourceKeys: Array<{ key: string, label: string, description: string }>, actorKeys: Array<{ key: string, label: string, description: string }> } };
 
 export type PolicySimulationQueryVariables = Exact<{
   draft: AstroliftPolicyDraftInput;
@@ -14014,7 +14014,7 @@ export type GetPolicyQueryVariables = Exact<{
 }>;
 
 
-export type GetPolicyQuery = { astroliftPolicy?: { id: string, slug: string, name: string, description: string, scopeLevel: string, scopeId?: string | null, effect: string, actionPattern: string, resourcePattern: Record<string, unknown>, conditions: Record<string, unknown>, actorPattern: Record<string, unknown>, createdAt: string, updatedAt: string, deletedAt?: string | null, createdByUsername?: string | null, updatedByUsername?: string | null, version: number } | null };
+export type GetPolicyQuery = { astroliftPolicy?: { id: string, slug: string, name: string, description: string, scopeLevel: string, scopeId?: string | null, effect: string, actionPattern: string, resourcePattern: unknown, conditions: unknown, actorPattern: unknown, createdAt: string, updatedAt: string, deletedAt?: string | null, createdByUsername?: string | null, updatedByUsername?: string | null, version: number } | null };
 
 export type ListGroupRoleMappingsPageQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
@@ -14431,9 +14431,9 @@ export type ClusterCountQuery = { astroliftClusterCount: number };
 export type ListClustersQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListClustersQuery = { astroliftClusters: Array<{ id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: Record<string, unknown> | null, oidcAuthConfig?: Record<string, unknown> | null, isActive: boolean, capabilities: Record<string, unknown>, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: Record<string, unknown>, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null }> };
+export type ListClustersQuery = { astroliftClusters: Array<{ id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: unknown | null, oidcAuthConfig?: unknown | null, isActive: boolean, capabilities: unknown, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: unknown, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null }> };
 
-export type ClusterFieldsFragment = { id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: Record<string, unknown> | null, isActive: boolean, capabilities: Record<string, unknown>, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, createdByUsername?: string | null, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: Record<string, unknown>, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null };
+export type ClusterFieldsFragment = { id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: unknown | null, isActive: boolean, capabilities: unknown, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, createdByUsername?: string | null, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: unknown, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null };
 
 export type ListClustersPageQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
@@ -14446,21 +14446,21 @@ export type ListClustersPageQueryVariables = Exact<{
 }>;
 
 
-export type ListClustersPageQuery = { astroliftClustersPage: { nextCursor?: string | null, totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: Record<string, unknown> | null, isActive: boolean, capabilities: Record<string, unknown>, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, createdByUsername?: string | null, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: Record<string, unknown>, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null }> } };
+export type ListClustersPageQuery = { astroliftClustersPage: { nextCursor?: string | null, totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: unknown | null, isActive: boolean, capabilities: unknown, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, createdByUsername?: string | null, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: unknown, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null }> } };
 
 export type GetClusterQueryVariables = Exact<{
   slug: Scalars['String']['input'];
 }>;
 
 
-export type GetClusterQuery = { astroliftCluster?: { oidcAuthConfig?: Record<string, unknown> | null, id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: Record<string, unknown> | null, isActive: boolean, capabilities: Record<string, unknown>, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, createdByUsername?: string | null, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: Record<string, unknown>, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null } | null };
+export type GetClusterQuery = { astroliftCluster?: { oidcAuthConfig?: unknown | null, id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: unknown | null, isActive: boolean, capabilities: unknown, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, createdByUsername?: string | null, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: unknown, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null } | null };
 
 export type UpdateTenantClusterMutationVariables = Exact<{
   input: UpdateTenantClusterInput;
 }>;
 
 
-export type UpdateTenantClusterMutation = { updateTenantCluster: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, slug: string, ingressClass: string, albAuthConfig?: Record<string, unknown> | null, oidcAuthConfig?: Record<string, unknown> | null } | null } };
+export type UpdateTenantClusterMutation = { updateTenantCluster: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, slug: string, ingressClass: string, albAuthConfig?: unknown | null, oidcAuthConfig?: unknown | null } | null } };
 
 export type ReconcileClusterIngressesMutationVariables = Exact<{
   input: ReconcileClusterIngressesInput;
@@ -14475,7 +14475,7 @@ export type ClusterBootstrapRunsQueryVariables = Exact<{
 }>;
 
 
-export type ClusterBootstrapRunsQuery = { astroliftCluster?: { id: string, slug: string, bootstrapRuns: Array<{ id: string, status: string, chartVersion: string, installedReleases: Record<string, unknown>, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null }> } | null };
+export type ClusterBootstrapRunsQuery = { astroliftCluster?: { id: string, slug: string, bootstrapRuns: Array<{ id: string, status: string, chartVersion: string, installedReleases: unknown, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null }> } | null };
 
 export type RecordClusterBootstrapRunMutationVariables = Exact<{
   input: RecordClusterBootstrapRunInput;
@@ -14508,7 +14508,7 @@ export type RefreshClusterManagementMutation = { refreshClusterManagement: { ok:
 export type ListManagedDomainsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListManagedDomainsQuery = { astroliftManagedDomains: Array<{ id: string, zone: string, organizationSlug?: string | null, dnsDriver: string, defaultFor: string, isWildcardManaged: boolean, createdAt: string, provisionState: string, provisionNameservers: Record<string, unknown>, provisionValidationRecords: Record<string, unknown>, delegationCheck: Record<string, unknown>, provisionClusterId?: string | null }> };
+export type ListManagedDomainsQuery = { astroliftManagedDomains: Array<{ id: string, zone: string, organizationSlug?: string | null, dnsDriver: string, defaultFor: string, isWildcardManaged: boolean, createdAt: string, provisionState: string, provisionNameservers: unknown, provisionValidationRecords: unknown, delegationCheck: unknown, provisionClusterId?: string | null }> };
 
 export type ClusterHealthQueryVariables = Exact<{
   clusterId: Scalars['GUID']['input'];
@@ -14523,7 +14523,7 @@ export type ClusterLiveStateQueryVariables = Exact<{
 }>;
 
 
-export type ClusterLiveStateQuery = { astroliftClusterLiveState?: { clusterId: string, status: string, lastHeartbeatAt?: string | null, heartbeatAgeSeconds?: number | null, heartbeatIntervalSeconds: number, agentProvisioned: boolean, nodeCount?: number | null, nodeReadyCount?: number | null, cpuUtilization?: number | null, memoryUtilization?: number | null, podTotal?: number | null, podsByNamespace: Record<string, unknown>, appReadiness: Record<string, unknown>, ingressIps: Array<string>, agentVersion: string } | null };
+export type ClusterLiveStateQuery = { astroliftClusterLiveState?: { clusterId: string, status: string, lastHeartbeatAt?: string | null, heartbeatAgeSeconds?: number | null, heartbeatIntervalSeconds: number, agentProvisioned: boolean, nodeCount?: number | null, nodeReadyCount?: number | null, cpuUtilization?: number | null, memoryUtilization?: number | null, podTotal?: number | null, podsByNamespace: unknown, appReadiness: unknown, ingressIps: Array<string>, agentVersion: string } | null };
 
 export type IssueClusterAgentKeyMutationVariables = Exact<{
   input: IssueClusterAgentKeyInput;
@@ -14546,7 +14546,7 @@ export type ClusterLifecycleAuditQueryVariables = Exact<{
 }>;
 
 
-export type ClusterLifecycleAuditQuery = { astroliftClusterLifecycleAudit: Array<{ operation: string, variables: Record<string, unknown>, success: boolean, errors: Array<string>, timestamp: string, actor?: string | null }> };
+export type ClusterLifecycleAuditQuery = { astroliftClusterLifecycleAudit: Array<{ operation: string, variables: unknown, success: boolean, errors: Array<string>, timestamp: string, actor?: string | null }> };
 
 export type ClusterAppCountQueryVariables = Exact<{
   clusterId: Scalars['GUID']['input'];
@@ -14560,7 +14560,7 @@ export type ClusterBootstrapPlanQueryVariables = Exact<{
 }>;
 
 
-export type ClusterBootstrapPlanQuery = { astroliftClusterBootstrapPlan?: { clusterId: string, providerPluginSlug: string, components: Array<{ key: string, title: string, defaultEnabled: boolean, installedByRecipe: boolean, runningOutsideRecipe: boolean, rationale: string, helmValues: Record<string, unknown>, requires: Array<string>, options: Array<{ key: string, label: string, default: string, choices: Array<{ value: string, label: string }> }> }> } | null };
+export type ClusterBootstrapPlanQuery = { astroliftClusterBootstrapPlan?: { clusterId: string, providerPluginSlug: string, components: Array<{ key: string, title: string, defaultEnabled: boolean, installedByRecipe: boolean, runningOutsideRecipe: boolean, rationale: string, helmValues: unknown, requires: Array<string>, options: Array<{ key: string, label: string, default: string, choices: Array<{ value: string, label: string }> }> }> } | null };
 
 export type InstallClusterPrereqsMutationVariables = Exact<{
   input: InstallClusterPrereqsInputType;
@@ -14579,7 +14579,7 @@ export type DeployClusterAgentMutation = { deployClusterAgent: { ok: boolean, er
 export type ListProviderPluginsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListProviderPluginsQuery = { astroliftProviderPlugins: Array<{ id: string, slug: string, name: string, version: string, capabilitiesManifest: Record<string, unknown>, isEnabled: boolean }> };
+export type ListProviderPluginsQuery = { astroliftProviderPlugins: Array<{ id: string, slug: string, name: string, version: string, capabilitiesManifest: unknown, isEnabled: boolean }> };
 
 export type ProviderRegionsQueryVariables = Exact<{
   providerPluginSlug: Scalars['String']['input'];
@@ -14720,14 +14720,14 @@ export type GetProviderPluginReferenceQueryVariables = Exact<{
 }>;
 
 
-export type GetProviderPluginReferenceQuery = { astroliftProviderPlugin?: { id: string, slug: string, name: string, version: string, capabilitiesManifest: Record<string, unknown>, isEnabled: boolean } | null };
+export type GetProviderPluginReferenceQuery = { astroliftProviderPlugin?: { id: string, slug: string, name: string, version: string, capabilitiesManifest: unknown, isEnabled: boolean } | null };
 
 export type IdentityTimestampsFragment = { createdAt: string, updatedAt: string, deletedAt?: string | null };
 
 export type ListOrganizationsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListOrganizationsQuery = { astroliftOrganizations: Array<{ id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: Record<string, unknown>, appearanceLocked: boolean, restrictedSettingsDefault: string, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null }> };
+export type ListOrganizationsQuery = { astroliftOrganizations: Array<{ id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: unknown, appearanceLocked: boolean, restrictedSettingsDefault: string, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null }> };
 
 export type ListTeamsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -14792,7 +14792,7 @@ export type GetOrganizationQueryVariables = Exact<{
 }>;
 
 
-export type GetOrganizationQuery = { astroliftOrganization?: { id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: Record<string, unknown>, appearanceLocked: boolean, restrictedSettingsDefault: string, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null } | null };
+export type GetOrganizationQuery = { astroliftOrganization?: { id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: unknown, appearanceLocked: boolean, restrictedSettingsDefault: string, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null } | null };
 
 export type GetOnboardingStateQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -14874,9 +14874,9 @@ export type ListRoleBindingsPageQuery = { astroliftRoleBindingsPage: { nextCurso
 export type ListPoliciesQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListPoliciesQuery = { astroliftPolicies: Array<{ id: string, slug: string, name: string, description: string, scopeLevel: string, scopeId?: string | null, effect: string, actionPattern: string, resourcePattern: Record<string, unknown>, conditions: Record<string, unknown>, actorPattern: Record<string, unknown>, createdAt: string, updatedAt: string, deletedAt?: string | null, createdByUsername?: string | null, updatedByUsername?: string | null, version: number }> };
+export type ListPoliciesQuery = { astroliftPolicies: Array<{ id: string, slug: string, name: string, description: string, scopeLevel: string, scopeId?: string | null, effect: string, actionPattern: string, resourcePattern: unknown, conditions: unknown, actorPattern: unknown, createdAt: string, updatedAt: string, deletedAt?: string | null, createdByUsername?: string | null, updatedByUsername?: string | null, version: number }> };
 
-export type PolicyFieldsFragment = { id: string, slug: string, name: string, description: string, scopeLevel: string, scopeId?: string | null, effect: string, actionPattern: string, resourcePattern: Record<string, unknown>, conditions: Record<string, unknown>, actorPattern: Record<string, unknown>, createdAt: string, updatedAt: string, deletedAt?: string | null, createdByUsername?: string | null, updatedByUsername?: string | null, version: number };
+export type PolicyFieldsFragment = { id: string, slug: string, name: string, description: string, scopeLevel: string, scopeId?: string | null, effect: string, actionPattern: string, resourcePattern: unknown, conditions: unknown, actorPattern: unknown, createdAt: string, updatedAt: string, deletedAt?: string | null, createdByUsername?: string | null, updatedByUsername?: string | null, version: number };
 
 export type ListPoliciesPageQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
@@ -14890,19 +14890,19 @@ export type ListPoliciesPageQueryVariables = Exact<{
 }>;
 
 
-export type ListPoliciesPageQuery = { astroliftPoliciesPage: { nextCursor?: string | null, totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, slug: string, name: string, description: string, scopeLevel: string, scopeId?: string | null, effect: string, actionPattern: string, resourcePattern: Record<string, unknown>, conditions: Record<string, unknown>, actorPattern: Record<string, unknown>, createdAt: string, updatedAt: string, deletedAt?: string | null, createdByUsername?: string | null, updatedByUsername?: string | null, version: number }> } };
+export type ListPoliciesPageQuery = { astroliftPoliciesPage: { nextCursor?: string | null, totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, slug: string, name: string, description: string, scopeLevel: string, scopeId?: string | null, effect: string, actionPattern: string, resourcePattern: unknown, conditions: unknown, actorPattern: unknown, createdAt: string, updatedAt: string, deletedAt?: string | null, createdByUsername?: string | null, updatedByUsername?: string | null, version: number }> } };
 
-export type IdentityProviderFieldsFragment = { id: string, organizationSlug: string, kind: string, name: string, config: Record<string, unknown>, metadataUrl: string, oidcDiscoveryUrl: string, clientId: string, isDefault: boolean, isActive: boolean, createdAt: string, updatedAt: string, activatedAt?: string | null, lastSwitchedByUsername?: string | null, version: number };
+export type IdentityProviderFieldsFragment = { id: string, organizationSlug: string, kind: string, name: string, config: unknown, metadataUrl: string, oidcDiscoveryUrl: string, clientId: string, isDefault: boolean, isActive: boolean, createdAt: string, updatedAt: string, activatedAt?: string | null, lastSwitchedByUsername?: string | null, version: number };
 
 export type ListIdentityProvidersQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListIdentityProvidersQuery = { astroliftIdentityProviders: Array<{ id: string, organizationSlug: string, kind: string, name: string, config: Record<string, unknown>, metadataUrl: string, oidcDiscoveryUrl: string, clientId: string, isDefault: boolean, isActive: boolean, createdAt: string, updatedAt: string, activatedAt?: string | null, lastSwitchedByUsername?: string | null, version: number }> };
+export type ListIdentityProvidersQuery = { astroliftIdentityProviders: Array<{ id: string, organizationSlug: string, kind: string, name: string, config: unknown, metadataUrl: string, oidcDiscoveryUrl: string, clientId: string, isDefault: boolean, isActive: boolean, createdAt: string, updatedAt: string, activatedAt?: string | null, lastSwitchedByUsername?: string | null, version: number }> };
 
 export type GetActiveIdentityProviderQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetActiveIdentityProviderQuery = { astroliftActiveIdentityProvider?: { id: string, organizationSlug: string, kind: string, name: string, config: Record<string, unknown>, metadataUrl: string, oidcDiscoveryUrl: string, clientId: string, isDefault: boolean, isActive: boolean, createdAt: string, updatedAt: string, activatedAt?: string | null, lastSwitchedByUsername?: string | null, version: number } | null };
+export type GetActiveIdentityProviderQuery = { astroliftActiveIdentityProvider?: { id: string, organizationSlug: string, kind: string, name: string, config: unknown, metadataUrl: string, oidcDiscoveryUrl: string, clientId: string, isDefault: boolean, isActive: boolean, createdAt: string, updatedAt: string, activatedAt?: string | null, lastSwitchedByUsername?: string | null, version: number } | null };
 
 export type ListActiveSessionsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -15027,14 +15027,14 @@ export type UpdateMyUiPreferencesMutationVariables = Exact<{
 }>;
 
 
-export type UpdateMyUiPreferencesMutation = { updateMyUiPreferences: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { homeLayout?: string | null, homeLayoutAsked: boolean, fleetView: string, workflowView: string, appView: string, flowParticles: boolean, motion: string, restrictedSettings: string, restrictedSettingsChoice?: string | null, restrictedSettingsOrgDefault: string, appearance: Record<string, unknown> } | null } };
+export type UpdateMyUiPreferencesMutation = { updateMyUiPreferences: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { homeLayout?: string | null, homeLayoutAsked: boolean, fleetView: string, workflowView: string, appView: string, flowParticles: boolean, motion: string, restrictedSettings: string, restrictedSettingsChoice?: string | null, restrictedSettingsOrgDefault: string, appearance: unknown } | null } };
 
-export type UiPreferencesFieldsFragment = { homeLayout?: string | null, homeLayoutAsked: boolean, fleetView: string, workflowView: string, appView: string, flowParticles: boolean, motion: string, restrictedSettings: string, restrictedSettingsChoice?: string | null, restrictedSettingsOrgDefault: string, appearance: Record<string, unknown> };
+export type UiPreferencesFieldsFragment = { homeLayout?: string | null, homeLayoutAsked: boolean, fleetView: string, workflowView: string, appView: string, flowParticles: boolean, motion: string, restrictedSettings: string, restrictedSettingsChoice?: string | null, restrictedSettingsOrgDefault: string, appearance: unknown };
 
 export type MyUiPreferencesQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type MyUiPreferencesQuery = { astroliftMyUiPreferences?: { homeLayout?: string | null, homeLayoutAsked: boolean, fleetView: string, workflowView: string, appView: string, flowParticles: boolean, motion: string, restrictedSettings: string, restrictedSettingsChoice?: string | null, restrictedSettingsOrgDefault: string, appearance: Record<string, unknown> } | null };
+export type MyUiPreferencesQuery = { astroliftMyUiPreferences?: { homeLayout?: string | null, homeLayoutAsked: boolean, fleetView: string, workflowView: string, appView: string, flowParticles: boolean, motion: string, restrictedSettings: string, restrictedSettingsChoice?: string | null, restrictedSettingsOrgDefault: string, appearance: unknown } | null };
 
 export type ListEnvironmentsQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
@@ -15107,7 +15107,7 @@ export type GetDeploymentLogQueryVariables = Exact<{
 }>;
 
 
-export type GetDeploymentLogQuery = { astroliftDeploymentLog: Array<{ id: string, deploymentId: string, status: string, message: string, detail: Record<string, unknown>, occurredAt: string }> };
+export type GetDeploymentLogQuery = { astroliftDeploymentLog: Array<{ id: string, deploymentId: string, status: string, message: string, detail: unknown, occurredAt: string }> };
 
 export type GetDeploymentRunLogPageQueryVariables = Exact<{
   deploymentId: Scalars['String']['input'];
@@ -15116,7 +15116,7 @@ export type GetDeploymentRunLogPageQueryVariables = Exact<{
 }>;
 
 
-export type GetDeploymentRunLogPageQuery = { astroliftDeploymentRunLogPage: { nextCursor?: string | null, hasMore: boolean, pageSize: number, items: Array<{ id: string, deploymentId: string, status: string, phase: string, event: string, message: string, detail: Record<string, unknown>, occurredAt: string }> } };
+export type GetDeploymentRunLogPageQuery = { astroliftDeploymentRunLogPage: { nextCursor?: string | null, hasMore: boolean, pageSize: number, items: Array<{ id: string, deploymentId: string, status: string, phase: string, event: string, message: string, detail: unknown, occurredAt: string }> } };
 
 export type DownloadDeploymentRunLogQueryVariables = Exact<{
   deploymentId: Scalars['String']['input'];
@@ -15169,9 +15169,9 @@ export type ListCommandRunsQueryVariables = Exact<{
 }>;
 
 
-export type ListCommandRunsQuery = { astroliftCommandRuns: Array<{ id: string, registeredAppSlug: string, workloadSlug?: string | null, invokedByUsername?: string | null, command: Record<string, unknown>, startedAt?: string | null, endedAt?: string | null, exitCode?: number | null, logExcerpt: string, output: string, createdAt: string }> };
+export type ListCommandRunsQuery = { astroliftCommandRuns: Array<{ id: string, registeredAppSlug: string, workloadSlug?: string | null, invokedByUsername?: string | null, command: unknown, startedAt?: string | null, endedAt?: string | null, exitCode?: number | null, logExcerpt: string, output: string, createdAt: string }> };
 
-export type CommandRunFieldsFragment = { id: string, registeredAppSlug: string, workloadSlug?: string | null, invokedByUsername?: string | null, command: Record<string, unknown>, startedAt?: string | null, endedAt?: string | null, exitCode?: number | null, logExcerpt: string, output: string, createdAt: string };
+export type CommandRunFieldsFragment = { id: string, registeredAppSlug: string, workloadSlug?: string | null, invokedByUsername?: string | null, command: unknown, startedAt?: string | null, endedAt?: string | null, exitCode?: number | null, logExcerpt: string, output: string, createdAt: string };
 
 export type ListCommandRunsPageQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
@@ -15182,14 +15182,14 @@ export type ListCommandRunsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListCommandRunsPageQuery = { astroliftCommandRunsPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, registeredAppSlug: string, workloadSlug?: string | null, invokedByUsername?: string | null, command: Record<string, unknown>, startedAt?: string | null, endedAt?: string | null, exitCode?: number | null, logExcerpt: string, output: string, createdAt: string }> } };
+export type ListCommandRunsPageQuery = { astroliftCommandRunsPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, registeredAppSlug: string, workloadSlug?: string | null, invokedByUsername?: string | null, command: unknown, startedAt?: string | null, endedAt?: string | null, exitCode?: number | null, logExcerpt: string, output: string, createdAt: string }> } };
 
 export type GetCommandRunQueryVariables = Exact<{
   id: Scalars['String']['input'];
 }>;
 
 
-export type GetCommandRunQuery = { astroliftCommandRun?: { id: string, registeredAppSlug: string, workloadSlug?: string | null, invokedByUsername?: string | null, command: Record<string, unknown>, startedAt?: string | null, endedAt?: string | null, exitCode?: number | null, logExcerpt: string, output: string, createdAt: string } | null };
+export type GetCommandRunQuery = { astroliftCommandRun?: { id: string, registeredAppSlug: string, workloadSlug?: string | null, invokedByUsername?: string | null, command: unknown, startedAt?: string | null, endedAt?: string | null, exitCode?: number | null, logExcerpt: string, output: string, createdAt: string } | null };
 
 export type ListAppHealthSummaryQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -15339,7 +15339,7 @@ export type CompareDeploymentsQueryVariables = Exact<{
 }>;
 
 
-export type CompareDeploymentsQuery = { astroliftCompareDeployments?: { deploymentAId: string, deploymentBId: string, baseSha: string, headSha: string, compareUrl: string, imageDiffSummary: string, manifestDiff: Array<{ op: string, path: string, before: Record<string, unknown>, after: Record<string, unknown> }> } | null };
+export type CompareDeploymentsQuery = { astroliftCompareDeployments?: { deploymentAId: string, deploymentBId: string, baseSha: string, headSha: string, compareUrl: string, imageDiffSummary: string, manifestDiff: Array<{ op: string, path: string, before: unknown, after: unknown }> } | null };
 
 export type ListMyAlertSubscriptionsQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
@@ -15354,9 +15354,9 @@ export type ListTaskRunsQueryVariables = Exact<{
 }>;
 
 
-export type ListTaskRunsQuery = { astroliftTaskRuns: Array<{ id: string, registeredAppSlug: string, workloadSlug: string, triggerKind: string, triggeredByUsername?: string | null, command: Record<string, unknown>, status: string, exitCode?: number | null, startedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, k8sJobName: string, createdAt: string }> };
+export type ListTaskRunsQuery = { astroliftTaskRuns: Array<{ id: string, registeredAppSlug: string, workloadSlug: string, triggerKind: string, triggeredByUsername?: string | null, command: unknown, status: string, exitCode?: number | null, startedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, k8sJobName: string, createdAt: string }> };
 
-export type TaskRunFieldsFragment = { id: string, registeredAppSlug: string, workloadSlug: string, triggerKind: string, triggeredByUsername?: string | null, command: Record<string, unknown>, status: string, exitCode?: number | null, startedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, k8sJobName: string, createdAt: string };
+export type TaskRunFieldsFragment = { id: string, registeredAppSlug: string, workloadSlug: string, triggerKind: string, triggeredByUsername?: string | null, command: unknown, status: string, exitCode?: number | null, startedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, k8sJobName: string, createdAt: string };
 
 export type ListTaskRunsPageQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
@@ -15368,16 +15368,16 @@ export type ListTaskRunsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListTaskRunsPageQuery = { astroliftTaskRunsPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, registeredAppSlug: string, workloadSlug: string, triggerKind: string, triggeredByUsername?: string | null, command: Record<string, unknown>, status: string, exitCode?: number | null, startedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, k8sJobName: string, createdAt: string }> } };
+export type ListTaskRunsPageQuery = { astroliftTaskRunsPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, registeredAppSlug: string, workloadSlug: string, triggerKind: string, triggeredByUsername?: string | null, command: unknown, status: string, exitCode?: number | null, startedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, k8sJobName: string, createdAt: string }> } };
 
 export type GetTaskRunQueryVariables = Exact<{
   id: Scalars['String']['input'];
 }>;
 
 
-export type GetTaskRunQuery = { astroliftTaskRun?: { id: string, registeredAppSlug: string, workloadSlug: string, triggerKind: string, triggeredByUsername?: string | null, command: Record<string, unknown>, status: string, exitCode?: number | null, startedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, k8sJobName: string, createdAt: string } | null };
+export type GetTaskRunQuery = { astroliftTaskRun?: { id: string, registeredAppSlug: string, workloadSlug: string, triggerKind: string, triggeredByUsername?: string | null, command: unknown, status: string, exitCode?: number | null, startedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, k8sJobName: string, createdAt: string } | null };
 
-export type AgentRunFieldsFragment = { id: string, registeredAppSlug: string, workloadSlug: string, triggerKind: string, triggeredByUsername?: string | null, status: string, input?: Record<string, unknown> | null, output?: Record<string, unknown> | null, reasoningTraceUrl: string, toolCallsCount: number, retryCount: number, startedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, k8sPodName: string, resultTtlHours: number, createdAt: string };
+export type AgentRunFieldsFragment = { id: string, registeredAppSlug: string, workloadSlug: string, triggerKind: string, triggeredByUsername?: string | null, status: string, input?: unknown | null, output?: unknown | null, reasoningTraceUrl: string, toolCallsCount: number, retryCount: number, startedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, k8sPodName: string, resultTtlHours: number, createdAt: string };
 
 export type ListAgentRunsPageQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
@@ -15390,7 +15390,7 @@ export type ListAgentRunsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListAgentRunsPageQuery = { astroliftAgentRunsPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, registeredAppSlug: string, workloadSlug: string, triggerKind: string, triggeredByUsername?: string | null, status: string, input?: Record<string, unknown> | null, output?: Record<string, unknown> | null, reasoningTraceUrl: string, toolCallsCount: number, retryCount: number, startedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, k8sPodName: string, resultTtlHours: number, createdAt: string }> } };
+export type ListAgentRunsPageQuery = { astroliftAgentRunsPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, registeredAppSlug: string, workloadSlug: string, triggerKind: string, triggeredByUsername?: string | null, status: string, input?: unknown | null, output?: unknown | null, reasoningTraceUrl: string, toolCallsCount: number, retryCount: number, startedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, k8sPodName: string, resultTtlHours: number, createdAt: string }> } };
 
 export type GetAppDeploymentActivityQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];
@@ -15490,14 +15490,14 @@ export type ListModelEndpointsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListModelEndpointsPageQuery = { astroliftModelEndpointsPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, name: string, variant: string, status: string, statusError: string, config: Record<string, unknown>, registeredAppSlug: string, projectSlug: string, ownerScope: string, clusterSlug: string, environmentName: string, deployedByEmail: string, deployedByMe: boolean }> } };
+export type ListModelEndpointsPageQuery = { astroliftModelEndpointsPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, name: string, variant: string, status: string, statusError: string, config: unknown, registeredAppSlug: string, projectSlug: string, ownerScope: string, clusterSlug: string, environmentName: string, deployedByEmail: string, deployedByMe: boolean }> } };
 
 export type GetModelEndpointQueryVariables = Exact<{
   id: Scalars['GUID']['input'];
 }>;
 
 
-export type GetModelEndpointQuery = { astroliftModelEndpoint?: { id: string, name: string, variant: string, status: string, statusError: string, config: Record<string, unknown>, registeredAppSlug: string, projectSlug: string, ownerScope: string, clusterSlug: string, environmentName: string, deployedByEmail: string, deployedByMe: boolean } | null };
+export type GetModelEndpointQuery = { astroliftModelEndpoint?: { id: string, name: string, variant: string, status: string, statusError: string, config: unknown, registeredAppSlug: string, projectSlug: string, ownerScope: string, clusterSlug: string, environmentName: string, deployedByEmail: string, deployedByMe: boolean } | null };
 
 export type ListModelTargetsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -15507,7 +15507,7 @@ export type ListModelTargetsQuery = { astroliftEnvironments: Array<{ id: string,
 export type ListClusterGpusQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListClusterGpusQuery = { astroliftClusters: Array<{ id: string, capabilities: Record<string, unknown> }> };
+export type ListClusterGpusQuery = { astroliftClusters: Array<{ id: string, capabilities: unknown }> };
 
 export type GetModelDeploymentMetricsQueryVariables = Exact<{
   serviceId: Scalars['GUID']['input'];
@@ -15704,7 +15704,7 @@ export type ExplorerSpansQueryVariables = Exact<{
 }>;
 
 
-export type ExplorerSpansQuery = { astroliftTraceSpansResult: { reason: AstroliftObservabilityPanelReason, scope?: { organizationId: string, appId: string, environmentId: string, environmentName: string, clusterId: string, namespace: string } | null, items: Array<{ traceId: string, spanId: string, parentSpanId?: string | null, operation: string, service: string, startTime: string, durationMs: number, statusCode: string, attributes: Record<string, unknown>, resourceAttributes: Record<string, unknown> }> } };
+export type ExplorerSpansQuery = { astroliftTraceSpansResult: { reason: AstroliftObservabilityPanelReason, scope?: { organizationId: string, appId: string, environmentId: string, environmentName: string, clusterId: string, namespace: string } | null, items: Array<{ traceId: string, spanId: string, parentSpanId?: string | null, operation: string, service: string, startTime: string, durationMs: number, statusCode: string, attributes: unknown, resourceAttributes: unknown }> } };
 
 export type CreateWebhookMutationVariables = Exact<{
   input: CreateWebhookSubscriptionInput;
@@ -15773,7 +15773,7 @@ export type GetRecentActivityQueryVariables = Exact<{
 }>;
 
 
-export type GetRecentActivityQuery = { astroliftRecentActivity: { nextCursor?: string | null, items: Array<{ id: string, eventType: string, action: string, actorDisplay: string, targetKind: string, targetLabel: string, targetHref?: string | null, occurredAt: string, payload: Record<string, unknown> }> } };
+export type GetRecentActivityQuery = { astroliftRecentActivity: { nextCursor?: string | null, items: Array<{ id: string, eventType: string, action: string, actorDisplay: string, targetKind: string, targetLabel: string, targetHref?: string | null, occurredAt: string, payload: unknown }> } };
 
 export type ListEventsQueryVariables = Exact<{
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -15782,9 +15782,9 @@ export type ListEventsQueryVariables = Exact<{
 }>;
 
 
-export type ListEventsQuery = { astroliftEvents: Array<{ id: string, eventType: string, payload: Record<string, unknown>, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string }> };
+export type ListEventsQuery = { astroliftEvents: Array<{ id: string, eventType: string, payload: unknown, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string }> };
 
-export type EventFieldsFragment = { id: string, eventType: string, payload: Record<string, unknown>, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string, severity: string };
+export type EventFieldsFragment = { id: string, eventType: string, payload: unknown, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string, severity: string };
 
 export type ListEventsPageQueryVariables = Exact<{
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -15796,7 +15796,7 @@ export type ListEventsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListEventsPageQuery = { astroliftEventsPage: { nextCursor?: string | null, reason: AstroliftObservabilityPanelReason, items: Array<{ id: string, eventType: string, payload: Record<string, unknown>, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string, severity: string }> } };
+export type ListEventsPageQuery = { astroliftEventsPage: { nextCursor?: string | null, reason: AstroliftObservabilityPanelReason, items: Array<{ id: string, eventType: string, payload: unknown, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string, severity: string }> } };
 
 export type ListEventsAggregatedQueryVariables = Exact<{
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -15805,7 +15805,7 @@ export type ListEventsAggregatedQueryVariables = Exact<{
 }>;
 
 
-export type ListEventsAggregatedQuery = { astroliftEventsAggregated: Array<{ count: number, firstAt: string, lastAt: string, eventType: string, resourceKind: string, resourceId: string, representative: { id: string, eventType: string, payload: Record<string, unknown>, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string } }> };
+export type ListEventsAggregatedQuery = { astroliftEventsAggregated: Array<{ count: number, firstAt: string, lastAt: string, eventType: string, resourceKind: string, resourceId: string, representative: { id: string, eventType: string, payload: unknown, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string } }> };
 
 export type ListEventsAggregatedPageQueryVariables = Exact<{
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -15818,7 +15818,7 @@ export type ListEventsAggregatedPageQueryVariables = Exact<{
 }>;
 
 
-export type ListEventsAggregatedPageQuery = { astroliftEventsAggregatedPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ count: number, firstAt: string, lastAt: string, eventType: string, resourceKind: string, resourceId: string, representative: { id: string, eventType: string, payload: Record<string, unknown>, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string, severity: string } }> } };
+export type ListEventsAggregatedPageQuery = { astroliftEventsAggregatedPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ count: number, firstAt: string, lastAt: string, eventType: string, resourceKind: string, resourceId: string, representative: { id: string, eventType: string, payload: unknown, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string, severity: string } }> } };
 
 export type ListAuditEventsQueryVariables = Exact<{
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -15830,7 +15830,7 @@ export type ListAuditEventsQueryVariables = Exact<{
 }>;
 
 
-export type ListAuditEventsQuery = { astroliftAuditEvents: Array<{ id: string, organizationId?: string | null, occurredAt: string, actorKind: string, actorId: string, actorDisplay: string, action: string, decision: string, targetKind: string, targetId: string, targetSlug: string, requestId: string, data: Record<string, unknown>, before?: Record<string, unknown> | null, after?: Record<string, unknown> | null }> };
+export type ListAuditEventsQuery = { astroliftAuditEvents: Array<{ id: string, organizationId?: string | null, occurredAt: string, actorKind: string, actorId: string, actorDisplay: string, action: string, decision: string, targetKind: string, targetId: string, targetSlug: string, requestId: string, data: unknown, before?: unknown | null, after?: unknown | null }> };
 
 export type ListAuditEventsPageQueryVariables = Exact<{
   limit?: InputMaybe<Scalars['Int']['input']>;
@@ -15847,7 +15847,7 @@ export type ListAuditEventsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListAuditEventsPageQuery = { astroliftAuditEventsPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, organizationId?: string | null, occurredAt: string, actorKind: string, actorId: string, actorDisplay: string, action: string, decision: string, targetKind: string, targetId: string, targetSlug: string, requestId: string, data: Record<string, unknown>, before?: Record<string, unknown> | null, after?: Record<string, unknown> | null }> } };
+export type ListAuditEventsPageQuery = { astroliftAuditEventsPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, organizationId?: string | null, occurredAt: string, actorKind: string, actorId: string, actorDisplay: string, action: string, decision: string, targetKind: string, targetId: string, targetSlug: string, requestId: string, data: unknown, before?: unknown | null, after?: unknown | null }> } };
 
 export type GetAuditRetentionQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -15906,21 +15906,21 @@ export type ListWorkflowRunsQueryVariables = Exact<{
 }>;
 
 
-export type ListWorkflowRunsQuery = { astroliftWorkflowRuns: Array<{ id: string, workflowKind: string, workflowId: string, runId: string, status: string, startedAt?: string | null, endedAt?: string | null, organizationId?: string | null, registeredAppId?: string | null, failure: Record<string, unknown> }> };
+export type ListWorkflowRunsQuery = { astroliftWorkflowRuns: Array<{ id: string, workflowKind: string, workflowId: string, runId: string, status: string, startedAt?: string | null, endedAt?: string | null, organizationId?: string | null, registeredAppId?: string | null, failure: unknown }> };
 
 export type GetEventQueryVariables = Exact<{
   id: Scalars['GUID']['input'];
 }>;
 
 
-export type GetEventQuery = { astroliftEvent?: { id: string, eventType: string, payload: Record<string, unknown>, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string, severity: string } | null };
+export type GetEventQuery = { astroliftEvent?: { id: string, eventType: string, payload: unknown, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string, severity: string } | null };
 
 export type GetAppSecurityEventsQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];
 }>;
 
 
-export type GetAppSecurityEventsQuery = { signing: Array<{ id: string, eventType: string, payload: Record<string, unknown>, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string, severity: string }>, scan: Array<{ id: string, eventType: string, payload: Record<string, unknown>, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string, severity: string }>, sbom: Array<{ id: string, eventType: string, payload: Record<string, unknown>, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string, severity: string }> };
+export type GetAppSecurityEventsQuery = { signing: Array<{ id: string, eventType: string, payload: unknown, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string, severity: string }>, scan: Array<{ id: string, eventType: string, payload: unknown, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string, severity: string }>, sbom: Array<{ id: string, eventType: string, payload: unknown, organizationId?: string | null, teamId?: string | null, projectId?: string | null, registeredAppId?: string | null, occurredAt: string, resourceKind: string, resourceId: string, severity: string }> };
 
 export type RunAuditQueryVariables = Exact<{
   filter?: InputMaybe<AstroliftRunAuditFilter>;
@@ -16055,9 +16055,9 @@ export type ListWorkloadsQueryVariables = Exact<{
 }>;
 
 
-export type ListWorkloadsQuery = { astroliftWorkloads: Array<{ id: string, version: number, slug: string, name: string, kind: string, isPublic: boolean, schedule: string, concurrencyPolicy: string, replicas: number, cpuRequest: string, cpuLimit: string, memoryRequest: string, memoryLimit: string, hpaMinReplicas?: number | null, hpaMaxReplicas?: number | null, hpaTargetCpuPct: number, storageClass: string, storageSize: string, volumes: Record<string, unknown>, registeredAppSlug: string, viewerCan: { restart: { allowed: boolean, code: string, reason: string }, scale: { allowed: boolean, code: string, reason: string } } }> };
+export type ListWorkloadsQuery = { astroliftWorkloads: Array<{ id: string, version: number, slug: string, name: string, kind: string, isPublic: boolean, schedule: string, concurrencyPolicy: string, replicas: number, cpuRequest: string, cpuLimit: string, memoryRequest: string, memoryLimit: string, hpaMinReplicas?: number | null, hpaMaxReplicas?: number | null, hpaTargetCpuPct: number, storageClass: string, storageSize: string, volumes: unknown, registeredAppSlug: string, viewerCan: { restart: { allowed: boolean, code: string, reason: string }, scale: { allowed: boolean, code: string, reason: string } } }> };
 
-export type WorkloadFieldsFragment = { id: string, version: number, slug: string, name: string, kind: string, isPublic: boolean, schedule: string, concurrencyPolicy: string, replicas: number, cpuRequest: string, cpuLimit: string, memoryRequest: string, memoryLimit: string, hpaMinReplicas?: number | null, hpaMaxReplicas?: number | null, hpaTargetCpuPct: number, storageClass: string, storageSize: string, volumes: Record<string, unknown>, registeredAppSlug: string, viewerCan: { restart: { allowed: boolean, code: string, reason: string }, scale: { allowed: boolean, code: string, reason: string } } };
+export type WorkloadFieldsFragment = { id: string, version: number, slug: string, name: string, kind: string, isPublic: boolean, schedule: string, concurrencyPolicy: string, replicas: number, cpuRequest: string, cpuLimit: string, memoryRequest: string, memoryLimit: string, hpaMinReplicas?: number | null, hpaMaxReplicas?: number | null, hpaTargetCpuPct: number, storageClass: string, storageSize: string, volumes: unknown, registeredAppSlug: string, viewerCan: { restart: { allowed: boolean, code: string, reason: string }, scale: { allowed: boolean, code: string, reason: string } } };
 
 export type ListWorkloadsPageQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
@@ -16072,7 +16072,7 @@ export type ListWorkloadsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListWorkloadsPageQuery = { astroliftWorkloadsPage: { nextCursor?: string | null, totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, version: number, slug: string, name: string, kind: string, isPublic: boolean, schedule: string, concurrencyPolicy: string, replicas: number, cpuRequest: string, cpuLimit: string, memoryRequest: string, memoryLimit: string, hpaMinReplicas?: number | null, hpaMaxReplicas?: number | null, hpaTargetCpuPct: number, storageClass: string, storageSize: string, volumes: Record<string, unknown>, registeredAppSlug: string, viewerCan: { restart: { allowed: boolean, code: string, reason: string }, scale: { allowed: boolean, code: string, reason: string } } }> } };
+export type ListWorkloadsPageQuery = { astroliftWorkloadsPage: { nextCursor?: string | null, totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, version: number, slug: string, name: string, kind: string, isPublic: boolean, schedule: string, concurrencyPolicy: string, replicas: number, cpuRequest: string, cpuLimit: string, memoryRequest: string, memoryLimit: string, hpaMinReplicas?: number | null, hpaMaxReplicas?: number | null, hpaTargetCpuPct: number, storageClass: string, storageSize: string, volumes: unknown, registeredAppSlug: string, viewerCan: { restart: { allowed: boolean, code: string, reason: string }, scale: { allowed: boolean, code: string, reason: string } } }> } };
 
 export type GetRenderedManifestQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];
@@ -16081,7 +16081,7 @@ export type GetRenderedManifestQueryVariables = Exact<{
 }>;
 
 
-export type GetRenderedManifestQuery = { astroliftRenderedManifest?: { appSlug: string, environmentName: string, imageTag: string, namespace: string, resources: Record<string, unknown>, error?: string | null, errorPath?: string | null, errorLine?: number | null, errorColumn?: number | null } | null };
+export type GetRenderedManifestQuery = { astroliftRenderedManifest?: { appSlug: string, environmentName: string, imageTag: string, namespace: string, resources: unknown, error?: string | null, errorPath?: string | null, errorLine?: number | null, errorColumn?: number | null } | null };
 
 export type GetWorkloadQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];
@@ -16089,14 +16089,14 @@ export type GetWorkloadQueryVariables = Exact<{
 }>;
 
 
-export type GetWorkloadQuery = { astroliftWorkload?: { id: string, version: number, name: string, slug: string, kind: string, isPublic: boolean, schedule: string, concurrencyPolicy: string, replicas: number, cpuRequest: string, cpuLimit: string, memoryRequest: string, memoryLimit: string, hpaMinReplicas?: number | null, hpaMaxReplicas?: number | null, hpaTargetCpuPct: number, storageClass: string, storageSize: string, volumes: Record<string, unknown>, registeredAppSlug: string, inClusterServiceFqdn: string, viewerCan: { restart: { allowed: boolean, code: string, reason: string }, scale: { allowed: boolean, code: string, reason: string } } } | null };
+export type GetWorkloadQuery = { astroliftWorkload?: { id: string, version: number, name: string, slug: string, kind: string, isPublic: boolean, schedule: string, concurrencyPolicy: string, replicas: number, cpuRequest: string, cpuLimit: string, memoryRequest: string, memoryLimit: string, hpaMinReplicas?: number | null, hpaMaxReplicas?: number | null, hpaTargetCpuPct: number, storageClass: string, storageSize: string, volumes: unknown, registeredAppSlug: string, inClusterServiceFqdn: string, viewerCan: { restart: { allowed: boolean, code: string, reason: string }, scale: { allowed: boolean, code: string, reason: string } } } | null };
 
 export type ListContainersQueryVariables = Exact<{
   workloadSlug?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
-export type ListContainersQuery = { astroliftContainers: Array<{ id: string, name: string, isPrimary: boolean, imageRef: string, dockerfilePath: string, buildContext: string, port: number, command: Array<string>, args: Array<string>, env: Record<string, unknown>, healthcheckKind: string, healthcheckValue: string, healthcheckPort?: number | null, startupProbe?: Record<string, unknown> | null, readinessProbe?: Record<string, unknown> | null, livenessProbe?: Record<string, unknown> | null, workloadSlug: string }> };
+export type ListContainersQuery = { astroliftContainers: Array<{ id: string, name: string, isPrimary: boolean, imageRef: string, dockerfilePath: string, buildContext: string, port: number, command: Array<string>, args: Array<string>, env: unknown, healthcheckKind: string, healthcheckValue: string, healthcheckPort?: number | null, startupProbe?: unknown | null, readinessProbe?: unknown | null, livenessProbe?: unknown | null, workloadSlug: string }> };
 
 export type GetPlatformApiUrlQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -16144,7 +16144,7 @@ export type GetWorkloadManifestQueryVariables = Exact<{
 }>;
 
 
-export type GetWorkloadManifestQuery = { astroliftWorkloadManifest?: { appSlug: string, workloadSlug: string, environmentName: string, imageTag: string, namespace: string, resources: Record<string, unknown>, previousImageTag: string, previousDeploymentId: string, resourcesPrevious: Record<string, unknown>, error?: string | null, errorPath?: string | null, errorLine?: number | null, errorColumn?: number | null } | null };
+export type GetWorkloadManifestQuery = { astroliftWorkloadManifest?: { appSlug: string, workloadSlug: string, environmentName: string, imageTag: string, namespace: string, resources: unknown, previousImageTag: string, previousDeploymentId: string, resourcesPrevious: unknown, error?: string | null, errorPath?: string | null, errorLine?: number | null, errorColumn?: number | null } | null };
 
 export type GetAppDoctorQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];
@@ -16215,7 +16215,7 @@ export type ReviewWorkflowStartQueryVariables = Exact<{
 }>;
 
 
-export type ReviewWorkflowStartQuery = { workflowDefinitionById?: { guid: string, revision: string, definition: { name: string, slug: string, isEnabled: boolean, stageCount: number }, inputContract: { schema?: Record<string, unknown> | null, digest: string, supported: boolean, error: string, acceptsInputs: boolean, supportsSimpleForm: boolean, fields: Array<{ name: string, kind: string, required: boolean, hasDefault: boolean, default?: Record<string, unknown> | null, sensitive: boolean, simple: boolean, enumValues?: Record<string, unknown> | null, constraints: Record<string, unknown> }> } } | null };
+export type ReviewWorkflowStartQuery = { workflowDefinitionById?: { guid: string, revision: string, definition: { name: string, slug: string, isEnabled: boolean, stageCount: number }, inputContract: { schema?: unknown | null, digest: string, supported: boolean, error: string, acceptsInputs: boolean, supportsSimpleForm: boolean, fields: Array<{ name: string, kind: string, required: boolean, hasDefault: boolean, default?: unknown | null, sensitive: boolean, simple: boolean, enumValues?: unknown | null, constraints: unknown }> } } | null };
 
 export type ReconcileWorkflowStartQueryVariables = Exact<{
   requestId: Scalars['String']['input'];
@@ -16421,7 +16421,7 @@ export type PreviewManagedServiceCostQueryVariables = Exact<{
 }>;
 
 
-export type PreviewManagedServiceCostQuery = { astroliftManagedServiceCostPreview?: { managedServiceId: string, available: boolean, reason: string, message: string, monthlyTotal?: number | null, currency: string, lineItems: Record<string, unknown>, pricingSourceUrl: string, pricingFetchedAt: string, notes: Array<string>, approximate: boolean } | null };
+export type PreviewManagedServiceCostQuery = { astroliftManagedServiceCostPreview?: { managedServiceId: string, available: boolean, reason: string, message: string, monthlyTotal?: number | null, currency: string, lineItems: unknown, pricingSourceUrl: string, pricingFetchedAt: string, notes: Array<string>, approximate: boolean } | null };
 
 export type GetAppVersionQueryVariables = Exact<{
   slug: Scalars['String']['input'];
@@ -16456,9 +16456,9 @@ export type ListProjectManagedServiceCatalogQueryVariables = Exact<{
 }>;
 
 
-export type ListProjectManagedServiceCatalogQuery = { astroliftProjectManagedServiceCatalog: Array<{ id: string, providerPluginSlug: string, kind: string, variant: string, displayName: string, description: string, status: string, available: boolean, unavailableReason: string, isDefaultForKind: boolean, sizeOptions: Array<string>, configSchema: Record<string, unknown>, bindingEnvs: Array<string>, issueUrl: string }> };
+export type ListProjectManagedServiceCatalogQuery = { astroliftProjectManagedServiceCatalog: Array<{ id: string, providerPluginSlug: string, kind: string, variant: string, displayName: string, description: string, status: string, available: boolean, unavailableReason: string, isDefaultForKind: boolean, sizeOptions: Array<string>, configSchema: unknown, bindingEnvs: Array<string>, issueUrl: string }> };
 
-export type ManagedServiceFieldsFragment = { id: string, kind: string, name: string, variant: string, environmentName: string, registeredAppSlug: string, status: string, statusError: string, config: Record<string, unknown>, appliedConfig?: Record<string, unknown> | null, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null, createdAt: string, updatedAt: string, lastActionAt?: string | null, lastActionKind: string, editableFields: Array<string>, volumeBindings: Array<{ id: string, name: string, mountPath: string, subPath: string, sourceKind: string, protocol: string, claimName: string, claimNamespace: string, storageClassName: string, csiDriver: string, readOnly: boolean, capacity: string, accessModes: Array<string>, workloadNames: Array<string>, containerNames: Array<string>, credentialReferenceCount: number }> };
+export type ManagedServiceFieldsFragment = { id: string, kind: string, name: string, variant: string, environmentName: string, registeredAppSlug: string, status: string, statusError: string, config: unknown, appliedConfig?: unknown | null, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null, createdAt: string, updatedAt: string, lastActionAt?: string | null, lastActionKind: string, editableFields: Array<string>, volumeBindings: Array<{ id: string, name: string, mountPath: string, subPath: string, sourceKind: string, protocol: string, claimName: string, claimNamespace: string, storageClassName: string, csiDriver: string, readOnly: boolean, capacity: string, accessModes: Array<string>, workloadNames: Array<string>, containerNames: Array<string>, credentialReferenceCount: number }> };
 
 export type ListManagedServicesQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];
@@ -16466,7 +16466,7 @@ export type ListManagedServicesQueryVariables = Exact<{
 }>;
 
 
-export type ListManagedServicesQuery = { astroliftManagedServices: Array<{ id: string, kind: string, name: string, variant: string, environmentName: string, registeredAppSlug: string, status: string, statusError: string, config: Record<string, unknown>, appliedConfig?: Record<string, unknown> | null, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null, createdAt: string, updatedAt: string, lastActionAt?: string | null, lastActionKind: string, editableFields: Array<string>, volumeBindings: Array<{ id: string, name: string, mountPath: string, subPath: string, sourceKind: string, protocol: string, claimName: string, claimNamespace: string, storageClassName: string, csiDriver: string, readOnly: boolean, capacity: string, accessModes: Array<string>, workloadNames: Array<string>, containerNames: Array<string>, credentialReferenceCount: number }> }> };
+export type ListManagedServicesQuery = { astroliftManagedServices: Array<{ id: string, kind: string, name: string, variant: string, environmentName: string, registeredAppSlug: string, status: string, statusError: string, config: unknown, appliedConfig?: unknown | null, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null, createdAt: string, updatedAt: string, lastActionAt?: string | null, lastActionKind: string, editableFields: Array<string>, volumeBindings: Array<{ id: string, name: string, mountPath: string, subPath: string, sourceKind: string, protocol: string, claimName: string, claimNamespace: string, storageClassName: string, csiDriver: string, readOnly: boolean, capacity: string, accessModes: Array<string>, workloadNames: Array<string>, containerNames: Array<string>, credentialReferenceCount: number }> }> };
 
 export type ListManagedServicesPageQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];
@@ -16477,7 +16477,7 @@ export type ListManagedServicesPageQueryVariables = Exact<{
 }>;
 
 
-export type ListManagedServicesPageQuery = { astroliftManagedServicesPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, kind: string, name: string, variant: string, environmentName: string, registeredAppSlug: string, status: string, statusError: string, config: Record<string, unknown>, appliedConfig?: Record<string, unknown> | null, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null, createdAt: string, updatedAt: string, lastActionAt?: string | null, lastActionKind: string, editableFields: Array<string>, volumeBindings: Array<{ id: string, name: string, mountPath: string, subPath: string, sourceKind: string, protocol: string, claimName: string, claimNamespace: string, storageClassName: string, csiDriver: string, readOnly: boolean, capacity: string, accessModes: Array<string>, workloadNames: Array<string>, containerNames: Array<string>, credentialReferenceCount: number }> }> } };
+export type ListManagedServicesPageQuery = { astroliftManagedServicesPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, kind: string, name: string, variant: string, environmentName: string, registeredAppSlug: string, status: string, statusError: string, config: unknown, appliedConfig?: unknown | null, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null, createdAt: string, updatedAt: string, lastActionAt?: string | null, lastActionKind: string, editableFields: Array<string>, volumeBindings: Array<{ id: string, name: string, mountPath: string, subPath: string, sourceKind: string, protocol: string, claimName: string, claimNamespace: string, storageClassName: string, csiDriver: string, readOnly: boolean, capacity: string, accessModes: Array<string>, workloadNames: Array<string>, containerNames: Array<string>, credentialReferenceCount: number }> }> } };
 
 export type ListManagedServiceObjectsQueryVariables = Exact<{
   managedServiceId: Scalars['GUID']['input'];
@@ -16525,7 +16525,7 @@ export type GetEmailMessagesQueryVariables = Exact<{
 }>;
 
 
-export type GetEmailMessagesQuery = { astroliftEmailMessages: Array<{ id: string, messageId: string, recipient: string, subject: string, eventKind: string, occurredAt: string, metadata: Record<string, unknown> }> };
+export type GetEmailMessagesQuery = { astroliftEmailMessages: Array<{ id: string, messageId: string, recipient: string, subject: string, eventKind: string, occurredAt: string, metadata: unknown }> };
 
 export type GetEmailEngagementMetricsQueryVariables = Exact<{
   managedServiceId: Scalars['GUID']['input'];
@@ -16535,7 +16535,7 @@ export type GetEmailEngagementMetricsQueryVariables = Exact<{
 
 export type GetEmailEngagementMetricsQuery = { astroliftEmailEngagementMetrics?: { totalSends: number, totalDeliveries: number, totalBounces: number, totalComplaints: number, totalOpens: number, totalClicks: number, bounceRatePct: number, complaintRatePct: number, openRatePct: number, clickRatePct: number, windowDays: number } | null };
 
-export type SecretChangeProposalFieldsFragment = { id: string, registeredAppSlug: string, environmentName: string, op: string, status: string, proposerUserId: string, proposerDisplayName: string, payload: Record<string, unknown>, payloadDiff: Record<string, unknown>, requiredApproverCount: number, approvalsCount: number, expiresAt: string, decidedAt?: string | null, appliedAt?: string | null, applyError: string, createdAt: string, approvals: Array<{ id: string, approverUserId: string, approverDisplayName: string, decision: string, decidedAt: string, reason: string }> };
+export type SecretChangeProposalFieldsFragment = { id: string, registeredAppSlug: string, environmentName: string, op: string, status: string, proposerUserId: string, proposerDisplayName: string, payload: unknown, payloadDiff: unknown, requiredApproverCount: number, approvalsCount: number, expiresAt: string, decidedAt?: string | null, appliedAt?: string | null, applyError: string, createdAt: string, approvals: Array<{ id: string, approverUserId: string, approverDisplayName: string, decision: string, decidedAt: string, reason: string }> };
 
 export type ListSecretChangeProposalsQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
@@ -16543,7 +16543,7 @@ export type ListSecretChangeProposalsQueryVariables = Exact<{
 }>;
 
 
-export type ListSecretChangeProposalsQuery = { astroliftSecretChangeProposals: Array<{ id: string, registeredAppSlug: string, environmentName: string, op: string, status: string, proposerUserId: string, proposerDisplayName: string, payload: Record<string, unknown>, payloadDiff: Record<string, unknown>, requiredApproverCount: number, approvalsCount: number, expiresAt: string, decidedAt?: string | null, appliedAt?: string | null, applyError: string, createdAt: string, approvals: Array<{ id: string, approverUserId: string, approverDisplayName: string, decision: string, decidedAt: string, reason: string }> }> };
+export type ListSecretChangeProposalsQuery = { astroliftSecretChangeProposals: Array<{ id: string, registeredAppSlug: string, environmentName: string, op: string, status: string, proposerUserId: string, proposerDisplayName: string, payload: unknown, payloadDiff: unknown, requiredApproverCount: number, approvalsCount: number, expiresAt: string, decidedAt?: string | null, appliedAt?: string | null, applyError: string, createdAt: string, approvals: Array<{ id: string, approverUserId: string, approverDisplayName: string, decision: string, decidedAt: string, reason: string }> }> };
 
 export type ListSecretChangeProposalsPageQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
@@ -16567,7 +16567,7 @@ export type GetSecretChangeProposalQueryVariables = Exact<{
 }>;
 
 
-export type GetSecretChangeProposalQuery = { astroliftSecretChangeProposal?: { id: string, registeredAppSlug: string, environmentName: string, op: string, status: string, proposerUserId: string, proposerDisplayName: string, payload: Record<string, unknown>, payloadDiff: Record<string, unknown>, requiredApproverCount: number, approvalsCount: number, expiresAt: string, decidedAt?: string | null, appliedAt?: string | null, applyError: string, createdAt: string, approvals: Array<{ id: string, approverUserId: string, approverDisplayName: string, decision: string, decidedAt: string, reason: string }> } | null };
+export type GetSecretChangeProposalQuery = { astroliftSecretChangeProposal?: { id: string, registeredAppSlug: string, environmentName: string, op: string, status: string, proposerUserId: string, proposerDisplayName: string, payload: unknown, payloadDiff: unknown, requiredApproverCount: number, approvalsCount: number, expiresAt: string, decidedAt?: string | null, appliedAt?: string | null, applyError: string, createdAt: string, approvals: Array<{ id: string, approverUserId: string, approverDisplayName: string, decision: string, decidedAt: string, reason: string }> } | null };
 
 export type GetAppSecretHistoryQueryVariables = Exact<{
   appSlug: Scalars['String']['input'];
@@ -16645,4 +16645,4 @@ export type GetWorkflowInstanceDetailQueryVariables = Exact<{
 }>;
 
 
-export type GetWorkflowInstanceDetailQuery = { astroliftWorkflowInstanceDetail?: { instance: { workflowId: string, workflowType: string, runId: string, status: string, startedAt: string, closedAt: string, durationSeconds?: number | null, taskQueue: string, triggeredBy: string }, history: Array<{ eventType: string, timestamp: string, payload: Record<string, unknown>, retryCount: number, decision: string }> } | null };
+export type GetWorkflowInstanceDetailQuery = { astroliftWorkflowInstanceDetail?: { instance: { workflowId: string, workflowType: string, runId: string, status: string, startedAt: string, closedAt: string, durationSeconds?: number | null, taskQueue: string, triggeredBy: string }, history: Array<{ eventType: string, timestamp: string, payload: unknown, retryCount: number, decision: string }> } | null };

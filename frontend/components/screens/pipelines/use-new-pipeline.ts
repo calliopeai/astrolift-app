@@ -2,6 +2,7 @@
 
 import { useMutation } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
@@ -14,6 +15,7 @@ type Response = {
 };
 
 export function useNewPipeline() {
+  const t = useTranslations("PipelineUI");
   const router = useRouter();
   const { can } = useMyPermissions();
   const allowed = can("app.update");
@@ -54,24 +56,24 @@ export function useNewPipeline() {
         },
       });
       if (!data?.createPipeline.ok || !data.createPipeline.data)
-        setError(data?.createPipeline.errors[0]?.message ?? "Could not create pipeline.");
+        setError(data?.createPipeline.errors[0]?.message ?? t("new.failed"));
       else {
         id = data.createPipeline.data.id;
         committed.current = true;
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not create pipeline.");
+      setError(cause instanceof Error ? cause.message : t("new.failed"));
     } finally {
       busy.current = false;
     }
     if (id) {
       setCreatedId(id);
-      toast.success("Pipeline created");
+      toast.success(t("new.createdToast"));
       // Creation committed. A navigation failure must not invite a duplicate retry.
       try {
         router.push(`/pipelines/${encodeURIComponent(id)}`);
       } catch {
-        toast.warning("Pipeline created. Open it using the link on this page.");
+        toast.warning(t("new.navigationFailed"));
       }
     }
   }

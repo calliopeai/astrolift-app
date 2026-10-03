@@ -5,7 +5,7 @@ import NextLink from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 
-import { resolveSourceHref } from "./event-source";
+import { eventPayloadText, resolveSourceHref } from "./event-source";
 
 /**
  * An event's source as a badge, linked to the resource when
@@ -18,7 +18,7 @@ export function SourceBadge({
 }: {
   resourceKind: string;
   resourceId: string;
-  payload: Record<string, unknown> | null | undefined;
+  payload: unknown;
 }) {
   const t = useTranslations("lists.events");
   if (!resourceKind && !resourceId) return null;
@@ -54,15 +54,11 @@ export function SourceBadge({
 }
 
 /** One-line payload preview; the full document lives on the detail page. */
-export function PayloadPreview({
-  payload,
-}: {
-  payload: Record<string, unknown> | null | undefined;
-}) {
-  if (Object.keys(payload ?? {}).length === 0) {
+export function PayloadPreview({ payload }: { payload: unknown }) {
+  const text = eventPayloadText(payload);
+  if (text === null) {
     return <span className="text-muted-foreground text-xs">—</span>;
   }
-  const text = JSON.stringify(payload);
   return (
     <span
       className="text-muted-foreground text-2xs block max-w-md truncate font-mono"

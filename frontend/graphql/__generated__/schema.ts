@@ -19,7 +19,7 @@ export type Scalars = {
   /** UUID v7 — the platform's external identifier. */
   GUID: { input: string; output: string; }
   /** The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf). */
-  JSON: { input: Record<string, unknown>; output: Record<string, unknown>; }
+  JSON: { input: unknown; output: unknown; }
   UUID: { input: any; output: any; }
   /** Represents NULL values */
   Void: { input: any; output: any; }

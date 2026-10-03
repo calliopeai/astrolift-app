@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useFormatters } from "@/lib/i18n/formatters";
 
+import { eventPayloadText } from "./event-source";
 import type { useBucketMembers } from "./use-events";
 
 export type BucketMembersProps = ReturnType<typeof useBucketMembers>;
@@ -44,7 +45,7 @@ export function BucketMembers({ loading, members }: BucketMembersProps) {
               {fmt.formatDateTime(e.occurredAt)}
             </span>
           </NextLink>
-          {Object.keys(e.payload ?? {}).length > 0 && (
+          {eventPayloadText(e.payload) !== null && (
             <pre className="bg-muted text-muted-foreground mt-2 overflow-x-auto rounded-md p-2 text-xs">
               {JSON.stringify(e.payload, null, 2)}
             </pre>
