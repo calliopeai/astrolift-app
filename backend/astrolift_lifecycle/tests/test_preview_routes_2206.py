@@ -76,7 +76,7 @@ def test_logs_use_canonical_namespace_not_url_or_environment_name(world, monkeyp
     seen = []
     monkeypatch.setattr("core.cluster_log_query.query_app_logs", lambda **kw: seen.append(kw) or None)
     monkeypatch.setattr(
-        "astrolift_observability.schema.log_queries._resolve_cluster",
+        "astrolift_observability.schema.log_queries.resolve_environment",
         lambda **kw: pytest.fail("fallback cluster resolution"),
     )
     world.preview.hostname = world.env.url = "https://reused-production.example.invalid"
