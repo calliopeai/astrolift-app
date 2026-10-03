@@ -31,8 +31,10 @@ from types import SimpleNamespace
 from unittest import mock
 
 import pytest
+from authlib.oidc.core import UserInfo as VerifiedUserInfo
 from constance.test import override_config
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, login
+from django.contrib.sessions.backends.db import SessionStore
 from django.test import RequestFactory
 from django.utils import timezone
 
@@ -63,6 +65,7 @@ from astrolift_identity.sessions import (
 )
 from astrolift_identity.step_up_sso import (
     SESSION_SSO_AUTH_TIME_KEY,
+    SESSION_SSO_BINDING_KEY,
     SESSION_SSO_NONCE_KEY,
     SESSION_SSO_RETURN_KEY,
     SESSION_SSO_STATE_KEY,
@@ -71,6 +74,7 @@ from astrolift_identity.step_up_sso import (
     freshness_window_seconds,
     is_safe_return_url,
 )
+from auth1.models import UserInfo
 from core.mutations import (
     AuditEntry,
     ErrorCode,
@@ -423,11 +427,35 @@ def test_elevate_sso_start_clamps_unsafe_return(rf):
 
 
 def _set_up_callback_session(user, *, return_to="/app/admin/", state="state-xyz", nonce="nonce-xyz"):
-    session = _FakeSession()
+    session = SessionStore()
+    session.create()
+    request = RequestFactory().get("/app/auth1/elevate-sso/")
+    request.session = session
+    login(request, user, backend="django.contrib.auth.backends.ModelBackend")
     session[SESSION_SSO_STATE_KEY] = state
     session[SESSION_SSO_NONCE_KEY] = nonce
     session[SESSION_SSO_RETURN_KEY] = return_to
+    session[SESSION_SSO_BINDING_KEY] = {
+        "user_id": str(user.pk),
+        "session_key": session.session_key,
+    }
+    session.save()
+    UserInfo.objects.get_or_create(
+        sub=f"owned-sub-{user.pk}",
+        defaults={
+            "iss": "https://idp.example",
+            "internal_user": user,
+            "updated_at": timezone.now(),
+            "email_verified": True,
+            "iat": int(time.time()),
+            "exp": int(time.time()) + 60,
+        },
+    )
     return session
+
+
+def _verified_claims(user, **claims):
+    return VerifiedUserInfo({"sub": f"owned-sub-{user.pk}", "iss": "https://idp.example", **claims})
 
 
 def test_callback_with_fresh_auth_time_elevates_and_redirects(rf, audit_capture):
@@ -444,7 +472,7 @@ def test_callback_with_fresh_auth_time_elevates_and_redirects(rf, audit_capture)
     with mock.patch(
         "astrolift_identity.step_up_sso._oauth.auth0_stepup.authorize_access_token",
         return_value={
-            "userinfo": {"auth_time": fresh_auth_time, "nonce": "nonce-xyz"},
+            "userinfo": _verified_claims(user, auth_time=fresh_auth_time, nonce="nonce-xyz"),
             "id_token": "fake.id.token",
         },
     ):
@@ -452,8 +480,8 @@ def test_callback_with_fresh_auth_time_elevates_and_redirects(rf, audit_capture)
 
     assert response.status_code == 302
     assert response["Location"] == "/app/admin/"
-    assert is_elevated(session)
-    assert session.get(SESSION_SSO_AUTH_TIME_KEY) == fresh_auth_time
+    assert is_elevated(request.session)
+    assert request.session.get(SESSION_SSO_AUTH_TIME_KEY) == fresh_auth_time
     # State + nonce are consumed (one-shot).
     assert SESSION_SSO_STATE_KEY not in session
     assert SESSION_SSO_NONCE_KEY not in session
@@ -474,7 +502,8 @@ def test_callback_with_stale_auth_time_rejected_and_audited(rf, audit_capture):
     with mock.patch(
         "astrolift_identity.step_up_sso._oauth.auth0_stepup.authorize_access_token",
         return_value={
-            "userinfo": {"auth_time": stale_auth_time, "nonce": "nonce-xyz"},
+            "userinfo": _verified_claims(user, auth_time=stale_auth_time, nonce="nonce-xyz"),
+            "id_token": "fake.id.token",
         },
     ):
         response = elevate_sso_callback(request)
@@ -533,7 +562,7 @@ def test_callback_missing_auth_time_rejected(rf, audit_capture):
 
     with mock.patch(
         "astrolift_identity.step_up_sso._oauth.auth0_stepup.authorize_access_token",
-        return_value={"userinfo": {"nonce": "nonce-xyz"}},
+        return_value={"userinfo": _verified_claims(user, nonce="nonce-xyz"), "id_token": "fake.id.token"},
     ):
         response = elevate_sso_callback(request)
 

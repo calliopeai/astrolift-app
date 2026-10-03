@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+from contextlib import ExitStack, contextmanager
+from dataclasses import replace
 from datetime import timedelta
 
 from django.conf import settings
@@ -24,6 +26,43 @@ from workflows.target_references import references_filter
 
 class ReviewedStartError(ValueError):
     pass
+
+
+@contextmanager
+def _current_start_authority(definition, organization_id, permission):
+    from django.contrib.auth import get_user_model
+
+    from astrolift_identity import abac
+    from astrolift_identity.api_tokens import active_member_organizations, get_current_api_token
+    from astrolift_identity.operation_context import agent_region_operation
+    from core.permissions import is_platform_operator
+
+    with current_dispatch_credential(permission):
+        tenant = get_current_tenant()
+        user = get_user_model().objects.filter(pk=tenant.actor_user_id, is_active=True).first()
+        if (
+            not (get_current_api_token() is None and is_platform_operator(user))
+            and not active_member_organizations(tenant.actor_user_id).filter(pk=organization_id).exists()
+        ):
+            raise PermissionDenied(
+                permission, None, "the workflow actor's organization membership is unavailable"
+            )
+        attributes = replace(
+            abac.attributes_for(tenant.actor_user_id),
+            cache={},
+            **agent_region_operation({})[0].attributes(),
+        )
+        with abac.request_attributes(attributes):
+            current = (
+                WorkflowDefinition._base_manager.filter(pk=definition.pk)
+                .filter(Q(organization_id=organization_id) | Q(organization__isnull=True))
+                .select_related("project__team")
+                .first()
+            )
+            if current is None:
+                raise PermissionDenied(permission, None, "the reviewed definition owner is unavailable")
+            check_permission(permission, scope=definition_scope(current, organization_id, permission))
+            yield
 
 
 def actor_key() -> str:
@@ -321,7 +360,11 @@ def reserve_start(
     body_digest = hmac.new(
         settings.SECRET_KEY.encode(), canonical_bytes(requested), hashlib.sha256
     ).hexdigest()
-    with transaction.atomic(), current_dispatch_credential(Permission.WORKFLOW_TRIGGER):
+    with (
+        transaction.atomic(),
+        current_dispatch_credential(Permission.WORKFLOW_TRIGGER),
+        ExitStack() as authority,
+    ):
         definition = (
             WorkflowDefinition.visible_to_org(tenant.organization_id)
             .select_for_update(of=("self",))
@@ -331,8 +374,8 @@ def reserve_start(
         )
         if definition is None:
             raise ReviewedStartError("Workflow definition not found")
-        check_permission(
-            Permission.WORKFLOW_TRIGGER, scope=definition_scope(definition, tenant.organization_id)
+        authority.enter_context(
+            _current_start_authority(definition, tenant.organization_id, Permission.WORKFLOW_TRIGGER)
         )
         # The definition lock serializes same-target requests; the actor-scoped key
         # also prevents a request from being silently retargeted to another definition.
@@ -363,6 +406,9 @@ def reserve_start(
         from core.run_trigger import request_trigger
         from workflows.run_service import build_workflow_definition_run_input
 
+        authority.enter_context(
+            _current_start_authority(definition, tenant.organization_id, Permission.WORKFLOW_TRIGGER)
+        )
         run, _, _ = build_workflow_definition_run_input(
             definition,
             organization_id=tenant.organization_id,
@@ -402,7 +448,11 @@ def dispatch_start(row):
     from astrolift_workflows.client import recover_workflow_once, start_workflow_once
     from astrolift_workflows.inputs import Actor, WorkflowDefinitionRunInput
 
-    with transaction.atomic(), current_dispatch_credential(Permission.WORKFLOW_TRIGGER):
+    with (
+        transaction.atomic(),
+        current_dispatch_credential(Permission.WORKFLOW_TRIGGER),
+        ExitStack() as authority,
+    ):
         tenant = get_current_tenant()
         key = actor_key()
         assert tenant is not None
@@ -411,8 +461,8 @@ def dispatch_start(row):
             .select_related("execution", "definition__project")
             .get(pk=row.pk, organization_id=tenant.organization_id, actor_key=key)
         )
-        check_permission(
-            Permission.WORKFLOW_TRIGGER, scope=definition_scope(current.definition, current.organization_id)
+        authority.enter_context(
+            _current_start_authority(current.definition, current.organization_id, Permission.WORKFLOW_TRIGGER)
         )
         if current.execution.run_id:
             return current
@@ -443,6 +493,9 @@ def dispatch_start(row):
                 )[: MAX_REVIEWED_STAGES + 1]
             )
             graph = _definition_graph(definition, stages=stages, lock=True)
+            authority.enter_context(
+                _current_start_authority(definition, current.organization_id, Permission.WORKFLOW_TRIGGER)
+            )
             stale = (
                 not definition.is_enabled
                 or definition_revision(definition, graph=graph) != current.definition_revision
@@ -496,14 +549,18 @@ def recover_start(row):
     tenant = get_current_tenant()
     key = actor_key()
     assert tenant is not None
-    with transaction.atomic(), current_dispatch_credential(Permission.WORKFLOW_READ):
+    with (
+        transaction.atomic(),
+        current_dispatch_credential(Permission.WORKFLOW_READ),
+        ExitStack() as authority,
+    ):
         current = (
             WorkflowDefinitionStart.objects.select_for_update(of=("self",))
             .select_related("execution", "definition__project")
             .get(pk=row.pk, organization_id=tenant.organization_id, actor_key=key)
         )
-        check_permission(
-            Permission.WORKFLOW_READ, scope=definition_scope(current.definition, current.organization_id)
+        authority.enter_context(
+            _current_start_authority(current.definition, current.organization_id, Permission.WORKFLOW_READ)
         )
         if current.execution.run_id:
             return current

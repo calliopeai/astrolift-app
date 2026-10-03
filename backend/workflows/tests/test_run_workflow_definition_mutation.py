@@ -33,9 +33,12 @@ MIN_STATES = [
 MIN_TRANSITIONS = [{"from_state": "pending", "to_state": "done", "label": "Complete"}]
 
 
-def _info():
+def _info(org):
     User = get_user_model()
     user = User.objects.create(username="member@test", email="member@test")
+    from astrolift_identity.models import Member
+
+    Member.objects.create(user=user, scope_kind="ORG", scope_id=org.pk)
     return SimpleNamespace(context=SimpleNamespace(user=user)), user
 
 
@@ -81,7 +84,7 @@ def patched_start(monkeypatch):
 def test_happy_path_starts_executor_and_creates_rows(patched_start, permission_resolver):
     org = _organization()
     wd = _definition(organization=org)
-    info, _user = _info()
+    info, _user = _info(org)
     permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
 
     with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=_user.pk)):
@@ -118,7 +121,7 @@ def test_happy_path_starts_executor_and_creates_rows(patched_start, permission_r
 def test_missing_trigger_permission_is_denied_and_starts_nothing(patched_start, permission_resolver):
     org = _organization()
     wd = _definition(organization=org)
-    info, user = _info()
+    info, user = _info(org)
 
     with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=user.pk)):
         with pytest.raises(PermissionDenied):
@@ -130,7 +133,7 @@ def test_missing_trigger_permission_is_denied_and_starts_nothing(patched_start, 
 
 def test_unknown_slug_returns_error_no_start(patched_start, permission_resolver):
     org = _organization()
-    info, user = _info()
+    info, user = _info(org)
     permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
     with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=user.pk)):
         result = Mutation().run_workflow_definition(info, workflow_slug="does-not-exist")
@@ -142,7 +145,7 @@ def test_unknown_slug_returns_error_no_start(patched_start, permission_resolver)
 def test_disabled_definition_returns_error(patched_start, permission_resolver):
     org = _organization()
     wd = _definition(organization=org, slug="wf-disabled", enabled=False)
-    info, user = _info()
+    info, user = _info(org)
     permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
     with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=user.pk)):
         result = Mutation().run_workflow_definition(info, workflow_slug=wd.slug)
@@ -154,7 +157,7 @@ def test_disabled_definition_returns_error(patched_start, permission_resolver):
 def test_definition_with_no_stages_returns_error(patched_start, permission_resolver):
     org = _organization()
     wd = _definition(organization=org, slug="wf-no-stages", with_stage=False)
-    info, user = _info()
+    info, user = _info(org)
     permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
     with tenant_context(TenantContext(organization_id=org.pk, actor_user_id=user.pk)):
         result = Mutation().run_workflow_definition(info, workflow_slug=wd.slug)
@@ -168,7 +171,7 @@ def test_foreign_org_definition_is_not_runnable(patched_start, permission_resolv
     caller = _organization("run-caller")
     foreign = _organization("run-foreign")
     wd = _definition(organization=foreign, slug="foreign-workflow")
-    info, user = _info()
+    info, user = _info(caller)
     permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
 
     with tenant_context(TenantContext(organization_id=caller.pk, actor_user_id=user.pk)):
