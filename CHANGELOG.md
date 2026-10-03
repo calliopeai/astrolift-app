@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Settle final registered-agent dispatch exhaustion and platform timeouts through
+  the locked task/completion outbox after confirmed cleanup of original placement.
+  Preserve activity retries, original execution provenance, prior terminal results
+  and Temporal replay; uncertain cleanup remains durably pending (#2234).
+
 - Add a dedicated reviewed EKS historical-log collector operation with durable
   original request/credential/source fencing, pinned archive rendering, owned
   resource/probe checkpoints, explicit pending/uncertain outcomes, and atomic

@@ -526,7 +526,7 @@ class K8sJobSpawner(ContainerSpawner):
                 raise RuntimeError(str(detail))
             logger.info("k8s_job_spawner: deleted Job %s (+ secret)", external_id)
         except Exception:  # noqa: BLE001
-            logger.exception("k8s_job_spawner: failed to delete Job %s", external_id)
+            logger.warning("k8s_job_spawner: failed to delete Job %s", external_id)
             raise
         finally:
             # After the kill, never before it: revocation reads the database
@@ -565,15 +565,14 @@ class K8sJobSpawner(ContainerSpawner):
                                 else "storage delete failed"
                             )
                             raise RuntimeError(str(detail))
-            except Exception as exc:  # noqa: BLE001
+            except Exception:  # noqa: BLE001
                 logger.warning(
                     "k8s_job_spawner: Job %s was deleted but filesystem cleanup failed",
                     external_id,
-                    exc_info=True,
                 )
                 raise RuntimeError(
-                    f"Job {external_id} was deleted but filesystem cleanup failed: {exc}",
-                ) from exc
+                    f"Job {external_id} was deleted but filesystem cleanup failed",
+                ) from None
 
     def confirm_stopped(self, external_id: str) -> bool:
         from _sdk.cluster import ClusterDriver

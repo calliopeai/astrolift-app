@@ -104,6 +104,8 @@ class AgentTask(BaseCoreModel):
     )
     # Persist placement before external creation so recovery cannot pick a new default.
     dispatch_target = models.JSONField(default=dict, blank=True)
+    # Metadata-only original Temporal execution and durable finalization intent.
+    dispatch_execution = models.JSONField(default=dict, blank=True)
     # Container/job ID assigned by the Dispatch Service.
     startup_diagnostic = models.JSONField(default=dict, blank=True)
     external_id = models.CharField(max_length=255, blank=True, default="")

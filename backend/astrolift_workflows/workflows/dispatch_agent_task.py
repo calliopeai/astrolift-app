@@ -13,8 +13,9 @@ mutation already performed).
 The activity is one long-running, self-heartbeating call, so this
 workflow is intentionally thin — there is no per-job DAG to fan out for a
 single ad-hoc dispatch. On the activity timing out or failing the workflow
-records a clean failure; the activity itself best-effort-cancels the
-in-flight task on Temporal cancellation.
+confirms cleanup of the original frozen placement and settles the task through
+the terminal/outbox transaction. Ambiguous cleanup remains durably retrying.
+Dispatch activity retries preserve the job; explicit cancellation stops it.
 
 Workflow id pattern: ``DispatchAgentTaskWorkflow-<task-guid>`` (the
 mutation constructs it that way) so a duplicate fire of the same task
@@ -27,10 +28,12 @@ from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+from temporalio.exceptions import CancelledError, TimeoutError
 
 from astrolift_workflows.inputs import DispatchAgentTaskInput, WorkflowResult
 
 with workflow.unsafe.imports_passed_through():
+    from astrolift_workflows.activities.agent_dispatch_finalization import finalize_agent_dispatch
     from astrolift_workflows.activities.agent_stage import dispatch_agent_task
 
 
@@ -39,6 +42,7 @@ with workflow.unsafe.imports_passed_through():
 # Bound the single execution generously (a long agent run) and let the
 # heartbeat — not a short start-to-close — be what detects a wedged worker.
 _DISPATCH_TIMEOUT = timedelta(hours=24)
+_INPUT_WAIT_DISPATCH_TIMEOUT = timedelta(days=8)
 _HEARTBEAT_TIMEOUT = timedelta(minutes=2)
 # A replacement worker resumes the persisted task and external container.
 _RETRY = RetryPolicy(initial_interval=timedelta(seconds=1), maximum_interval=timedelta(seconds=30))
@@ -53,18 +57,46 @@ class DispatchAgentTaskWorkflow:
                 dispatch_agent_task,
                 input.agent_task_id,
                 start_to_close_timeout=(
-                    timedelta(days=8) if workflow.patched("agent-input-wait-budget") else _DISPATCH_TIMEOUT
+                    _INPUT_WAIT_DISPATCH_TIMEOUT
+                    if workflow.patched("agent-input-wait-budget")
+                    else _DISPATCH_TIMEOUT
                 ),
                 schedule_to_close_timeout=(
-                    timedelta(days=8) if workflow.patched("agent-input-wait-budget") else _DISPATCH_TIMEOUT
+                    _INPUT_WAIT_DISPATCH_TIMEOUT
+                    if workflow.patched("agent-input-wait-budget")
+                    else _DISPATCH_TIMEOUT
                 ),
                 heartbeat_timeout=_HEARTBEAT_TIMEOUT,
                 retry_policy=_RETRY,
             )
-        except Exception as exc:  # noqa: BLE001 — surface as a clean result
+        except Exception as exc:  # noqa: BLE001 — settle only after all dispatch activity retries
+            if not workflow.patched("agent-dispatch-terminal-finalization-2234"):
+                # Completed N1 histories keep their original commands/result on replay.
+                return WorkflowResult(ok=False, message=f"agent dispatch failed: {exc}")
+            cause = exc
+            reason = "failed"
+            while cause is not None:
+                if isinstance(cause, CancelledError):
+                    reason = "cancelled"
+                    break
+                if isinstance(cause, TimeoutError):
+                    reason = "timed_out"
+                    break
+                cause = cause.__cause__
+            outcome = await workflow.execute_activity(
+                finalize_agent_dispatch,
+                args=[input.agent_task_id, reason],
+                start_to_close_timeout=timedelta(minutes=2),
+                # Deliberately no schedule-to-close ceiling: uncertainty is durable,
+                # not a terminal task or an abandoned physical container.
+                retry_policy=RetryPolicy(
+                    initial_interval=timedelta(seconds=5), maximum_interval=timedelta(minutes=1)
+                ),
+            )
             return WorkflowResult(
-                ok=False,
-                message=f"agent dispatch failed: {exc}",
+                ok=outcome.get("status") == "completed",
+                message="Agent dispatch finished after platform failure.",
+                data=outcome,
             )
 
         status = outcome.get("status", "")

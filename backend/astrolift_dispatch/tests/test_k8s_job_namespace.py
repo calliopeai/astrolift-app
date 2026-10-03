@@ -212,9 +212,7 @@ def test_stop_kills_job_before_attachment_recovery(monkeypatch):
     try:
         spawner.stop("agent-task-restarted")
     except RuntimeError as exc:
-        assert str(exc) == (
-            "Job agent-task-restarted was deleted but filesystem cleanup failed: database unavailable"
-        )
+        assert str(exc) == ("Job agent-task-restarted was deleted but filesystem cleanup failed")
     else:  # pragma: no cover - the recovery failure must remain visible
         raise AssertionError("stop should surface attachment recovery failure")
 
