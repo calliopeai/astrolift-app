@@ -19,6 +19,7 @@ from astrolift_lifecycle.schema.mutations import (
     TriggerDeployWorkflowInput,
 )
 from astrolift_scm.models import SourceConnection
+from astrolift_scm.services.workflow_sync import github_workflow_path_for
 from core.permissions import Permission
 from core.secrets import encrypt_at_rest
 from core.tenancy import TenantContext, tenant_context
@@ -137,10 +138,11 @@ def test_trigger_dispatches_workflow_and_returns_run_url(
 
     assert result.ok, result.errors
     assert result.data.dispatched_branch == "main"
-    assert result.data.run_url == ("https://github.com/acme/api/actions/workflows/astrolift-ci.yml")
+    workflow_file = github_workflow_path_for(app_with_repo).rsplit("/", 1)[-1]
+    assert result.data.run_url == (f"https://github.com/acme/api/actions/workflows/{workflow_file}")
     # Right endpoint shape: /repos/{owner}/{repo}/actions/workflows/{file}/dispatches
     assert captured["method"] == "POST"
-    assert captured["url"].endswith("/repos/acme/api/actions/workflows/astrolift-ci.yml/dispatches")
+    assert captured["url"].endswith(f"/repos/acme/api/actions/workflows/{workflow_file}/dispatches")
     assert captured["auth"].startswith("token ")
     # Body is JSON-encoded; just check the branch slot.
     assert b'"ref": "main"' in captured["body"]

@@ -298,6 +298,8 @@ def put_file(
     commit_message: str,
     operation: str | None = None,
     permission: str | None = None,
+    expected_sha: str | None = None,
+    expected_absent: bool = False,
 ) -> PutFileResult:
     """Create or update ``path`` on ``branch`` of ``repo_full_name``.
 
@@ -311,7 +313,16 @@ def put_file(
     caller passes when it knows what it is writing; they only sharpen a
     403 message for an under-permitted GitHub App (see
     :func:`astrolift_scm.auth_errors.github_auth_error_message`) and are
-    forwarded only to the GitHub driver."""
+    forwarded only to the GitHub driver.
+
+    ``expected_sha`` updates only the reviewed blob; ``expected_absent``
+    creates only if no file exists. Conditional writes never discover a new
+    baseline. Providers without this contract refuse before writing. Omitting
+    both retains the existing unconditional create/update behavior."""
+    if expected_sha is not None and expected_absent:
+        raise ValueError("file write conditions are mutually exclusive")
+    if (expected_sha is not None or expected_absent) and connection.kind not in _GITHUB_KINDS:
+        raise ProviderError("UNSUPPORTED", "conditional file writes are not supported by this provider")
     if connection.kind in _GITHUB_KINDS:
         try:
             result = put_github_file(
@@ -323,6 +334,8 @@ def put_file(
                 commit_message=commit_message,
                 operation=operation,
                 permission=permission,
+                expected_sha=expected_sha,
+                expected_absent=expected_absent,
             )
             return PutFileResult(
                 commit_sha=result.commit_sha,

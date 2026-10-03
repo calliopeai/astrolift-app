@@ -23,6 +23,7 @@ from astrolift_lifecycle.schema.mutations import (
     LifecycleMutation,
     ValidateAstroliftCiSecretsInput,
 )
+from astrolift_scm.ci_identity import github_ci_secret_name
 from astrolift_scm.models import SourceConnection
 from core.permissions import Permission
 from core.secrets import encrypt_at_rest
@@ -41,13 +42,17 @@ def _ctx(org):
     return tenant_context(TenantContext(organization_id=org.id))
 
 
-_FIVE = (
+_BASE_FIVE = (
     "ASTROLIFT_PUSH_ROLE_ARN",
     "ASTROLIFT_ECR_URI",
     "ASTROLIFT_APP_SLUG",
     "ASTROLIFT_API_URL",
     "ASTROLIFT_DEPLOY_TOKEN",
 )
+
+
+def _five(app):
+    return tuple(github_ci_secret_name(app, name) for name in _BASE_FIVE)
 
 
 @pytest.fixture
@@ -134,7 +139,7 @@ def test_validate_returns_all_five_when_all_set(
     permission_resolver.grant(Permission.APP_READ)
     _install_fake_list(
         monkeypatch,
-        secrets=[{"name": name, "updated_at": "2026-05-10T00:00:00Z"} for name in _FIVE],
+        secrets=[{"name": name, "updated_at": "2026-05-10T00:00:00Z"} for name in _five(app_with_repo)],
     )
     with _ctx(org):
         result = LifecycleMutation().validate_astrolift_ci_secrets(
@@ -144,7 +149,7 @@ def test_validate_returns_all_five_when_all_set(
     assert result.ok, result.errors
     assert result.data.repo == "acme/api"
     by_name = {r.secret_name: r for r in result.data.results}
-    for name in _FIVE:
+    for name in _five(app_with_repo):
         assert by_name[name].is_set is True, name
     # Without a baseline (`ci_secrets_pushed_at`) is_current is unknown.
     assert all(r.is_current is None for r in result.data.results)
@@ -157,8 +162,8 @@ def test_validate_returns_missing_rows_for_unset_secrets(
     _install_fake_list(
         monkeypatch,
         secrets=[
-            {"name": "ASTROLIFT_PUSH_ROLE_ARN", "updated_at": "2026-05-10T00:00:00Z"},
-            {"name": "ASTROLIFT_ECR_URI", "updated_at": "2026-05-10T00:00:00Z"},
+            {"name": _five(app_with_repo)[0], "updated_at": "2026-05-10T00:00:00Z"},
+            {"name": _five(app_with_repo)[1], "updated_at": "2026-05-10T00:00:00Z"},
             # missing the other three
         ],
     )
@@ -169,9 +174,10 @@ def test_validate_returns_missing_rows_for_unset_secrets(
         )
     assert result.ok, result.errors
     by_name = {r.secret_name: r for r in result.data.results}
-    assert by_name["ASTROLIFT_PUSH_ROLE_ARN"].is_set is True
-    assert by_name["ASTROLIFT_DEPLOY_TOKEN"].is_set is False
-    assert by_name["ASTROLIFT_DEPLOY_TOKEN"].is_current is False
+    names = _five(app_with_repo)
+    assert by_name[names[0]].is_set is True
+    assert by_name[names[-1]].is_set is False
+    assert by_name[names[-1]].is_current is False
 
 
 # ---- Failure paths ------------------------------------------------
@@ -287,7 +293,7 @@ def test_validate_is_current_true_when_pushed_before_update(
     app_with_repo.save(update_fields=["ci_secrets_pushed_at", "updated_at", "version"])
     _install_fake_list(
         monkeypatch,
-        secrets=[{"name": name, "updated_at": "2026-05-10T00:00:00Z"} for name in _FIVE],
+        secrets=[{"name": name, "updated_at": "2026-05-10T00:00:00Z"} for name in _five(app_with_repo)],
     )
     result = _validate(org, actor, app_with_repo)
     assert result.ok, result.errors
@@ -306,7 +312,7 @@ def test_validate_is_current_true_within_same_second_tolerance(
     app_with_repo.save(update_fields=["ci_secrets_pushed_at", "updated_at", "version"])
     _install_fake_list(
         monkeypatch,
-        secrets=[{"name": name, "updated_at": "2026-05-10T00:00:00Z"} for name in _FIVE],
+        secrets=[{"name": name, "updated_at": "2026-05-10T00:00:00Z"} for name in _five(app_with_repo)],
     )
     result = _validate(org, actor, app_with_repo)
     assert result.ok, result.errors
@@ -323,7 +329,7 @@ def test_validate_is_current_false_when_secret_predates_push(
     app_with_repo.save(update_fields=["ci_secrets_pushed_at", "updated_at", "version"])
     _install_fake_list(
         monkeypatch,
-        secrets=[{"name": name, "updated_at": "2026-05-10T00:00:00Z"} for name in _FIVE],
+        secrets=[{"name": name, "updated_at": "2026-05-10T00:00:00Z"} for name in _five(app_with_repo)],
     )
     result = _validate(org, actor, app_with_repo)
     assert result.ok, result.errors

@@ -1,25 +1,9 @@
-"""
-GitHub Actions / GitLab CI workflow templates we push into source
-repos on operator request (``pushCiWorkflow`` mutation).
+"""Managed CI stamping and retained legacy deploy-only template helpers.
 
-The templates are inline strings rather than on-disk files so the
-backend stays self-contained — no MANIFEST changes, no missing-file
-flakiness in tests, no template hot-reload story to invent. When the
-template surface grows past ~3 hosts we'll graduate to ``Jinja`` +
-``astrolift_scm/templates/`` and the resolver will look up by host.
-
-The GitHub Actions workflow follows three constraints:
-
-* Triggers on ``push`` against the configured deploy branch(es). The
-  workflow file only ever runs from the deploy branch itself, so the
-  trigger is the source of truth for "when to deploy" — operators
-  don't need a separate hook.
-* Single job, no matrix. The Astrolift CLI talks to the platform; the
-  platform is what dispatches the actual deploy workflow on Temporal.
-  This file is "tell the platform a new SHA exists" — that's it.
-* Auth via a repo secret named ``ASTROLIFT_DEPLOY_TOKEN``. The operator
-  rotates by replacing the secret on the GitHub side; the workflow
-  file doesn't change. ``astro app deploy`` reads the env var.
+Production sync uses ``services.workflow_sync``. Its GitHub template builds
+and publishes explicitly CI-pushed images before notifying the platform, with
+app-owned workflow paths and secret names. The legacy renderers below remain
+for compatibility tests; they are not the production sync entry point.
 """
 
 from __future__ import annotations
@@ -81,7 +65,12 @@ import re
 # It now requires at least one agent workload and says what it found.
 # v8 (#2148): GitHub AWS authentication uses the actual ECR/default-cluster
 # region, omits unconfigured deploy-only AWS auth, and quotes YAML inputs.
-TEMPLATE_VERSION = 8
+# v9 (#2139): ordinary GitHub apps have GUID-owned workflow paths and deploy
+# secrets, GUID concurrency/PR branches and app/org/repo ownership; cleanup
+# retains legacy or edited files and binds the inspected blob SHA. ci_pushed
+# renders persisted Dockerfile/context/arguments and refuses
+# missing image/build configuration instead of producing a notify-only job.
+TEMPLATE_VERSION = 9
 
 # The stamp is a host-agnostic ``#`` comment so it's inert on GitHub
 # Actions / GitLab CI / Bitbucket Pipelines / Gitea alike — it never

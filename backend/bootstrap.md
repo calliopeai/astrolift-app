@@ -111,6 +111,13 @@ python manage.py startapp myapp
 # Then: add to INSTALLED_APPS, create schema/, wire into config/schema.py, make migrations
 ```
 
+## Managed repository CI
+
+For independently registered GitHub apps sharing one repository, follow
+[managed monorepo CI](../docs/operators/managed-monorepo-ci.md). It documents
+context-relative Dockerfiles, GUID-owned workflow/secret names, setup refusals
+and provenance-safe upgrades.
+
 ## ECR deployment retention
 
 AWS deploy and rollback activities protect their ECR images before workload

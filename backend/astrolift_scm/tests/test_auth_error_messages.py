@@ -397,6 +397,7 @@ def test_sync_github_threads_ci_workflow_permission_hint(monkeypatch):
     monkeypatch.setattr(ws, "render_astrolift_ci_workflow", lambda app: "name: ci\n")
 
     app = SimpleNamespace(
+        guid="11111111-1111-4111-8111-111111111111",
         source_kind="github",
         source_repo="acme/api",
         deploy_branch="main",

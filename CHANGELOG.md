@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Bind managed GitHub workflow creation and updates to the reviewed absence or
+  blob SHA. Refuse concurrent edits, creation and deletion without advancing
+  sync receipts; preserve independent edits on reconciliation PR branches.
+  Providers without conditional writes fail closed when that contract is
+  requested (#2139).
+
 - Verify Lambda function and execution-role ownership against the saved service
   GUID before reporting readiness or returning URLs, ARNs and invoke grants.
   Tagged legacy names stay supported; missing or foreign ownership evidence

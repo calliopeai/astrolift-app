@@ -608,7 +608,9 @@ def dispatch_astrolift_ci_workflow(
     resolved_branch = (branch or app.deploy_branch or "main").strip() or "main"
 
     if app.source_kind == "github":
-        resolved_path = (workflow_path or ".github/workflows/astrolift-ci.yml").lstrip("/")
+        from astrolift_scm.services.workflow_sync import github_workflow_path_for
+
+        resolved_path = (workflow_path or github_workflow_path_for(app)).lstrip("/")
         return _dispatch_github_workflow(
             connection,
             repo_full_name=app.source_repo,

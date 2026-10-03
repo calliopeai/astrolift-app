@@ -567,7 +567,9 @@ def validate_astrolift_ci_secrets(
     # None per CiSecretValidation contract.
     pushed_at = app.ci_secrets_pushed_at
     out: list[CiSecretValidation] = []
-    for name in _GITHUB_SECRET_NAMES:
+    from astrolift_scm.ci_identity import github_ci_secret_name
+
+    for name in (github_ci_secret_name(app, item) for item in _GITHUB_SECRET_NAMES):
         updated_at = present.get(name, "")
         is_set = bool(updated_at) or (name in present)
         is_current: bool | None
@@ -781,7 +783,11 @@ def push_astrolift_ci_secrets(
     # PUTs so the host-side ``updated_at`` of every pushed secret is ≥ it.
     push_started_at = timezone.now()
 
-    for name in _GITHUB_SECRET_NAMES:
+    from astrolift_scm.ci_identity import github_ci_secret_name
+
+    names = tuple(github_ci_secret_name(app, name) for name in _GITHUB_SECRET_NAMES)
+    values = {github_ci_secret_name(app, name): value for name, value in values.items()}
+    for name in names:
         sealed = seal_secret_for_repo(public_key_b64, values[name])
         try:
             _put_repo_secret(
@@ -806,7 +812,7 @@ def push_astrolift_ci_secrets(
 
     return PushSecretsResult(
         ok=True,
-        secret_names=_GITHUB_SECRET_NAMES,
+        secret_names=names,
         new_token_last_4=new_token_plaintext[-4:],
     )
 
