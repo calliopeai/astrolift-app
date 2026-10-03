@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Scope CloudWatch historical logs with exact Kubernetes namespace/app metadata
+  and the requested workload label. Exclude foreign, unattributed and ambiguous
+  records, preserve server cursors, and sanitize provider failures (#2262).
+
 - Bind managed GitHub workflow creation and updates to the reviewed absence or
   blob SHA. Refuse concurrent edits, creation and deletion without advancing
   sync receipts; preserve independent edits on reconciliation PR branches.
