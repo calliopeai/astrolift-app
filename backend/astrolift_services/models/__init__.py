@@ -1,5 +1,6 @@
 from astrolift_services.models.email_event import EmailEvent, EmailEventKind
 from astrolift_services.models.hugging_face_connection import HuggingFaceConnection
+from astrolift_services.models.local_model_artifact import LocalModelArtifact
 from astrolift_services.models.managed_resource_adoption import ManagedResourceAdoption
 from astrolift_services.models.managed_service import (
     ManagedService,
@@ -24,6 +25,7 @@ __all__ = [
     "EmailEvent",
     "EmailEventKind",
     "HuggingFaceConnection",
+    "LocalModelArtifact",
     "ManagedResourceAdoption",
     "ManagedService",
     "ManagedServiceAttachment",
