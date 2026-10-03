@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Evaluate generated Envoy ingress queries in a checksum-pinned native Prometheus
+  engine, proving exact-route isolation, request rates, status/error ratios,
+  millisecond latency conversion and idle-window behavior (#2250).
+
 - Map supported Langflow serial loop bodies to explicitly reviewed native Agent
   or WorkflowDefinition GUIDs, retaining source ports and bounded input/output
   projections through TOML/YAML and storage. Refuse stale source digests,
