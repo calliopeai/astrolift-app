@@ -1358,7 +1358,7 @@ class LifecycleQuery:
         if deployment is None:
             return []
         qs = DeploymentLog.objects.filter(deployment=deployment).exclude(status="").order_by("occurred_at")
-        return [deployment_log_to_type(e) for e in qs[:1000]]
+        return [deployment_log_to_type(e, deployment=deployment) for e in qs[:1000]]
 
     @strawberry.field
     @require_permission(
@@ -1383,7 +1383,7 @@ class LifecycleQuery:
             )
         rows, next_cursor, more, page_size = log_window(deployment, cursor, limit)
         return DeploymentRunLogPageType(
-            items=[deployment_log_to_type(row) for row in rows],
+            items=[deployment_log_to_type(row, deployment=deployment) for row in rows],
             next_cursor=next_cursor,
             has_more=more,
             page_size=page_size,

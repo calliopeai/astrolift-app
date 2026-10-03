@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Return the exact public deployment GUID in both legacy and paged timeline
+  ownership references, preserving authorization, paging and legacy limits
+  without per-row parent lookups (#2265).
+
 - Exclude signed model-file transfer capabilities from browser error records,
   network breadcrumbs and custom replay events. Preserve span timing without
   private request attributes or descriptions, mask replay inputs/text and disable
