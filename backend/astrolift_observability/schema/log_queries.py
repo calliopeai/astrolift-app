@@ -23,13 +23,18 @@ from graphql import GraphQLError
 from strawberry.types import Info
 
 from astrolift_graphql import GUID
-from astrolift_lifecycle.models import AppEnvironment
 from astrolift_observability.schema.types import AppLogLine, AppLogPage
+from astrolift_observability.scope import (
+    environment_namespace,
+    placement_fingerprint,
+    placement_is_current,
+    resolve_environment,
+)
+from astrolift_observability.scoped_traces import _scope
 from astrolift_operations import observability_retention
 from astrolift_registry.models import RegisteredApp
-from astrolift_registry.scopes import app_scope_by_slug
+from astrolift_registry.scopes import app_scope_by_slug, live_app_owners
 from core import cluster_log_query
-from core.cluster_observability import namespace_for_app_environment
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from core.schema.enums import ObservabilityPanelReason
@@ -91,7 +96,7 @@ def _classify_level(message: str, structured_level: str | None) -> str:
     return "other"
 
 
-def _empty_page(historical_available: bool, reason: ObservabilityPanelReason) -> AppLogPage:
+def _empty_page(historical_available: bool, reason: ObservabilityPanelReason, scope=None) -> AppLogPage:
     return AppLogPage(
         items=[],
         next_cursor="",
@@ -99,39 +104,8 @@ def _empty_page(historical_available: bool, reason: ObservabilityPanelReason) ->
         historical_available=historical_available,
         total_count=0,
         reason=reason,
+        scope=scope,
     )
-
-
-def _resolve_cluster(*, app: RegisteredApp, environment_name: str | None):
-    """Pick the cluster row to query against, matching the per-pod
-    log subscription's resolution order so the historical surface
-    sees the same cluster as the live tail."""
-    if environment_name:
-        env = (
-            AppEnvironment.objects.select_related("tenant_cluster")
-            .filter(
-                registered_app=app,
-                name=environment_name,
-                deleted_at__isnull=True,
-            )
-            .first()
-        )
-        if env and env.tenant_cluster_id:
-            return env.tenant_cluster
-    # Fall back to any wired environment, then to the app's default.
-    env = (
-        AppEnvironment.objects.select_related("tenant_cluster")
-        .filter(
-            registered_app=app,
-            deleted_at__isnull=True,
-            tenant_cluster__isnull=False,
-        )
-        .order_by("created_at")
-        .first()
-    )
-    if env and env.tenant_cluster_id:
-        return env.tenant_cluster
-    return getattr(app, "default_tenant_cluster", None)
 
 
 def _normalize_window(
@@ -195,6 +169,7 @@ class LogHistoryQuery:
         since: dt.datetime,
         until: dt.datetime,
         environment_name: str | None = None,
+        environment_id: GUID | None = None,
         workload_slug: str | None = None,
         level: str | None = None,
         search: str | None = None,
@@ -213,8 +188,8 @@ class LogHistoryQuery:
              slug is unique per-org only, so the ``organization_id``
              constraint is what keeps this from reading another org's
              logs (PII); an unknown/foreign slug returns an empty page.
-          2. Pick the cluster (env-named, falling back to the app
-             default — same as the live-tail subscription).
+          2. Pick the cluster (the exact live named environment, or the first live
+             environment when no name is supplied).
           3. Resolve the cluster's log-aggregator driver via
              ``core.cluster_log_query``. When no driver is configured
              the page returns ``historicalAvailable=False`` and the FE
@@ -228,12 +203,14 @@ class LogHistoryQuery:
         """
         tenant = get_current_tenant()
         app = (
-            RegisteredApp.objects.filter(
-                slug=app_slug,
-                organization_id=tenant.organization_id,
-                deleted_at__isnull=True,
+            live_app_owners(
+                RegisteredApp.objects.filter(
+                    slug=app_slug,
+                    organization_id=tenant.organization_id,
+                    deleted_at__isnull=True,
+                    organization__deleted_at__isnull=True,
+                )
             )
-            .only("id", "slug", "k8s_namespace", "organization", "default_tenant_cluster")
             .select_related("organization", "default_tenant_cluster")
             .first()
         )
@@ -280,14 +257,33 @@ class LogHistoryQuery:
                 raise GraphQLError(error, extensions={"code": "PRECONDITION"})
             cluster, namespace = preview.app_environment.tenant_cluster, target.namespace
         else:
-            cluster = _resolve_cluster(app=app, environment_name=environment_name)
-            namespace = namespace_for_app_environment(app, environment_name)
-        if cluster is None or not getattr(cluster, "is_active", True):
+            env = resolve_environment(app, environment_name, environment_id)
+            if env is None:
+                return _empty_page(historical_available=False, reason=ObservabilityPanelReason.NOT_CONFIGURED)
+            if (
+                environment_id is not None
+                and env.preview_environments.filter(deleted_at__isnull=True).exists()
+            ):
+                raise GraphQLError(
+                    "Preview logs require reviewed preview identity", extensions={"code": "PRECONDITION"}
+                )
+            cluster, namespace = env.tenant_cluster, environment_namespace(env)
+        if (
+            cluster is None
+            or not cluster.is_active
+            or cluster.deleted_at is not None
+            or cluster.organization_id not in {None, app.organization_id}
+            or cluster.lifecycle in {"decommissioning", "decommissioned"}
+        ):
             return _empty_page(
                 historical_available=False,
                 reason=ObservabilityPanelReason.NOT_CONFIGURED,
             )
 
+        env = preview.app_environment if any(value is not None for value in preview_proof) else env
+        if environment_id is not None and str(env.guid) != str(environment_id):
+            raise GraphQLError("The selected environment has changed", extensions={"code": "PRECONDITION"})
+        fingerprint = placement_fingerprint(app, env)
         since, until = _normalize_window(since, until)
         bounded_limit = _clamp_limit(limit)
         # The 31-day ceiling above is a scan guard, not a policy. The
@@ -321,19 +317,23 @@ class LogHistoryQuery:
             # Aggregator transport errors land here. Match the live
             # tail's "swallow + render empty" contract; the operator
             # already sees the cluster's health on the events panel.
-            logger.exception(
-                "astrolift_app_logs: aggregator query raised for app %s",
-                app.slug,
-            )
+            logger.warning("astrolift_app_logs: aggregator query failed")
+            if not placement_is_current(app, env, fingerprint):
+                return _empty_page(historical_available=False, reason=ObservabilityPanelReason.NOT_CONFIGURED)
             return _empty_page(
                 historical_available=True,
                 reason=ObservabilityPanelReason.ERROR,
+                scope=_scope(app, env),
             )
+
+        if not placement_is_current(app, env, fingerprint):
+            return _empty_page(historical_available=False, reason=ObservabilityPanelReason.NOT_CONFIGURED)
 
         if page is None:
             return _empty_page(
                 historical_available=False,
                 reason=ObservabilityPanelReason.NOT_CONFIGURED,
+                scope=_scope(app, env),
             )
 
         items: list[AppLogLine] = []
@@ -366,4 +366,5 @@ class LogHistoryQuery:
             historical_available=True,
             total_count=len(items),
             reason=reason,
+            scope=_scope(app, env),
         )

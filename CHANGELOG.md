@@ -12,6 +12,12 @@
   filters, states and feedback in all eight locales. Preserve API identifiers and
   bound pending control feedback to the selected environment specification (#2145).
 
+- Replace the static logs and traces pages with app/environment-scoped explorers,
+  historical-log filters and cursors, existing live-log navigation, and truthful
+  unavailable/error/empty states in all eight locales. Require verified collector
+  resource attribution for bounded Tempo searches and trace details; refuse retired,
+  foreign or changed placement and discard mixed-trace foreign spans (#2260).
+
 - Verify Lambda function and execution-role ownership against the saved service
   GUID before reporting readiness or returning URLs, ARNs and invoke grants.
   Tagged legacy names stay supported; missing or foreign ownership evidence

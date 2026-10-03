@@ -1407,62 +1407,24 @@ class GoldenSignalsQuery:
         status: str | None = None,
         limit: int | None = None,
     ) -> list[AppTrace]:
-        """List distributed traces for an app (#749).
+        """Compatibility array backed by the same trusted-attribution admission."""
+        from astrolift_observability.schema.scoped_trace_queries import scoped_app
+        from astrolift_observability.scoped_traces import trace_page
 
-        Queries the trace backend configured on the app's cluster
-        (``TenantCluster.provider_config['trace_driver']`` + ``trace_config``).
-        Currently supports Tempo; the protocol allows for Jaeger, X-Ray, etc.
-
-        ``since`` / ``until`` are ISO-8601 timestamps or UNIX seconds as
-        strings — the format accepted by Tempo's HTTP API.
-
-        Returns ``[]`` when the cluster has no trace backend configured or
-        the backend is unreachable — same empty-state convention as the other
-        observability resolvers.
-        """
-        from astrolift_observability import trace_client
-
-        tenant = get_current_tenant()
-        app = (
-            RegisteredApp.objects.filter(
-                slug=app_slug,
-                organization_id=tenant.organization_id,
-                deleted_at__isnull=True,
-            )
-            .only("id", "slug")
-            .first()
-        )
+        app = scoped_app(app_slug)
         if app is None:
             return []
-
-        driver = trace_client.resolve_trace_driver(app=app, environment_name=environment_name)
-        if driver is None:
-            return []
-
-        try:
-            summaries = driver.list_traces(
-                service=service,
-                operation=operation,
-                min_duration_ms=min_duration_ms,
-                status=status,
-                since=since,
-                until=until,
-                limit=limit or 50,
-            )
-        except Exception:
-            return []
-
-        return [
-            AppTrace(
-                trace_id=s.trace_id,
-                root_service=s.root_service,
-                root_operation=s.root_operation,
-                span_count=s.span_count,
-                duration_ms=s.duration_ms,
-                status_code=s.status_code,
-            )
-            for s in summaries
-        ]
+        return trace_page(
+            app,
+            environment_name=environment_name,
+            since=since,
+            until=until,
+            service=service,
+            operation=operation,
+            min_duration_ms=min_duration_ms,
+            status=status,
+            limit=limit or 10,
+        ).items
 
     @strawberry.field
     @require_permission(
@@ -1476,51 +1438,17 @@ class GoldenSignalsQuery:
         trace_id: str,
         environment_name: str | None = None,
     ) -> list[TraceSpan]:
-        """Fetch all spans for a single trace (#749).
+        """Compatibility detail requires an owned trace in the bounded recent window."""
+        from astrolift_observability.schema.scoped_trace_queries import scoped_app
+        from astrolift_observability.scoped_traces import trace_spans
 
-        ``trace_id`` is the trace identifier returned by ``astroliftAppTraces``.
-
-        Returns ``[]`` when the cluster has no trace backend configured, the
-        trace doesn't exist, or the backend is unreachable.
-        """
-        from astrolift_observability import trace_client
-
-        tenant = get_current_tenant()
-        app = (
-            RegisteredApp.objects.filter(
-                slug=app_slug,
-                organization_id=tenant.organization_id,
-                deleted_at__isnull=True,
-            )
-            .only("id", "slug")
-            .first()
-        )
+        app = scoped_app(app_slug)
         if app is None:
             return []
-
-        driver = trace_client.resolve_trace_driver(app=app, environment_name=environment_name)
-        if driver is None:
-            return []
-
-        try:
-            spans = driver.get_trace(trace_id)
-        except Exception:
-            return []
-
-        return [
-            TraceSpan(
-                trace_id=span.trace_id,
-                span_id=span.span_id,
-                parent_span_id=span.parent_span_id,
-                operation=span.operation,
-                service=span.service,
-                start_time=span.start_time,
-                duration_ms=span.duration_ms,
-                status_code=span.status_code,
-                attributes=dict(span.attributes),
-            )
-            for span in spans
-        ]
+        now = int(dt.datetime.now(dt.UTC).timestamp())
+        return trace_spans(
+            app, environment_name=environment_name, trace_id=trace_id, since=str(now - 86400), until=str(now)
+        ).items
 
     @strawberry.field
     @require_permission(

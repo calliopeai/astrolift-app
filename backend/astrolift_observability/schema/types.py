@@ -332,6 +332,7 @@ class AppLogPage:
     historical_available: bool
     total_count: int
     reason: ObservabilityPanelReason
+    scope: TelemetryScope | None = None
 
 
 @strawberry.type(name="AstroliftManagedServiceMetricSeries")
@@ -540,6 +541,7 @@ class TraceSpan:
     status_code: str
     """OK | ERROR | UNSET"""
     attributes: strawberry.scalars.JSON
+    resource_attributes: strawberry.scalars.JSON = strawberry.field(default_factory=dict)
 
 
 @strawberry.type(name="AstroliftAppTrace")
@@ -584,3 +586,29 @@ class AppEndpointMetric:
     p50_ms: float | None
     p90_ms: float | None
     p99_ms: float | None
+
+
+@strawberry.type(name="AstroliftTelemetryScope")
+class TelemetryScope:
+    organization_id: str
+    app_id: str
+    environment_id: str
+    environment_name: str
+    cluster_id: str
+    namespace: str
+
+
+@strawberry.type(name="AstroliftAppTracePage")
+class AppTracePage:
+    reason: ObservabilityPanelReason
+    items: list[AppTrace]
+    scope: TelemetryScope | None
+    truncated: bool = False
+    limit: int = 10
+
+
+@strawberry.type(name="AstroliftTraceSpansResult")
+class TraceSpansResult:
+    reason: ObservabilityPanelReason
+    items: list[TraceSpan]
+    scope: TelemetryScope | None

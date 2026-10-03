@@ -50,6 +50,8 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     # Console / cluster exec surfaces.
     "console.exec",
     "console.log_tail",
+    "observability.exact_environment_logs",
+    "observability.scoped_trace_envelopes",
     # Secrets handling surfaces.
     "secrets.reveal",
     "secrets.rotate",
