@@ -239,9 +239,9 @@ def finalize_artifact(artifact_id, expected_version):
         return current
 
 
-def validate_artifact_request(org_id, artifact_id, expected_version):
+def validate_artifact_request(org_id, artifact_id, expected_version, *, locked=False):
     """Current source admission; import verification does not assert model fit or health."""
-    row = _artifact(artifact_id, expected_version)
+    row = _artifact(artifact_id, expected_version, locked=locked)
     if row.organization_id != org_id or row.state != LocalModelArtifact.State.VERIFIED:
         raise ValueError("Local model source has not completed immutable verification.")
     _, digest = model_manifest([ModelFile(**file) for file in row.manifest])
@@ -281,6 +281,11 @@ def prepare_artifact_delivery(service, *, checkpoint):
         checkpoint()
         if not LocalModelArtifact.objects.filter(
             pk=row.pk,
+            guid=row.guid,
+            organization_id=service.organization_id,
+            manifest_sha256=row.manifest_sha256,
+            manifest=row.manifest,
+            storage_receipt=row.storage_receipt,
             version=row.version,
             state="verified",
             organization__deleted_at__isnull=True,

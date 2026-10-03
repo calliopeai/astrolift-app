@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Assemble verified local artifacts as an explicit alternate cluster-model source,
+  pin source versions through native worker delivery, join source migrations and
+  audit import transitions with metadata only. Sanitize local delivery failures
+  before returning provider results; verified files remain distinct from runtime
+  health (#2266).
+
 - Exclude signed model-file transfer capabilities from browser error records,
   network breadcrumbs and custom replay events. Preserve span timing without
   private request attributes or descriptions, mask replay inputs/text and disable

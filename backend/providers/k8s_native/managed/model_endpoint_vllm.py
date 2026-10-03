@@ -221,7 +221,12 @@ class VLLMDriver(ManagedServiceDriver):
         handle = _pack_handle(kind=KIND, cluster_id=spec.tenant_cluster_id, namespace=namespace, name=name)
         result = self._config.cluster_driver.apply_manifests(spec.tenant_cluster_id, namespace, manifests)
         if not result.ok:
-            return ProvisionResult(False, handle, "vLLM manifests were rejected", result.summary())
+            return ProvisionResult(
+                False,
+                handle,
+                "vLLM manifests were rejected",
+                ["local_model_apply_failed"] if cfg.get("model_source") == "local_artifact" else result.summary(),
+            )
         return ProvisionResult(True, handle, f"vLLM server {namespace}/{name} submitted", ready=False)
 
     @driver_op(cloud="k8s_native", driver="model_endpoint_vllm")
@@ -259,7 +264,12 @@ class VLLMDriver(ManagedServiceDriver):
             return UpdateResult(False, spec.handle, str(exc), ["invalid_vllm_config"])
         result = self._config.cluster_driver.apply_manifests(parsed.cluster_id, parsed.namespace, manifests)
         if not result.ok:
-            return UpdateResult(False, spec.handle, "vLLM update was rejected", result.summary())
+            return UpdateResult(
+                False,
+                spec.handle,
+                "vLLM update was rejected",
+                ["local_model_apply_failed"] if cfg.get("model_source") == "local_artifact" else result.summary(),
+            )
         return UpdateResult(True, spec.handle, "vLLM update submitted")
 
     @driver_op(

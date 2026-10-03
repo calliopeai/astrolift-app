@@ -7,6 +7,7 @@ from astrolift_graphql import GUID, MutationResultType, PageType, clamp_limit, f
 from astrolift_identity.scopes import identity_organization_scope
 from astrolift_services import local_model_artifacts as service
 from astrolift_services.models.local_model_artifact import LocalModelArtifact
+from astrolift_services.schema.model_mutation_audit import model_mutation_audit
 from core.decorators import tenant_scoped
 from core.permissions import Permission, require_permission
 from providers._sdk.local_model_artifact import ArtifactStoreUnavailable
@@ -97,9 +98,17 @@ class ModelArtifactsQuery:
         return keyset_page(rows, limit=clamp_limit(limit), cursor=after).map(artifact_to_type)
 
 
+def artifact_audit_metadata(result):
+    row = result.data if result.ok else None
+    if isinstance(row, LocalModelUploadAuthorization):
+        row = row.artifact
+    return {"artifact_id": str(row.id), "state": row.state, "version": row.version} if row else None
+
+
 @strawberry.type
 class ModelArtifactsMutation:
     @strawberry.mutation
+    @model_mutation_audit(action="model.local_artifact.begin", extras=artifact_audit_metadata)
     @require_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE))
     @tenant_scoped()
     def begin_local_model_artifact(
@@ -124,6 +133,7 @@ class ModelArtifactsMutation:
             return _failure(error)
 
     @strawberry.mutation
+    @model_mutation_audit(action="model.local_artifact.authorize", extras=artifact_audit_metadata)
     @require_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE))
     @tenant_scoped()
     def authorize_local_model_uploads(
@@ -152,6 +162,7 @@ class ModelArtifactsMutation:
             return _failure(error)
 
     @strawberry.mutation
+    @model_mutation_audit(action="model.local_artifact.finalize", extras=artifact_audit_metadata)
     @require_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE))
     @tenant_scoped()
     def finalize_local_model_artifact(
