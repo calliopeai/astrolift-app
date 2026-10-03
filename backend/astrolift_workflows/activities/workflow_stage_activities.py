@@ -257,6 +257,28 @@ def _get_workflow_stages_sync(
             if str(nested_definition.pk) in ancestry + [definition_id]:
                 raise RuntimeError("nested workflow cycle detected at runtime")
 
+        if (
+            stage.kind in {WorkflowStage.StageKind.AGENT_DISPATCH, WorkflowStage.StageKind.WORKFLOW}
+            and stage.iteration
+        ):
+            from workflows.source_ports import validate_source_ports
+
+            ports = validate_source_ports(stage.iteration, kind=stage.kind)
+            target = workload if stage.kind == WorkflowStage.StageKind.AGENT_DISPATCH else nested_definition
+            ref = (
+                stage.agent_ref
+                if stage.kind == WorkflowStage.StageKind.AGENT_DISPATCH
+                else stage.workflow_ref
+            )
+            if (
+                target is None
+                or ref != f"guid:{ports['target_guid']}"
+                or str(target.guid) != ports["target_guid"]
+            ):
+                raise RuntimeError(
+                    f"stage {stage.order} source ports differ from their explicit native target"
+                )
+
         if "skill_refs" in binding:
             skill_refs = binding["skill_refs"]
             if not isinstance(skill_refs, list) or any(not isinstance(ref, str) for ref in skill_refs):

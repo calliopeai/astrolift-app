@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Map supported Langflow serial loop bodies to explicitly reviewed native Agent
+  or WorkflowDefinition GUIDs, retaining source ports and bounded input/output
+  projections through TOML/YAML and storage. Refuse stale source digests,
+  unsupported ports and target substitutions. Source scheduling and nested
+  execution are covered; full framework and container-agent parity remain open
+  (#2156).
+
 
 - Install private-cluster agents from the control-plane worker using an exact
   reviewed cluster/provider source and durable request identity. Keep the old

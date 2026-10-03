@@ -44,9 +44,7 @@ def _value(node, name, default=None):
         raise FlowImportError("Langflow components require an explicit template object")
     field = template.get(name, {})
     if not isinstance(field, dict):
-        raise FlowImportError(
-            "Langflow component template fields must be explicit objects"
-        )
+        raise FlowImportError("Langflow component template fields must be explicit objects")
     return field.get("value", default)
 
 
@@ -72,9 +70,7 @@ def _handle(edge, *, source):
             or value.get("id") != endpoint
             or not isinstance(value.get(field), str)
         ):
-            raise FlowImportError(
-                "Langflow loop requires exact node and input/output handle identities"
-            )
+            raise FlowImportError("Langflow loop requires exact node and input/output handle identities")
         identities.append(value[field])
     if not identities or len(set(identities)) != 1:
         raise FlowImportError("Langflow loop handles are unavailable or ambiguous")
@@ -82,12 +78,12 @@ def _handle(edge, *, source):
 
 
 def import_collection(payload, nodes, edges) -> FlowImportResult:
+    if any(isinstance(node, dict) and _type(node) in {"Agent", "RunFlow"} for node in nodes):
+        from workflows.importers.langflow_bound_bodies import import_bound_collection
+
+        return import_bound_collection(payload, nodes, edges)
     by_id = {node.get("id"): node for node in nodes if isinstance(node, dict)}
-    if (
-        len(by_id) != len(nodes)
-        or None in by_id
-        or any(not isinstance(key, str) or not key for key in by_id)
-    ):
+    if len(by_id) != len(nodes) or None in by_id or any(not isinstance(key, str) or not key for key in by_id):
         raise FlowImportError("Langflow loop requires unique source node identities")
     kinds = {}
     for node in nodes:
@@ -115,18 +111,13 @@ def import_collection(payload, nodes, edges) -> FlowImportResult:
             else "converter"
         )
         if canonical in kinds:
-            raise FlowImportError(
-                "Langflow serial import requires one exact component per role"
-            )
+            raise FlowImportError("Langflow serial import requires one exact component per role")
         code = _value(node, "code")
         if code is not None and (
             not isinstance(code, str)
-            or hashlib.sha256(code.replace("\r\n", "\n").encode()).hexdigest()
-            != _BUILTIN_CODE[canonical]
+            or hashlib.sha256(code.replace("\r\n", "\n").encode()).hexdigest() != _BUILTIN_CODE[canonical]
         ):
-            raise FlowImportError(
-                "custom or older Langflow component code has no verified scheduler mapping"
-            )
+            raise FlowImportError("custom or older Langflow component code has no verified scheduler mapping")
         kinds[canonical] = node["id"]
     if not {"list", "loop", "parser"} <= kinds.keys():
         raise FlowImportError(
@@ -134,11 +125,7 @@ def import_collection(payload, nodes, edges) -> FlowImportResult:
         )
     identities = set()
     for edge in edges:
-        if (
-            not isinstance(edge, dict)
-            or edge.get("source") not in by_id
-            or edge.get("target") not in by_id
-        ):
+        if not isinstance(edge, dict) or edge.get("source") not in by_id or edge.get("target") not in by_id:
             raise FlowImportError("Langflow loop edge target is unavailable")
         identity = (
             edge["source"],
@@ -160,9 +147,7 @@ def import_collection(payload, nodes, edges) -> FlowImportResult:
         if a == list_id and c == loop_id and d == "data" and b in {"list", "dataframe"}
     ]
     if len(source_edge) != 1:
-        raise FlowImportError(
-            "Langflow collection requires one CreateList data binding"
-        )
+        raise FlowImportError("Langflow collection requires one CreateList data binding")
     expected.add(source_edge[0])
     if "converter" in kinds:
         converter = by_id[kinds["converter"]]
@@ -175,23 +160,15 @@ def import_collection(payload, nodes, edges) -> FlowImportResult:
             )
         expected.add((loop_id, "done", kinds["converter"], "input_data"))
     if identities != expected:
-        raise FlowImportError(
-            "Langflow loop body or done scheduling is unsupported; no graph was flattened"
-        )
+        raise FlowImportError("Langflow loop body or done scheduling is unsupported; no graph was flattened")
     source, loop, parser = (by_id[key] for key in (list_id, loop_id, parser_id))
     texts = _value(source, "texts")
     if not isinstance(texts, list) or any(not isinstance(text, str) for text in texts):
-        raise FlowImportError(
-            "Langflow CreateList requires an explicit ordered list of text values"
-        )
+        raise FlowImportError("Langflow CreateList requires an explicit ordered list of text values")
     if _value(parser, "mode", "Parser") != "Parser":
-        raise FlowImportError(
-            "Langflow Parser Stringify mode has no verified native mapping"
-        )
+        raise FlowImportError("Langflow Parser Stringify mode has no verified native mapping")
     if any(isinstance(text, str) and "{{" in text for text in texts):
-        raise FlowImportError(
-            "Langflow unresolved input variables require source runtime resolution"
-        )
+        raise FlowImportError("Langflow unresolved input variables require source runtime resolution")
     if _value(loop, "data") not in (None, "", []):
         raise FlowImportError("Langflow loop data must come from its exact source edge")
     parser_key = flowise_output_key(parser_id)
@@ -225,9 +202,7 @@ def import_collection(payload, nodes, edges) -> FlowImportResult:
                 iteration=formatter,
             ),
         ]
-        validate_loop_plan(
-            [dataclasses.asdict(stage) for stage in stages], pattern_kind="chained"
-        )
+        validate_loop_plan([dataclasses.asdict(stage) for stage in stages], pattern_kind="chained")
     except ValueError as exc:
         raise FlowImportError(str(exc)) from exc
     name = str(payload.get("name") or "Imported Langflow collection")
