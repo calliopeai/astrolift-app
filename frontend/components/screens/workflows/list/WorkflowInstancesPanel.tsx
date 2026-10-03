@@ -8,6 +8,7 @@
  */
 
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import { CircleSlashIcon, Loader2Icon, OctagonXIcon, XIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +28,7 @@ export type InstanceDetailViewProps = Omit<
 > & {
   isAdmin: boolean;
   onClose: () => void;
+  onRefresh?: () => void;
   /** Cancel / terminate controls; shown to admins while the instance is RUNNING. */
   adminControls?: ReactNode;
 };
@@ -39,9 +41,11 @@ export function InstanceDetailView({
   error,
   isAdmin,
   onClose,
+  onRefresh,
   adminControls,
 }: InstanceDetailViewProps) {
   const fmt = useFormatters();
+  const t = useTranslations("shared.versionMismatch");
 
   if (!workflowId) {
     return (
@@ -90,6 +94,11 @@ export function InstanceDetailView({
           {error.message}
         </div>
       )}
+      {onRefresh && (
+        <Button variant="outline" size="sm" onClick={onRefresh} disabled={loading}>
+          {t("refresh")}
+        </Button>
+      )}
 
       {detail && (
         <>
@@ -113,7 +122,12 @@ export function InstanceAdminControlsView({
 }: InstanceAdminControlsViewProps) {
   return (
     <div className="flex items-center gap-2 border-b pb-3">
-      <Button size="sm" variant="outline" onClick={onCancel} disabled={cancelLoading}>
+      <Button
+        size="sm"
+        variant="outline"
+        onClick={onCancel}
+        disabled={cancelLoading || terminateLoading}
+      >
         <CircleSlashIcon className="mr-1 size-3" />
         Cancel
       </Button>
@@ -122,7 +136,7 @@ export function InstanceAdminControlsView({
         variant="outline"
         className="text-destructive hover:text-destructive hover:bg-destructive/10"
         onClick={onTerminate}
-        disabled={terminateLoading}
+        disabled={cancelLoading || terminateLoading}
       >
         <OctagonXIcon className="mr-1 size-3" />
         Terminate

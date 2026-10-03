@@ -38,7 +38,9 @@ function InstancesList({
       detail={
         state.selectedWorkflowId ? (
           <InstanceDetail
+            key={`${state.selectedWorkflowId}:${state.selectedRunId}`}
             workflowId={state.selectedWorkflowId}
+            runId={state.selectedRunId}
             isAdmin={isAdmin}
             onClose={state.onCloseInstance}
             onAfterMutation={state.onRetry}

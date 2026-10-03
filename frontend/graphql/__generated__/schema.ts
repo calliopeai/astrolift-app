@@ -7852,6 +7852,7 @@ export type MutationCancelTaskArgs = {
 
 
 export type MutationCancelWorkflowInstanceArgs = {
+  runId?: InputMaybe<Scalars['String']['input']>;
   workflowId: Scalars['String']['input'];
 };
 
@@ -9308,6 +9309,7 @@ export type MutationTearDownPreviewArgs = {
 
 export type MutationTerminateWorkflowInstanceArgs = {
   reason: Scalars['String']['input'];
+  runId?: InputMaybe<Scalars['String']['input']>;
   workflowId: Scalars['String']['input'];
 };
 
@@ -11932,6 +11934,7 @@ export type QueryAstroliftWorkflowInstanceArgs = {
 
 
 export type QueryAstroliftWorkflowInstanceDetailArgs = {
+  runId?: InputMaybe<Scalars['String']['input']>;
   workflowId: Scalars['String']['input'];
 };
 
