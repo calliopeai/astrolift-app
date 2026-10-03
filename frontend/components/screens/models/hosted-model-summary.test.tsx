@@ -30,10 +30,7 @@ describe("hosted model connection and usage summaries", () => {
         subscriptions={{
           ...subscriptionProps.subscriptions,
           totalCount: 12,
-          rows: [
-            row,
-            { ...row, id: "second", environmentName: "other", environmentId: "other-env" },
-          ],
+          rows: [row, { ...row, id: "second", environmentName: "other" }],
         }}
       />
     );
