@@ -83,3 +83,63 @@ export const BoundedTraces: StoryObj = {
     />
   ),
 };
+
+export const SelectedTrace: StoryObj = {
+  render: () => (
+    <ExplorerStory
+      mode="traces"
+      overrides={{
+        traceId: "a".repeat(32),
+        traces: {
+          reason: "OK",
+          scope: null,
+          truncated: false,
+          items: [
+            {
+              traceId: "a".repeat(32),
+              rootService: "example-service",
+              rootOperation: "SEARCH_ONLY_OPERATION",
+              durationMs: 4,
+              spanCount: 1,
+              statusCode: "OK",
+            },
+          ],
+        },
+        spans: {
+          reason: "OK",
+          scope: null,
+          items: [
+            {
+              traceId: "a".repeat(32),
+              spanId: "b".repeat(16),
+              parentSpanId: null,
+              service: "example-service",
+              operation: "SELECTED_SPAN_OPERATION",
+              startTime: "1",
+              durationMs: 4,
+              statusCode: "OK",
+              attributes: {},
+              resourceAttributes: {},
+            },
+          ],
+        },
+      }}
+    />
+  ),
+};
+export const SelectedTraceLoading: StoryObj = {
+  render: () => (
+    <ExplorerStory mode="traces" overrides={{ traceId: "a".repeat(32), spansLoading: true }} />
+  ),
+};
+export const SelectedTraceError: StoryObj = {
+  render: () => (
+    <ExplorerStory
+      mode="traces"
+      overrides={{
+        traceId: "a".repeat(32),
+        spansError: "Recorded span diagnostic: connection refused",
+      }}
+    />
+  ),
+};

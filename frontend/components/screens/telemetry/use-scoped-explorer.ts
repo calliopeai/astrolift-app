@@ -239,11 +239,19 @@ export function useScopedExplorer(mode: "logs" | "traces") {
     since: String(Math.floor((until - range * 1000) / 1000)),
     until: String(Math.floor(until / 1000)),
   };
+  const spanIdentity =
+    identity && traceId && traces?.items.some((trace) => trace.traceId === traceId)
+      ? `${identity}:trace:${traceId}`
+      : "";
+  const [spanRead, setSpanRead] = React.useState({ identity: spanIdentity, epoch: 0, revision: 0 });
+  if (spanRead.identity !== spanIdentity) {
+    setSpanRead({ identity: spanIdentity, epoch: spanRead.epoch + 1, revision: 0 });
+  }
   const spans = useRead<{ astroliftTraceSpansResult: SpanResult }>(
     EXPLORER_SPANS,
     spanVars,
-    identity && traceId && traces?.items.some((trace) => trace.traceId === traceId)
-      ? `${identity}:trace:${traceId}`
+    spanIdentity && spanRead.identity === spanIdentity
+      ? `${spanIdentity}:epoch:${spanRead.epoch}:retry:${spanRead.revision}`
       : ""
   );
   const spanData = spans.data?.astroliftTraceSpansResult;
@@ -328,6 +336,16 @@ export function useScopedExplorer(mode: "logs" | "traces") {
     },
     traceId,
     onTrace: setTraceId,
+    onRetryTrace: () => {
+      if (!spanIdentity) return;
+      setSpanRead((current) =>
+        current.identity === spanIdentity &&
+        current.epoch === spanRead.epoch &&
+        current.revision === spanRead.revision
+          ? { ...current, revision: current.revision + 1 }
+          : current
+      );
+    },
     spans: safeSpans,
     spansLoading: spans.loading,
     spansError: spans.error ?? (spanData?.reason === "OK" && !safeSpans ? t("stale") : null),
