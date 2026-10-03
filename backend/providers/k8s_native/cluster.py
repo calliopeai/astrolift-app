@@ -752,7 +752,13 @@ class K8sNativeClusterDriver(ClusterDriver):
                             # Picked up by the kube-prometheus-stack operator;
                             # without a ServiceMonitor the exporter runs but
                             # nothing scrapes it and the RED panels stay empty.
-                            "serviceMonitor": {"enabled": True},
+                            "serviceMonitor": {
+                                "enabled": True,
+                                # The controller emits each app's namespace;
+                                # the scrape target's namespace must not replace
+                                # it with the ingress-controller namespace.
+                                "honorLabels": True,
+                            },
                         },
                         # Header buffers sized for a cookie-bearing auth gate
                         # (#1725). Every app behind the central auth host

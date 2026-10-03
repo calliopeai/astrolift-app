@@ -81,6 +81,7 @@ def resolve_prometheus_endpoint(
     cluster-local.
     """
     from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_lifecycle.visibility import cluster_owned_and_live
 
     qs = AppEnvironment.objects.filter(
         registered_app=app,
@@ -89,7 +90,7 @@ def resolve_prometheus_endpoint(
     if environment_name:
         qs = qs.filter(name=environment_name)
     env = qs.order_by("name").first()
-    if env is None or env.tenant_cluster_id is None:
+    if env is None or not cluster_owned_and_live(env.tenant_cluster, app.organization_id):
         return None
     # Check provider_config first (operator-set), then fall back to
     # capabilities (probe-discovered, e.g. set via bringClusterIntoManagement).
@@ -173,15 +174,29 @@ def resolve_edge_metrics(
     as a parity gap rather than silently wrong data.
     """
     from astrolift_lifecycle.models import AppEnvironment
-    from providers._sdk.edge_metrics import edge_metrics_for_ingress_class
+    from astrolift_lifecycle.visibility import cluster_owned_and_live
 
     qs = AppEnvironment.objects.filter(
         registered_app=app,
         deleted_at__isnull=True,
-    ).select_related("tenant_cluster")
+    ).select_related("tenant_cluster__provider_plugin")
     if environment_name:
         qs = qs.filter(name=environment_name)
     env = qs.order_by("name").first()
-    if env is None or env.tenant_cluster is None:
+    if env is None or not cluster_owned_and_live(env.tenant_cluster, app.organization_id):
         return None
-    return edge_metrics_for_ingress_class(getattr(env.tenant_cluster, "ingress_class", None))
+    from core.cluster_observability import namespace_for_environment
+
+    return resolve_cluster_edge_metrics(env.tenant_cluster, namespace_for_environment(env))
+
+
+def resolve_cluster_edge_metrics(cluster, namespace):
+    from providers._sdk.edge_metrics import edge_metrics_for_ingress_class, envoy_metrics_for_routes
+
+    if cluster.ingress_class != "envoy":
+        return edge_metrics_for_ingress_class(cluster.ingress_class)
+    from core.cluster_management import _driver_for_cluster
+
+    driver = _driver_for_cluster(cluster)
+    routes = driver.list_manifests(cluster.slug, "astrolift-edge", "gateway.networking.k8s.io/v1/HTTPRoute")
+    return envoy_metrics_for_routes(routes, namespace)

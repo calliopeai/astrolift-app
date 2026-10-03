@@ -27,7 +27,6 @@ from astrolift_operations.prometheus_client import PrometheusError
 from astrolift_registry.models import Workload
 from core.cluster_observability import _auth_for_cluster, _driver_for_cluster, namespace_for_environment
 from core.schema.enums import ObservabilityPanelReason
-from providers._sdk.edge_metrics import edge_metrics_for_ingress_class
 from providers._sdk.workload_metrics import MetricContainer
 
 _SIGNAL_PLAN: tuple[
@@ -96,6 +95,8 @@ def _envelope(signals):
         else (
             ObservabilityPanelReason.ERROR
             if any(signal.reason == ObservabilityPanelReason.ERROR for signal in signals)
+            else ObservabilityPanelReason.NOT_CONFIGURED
+            if all(signal.reason == ObservabilityPanelReason.NOT_CONFIGURED for signal in signals)
             else ObservabilityPanelReason.NO_DATA_YET
         )
     )
@@ -166,14 +167,12 @@ def golden_signals_for_app(*, app, environment_name, workload_slug, seconds, now
     assert environment is not None and cluster is not None
     cfg, caps = cluster.provider_config or {}, cluster.capabilities or {}
     endpoint = str(cfg.get("prometheus_endpoint") or caps.get("prometheus_endpoint") or "").strip()
-    if not endpoint:
-        return AppGoldenSignalsResult(
-            reason=ObservabilityPanelReason.NOT_CONFIGURED,
-            signals=[
-                _unavailable(signal, GoldenSignalUnavailableReason.NOT_CONFIGURED) for signal in signals
-            ],
-        )
-    edge = edge_metrics_for_ingress_class(cluster.ingress_class)
+    edge, edge_error = None, None
+    if endpoint and not workload:
+        try:
+            edge = prom_client.resolve_cluster_edge_metrics(cluster, namespace)
+        except Exception:
+            edge_error = GoldenSignalUnavailableReason.PROVIDER_ERROR
     declared = (app.manifest_normalized or {}).get("workloads") or []
     instrumented = any(
         isinstance(row, dict)
@@ -184,7 +183,7 @@ def golden_signals_for_app(*, app, environment_name, workload_slug, seconds, now
     members: list[MetricContainer] = []
     member_error = None
     observed = None
-    if workload:
+    if workload and endpoint:
         try:
             driver = _driver_for_cluster(cluster)
             read = getattr(driver, "metric_containers", None)
@@ -213,9 +212,15 @@ def golden_signals_for_app(*, app, environment_name, workload_slug, seconds, now
             )
     for index, (kind, _, builder, extra) in enumerate(_SIGNAL_PLAN):
         signal = signals[index]
+        if not endpoint:
+            signals[index] = _unavailable(signal, GoldenSignalUnavailableReason.NOT_CONFIGURED)
+            continue
         measurement = signal.measurement
         assert measurement is not None
         resource = _RESOURCES.get(kind)
+        if not resource and edge_error:
+            signals[index] = _unavailable(signal, edge_error)
+            continue
         source = (
             GoldenSignalSource.CADVISOR_KUBE_STATE_METRICS
             if resource
@@ -327,7 +332,7 @@ def golden_signals_for_app(*, app, environment_name, workload_slug, seconds, now
             )
             signal = _unavailable(signal, reason)
         signals[index] = signal
-    if not workload and all(not signal.samples for signal in signals if signal.name not in _RESOURCES):
+    if not workload and any(not signal.samples for signal in signals if signal.name not in _RESOURCES):
         signals, configured = cloudwatch_fallback(
             out=signals,
             app=app,
@@ -343,13 +348,9 @@ def golden_signals_for_app(*, app, environment_name, workload_slug, seconds, now
                 continue
             measurement = signal.measurement
             assert measurement is not None
-            if configured:
+            if configured and (not signal.samples or signal.promql.startswith("# CloudWatch")):
                 measurement.source = GoldenSignalSource.CLOUDWATCH_ALB
                 measurement.identity_basis = GoldenSignalIdentityBasis.NAMESPACE
-                if signal.name == GoldenSignalKind.LATENCY_P90:
-                    signal.reason = ObservabilityPanelReason.NOT_SUPPORTED_BY_PROVIDER
-                    measurement.unavailable_reason = GoldenSignalUnavailableReason.NOT_SUPPORTED_BY_PROVIDER
-                    continue
             if signal.samples and signal.promql.startswith("# CloudWatch"):
                 signal.reason = ObservabilityPanelReason.OK
                 signal.measurement = dataclasses.replace(
@@ -360,7 +361,9 @@ def golden_signals_for_app(*, app, environment_name, workload_slug, seconds, now
                     unavailable_reason=None,
                 )
             elif (
-                configured and measurement.unavailable_reason != GoldenSignalUnavailableReason.PROVIDER_ERROR
+                configured
+                and not signal.samples
+                and measurement.unavailable_reason != GoldenSignalUnavailableReason.PROVIDER_ERROR
             ):
                 signal.reason = ObservabilityPanelReason.NO_DATA_YET
                 measurement.unavailable_reason = GoldenSignalUnavailableReason.NO_DATA_YET
