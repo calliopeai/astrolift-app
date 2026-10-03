@@ -1,12 +1,14 @@
 "use client";
 
 import { useQuery } from "@apollo/client/react";
+import { useMemo } from "react";
+import { useTranslations } from "next-intl";
 
 import { useListState } from "@/components/list/use-list-state";
 import { TOOL_DEFS_LIST_PAGE } from "@/graphql/agents/agents.queries";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
-import { TOOLS_LIST, toolDefsPageVariables } from "./tools-list";
+import { localizedToolsList, toolDefsPageVariables } from "./tools-list";
 
 export type ToolRegistryTool = {
   id: string;
@@ -42,7 +44,9 @@ type ToolDefsPageData = {
  * ToolRegistryScreen.
  */
 export function useToolRegistry() {
-  const list = useListState(TOOLS_LIST);
+  const t = useTranslations("agentToolRegistry");
+  const definition = useMemo(() => localizedToolsList(t), [t]);
+  const list = useListState(definition);
   const { state } = list;
   // Reactive org id (#agents-empty): a synchronous cookie read races the
   // post-render effect that sets it, leaving orgId "" and the query skipped.

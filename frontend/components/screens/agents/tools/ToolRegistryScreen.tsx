@@ -1,15 +1,15 @@
 "use client";
 
 import { BoxIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
-import { agentsCrumbs } from "@/components/screens/agents/skills/catalog";
-import { ADAPTER_LABEL } from "@/components/screens/agents/skills/tool-adapters";
 import { Badge } from "@/components/ui/badge";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import type { ToolRegistryState, ToolRegistryTool } from "./use-tool-registry";
+import { localizedToolAdapter, localizedToolsCrumbs } from "./tools-list";
 
 export type ToolRegistryScreenProps = ToolRegistryState;
 
@@ -30,11 +30,12 @@ export function ToolRegistryScreen({
   onRetry,
 }: ToolRegistryScreenProps) {
   const fmt = useFormatters();
+  const label = useTranslations("agentToolRegistry");
 
   const columns: Column<ToolRegistryTool>[] = [
     {
       id: "tool",
-      header: "Tool",
+      header: label("tool"),
       sortKey: "name",
       cellClassName: "max-w-80",
       cell: (t) => (
@@ -50,7 +51,7 @@ export function ToolRegistryScreen({
     },
     {
       id: "skill",
-      header: "Skill",
+      header: label("skill"),
       sortKey: "skill",
       cellClassName: "max-w-56",
       cell: (t) =>
@@ -60,27 +61,31 @@ export function ToolRegistryScreen({
               {t.skillName || t.skillSlug}
             </span>
             <span className="text-muted-foreground block truncate text-xs">
-              {t.isBuiltin ? "Built-in" : t.skillIsGlobal ? "Global" : "Organization"}
+              {t.isBuiltin
+                ? label("builtin")
+                : t.skillIsGlobal
+                  ? label("global")
+                  : label("organization")}
             </span>
           </span>
         ) : (
-          <span className="text-muted-foreground text-xs">none</span>
+          <span className="text-muted-foreground text-xs">{label("none")}</span>
         ),
     },
     {
       id: "adapter",
-      header: "Adapter",
+      header: label("adapter"),
       sortKey: "adapter",
       cell: (t) =>
         t.adapter ? (
-          <Badge variant="outline">{ADAPTER_LABEL[t.adapter] ?? t.adapter}</Badge>
+          <Badge variant="outline">{localizedToolAdapter(label, t.adapter)}</Badge>
         ) : (
-          <span className="text-muted-foreground text-xs">unknown</span>
+          <span className="text-muted-foreground text-xs">{label("unknown")}</span>
         ),
     },
     {
       id: "description",
-      header: "Description",
+      header: label("description"),
       cellClassName: "max-w-80",
       cell: (t) =>
         t.description ? (
@@ -88,12 +93,12 @@ export function ToolRegistryScreen({
             {t.description}
           </span>
         ) : (
-          <span className="text-muted-foreground text-sm italic">No description</span>
+          <span className="text-muted-foreground text-sm italic">{label("noDescription")}</span>
         ),
     },
     {
       id: "handler",
-      header: "Handler",
+      header: label("handler"),
       cellClassName: "max-w-64",
       cell: (t) =>
         t.handlerRef ? (
@@ -104,16 +109,18 @@ export function ToolRegistryScreen({
             {t.handlerRef}
           </span>
         ) : (
-          <span className="text-muted-foreground text-xs">none</span>
+          <span className="text-muted-foreground text-xs">{label("none")}</span>
         ),
     },
     {
       id: "created",
-      header: "Registered",
+      header: label("registered"),
       sortKey: "created",
       cell: (t) => (
-        <span className="text-muted-foreground font-mono text-xs">
-          {t.createdAt ? fmt.formatDateTime(t.createdAt) : "unknown"}
+        <span className="text-muted-foreground font-mono text-xs" title={t.createdAt}>
+          {t.createdAt && Number.isFinite(new Date(t.createdAt).getTime())
+            ? fmt.formatDateTime(t.createdAt)
+            : label("unknownDate")}
         </span>
       ),
     },
@@ -122,12 +129,12 @@ export function ToolRegistryScreen({
   return (
     <ListPage<ToolRegistryTool>
       header={{
-        crumbs: agentsCrumbs("tools"),
-        title: "Tools",
-        context: "Every tool definition across every skill in this org. Register tools on a skill.",
+        crumbs: localizedToolsCrumbs(label),
+        title: label("title"),
+        context: label("context"),
       }}
       list={list}
-      label="Tools"
+      label={label("title")}
       columns={columns}
       rows={rows}
       getRowId={(t) => t.id}
@@ -138,11 +145,10 @@ export function ToolRegistryScreen({
       onRetry={onRetry}
       empty={{
         icon: <BoxIcon className="size-5" />,
-        title: "No tools registered",
-        description:
-          "Register tool definitions on a skill's Tools tab. Tools declare the callable capabilities agents can invoke.",
+        title: label("emptyTitle"),
+        description: label("emptyDescription"),
         actionHref: "/agents/skills",
-        actionLabel: "Go to skills",
+        actionLabel: label("goToSkills"),
       }}
       totalCount={totalCount}
     />
