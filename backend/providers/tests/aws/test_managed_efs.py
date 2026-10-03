@@ -13,6 +13,7 @@ from aws.managed._base import ManagedServiceError
 from aws.managed._networking import ensure_efs_networking
 from aws.managed.filesystem_efs import EFSConfig, EFSDriver
 
+SERVICE_ID = "11111111-1111-4111-8111-111111111111"
 FS_ID = "fs-12345678"
 AP_ID = "fsap-12345678"
 FS_ARN = f"arn:aws:elasticfilesystem:us-west-2:123456789012:file-system/{FS_ID}"
@@ -22,7 +23,8 @@ SECURITY_GROUPS = ("sg-12345678",)
 
 _OWNED_TAGS = [
     {"Key": "astrolift.io/managed-by", "Value": "platform"},
-    {"Key": "astrolift.io/organization", "Value": "steadymd"},
+    {"Key": "astrolift.io/managed_service_id", "Value": SERVICE_ID},
+    {"Key": "astrolift.io/organization", "Value": "alpha"},
     {"Key": "astrolift.io/app", "Value": "triage"},
 ]
 
@@ -30,7 +32,7 @@ _OWNED_TAGS = [
 def _spec(**overrides) -> ProvisionSpec:
     values = {
         "organization_id": "org-1",
-        "organization_slug": "steadymd",
+        "organization_slug": "alpha",
         "app_id": "app-1",
         "app_slug": "triage",
         "environment_id": "env-1",
@@ -42,10 +44,18 @@ def _spec(**overrides) -> ProvisionSpec:
         "tags": {"owner": "agents"},
         "isolation": "shared",
         "binding_id": "binding-1",
-        "managed_service_id": "service-1",
+        "managed_service_id": "11111111-1111-4111-8111-111111111111",
     }
     values.update(overrides)
     return ProvisionSpec(**values)
+
+
+def _update_spec(*args, **kwargs):
+    return UpdateSpec(*args, **kwargs, managed_service_id=SERVICE_ID)
+
+
+def _deprovision_spec(*args, **kwargs):
+    return DeprovisionSpec(*args, **kwargs, managed_service_id=SERVICE_ID)
 
 
 def _config(**overrides) -> EFSConfig:
@@ -80,10 +90,11 @@ def _validate(operation: str, params: dict) -> None:
 
 def _client(*, existing: bool = False, managed: bool = True, state: str = "available") -> MagicMock:
     client = MagicMock()
-    token = "platform-steadymd-triage-prod-shared"
+    token = "platform-alpha-triage-prod-shared"
     fs = {
         "CreationToken": token,
         "FileSystemId": FS_ID,
+        "OwnerId": "123456789012",
         "FileSystemArn": FS_ARN,
         "LifeCycleState": state,
         "Encrypted": True,
@@ -123,6 +134,7 @@ def _client(*, existing: bool = False, managed: bool = True, state: str = "avail
         target = {
             "MountTargetId": f"fsmt-{len(store['mount_targets']) + 1:08x}",
             "FileSystemId": request["FileSystemId"],
+            "OwnerId": "123456789012",
             "SubnetId": request["SubnetId"],
             "LifeCycleState": "available",
         }
@@ -146,9 +158,10 @@ def _client(*, existing: bool = False, managed: bool = True, state: str = "avail
     def create_access_point(**request):
         point = {
             "AccessPointId": AP_ID,
-            "AccessPointArn": ("arn:aws:elasticfilesystem:us-west-2:123456789012:access-point/" + AP_ID),
+            "AccessPointArn": f"arn:aws:elasticfilesystem:us-west-2:123456789012:access-point/{AP_ID}",
             "ClientToken": request["ClientToken"],
             "FileSystemId": request["FileSystemId"],
+            "OwnerId": "123456789012",
             "LifeCycleState": "available",
             "Tags": list(request.get("Tags") or []),
         }
@@ -171,6 +184,8 @@ def _client(*, existing: bool = False, managed: bool = True, state: str = "avail
     def create_replication_configuration(**request):
         replication = {
             "SourceFileSystemId": request["SourceFileSystemId"],
+            "SourceFileSystemArn": FS_ARN,
+            "SourceFileSystemRegion": "us-west-2",
             "Destinations": [
                 {
                     "Region": destination.get("Region") or str(destination.get("AvailabilityZoneName") or "")[:-1],
@@ -261,6 +276,7 @@ def test_existing_managed_filesystem_is_reconciled_not_recreated():
         {
             "MountTargetId": f"fsmt-{index:08x}",
             "FileSystemId": FS_ID,
+            "OwnerId": "123456789012",
             "SubnetId": subnet,
             "LifeCycleState": "available",
         }
@@ -269,10 +285,12 @@ def test_existing_managed_filesystem_is_reconciled_not_recreated():
     client.store["access_points"] = [
         {
             "AccessPointId": AP_ID,
-            "ClientToken": "platform-steadymd-triage-prod-shared-access-point",
+            "AccessPointArn": f"arn:aws:elasticfilesystem:us-west-2:123456789012:access-point/{AP_ID}",
+            "ClientToken": "platform-alpha-triage-prod-shared-access-point",
             "FileSystemId": FS_ID,
+            "OwnerId": "123456789012",
             "LifeCycleState": "available",
-            "Tags": [{"Key": "astrolift.io/managed-by", "Value": "platform"}],
+            "Tags": list(_OWNED_TAGS),
         },
     ]
     driver = EFSDriver(config=_config(), client=client)
@@ -283,16 +301,16 @@ def test_existing_managed_filesystem_is_reconciled_not_recreated():
     client.create_file_system.assert_not_called()
     client.create_mount_target.assert_not_called()
     client.create_access_point.assert_not_called()
-    client.tag_resource.assert_called_once()
+    client.tag_resource.assert_not_called()
 
 
-def test_creation_token_collision_is_never_adopted():
+def test_recorded_external_filesystem_is_never_adopted():
     client = _client(existing=True, managed=False)
     driver = EFSDriver(config=_config(), client=client)
 
-    result = driver.provision(_spec())
+    result = driver.provision(_spec(recorded_handle=f"filesystem/{FS_ID}"))
 
-    assert not result.ok and "outside this declaration" in result.message
+    assert not result.ok and "ownership" in result.message
     client.tag_resource.assert_not_called()
     client.create_mount_target.assert_not_called()
 
@@ -303,6 +321,7 @@ def test_update_applies_native_throughput_lifecycle_backup_and_protection():
         {
             "MountTargetId": "fsmt-12345678",
             "FileSystemId": FS_ID,
+            "OwnerId": "123456789012",
             "SubnetId": SUBNETS[0],
             "LifeCycleState": "available",
         },
@@ -320,7 +339,7 @@ def test_update_applies_native_throughput_lifecycle_backup_and_protection():
         "mount_target_security_group_ids": ["sg-99999999"],
     }
 
-    result = driver.update(UpdateSpec(f"filesystem/{FS_ID}", config=config))
+    result = driver.update(_update_spec(f"filesystem/{FS_ID}", config=config))
 
     assert result.ok
     update = client.update_file_system.call_args.kwargs
@@ -371,6 +390,8 @@ def test_replication_destination_drift_requires_reprovision():
     client.store["replications"] = [
         {
             "SourceFileSystemId": FS_ID,
+            "SourceFileSystemArn": FS_ARN,
+            "SourceFileSystemRegion": "us-west-2",
             "Destinations": [{"Region": "us-east-1", "FileSystemId": "fs-87654321"}],
         },
     ]
@@ -400,6 +421,7 @@ def test_status_maps_filesystem_lifecycle(provider_state, expected):
             {
                 "MountTargetId": "fsmt-12345678",
                 "FileSystemId": FS_ID,
+                "OwnerId": "123456789012",
                 "SubnetId": SUBNETS[0],
                 "LifeCycleState": "available",
             },
@@ -418,6 +440,16 @@ def test_available_filesystem_without_ready_mount_target_is_not_reported_ready()
 
 def test_binding_emits_portable_csi_envelope_and_scoped_client_grants():
     client = _client(existing=True)
+    client.store["access_points"] = [
+        {
+            "AccessPointId": AP_ID,
+            "AccessPointArn": f"arn:aws:elasticfilesystem:us-west-2:123456789012:access-point/{AP_ID}",
+            "FileSystemId": FS_ID,
+            "OwnerId": "123456789012",
+            "LifeCycleState": "available",
+            "Tags": list(_OWNED_TAGS),
+        }
+    ]
     driver = EFSDriver(config=_config(), client=client)
 
     binding = driver.binding(
@@ -463,12 +495,12 @@ def test_binding_and_delete_refuse_an_external_filesystem_even_with_force():
     with pytest.raises(ManagedServiceError, match="not owned"):
         driver.binding(ServiceHandle(handle))
     result = driver.deprovision(
-        DeprovisionSpec(handle),
+        _deprovision_spec(handle),
         delete_data=True,
         force_destroy=True,
     )
 
-    assert not result.ok and result.errors == ["external_resource_collision"]
+    assert not result.ok and result.errors == ["ownership_refused"]
     client.delete_file_system.assert_not_called()
 
 
@@ -478,6 +510,7 @@ def test_mount_target_pruning_is_explicit_and_convergent():
         {
             "MountTargetId": f"fsmt-{index:08x}",
             "FileSystemId": FS_ID,
+            "OwnerId": "123456789012",
             "SubnetId": subnet,
             "LifeCycleState": "available",
         }
@@ -486,7 +519,7 @@ def test_mount_target_pruning_is_explicit_and_convergent():
     driver = EFSDriver(config=_config(), client=client)
 
     result = driver.update(
-        UpdateSpec(
+        _update_spec(
             f"filesystem/{FS_ID}",
             config={
                 "mount_targets": [{"SubnetId": SUBNETS[0]}],
@@ -506,6 +539,7 @@ def test_deprovision_requires_guard_and_data_loss_ack_then_removes_dependencies(
         {
             "MountTargetId": "fsmt-12345678",
             "FileSystemId": FS_ID,
+            "OwnerId": "123456789012",
             "SubnetId": SUBNETS[0],
             "LifeCycleState": "available",
         },
@@ -513,26 +547,30 @@ def test_deprovision_requires_guard_and_data_loss_ack_then_removes_dependencies(
     client.store["access_points"] = [
         {
             "AccessPointId": AP_ID,
+            "AccessPointArn": f"arn:aws:elasticfilesystem:us-west-2:123456789012:access-point/{AP_ID}",
             "FileSystemId": FS_ID,
+            "OwnerId": "123456789012",
             "LifeCycleState": "available",
-            "Tags": [{"Key": "astrolift.io/managed-by", "Value": "platform"}],
+            "Tags": list(_OWNED_TAGS),
         },
     ]
     client.store["replications"] = [
         {
             "SourceFileSystemId": FS_ID,
+            "SourceFileSystemArn": FS_ARN,
+            "SourceFileSystemRegion": "us-west-2",
             "Destinations": [{"Region": "us-east-1", "FileSystemId": "fs-87654321"}],
         },
     ]
     driver = EFSDriver(config=_config(), client=client)
     handle = f"filesystem/{FS_ID}/{AP_ID}"
 
-    protected = driver.deprovision(DeprovisionSpec(handle))
+    protected = driver.deprovision(_deprovision_spec(handle))
     retained = driver.deprovision(
-        DeprovisionSpec(handle, config={"deletion_protection": False}),
+        _deprovision_spec(handle, config={"deletion_protection": False}),
     )
     deleted = driver.deprovision(
-        DeprovisionSpec(handle),
+        _deprovision_spec(handle),
         delete_data=True,
         force_destroy=True,
     )
@@ -555,8 +593,8 @@ def test_missing_status_update_and_delete_converge_honestly():
     handle = f"filesystem/{FS_ID}"
 
     assert driver.status(ServiceHandle(handle)).state == "deprovisioned"
-    assert not driver.update(UpdateSpec(handle, config={})).ok
-    assert driver.deprovision(DeprovisionSpec(handle)).ok
+    assert not driver.update(_update_spec(handle, config={})).ok
+    assert driver.deprovision(_deprovision_spec(handle)).ok
 
 
 def test_snapshot_contract_points_to_aws_backup_instead_of_faking_efs_snapshot():
@@ -676,7 +714,7 @@ def test_a_platform_filesystem_of_another_org_is_not_adopted():
     ]
     driver = EFSDriver(config=_config(), client=client)
 
-    result = driver.provision(_spec())
+    result = driver.provision(_spec(recorded_handle=f"filesystem/{FS_ID}"))
 
-    assert not result.ok and "outside this declaration" in result.message
+    assert not result.ok and "ownership" in result.message
     client.tag_resource.assert_not_called()

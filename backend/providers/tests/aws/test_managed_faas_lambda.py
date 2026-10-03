@@ -24,6 +24,9 @@ from aws.managed.faas_lambda import (
     LambdaDriver,
 )
 
+_ID = "a1234567-1234-4234-8234-123456789012"
+_TAGS = {"astrolift.io/managed-by": "platform", "astrolift.io/managed_service_id": _ID}
+
 # ---- recording fakes -------------------------------------------------
 
 
@@ -63,6 +66,7 @@ class FakeLambda:
         self._urls: dict[str, str] = {}
         self._url_auth: dict[str, str] = {}
         self._permissions: set[tuple[str, str]] = set()
+        self._statements: dict[tuple[str, str], dict] = {}
         self._conflict_on_create = conflict_on_create
 
     def _record(self, name: str, kwargs: dict) -> None:
@@ -86,10 +90,10 @@ class FakeLambda:
         tags: dict[str, str] | None = None,
     ) -> None:
         if tags is not None or function_name not in self._function_tags:
-            self._function_tags[function_name] = (
-                tags if tags is not None else {"astrolift.io/organization": "acme", "astrolift.io/app": "api"}
-            )
+            self._function_tags[function_name] = tags if tags is not None else dict(_TAGS)
         self._functions[function_name] = {
+            "FunctionName": function_name,
+            "Role": f"arn:aws:iam::123456789012:role/{function_name}-fn",
             "FunctionArn": f"arn:aws:lambda:us-east-1:123456789012:function:{function_name}",
             "State": "Active",
             "LastUpdateStatus": "Successful",
@@ -118,13 +122,16 @@ class FakeLambda:
 
     def create_function(self, **kwargs):
         self._record("create_function", kwargs)
+        self.seed_function(kwargs["FunctionName"], tags=kwargs["Tags"])
+        self._functions[kwargs["FunctionName"]]["Role"] = kwargs["Role"]
         if self._conflict_on_create:
             raise _ResourceConflictException(kwargs["FunctionName"])
-        self.seed_function(kwargs["FunctionName"])
+        return self._functions[kwargs["FunctionName"]]
 
     def update_function_code(self, **kwargs):
         self._record("update_function_code", kwargs)
-        self.seed_function(kwargs["FunctionName"])
+        if kwargs["FunctionName"] not in self._functions:
+            raise _ResourceNotFoundException(kwargs["FunctionName"])
 
     def update_function_configuration(self, **kwargs):
         self._record("update_function_configuration", kwargs)
@@ -138,21 +145,33 @@ class FakeLambda:
         url = f"https://{name}.lambda-url.us-east-1.on.aws/"
         self._urls[name] = url
         self._url_auth[name] = kwargs.get("AuthType", "")
-        return {"FunctionUrl": url}
+        return {
+            "FunctionUrl": url,
+            "FunctionArn": self._functions[name]["FunctionArn"],
+            "AuthType": self._url_auth[name],
+        }
 
     def update_function_url_config(self, **kwargs):
         self._record("update_function_url_config", kwargs)
         name = kwargs["FunctionName"]
         if "AuthType" in kwargs:
             self._url_auth[name] = kwargs["AuthType"]
-        return {"FunctionUrl": self._urls.get(name, "")}
+        return {
+            "FunctionUrl": self._urls.get(name, ""),
+            "FunctionArn": self._functions[name]["FunctionArn"],
+            "AuthType": self._url_auth[name],
+        }
 
     def get_function_url_config(self, **kwargs):
         self._record("get_function_url_config", kwargs)
         name = kwargs["FunctionName"]
         if name not in self._urls:
             raise _ResourceNotFoundException(name)
-        return {"FunctionUrl": self._urls[name], "AuthType": self._url_auth.get(name, "")}
+        return {
+            "FunctionUrl": self._urls[name],
+            "FunctionArn": self._functions[name]["FunctionArn"],
+            "AuthType": self._url_auth.get(name, ""),
+        }
 
     def delete_function_url_config(self, **kwargs):
         self._record("delete_function_url_config", kwargs)
@@ -167,6 +186,22 @@ class FakeLambda:
         if key in self._permissions:
             raise _ResourceConflictException(str(key))
         self._permissions.add(key)
+        self._statements[key] = {
+            "Sid": kwargs["StatementId"],
+            "Resource": self._functions[kwargs["FunctionName"]]["FunctionArn"],
+            "Effect": "Allow",
+            "Action": kwargs["Action"],
+            "Principal": {"Service": kwargs["Principal"]},
+            "Condition": {"ArnLike": {"AWS:SourceArn": kwargs["SourceArn"]}},
+        }
+        return {"Statement": json.dumps(self._statements[key])}
+
+    def get_policy(self, **kwargs):
+        self._record("get_policy", kwargs)
+        statements = [row for (fn, _), row in self._statements.items() if fn == kwargs["FunctionName"]]
+        if not statements:
+            raise _ResourceNotFoundException(kwargs["FunctionName"])
+        return {"Policy": json.dumps({"Statement": statements})}
 
     def remove_permission(self, **kwargs):
         self._record("remove_permission", kwargs)
@@ -221,6 +256,9 @@ class FakeIAM:
     def seed_role(self, role_name: str) -> None:
         self._roles[role_name] = {
             "Arn": f"arn:aws:iam::123456789012:role/{role_name}",
+            "RoleName": role_name,
+            "Path": "/",
+            "Tags": [{"Key": k, "Value": v} for k, v in _TAGS.items()],
         }
 
     def create_role(self, **kwargs):
@@ -229,8 +267,8 @@ class FakeIAM:
         if name in self._roles:
             raise _EntityAlreadyExistsException(name)
         arn = f"arn:aws:iam::123456789012:role/{name}"
-        self._roles[name] = {"Arn": arn}
-        return {"Role": {"Arn": arn}}
+        self._roles[name] = {"Arn": arn, "RoleName": name, "Path": kwargs["Path"], "Tags": kwargs["Tags"]}
+        return {"Role": self._roles[name]}
 
     def get_role(self, **kwargs):
         self._record("get_role", kwargs)
@@ -266,13 +304,17 @@ class FakeIAM:
 
 def _driver(*, conflict_on_create: bool = False, lam: FakeLambda | None = None, iam: FakeIAM | None = None):
     lam = lam or FakeLambda(conflict_on_create=conflict_on_create)
-    iam = iam or FakeIAM()
-    drv = LambdaDriver(config=LambdaConfig(region="us-east-1"), client=lam, iam_client=iam)
+    if iam is None:
+        iam = FakeIAM()
+        for name in lam._functions:
+            iam.seed_role(name + "-fn")
+    drv = LambdaDriver(config=LambdaConfig(region="us-east-1", account_id="123456789012"), client=lam, iam_client=iam)
     return drv, lam, iam
 
 
 def _spec(config: dict | None = None) -> ProvisionSpec:
     return ProvisionSpec(
+        managed_service_id=_ID,
         organization_id="org-1",
         organization_slug="acme",
         app_id="app-1",
@@ -286,10 +328,9 @@ def _spec(config: dict | None = None) -> ProvisionSpec:
     )
 
 
-# Function name is deterministic from org/app/env + the service_handle_hint
-# ("faas" here, per _spec); the role appends "-fn".
-_FN = "astrolift-acme-api-prod-faas"
-_ROLE = "astrolift-acme-api-prod-faas-fn"
+# Function and role identities retain the persisted service UUID.
+_FN = "astrolift-a1234567123442348234123456789012"
+_ROLE = _FN + "-fn"
 
 
 # ---- provision: idempotency ------------------------------------------
@@ -368,13 +409,12 @@ def test_provision_zip_mode_sets_runtime_handler():
 
 def test_two_faas_workloads_get_distinct_function_names():
     # Two faas workloads in the SAME org/app/env must not collide onto one
-    # Lambda. The per-workload service_handle_hint scopes the name; dropping it
-    # from _function_name would make these equal (silent overwrite).
+    # Lambda. Mutable labels do not distinguish physical incarnations.
     import dataclasses
 
     drv, _, _ = _driver()
     a = drv._function_name(_spec())  # hint defaults to "faas"
-    b = drv._function_name(dataclasses.replace(_spec(), service_handle_hint="worker-prod-fn"))
+    b = drv._function_name(dataclasses.replace(_spec(), managed_service_id="b1234567-1234-4234-8234-123456789012"))
     assert a != b
     assert a.startswith("astrolift-") and b.startswith("astrolift-")
 
@@ -383,8 +423,12 @@ def test_two_faas_workloads_get_distinct_function_names():
 
 
 def test_update_serializes_code_before_config_with_wait():
-    drv, lam, _ = _driver()
-    result = drv.update(UpdateSpec(handle=f"{KIND}/{_FN}", config={"image_uri": "repo@sha256:v2"}))
+    lam = FakeLambda()
+    lam.seed_function(_FN)
+    drv, lam, _ = _driver(lam=lam)
+    result = drv.update(
+        UpdateSpec(managed_service_id=_ID, handle=f"{KIND}/{_FN}", config={"image_uri": "repo@sha256:v2"})
+    )
     assert result.ok is True
     tracked = ("update_function_code", "update_function_configuration")
     order = [n for n in lam.names() if n in tracked or n.startswith("waiter:")]
@@ -443,8 +487,10 @@ def test_allow_cloudfront_invoke_scopes_to_distribution():
     # principal scoped to ONE distribution SourceArn. Falsifiable: a Principal
     # "*" / missing SourceArn would fail these asserts.
     dist_arn = "arn:aws:cloudfront::123456789012:distribution/E123"
-    drv, lam, _ = _driver()
-    drv.allow_cloudfront_invoke(_FN, dist_arn)
+    lam = FakeLambda()
+    lam.seed_function(_FN)
+    drv, lam, _ = _driver(lam=lam)
+    drv.allow_cloudfront_invoke(_FN, dist_arn, managed_service_id=_ID)
     perm = lam.kwargs_for("add_permission")
     assert perm["StatementId"] == "AstroliftFunctionUrlCloudFront"
     assert perm["Action"] == "lambda:InvokeFunctionUrl"
@@ -455,11 +501,13 @@ def test_allow_cloudfront_invoke_scopes_to_distribution():
 
 def test_allow_cloudfront_invoke_is_idempotent():
     dist_arn = "arn:aws:cloudfront::123456789012:distribution/E123"
-    drv, lam, _ = _driver()
-    drv.allow_cloudfront_invoke(_FN, dist_arn)
+    lam = FakeLambda()
+    lam.seed_function(_FN)
+    drv, lam, _ = _driver(lam=lam)
+    drv.allow_cloudfront_invoke(_FN, dist_arn, managed_service_id=_ID)
     # A second grant under the same StatementId conflicts; it must be swallowed,
     # not raised (re-provision must converge).
-    drv.allow_cloudfront_invoke(_FN, dist_arn)
+    drv.allow_cloudfront_invoke(_FN, dist_arn, managed_service_id=_ID)
     assert (_FN, "AstroliftFunctionUrlCloudFront") in lam._permissions
 
 
@@ -521,12 +569,20 @@ def test_the_execution_role_carries_basic_execution_only():
 
 
 def test_update_resets_a_role_that_carried_config_grants_and_refuses_new_ones():
-    drv, _, iam = _driver()
+    lam = FakeLambda()
+    lam.seed_function(_FN)
+    drv, _, iam = _driver(lam=lam)
 
     refused = drv.update(
-        UpdateSpec(handle=f"{KIND}/{_FN}", config={"image_uri": "repo@sha256:v2", "grants": [{"actions": ["*"]}]}),
+        UpdateSpec(
+            managed_service_id=_ID,
+            handle=f"{KIND}/{_FN}",
+            config={"image_uri": "repo@sha256:v2", "grants": [{"actions": ["*"]}]},
+        ),
     )
-    updated = drv.update(UpdateSpec(handle=f"{KIND}/{_FN}", config={"image_uri": "repo@sha256:v2"}))
+    updated = drv.update(
+        UpdateSpec(managed_service_id=_ID, handle=f"{KIND}/{_FN}", config={"image_uri": "repo@sha256:v2"})
+    )
 
     assert refused.ok is False and "grants are no longer supported" in refused.message
     assert updated.ok is True
@@ -557,7 +613,7 @@ def test_deprovision_deletes_function_url_function_and_role():
     iam.seed_role(_ROLE)
     iam._inline[(_ROLE, "astrolift-faas-policy")] = "{}"
     drv, lam, iam = _driver(lam=lam, iam=iam)
-    result = drv.deprovision(DeprovisionSpec(handle=f"{KIND}/{_FN}"))
+    result = drv.deprovision(DeprovisionSpec(managed_service_id=_ID, handle=f"{KIND}/{_FN}"))
     assert result.ok is True
     assert "delete_function_url_config" in lam.names()
     assert "delete_function" in lam.names()
@@ -568,10 +624,10 @@ def test_deprovision_deletes_function_url_function_and_role():
 def test_deprovision_idempotent_when_everything_gone():
     # Nothing seeded: every delete hits NotFound and must be swallowed.
     drv, lam, iam = _driver()
-    result = drv.deprovision(DeprovisionSpec(handle=f"{KIND}/{_FN}"))
+    result = drv.deprovision(DeprovisionSpec(managed_service_id=_ID, handle=f"{KIND}/{_FN}"))
     assert result.ok is True
-    assert "delete_function" in lam.names()
-    assert "delete_role" in iam.names()
+    assert "delete_function" not in lam.names()
+    assert "delete_role" not in iam.names()
 
 
 # ---- status + binding ------------------------------------------------
@@ -581,13 +637,13 @@ def test_status_available_when_active():
     lam = FakeLambda()
     lam.seed_function(_FN)
     drv, _, _ = _driver(lam=lam)
-    st = drv.status(ServiceHandle(handle=f"{KIND}/{_FN}"))
+    st = drv.status(ServiceHandle(handle=f"{KIND}/{_FN}", managed_service_id=_ID))
     assert st.state == "available"
 
 
 def test_status_deprovisioned_when_missing():
     drv, _, _ = _driver()
-    st = drv.status(ServiceHandle(handle=f"{KIND}/{_FN}"))
+    st = drv.status(ServiceHandle(handle=f"{KIND}/{_FN}", managed_service_id=_ID))
     assert st.state == "deprovisioned"
 
 
@@ -595,7 +651,7 @@ def test_binding_env_and_invoke_grant_shape():
     lam = FakeLambda()
     lam.seed_function(_FN, url="https://x.lambda-url.us-east-1.on.aws/")
     drv, _, _ = _driver(lam=lam)
-    binding = drv.binding(ServiceHandle(handle=f"{KIND}/{_FN}"))
+    binding = drv.binding(ServiceHandle(handle=f"{KIND}/{_FN}", managed_service_id=_ID))
     assert binding.env_vars["FUNCTION_NAME"].literal == _FN
     assert binding.env_vars["FUNCTION_URL"].literal == "https://x.lambda-url.us-east-1.on.aws/"
     # #1402: the rest of the faas envelope. FUNCTION_ARN is the portable
@@ -629,13 +685,18 @@ def test_managed_config_for_faas_returns_lambda_config():
         SimpleNamespace(
             slug="aws-prod",
             region="us-west-2",
-            provider_config={"faas_default_architecture": "x86_64", "faas_log_retention_days": 30},
+            provider_config={
+                "faas_default_architecture": "x86_64",
+                "faas_log_retention_days": 30,
+                "account_id": "123456789012",
+            },
             auth_config={},
         ),
         kind="faas",
     )
     assert pinned.default_architecture == "x86_64"
     assert pinned.log_retention_days == 30
+    assert pinned.account_id == "123456789012"
 
 
 # ---- #1010 cdn custom-origin extension: static-site regression guard --
@@ -715,5 +776,5 @@ def test_provision_does_not_rewrite_another_orgs_function():
 
     result = drv.provision(_spec({"image_uri": "repo@sha256:new"}))
 
-    assert result.ok is False and "refusing to adopt" in result.message
+    assert result.ok is False and "refusing" in result.message
     assert not {"update_function_code", "update_function_configuration", "create_function"} & set(lam.names())
