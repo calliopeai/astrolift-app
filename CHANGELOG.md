@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Map supported Langflow serial loop bodies to explicitly reviewed native Agent
+  or WorkflowDefinition GUIDs, retaining source ports and bounded input/output
+  projections through TOML/YAML and storage. Refuse stale source digests,
+  unsupported ports and target substitutions. Source scheduling and nested
+  execution are covered; full framework and container-agent parity remain open
+  (#2156).
+
 - Replace the static platform activity page with the permission-scoped Temporal
   execution viewer. Bind detail/history and confirmed cancel/terminate requests
   to the selected run ID, follow server cursor pages including empty authorized

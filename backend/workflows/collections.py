@@ -18,11 +18,16 @@ class CollectionContractError(ValueError):
 
 
 def validate_iteration(value: Any, *, kind: str) -> dict:
+    if kind in {"agent_dispatch", "workflow"} and value != {}:
+        from workflows.source_ports import SourcePortContractError, validate_source_ports
+
+        try:
+            return validate_source_ports(value, kind=kind)
+        except SourcePortContractError as exc:
+            raise CollectionContractError(str(exc)) from exc
     if kind not in {"collection", "format_record"}:
         if value != {}:
-            raise CollectionContractError(
-                "iteration is valid only for collection and format_record stages"
-            )
+            raise CollectionContractError("iteration is valid only for collection and format_record stages")
         return {}
     if not isinstance(value, dict):
         raise CollectionContractError("iteration must be an object")
@@ -39,9 +44,7 @@ def validate_iteration(value: Any, *, kind: str) -> dict:
             or not isinstance(separator, str)
             or len(separator) > 256
         ):
-            raise CollectionContractError(
-                "record pattern and separator must be bounded strings"
-            )
+            raise CollectionContractError("record pattern and separator must be bounded strings")
         try:
             fields = list(string.Formatter().parse(pattern))
         except ValueError as exc:
@@ -50,9 +53,7 @@ def validate_iteration(value: Any, *, kind: str) -> dict:
             field is not None and (not _KEY.fullmatch(field) or spec or conversion)
             for _, field, spec, conversion in fields
         ):
-            raise CollectionContractError(
-                "record patterns support plain named fields only"
-            )
+            raise CollectionContractError("record patterns support plain named fields only")
         return dict(value)
     required = {"max_items", "body_end"}
     allowed = required | {"items", "items_path", "source_format"}
@@ -66,23 +67,16 @@ def validate_iteration(value: Any, *, kind: str) -> dict:
         )
     cap = value["max_items"]
     if type(cap) is not int or not 1 <= cap <= MAX_COLLECTION_ITEMS:
-        raise CollectionContractError(
-            "collection max_items must be an integer between 1 and 50"
-        )
+        raise CollectionContractError("collection max_items must be an integer between 1 and 50")
     end = value["body_end"]
     if not isinstance(end, str) or not 1 <= len(end) <= 100:
-        raise CollectionContractError(
-            "collection body_end requires an explicit forward output_key"
-        )
+        raise CollectionContractError("collection body_end requires an explicit forward output_key")
     if "source_format" in value and value["source_format"] != "langflow_loop":
         raise CollectionContractError("unsupported imported collection contract")
     if "items_path" in value and (
-        not isinstance(value["items_path"], str)
-        or not _PATH.fullmatch(value["items_path"])
+        not isinstance(value["items_path"], str) or not _PATH.fullmatch(value["items_path"])
     ):
-        raise CollectionContractError(
-            "collection items_path requires a dotted object field path"
-        )
+        raise CollectionContractError("collection items_path requires a dotted object field path")
     if "items" in value:
         validate_items(value["items"], cap=cap)
     return dict(value)
@@ -94,9 +88,7 @@ def validate_items(value: Any, *, cap: int) -> list[dict]:
             "collection data is unavailable or exceeds max_items; no items were dispatched"
         )
     if any(not isinstance(item, dict) for item in value):
-        raise CollectionContractError(
-            "collection requires an ordered list of JSON records"
-        )
+        raise CollectionContractError("collection requires an ordered list of JSON records")
     bounded_json(value)
     return value
 
@@ -108,14 +100,10 @@ def bounded_json(value: Any) -> None:
         member, depth = pending.pop()
         visited += 1
         if depth > 32 or visited > 16384:
-            raise CollectionContractError(
-                "collection data exceeds its bounded JSON structure"
-            )
+            raise CollectionContractError("collection data exceeds its bounded JSON structure")
         if isinstance(member, dict):
             if any(not isinstance(key, str) for key in member):
-                raise CollectionContractError(
-                    "collection records require JSON object keys"
-                )
+                raise CollectionContractError("collection records require JSON object keys")
             pending.extend((nested, depth + 1) for nested in member.values())
         elif isinstance(member, list):
             pending.extend((nested, depth + 1) for nested in member)
@@ -125,19 +113,13 @@ def bounded_json(value: Any) -> None:
             or type(member) is float
             and math.isfinite(member)
         ):
-            raise CollectionContractError(
-                "collection records require finite JSON values"
-            )
+            raise CollectionContractError("collection records require finite JSON values")
     try:
         encoded = json.dumps(value, allow_nan=False)
     except (ValueError, TypeError, OverflowError, RecursionError) as exc:
-        raise CollectionContractError(
-            "collection records require finite JSON values"
-        ) from exc
+        raise CollectionContractError("collection records require finite JSON values") from exc
     if len(encoded.encode()) > 262144:
-        raise CollectionContractError(
-            "collection data exceeds its bounded payload size"
-        )
+        raise CollectionContractError("collection data exceeds its bounded payload size")
 
 
 def collection_items(config: dict, previous: Any) -> list[dict]:
@@ -154,11 +136,7 @@ def collection_items(config: dict, previous: Any) -> list[dict]:
 
 
 def collection_ranges(stages: list[dict]) -> dict[int, int]:
-    keys = {
-        stage.get("output_key"): index
-        for index, stage in enumerate(stages)
-        if stage.get("output_key")
-    }
+    keys = {stage.get("output_key"): index for index, stage in enumerate(stages) if stage.get("output_key")}
     ranges: dict[int, int] = {}
     occupied: set[int] = set()
     for index, stage in enumerate(stages):
@@ -167,14 +145,10 @@ def collection_ranges(stages: list[dict]) -> dict[int, int]:
             continue
         end = keys.get(config["body_end"])
         if not stage.get("output_key") or end is None or end <= index:
-            raise CollectionContractError(
-                "collection requires an explicit forward body range"
-            )
+            raise CollectionContractError("collection requires an explicit forward body range")
         body = set(range(index + 1, end + 1))
         if body & occupied or index in occupied:
-            raise CollectionContractError(
-                "nested or overlapping collection ranges are not supported"
-            )
+            raise CollectionContractError("nested or overlapping collection ranges are not supported")
         occupied |= body
         ranges[index] = end
         for member in stages[index + 1 : end + 1]:
@@ -191,9 +165,7 @@ def collection_ranges(stages: list[dict]) -> dict[int, int]:
                 or member.get("fan_out_count")
                 or member.get("fan_out") not in (None, 0)
             ):
-                raise CollectionContractError(
-                    "collection bodies execute serially; fan-out is not supported"
-                )
+                raise CollectionContractError("collection bodies execute serially; fan-out is not supported")
     for index, stage in enumerate(stages):
         edge = stage.get("back_edge") or {}
         if not edge:
@@ -201,9 +173,7 @@ def collection_ranges(stages: list[dict]) -> dict[int, int]:
         target = keys.get(edge.get("to"))
         for start, end in ranges.items():
             if (start < index <= end) != (target is not None and start < target <= end):
-                raise CollectionContractError(
-                    "return edges cannot enter or leave a collection body"
-                )
+                raise CollectionContractError("return edges cannot enter or leave a collection body")
     return ranges
 
 
@@ -219,9 +189,7 @@ def format_record(config: dict, value: Any, *, timestamp: str) -> dict:
 
     text = config["pattern"].format_map(DefaultFields(value))
     if len(text.encode()) > 65536:
-        raise CollectionContractError(
-            "record formatter output exceeds its bounded payload size"
-        )
+        raise CollectionContractError("record formatter output exceeds its bounded payload size")
     return {"text": text, "timestamp": timestamp}
 
 
@@ -236,8 +204,7 @@ def collection_binding(output: Any) -> dict | None:
     }:
         return None
     order, count, cap, ids = (
-        value[key]
-        for key in ("owner_order", "item_count", "max_items", "body_stage_ids")
+        value[key] for key in ("owner_order", "item_count", "max_items", "body_stage_ids")
     )
     if (
         type(order) is not int
