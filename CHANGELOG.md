@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add an internal guarded EKS collector execution seam with verified chart bytes,
+  conditional resource identities, bounded registered transport and scoped probe
+  reads before and after exact-UID deletion (#1706). Keep public installation,
+  durable operation admission and reader activation separate; local HTTP proof
+  does not establish live ingestion or Fargate coverage.
+
 - Stage a pinned EKS CloudWatch Fluent Bit profile and credential-aware,
   immutable cluster-owned log-group/IRSA preparation helpers (#1706). Keep the
   component outside the installable recipe pending guarded orchestration,
