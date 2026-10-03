@@ -62,14 +62,15 @@ def files():
 
 
 @pytest.fixture
-def configured(settings, monkeypatch, model_s3_wire):
+def configured(settings, monkeypatch, request):
+    wire = request.getfixturevalue("model_s3_wire")
     settings.AWS_STORAGE_BUCKET_NAME = "owned-models"
     settings.AWS_S3_REGION_NAME = "us-east-1"
-    settings.AWS_S3_ENDPOINT_URL = model_s3_wire["url"]
+    settings.AWS_S3_ENDPOINT_URL = wire["url"]
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "owned-fixture")
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "owned-fixture-only")
-    monkeypatch.setenv("AWS_CA_BUNDLE", str(model_s3_wire["cert"]))
-    return model_s3_wire
+    monkeypatch.setenv("AWS_CA_BUNDLE", str(wire["cert"]))
+    return wire
 
 
 def import_uploaded(owner, wire):
