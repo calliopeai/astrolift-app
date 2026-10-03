@@ -1373,6 +1373,7 @@ export type AstroliftAppLogPage = {
   nextCursor: Scalars['String']['output'];
   reachedRetention: Scalars['Boolean']['output'];
   reason: AstroliftObservabilityPanelReason;
+  scope?: Maybe<AstroliftTelemetryScope>;
   totalCount: Scalars['Int']['output'];
 };
 
@@ -1543,6 +1544,14 @@ export type AstroliftAppTrace = {
   spanCount: Scalars['Int']['output'];
   statusCode: Scalars['String']['output'];
   traceId: Scalars['String']['output'];
+};
+
+export type AstroliftAppTracePage = {
+  items: Array<AstroliftAppTrace>;
+  limit: Scalars['Int']['output'];
+  reason: AstroliftObservabilityPanelReason;
+  scope?: Maybe<AstroliftTelemetryScope>;
+  truncated: Scalars['Boolean']['output'];
 };
 
 export type AstroliftAppUptime = {
@@ -5304,6 +5313,15 @@ export type AstroliftTeamsListFilter = {
   mine: InputMaybe<Scalars['Boolean']['input']>;
 };
 
+export type AstroliftTelemetryScope = {
+  appId: Scalars['String']['output'];
+  clusterId: Scalars['String']['output'];
+  environmentId: Scalars['String']['output'];
+  environmentName: Scalars['String']['output'];
+  namespace: Scalars['String']['output'];
+  organizationId: Scalars['String']['output'];
+};
+
 export type AstroliftTemplateSendStatPoint = {
   bounces: Scalars['Int']['output'];
   complaints: Scalars['Int']['output'];
@@ -5424,11 +5442,18 @@ export type AstroliftTraceSpan = {
   durationMs: Scalars['Float']['output'];
   operation: Scalars['String']['output'];
   parentSpanId?: Maybe<Scalars['String']['output']>;
+  resourceAttributes: Scalars['JSON']['output'];
   service: Scalars['String']['output'];
   spanId: Scalars['String']['output'];
   startTime: Scalars['String']['output'];
   statusCode: Scalars['String']['output'];
   traceId: Scalars['String']['output'];
+};
+
+export type AstroliftTraceSpansResult = {
+  items: Array<AstroliftTraceSpan>;
+  reason: AstroliftObservabilityPanelReason;
+  scope?: Maybe<AstroliftTelemetryScope>;
 };
 
 export type AstroliftTrigger = {
@@ -10056,6 +10081,7 @@ export type Query = {
   /** @deprecated Returns every grant in one unbounded response. Use astroliftAppTeamAccessesPage. */
   astroliftAppTeamAccesses: Array<AstroliftAppTeamAccess>;
   astroliftAppTeamAccessesPage: AstroliftAppTeamAccessPage;
+  astroliftAppTracePage: AstroliftAppTracePage;
   astroliftAppTraces: Array<AstroliftAppTrace>;
   astroliftAppUptime?: Maybe<AstroliftAppUptime>;
   astroliftAppUrlHealth?: Maybe<AstroliftAppUrlHealth>;
@@ -10255,6 +10281,7 @@ export type Query = {
   astroliftTeamsPage: AstroliftTeamPage;
   astroliftTopologyTraffic?: Maybe<TopologyTraffic>;
   astroliftTraceSpans: Array<AstroliftTraceSpan>;
+  astroliftTraceSpansResult: AstroliftTraceSpansResult;
   /** @deprecated Caps at 100 attempts with no way to reach the 101st. Use astroliftWebhookDeliveriesPage. */
   astroliftWebhookDeliveries: Array<AstroliftWebhookDelivery>;
   astroliftWebhookDeliveriesPage: AstroliftWebhookDeliveryPage;
@@ -10780,6 +10807,7 @@ export type QueryAstroliftAppIdentityBindingArgs = {
 export type QueryAstroliftAppLogsArgs = {
   appSlug: Scalars['String']['input'];
   cursor?: InputMaybe<Scalars['String']['input']>;
+  environmentId?: InputMaybe<Scalars['GUID']['input']>;
   environmentName?: InputMaybe<Scalars['String']['input']>;
   expectedEnvironmentId?: InputMaybe<Scalars['GUID']['input']>;
   ifMatchEnvironmentVersion?: InputMaybe<Scalars['Int']['input']>;
@@ -10857,6 +10885,18 @@ export type QueryAstroliftAppTeamAccessesPageArgs = {
   appSlug: Scalars['String']['input'];
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftAppTracePageArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentId?: InputMaybe<Scalars['GUID']['input']>;
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  service?: InputMaybe<Scalars['String']['input']>;
+  since: Scalars['String']['input'];
+  status?: InputMaybe<Scalars['String']['input']>;
+  until: Scalars['String']['input'];
 };
 
 
@@ -11902,6 +11942,16 @@ export type QueryAstroliftTraceSpansArgs = {
   appSlug: Scalars['String']['input'];
   environmentName?: InputMaybe<Scalars['String']['input']>;
   traceId: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftTraceSpansResultArgs = {
+  appSlug: Scalars['String']['input'];
+  environmentId?: InputMaybe<Scalars['GUID']['input']>;
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  since: Scalars['String']['input'];
+  traceId: Scalars['String']['input'];
+  until: Scalars['String']['input'];
 };
 
 
