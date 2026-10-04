@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Stage private original-caller receipts for human GCP Endpoint deployments and exact-environment approval handoff; validate them in the real worker before downstream effects and explicitly refuse until the native pipeline is configured. Public caller inputs and ordinary non-native deployments remain unchanged (#2278).
+
 - Keep bearer-authenticated requests from reassigning, refreshing, or reviving an unrelated browser cookie's tracked session; preserve original browser authority across approval requests (#2278).
 
 - Refuse GCP IAM journal row-lock contention without waiting across existing workload writer lock orders; return fixed busy only after rollback, preserve committed receipts and require fresh source/authority on retry (#2278).

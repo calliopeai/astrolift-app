@@ -23,6 +23,7 @@ with workflow.unsafe.imports_passed_through():
         ensure_workload_identity,
         health_check,
         mark_deploying,
+        mark_deployment_identity_refused,
         mark_failed,
         mark_running,
         poll_rollout,
@@ -32,6 +33,7 @@ with workflow.unsafe.imports_passed_through():
         restore_previous_secrets,
         resync_manifest_for_deploy,
         update_secrets,
+        validate_deployment_identity_origin,
         wait_dns,
     )
     from astrolift_workflows.activities.build_image import (
@@ -108,6 +110,24 @@ class DeployAppWorkflow:
         # placeholder — that always loaded the wrong record because the
         # activities key on the deployment, not the env.
         deployment_id = input.deployment_id
+
+        if workflow.patched("deployment-native-original-authority-v1"):
+            try:
+                await workflow.execute_activity(
+                    validate_deployment_identity_origin,
+                    input,
+                    start_to_close_timeout=_MARK_TIMEOUT,
+                    retry_policy=_ROLLOUT_RETRY,
+                )
+            except ActivityError as exc:
+                reason = _failure_reason(exc)
+                await workflow.execute_activity(
+                    mark_deployment_identity_refused,
+                    args=[input, reason],
+                    start_to_close_timeout=_MARK_TIMEOUT,
+                    retry_policy=_STANDARD_RETRY,
+                )
+                return WorkflowResult(ok=False, message=reason)
 
         try:
             # Refresh the manifest from the source repo BEFORE validation and

@@ -2463,6 +2463,9 @@ def _create_rollback_deployment_sync(deployment_id: int) -> int:
     from astrolift_lifecycle.models import Deployment
 
     current = Deployment.all_objects.select_related("registered_app", "app_environment").get(pk=deployment_id)
+    from astrolift_lifecycle.deployment_identity_origin import refuse_unsupported_origin
+
+    refuse_unsupported_origin(current.registered_app, current.app_environment)
     # Find the prior running deployment in the same env (older
     # than the current row). Pick the most recent terminal-OK one.
     prior = (
@@ -2539,6 +2542,9 @@ def _create_promotion_deployment_sync(
         pk=source_deployment_id
     )
     target_env = AppEnvironment.objects.get(pk=target_app_environment_id)
+    from astrolift_lifecycle.deployment_identity_origin import refuse_unsupported_origin
+
+    refuse_unsupported_origin(source.registered_app, target_env)
     if target_env.registered_app_id != source.registered_app_id:
         raise RuntimeError("promotion target must belong to the same app as the source")
     if target_env.deploys_paused:

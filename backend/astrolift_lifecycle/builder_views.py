@@ -854,6 +854,10 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
     existing_app = RegisteredApp.objects.filter(
         slug=app_slug, organization=org, deleted_at__isnull=True
     ).first()
+    from astrolift_lifecycle.deployment_identity_origin import native_origin_required
+
+    if existing_app is not None and native_origin_required(existing_app, tenant_cluster=dev.tenant_cluster):
+        return JsonResponse({"detail": "NATIVE_HUMAN_ORIGIN_REQUIRED"}, status=409)
     is_update = existing_app is not None and dev.promoted_app_id == existing_app.pk
     if existing_app is not None and not is_update:
         return JsonResponse(

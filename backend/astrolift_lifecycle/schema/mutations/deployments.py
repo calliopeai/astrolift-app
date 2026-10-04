@@ -18,6 +18,11 @@ from astrolift_identity.operation_context import (
 )
 from astrolift_lifecycle.action_preconditions import locked_deployment, recheck_action
 from astrolift_lifecycle.approval import mint_magic_link
+from astrolift_lifecycle.deployment_identity_origin import (
+    DeploymentOriginError,
+    capture_deployment_origin,
+    persist_deployment_origin,
+)
 from astrolift_lifecycle.models import (
     AppEnvironment,
     Deployment,
@@ -123,6 +128,10 @@ class DeploymentMutations:
                 f"app {input.app_slug!r} environment {input.environment_name!r} not found",
             )
         app, env = resolved
+        try:
+            origin = capture_deployment_origin(getattr(info.context, "request", None), app, env)
+        except DeploymentOriginError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
 
         # #1093: an app whose manifest yields zero deployable resources
         # (all workloads are Job-family agents) has nothing the deploy
@@ -236,6 +245,8 @@ class DeploymentMutations:
                 pr_number=int(input.pr_number or 0),
                 commit_author_avatar_url=(input.commit_author_avatar_url or "").strip(),
             )
+
+            persist_deployment_origin(deployment, origin)
 
             if approval_token_plaintext:
                 # Surface the plaintext exactly once, on the
@@ -793,6 +804,10 @@ class DeploymentMutations:
             if mismatch is not None:
                 return mismatch
             recheck_action(Permission.APP_ROLLBACK, deployment, deployment.app_environment, deployment=True)
+            from astrolift_lifecycle.deployment_identity_origin import native_origin_required
+
+            if native_origin_required(deployment.registered_app, deployment.app_environment):
+                return gql_failure(ErrorCode.PRECONDITION.value, "NATIVE_HUMAN_ORIGIN_REQUIRED")
 
             if deployment.status != Deployment.Status.RUNNING.value:
                 return gql_failure(
@@ -902,6 +917,12 @@ class DeploymentMutations:
 
             actor = _actor_from_request(info)
             env = source.app_environment
+            try:
+                origin = capture_deployment_origin(
+                    getattr(info.context, "request", None), source.registered_app, env
+                )
+            except DeploymentOriginError as exc:
+                return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
 
             if env.deploys_paused:
                 return gql_failure(
@@ -931,6 +952,8 @@ class DeploymentMutations:
                     approvals_received=0,
                     promoted_from=source,
                 )
+
+                persist_deployment_origin(new_deploy, origin)
 
                 if initial_status is Deployment.Status.PENDING:
                     wf_id = _deploy_workflow_id(str(source.registered_app.guid), str(env.guid))
@@ -1031,6 +1054,11 @@ class DeploymentMutations:
                 field="targetEnvironmentName",
             )
 
+        try:
+            origin = capture_deployment_origin(getattr(info.context, "request", None), app, target_env)
+        except DeploymentOriginError as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc))
+
         if target_env.deploys_paused:
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
@@ -1111,6 +1139,8 @@ class DeploymentMutations:
                 approvals_received=0,
                 promoted_from_id=plan.promoted_from_id,
             )
+
+            persist_deployment_origin(new_deploy, origin)
 
             if initial_status is Deployment.Status.PENDING:
                 wf_id = _deploy_workflow_id(str(app.guid), str(target_env.guid))
