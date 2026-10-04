@@ -129,8 +129,13 @@ The browser rechecks the selected action before its reviewed write. An automatic
 connection uses the existing subscription mutation; an approval-required row records
 only a request. A denied, unknown, failed or changed source cannot start either.
 
-Open a request using the current version from the queue. The detail exposes only
-current server action hints for approval, rejection, requester cancellation and
+Open a request using the version from the queue. A detail read may return a newer
+current row, including a row whose read has marked it stale. The browser adopts
+that validated current row, invalidates any older open review, and binds each
+write to its newly observed version. A stale row remains inspectable without
+invented action hints; retry reads the current server state.
+
+The detail exposes only current server action hints for approval, rejection, requester cancellation and
 finalization. Approval and **Connect** have separate confirmations. Only the final
 response's subscription identity establishes a recorded connection; pending runtime
 reconciliation and observed readiness remain distinct. These hints do not replace
@@ -139,7 +144,10 @@ incarnation or delivery of a notification.
 
 The browser retains a request's exact public target/version/alias/policy metadata
 and its caller-generated UUID in this tab's session storage before sending intake.
-An unconfirmed reply offers restoration of that exact review and key. Repeating it
+An unconfirmed or malformed reply retains that exact review and key; only a
+confirmed refusal or a correlated acceptance with valid returned GUIDs clears
+it. A known accepted reply with unverified metadata remains accepted separately
+from its unresolved identity. Restoration offers that exact review and key. Repeating it
 asks the server for the same request rather than issuing a new identity. A changed
 review must inspect the current request queue or explicitly discard its local
 recovery record first. Discarding local recovery does **not** cancel a stored

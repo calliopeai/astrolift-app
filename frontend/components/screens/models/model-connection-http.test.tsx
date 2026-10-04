@@ -51,6 +51,8 @@ vi.mock("@/graphql/user/user.hooks", () => ({
 const catalogs = { en, es, fr, de, ja, ko, "zh-Hans": zh, "pt-BR": pt };
 const schema = buildSchema(readFileSync(`${process.cwd()}/schema.graphql`, "utf8"));
 const model = sharedModelDetailProps.model!;
+const requestGuid = "b83b44d8-a52d-4c4f-9efd-f4fa29172961";
+const subscriptionGuid = "5f82114f-2b90-48e6-b14a-25d237ed7da5";
 type Request = {
   operationName: string;
   query: string;
@@ -197,7 +199,8 @@ function handle(request: Request) {
         break;
       }
       let data: unknown;
-      if (request.operationName === "RequestModelConnection") data = { ...row, version: 1 };
+      if (request.operationName === "RequestModelConnection")
+        data = { ...row, id: requestGuid, version: 1 };
       else if (request.operationName === "SubscribeClusterModel")
         data = {
           subscription: {
@@ -396,7 +399,7 @@ describe("actual-schema connection intake", () => {
       expect(input.idempotencyKey).toMatch(/^[0-9a-f-]{36}$/);
       expect(screen.getByRole("link", { name: t("openRequest") })).toHaveAttribute(
         "href",
-        "/models/connections/request-one?version=1"
+        `/models/connections/${requestGuid}?version=1`
       );
     }
   );
@@ -449,7 +452,13 @@ describe("actual-schema connection intake", () => {
   });
   it("a replay already finalized is recorded, never described as unconnected", async () => {
     replyOverride = {
-      data: { ...row, version: 1, status: "APPROVED", subscriptionId: "existing-subscription" },
+      data: {
+        ...row,
+        id: requestGuid,
+        version: 1,
+        status: "APPROVED",
+        subscriptionId: subscriptionGuid,
+      },
     };
     render(<Intake />, { wrapper: wrapper() });
     const t = await intakeReview();
@@ -457,6 +466,68 @@ describe("actual-schema connection intake", () => {
     await screen.findByText(t("connectionRecorded"));
     expect(screen.queryByText(t("requestSaved"))).toBeNull();
   });
+  it.each(["missing", "malformed", "subscription"])(
+    "keeps known accepted %s identity unverified with recovery",
+    async (kind) => {
+      replyOverride = {
+        data: {
+          ...row,
+          id: kind === "missing" ? undefined : kind === "malformed" ? "not-a-guid" : requestGuid,
+          version: 1,
+          subscriptionId: kind === "subscription" ? "not-a-guid" : null,
+        },
+      };
+      render(<Intake />, { wrapper: wrapper() });
+      const t = await intakeReview();
+      await confirm(t("requestApproval"));
+      await screen.findByText(t("acceptedUnverified"));
+      expect(sessionStorage.length).toBe(1);
+      expect(screen.queryByRole("link", { name: t("openRequest") })).toBeNull();
+      expect(screen.queryByText(t("requestSaved"))).toBeNull();
+    }
+  );
+  it("keeps a known accepted malformed error envelope unverified rather than discarding recovery", async () => {
+    replyOverride = { ok: true, errors: null };
+    render(<Intake />, { wrapper: wrapper() });
+    const t = await intakeReview();
+    await confirm(t("requestApproval"));
+    await screen.findByText(t("acceptedUnverified"));
+    expect(sessionStorage.length).toBe(1);
+    expect(screen.queryByRole("link", { name: t("openRequest") })).toBeNull();
+  });
+  it.each(["missing", "nonboolean", "malformedRefusal"])(
+    "retains the exact recovery key for a %s envelope",
+    async (kind) => {
+      replyOverride =
+        kind === "missing"
+          ? { ok: undefined }
+          : kind === "nonboolean"
+            ? { ok: "false" }
+            : { ok: false, errors: null };
+      const first = render(<Intake />, { wrapper: wrapper() });
+      const t = await intakeReview();
+      await confirm(t("requestApproval"));
+      await screen.findByText(t("uncertain"));
+      expect(sessionStorage.length).toBe(1);
+      const key = (calls("RequestModelConnection")[0].variables.input as Record<string, unknown>)
+        .idempotencyKey;
+      expect(screen.queryByText(t("requestSaved"))).toBeNull();
+      first.unmount();
+      replyOverride = null;
+      render(<Intake />, { wrapper: wrapper() });
+      await screen.findByText(t("recoveryAvailable"));
+      fireEvent.click(screen.getByRole("button", { name: t("restoreReview") }));
+      await waitFor(() => expect(screen.getByRole("button", { name: t("review") })).toBeEnabled());
+      fireEvent.click(screen.getByRole("button", { name: t("review") }));
+      await waitFor(() => expect(screen.getByRole("alertdialog")).toBeVisible());
+      await confirm(t("requestApproval"));
+      await screen.findByText(t("requestSaved"));
+      expect(
+        (calls("RequestModelConnection")[1].variables.input as Record<string, unknown>)
+          .idempotencyKey
+      ).toBe(key);
+    }
+  );
   it("AUTO connects only after current action recheck", async () => {
     action = "AUTO";
     render(<Intake />, { wrapper: wrapper() });
@@ -601,6 +672,92 @@ describe("current request detail, reviewer and exact policy writes", () => {
     expect(calls("FinalizeModelConnectionRequest")[0].variables).toEqual({
       input: { id: "request-one", ifMatchVersion: 2 },
     });
+  });
+  it("adopts a fresh current version from an older URL and finalizes that observed version", async () => {
+    row = { ...row, version: 2, status: "APPROVED", canFinalize: true };
+    render(<ModelConnectionRequestClient id={row.id} version={1} review={false} />, {
+      wrapper: wrapper(),
+    });
+    await screen.findByRole("button", { name: "Connect" });
+    fireEvent.click(screen.getByRole("button", { name: "Connect" }));
+    await confirm("Connect");
+    await screen.findByText(en.models.shared.connections.connectionRecorded);
+    expect(calls("FinalizeModelConnectionRequest")[0].variables).toEqual({
+      input: { id: row.id, ifMatchVersion: 2 },
+    });
+  });
+  it("retry adopts the current reviewer row and a further read withdraws an open older review", async () => {
+    failure.add("GetModelConnectionRequest");
+    row = { ...row, version: 2, canApprove: true, canReject: true };
+    render(<ModelConnectionRequestClient id={row.id} version={1} review />, { wrapper: wrapper() });
+    await screen.findByText("Raw current read unavailable");
+    failure.delete("GetModelConnectionRequest");
+    fireEvent.click(screen.getByRole("button", { name: en.models.shared.connections.retry }));
+    await screen.findByRole("button", { name: "Approve" });
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    row = { ...row, version: 3 };
+    await act(async () => {
+      await client.refetchQueries({ include: ["GetModelConnectionRequest"] });
+    });
+    expect(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Approve" })
+    ).toBeDisabled();
+    await confirm("Approve");
+    expect(calls("ApproveModelConnectionRequest")).toHaveLength(0);
+    fireEvent.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", {
+        name: "Cancel",
+      })
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Approve" }));
+    await confirm("Approve");
+    await screen.findByText(en.models.shared.connections.decisionSaved);
+    expect(calls("ApproveModelConnectionRequest")[0].variables).toEqual({
+      input: { id: row.id, ifMatchVersion: 3 },
+    });
+  });
+  it("a read that returns a newer STALE row remains inspectable without actions", async () => {
+    row = {
+      ...row,
+      version: 3,
+      status: "STALE",
+      canApprove: false,
+      canReject: false,
+      canCancel: false,
+      canFinalize: false,
+    };
+    render(<ModelConnectionRequestClient id={row.id} version={1} review />, { wrapper: wrapper() });
+    await screen.findByText(en.models.shared.connections.stale);
+    expect(screen.getByText(row.id)).toBeVisible();
+    expect(screen.queryByText(en.models.shared.connections.changed)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Approve" })).toBeNull();
+    expect(writes.flatMap(calls)).toHaveLength(0);
+  });
+  it("actor ABA requires a new production detail read before action hints reenable", async () => {
+    row = { ...row, status: "APPROVED", canFinalize: true };
+    const view = render(<ModelConnectionRequestClient id={row.id} version={2} review={false} />, {
+      wrapper: wrapper(),
+    });
+    await screen.findByRole("button", { name: "Connect" });
+    hold.add("GetModelConnectionRequest");
+    identity.actor = "other";
+    view.rerender(<ModelConnectionRequestClient id={row.id} version={2} review={false} />);
+    await waitFor(() => expect(calls("GetModelConnectionRequest")).toHaveLength(2));
+    expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
+    identity.actor = "owner";
+    view.rerender(<ModelConnectionRequestClient id={row.id} version={2} review={false} />);
+    await waitFor(() => expect(calls("GetModelConnectionRequest")).toHaveLength(3));
+    await act(async () => {
+      handle(calls("GetModelConnectionRequest")[1]);
+    });
+    expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
+    row = { ...row, canFinalize: false };
+    await act(async () => {
+      handle(calls("GetModelConnectionRequest")[2]);
+    });
+    await screen.findByText(row.id);
+    expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
+    expect(writes.flatMap(calls)).toHaveLength(0);
   });
   it("reviewer approval does not finalize or create a subscription", async () => {
     row = { ...row, canApprove: true, canReject: true, canCancel: false };

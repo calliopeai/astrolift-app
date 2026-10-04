@@ -67,7 +67,9 @@ export function useModelConnectionRequest(
     !!source &&
     (source.id !== id ||
       source.organizationId !== org?.id ||
-      source.version !== version ||
+      // Detail reads return the current row, not a CAS result for the URL hint.
+      !Number.isSafeInteger(source.version) ||
+      source.version < version ||
       [source.canApprove, source.canReject, source.canCancel, source.canFinalize].some(
         (value) => typeof value !== "boolean"
       ));

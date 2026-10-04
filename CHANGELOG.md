@@ -10,6 +10,10 @@
   automatic model connection or subscription revocation effects after lock waits.
   Preserve withdrawn session tracking when refusing stale requests (#2270).
 
+- Recover model connection detail from an older queue/URL version by reviewing
+  the freshly read current row. Keep prior confirmations invalidated, and retain
+  exact request retry keys when envelopes or returned GUIDs are unverified (#2270).
+
 - Edit a hosted model's stored data type, context length and concurrent sequences
   through the existing versioned runtime admission and update. Show actual desired
   values, preserve blank and unknown settings without invented defaults, and retain

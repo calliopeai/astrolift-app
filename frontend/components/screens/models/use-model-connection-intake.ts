@@ -30,7 +30,11 @@ import type {
   ConnectionWriteResult,
   ModelConnectionIntakeProps,
 } from "./ModelConnectionIntakePanel";
-import { useConnectionEpoch, useModelConnectionSupport } from "./use-model-connection-context";
+import {
+  isConnectionGuid,
+  useConnectionEpoch,
+  useModelConnectionSupport,
+} from "./use-model-connection-context";
 
 type Recovery = {
   review: ConnectionIntakeReview;
@@ -123,10 +127,7 @@ export function useModelConnectionIntake(
           value.review.modelId === model.id &&
           value.review.clusterId === model.clusterId &&
           value.review.providerId === model.providerId &&
-          typeof value.request?.idempotencyKey === "string" &&
-          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-            value.request.idempotencyKey
-          ) &&
+          isConnectionGuid(value.request?.idempotencyKey) &&
           value.review.action === "REQUEST" &&
           /^[a-z][a-z0-9_]{0,31}$/.test(value.review.alias) &&
           typeof value.review.policyVersion === "string" &&
@@ -291,13 +292,22 @@ export function useModelConnectionIntake(
         const reply = (await request({ variables: { input: pending.request } })).data
           ?.requestModelConnection;
         if (!current()) return { accepted: false, message: t("changed") };
-        if (!reply?.ok) {
-          if (reply) persist(null);
-          return { accepted: false, message: reply?.errors[0]?.message ?? t("uncertain") };
+        if (reply?.ok !== true) {
+          const refusal =
+            reply?.ok === false &&
+            Array.isArray(reply.errors) &&
+            typeof reply.errors[0]?.code === "string" &&
+            typeof reply.errors[0]?.message === "string";
+          if (refusal) persist(null);
+          return { accepted: false, message: refusal ? reply.errors[0].message : t("uncertain") };
         }
+        if (!Array.isArray(reply.errors) || reply.errors.length !== 0)
+          return { accepted: true, kind: "REQUEST", correlated: false };
         const data = reply.data;
         if (
           !data ||
+          !isConnectionGuid(data.id) ||
+          (data.subscriptionId != null && !isConnectionGuid(data.subscriptionId)) ||
           data.organizationId !== review.organizationId ||
           data.modelDeploymentId !== review.modelId ||
           data.appEnvironmentId !== review.environmentId ||
