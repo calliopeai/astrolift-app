@@ -108,6 +108,14 @@ def _service_organization_id(svc: Any) -> str:
     return str(organization.guid)
 
 
+def _driver_organization_id(svc: Any, resolved: Any) -> str:
+    # Model handles carry paid native resources as well as capability bindings.
+    # The saved handle is not proof that the current database owner is unchanged.
+    if svc.kind == "model_endpoint" or is_spanner(resolved):
+        return _service_organization_id(svc)
+    return ""
+
+
 def _resolve_isolation(svc: Any, *, org: Any, cluster: Any) -> str:
     """The isolation mode this row provisions at.
 
@@ -721,7 +729,7 @@ def _deprovision_sync(
                 handle=svc.backend_ref,
                 managed_service_id=_service_identity(svc),
                 recorded_handle_exclusive=exclusive,
-                organization_id=_service_organization_id(svc) if is_spanner(resolved) else "",
+                organization_id=_driver_organization_id(svc, resolved),
                 recorded_container_exclusive=container_proof,
             )
         )
@@ -748,7 +756,7 @@ def _deprovision_sync(
         config=deprovision_config,
         managed_service_id=_service_identity(svc),
         recorded_handle_exclusive=exclusive,
-        organization_id=_service_organization_id(svc) if is_spanner(resolved) else "",
+        organization_id=_driver_organization_id(svc, resolved),
         recorded_container_exclusive=container_proof,
     )
     try:
@@ -819,6 +827,17 @@ async def deprovision_managed_service(
     handle the "already gone" path).
     """
     from asgiref.sync import sync_to_async
+
+    from astrolift_workflows.vertex_managed_service import is_vertex_service, vertex_lifecycle_call
+
+    if await sync_to_async(is_vertex_service)(managed_service_id):
+        return await vertex_lifecycle_call(
+            managed_service_id,
+            reviewed_binding,
+            "deprovision",
+            delete_data=delete_data,
+            force_destroy=force_destroy,
+        )
 
     activity.heartbeat()
     result = await sync_to_async(reviewed_service_call)(
@@ -1027,7 +1046,7 @@ def _update_sync(managed_service_id: int) -> dict[str, Any]:
             managed_service_id=_service_identity(svc),
             recorded_handle_exclusive=_recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg),
             cluster_model=_cluster_model_placement(svc, cluster=cluster) if svc.organization_id else None,
-            organization_id=_service_organization_id(svc) if is_spanner(resolved) else "",
+            organization_id=_driver_organization_id(svc, resolved),
             recorded_container_exclusive=container_exclusive(svc, resolved=resolved, cfg=cfg),
         ),
     )
@@ -1049,6 +1068,11 @@ async def update_managed_service(
     """Apply the row's desired config through ``ManagedServiceDriver.update``."""
     from asgiref.sync import sync_to_async
     from temporalio.exceptions import ApplicationError
+
+    from astrolift_workflows.vertex_managed_service import is_vertex_service, vertex_lifecycle_call
+
+    if await sync_to_async(is_vertex_service)(managed_service_id):
+        return await vertex_lifecycle_call(managed_service_id, reviewed_binding, "update")
 
     activity.heartbeat()
     try:
@@ -1082,6 +1106,11 @@ async def provision_managed_service(
     Raises on ``ok=False`` so Temporal honors the RetryPolicy.
     """
     from asgiref.sync import sync_to_async
+
+    from astrolift_workflows.vertex_managed_service import is_vertex_service, vertex_lifecycle_call
+
+    if await sync_to_async(is_vertex_service)(managed_service_id):
+        return await vertex_lifecycle_call(managed_service_id, reviewed_binding, "provision")
 
     activity.heartbeat()
     from temporalio.exceptions import ApplicationError
@@ -1131,6 +1160,9 @@ def _check_ready_sync(managed_service_id: int, handle: str) -> str:
         return "available"
     validate_observed_placement(svc, resolved)
     cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
+    from astrolift_workflows.vertex_managed_service import vertex_read_config
+
+    cfg = vertex_read_config(svc, cfg)
     driver = resolved.driver_cls(config=cfg)
     status_method = getattr(driver, "status", None)
     if not callable(status_method):
@@ -1140,11 +1172,18 @@ def _check_ready_sync(managed_service_id: int, handle: str) -> str:
     probe = ServiceHandle(
         handle=handle,
         managed_service_id=_service_identity(svc),
-        organization_id=_service_organization_id(svc) if is_spanner(resolved) else "",
+        organization_id=_driver_organization_id(svc, resolved),
         recorded_handle_exclusive=_recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg),
         recorded_container_exclusive=container_exclusive(svc, resolved=resolved, cfg=cfg),
     )
-    return str(getattr(status_method(probe), "state", "available"))
+    import inspect
+
+    try:
+        accepts_config = "config" in inspect.signature(status_method).parameters
+    except (TypeError, ValueError):
+        accepts_config = False
+    observed = status_method(probe, config=dict(svc.config or {})) if accepts_config else status_method(probe)
+    return str(getattr(observed, "state", "available"))
 
 
 @activity.defn(name="astrolift.managed_service.check_ready")
@@ -1269,6 +1308,10 @@ def _managed_binding_for(svc: Any) -> Any:
     identity activity (reads ``iam_grants``) so both resolve the driver the
     same way.
     """
+    from astrolift_services.native_model_connections import binding, is_bedrock_connection
+
+    if is_bedrock_connection(svc):
+        return binding(svc)
     from astrolift_drivers.managed_resolution import resolve_managed_driver
     from astrolift_drivers.registry import DriverNotFound
     from core.cluster_observability import managed_config_for
@@ -1290,6 +1333,9 @@ def _managed_binding_for(svc: Any) -> Any:
         return None
     validate_observed_placement(svc, resolved)
     cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
+    from astrolift_workflows.vertex_managed_service import vertex_read_config
+
+    cfg = vertex_read_config(svc, cfg)
     driver = resolved.driver_cls(config=cfg)
 
     binding_method = getattr(driver, "binding", None)
@@ -1301,7 +1347,7 @@ def _managed_binding_for(svc: Any) -> Any:
         handle=svc.backend_ref,
         managed_service_id=_service_identity(svc),
         recorded_handle_exclusive=_recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg),
-        organization_id=_service_organization_id(svc) if is_spanner(resolved) else "",
+        organization_id=_driver_organization_id(svc, resolved),
         recorded_container_exclusive=container_exclusive(svc, resolved=resolved, cfg=cfg),
     )
     # Thread the operator-supplied ``ManagedService.config`` into the

@@ -12,6 +12,7 @@ import type { ModelSubscription } from "./ModelSubscriptionsPanel";
 import type { ClusterModelFieldsFragment } from "@/graphql/__generated__/operations";
 import { ModelSubscriptionsPanel } from "./ModelSubscriptionsPanel";
 import { useModelSubscriptions } from "./use-model-subscriptions";
+import { modelSourceMode } from "./native-model-source";
 export function ModelSubscriptionsClient(props: {
   model: ClusterModelFieldsFragment;
   blocked: boolean;
@@ -28,17 +29,20 @@ function Views(props: {
 }) {
   const t = useTranslations("models.shared.connections");
   const [adding, setAdding] = useState(false);
+  const sourceMode = modelSourceMode(props.model);
+  const canAdd = !props.blocked && (sourceMode === "hosted" || sourceMode === "native");
+  const showIntake = adding && (sourceMode === "hosted" || sourceMode === "native");
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" onClick={() => setAdding(!adding)}>
-          {t(adding ? "connections" : "add")}
+        <Button variant="outline" disabled={!canAdd} onClick={() => setAdding(!showIntake)}>
+          {t(showIntake ? "connections" : "add")}
         </Button>
         <Button variant="outline" asChild>
           <Link href="/models/connections">{t("viewRequests")}</Link>
         </Button>
       </div>
-      {adding ? <IntakeContext {...props} /> : <Context {...props} />}
+      {showIntake ? <IntakeContext {...props} /> : <Context {...props} />}
     </section>
   );
 }
@@ -82,6 +86,7 @@ function Context({
     !props.subscriptions.loading &&
     !props.subscriptions.stale &&
     !props.subscriptions.error;
+  const trafficSupported = modelSourceMode(model) === "hosted";
   const selected =
     pageReady && selection.row && selection.pageKey === pageKey
       ? props.subscriptions.rows.find(
@@ -97,17 +102,21 @@ function Context({
       {...props}
       mode="connections"
       usageBlocked={!pageReady}
-      onSelectUsage={(row) => {
-        if (
-          pageReady &&
-          props.subscriptions.rows.some(
-            (candidate) => candidate.id === row.id && candidate.version === row.version
-          )
-        )
-          setSelection({ row, pageKey });
-      }}
+      onSelectUsage={
+        trafficSupported
+          ? (row) => {
+              if (
+                pageReady &&
+                props.subscriptions.rows.some(
+                  (candidate) => candidate.id === row.id && candidate.version === row.version
+                )
+              )
+                setSelection({ row, pageKey });
+            }
+          : undefined
+      }
       usage={
-        selected ? (
+        selected && trafficSupported ? (
           <ModelSubscriptionUsageClient
             key={`${selected.id}:${selected.version}`}
             model={model}

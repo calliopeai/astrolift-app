@@ -135,14 +135,48 @@ export function FeaturesScreen({
   pendingKey,
   toggleFlag,
   section,
+  contextKey,
+  controlsDisabled,
+  recovery,
 }: FeaturesScreenProps) {
   // A runtime flag is install-wide and takes effect for everyone the moment
   // it flips, so the switch stages the change here and the dialog commits it.
   const t = useTranslations("administration.features");
-  const [confirmFlag, setConfirmFlag] = React.useState<RuntimeFlag | null>(null);
+  const [selection, setSelection] = React.useState<{ context: number; flag: RuntimeFlag } | null>(
+    null
+  );
+  const confirmFlag = selection?.context === contextKey ? selection.flag : null;
+  const setConfirmFlag = (flag: RuntimeFlag | null) =>
+    setSelection(flag ? { context: contextKey, flag } : null);
+  const currentConfirmation = runtimeFlags.some(
+    (flag) => flag.key === confirmFlag?.key && flag.enabled === confirmFlag.enabled
+  );
 
   return (
     <AdministrationShell fnKey="features" title={t("title")} description={t("description")}>
+      {(recovery || (error && runtimeFlags.length > 0)) && (
+        <div
+          role="status"
+          className="bg-warning-bg text-warning-fg mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg p-4"
+        >
+          <p>
+            {recovery
+              ? t(recovery.kind === "accepted" ? "acceptedRecovery" : "uncertainRecovery", {
+                  key: recovery.key,
+                })
+              : t("refreshError")}
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onRetry}
+            disabled={loading || pendingKey !== null}
+          >
+            {loading ? t("refreshing") : t("refresh")}
+          </Button>
+          {error && recovery && <p className="w-full">{t("refreshError")}</p>}
+        </div>
+      )}
       {error && runtimeFlags.length === 0 && buildTimeFeatures.length === 0 ? (
         <EmptyState
           icon={<AlertTriangleIcon className="text-danger size-5" />}
@@ -190,7 +224,10 @@ export function FeaturesScreen({
                                 <FlagSwitch
                                   checked={flag.enabled}
                                   pending={pendingKey === flag.key}
-                                  disabled={pendingKey !== null && pendingKey !== flag.key}
+                                  disabled={
+                                    controlsDisabled ||
+                                    (pendingKey !== null && pendingKey !== flag.key)
+                                  }
                                   onToggle={() => setConfirmFlag(flag)}
                                   label={t("toggle", { key: flag.key })}
                                 />
@@ -287,6 +324,7 @@ export function FeaturesScreen({
         description={confirmFlag?.enabled ? t("disableDescription") : t("enableDescription")}
         confirmLabel={t(confirmFlag?.enabled ? "disable" : "enable")}
         destructive={confirmFlag?.enabled === true}
+        confirmDisabled={controlsDisabled || !currentConfirmation}
         onConfirm={async () => {
           if (confirmFlag) await toggleFlag(confirmFlag);
         }}

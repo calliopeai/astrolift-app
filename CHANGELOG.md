@@ -2,6 +2,171 @@
 
 ## Unreleased
 
+- Retry startup connection resets within the existing bounded CPU runtime health poll; retain container-exit and readiness-deadline failures before inference (#2284).
+
+- Check the pinned vLLM CPU activation kernel through its registered PyTorch operator and validate numerical results before bounded model inference (#2269).
+
+- Separate native model discovery, connection settings and final registration review into distinct wizard steps, with one primary list per step (#2284).
+
+- Keep Vertex in-place update completion and pending results explicit for the managed-service update contract; preserve native operation/refusal behavior and verify completed, pending and failed operation outcomes (#2284).
+
+- Instrument owned AWS identity reconciliation/verification and the Azure owned-reconciler factory with private operation telemetry; redact arguments and native error contents while preserving original exceptions and existing default telemetry behavior (#2284).
+
+- Run the pinned AVX2 CPU runtime build and bounded model smoke in remote pull-request CI when its inputs change; keep registry publication explicit after verification (#2269).
+
+- Retain append-only GCP namespace/KSA and IAM response acknowledgments without advancing ownership or completion after caller withdrawal; guarded create recovery requires the original acknowledged UID (Refs: #2278).
+
+- Keep redeploy rebuilds on the original saved immutable source commit, including approval-delayed dispatch; refuse rebuilds with missing historical source pins before creating or enqueueing a deployment, while preserving artifact-only repeats and checking saved pins again before a delayed rebuild (#2282).
+
+- Settle every installation-feature refresh read even when another query fails during setup, preventing an orphaned rejection while retaining accepted read-only recovery (#2281).
+
+- Keep accepted installation feature changes read-only when a refresh returns malformed inventory or cache updates fail; recover through fresh inventory and viewer reads without resending the write (#2281).
+
+- Protect original GKE incarnation, mode and node-pool placement acceptance before private controller writes; derive runtime targets only from current completed apply records and original controller evidence, preserving the admitted ceiling across node autoscaling and treating unknown DaemonSet counts as pending. Public executor activation remains separate (#2278).
+
+- Stage private receipt-bound GKE controller and ancillary configuration with protected physical ownership, committed send/evidence history, guarded UID/resourceVersion updates and bounded definitive rejection recovery. Keep uncertain sends unresolved and distinguish configuration from rollout; public activation, complete removals, node-pool runtime admission and identity evolution remain separate (#2278).
+- Scope private native execution checkpoints to the actual activity lifetime and cancellation; re-admit callbacks on SDK metadata threads and final source transitions, preserve acknowledged UID evidence after withdrawal, and avoid receipt-lock waits beneath source parents. Full native pipeline activation remains staged (#2278).
+
+
+- Pin native deployment enqueue intent and actual Temporal run in protected append-only receipts; refuse changed inputs or replacement runs before effects and keep failure status scoped to the accepted execution. Native pipeline activation remains staged (#2278).
+
+- Retain original-caller admission for GCP app bootstrap history on its exact app and physical cluster, including uncertain creates and empty desired service graphs; shared cluster pins alone do not gate unrelated app deployments (#2278).
+- Stage private GCP deployment rendering from current completed preparation/IAM receipts; retain recorded namespace/KSA identities, omit identity writes and bind final controller execution/placement fingerprints. Guarded apply, rename evolution and rollout acceptance remain separate (#2278).
+- Carry the exact protected Deployment approval context through private GCP source and producer checkpoints; bind pending source acceptance to that Deployment, keep sibling votes separate and evaluate application placement against each persisted cluster region (#2278).
+
+- Require a satisfied protected Deployment quorum and full current approval policy before native execution admission; preserve pre-vote deferral separately and refuse counters or nonhuman credential votes as identified approvers (#2278).
+
+- Stage private original-caller receipts for human GCP Endpoint deployments and exact-environment approval handoff; validate them in the real worker before downstream effects and explicitly refuse until the native pipeline is configured. Public caller inputs and ordinary non-native deployments remain unchanged (#2278).
+
+- Keep bearer-authenticated requests from reassigning, refreshing, or reviving an unrelated browser cookie's tracked session; preserve original browser authority across approval requests (#2278).
+
+- Retain original registered GKE/project/credential and GUID-owned GSA creation evidence in protected records; commit one-shot reservations and require fresh numeric-UID readback before context use. Unknown sends refuse retries, native reads remain outside short transactions, and Endpoint plans require explicit Vertex region. Private deployment/render/cleanup integration remains pending. Refs: #2278.
+
+- Refuse GCP IAM journal row-lock contention without waiting across existing workload writer lock orders; return fixed busy only after rollback, preserve committed receipts and require fresh source/authority on retry (#2278).
+
+- Bind private Endpoint preparation templates to every current environment alias while retaining original physical KSA identity; clarify typed uncertain-send recovery and model detach versus full identity decommission (#2278).
+
+- Produce complete server-owned Endpoint-only app grant templates with signed original authority, every shared-ServiceAccount environment alias, current row/configuration guards and fresh model-version/routing evidence. Keep database checkpoints separate from native reads, allow empty detach without source lookup, and require future durable operation/deployment integration (#2278).
+
+- Verify current GCP prediction custom-role and managed Endpoint owner metadata through checkpointed, read-only native clients; refuse withdrawn admission before credential discovery and preserve owned-grant cleanup without role metadata reads (#2278).
+
+- Observe original GKE workload/controller/KSA identities, current Ready Pod ownership and admitted node placement through bounded private native reads; distinguish pending rollout and completed Job execution from unverified token exchange/inference. Production orchestration remains separate (#2278).
+
+- Add a private durable GKE preparation journal with committed create/annotation receipts, protected accepted-operation history, current original-credential admission and once-bound native IAM plans. Preserve uncertain sends, shared environment aliases and original physical UIDs across Endpoint detach; public caller orchestration and workload acceptance remain open (#2278).
+
+- Keep original native app identity references independent of Django imports for Temporal sandbox payloads, preserving signed JSON and service imports; verify actual HTTP-captured browser and bearer references through the real sandbox runner (#2278).
+
+- Prepare exact GKE namespace/ServiceAccount identities through committed submission and observation hooks, resolve all older sends before new effects, and gate guarded GSA annotation on the current complete IAM union. Backend durability and deployment integration remain separate prerequisites (#2278).
+
+- Record the exact native Bedrock owner-constraint replacement in the migration ratchet with PostgreSQL row-preservation and downgrade/refusal proof; retain required migration review and forward-schema rollback guidance (#2269).
+
+- Add a private typed GCP IAM submission hook with exact UNSENT/SENT commit receipts, bounded partial-outcome evidence and guarded recovery; refuse unsent ownership adoption and blind resends after uncertainty. Durable backend journal and app orchestration remain separate prerequisites (#2278).
+
+- Add a private signed original-credential reference for native app identity work, rechecking actual browser/session or API-token authority, immutable placement and current RBAC/ABAC. Public dispatch capture and GCP journal/workflow integration remain pending (#2278).
+
+- Render typed native model family metadata in inventory, detail and settings; preserve Bedrock actions only for coherent current source identities, and keep unadopted Vertex/Foundry families read-only without hosted runtime fallbacks (#2269).
+- Add a private GCP workload identity ownership journal with committed operation reservations, canonical owner fences, nonblocking advisory-only mutexes and typed UNSENT/SENT receipts. Preserve uncertain sends and removal obligations; production authority/union integration, workload rollout and Vertex invocation remain separate (#2278).
+
+- Observe exact Foundry account/deployment metadata through bounded private ARM reads, recheck caller admission, preserve reviewed routing/source fingerprints and suppress native logs/traces. Runtime compatibility, tenant/principal admission and gateway deployment remain separate prerequisites (#2280).
+
+- Observe current GKE project/cluster/workload-pool configuration and original namespace/ServiceAccount UIDs through verified native endpoints and CA. Refuse withdrawn admission or changed identity; workload rollout and impersonation remain unverified (#2278).
+
+- Add typed common native model metadata with an explicit capability, preserve existing Bedrock source fields, and refuse hosted readiness fallback for inconsistent native sources (#2269).
+
+- Recheck a trusted caller's current Vertex catalogue admission before credential discovery and around each native read; discard withdrawn responses and close partial clients (#2269).
+
+- Add a provider-internal Foundry Chat-v1 gateway with existing attributed model authentication, fixed Azure origin and audience, bounded one-attempt delivery and private transport logging. Production source admission, gateway deployment and Azure workload rollout remain pending (#2280).
+
+- Retain accepted installation feature changes when refreshes fail, and require a fresh read after uncertain replies before another toggle (#2281).
+
+- Add an internal existing-UAMI Azure reconciliation port with real MSI7 clients,
+  current subscription/tenant/native owner checks, bounded federation/grant union
+  inventories and foreign-preserving removal. Keep legacy ambient writes refused,
+  sanitize native errors, and distinguish observed ARM configuration from pending
+  AKS rollout/token acceptance. UAMI creation and app integration remain separate
+  prerequisites (#2279, #2269).
+
+- Preserve GCP managed-service grant resources and refuse legacy Vertex grants
+  before project-wide IAM effects. Add an internal owned Endpoint IAM union/removal
+  port with current project/GSA/custom-role proof, etag-aware policy readback and
+  caller-durable retry ownership. GKE and app rollout integration remain pending;
+  no invocation readiness is claimed (#2278).
+
+- Add internal read-only Vertex Endpoint and registered Model catalogues with
+  repeated ACTIVE project ID/number mapping, fixed regional native clients,
+  bounded metadata/pagination and safe diagnostics. Preserve literal version
+  observations and unknown invocation access; no adoption, lifecycle, API or UI
+  availability is added. Keep private SDK DEBUG payloads out of logs (#2269).
+
+- Register native Bedrock reconciliation in the production Temporal worker.
+  Prove configuration observation, mixed-source cleanup, bounded timeout and
+  stale/error/deletion refusal through actual worker execution (#2269).
+
+- Register existing Bedrock on-demand models and inference profiles as explicitly
+  native, organization-owned shared or dedicated connections. Require the default-off
+  global feature and current hosting authority; reconcile exact app-owned IAM grants
+  and named bindings without allocating or deleting cloud models. Preserve approval
+  policy, refuse ambiguous role/ServiceAccount ownership, and keep native readiness,
+  invocation access and local serving metrics distinct (#2269).
+
+- Bind native model presentation to the serialized foundation/profile source
+  discriminators; refuse mismatched or unknown variants and retain unavailable
+  native identity without a hosted-runtime fallback (#2269).
+
+- Retain accepted native settings across exact version refresh and preserve app
+  connection acknowledgments during fresh reads, while stale reviews and actor
+  changes continue to refuse writes (#2269).
+
+- Show native cloud connections in model inventory/detail with immutable source
+  metadata and guarded local settings/removal. Preserve app subscription policy,
+  expose unavailable native sources without hosted-runtime fallbacks, and keep
+  cloud inference/metrics explicitly unverified or unsupported (#2269).
+
+- Add a common cloud-model connection wizard with fresh versioned placement and
+  exact source review, bounded native discovery, and synchronous metadata-only
+  registration. Preserve unknown invocation access and refuse blind write retries
+  or stale actor/organization reviews (#2269).
+
+- Add native Bedrock source query contracts and immutable registration outcome
+  guards. Keep app binding reconciliation separate from runtime/inference proof,
+  and suppress hosted-runtime usage queries for native connections (#2269).
+
+- Prepare translated hosting/native-connection choices and explicit unsupported
+  native observation panels for the cloud model connection UI (#2269).
+
+- Add internal read-only Microsoft Foundry deployment discovery through the native
+  Cognitive Services SDK. Bind results to the exact subscription/account/region,
+  bound pagination, block redirects and writes, and keep inference access unknown
+  until independently observed. Native UI connections remain separate work (#2269).
+
+- Ignore process endpoint overrides during private Bedrock discovery, validate
+  bounded metadata projections after SDK decoding, and close private clients
+  explicitly without changing native partition/FIPS routing (#2269).
+
+- Add bounded, credential-verified Bedrock foundation-model and inference-profile
+  metadata reads. Preserve native source identities, partial/truncated states and
+  unknown invocation access; no resource allocation or public API is added (#2269).
+
+- Persist exact Bedrock throughput ARN/owner/intent handles across fresh activities.
+  Recover uncertain creation with stable AWS idempotency and exact native proof;
+  refuse false readiness, source/owner substitution, unsupported paid updates and
+  commitment bypass. Recover original legacy ownership without tag writes and
+  retain truthful log cleanup across deletion retries. Block legacy cleanup when
+  its original log identity is unproved; reject paid commitment removal and paid
+  inference-profile sources before effects (#2276).
+
+- Require Vertex native machine, replica bounds and traffic to match the saved
+  reviewed serving request before completion/readiness; keep divergent observations
+  pending without a second deployment. Refuse unproved Model deletion even when
+  its Endpoint is absent, and never infer unknown legacy serving intent (#2277).
+
+- Retain Vertex Endpoint resource IDs, deployed-model IDs and long-running
+  operation receipts across fresh reviewed lifecycle activities. Commit bounded
+  per-phase reservations before cloud submission; refuse unknown outcomes without
+  resending and keep status/binding read-only. Confirm available replicas before
+  ready, use supported update masks/traffic etags, preserve unproved Model
+  artifacts and document legacy/recovery limits (#2277).
+
 - Bind model subscription finalization and traffic lookups explicitly to current
   service/app owners. Preserve admitted installation-shared cluster placement
   while keeping dedicated-app selectors tenant-bound (#2269, #2270).

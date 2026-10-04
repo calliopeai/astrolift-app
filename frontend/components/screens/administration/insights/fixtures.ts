@@ -479,6 +479,9 @@ export const METRICS: Omit<AdminMetricsScreenProps, "renderLivePanels"> = {
 // ─── Features ────────────────────────────────────────────────────────
 
 export const FEATURES: FeaturesScreenProps = {
+  contextKey: 0,
+  controlsDisabled: false,
+  recovery: null,
   runtimeFlags: [
     {
       key: "zentinelle.enabled",

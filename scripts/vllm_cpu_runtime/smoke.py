@@ -11,14 +11,13 @@ from pathlib import Path
 
 PACKAGE_CHECK = """import importlib.metadata, json, torch
 import vllm._C
-from vllm import _custom_ops as ops
 assert importlib.metadata.version("vllm") == "0.15.1+cpu"
 assert importlib.metadata.version("torch") == "2.10.0+cpu"
-x = torch.ones((2, 16), dtype=torch.float32)
+x = torch.arange(-16, 16, dtype=torch.float32).reshape(2, 16) / 8
 out = torch.empty((2, 8), dtype=torch.float32)
-ops.silu_and_mul(out, x)
+torch.ops._C.silu_and_mul(out, x)
 assert torch.isfinite(out).all()
-assert torch.allclose(torch.nn.functional.linear(x, x), torch.full((2, 2), 16.0))
+assert torch.allclose(out, torch.nn.functional.silu(x[:, :8]) * x[:, 8:], rtol=1e-5, atol=1e-6)
 print(json.dumps({"vllm": importlib.metadata.version("vllm"), "torch": importlib.metadata.version("torch"), "float32_cpu_kernel": True, "packages": sorted((d.metadata["Name"], d.version) for d in importlib.metadata.distributions())}))"""
 
 
@@ -157,7 +156,7 @@ def smoke(image, proof):
                 ) as response:
                     if response.status == 200:
                         break
-            except (urllib.error.URLError, TimeoutError):
+            except (urllib.error.URLError, TimeoutError, ConnectionError):
                 pass
             time.sleep(2)
         else:

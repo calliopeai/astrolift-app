@@ -390,6 +390,149 @@ class IRSADriver(WorkloadIdentityDriver):
         )
         return {"eks.amazonaws.com/role-arn": role_arn}
 
+    def _managed_role(self, name: str, owner: dict[str, str], subjects: list[str]) -> dict[str, Any] | None:
+        from uuid import UUID
+
+        if set(owner) != {"organization", "app", "cluster"} or any(
+            str(UUID(value)) != value for value in owner.values()
+        ):
+            raise ValueError("Native identity owner is invalid")
+        try:
+            role = self._iam.get_role(RoleName=name)["Role"]
+        except self._iam.exceptions.NoSuchEntityException:
+            return None
+        tags = role.get("Tags")
+        if not isinstance(tags, list) or len({tag.get("Key") for tag in tags}) != len(tags):
+            raise ValueError("Native workload identity ownership is unproved; operator resolution is required")
+        observed = {tag.get("Key"): tag.get("Value") for tag in tags}
+        expected = {"astrolift.io/managed-by": "platform"} | {
+            f"astrolift.io/{key}-id": value for key, value in owner.items()
+        }
+        if role.get("Arn") != self._role_arn(name) or any(
+            observed.get(key) != value for key, value in expected.items()
+        ):
+            raise ValueError("Native workload identity ownership is unproved; operator resolution is required")
+        trust = self._identity_document(role.get("AssumeRolePolicyDocument"))
+        statements = trust.get("Statement", [])
+        if not isinstance(statements, list) or len(statements) != 1:
+            raise ValueError("Native workload identity trust is unavailable")
+        current = statements[0]
+        expected_trust = self._oidc_trust_policy()["Statement"][0]
+        conditions = current.get("Condition", {})
+        equal = conditions.get("StringEquals", {})
+        issuer = self._config.cluster_oidc_issuer
+        if (
+            current.get("Effect") != "Allow"
+            or current.get("Principal") != expected_trust["Principal"]
+            or current.get("Action") != expected_trust["Action"]
+            or set(current) - {"Effect", "Principal", "Action", "Condition", "Sid"}
+            or set(conditions) - {"StringEquals"}
+            or set(equal) - {f"{issuer}:aud", f"{issuer}:sub"}
+            or equal.get(f"{issuer}:aud") != "sts.amazonaws.com"
+        ):
+            raise ValueError("Native workload identity trust is unavailable")
+        raw = equal.get(f"{issuer}:sub", [])
+        prior = raw if isinstance(raw, list) else [raw]
+        if any(not isinstance(value, str) or value not in subjects for value in prior) or len(prior) != len(set(prior)):
+            raise ValueError("Native workload identity trust is unavailable")
+        return role
+
+    @staticmethod
+    def _identity_document(value: Any) -> dict[str, Any]:
+        from urllib.parse import unquote
+
+        if isinstance(value, str):
+            value = json.loads(unquote(value))
+        if not isinstance(value, dict) or len(json.dumps(value)) > 32768:
+            raise ValueError("Native identity document is invalid")
+        return value
+
+    @driver_op(
+        cloud="aws",
+        driver="identity",
+        audit=True,
+        redact_args=("name", "permissions", "owner", "subjects"),
+        redact_errors=True,
+    )
+    def reconcile_managed_identity(
+        self, *, name: str, permissions: list[dict[str, Any]], owner: dict[str, str], subjects: list[str]
+    ) -> str:
+        """Only a GUID-owned role and Astro's inline document may be changed."""
+        import re
+
+        if (
+            not self._config.cluster_oidc_issuer
+            or len(json.dumps(permissions)) > 10000
+            or not subjects
+            or len(subjects) > 100
+            or len(subjects) != len(set(subjects))
+            or any(
+                not re.fullmatch(r"system:serviceaccount:[a-z0-9-]{1,63}:[a-z0-9-]{1,63}", subject)
+                for subject in subjects
+            )
+        ):
+            raise ValueError("Native workload identity configuration is unavailable")
+        role = self._managed_role(name, owner, subjects)
+        if role is None and not permissions:
+            return self._role_arn(name)
+        trust = self._oidc_trust_policy()
+        trust["Statement"][0]["Condition"]["StringEquals"][f"{self._config.cluster_oidc_issuer}:sub"] = sorted(subjects)
+        if role is None:
+            try:
+                args = {
+                    "Path": self._config.role_path,
+                    "RoleName": name,
+                    "AssumeRolePolicyDocument": json.dumps(trust),
+                    "Tags": [{"Key": "astrolift.io/managed-by", "Value": "platform"}]
+                    + [{"Key": f"astrolift.io/{key}-id", "Value": value} for key, value in owner.items()],
+                }
+                if self._config.permissions_boundary_arn:
+                    args["PermissionsBoundary"] = self._config.permissions_boundary_arn
+                self._iam.create_role(**args)
+            except self._iam.exceptions.EntityAlreadyExistsException:
+                # A racing create never authorizes the collision's owner.
+                if self._managed_role(name, owner, subjects) is None:
+                    raise ValueError("Native workload identity creation is unconfirmed") from None
+                self._iam.update_assume_role_policy(RoleName=name, PolicyDocument=json.dumps(trust))
+        else:
+            self._iam.update_assume_role_policy(RoleName=name, PolicyDocument=json.dumps(trust))
+        if permissions:
+            self._iam.put_role_policy(
+                RoleName=name,
+                PolicyName="astrolift-workload-policy",
+                PolicyDocument=json.dumps({"Version": "2012-10-17", "Statement": permissions}),
+            )
+        else:
+            with suppress(self._iam.exceptions.NoSuchEntityException):
+                self._iam.delete_role_policy(RoleName=name, PolicyName="astrolift-workload-policy")
+        return self._role_arn(name)
+
+    @driver_op(
+        cloud="aws",
+        driver="identity",
+        redact_args=("name", "permissions", "owner", "subjects"),
+        redact_errors=True,
+    )
+    def verify_managed_identity(
+        self, *, name: str, permissions: list[dict[str, Any]], owner: dict[str, str], subjects: list[str]
+    ) -> bool:
+        role = self._managed_role(name, owner, subjects)
+        if role is None:
+            return not permissions
+        trust = self._identity_document(role["AssumeRolePolicyDocument"])
+        raw = trust["Statement"][0]["Condition"]["StringEquals"].get(f"{self._config.cluster_oidc_issuer}:sub", [])
+        observed = raw if isinstance(raw, list) else [raw]
+        if set(observed) != set(subjects):
+            return False
+        try:
+            policy = self._identity_document(
+                self._iam.get_role_policy(RoleName=name, PolicyName="astrolift-workload-policy")["PolicyDocument"]
+            )
+        except self._iam.exceptions.NoSuchEntityException:
+            return not permissions
+        expected = {"Version": "2012-10-17", "Statement": permissions}
+        return policy == expected
+
     @driver_op(cloud="aws", driver="identity", audit=True, sensitive_kind="identity.create_role")
     def create_identity_role(
         self,

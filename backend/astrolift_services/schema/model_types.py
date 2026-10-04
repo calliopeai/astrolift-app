@@ -8,6 +8,8 @@ from astrolift_graphql import GUID
 from astrolift_services.cluster_models import model_binding_prefix
 from astrolift_services.model_settings import ModelSharingMode, dedicated_app
 from astrolift_services.models import ManagedService
+from astrolift_services.schema.bedrock_model_types import NativeModelConnectionSourceType
+from astrolift_services.schema.native_model_types import NativeModelConnectionType, NativeModelFamily
 
 
 @strawberry.type(name="ModelResources")
@@ -66,6 +68,8 @@ class ClusterModelDeploymentType:
     operation_completed_at: datetime | None
     desired_resources: ModelResourcesType
     applied_resources: ModelResourcesType | None
+    native_source: NativeModelConnectionSourceType | None = None
+    native_connection: NativeModelConnectionType | None = None
     source_kind: str = "unknown"
     local_artifact_id: GUID | None = None
     local_artifact_version: int | None = None
@@ -144,6 +148,10 @@ def cluster_model_to_type(service, *, dedicated=_DEDICATED_APP_UNSET):
     provider = cluster.provider_plugin
     available = cluster.is_active and cluster.lifecycle == "managed" and provider.is_enabled
     runtime_supported, runtime_reason = None, None
+    from astrolift_services.native_model_projection import native_connection_to_type
+
+    native_connection = native_connection_to_type(service)
+    native = native_connection is not None
     try:
         shared_runtime(
             (cluster.provider_config if isinstance(cluster.provider_config, dict) else {}).get(
@@ -195,7 +203,35 @@ def cluster_model_to_type(service, *, dedicated=_DEDICATED_APP_UNSET):
         and type(service.applied_config.get("replicas", 1)) is int
         and service.applied_config.get("replicas", 1) > 0
     )
+    native_source = None
+    if native:
+        native_source = (
+            native_connection.source if native_connection.family == NativeModelFamily.BEDROCK else None
+        )
+        ready = runtime_supported = None
+        runtime_reason = (
+            "Native Bedrock connection; Kubernetes model runtime is inapplicable."
+            if native_connection.family == NativeModelFamily.BEDROCK
+            else "Native connection; Kubernetes model runtime is inapplicable."
+        )
+        stored_native = config.get("native_connection")
+        stored_kind = stored_native.get("source_kind") if isinstance(stored_native, dict) else None
+        source_kind = (
+            "bedrock_"
+            + (
+                native_source.source_kind.value
+                if native_source is not None
+                else stored_kind
+                if stored_kind in ("foundation_model", "inference_profile")
+                else "unknown"
+            )
+            if native_connection.family == NativeModelFamily.BEDROCK
+            else native_connection.source_kind.value
+        )
+
     return ClusterModelDeploymentType(
+        native_source=native_source,
+        native_connection=native_connection,
         id=GUID(str(service.guid)),
         version=service.version,
         name=service.name,
@@ -204,12 +240,12 @@ def cluster_model_to_type(service, *, dedicated=_DEDICATED_APP_UNSET):
         provider_id=GUID(str(provider.guid)),
         cluster_slug=cluster.slug,
         cluster_name=cluster.name,
-        model_repo=str(config.get("model") or ""),
-        revision_sha=revision,
+        model_repo="" if native else str(config.get("model") or ""),
+        revision_sha=None if native else revision,
         source_kind=source_kind,
-        local_artifact_id=artifact_id,
-        local_artifact_version=artifact_version,
-        local_manifest_sha256=manifest_sha256,
+        local_artifact_id=None if native else artifact_id,
+        local_artifact_version=None if native else artifact_version,
+        local_manifest_sha256=None if native else manifest_sha256,
         sharing_mode=ModelSharingMode.DEDICATED
         if config.get("sharing_mode") == "dedicated"
         else ModelSharingMode.SHARED,
@@ -217,7 +253,9 @@ def cluster_model_to_type(service, *, dedicated=_DEDICATED_APP_UNSET):
         dedicated_app_version=app.version if app else None,
         dedicated_app_name=app.name if app else None,
         dedicated_app_slug=app.slug if app else None,
-        compute_mode=config.get("compute_mode") if config.get("compute_mode") in ("cpu", "gpu") else None,
+        compute_mode=config.get("compute_mode")
+        if not native and config.get("compute_mode") in ("cpu", "gpu")
+        else None,
         subscriptions_enabled=config.get("allow_subscriptions") is True,
         runtime_supported=runtime_supported,
         runtime_reason=runtime_reason,
@@ -230,16 +268,16 @@ def cluster_model_to_type(service, *, dedicated=_DEDICATED_APP_UNSET):
             else None
         ),
         ready=ready,
-        readiness_observed_at=service.model_ready_observed_at,
-        readiness_generation=service.model_ready_generation,
+        readiness_observed_at=None if native else service.model_ready_observed_at,
+        readiness_generation=None if native else service.model_ready_generation,
         desired_subscription_revision=service.subscription_revision,
         applied_subscription_revision=service.applied_subscription_revision,
         operation_id=service.operation_workflow_id or None,
         operation_started_at=service.operation_started_at,
         operation_completed_at=service.operation_completed_at,
-        desired_resources=model_resources(config),
+        desired_resources=model_resources({} if native else config),
         applied_resources=model_resources(service.applied_config)
-        if service.applied_config is not None
+        if not native and service.applied_config is not None
         else None,
     )
 

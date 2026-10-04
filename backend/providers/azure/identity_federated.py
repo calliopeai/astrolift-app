@@ -30,8 +30,13 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from dataclasses import dataclass
-from typing import Any
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from azure.identity_owned import AzureIdentityContext, AzureOwnedIdentityDriver
 
 from _sdk._telemetry import driver_op
 from _sdk.azure_tags import serialize_azure_arm_tags
@@ -108,8 +113,8 @@ class FederatedIdentityConfig:
     location: str = "eastus"
 
     msi_client: Any | None = None
-    """ManagedServiceIdentityClient — injected for tests; production builds a
-    real one lazily."""
+    """Explicit legacy compatibility port. Ambient writes are not enabled by
+    constructing a production client; use ``owned_reconciler`` instead."""
 
     graph_client: Any | None = None
     """Microsoft Graph client for AAD Application CRUD. Injected
@@ -126,6 +131,15 @@ class FederatedIdentityConfig:
     is wrong with it — the directory is still catching up. Tests set 0 so no
     test ever sleeps."""
 
+    owned_context: AzureIdentityContext | None = None
+    """Recorded existing-UAMI owner/native identity. No name-only adoption."""
+
+    native_checkpoint: Callable[[], None] | None = None
+    """Current admission/source validation before each owned native request."""
+
+    credential: Any | None = field(default=None, repr=False, compare=False)
+    """Private admitted Azure credential for the owned port; never app binding data."""
+
 
 class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
     def __init__(self, *, config: FederatedIdentityConfig) -> None:
@@ -135,6 +149,26 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
         self._authz = config.authz_client
         self._grant_assignments: list[GrantAssignment] = []
         self._prune_refusals: list[str] = []
+
+    @driver_op(cloud="azure", driver="identity", heartbeat=False, redact_errors=True)
+    def owned_reconciler(self) -> AzureOwnedIdentityDriver:
+        """Build real MSI7/authorization clients without enabling legacy writes."""
+        from azure.identity_owned import AzureOwnedIdentityDriver
+
+        context = self._config.owned_context
+        checkpoint = self._config.native_checkpoint
+        if (
+            context is None
+            or checkpoint is None
+            or (
+                context.tenant_id != self._config.tenant_id
+                or context.subscription_id != self._config.subscription_id
+                or context.resource_group != self._config.resource_group
+                or context.issuer != self._config.cluster_oidc_issuer
+            )
+        ):
+            raise RuntimeError("Recorded owned identity and current admission/source checkpoint required")
+        return AzureOwnedIdentityDriver(context, checkpoint=checkpoint, credential=self._config.credential)
 
     @driver_op(cloud="azure", driver="identity", audit=True, sensitive_kind="identity.bind")
     def bind_service_account(

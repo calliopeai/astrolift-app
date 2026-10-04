@@ -1,9 +1,10 @@
 # AVX2 CPU runtime candidate
 
 This is a prepared manual build, not a published image or a certified cluster
-runtime. It adds no cloud capacity and performs no deployment. The workflow
-runs only by explicit dispatch; publication defaults to false. Publication,
-when selected, happens after the runner's kernel and bounded inference checks.
+runtime. It adds no cloud capacity and performs no deployment. Pull requests
+that change the build inputs run the build and smoke checks. Registry publication
+requires an explicit workflow dispatch with publication enabled, which defaults
+to false, and happens after the runner's kernel and bounded inference checks.
 
 The build uses upstream vLLM 0.15.1 commit
 `1892993bc18e243e2c05841314c5e9c06a80c70d`, an archive checksum, and an
@@ -26,7 +27,8 @@ support preparing an AVX2 float32 candidate. They do not prove compatibility
 with a particular node or sufficient memory for a particular model.
 
 The smoke checks the actual package is `0.15.1+cpu`, PyTorch is `2.10.0+cpu`,
-and runs a float32 CPU kernel before starting a localhost-only server with
+and checks the registered float32 CPU SwiGLU kernel against PyTorch's numerical
+reference before starting a localhost-only server with
 one CPU, 4 GiB memory, 1 GiB KV cache, a 256-token context and one sequence.
 It loads an immutable public Qwen/Qwen2.5-0.5B-Instruct revision and requires
 an actual bounded chat completion. Failure, including out of memory, prevents

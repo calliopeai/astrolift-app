@@ -626,6 +626,10 @@ CONSTANCE_CONFIG = {
         "presenting the legacy shape — at that point any straggler legacy token will fail "
         "auth with a 401 and operators can re-issue.",
     ),
+    "BEDROCK_MODEL_CONNECTIONS_ENABLED": (
+        False,
+        "Enable existing Bedrock on-demand/profile model connections independently of AWS plugin availability. No paid allocation or model invocation is enabled by this setting.",
+    ),
     "MODEL_CONNECTION_DEFAULT_MODE": (
         "AUTO",
         "Default app-to-model connection mode: AUTO, REQUIRE_APPROVAL or DENY. Organization policies may override this default; model restrictions cannot loosen organization policy.",
@@ -868,6 +872,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
             "TEMPORAL_ENABLED",
             "DEPLOY_PIPELINE_ENABLED",
             "ALLOW_SELF_APPROVE_DEPLOYS",
+            "BEDROCK_MODEL_CONNECTIONS_ENABLED",
             "MODEL_CONNECTION_DEFAULT_MODE",
             "MODEL_CONNECTION_DEFAULT_QUORUM",
             "MODEL_CONNECTION_ALLOW_SELF_APPROVAL",

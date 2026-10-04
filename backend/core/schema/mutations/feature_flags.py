@@ -49,6 +49,54 @@ def _feature_flag_target(*args, **kwargs):
     return "FeatureFlag", key
 
 
+def _set_model_connection_flag(info, config, key, enabled):
+    """Fresh install operator admission; other feature setters retain their contract."""
+    from dataclasses import replace
+    from types import SimpleNamespace
+
+    from django.contrib.auth import get_user_model
+    from django.http import HttpRequest
+
+    from astrolift_identity import abac
+    from astrolift_identity.api_tokens import get_current_api_token, with_active_org_member
+    from astrolift_identity.models import ApiToken
+    from core.current_credential import current_dispatch_credential
+    from core.current_session import fresh_authenticated_session
+    from core.permissions import PermissionDenied, check_permission
+    from core.tenancy import get_current_tenant
+
+    permission = Permission.ADMIN_ELEVATE
+    request = getattr(info.context, "request", None)
+    actor_id = getattr(getattr(info.context, "user", None), "pk", None)
+    tenant = get_current_tenant()
+    actor = get_user_model().objects.filter(pk=actor_id, is_active=True).first()
+    if actor is None or (tenant is not None and tenant.actor_user_id != actor.pk):
+        raise PermissionDenied(permission, None, "Current operator authority is unavailable.")
+    with current_dispatch_credential(permission):
+        token = get_current_api_token()
+        if token is not None:
+            if token.team_id is not None:
+                raise PermissionDenied(permission, None, "Current operator credential is unavailable.")
+            if not with_active_org_member(
+                ApiToken.objects.filter(pk=token.pk, user_id=actor.pk),
+                user="user",
+                organization="organization",
+            ).exists():
+                raise PermissionDenied(permission, None, "Current operator credential is unavailable.")
+            attrs = abac.attributes_for(actor.pk)
+        elif isinstance(request, HttpRequest) or hasattr(request, "session"):
+            bag = fresh_authenticated_session(request, actor_user_id=actor.pk, permission=permission)
+            attrs = abac.attributes_from_request(
+                SimpleNamespace(META=getattr(request, "META", {}), session=bag), actor.pk
+            )
+        else:
+            attrs = abac.attributes_for(actor.pk)
+        with abac.request_attributes(replace(attrs, cache={})):
+            check_platform_operator(actor, gate=permission)
+            check_permission(permission)
+            setattr(config, key, bool(enabled))
+
+
 @strawberry.type
 class FeatureFlagMutations:
     @strawberry.field(
@@ -65,9 +113,7 @@ class FeatureFlagMutations:
     )
     @mutation_audit(action="admin.feature_flag.set", target=_feature_flag_target)
     @require_permission(Permission.ADMIN_ELEVATE)
-    def set_feature_flag(
-        self, info: Info, key: str, enabled: bool
-    ) -> MutationResultType[FeatureFlagInfo]:
+    def set_feature_flag(self, info: Info, key: str, enabled: bool) -> MutationResultType[FeatureFlagInfo]:
         check_platform_operator(info.context.user, gate=Permission.ADMIN_ELEVATE)
         mapping = _PUBLIC_KEY_TO_CONSTANCE.get(key)
         if mapping is None:
@@ -83,8 +129,9 @@ class FeatureFlagMutations:
         # constance module sees the write reflected on the next read.
         from constance import config as constance_config
 
-        setattr(constance_config, constance_key, bool(enabled))
+        if key == "models.bedrock_connections_enabled":
+            _set_model_connection_flag(info, constance_config, constance_key, enabled)
+        else:
+            setattr(constance_config, constance_key, bool(enabled))
 
-        return gql_success(
-            FeatureFlagInfo(key=key, enabled=bool(enabled), description=description)
-        )
+        return gql_success(FeatureFlagInfo(key=key, enabled=bool(enabled), description=description))

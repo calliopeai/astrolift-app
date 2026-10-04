@@ -90,8 +90,9 @@ def test_gcp_permissions_translate_roles_and_deduplicate():
         ),
     ]
     assert _permissions_from_bindings(bindings, plugin_slug="gcp") == [
-        {"role": "roles/pubsub.publisher"},
-        {"role": "roles/pubsub.subscriber"},
+        {"role": "roles/pubsub.publisher", "resource": "projects/acme/topics/events"},
+        {"role": "roles/pubsub.subscriber", "resource": "projects/acme/subscriptions/jobs"},
+        {"role": "roles/pubsub.publisher", "resource": "projects/acme/subscriptions/jobs"},
     ]
 
 

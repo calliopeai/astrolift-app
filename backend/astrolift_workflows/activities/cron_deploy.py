@@ -35,6 +35,7 @@ class CronDispatchSummary:
     candidates_count: int
     fired_count: int
     fired_app_slugs: tuple[str, ...]
+    refused_native_count: int = 0
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -194,9 +195,16 @@ def _dispatch_cron_deploys_sync() -> CronDispatchSummary:
     matches = select_matches(candidates=candidates, now=now)
 
     fired: list[str] = []
+    refused_native_count = 0
     for match in matches:
         app = app_by_id[match.app_id]
         env = env_by_app[match.app_id]
+        from astrolift_lifecycle.deployment_identity_origin import native_origin_required
+
+        if native_origin_required(app, env):
+            refused_native_count += 1
+            log.warning("cron deployment refused: NATIVE_HUMAN_ORIGIN_REQUIRED")
+            continue
         # Re-derive image_tag from the most recent successful deploy
         # in this env; absent that, fall back to 'latest' which the
         # deploy workflow's pre_flight activity will validate against
@@ -297,6 +305,7 @@ def _dispatch_cron_deploys_sync() -> CronDispatchSummary:
         candidates_count=len(candidates),
         fired_count=len(fired),
         fired_app_slugs=tuple(fired),
+        refused_native_count=refused_native_count,
     )
 
 

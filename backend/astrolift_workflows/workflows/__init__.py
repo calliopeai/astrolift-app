@@ -57,6 +57,7 @@ from astrolift_workflows.workflows.install_cluster_prereqs import (
     InstallClusterPrereqsWorkflow,
 )
 from astrolift_workflows.workflows.migrate_app import MigrateAppWorkflow
+from astrolift_workflows.workflows.native_model_connections import NativeModelConnectionReconcileWorkflow
 from astrolift_workflows.workflows.observability_retention_tick import (
     ObservabilityRetentionTickWorkflow,
 )
@@ -111,6 +112,7 @@ from astrolift_workflows.workflows.workflow_definition_run import (
 from astrolift_workflows.workflows.workflow_run_reconcile_tick import WorkflowRunReconcileTickWorkflow
 
 __all__ = [
+    "NativeModelConnectionReconcileWorkflow",
     "AgentTaskCallbackReconcileWorkflow",
     "DeliverAgentTaskCallbackWorkflow",
     "SharedModelReconcileWorkflow",

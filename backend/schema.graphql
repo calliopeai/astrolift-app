@@ -6567,6 +6567,56 @@ type AvailableTransition {
   conditionsMet: Boolean!
 }
 
+type BedrockModelConnectionAction {
+  enabled: Boolean!
+  allowed: Boolean!
+  reason: String
+}
+
+input BedrockModelPlacementInput {
+  organizationId: GUID!
+  clusterId: GUID!
+  expectedProviderId: GUID!
+  expectedClusterVersion: Int!
+  expectedProviderVersion: Int!
+}
+
+type BedrockModelSource {
+  identity: NativeModelConnectionSource!
+  name: String!
+  provider: String
+  inputModalities: [String!]!
+  outputModalities: [String!]!
+  streaming: Boolean
+  lifecycle: String
+  profileType: String
+  registerable: Boolean!
+  reason: String
+}
+
+input BedrockModelSourceInput {
+  organizationId: GUID!
+  clusterId: GUID!
+  expectedProviderId: GUID!
+  expectedClusterVersion: Int!
+  expectedProviderVersion: Int!
+  sourceKind: BedrockModelSourceKind!
+  sourceIdentifier: String!
+}
+
+enum BedrockModelSourceKind {
+  FOUNDATION_MODEL
+  INFERENCE_PROFILE
+}
+
+type BedrockModelSources {
+  items: [BedrockModelSource!]!
+  state: String!
+  reason: String
+  truncated: Boolean!
+  partial: Boolean!
+}
+
 input BeginLocalModelArtifactInput {
   organizationId: GUID!
   name: String!
@@ -6796,6 +6846,8 @@ type ClusterModelDeployment {
   operationCompletedAt: DateTime
   desiredResources: ModelResources!
   appliedResources: ModelResources
+  nativeSource: NativeModelConnectionSource
+  nativeConnection: NativeModelConnection
   sourceKind: String!
   localArtifactId: GUID
   localArtifactVersion: Int
@@ -7511,6 +7563,26 @@ input FormDefinitionUpdateInput {
   isPublic: Boolean = null
 }
 
+"""
+Deployment metadata only; application adoption requires an independent gateway credential lifecycle.
+"""
+type FoundryDeploymentConnectionSource {
+  subscriptionId: String!
+  resourceGroup: String!
+  accountResourceId: String!
+  region: String!
+  accountKind: String!
+  localAuthDisabled: Boolean
+  deploymentResourceId: String!
+  deploymentName: String!
+  modelFormat: String!
+  modelName: String!
+  modelVersion: String
+  declaredSku: String
+  declaredCapacity: Int
+  provisioningState: String
+}
+
 """UUID v7 — the platform's external identifier."""
 scalar GUID
 
@@ -8162,7 +8234,9 @@ enum ModelObservationState {
 
 type ModelPlacementCluster {
   id: GUID!
+  version: Int!
   providerId: GUID!
+  providerVersion: Int!
   name: String!
   slug: String!
   region: String
@@ -8716,6 +8790,9 @@ type Mutation {
   revokeModelSubscription(input: RevokeModelSubscriptionInput!): ModelSubscriptionOperationMutationResult!
   updateClusterModel(input: UpdateClusterModelInput!): ClusterModelDeploymentMutationResult!
   deprovisionClusterModel(input: DeprovisionClusterModelInput!): ClusterModelDeploymentMutationResult!
+  registerBedrockModelConnection(input: RegisterBedrockModelConnectionInput!): ClusterModelDeploymentMutationResult!
+  updateBedrockModelConnection(input: UpdateBedrockModelConnectionInput!): ClusterModelDeploymentMutationResult!
+  unregisterBedrockModelConnection(input: UnregisterBedrockModelConnectionInput!): ClusterModelDeploymentMutationResult!
   updateOrganizationModelConnectionPolicy(input: UpdateOrganizationModelConnectionPolicyInput!): ModelConnectionPolicyMutationResult!
   setModelConnectionRestriction(input: SetModelConnectionRestrictionInput!): ModelConnectionPolicyMutationResult!
   requestModelConnection(input: RequestModelConnectionInput!): ModelConnectionRequestMutationResult!
@@ -8938,6 +9015,67 @@ input MuteAlertRuleInput {
   ruleId: GUID!
   durationSeconds: Int!
   reason: String!
+}
+
+union NativeConnectionSource = NativeModelConnectionSource | VertexEndpointConnectionSource | FoundryDeploymentConnectionSource
+
+enum NativeModelConfigurationState {
+  CONFIGURED
+  UNAVAILABLE
+}
+
+type NativeModelConnection {
+  family: NativeModelFamily!
+  sourceKind: NativeModelConnectionKind!
+  configurationState: NativeModelConfigurationState!
+  invokeAccess: NativeModelInvokeAccess!
+  reason: String
+
+  """
+  Hash of the validated recorded resource tuple; not native incarnation, ownership or invocation proof.
+  """
+  resourceIdentityFingerprint: String
+  reviewedSourceFingerprint: String
+  metadataObservedAt: DateTime
+  source: NativeConnectionSource
+}
+
+enum NativeModelConnectionKind {
+  BEDROCK_FOUNDATION_MODEL
+  BEDROCK_INFERENCE_PROFILE
+  VERTEX_ENDPOINT
+  FOUNDRY_DEPLOYMENT
+  UNKNOWN
+}
+
+type NativeModelConnectionSource {
+  protocol: NativeModelProtocol!
+  sourceKind: BedrockModelSourceKind!
+  accountId: String!
+  region: String!
+  partition: String!
+  sourceId: String!
+  sourceArn: String!
+  destinationModelArns: [String!]!
+  sourceFingerprint: String!
+  metadataObservedAt: DateTime
+  configurationState: String!
+  invokeAccess: String!
+}
+
+enum NativeModelFamily {
+  BEDROCK
+  VERTEX
+  FOUNDRY
+  UNKNOWN
+}
+
+enum NativeModelInvokeAccess {
+  UNKNOWN
+}
+
+enum NativeModelProtocol {
+  BEDROCK
 }
 
 type NoneTypeMutationResult {
@@ -9514,6 +9652,10 @@ type Query {
   clusterModelRuntimeAdmission(input: ProvisionClusterModelInput!): ModelRuntimeAdmission!
   clusterModelSubscriptionTargetsPage(organizationId: GUID!, modelDeploymentId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionTargetPage!
   clusterModelSubscriptionsPage(organizationId: GUID!, modelDeploymentId: GUID!, appEnvironmentId: GUID = null, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionPage!
+  bedrockModelConnectionSupport(organizationId: GUID!): BedrockModelConnectionAction!
+  bedrockModelConnectionAction(input: BedrockModelPlacementInput!): BedrockModelConnectionAction!
+  bedrockModelSources(input: BedrockModelPlacementInput!, sourceKind: BedrockModelSourceKind!, limit: Int! = 100): BedrockModelSources!
+  bedrockModelSource(input: BedrockModelSourceInput!): BedrockModelSource
   modelHostingAction(organizationId: GUID!): ModelHostingAction!
   huggingFaceConnectionsPage(organizationId: GUID!, page: Int! = 1, pageSize: Int! = 25): HuggingFaceConnectionTypePage!
   clusterModelSourceAccess(organizationId: GUID!, modelRepo: String!, revisionSha: String!, connectionId: GUID = null, expectedConnectionVersion: Int = null): ModelSourceAccess!
@@ -9824,6 +9966,22 @@ input RegisterAppRepoInput {
   ref: String! = "main"
   defaultBranch: String = null
   deployBranch: String = null
+}
+
+input RegisterBedrockModelConnectionInput {
+  organizationId: GUID!
+  clusterId: GUID!
+  expectedProviderId: GUID!
+  expectedClusterVersion: Int!
+  expectedProviderVersion: Int!
+  sourceKind: BedrockModelSourceKind!
+  sourceIdentifier: String!
+  sourceFingerprint: String!
+  name: String!
+  allowSubscriptions: Boolean!
+  sharingMode: ModelSharingMode! = SHARED
+  dedicatedAppId: GUID = null
+  ifMatchDedicatedAppVersion: Int = null
 }
 
 input RegisterMobileDeviceInput {
@@ -10547,6 +10705,14 @@ input UnmuteAlertRuleInput {
   ruleId: GUID!
 }
 
+input UnregisterBedrockModelConnectionInput {
+  organizationId: GUID!
+  id: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  ifMatchVersion: Int!
+}
+
 input UnregisterTenantClusterInput {
   id: GUID!
 }
@@ -10606,6 +10772,19 @@ input UpdateAppInput {
   minimumApprovals: Int = null
   cronPaused: Boolean = null
   ifMatchVersion: Int = null
+}
+
+input UpdateBedrockModelConnectionInput {
+  organizationId: GUID!
+  id: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  ifMatchVersion: Int!
+  name: String!
+  allowSubscriptions: Boolean!
+  sharingMode: ModelSharingMode = null
+  dedicatedAppId: GUID = null
+  ifMatchDedicatedAppVersion: Int = null
 }
 
 input UpdateClusterModelInput {
@@ -10897,6 +11076,28 @@ type VerifyManagedDomainPayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: VerifyManagedDomainPayload
+}
+
+"""
+Endpoint routing metadata. IAM covers the whole Endpoint; Predict does not select one deployed model.
+"""
+type VertexEndpointConnectionSource {
+  projectId: String!
+  projectNumber: String!
+  region: String!
+  endpointResourceName: String!
+  deployedModels: [VertexEndpointDeployedModelObservation!]!
+}
+
+type VertexEndpointDeployedModelObservation {
+  deployedModelId: String!
+  modelResourceName: String!
+  modelVersionId: String
+  trafficPercent: Int!
+  machineType: String
+  minReplicas: Int
+  maxReplicas: Int
+  availableReplicas: Int
 }
 
 """Represents NULL values"""

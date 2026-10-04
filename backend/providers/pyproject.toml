@@ -25,6 +25,9 @@ aws = [
     "PyYAML>=6.0",
 ]
 gcp = [
+    "google-cloud-iam>=2.24,<3",
+    "google-cloud-aiplatform>=1.142,<2",
+    "google-cloud-resource-manager>=1.19,<2",
     "google-cloud-container>=2.40",
     "google-cloud-secret-manager>=2.20",
     "google-cloud-dns>=0.34",
@@ -72,7 +75,8 @@ azure = [
     "azure-keyvault-secrets>=4.7",
     # CI push role on ACR provisions a User-Assigned Managed Identity +
     # AcrPush role assignment + GitHub OIDC Federated Identity Credential.
-    "azure-mgmt-msi>=7.0",
+    # Owned UAMI federation uses the MSI7 API2024-11-30 contract.
+    "azure-mgmt-msi>=7.1,<8",
     "azure-mgmt-authorization>=4.0",
     "azure-mgmt-network>=31.0.1",
     # Pinned: 36.0.0 introduced a regression where ApiClient drops the
@@ -101,6 +105,8 @@ dev = [
     "prometheus-client>=0.20",
     # Standalone CI must record spans for private-delivery failure assertions.
     "opentelemetry-sdk>=1.41,<2",
+    # Gateway privacy tests exercise real client header/error instrumentation.
+    "opentelemetry-instrumentation-httpx>=0.62b0,<0.64",
     # Driver config_schema() output is asserted to be a well-formed JSON
     # Schema, and sample configs are validated against it. Test-only: no
     # driver imports jsonschema at runtime.

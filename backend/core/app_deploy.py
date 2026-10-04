@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from astrolift_clusters.models import TenantCluster
     from astrolift_lifecycle.models import AppEnvironment, Deployment
     from astrolift_registry.models import RegisteredApp
+    from core.gcp_prepared_identity_render import PreparedGCPIdentity
 
 log = logging.getLogger(__name__)
 
@@ -1154,6 +1155,7 @@ def render_resources_for_deployment(
     *,
     cluster_override: TenantCluster | None = None,
     include_managed_filesystems: bool = True,
+    prepared_gcp_identity: PreparedGCPIdentity | None = None,
 ) -> list[dict[str, Any]]:
     """Re-render the deployment's manifests against the stored TOML.
 
@@ -1179,7 +1181,18 @@ def render_resources_for_deployment(
             f"app {app.slug!r} has no saved manifest — open the Manifest tab and paste astrolift.toml first",
         )
     manifest = normalize(parse_raw(app.manifest_raw), defaults=NormalizationDefaults())
-    namespace = namespace_for_environment(env)
+    if prepared_gcp_identity is not None:
+        from core.gcp_prepared_identity_render import PreparedIdentityRenderError, assert_deployment_identity
+
+        try:
+            assert_deployment_identity(
+                deployment, cluster_override or getattr(env, "tenant_cluster", None), prepared_gcp_identity
+            )
+        except PreparedIdentityRenderError as error:
+            raise AppDeployError(str(error)) from None
+        namespace = prepared_gcp_identity.namespace
+    else:
+        namespace = namespace_for_environment(env)
 
     # envFrom: the app's literal [env] secrets + operator secret bundles +
     # the platform-synthesized managed-service bindings Secret
@@ -1214,6 +1227,14 @@ def render_resources_for_deployment(
         env_from_secret_refs=env_from,
         workload_env_from_secret_refs=workload_env_from,
     )
+
+    if prepared_gcp_identity is not None:
+        from core.gcp_prepared_identity_render import validate_prepared_resources
+
+        try:
+            validate_prepared_resources(resources, prepared_gcp_identity)
+        except PreparedIdentityRenderError as error:
+            raise AppDeployError(str(error)) from None
 
     from core.runtime_metric_identity import stamp_metric_identities
 
@@ -1264,7 +1285,7 @@ def render_resources_for_deployment(
 
     # Workload identity (#1011): IAM-authed managed services run through a
     # provider-annotated Kubernetes ServiceAccount, never static credentials.
-    if has_managed and cluster is not None:
+    if prepared_gcp_identity is None and has_managed and cluster is not None:
         pc = getattr(cluster, "provider_config", None) or {}
         ac = getattr(cluster, "auth_config", None) or {}
         plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
@@ -1289,6 +1310,18 @@ def render_resources_for_deployment(
     from astrolift_services.model_subscriptions import stamp_binding_revisions
 
     stamp_binding_revisions(resources, env)
+
+    if prepared_gcp_identity is not None:
+        from core.gcp_prepared_identity_render import (
+            inject_prepared_identity,
+            prepared_controller_fingerprints,
+        )
+
+        try:
+            resources = inject_prepared_identity(resources, prepared_gcp_identity)
+            prepared_controller_fingerprints(resources, prepared_gcp_identity)
+        except PreparedIdentityRenderError as error:
+            raise AppDeployError(str(error)) from None
 
     log.info(
         # ``md_id`` read as "managed service id" to more than one person

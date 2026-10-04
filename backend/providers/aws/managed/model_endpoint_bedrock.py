@@ -1,48 +1,21 @@
-"""AWS Bedrock managed-service driver (#376).
+"""Bedrock capability bindings and durable, owned provisioned throughput.
 
-Implements ``ManagedServiceDriver`` for the canonical AWS managed
-model-endpoint path. Bedrock's invocation surface is a single
-regional endpoint (``bedrock-runtime``) keyed by ``model_id`` --
-no Bedrock-side resource is created for on-demand foundation
-models, so the driver's "provision" is really a record-keeping +
-optional provisioned-throughput attach step.
-
-When ``spec.config.provisioned_throughput`` is set the driver
-allocates a provisioned-throughput commitment via
-``create_provisioned_model_throughput``. Provisioned throughput
-carries a commitment window (1 month / 6 months); the deprovision
-path refuses to delete during an active commitment unless
-``force_destroy=True`` is set.
-
-Deprovision matrix:
-
-  delete_data=False, force_destroy=False (default):
-    Preserve CloudWatch invocation logs. Refuse if a provisioned
-    throughput commitment is still in-window.
-
-  delete_data=True, force_destroy=False:
-    Drop the platform's CloudWatch log group + retained model
-    record. Commitment window still respected.
-
-  delete_data=False, force_destroy=True:
-    Preserve invocation logs. Bypass commitment-window check and
-    delete the provisioned throughput.
-
-  delete_data=True, force_destroy=True:
-    Atomic teardown: delete log group, delete provisioned
-    throughput regardless of commitment, drop the record.
+On-demand access creates no Bedrock resource. Paid throughput uses a versioned
+native ARN/intent handle and live ownership checks across activity instances.
+AWS commitment terms apply even when force_destroy is requested.
 """
 
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any
 
 from _sdk._telemetry import driver_op
 from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
+    UPDATE_NOT_SUPPORTED_IN_PLACE,
     Binding,
     BindingSchema,
     DeprovisionResult,
@@ -57,13 +30,14 @@ from _sdk.managed_service import (
     UpdateResult,
     UpdateSpec,
     ValueRef,
+    unsupported_update,
 )
 from aws.managed._base import (
     ManagedServiceError,
     handle_for,
     parse_handle,
-    tags_for,
 )
+from aws.managed._bedrock_throughput import PaidHandle, Throughput, digest, is_inference_profile, model_arn
 from aws.session import aws_client
 
 KIND = "model_endpoint"
@@ -71,15 +45,7 @@ KIND = "model_endpoint"
 # A system-defined cross-region inference profile id: a geography prefix
 # before the model id, e.g. ``us.anthropic.claude-sonnet-4-6`` (#2137). An
 # application profile or a system profile may also be named by its ARN.
-_PROFILE_ID = re.compile(r"^(?:us|eu|apac|us-gov|ca|jp|au|global)\.[a-z0-9-]+\.")
-_PROFILE_ARN = re.compile(r"^arn:aws[a-z-]*:bedrock:[a-z0-9-]+:\d{12}:(?:application-)?inference-profile/")
-
 _INVOKE_ACTIONS = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
-
-
-def is_inference_profile(model_id: str) -> bool:
-    """Whether ``model_id`` names an inference profile, not a foundation model."""
-    return bool(_PROFILE_ID.match(model_id) or _PROFILE_ARN.match(model_id))
 
 
 # Size -> default foundation model id. Operators override per spec
@@ -148,12 +114,9 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                 region=config.region,
                 credential=config.credential,
             )
-        # Bedrock has no first-party "model record" resource for
-        # on-demand models. The driver owns this dict as the
-        # source of truth for the platform record; in prod the
-        # ManagedServiceBinding row upstream of the driver is the
-        # durable equivalent.
+        # Only a same-instance optimization for resource-free on-demand bindings.
         self._records: dict[str, dict[str, Any]] = {}
+        self._throughput = Throughput(self._bedrock, config)
 
     # ---- lifecycle ----------------------------------------------------
 
@@ -167,6 +130,27 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         record_id = self._record_id_for(spec=spec)
         cfg = spec.config or {}
 
+        if cfg.get("provisioned_throughput") or (spec.recorded_handle and PaidHandle.parse(spec.recorded_handle)):
+            return self._provision_throughput(spec)
+        if spec.recorded_handle:
+            try:
+                _, native = self._throughput.observe(
+                    spec.recorded_handle, service=spec.managed_service_id, organization=spec.organization_id
+                )
+                if native:
+                    return ProvisionResult(
+                        ok=False,
+                        handle="",
+                        message="Recorded paid throughput cannot become an on-demand binding implicitly",
+                        errors=["replacement_required"],
+                    )
+            except ManagedServiceError:
+                return ProvisionResult(
+                    ok=False,
+                    handle="",
+                    message="Recorded Bedrock identity could not be verified",
+                    errors=["throughput_unverified"],
+                )
         existing = self._describe(record_id)
         if existing is not None:
             return ProvisionResult(
@@ -184,24 +168,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         self._ensure_log_group(log_group)
 
         provisioned_throughput_arn = ""
-        commitment_duration = cfg.get("provisioned_throughput")
-        if commitment_duration:
-            try:
-                resp = self._bedrock.create_provisioned_model_throughput(
-                    modelUnits=int(cfg.get("model_units", 1)),
-                    provisionedModelName=record_id,
-                    modelId=model_id,
-                    commitmentDuration=commitment_duration,
-                    tags=_pt_tags(spec),
-                )
-                provisioned_throughput_arn = resp.get("provisionedModelArn") or ""
-            except Exception as exc:
-                return ProvisionResult(
-                    ok=False,
-                    handle="",
-                    message=(f"create_provisioned_model_throughput: {exc}"),
-                    errors=[str(exc)],
-                )
+        commitment_duration = ""
 
         self._store_record(
             record_id=record_id,
@@ -230,16 +197,67 @@ class AmazonBedrockDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="model_endpoint_bedrock")
     def update(self, spec: UpdateSpec) -> UpdateResult:
+        cfg = spec.config or {}
+        saved = PaidHandle.parse(spec.handle)
         _, record_id = parse_handle(spec.handle)
         existing = self._describe(record_id)
-        if existing is None:
+        try:
+            if saved or cfg.get("provisioned_throughput") or not existing:
+                paid, row = self._throughput.observe(
+                    spec.handle, service=spec.managed_service_id, organization=spec.organization_id
+                )
+                if paid or row:
+                    if row is None:
+                        return UpdateResult(
+                            ok=False, handle=spec.handle, message="Bedrock throughput is missing", errors=["not_found"]
+                        )
+                    if paid is None:
+                        raise ManagedServiceError("Bedrock throughput durable identity is missing")
+                    unchanged = True
+                    try:
+                        desired = dict(cfg)
+                        if spec.size:
+                            desired.setdefault("size", spec.size)
+                        self._assert_paid_config(paid, desired)
+                    except ManagedServiceError:
+                        unchanged = False
+                    if not unchanged:
+                        return UpdateResult(
+                            ok=False,
+                            handle=spec.handle,
+                            retryable=False,
+                            errors=[UPDATE_NOT_SUPPORTED_IN_PLACE],
+                            message=(
+                                "No native update was performed. Paid model, units or commitment changes "
+                                "need a separately reviewed replacement service with a new identity; "
+                                "automatic reprovision of this identity is not supported"
+                            ),
+                        )
+                    if row.get("status") != "InService":
+                        return UpdateResult(
+                            ok=False,
+                            handle=spec.handle,
+                            message="Bedrock throughput is not InService",
+                            errors=["not_ready"],
+                        )
+                    return UpdateResult(
+                        ok=True,
+                        handle=paid.encode(),
+                        message="Owned provisioned throughput matches the unchanged configuration",
+                    )
+        except ManagedServiceError:
             return UpdateResult(
                 ok=False,
                 handle=spec.handle,
-                message=f"bedrock model endpoint {record_id} not found",
-                errors=["not_found"],
+                message="Bedrock throughput identity or readiness could not be verified",
+                errors=["throughput_unverified"],
             )
-        cfg = spec.config or {}
+        if existing is None:
+            if not spec.managed_service_id:
+                return UpdateResult(
+                    ok=False, handle=spec.handle, message="Bedrock capability identity is missing", errors=["not_found"]
+                )
+            existing = {"ModelId": self._config.default_model_id}
 
         new_model_id = None
         if cfg.get("model_id"):
@@ -257,13 +275,10 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         if new_model_id:
             existing["ModelId"] = new_model_id
 
-        if "provisioned_throughput" in cfg:
-            existing["CommitmentDuration"] = str(
-                cfg["provisioned_throughput"],
-            )
+        if cfg.get("provisioned_throughput"):
+            return unsupported_update(spec.handle, reason="Attaching paid throughput requires explicit provisioning")
 
-        # Persist mutated record back to the in-memory store +
-        # CloudWatch tags (the durable side-channel).
+        # The persisted desired config supplies fresh on-demand bindings.
         self._records[record_id] = existing
 
         return UpdateResult(
@@ -285,104 +300,94 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         delete_data: bool = False,
         force_destroy: bool = False,
     ) -> DeprovisionResult:
-        _, record_id = parse_handle(spec.handle)
-
-        existing = self._describe(record_id)
-        if existing is None:
+        try:
+            paid = PaidHandle.parse(spec.handle)
+            _, record_id = parse_handle(spec.handle)
+            existing = self._describe(record_id)
+            if paid:
+                if delete_data and not paid.log_prefix_hash:
+                    raise ManagedServiceError("Bedrock paid log identity is not recorded; explicit recovery required")
+                record_id = paid.record_name
+            if paid or not existing or (spec.config or {}).get("provisioned_throughput"):
+                paid, row = self._throughput.observe(
+                    spec.handle, service=spec.managed_service_id, organization=spec.organization_id
+                )
+                if row:
+                    if paid is None:
+                        raise ManagedServiceError("Bedrock throughput durable identity is missing")
+                    if self._throughput.commitment_active(row):
+                        return DeprovisionResult(
+                            ok=False,
+                            handle=spec.handle,
+                            message="AWS commitment is active or its expiry is unknown; force_destroy cannot bypass it",
+                            errors=["commitment_active"],
+                        )
+                    self._bedrock.delete_provisioned_model_throughput(provisionedModelId=paid.arn)
+                    record_id = row["provisionedModelName"]
+            if delete_data:
+                if not self._delete_log_group(log_group=self._log_group_for(record_id=record_id)):
+                    return DeprovisionResult(
+                        ok=False,
+                        handle=spec.handle,
+                        message=(
+                            "Native throughput removal accepted or already gone; invocation log deletion unconfirmed"
+                        ),
+                        errors=["log_cleanup_unconfirmed"],
+                    )
+                self._records.pop(record_id, None)
             return DeprovisionResult(
                 ok=True,
                 handle=spec.handle,
-                message=(f"bedrock model endpoint {record_id} already gone"),
+                message="Bedrock removal accepted or already gone; logs=" + ("deleted" if delete_data else "preserved"),
             )
-
-        pt_arn = existing.get("ProvisionedThroughputArn") or ""
-        commitment_active = self._commitment_active(existing)
-        if pt_arn and commitment_active and not force_destroy:
+        except Exception:
             return DeprovisionResult(
                 ok=False,
                 handle=spec.handle,
-                message=(
-                    f"bedrock model endpoint {record_id} has an "
-                    f"active provisioned-throughput commitment; pass "
-                    f"force_destroy=True to bypass"
-                ),
-                errors=["commitment_active"],
+                message="Bedrock removal could not be verified or accepted",
+                errors=["throughput_unverified"],
             )
-
-        if pt_arn:
-            try:
-                self._bedrock.delete_provisioned_model_throughput(
-                    provisionedModelId=pt_arn,
-                )
-            except Exception as exc:
-                return DeprovisionResult(
-                    ok=False,
-                    handle=spec.handle,
-                    message=(f"delete_provisioned_model_throughput: {exc}"),
-                    errors=[str(exc)],
-                )
-
-        log_action = "preserved"
-        if delete_data:
-            self._delete_log_group(
-                log_group=existing.get("LogGroup") or self._log_group_for(record_id=record_id),
-            )
-            log_action = "deleted"
-            self._records.pop(record_id, None)
-
-        return DeprovisionResult(
-            ok=True,
-            handle=spec.handle,
-            message=(
-                f"bedrock model endpoint {record_id} delete queued "
-                f"(provisioned_throughput="
-                f"{'released' if pt_arn else 'none'}, "
-                f"logs={log_action}, "
-                f"force_destroy={force_destroy})"
-            ),
-        )
 
     # ---- read-only ops ------------------------------------------------
 
     @driver_op(cloud="aws", driver="model_endpoint_bedrock")
-    def status(self, handle: ServiceHandle) -> ServiceStatus:
-        _, record_id = parse_handle(handle.handle)
-        existing = self._describe(record_id) or {}
-        pt_arn = existing.get("ProvisionedThroughputArn") or ""
-        if pt_arn:
-            try:
-                resp = self._bedrock.get_provisioned_model_throughput(
-                    provisionedModelId=pt_arn,
+    def status(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> ServiceStatus:
+        try:
+            saved = PaidHandle.parse(handle.handle)
+            _, record_id = parse_handle(handle.handle)
+            existing = self._describe(record_id)
+            if existing and not saved:
+                return ServiceStatus(
+                    handle=handle.handle, state="available", message="On-demand Bedrock capability binding"
                 )
-                pt_state = (resp.get("status") or "").lower()
-                if pt_state == "creating":
-                    return ServiceStatus(
-                        handle=handle.handle,
-                        state="provisioning",
-                        message=(f"provisioned throughput {pt_arn} creating"),
-                    )
-                if pt_state == "failed":
-                    return ServiceStatus(
-                        handle=handle.handle,
-                        state="error",
-                        message=(f"provisioned throughput {pt_arn} failed"),
-                    )
-            except Exception:
-                # Best-effort -- fall through to available.
-                pass
-        # On-demand foundation-model access has no cloud resource that can
-        # be "unavailable": a syntactically valid handle is always
-        # available. The in-memory record is per-driver-instance and is
-        # absent across Temporal activity boundaries (each activity builds
-        # a fresh driver), so a missing record must NOT read as
-        # "deprovisioned" -- doing so false-failed the provision readiness
-        # gate with "backend not ready: state=deprovisioned".
-        model_id = existing.get("ModelId") or self._config.default_model_id
-        return ServiceStatus(
-            handle=handle.handle,
-            state="available",
-            message=(f"bedrock model endpoint {record_id} available (model_id={model_id})"),
-        )
+            paid, row = self._throughput.observe(
+                handle.handle, service=handle.managed_service_id, organization=handle.organization_id
+            )
+            if row is None:
+                return ServiceStatus(
+                    handle=handle.handle,
+                    state="deprovisioned" if paid else "available",
+                    message="Native throughput missing" if paid else "On-demand Bedrock capability binding",
+                )
+            if paid is None:
+                raise ManagedServiceError("Bedrock throughput durable identity is missing")
+            if config is not None:
+                self._assert_paid_config(paid, config)
+            state = {
+                "Creating": "provisioning",
+                "Updating": "updating",
+                "InService": "available",
+                "Failed": "error",
+            }.get(str(row.get("status")), "error")
+            return ServiceStatus(
+                handle=handle.handle, state=state, message="Owned Bedrock throughput native state observed"
+            )
+        except Exception:
+            return ServiceStatus(
+                handle=handle.handle,
+                state="error",
+                message="Bedrock throughput identity or readiness could not be verified",
+            )
 
     @driver_op(cloud="aws", driver="model_endpoint_bedrock")
     def binding(
@@ -390,15 +395,22 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         handle: ServiceHandle,
         config: dict[str, Any] | None = None,
     ) -> Binding:
+        paid = PaidHandle.parse(handle.handle)
         _, record_id = parse_handle(handle.handle)
-        # Capability-only service: reconstruct the connection envelope from
-        # the handle + driver config alone. The in-memory record is absent
-        # in the fresh driver instance the finalize activity builds, so we
-        # must not require it (that raised and aborted provisioning). When
-        # present (same-instance) its ModelId wins; otherwise fall back to
-        # operator config then the driver default.
         existing = self._describe(record_id) or {}
         cfg = config or {}
+        paid_grants = None
+        if paid or cfg.get("provisioned_throughput"):
+            paid, row = self._throughput.observe(
+                handle.handle, service=handle.managed_service_id, organization=handle.organization_id
+            )
+            if not paid or not row or row.get("status") != "InService":
+                raise ManagedServiceError("Bedrock provisioned throughput is not verified InService")
+            if config is not None:
+                self._assert_paid_config(paid, cfg)
+            existing = {"ModelId": paid.arn}
+            record_id = row["provisionedModelName"]
+            paid_grants = [Grant(resource=paid.arn, actions=list(_INVOKE_ACTIONS))]
         invoke_endpoint = (
             self._config.invoke_endpoint_override or f"https://bedrock-runtime.{self._config.region}.amazonaws.com"
         )
@@ -412,6 +424,11 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             record_id=record_id,
         )
         irsa_role_tag_value = f"{self._config.irsa_role_tag_value_prefix}-{record_id}"
+        log_note = (
+            "Original invocation log location is unproved; delete-data cleanup is blocked."
+            if paid and not paid.log_prefix_hash
+            else f"Configured invocation log group is {log_group}; this does not prove logging is enabled."
+        )
         return Binding(
             env_vars={
                 # Canonical contract envs
@@ -429,14 +446,8 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                     literal=invoke_endpoint,
                 ),
             },
-            iam_grants=self._invoke_grants(model_id),
-            notes=(
-                f"IRSA role lookup uses tag "
-                f"{self._config.irsa_role_tag_key}="
-                f"{irsa_role_tag_value}. CloudWatch invocation logs "
-                f"persist at {log_group} -- retention "
-                f"governed by deprovision delete_data flag."
-            ),
+            iam_grants=paid_grants if paid_grants is not None else self._invoke_grants(model_id),
+            notes=(f"IRSA role lookup uses tag {self._config.irsa_role_tag_key}={irsa_role_tag_value}. {log_note}"),
         )
 
     def _invoke_grants(self, model_id: str) -> list[Grant]:
@@ -480,6 +491,8 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         # CloudWatch log group, both already durable. We return a
         # deterministic id so the workflow layer's snapshot path
         # gets a handle to track.
+        if PaidHandle.parse(handle.handle):
+            raise ManagedServiceError("Bedrock provisioned throughput has no snapshot primitive")
         _, record_id = parse_handle(handle.handle)
         existing = self._describe(record_id)
         if existing is None:
@@ -499,12 +512,20 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         snapshot: SnapshotHandle,
         target: ProvisionSpec,
     ) -> ProvisionResult:
+        if PaidHandle.parse(snapshot.handle) or (target.config or {}).get("provisioned_throughput"):
+            return ProvisionResult(
+                ok=False,
+                handle="",
+                message="Bedrock throughput snapshots cannot restore paid resources",
+                errors=["snapshot_not_supported"],
+            )
         provisioned = self.provision(target)
         if not provisioned.ok:
             return provisioned
         return ProvisionResult(
             ok=True,
             handle=provisioned.handle,
+            ready=provisioned.ready,
             message=(
                 f"target record provisioned; snapshot "
                 f"{snapshot.snapshot_id} carries no replayable state "
@@ -531,11 +552,11 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         return BindingSchema(
             env_vars={
                 "MODEL_ENDPOINT_URL": ("Bedrock runtime HTTPS endpoint"),
-                "MODEL_DEPLOYMENT_NAME": "Foundation model id, sent as the request's modelId",
+                "MODEL_DEPLOYMENT_NAME": "Foundation model/profile ID or provisioned throughput ARN used as modelId",
                 "MODEL_REGION": "AWS region of the Bedrock runtime",
                 "MODEL_API_STYLE": "Client protocol: 'bedrock'",
                 "MODEL_AUTH_MODE": "Credential kind: 'cloud_identity' (IRSA)",
-                "MODEL_ENDPOINT_MODEL_ID": ("Foundation model id (e.g. anthropic.claude-3-...)"),
+                "MODEL_ENDPOINT_MODEL_ID": "Foundation model/profile ID or provisioned throughput ARN",
                 "MODEL_ENDPOINT_PROVIDER": ("Provider literal: 'bedrock'"),
                 "BEDROCK_REGION": "AWS region hosting the endpoint",
                 "BEDROCK_MODEL_ID": "Alias for MODEL_ENDPOINT_MODEL_ID",
@@ -543,7 +564,124 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             },
         )
 
+    def editable_fields(self) -> list[str]:
+        # Native paid operations enforce the narrower per-handle restriction.
+        return ["model_id"]
+
     # ---- internals ----------------------------------------------------
+
+    def _assert_paid_config(self, paid: PaidHandle, cfg: dict[str, Any]) -> None:
+        requested = (
+            cfg.get("model_id") or _SIZE_TO_MODEL_ID.get(str(cfg.get("size", "small"))) or self._config.default_model_id
+        )
+        units = cfg.get("model_units", 1)
+        if (
+            digest(model_arn(requested, self._config)) != paid.model_hash
+            or type(units) is not int
+            or units != paid.units
+            or cfg.get("provisioned_throughput") != paid.term
+        ):
+            raise ManagedServiceError("Bedrock current configuration differs from recorded throughput")
+
+    def _provision_throughput(self, spec: ProvisionSpec) -> ProvisionResult:
+        try:
+            cfg = spec.config or {}
+            model = cfg.get("model_id") or _SIZE_TO_MODEL_ID.get(spec.size) or self._config.default_model_id
+            expected, tags = self._throughput.expected(spec, model)
+            name = "astrolift-" + expected.service.replace("-", "")
+            # Validate storage and region bounds before any provider effects.
+            partition = (
+                "aws-us-gov"
+                if self._config.region.startswith("us-gov-")
+                else "aws-cn"
+                if self._config.region.startswith("cn-")
+                else "aws"
+            )
+            placeholder = f"arn:{partition}:bedrock:{self._config.region}:000000000000:provisioned-model/000000000000"
+            replace(expected, arn=placeholder).encode()
+            if not re.fullmatch(r"[./_#A-Za-z0-9-]{1,512}", self._log_group_for(record_id=name)):
+                raise ManagedServiceError("Bedrock invocation log-group identity is invalid")
+            if not re.fullmatch(r"[a-z0-9-]{1,20}", self._config.region):
+                raise ManagedServiceError("Bedrock region is invalid")
+            candidates = (
+                [spec.recorded_handle]
+                if spec.recorded_handle
+                else [
+                    handle_for(kind=KIND, resource_id=name),
+                    handle_for(kind=KIND, resource_id=self._record_id_for(spec=spec)),
+                ]
+            )
+            for candidate in dict.fromkeys(candidates):
+                if PaidHandle.parse(candidate):
+                    saved, row = self._throughput.observe(
+                        candidate, service=expected.service, organization=expected.organization
+                    )
+                else:
+                    row = self._throughput.get(parse_handle(candidate)[1])
+                    saved = None
+                    if row:
+                        original_row = row
+                        try:
+                            saved, row = self._throughput.observe(
+                                candidate, service=expected.service, organization=expected.organization
+                            )
+                        except ManagedServiceError:
+                            saved = self._throughput.recover_legacy(spec, expected, original_row)
+                            row = original_row
+                if row:
+                    if saved is None:
+                        raise ManagedServiceError("Bedrock throughput durable identity is missing")
+                    # A legacy tag fingerprint proves the native intent, but never proves
+                    # the old CloudWatch prefix. Compare intent without inventing that proof.
+                    comparable = replace(saved, arn="", legacy_tags_hash="", legacy_name="")
+                    if saved.legacy_tags_hash and not saved.log_prefix_hash:
+                        comparable = replace(comparable, log_prefix_hash=expected.log_prefix_hash)
+                    if comparable != expected:
+                        raise ManagedServiceError("Bedrock recorded throughput does not match the requested intent")
+                    if row.get("status") not in ("Creating", "Updating", "InService"):
+                        raise ManagedServiceError("Bedrock throughput is failed or unknown")
+                    return ProvisionResult(
+                        ok=True,
+                        handle=saved.encode(),
+                        ready=row.get("status") == "InService",
+                        message="Owned Bedrock throughput recovered",
+                    )
+                if spec.recorded_handle:
+                    raise ManagedServiceError("Recorded Bedrock throughput is missing; explicit recovery required")
+            response = self._bedrock.create_provisioned_model_throughput(
+                modelUnits=expected.units,
+                provisionedModelName=name,
+                modelId=model,
+                commitmentDuration=expected.term,
+                tags=tags,
+                clientRequestToken=digest(["astrolift-bedrock-pt1", expected.service]),
+            )
+            arn = response.get("provisionedModelArn")
+            self._throughput.validate_arn(arn)
+            saved = replace(expected, arn=arn)
+            row = self._throughput.get(arn)
+            if row is None:
+                raise ManagedServiceError("Created Bedrock throughput is not yet observable; recover before retry")
+            self._throughput.verify(row, saved, service=expected.service, organization=expected.organization)
+            if row.get("status") not in ("Creating", "Updating", "InService"):
+                raise ManagedServiceError("Created Bedrock throughput is failed or unknown")
+            self._ensure_log_group(self._log_group_for(record_id=name))
+            return ProvisionResult(
+                ok=True,
+                handle=saved.encode(),
+                ready=False,
+                message="Bedrock throughput creation accepted; native readiness pending",
+            )
+        except Exception:
+            return ProvisionResult(
+                ok=False,
+                handle="",
+                message=(
+                    "Bedrock throughput identity or creation could not be confirmed; "
+                    "retry recovery before any replacement"
+                ),
+                errors=["throughput_unverified"],
+            )
 
     def _describe(self, record_id: str) -> dict[str, Any] | None:
         return self._records.get(record_id)
@@ -569,13 +707,6 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             "AppSlug": spec.app_slug,
             "EnvName": spec.environment_name,
         }
-
-    def _commitment_active(self, record: dict[str, Any]) -> bool:
-        # Conservative: any non-empty commitment is treated as
-        # active. The control plane that owns the row can blank
-        # out the field when the commitment window ends; we don't
-        # second-guess time math here.
-        return bool(record.get("CommitmentDuration"))
 
     def _record_id_for(self, *, spec: ProvisionSpec) -> str:
         # Bedrock provisioned-model names: 1-63 chars, alphanumeric +
@@ -620,19 +751,13 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         except Exception:
             return
 
-    def _delete_log_group(self, *, log_group: str) -> None:
+    def _delete_log_group(self, *, log_group: str) -> bool:
+        from botocore.exceptions import ClientError
+
         try:
             self._logs.delete_log_group(logGroupName=log_group)
+        except ClientError as exc:
+            return bool(exc.response.get("Error", {}).get("Code") == "ResourceNotFoundException")
         except Exception:
-            return
-
-
-# ----- module-level helpers --------------------------------------------
-
-
-def _pt_tags(spec: ProvisionSpec) -> dict[str, str]:
-    """Tag dict for Bedrock provisioned-throughput requests. The
-    SDK expects a flat ``{key: value}`` map here rather than the
-    ``[{"Key": ..., "Value": ...}]`` list shape used elsewhere."""
-    flat = {t["Key"]: t["Value"] for t in tags_for(spec)}
-    return flat
+            return False
+        return True

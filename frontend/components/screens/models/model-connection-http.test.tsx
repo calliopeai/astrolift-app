@@ -20,6 +20,7 @@ import type {
   ClusterModelFieldsFragment,
   ModelConnectionRequestFieldsFragment,
 } from "@/graphql/__generated__/operations";
+import { nativeModel } from "./native-model.fixtures";
 import { sharedModelDetailProps } from "./shared-model-detail.fixtures";
 import { connectionRequestRow, connectionPolicyProps } from "./model-connection.fixtures";
 import { ModelConnectionIntakePanel } from "./ModelConnectionIntakePanel";
@@ -50,7 +51,7 @@ vi.mock("@/graphql/user/user.hooks", () => ({
 }));
 const catalogs = { en, es, fr, de, ja, ko, "zh-Hans": zh, "pt-BR": pt };
 const schema = buildSchema(readFileSync(`${process.cwd()}/schema.graphql`, "utf8"));
-const model = sharedModelDetailProps.model!;
+let model = sharedModelDetailProps.model!;
 const requestGuid = "b83b44d8-a52d-4c4f-9efd-f4fa29172961";
 const subscriptionGuid = "5f82114f-2b90-48e6-b14a-25d237ed7da5";
 type Request = {
@@ -230,7 +231,7 @@ function handle(request: Request) {
             status: "updating",
             operationId: "controlled-reconcile",
             operationCompletedAt: null,
-            ready: false,
+            ready: model.sourceKind === "bedrock_foundation_model" ? null : false,
             desiredSubscriptionRevision: 3,
           },
         };
@@ -272,6 +273,7 @@ function handle(request: Request) {
   }
 }
 beforeEach(async () => {
+  model = sharedModelDetailProps.model!;
   identity.org = "org";
   identity.actor = "owner";
   identity.loading = false;
@@ -943,4 +945,40 @@ describe("current request detail, reviewer and exact policy writes", () => {
     expect(calls("GetModelConnectionRestriction")).toHaveLength(0);
     expect(calls("SetModelConnectionRestriction")).toHaveLength(0);
   });
+});
+
+describe("native app owner policy compatibility", () => {
+  it.each(["AUTO", "REQUEST"] as const)(
+    "preserves %s without hosting privileges or cloud runtime claims",
+    async (nativeAction) => {
+      model = {
+        ...model,
+        ...nativeModel,
+        id: model.id,
+        organizationId: model.organizationId,
+        clusterId: model.clusterId,
+        providerId: model.providerId,
+        version: 5,
+        name: model.name,
+      };
+      hosting = false;
+      action = nativeAction;
+      render(<Intake />, { wrapper: wrapper() });
+      const t = await intakeReview();
+      if (nativeAction === "AUTO")
+        expect(screen.getByRole("alertdialog")).toHaveTextContent(
+          en.models.native.details.restartImpact
+        );
+      await confirm(t(nativeAction === "AUTO" ? "connect" : "requestApproval"));
+      await screen.findByText(t(nativeAction === "AUTO" ? "connectionQueued" : "requestSaved"));
+      expect(calls("GetModelHostingAction")).toHaveLength(0);
+      expect(calls("RegisterBedrockModel")).toHaveLength(0);
+      expect(
+        calls(nativeAction === "AUTO" ? "SubscribeClusterModel" : "RequestModelConnection")
+      ).toHaveLength(1);
+      expect(
+        calls(nativeAction === "AUTO" ? "RequestModelConnection" : "SubscribeClusterModel")
+      ).toHaveLength(0);
+    }
+  );
 });

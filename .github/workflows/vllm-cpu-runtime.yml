@@ -1,6 +1,10 @@
 name: Build AVX2 CPU model runtime
 
 on:
+  pull_request:
+    paths:
+      - .github/workflows/vllm-cpu-runtime.yml
+      - scripts/vllm_cpu_runtime/**
   workflow_dispatch:
     inputs:
       publish:
@@ -49,14 +53,14 @@ jobs:
       - name: Verify package and bounded float32 generation
         run: python3 scripts/vllm_cpu_runtime/smoke.py --image astrolift-vllm-cpu:candidate --proof "$RUNNER_TEMP/runtime-proof.json"
       - name: Login to GHCR for explicit publication
-        if: ${{ inputs.publish }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Publish verified candidate and capture registry manifest
-        if: ${{ inputs.publish }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
         run: |
           set -euo pipefail
           IMAGE="ghcr.io/calliopeai/astrolift-vllm-cpu:0.15.1-avx2-${GITHUB_SHA}"

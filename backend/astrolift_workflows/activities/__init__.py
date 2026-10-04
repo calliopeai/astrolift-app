@@ -107,6 +107,10 @@ from astrolift_workflows.activities.custom_domain import (
     probe_required_records,
     transition_domain_status,
 )
+from astrolift_workflows.activities.deployment_identity_origin import (
+    mark_deployment_identity_refused,
+    validate_deployment_identity_origin,
+)
 from astrolift_workflows.activities.deprovision_managed_domain import (
     deprovision_managed_domain_resources,
 )
@@ -144,6 +148,11 @@ from astrolift_workflows.activities.migration import (
     poll_rollout_on_target,
     switch_app_env_binding,
     validate_migration_target,
+)
+from astrolift_workflows.activities.native_model_connections import (
+    apply_native_model_connection,
+    fail_native_model_connection,
+    finish_native_model_connection,
 )
 from astrolift_workflows.activities.observability_retention import (
     ObservabilityRetentionSummary,
@@ -225,6 +234,9 @@ from astrolift_workflows.activities.workload_identity import (
 )
 
 __all__ = [
+    "apply_native_model_connection",
+    "finish_native_model_connection",
+    "fail_native_model_connection",
     "apply_shared_model",
     "observe_shared_model",
     "activate_shared_model_subscriptions",
