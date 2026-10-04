@@ -89,7 +89,10 @@ blocking row lock, before subscription or reconciliation effects. Browser admiss
 Django session through the shared read-only validator and validates expiry, actor
 and auth hash; revoked, deleted, expired or foreign-actor tracked sessions refuse.
 A request-local refusal marker prevents response tracking from reviving the
-withdrawn sidecar. This is a fresh admission check, not a global atomic snapshot of
+withdrawn sidecar. The ordinary automatic connection and subscription-revocation
+paths apply the same persisted-session validation after their final attachment
+lock wait, with authentication facts rebuilt from the fresh session bag.
+Bearer credential ceilings and direct non-HTTP service admission remain unchanged. This is a fresh admission check, not a global atomic snapshot of
 all authority rows or a logout/response-persistence linearization guarantee.
 
 Votes retain an internal link to the review credential so expired/revoked tokens

@@ -190,8 +190,26 @@ def _recheck_authority(info, permission, cluster, *, environment=None):
         actor = get_user_model().objects.filter(pk=tenant.actor_user_id, is_active=True).first()
         if actor is None or not session_may_act_in(actor, tenant.organization_id):
             raise PermissionDenied(permission, None, "Authentication required")
+        request = getattr(info.context, "request", None)
+        from django.http import HttpRequest
+
+        if token is None and (isinstance(request, HttpRequest) or hasattr(request, "session")):
+            from types import SimpleNamespace
+
+            from core.current_session import fresh_authenticated_session
+
+            current_session = fresh_authenticated_session(
+                request, actor_user_id=actor.pk, permission=permission
+            )
+            auth_attrs = abac.attributes_from_request(
+                SimpleNamespace(META=getattr(request, "META", {}), session=current_session), actor.pk
+            )
+        else:
+            # Bearer ceilings are refreshed above; direct non-HTTP fixtures have
+            # no persisted session. Keep their existing operation facts.
+            auth_attrs = abac.attributes_for(tenant.actor_user_id)
         attrs = replace(
-            abac.attributes_for(tenant.actor_user_id),
+            auth_attrs,
             cache={},
             environment=environment.name if environment is not None else None,
             region=cluster.region or None,

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Revalidate persisted browser sessions and current authentication facts before
+  automatic model connection or subscription revocation effects after lock waits.
+  Preserve withdrawn session tracking when refusing stale requests (#2270).
+
 - Add explicit connected-app subscription traffic reads to hosted models, with
   request/error rates, accepted response bytes and latency. Keep authenticated
   subscription scope separate from deployment totals, preserve missing/zero/stale
