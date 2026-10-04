@@ -80,20 +80,96 @@ def test_unrelated_opaque_or_ambiguous_payload_refused(mutation):
         accepted_preparation_template_from_payload(payload)
 
 
-def test_import_is_pure_in_fresh_interpreter():
+_IMPORT_GUARD = """
+import builtins
+import importlib
+import importlib.util
+import sys
+import types
+
+forbidden_roots = {'django', 'google', 'gcp', 'aws', 'azure', 'k8s_native',
+                   '_sdk', 'boto3', 'botocore', 'kubernetes'}
+
+def forbidden(name):
+    return name.split('.', 1)[0] in forbidden_roots
+
+class ForbiddenDependency(types.ModuleType):
+    def __getattribute__(self, name):
+        if name in {'__name__', '__spec__', '__loader__', '__package__', '__path__'}:
+            return super().__getattribute__(name)
+        dependency = super().__getattribute__('__name__')
+        raise AssertionError('Forbidden dependency access: ' + dependency + '.' + name)
+
+# Installed namespace .pth files may load google.cloud before this probe runs.
+# Poison those modules as well as blocking imports, so startup is not authority
+# to use a preloaded dependency or construct one of its clients.
+before = set(sys.modules)
+for name in tuple(before):
+    if forbidden(name):
+        sys.modules[name] = ForbiddenDependency(name)
+
+original_import = builtins.__import__
+original_import_module = importlib.import_module
+
+def guarded_import(name, *args, **kwargs):
+    if forbidden(name):
+        raise AssertionError('Forbidden dependency import: ' + name)
+    return original_import(name, *args, **kwargs)
+
+def guarded_import_module(name, package=None):
+    absolute = importlib.util.resolve_name(name, package) if name.startswith('.') else name
+    if forbidden(absolute):
+        raise AssertionError('Forbidden dependency import: ' + absolute)
+    return original_import_module(name, package)
+
+builtins.__import__ = guarded_import
+importlib.import_module = guarded_import_module
+"""
+
+
+def _import_probe(code, *, preload=""):
     root = Path(__file__).resolve().parents[2]
-    result = subprocess.run(
+    return subprocess.run(
         [
             sys.executable,
             "-c",
-            "import sys; from astrolift_workflows.gcp_identity_inputs import AcceptedPreparationTemplate; assert not any(name == 'django' or name.startswith(('django.', 'google.', 'gcp.')) for name in sys.modules)",
+            preload + _IMPORT_GUARD + code + "\n"
+            "added = sorted(name for name in set(sys.modules) - before if forbidden(name))\n"
+            "assert not added, 'Forbidden dependencies loaded by target: ' + repr(added)\n",
         ],
         env={**os.environ, "PYTHONPATH": str(root)},
         capture_output=True,
         text=True,
         check=False,
+        timeout=15,
+    )
+
+
+def test_import_is_pure_in_fresh_interpreter():
+    result = _import_probe(
+        "\nfrom astrolift_workflows.gcp_identity_inputs import AcceptedPreparationTemplate\n"
+        "assert AcceptedPreparationTemplate.__module__ == 'astrolift_workflows.gcp_identity_inputs'"
     )
     assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    "code",
+    [
+        "\nimport google.cloud",
+        "\nfrom google.cloud import Client; Client()",
+        "\nimportlib.import_module('google.cloud')",
+        "\nbuiltins.__import__('google.cloud')",
+        "\nsys.modules['google.cloud'].Client()",
+    ],
+)
+def test_purity_guard_refuses_preloaded_dependency_import_or_client_access(code):
+    result = _import_probe(
+        code,
+        preload="import sys, types\nsys.modules['google.cloud'] = types.ModuleType('google.cloud')\n",
+    )
+    assert result.returncode != 0
+    assert "Forbidden dependency" in result.stderr
 
 
 def test_shared_physical_subject_retains_all_aliases_and_detach_changes_plan():
