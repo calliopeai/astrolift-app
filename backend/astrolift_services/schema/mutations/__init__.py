@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import strawberry
 
+from astrolift_services.schema.bedrock_model_connections import BedrockModelConnectionsMutation
 from astrolift_services.schema.cluster_model_mutations import ClusterModelMutations
 from astrolift_services.schema.hf_connections import HuggingFaceConnectionsMutation
 from astrolift_services.schema.local_model_artifacts import ModelArtifactsMutation
@@ -82,6 +83,7 @@ from astrolift_services.schema.mutations.types import (  # noqa: F401
 @strawberry.type
 class ServicesMutation(
     ClusterModelMutations,
+    BedrockModelConnectionsMutation,
     ModelConnectionsMutation,
     HuggingFaceConnectionsMutation,
     ModelArtifactsMutation,

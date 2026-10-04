@@ -145,6 +145,11 @@ from astrolift_workflows.activities.migration import (
     switch_app_env_binding,
     validate_migration_target,
 )
+from astrolift_workflows.activities.native_model_connections import (
+    apply_native_model_connection,
+    fail_native_model_connection,
+    finish_native_model_connection,
+)
 from astrolift_workflows.activities.observability_retention import (
     ObservabilityRetentionSummary,
     prune_observability_data,
@@ -225,6 +230,9 @@ from astrolift_workflows.activities.workload_identity import (
 )
 
 __all__ = [
+    "apply_native_model_connection",
+    "finish_native_model_connection",
+    "fail_native_model_connection",
     "apply_shared_model",
     "observe_shared_model",
     "activate_shared_model_subscriptions",

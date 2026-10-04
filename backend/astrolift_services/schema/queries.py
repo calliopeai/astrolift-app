@@ -45,6 +45,7 @@ from astrolift_services.models import (
     SecretChangeProposal,
     WorkloadIdentityGrant,
 )
+from astrolift_services.schema.bedrock_model_connections import BedrockModelConnectionsQuery
 from astrolift_services.schema.cluster_models import ClusterModelsQuery
 from astrolift_services.schema.hf_connections import HuggingFaceConnectionsQuery
 from astrolift_services.schema.local_model_artifacts import ModelArtifactsQuery
@@ -685,6 +686,7 @@ def _managed_services_qs(
 class ServicesQuery(
     ModelConnectionsQuery,
     ClusterModelsQuery,
+    BedrockModelConnectionsQuery,
     HuggingFaceConnectionsQuery,
     ModelArtifactsQuery,
     ModelRuntimeSettingsQuery,

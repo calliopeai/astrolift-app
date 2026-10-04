@@ -161,13 +161,9 @@ def _subscription_targets_page(
                 current_org_id(),
             ).exists()
         )
-        decision = cluster_model_to_type(service, dedicated=None)
-        admitted = (
-            admitted
-            and decision.runtime_supported is True
-            and decision.ready is True
-            and service.status == "active"
-        )
+        from astrolift_services.native_model_connections import model_connectable
+
+        admitted = admitted and model_connectable(service) and service.status == "active"
 
     from astrolift_services.model_settings import dedicated_app
 
@@ -233,7 +229,9 @@ def _subscription_targets_page(
 @strawberry.type(name="ModelPlacementCluster")
 class ModelPlacementClusterType:
     id: GUID
+    version: int
     provider_id: GUID
+    provider_version: int
     name: str
     slug: str
     region: str | None
@@ -364,7 +362,9 @@ class ClusterModelsQuery:
             page_size=page_size,
             projection=lambda cluster: ModelPlacementClusterType(
                 id=GUID(str(cluster.guid)),
+                version=cluster.version,
                 provider_id=GUID(str(cluster.provider_plugin.guid)),
+                provider_version=cluster.provider_plugin.version,
                 name=cluster.name,
                 slug=cluster.slug,
                 region=cluster.region or None,

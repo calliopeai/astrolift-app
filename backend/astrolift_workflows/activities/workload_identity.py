@@ -263,7 +263,25 @@ def _identity_services_by_environment(app, cluster):
                 project_id=app.project_id,
                 project__deleted_at__isnull=True,
                 tenant_cluster=cluster,
+            )
+            | Q(
+                organization_id=app.organization_id,
+                registered_app__isnull=True,
+                app_environment__isnull=True,
+                project__isnull=True,
+                kind="model_endpoint",
+                variant="bedrock",
+                config__existing_connection_only=True,
+                config__model_source="bedrock",
+                tenant_cluster=cluster,
+                tenant_cluster__provider_plugin__slug="aws",
+                attachments__model_subscription=True,
+                attachments__desired_enabled=True,
+                attachments__app_environment_id__in=environment_ids,
+                attachments__deleted_at__isnull=True,
             ),
+            # Organization-owned native connections use explicit desired subscriptions,
+            # not the vLLM service's operator key or runtime grants.
             Q(tenant_cluster__isnull=True) | Q(tenant_cluster=cluster),
         )
         .select_related("app_environment__tenant_cluster__provider_plugin", "tenant_cluster__provider_plugin")
@@ -279,7 +297,17 @@ def _identity_services_by_environment(app, cluster):
     )
     services_by_env: dict[int, list[ManagedService]] = {env.pk: [] for env in environments}
     for service in rows:
-        consumers = {attachment.app_environment_id for attachment in service.identity_attachments}
+        from astrolift_services.model_settings import allows_app
+        from astrolift_services.native_model_connections import is_bedrock_connection
+
+        native = is_bedrock_connection(service)
+        if native and not allows_app(service, app):
+            raise ValueError("Native model subscription app access is no longer coherent.")
+        consumers = {
+            attachment.app_environment_id
+            for attachment in service.identity_attachments
+            if not native or (attachment.model_subscription and attachment.desired_enabled)
+        }
         if service.app_environment_id in services_by_env:
             consumers.add(service.app_environment_id)
         for env_id in consumers:
@@ -287,14 +315,29 @@ def _identity_services_by_environment(app, cluster):
     return [(env, services_by_env[env.pk]) for env in environments]
 
 
-def _ensure_workload_identity_sync(registered_app_id: int, app_environment_id: int) -> dict[str, Any]:
+def _native_identity_driver(cluster):
+    from aws.identity_native import NativeIRSADriver
+
+    from core.app_deploy import _config_for_capability
+
+    # Native model connection reconciliation does not discover/change cluster
+    # setup using legacy ambient EKS clients. An operator must have declared its
+    # exact OIDC issuer before a native IAM role can be created or changed.
+    return NativeIRSADriver(config=_config_for_capability("aws", cluster, "identity"))
+
+
+def _ensure_workload_identity_sync(
+    registered_app_id: int, app_environment_id: int, *, reconcile_empty=False
+) -> dict[str, Any]:
     from django.db import transaction
 
     # The shared policy and trust must reconcile together across concurrent deploys.
     failure = None
     with transaction.atomic():
         try:
-            return _ensure_workload_identity_locked(registered_app_id, app_environment_id)
+            return _ensure_workload_identity_locked(
+                registered_app_id, app_environment_id, reconcile_empty=reconcile_empty
+            )
         except Exception as exc:
             # Assignment failures must remain observable after the activity raises.
             failure = exc
@@ -304,6 +347,8 @@ def _ensure_workload_identity_sync(registered_app_id: int, app_environment_id: i
 def _ensure_workload_identity_locked(
     registered_app_id: int,
     app_environment_id: int,
+    *,
+    reconcile_empty=False,
 ) -> dict[str, Any]:
     from astrolift_lifecycle.models import AppEnvironment
     from astrolift_lifecycle.visibility import cluster_owned_and_live, live_app_rows
@@ -344,7 +389,9 @@ def _ensure_workload_identity_locked(
     if not cluster_owned_and_live(cluster, app.organization_id):
         raise ValueError("workload identity cluster is not live in the app organization")
     groups = _identity_services_by_environment(app, cluster)
-    if not next((services for env, services in groups if env.pk == environment.pk), []):
+    if not reconcile_empty and not next(
+        (services for env, services in groups if env.pk == environment.pk), []
+    ):
         return {
             "skipped": True,
             "reason": "no managed services",
@@ -353,6 +400,28 @@ def _ensure_workload_identity_locked(
     services = list({service.pk: service for _, group in groups for service in group}.values())
 
     plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
+    if reconcile_empty and plugin_slug != "aws":
+        raise ValueError("Native empty-union reconciliation requires the admitted AWS cluster.")
+    from astrolift_services.native_model_connections import is_bedrock_connection, verify_source
+
+    native_mode = reconcile_empty or any(is_bedrock_connection(service) for service in services)
+    unavailable_native = []
+    retained = []
+    for service in services:
+        if is_bedrock_connection(service):
+            try:
+                verify_source(service)
+            except ValueError:
+                if not reconcile_empty:
+                    raise
+                # Cleanup cannot strand an owned old grant because catalogue
+                # admission was withdrawn. Never use an unavailable source to
+                # justify a retained/new grant in the recomputed owned union.
+                unavailable_native.append(service.pk)
+                continue
+        retained.append(service)
+    services = retained
+    groups = [(env, [svc for svc in group if svc.pk not in unavailable_native]) for env, group in groups]
     bindings = [_managed_binding_for(svc) for svc in services]
     _refuse_unscoped_secret_grants(services, bindings)
     permissions = _permissions_from_bindings(bindings, plugin_slug=plugin_slug)
@@ -400,9 +469,11 @@ def _ensure_workload_identity_locked(
     # Discover it from EKS + cache on the cluster row when absent, so the
     # trust isn't malformed by an empty issuer (which yields a broken
     # oidc-provider/ principal + bare :sub condition).
-    _ensure_cluster_oidc_issuer(cluster)
-
-    identity_driver = _resolve_capability_driver(cluster, "identity")
+    if not native_mode:
+        _ensure_cluster_oidc_issuer(cluster)
+        identity_driver = _resolve_capability_driver(cluster, "identity")
+    else:
+        identity_driver = _native_identity_driver(cluster)
     role_name = workload_identity_role_name(app)
     namespace = namespace_for_environment(environment)
 
@@ -413,10 +484,30 @@ def _ensure_workload_identity_locked(
     # per-assignment state is persisted on the failing path too — that is the
     # path an operator most needs it on.
     try:
-        role_arn = identity_driver.create_identity_role(role_name, permissions)
+        if native_mode:
+            owner = {
+                "organization": str(app.organization.guid),
+                "app": str(app.guid),
+                "cluster": str(cluster.guid),
+            }
+            subjects = sorted(
+                {f"system:serviceaccount:{namespace_for_environment(env)}:{role_name}" for env, _ in groups}
+            )
+            role_arn = identity_driver.reconcile_managed_identity(
+                name=role_name, permissions=permissions, owner=owner, subjects=subjects
+            )
+            if not identity_driver.verify_managed_identity(
+                name=role_name, permissions=permissions, owner=owner, subjects=subjects
+            ):
+                raise ValueError("Owned workload identity reconciliation could not be observed.")
+        else:
+            role_arn = identity_driver.create_identity_role(role_name, permissions)
     except Exception:
         persist_states()
         raise
+    finally:
+        if native_mode:
+            identity_driver.close()
     states = persist_states()
     refusals = list(getattr(identity_driver, "prune_refusals", list)())
     for refusal in refusals:
@@ -433,19 +524,17 @@ def _ensure_workload_identity_locked(
     # cluster whose render carries the ServiceAccount is bound, this one
     # last; with every environment in the app namespace that is the one
     # call it always was.
-    other_namespaces = {
-        namespace_for_environment(env)
-        for env, group in groups
-        if group and env.pk != environment.pk and namespace_for_environment(env) != namespace
-    }
-    for other in sorted(other_namespaces):
-        identity_driver.bind_service_account(cluster.slug, other, role_name, role_name)
-    annotation = identity_driver.bind_service_account(
-        cluster.slug,
-        namespace,
-        role_name,
-        role_name,
-    )
+    if native_mode:
+        annotation = {"eks.amazonaws.com/role-arn": role_arn}
+    else:
+        other_namespaces = {
+            namespace_for_environment(env)
+            for env, group in groups
+            if group and env.pk != environment.pk and namespace_for_environment(env) != namespace
+        }
+        for other in sorted(other_namespaces):
+            identity_driver.bind_service_account(cluster.slug, other, role_name, role_name)
+        annotation = identity_driver.bind_service_account(cluster.slug, namespace, role_name, role_name)
     return {
         "registered_app_id": registered_app_id,
         "role": role_name,
@@ -460,6 +549,7 @@ def _ensure_workload_identity_locked(
         "grants_failed": states.get("failed", 0),
         "prune_refusals": len(refusals),
         "annotation": annotation,
+        "unavailable_native_services": unavailable_native,
     }
 
 

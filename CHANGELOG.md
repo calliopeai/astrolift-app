@@ -8,6 +8,13 @@
   observations and unknown invocation access; no adoption, lifecycle, API or UI
   availability is added. Keep private SDK DEBUG payloads out of logs (#2269).
 
+- Register existing Bedrock on-demand models and inference profiles as explicitly
+  native, organization-owned shared or dedicated connections. Require the default-off
+  global feature and current hosting authority; reconcile exact app-owned IAM grants
+  and named bindings without allocating or deleting cloud models. Preserve approval
+  policy, refuse ambiguous role/ServiceAccount ownership, and keep native readiness,
+  invocation access and local serving metrics distinct (#2269).
+
 - Add internal read-only Microsoft Foundry deployment discovery through the native
   Cognitive Services SDK. Bind results to the exact subscription/account/region,
   bound pagination, block redirects and writes, and keep inference access unknown

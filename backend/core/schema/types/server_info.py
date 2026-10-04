@@ -51,6 +51,11 @@ logger = logging.getLogger(__name__)
 # tenant-counts stays off this list.
 _PUBLIC_FEATURE_FLAGS: tuple[tuple[str, str, str], ...] = (
     (
+        "BEDROCK_MODEL_CONNECTIONS_ENABLED",
+        "models.bedrock_connections_enabled",
+        "Existing Bedrock connections are enabled; current hosting admission and app invocation are checked separately.",
+    ),
+    (
         "TEMPORAL_ENABLED",
         "workflows.temporal_enabled",
         "Durable-workflow runtime is online; clients can expect workflow ids on long-running mutations.",
