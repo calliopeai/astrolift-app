@@ -231,7 +231,7 @@ function handle(request: Request) {
             status: "updating",
             operationId: "controlled-reconcile",
             operationCompletedAt: null,
-            ready: model.sourceKind === "bedrock" ? null : false,
+            ready: model.sourceKind === "bedrock_foundation_model" ? null : false,
             desiredSubscriptionRevision: 3,
           },
         };

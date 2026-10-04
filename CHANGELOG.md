@@ -26,6 +26,10 @@
   policy, refuse ambiguous role/ServiceAccount ownership, and keep native readiness,
   invocation access and local serving metrics distinct (#2269).
 
+- Bind native model presentation to the serialized foundation/profile source
+  discriminators; refuse mismatched or unknown variants and retain unavailable
+  native identity without a hosted-runtime fallback (#2269).
+
 - Retain accepted native settings across exact version refresh and preserve app
   connection acknowledgments during fresh reads, while stale reviews and actor
   changes continue to refuse writes (#2269).

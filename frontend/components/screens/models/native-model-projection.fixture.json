@@ -1,0 +1,39 @@
+{
+  "head": "5537cc7dd9861c6d8ea976758f47caa09f80c7b6",
+  "rows": [
+    {
+      "case": "foundation",
+      "serializedQueryData": {
+        "sourceKind": "bedrock_foundation_model",
+        "nativeSource": {
+          "protocol": "BEDROCK",
+          "sourceKind": "FOUNDATION_MODEL"
+        }
+      }
+    },
+    {
+      "case": "profile",
+      "serializedQueryData": {
+        "sourceKind": "bedrock_inference_profile",
+        "nativeSource": {
+          "protocol": "BEDROCK",
+          "sourceKind": "INFERENCE_PROFILE"
+        }
+      }
+    },
+    {
+      "case": "withdrawn",
+      "serializedQueryData": {
+        "sourceKind": "bedrock_foundation_model",
+        "nativeSource": null
+      }
+    },
+    {
+      "case": "unknown",
+      "serializedQueryData": {
+        "sourceKind": "bedrock_unknown",
+        "nativeSource": null
+      }
+    }
+  ]
+}

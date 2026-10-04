@@ -12,7 +12,7 @@ import type { ModelSubscription } from "./ModelSubscriptionsPanel";
 import type { ClusterModelFieldsFragment } from "@/graphql/__generated__/operations";
 import { ModelSubscriptionsPanel } from "./ModelSubscriptionsPanel";
 import { useModelSubscriptions } from "./use-model-subscriptions";
-import { modelSourceMode } from "./native-model-source";
+import { isBedrockModelKind, modelSourceMode } from "./native-model-source";
 export function ModelSubscriptionsClient(props: {
   model: ClusterModelFieldsFragment;
   blocked: boolean;
@@ -32,11 +32,11 @@ function Views(props: {
   const sourceMode = modelSourceMode(props.model);
   const canAdd =
     !props.blocked &&
-    (props.model.sourceKind !== "bedrock" ||
+    (!isBedrockModelKind(props.model.sourceKind) ||
       (sourceMode === "native" && props.model.nativeSource?.configurationState === "configured"));
   const showIntake =
     adding &&
-    (props.model.sourceKind !== "bedrock" ||
+    (!isBedrockModelKind(props.model.sourceKind) ||
       (sourceMode === "native" && props.model.nativeSource?.configurationState === "configured"));
   return (
     <section className="space-y-4">

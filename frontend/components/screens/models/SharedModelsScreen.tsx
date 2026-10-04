@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { NativeModelSourceFieldsFragment } from "@/graphql/__generated__/operations";
-import { validNativeSource } from "./native-model-source";
+import { modelSourceMode, validNativeSource } from "./native-model-source";
 import Link from "next/link";
 import { BrainCircuitIcon, RocketIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
@@ -110,18 +110,18 @@ export function SharedModelsScreen({ page, addChoices }: SharedModelsScreenProps
               <span
                 className="text-muted-foreground block truncate font-mono text-xs"
                 title={
-                  (validNativeSource(row.nativeSource)
+                  (modelSourceMode(row) === "native" && validNativeSource(row.nativeSource)
                     ? row.nativeSource.sourceFingerprint
-                    : row.sourceKind === "local_artifact"
+                    : modelSourceMode(row) === "hosted" && row.sourceKind === "local_artifact"
                       ? row.localManifestSha256
                       : row.revisionSha) ?? undefined
                 }
               >
-                {(row.sourceKind === "bedrock" && !row.nativeSource
+                {(modelSourceMode(row) === "native_unavailable"
                   ? native("unavailable")
-                  : validNativeSource(row.nativeSource)
+                  : modelSourceMode(row) === "native" && validNativeSource(row.nativeSource)
                     ? row.nativeSource.sourceFingerprint
-                    : row.sourceKind === "local_artifact"
+                    : modelSourceMode(row) === "hosted" && row.sourceKind === "local_artifact"
                       ? row.localManifestSha256
                       : row.revisionSha) ?? t("unknownRevision")}
               </span>
@@ -132,13 +132,13 @@ export function SharedModelsScreen({ page, addChoices }: SharedModelsScreenProps
           id: "source",
           header: inventory("source"),
           cell: (row) =>
-            validNativeSource(row.nativeSource)
+            modelSourceMode(row) === "native" && validNativeSource(row.nativeSource)
               ? "Amazon Bedrock"
-              : row.sourceKind === "local_artifact"
+              : modelSourceMode(row) === "hosted" && row.sourceKind === "local_artifact"
                 ? inventory("local")
-                : row.sourceKind === "huggingface"
+                : modelSourceMode(row) === "hosted" && row.sourceKind === "huggingface"
                   ? inventory("huggingface")
-                  : row.sourceKind === "bedrock"
+                  : modelSourceMode(row) === "native_unavailable"
                     ? `Amazon Bedrock · ${native("unavailable")}`
                     : inventory("unknownSource"),
         },
@@ -165,7 +165,7 @@ export function SharedModelsScreen({ page, addChoices }: SharedModelsScreenProps
           id: "resources",
           header: inventory("resources"),
           cell: (row) =>
-            row.sourceKind === "bedrock" || row.nativeSource
+            modelSourceMode(row) !== "hosted"
               ? native("notApplicable")
               : inventory("resourceSummary", {
                   cpu: row.desiredResources?.cpuRequest ?? t("unknown"),
@@ -193,7 +193,7 @@ export function SharedModelsScreen({ page, addChoices }: SharedModelsScreenProps
           id: "compute",
           header: t("compute"),
           cell: (row) =>
-            row.sourceKind === "bedrock" || row.nativeSource
+            modelSourceMode(row) !== "hosted"
               ? native("notApplicable")
               : row.computeMode === "cpu" || row.computeMode === "gpu"
                 ? t(row.computeMode)
@@ -215,11 +215,11 @@ export function SharedModelsScreen({ page, addChoices }: SharedModelsScreenProps
           header: t("readiness"),
           cellClassName: "max-w-64",
           cell: (row) =>
-            row.sourceKind === "bedrock" || row.nativeSource ? (
+            modelSourceMode(row) !== "hosted" ? (
               <span>
-                {validNativeSource(row.nativeSource)
+                {modelSourceMode(row) === "native" && validNativeSource(row.nativeSource)
                   ? native("description")
-                  : row.sourceKind === "bedrock" && !row.nativeSource
+                  : modelSourceMode(row) === "native_unavailable"
                     ? native("unavailable")
                     : native("unsupported")}
               </span>
