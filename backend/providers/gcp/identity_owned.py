@@ -138,6 +138,7 @@ class OwnedGrantLedger:
     context_sha256: str
     policies: tuple[PolicyOwnership, ...] = ()
     pending: tuple[PolicyIntent, ...] = ()
+    removals: tuple[PolicyOwnership, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -253,6 +254,7 @@ class NativeGCPIdentity:
         return value
 
     def _admit(self, checkpoint: Callable[[], None]) -> None:
+        checkpoint()
         projects, iam, _ = self._native()
         context = self.context
         project = self._call(projects.get_project, {"name": f"projects/{context.project_number}"}, checkpoint)
@@ -312,9 +314,10 @@ class NativeGCPIdentity:
             ledger.context_sha256 != self.context.fingerprint
             or len(ledger.policies) > MAX_RESOURCES
             or len(ledger.pending) > MAX_RESOURCES
+            or len(ledger.removals) > MAX_RESOURCES
         ):
             raise NativeIdentityError("INVALID_LEDGER_CONTEXT")
-        for rows in (ledger.policies, ledger.pending):
+        for rows in (ledger.policies, ledger.pending, ledger.removals):
             resources = [row.resource for row in rows]
             if len(resources) != len(set(resources)):
                 raise NativeIdentityError("DUPLICATE_LEDGER_RESOURCE")
@@ -385,10 +388,14 @@ class NativeGCPIdentity:
         self._admit(checkpoint)
         _, iam, endpoints = self._native()
         self._verify_roles(roles, checkpoint)
-        resources = set(desired) | {row.resource for row in ledger.policies} | {row.resource for row in ledger.pending}
+        resources = (
+            set(desired)
+            | {row.resource for row in ledger.policies}
+            | {row.resource for row in ledger.pending}
+            | {row.resource for row in ledger.removals}
+        )
         if len(resources) > MAX_RESOURCES:
             raise NativeIdentityError("TOO_MANY_RESOURCES")
-        external = 0
         for resource in sorted(resources):
             self._admit(checkpoint)
             client = iam if resource == self.context.service_account_resource else endpoints
@@ -412,7 +419,18 @@ class NativeGCPIdentity:
                     persist(ledger)
                 elif current_hash != pending.before_sha256:
                     raise NativeIdentityError("PENDING_POLICY_CONFLICT")
+            owned.update(next((row.grants for row in ledger.removals if row.resource == resource), ()))
             wanted = desired.get(resource, set())
+            removed = owned - wanted
+            if removed:
+                existing = set(next((row.grants for row in ledger.removals if row.resource == resource), ()))
+                ledger = replace(
+                    ledger,
+                    removals=(
+                        *tuple(row for row in ledger.removals if row.resource != resource),
+                        PolicyOwnership(resource, tuple(sorted(existing | removed))),
+                    ),
+                )
             changed = type(policy)()
             changed.CopyFrom(policy)
             for grant in sorted(owned):
@@ -440,7 +458,6 @@ class NativeGCPIdentity:
                     and grant.member in binding.members
                 ]
                 if matches:
-                    external += int(grant not in owned)
                     continue
                 binding = next(
                     (
@@ -483,7 +500,53 @@ class NativeGCPIdentity:
             persist(ledger)
         self._admit(checkpoint)
         self._verify_roles(roles, checkpoint)
+        external = self._verify_union(resources, desired, ledger, checkpoint)
+        self._admit(checkpoint)
+        self._verify_roles(roles, checkpoint)
+        ledger = replace(ledger, removals=())
+        persist(ledger)
         return NativeIdentityResult(ledger, {"iam.gke.io/gcp-service-account": self.context.email}, external)
+
+    def _verify_union(
+        self,
+        resources: set[str],
+        desired: dict[str, set[OwnedGrant]],
+        ledger: OwnedGrantLedger,
+        checkpoint: Callable[[], None],
+    ) -> int:
+        from google.iam.v1 import iam_policy_pb2
+
+        _, iam, endpoints = self._native()
+        external = 0
+        for resource in sorted(resources):
+            self._admit(checkpoint)
+            client = iam if resource == self.context.service_account_resource else endpoints
+            wanted = desired.get(resource, set())
+            if client is endpoints and wanted:
+                endpoint = self._call(endpoints.get_endpoint, {"name": resource}, checkpoint)
+                if self._resource(endpoint.name) != resource:
+                    raise NativeIdentityError("ENDPOINT_IDENTITY_CHANGED")
+            policy = self._call(
+                client.get_iam_policy,
+                iam_policy_pb2.GetIamPolicyRequest(resource=resource, options={"requested_policy_version": 3}),
+                checkpoint,
+            )
+            self._policy(policy)
+            owned = set(next((row.grants for row in ledger.policies if row.resource == resource), ()))
+            removed = set(next((row.grants for row in ledger.removals if row.resource == resource), ())) - wanted
+            for grant in wanted | removed:
+                occurrences = sum(
+                    list(binding.members).count(grant.member)
+                    for binding in policy.bindings
+                    if not binding.HasField("condition") and binding.role == grant.role
+                )
+                if (grant in removed and occurrences) or (grant in wanted and not occurrences):
+                    raise NativeIdentityError("FINAL_POLICY_UNION_MISMATCH")
+                if grant in owned and occurrences != 1:
+                    raise NativeIdentityError("OWNED_GRANT_AMBIGUOUS")
+                if grant in wanted and grant not in owned:
+                    external += 1
+        return external
 
     @staticmethod
     def _record(ledger: OwnedGrantLedger, resource: str, owned: set[OwnedGrant]) -> OwnedGrantLedger:

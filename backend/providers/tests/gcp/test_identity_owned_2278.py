@@ -543,3 +543,112 @@ def test_invalid_native_endpoint_ids_refuse_before_effect(world, endpoint_id):
     with pytest.raises(NativeIdentityError, match="INVALID_ENDPOINT_RESOURCE"):
         reconcile([{"role": ROLE, "resource": resource}])
     assert not wire.calls
+
+
+def test_withdrawn_checkpoint_precedes_adc_discovery_and_private_client_construction(monkeypatch):
+    import google.auth
+
+    wire = Wire()
+    discovered = []
+    constructed = []
+
+    def adc(**kwargs):
+        discovered.append(True)
+        return AnonymousCredentials(), PROJECT
+
+    def channel(host, **kwargs):
+        constructed.append(host)
+        return wire
+
+    monkeypatch.setattr(google.auth, "default", adc)
+    for transport in (ProjectsGrpcTransport, IAMGrpcTransport, EndpointServiceGrpcTransport):
+        monkeypatch.setattr(transport, "create_channel", channel)
+
+    def withdrawn():
+        raise NativeIdentityError("CURRENT_AUTHORITY_WITHDRAWN")
+
+    with NativeGCPIdentity(CONTEXT) as driver:
+        with pytest.raises(NativeIdentityError, match="CURRENT_AUTHORITY_WITHDRAWN"):
+            driver.reconcile(
+                PERMISSIONS,
+                service_account_uids=(UID,),
+                ledger=OwnedGrantLedger(CONTEXT.fingerprint),
+                checkpoint=withdrawn,
+                persist=lambda ledger: None,
+            )
+    assert discovered == [] and constructed == [] and not wire.calls
+
+
+@pytest.mark.parametrize("case", ["wanted_removed", "owned_removal_reappears", "external_equivalent_removed"])
+def test_late_second_policy_write_cannot_certify_stale_first_policy_union(world, case):
+    wire, _state, reconcile = world
+    if case == "owned_removal_reappears":
+        reconcile()
+    elif case == "external_equivalent_removed":
+        wire.policies[ENDPOINT].bindings.add(role=ROLE, members=["serviceAccount:" + CONTEXT.email])
+
+    def after(name):
+        if name != "SetIamPolicy" or wire.calls[-1][1].resource != CONTEXT.service_account_resource:
+            return
+        first = wire.policies[ENDPOINT]
+        if case == "owned_removal_reappears":
+            first.bindings.add(role=ROLE, members=["serviceAccount:" + CONTEXT.email])
+        else:
+            for binding in first.bindings:
+                if binding.role == ROLE and "serviceAccount:" + CONTEXT.email in binding.members:
+                    binding.members.remove("serviceAccount:" + CONTEXT.email)
+        first.etag = b"held-late-edit"
+        wire.after_call = None
+
+    wire.after_call = after
+    with pytest.raises(NativeIdentityError, match="FINAL_POLICY_UNION_MISMATCH"):
+        reconcile([], ()) if case == "owned_removal_reappears" else reconcile()
+
+
+def test_late_reappeared_owned_removal_is_durable_and_retry_removes_it(world):
+    wire, state, reconcile = world
+    reconcile()
+
+    def after(name):
+        if name == "SetIamPolicy" and wire.calls[-1][1].resource == CONTEXT.service_account_resource:
+            wire.policies[ENDPOINT].bindings.add(role=ROLE, members=["serviceAccount:" + CONTEXT.email])
+            wire.after_call = None
+
+    wire.after_call = after
+    with pytest.raises(NativeIdentityError, match="FINAL_POLICY_UNION_MISMATCH"):
+        reconcile([], ())
+    assert state["ledger"].removals
+    result = reconcile([], ())
+    assert not result.ledger.removals and not result.ledger.policies
+    assert not grants(wire.policies[ENDPOINT])
+
+
+def test_final_union_observation_preserves_late_unrelated_foreign_edits(world):
+    wire, _state, reconcile = world
+    wire.policies[ENDPOINT].bindings.add(role=ROLE, members=["serviceAccount:" + CONTEXT.email])
+
+    def after(name):
+        if name == "SetIamPolicy" and wire.calls[-1][1].resource == CONTEXT.service_account_resource:
+            wire.policies[ENDPOINT].bindings.add(role="roles/viewer", members=["user:late-foreign@example.invalid"])
+            wire.after_call = None
+
+    wire.after_call = after
+    result = reconcile()
+    assert result.external_equivalent_grants == 1
+    assert ("roles/viewer", "user:late-foreign@example.invalid") in grants(wire.policies[ENDPOINT])
+    assert all(row.resource != ENDPOINT for row in result.ledger.policies)
+
+
+def test_current_checkpoint_refuses_withdrawal_during_final_union_read(world):
+    wire, state, reconcile = world
+
+    def after(name):
+        if name == "GetIamPolicy":
+            reads = [request for method, request in wire.calls if method == name and request.resource == ENDPOINT]
+            if len(reads) == 3:
+                state["admitted"] = False
+
+    wire.after_call = after
+    with pytest.raises(NativeIdentityError, match="CURRENT_AUTHORITY_WITHDRAWN"):
+        reconcile()
+    assert wire.writes == 2

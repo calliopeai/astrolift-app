@@ -55,6 +55,11 @@ a different policy refuses for explicit recovery rather than adopting grants.
 If a journal commit fails, no corresponding provider write occurs. Multiple
 resource policies are separate cloud effects: partial progress is retained in
 the ledger and must remain pending/failed until all required observations succeed.
+Removed owned pairs remain as bounded `removals` obligations in the durable
+ledger until a final complete-policy pass observes every desired pair and every
+owned removal. A late mismatch refuses success and retains the obligation for
+retry. That final pass recomputes external equivalent grants from current policies
+and allows unrelated foreign edits; it does not overwrite them.
 
 Only unconditional pairs first inserted by this integration are tracked as owned.
 Removal deletes those pairs while preserving unrelated bindings, conditions,
@@ -76,6 +81,11 @@ loggers. Native errors produce fixed reasons; no token or policy body is logged.
 The mandatory checkpoint must admit current actor/credential, source and exact
 placement before and after every RPC. It cannot make cloud policy/config changes
 atomic with the caller's database transaction.
+Initial admission runs before ADC discovery or private client construction.
+The final union is a bounded sequence of observations, not a cross-policy atomic
+snapshot or guarantee against changes after a resource's final read. Matching an
+Endpoint resource name does not prove its deployed model or incarnation; those
+source observations remain the integrating caller's responsibility.
 
 ## Remaining integration
 
