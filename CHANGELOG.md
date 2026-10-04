@@ -5,6 +5,11 @@
 - Preserve immutable local and private Hugging Face model sources when editing
   hosted model settings. Add versioned names and shared or dedicated app access,
   with admin admission and matching subscription/reconciliation guards (#2269).
+- Require a fresh installation platform operator for model hosting, source imports
+  and model configuration, including legacy app/project model entry points. Keep
+  existing organization/cluster and bearer ceilings, deny withdrawn authority after
+  source/target waits, and preserve ordinary app subscription/revocation authority
+  (#2269).
 
 - Bind browser SSO step-up to the verified issuer/subject, active actor and current
   persisted authenticated session. Recheck proof freshness after admission locks,

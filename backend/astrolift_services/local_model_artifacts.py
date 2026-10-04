@@ -6,19 +6,10 @@ import os
 from uuid import UUID, uuid4
 
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.db.models import Q
 from django.utils import timezone
 
-from astrolift_identity.api_tokens import (
-    get_current_api_token,
-    reset_current_api_token,
-    session_may_act_in,
-    set_current_api_token,
-    with_active_org_member,
-)
-from astrolift_identity.models import ApiToken, Organization
+from astrolift_identity.models import Organization
 from astrolift_identity.scopes import identity_organization_scope
 from astrolift_services.models.local_model_artifact import LocalModelArtifact
 from core.permissions import Permission, PermissionDenied, check_permission
@@ -33,43 +24,16 @@ from providers._sdk.local_model_artifact import (
 
 
 def import_authority(org_guid=None):
+    from astrolift_services.cluster_models import cluster_model_org_scope
+    from astrolift_services.hosting_authority import current_host_operator
+
     tenant = get_current_tenant()
-    scope = identity_organization_scope(Permission.ORG_UPDATE)({})
-    user = (
-        get_user_model().objects.filter(pk=tenant.actor_user_id, is_active=True).first() if tenant else None
-    )
-    if tenant is None or user is None or not session_may_act_in(user, tenant.organization_id):
-        raise PermissionDenied(Permission.ORG_UPDATE, scope, "Model source authority is unavailable.")
-    token = get_current_api_token()
-    marker = None
-    if token is not None:
-        fresh = with_active_org_member(
-            ApiToken.objects.filter(
-                pk=token.pk,
-                guid=token.guid,
-                user_id=user.pk,
-                organization_id=tenant.organization_id,
-                team_id=token.team_id,
-                is_revoked=False,
-            ).filter(Q(expires_at__isnull=True) | Q(expires_at__gt=timezone.now())),
-            user="user",
-            organization="organization",
-        ).first()
-        if fresh is None:
-            raise PermissionDenied(
-                Permission.ORG_UPDATE, scope, "Model source credential authority is unavailable."
-            )
-        marker = set_current_api_token(fresh)
-    try:
-        check_permission(Permission.ORG_UPDATE, scope=scope)
-    finally:
-        if marker is not None:
-            reset_current_api_token(marker)
-    org = (
-        Organization.objects.filter(pk=tenant.organization_id, deleted_at__isnull=True).first()
-        if tenant
-        else None
-    )
+    with current_host_operator():
+        check_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE)({}))
+        check_permission(
+            Permission.CLUSTER_UPDATE, scope=cluster_model_org_scope(Permission.CLUSTER_UPDATE)({})
+        )
+    org = Organization.objects.filter(pk=tenant.organization_id).first()
     if org is None or org_guid is not None and str(org.guid) != str(org_guid):
         raise ValueError("Model source organization is unavailable.")
     return org
@@ -175,6 +139,9 @@ def _artifact(artifact_id, expected_version, *, locked=False):
         raise ValueError("Local model source requires its reviewed version.")
     rows = LocalModelArtifact.objects.select_for_update() if locked else LocalModelArtifact.objects
     artifact = rows.filter(guid=UUID(str(artifact_id)), organization=org).first()
+    if locked:
+        # A waited-on source lock must not retain withdrawn hosting authority.
+        import_authority(org.guid)
     if artifact is None:
         raise ValueError("Local model source is unavailable.")
     if artifact.version != expected_version:

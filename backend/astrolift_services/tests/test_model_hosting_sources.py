@@ -8,11 +8,12 @@ from django.utils import timezone
 
 from astrolift_clusters.models import ProviderPlugin
 from astrolift_graphql import GUID
-from astrolift_identity.models import Member, RoleBinding
+from astrolift_identity.models import Member
 from astrolift_services import local_model_artifacts as artifacts
 from astrolift_services.models import LocalModelArtifact, ManagedService
 from astrolift_services.schema.cluster_model_mutations import ClusterModelMutations
 from astrolift_services.schema.model_types import cluster_model_to_type
+from astrolift_services.tests.model_hosting_helpers import promote_host_operator
 from astrolift_services.tests.test_cluster_model_foundation_2213 import subject
 from astrolift_services.tests.test_cluster_model_foundation_2213 import world as foundation_world
 from astrolift_services.tests.test_cluster_model_mutations_2213 import queue as queue_fixture
@@ -89,6 +90,7 @@ def local_request(w, **changes):
 
 
 def test_actual_local_provision_pins_verified_identity_without_hf_request_or_app_owner(world, queue):
+    promote_host_operator(world)
     with subject(world):
         result = ClusterModelMutations().provision_cluster_model(
             make_info(world.user), input=local_request(world)
@@ -110,6 +112,7 @@ def test_actual_local_provision_pins_verified_identity_without_hf_request_or_app
 
 @pytest.mark.parametrize("change", ["foreign", "unverified", "deleted", "version", "manifest"])
 def test_changed_local_source_refuses_without_hf_or_create(world, queue, change):
+    promote_host_operator(world)
     item = local_request(world)
     if change == "foreign":
         world.artifact.organization = world.other_org
@@ -132,6 +135,7 @@ def test_changed_local_source_refuses_without_hf_or_create(world, queue, change)
 
 @pytest.mark.parametrize("extra", ["repository", "revision", "connection", "missing_artifact"])
 def test_two_sources_or_partial_source_cannot_reach_credentials_or_queue(world, queue, extra):
+    promote_host_operator(world)
     item = local_request(world)
     if extra == "repository":
         item.model_repo = "owner/model"
@@ -147,11 +151,12 @@ def test_two_sources_or_partial_source_cannot_reach_credentials_or_queue(world, 
 
 
 def test_admin_revocation_after_last_source_lock_refuses_before_create(world, queue, monkeypatch):
+    promote_host_operator(world)
     original = artifacts.validate_artifact_request
 
     def withdraw(*args, **kwargs):
         result = original(*args, **kwargs)
-        RoleBinding.objects.filter(user=world.user).delete()
+        type(world.user).objects.filter(pk=world.user.pk).update(is_superuser=False)
         return result
 
     monkeypatch.setattr(artifacts, "validate_artifact_request", withdraw)
@@ -165,6 +170,7 @@ def test_admin_revocation_after_last_source_lock_refuses_before_create(world, qu
 @pytest.mark.parametrize("change", ["owner", "manifest", "receipt"])
 def test_worker_rechecks_complete_source_identity_before_private_url_generation(request, change):
     actor = request.getfixturevalue("owner")
+    promote_host_operator(actor)
     wire = request.getfixturevalue("configured")
     with caller(actor):
         row = import_uploaded(actor, wire)
@@ -205,6 +211,7 @@ def test_worker_rechecks_complete_source_identity_before_private_url_generation(
 
 def test_native_http_import_transitions_audit_metadata_only(request, caplog):
     actor_subject = request.getfixturevalue("owner")
+    promote_host_operator(actor_subject)
     wire = request.getfixturevalue("configured")
     import json
     import ssl

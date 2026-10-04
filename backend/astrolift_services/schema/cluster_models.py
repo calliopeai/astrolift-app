@@ -370,12 +370,16 @@ class ClusterModelsQuery:
                 runtime_version=None,
                 architecture=None,
             )
+        from astrolift_services.schema.hf_connections import require_host_admin
+
+        require_host_admin(info, cluster)
         try:
             _, runtime = validate_cluster_request(input, cluster)
         except (TypeError, ValueError) as exc:
             return ModelRuntimeAdmissionType(
                 eligible=False, reason=str(exc), runtime_version=None, architecture=None
             )
+        require_host_admin(info, cluster)
         return ModelRuntimeAdmissionType(
             eligible=True,
             reason=None,
