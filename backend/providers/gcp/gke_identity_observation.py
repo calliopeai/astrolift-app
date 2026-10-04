@@ -25,11 +25,16 @@ MAX_SUBJECTS = 64
 _NAME = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\Z")
 _LOCATION = re.compile(r"[a-z]+(?:-[a-z0-9]+)+[0-9](?:-[a-z])?\Z")
 _NATIVE_ID = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
-_VERSION = re.compile(r"[0-9]{1,32}\Z")
+_VERSION = re.compile(r"[!-~]{1,256}\Z")
 
 
 class GKEObservationError(ValueError):
     """Fixed private-transport errors; never propagate native exception text."""
+
+
+def _checkpoint(fn: Callable[[], object]) -> None:
+    if fn() is not None:
+        raise GKEObservationError("CURRENT_ADMISSION_UNCONFIRMED")
 
 
 @dataclass(frozen=True)
@@ -157,7 +162,7 @@ class _CredentialRequest:
         timeout: float | None = None,
         **kwargs: Any,
     ) -> _Response:
-        self.checkpoint()
+        _checkpoint(self.checkpoint)
         parsed = urlsplit(url)
         metadata = (
             parsed.scheme == "http"
@@ -189,9 +194,9 @@ class _CredentialRequest:
         try:
             value = _http(url, method=method, headers=headers or {}, data=data, context=ssl.create_default_context())
         except Exception:
-            self.checkpoint()
+            _checkpoint(self.checkpoint)
             raise GKEObservationError("CREDENTIAL_READ_UNCONFIRMED") from None
-        self.checkpoint()
+        _checkpoint(self.checkpoint)
         return value
 
 
@@ -204,7 +209,22 @@ def _endpoint(value: str) -> str:
         if not re.fullmatch(r"[a-z0-9.-]+\.gke\.goog", value):
             raise GKEObservationError("ENDPOINT_UNVERIFIED") from None
     else:
-        if not address.is_global:
+        private = any(
+            address in network
+            for network in (
+                ipaddress.IPv4Network("10.0.0.0/8"),
+                ipaddress.IPv4Network("172.16.0.0/12"),
+                ipaddress.IPv4Network("192.168.0.0/16"),
+            )
+        )
+        if (
+            not (address.is_global or private)
+            or address.is_multicast
+            or address.is_loopback
+            or address.is_link_local
+            or address.is_reserved
+            or address.is_unspecified
+        ):
             raise GKEObservationError("ENDPOINT_UNVERIFIED")
     return f"https://{value}"
 
@@ -231,11 +251,11 @@ class KubernetesReadAdapter:
         path = f"/api/v1/namespaces/{namespace}"
         if name is not None:
             path += f"/serviceaccounts/{name}"
-        self.checkpoint()
+        _checkpoint(self.checkpoint)
         try:
             if not self.credentials.valid:
                 self.credentials.refresh(self.credential_request)
-            self.checkpoint()
+            _checkpoint(self.checkpoint)
             token = self.credentials.token
             if not isinstance(token, str) or not token or len(token) > 16384 or any(c in token for c in "\r\n"):
                 raise GKEObservationError("CREDENTIAL_UNAVAILABLE")
@@ -247,9 +267,9 @@ class KubernetesReadAdapter:
                 context=self.tls,
             )
         except Exception:
-            self.checkpoint()
+            _checkpoint(self.checkpoint)
             raise GKEObservationError("KUBERNETES_READ_UNCONFIRMED") from None
-        self.checkpoint()
+        _checkpoint(self.checkpoint)
         if response.status == 404:
             raise GKEObservationError("SUBJECT_UNOBSERVED")
         if response.status != 200:
@@ -293,7 +313,7 @@ class GKEIdentityObserver:
         self.close()
 
     def _native(self, checkpoint: Callable[[], None]) -> tuple[Any, Any]:
-        checkpoint()
+        _checkpoint(checkpoint)
         if self._closed:
             raise GKEObservationError("CLOSED")
         if self._clients is None:
@@ -317,9 +337,9 @@ class GKEIdentityObserver:
                     request=cast("Any", credential_request), scopes=["https://www.googleapis.com/auth/cloud-platform"]
                 )
             except Exception:
-                checkpoint()
+                _checkpoint(checkpoint)
                 raise GKEObservationError("CREDENTIAL_DISCOVERY_UNCONFIRMED") from None
-            checkpoint()
+            _checkpoint(checkpoint)
             if type(credentials).__module__ not in (
                 "google.auth.compute_engine.credentials",
                 "google.oauth2.service_account",
@@ -343,7 +363,7 @@ class GKEIdentityObserver:
                         CLUSTER_INFO,
                     ),
                 ):
-                    checkpoint()
+                    _checkpoint(checkpoint)
                     channel_factory: Any = google.auth.transport.grpc.secure_authorized_channel
                     channel = channel_factory(
                         credentials,
@@ -361,24 +381,24 @@ class GKEIdentityObserver:
                     except Exception:
                         channel.close()
                         raise
-                    checkpoint()
+                    _checkpoint(checkpoint)
             except Exception:
                 for client in made:
                     client.transport.close()
-                checkpoint()
+                _checkpoint(checkpoint)
                 raise GKEObservationError("NATIVE_CLIENT_UNAVAILABLE") from None
             self._clients = (made[0], made[1])
         return self._clients
 
     @staticmethod
     def _call(fn: Any, request: dict[str, str], checkpoint: Callable[[], None]) -> Any:
-        checkpoint()
+        _checkpoint(checkpoint)
         try:
             value = fn(request=request, retry=None, timeout=TIMEOUT)
         except Exception:
-            checkpoint()
+            _checkpoint(checkpoint)
             raise GKEObservationError("NATIVE_READ_UNCONFIRMED") from None
-        checkpoint()
+        _checkpoint(checkpoint)
         if len(type(value).serialize(value)) > MAX_BYTES:
             raise GKEObservationError("OVERSIZED_RESPONSE")
         return value
@@ -443,12 +463,15 @@ class GKEIdentityObserver:
         namespaces: dict[str, dict[str, Any]] = {}
         rows = []
         for subject in self.context.subjects:
-            checkpoint()
+            _checkpoint(checkpoint)
             if subject.namespace not in namespaces:
                 namespaces[subject.namespace] = adapter.read(subject.namespace)
+                _checkpoint(checkpoint)
             namespace = self._metadata(namespaces[subject.namespace], subject, namespace=True)
-            account = self._metadata(adapter.read(subject.namespace, subject.name), subject, namespace=False)
-            checkpoint()
+            _checkpoint(checkpoint)
+            account_value = adapter.read(subject.namespace, subject.name)
+            _checkpoint(checkpoint)
+            account = self._metadata(account_value, subject, namespace=False)
             annotations = account.get("annotations", {})
             if not isinstance(annotations, dict):
                 raise GKEObservationError("SUBJECT_RESPONSE_INVALID")
@@ -469,7 +492,7 @@ class GKEIdentityObserver:
         return tuple(rows)
 
     def observe(self, *, checkpoint: Callable[[], None]) -> GKEObservation:
-        checkpoint()
+        _checkpoint(checkpoint)
         if any(not row.namespace_uid or not row.service_account_uid for row in self.context.subjects):
             return GKEObservation(False, "SUBJECT_UID_UNRECORDED")
         try:
@@ -489,8 +512,8 @@ class GKEIdentityObserver:
             final_rows = self._subjects(adapter, checkpoint)
             if final_rows != rows:
                 raise GKEObservationError("SUBJECT_OBSERVATION_CHANGED")
-            checkpoint()
+            _checkpoint(checkpoint)
             return GKEObservation(True, "CONFIGURATION_OBSERVED", cluster.id, cluster.autopilot.enabled, pools, rows)
         except GKEObservationError as error:
-            checkpoint()
+            _checkpoint(checkpoint)
             return GKEObservation(False, str(error))

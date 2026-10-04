@@ -7,7 +7,8 @@ location/name/native `Cluster.id`, and exact Kubernetes namespace and
 ServiceAccount names plus their original UIDs. Empty UIDs return unavailable
 before ADC or native reads. Names and owner labels never authorize UID adoption.
 
-The caller must provide a current-admission checkpoint. It runs before ambient
+The caller must provide a current-admission checkpoint that explicitly returns
+`None` on admission. Boolean or other returned values refuse. It runs before ambient
 credential discovery/client construction and before/after every native or
 Kubernetes response, including failed transport. The same admitted ADC identity
 reads the ACTIVE Resource Manager project ID/number mapping and the exact native
@@ -25,16 +26,18 @@ These are configuration observations, not node capacity or pod scheduling proof.
 See [Google's GKE workload identity guide](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/workload-identity).
 
 The production Kubernetes adapter makes only exact namespace and ServiceAccount
-GETs through a fresh native public IPv4 or `*.gke.goog` endpoint and its verified
+GETs through a fresh native public/RFC1918 IPv4 or `*.gke.goog` endpoint and its verified
 CA. It ignores proxies, refuses redirects/encoded/oversized responses, and uses
-bounded TLS HTTP reads. Private control-plane addresses are unsupported by this
-initial adapter. Namespace and ServiceAccount UIDs, resource versions, live
+bounded TLS HTTP reads. RFC1918 addresses require the same verified native
+cluster ID/endpoint/CA path; loopback, link-local, multicast, reserved and
+unspecified destinations refuse. Namespace and ServiceAccount UIDs, resource versions, live
 state and organization/app/cluster GUID labels must match. An absent GSA
 annotation may still be observed as unlinked configuration; a foreign annotation
 refuses. No create, annotation, apply, delete, identity or IAM operation occurs.
 
 The port rereads project, cluster, Standard pools, and exact Kubernetes objects
-before returning. Any replacement or observed configuration/resource-version
+before returning. Resource versions are bounded opaque nonempty visible strings,
+compared unchanged without numeric parsing or ordering. Any replacement or observed configuration/resource-version
 change refuses. Sequential observations are not an atomic native snapshot, CAS
 or a promise that resources cannot change immediately afterward. A subsequent
 mutation needs its own current checkpoint and original identity admission.

@@ -254,7 +254,7 @@ def test_original_kubernetes_identity_refusals(fixture, namespace, change):
         value["metadata"]["labels"]["astrolift.io/app-id"] = "foreign"
     else:
         key = {"uid": "uid", "deleted": "deletionTimestamp", "version": "resourceVersion", "name": "name"}[change]
-        value["metadata"][key] = "changed"
+        value["metadata"][key] = "" if change == "version" else "changed"
     assert observer.observe(checkpoint=lambda: None).reason == "SUBJECT_OWNERSHIP_UNVERIFIED"
 
 
@@ -359,7 +359,7 @@ def tls_server(tmp_path):
             "-subj",
             "/CN=127.0.0.1",
             "-addext",
-            "subjectAltName=IP:127.0.0.1",
+            "subjectAltName=IP:127.0.0.1,IP:10.23.1.7",
         ],
         check=True,
         capture_output=True,
@@ -413,7 +413,9 @@ def adapter_for(server, certificate, monkeypatch, checkpoint=lambda: None):
 
 
 def test_actual_tls_production_adapter_reads_no_body_or_credential_logs(tls_server, monkeypatch, caplog, fixture):
+    caplog.set_level("DEBUG")
     server, state, cert = tls_server
+    state["account"]["metadata"]["annotations"]["fixture-private-marker"] = "synthetic-private-body-marker"
     wire, _, _ = fixture
     wire.cluster.master_auth.cluster_ca_certificate = cert
     observer = GKEIdentityObserver(
@@ -428,6 +430,7 @@ def test_actual_tls_production_adapter_reads_no_body_or_credential_logs(tls_serv
     assert all(row[0] == "GET" and row[2] == "Bearer synthetic-private-credential" for row in state["requests"])
     assert "synthetic-private-credential" not in caplog.text
     assert SUBJECT.service_account_uid not in caplog.text
+    assert "synthetic-private-body-marker" not in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -466,10 +469,11 @@ def test_production_endpoint_not_arbitrary(endpoint):
         module._endpoint(endpoint)
 
 
-def test_fixed_native_endpoint_and_current_before_construction(monkeypatch):
+def test_fixed_native_endpoint_and_current_before_construction(monkeypatch, caplog):
     import google.auth
     import google.auth.transport.grpc
 
+    caplog.set_level("DEBUG")
     wire = Wire()
     made = []
 
@@ -491,6 +495,9 @@ def test_fixed_native_endpoint_and_current_before_construction(monkeypatch):
         assert observer.observe(checkpoint=lambda: None).configuration_observed
     assert made == ["cloudresourcemanager.googleapis.com:443", "container.googleapis.com:443"]
     assert wire.closed == 2
+    assert "synthetic-private-credential" not in caplog.text
+    assert CONTEXT.native_cluster_id not in caplog.text
+    assert IDENTITY.project_number not in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -674,3 +681,146 @@ def test_read_deadline_enforced_between_bounded_chunks(monkeypatch):
             "https://owned.example.invalid", method="GET", headers={}, data=None, context=ssl.create_default_context()
         )
     assert response.closed
+
+
+@pytest.mark.parametrize("value", [False, True, 0, "admitted", {}])
+def test_invalid_checkpoint_before_discovery_is_not_admission(monkeypatch, value):
+    import google.auth
+
+    monkeypatch.setattr(google.auth, "default", lambda **kwargs: pytest.fail("no ADC on non-None checkpoint"))
+    with pytest.raises(GKEObservationError, match="CURRENT_ADMISSION_UNCONFIRMED"):
+        GKEIdentityObserver(CONTEXT).observe(checkpoint=lambda: value)
+
+
+@pytest.mark.parametrize("native", [True, False])
+def test_invalid_checkpoint_after_held_response_refuses(fixture, native):
+    wire, kube, observer = fixture
+    current = [None]
+    if native:
+        wire.after = lambda name: current.__setitem__(0, False)
+    else:
+        kube.after = lambda *args: current.__setitem__(0, False)
+    with pytest.raises(GKEObservationError, match="CURRENT_ADMISSION_UNCONFIRMED"):
+        observer.observe(checkpoint=lambda: current[0])
+    if native:
+        assert wire.calls == ["GetProject"] and kube.calls == []
+    else:
+        assert len(kube.calls) == 1
+
+
+def test_private_native_endpoint_actual_tls_configuration(tls_server, fixture, monkeypatch, caplog):
+    import socket
+
+    server, state, cert = tls_server
+    wire, _, _ = fixture
+    wire.cluster.endpoint = "10.23.1.7"
+    wire.cluster.master_auth.cluster_ca_certificate = cert
+    original = socket.create_connection
+    connections = []
+
+    def route(address, *args, **kwargs):
+        connections.append(address)
+        assert address == (wire.cluster.endpoint, 443)
+        return original(("127.0.0.1", server.server_port), *args, **kwargs)
+
+    monkeypatch.setattr(socket, "create_connection", route)
+    caplog.set_level("DEBUG")
+    observer = GKEIdentityObserver(CONTEXT, clients=wire.clients)
+    observer._credentials = Credentials(token="synthetic-private-credential")
+    result = observer.observe(checkpoint=lambda: None)
+    assert result.configuration_observed and len(connections) == 4
+    assert all(row[0] == "GET" for row in state["requests"])
+    assert "synthetic-private-credential" not in caplog.text
+
+
+def test_private_native_wrong_ca_sends_no_credential(tls_server, fixture, monkeypatch, tmp_path):
+    import socket
+
+    server, state, cert = tls_server
+    wire, _, _ = fixture
+    wire.cluster.endpoint = "10.23.1.7"
+    wire.cluster.master_auth.cluster_ca_certificate = cert
+    original = socket.create_connection
+
+    def route(address, *args, **kwargs):
+        assert address == (wire.cluster.endpoint, 443)
+        return original(("127.0.0.1", server.server_port), *args, **kwargs)
+
+    monkeypatch.setattr(socket, "create_connection", route)
+
+    other_cert = tmp_path / "other-ca.pem"
+    subprocess.run(
+        [
+            "openssl",
+            "req",
+            "-x509",
+            "-newkey",
+            "rsa:2048",
+            "-nodes",
+            "-days",
+            "1",
+            "-keyout",
+            str(tmp_path / "other-key.pem"),
+            "-out",
+            str(other_cert),
+            "-subj",
+            "/CN=10.23.1.7",
+            "-addext",
+            "subjectAltName=IP:10.23.1.7",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    wire.cluster.master_auth.cluster_ca_certificate = base64.b64encode(other_cert.read_bytes()).decode()
+    observer = GKEIdentityObserver(CONTEXT, clients=wire.clients)
+    observer._credentials = Credentials(token="synthetic-private-credential")
+    assert observer.observe(checkpoint=lambda: None).reason == "KUBERNETES_READ_UNCONFIRMED"
+    assert state["requests"] == []
+
+
+@pytest.mark.parametrize("value", ["10.23.1.7", "172.31.0.7", "192.168.1.7", "34.1.2.3"])
+def test_only_verified_native_global_or_rfc1918_endpoint_format(value):
+    assert module._endpoint(value) == "https://" + value
+
+
+@pytest.mark.parametrize("value", ["224.0.0.1", "255.255.255.255", "100.64.0.1", "0.0.0.0", "192.0.2.1", "240.0.0.1"])
+def test_non_cluster_endpoint_ranges_refuse(value):
+    with pytest.raises(GKEObservationError, match="ENDPOINT_UNVERIFIED"):
+        module._endpoint(value)
+
+
+@pytest.mark.parametrize("value", ["v1:revision-17/fixture", "9" * 128])
+def test_resource_versions_are_bounded_opaque_equalities(fixture, value):
+    _, kube, observer = fixture
+    kube.namespace["metadata"]["resourceVersion"] = value
+    kube.account["metadata"]["resourceVersion"] = value
+    result = observer.observe(checkpoint=lambda: None)
+    assert result.configuration_observed
+    assert result.subjects[0].namespace_resource_version == value
+    assert result.subjects[0].service_account_resource_version == value
+
+
+@pytest.mark.parametrize("value", ["", "x" * 257, "newline\n", "null\x00"])
+def test_resource_version_bound_and_control_refusal(fixture, value):
+    _, kube, observer = fixture
+    kube.account["metadata"]["resourceVersion"] = value
+    assert observer.observe(checkpoint=lambda: None).reason == "SUBJECT_OWNERSHIP_UNVERIFIED"
+
+
+def test_actual_tls_opaque_version_drift_is_refused(tls_server, fixture, monkeypatch):
+    server, state, cert = tls_server
+    wire, _, _ = fixture
+    wire.cluster.master_auth.cluster_ca_certificate = cert
+    state["account"]["metadata"]["resourceVersion"] = "opaque:revision-1"
+    adapter = adapter_for(server, cert, monkeypatch)
+    original = adapter.read
+
+    def read(*args):
+        value = original(*args)
+        if len(state["requests"]) == 2:
+            state["account"]["metadata"]["resourceVersion"] = "opaque:revision-2"
+        return value
+
+    adapter.read = read
+    observer = GKEIdentityObserver(CONTEXT, clients=wire.clients, kubernetes_factory=lambda *args: adapter)
+    assert observer.observe(checkpoint=lambda: None).reason == "SUBJECT_OBSERVATION_CHANGED"
