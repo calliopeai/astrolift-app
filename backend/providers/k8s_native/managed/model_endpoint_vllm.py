@@ -90,6 +90,7 @@ _CONFIG_FIELDS = frozenset(
         "gpu_memory_utilization",
         "dtype",
         "max_num_seqs",
+        "runtime_controls_revision",
         "enable_prefix_caching",
         "tool_call_parser",
         "reasoning_parser",
@@ -103,6 +104,8 @@ _CONFIG_FIELDS = frozenset(
         "model_revision",
         "cpu_kv_cache_gib",
         "allow_subscriptions",
+        "sharing_mode",
+        "dedicated_app_id",
         "model_source",
         "model_artifact_id",
         "model_artifact_version",
@@ -491,6 +494,7 @@ class VLLMDriver(ManagedServiceDriver):
             - {
                 "model",
                 "model_revision",
+                "runtime_controls_revision",
                 "compute_mode",
                 "cpu_kv_cache_gib",
                 "allow_subscriptions",
@@ -549,6 +553,17 @@ class VLLMDriver(ManagedServiceDriver):
             raise ValueError("compute_mode must be cpu or gpu")
         if cfg.get("allow_subscriptions") is not None and not isinstance(cfg["allow_subscriptions"], bool):
             raise ValueError("allow_subscriptions must be boolean")
+        if cfg.get("sharing_mode", "shared") not in ("shared", "dedicated"):
+            raise ValueError("sharing_mode must be shared or dedicated")
+        if cfg.get("sharing_mode") == "dedicated":
+            from uuid import UUID
+
+            try:
+                UUID(str(cfg.get("dedicated_app_id")))
+            except (TypeError, ValueError):
+                raise ValueError("Dedicated models require a valid app identity.") from None
+        elif cfg.get("dedicated_app_id") is not None:
+            raise ValueError("Shared models cannot select a dedicated app.")
         if cfg.get("frontend") is not None and cfg["frontend"] not in FRONTENDS:
             raise ValueError(f"frontend must be one of {list(FRONTENDS)}")
         return cfg
@@ -647,10 +662,11 @@ class VLLMDriver(ManagedServiceDriver):
                 raise ValueError("Shared model subscriber credential snapshot is invalid.")
             secret_data["keys.json"] = json.dumps(
                 {
-                    "version": 1,
+                    "version": 2,
                     "revision": spec.cluster_model.revision,
                     "operator_key": api_key,
                     "subscription_keys": keys,
+                    "subscription_ids": [consumer.subscription_id for consumer in spec.cluster_model.consumers],
                 },
                 separators=(",", ":"),
             )
@@ -1119,7 +1135,11 @@ class VLLMDriver(ManagedServiceDriver):
         del namespace, name
         identities = set()
         for consumer in placement.consumers:
-            UUID(consumer.subscription_id)
+            if (
+                str(UUID(consumer.subscription_id)) != consumer.subscription_id
+                or not UUID(consumer.subscription_id).int
+            ):
+                raise ValueError("Shared model consumer identity must be a canonical UUID.")
             if consumer.subscription_id in identities:
                 raise ValueError("Duplicate shared model consumer identity.")
             identities.add(consumer.subscription_id)

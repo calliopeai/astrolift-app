@@ -16,7 +16,7 @@ export const Full: Story = {
   args: sharedModelsProps,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole("link", { name: "Host a model" })).toHaveAttribute(
+    await expect(canvas.getByRole("link", { name: "Add model" })).toHaveAttribute(
       "href",
       "/models/deploy"
     );
@@ -95,4 +95,22 @@ export const Width768: Story = {
       <SharedModelsScreen {...args} />
     </div>
   ),
+};
+
+/** A verified local source is hosted independently of any app subscription. */
+export const LocalSource: Story = {
+  args: {
+    page: {
+      ...sharedModelsProps.page,
+      rows: [
+        {
+          ...sharedModelsProps.page.rows[1],
+          sourceKind: "local_artifact",
+          localManifestSha256: "c".repeat(64),
+          revisionSha: null,
+          desiredResources: { cpuRequest: "2", memoryRequest: "8Gi", gpuCount: 0 },
+        },
+      ],
+    },
+  },
 };

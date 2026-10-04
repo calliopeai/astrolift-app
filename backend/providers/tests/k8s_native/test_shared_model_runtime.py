@@ -142,6 +142,8 @@ def test_shared_deployment_has_explicit_runtime_revision_and_independent_keys(mo
         assert container["resources"]["limits"] == {"nvidia.com/gpu": "1"}
     secret = object_of(cluster, "v1/Secret")
     snapshot = json.loads(secret["stringData"]["keys.json"])
+    assert snapshot["version"] == 2
+    assert snapshot["subscription_ids"] == [consumer.subscription_id for consumer in spec.cluster_model.consumers]
     assert snapshot["operator_key"] == secret["stringData"]["api_key"]
     assert snapshot["subscription_keys"] == [
         secrets.data[c.credential_ref.partition("#")[0]]["api_key"] for c in spec.cluster_model.consumers

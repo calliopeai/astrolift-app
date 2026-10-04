@@ -37,6 +37,7 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "models.hugging_face_catalogue",
     "models.deployment_observations",
     "models.cluster_density",
+    "models.authenticated_subscription_metrics",
     "models.shared_prompt_relay",
     # Audit log surfaces (#293, #310, #383, etc.).
     "audit.read",
@@ -99,6 +100,7 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "identity.session_cookie",
     "identity.invitation_accept",
     "identity.organization_switch",
+    "identity.reviewed_team_membership",
     # Webhook subscription surfaces.
     "webhooks.subscribe",
     "webhooks.secret_rotation",
@@ -110,8 +112,10 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     # File uploads.
     "uploads.presigned",
     "models.admin_hosting",
+    "models.runtime_settings",
     "models.huggingface_connections",
     "models.local_artifacts",
+    "models.connection_approvals",
     # Federation between Astrolift installs (#411 family).
     "federation.peer_register",
     "federation.jwks_serve",

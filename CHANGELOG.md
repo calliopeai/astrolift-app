@@ -2,6 +2,111 @@
 
 ## Unreleased
 
+- Bind model subscription finalization and traffic lookups explicitly to current
+  service/app owners. Preserve admitted installation-shared cluster placement
+  while keeping dedicated-app selectors tenant-bound (#2269, #2270).
+
+- Batch model target, request/reviewer and dedicated-inventory page projections
+  while preserving current credential, session, SCIM and per-target policy gates.
+  Keep list staleness read-only and exact-detail/effect checks locked; refuse old
+  approvals after same-version environment reassignment. Ignore foreign-owned
+  connection roles and withdrawn bearer memberships when requalifying votes (#2270).
+
+- Match Models create/manage hints to current installation-superadmin hosting
+  admission and bearer/session ceilings. Preserve ordinary shared-prompt run
+  authority and legacy app visibility; hints never replace target checks (#2270).
+
+- Revalidate persisted browser sessions and current authentication facts before
+  automatic model connection or subscription revocation effects after lock waits.
+  Preserve withdrawn session tracking when refusing stale requests (#2270).
+
+- Recover model connection detail from an older queue/URL version by reviewing
+  the freshly read current row. Keep prior confirmations invalidated, and retain
+  exact request retry keys when envelopes or returned GUIDs are unverified (#2270).
+
+- Edit a hosted model's stored data type, context length and concurrent sequences
+  through the existing versioned runtime admission and update. Show actual desired
+  values, preserve blank and unknown settings without invented defaults, and retain
+  immutable local/Hugging Face sources and accepted-pending feedback (#2269, #2270).
+
+- Add policy-aware hosted-model app connections, separate requester/reviewer
+  queues and exact-version approval detail with an explicit approved-to-Connect
+  step. Keep durable request-key recovery, neutral superadmin restriction overlays,
+  organization policy administration, accepted-write/read-failure feedback and
+  source/actor review invalidation explicit across all eight locales (Refs: #2270).
+
+- Add explicit connected-app subscription traffic reads to hosted models, with
+  request/error rates, accepted response bytes and latency. Keep authenticated
+  subscription scope separate from deployment totals, preserve missing/zero/stale
+  states, and clarify active platform-super-admin hosting in all eight locales
+  (#2269).
+- Revalidate persisted browser authentication after model-hosting and runtime
+  admission waits, including expiry, revocation and password-hash changes. Keep
+  refused stale requests from reviving session-tracking state; keep bearer
+  ceilings and direct native service fixtures unchanged (#2269).
+
+- Add typed, versioned platform-operator model runtime declarations without
+  exposing unrelated provider configuration. Require explicit hardware evidence
+  and attestation, preserve other compute modes, and admit only declared data
+  types and bounded context, concurrency and resource requests. Add a Placement
+  setup form and float32/256-token/single-sequence tiny CPU preset; saving a
+  declaration does not build, probe or deploy a model (Refs: #2269).
+
+- Show hosted models with source, requested resources, exact deployment links and
+  fresh actor/organization reads. Surface authorized subscription summaries and
+  deployment metric states without claiming per-app traffic or measured cost (#2266).
+
+- Add hosted-model name/resource settings and reviewed shared or dedicated app
+  access, with a paged eligible-app chooser, fresh admin/source admission and
+  immutable-source write checks. Accepted changes remain pending reconciliation
+  and local sources can be edited without rebuilding a Hugging Face request (#2269).
+
+- Attribute hosted-model traffic to authenticated app subscriptions, with bounded
+  permission-scoped API reads for request/error rates, accepted response bytes
+  and p95 duration. Preserve measured zero and unavailable states; leave token
+  counts and cost unsupported without an actual usage source (#2269).
+- Reuse persisted browser-session admission for model connection requests and
+  reviews; preserve revoked, expired, deleted or foreign-actor session tracking
+  after a waiting request is refused (#2270).
+
+- Govern app connections to hosted models with organization defaults, tighter
+  model restrictions and version-bound approval requests. Keep approved requests
+  separate from current-owner Connect and reconciliation; recheck scoped authority
+  and distinct human quorum after lock waits without exposing credentials (#2270).
+
+- Preserve immutable local and private Hugging Face model sources when editing
+  hosted model settings. Add versioned names and shared or dedicated app access,
+  with admin admission and matching subscription/reconciliation guards (#2269).
+
+- Show model hosting as three focused Source, Placement and Review steps. Suggest
+  an editable model-derived deployment name, offer a small-model catalogue preset,
+  require an explicit cluster selection and CPU KV-cache request, and move resource
+  actions to the corresponding controls. Preserve reviewed inputs through Back/Next
+  without treating queued hosting as model readiness (Refs: #2266).
+- Require a fresh installation platform operator for model hosting, source imports
+  and model configuration, including legacy app/project model entry points. Keep
+  existing organization/cluster and bearer ceilings, deny withdrawn authority after
+  source/target waits, and preserve ordinary app subscription/revocation authority
+  (#2269).
+- Shared model runtimes attribute admitted inference request counts, ASGI
+  response bytes and duration histograms to validated subscription UUIDs through
+  operator-only metrics. Legacy snapshots remain supported without false
+  attribution; per-app token and cost metrics remain unavailable.
+- Confine user and group role bindings to global or current-organization roles
+  before navigation, permission and reviewed membership decisions. Preserve the
+  self-readable team navigation contract and exact auxiliary module ordering;
+  withdrawn or foreign authority cannot enable hints or membership writes (#2273).
+
+- Make team and person membership tabs discoverable with paged selectors,
+  explicit direct-grant review and original-request recovery in all eight
+  locales. Keep team-only navigation scoped and retain the guarded legacy
+  bulk-assignment route with its stated limits (#2273).
+
+- Add reviewed, paged direct user/team membership APIs with exact public GUIDs,
+  current team-manager and credential checks, role ceilings, concurrent source
+  refusal and actor-bound retry receipts. Preserve inherited/IdP/other-scope
+  access and refuse withdrawn sessions after lock waits (#2273).
+
 - Bind browser SSO step-up to the verified issuer/subject, active actor and current
   persisted authenticated session. Recheck proof freshness after admission locks,
   preserve concurrent logout and suppress stale response-session writes (#2202).

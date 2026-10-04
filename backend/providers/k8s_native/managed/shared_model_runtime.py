@@ -35,6 +35,58 @@ def _resource_requests(cfg):
     return memory_bytes
 
 
+def _serving_controls(declaration, cfg, mode):
+    revision = cfg.get("runtime_controls_revision")
+    if revision is not None and (type(revision) is not int or revision != 1):
+        raise ValueError("Runtime serving controls revision is unsupported.")
+    declared = declaration.get("supported_dtypes")
+    if declared is None:
+        if cfg.get("runtime_controls_revision") is not None:
+            raise ValueError("Runtime serving controls are not declared for this cluster.")
+        return  # Existing declarations retain their earlier, bounded runtime contract.
+    allowed = {"auto", "float16", "bfloat16", "float32"}
+    if (
+        not isinstance(declared, list)
+        or not 1 <= len(declared) <= 4
+        or any(not isinstance(value, str) or value not in allowed for value in declared)
+        or len(set(declared)) != len(declared)
+        or declaration.get("default_dtype") not in declared
+    ):
+        raise ValueError("Runtime supported dtypes and default are invalid.")
+    if cfg.get("dtype") not in declared:
+        raise ValueError("Selected dtype is not supported by this declared runtime.")
+    for key, ceiling_key, default_key, low, high in (
+        ("max_model_len", "max_model_len_ceiling", "default_max_model_len", 256, 131072),
+        ("max_num_seqs", "max_num_seqs_ceiling", "default_max_num_seqs", 1, 4096),
+    ):
+        value, ceiling, default = cfg.get(key), declaration.get(ceiling_key), declaration.get(default_key)
+        if (
+            type(value) is not int
+            or type(ceiling) is not int
+            or type(default) is not int
+            or not low <= default <= ceiling <= high
+            or not low <= value <= ceiling
+        ):
+            raise ValueError("Model context or concurrency exceeds the declared runtime bounds.")
+    limits = {"cpu": declaration.get("cpu_request_ceiling"), "memory": declaration.get("memory_request_ceiling")}
+    ceiling_memory = _resource_requests(limits)
+    cpu, ceiling_cpu = _CPU.fullmatch(cfg["cpu"]), _CPU.fullmatch(limits["cpu"])
+
+    def cores(match):
+        return Decimal(match[1]) / (1000 if match[2] else 1)
+
+    ceiling_gpu = declaration.get("gpu_count_ceiling")
+    if (
+        type(ceiling_gpu) is not int
+        or not 0 <= ceiling_gpu <= 16
+        or (mode == "cpu") != (ceiling_gpu == 0)
+        or cfg.get("gpu", 0) > ceiling_gpu
+        or cores(cpu) > cores(ceiling_cpu)
+        or _resource_requests(cfg) > ceiling_memory
+    ):
+        raise ValueError("Model resources exceed the declared runtime ceilings.")
+
+
 @dataclass(frozen=True)
 class SharedRuntime:
     image: str
@@ -97,6 +149,7 @@ def shared_runtime(runtimes: dict[str, Any], cfg: dict[str, Any], frontend: str)
             raise ValueError("CPU runtime requires bounded explicit KV-cache space in GiB.")
         if memory_bytes <= cache * 1024**3:
             raise ValueError("CPU memory request must exceed its KV-cache space; model-fit remains unverified.")
+    _serving_controls(declaration, cfg, mode)
     if cfg.get("model_source") == "local_artifact":
         local_source_identity(cfg)
         if "@sha256:" not in image:

@@ -16,6 +16,7 @@ from astrolift_identity.models import ApiToken, Member, Organization, Role, Role
 from astrolift_services import local_model_artifacts as service
 from astrolift_services.models.local_model_artifact import LocalModelArtifact
 from astrolift_services.schema.local_model_artifacts import ModelArtifactsMutation, ModelArtifactsQuery
+from astrolift_services.tests.model_hosting_helpers import promote_host_operator
 from core.permissions import PermissionDenied
 from core.tenancy import TenantContext, tenant_context
 from providers._sdk.local_model_artifact import ArtifactStoreUnavailable
@@ -93,6 +94,7 @@ def import_uploaded(owner, wire):
 
 
 def test_real_import_source_tuple_and_private_delivery(owner, configured):
+    promote_host_operator(owner)
     with caller(owner):
         row = import_uploaded(owner, configured)
         old_version = row.version
@@ -122,6 +124,7 @@ def test_real_import_source_tuple_and_private_delivery(owner, configured):
     "failure", ["foreign_org", "narrow_token", "withdrawn_member", "revoked_token", "team_ceiling"]
 )
 def test_refused_authority_has_no_store_network(owner, configured, failure):
+    promote_host_operator(owner)
     foreign = Organization.objects.create(name="Other", slug="local-model-foreign")
     if failure == "narrow_token":
         owner.token.scopes = ["read:clusters", "write:clusters", "manage:clusters"]
@@ -146,6 +149,7 @@ def test_refused_authority_has_no_store_network(owner, configured, failure):
 
 
 def test_missing_file_leaves_uploading_and_retry_finalizes(owner, configured):
+    promote_host_operator(owner)
     with caller(owner):
         row = import_uploaded(owner, configured)
         state = configured["state"]
@@ -161,6 +165,7 @@ def test_missing_file_leaves_uploading_and_retry_finalizes(owner, configured):
 
 
 def test_source_change_and_soft_deletion_cannot_deliver(owner, configured, settings):
+    promote_host_operator(owner)
     with caller(owner):
         row = import_uploaded(owner, configured)
         row = service.finalize_artifact(row.guid, row.version)
@@ -183,6 +188,7 @@ def test_source_change_and_soft_deletion_cannot_deliver(owner, configured, setti
 
 
 def test_unconfigured_refusal_before_source_creation(owner, settings):
+    promote_host_operator(owner)
     settings.AWS_STORAGE_BUCKET_NAME = ""
     with caller(owner), pytest.raises(ArtifactStoreUnavailable, match="configured"):
         service.begin_artifact(organization_id=owner.org.guid, name="Unavailable", files=files())
@@ -191,6 +197,7 @@ def test_unconfigured_refusal_before_source_creation(owner, settings):
 
 @pytest.mark.parametrize("expected", [None, True, 0, 999])
 def test_unreviewed_source_version_refuses_before_store(owner, configured, expected):
+    promote_host_operator(owner)
     with caller(owner):
         row = import_uploaded(owner, configured)
         count = len(configured["state"]["calls"])
@@ -200,6 +207,7 @@ def test_unreviewed_source_version_refuses_before_store(owner, configured, expec
 
 
 def test_public_bucket_refuses_source_creation(owner, configured):
+    promote_host_operator(owner)
     configured["state"]["public_block"] = False
     with caller(owner), pytest.raises(ArtifactStoreUnavailable, match="public-access"):
         service.begin_artifact(organization_id=owner.org.guid, name="Unconfigured", files=files())
@@ -207,6 +215,7 @@ def test_public_bucket_refuses_source_creation(owner, configured):
 
 
 def test_membership_withdrawal_between_actual_head_requests_refuses_finalization(owner, configured):
+    promote_host_operator(owner)
     from django.db import close_old_connections
 
     with caller(owner):
@@ -229,6 +238,7 @@ def test_membership_withdrawal_between_actual_head_requests_refuses_finalization
 
 
 def test_native_graphql_size_string_pagination_and_safe_metadata(owner, configured):
+    promote_host_operator(owner)
     schema = strawberry.Schema(query=ModelArtifactsQuery, mutation=ModelArtifactsMutation)
     with caller(owner):
         response = schema.execute_sync(
@@ -269,6 +279,7 @@ def test_native_graphql_size_string_pagination_and_safe_metadata(owner, configur
 
 
 def test_native_graphql_upload_grants_and_complete_verification_envelope(owner, configured):
+    promote_host_operator(owner)
     import ssl
 
     schema = strawberry.Schema(query=ModelArtifactsQuery, mutation=ModelArtifactsMutation)

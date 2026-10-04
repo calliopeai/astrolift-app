@@ -16,6 +16,7 @@ from astrolift_services.schema.cluster_model_mutations import (
     RevokeModelSubscriptionInput,
     SubscribeClusterModelInput,
 )
+from astrolift_services.tests.model_hosting_helpers import promote_host_operator
 from astrolift_services.tests.test_cluster_model_foundation_2213 import subject
 from astrolift_services.tests.test_cluster_model_foundation_2213 import world as foundation_world
 from astrolift_services.tests.test_cluster_model_queries_2213 import grant, request, runtime
@@ -289,6 +290,7 @@ def test_provision_checks_actual_owner_provider_and_runtime_before_hf(world, que
     assert not denied.ok and calls == [] and queue == []
     grant(world, Permission.CLUSTER_UPDATE)
     grant(world, Permission.ORG_UPDATE)
+    promote_host_operator(world)
     with subject(world):
         missing = ClusterModelMutations().provision_cluster_model(
             make_info(world.user),
@@ -317,8 +319,9 @@ def test_provision_checks_actual_owner_provider_and_runtime_before_hf(world, que
     )
 
 
-@pytest.mark.parametrize("change", ["narrowed-token", "revoked-token", "retired-grant", "inactive-actor"])
+@pytest.mark.parametrize("change", ["narrowed-token", "revoked-token", "retired-operator", "inactive-actor"])
 def test_creation_refreshes_authority_after_hub_observation(world, queue, monkeypatch, change):
+    promote_host_operator(world)
     from types import SimpleNamespace
 
     from astrolift_clusters.models import ProviderPlugin
@@ -328,9 +331,9 @@ def test_creation_refreshes_authority_after_hub_observation(world, queue, monkey
     from astrolift_services.models import ManagedService
     from core.permissions import Permission
 
-    binding = grant(world, Permission.CLUSTER_UPDATE)
+    grant(world, Permission.CLUSTER_UPDATE)
     grant(world, Permission.ORG_UPDATE)
-    Member.objects.create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
+    Member.objects.get_or_create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
     actual = ProviderPlugin.objects.filter(slug="k8s_native").first()
     if actual is None:
         world.cluster.provider_plugin.slug = "k8s_native"
@@ -344,8 +347,8 @@ def test_creation_refreshes_authority_after_hub_observation(world, queue, monkey
             ApiToken.objects.filter(pk=get_current_api_token().pk).update(scopes=["read:clusters"])
         elif change == "revoked-token":
             ApiToken.objects.filter(pk=get_current_api_token().pk).update(is_revoked=True)
-        elif change == "retired-grant":
-            binding.soft_delete()
+        elif change == "retired-operator":
+            type(world.user).objects.filter(pk=world.user.pk).update(is_superuser=False)
         else:
             type(world.user).objects.filter(pk=world.user.pk).update(is_active=False)
         return SimpleNamespace(
@@ -400,7 +403,7 @@ def test_subscription_http_bearer_envelope_and_revocation_recheck(world, queue, 
     from astrolift_identity.models import ApiToken, Member
 
     allowed(world)
-    Member.objects.create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
+    Member.objects.get_or_create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
     minted = mint_token()
     token = ApiToken.objects.create(
         user=world.user,
@@ -536,6 +539,7 @@ def test_owner_mutations_refuse_before_persisting_or_queueing(world, monkeypatch
     from core.permissions import Permission
 
     if refusal != "no_owner_grant":
+        promote_host_operator(world)
         grant(world, Permission.CLUSTER_UPDATE)
     grant(world, Permission.ORG_UPDATE)
     if refusal == "unavailable":
@@ -578,6 +582,7 @@ def test_owner_mutations_refuse_before_persisting_or_queueing(world, monkeypatch
 
 
 def test_owner_update_changes_admission_without_revoking_other_keys(world, queue):
+    promote_host_operator(world)
     from astrolift_services.schema.cluster_model_mutations import UpdateClusterModelInput
     from core.permissions import Permission
 
@@ -614,6 +619,7 @@ def test_owner_update_changes_admission_without_revoking_other_keys(world, queue
 
 
 def test_delete_requires_actual_revocation_then_is_accepted_pending(world, queue):
+    promote_host_operator(world)
     from astrolift_services.schema.cluster_model_mutations import DeprovisionClusterModelInput
     from core.permissions import Permission
 
@@ -653,6 +659,7 @@ def test_delete_requires_actual_revocation_then_is_accepted_pending(world, queue
 def test_creation_refuses_unverified_or_gated_hf_source_without_persisting(
     world, queue, monkeypatch, observation
 ):
+    promote_host_operator(world)
     from types import SimpleNamespace
 
     from astrolift_clusters.models import ProviderPlugin
@@ -701,7 +708,7 @@ def test_creation_refuses_unverified_or_gated_hf_source_without_persisting(
 
 
 @pytest.mark.parametrize("action", ["create", "update", "delete"])
-def test_owner_permission_rechecks_locked_region_after_initial_gate(world, queue, monkeypatch, action):
+def test_ordinary_owner_is_denied_even_after_locked_region_change(world, queue, monkeypatch, action):
     from astrolift_identity.models import Policy
     from astrolift_services.schema import cluster_model_mutations as module
     from astrolift_services.schema.cluster_model_mutations import (
@@ -762,13 +769,14 @@ def test_owner_permission_rechecks_locked_region_after_initial_gate(world, queue
     assert world.model.subscription_revision == 0 and world.model.status == "active"
 
 
-@pytest.mark.parametrize("change", ["foreign_owner", "revoked_owner_grant", "inactive_actor"])
+@pytest.mark.parametrize("change", ["foreign_owner", "revoked_operator", "inactive_actor"])
 def test_locked_target_rechecks_canonical_owner_actor_and_grants(world, queue, monkeypatch, change):
+    promote_host_operator(world)
     from astrolift_services.schema import cluster_model_mutations as module
     from astrolift_services.schema.cluster_model_mutations import DeprovisionClusterModelInput
     from core.permissions import Permission
 
-    binding = grant(world, Permission.CLUSTER_UPDATE)
+    grant(world, Permission.CLUSTER_UPDATE)
     grant(world, Permission.ORG_UPDATE)
     world.cluster.organization = None
     world.cluster.save()
@@ -793,8 +801,8 @@ def test_locked_target_rechecks_canonical_owner_actor_and_grants(world, queue, m
 
         def raced_lock(value):
             row = original(value)
-            if change == "revoked_owner_grant":
-                binding.soft_delete()
+            if change == "revoked_operator":
+                type(world.user).objects.filter(pk=world.user.pk).update(is_superuser=False)
             else:
                 type(world.user).objects.filter(pk=world.user.pk).update(is_active=False)
             return row
@@ -814,7 +822,7 @@ def test_subscription_rechecks_current_source_and_bearer_after_locks(world, queu
     from astrolift_services.schema import cluster_model_mutations as module
 
     allowed(world)
-    Member.objects.create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
+    Member.objects.get_or_create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
     original = module._locked_environment
 
     def raced_environment(value):

@@ -38,6 +38,7 @@ test("owner can reach every active page from rendered navigation", async ({
   page.setDefaultTimeout(15_000);
   page.setDefaultNavigationTimeout(20_000);
   const visited = new Map<string, string>();
+  const verifiedLandings = new Set<string>();
   const queued = new Set<string>(["/dashboard"]);
   const edges: Record<string, string[]> = {};
   const errors: string[] = [];
@@ -74,6 +75,12 @@ test("owner can reach every active page from rendered navigation", async ({
     expect(response?.status(), path).toBeLessThan(400);
     const actual = new URL(page.url()).pathname;
     visited.set(path, actual);
+    if (path === "/administration/access") {
+      // This landing selects its destination from the current credential on
+      // the client. Preserve the actual graph and verify the owner's target.
+      await expect(page).toHaveURL(/\/administration\/access\/people$/);
+      verifiedLandings.add(path);
+    }
     if (livePods)
       await expect(
         page
@@ -156,7 +163,9 @@ test("owner can reach every active page from rendered navigation", async ({
   });
   const missing = inventory.filter(
     (route) =>
-      route.kind === "page" && ![...visited.values()].some((path) => match(route.path, path))
+      route.kind === "page" &&
+      !verifiedLandings.has(route.path) &&
+      ![...visited.values()].some((path) => match(route.path, path))
   );
   expect(errors, "Pages must render without a Next error boundary").toEqual([]);
   expect(runtimeErrors, "Pages must render without client runtime errors").toEqual([]);

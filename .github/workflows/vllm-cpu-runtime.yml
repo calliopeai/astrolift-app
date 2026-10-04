@@ -1,0 +1,77 @@
+name: Build AVX2 CPU model runtime
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish to GHCR after local runner smoke succeeds
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vllm-cpu-runtime-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Prepare exact upstream source
+        id: source
+        run: |
+          set -euo pipefail
+          SOURCE_ROOT=$(python3 scripts/vllm_cpu_runtime/prepare.py --destination "$RUNNER_TEMP/vllm-source")
+          echo "root=$SOURCE_ROOT" >> "$GITHUB_OUTPUT"
+      - name: Build linux amd64 AVX2 candidate
+        env:
+          SOURCE_ROOT: ${{ steps.source.outputs.root }}
+        run: |
+          set -euo pipefail
+          mapfile -t BUILD_ARGS < <(python3 -c 'import json; s=json.load(open("scripts/vllm_cpu_runtime/source.json")); [print(k+"="+v) for k,v in s["build_args"].items()]')
+          ARGUMENTS=()
+          for ARGUMENT in "${BUILD_ARGS[@]}"; do ARGUMENTS+=(--build-arg "$ARGUMENT"); done
+          docker buildx build --platform linux/amd64 --target vllm-openai --load --progress plain \
+            "${ARGUMENTS[@]}" -f "$SOURCE_ROOT/docker/Dockerfile.cpu" \
+            -t astrolift-vllm-cpu:candidate "$SOURCE_ROOT" > "$RUNNER_TEMP/build.log" 2>&1
+          grep -F 'CPU extension compile flags:' "$RUNNER_TEMP/build.log"
+          if grep -E 'CPU extension compile flags:.*(-mavx512|-mamx)' "$RUNNER_TEMP/build.log"; then exit 1; fi
+          grep -E 'CPU extension compile flags:.*-mavx2' "$RUNNER_TEMP/build.log"
+      - name: Verify package and bounded float32 generation
+        run: python3 scripts/vllm_cpu_runtime/smoke.py --image astrolift-vllm-cpu:candidate --proof "$RUNNER_TEMP/runtime-proof.json"
+      - name: Login to GHCR for explicit publication
+        if: ${{ inputs.publish }}
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish verified candidate and capture registry manifest
+        if: ${{ inputs.publish }}
+        run: |
+          set -euo pipefail
+          IMAGE="ghcr.io/calliopeai/astrolift-vllm-cpu:0.15.1-avx2-${GITHUB_SHA}"
+          docker tag astrolift-vllm-cpu:candidate "$IMAGE"
+          docker push "$IMAGE"
+          docker buildx imagetools inspect --raw "$IMAGE" > "$RUNNER_TEMP/registry-manifest.json"
+          sha256sum "$RUNNER_TEMP/registry-manifest.json" > "$RUNNER_TEMP/registry-manifest.sha256"
+      - name: Keep build and runtime evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: vllm-cpu-runtime-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/build.log
+            ${{ runner.temp }}/runtime-proof.json
+            ${{ runner.temp }}/registry-manifest.json
+            ${{ runner.temp }}/registry-manifest.sha256
+          retention-days: 7

@@ -27,6 +27,13 @@ from astrolift_services.model_admission import (
     shared_model_operation,
     validate_cluster_request,
 )
+from astrolift_services.model_settings import (
+    UpdateClusterModelInput,
+    allows_app,
+    sharing_config,
+    update_placement,
+    validate_updated_source,
+)
 from astrolift_services.models import ManagedService, ManagedServiceAttachment
 from astrolift_services.schema.cluster_models import ProvisionClusterModelInput, _environment_rows, _guid
 from astrolift_services.schema.model_mutation_audit import model_mutation_audit
@@ -61,20 +68,6 @@ class RevokeModelSubscriptionInput:
     expected_provider_id: GUID
     if_match_version: int
     if_match_deployment_version: int
-
-
-@strawberry.input
-class UpdateClusterModelInput:
-    organization_id: GUID
-    id: GUID
-    expected_cluster_id: GUID
-    expected_provider_id: GUID
-    if_match_version: int
-    allow_subscriptions: bool
-    cpu_request: str
-    memory_request: str
-    gpu_count: int
-    cpu_kv_cache_gi_b: int | None = None
 
 
 @strawberry.input
@@ -160,6 +153,7 @@ def _recheck_authority(info, permission, cluster, *, environment=None):
     from astrolift_identity.api_tokens import (
         get_current_api_token,
         reset_current_api_token,
+        session_may_act_in,
         set_current_api_token,
         with_active_org_member,
     )
@@ -191,8 +185,31 @@ def _recheck_authority(info, permission, cluster, *, environment=None):
         except Exception:
             raise PermissionDenied(permission, None, "Authentication required") from None
         tenant = get_current_tenant()
+        from django.contrib.auth import get_user_model
+
+        actor = get_user_model().objects.filter(pk=tenant.actor_user_id, is_active=True).first()
+        if actor is None or not session_may_act_in(actor, tenant.organization_id):
+            raise PermissionDenied(permission, None, "Authentication required")
+        request = getattr(info.context, "request", None)
+        from django.http import HttpRequest
+
+        if token is None and (isinstance(request, HttpRequest) or hasattr(request, "session")):
+            from types import SimpleNamespace
+
+            from core.current_session import fresh_authenticated_session
+
+            current_session = fresh_authenticated_session(
+                request, actor_user_id=actor.pk, permission=permission
+            )
+            auth_attrs = abac.attributes_from_request(
+                SimpleNamespace(META=getattr(request, "META", {}), session=current_session), actor.pk
+            )
+        else:
+            # Bearer ceilings are refreshed above; direct non-HTTP fixtures have
+            # no persisted session. Keep their existing operation facts.
+            auth_attrs = abac.attributes_for(tenant.actor_user_id)
         attrs = replace(
-            abac.attributes_for(tenant.actor_user_id),
+            auth_attrs,
             cache={},
             environment=environment.name if environment is not None else None,
             region=cluster.region or None,
@@ -204,19 +221,46 @@ def _recheck_authority(info, permission, cluster, *, environment=None):
                 if environment is not None
                 else cluster_model_org_scope(permission)({})
             )
-            check_permission(permission, scope=scope)
             if environment is not None:
-                check_permission(Permission.ORG_READ, scope=cluster_model_org_scope(Permission.ORG_READ)({}))
+                from astrolift_services.model_connection_policy import check_connection_permission
+
+                check_connection_permission(permission, scope=scope)
+            else:
+                check_permission(permission, scope=scope)
+            # A platform operator is not exempt from a connection approval/deny policy.
+            if environment is not None and permission == Permission.APP_UPDATE:
+                from astrolift_identity.permission_resolver import _candidate_scopes, decide
+
+                if decide(tenant, permission, scope).superuser:
+                    result = abac.evaluate(
+                        abac.new_subject(
+                            organization_id=tenant.organization_id,
+                            actor_user_id=tenant.actor_user_id,
+                            permission=permission.value,
+                            chain=_candidate_scopes(tenant, scope),
+                            roles_at_target=[],
+                            groups=[],
+                            attrs=attrs,
+                        )
+                    )
+                    if result.denied:
+                        raise PermissionDenied(
+                            permission, scope, "model connection policy denies this operation"
+                        )
+            if environment is not None:
+                check_connection_permission(
+                    Permission.ORG_READ, scope=cluster_model_org_scope(Permission.ORG_READ)({})
+                )
     finally:
         if marker is not None:
             reset_current_api_token(marker)
 
 
-def _locked_environment(guid):
+def _locked_environment(guid, *, approvals=0):
     from astrolift_registry.models import RegisteredApp
 
     initial = (
-        _environment_rows(Permission.APP_UPDATE)
+        _environment_rows(Permission.APP_UPDATE, approvals=approvals)
         .filter(guid=_guid(guid), registered_app__organization_id=current_org_id())
         .values_list("pk", "registered_app_id")
         .first()
@@ -231,7 +275,7 @@ def _locked_environment(guid):
     ):
         return None
     return (
-        _environment_rows(Permission.APP_UPDATE)
+        _environment_rows(Permission.APP_UPDATE, approvals=approvals)
         .select_for_update(of=("self",))
         .filter(pk=initial[0], registered_app__organization_id=current_org_id())
         .first()
@@ -318,6 +362,132 @@ def _subscription_environment_operation(args):
         else None
     )
     return environment_operation("environment_id")({"environment_id": str(env_guid) if env_guid else None})
+
+
+def _subscribe_model(info, input, *, connection_request=None):
+    approvals = None
+    if connection_request is not None:
+        from astrolift_services.model_connection_requests import eligible_vote_count
+
+        approvals = eligible_vote_count(connection_request, connection_request.app_environment)
+    if approvals is None:
+        check_permission(Permission.ORG_READ, scope=cluster_model_org_scope(Permission.ORG_READ)({}))
+    try:
+        model_binding_prefix(input.alias)
+    except (TypeError, ValueError):
+        return failure(
+            "VALIDATION",
+            "Subscription alias must start with a lowercase letter and contain up to 32 lowercase letters, digits or underscores.",
+        )
+    try:
+        with transaction.atomic():
+            from astrolift_services.model_connection_policy import locked_organization
+
+            locked_organization()
+            lookup = _ModelIdentity(
+                input.model_deployment_id,
+                input.organization_id,
+                input.expected_cluster_id,
+                input.expected_provider_id,
+            )
+            service = _locked_model(lookup)
+            if service is None:
+                return _refusal()
+            if service.version != input.if_match_version:
+                return version_mismatch(
+                    current_version=service.version,
+                    requested_version=input.if_match_version,
+                    kind="Model deployment",
+                )
+            if (
+                not _idle(service)
+                or service.status != "active"
+                or not cluster_model_to_type(service).ready
+                or (service.config or {}).get("allow_subscriptions") is not True
+            ):
+                return _refusal()
+            env = (
+                _locked_environment(input.app_environment_id)
+                if approvals is None
+                else _locked_environment(input.app_environment_id, approvals=approvals)
+            )
+            if env is None or env.tenant_cluster_id != service.tenant_cluster_id:
+                return _refusal()
+            if not allows_app(service, env.registered_app):
+                return failure(
+                    "PRECONDITION", "This model is dedicated to another app or its app is unavailable."
+                )
+            from astrolift_services.model_connection_policy import effective_policy
+            from astrolift_services.model_connection_requests import source_current
+
+            if not source_current(service):
+                return failure("PRECONDITION", "Reviewed model source is unavailable.")
+            policy = effective_policy(service)
+            if policy.mode == "DENY" or (approvals is None and policy.mode != "AUTO"):
+                return failure(
+                    "PRECONDITION", "Model connections require approval or are denied by organization policy."
+                )
+            if env.version != input.if_match_environment_version:
+                return version_mismatch(
+                    current_version=env.version,
+                    requested_version=input.if_match_environment_version,
+                    kind="App environment",
+                )
+            from astrolift_services.model_subscriptions import validate_destination
+
+            validate_destination(env, input.alias)
+            if service.attachments.filter(model_subscription=True, desired_enabled=True).count() >= 64:
+                return failure("PRECONDITION", "This model has reached its supported subscription limit.")
+            prior = (
+                ManagedServiceAttachment.objects.select_for_update()
+                .filter(model_subscription=True, app_environment=env, binding_alias=input.alias)
+                .first()
+            )
+            # This is the last potentially blocking attachment lock. Re-admit source,
+            # policy and the current durable human quorum after it, before any effect.
+            if connection_request is None:
+                _recheck_authority(info, Permission.APP_UPDATE, service.tenant_cluster, environment=env)
+                if not source_current(service) or effective_policy(service).mode != "AUTO":
+                    return failure("PRECONDITION", "Model source or connection policy changed. Review again.")
+            else:
+                from astrolift_services.model_connection_requests import connection_effect_checkpoint
+
+                if not connection_effect_checkpoint(info, connection_request, service, env):
+                    return failure("PRECONDITION", "Model connection review is no longer current.")
+            if prior:
+                if prior.subscription_status != "revoked" or prior.desired_enabled:
+                    return failure(
+                        "CONFLICT",
+                        "This alias already belongs to a model subscription; revoke it before reusing it.",
+                    )
+                prior.soft_delete()
+            service.subscription_revision += 1
+            service.save(update_fields=["subscription_revision", "updated_at", "version"])
+            row = ManagedServiceAttachment(
+                managed_service=service,
+                app_environment=env,
+                model_subscription=True,
+                binding_alias=input.alias,
+                desired_enabled=True,
+                subscription_status="pending",
+                desired_revision=service.subscription_revision,
+                reconcile_started_at=timezone.now(),
+            )
+            row.credential_ref = (
+                f"services/{service.organization.guid}/{service.guid}/subscriptions/{row.guid}#api_key"
+            )
+            row.save()
+            _enqueue(info, service)
+            return _response(service, row)
+    except (TypeError, ValueError) as exc:
+        return failure("VALIDATION", str(exc))
+    except IntegrityError:
+        return failure("CONFLICT", "This alias already belongs to a model subscription.")
+    except ModelOperationUnavailable:
+        return failure(
+            "PRECONDITION",
+            "Model reconciliation could not be queued. No change was committed; retry later.",
+        )
 
 
 @strawberry.type
@@ -420,92 +590,7 @@ class ClusterModelMutations:
     def subscribe_cluster_model(
         self, info: Info, input: SubscribeClusterModelInput
     ) -> MutationResultType[ModelSubscriptionOperationType]:
-        check_permission(Permission.ORG_READ, scope=cluster_model_org_scope(Permission.ORG_READ)({}))
-        try:
-            model_binding_prefix(input.alias)
-        except (TypeError, ValueError):
-            return failure(
-                "VALIDATION",
-                "Subscription alias must start with a lowercase letter and contain up to 32 lowercase letters, digits or underscores.",
-            )
-        try:
-            with transaction.atomic():
-                lookup = _ModelIdentity(
-                    input.model_deployment_id,
-                    input.organization_id,
-                    input.expected_cluster_id,
-                    input.expected_provider_id,
-                )
-                service = _locked_model(lookup)
-                if service is None:
-                    return _refusal()
-                if service.version != input.if_match_version:
-                    return version_mismatch(
-                        current_version=service.version,
-                        requested_version=input.if_match_version,
-                        kind="Model deployment",
-                    )
-                if (
-                    not _idle(service)
-                    or service.status != "active"
-                    or not cluster_model_to_type(service).ready
-                    or (service.config or {}).get("allow_subscriptions") is not True
-                ):
-                    return _refusal()
-                env = _locked_environment(input.app_environment_id)
-                if env is None or env.tenant_cluster_id != service.tenant_cluster_id:
-                    return _refusal()
-                if env.version != input.if_match_environment_version:
-                    return version_mismatch(
-                        current_version=env.version,
-                        requested_version=input.if_match_environment_version,
-                        kind="App environment",
-                    )
-                from astrolift_services.model_subscriptions import validate_destination
-
-                validate_destination(env, input.alias)
-                if service.attachments.filter(model_subscription=True, desired_enabled=True).count() >= 64:
-                    return failure("PRECONDITION", "This model has reached its supported subscription limit.")
-                prior = (
-                    ManagedServiceAttachment.objects.select_for_update()
-                    .filter(model_subscription=True, app_environment=env, binding_alias=input.alias)
-                    .first()
-                )
-                _recheck_authority(info, Permission.APP_UPDATE, service.tenant_cluster, environment=env)
-                if prior:
-                    if prior.subscription_status != "revoked" or prior.desired_enabled:
-                        return failure(
-                            "CONFLICT",
-                            "This alias already belongs to a model subscription; revoke it before reusing it.",
-                        )
-                    prior.soft_delete()
-                service.subscription_revision += 1
-                service.save(update_fields=["subscription_revision", "updated_at", "version"])
-                row = ManagedServiceAttachment(
-                    managed_service=service,
-                    app_environment=env,
-                    model_subscription=True,
-                    binding_alias=input.alias,
-                    desired_enabled=True,
-                    subscription_status="pending",
-                    desired_revision=service.subscription_revision,
-                    reconcile_started_at=timezone.now(),
-                )
-                row.credential_ref = (
-                    f"services/{service.organization.guid}/{service.guid}/subscriptions/{row.guid}#api_key"
-                )
-                row.save()
-                _enqueue(info, service)
-                return _response(service, row)
-        except (TypeError, ValueError) as exc:
-            return failure("VALIDATION", str(exc))
-        except IntegrityError:
-            return failure("CONFLICT", "This alias already belongs to a model subscription.")
-        except ModelOperationUnavailable:
-            return failure(
-                "PRECONDITION",
-                "Model reconciliation could not be queued. No change was committed; retry later.",
-            )
+        return _subscribe_model(info, input)
 
     @strawberry.field
     @model_mutation_audit(action="model.revoke_subscription")
@@ -620,6 +705,11 @@ class ClusterModelMutations:
     @strawberry.field
     @model_mutation_audit(action="model.update")
     @require_permission(
+        Permission.ORG_UPDATE,
+        scope=cluster_model_org_scope(Permission.ORG_UPDATE),
+        operation=shared_model_operation(),
+    )
+    @require_permission(
         Permission.CLUSTER_UPDATE,
         scope=cluster_model_org_scope(Permission.CLUSTER_UPDATE),
         operation=shared_model_operation(),
@@ -633,36 +723,33 @@ class ClusterModelMutations:
                 service = _locked_model(input)
                 if service is None or not _idle(service):
                     return _refusal()
-                _recheck_authority(info, Permission.CLUSTER_UPDATE, service.tenant_cluster)
+                from astrolift_services.schema.hf_connections import require_host_admin
+
+                require_host_admin(info, service.tenant_cluster)
                 if service.version != input.if_match_version:
                     return version_mismatch(
                         current_version=service.version,
                         requested_version=input.if_match_version,
                         kind="Model deployment",
                     )
-                config = service.config or {}
-                placement = ProvisionClusterModelInput(
-                    organization_id=input.organization_id,
-                    cluster_id=input.expected_cluster_id,
-                    expected_provider_id=input.expected_provider_id,
-                    name=service.name,
-                    model_repo=config.get("model", ""),
-                    revision_sha=config.get("model_revision", ""),
-                    compute_mode=config.get("compute_mode", ""),
-                    cpu_request=input.cpu_request,
-                    memory_request=input.memory_request,
-                    gpu_count=input.gpu_count,
-                    allow_subscriptions=input.allow_subscriptions,
-                    cpu_kv_cache_gi_b=input.cpu_kv_cache_gi_b,
-                )
-                config, _ = validate_cluster_request(placement, service.tenant_cluster)
+                placement = update_placement(service, input)
+                config, _ = validate_updated_source(service, placement, locked=True)
+                config.update(sharing_config(service, input, locked=True))
+                if config["sharing_mode"] == "shared":
+                    config.pop("dedicated_app_id", None)
+                require_host_admin(info, service.tenant_cluster)
+                service.name = placement.name.strip()
                 service.config = config
                 service.subscription_revision += 1
-                service.save(update_fields=["config", "subscription_revision", "updated_at", "version"])
+                service.save(
+                    update_fields=["name", "config", "subscription_revision", "updated_at", "version"]
+                )
                 _enqueue(info, service)
                 return success(cluster_model_to_type(service))
         except (TypeError, ValueError) as exc:
             return failure("VALIDATION", str(exc))
+        except IntegrityError:
+            return failure("CONFLICT", "A model with this name already exists on this cluster.")
         except ModelOperationUnavailable:
             return failure(
                 "PRECONDITION",
@@ -671,6 +758,11 @@ class ClusterModelMutations:
 
     @strawberry.field
     @model_mutation_audit(action="model.deprovision")
+    @require_permission(
+        Permission.ORG_UPDATE,
+        scope=cluster_model_org_scope(Permission.ORG_UPDATE),
+        operation=shared_model_operation(),
+    )
     @require_permission(
         Permission.CLUSTER_UPDATE,
         scope=cluster_model_org_scope(Permission.CLUSTER_UPDATE),
@@ -685,7 +777,9 @@ class ClusterModelMutations:
                 service = _locked_model(input)
                 if service is None or not _idle(service):
                     return _refusal()
-                _recheck_authority(info, Permission.CLUSTER_UPDATE, service.tenant_cluster)
+                from astrolift_services.schema.hf_connections import require_host_admin
+
+                require_host_admin(info, service.tenant_cluster)
                 if service.version != input.if_match_version:
                     return version_mismatch(
                         current_version=service.version,

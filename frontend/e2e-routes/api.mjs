@@ -36,6 +36,9 @@ const sharedResources = {
   gpuCount: 0,
   replicas: 1,
   cpuKvCacheGiB: 2,
+  dtype: "float32",
+  maxModelLen: 512,
+  maxNumSeqs: 1,
 };
 const sharedModel = {
   id: sharedModelId,
@@ -49,6 +52,15 @@ const sharedModel = {
   modelRepo: "Qwen/Qwen3-0.6B",
   revisionSha: "a".repeat(40),
   computeMode: "cpu",
+  sourceKind: "huggingface",
+  localArtifactId: null,
+  localArtifactVersion: null,
+  localManifestSha256: null,
+  sharingMode: "SHARED",
+  dedicatedAppId: null,
+  dedicatedAppVersion: null,
+  dedicatedAppName: null,
+  dedicatedAppSlug: null,
   subscriptionsEnabled: true,
   runtimeSupported: true,
   runtimeReason: null,
@@ -95,6 +107,41 @@ const siblingSubscription = {
   bindingPrefix: "MODEL_SEARCH_",
 };
 let subscriptionRows = [activeSubscription, siblingSubscription];
+const pendingConnection = {
+  id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  version: 2,
+  status: "PENDING",
+  organizationId: id,
+  modelDeploymentId: sharedModelId,
+  appId: activeSubscription.appId,
+  appEnvironmentId: activeSubscription.environmentId,
+  clusterId: sharedClusterId,
+  providerId: sharedProviderId,
+  alias: "reviewed",
+  modelName: sharedModel.name,
+  appName: activeSubscription.appName,
+  environmentName: activeSubscription.environmentName,
+  requesterUsername: "controlled-requester",
+  policyVersion: "controlled-request-policy",
+  requiredApprovals: 1,
+  approvalCount: 0,
+  subscriptionId: null,
+  createdAt: observedAt,
+  decidedAt: null,
+  finalizedAt: null,
+};
+let connectionRequest = pendingConnection;
+function connectionProjection(review, queue = false) {
+  return object({
+    ...connectionRequest,
+    version: queue && connectionRequest.version === 2 ? 1 : connectionRequest.version,
+    canApprove: review && connectionRequest.status === "PENDING",
+    canReject: review && connectionRequest.status === "PENDING",
+    canCancel: !review && !connectionRequest.subscriptionId,
+    canFinalize:
+      !review && connectionRequest.status === "APPROVED" && !connectionRequest.subscriptionId,
+  });
+}
 const hubModel = {
   repoId: sharedModel.modelRepo,
   revisionSha: sharedModel.revisionSha,
@@ -142,6 +189,68 @@ function value(type, field, args, role) {
       page: args.page,
       pageSize: args.pageSize,
     });
+  if (field === "capabilities") return ["models.connection_approvals"];
+  if (field === "modelConnectionRequestsPage" || field === "modelConnectionApprovalRequestsPage")
+    return object({
+      items:
+        role === "owner" && args.organizationId === id
+          ? [connectionProjection(field === "modelConnectionApprovalRequestsPage", true)]
+          : [],
+      totalCount: role === "owner" && args.organizationId === id ? 1 : 0,
+      page: args.page,
+      pageSize: args.pageSize,
+      nextCursor: null,
+    });
+  if (field === "modelConnectionRequest" || field === "modelConnectionReviewRequest")
+    return role === "owner" && args.input.id === connectionRequest.id
+      ? connectionProjection(field === "modelConnectionReviewRequest")
+      : null;
+  if (field === "modelConnectionRestriction" || field === "organizationModelConnectionPolicy")
+    return object({
+      id: null,
+      version: 0,
+      mode: "AUTO",
+      requiredApprovals: 1,
+      allowSelfApproval: true,
+    });
+  if (field === "modelConnectionAction")
+    return object({
+      action: role === "owner" && currentSharedModel.ready ? "AUTO" : "DENY",
+      reason: currentSharedModel.ready
+        ? "Controlled automatic connection is permitted."
+        : "Controlled reconciliation remains pending.",
+      policyVersion: "controlled-auto-policy",
+      requiredApprovals: 1,
+      allowSelfApproval: true,
+    });
+  if (field === "modelConnectionTargetsPage")
+    return object({
+      page: args.page,
+      pageSize: args.pageSize,
+      nextCursor: null,
+      totalCount: args.input?.modelDeploymentId === sharedModelId ? 1 : 0,
+      items:
+        args.input?.modelDeploymentId === sharedModelId
+          ? [
+              object({
+                environmentId: activeSubscription.environmentId,
+                environmentVersion: 4,
+                appVersion: 7,
+                appSlug: activeSubscription.appSlug,
+                environmentName: activeSubscription.environmentName,
+                clusterId: sharedClusterId,
+                eligible: role === "owner" && currentSharedModel.ready,
+                action: role === "owner" && currentSharedModel.ready ? "AUTO" : "DENY",
+                reason: currentSharedModel.ready
+                  ? null
+                  : "Controlled reconciliation remains pending.",
+                policyVersion: "controlled-auto-policy",
+                requiredApprovals: 1,
+                allowSelfApproval: true,
+              }),
+            ]
+          : [],
+    });
   if (field === "clusterModelSubscriptionTargetsPage")
     return object({
       items:
@@ -183,7 +292,7 @@ function value(type, field, args, role) {
       page: args.page,
       pageSize: args.pageSize,
     });
-  if (field === "clusterModelRuntimeAdmission")
+  if (field === "clusterModelRuntimeAdmission" || field === "clusterModelUpdateAdmission")
     return object({
       eligible: role === "owner",
       reason: null,
@@ -202,7 +311,7 @@ function value(type, field, args, role) {
     const accessible =
       role === "owner" &&
       args.organizationId === id &&
-      args.modelRepo === hubModel.repoId &&
+      [hubModel.repoId, "Qwen/Qwen2.5-0.5B-Instruct"].includes(args.modelRepo) &&
       args.revisionSha === hubModel.revisionSha &&
       args.connectionId == null &&
       args.expectedConnectionVersion == null;
@@ -210,7 +319,7 @@ function value(type, field, args, role) {
       accessible,
       reason: accessible ? null : "Controlled pinned-source access refusal.",
       observedAt,
-      model: accessible ? hubModel : null,
+      model: accessible ? { ...hubModel, repoId: args.modelRepo } : null,
     });
   }
   if (field === "astroliftHuggingFaceModels")
@@ -228,7 +337,9 @@ function value(type, field, args, role) {
       source: "controlled_hub_transport",
       observedAt,
       retryAfterSeconds: null,
-      model: args.repoId === hubModel.repoId ? hubModel : null,
+      model: [hubModel.repoId, "Qwen/Qwen2.5-0.5B-Instruct"].includes(args.repoId)
+        ? { ...hubModel, repoId: args.repoId }
+        : null,
     });
   if (field === "astroliftSharedModelPromptReadiness") {
     const ready =
@@ -455,6 +566,7 @@ createServer(async (req, res) => {
     modelWriteRequests.length = 0;
     acceptedModel = null;
     currentSharedModel = sharedModel;
+    connectionRequest = pendingConnection;
     subscriptionRows = req.url.endsWith("model=unsubscribed")
       ? []
       : [activeSubscription, siblingSubscription];
@@ -486,6 +598,61 @@ createServer(async (req, res) => {
       fieldResolver(source, args, context, info) {
         if (info.parentType.name === "Mutation") {
           const input = args.input;
+          const approve = info.fieldName === "approveModelConnectionRequest";
+          const finalize = info.fieldName === "finalizeModelConnectionRequest";
+          if (
+            (approve || finalize) &&
+            role === "owner" &&
+            input.id === connectionRequest.id &&
+            input.ifMatchVersion === connectionRequest.version &&
+            (approve
+              ? connectionRequest.status === "PENDING"
+              : connectionRequest.status === "APPROVED")
+          ) {
+            modelWriteRequests.push({ operationName, input: { ...input } });
+            connectionRequest = {
+              ...connectionRequest,
+              version: connectionRequest.version + 1,
+              status: "APPROVED",
+              approvalCount: 1,
+              decidedAt: observedAt,
+              ...(finalize
+                ? {
+                    subscriptionId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+                    finalizedAt: observedAt,
+                  }
+                : {}),
+            };
+            if (finalize) {
+              currentSharedModel = {
+                ...sharedModel,
+                version: 7,
+                status: "updating",
+                ready: false,
+                readinessObservedAt: null,
+                readinessGeneration: null,
+                desiredSubscriptionRevision: 3,
+                operationId: "controlled-approved-subscription",
+                operationCompletedAt: null,
+              };
+              subscriptionRows = [
+                ...subscriptionRows,
+                {
+                  ...activeSubscription,
+                  id: connectionRequest.subscriptionId,
+                  version: 1,
+                  alias: connectionRequest.alias,
+                  bindingPrefix: "MODEL_REVIEWED_",
+                  status: "pending",
+                  desiredRevision: 3,
+                  appliedRevision: 0,
+                  reconciledAt: null,
+                  canRevoke: false,
+                },
+              ];
+            }
+            return object({ ok: true, errors: [], data: connectionProjection(approve) });
+          }
           const update = info.fieldName === "updateClusterModel";
           const deprovision = info.fieldName === "deprovisionClusterModel";
           if (
@@ -608,11 +775,13 @@ createServer(async (req, res) => {
             args.input.organizationId === id &&
             args.input.clusterId === sharedClusterId &&
             args.input.expectedProviderId === sharedProviderId &&
-            args.input.modelRepo === hubModel.repoId &&
+            [hubModel.repoId, "Qwen/Qwen2.5-0.5B-Instruct"].includes(args.input.modelRepo) &&
             args.input.revisionSha === hubModel.revisionSha &&
             ((args.input.computeMode === "cpu" &&
               args.input.gpuCount === 0 &&
-              args.input.name === "Controlled newly created CPU model") ||
+              ["Controlled newly created CPU model", "Qwen2.5-0.5B-Instruct"].includes(
+                args.input.name
+              )) ||
               (args.input.computeMode === "gpu" &&
                 args.input.gpuCount === 1 &&
                 args.input.name === "Controlled newly created GPU model")) &&
@@ -625,6 +794,8 @@ createServer(async (req, res) => {
               id: createdModelId,
               version: 3,
               name: input.name,
+              modelRepo: input.modelRepo,
+              revisionSha: input.revisionSha,
               computeMode: input.computeMode,
               subscriptionsEnabled: input.allowSubscriptions,
               status: "updating",

@@ -326,7 +326,7 @@ def module_entitlements(
     ``apps``                      app.read         app.create         app.update | app.delete       app.deploy
     ``agents``                    agent.read       agent.create       agent.update | agent.delete   agent.dispatch
     ``workflows``                 workflow.read    workflow.create    workflow.update|.delete       workflow.trigger
-    ``models``                    org.read|app.read cluster.update     cluster.update                cluster.update
+    ``models``                    org.read|app.read operator (refined) operator (refined)            cluster.update
     ``admin``                     any admin slug   cluster.register   same as can_view              (always false)
                                   OR staff/super   | org.manage_members
     ``chat_studio_integration``   app.read         app.create         app.update | app.delete       app.deploy
@@ -359,7 +359,11 @@ def module_entitlements(
     ``enabled``: a superuser cannot use a module that is off for the org.
     The Models row is recomputed in ``AstroliftMe.modules`` with current live
     membership, credential ceilings and actual ORG/app scopes. This pure
-    mapping alone cannot establish organization-level model authority.
+    mapping alone cannot establish current hosting authority: ordinary permission
+    slugs never advertise model create/manage. Explicit superuser input is still
+    only an advisory identity hint, replaced by current credentials and hosting
+    admission in ``AstroliftMe.modules``. Model run remains the shared prompt
+    owner permission; app prompts/subscriptions have their own concrete gates.
     The ``admin`` module additionally lights its view/manage capability
     for staff (``is_staff``) even without an explicit admin slug.
     """
@@ -418,8 +422,8 @@ def module_entitlements(
     models = ModuleEntitlement(
         key="models",
         can_view=has("org.read") or has("app.read"),
-        can_create=has("cluster.update"),
-        can_manage=has("cluster.update"),
+        can_create=False,
+        can_manage=False,
         can_run=has("cluster.update"),
         enabled=True,
     )
@@ -692,6 +696,7 @@ def require_permission(
     scope: Callable[[dict[str, Any]], PermissionScope | None] | None = None,
     any_scope: bool = False,
     operation: Callable[[dict[str, Any]], Iterable[OperationContext]] | None = None,
+    approval_request: bool = False,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Resolver-entry permission gate.
 
@@ -719,6 +724,11 @@ def require_permission(
     It is deliberately weaker than the scoped check, so a resolver using
     it MUST filter its rows down to the caller's granted scopes; see
     ``check_permission_any_scope``. Mutually exclusive with ``scope``.
+
+    ``approval_request=True`` is a trusted pending-request admission seam: only
+    well-formed unsatisfied ALLOW approval conditions may defer. It never supplies
+    approval counts and is removed before the resolver/effect runs. Ordinary
+    gates retain the default false value.
 
     The check raises :class:`PermissionDenied`; mutation wrappers
     (``@mutation_audit``) translate that into the ``MutationResult``
@@ -762,7 +772,7 @@ def require_permission(
                 if memo is not None:
                     _scopes_memo.reset(memo)
 
-        def check(args, kwargs) -> None:
+        def check_bound(args, kwargs) -> None:
             if any_scope:
                 for perm in permissions:
                     check_permission_any_scope(perm)
@@ -774,6 +784,13 @@ def require_permission(
                 target_scope = scope(bound.arguments)
             for perm in permissions:
                 check_permission(perm, scope=target_scope)
+
+        def check(args, kwargs) -> None:
+            from astrolift_identity.abac import operation_attributes
+
+            # Request admission may defer quorum; the resolver/effect never inherits it.
+            with operation_attributes(approval_request=approval_request):
+                check_bound(args, kwargs)
 
         def operation_contexts(args, kwargs):
             contexts = (None,)

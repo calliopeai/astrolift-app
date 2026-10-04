@@ -3557,6 +3557,7 @@ export type AstroliftMe = {
   id: Scalars['String']['output'];
   modules: Array<AstroliftModuleEntitlement>;
   profile?: Maybe<AstroliftUserProfile>;
+  teamAccessNavigation: AstroliftTeamAccessNavigation;
 };
 
 export type AstroliftMember = {
@@ -5359,6 +5360,136 @@ export type AstroliftTeam = {
   updatedAt: Scalars['DateTime']['output'];
 };
 
+export type AstroliftTeamAccessNavigation = {
+  canCheckAccess: Scalars['Boolean']['output'];
+  canManageTeamMembers: Scalars['Boolean']['output'];
+  canViewPeople: Scalars['Boolean']['output'];
+  canViewPolicies: Scalars['Boolean']['output'];
+  canViewRoles: Scalars['Boolean']['output'];
+  canViewTeams: Scalars['Boolean']['output'];
+};
+
+export type AstroliftTeamAccessSource = {
+  expired: Scalars['Boolean']['output'];
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['GUID']['output'];
+  removable: Scalars['Boolean']['output'];
+  roleId: Scalars['GUID']['output'];
+  roleName: Scalars['String']['output'];
+  scopeKind: Scalars['String']['output'];
+  source: Scalars['String']['output'];
+  sourceHref?: Maybe<Scalars['String']['output']>;
+};
+
+export type AstroliftTeamMembership = {
+  canRemove: Scalars['Boolean']['output'];
+  lifecycle?: Maybe<Scalars['String']['output']>;
+  person: AstroliftTeamMembershipPerson;
+  sources: Array<AstroliftTeamAccessSource>;
+  team: AstroliftTeamMembershipTeam;
+  teamMemberId?: Maybe<Scalars['GUID']['output']>;
+};
+
+export type AstroliftTeamMembershipChange = {
+  changeId: Scalars['GUID']['output'];
+  committed: Scalars['Boolean']['output'];
+  orgMemberId: Scalars['GUID']['output'];
+  remainingSources: Array<AstroliftTeamAccessSource>;
+  removedBindingIds: Array<Scalars['GUID']['output']>;
+  replayed: Scalars['Boolean']['output'];
+  requestId: Scalars['GUID']['output'];
+  teamId: Scalars['GUID']['output'];
+  teamMemberId?: Maybe<Scalars['GUID']['output']>;
+};
+
+export type AstroliftTeamMembershipChangeMutationResult = {
+  data?: Maybe<AstroliftTeamMembershipChange>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftTeamMembershipPage = {
+  items: Array<AstroliftTeamMembership>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftTeamMembershipPerson = {
+  active: Scalars['Boolean']['output'];
+  email: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  orgMemberId: Scalars['GUID']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftTeamMembershipPersonPage = {
+  items: Array<AstroliftTeamMembershipPerson>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftTeamMembershipReview = {
+  expectedSource: Scalars['String']['output'];
+  kind: TeamMembershipChangeKind;
+  membership: AstroliftTeamMembership;
+  remainingSources: Array<AstroliftTeamAccessSource>;
+  roles: Array<AstroliftTeamMembershipRole>;
+};
+
+export type AstroliftTeamMembershipRole = {
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  permissions: Array<Scalars['String']['output']>;
+  version: Scalars['Int']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftTeamMembershipRolePage = {
+  items: Array<AstroliftTeamMembershipRole>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftTeamMembershipTeam = {
+  canManageMembers: Scalars['Boolean']['output'];
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftTeamMembershipTeamPage = {
+  items: Array<AstroliftTeamMembershipTeam>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AstroliftTeamMutationResult = {
   data?: Maybe<AstroliftTeam>;
   errors: Array<MutationError>;
@@ -6131,6 +6262,15 @@ export type CatalogueState =
   | 'RATE_LIMITED'
   | 'UNAVAILABLE';
 
+export type ChangeAstroliftTeamMembershipInput = {
+  expectedSource: Scalars['String']['input'];
+  kind: TeamMembershipChangeKind;
+  orgMemberId: Scalars['GUID']['input'];
+  requestId: Scalars['GUID']['input'];
+  roleId: InputMaybe<Scalars['GUID']['input']>;
+  teamId: Scalars['GUID']['input'];
+};
+
 export type CiWorkflowSyncActionInput = {
   appId: Scalars['GUID']['input'];
 };
@@ -6217,6 +6357,10 @@ export type ClusterModelDeployment = {
   clusterName: Scalars['String']['output'];
   clusterSlug: Scalars['String']['output'];
   computeMode?: Maybe<Scalars['String']['output']>;
+  dedicatedAppId?: Maybe<Scalars['GUID']['output']>;
+  dedicatedAppName?: Maybe<Scalars['String']['output']>;
+  dedicatedAppSlug?: Maybe<Scalars['String']['output']>;
+  dedicatedAppVersion?: Maybe<Scalars['Int']['output']>;
   desiredResources: ModelResources;
   desiredSubscriptionRevision: Scalars['Int']['output'];
   id: Scalars['GUID']['output'];
@@ -6237,6 +6381,7 @@ export type ClusterModelDeployment = {
   revisionSha?: Maybe<Scalars['String']['output']>;
   runtimeReason?: Maybe<Scalars['String']['output']>;
   runtimeSupported?: Maybe<Scalars['Boolean']['output']>;
+  sharingMode: ModelSharingMode;
   sourceKind: Scalars['String']['output'];
   status: Scalars['String']['output'];
   subscriptionsEnabled: Scalars['Boolean']['output'];
@@ -6260,6 +6405,30 @@ export type ClusterModelDeploymentPage = {
   pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ClusterModelRuntimeModeSettings = {
+  computeMode: ModelRuntimeMode;
+  configured: Scalars['Boolean']['output'];
+  declaration?: Maybe<ModelRuntimeDeclaration>;
+  hardwareAdmission: Scalars['String']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+};
+
+export type ClusterModelRuntimeSettings = {
+  clusterId: Scalars['GUID']['output'];
+  clusterVersion: Scalars['Int']['output'];
+  modes: Array<ClusterModelRuntimeModeSettings>;
+  observedAt: Scalars['DateTime']['output'];
+  organizationId: Scalars['GUID']['output'];
+  providerId: Scalars['GUID']['output'];
+  providerVersion: Scalars['Int']['output'];
+};
+
+export type ClusterModelRuntimeSettingsMutationResult = {
+  data?: Maybe<ClusterModelRuntimeSettings>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type ClusterModelsFilterInput = {
@@ -6580,6 +6749,11 @@ export type DataImportUploadResult = {
   id?: Maybe<Scalars['ID']['output']>;
   preSignedUrl?: Maybe<Scalars['String']['output']>;
   publicUrl?: Maybe<Scalars['String']['output']>;
+};
+
+export type DecideModelConnectionRequestInput = {
+  id: Scalars['GUID']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
 };
 
 export type DecommissionClusterInputType = {
@@ -7300,6 +7474,157 @@ export type ModelClusterCapacity = {
 export type ModelCompatibility =
   | 'UNKNOWN';
 
+export type ModelConnectionAction =
+  | 'AUTO'
+  | 'DENY'
+  | 'REQUEST';
+
+export type ModelConnectionDestination = {
+  action: ModelConnectionAction;
+  allowSelfApproval?: Maybe<Scalars['Boolean']['output']>;
+  appId: Scalars['GUID']['output'];
+  appName: Scalars['String']['output'];
+  appSlug: Scalars['String']['output'];
+  appVersion: Scalars['Int']['output'];
+  clusterId: Scalars['GUID']['output'];
+  eligible: Scalars['Boolean']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  environmentVersion: Scalars['Int']['output'];
+  policyVersion?: Maybe<Scalars['String']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  requiredApprovals?: Maybe<Scalars['Int']['output']>;
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type ModelConnectionDestinationPage = {
+  items: Array<ModelConnectionDestination>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ModelConnectionEligibility = {
+  action: ModelConnectionAction;
+  allowSelfApproval?: Maybe<Scalars['Boolean']['output']>;
+  policyVersion?: Maybe<Scalars['String']['output']>;
+  reason: Scalars['String']['output'];
+  requiredApprovals?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ModelConnectionMode =
+  | 'AUTO'
+  | 'DENY'
+  | 'REQUIRE_APPROVAL';
+
+export type ModelConnectionPlacementInput = {
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
+export type ModelConnectionPolicy = {
+  allowSelfApproval: Scalars['Boolean']['output'];
+  id?: Maybe<Scalars['GUID']['output']>;
+  mode: ModelConnectionMode;
+  requiredApprovals: Scalars['Int']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type ModelConnectionPolicyMutationResult = {
+  data?: Maybe<ModelConnectionPolicy>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type ModelConnectionRequest = {
+  alias: Scalars['String']['output'];
+  appEnvironmentId: Scalars['GUID']['output'];
+  appId: Scalars['GUID']['output'];
+  appName?: Maybe<Scalars['String']['output']>;
+  approvalCount: Scalars['Int']['output'];
+  canApprove: Scalars['Boolean']['output'];
+  canCancel: Scalars['Boolean']['output'];
+  canFinalize: Scalars['Boolean']['output'];
+  canReject: Scalars['Boolean']['output'];
+  clusterId: Scalars['GUID']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  decidedAt?: Maybe<Scalars['DateTime']['output']>;
+  environmentName?: Maybe<Scalars['String']['output']>;
+  finalizedAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['GUID']['output'];
+  modelDeploymentId: Scalars['GUID']['output'];
+  modelName?: Maybe<Scalars['String']['output']>;
+  organizationId: Scalars['GUID']['output'];
+  policyVersion: Scalars['String']['output'];
+  providerId: Scalars['GUID']['output'];
+  requesterUsername?: Maybe<Scalars['String']['output']>;
+  requiredApprovals: Scalars['Int']['output'];
+  status: ModelConnectionRequestStatus;
+  subscriptionId?: Maybe<Scalars['GUID']['output']>;
+  version: Scalars['Int']['output'];
+};
+
+export type ModelConnectionRequestMutationResult = {
+  data?: Maybe<ModelConnectionRequest>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type ModelConnectionRequestPage = {
+  items: Array<ModelConnectionRequest>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ModelConnectionRequestStatus =
+  | 'APPROVED'
+  | 'CANCELLED'
+  | 'PENDING'
+  | 'REJECTED'
+  | 'STALE';
+
+export type ModelConnectionTargetInput = {
+  appEnvironmentId: Scalars['GUID']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
+export type ModelDedicatedApp = {
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type ModelDedicatedAppPage = {
+  items: Array<ModelDedicatedApp>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type ModelDeploymentMetrics = {
   clusterId: Scalars['GUID']['output'];
   end: Scalars['DateTime']['output'];
@@ -7311,6 +7636,12 @@ export type ModelDeploymentMetrics = {
   start: Scalars['DateTime']['output'];
   stepSeconds: Scalars['Int']['output'];
 };
+
+export type ModelDtype =
+  | 'AUTO'
+  | 'BFLOAT16'
+  | 'FLOAT16'
+  | 'FLOAT32';
 
 export type ModelGating =
   | 'AUTO'
@@ -7389,7 +7720,10 @@ export type ModelResourceRequests = {
 export type ModelResources = {
   cpuKvCacheGiB?: Maybe<Scalars['Int']['output']>;
   cpuRequest?: Maybe<Scalars['String']['output']>;
+  dtype?: Maybe<Scalars['String']['output']>;
   gpuCount?: Maybe<Scalars['Int']['output']>;
+  maxModelLen?: Maybe<Scalars['Int']['output']>;
+  maxNumSeqs?: Maybe<Scalars['Int']['output']>;
   memoryRequest?: Maybe<Scalars['String']['output']>;
   replicas?: Maybe<Scalars['Int']['output']>;
 };
@@ -7401,6 +7735,67 @@ export type ModelRuntimeAdmission = {
   reason?: Maybe<Scalars['String']['output']>;
   runtimeVersion?: Maybe<Scalars['String']['output']>;
 };
+
+export type ModelRuntimeArchitecture =
+  | 'AMD64'
+  | 'ARM64';
+
+export type ModelRuntimeDeclaration = {
+  architecture: ModelRuntimeArchitecture;
+  cpuRequestCeiling: Scalars['String']['output'];
+  defaultDtype: ModelDtype;
+  defaultMaxModelLen: Scalars['Int']['output'];
+  defaultMaxNumSeqs: Scalars['Int']['output'];
+  gpuCountCeiling: Scalars['Int']['output'];
+  hardwareCertified: Scalars['Boolean']['output'];
+  hardwareEvidence?: Maybe<Scalars['String']['output']>;
+  image: Scalars['String']['output'];
+  maxModelLenCeiling: Scalars['Int']['output'];
+  maxNumSeqsCeiling: Scalars['Int']['output'];
+  memoryRequestCeiling: Scalars['String']['output'];
+  nodeSelector: Array<ModelRuntimeSelector>;
+  packageVersion: Scalars['String']['output'];
+  supportedDtypes: Array<ModelDtype>;
+  version: Scalars['String']['output'];
+};
+
+export type ModelRuntimeDeclarationInput = {
+  architecture: ModelRuntimeArchitecture;
+  cpuRequestCeiling: Scalars['String']['input'];
+  defaultDtype: ModelDtype;
+  defaultMaxModelLen: Scalars['Int']['input'];
+  defaultMaxNumSeqs: Scalars['Int']['input'];
+  gpuCountCeiling: Scalars['Int']['input'];
+  hardwareAttested: Scalars['Boolean']['input'];
+  hardwareCertified: Scalars['Boolean']['input'];
+  hardwareEvidence: InputMaybe<Scalars['String']['input']>;
+  image: Scalars['String']['input'];
+  maxModelLenCeiling: Scalars['Int']['input'];
+  maxNumSeqsCeiling: Scalars['Int']['input'];
+  memoryRequestCeiling: Scalars['String']['input'];
+  nodeSelector: Array<ModelRuntimeSelectorInput>;
+  packageVersion: Scalars['String']['input'];
+  supportedDtypes: Array<ModelDtype>;
+  version: Scalars['String']['input'];
+};
+
+export type ModelRuntimeMode =
+  | 'CPU'
+  | 'GPU';
+
+export type ModelRuntimeSelector = {
+  key: Scalars['String']['output'];
+  value: Scalars['String']['output'];
+};
+
+export type ModelRuntimeSelectorInput = {
+  key: Scalars['String']['input'];
+  value: Scalars['String']['input'];
+};
+
+export type ModelSharingMode =
+  | 'DEDICATED'
+  | 'SHARED';
 
 export type ModelSourceAccess = {
   accessible: Scalars['Boolean']['output'];
@@ -7428,6 +7823,18 @@ export type ModelSubscription = {
   reconciledAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
   version: Scalars['Int']['output'];
+};
+
+export type ModelSubscriptionMetrics = {
+  clusterId: Scalars['GUID']['output'];
+  end: Scalars['DateTime']['output'];
+  metrics: Array<ModelMetricObservation>;
+  retrievedAt: Scalars['DateTime']['output'];
+  scope: Scalars['String']['output'];
+  serviceId: Scalars['GUID']['output'];
+  start: Scalars['DateTime']['output'];
+  stepSeconds: Scalars['Int']['output'];
+  subscriptionId: Scalars['GUID']['output'];
 };
 
 export type ModelSubscriptionOperation = {
@@ -7500,6 +7907,7 @@ export type Mutation = {
   applyStagedManifest: ManifeststagepayloadMutationResult;
   approveDeployment: AstroliftDeploymentMutationResult;
   approveDeploymentByToken: AstroliftDeploymentMutationResult;
+  approveModelConnectionRequest: ModelConnectionRequestMutationResult;
   approveSecretChange: AstroliftSecretChangeProposalMutationResult;
   archiveApp: AstroliftRegisteredAppMutationResult;
   archiveAppRegistryRepo: AstroliftCapabilityDeprovisionPayloadMutationResult;
@@ -7527,9 +7935,11 @@ export type Mutation = {
   bulkRevokeAstroliftRoleBindings: AstroliftBulkRevokeRoleBindingsPayloadMutationResult;
   bulkRollingRestart: BulkOperationResult;
   cancelAstroliftDeregister: AstroliftCancelDeregisterPayloadMutationResult;
+  cancelModelConnectionRequest: ModelConnectionRequestMutationResult;
   cancelPipelineRun: AstroliftPipelineRunMutationResult;
   cancelTask: NoneTypeMutationResult;
   cancelWorkflowInstance: MutationResult;
+  changeAstroliftTeamMembership: AstroliftTeamMembershipChangeMutationResult;
   clearAgentQuarantine: NoneTypeMutationResult;
   clearAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
   clearEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
@@ -7632,6 +8042,7 @@ export type Mutation = {
   /** Upload a file and get a pre-signed URL. Creates a FileUpload wrapper around the Upload. */
   fileUpload: FileUploadResult;
   finalizeLocalModelArtifact: LocalModelArtifactMutationResult;
+  finalizeModelConnectionRequest: ModelConnectionRequestMutationResult;
   forceAstroliftRedeploy: AstroliftForceRedeployPayloadMutationResult;
   generateInstallEnrollmentQr: AstroliftEnrollmentQrPayloadMutationResult;
   /** Generate a temporary authentication token for Rocket.Chat. TTL is configured on the Rocket.Chat server. */
@@ -7735,6 +8146,7 @@ export type Mutation = {
   reissueManagedDomainCert: ReissueManagedDomainCertPayloadMutationResult;
   rejectDeployment: AstroliftDeploymentMutationResult;
   rejectDeploymentByToken: AstroliftDeploymentMutationResult;
+  rejectModelConnectionRequest: ModelConnectionRequestMutationResult;
   rejectSecretChange: AstroliftSecretChangeProposalMutationResult;
   releaseObservabilityRetentionHold: ObservabilityRetentionHoldTypeMutationResult;
   removeAgentSecretRef: AstroliftAgentSecretStatusMutationResult;
@@ -7748,6 +8160,7 @@ export type Mutation = {
   reprovisionManagedService: AstroliftManagedServiceMutationResult;
   reprovisionProjectManagedService: AstroliftManagedServiceMutationResult;
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
+  requestModelConnection: ModelConnectionRequestMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
   rerunAstroliftOnboarding: AstroliftRerunOnboardingPayloadMutationResult;
   resendInvitation: AstroliftInvitationCreatedMutationResult;
@@ -7812,6 +8225,7 @@ export type Mutation = {
   setEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
   /** Toggle a public runtime feature flag (the admin 'feature flipper'). Platform-admin only. ``key`` is the public dotted key from ``astroliftServerInfo.featureFlags`` (e.g. ``zentinelle.enabled``); the backing Constance value is set and the updated flag is returned. Unknown / non-public keys are rejected with a VALIDATION error. Install-time features (``astroliftServerInfo.buildTimeFeatures``) are NOT settable here — they require a redeploy. */
   setFeatureFlag: FeatureFlagInfoMutationResult;
+  setModelConnectionRestriction: ModelConnectionPolicyMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
   setNotificationProfile: AstroliftNotificationProfileMutationResult;
   /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with PRECONDITION; turning one off always succeeds. */
@@ -7870,6 +8284,7 @@ export type Mutation = {
   updateApp: AstroliftRegisteredAppMutationResult;
   updateAstroliftSecurityPolicy: AstroliftRegisteredAppMutationResult;
   updateClusterModel: ClusterModelDeploymentMutationResult;
+  updateClusterModelRuntime: ClusterModelRuntimeSettingsMutationResult;
   updateEmailTemplate: AstroliftEmailTemplateMutationResult;
   updateFormDefinition: AstroliftFormDefinitionMutationResult;
   updateIdentityProvider: AstroliftIdentityProviderMutationResult;
@@ -7880,6 +8295,7 @@ export type Mutation = {
   updateMyUiPreferences: AstroliftUiPreferencesMutationResult;
   updateOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
   updateOrganization: AstroliftOrganizationMutationResult;
+  updateOrganizationModelConnectionPolicy: ModelConnectionPolicyMutationResult;
   updatePipeline: AstroliftPipelineMutationResult;
   updatePolicy: AstroliftPolicyMutationResult;
   updateProject: AstroliftProjectMutationResult;
@@ -7976,6 +8392,11 @@ export type MutationApproveDeploymentArgs = {
 
 export type MutationApproveDeploymentByTokenArgs = {
   input: ApproveByTokenInput;
+};
+
+
+export type MutationApproveModelConnectionRequestArgs = {
+  input: DecideModelConnectionRequestInput;
 };
 
 
@@ -8120,6 +8541,11 @@ export type MutationCancelAstroliftDeregisterArgs = {
 };
 
 
+export type MutationCancelModelConnectionRequestArgs = {
+  input: DecideModelConnectionRequestInput;
+};
+
+
 export type MutationCancelPipelineRunArgs = {
   confirmed?: Scalars['Boolean']['input'];
   expectedVersion?: InputMaybe<Scalars['Int']['input']>;
@@ -8137,6 +8563,11 @@ export type MutationCancelTaskArgs = {
 export type MutationCancelWorkflowInstanceArgs = {
   runId?: InputMaybe<Scalars['String']['input']>;
   workflowId: Scalars['String']['input'];
+};
+
+
+export type MutationChangeAstroliftTeamMembershipArgs = {
+  input: ChangeAstroliftTeamMembershipInput;
 };
 
 
@@ -8648,6 +9079,11 @@ export type MutationFinalizeLocalModelArtifactArgs = {
 };
 
 
+export type MutationFinalizeModelConnectionRequestArgs = {
+  input: DecideModelConnectionRequestInput;
+};
+
+
 export type MutationForceAstroliftRedeployArgs = {
   input: ForceRedeployInput;
 };
@@ -9064,6 +9500,11 @@ export type MutationRejectDeploymentByTokenArgs = {
 };
 
 
+export type MutationRejectModelConnectionRequestArgs = {
+  input: DecideModelConnectionRequestInput;
+};
+
+
 export type MutationRejectSecretChangeArgs = {
   input: RejectSecretChangeInput;
 };
@@ -9125,6 +9566,11 @@ export type MutationReprovisionProjectManagedServiceArgs = {
 
 export type MutationRequestAttestationChallengeArgs = {
   input: RequestAttestationChallengeInput;
+};
+
+
+export type MutationRequestModelConnectionArgs = {
+  input: RequestModelConnectionInput;
 };
 
 
@@ -9453,6 +9899,11 @@ export type MutationSetFeatureFlagArgs = {
 };
 
 
+export type MutationSetModelConnectionRestrictionArgs = {
+  input: SetModelConnectionRestrictionInput;
+};
+
+
 export type MutationSetNotificationPreferenceArgs = {
   input: SetNotificationPreferenceInput;
 };
@@ -9723,6 +10174,11 @@ export type MutationUpdateClusterModelArgs = {
 };
 
 
+export type MutationUpdateClusterModelRuntimeArgs = {
+  input: UpdateClusterModelRuntimeInput;
+};
+
+
 export type MutationUpdateEmailTemplateArgs = {
   input: UpdateEmailTemplateInput;
 };
@@ -9770,6 +10226,11 @@ export type MutationUpdateOrgSkillRepoArgs = {
 
 export type MutationUpdateOrganizationArgs = {
   input: UpdateOrganizationInput;
+};
+
+
+export type MutationUpdateOrganizationModelConnectionPolicyArgs = {
+  input: UpdateOrganizationModelConnectionPolicyInput;
 };
 
 
@@ -10202,11 +10663,14 @@ export type ProvisionClusterModelInput = {
   connectionId: InputMaybe<Scalars['GUID']['input']>;
   cpuKvCacheGiB: InputMaybe<Scalars['Int']['input']>;
   cpuRequest: Scalars['String']['input'];
+  dtype: InputMaybe<ModelDtype>;
   expectedArtifactVersion: InputMaybe<Scalars['Int']['input']>;
   expectedConnectionVersion: InputMaybe<Scalars['Int']['input']>;
   expectedProviderId: Scalars['GUID']['input'];
   gpuCount: Scalars['Int']['input'];
   localArtifactId: InputMaybe<Scalars['GUID']['input']>;
+  maxModelLen: InputMaybe<Scalars['Int']['input']>;
+  maxNumSeqs: InputMaybe<Scalars['Int']['input']>;
   memoryRequest: Scalars['String']['input'];
   modelRepo: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
@@ -10455,11 +10919,13 @@ export type Query = {
   astroliftMembers: Array<AstroliftMember>;
   astroliftMembersCsv: AstroliftIdentityCsvExport;
   astroliftMembersPage: AstroliftMemberPage;
+  astroliftMembershipTeamsPage: AstroliftTeamMembershipTeamPage;
   astroliftModelDeploymentMetrics?: Maybe<ModelDeploymentMetrics>;
   astroliftModelEndpoint?: Maybe<AstroliftManagedService>;
   astroliftModelEndpoints: Array<AstroliftManagedService>;
   astroliftModelEndpointsPage: AstroliftManagedServicePage;
   astroliftModelPromptReadiness?: Maybe<AstroliftModelPromptReadiness>;
+  astroliftModelSubscriptionMetrics?: Maybe<ModelSubscriptionMetrics>;
   astroliftMyAlertSubscriptions: Array<AstroliftUserAlertSubscription>;
   astroliftMyApps: Array<AstroliftRegisteredApp>;
   astroliftMyAppsPage: AstroliftRegisteredAppPage;
@@ -10477,6 +10943,7 @@ export type Query = {
   astroliftOrganization?: Maybe<AstroliftOrganization>;
   astroliftOrganizationAllowlistDomains: Array<AstroliftOrganizationAllowlistedDomain>;
   astroliftOrganizations: Array<AstroliftOrganization>;
+  astroliftPersonTeamMembershipsPage: AstroliftTeamMembershipPage;
   astroliftPipeline?: Maybe<AstroliftPipeline>;
   astroliftPipelineRun?: Maybe<AstroliftPipelineRun>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftPipelineRunsPage. */
@@ -10557,7 +11024,13 @@ export type Query = {
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftTaskRunsPage. */
   astroliftTaskRuns: Array<AstroliftTaskRun>;
   astroliftTaskRunsPage: AstroliftTaskRunPage;
+  astroliftTeamMemberCandidatesPage: AstroliftTeamMembershipPersonPage;
   astroliftTeamMembers: Array<AstroliftMember>;
+  astroliftTeamMembershipPerson?: Maybe<AstroliftTeamMembershipPerson>;
+  astroliftTeamMembershipReview?: Maybe<AstroliftTeamMembershipReview>;
+  astroliftTeamMembershipRolesPage: AstroliftTeamMembershipRolePage;
+  astroliftTeamMembershipTeam?: Maybe<AstroliftTeamMembershipTeam>;
+  astroliftTeamMembershipsPage: AstroliftTeamMembershipPage;
   astroliftTeamSlugAvailable: Scalars['Boolean']['output'];
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftTeamsPage. */
   astroliftTeams: Array<AstroliftTeam>;
@@ -10594,13 +11067,16 @@ export type Query = {
   /** Cursor-paginated mutation audit log. Superuser only. */
   auditLogsPage: AuditLogEntryPage;
   brief?: Maybe<AstroliftBrief>;
+  clusterModelDedicatedAppsPage: ModelDedicatedAppPage;
   clusterModelDeployment?: Maybe<ClusterModelDeployment>;
   clusterModelDeploymentsPage: ClusterModelDeploymentPage;
   clusterModelPlacementClustersPage: ModelPlacementClusterPage;
   clusterModelRuntimeAdmission: ModelRuntimeAdmission;
+  clusterModelRuntimeSettings?: Maybe<ClusterModelRuntimeSettings>;
   clusterModelSourceAccess: ModelSourceAccess;
   clusterModelSubscriptionTargetsPage: ModelSubscriptionTargetPage;
   clusterModelSubscriptionsPage: ModelSubscriptionPage;
+  clusterModelUpdateAdmission: ModelRuntimeAdmission;
   dispatchers: Array<AstroliftDispatcherInstance>;
   /** List all effective permissions for a user, with the role bindings that grant each one. */
   effectivePermissions: Array<PermissionEntry>;
@@ -10615,11 +11091,19 @@ export type Query = {
   members: Array<OrganizationMemberType>;
   /** Cursor-paginated list of members in the caller's organizations. */
   membersPage: OrganizationMemberTypePage;
+  modelConnectionAction: ModelConnectionEligibility;
+  modelConnectionApprovalRequestsPage: ModelConnectionRequestPage;
+  modelConnectionRequest?: Maybe<ModelConnectionRequest>;
+  modelConnectionRequestsPage: ModelConnectionRequestPage;
+  modelConnectionRestriction: ModelConnectionPolicy;
+  modelConnectionReviewRequest?: Maybe<ModelConnectionRequest>;
+  modelConnectionTargetsPage: ModelConnectionDestinationPage;
   modelHostingAction: ModelHostingAction;
   orgSkillRepos: Array<AstroliftOrgSkillRepo>;
   orgToolDefs: Array<AstroliftToolDef>;
   orgToolDefsPage: AstroliftToolDefPage;
   organization?: Maybe<OrganizationType>;
+  organizationModelConnectionPolicy: ModelConnectionPolicy;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use organizationsPage. */
   organizations: Array<OrganizationType>;
   /** Cursor-paginated list of the caller's organizations. */
@@ -11754,6 +12238,13 @@ export type QueryAstroliftMembersPageArgs = {
 };
 
 
+export type QueryAstroliftMembershipTeamsPageArgs = {
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryAstroliftModelDeploymentMetricsArgs = {
   end: Scalars['DateTime']['input'];
   expectedClusterId: Scalars['GUID']['input'];
@@ -11779,6 +12270,17 @@ export type QueryAstroliftModelEndpointsPageArgs = {
 
 export type QueryAstroliftModelPromptReadinessArgs = {
   id: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftModelSubscriptionMetricsArgs = {
+  end: Scalars['DateTime']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+  serviceId: Scalars['GUID']['input'];
+  start: Scalars['DateTime']['input'];
+  subscriptionId: Scalars['GUID']['input'];
 };
 
 
@@ -11833,6 +12335,14 @@ export type QueryAstroliftOrgMembersForApprovalPickerArgs = {
 
 export type QueryAstroliftOrganizationArgs = {
   slug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftPersonTeamMembershipsPageArgs = {
+  orgMemberId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -12221,7 +12731,50 @@ export type QueryAstroliftTaskRunsPageArgs = {
 };
 
 
+export type QueryAstroliftTeamMemberCandidatesPageArgs = {
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftTeamMembersArgs = {
+  teamId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftTeamMembershipPersonArgs = {
+  orgMemberId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftTeamMembershipReviewArgs = {
+  kind: TeamMembershipChangeKind;
+  orgMemberId: Scalars['GUID']['input'];
+  roleId?: InputMaybe<Scalars['GUID']['input']>;
+  teamId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftTeamMembershipRolesPageArgs = {
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftTeamMembershipTeamArgs = {
+  slug?: InputMaybe<Scalars['String']['input']>;
+  teamId?: InputMaybe<Scalars['GUID']['input']>;
+};
+
+
+export type QueryAstroliftTeamMembershipsPageArgs = {
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
   teamId: Scalars['GUID']['input'];
 };
 
@@ -12407,6 +12960,16 @@ export type QueryBriefArgs = {
 };
 
 
+export type QueryClusterModelDedicatedAppsPageArgs = {
+  clusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryClusterModelDeploymentArgs = {
   id: Scalars['GUID']['input'];
   organizationId: Scalars['GUID']['input'];
@@ -12435,6 +12998,13 @@ export type QueryClusterModelRuntimeAdmissionArgs = {
 };
 
 
+export type QueryClusterModelRuntimeSettingsArgs = {
+  clusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
+
 export type QueryClusterModelSourceAccessArgs = {
   connectionId?: InputMaybe<Scalars['GUID']['input']>;
   expectedConnectionVersion?: InputMaybe<Scalars['Int']['input']>;
@@ -12460,6 +13030,11 @@ export type QueryClusterModelSubscriptionsPageArgs = {
   page?: Scalars['Int']['input'];
   pageSize?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryClusterModelUpdateAdmissionArgs = {
+  input: UpdateClusterModelInput;
 };
 
 
@@ -12503,6 +13078,48 @@ export type QueryMembersPageArgs = {
 };
 
 
+export type QueryModelConnectionActionArgs = {
+  input: ModelConnectionTargetInput;
+};
+
+
+export type QueryModelConnectionApprovalRequestsPageArgs = {
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+};
+
+
+export type QueryModelConnectionRequestArgs = {
+  input: DecideModelConnectionRequestInput;
+};
+
+
+export type QueryModelConnectionRequestsPageArgs = {
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+};
+
+
+export type QueryModelConnectionRestrictionArgs = {
+  input: ModelConnectionPlacementInput;
+};
+
+
+export type QueryModelConnectionReviewRequestArgs = {
+  input: DecideModelConnectionRequestInput;
+};
+
+
+export type QueryModelConnectionTargetsPageArgs = {
+  input: ModelConnectionPlacementInput;
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryModelHostingActionArgs = {
   organizationId: Scalars['GUID']['input'];
 };
@@ -12530,6 +13147,11 @@ export type QueryOrgToolDefsPageArgs = {
 
 export type QueryOrganizationArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryOrganizationModelConnectionPolicyArgs = {
+  organizationId: Scalars['GUID']['input'];
 };
 
 
@@ -12948,6 +13570,20 @@ export type RequestAttestationChallengeInput = {
   kind: Scalars['String']['input'];
 };
 
+export type RequestModelConnectionInput = {
+  alias: Scalars['String']['input'];
+  appEnvironmentId: Scalars['GUID']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  idempotencyKey: Scalars['GUID']['input'];
+  ifMatchAppVersion: Scalars['Int']['input'];
+  ifMatchEnvironmentVersion: Scalars['Int']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+  policyVersion: Scalars['String']['input'];
+};
+
 export type RequestQuotaIncreaseInput = {
   factor: Scalars['Float']['input'];
   quotaId: Scalars['GUID']['input'];
@@ -13285,6 +13921,18 @@ export type SetEnvironmentSettingInput = {
   value: Scalars['String']['input'];
 };
 
+export type SetModelConnectionRestrictionInput = {
+  allowSelfApproval: Scalars['Boolean']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  ifMatchDeploymentVersion: Scalars['Int']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  mode: ModelConnectionMode;
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+  requiredApprovals: Scalars['Int']['input'];
+};
+
 export type SetNotificationPreferenceInput = {
   channel: Scalars['String']['input'];
   enabled: Scalars['Boolean']['input'];
@@ -13478,6 +14126,10 @@ export type SyncManifestFromRepoInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type TeamMembershipChangeKind =
+  | 'ADD'
+  | 'REMOVE';
+
 export type TearDownAppInput = {
   deleteData: Scalars['Boolean']['input'];
   forceDestroy: Scalars['Boolean']['input'];
@@ -13657,12 +14309,29 @@ export type UpdateClusterModelInput = {
   allowSubscriptions: Scalars['Boolean']['input'];
   cpuKvCacheGiB: InputMaybe<Scalars['Int']['input']>;
   cpuRequest: Scalars['String']['input'];
+  dedicatedAppId: InputMaybe<Scalars['GUID']['input']>;
+  dtype: InputMaybe<ModelDtype>;
   expectedClusterId: Scalars['GUID']['input'];
   expectedProviderId: Scalars['GUID']['input'];
   gpuCount: Scalars['Int']['input'];
   id: Scalars['GUID']['input'];
+  ifMatchDedicatedAppVersion: InputMaybe<Scalars['Int']['input']>;
   ifMatchVersion: Scalars['Int']['input'];
+  maxModelLen: InputMaybe<Scalars['Int']['input']>;
+  maxNumSeqs: InputMaybe<Scalars['Int']['input']>;
   memoryRequest: Scalars['String']['input'];
+  name: InputMaybe<Scalars['String']['input']>;
+  organizationId: Scalars['GUID']['input'];
+  sharingMode: InputMaybe<ModelSharingMode>;
+};
+
+export type UpdateClusterModelRuntimeInput = {
+  clusterId: Scalars['GUID']['input'];
+  computeMode: ModelRuntimeMode;
+  declaration: ModelRuntimeDeclarationInput;
+  expectedProviderId: Scalars['GUID']['input'];
+  expectedProviderVersion: Scalars['Int']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
   organizationId: Scalars['GUID']['input'];
 };
 
@@ -13749,6 +14418,14 @@ export type UpdateOrganizationInput = {
   restrictedSettingsDefault: InputMaybe<Scalars['String']['input']>;
   traceRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
   website: InputMaybe<Scalars['String']['input']>;
+};
+
+export type UpdateOrganizationModelConnectionPolicyInput = {
+  allowSelfApproval: Scalars['Boolean']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  mode: ModelConnectionMode;
+  organizationId: Scalars['GUID']['input'];
+  requiredApprovals: Scalars['Int']['input'];
 };
 
 export type UpdatePipelineInput = {
@@ -15357,6 +16034,93 @@ export type ExportRoleBindingsCsvQueryVariables = Exact<{
 
 export type ExportRoleBindingsCsvQuery = { astroliftRoleBindingsCsv: { filename: string, content: string, rowCount: number, contentType: string } };
 
+export type ReviewedTeamMembershipFragment = { teamMemberId?: string | null, lifecycle?: string | null, canRemove: boolean, team: { id: string, version: number, name: string, slug: string, canManageMembers: boolean }, person: { orgMemberId: string, name: string, email: string, active: boolean }, sources: Array<{ id: string, source: string, scopeKind: string, roleName: string, roleId: string, sourceHref?: string | null, expiresAt?: string | null, expired: boolean, removable: boolean }> };
+
+export type GetTeamAccessNavigationQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetTeamAccessNavigationQuery = { me?: { teamAccessNavigation: { canViewTeams: boolean, canManageTeamMembers: boolean, canViewPeople: boolean, canViewRoles: boolean, canViewPolicies: boolean, canCheckAccess: boolean } } | null };
+
+export type GetMembershipTeamQueryVariables = Exact<{
+  slug: Scalars['String']['input'];
+}>;
+
+
+export type GetMembershipTeamQuery = { astroliftTeamMembershipTeam?: { id: string, version: number, name: string, slug: string, canManageMembers: boolean } | null };
+
+export type GetMembershipPersonQueryVariables = Exact<{
+  orgMemberId: Scalars['GUID']['input'];
+}>;
+
+
+export type GetMembershipPersonQuery = { astroliftTeamMembershipPerson?: { orgMemberId: string, name: string, email: string, active: boolean } | null };
+
+export type ListReviewedTeamMembershipsQueryVariables = Exact<{
+  teamId: Scalars['GUID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type ListReviewedTeamMembershipsQuery = { astroliftTeamMembershipsPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ teamMemberId?: string | null, lifecycle?: string | null, canRemove: boolean, team: { id: string, version: number, name: string, slug: string, canManageMembers: boolean }, person: { orgMemberId: string, name: string, email: string, active: boolean }, sources: Array<{ id: string, source: string, scopeKind: string, roleName: string, roleId: string, sourceHref?: string | null, expiresAt?: string | null, expired: boolean, removable: boolean }> }> } };
+
+export type ListReviewedPersonTeamsQueryVariables = Exact<{
+  orgMemberId: Scalars['GUID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type ListReviewedPersonTeamsQuery = { astroliftPersonTeamMembershipsPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ teamMemberId?: string | null, lifecycle?: string | null, canRemove: boolean, team: { id: string, version: number, name: string, slug: string, canManageMembers: boolean }, person: { orgMemberId: string, name: string, email: string, active: boolean }, sources: Array<{ id: string, source: string, scopeKind: string, roleName: string, roleId: string, sourceHref?: string | null, expiresAt?: string | null, expired: boolean, removable: boolean }> }> } };
+
+export type ListTeamMemberCandidatesQueryVariables = Exact<{
+  teamId: Scalars['GUID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type ListTeamMemberCandidatesQuery = { astroliftTeamMemberCandidatesPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ orgMemberId: string, name: string, email: string, active: boolean }> } };
+
+export type ListMembershipTeamsQueryVariables = Exact<{
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type ListMembershipTeamsQuery = { astroliftMembershipTeamsPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, version: number, name: string, slug: string, canManageMembers: boolean }> } };
+
+export type GetTeamMembershipReviewQueryVariables = Exact<{
+  teamId: Scalars['GUID']['input'];
+  orgMemberId: Scalars['GUID']['input'];
+  kind: TeamMembershipChangeKind;
+  roleId?: InputMaybe<Scalars['GUID']['input']>;
+}>;
+
+
+export type GetTeamMembershipReviewQuery = { astroliftTeamMembershipReview?: { kind: TeamMembershipChangeKind, expectedSource: string, membership: { teamMemberId?: string | null, lifecycle?: string | null, canRemove: boolean, team: { id: string, version: number, name: string, slug: string, canManageMembers: boolean }, person: { orgMemberId: string, name: string, email: string, active: boolean }, sources: Array<{ id: string, source: string, scopeKind: string, roleName: string, roleId: string, sourceHref?: string | null, expiresAt?: string | null, expired: boolean, removable: boolean }> }, roles: Array<{ id: string, version: number, name: string, permissions: Array<string> }>, remainingSources: Array<{ id: string, source: string, scopeKind: string, roleName: string, roleId: string, sourceHref?: string | null, expiresAt?: string | null, expired: boolean, removable: boolean }> } | null };
+
+export type ChangeTeamMembershipMutationVariables = Exact<{
+  input: ChangeAstroliftTeamMembershipInput;
+}>;
+
+
+export type ChangeTeamMembershipMutation = { changeAstroliftTeamMembership: { ok: boolean, errors: Array<{ code: string, message: string, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { requestId: string, changeId: string, committed: boolean, replayed: boolean, teamId: string, orgMemberId: string, teamMemberId?: string | null, removedBindingIds: Array<string>, remainingSources: Array<{ id: string, source: string, scopeKind: string, roleName: string, roleId: string, sourceHref?: string | null, expiresAt?: string | null, expired: boolean, removable: boolean }> } | null } };
+
+export type ListTeamMembershipRolesQueryVariables = Exact<{
+  teamId: Scalars['GUID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type ListTeamMembershipRolesQuery = { astroliftTeamMembershipRolesPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, version: number, name: string, permissions: Array<string> }> } };
+
 export type UpdateMyUiPreferencesMutationVariables = Exact<{
   input: UpdateMyUiPreferencesInput;
 }>;
@@ -15882,6 +16646,131 @@ export type FinalizeLocalModelArtifactMutationVariables = Exact<{
 
 export type FinalizeLocalModelArtifactMutation = { finalizeLocalModelArtifact: { ok: boolean, data?: { id: string, name: string, version: number, state: string, manifestSha256: string, fileCount: number, sizeBytes: string } | null, errors: Array<{ code: string, field?: string | null, message: string, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }> } };
 
+export type RequestModelConnectionMutationVariables = Exact<{
+  input: RequestModelConnectionInput;
+}>;
+
+
+export type RequestModelConnectionMutation = { requestModelConnection: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null } | null } };
+
+export type ApproveModelConnectionRequestMutationVariables = Exact<{
+  input: DecideModelConnectionRequestInput;
+}>;
+
+
+export type ApproveModelConnectionRequestMutation = { approveModelConnectionRequest: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null } | null } };
+
+export type RejectModelConnectionRequestMutationVariables = Exact<{
+  input: DecideModelConnectionRequestInput;
+}>;
+
+
+export type RejectModelConnectionRequestMutation = { rejectModelConnectionRequest: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null } | null } };
+
+export type CancelModelConnectionRequestMutationVariables = Exact<{
+  input: DecideModelConnectionRequestInput;
+}>;
+
+
+export type CancelModelConnectionRequestMutation = { cancelModelConnectionRequest: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null } | null } };
+
+export type FinalizeModelConnectionRequestMutationVariables = Exact<{
+  input: DecideModelConnectionRequestInput;
+}>;
+
+
+export type FinalizeModelConnectionRequestMutation = { finalizeModelConnectionRequest: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null } | null } };
+
+export type UpdateOrganizationModelConnectionPolicyMutationVariables = Exact<{
+  input: UpdateOrganizationModelConnectionPolicyInput;
+}>;
+
+
+export type UpdateOrganizationModelConnectionPolicyMutation = { updateOrganizationModelConnectionPolicy: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id?: string | null, version: number, mode: ModelConnectionMode, requiredApprovals: number, allowSelfApproval: boolean } | null } };
+
+export type SetModelConnectionRestrictionMutationVariables = Exact<{
+  input: SetModelConnectionRestrictionInput;
+}>;
+
+
+export type SetModelConnectionRestrictionMutation = { setModelConnectionRestriction: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id?: string | null, version: number, mode: ModelConnectionMode, requiredApprovals: number, allowSelfApproval: boolean } | null } };
+
+export type ModelConnectionPolicyFieldsFragment = { id?: string | null, version: number, mode: ModelConnectionMode, requiredApprovals: number, allowSelfApproval: boolean };
+
+export type ModelConnectionRequestFieldsFragment = { id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null };
+
+export type GetModelConnectionCapabilitiesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetModelConnectionCapabilitiesQuery = { astroliftServerInfo: { capabilities: Array<string> } };
+
+export type ListModelConnectionTargetsQueryVariables = Exact<{
+  input: ModelConnectionPlacementInput;
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type ListModelConnectionTargetsQuery = { modelConnectionTargetsPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, nextCursor?: string | null, items: Array<{ environmentId: string, environmentVersion: number, clusterId: string, appSlug: string, environmentName: string, eligible: boolean, reason?: string | null, appVersion: number, action: ModelConnectionAction, policyVersion?: string | null, requiredApprovals?: number | null, allowSelfApproval?: boolean | null }> } };
+
+export type GetModelConnectionActionQueryVariables = Exact<{
+  input: ModelConnectionTargetInput;
+}>;
+
+
+export type GetModelConnectionActionQuery = { modelConnectionAction: { action: ModelConnectionAction, reason: string, policyVersion?: string | null, requiredApprovals?: number | null, allowSelfApproval?: boolean | null } };
+
+export type GetOrganizationModelConnectionPolicyQueryVariables = Exact<{
+  organizationId: Scalars['GUID']['input'];
+}>;
+
+
+export type GetOrganizationModelConnectionPolicyQuery = { organizationModelConnectionPolicy: { id?: string | null, version: number, mode: ModelConnectionMode, requiredApprovals: number, allowSelfApproval: boolean } };
+
+export type GetModelConnectionRestrictionQueryVariables = Exact<{
+  input: ModelConnectionPlacementInput;
+}>;
+
+
+export type GetModelConnectionRestrictionQuery = { modelConnectionRestriction: { id?: string | null, version: number, mode: ModelConnectionMode, requiredApprovals: number, allowSelfApproval: boolean } };
+
+export type ListModelConnectionRequestsQueryVariables = Exact<{
+  organizationId: Scalars['GUID']['input'];
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+  review: Scalars['Boolean']['input'];
+}>;
+
+
+export type ListModelConnectionRequestsQuery = { own?: { totalCount?: number | null, page?: number | null, pageSize?: number | null, nextCursor?: string | null, items: Array<{ id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null }> }, inbox?: { totalCount?: number | null, page?: number | null, pageSize?: number | null, nextCursor?: string | null, items: Array<{ id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null }> } };
+
+export type GetModelConnectionRequestQueryVariables = Exact<{
+  input: DecideModelConnectionRequestInput;
+  review: Scalars['Boolean']['input'];
+}>;
+
+
+export type GetModelConnectionRequestQuery = { own?: { id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null } | null, inbox?: { id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null } | null };
+
+export type UpdateClusterModelRuntimeMutationVariables = Exact<{
+  input: UpdateClusterModelRuntimeInput;
+}>;
+
+
+export type UpdateClusterModelRuntimeMutation = { updateClusterModelRuntime: { ok: boolean, errors: Array<{ code: string, message: string, currentVersion?: number | null, requestedVersion?: number | null, field?: string | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { organizationId: string, clusterId: string, providerId: string, clusterVersion: number, providerVersion: number, observedAt: string, modes: Array<{ computeMode: ModelRuntimeMode, configured: boolean, reason?: string | null, hardwareAdmission: string, declaration?: { image: string, version: string, packageVersion: string, architecture: ModelRuntimeArchitecture, supportedDtypes: Array<ModelDtype>, defaultDtype: ModelDtype, defaultMaxModelLen: number, maxModelLenCeiling: number, defaultMaxNumSeqs: number, maxNumSeqsCeiling: number, cpuRequestCeiling: string, memoryRequestCeiling: string, gpuCountCeiling: number, hardwareCertified: boolean, hardwareEvidence?: string | null, nodeSelector: Array<{ key: string, value: string }> } | null }> } | null } };
+
+export type ModelRuntimeSettingsFieldsFragment = { organizationId: string, clusterId: string, providerId: string, clusterVersion: number, providerVersion: number, observedAt: string, modes: Array<{ computeMode: ModelRuntimeMode, configured: boolean, reason?: string | null, hardwareAdmission: string, declaration?: { image: string, version: string, packageVersion: string, architecture: ModelRuntimeArchitecture, supportedDtypes: Array<ModelDtype>, defaultDtype: ModelDtype, defaultMaxModelLen: number, maxModelLenCeiling: number, defaultMaxNumSeqs: number, maxNumSeqsCeiling: number, cpuRequestCeiling: string, memoryRequestCeiling: string, gpuCountCeiling: number, hardwareCertified: boolean, hardwareEvidence?: string | null, nodeSelector: Array<{ key: string, value: string }> } | null }> };
+
+export type GetClusterModelRuntimeSettingsQueryVariables = Exact<{
+  organizationId: Scalars['GUID']['input'];
+  clusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+}>;
+
+
+export type GetClusterModelRuntimeSettingsQuery = { clusterModelRuntimeSettings?: { organizationId: string, clusterId: string, providerId: string, clusterVersion: number, providerVersion: number, observedAt: string, modes: Array<{ computeMode: ModelRuntimeMode, configured: boolean, reason?: string | null, hardwareAdmission: string, declaration?: { image: string, version: string, packageVersion: string, architecture: ModelRuntimeArchitecture, supportedDtypes: Array<ModelDtype>, defaultDtype: ModelDtype, defaultMaxModelLen: number, maxModelLenCeiling: number, defaultMaxNumSeqs: number, maxNumSeqsCeiling: number, cpuRequestCeiling: string, memoryRequestCeiling: string, gpuCountCeiling: number, hardwareCertified: boolean, hardwareEvidence?: string | null, nodeSelector: Array<{ key: string, value: string }> } | null }> } | null };
+
 export type ListModelEndpointsPageQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
   filter?: InputMaybe<AstroliftModelEndpointsFilter>;
@@ -15940,37 +16829,37 @@ export type ProvisionClusterModelMutationVariables = Exact<{
 }>;
 
 
-export type ProvisionClusterModelMutation = { provisionClusterModel: { ok: boolean, errors: Array<{ code: string, field?: string | null, message: string, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, sourceKind: string, localArtifactId?: string | null, localArtifactVersion?: number | null, localManifestSha256?: string | null, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null } | null } | null } };
+export type ProvisionClusterModelMutation = { provisionClusterModel: { ok: boolean, errors: Array<{ code: string, field?: string | null, message: string, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, sourceKind: string, localArtifactId?: string | null, localArtifactVersion?: number | null, localManifestSha256?: string | null, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, sharingMode: ModelSharingMode, dedicatedAppId?: string | null, dedicatedAppVersion?: number | null, dedicatedAppName?: string | null, dedicatedAppSlug?: string | null, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null, dtype?: string | null, maxModelLen?: number | null, maxNumSeqs?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null, dtype?: string | null, maxModelLen?: number | null, maxNumSeqs?: number | null } | null } | null } };
 
 export type SubscribeClusterModelMutationVariables = Exact<{
   input: SubscribeClusterModelInput;
 }>;
 
 
-export type SubscribeClusterModelMutation = { subscribeClusterModel: { ok: boolean, errors: Array<{ code: string, field?: string | null, message: string, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { restartRequired: boolean, deployment: { id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, sourceKind: string, localArtifactId?: string | null, localArtifactVersion?: number | null, localManifestSha256?: string | null, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null } | null }, subscription: { id: string, version: number, modelDeploymentId: string, appId: string, appSlug: string, appName: string, environmentId: string, environmentName: string, alias: string, bindingPrefix: string, status: string, canRevoke: boolean, desiredEnabled: boolean, desiredRevision: number, appliedRevision: number, reason?: string | null, reconcileStartedAt?: string | null, reconciledAt?: string | null } } | null } };
+export type SubscribeClusterModelMutation = { subscribeClusterModel: { ok: boolean, errors: Array<{ code: string, field?: string | null, message: string, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { restartRequired: boolean, deployment: { id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, sourceKind: string, localArtifactId?: string | null, localArtifactVersion?: number | null, localManifestSha256?: string | null, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, sharingMode: ModelSharingMode, dedicatedAppId?: string | null, dedicatedAppVersion?: number | null, dedicatedAppName?: string | null, dedicatedAppSlug?: string | null, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null, dtype?: string | null, maxModelLen?: number | null, maxNumSeqs?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null, dtype?: string | null, maxModelLen?: number | null, maxNumSeqs?: number | null } | null }, subscription: { id: string, version: number, modelDeploymentId: string, appId: string, appSlug: string, appName: string, environmentId: string, environmentName: string, alias: string, bindingPrefix: string, status: string, canRevoke: boolean, desiredEnabled: boolean, desiredRevision: number, appliedRevision: number, reason?: string | null, reconcileStartedAt?: string | null, reconciledAt?: string | null } } | null } };
 
 export type RevokeModelSubscriptionMutationVariables = Exact<{
   input: RevokeModelSubscriptionInput;
 }>;
 
 
-export type RevokeModelSubscriptionMutation = { revokeModelSubscription: { ok: boolean, errors: Array<{ code: string, field?: string | null, message: string, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { restartRequired: boolean, deployment: { id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, sourceKind: string, localArtifactId?: string | null, localArtifactVersion?: number | null, localManifestSha256?: string | null, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null } | null }, subscription: { id: string, version: number, modelDeploymentId: string, appId: string, appSlug: string, appName: string, environmentId: string, environmentName: string, alias: string, bindingPrefix: string, status: string, canRevoke: boolean, desiredEnabled: boolean, desiredRevision: number, appliedRevision: number, reason?: string | null, reconcileStartedAt?: string | null, reconciledAt?: string | null } } | null } };
+export type RevokeModelSubscriptionMutation = { revokeModelSubscription: { ok: boolean, errors: Array<{ code: string, field?: string | null, message: string, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { restartRequired: boolean, deployment: { id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, sourceKind: string, localArtifactId?: string | null, localArtifactVersion?: number | null, localManifestSha256?: string | null, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, sharingMode: ModelSharingMode, dedicatedAppId?: string | null, dedicatedAppVersion?: number | null, dedicatedAppName?: string | null, dedicatedAppSlug?: string | null, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null, dtype?: string | null, maxModelLen?: number | null, maxNumSeqs?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null, dtype?: string | null, maxModelLen?: number | null, maxNumSeqs?: number | null } | null }, subscription: { id: string, version: number, modelDeploymentId: string, appId: string, appSlug: string, appName: string, environmentId: string, environmentName: string, alias: string, bindingPrefix: string, status: string, canRevoke: boolean, desiredEnabled: boolean, desiredRevision: number, appliedRevision: number, reason?: string | null, reconcileStartedAt?: string | null, reconciledAt?: string | null } } | null } };
 
 export type UpdateClusterModelMutationVariables = Exact<{
   input: UpdateClusterModelInput;
 }>;
 
 
-export type UpdateClusterModelMutation = { updateClusterModel: { ok: boolean, errors: Array<{ code: string, field?: string | null, message: string, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, sourceKind: string, localArtifactId?: string | null, localArtifactVersion?: number | null, localManifestSha256?: string | null, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null } | null } | null } };
+export type UpdateClusterModelMutation = { updateClusterModel: { ok: boolean, errors: Array<{ code: string, field?: string | null, message: string, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, sourceKind: string, localArtifactId?: string | null, localArtifactVersion?: number | null, localManifestSha256?: string | null, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, sharingMode: ModelSharingMode, dedicatedAppId?: string | null, dedicatedAppVersion?: number | null, dedicatedAppName?: string | null, dedicatedAppSlug?: string | null, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null, dtype?: string | null, maxModelLen?: number | null, maxNumSeqs?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null, dtype?: string | null, maxModelLen?: number | null, maxNumSeqs?: number | null } | null } | null } };
 
 export type DeprovisionClusterModelMutationVariables = Exact<{
   input: DeprovisionClusterModelInput;
 }>;
 
 
-export type DeprovisionClusterModelMutation = { deprovisionClusterModel: { ok: boolean, errors: Array<{ code: string, field?: string | null, message: string, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, sourceKind: string, localArtifactId?: string | null, localArtifactVersion?: number | null, localManifestSha256?: string | null, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null } | null } | null } };
+export type DeprovisionClusterModelMutation = { deprovisionClusterModel: { ok: boolean, errors: Array<{ code: string, field?: string | null, message: string, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, sourceKind: string, localArtifactId?: string | null, localArtifactVersion?: number | null, localManifestSha256?: string | null, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, sharingMode: ModelSharingMode, dedicatedAppId?: string | null, dedicatedAppVersion?: number | null, dedicatedAppName?: string | null, dedicatedAppSlug?: string | null, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null, dtype?: string | null, maxModelLen?: number | null, maxNumSeqs?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null, dtype?: string | null, maxModelLen?: number | null, maxNumSeqs?: number | null } | null } | null } };
 
-export type ClusterModelFieldsFragment = { id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, sourceKind: string, localArtifactId?: string | null, localArtifactVersion?: number | null, localManifestSha256?: string | null, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null } | null };
+export type ClusterModelFieldsFragment = { id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, sourceKind: string, localArtifactId?: string | null, localArtifactVersion?: number | null, localManifestSha256?: string | null, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, sharingMode: ModelSharingMode, dedicatedAppId?: string | null, dedicatedAppVersion?: number | null, dedicatedAppName?: string | null, dedicatedAppSlug?: string | null, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null, dtype?: string | null, maxModelLen?: number | null, maxNumSeqs?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null, dtype?: string | null, maxModelLen?: number | null, maxNumSeqs?: number | null } | null };
 
 export type ListClusterModelsPageQueryVariables = Exact<{
   organizationId: Scalars['GUID']['input'];
@@ -15981,7 +16870,7 @@ export type ListClusterModelsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListClusterModelsPageQuery = { clusterModelDeploymentsPage: { totalCount?: number | null, nextCursor?: string | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, sourceKind: string, localArtifactId?: string | null, localArtifactVersion?: number | null, localManifestSha256?: string | null, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null } | null }> } };
+export type ListClusterModelsPageQuery = { clusterModelDeploymentsPage: { totalCount?: number | null, nextCursor?: string | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, sourceKind: string, localArtifactId?: string | null, localArtifactVersion?: number | null, localManifestSha256?: string | null, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, sharingMode: ModelSharingMode, dedicatedAppId?: string | null, dedicatedAppVersion?: number | null, dedicatedAppName?: string | null, dedicatedAppSlug?: string | null, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null, dtype?: string | null, maxModelLen?: number | null, maxNumSeqs?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null, dtype?: string | null, maxModelLen?: number | null, maxNumSeqs?: number | null } | null }> } };
 
 export type GetClusterModelDeploymentQueryVariables = Exact<{
   organizationId: Scalars['GUID']['input'];
@@ -15989,7 +16878,7 @@ export type GetClusterModelDeploymentQueryVariables = Exact<{
 }>;
 
 
-export type GetClusterModelDeploymentQuery = { clusterModelDeployment?: { id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, sourceKind: string, localArtifactId?: string | null, localArtifactVersion?: number | null, localManifestSha256?: string | null, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null } | null } | null };
+export type GetClusterModelDeploymentQuery = { clusterModelDeployment?: { id: string, version: number, name: string, organizationId: string, clusterId: string, providerId: string, clusterSlug: string, clusterName: string, modelRepo: string, sourceKind: string, localArtifactId?: string | null, localArtifactVersion?: number | null, localManifestSha256?: string | null, revisionSha?: string | null, computeMode?: string | null, subscriptionsEnabled: boolean, sharingMode: ModelSharingMode, dedicatedAppId?: string | null, dedicatedAppVersion?: number | null, dedicatedAppName?: string | null, dedicatedAppSlug?: string | null, runtimeSupported?: boolean | null, runtimeReason?: string | null, status: string, reason?: string | null, ready?: boolean | null, readinessObservedAt?: string | null, readinessGeneration?: number | null, desiredSubscriptionRevision: number, appliedSubscriptionRevision: number, operationId?: string | null, operationStartedAt?: string | null, operationCompletedAt?: string | null, desiredResources: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null, dtype?: string | null, maxModelLen?: number | null, maxNumSeqs?: number | null }, appliedResources?: { cpuRequest?: string | null, memoryRequest?: string | null, gpuCount?: number | null, replicas?: number | null, cpuKvCacheGiB?: number | null, dtype?: string | null, maxModelLen?: number | null, maxNumSeqs?: number | null } | null } | null };
 
 export type ListModelPlacementClustersQueryVariables = Exact<{
   organizationId: Scalars['GUID']['input'];
@@ -16031,6 +16920,25 @@ export type ListClusterModelSubscriptionsQueryVariables = Exact<{
 
 export type ListClusterModelSubscriptionsQuery = { clusterModelSubscriptionsPage: { totalCount?: number | null, nextCursor?: string | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, version: number, modelDeploymentId: string, appId: string, appSlug: string, appName: string, environmentId: string, environmentName: string, alias: string, bindingPrefix: string, status: string, canRevoke: boolean, desiredEnabled: boolean, desiredRevision: number, appliedRevision: number, reason?: string | null, reconcileStartedAt?: string | null, reconciledAt?: string | null }> } };
 
+export type GetClusterModelUpdateAdmissionQueryVariables = Exact<{
+  input: UpdateClusterModelInput;
+}>;
+
+
+export type GetClusterModelUpdateAdmissionQuery = { clusterModelUpdateAdmission: { eligible: boolean, reason?: string | null, runtimeVersion?: string | null, architecture?: string | null, hardwareAdmission: string } };
+
+export type ListModelDedicatedAppsQueryVariables = Exact<{
+  organizationId: Scalars['GUID']['input'];
+  clusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type ListModelDedicatedAppsQuery = { clusterModelDedicatedAppsPage: { totalCount?: number | null, nextCursor?: string | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, version: number, name: string, slug: string }> } };
+
 export type GetSharedModelPromptReadinessQueryVariables = Exact<{
   id: Scalars['GUID']['input'];
   expectedClusterId: Scalars['GUID']['input'];
@@ -16047,6 +16955,19 @@ export type TestSharedModelEndpointMutationVariables = Exact<{
 
 
 export type TestSharedModelEndpointMutation = { testSharedModelEndpoint: { ok: boolean, errors: Array<{ code: string, field?: string | null, message: string, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { status: string, reply: string, latencyMs?: number | null, promptTokens?: number | null, completionTokens?: number | null, totalTokens?: number | null, error: string } | null } };
+
+export type GetModelSubscriptionMetricsQueryVariables = Exact<{
+  organizationId: Scalars['GUID']['input'];
+  serviceId: Scalars['GUID']['input'];
+  subscriptionId: Scalars['GUID']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  start: Scalars['DateTime']['input'];
+  end: Scalars['DateTime']['input'];
+}>;
+
+
+export type GetModelSubscriptionMetricsQuery = { astroliftModelSubscriptionMetrics?: { serviceId: string, clusterId: string, subscriptionId: string, start: string, end: string, retrievedAt: string, stepSeconds: number, scope: string, metrics: Array<{ key: string, unit: string, source: string, state: ModelObservationState, observedAt?: string | null, value?: number | null, aggregationWindowSeconds: number, samples: Array<{ timestamp: string, value: number }> }> } | null };
 
 export type TelemetryAppsQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;

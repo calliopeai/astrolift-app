@@ -8,7 +8,24 @@ released. Deployment and browser verification must accompany the implementation.
 
 A shared model belongs to an organization and an eligible cluster. Creating it
 does not require an application or a placeholder project. Existing app-owned and
-project-owned managed services retain their ownership and access rules.
+project-owned managed services retain their owner scopes. Adding, importing,
+configuring, reprovisioning, adopting or deprovisioning a model now additionally
+requires a fresh installation platform operator: an active Django superuser.
+An organization owner or administrator with all role grants is insufficient.
+Bearer requests also require the existing `admin` scope, a live selected-org
+membership, and the existing organization/team credential ceilings. The existing
+`org.update` and `cluster.update` checks remain; no role-name inference is used.
+Session operators retain the existing selected-org operator semantics.
+
+`modelHostingAction` reports this current server admission decision, not model
+access, capacity or readiness. Hosting checkpoints reload the actor and bearer
+after model/cluster/source locks and bounded source reads. Already accepted
+workflow work keeps its existing admission/runtime contract; this gate does not
+claim cancellation of a previously queued job when an operator later loses access.
+
+App-environment subscription and revocation retain their existing `app.update`
+destination and source-catalogue checks; they do not require platform operator
+status. Subscription approval policy is a separate contract.
 
 The two journeys are separate:
 
@@ -25,6 +42,30 @@ Application targets and model discovery use server-side search and pagination.
 A capped initial page is not the complete set of eligible applications. Failed,
 pending and unavailable deployments remain inspectable; metadata visibility is
 separate from permission and readiness to perform cluster operations.
+
+## Edit a hosted model
+
+`updateClusterModel` requires both organization configuration and cluster update
+permission. Its exact organization, cluster, provider and deployment version must
+match the reviewed deployment. Optional `name` renames the existing deployment.
+Resource edits preserve the admitted local artifact GUID, version and manifest,
+or the immutable Hub revision and service-owned private Hub credential reference.
+An unavailable or changed source refuses before reconciliation is queued.
+
+Review settings with `clusterModelUpdateAdmission(input: UpdateClusterModelInput)`.
+This derives the source from the deployment, rather than reconstructing a public
+Hub request from display metadata. Admission checks configuration; an observed
+ready generation is still required to establish a running model.
+
+Models use `SHARED` access unless explicitly changed to `DEDICATED`. Shared models
+accept independent subscriptions from multiple authorized apps. A dedicated model
+remains owned by the organization and cluster, and only the selected app's
+environments may subscribe. This does not reserve additional physical hardware.
+Select from `clusterModelDedicatedAppsPage`, and submit `dedicatedAppId` with
+`ifMatchDedicatedAppVersion` when changing the mode. Other apps' existing bindings
+must be fully revoked before the change is accepted; pending revocation is not
+sufficient. Retiring or unavailable apps cannot be selected. Subscription writes,
+runtime reconciliation and app binding reads enforce the same policy.
 
 ## Search and placement evidence
 
@@ -96,8 +137,10 @@ visible. Other subscriptions retain their credentials and access.
 The runtime hook is `astrolift_shared_model_auth.SharedModelAuth`, mounted from
 the dependency-free provider module using the supported Python vLLM middleware
 hook. It reads `/var/run/astrolift/model-auth/keys.json` once at startup. The
-snapshot has version 1, the expected revision, one private operator key and at
-most 64 distinct subscription keys. `ASTROLIFT_MODEL_AUTH_REVISION` must match;
+snapshot has version 2, the expected revision, one private operator key and at
+most 64 distinct subscription keys with aligned canonical subscription GUIDs.
+Existing version 1 snapshots retain their authorization behavior and cannot
+supply per-subscription traffic attribution. `ASTROLIFT_MODEL_AUTH_REVISION` must match;
 missing, malformed, duplicate or replaced snapshots refuse startup.
 
 Supported inference paths accept a current subscription key or operator key.
@@ -107,6 +150,42 @@ are public. Administrative `/v1` paths do not inherit inference access, and
 WebSocket traffic has no supported subscription contract. The ServiceMonitor
 must authenticate with the operator Secret. Kubernetes NetworkPolicy cannot
 enforce these HTTP path boundaries on its own.
+
+## Per-application traffic
+
+`astroliftModelSubscriptionMetrics` reads one exact subscription under the
+caller's current `app.read_metrics` grant and organization visibility. Supply
+`organizationId`, `serviceId`, `subscriptionId`, `expectedClusterId`,
+`expectedProviderId`, `start` and `end`. Its `scope` is
+`authenticated_subscription`; it does not expose another app's traffic or require
+permission to configure models. The time window is one minute to 24 hours, with
+at most 120 samples per measure and a five-minute rate window.
+The public server-info handshake advertises
+`models.authenticated_subscription_metrics`; it contains no model or app usage.
+
+The version 2 runtime mapping attributes admitted inference POST requests to
+the authenticated subscription GUID. Caller-supplied identity headers cannot
+choose this identity. Operator traffic, invalid credentials and other routes
+are excluded. Prometheus must scrape the authenticated model ServiceMonitor and
+retain its canonical managed-service, namespace, service and pod labels.
+Existing version 1 deployments require reconciliation to install this mapping.
+
+Available measures are requests per second, errors per second, accepted response
+bytes per second and p95 request duration in seconds. Errors include completed
+4xx/5xx responses and interrupted, disconnected or failed ASGI calls. Bytes are
+those accepted by ASGI `send`; duration covers the ASGI application call. They
+do not establish bytes received by the caller, token use or billable cost.
+Token counts and cost remain `UNSUPPORTED` until an actual attributable usage
+source exists. No prompt or response body is parsed or used as a metric label.
+
+An idle, initialized and scraped counter can report measured zero. Missing
+meters, missing rate windows or absent histogram observations report `NO_DATA`;
+no collector configuration reports `UNCONFIGURED`. Failed transport or invalid
+series report `UNAVAILABLE`, and old samples report `STALE`. Duplicate scrape
+jobs for the same pod are deduplicated before aggregation. Immutable subscription
+identities retain history across credential revisions; process counters reset
+with their model process. Both current authority and target ownership are
+rechecked after the bounded Prometheus request.
 
 ASGI transport checks prove this hook's routing and startup-snapshot behavior,
 including removal of one key while preserving another. They do not establish
@@ -205,3 +284,23 @@ clusters without a verified mapping to that organization's node pool.
 - [Hugging Face Hub API](https://huggingface.co/docs/huggingface_hub/en/package_reference/hf_api)
 - [vLLM CPU installation](https://docs.vllm.ai/en/latest/getting_started/installation/cpu/)
 - [vLLM production metrics](https://docs.vllm.ai/en/latest/usage/metrics/)
+
+## Editing stored runtime controls
+
+The hosted model's Settings form initializes data type, context length and
+concurrent sequences from its recorded **desired** resources. Last-applied
+resources are read separately and do not overwrite the edit draft. A missing
+record is not a guessed runtime default; an unknown recorded data type is shown
+literally. Leaving a control blank sends the existing nullable preserve input,
+including when clearing a previously populated field; it does not reset the
+stored value to a new declaration's default.
+
+An explicit edit is included in current version/cluster/provider runtime
+admission, the confirmation fingerprint and the existing model update. Context
+length remains bounded to 256–131072 and concurrent sequences to 1–4096; the
+selected runtime may impose stricter limits or reject a data type. The server
+retains immutable local-artifact or Hugging Face source and other omitted advanced
+settings. Changing the target/version or admission invalidates an old review;
+new desired metadata replaces the draft only for the newly observed version.
+Accepted updates remain pending reconciliation and a model restart, not live
+readiness or hardware-fit proof. Existing superadmin and bearer admission apply.

@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState, useId, useLayoutEffect } from "react";
+import { useRef, useState, useId, useLayoutEffect, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
+import Link from "next/link";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -84,12 +85,16 @@ export type ModelPage<T> = {
   totalCount: number | null;
 };
 export interface ModelSubscriptionsPanelProps {
+  mode?: "legacy" | "connections";
   deployment: SubscriptionModel;
   targets: ModelPage<SubscriptionTarget>;
   subscriptions: ModelPage<ModelSubscription>;
   onSubscribe: (request: SubscriptionRequest) => Promise<SubscriptionActionResult>;
   onRevoke: (request: RevokeSubscriptionRequest) => Promise<SubscriptionActionResult>;
   onAccepted?: () => void;
+  onSelectUsage?: (subscription: ModelSubscription) => void;
+  usageBlocked?: boolean;
+  usage?: ReactNode;
 }
 
 type Review = { scopeRevision: number; modelName: string } & (
@@ -104,7 +109,7 @@ const draftSchema = z.object({
 export function ModelSubscriptionsPanel(props: ModelSubscriptionsPanelProps) {
   return (
     <SubscriptionPanel
-      key={`${props.deployment.organizationId}:${props.deployment.id}`}
+      key={`${props.deployment.organizationId}:${props.deployment.id}:${props.mode ?? "legacy"}`}
       {...props}
     />
   );
@@ -115,6 +120,13 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
   const targetsLoading = targets.loading;
   const targetsError = Boolean(targets.error);
   const t = useTranslations("models.shared.subscriptions");
+  const inventory = useTranslations("models.shared.inventory");
+  const confirmedPage = !subscriptions.loading && !subscriptions.stale && !subscriptions.error;
+  const visibleApps = confirmedPage
+    ? [...new Set(subscriptions.rows.map((row) => row.appSlug))]
+    : [];
+
+  const traffic = useTranslations("models.shared.subscriptionUsage");
   const id = useId();
   const form = useForm<z.infer<typeof draftSchema>>({
     resolver: zodResolver(draftSchema),
@@ -229,11 +241,31 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
     !targetsError &&
     !targets.stale;
   return (
-    <section className="space-y-5" aria-labelledby={`${id}-title`}>
+    <section
+      id="model-connections"
+      className="scroll-mt-20 space-y-5"
+      aria-labelledby={`${id}-title`}
+    >
       <div className="space-y-2">
         <h2 id={`${id}-title`} className="text-lg font-semibold">
-          {t("title")}
+          {inventory("connections")}
         </h2>
+        <p className="text-muted-foreground text-sm">{inventory("connectionsHelp")}</p>
+        {confirmedPage && subscriptions.totalCount != null && (
+          <p>
+            {inventory("visibleSubscriptions", { count: subscriptions.totalCount })} ·{" "}
+            {inventory("shownApps", { count: visibleApps.length })}
+          </p>
+        )}
+        {visibleApps.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {visibleApps.map((app) => (
+              <Button key={app} variant="outline" size="sm" asChild>
+                <Link href={`/apps/${encodeURIComponent(app)}`}>{app}</Link>
+              </Button>
+            ))}
+          </div>
+        )}
         <p className="text-muted-foreground text-sm">{t("description")}</p>
       </div>
       <p className="border-warning-border bg-warning-bg text-warning-fg rounded-md border p-3 text-sm">
@@ -247,117 +279,121 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
           )}
         </p>
       )}
-      <div className="space-y-2 sm:col-span-2">
-        <h3 className="text-sm font-medium">{t("target")}</h3>
-        <ListPage
-          embedded
-          label={t("target")}
-          {...targets}
-          getRowId={(row) => row.id}
-          empty={{ icon: <LinkIcon />, title: t("noEligibleTargets") }}
-          columns={[
-            {
-              id: "environment",
-              header: t("target"),
-              cell: (target) => (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-auto text-left break-all whitespace-normal"
-                  disabled={
-                    !ready ||
-                    target.admission !== "allowed" ||
-                    target.clusterId !== deployment.clusterId
-                  }
-                  onClick={() =>
-                    form.setValue("environmentId", target.id, { shouldValidate: true })
-                  }
-                >
-                  {target.appSlug} / {target.environmentName}
-                </Button>
-              ),
-            },
-            {
-              id: "admission",
-              header: t("state"),
-              cell: (target) =>
-                target.clusterId === deployment.clusterId && target.admission === "allowed"
-                  ? t("eligible")
-                  : (target.reason ?? t("notVerified")),
-            },
-          ]}
-        />
-        <p role="status" className="text-sm">
-          {selectedTarget
-            ? t("selectedTarget", {
-                target: `${selectedTarget.appSlug} / ${selectedTarget.environmentName}`,
-              })
-            : t("chooseTarget")}
-        </p>
-        {form.formState.errors.environmentId && (
-          <p role="alert" className="text-destructive text-sm">
-            {t("chooseTarget")}
-          </p>
-        )}
-      </div>
-      <form
-        className="grid gap-4 sm:grid-cols-2"
-        onSubmit={form.handleSubmit((draft) => {
-          const target = targets.rows.find(
-            (item) =>
-              item.id === draft.environmentId &&
-              item.admission === "allowed" &&
-              item.clusterId === deployment.clusterId
-          );
-          if (!ready || !target) {
-            setFailure(t("changed"));
-            return;
-          }
-          setFailure(null);
-          setAccepted(false);
-          setReview({
-            kind: "subscribe",
-            scopeRevision: scope.revision,
-            modelName: deployment.name,
-            target,
-            request: {
-              organizationId: deployment.organizationId,
-              modelId: deployment.id,
-              modelVersion: deployment.version,
-              expectedClusterId: deployment.clusterId,
-              expectedProviderId: deployment.providerId,
-              environmentId: target.id,
-              environmentVersion: target.version,
-              alias: draft.alias,
-            },
-          });
-        })}
-      >
-        <div className="space-y-2">
-          <Label htmlFor={`${id}-alias`}>{t("alias")}</Label>
-          <Input
-            id={`${id}-alias`}
-            {...form.register("alias")}
-            disabled={!ready}
-            aria-invalid={Boolean(form.formState.errors.alias)}
-            aria-describedby={`${id}-alias-help`}
-            maxLength={32}
-          />
-          <p id={`${id}-alias-help`} className="text-muted-foreground text-sm">
-            {t("aliasHelp")}
-          </p>
-          {form.formState.errors.alias && (
-            <p role="alert" className="text-destructive text-sm">
-              {t("invalidAlias")}
+      {props.mode !== "connections" && (
+        <>
+          <div className="space-y-2 sm:col-span-2">
+            <h3 className="text-sm font-medium">{t("target")}</h3>
+            <ListPage
+              embedded
+              label={t("target")}
+              {...targets}
+              getRowId={(row) => row.id}
+              empty={{ icon: <LinkIcon />, title: t("noEligibleTargets") }}
+              columns={[
+                {
+                  id: "environment",
+                  header: t("target"),
+                  cell: (target) => (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="h-auto text-left break-all whitespace-normal"
+                      disabled={
+                        !ready ||
+                        target.admission !== "allowed" ||
+                        target.clusterId !== deployment.clusterId
+                      }
+                      onClick={() =>
+                        form.setValue("environmentId", target.id, { shouldValidate: true })
+                      }
+                    >
+                      {target.appSlug} / {target.environmentName}
+                    </Button>
+                  ),
+                },
+                {
+                  id: "admission",
+                  header: t("state"),
+                  cell: (target) =>
+                    target.clusterId === deployment.clusterId && target.admission === "allowed"
+                      ? t("eligible")
+                      : (target.reason ?? t("notVerified")),
+                },
+              ]}
+            />
+            <p role="status" className="text-sm">
+              {selectedTarget
+                ? t("selectedTarget", {
+                    target: `${selectedTarget.appSlug} / ${selectedTarget.environmentName}`,
+                  })
+                : t("chooseTarget")}
             </p>
-          )}
-        </div>
-        <div className="sm:col-span-2">
-          <Button type="submit" disabled={!ready}>
-            {t("reviewSubscribe")}
-          </Button>
-        </div>
-      </form>
+            {form.formState.errors.environmentId && (
+              <p role="alert" className="text-destructive text-sm">
+                {t("chooseTarget")}
+              </p>
+            )}
+          </div>
+          <form
+            className="grid gap-4 sm:grid-cols-2"
+            onSubmit={form.handleSubmit((draft) => {
+              const target = targets.rows.find(
+                (item) =>
+                  item.id === draft.environmentId &&
+                  item.admission === "allowed" &&
+                  item.clusterId === deployment.clusterId
+              );
+              if (!ready || !target) {
+                setFailure(t("changed"));
+                return;
+              }
+              setFailure(null);
+              setAccepted(false);
+              setReview({
+                kind: "subscribe",
+                scopeRevision: scope.revision,
+                modelName: deployment.name,
+                target,
+                request: {
+                  organizationId: deployment.organizationId,
+                  modelId: deployment.id,
+                  modelVersion: deployment.version,
+                  expectedClusterId: deployment.clusterId,
+                  expectedProviderId: deployment.providerId,
+                  environmentId: target.id,
+                  environmentVersion: target.version,
+                  alias: draft.alias,
+                },
+              });
+            })}
+          >
+            <div className="space-y-2">
+              <Label htmlFor={`${id}-alias`}>{t("alias")}</Label>
+              <Input
+                id={`${id}-alias`}
+                {...form.register("alias")}
+                disabled={!ready}
+                aria-invalid={Boolean(form.formState.errors.alias)}
+                aria-describedby={`${id}-alias-help`}
+                maxLength={32}
+              />
+              <p id={`${id}-alias-help`} className="text-muted-foreground text-sm">
+                {t("aliasHelp")}
+              </p>
+              {form.formState.errors.alias && (
+                <p role="alert" className="text-destructive text-sm">
+                  {t("invalidAlias")}
+                </p>
+              )}
+            </div>
+            <div className="sm:col-span-2">
+              <Button type="submit" disabled={!ready}>
+                {t("reviewSubscribe")}
+              </Button>
+            </div>
+          </form>
+        </>
+      )}
       {accepted && (
         <p role="status" className="text-sm">
           {t(
@@ -419,6 +455,25 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
               </div>
             ),
           },
+          ...(props.onSelectUsage
+            ? [
+                {
+                  id: "traffic",
+                  header: traffic("title"),
+                  cell: (row: ModelSubscription) => (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!confirmedPage || props.usageBlocked}
+                      onClick={() => props.onSelectUsage?.(row)}
+                    >
+                      {traffic("view")}
+                    </Button>
+                  ),
+                },
+              ]
+            : []),
           {
             id: "actions",
             header: t("actions"),
@@ -457,6 +512,7 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
           },
         ]}
       />
+      {props.usage}
       <ConfirmDialog
         open={Boolean(review)}
         onOpenChange={(open) => {

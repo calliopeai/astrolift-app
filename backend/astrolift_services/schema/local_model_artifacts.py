@@ -91,7 +91,7 @@ class ModelArtifactsQuery:
     def astrolift_local_model_artifacts_page(
         self, info: Info, search: str | None = None, limit: int = 25, after: str | None = None
     ) -> PageType[LocalModelArtifactType]:
-        org = service.import_authority()
+        org = service.import_authority(request=getattr(info.context, "request", None))
         rows = LocalModelArtifact.objects.filter(organization=org)
         if search:
             rows = rows.filter(name__icontains=search[:128])
@@ -122,6 +122,7 @@ class ModelArtifactsMutation:
                 raise ValueError("Model file byte sizes must be bounded decimal strings.")
             row = service.begin_artifact(
                 organization_id=str(input.organization_id),
+                request=getattr(info.context, "request", None),
                 name=input.name,
                 files=[
                     {"name": file.name, "sha256": file.sha256, "size_bytes": int(file.size_bytes)}
@@ -140,7 +141,9 @@ class ModelArtifactsMutation:
         self, info: Info, input: LocalModelArtifactIdentityInput
     ) -> MutationResultType[LocalModelUploadAuthorization]:
         try:
-            row, uploads = service.artifact_uploads(input.id, input.expected_version)
+            row, uploads = service.artifact_uploads(
+                input.id, input.expected_version, request=getattr(info.context, "request", None)
+            )
             return success(
                 LocalModelUploadAuthorization(
                     artifact=artifact_to_type(row),
@@ -169,6 +172,12 @@ class ModelArtifactsMutation:
         self, info: Info, input: LocalModelArtifactIdentityInput
     ) -> MutationResultType[LocalModelArtifactType]:
         try:
-            return success(artifact_to_type(service.finalize_artifact(input.id, input.expected_version)))
+            return success(
+                artifact_to_type(
+                    service.finalize_artifact(
+                        input.id, input.expected_version, request=getattr(info.context, "request", None)
+                    )
+                )
+            )
         except (ValueError, ArtifactStoreUnavailable) as error:
             return _failure(error)

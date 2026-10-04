@@ -6,14 +6,14 @@ Astrolift hosts open-weight models with **vLLM**, the same OpenAI-compatible ser
 
 vLLM runs one engine behind one of two HTTP frontends:
 
-| | Rust | Python |
-|---|---|---|
-| What it is | `vllm-rs`, enabled with `VLLM_USE_RUST_FRONTEND=1` | The original FastAPI server |
-| Speed | About 5x requests/s on preprocess-heavy loads (per upstream) | Baseline |
-| Chat and completions (streaming too) | Yes | Yes |
-| Tool calling and reasoning | Some model families (see below) | All parsers |
-| Embeddings, score, rerank | **Not yet** | Yes |
-| Anthropic Messages, Responses API | Not yet / in progress | Yes |
+|                                      | Rust                                                         | Python                      |
+| ------------------------------------ | ------------------------------------------------------------ | --------------------------- |
+| What it is                           | `vllm-rs`, enabled with `VLLM_USE_RUST_FRONTEND=1`           | The original FastAPI server |
+| Speed                                | About 5x requests/s on preprocess-heavy loads (per upstream) | Baseline                    |
+| Chat and completions (streaming too) | Yes                                                          | Yes                         |
+| Tool calling and reasoning           | Some model families (see below)                              | All parsers                 |
+| Embeddings, score, rerank            | **Not yet**                                                  | Yes                         |
+| Anthropic Messages, Responses API    | Not yet / in progress                                        | Yes                         |
 
 Upstream tracks the gaps in [vllm-project/vllm#44280](https://github.com/vllm-project/vllm/issues/44280). Astrolift keeps the same table in `providers/k8s_native/managed/model_endpoint_vllm.py` (`RUST_TASKS`, `RUST_TOOL_PARSERS`, `RUST_REASONING_PARSERS`), and it is updated as upstream closes items.
 
@@ -24,7 +24,12 @@ Four levels, where the most specific one that is set wins:
 1. **The service:** `frontend = "python"` in the service config.
 2. **The model:** `vllm_model_defaults` in the cluster's provider config, keyed by model id or glob:
    ```json
-   {"vllm_model_defaults": {"Qwen/*": {"frontend": "rust"}, "BAAI/*": {"frontend": "python"}}}
+   {
+     "vllm_model_defaults": {
+       "Qwen/*": { "frontend": "rust" },
+       "BAAI/*": { "frontend": "python" }
+     }
+   }
    ```
 3. **The cluster:** `"vllm_frontend": "python"` in the cluster's provider config.
 4. **The install:** the admin setting **Model hosting > `VLLM_FRONTEND_DEFAULT`**, which is `rust` by default.
@@ -68,7 +73,10 @@ legacy `MODEL_*` bindings retain their contracts. Shared creation requires
 and an available enabled managed cluster. In-org catalogue reads require
 `ORG_READ`; metadata visibility does not grant deployment authority.
 
-Configure certified runtimes in the cluster's `provider_config` before creation.
+Configure certified runtimes before creation using the Placement step's runtime
+setup form or the typed `clusterModelRuntimeSettings` / `updateClusterModelRuntime`
+API described below. Existing legacy declarations remain readable by admission;
+new setup declarations include serving and resource bounds.
 This example is a declaration template: replace both digest placeholders with
 verified image digests and certify the actual hardware/node labels first.
 Unconfigured modes are refused; neither zero requested GPUs nor an architecture
@@ -83,7 +91,7 @@ label proves CPU compatibility.
       "image": "registry.example/operator-verified-vllm-cpu@sha256:<64-lowercase-hex-digest>",
       "architecture": "amd64",
       "hardware_certified": true,
-      "node_selector": {"example.com/vllm-cpu-certified": "true"}
+      "node_selector": { "example.com/vllm-cpu-certified": "true" }
     },
     "gpu": {
       "version": "0.15.1",
@@ -91,16 +99,16 @@ label proves CPU compatibility.
       "image": "registry.example/operator-verified-vllm-gpu@sha256:<64-lowercase-hex-digest>",
       "architecture": "amd64",
       "hardware_certified": true,
-      "node_selector": {"example.com/vllm-gpu-certified": "true"}
+      "node_selector": { "example.com/vllm-gpu-certified": "true" }
     }
   },
   "vllm_agent_test": {
     "namespace": "astrolift-system",
-    "pod_labels": {"app": "astrolift-agent"}
+    "pod_labels": { "app": "astrolift-agent" }
   },
   "vllm_metrics": {
     "namespace": "monitoring",
-    "labels": {"release": "kube-prometheus-stack"}
+    "labels": { "release": "kube-prometheus-stack" }
   }
 }
 ```
@@ -186,3 +194,153 @@ requires deprovisioning all its shared model deployments, including deployments
 without subscribers. This release adds no orphan-recovery or instant force-revoke
 API; investigate pre-existing corrupted/orphaned records with an operator before
 attempting cleanup.
+
+### Hosting wizard setup
+
+`/models/deploy` shows one active step at a time: source, cluster placement and
+resources, then the access/license/runtime/resource review. Back and Next preserve
+the selected model, cluster, request and unchanged license acknowledgement. Changes
+to the reviewed source, target or request still invalidate confirmation. Resource
+review actions return to placement and focus the corresponding input. Runtime
+settings open in a separate tab so the hosting draft stays in the wizard.
+
+The small-model action resolves `Qwen/Qwen2.5-0.5B-Instruct` through the catalogue
+and uses its returned immutable revision. It does not prove access, license
+acceptance, CPU/GPU compatibility or model fit. The suggested deployment name is
+editable. Cluster choice remains explicit. The small-model preset initializes
+1 CPU, 4 GiB memory and 1 GiB CPU KV cache; generic CPU setup starts with
+2 CPUs, 8 GiB memory and 2 GiB KV cache. These are editable requests rather than
+certified fit or available capacity. CPU KV cache must be an integer from 1 through 1024
+GiB, with memory greater than the cache as checked by server admission. GPU
+requests omit the CPU cache argument.
+
+Focused tests exercise actual schema-validated HttpLink requests in all eight
+locales. Controlled Next/Chromium journeys exercise CPU, GPU and the small-model
+preset through review and accepted requests. These fixture receipts prove UI and
+request behavior, not successful downloading, scheduling, vLLM inference or live
+readiness. Deployment health still requires the actual runtime observations.
+
+### Authenticated subscription traffic
+
+New shared-model rollouts mount a version 2 authentication snapshot. Its
+`subscription_ids` list contains the canonical subscription UUIDs in exactly
+the same order as `subscription_keys`, both derived from the reviewed SDK
+consumer snapshot. Startup rejects duplicate or noncanonical UUIDs, mismatched
+list lengths, duplicate keys and operator-key collisions. Version 1 snapshots
+remain usable but emit no attributed series. Updating the Secret alone does
+not update a running server; the existing revision rollout still needs a new
+loaded snapshot and observed readiness.
+
+The existing operator-only `/metrics` scrape includes process-local
+`astrolift_model_subscription_info` (schema version 2) and
+`astrolift_model_subscription_auth_revision` gauges for each loaded UUID.
+Request and response-byte counters and duration histograms initialize to zero
+for each UUID and the five fixed inference route groups. This distinguishes a
+known instrumented subscription from legacy or absent telemetry. A rate still
+requires valid scrape samples over its time window. Counters reset when the
+process restarts; observe every replica and use counter-aware aggregation.
+
+Only authenticated subscriber POSTs to admitted inference routes contribute.
+The identity comes from the loaded credential mapping, never app headers or
+request data. Operator prompts, denied credentials, metadata GETs and metrics
+scrapes do not contribute. The series are:
+
+- `astrolift_model_subscription_requests_total`, with `subscription_id`,
+  `route`, `status_class` and `outcome` labels;
+- `astrolift_model_subscription_response_bytes_total`, with `subscription_id`
+  and `route` labels;
+- `astrolift_model_subscription_request_duration_seconds`, a histogram with
+  `subscription_id` and `route` labels and fixed buckets from 0.01 to 300 seconds.
+
+Outcomes are `completed`, `disconnected`, `interrupted` or `error`. Cancellation
+without an observed disconnect is interrupted. A stream that started with
+HTTP 200 can still end in an error; count failures without double-counting
+status and outcome. Each admitted request is recorded once. Byte counts measure
+body bytes accepted by ASGI's send callback, not confirmed client delivery,
+model tokens or billable usage. Duration measures the ASGI application call,
+including interrupted streams and cleanup. No prompt, response content,
+credential, caller-supplied label or token parsing is added. Per-app token and
+cost attribution remain unsupported.
+
+Scraping negotiates plain text and identity encoding. Appending preserves
+upstream series, handles bounded gzip bodies and keeps a single terminal
+OpenMetrics EOF when needed. The response length is recomputed and stale
+content digests removed. Unsupported encodings, non-text/non-200 responses,
+trailers or upstream bodies exceeding 2 MiB pass through without appended
+series. Missing attribution series must therefore remain unavailable rather
+than imply zero traffic. The API must select the authorized immutable
+subscription UUID and exact model namespace/service selectors; these runtime
+labels alone do not authorize a query or identify user accounts.
+
+## Typed runtime setup and serving bounds
+
+`models.runtime_settings` advertises this additive API, not permission or runtime
+readiness. Both reads and writes require a fresh active installation platform
+operator, the existing exact organization/cluster gates, and bearer admin,
+organization/team and live membership ceilings. The server rechecks authority
+and eligible cluster/provider after the final placement lock. Only the selected
+`vllm_shared_runtimes.cpu` or `.gpu` entry changes; unrelated provider/auth
+configuration and the other compute mode are preserved and never projected.
+
+```graphql
+query RuntimeSetup($organizationId: GUID!, $clusterId: GUID!, $expectedProviderId: GUID!) {
+  clusterModelRuntimeSettings(organizationId: $organizationId, clusterId: $clusterId,
+    expectedProviderId: $expectedProviderId) {
+    organizationId clusterId providerId clusterVersion providerVersion
+    modes { computeMode configured reason hardwareAdmission
+      declaration { image version packageVersion architecture
+        nodeSelector { key value } supportedDtypes defaultDtype
+        defaultMaxModelLen maxModelLenCeiling defaultMaxNumSeqs maxNumSeqsCeiling
+        cpuRequestCeiling memoryRequestCeiling gpuCountCeiling hardwareCertified hardwareEvidence }
+    }
+  }
+}
+```
+
+`updateClusterModelRuntime(input: UpdateClusterModelRuntimeInput!)` requires those
+exact organization/cluster/provider identities, reviewed `ifMatchVersion` and
+`expectedProviderVersion`, a `CPU` or `GPU` compute mode, and a typed declaration.
+The declaration requires a digest-pinned image, exact supported vLLM version
+`0.15.1`, CPU package `0.15.1+cpu` or supported GPU release package, architecture
+and at least one explicit certified hardware selector beyond architecture alone.
+It also requires supported/default data types, default/maximum context and
+concurrency, positive CPU/memory ceilings and the mode-appropriate GPU ceiling.
+Context bounds are 256–131072 tokens and concurrency is 1–4096 sequences.
+
+`hardwareCertified: true` additionally requires `hardwareAttested: true` and a
+bounded evidence reference. Record image smoke and node inspection evidence
+without credentials/private URLs; the server records the actor and time. An
+uncertified declaration may be saved but remains ineligible. This is an operator
+assertion, not an automated hardware probe or successful model launch. A tagged
+image or a claimed architecture is insufficient for new declarations.
+
+Provisioning and source-preserving settings updates accept optional `dtype`
+(`AUTO`, `FLOAT16`, `BFLOAT16`, `FLOAT32`), `maxModelLen` and `maxNumSeqs`. New
+runtime declarations supply defaults when creating a model; explicit requests
+must match declared dtype support and bounds. Omitting these settings during an
+update preserves stored advanced values, including local/HF source identity.
+Current declarations are checked again by the actual worker/provider before
+credential or Kubernetes writes. Removing certification or narrowing support can
+therefore refuse a queued operation. Existing declarations without these new
+controls retain their old admission contract; they cannot admit a request that
+claims the new serving-controls contract.
+
+The tiny CPU preset requests 1 CPU, 4 GiB memory, 1 GiB CPU KV cache, float32,
+256-token context and one concurrent sequence. These limits match the prepared
+AVX2 image smoke plan; that plan is not a built image or hardware/runtime proof.
+The operator still needs a built digest, image smoke and actual compatible node
+inspection. Requested memory above KV cache does not prove weight/KV fit, and
+node capacity/selector declarations do not prove successful scheduling. Only
+existing generation, auth snapshot, pod rollout and model-server `/health`
+observations establish hosted-model readiness. Runtime setup performs no build,
+cluster apply, model download or inference.
+
+An accepted setup write survives a failed follow-up read, with a saved-but-read
+unconfirmed warning. Refused writes preserve the draft and do not refresh.
+Browser hosting and runtime checks re-read the persisted Django session, its
+current authentication hash and any recorded session revocation/expiry after
+admission waits. The validation is read-only and does not lock out a later
+concurrent logout; it is not an atomic logout/dispatch guarantee. The
+browser binds review/drafts to the actor/organization, selected cluster/provider,
+mode and observed versions; server identity/version and authority checks remain
+canonical. Retry current reads before another write after an unknown response.

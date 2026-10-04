@@ -7,6 +7,14 @@ import { NextIntlClientProvider } from "next-intl";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import en from "@/messages/en.json";
+import es from "@/messages/es.json";
+import fr from "@/messages/fr.json";
+import de from "@/messages/de.json";
+import ja from "@/messages/ja.json";
+import ko from "@/messages/ko.json";
+import zh from "@/messages/zh-Hans.json";
+import pt from "@/messages/pt-BR.json";
+const catalogs = { en, es, fr, de, ja, ko, "zh-Hans": zh, "pt-BR": pt };
 import { SharedModelDeploymentClient } from "./SharedModelDeploymentClient";
 import { useSharedModelDeployment } from "./use-shared-model-deployment";
 import { sharedModelDetailProps } from "./shared-model-detail.fixtures";
@@ -33,6 +41,11 @@ function response(data: Record<string, unknown>) {
 function fixture(request: Request) {
   const model = {
     ...hfCatalogueProps.page.rows[0],
+    repoId: String(
+      request.variables.repoId ??
+        request.variables.modelRepo ??
+        hfCatalogueProps.page.rows[0].repoId
+    ),
     gated: "NONE",
     pipelineTag: "text-generation",
     revisionSha: "a".repeat(40),
@@ -168,7 +181,7 @@ function fixture(request: Request) {
       throw new Error(`Unexpected operation ${request.operationName}`);
   }
 }
-function wrapper() {
+function wrapper(locale: keyof typeof catalogs = "en") {
   const client = new ApolloClient({
     cache: new InMemoryCache(),
     devtools: { enabled: false },
@@ -184,7 +197,7 @@ function wrapper() {
   });
   return function Provider({ children }: PropsWithChildren) {
     return (
-      <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
+      <NextIntlClientProvider locale={locale} messages={catalogs[locale]} timeZone="UTC">
         <ApolloProvider client={client}>{children}</ApolloProvider>
       </NextIntlClientProvider>
     );
@@ -211,6 +224,7 @@ async function prepare(mode: "CPU" | "GPU" = "CPU") {
     fireEvent.change(screen.getByLabelText(en.models.shared.placement.gpuCount), {
       target: { value: "1" },
     });
+  fireEvent.click(screen.getByRole("button", { name: en.models.shared.usability.continueStep }));
   fireEvent.click(screen.getByLabelText(en.models.shared.hosting.licenseReview));
   await waitFor(() =>
     expect(screen.getByRole("button", { name: "Review deployment" })).toBeEnabled()
@@ -221,6 +235,140 @@ function writes() {
 }
 
 describe("shared model create Apollo boundary", () => {
+  it("preserves a manual deployment name across source changes and revisiting steps", async () => {
+    const { result } = renderHook(useSharedModelDeployment, { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.hostingProps.allowed).toBe(true));
+    act(() =>
+      result.current.hostingProps.onManualSource({
+        repoId: "first/tiny-model",
+        revisionSha: "a".repeat(40),
+      })
+    );
+    await waitFor(() => expect(result.current.draft.name).toBe("tiny-model"));
+    act(() => result.current.onDraftChange("name", "My deliberate test"));
+    act(() =>
+      result.current.hostingProps.onManualSource({
+        repoId: "second/another-model",
+        revisionSha: "a".repeat(40),
+      })
+    );
+    await waitFor(() =>
+      expect(result.current.model).toMatchObject({ repoId: "second/another-model" })
+    );
+    expect(result.current.draft.name).toBe("My deliberate test");
+  });
+
+  it.each(Object.keys(catalogs) as (keyof typeof catalogs)[])(
+    "%s hosts the small-model choice through three actual schema-validated stages",
+    async (locale) => {
+      const messages = catalogs[locale];
+      render(<SharedModelDeploymentClient />, { wrapper: wrapper(locale) });
+      const small = await screen.findByRole("button", {
+        name: messages.models.shared.usability.smallModel,
+      });
+      await waitFor(() => expect(small).toBeEnabled());
+      fireEvent.click(small);
+      const pin = await screen.findByRole("button", {
+        name: messages.models.shared.hosting.continue,
+      });
+      await waitFor(() => expect(pin).toBeEnabled());
+      fireEvent.click(pin);
+      expect(await screen.findByLabelText(messages.models.shared.placement.name)).toHaveValue(
+        "Qwen2.5-0.5B-Instruct"
+      );
+      fireEvent.change(screen.getByLabelText(messages.models.shared.placement.name), {
+        target: { value: "" },
+      });
+      fireEvent.click(
+        screen.getByRole("button", { name: messages.models.shared.usability.enterName })
+      );
+      expect(screen.getByLabelText(messages.models.shared.placement.name)).toHaveFocus();
+      expect(
+        screen.getByRole("button", { name: messages.models.shared.usability.continueStep })
+      ).toBeDisabled();
+      fireEvent.change(screen.getByLabelText(messages.models.shared.placement.name), {
+        target: { value: "Qwen2.5-0.5B-Instruct" },
+      });
+      expect(
+        screen.queryByRole("button", { name: messages.models.shared.hosting.connect })
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: messages.models.shared.placement.review })
+      ).not.toBeInTheDocument();
+      fireEvent.click(await screen.findByRole("button", { name: "Production · production" }));
+      fireEvent.click(screen.getByLabelText("CPU"));
+      expect(screen.getByLabelText(messages.models.shared.placement.cpuKvCacheGiB)).toHaveValue(1);
+      expect(screen.getByLabelText(messages.models.shared.placement.cpuRequest)).toHaveValue("1");
+      expect(screen.getByLabelText(messages.models.shared.placement.memoryRequest)).toHaveValue(
+        "4Gi"
+      );
+      const next = screen.getByRole("button", {
+        name: messages.models.shared.usability.continueStep,
+      });
+      await waitFor(() => expect(next).toBeEnabled());
+      fireEvent.click(next);
+      expect(screen.queryByRole("radio", { name: "CPU" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Production · production" })
+      ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByLabelText(messages.models.shared.hosting.licenseReview));
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: messages.models.shared.placement.review })
+        ).toBeEnabled()
+      );
+      fireEvent.click(
+        screen.getByRole("link", { name: messages.models.shared.hosting.reviewResourceRequests })
+      );
+      expect(screen.getByLabelText(messages.models.shared.placement.cpuRequest)).toHaveFocus();
+      expect(
+        screen.queryByRole("button", { name: messages.models.shared.placement.review })
+      ).not.toBeInTheDocument();
+      fireEvent.click(
+        screen.getByRole("button", { name: messages.models.shared.usability.continueStep })
+      );
+      expect(screen.getByLabelText(messages.models.shared.hosting.licenseReview)).toBeChecked();
+      fireEvent.click(
+        screen.getByRole("button", { name: messages.models.shared.placement.review })
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: messages.models.shared.placement.deploy })
+      );
+      expect(
+        await screen.findByRole("link", { name: messages.models.shared.placement.openDeployment })
+      ).toHaveAttribute("href", `/models/shared/${deploymentId}`);
+      expect(writes()).toHaveLength(1);
+      expect(writes()[0].variables.input).toMatchObject({
+        name: "Qwen2.5-0.5B-Instruct",
+        modelRepo: "Qwen/Qwen2.5-0.5B-Instruct",
+        cpuRequest: "1",
+        memoryRequest: "4Gi",
+        cpuKvCacheGiB: 1,
+        dtype: "FLOAT32",
+        maxModelLen: 256,
+        maxNumSeqs: 1,
+        revisionSha: "a".repeat(40),
+        clusterId,
+        expectedProviderId: providerId,
+        computeMode: "cpu",
+        gpuCount: 0,
+      });
+    }
+  );
+
+  it("supplies an editable model-derived name after actual catalogue selection", async () => {
+    render(<SharedModelDeploymentClient />, { wrapper: wrapper() });
+    fireEvent.click(
+      await screen.findByRole("button", { name: hfCatalogueProps.page.rows[0].repoId })
+    );
+    const pin = await screen.findByRole("button", { name: en.models.shared.hosting.continue });
+    await waitFor(() => expect(pin).toBeEnabled());
+    fireEvent.click(pin);
+    expect(await screen.findByLabelText("Deployment name")).toHaveValue(
+      hfCatalogueProps.page.rows[0].repoId.split("/").at(-1)
+    );
+  });
+
   it.each(["checking", "denied", "error"])(
     "keeps catalogue readable but Host unavailable for %s authority",
     async (kind) => {
@@ -291,12 +439,15 @@ describe("shared model create Apollo boundary", () => {
         cpuRequest: "2",
         memoryRequest: "8Gi",
         gpuCount: mode === "CPU" ? 0 : 1,
-        cpuKvCacheGiB: null,
+        cpuKvCacheGiB: mode === "CPU" ? 2 : null,
         allowSubscriptions: false,
         connectionId: null,
         expectedConnectionVersion: null,
         localArtifactId: null,
         expectedArtifactVersion: null,
+        dtype: null,
+        maxModelLen: null,
+        maxNumSeqs: null,
       });
       expect(
         requests
@@ -329,6 +480,9 @@ describe("shared model create Apollo boundary", () => {
         fireEvent.change(screen.getByLabelText(en.models.shared.placement.gpuCount), {
           target: { value: "1" },
         });
+      fireEvent.click(
+        screen.getByRole("button", { name: en.models.shared.usability.continueStep })
+      );
       expect(screen.getByText(en.models.shared.localImport.localLicense)).toBeVisible();
       expect(
         screen.queryByRole("link", { name: en.models.shared.hosting.openModel })
@@ -423,6 +577,7 @@ describe("shared model create Apollo boundary", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Production · production" }));
     fireEvent.change(screen.getByLabelText("Deployment name"), { target: { value: "cpu" } });
     fireEvent.click(screen.getByLabelText("CPU"));
+    fireEvent.click(screen.getByRole("button", { name: en.models.shared.usability.continueStep }));
     expect(await screen.findByText("Runtime is not configured")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Review deployment" })).toBeDisabled();
     expect(writes()).toHaveLength(0);

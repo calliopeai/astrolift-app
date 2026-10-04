@@ -35,8 +35,11 @@ const initialDraft: SharedModelDraft = {
   cpuRequest: "2",
   memoryRequest: "8Gi",
   gpuCount: "",
-  cpuKvCacheGiB: "",
+  cpuKvCacheGiB: "2",
   allowSubscriptions: false,
+  dtype: "",
+  maxModelLen: "",
+  maxNumSeqs: "",
 };
 export function useSharedModelDeployment() {
   const t = useTranslations("models.shared.placement");
@@ -48,17 +51,38 @@ export function useSharedModelDeployment() {
     resolver: zodResolver(sharedModelDraftSchema),
     defaultValues: initialDraft,
   });
+  const suggestedName = useRef("");
+  const presetRepo = useRef<string | null>(null);
+  const selectModel = (source: SharedModelSource) => {
+    const nextName =
+      ("repoId" in source ? source.repoId.split("/").at(-1) : source.name)?.trim().slice(0, 128) ??
+      "";
+    const currentName = form.getValues("name");
+    if (!currentName.trim() || currentName === suggestedName.current)
+      form.setValue("name", nextName);
+    suggestedName.current = nextName;
+    if ("repoId" in source && source.repoId === presetRepo.current) {
+      form.setValue("cpuRequest", "1");
+      form.setValue("memoryRequest", "4Gi");
+      form.setValue("cpuKvCacheGiB", "1");
+      form.setValue("dtype", "FLOAT32");
+      form.setValue("maxModelLen", "256");
+      form.setValue("maxNumSeqs", "1");
+    }
+    presetRepo.current = null;
+    setModel(source);
+  };
   const watched = useWatch({ control: form.control });
   const draft: SharedModelDraft = { ...initialDraft, ...watched };
   const [sourceKind, setSourceKind] = useState<"huggingface" | "local">("huggingface");
   const hfModel = model && "repoId" in model ? model : null;
-  const hosting = useModelHostingSource(hfModel, setModel);
+  const hosting = useModelHostingSource(hfModel, selectModel);
   const access =
     model && "localArtifactId" in model
       ? { confirmed: true, loading: false, reason: null, license: null, onRetry: () => {} }
       : hosting.access;
   const connection = sourceKind === "huggingface" ? hosting.connection : null;
-  const catalogueProps = useHfCatalogue(setModel, hosting.props.allowed);
+  const catalogueProps = useHfCatalogue(selectModel, hosting.props.allowed);
   const licenseKey = JSON.stringify([
     organizationId,
     hosting.actorId,
@@ -131,12 +155,17 @@ export function useSharedModelDeployment() {
         gpuCount: 0,
         cpuKvCacheGiB: null,
         allowSubscriptions: false,
+        dtype: null,
+        maxModelLen: null,
+        maxNumSeqs: null,
       },
     },
     skip: skipped || !request,
     fetchPolicy: "no-cache",
     context: { queryDeduplication: false },
   });
+  const [admissionLease, setAdmissionLease] = useState({ key: requestKey, fresh: true });
+  if (admissionLease.key !== requestKey) setAdmissionLease({ key: requestKey, fresh: true });
   const [provision] = useMutation<
     ProvisionClusterModelMutation,
     ProvisionClusterModelMutationVariables
@@ -182,6 +211,8 @@ export function useSharedModelDeployment() {
       else if (field === "computeMode" && (value === "" || value === "cpu" || value === "gpu")) {
         form.setValue("computeMode", value);
         form.setValue("gpuCount", value === "cpu" ? "0" : "");
+        if (value === "cpu" && !form.getValues("cpuKvCacheGiB"))
+          form.setValue("cpuKvCacheGiB", "2");
       } else if (
         field !== "computeMode" &&
         field !== "allowSubscriptions" &&
@@ -224,7 +255,7 @@ export function useSharedModelDeployment() {
       },
     },
     admission:
-      request && admission.data?.clusterModelRuntimeAdmission
+      request && admissionLease.fresh && admission.data?.clusterModelRuntimeAdmission
         ? {
             ...admission.data.clusterModelRuntimeAdmission,
             reason: admission.data.clusterModelRuntimeAdmission.reason ?? null,
@@ -273,8 +304,34 @@ export function useSharedModelDeployment() {
   };
   return {
     ...props,
-    catalogueProps,
+    catalogueProps: {
+      ...catalogueProps,
+      onSelect: (repoId: string) => {
+        presetRepo.current = null;
+        catalogueProps.onSelect(repoId);
+      },
+      onSelectSmallModel: () => {
+        presetRepo.current = "Qwen/Qwen2.5-0.5B-Instruct";
+        catalogueProps.onSelect(presetRepo.current);
+      },
+    },
     hostingProps: hosting.props,
+    refreshRuntimeAdmission: async () => {
+      if (!request || skipped) return;
+      const epoch = lifecycle.current;
+      setAdmissionLease({ key: requestKey, fresh: false });
+      await admission.refetch();
+      if (
+        mounted.current &&
+        lifecycle.current === epoch &&
+        latest.current.requestKey === requestKey
+      )
+        setAdmissionLease({ key: requestKey, fresh: true });
+    },
+    runtimeTarget:
+      !skipped && cluster
+        ? { organizationId, clusterId: cluster.id, expectedProviderId: cluster.providerId }
+        : null,
     sourceKind,
     onUseLocalArtifact: (artifact: {
       id: string;
@@ -282,7 +339,7 @@ export function useSharedModelDeployment() {
       name: string;
       manifestSha256: string;
     }) =>
-      setModel({
+      selectModel({
         localArtifactId: artifact.id,
         expectedArtifactVersion: artifact.version,
         name: artifact.name,
@@ -294,6 +351,8 @@ export function useSharedModelDeployment() {
         setModel(null);
         setSelectedClusterId(null);
         form.reset(initialDraft);
+        suggestedName.current = "";
+        presetRepo.current = null;
       }
     },
   };

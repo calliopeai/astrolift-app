@@ -10,7 +10,16 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { sharedModelRequest, type SharedModelDraft } from "./shared-model-form";
+import type { SharedModelDraft } from "./shared-model-form";
+import {
+  modelAccessDraft,
+  modelSettingsRequest,
+  type ModelAccessDraft,
+  type DedicatedModelApp,
+} from "./shared-model-settings";
+import { UsersIcon } from "lucide-react";
+import { ListPage } from "@/components/list/ListPage";
+import type { ModelPage } from "./ModelSubscriptionsPanel";
 import type { ModelPlacementAdmission } from "./SharedModelDeploymentScreen";
 export type ManagementResult =
   | { accepted: true; operationId: string }
@@ -24,6 +33,10 @@ export type SharedModelManagementPanelProps = {
   onRetryCapabilities: () => void;
   draft: SharedModelDraft;
   onDraftChange: <K extends keyof SharedModelDraft>(field: K, value: SharedModelDraft[K]) => void;
+  access?: ModelAccessDraft;
+  onAccessChange?: (mode: ModelAccessDraft["mode"]) => void;
+  onSelectDedicatedApp?: (app: DedicatedModelApp) => void;
+  dedicatedApps?: ModelPage<DedicatedModelApp>;
   admission: ModelPlacementAdmission | null;
   admissionLoading: boolean;
   admissionError: string | null;
@@ -48,13 +61,12 @@ function ManagementPanel(props: SharedModelManagementPanelProps) {
   const { model, draft, onDraftChange, admission } = props;
   const t = useTranslations("models.shared.management"),
     placement = useTranslations("models.shared.placement");
+  const inventory = useTranslations("models.shared.inventory");
+  const runtime = useTranslations("models.shared.runtimeSetup"),
+    stored = useTranslations("models.shared.storedControls");
   const id = useId();
-  const request = sharedModelRequest(
-      model.organizationId,
-      { id: model.clusterId, providerId: model.providerId },
-      model.revisionSha ? { repoId: model.modelRepo, revisionSha: model.revisionSha } : null,
-      draft
-    ),
+  const access = props.access ?? modelAccessDraft(model);
+  const request = modelSettingsRequest(model, draft, access),
     requestKey = JSON.stringify(request);
   const idle = model.status === "active" || model.status === "failed";
   const manageable =
@@ -171,12 +183,12 @@ function ManagementPanel(props: SharedModelManagementPanelProps) {
     }
   }
   return (
-    <section aria-labelledby={`${id}-title`} className="space-y-4">
+    <section id="model-settings" aria-labelledby={`${id}-title`} className="scroll-mt-20 space-y-4">
       <h2 id={`${id}-title`} className="text-lg font-semibold">
-        {t("title")}
+        {inventory("settings")}
       </h2>
-      <p className="text-muted-foreground text-sm">{t("description")}</p>
-      <p className="text-muted-foreground text-sm">{t("immutable")}</p>
+      <p className="text-muted-foreground text-sm">{inventory("settingsDescription")}</p>
+      <p className="text-muted-foreground text-sm">{inventory("immutableSource")}</p>
       {props.capabilityLoading ? (
         <p role="status">{t("checking")}</p>
       ) : props.capabilityError ? (
@@ -191,6 +203,68 @@ function ManagementPanel(props: SharedModelManagementPanelProps) {
       ) : !idle || props.blocked ? (
         <p role="status">{t("blocked")}</p>
       ) : null}
+      <fieldset className="space-y-3 sm:col-span-2" disabled={!manageable}>
+        <legend className="font-medium">{inventory("access")}</legend>
+        <p className="text-muted-foreground text-sm">{inventory("sharingHelp")}</p>
+        <div className="flex gap-4">
+          {(["SHARED", "DEDICATED"] as const).map((mode) => (
+            <Label key={mode} className="flex gap-2">
+              <input
+                type="radio"
+                name={`${id}-sharing`}
+                checked={access.mode === mode}
+                disabled={!manageable || !props.onAccessChange}
+                onChange={() => props.onAccessChange?.(mode)}
+              />
+              {inventory(mode === "SHARED" ? "shared" : "dedicated")}
+            </Label>
+          ))}
+        </div>
+        {access.mode === "DEDICATED" && (
+          <div className="space-y-3">
+            <p>
+              {access.app
+                ? inventory("dedicatedApp", { app: access.app.name })
+                : inventory("chooseDedicatedApp")}
+            </p>
+            {props.dedicatedApps && (
+              <ListPage
+                {...props.dedicatedApps}
+                embedded
+                label={inventory("selectApp")}
+                getRowId={(app) => app.id}
+                columns={[
+                  {
+                    id: "app",
+                    header: inventory("selectApp"),
+                    cell: (app) => (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={
+                          !manageable ||
+                          props.dedicatedApps?.loading ||
+                          props.dedicatedApps?.stale ||
+                          !!props.dedicatedApps?.error ||
+                          !props.onSelectDedicatedApp
+                        }
+                        onClick={() => props.onSelectDedicatedApp?.(app)}
+                      >
+                        {app.name} · {app.slug}
+                      </Button>
+                    ),
+                  },
+                ]}
+                empty={{
+                  icon: <UsersIcon />,
+                  title: inventory("appsEmpty"),
+                  description: inventory("appsEmptyHelp"),
+                }}
+              />
+            )}
+          </div>
+        )}
+      </fieldset>
       <form
         className="grid gap-4 sm:grid-cols-2"
         onSubmit={(event) => {
@@ -201,21 +275,22 @@ function ManagementPanel(props: SharedModelManagementPanelProps) {
           setReview({
             kind: "update",
             revision: scope.updateRevision,
-            input: {
-              organizationId: model.organizationId,
-              id: model.id,
-              expectedClusterId: model.clusterId,
-              expectedProviderId: model.providerId,
-              ifMatchVersion: model.version,
-              cpuRequest: request.cpuRequest,
-              memoryRequest: request.memoryRequest,
-              gpuCount: request.gpuCount,
-              cpuKvCacheGiB: request.cpuKvCacheGiB,
-              allowSubscriptions: request.allowSubscriptions,
-            },
+            input: request,
           });
         }}
       >
+        <div className="space-y-2 sm:col-span-2">
+          <Label htmlFor={`${id}-name`}>{placement("name")}</Label>
+          <Input
+            id={`${id}-name`}
+            value={draft.name}
+            disabled={!manageable}
+            required
+            maxLength={128}
+            onChange={(event) => onDraftChange("name", event.target.value)}
+          />
+        </div>
+
         {(
           [
             "cpuRequest",
@@ -239,6 +314,54 @@ function ManagementPanel(props: SharedModelManagementPanelProps) {
             <p className="text-muted-foreground text-xs">{placement(`${field}Help`)}</p>
           </div>
         ))}
+        <div className="space-y-2">
+          <Label htmlFor={`${id}-dtype`}>{runtime("dtype")}</Label>
+          <select
+            id={`${id}-dtype`}
+            value={draft.dtype ?? ""}
+            disabled={!manageable}
+            onChange={(event) =>
+              onDraftChange("dtype", event.target.value as SharedModelDraft["dtype"])
+            }
+          >
+            <option value="">{stored("keepStored")}</option>
+            {(["AUTO", "FLOAT16", "BFLOAT16", "FLOAT32"] as const).map((value) => (
+              <option key={value} value={value}>
+                {value.toLowerCase()}
+              </option>
+            ))}
+          </select>
+          <p className="text-muted-foreground text-xs">
+            {stored("storedValue", {
+              value: model.desiredResources.dtype ?? stored("notRecorded"),
+            })}
+          </p>
+        </div>
+        {(["maxModelLen", "maxNumSeqs"] as const).map((field) => (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={`${id}-${field}`}>{runtime(field)}</Label>
+            <Input
+              id={`${id}-${field}`}
+              type="number"
+              step={1}
+              min={field === "maxModelLen" ? 256 : 1}
+              max={field === "maxModelLen" ? 131072 : 4096}
+              placeholder={stored("keepStored")}
+              value={draft[field] ?? ""}
+              disabled={!manageable}
+              onChange={(event) => onDraftChange(field, event.target.value)}
+            />
+            <p className="text-muted-foreground text-xs">
+              {stored("storedValue", {
+                value:
+                  model.desiredResources[field] == null
+                    ? stored("notRecorded")
+                    : String(model.desiredResources[field]),
+              })}
+            </p>
+          </div>
+        ))}
+        <p className="text-muted-foreground text-sm sm:col-span-2">{stored("preserveHelp")}</p>
         <Label className="flex items-center gap-2 sm:col-span-2">
           <input
             type="checkbox"
@@ -333,6 +456,18 @@ function ManagementPanel(props: SharedModelManagementPanelProps) {
             </span>
             {review?.kind === "update" && (
               <span className="block">
+                {placement("name")}: {review.input.name}
+                <span className="block">
+                  {inventory("access")}:{" "}
+                  {inventory(review.input.sharingMode === "DEDICATED" ? "dedicated" : "shared")}
+                  {review.input.sharingMode === "DEDICATED" && access.app
+                    ? ` · ${access.app.name} · ${access.app.slug}`
+                    : ""}
+                </span>
+              </span>
+            )}
+            {review?.kind === "update" && (
+              <span className="block">
                 {placement("reviewResources", {
                   cpu: review.input.cpuRequest,
                   memory: review.input.memoryRequest,
@@ -342,6 +477,18 @@ function ManagementPanel(props: SharedModelManagementPanelProps) {
                       ? placement("notRequested")
                       : `${review.input.cpuKvCacheGiB} GiB`,
                 })}
+              </span>
+            )}
+            {review?.kind === "update" && (
+              <span className="block">
+                {(["dtype", "maxModelLen", "maxNumSeqs"] as const).map((field) => (
+                  <span key={field} className="block">
+                    {runtime(field)}:{" "}
+                    {review.input[field] == null
+                      ? stored("keepStored")
+                      : String(review.input[field])}
+                  </span>
+                ))}
               </span>
             )}
             <span className="block">

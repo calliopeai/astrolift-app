@@ -64,7 +64,7 @@ def capabilities(row):
         (("org.read",), (True, False, False, False)),
         (("app.read",), (True, False, False, False)),
         (("agent.read",), (False, False, False, False)),
-        (("cluster.update",), (False, True, True, True)),
+        (("cluster.update",), (False, False, False, True)),
     ],
 )
 def test_pure_mapping_has_dedicated_always_enabled_models_row(permissions, expected):
@@ -87,9 +87,9 @@ def test_org_reader_without_agent_read_sees_shared_models(world):
     assert not rows["agents"].can_view
 
 
-def test_org_owner_write_matches_explicit_owner_permission(world):
+def test_org_owner_can_run_shared_prompt_but_cannot_host_or_configure(world):
     grant(world)
-    assert capabilities(read(world)["models"]) == (True, True, True, True)
+    assert capabilities(read(world)["models"]) == (True, False, False, True)
 
 
 def test_scoped_superuser_bypass_preserves_actual_bearer_team_ceiling(world):
@@ -164,6 +164,8 @@ def test_team_bearer_can_only_keep_actual_legacy_view_and_never_owner_write(worl
 
 def test_direct_bearer_reloads_changed_scope_ceiling_instead_of_stale_token_object(world):
     grant(world)
+    world.user.is_superuser = True
+    world.user.save(update_fields=["is_superuser"])
     token = ApiToken.objects.create(
         user=world.user,
         organization=world.org,
@@ -210,7 +212,9 @@ def test_owner_policy_denials_are_reflected_without_flat_slug_fallback(world, pe
         resource_pattern={},
         conditions=[],
     )
-    expected = (False, True, True, True) if permission == Permission.ORG_READ else (True, False, False, False)
+    expected = (
+        (False, False, False, True) if permission == Permission.ORG_READ else (True, False, False, False)
+    )
     assert capabilities(read(world)["models"]) == expected
 
 
@@ -218,7 +222,7 @@ def test_owner_policy_denials_are_reflected_without_flat_slug_fallback(world, pe
     "scopes,team,expected",
     [
         (["read:apps"], None, (True, False, False, False)),
-        (["admin"], None, (True, True, True, True)),
+        (["admin"], None, (True, False, False, True)),
         (["admin"], "home", (True, False, False, False)),
         (["admin"], "sibling", (False, False, False, False)),
     ],

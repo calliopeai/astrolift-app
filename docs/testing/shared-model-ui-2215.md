@@ -159,3 +159,36 @@ real Temporal activities/history replay, native Kubernetes apply/binding/pod
 checks and an enforcing Calico traffic test. The heavy model process is controlled
 for local tests. Release requires generated contracts, full CI and separately
 recorded immutable image/migration/control-plane deployment evidence.
+
+## Model connection policy UI (#2270)
+
+The connected destination, request/inbox, exact-version detail and policy adapters
+are covered by schema-validated native Apollo HttpLink journeys. They distinguish
+request-only intake, direct automatic connection, current reviewer votes and the
+requester's separate finalization, preserving typed identifiers/versions and raw
+refusals. Coverage includes durable caller UUID recovery, accepted/unverified replies,
+accepted writes with failed reads, scope/source/actor ABA, withdrawn decisions,
+first-read recovery, neutral restriction overlays and superadmin restriction denial.
+
+All eight catalogues have exact owned-key/ICU checks and real NextIntl rendering;
+SSR hydration/date checks retain literal identities and the request timezone.
+Portable stories exercise the pure views and genuine scoped client adapters. A
+selected native Chromium Storybook run covers keyboard review/cancel, direct
+accepted-pending connection, approved review, a recorded subscription, policy
+review and requester queue/detail. These controlled transports do not establish
+live approval, model inference, hardware fit or notification delivery. The existing
+Next route fixture now follows the separate Add connection and connection-list
+states with actual AUTO decision reads; production-route execution belongs to the
+composed build gate.
+
+## Stored runtime settings controls
+
+The additional settings tests read real desired/applied DTO fields through a
+schema-validated HttpLink before editing dtype, context length and concurrency.
+They prove all-eight-locale reviewed inputs, immutable-source omission, unknown
+and absent metadata preservation, exact admission/update agreement, raw refusal,
+accepted feedback after a failed refresh, bounded values, runtime/hosting denial,
+review ABA and a newer desired version replacing the draft. Portable settings
+stories and SSR hydration checks cover literal unknown values and label/input
+identity. These remain fixture transport and recorded configuration checks; they
+do not launch a model or establish hardware fit or rollout readiness.

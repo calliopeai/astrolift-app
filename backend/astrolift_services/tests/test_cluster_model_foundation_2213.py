@@ -9,7 +9,7 @@ from django.utils import timezone
 
 from astrolift_clusters.models import TenantCluster
 from astrolift_identity.api_tokens import reset_current_api_token, set_current_api_token
-from astrolift_identity.models import ApiToken, Organization
+from astrolift_identity.models import ApiToken, Member, Organization
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_services.cluster_models import (
     available_model_clusters,
@@ -33,6 +33,7 @@ def world(monkeypatch):
     monkeypatch.setattr("core.documents.ProfileDocument.delete_profile", classmethod(lambda cls, row: None))
     w = ScopeWorld("models2213")
     w.user = make_user("models2213")
+    Member.objects.create(user=w.user, scope_kind="ORG", scope_id=w.org.pk)
     w.cluster = make_cluster(w, "models2213")
     w.cluster.lifecycle = TenantCluster.Lifecycle.MANAGED
     w.cluster.save()

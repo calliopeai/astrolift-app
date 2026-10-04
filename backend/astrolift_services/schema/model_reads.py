@@ -16,6 +16,7 @@ from astrolift_identity.abac import operation_attributes
 from astrolift_identity.api_tokens import get_current_api_token, with_active_org_member
 from astrolift_identity.models import ApiToken, Organization
 from astrolift_identity.operation_context import OperationContext, environment_context
+from astrolift_lifecycle.scopes import app_scope_via
 from astrolift_services.cluster_models import (
     available_model_clusters,
     cluster_model_org_scope,
@@ -35,13 +36,19 @@ from astrolift_services.model_observations import (
     deployment_metrics,
     observation_window,
 )
+from astrolift_services.model_subscription_observations import (
+    ModelSubscriptionMetrics,
+    subscription_metric_operation,
+    subscription_metrics,
+)
 from astrolift_services.models import ManagedService
 from astrolift_services.scopes import (
     assert_provider_cluster,
     live_managed_services,
     managed_service_scope_by_guid,
 )
-from core.permissions import Permission, PermissionDenied, check_permission
+from core.decorators import tenant_scoped
+from core.permissions import Permission, PermissionDenied, check_permission, require_permission
 from core.tenancy import get_current_tenant
 
 
@@ -137,6 +144,100 @@ def _observation_service(service_id, expected_cluster_id, expected_provider_id):
 
 @strawberry.type
 class ModelReadsQuery:
+    @strawberry.field
+    @require_permission(
+        Permission.APP_READ_METRICS,
+        scope=app_scope_via(
+            "astrolift_services.ManagedServiceAttachment",
+            "subscription_id",
+            app_path="app_environment__registered_app",
+            permission=Permission.APP_READ_METRICS,
+        ),
+        operation=subscription_metric_operation,
+    )
+    @tenant_scoped()
+    def astrolift_model_subscription_metrics(
+        self,
+        info: Info,
+        organization_id: GUID,
+        service_id: GUID,
+        subscription_id: GUID,
+        expected_cluster_id: GUID,
+        expected_provider_id: GUID,
+        start: datetime,
+        end: datetime,
+    ) -> ModelSubscriptionMetrics | None:
+        from astrolift_services.model_admission import in_current_org
+        from astrolift_services.models import ManagedServiceAttachment
+        from astrolift_services.schema.cluster_model_mutations import _recheck_authority
+        from astrolift_services.schema.cluster_models import _environment_rows
+
+        _catalogue_audience(info)
+        observation_window(start, end)
+        if not in_current_org(organization_id):
+            return None
+        service = live_cluster_model_by_guid(_identity(service_id))
+        if service is None or (service.tenant_cluster.guid, service.tenant_cluster.provider_plugin.guid) != (
+            _identity(expected_cluster_id),
+            _identity(expected_provider_id),
+        ):
+            return None
+        row = (
+            ManagedServiceAttachment.objects.filter(
+                guid=_identity(subscription_id),
+                managed_service=service,
+                model_subscription=True,
+                managed_service__organization_id=get_current_tenant().organization_id,
+                app_environment__registered_app__organization_id=get_current_tenant().organization_id,
+                app_environment__in=_environment_rows(Permission.APP_READ_METRICS),
+                app_environment__tenant_cluster_id=service.tenant_cluster_id,
+            )
+            .select_related("app_environment__registered_app__organization")
+            .first()
+        )
+        if row is None:
+            return None
+        _recheck_authority(
+            info, Permission.APP_READ_METRICS, service.tenant_cluster, environment=row.app_environment
+        )
+        row.managed_service = service
+        available = available_model_clusters(
+            TenantCluster.objects.filter(
+                Q(organization_id=get_current_tenant().organization_id) | Q(organization_id__isnull=True),
+                pk=service.tenant_cluster_id,
+            ),
+            get_current_tenant().organization_id,
+        ).exists()
+        result = subscription_metrics(row, start, end, transport_available=available)
+        current_service = live_cluster_model_by_guid(_identity(service_id))
+        if current_service is None or (
+            current_service.tenant_cluster.guid,
+            current_service.tenant_cluster.provider_plugin.guid,
+        ) != (_identity(expected_cluster_id), _identity(expected_provider_id)):
+            return None
+        current_row = (
+            ManagedServiceAttachment.objects.filter(
+                guid=_identity(subscription_id),
+                managed_service=current_service,
+                model_subscription=True,
+                managed_service__organization_id=get_current_tenant().organization_id,
+                app_environment__registered_app__organization_id=get_current_tenant().organization_id,
+                app_environment__in=_environment_rows(Permission.APP_READ_METRICS),
+                app_environment__tenant_cluster_id=current_service.tenant_cluster_id,
+            )
+            .select_related("app_environment__registered_app__organization")
+            .first()
+        )
+        if current_row is None:
+            return None
+        _recheck_authority(
+            info,
+            Permission.APP_READ_METRICS,
+            current_service.tenant_cluster,
+            environment=current_row.app_environment,
+        )
+        return result
+
     @strawberry.field
     def astrolift_model_deployment_metrics(
         self,

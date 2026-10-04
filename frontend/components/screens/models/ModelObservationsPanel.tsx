@@ -71,6 +71,8 @@ export function ModelObservationsPanel({
   organizationId,
   onRefresh,
 }: ModelObservationsPanelProps) {
+  const inventory = useTranslations("models.shared.inventory");
+  const usage = useTranslations("models.shared.subscriptionUsage");
   const t = useTranslations("models.shared.observations"),
     format = useFormatter();
   const time = (value: string | null | undefined) =>
@@ -142,13 +144,46 @@ export function ModelObservationsPanel({
       <p>{t("notApplied")}</p>
     );
   const capacity = density.data?.capacity;
+  const serving = metrics.data?.metrics.filter((metric) => metric.source === "vllm") ?? [];
+  const available =
+    metrics.data?.metrics.filter(
+      (metric) => metric.state === "AVAILABLE" && observedValue(metric) !== null
+    ).length ?? 0;
+  const unconfigured =
+    serving.length > 0 && serving.every((metric) => metric.state === "UNCONFIGURED");
+  const noSamples = serving.length > 0 && serving.every((metric) => metric.state === "NO_DATA");
+
   const capacityNumber = (value: number | null | undefined) =>
     capacity && (capacity.state === "AVAILABLE" || capacity.state === "STALE")
       ? number(value)
       : t("unknown");
   return (
-    <div className="space-y-6">
-      <Section title={t("title")} description={t("scope")}>
+    <div id="model-metrics" className="scroll-mt-20 space-y-6">
+      <Section title={inventory("metrics")} description={inventory("metricsScope")}>
+        <div className="mb-4 space-y-2 text-sm">
+          <p>{t("scope")}</p>
+          {metrics.error ? (
+            <p role="status">{inventory("metricsReadUnavailable")}</p>
+          ) : (
+            !metrics.loading &&
+            !metrics.stale && (
+              <>
+                {available > 0 && <p>{inventory("metricsAvailable", { count: available })}</p>}
+                {unconfigured && <p role="status">{inventory("metricsUnconfigured")}</p>}
+                {noSamples && <p role="status">{inventory("metricsNoData")}</p>}
+              </>
+            )
+          )}
+          <p>
+            <a href="#model-connections" className="underline">
+              {usage("selectionHint")}
+            </a>
+          </p>
+          <p>{inventory("costUnavailable")}</p>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/documentation/cluster-prerequisites">{inventory("metricsSetup")}</Link>
+          </Button>
+        </div>
         <div className="space-y-4">
           <Button
             variant="outline"
