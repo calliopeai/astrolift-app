@@ -151,10 +151,50 @@ class ResourcePlan:
 
 
 @dataclass(frozen=True)
+class PlacementAcceptance:
+    cluster_resource: str
+    native_cluster_id: str
+    autopilot: bool
+    allowed_node_pools: tuple[str, ...]
+    controller_binding_sha256: str
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.cluster_resource, str)
+            or not re.fullmatch(
+                r"projects/[a-z0-9-]{6,63}/locations/[a-z0-9-]{1,63}/clusters/[a-z0-9-]{1,63}", self.cluster_resource
+            )
+            or not isinstance(self.native_cluster_id, str)
+            or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", self.native_cluster_id)
+            or type(self.autopilot) is not bool
+            or type(self.allowed_node_pools) is not tuple
+            or any(not isinstance(p, str) or not _NAME.fullmatch(p) for p in self.allowed_node_pools)
+            or tuple(sorted(set(self.allowed_node_pools))) != self.allowed_node_pools
+            or len(self.allowed_node_pools) > 64
+            or (self.autopilot and self.allowed_node_pools)
+            or (not self.autopilot and not self.allowed_node_pools)
+        ):
+            raise ApplyError("INVALID_PLACEMENT_ACCEPTANCE")
+        _sha(self.controller_binding_sha256)
+
+
+def controller_binding_sha256(execution: ExecutionBinding, identity: str, resources: tuple[ResourcePlan, ...]) -> str:
+    return _hash(
+        {
+            "schema": "astrolift.gcp.controller-placement.v1",
+            "execution": asdict(execution),
+            "identity": identity,
+            "controllers": [asdict(r) for r in resources if r.kind in _CONTROLLERS],
+        }
+    )
+
+
+@dataclass(frozen=True)
 class CompiledAppPlan:
     execution: ExecutionBinding
     identity_sha256: str
     resources: tuple[ResourcePlan, ...]
+    placement: PlacementAcceptance | None = None
 
     def __post_init__(self) -> None:
         _sha(self.identity_sha256)
@@ -178,10 +218,16 @@ class CompiledAppPlan:
                     raise ApplyError("APPLY_REPLICAS_UNSUPPORTED")
         if not 1 <= sum(row.kind in _CONTROLLERS for row in self.resources) <= 16:
             raise ApplyError("APPLY_CONTROLLER_BOUND_EXCEEDED")
+        if self.placement is not None and (
+            type(self.placement) is not PlacementAcceptance
+            or self.placement.controller_binding_sha256
+            != controller_binding_sha256(self.execution, self.identity_sha256, self.resources)
+        ):
+            raise ApplyError("ACCEPTED_CONTROLLER_PLACEMENT_CHANGED")
 
     @property
     def sha256(self) -> str:
-        return _hash({"schema": "astrolift.gcp.app-apply.v1", **asdict(self)})
+        return _hash({"schema": "astrolift.gcp.app-apply.v2", **asdict(self)})
 
 
 class ApplyPhase(StrEnum):
@@ -522,6 +568,7 @@ def compile_app_plan(
     resources: list[dict[str, Any]],
     *,
     identity_sha256: str,
+    placement: PlacementAcceptance | None = None,
 ) -> tuple[CompiledAppPlan, tuple[dict[str, Any], ...]]:
     if type(context) is not GKEObservationContext or not isinstance(resources, list) or not 1 <= len(resources) <= 256:
         raise ApplyError("INVALID_APPLY_PLAN")
@@ -594,7 +641,7 @@ def compile_app_plan(
         descriptor = replace(descriptor, projection_sha256=_hash(projection(body, descriptor)))
         bodies.append(body)
         descriptors.append(descriptor)
-    plan = CompiledAppPlan(execution, identity_sha256, tuple(descriptors))
+    plan = CompiledAppPlan(execution, identity_sha256, tuple(descriptors), placement)
     return plan, tuple(bodies)
 
 
@@ -678,9 +725,18 @@ class GKEAppApply:
     def __exit__(self, *args: Any) -> None:
         self.close()
 
-    def _admit(self, checkpoint: Callable[[], None]) -> Any:
+    def _admit(self, checkpoint: Callable[[], None], placement: PlacementAcceptance | None = None) -> Any:
         _checkpoint(checkpoint)
-        cluster, _ = self.observer._cluster(checkpoint)
+        cluster, pools = self.observer._cluster(
+            checkpoint, accepted_node_pools=placement.allowed_node_pools if placement is not None else None
+        )
+        if placement is not None and (
+            placement.cluster_resource != self.context.cluster_resource
+            or placement.native_cluster_id != cluster.id
+            or placement.autopilot != bool(cluster.autopilot.enabled)
+            or not set(placement.allowed_node_pools) <= set(pools)
+        ):
+            raise ApplyError("ACCEPTED_PLACEMENT_UNAVAILABLE")
         adapter = self.observer._kubernetes_factory(
             cluster.endpoint, cluster.master_auth.cluster_ca_certificate, self.observer._credentials, checkpoint
         )
@@ -689,6 +745,23 @@ class GKEAppApply:
             raise ApplyError("APPLY_IDENTITY_CONFIGURATION_UNOBSERVED")
         _checkpoint(checkpoint)
         return adapter
+
+    def capture_placement(self, plan: CompiledAppPlan, *, checkpoint: Callable[[], None]) -> CompiledAppPlan:
+        """Read native admission before durable acceptance; metadata is not authority."""
+        if type(plan) is not CompiledAppPlan or plan.placement is not None:
+            raise ApplyError("PLACEMENT_ALREADY_ACCEPTED")
+        _checkpoint(checkpoint)
+        cluster, pools = self.observer._cluster(checkpoint, accepted_node_pools=())
+        acceptance = PlacementAcceptance(
+            self.context.cluster_resource,
+            cluster.id,
+            bool(cluster.autopilot.enabled),
+            pools,
+            controller_binding_sha256(plan.execution, plan.identity_sha256, plan.resources),
+        )
+        self._admit(checkpoint, acceptance)
+        _checkpoint(checkpoint)
+        return replace(plan, placement=acceptance)
 
     def _observe(self, body: Any, descriptor: ResourcePlan, uid: str = "", *, desired: bool = True) -> ObservedResource:
         meta = body.get("metadata", {})
@@ -728,8 +801,10 @@ class GKEAppApply:
     ) -> AppApplyReceipt:
         if type(plan) is not CompiledAppPlan or type(ledger) is not ApplyLedger or not callable(checkpoint):
             raise ApplyError("INVALID_APPLY_INPUT")
+        if plan.placement is None:
+            raise ApplyError("PLACEMENT_ACCEPTANCE_REQUIRED")
         compiled, bound = compile_app_plan(
-            self.context, plan.execution, list(bodies), identity_sha256=plan.identity_sha256
+            self.context, plan.execution, list(bodies), identity_sha256=plan.identity_sha256, placement=plan.placement
         )
         if compiled != plan or tuple(bodies) != bound:
             raise ApplyError("APPLY_COMPILED_BYTES_CHANGED")
@@ -756,7 +831,7 @@ class GKEAppApply:
                 pending_path = ledger.pending.resource.path
                 ordered.sort(key=lambda pair: pair[0].path != pending_path)
             for descriptor, body in ordered:
-                adapter = self._admit(checkpoint)
+                adapter = self._admit(checkpoint, plan.placement)
                 prior = rows.get(descriptor.path)
                 pending = ledger.pending
                 rejected_submission = ledger.rejection.intent.submission_id if ledger.rejection else ""
@@ -882,7 +957,7 @@ class GKEAppApply:
                 _checkpoint(checkpoint)
                 if observed.native_projection_sha256 != descriptor.projection_sha256:
                     raise ApplyError("APPLY_ADMISSION_MUTATION_UNREVIEWED")
-                adapter = self._admit(checkpoint)
+                adapter = self._admit(checkpoint, plan.placement)
                 current = self._observe(adapter.request(descriptor), descriptor, observed.uid)
                 _checkpoint(checkpoint)
                 evidence = NativeEvidence(intent, current)
@@ -891,7 +966,7 @@ class GKEAppApply:
                 correlate(receipt)
                 rows[descriptor.path] = current
                 ledger = ApplyLedger(tuple(rows.values()))
-            adapter = self._admit(checkpoint)
+            adapter = self._admit(checkpoint, plan.placement)
             for descriptor in plan.resources:
                 current = self._observe(adapter.request(descriptor), descriptor, rows[descriptor.path].uid)
                 rows[descriptor.path] = current

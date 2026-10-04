@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Protect original GKE incarnation, mode and node-pool placement acceptance before private controller writes; derive runtime targets only from current completed apply records and original controller evidence, preserving the admitted ceiling across node autoscaling and treating unknown DaemonSet counts as pending. Public executor activation remains separate (#2278).
+
 - Stage private receipt-bound GKE controller and ancillary configuration with protected physical ownership, committed send/evidence history, guarded UID/resourceVersion updates and bounded definitive rejection recovery. Keep uncertain sends unresolved and distinguish configuration from rollout; public activation, complete removals, node-pool runtime admission and identity evolution remain separate (#2278).
 - Scope private native execution checkpoints to the actual activity lifetime and cancellation; re-admit callbacks on SDK metadata threads and final source transitions, preserve acknowledged UID evidence after withdrawal, and avoid receipt-lock waits beneath source parents. Full native pipeline activation remains staged (#2278).
 

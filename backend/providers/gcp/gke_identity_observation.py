@@ -403,7 +403,9 @@ class GKEIdentityObserver:
             raise GKEObservationError("OVERSIZED_RESPONSE")
         return value
 
-    def _cluster(self, checkpoint: Callable[[], None]) -> tuple[Any, tuple[str, ...]]:
+    def _cluster(
+        self, checkpoint: Callable[[], None], *, accepted_node_pools: tuple[str, ...] | None = None
+    ) -> tuple[Any, tuple[str, ...]]:
         project_client, cluster_client = self._native(checkpoint)
         context = self.context
         project = self._call(
@@ -431,13 +433,21 @@ class GKEIdentityObserver:
         if (
             not 1 <= len(pools) <= MAX_POOLS
             or len({pool.name for pool in pools}) != len(pools)
-            or any(
-                not _NAME.fullmatch(pool.name) or pool.status != 2 or pool.config.workload_metadata_config.mode != 2
-                for pool in pools
-            )
+            or any(not _NAME.fullmatch(pool.name) for pool in pools)
         ):
             raise GKEObservationError("NODE_CONFIGURATION_UNVERIFIED")
-        return cluster, tuple(sorted(pool.name for pool in pools))
+        eligible = tuple(
+            sorted(pool.name for pool in pools if pool.status == 2 and pool.config.workload_metadata_config.mode == 2)
+        )
+        # None preserves standalone strict admission. Empty captures the current
+        # eligible set; a recorded ceiling admits only those original pools.
+        if accepted_node_pools is None:
+            if len(eligible) != len(pools):
+                raise GKEObservationError("NODE_CONFIGURATION_UNVERIFIED")
+            return cluster, eligible
+        if not eligible or not set(accepted_node_pools) <= set(eligible):
+            raise GKEObservationError("NODE_CONFIGURATION_UNVERIFIED")
+        return cluster, accepted_node_pools or eligible
 
     def _metadata(self, value: dict[str, Any], subject: KSASubject, *, namespace: bool) -> dict[str, Any]:
         metadata = value.get("metadata")

@@ -280,12 +280,13 @@ def resources(kind="Deployment"):
 
 
 def compiled(driver, raw=None, execution=None):
-    return compile_app_plan(
+    plan, bodies = compile_app_plan(
         driver.context,
         execution or ExecutionBinding(str(uuid4()), str(uuid4()), "workflow", "run"),
         raw or resources(),
         identity_sha256="1" * 64,
     )
+    return driver.capture_placement(plan, checkpoint=lambda: None), bodies
 
 
 def test_actual_https_sdk_all_ancillary_configuration_not_rollout(app_native, caplog):
@@ -408,9 +409,10 @@ def test_uid_rv_patch_preserves_external_labels_annotations(app_native):
 def test_invalid_checkpoint_refuses_before_any_native_read(app_native, value):
     driver, state, wire = app_native
     plan, bodies = compiled(driver)
+    before = len(state["requests"]), len(wire.calls), len(state["effects"])
     with pytest.raises(ApplyError):
         MemoryHooks(plan).call(driver, bodies, lambda: value)
-    assert not state["requests"] and not wire.calls and not state["effects"]
+    assert (len(state["requests"]), len(wire.calls), len(state["effects"])) == before
 
 
 @pytest.mark.parametrize("mutation", ["HPA", "zero", "uid", "foreign_sa", "unprepared"])

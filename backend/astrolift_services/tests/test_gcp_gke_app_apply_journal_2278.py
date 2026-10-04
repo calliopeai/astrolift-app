@@ -69,7 +69,7 @@ pytestmark = pytest.mark.django_db(transaction=True)
 
 
 @pytest.fixture
-def bridge(monkeypatch, client, tmp_path):
+def bridge(monkeypatch, client, tmp_path, request):
     w = source_world.__wrapped__(monkeypatch, client, tmp_path)
     gen = tls_fixture.__wrapped__(tmp_path, monkeypatch)
     prep_driver, _, http, wire = next(gen)
@@ -223,6 +223,10 @@ def bridge(monkeypatch, client, tmp_path):
                         },
                     },
                 ]
+                kind = getattr(request, "param", "Deployment")
+                raw[-1]["kind"] = kind
+                if kind == "DaemonSet":
+                    raw[-1]["spec"].pop("replicas")
                 bodies = inject_prepared_identity(raw, identity)
                 execution = ExecutionBinding(
                     str(w.deployment.guid),
@@ -233,13 +237,20 @@ def bridge(monkeypatch, client, tmp_path):
                 w.compiled, w.bodies = compile_app_plan(
                     pinned, execution, bodies, identity_sha256=identity.fingerprint
                 )
+
+                def placement_checkpoint():
+                    prep.validate_current(prep_res, checkpoint=admitted, iam=iam)
+                    iam_store.validate_current(iam_res, checkpoint=lambda c: admitted_iam(w, c))
+                    current(w, None)
+
+                w.compiled = driver.capture_placement(w.compiled, checkpoint=placement_checkpoint)
                 accepted = AcceptedApply(
                     w.compiled, identity, SourceFence.from_original(original), w.execution
                 )
                 w.accepted = accepted
                 http["after_write"] = (
                     lambda m, p: http["objects"][p]["metadata"].update(generation=1)
-                    if http["objects"][p]["kind"] == "Deployment"
+                    if http["objects"][p]["kind"] in ("Deployment", "StatefulSet", "DaemonSet")
                     else None
                 )
                 with app_apply_mutex(
@@ -268,7 +279,7 @@ def current(w, context):
         with admitted_deployment_execution(w.input) as execution:
             assert execution == w.execution
             endpoint_app_checkpoint(w.source_plan)()
-            assert str(context.deployment.guid) == execution.deployment_guid
+            assert str((context.deployment if context else w.deployment).guid) == execution.deployment_guid
 
     w.activity.run(admission)
 
