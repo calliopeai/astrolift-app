@@ -549,7 +549,9 @@ async def main():
     guard = module.SharedModelAuth(endpoint)
     sent = []
     async def send(message): sent.append(message)
-    await guard({"type":"http", "method":"GET", "path":"/metrics", "headers":[(b"authorization", ("Bearer " + snapshot.operator_key).encode())]}, receive, send)
+    scope = {"type":"http", "method":"GET", "path":"/metrics",
+             "headers":[(b"authorization", ("Bearer " + snapshot.operator_key).encode())]}
+    await guard(scope, receive, send)
     assert b"astrolift_model_subscription_info" in sent[-1]["body"]
 asyncio.run(main())
 assert "k8s_native" not in sys.modules and "_sdk" not in sys.modules
