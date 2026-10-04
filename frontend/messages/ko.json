@@ -6036,6 +6036,21 @@
         "queued": "바인딩 조정을 위해 설정이 접수되었습니다. 클라우드 호출은 확인되지 않았습니다.",
         "removed": "로컬 연결이 제거되었습니다. 클라우드 소스는 삭제되지 않았습니다.",
         "restartImpact": "앱의 클라우드 ID 바인딩을 변경하며 앱 재시작이 필요할 수 있습니다. 클라우드 모델을 재시작하거나 할당하지 않습니다."
+      },
+      "common": {
+        "BEDROCK": "Amazon Bedrock",
+        "VERTEX": "Google Vertex AI",
+        "FOUNDRY": "Azure AI Foundry",
+        "UNKNOWN": "알 수 없는 네이티브 계열",
+        "title": "네이티브 연결 메타데이터",
+        "family": "네이티브 계열",
+        "resourceIdentity": "리소스 식별 지문",
+        "reviewedSource": "검토된 소스 지문",
+        "identityHelp": "식별 정보와 검토된 메타데이터는 서로 다른 관측입니다. 어느 것도 네이티브 리소스 인스턴스나 추론 접근을 증명하지 않습니다.",
+        "unavailable": "네이티브 구성을 사용할 수 없습니다. 이 메타데이터는 호스팅, 연결 또는 설정 작업을 활성화하지 않습니다.",
+        "accessUnknown": "추론 접근이 검증되지 않았습니다.",
+        "vertexHelp": "Vertex 예측은 Endpoint 전체와 배포된 모델의 트래픽 구성을 사용합니다. 모델별 라우팅과 접근 격리는 검증되지 않았습니다.",
+        "foundryHelp": "Foundry 앱 접근에는 독립적인 게이트웨이 자격 증명 수명 주기가 필요합니다. 계정 키 메타데이터는 앱별 접근이나 취소를 증명하지 않습니다."
       }
     }
   },

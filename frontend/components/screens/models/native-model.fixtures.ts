@@ -1,28 +1,17 @@
 import type {
   BedrockModelSourceFieldsFragment,
   ClusterModelFieldsFragment,
+  CommonNativeConnectionFieldsFragment,
 } from "@/graphql/__generated__/operations";
 import type { SharedModelListRow } from "./SharedModelsScreen";
 import projections from "./native-model-projection.fixture.json";
 import { sharedModelDetailProps } from "./shared-model-detail.fixtures";
 
 export const nativeSource: BedrockModelSourceFieldsFragment = {
-  identity: {
-    protocol: "BEDROCK",
-    sourceKind: "FOUNDATION_MODEL",
-    accountId: "123456789012",
-    region: "us-east-1",
-    partition: "aws",
-    sourceId: "amazon.titan-text-express-v1",
-    sourceArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-text-express-v1",
-    destinationModelArns: [],
-    sourceFingerprint: "a".repeat(64),
-    metadataObservedAt: "2026-10-04T00:00:00Z",
-    configurationState: "configured",
-    invokeAccess: "unknown",
-  },
-  name: "Titan Text Express",
-  provider: "Amazon",
+  identity: projections.rows.find((row) => row.case === "foundation")!.serializedQueryData
+    .nativeConnection.source as BedrockModelSourceFieldsFragment["identity"],
+  name: "Claude 3 Haiku",
+  provider: "Anthropic",
   inputModalities: ["TEXT"],
   outputModalities: ["TEXT"],
   streaming: true,
@@ -43,6 +32,8 @@ export const nativeModel: ClusterModelFieldsFragment = {
   sourceKind: projections.rows.find((row) => row.case === "foundation")!.serializedQueryData
     .sourceKind,
   nativeSource: nativeSource.identity,
+  nativeConnection: projections.rows.find((row) => row.case === "foundation")!.serializedQueryData
+    .nativeConnection as CommonNativeConnectionFieldsFragment,
   revisionSha: null,
   computeMode: null,
   runtimeSupported: null,
@@ -80,4 +71,18 @@ export const nativeModelRow: SharedModelListRow = {
     memoryRequest: nativeModel.desiredResources.memoryRequest ?? null,
     gpuCount: nativeModel.desiredResources.gpuCount ?? null,
   },
+};
+
+/** Only the four Bedrock rows have persisted HTTP/PG provenance. Other rows
+ * are explicitly unadopted transient Strawberry projections, not registrations. */
+export const projectedNativeModel = (variant: string): ClusterModelFieldsFragment => {
+  const wire = projections.rows.find((row) => row.case === variant)!.serializedQueryData;
+  const connection = wire.nativeConnection as CommonNativeConnectionFieldsFragment;
+  return {
+    ...nativeModel,
+    sourceKind: wire.sourceKind,
+    nativeConnection: connection,
+    nativeSource:
+      connection.source?.__typename === "NativeModelConnectionSource" ? connection.source : null,
+  };
 };

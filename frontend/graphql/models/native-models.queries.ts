@@ -16,6 +16,57 @@ export const NATIVE_MODEL_SOURCE_FIELDS = gql`
     invokeAccess
   }
 `;
+export const COMMON_NATIVE_CONNECTION_FIELDS = gql`
+  fragment CommonNativeConnectionFields on NativeModelConnection {
+    family
+    sourceKind
+    configurationState
+    invokeAccess
+    reason
+    resourceIdentityFingerprint
+    reviewedSourceFingerprint
+    metadataObservedAt
+    source {
+      __typename
+      ... on NativeModelConnectionSource {
+        ...NativeModelSourceFields
+      }
+      ... on VertexEndpointConnectionSource {
+        projectId
+        projectNumber
+        region
+        endpointResourceName
+        deployedModels {
+          deployedModelId
+          modelResourceName
+          modelVersionId
+          trafficPercent
+          machineType
+          minReplicas
+          maxReplicas
+          availableReplicas
+        }
+      }
+      ... on FoundryDeploymentConnectionSource {
+        subscriptionId
+        resourceGroup
+        accountResourceId
+        region
+        accountKind
+        localAuthDisabled
+        deploymentResourceId
+        deploymentName
+        modelFormat
+        modelName
+        modelVersion
+        declaredSku
+        declaredCapacity
+        provisioningState
+      }
+    }
+  }
+  ${NATIVE_MODEL_SOURCE_FIELDS}
+`;
 export const BEDROCK_MODEL_SOURCE_FIELDS = gql`
   fragment BedrockModelSourceFields on BedrockModelSource {
     identity {

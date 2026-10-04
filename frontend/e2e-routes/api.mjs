@@ -60,6 +60,7 @@ const sharedModel = {
   computeMode: "cpu",
   sourceKind: "huggingface",
   nativeSource: null,
+  nativeConnection: null,
   localArtifactId: null,
   localArtifactVersion: null,
   localManifestSha256: null,
@@ -85,24 +86,12 @@ const sharedModel = {
   appliedResources: sharedResources,
 };
 const nativeConnectionId = "99999999-9999-4999-8999-999999999999";
-const nativeSource = {
-  protocol: nativeProjection.nativeSource.protocol,
-  sourceKind: nativeProjection.nativeSource.sourceKind,
-  accountId: "123456789012",
-  region: "us-west-2",
-  partition: "aws",
-  sourceId: "amazon.titan-text-express-v1",
-  sourceArn: "arn:aws:bedrock:us-west-2::foundation-model/amazon.titan-text-express-v1",
-  destinationModelArns: [],
-  sourceFingerprint: "c".repeat(64),
-  metadataObservedAt: observedAt,
-  configurationState: "configured",
-  invokeAccess: "unknown",
-};
+const nativeCommonConnection = nativeProjection.nativeConnection;
+const nativeSource = nativeCommonConnection.source;
 const nativeSourceDetail = {
   identity: nativeSource,
-  name: "Titan Text Express",
-  provider: "Amazon",
+  name: "Claude 3 Haiku",
+  provider: "Anthropic",
   inputModalities: ["TEXT"],
   outputModalities: ["TEXT"],
   streaming: true,
@@ -746,6 +735,7 @@ createServer(async (req, res) => {
               name: input.name,
               sourceKind: nativeProjection.sourceKind,
               nativeSource,
+              nativeConnection: nativeCommonConnection,
               modelRepo: nativeSource.sourceId,
               revisionSha: null,
               computeMode: null,

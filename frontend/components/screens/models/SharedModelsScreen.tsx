@@ -1,8 +1,11 @@
 "use client";
 
 import type { ReactNode } from "react";
-import type { NativeModelSourceFieldsFragment } from "@/graphql/__generated__/operations";
-import { modelSourceMode, validNativeSource } from "./native-model-source";
+import type {
+  CommonNativeConnectionFieldsFragment,
+  NativeModelSourceFieldsFragment,
+} from "@/graphql/__generated__/operations";
+import { modelSourceMode, nativeModelFamily, validNativeSource } from "./native-model-source";
 import Link from "next/link";
 import { BrainCircuitIcon, RocketIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
@@ -32,6 +35,7 @@ export type SharedModelListRow = {
   dedicatedAppSlug?: string | null;
   sourceKind?: string;
   nativeSource?: NativeModelSourceFieldsFragment | null;
+  nativeConnection?: CommonNativeConnectionFieldsFragment | null;
   localManifestSha256?: string | null;
   desiredResources?: {
     cpuRequest: string | null;
@@ -50,6 +54,7 @@ export function SharedModelsScreen({ page, addChoices }: SharedModelsScreenProps
   const connections = useTranslations("models.shared.connections");
   const format = useFormatter();
   const native = useTranslations("models.native.details");
+  const family = useTranslations("models.native.common");
   return (
     <ListPage
       {...page}
@@ -103,9 +108,13 @@ export function SharedModelsScreen({ page, addChoices }: SharedModelsScreenProps
               </span>
               <span
                 className="text-muted-foreground block truncate font-mono text-xs"
-                title={row.modelRepo}
+                title={modelSourceMode(row) === "hosted" ? row.modelRepo : undefined}
               >
-                {row.modelRepo || t("unknown")}
+                {modelSourceMode(row) === "native"
+                  ? row.nativeSource?.sourceId
+                  : modelSourceMode(row) === "hosted"
+                    ? row.modelRepo || t("unknown")
+                    : native("unavailable")}
               </span>
               <span
                 className="text-muted-foreground block truncate font-mono text-xs"
@@ -114,7 +123,9 @@ export function SharedModelsScreen({ page, addChoices }: SharedModelsScreenProps
                     ? row.nativeSource.sourceFingerprint
                     : modelSourceMode(row) === "hosted" && row.sourceKind === "local_artifact"
                       ? row.localManifestSha256
-                      : row.revisionSha) ?? undefined
+                      : modelSourceMode(row) === "hosted"
+                        ? row.revisionSha
+                        : null) ?? undefined
                 }
               >
                 {(modelSourceMode(row) === "native_unavailable"
@@ -123,7 +134,9 @@ export function SharedModelsScreen({ page, addChoices }: SharedModelsScreenProps
                     ? row.nativeSource.sourceFingerprint
                     : modelSourceMode(row) === "hosted" && row.sourceKind === "local_artifact"
                       ? row.localManifestSha256
-                      : row.revisionSha) ?? t("unknownRevision")}
+                      : modelSourceMode(row) === "hosted"
+                        ? row.revisionSha
+                        : null) ?? t("unknownRevision")}
               </span>
             </span>
           ),
@@ -139,7 +152,7 @@ export function SharedModelsScreen({ page, addChoices }: SharedModelsScreenProps
                 : modelSourceMode(row) === "hosted" && row.sourceKind === "huggingface"
                   ? inventory("huggingface")
                   : modelSourceMode(row) === "native_unavailable"
-                    ? `Amazon Bedrock · ${native("unavailable")}`
+                    ? `${family(nativeModelFamily(row) ?? "UNKNOWN")} · ${native("unavailable")}`
                     : inventory("unknownSource"),
         },
         {

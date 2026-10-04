@@ -30,7 +30,7 @@ import {
 } from "./NativeModelSettingsPanel";
 import { isConnectionGuid, useConnectionEpoch } from "./use-model-connection-context";
 import { modelAccessDraft } from "./shared-model-settings";
-import { sameNativeSource, modelSourceMode } from "./native-model-source";
+import { sameNativeConnection, modelSourceMode, nativeModelFamily } from "./native-model-source";
 import { modelWriteFailure } from "./shared-model-write-results";
 type Props = {
   model: ClusterModelFieldsFragment;
@@ -58,6 +58,7 @@ function Context({ model, blocked, onRefresh, onRemoved, onQueued, queuedConfirm
     { user, loading: actorLoading, error: actorError } = useMe();
   const client = useApolloClient();
   const skip =
+    nativeModelFamily(model) !== "BEDROCK" ||
     orgLoading ||
     actorLoading ||
     !!orgError ||
@@ -275,7 +276,7 @@ function Context({ model, blocked, onRefresh, onRemoved, onQueued, queuedConfirm
           fresh.version !== model.version ||
           !["active", "failed"].includes(fresh.status) ||
           modelSourceMode(fresh) !== "native" ||
-          !sameNativeSource(fresh.nativeSource, model.nativeSource)
+          !sameNativeConnection(fresh, model)
         )
           throw new Error(t("changed"));
         setSent(true);
@@ -310,7 +311,7 @@ function Context({ model, blocked, onRefresh, onRemoved, onQueued, queuedConfirm
           data.clusterId !== model.clusterId ||
           data.providerId !== model.providerId ||
           modelSourceMode(data) !== "native" ||
-          !sameNativeSource(data.nativeSource, model.nativeSource) ||
+          !sameNativeConnection(data, model) ||
           data.ready != null ||
           data.runtimeSupported != null ||
           (kind === "update"

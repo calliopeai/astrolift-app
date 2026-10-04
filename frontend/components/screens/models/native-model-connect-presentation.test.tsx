@@ -20,7 +20,12 @@ import { SharedModelsScreen } from "./SharedModelsScreen";
 import { SharedModelDetailScreen } from "./SharedModelDetailScreen";
 import { sharedModelsProps } from "./shared-models.fixtures";
 import { sharedModelDetailProps } from "./shared-model-detail.fixtures";
-import { nativeSource, nativeModel, nativeModelRow } from "./native-model.fixtures";
+import {
+  nativeSource,
+  nativeModel,
+  nativeModelRow,
+  projectedNativeModel,
+} from "./native-model.fixtures";
 
 setProjectAnnotations(preview);
 afterEach(cleanup);
@@ -98,11 +103,20 @@ it.each(Object.entries({ en, es, fr, de, ja, ko, "pt-BR": pt, "zh-Hans": zh }))(
     const view = render(
       <NextIntlClientProvider locale={locale} messages={messages} timeZone="UTC" onError={onError}>
         <SharedModelsScreen
-          page={{ ...sharedModelsProps.page, rows: [{ ...nativeModelRow, nativeSource: null }] }}
+          page={{
+            ...sharedModelsProps.page,
+            rows: [
+              {
+                ...nativeModelRow,
+                nativeSource: null,
+                nativeConnection: projectedNativeModel("withdrawn").nativeConnection,
+              },
+            ],
+          }}
         />
         <SharedModelDetailScreen
           {...sharedModelDetailProps}
-          model={{ ...nativeModel, nativeSource: null }}
+          model={projectedNativeModel("withdrawn")}
           prompt={null}
         />
       </NextIntlClientProvider>

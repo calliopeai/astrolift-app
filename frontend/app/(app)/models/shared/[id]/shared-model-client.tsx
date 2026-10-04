@@ -1,7 +1,12 @@
 "use client";
 import { useState } from "react";
 import type { ClusterModelFieldsFragment } from "@/graphql/__generated__/operations";
-import { sameNativeSource, modelSourceMode } from "@/components/screens/models/native-model-source";
+import {
+  sameNativeConnection,
+  modelSourceMode,
+  nativeModelFamily,
+} from "@/components/screens/models/native-model-source";
+import { NativeConnectionMetadataPanel } from "@/components/screens/models/NativeConnectionMetadataPanel";
 import { NativeModelObservationsPanel } from "@/components/screens/models/NativeModelObservationsPanel";
 import { NativeModelSettingsClient } from "@/components/screens/models/NativeModelSettingsClient";
 import { ModelConnectionPolicyClient } from "@/components/screens/models/ModelConnectionPolicyClient";
@@ -30,15 +35,16 @@ function DetailContext({ id }: { id: string }) {
     settingsReceipt.clusterId === props.model.clusterId &&
     settingsReceipt.providerId === props.model.providerId &&
     settingsReceipt.version === props.model.version &&
-    sameNativeSource(settingsReceipt.nativeSource, props.model.nativeSource)
+    sameNativeConnection(settingsReceipt, props.model)
   );
   const mode = props.model ? modelSourceMode(props.model) : "unsupported";
+  const bedrock = !!props.model && nativeModelFamily(props.model) === "BEDROCK";
   return (
     <SharedModelDetailScreen
       {...props}
       removalConfirmed={removalConfirmed}
       subscriptions={
-        props.model && mode !== "unsupported" ? (
+        props.model && (mode === "hosted" || (bedrock && mode !== "unsupported")) ? (
           <ModelSubscriptionsClient
             model={props.model}
             blocked={props.stale || !!props.error}
@@ -59,7 +65,7 @@ function DetailContext({ id }: { id: string }) {
       management={
         props.model && mode !== "unsupported" ? (
           <>
-            {mode === "native" || mode === "native_unavailable" ? (
+            {bedrock && (mode === "native" || mode === "native_unavailable") ? (
               <NativeModelSettingsClient
                 model={props.model}
                 blocked={props.stale || !!props.error}
@@ -74,11 +80,15 @@ function DetailContext({ id }: { id: string }) {
                 blocked={props.stale || !!props.error}
                 onRefresh={props.onRetry}
               />
-            ) : null}
-            <ModelConnectionPolicyClient
-              model={props.model}
-              blocked={props.stale || !!props.error}
-            />
+            ) : (
+              <NativeConnectionMetadataPanel model={props.model} settings />
+            )}
+            {(mode === "hosted" || bedrock) && (
+              <ModelConnectionPolicyClient
+                model={props.model}
+                blocked={props.stale || !!props.error}
+              />
+            )}
           </>
         ) : null
       }

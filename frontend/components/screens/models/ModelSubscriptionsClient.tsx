@@ -12,7 +12,7 @@ import type { ModelSubscription } from "./ModelSubscriptionsPanel";
 import type { ClusterModelFieldsFragment } from "@/graphql/__generated__/operations";
 import { ModelSubscriptionsPanel } from "./ModelSubscriptionsPanel";
 import { useModelSubscriptions } from "./use-model-subscriptions";
-import { isBedrockModelKind, modelSourceMode } from "./native-model-source";
+import { modelSourceMode } from "./native-model-source";
 export function ModelSubscriptionsClient(props: {
   model: ClusterModelFieldsFragment;
   blocked: boolean;
@@ -30,14 +30,8 @@ function Views(props: {
   const t = useTranslations("models.shared.connections");
   const [adding, setAdding] = useState(false);
   const sourceMode = modelSourceMode(props.model);
-  const canAdd =
-    !props.blocked &&
-    (!isBedrockModelKind(props.model.sourceKind) ||
-      (sourceMode === "native" && props.model.nativeSource?.configurationState === "configured"));
-  const showIntake =
-    adding &&
-    (!isBedrockModelKind(props.model.sourceKind) ||
-      (sourceMode === "native" && props.model.nativeSource?.configurationState === "configured"));
+  const canAdd = !props.blocked && (sourceMode === "hosted" || sourceMode === "native");
+  const showIntake = adding && (sourceMode === "hosted" || sourceMode === "native");
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap gap-2">

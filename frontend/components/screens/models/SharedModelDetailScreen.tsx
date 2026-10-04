@@ -10,7 +10,8 @@ import { DefinitionList } from "@/components/ui/definition-list";
 import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { ClusterModelFieldsFragment } from "@/graphql/__generated__/operations";
-import { modelSourceMode } from "./native-model-source";
+import { modelSourceMode, nativeModelFamily } from "./native-model-source";
+import { NativeConnectionMetadataPanel } from "./NativeConnectionMetadataPanel";
 import { SHARED_MODEL_STATUSES } from "./shared-models-list";
 
 export type SharedModelDetailScreenProps = {
@@ -45,6 +46,7 @@ export function SharedModelDetailScreen({
   const native = useTranslations("models.native.details"),
     connect = useTranslations("models.native.connect");
   const mode = model ? modelSourceMode(model) : "unsupported";
+  const family = useTranslations("models.native.common");
   const unknown = t("unknown");
   const time = (value: string | null | undefined) =>
     value && Number.isFinite(Date.parse(value))
@@ -215,7 +217,11 @@ export function SharedModelDetailScreen({
                           {
                             term: inventory("source"),
                             description: (
-                              <code className="break-all">{model.modelRepo || unknown}</code>
+                              <code className="break-all">
+                                {nativeModelFamily(model)
+                                  ? family(nativeModelFamily(model)!)
+                                  : unknown}
+                              </code>
                             ),
                           },
                           { term: common("status"), description: model.status },
@@ -340,11 +346,13 @@ export function SharedModelDetailScreen({
               />
             </Section>
             {mode === "unsupported" && <p role="status">{native("unsupported")}</p>}
-            {mode === "native_unavailable" && (
-              <Section title={native("title")} description={native("unavailable")}>
-                <p role="status">{connect("accessUnknown")}</p>
-                {model.reason && <p className="break-words">{model.reason}</p>}
-              </Section>
+            {(mode === "native" || mode === "native_unavailable") && (
+              <NativeConnectionMetadataPanel model={model} />
+            )}
+            {mode === "native_unavailable" && model.reason && (
+              <p role="status" className="break-words">
+                {model.reason}
+              </p>
             )}
             {mode === "hosted" && (
               <div className="grid gap-6 lg:grid-cols-2">

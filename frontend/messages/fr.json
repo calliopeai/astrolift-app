@@ -6039,6 +6039,21 @@
         "queued": "Paramètres acceptés pour la réconciliation des liaisons. L’invocation cloud reste non vérifiée.",
         "removed": "Connexion locale supprimée. La source cloud n’a pas été supprimée.",
         "restartImpact": "Cela modifie la liaison d’identité cloud de l’application et peut nécessiter son redémarrage. Le modèle cloud n’est ni redémarré ni alloué."
+      },
+      "common": {
+        "BEDROCK": "Amazon Bedrock",
+        "VERTEX": "Google Vertex AI",
+        "FOUNDRY": "Azure AI Foundry",
+        "UNKNOWN": "Famille native inconnue",
+        "title": "Métadonnées de connexion native",
+        "family": "Famille native",
+        "resourceIdentity": "Empreinte d’identité de la ressource",
+        "reviewedSource": "Empreinte de la source examinée",
+        "identityHelp": "L’identité et les métadonnées examinées sont des observations distinctes. Aucune ne prouve l’instance de la ressource native ni l’accès à l’inférence.",
+        "unavailable": "La configuration native est indisponible. Ces métadonnées n’activent pas les actions d’hébergement, de connexion ou de réglage.",
+        "accessUnknown": "L’accès à l’inférence n’a pas été vérifié.",
+        "vertexHelp": "La prédiction Vertex utilise l’ensemble de l’Endpoint et sa configuration de trafic entre modèles déployés. Le routage et l’isolation des accès par modèle ne sont pas vérifiés.",
+        "foundryHelp": "L’accès des apps à Foundry nécessite un cycle de vie de credentials de passerelle indépendant. Les métadonnées de clé de compte ne prouvent pas l’accès ou la révocation par app."
       }
     }
   },

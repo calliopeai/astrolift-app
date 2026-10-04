@@ -4,6 +4,8 @@
 
 - Add a private signed original-credential reference for native app identity work, rechecking actual browser/session or API-token authority, immutable placement and current RBAC/ABAC. Public dispatch capture and GCP journal/workflow integration remain pending (#2278).
 
+- Render typed native model family metadata in inventory, detail and settings; preserve Bedrock actions only for coherent current source identities, and keep unadopted Vertex/Foundry families read-only without hosted runtime fallbacks (#2269).
+
 - Observe exact Foundry account/deployment metadata through bounded private ARM reads, recheck caller admission, preserve reviewed routing/source fingerprints and suppress native logs/traces. Runtime compatibility, tenant/principal admission and gateway deployment remain separate prerequisites (#2280).
 
 - Observe current GKE project/cluster/workload-pool configuration and original namespace/ServiceAccount UIDs through verified native endpoints and CA. Refuse withdrawn admission or changed identity; workload rollout and impersonation remain unverified (#2278).

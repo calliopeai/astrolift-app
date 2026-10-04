@@ -1,13 +1,16 @@
 import { expect, test, type Page, type BrowserContext } from "@playwright/test";
 import en from "../messages/en.json";
+import projections from "../components/screens/models/native-model-projection.fixture.json";
 
 const api = `http://127.0.0.1:${process.env.ROUTE_API_PORT ?? 6172}`;
 const connectionId = "99999999-9999-4999-8999-999999999999";
 const organizationId = "11111111-1111-4111-8111-111111111111";
 const clusterId = "33333333-3333-4333-8333-333333333333";
 const providerId = "44444444-4444-4444-8444-444444444444";
-const sourceId = "amazon.titan-text-express-v1";
-const sourceArn = `arn:aws:bedrock:us-west-2::foundation-model/${sourceId}`;
+const common = projections.rows.find((row) => row.case === "foundation")!.serializedQueryData
+  .nativeConnection;
+const sourceId = common.source!.sourceId;
+const sourceArn = common.source!.sourceArn;
 const placement = { organizationId, clusterId, expectedProviderId: providerId };
 async function register(page: Page, context: BrowserContext, baseURL: string) {
   expect((await context.request.post(`${api}/observations/reset`)).status()).toBe(204);
@@ -23,7 +26,7 @@ async function register(page: Page, context: BrowserContext, baseURL: string) {
     .getByRole("button", { name: "Controlled shared cluster · shared-fixture", exact: true })
     .click();
   await page.getByRole("button", { name: en.models.native.connect.load, exact: true }).click();
-  await page.getByRole("button", { name: "Titan Text Express", exact: true }).click();
+  await page.getByRole("button", { name: "Claude 3 Haiku", exact: true }).click();
   await expect(page.getByText(sourceArn, { exact: true })).toBeVisible();
   await expect(
     page.getByText(en.models.native.connect.accessUnknown, { exact: true })
@@ -46,8 +49,20 @@ async function register(page: Page, context: BrowserContext, baseURL: string) {
     page.getByRole("heading", { name: "Controlled native connection", exact: true })
   ).toBeVisible();
   await expect(page.getByText(sourceArn, { exact: true })).toBeVisible();
+  const metadata = page.getByRole("region", { name: en.models.native.common.title, exact: true });
   await expect(
-    page.getByText(en.models.native.observations.inferenceUnknown, { exact: true })
+    metadata.getByText(common.resourceIdentityFingerprint!, { exact: true })
+  ).toBeVisible();
+  await expect(
+    metadata.getByText(common.reviewedSourceFingerprint!, { exact: true })
+  ).toBeVisible();
+  await expect(
+    metadata.getByText(en.models.native.common.identityHelp, { exact: true })
+  ).toBeVisible();
+  await expect(
+    page
+      .locator("#model-metrics")
+      .getByText(en.models.native.observations.inferenceUnknown, { exact: true })
   ).toBeVisible();
   await expect(
     page.getByText(en.models.native.observations.trafficUnsupported, { exact: true })
@@ -64,7 +79,7 @@ async function register(page: Page, context: BrowserContext, baseURL: string) {
         expectedProviderVersion: 2,
         sourceKind: "FOUNDATION_MODEL",
         sourceIdentifier: sourceId,
-        sourceFingerprint: "c".repeat(64),
+        sourceFingerprint: common.reviewedSourceFingerprint,
         name: "Controlled native connection",
         allowSubscriptions: true,
         sharingMode: "SHARED",

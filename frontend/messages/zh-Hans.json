@@ -6036,6 +6036,21 @@
         "queued": "设置已接受，等待绑定协调。云调用仍未经验证。",
         "removed": "本地连接已移除。云来源未删除。",
         "restartImpact": "这将改变应用的云身份绑定，可能需要重启应用。不会重启或分配云模型。"
+      },
+      "common": {
+        "BEDROCK": "Amazon Bedrock",
+        "VERTEX": "Google Vertex AI",
+        "FOUNDRY": "Azure AI Foundry",
+        "UNKNOWN": "未知原生系列",
+        "title": "原生连接元数据",
+        "family": "原生系列",
+        "resourceIdentity": "资源身份指纹",
+        "reviewedSource": "已审核来源指纹",
+        "identityHelp": "身份和已审核元数据是不同的观测。两者都不能证明原生资源实例或推理访问权限。",
+        "unavailable": "原生配置不可用。这些元数据不会启用托管、连接或设置操作。",
+        "accessUnknown": "推理访问权限尚未验证。",
+        "vertexHelp": "Vertex 预测使用整个 Endpoint 及其已部署模型的流量配置。单模型路由和访问隔离尚未验证。",
+        "foundryHelp": "Foundry 应用访问需要独立的网关凭证生命周期。账户密钥元数据不能证明应用专属访问或撤销。"
       }
     }
   },
