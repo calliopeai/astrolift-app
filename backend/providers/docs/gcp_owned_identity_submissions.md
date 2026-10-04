@@ -83,3 +83,19 @@ mutex, Temporal/app orchestration, Kubernetes changes, actual impersonation or
 rollout/inference acceptance. Endpoint permission scope remains the whole
 Endpoint. The complete one-KSA/one-GSA mixed-app union, uncertain-send fencing,
 legacy migration and full #2278 acceptance remain open.
+
+## Generated client construction
+
+The private client factory pairs each concrete Resource Manager, IAM Admin and
+Vertex v1beta1 transport with its corresponding generated client. The generated
+`_prep_wrapped_messages` methods accept `ClientInfo` and return `None`; that narrow
+boundary is typed explicitly because the supported SDKs omit its annotations.
+The factory retains fixed public hosts, bounded receive sizes, current admission
+checkpoints and private channels without generated logging interceptors. A failed
+constructor closes its own channel and every already constructed client.
+
+Offline tests use actual generated serializers/clients for the declared minimum
+and installed current SDKs, including constructor failure at each family and
+existing lost-submission, checkpoint, acknowledgement and owned TLS preparation
+controls. These checks establish local compatibility and cleanup, not native IAM
+access, workload readiness or public pipeline activation.
