@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep bearer-authenticated requests from reassigning, refreshing, or reviving an unrelated browser cookie's tracked session; preserve original browser authority across approval requests (#2278).
+
 - Refuse GCP IAM journal row-lock contention without waiting across existing workload writer lock orders; return fixed busy only after rollback, preserve committed receipts and require fresh source/authority on retry (#2278).
 
 - Bind private Endpoint preparation templates to every current environment alias while retaining original physical KSA identity; clarify typed uncertain-send recovery and model detach versus full identity decommission (#2278).

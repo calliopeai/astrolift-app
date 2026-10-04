@@ -5,6 +5,13 @@ for the GCP identity journal. Existing public mutation/workflow contracts do not
 capture these references yet. The module enables no model connection or cloud
 effect on its own.
 
+Bearer authentication and browser-session tracking remain separate. A request
+authenticated by an API token does not create, refresh, reassign, or revive the
+sidecar for any browser cookie it happens to carry. Ordinary browser requests
+and device-session issuance retain their existing tracking behavior. In
+particular, an approver's bearer cannot revive or replace the initiating user's
+tracked browser authority; withdrawn original sessions remain unavailable.
+
 The frozen reference dataclass lives in the Django-independent
 `astrolift_workflows.native_identity_inputs` module. The service module preserves
 its existing import as an alias. Its fields and signed JSON are unchanged; it can
