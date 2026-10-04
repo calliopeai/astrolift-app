@@ -1012,6 +1012,9 @@ def test_real_migration_refuses_retained_journal_and_empty_roundtrip(world, stat
     before = ("astrolift_services", "0037_native_bedrock_connection_owner")
     after = ("astrolift_services", "0038_gcp_workload_identity_journal")
     original_targets = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    # Exercise this migration's exact boundary. Later empty migrations may
+    # legitimately reverse before its guard runs, and are restored finally.
+    MigrationExecutor(connection).migrate([after])
     with journal_mutex(world.target) as store:
         reservation = store.reserve(world.operation, checkpoint=admitted)
         if state == "SENT":

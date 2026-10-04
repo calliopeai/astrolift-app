@@ -115,8 +115,11 @@ source observations remain the integrating caller's responsibility.
 The private IAM journal now stores ownership, committed typed submissions and
 operation fences. Separate GKE observer and preparation ports check current native
 cluster/pool configuration and original namespace/KSA UIDs, and prepare subjects
-through committed hook receipts. Their provider tests do not establish backend
-preparation durability or a deployed workflow. See the
+through committed hook receipts. The separate private
+[preparation journal](gcp-gke-preparation-journal.md) retains accepted templates,
+original authority and committed object observations, then rechecks actual IAM
+completion before annotation. Its backend tests establish those commit boundaries;
+they do not establish a deployed workflow. See the
 [GKE preparation contract](../../backend/providers/docs/gcp_gke_identity_preparation.md).
 
 The pure schema-2 `AcceptedPreparationTemplate` retains every current environment
@@ -176,8 +179,25 @@ template and original authority in the accepted operation, retain prior unknown
 sends, and run the separate source and DB checkpoints in the real deployment
 workflow. This internal seam adds no public dispatch/API or connection capability.
 
+### Current workload observations
+
+The private [GKE runtime observer](../../backend/providers/docs/gcp_gke_identity_runtime.md)
+checks original Deployment, StatefulSet, DaemonSet, ReplicaSet, Job and CronJob
+controller UIDs, current revisions, exact execution templates and placement.
+Bounded reads follow owned controllers to current Ready Pods and Ready Nodes,
+checking original KSA identity and admitted GKE pool/location metadata. Completed
+Jobs have a separate execution observation; a CronJob schedule alone is not
+evidence of a running or completed job.
+
+Sequential node provider IDs and pool labels are configuration evidence, not
+cryptographic node membership. The current KSA UID and name do not verify the
+Pod token's issuer or UID claims. The observer performs no apply, token exchange
+or inference; `impersonation_verified` and `inference_verified` remain false.
+Production deployment must bind these observations to its exact accepted and
+applied workload records before treating them as rollout evidence.
+
 These foundations do not complete #2278 or expose native Vertex connections in
-the UI/API. Backend preparation storage, public original-caller capture,
+the UI/API. Public original-caller capture,
 consumption of the accepted Endpoint-only app plan, subscription orchestration,
 receipt-bound rendering, rollout, actual token exchange and inference still
 require integration. Complete mixed-service unions and GSA/custom-role creation

@@ -23,18 +23,23 @@ the current alias list or permission evidence. The separate per-operation
 schema-2 `AcceptedPreparationTemplate` groups all current environment GUIDs by
 physical namespace/KSA name; each alias requires current source and authority
 checks. Adding or removing an alias cannot replace the original KSA UID or GSA.
-The pure template is available; durable preparation history and its production
-consumer remain separate integration work.
+The private [preparation journal](gcp-gke-preparation-journal.md) now retains that
+template and the original signed authority separately for each accepted operation.
+Its real deployment consumer remains separate integration work.
 
 ## Committed write protocol
 
 1. Refuse an enclosing Django transaction or disabled autocommit. Acquire a
    nonblocking session advisory mutex on a separate PostgreSQL connection. This
    connection only locks; it never reads or writes parent/journal rows.
-2. In the normal Django connection, take short canonical parent-first locks:
+2. In the normal Django connection, take short canonical parent-first NOWAIT locks:
    organization, cluster, provider, current team/project, app, journal. Recheck
    coherent ownership and invoke the mandatory current-authority/source callback
-   after the final lock. Reserve the original operation and commit.
+   after the final lock. Reserve the original operation and commit. PostgreSQL
+   lock-unavailable `55P03` rolls back the transaction before returning fixed
+   `JOURNAL_BUSY`. Re-admit current authority and sources before retrying. This
+   avoids waiting across existing app/environment-to-cluster writer orders;
+   it does not promise bounded connection or DDL waits.
 3. The native port supplies a typed UNSENT submission. Persist its exact
    resource, before/after/etag and desired-union hashes plus bounded owned grants;
    return the committed journal GUID/version and ledger digest.

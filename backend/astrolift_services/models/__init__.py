@@ -1,4 +1,8 @@
 from astrolift_services.models.email_event import EmailEvent, EmailEventKind
+from astrolift_services.models.gcp_gke_preparation_journal import (
+    GCPGKEPreparationJournal,
+    GCPGKEPreparationOperation,
+)
 from astrolift_services.models.gcp_workload_identity_journal import GCPWorkloadIdentityJournal
 from astrolift_services.models.hugging_face_connection import HuggingFaceConnection
 from astrolift_services.models.local_model_artifact import LocalModelArtifact
@@ -26,6 +30,8 @@ from astrolift_services.models.workload_identity_grant import (
 )
 
 __all__ = [
+    "GCPGKEPreparationJournal",
+    "GCPGKEPreparationOperation",
     "GCPWorkloadIdentityJournal",
     "ModelConnectionApproval",
     "ModelConnectionPolicy",
