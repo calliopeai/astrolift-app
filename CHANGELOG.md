@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Add an internal existing-UAMI Azure reconciliation port with real MSI7 clients,
+  current subscription/tenant/native owner checks, bounded federation/grant union
+  inventories and foreign-preserving removal. Keep legacy ambient writes refused,
+  sanitize native errors, and distinguish observed ARM configuration from pending
+  AKS rollout/token acceptance. UAMI creation and app integration remain separate
+  prerequisites (#2279, #2269).
+
 - Add internal read-only Vertex Endpoint and registered Model catalogues with
   repeated ACTIVE project ID/number mapping, fixed regional native clients,
   bounded metadata/pagination and safe diagnostics. Preserve literal version
