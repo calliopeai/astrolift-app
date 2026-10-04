@@ -5859,8 +5859,7 @@
         "appsEmptyHelp": "Apps need a live environment on this deployment’s cluster.",
         "sharingHelp": "Shared models accept subscriptions from multiple apps. Dedicated models accept only the selected app. Revoke incompatible subscriptions and confirm reconciliation before changing access.",
         "immutableSource": "Model source, cluster and compute mode are preserved when editing settings.",
-        "chooseDedicatedApp": "Choose a current app before reviewing dedicated access.",
-        "nativeConnectionHelp": "Native app bindings use cloud identity. Applied binding revisions do not verify model inference access."
+        "chooseDedicatedApp": "Choose a current app before reviewing dedicated access."
       },
       "usability": {
         "nextStep": "Finish setup to review hosting",
@@ -6057,6 +6056,41 @@
         "trafficUnsupported": "Native model traffic and latency observations are not supported here. Missing observations do not mean zero traffic.",
         "tokensCost": "Tokens and cost",
         "tokensCostUnsupported": "Token usage and cost observations are not supported here."
+      },
+      "bindingHelp": "Native app bindings use cloud identity. Applied binding revisions do not verify model inference access.",
+      "connect": {
+        "steps": "Connection steps",
+        "placementStep": "Provider and cluster",
+        "sourceStep": "Choose a source",
+        "reviewStep": "Review connection",
+        "availability": "Connection availability",
+        "readFailed": "Could not verify the connection",
+        "provider": "Provider",
+        "region": "Region",
+        "clustersEmpty": "Choose a current cluster to verify its registered cloud source.",
+        "bounded": "Discovery returns at most {limit} sources. Exact ID or ARN lookup remains available.",
+        "foundation": "Foundation models",
+        "profile": "Inference profiles",
+        "load": "Load sources",
+        "returned": "{count} sources returned",
+        "partial": "Some metadata reads failed; this list is incomplete.",
+        "truncated": "The result limit was reached. Use an exact ID or ARN to inspect another source.",
+        "catalogue": "Native model sources",
+        "empty": "No sources returned",
+        "exactHelp": "Inspect an exact model or profile ID or ARN. This does not invoke or allocate a model.",
+        "exact": "Source ID or ARN",
+        "inspect": "Inspect source",
+        "account": "AWS account",
+        "fingerprint": "Source fingerprint",
+        "accessUnknown": "Invoke access is unverified. Registration does not prove inference readiness.",
+        "name": "Connection name",
+        "review": "Review connection",
+        "registerHelp": "Register immutable source metadata locally. No model is allocated, invoked or made inference-ready.",
+        "registered": "Connection registered. Invoke access remains unverified.",
+        "register": "Register connection",
+        "unconfirmed": "The write outcome is unconfirmed. Refresh the model inventory before retrying; do not submit another registration blindly.",
+        "clusterSearch": "Search clusters",
+        "changed": "The reviewed source or placement changed. Read it again before continuing."
       }
     }
   },

@@ -5782,8 +5782,7 @@
         "appsEmptyHelp": "Las aplicaciones necesitan un entorno activo en el clúster de este despliegue.",
         "sharingHelp": "Los modelos compartidos aceptan suscripciones de varias aplicaciones. Los modelos dedicados solo aceptan la aplicación seleccionada. Revoca las suscripciones incompatibles y confirma la reconciliación antes de cambiar el acceso.",
         "immutableSource": "El origen del modelo, el clúster y el modo de cómputo se mantienen al editar la configuración.",
-        "chooseDedicatedApp": "Elige una aplicación vigente antes de revisar el acceso dedicado.",
-        "nativeConnectionHelp": "Los enlaces de aplicaciones nativas usan identidad en la nube. Las revisiones aplicadas no verifican el acceso a la inferencia del modelo."
+        "chooseDedicatedApp": "Elige una aplicación vigente antes de revisar el acceso dedicado."
       },
       "usability": {
         "nextStep": "Completa la configuración para revisar el alojamiento",
@@ -5980,6 +5979,41 @@
         "trafficUnsupported": "Aquí no se admiten observaciones de tráfico ni latencia de modelos nativos. La ausencia de observaciones no significa tráfico cero.",
         "tokensCost": "Tokens y coste",
         "tokensCostUnsupported": "Aquí no se admiten observaciones del uso de tokens ni del coste."
+      },
+      "bindingHelp": "Los enlaces de aplicaciones nativas usan identidad en la nube. Las revisiones aplicadas no verifican el acceso a la inferencia del modelo.",
+      "connect": {
+        "steps": "Pasos de conexión",
+        "placementStep": "Proveedor y clúster",
+        "sourceStep": "Elegir fuente",
+        "reviewStep": "Revisar conexión",
+        "availability": "Disponibilidad de conexión",
+        "readFailed": "No se pudo verificar la conexión",
+        "provider": "Proveedor",
+        "region": "Región",
+        "clustersEmpty": "Elige un clúster actual para verificar su fuente de nube registrada.",
+        "bounded": "La búsqueda devuelve como máximo {limit} fuentes. Puedes consultar un ID o ARN exacto.",
+        "foundation": "Modelos base",
+        "profile": "Perfiles de inferencia",
+        "load": "Cargar fuentes",
+        "returned": "{count} fuentes devueltas",
+        "partial": "Algunas lecturas de metadatos fallaron; esta lista está incompleta.",
+        "truncated": "Se alcanzó el límite. Usa un ID o ARN exacto para inspeccionar otra fuente.",
+        "catalogue": "Fuentes de modelos nativos",
+        "empty": "No se devolvieron fuentes",
+        "exactHelp": "Inspecciona un ID o ARN exacto de modelo o perfil. No se invoca ni asigna ningún modelo.",
+        "exact": "ID o ARN de fuente",
+        "inspect": "Inspeccionar fuente",
+        "account": "Cuenta de AWS",
+        "fingerprint": "Huella de la fuente",
+        "accessUnknown": "El acceso de invocación no está verificado. El registro no demuestra disponibilidad para inferencia.",
+        "name": "Nombre de conexión",
+        "review": "Revisar conexión",
+        "registerHelp": "Registra metadatos inmutables de la fuente localmente. No se asigna ni invoca ningún modelo, ni se habilita la inferencia.",
+        "registered": "Conexión registrada. El acceso de invocación sigue sin verificarse.",
+        "register": "Registrar conexión",
+        "unconfirmed": "El resultado de escritura no está confirmado. Actualiza el inventario antes de reintentar; no envíes otro registro a ciegas.",
+        "clusterSearch": "Buscar clústeres",
+        "changed": "La fuente o ubicación revisada cambió. Vuelve a leerla antes de continuar."
       }
     }
   },

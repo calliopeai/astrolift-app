@@ -5782,8 +5782,7 @@
         "appsEmptyHelp": "Apps benötigen eine aktive Umgebung auf dem Cluster dieser Bereitstellung.",
         "sharingHelp": "Gemeinsam genutzte Modelle akzeptieren Abonnements mehrerer Apps. Dedizierte Modelle akzeptieren nur die ausgewählte App. Widerrufen Sie inkompatible Abonnements und bestätigen Sie den Abgleich, bevor Sie den Zugriff ändern.",
         "immutableSource": "Modellquelle, Cluster und Rechenmodus bleiben beim Bearbeiten der Einstellungen erhalten.",
-        "chooseDedicatedApp": "Wählen Sie eine aktuell verfügbare App aus, bevor Sie den dedizierten Zugriff prüfen.",
-        "nativeConnectionHelp": "Native App-Bindungen verwenden Cloud-Identitäten. Angewendete Bindungsrevisionen prüfen keinen Inferenzzugriff auf das Modell."
+        "chooseDedicatedApp": "Wählen Sie eine aktuell verfügbare App aus, bevor Sie den dedizierten Zugriff prüfen."
       },
       "usability": {
         "nextStep": "Schließen Sie die Einrichtung ab, um das Hosting zu prüfen",
@@ -5980,6 +5979,41 @@
         "trafficUnsupported": "Beobachtungen zu Verkehr und Latenz nativer Modelle werden hier nicht unterstützt. Fehlende Beobachtungen bedeuten nicht, dass kein Verkehr vorliegt.",
         "tokensCost": "Tokens und Kosten",
         "tokensCostUnsupported": "Beobachtungen zur Token-Nutzung und zu Kosten werden hier nicht unterstützt."
+      },
+      "bindingHelp": "Native App-Bindungen verwenden Cloud-Identitäten. Angewendete Bindungsrevisionen prüfen keinen Inferenzzugriff auf das Modell.",
+      "connect": {
+        "steps": "Verbindungsschritte",
+        "placementStep": "Anbieter und Cluster",
+        "sourceStep": "Quelle auswählen",
+        "reviewStep": "Verbindung prüfen",
+        "availability": "Verbindungsverfügbarkeit",
+        "readFailed": "Verbindung konnte nicht überprüft werden",
+        "provider": "Anbieter",
+        "region": "Region",
+        "clustersEmpty": "Wähle einen aktuellen Cluster, um seine registrierte Cloud-Quelle zu prüfen.",
+        "bounded": "Die Suche liefert höchstens {limit} Quellen. Eine genaue ID oder ARN kann weiterhin geprüft werden.",
+        "foundation": "Basismodelle",
+        "profile": "Inferenzprofile",
+        "load": "Quellen laden",
+        "returned": "{count} Quellen zurückgegeben",
+        "partial": "Einige Metadaten konnten nicht gelesen werden; die Liste ist unvollständig.",
+        "truncated": "Das Limit wurde erreicht. Prüfe eine andere Quelle mit ihrer genauen ID oder ARN.",
+        "catalogue": "Native Modellquellen",
+        "empty": "Keine Quellen zurückgegeben",
+        "exactHelp": "Prüfe eine genaue Modell- oder Profil-ID oder ARN. Es wird kein Modell aufgerufen oder bereitgestellt.",
+        "exact": "Quell-ID oder ARN",
+        "inspect": "Quelle prüfen",
+        "account": "AWS-Konto",
+        "fingerprint": "Quell-Fingerabdruck",
+        "accessUnknown": "Der Aufrufzugriff ist ungeprüft. Die Registrierung belegt keine Inferenzbereitschaft.",
+        "name": "Verbindungsname",
+        "review": "Verbindung prüfen",
+        "registerHelp": "Unveränderliche Quellmetadaten lokal registrieren. Kein Modell wird bereitgestellt, aufgerufen oder für Inferenz freigegeben.",
+        "registered": "Verbindung registriert. Der Aufrufzugriff bleibt ungeprüft.",
+        "register": "Verbindung registrieren",
+        "unconfirmed": "Das Schreibergebnis ist unbestätigt. Aktualisiere das Inventar vor einem erneuten Versuch; registriere nicht erneut ohne Prüfung.",
+        "clusterSearch": "Cluster suchen",
+        "changed": "Die geprüfte Quelle oder Platzierung hat sich geändert. Lies sie vor dem Fortfahren erneut."
       }
     }
   },

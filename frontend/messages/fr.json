@@ -5782,8 +5782,7 @@
         "appsEmptyHelp": "Les applications doivent avoir un environnement actif sur le cluster de ce déploiement.",
         "sharingHelp": "Les modèles partagés acceptent les abonnements de plusieurs applications. Les modèles dédiés acceptent uniquement l’application sélectionnée. Révoquez les abonnements incompatibles et confirmez la réconciliation avant de modifier l’accès.",
         "immutableSource": "La source du modèle, le cluster et le mode de calcul sont conservés lors de la modification des paramètres.",
-        "chooseDedicatedApp": "Choisissez une application actuelle avant de vérifier l’accès dédié.",
-        "nativeConnectionHelp": "Les liaisons des applications natives utilisent l’identité cloud. Les révisions appliquées ne vérifient pas l’accès à l’inférence du modèle."
+        "chooseDedicatedApp": "Choisissez une application actuelle avant de vérifier l’accès dédié."
       },
       "usability": {
         "nextStep": "Terminez la configuration pour vérifier l’hébergement",
@@ -5980,6 +5979,41 @@
         "trafficUnsupported": "Les observations du trafic et de la latence des modèles natifs ne sont pas prises en charge ici. Leur absence ne signifie pas un trafic nul.",
         "tokensCost": "Tokens et coût",
         "tokensCostUnsupported": "Les observations de l’utilisation des tokens et du coût ne sont pas prises en charge ici."
+      },
+      "bindingHelp": "Les liaisons des applications natives utilisent l’identité cloud. Les révisions appliquées ne vérifient pas l’accès à l’inférence du modèle.",
+      "connect": {
+        "steps": "Étapes de connexion",
+        "placementStep": "Fournisseur et cluster",
+        "sourceStep": "Choisir une source",
+        "reviewStep": "Vérifier la connexion",
+        "availability": "Disponibilité de la connexion",
+        "readFailed": "Impossible de vérifier la connexion",
+        "provider": "Fournisseur",
+        "region": "Région",
+        "clustersEmpty": "Choisissez un cluster actuel pour vérifier sa source cloud enregistrée.",
+        "bounded": "La découverte renvoie au maximum {limit} sources. La recherche par ID ou ARN exact reste disponible.",
+        "foundation": "Modèles de base",
+        "profile": "Profils d’inférence",
+        "load": "Charger les sources",
+        "returned": "{count} sources renvoyées",
+        "partial": "Certaines lectures de métadonnées ont échoué ; cette liste est incomplète.",
+        "truncated": "La limite est atteinte. Utilisez un ID ou ARN exact pour inspecter une autre source.",
+        "catalogue": "Sources de modèles natifs",
+        "empty": "Aucune source renvoyée",
+        "exactHelp": "Inspectez un ID ou ARN exact de modèle ou profil. Aucun modèle n’est invoqué ni alloué.",
+        "exact": "ID ou ARN de la source",
+        "inspect": "Inspecter la source",
+        "account": "Compte AWS",
+        "fingerprint": "Empreinte de la source",
+        "accessUnknown": "L’accès à l’invocation n’est pas vérifié. L’enregistrement ne prouve pas la disponibilité de l’inférence.",
+        "name": "Nom de la connexion",
+        "review": "Vérifier la connexion",
+        "registerHelp": "Enregistrez localement des métadonnées immuables. Aucun modèle n’est alloué, invoqué ou rendu prêt pour l’inférence.",
+        "registered": "Connexion enregistrée. L’accès à l’invocation reste non vérifié.",
+        "register": "Enregistrer la connexion",
+        "unconfirmed": "Le résultat de l’écriture est incertain. Actualisez l’inventaire avant de réessayer ; ne répétez pas l’enregistrement sans vérification.",
+        "clusterSearch": "Rechercher des clusters",
+        "changed": "La source ou le placement vérifié a changé. Relisez-le avant de continuer."
       }
     }
   },

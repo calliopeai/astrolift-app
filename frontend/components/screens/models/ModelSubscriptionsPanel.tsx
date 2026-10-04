@@ -123,6 +123,7 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
   const targetsError = Boolean(targets.error);
   const t = useTranslations("models.shared.subscriptions");
   const inventory = useTranslations("models.shared.inventory");
+  const native = useTranslations("models.native");
   const confirmedPage = !subscriptions.loading && !subscriptions.stale && !subscriptions.error;
   const visibleApps = confirmedPage
     ? [...new Set(subscriptions.rows.map((row) => row.appSlug))]
@@ -274,7 +275,7 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
         {t("restartImpact")}
       </p>
       {!deployment.subscriptionsEnabled && <p role="status">{t("subscriptionsDisabled")}</p>}
-      {deployment.nativeConnection && <p role="status">{inventory("nativeConnectionHelp")}</p>}
+      {deployment.nativeConnection && <p role="status">{native("bindingHelp")}</p>}
       {!deployment.nativeConnection && deployment.runtimeAdmission !== "configured" && (
         <p role="status">
           {t(

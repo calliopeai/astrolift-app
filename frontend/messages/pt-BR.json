@@ -5779,8 +5779,7 @@
         "appsEmptyHelp": "Os aplicativos precisam de um ambiente ativo no cluster desta implantação.",
         "sharingHelp": "Modelos compartilhados aceitam assinaturas de vários aplicativos. Modelos dedicados aceitam apenas o aplicativo selecionado. Revogue assinaturas incompatíveis e confirme a reconciliação antes de alterar o acesso.",
         "immutableSource": "A origem do modelo, o cluster e o modo de computação são preservados ao editar as configurações.",
-        "chooseDedicatedApp": "Escolha um aplicativo disponível atualmente antes de revisar o acesso dedicado.",
-        "nativeConnectionHelp": "As vinculações de aplicativos nativos usam identidade na nuvem. As revisões aplicadas não verificam o acesso à inferência do modelo."
+        "chooseDedicatedApp": "Escolha um aplicativo disponível atualmente antes de revisar o acesso dedicado."
       },
       "usability": {
         "nextStep": "Conclua a configuração para revisar a hospedagem",
@@ -5977,6 +5976,41 @@
         "trafficUnsupported": "As observações de tráfego e latência de modelos nativos não são compatíveis aqui. A ausência de observações não significa tráfego zero.",
         "tokensCost": "Tokens e custo",
         "tokensCostUnsupported": "As observações de uso de tokens e custo não são compatíveis aqui."
+      },
+      "bindingHelp": "As vinculações de aplicativos nativos usam identidade na nuvem. As revisões aplicadas não verificam o acesso à inferência do modelo.",
+      "connect": {
+        "steps": "Etapas da conexão",
+        "placementStep": "Provedor e cluster",
+        "sourceStep": "Escolher origem",
+        "reviewStep": "Revisar conexão",
+        "availability": "Disponibilidade da conexão",
+        "readFailed": "Não foi possível verificar a conexão",
+        "provider": "Provedor",
+        "region": "Região",
+        "clustersEmpty": "Escolha um cluster atual para verificar sua origem de nuvem registrada.",
+        "bounded": "A descoberta retorna no máximo {limit} origens. A consulta por ID ou ARN exato continua disponível.",
+        "foundation": "Modelos base",
+        "profile": "Perfis de inferência",
+        "load": "Carregar origens",
+        "returned": "{count} origens retornadas",
+        "partial": "Algumas leituras de metadados falharam; esta lista está incompleta.",
+        "truncated": "O limite foi atingido. Use um ID ou ARN exato para inspecionar outra origem.",
+        "catalogue": "Origens de modelos nativos",
+        "empty": "Nenhuma origem retornada",
+        "exactHelp": "Inspecione um ID ou ARN exato de modelo ou perfil. Nenhum modelo é invocado ou alocado.",
+        "exact": "ID ou ARN da origem",
+        "inspect": "Inspecionar origem",
+        "account": "Conta AWS",
+        "fingerprint": "Impressão digital da origem",
+        "accessUnknown": "O acesso de invocação não foi verificado. O registro não comprova prontidão para inferência.",
+        "name": "Nome da conexão",
+        "review": "Revisar conexão",
+        "registerHelp": "Registre metadados imutáveis da origem localmente. Nenhum modelo é alocado, invocado ou preparado para inferência.",
+        "registered": "Conexão registrada. O acesso de invocação continua não verificado.",
+        "register": "Registrar conexão",
+        "unconfirmed": "O resultado da gravação não foi confirmado. Atualize o inventário antes de tentar novamente; não repita o registro sem verificar.",
+        "clusterSearch": "Pesquisar clusters",
+        "changed": "A origem ou o posicionamento revisado mudou. Leia novamente antes de continuar."
       }
     }
   },

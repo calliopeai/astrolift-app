@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add a common cloud-model connection wizard with fresh versioned placement and
+  exact source review, bounded native discovery, and synchronous metadata-only
+  registration. Preserve unknown invocation access and refuse blind write retries
+  or stale actor/organization reviews (#2269).
+
 - Add native Bedrock source query contracts and immutable registration outcome
   guards. Keep app binding reconciliation separate from runtime/inference proof,
   and suppress hosted-runtime usage queries for native connections (#2269).

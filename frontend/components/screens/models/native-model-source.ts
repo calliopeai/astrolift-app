@@ -85,6 +85,7 @@ export const nativeRegistrationResult = (
   if (failure) return { accepted: false, message: failure };
   if (
     !data?.id ||
+    !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(data.id) ||
     data.organizationId !== request.organizationId ||
     data.clusterId !== request.clusterId ||
     data.providerId !== request.expectedProviderId ||
