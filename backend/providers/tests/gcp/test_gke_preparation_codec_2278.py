@@ -7,7 +7,8 @@ import pytest
 
 from gcp.gke_identity_preparation import GKEPreparationLedger, PreparedObject, preparation_target_sha256
 from gcp.gke_preparation_codec import preparation_ledger_from_payload, preparation_ledger_payload
-from tests.gcp.test_gke_identity_observation_2278 import CONTEXT, SUBJECT
+
+from .test_gke_identity_observation_2278 import CONTEXT, SUBJECT
 
 
 def ledger():

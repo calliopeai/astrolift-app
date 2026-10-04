@@ -24,7 +24,8 @@ from gcp.gke_identity_preparation import (
     VerifiedIAMConfigurationReceipt,
     preparation_target_sha256,
 )
-from tests.gcp.test_gke_identity_observation_2278 import CONTEXT, IDENTITY, SUBJECT, Wire, obj
+
+from .test_gke_identity_observation_2278 import CONTEXT, IDENTITY, SUBJECT, Wire, obj
 
 OPERATION = "12345678-0000-4000-8000-000000000006"
 JOURNAL = "12345678-0000-4000-8000-000000000007"

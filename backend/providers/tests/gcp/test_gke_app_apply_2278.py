@@ -28,8 +28,9 @@ from gcp.gke_app_apply import (
 )
 from gcp.gke_identity_observation import GKEObservationContext
 from gcp.gke_identity_preparation import GKEIdentityPreparation, PreparationPhase
-from tests.gcp.test_gke_identity_observation_2278 import CONTEXT, SUBJECT, Wire, obj
-from tests.gcp.test_gke_identity_preparation_2278 import BLANK, TOKEN, Store
+
+from .test_gke_identity_observation_2278 import CONTEXT, SUBJECT, Wire, obj
+from .test_gke_identity_preparation_2278 import BLANK, TOKEN, Store
 
 
 class MemoryHooks:
