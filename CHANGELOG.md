@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Record the exact native Bedrock owner-constraint replacement in the migration ratchet with PostgreSQL row-preservation and downgrade/refusal proof; retain required migration review and forward-schema rollback guidance (#2269).
+
 - Add a private typed GCP IAM submission hook with exact UNSENT/SENT commit receipts, bounded partial-outcome evidence and guarded recovery; refuse unsent ownership adoption and blind resends after uncertainty. Durable backend journal and app orchestration remain separate prerequisites (#2278).
 
 - Add a private signed original-credential reference for native app identity work, rechecking actual browser/session or API-token authority, immutable placement and current RBAC/ABAC. Public dispatch capture and GCP journal/workflow integration remain pending (#2278).
