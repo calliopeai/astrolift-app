@@ -4,6 +4,8 @@ import { expect, userEvent, within } from "storybook/test";
 import fr from "@/messages/fr.json";
 import ja from "@/messages/ja.json";
 import { SharedModelDetailScreen } from "./SharedModelDetailScreen";
+import { nativeModel } from "./native-model.fixtures";
+import { NativeModelObservationsPanel } from "./NativeModelObservationsPanel";
 import { sharedModelDetailProps } from "./shared-model-detail.fixtures";
 const meta = {
   title: "Screens/Models/SharedModelDetailScreen",
@@ -116,5 +118,27 @@ export const LocalSourceSettings: Story = {
       computeMode: "cpu",
     },
     management: <section id="model-settings">Local-source resource settings</section>,
+  },
+};
+
+export const NativeConnection: Story = {
+  args: {
+    ...sharedModelDetailProps,
+    model: nativeModel,
+    prompt: null,
+    observations: <NativeModelObservationsPanel />,
+    management: null,
+  },
+};
+
+export const NativeMetadataUnavailable: Story = {
+  args: {
+    ...sharedModelDetailProps,
+    model: {
+      ...nativeModel,
+      nativeSource: null,
+      reason: "Native source declaration is unavailable",
+    },
+    prompt: null,
   },
 };

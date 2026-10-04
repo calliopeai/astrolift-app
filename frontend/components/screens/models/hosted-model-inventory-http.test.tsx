@@ -108,7 +108,28 @@ beforeEach(async () => {
       } as Request;
       expect(validate(schema, parse(request.query))).toEqual([]);
       requests.push(request);
-      handler(request);
+      if (["GetModelHostingAction", "GetBedrockModelSupport"].includes(request.operationName)) {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end(
+          JSON.stringify({
+            data:
+              request.operationName === "GetModelHostingAction"
+                ? {
+                    modelHostingAction: {
+                      allowed: false,
+                      reason: "Controlled read-only hosting scope",
+                    },
+                  }
+                : {
+                    bedrockModelConnectionSupport: {
+                      enabled: false,
+                      allowed: false,
+                      reason: "Native connections disabled",
+                    },
+                  },
+          })
+        );
+      } else handler(request);
     });
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -128,6 +149,8 @@ afterEach(async () => {
   server.closeAllConnections();
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
+const inventoryRequests = () =>
+  requests.filter((row) => row.operationName === "ListClusterModelsPage");
 describe("hosted model routes over real owned HTTP", () => {
   it("shows immutable local source and requested CPU resources, pages, and links exact deployment", async () => {
     render(<ModelsClient />, { wrapper });
@@ -148,28 +171,28 @@ describe("hosted model routes over real owned HTTP", () => {
     async (binding) => {
       handler = () => {};
       const view = render(<ModelsClient />, { wrapper });
-      await waitFor(() => expect(requests).toHaveLength(1));
-      const first = requests[0];
+      await waitFor(() => expect(inventoryRequests()).toHaveLength(1));
+      const first = inventoryRequests()[0];
       if (binding === "actor") scope.actor = "actor-two";
       else scope.org = "org-two";
       view.rerender(<ModelsClient />);
-      await waitFor(() => expect(requests).toHaveLength(2));
+      await waitFor(() => expect(inventoryRequests()).toHaveLength(2));
       if (binding === "actor") scope.actor = "actor-one";
       else scope.org = "org-one";
       view.rerender(<ModelsClient />);
-      await waitFor(() => expect(requests).toHaveLength(3));
+      await waitFor(() => expect(inventoryRequests()).toHaveLength(3));
       await act(async () => {
-        reply(requests[2], "Current model");
+        reply(inventoryRequests()[2], "Current model");
       });
       await screen.findByText("Current model");
       await act(async () => {
         reply(first, "Withdrawn model");
-        reply(requests[1], "Other context model");
+        reply(inventoryRequests()[1], "Other context model");
       });
       expect(screen.queryByText("Withdrawn model")).not.toBeInTheDocument();
       expect(screen.queryByText("Other context model")).not.toBeInTheDocument();
       expect(screen.getByText("Current model")).toBeInTheDocument();
-      expect(requests.map((request) => request.actor)).toEqual(
+      expect(inventoryRequests().map((request) => request.actor)).toEqual(
         binding === "actor"
           ? ["actor-one", "actor-two", "actor-one"]
           : ["actor-one", "actor-one", "actor-one"]

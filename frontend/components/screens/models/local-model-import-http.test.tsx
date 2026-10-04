@@ -20,7 +20,7 @@ vi.mock("@/graphql/identity/identity.hooks", () => ({
   useActiveOrg: () => ({ org: { id: identity.org }, loading: false, error: null }),
 }));
 const catalogs = { en, es, fr, de, ja, ko, "zh-Hans": zh, "pt-BR": pt };
-const schema = buildSchema(readFileSync("../backend/schema.graphql", "utf8"));
+const schema = buildSchema(readFileSync("schema.graphql", "utf8"));
 const files = [
   new File(["{}"], "config.json"),
   new File(["{}"], "tokenizer.json"),

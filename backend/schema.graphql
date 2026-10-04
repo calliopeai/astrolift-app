@@ -6567,6 +6567,56 @@ type AvailableTransition {
   conditionsMet: Boolean!
 }
 
+type BedrockModelConnectionAction {
+  enabled: Boolean!
+  allowed: Boolean!
+  reason: String
+}
+
+input BedrockModelPlacementInput {
+  organizationId: GUID!
+  clusterId: GUID!
+  expectedProviderId: GUID!
+  expectedClusterVersion: Int!
+  expectedProviderVersion: Int!
+}
+
+type BedrockModelSource {
+  identity: NativeModelConnectionSource!
+  name: String!
+  provider: String
+  inputModalities: [String!]!
+  outputModalities: [String!]!
+  streaming: Boolean
+  lifecycle: String
+  profileType: String
+  registerable: Boolean!
+  reason: String
+}
+
+input BedrockModelSourceInput {
+  organizationId: GUID!
+  clusterId: GUID!
+  expectedProviderId: GUID!
+  expectedClusterVersion: Int!
+  expectedProviderVersion: Int!
+  sourceKind: BedrockModelSourceKind!
+  sourceIdentifier: String!
+}
+
+enum BedrockModelSourceKind {
+  FOUNDATION_MODEL
+  INFERENCE_PROFILE
+}
+
+type BedrockModelSources {
+  items: [BedrockModelSource!]!
+  state: String!
+  reason: String
+  truncated: Boolean!
+  partial: Boolean!
+}
+
 input BeginLocalModelArtifactInput {
   organizationId: GUID!
   name: String!
@@ -6796,6 +6846,7 @@ type ClusterModelDeployment {
   operationCompletedAt: DateTime
   desiredResources: ModelResources!
   appliedResources: ModelResources
+  nativeSource: NativeModelConnectionSource
   sourceKind: String!
   localArtifactId: GUID
   localArtifactVersion: Int
@@ -8162,7 +8213,9 @@ enum ModelObservationState {
 
 type ModelPlacementCluster {
   id: GUID!
+  version: Int!
   providerId: GUID!
+  providerVersion: Int!
   name: String!
   slug: String!
   region: String
@@ -8716,6 +8769,9 @@ type Mutation {
   revokeModelSubscription(input: RevokeModelSubscriptionInput!): ModelSubscriptionOperationMutationResult!
   updateClusterModel(input: UpdateClusterModelInput!): ClusterModelDeploymentMutationResult!
   deprovisionClusterModel(input: DeprovisionClusterModelInput!): ClusterModelDeploymentMutationResult!
+  registerBedrockModelConnection(input: RegisterBedrockModelConnectionInput!): ClusterModelDeploymentMutationResult!
+  updateBedrockModelConnection(input: UpdateBedrockModelConnectionInput!): ClusterModelDeploymentMutationResult!
+  unregisterBedrockModelConnection(input: UnregisterBedrockModelConnectionInput!): ClusterModelDeploymentMutationResult!
   updateOrganizationModelConnectionPolicy(input: UpdateOrganizationModelConnectionPolicyInput!): ModelConnectionPolicyMutationResult!
   setModelConnectionRestriction(input: SetModelConnectionRestrictionInput!): ModelConnectionPolicyMutationResult!
   requestModelConnection(input: RequestModelConnectionInput!): ModelConnectionRequestMutationResult!
@@ -8938,6 +8994,25 @@ input MuteAlertRuleInput {
   ruleId: GUID!
   durationSeconds: Int!
   reason: String!
+}
+
+type NativeModelConnectionSource {
+  protocol: NativeModelProtocol!
+  sourceKind: BedrockModelSourceKind!
+  accountId: String!
+  region: String!
+  partition: String!
+  sourceId: String!
+  sourceArn: String!
+  destinationModelArns: [String!]!
+  sourceFingerprint: String!
+  metadataObservedAt: DateTime
+  configurationState: String!
+  invokeAccess: String!
+}
+
+enum NativeModelProtocol {
+  BEDROCK
 }
 
 type NoneTypeMutationResult {
@@ -9514,6 +9589,10 @@ type Query {
   clusterModelRuntimeAdmission(input: ProvisionClusterModelInput!): ModelRuntimeAdmission!
   clusterModelSubscriptionTargetsPage(organizationId: GUID!, modelDeploymentId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionTargetPage!
   clusterModelSubscriptionsPage(organizationId: GUID!, modelDeploymentId: GUID!, appEnvironmentId: GUID = null, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionPage!
+  bedrockModelConnectionSupport(organizationId: GUID!): BedrockModelConnectionAction!
+  bedrockModelConnectionAction(input: BedrockModelPlacementInput!): BedrockModelConnectionAction!
+  bedrockModelSources(input: BedrockModelPlacementInput!, sourceKind: BedrockModelSourceKind!, limit: Int! = 100): BedrockModelSources!
+  bedrockModelSource(input: BedrockModelSourceInput!): BedrockModelSource
   modelHostingAction(organizationId: GUID!): ModelHostingAction!
   huggingFaceConnectionsPage(organizationId: GUID!, page: Int! = 1, pageSize: Int! = 25): HuggingFaceConnectionTypePage!
   clusterModelSourceAccess(organizationId: GUID!, modelRepo: String!, revisionSha: String!, connectionId: GUID = null, expectedConnectionVersion: Int = null): ModelSourceAccess!
@@ -9824,6 +9903,22 @@ input RegisterAppRepoInput {
   ref: String! = "main"
   defaultBranch: String = null
   deployBranch: String = null
+}
+
+input RegisterBedrockModelConnectionInput {
+  organizationId: GUID!
+  clusterId: GUID!
+  expectedProviderId: GUID!
+  expectedClusterVersion: Int!
+  expectedProviderVersion: Int!
+  sourceKind: BedrockModelSourceKind!
+  sourceIdentifier: String!
+  sourceFingerprint: String!
+  name: String!
+  allowSubscriptions: Boolean!
+  sharingMode: ModelSharingMode! = SHARED
+  dedicatedAppId: GUID = null
+  ifMatchDedicatedAppVersion: Int = null
 }
 
 input RegisterMobileDeviceInput {
@@ -10547,6 +10642,14 @@ input UnmuteAlertRuleInput {
   ruleId: GUID!
 }
 
+input UnregisterBedrockModelConnectionInput {
+  organizationId: GUID!
+  id: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  ifMatchVersion: Int!
+}
+
 input UnregisterTenantClusterInput {
   id: GUID!
 }
@@ -10606,6 +10709,19 @@ input UpdateAppInput {
   minimumApprovals: Int = null
   cronPaused: Boolean = null
   ifMatchVersion: Int = null
+}
+
+input UpdateBedrockModelConnectionInput {
+  organizationId: GUID!
+  id: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  ifMatchVersion: Int!
+  name: String!
+  allowSubscriptions: Boolean!
+  sharingMode: ModelSharingMode = null
+  dedicatedAppId: GUID = null
+  ifMatchDedicatedAppVersion: Int = null
 }
 
 input UpdateClusterModelInput {

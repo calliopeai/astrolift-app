@@ -1,0 +1,81 @@
+import type {
+  BedrockModelSourceFieldsFragment,
+  ClusterModelFieldsFragment,
+} from "@/graphql/__generated__/operations";
+import type { SharedModelListRow } from "./SharedModelsScreen";
+import { sharedModelDetailProps } from "./shared-model-detail.fixtures";
+
+export const nativeSource: BedrockModelSourceFieldsFragment = {
+  identity: {
+    protocol: "BEDROCK",
+    sourceKind: "FOUNDATION_MODEL",
+    accountId: "123456789012",
+    region: "us-east-1",
+    partition: "aws",
+    sourceId: "amazon.titan-text-express-v1",
+    sourceArn: "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-text-express-v1",
+    destinationModelArns: [],
+    sourceFingerprint: "a".repeat(64),
+    metadataObservedAt: "2026-10-04T00:00:00Z",
+    configurationState: "configured",
+    invokeAccess: "unknown",
+  },
+  name: "Titan Text Express",
+  provider: "Amazon",
+  inputModalities: ["TEXT"],
+  outputModalities: ["TEXT"],
+  streaming: true,
+  lifecycle: "ACTIVE",
+  profileType: null,
+  registerable: true,
+  reason: null,
+};
+export const nativeModel: ClusterModelFieldsFragment = {
+  ...sharedModelDetailProps.model!,
+  id: "019e1abc-0000-7000-8000-000000000003",
+  organizationId: "019e1abc-0000-7000-8000-000000000001",
+  clusterId: "019e1abc-0000-7000-8000-000000000002",
+  providerId: "019e1abc-0000-7000-8000-000000000004",
+  version: 1,
+  name: "Native text",
+  modelRepo: nativeSource.identity.sourceId,
+  sourceKind: "bedrock",
+  nativeSource: nativeSource.identity,
+  revisionSha: null,
+  computeMode: null,
+  runtimeSupported: null,
+  runtimeReason: null,
+  ready: null,
+  readinessObservedAt: null,
+  readinessGeneration: null,
+  desiredSubscriptionRevision: 0,
+  appliedSubscriptionRevision: 0,
+  operationId: null,
+  operationStartedAt: null,
+  operationCompletedAt: null,
+  desiredResources: {
+    cpuRequest: null,
+    memoryRequest: null,
+    gpuCount: null,
+    replicas: null,
+    cpuKvCacheGiB: null,
+    dtype: null,
+    maxModelLen: null,
+    maxNumSeqs: null,
+  },
+  appliedResources: null,
+};
+
+export const nativeModelRow: SharedModelListRow = {
+  ...nativeModel,
+  revisionSha: nativeModel.revisionSha ?? null,
+  computeMode: nativeModel.computeMode ?? null,
+  reason: nativeModel.reason ?? null,
+  ready: nativeModel.ready ?? null,
+  readinessObservedAt: nativeModel.readinessObservedAt ?? null,
+  desiredResources: {
+    cpuRequest: nativeModel.desiredResources.cpuRequest ?? null,
+    memoryRequest: nativeModel.desiredResources.memoryRequest ?? null,
+    gpuCount: nativeModel.desiredResources.gpuCount ?? null,
+  },
+};

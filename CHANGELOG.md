@@ -19,6 +19,23 @@
   policy, refuse ambiguous role/ServiceAccount ownership, and keep native readiness,
   invocation access and local serving metrics distinct (#2269).
 
+- Show native cloud connections in model inventory/detail with immutable source
+  metadata and guarded local settings/removal. Preserve app subscription policy,
+  expose unavailable native sources without hosted-runtime fallbacks, and keep
+  cloud inference/metrics explicitly unverified or unsupported (#2269).
+
+- Add a common cloud-model connection wizard with fresh versioned placement and
+  exact source review, bounded native discovery, and synchronous metadata-only
+  registration. Preserve unknown invocation access and refuse blind write retries
+  or stale actor/organization reviews (#2269).
+
+- Add native Bedrock source query contracts and immutable registration outcome
+  guards. Keep app binding reconciliation separate from runtime/inference proof,
+  and suppress hosted-runtime usage queries for native connections (#2269).
+
+- Prepare translated hosting/native-connection choices and explicit unsupported
+  native observation panels for the cloud model connection UI (#2269).
+
 - Add internal read-only Microsoft Foundry deployment discovery through the native
   Cognitive Services SDK. Bind results to the exact subscription/account/region,
   bound pagination, block redirects and writes, and keep inference access unknown

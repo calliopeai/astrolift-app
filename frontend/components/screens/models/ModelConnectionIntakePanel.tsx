@@ -71,6 +71,7 @@ export function ModelConnectionIntakePanel(props: ModelConnectionIntakeProps) {
   return <Intake key={props.scopeKey} {...props} />;
 }
 function Intake(props: ModelConnectionIntakeProps) {
+  const native = useTranslations("models.native.details");
   const t = useTranslations("models.shared.connections"),
     id = useId();
   const form = useForm<z.infer<typeof schema>>({
@@ -319,7 +320,13 @@ function Intake(props: ModelConnectionIntakeProps) {
                   alias: review.input.alias,
                 })}
             </p>
-            <p>{t(review?.input.action === "REQUEST" ? "requestNotice" : "restartNotice")}</p>
+            <p>
+              {review?.input.action === "REQUEST"
+                ? t("requestNotice")
+                : props.deployment.nativeConnection
+                  ? native("restartImpact")
+                  : t("restartNotice")}
+            </p>
             {!current && <p>{t("changed")}</p>}
           </div>
         }
