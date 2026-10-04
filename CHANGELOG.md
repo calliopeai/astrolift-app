@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Show hosted models with source, requested resources, exact deployment links and
+  fresh actor/organization reads. Surface authorized subscription summaries and
+  deployment metric states without claiming per-app traffic or measured cost (#2266).
+
+- Add hosted-model name/resource settings and reviewed shared or dedicated app
+  access, with a paged eligible-app chooser, fresh admin/source admission and
+  immutable-source write checks. Accepted changes remain pending reconciliation
+  and local sources can be edited without rebuilding a Hugging Face request (#2269).
+
 - Preserve immutable local and private Hugging Face model sources when editing
   hosted model settings. Add versioned names and shared or dedicated app access,
   with admin admission and matching subscription/reconciliation guards (#2269).

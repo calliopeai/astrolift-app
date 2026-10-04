@@ -18,6 +18,11 @@ export const CLUSTER_MODEL_FIELDS = gql`
     revisionSha
     computeMode
     subscriptionsEnabled
+    sharingMode
+    dedicatedAppId
+    dedicatedAppVersion
+    dedicatedAppName
+    dedicatedAppSlug
     runtimeSupported
     runtimeReason
     status
@@ -188,6 +193,48 @@ export const LIST_CLUSTER_MODEL_SUBSCRIPTIONS = gql`
         reason
         reconcileStartedAt
         reconciledAt
+      }
+      totalCount
+      nextCursor
+      page
+      pageSize
+    }
+  }
+`;
+
+export const GET_CLUSTER_MODEL_UPDATE_ADMISSION = gql`
+  query GetClusterModelUpdateAdmission($input: UpdateClusterModelInput!) {
+    clusterModelUpdateAdmission(input: $input) {
+      eligible
+      reason
+      runtimeVersion
+      architecture
+      hardwareAdmission
+    }
+  }
+`;
+export const LIST_MODEL_DEDICATED_APPS = gql`
+  query ListModelDedicatedApps(
+    $organizationId: GUID!
+    $clusterId: GUID!
+    $expectedProviderId: GUID!
+    $search: String
+    $page: Int!
+    $pageSize: Int!
+  ) {
+    clusterModelDedicatedAppsPage(
+      organizationId: $organizationId
+      clusterId: $clusterId
+      expectedProviderId: $expectedProviderId
+      search: $search
+      page: $page
+      pageSize: $pageSize
+    ) {
+      items {
+        id
+        version
+        name
+        slug
       }
       totalCount
       nextCursor

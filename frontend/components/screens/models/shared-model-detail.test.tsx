@@ -28,6 +28,7 @@ vi.mock("@/graphql/identity/identity.hooks", () => ({
     error: scope.error,
   }),
 }));
+vi.mock("@/graphql/user/user.hooks", () => ({ useMe: () => ({ user: { id: "viewer" } }) }));
 type Request = { operationName: string; variables: Record<string, unknown> };
 let requests: Request[], transport: (request: Request) => Promise<Response>;
 function response(data: Record<string, unknown>) {
@@ -62,36 +63,28 @@ beforeEach(() => {
   scope.error = null;
   requests = [];
   transport = async (request) =>
-    request.operationName === "Me"
-      ? response({
-          me: {
-            id: "viewer",
-            profile: { id: "profile", username: "reader" },
-            modules: [
-              {
-                key: "models",
-                enabled: true,
-                canView: true,
-                canCreate: false,
-                canManage: false,
-                canRun: false,
-              },
-            ],
-          },
-        })
-      : request.operationName === "ListModelSubscriptionTargets"
+    request.operationName === "GetModelHostingAction"
+      ? response({ modelHostingAction: { allowed: false, reason: null } })
+      : request.operationName === "Me"
         ? response({
-            clusterModelSubscriptionTargetsPage: {
-              items: [],
-              totalCount: 0,
-              nextCursor: null,
-              page: request.variables.page,
-              pageSize: request.variables.pageSize,
+            me: {
+              id: "viewer",
+              profile: { id: "profile", username: "reader" },
+              modules: [
+                {
+                  key: "models",
+                  enabled: true,
+                  canView: true,
+                  canCreate: false,
+                  canManage: false,
+                  canRun: false,
+                },
+              ],
             },
           })
-        : request.operationName === "ListClusterModelSubscriptions"
+        : request.operationName === "ListModelSubscriptionTargets"
           ? response({
-              clusterModelSubscriptionsPage: {
+              clusterModelSubscriptionTargetsPage: {
                 items: [],
                 totalCount: 0,
                 nextCursor: null,
@@ -99,21 +92,31 @@ beforeEach(() => {
                 pageSize: request.variables.pageSize,
               },
             })
-          : request.operationName === "GetSharedModelPromptReadiness"
+          : request.operationName === "ListClusterModelSubscriptions"
             ? response({
-                astroliftSharedModelPromptReadiness: sharedModelPromptProps.readiness.data,
+                clusterModelSubscriptionsPage: {
+                  items: [],
+                  totalCount: 0,
+                  nextCursor: null,
+                  page: request.variables.page,
+                  pageSize: request.variables.pageSize,
+                },
               })
-            : request.operationName === "GetModelDeploymentMetrics"
-              ? response({ astroliftModelDeploymentMetrics: modelObservationsProps.metrics.data })
-              : request.operationName === "GetClusterModelDensity"
-                ? response({ astroliftClusterModelDensity: modelObservationsProps.density.data })
-                : response({
-                    clusterModelDeployment: {
-                      ...model(),
-                      id: request.variables.id,
-                      organizationId: request.variables.organizationId,
-                    },
-                  });
+            : request.operationName === "GetSharedModelPromptReadiness"
+              ? response({
+                  astroliftSharedModelPromptReadiness: sharedModelPromptProps.readiness.data,
+                })
+              : request.operationName === "GetModelDeploymentMetrics"
+                ? response({ astroliftModelDeploymentMetrics: modelObservationsProps.metrics.data })
+                : request.operationName === "GetClusterModelDensity"
+                  ? response({ astroliftClusterModelDensity: modelObservationsProps.density.data })
+                  : response({
+                      clusterModelDeployment: {
+                        ...model(),
+                        id: request.variables.id,
+                        organizationId: request.variables.organizationId,
+                      },
+                    });
 });
 describe("actual shared model detail", () => {
   it("reads the explicit tenant/deployment identity through the actual route client", async () => {
@@ -176,6 +179,7 @@ describe("actual shared model detail", () => {
           "GetClusterModelDensity",
           "GetSharedModelPromptReadiness",
           "Me",
+          "GetModelHostingAction",
           "ListModelSubscriptionTargets",
           "ListClusterModelSubscriptions",
         ].includes(request.operationName)

@@ -2,6 +2,7 @@
 
 import { useRef, useState, useId, useLayoutEffect } from "react";
 import { useTranslations } from "next-intl";
+import Link from "next/link";
 import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -115,6 +116,12 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
   const targetsLoading = targets.loading;
   const targetsError = Boolean(targets.error);
   const t = useTranslations("models.shared.subscriptions");
+  const inventory = useTranslations("models.shared.inventory");
+  const confirmedPage = !subscriptions.loading && !subscriptions.stale && !subscriptions.error;
+  const visibleApps = confirmedPage
+    ? [...new Set(subscriptions.rows.map((row) => row.appSlug))]
+    : [];
+
   const id = useId();
   const form = useForm<z.infer<typeof draftSchema>>({
     resolver: zodResolver(draftSchema),
@@ -229,11 +236,31 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
     !targetsError &&
     !targets.stale;
   return (
-    <section className="space-y-5" aria-labelledby={`${id}-title`}>
+    <section
+      id="model-connections"
+      className="scroll-mt-20 space-y-5"
+      aria-labelledby={`${id}-title`}
+    >
       <div className="space-y-2">
         <h2 id={`${id}-title`} className="text-lg font-semibold">
-          {t("title")}
+          {inventory("connections")}
         </h2>
+        <p className="text-muted-foreground text-sm">{inventory("connectionsHelp")}</p>
+        {confirmedPage && subscriptions.totalCount != null && (
+          <p>
+            {inventory("visibleSubscriptions", { count: subscriptions.totalCount })} ·{" "}
+            {inventory("shownApps", { count: visibleApps.length })}
+          </p>
+        )}
+        {visibleApps.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {visibleApps.map((app) => (
+              <Button key={app} variant="outline" size="sm" asChild>
+                <Link href={`/apps/${encodeURIComponent(app)}`}>{app}</Link>
+              </Button>
+            ))}
+          </div>
+        )}
         <p className="text-muted-foreground text-sm">{t("description")}</p>
       </div>
       <p className="border-warning-border bg-warning-bg text-warning-fg rounded-md border p-3 text-sm">
