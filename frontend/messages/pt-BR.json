@@ -5772,7 +5772,14 @@
         "metricsReadUnavailable": "Não foi possível ler os dados de uso.",
         "metricsScope": "Totais da implantação entre consumidores; não representam tráfego por app.",
         "metricsSetup": "Configurar métricas",
-        "costUnavailable": "O custo está indisponível sem uso medido e preços."
+        "costUnavailable": "O custo está indisponível sem uso medido e preços.",
+        "selectApp": "Selecionar um aplicativo",
+        "appSearch": "Buscar aplicativos",
+        "appsEmpty": "Nenhum aplicativo elegível",
+        "appsEmptyHelp": "Os aplicativos precisam de um ambiente ativo no cluster desta implantação.",
+        "sharingHelp": "Modelos compartilhados aceitam assinaturas de vários aplicativos. Modelos dedicados aceitam apenas o aplicativo selecionado. Revogue assinaturas incompatíveis e confirme a reconciliação antes de alterar o acesso.",
+        "immutableSource": "A origem do modelo, o cluster e o modo de computação são preservados ao editar as configurações.",
+        "chooseDedicatedApp": "Escolha um aplicativo disponível atualmente antes de revisar o acesso dedicado."
       }
     }
   },

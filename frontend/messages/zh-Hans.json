@@ -5772,7 +5772,14 @@
         "metricsReadUnavailable": "无法读取用量数据。",
         "metricsScope": "跨所有使用方的部署汇总，并非各应用流量。",
         "metricsSetup": "指标配置",
-        "costUnavailable": "没有实测用量和定价信息，无法获取费用。"
+        "costUnavailable": "没有实测用量和定价信息，无法获取费用。",
+        "selectApp": "选择应用",
+        "appSearch": "搜索应用",
+        "appsEmpty": "没有符合条件的应用",
+        "appsEmptyHelp": "应用需要在此部署的集群上拥有有效环境。",
+        "sharingHelp": "共享模型允许多个应用订阅。专用模型仅允许所选应用订阅。更改访问权限前，请撤销不兼容的订阅并确认协调已完成。",
+        "immutableSource": "编辑设置时，模型来源、集群和计算模式保持不变。",
+        "chooseDedicatedApp": "审查专用访问权限前，请选择当前可用的应用。"
       }
     }
   },

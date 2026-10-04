@@ -5775,7 +5775,14 @@
         "metricsReadUnavailable": "Nutzungsdaten konnten nicht gelesen werden.",
         "metricsScope": "Bereitstellungssummen über alle Verbraucher; kein Datenverkehr je App.",
         "metricsSetup": "Metriken einrichten",
-        "costUnavailable": "Ohne gemessene Nutzung und Preise sind keine Kosten verfügbar."
+        "costUnavailable": "Ohne gemessene Nutzung und Preise sind keine Kosten verfügbar.",
+        "selectApp": "Eine App auswählen",
+        "appSearch": "Apps suchen",
+        "appsEmpty": "Keine geeigneten Apps",
+        "appsEmptyHelp": "Apps benötigen eine aktive Umgebung auf dem Cluster dieser Bereitstellung.",
+        "sharingHelp": "Gemeinsam genutzte Modelle akzeptieren Abonnements mehrerer Apps. Dedizierte Modelle akzeptieren nur die ausgewählte App. Widerrufen Sie inkompatible Abonnements und bestätigen Sie den Abgleich, bevor Sie den Zugriff ändern.",
+        "immutableSource": "Modellquelle, Cluster und Rechenmodus bleiben beim Bearbeiten der Einstellungen erhalten.",
+        "chooseDedicatedApp": "Wählen Sie eine aktuell verfügbare App aus, bevor Sie den dedizierten Zugriff prüfen."
       }
     }
   },

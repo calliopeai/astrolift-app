@@ -5775,7 +5775,14 @@
         "metricsReadUnavailable": "No se pudieron leer los datos de uso.",
         "metricsScope": "Totales del despliegue entre consumidores; no son tráfico por app.",
         "metricsSetup": "Configurar métricas",
-        "costUnavailable": "El coste no está disponible sin datos de uso medidos y precios."
+        "costUnavailable": "El coste no está disponible sin datos de uso medidos y precios.",
+        "selectApp": "Seleccionar una aplicación",
+        "appSearch": "Buscar aplicaciones",
+        "appsEmpty": "No hay aplicaciones aptas",
+        "appsEmptyHelp": "Las aplicaciones necesitan un entorno activo en el clúster de este despliegue.",
+        "sharingHelp": "Los modelos compartidos aceptan suscripciones de varias aplicaciones. Los modelos dedicados solo aceptan la aplicación seleccionada. Revoca las suscripciones incompatibles y confirma la reconciliación antes de cambiar el acceso.",
+        "immutableSource": "El origen del modelo, el clúster y el modo de cómputo se mantienen al editar la configuración.",
+        "chooseDedicatedApp": "Elige una aplicación vigente antes de revisar el acceso dedicado."
       }
     }
   },

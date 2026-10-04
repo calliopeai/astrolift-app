@@ -52,6 +52,14 @@ const english = {
   metricsScope: "Deployment totals across consumers; not per-app traffic.",
   metricsSetup: "Metrics setup",
   costUnavailable: "Cost is unavailable without measured usage and pricing.",
+  selectApp: "Select an app",
+  appSearch: "Search apps",
+  appsEmpty: "No eligible apps",
+  appsEmptyHelp: "Apps need a live environment on this deployment’s cluster.",
+  sharingHelp:
+    "Shared models accept subscriptions from multiple apps. Dedicated models accept only the selected app. Revoke incompatible subscriptions and confirm reconciliation before changing access.",
+  immutableSource: "Model source, cluster and compute mode are preserved when editing settings.",
+  chooseDedicatedApp: "Choose a current app before reviewing dedicated access.",
 } as const;
 const keys = Object.keys(english) as (keyof typeof english)[];
 const args = { count: 3, cpu: "2", memory: "8Gi", gpu: "0", app: "Test <app> & team" };
@@ -70,12 +78,19 @@ function Copy() {
       <p>{t("metricsAvailable", args)}</p>
       <p>{t("metricsScope")}</p>
       <p>{t("appTrafficUnavailable")}</p>
+      <button>{t("selectApp")}</button>
+      <label>{t("appSearch")}</label>
+      <p>{t("appsEmpty")}</p>
+      <p>{t("appsEmptyHelp")}</p>
+      <p>{t("sharingHelp")}</p>
+      <p>{t("immutableSource")}</p>
+      <p>{t("chooseDedicatedApp")}</p>
     </>
   );
 }
 afterEach(cleanup);
 describe("hosted model inventory copy contract", () => {
-  it("keeps the exact thirty-four-key English map", () => {
+  it("keeps the exact forty-one-key English map", () => {
     expect(en.models.shared.inventory).toEqual(english);
   });
   it.each(locales)("%s preserves keys and ICU arguments with genuine translations", (locale) => {
@@ -142,6 +157,16 @@ describe("hosted model inventory copy contract", () => {
       expect(screen.getByText(t(key, args))).toBeInTheDocument();
     expect(screen.getByText(copy.metricsScope)).toBeInTheDocument();
     expect(screen.getByText(copy.appTrafficUnavailable)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: copy.selectApp })).toBeInTheDocument();
+    for (const key of [
+      "appSearch",
+      "appsEmpty",
+      "appsEmptyHelp",
+      "sharingHelp",
+      "immutableSource",
+      "chooseDedicatedApp",
+    ] as const)
+      expect(screen.getByText(copy[key])).toBeInTheDocument();
     expect(document.querySelector("app")).toBeNull();
     expect(errors).toEqual([]);
   });
