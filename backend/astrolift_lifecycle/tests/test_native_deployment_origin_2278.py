@@ -554,3 +554,63 @@ def test_protected_approval_votes_apply_only_to_exact_original_environment(world
         with deployment_app_identity_authority(other_ref, DeploymentAuthorityContext(str(selected.guid))):
             pass
     assert not other.approval_votes.exists()
+
+
+@pytest.mark.parametrize("provider_replaced", [False, True])
+def test_preparation_only_retained_history_requires_exact_selected_cluster_origin(
+    monkeypatch, client, request, provider_replaced
+):
+    from astrolift_lifecycle.deployment_identity_origin import native_origin_required
+    from astrolift_services.gcp_gke_preparation_journal import preparation_journal_mutex
+    from astrolift_services.models import (
+        GCPGKEPreparationJournal,
+        GCPGKEPreparationOperation,
+        GCPWorkloadIdentityJournal,
+    )
+    from astrolift_services.tests.test_gcp_gke_preparation_journal_2278 import admitted
+    from astrolift_services.tests.test_gcp_gke_preparation_journal_2278 import world as prep_world
+    from core.tests.utils.scope_world import make_cluster
+
+    w = prep_world.__wrapped__(monkeypatch, client, request)
+    # Capture fixture initially connects vLLM only to obtain a real HTTP ref.
+    # Retire that fixture attachment before proving preparation-only ownership.
+    from django.utils import timezone
+
+    from astrolift_services.models import ManagedServiceAttachment
+
+    ManagedServiceAttachment.objects.filter(app_environment=w.env).update(deleted_at=timezone.now())
+    assert not ManagedServiceAttachment.objects.exists()
+    assert not native_origin_required(w.medops_app, w.env)
+    with preparation_journal_mutex(w.target) as store:
+        store.reserve(w.operation, checkpoint=admitted)
+    assert GCPGKEPreparationJournal.objects.count() == GCPGKEPreparationOperation.objects.count() == 1
+    assert not GCPWorkloadIdentityJournal.objects.exists()
+    assert native_origin_required(w.medops_app, w.env)
+    cluster = make_cluster(w, "prep-other-" + uuid4().hex)
+    other = AppEnvironment.objects.create(
+        registered_app=w.medops_app, tenant_cluster=cluster, name="unrelated-preparation-target"
+    )
+    assert not native_origin_required(w.medops_app, other)
+    grant(w, Permission.APP_DEPLOY, "APP", w.medops_app.pk)
+    w.medops_app.build_mode = "ci_pushed"
+    w.medops_app.save()
+    w.token, w.headers = http_token(w, scopes=("read:apps", "write:apps"))
+    starts = []
+
+    def start(name, args, *, workflow_id, **kwargs):
+        starts.append(args[0])
+        return WorkflowHandle(workflow_id, "prep-origin-test", True)
+
+    monkeypatch.setattr("astrolift_lifecycle.schema.mutations.helpers.start_workflow", start)
+    monkeypatch.setattr("core.pubsub.publish_sync", lambda *a, **k: None)
+    if provider_replaced:
+        w.cluster.provider_plugin.slug = "aws"
+        w.cluster.provider_plugin.save()
+    outcome = start_public(w, client)
+    if provider_replaced:
+        assert not outcome["ok"] and outcome["errors"][0]["code"] == "PRECONDITION"
+        assert not starts and not Deployment.objects.exists()
+    else:
+        assert outcome["ok"], outcome["errors"]
+        row = Deployment.objects.get(guid=outcome["data"]["id"])
+        assert deployment_origin(row) == starts[0].identity_authority

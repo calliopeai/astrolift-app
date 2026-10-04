@@ -78,7 +78,9 @@ reference, credential, approval count or private receipt. `config_snapshot`
 contains no authority reference.
 
 Admission concerns the complete app graph on the **selected physical cluster**,
-including direct and attached Endpoint sources and retained ownership history.
+including direct and attached Endpoint sources and retained IAM/preparation
+journals. Protected preparation operations retain their journal parent through
+`PROTECT`; an empty desired graph cannot erase that origin requirement.
 A separate GCP environment does not change ordinary AWS/local target deployment
 behavior. A missing target is never guessed as a supported native origin.
 Unsupported mixed-service unions refuse before creating a Deployment. Deploy-token,

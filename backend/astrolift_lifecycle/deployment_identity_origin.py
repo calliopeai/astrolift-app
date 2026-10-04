@@ -9,7 +9,12 @@ from django.conf import settings
 from django.db.models import Q
 
 from astrolift_lifecycle.models import AppEnvironment, Deployment, DeploymentIdentityOrigin
-from astrolift_services.models import GCPWorkloadIdentityJournal, ManagedService, ManagedServiceAttachment
+from astrolift_services.models import (
+    GCPGKEPreparationJournal,
+    GCPWorkloadIdentityJournal,
+    ManagedService,
+    ManagedServiceAttachment,
+)
 from astrolift_services.native_identity_authority import (
     capture_app_identity_authority,
     current_app_identity_authority,
@@ -46,11 +51,14 @@ def native_origin_required(app, environment=None, *, tenant_cluster=None):
         else (environment.tenant_cluster_id if environment is not None else None)
     )
     journals = GCPWorkloadIdentityJournal.all_objects.filter(registered_app=app)
+    preparation = GCPGKEPreparationJournal.all_objects.filter(registered_app=app)
     environments = AppEnvironment.all_objects.filter(registered_app=app)
     if cluster_id is not None:
         journals = journals.filter(tenant_cluster_id=cluster_id)
+        preparation = preparation.filter(tenant_cluster_id=cluster_id)
         environments = environments.filter(tenant_cluster_id=cluster_id)
-    if journals.exists():
+    # Protected preparation operations cannot survive without their PROTECT parent.
+    if journals.exists() or preparation.exists():
         return True
     attachments = ManagedServiceAttachment.all_objects.filter(app_environment__in=environments)
     services = ManagedService.all_objects.filter(
