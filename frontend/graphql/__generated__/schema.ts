@@ -7459,6 +7459,18 @@ export type ModelSubscription = {
   version: Scalars['Int']['output'];
 };
 
+export type ModelSubscriptionMetrics = {
+  clusterId: Scalars['GUID']['output'];
+  end: Scalars['DateTime']['output'];
+  metrics: Array<ModelMetricObservation>;
+  retrievedAt: Scalars['DateTime']['output'];
+  scope: Scalars['String']['output'];
+  serviceId: Scalars['GUID']['output'];
+  start: Scalars['DateTime']['output'];
+  stepSeconds: Scalars['Int']['output'];
+  subscriptionId: Scalars['GUID']['output'];
+};
+
 export type ModelSubscriptionOperation = {
   deployment: ClusterModelDeployment;
   restartRequired: Scalars['Boolean']['output'];
@@ -10489,6 +10501,7 @@ export type Query = {
   astroliftModelEndpoints: Array<AstroliftManagedService>;
   astroliftModelEndpointsPage: AstroliftManagedServicePage;
   astroliftModelPromptReadiness?: Maybe<AstroliftModelPromptReadiness>;
+  astroliftModelSubscriptionMetrics?: Maybe<ModelSubscriptionMetrics>;
   astroliftMyAlertSubscriptions: Array<AstroliftUserAlertSubscription>;
   astroliftMyApps: Array<AstroliftRegisteredApp>;
   astroliftMyAppsPage: AstroliftRegisteredAppPage;
@@ -11810,6 +11823,17 @@ export type QueryAstroliftModelEndpointsPageArgs = {
 
 export type QueryAstroliftModelPromptReadinessArgs = {
   id: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftModelSubscriptionMetricsArgs = {
+  end: Scalars['DateTime']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+  serviceId: Scalars['GUID']['input'];
+  start: Scalars['DateTime']['input'];
+  subscriptionId: Scalars['GUID']['input'];
 };
 
 

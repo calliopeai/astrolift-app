@@ -7913,6 +7913,18 @@ type ModelSubscription {
   reconciledAt: DateTime
 }
 
+type ModelSubscriptionMetrics {
+  serviceId: GUID!
+  clusterId: GUID!
+  subscriptionId: GUID!
+  start: DateTime!
+  end: DateTime!
+  retrievedAt: DateTime!
+  stepSeconds: Int!
+  metrics: [ModelMetricObservation!]!
+  scope: String!
+}
+
 type ModelSubscriptionOperation {
   deployment: ClusterModelDeployment!
   subscription: ModelSubscription!
@@ -9124,6 +9136,7 @@ type Query {
   astroliftSecretChangeProposalMetadata(id: GUID!): AstroliftSecretChangeProposalMetadata
   astroliftSecretChangeProposals(appSlug: String = null, status: String = null): [AstroliftSecretChangeProposal!]!
   astroliftSecretChangeProposal(id: GUID!): AstroliftSecretChangeProposal
+  astroliftModelSubscriptionMetrics(organizationId: GUID!, serviceId: GUID!, subscriptionId: GUID!, expectedClusterId: GUID!, expectedProviderId: GUID!, start: DateTime!, end: DateTime!): ModelSubscriptionMetrics
   astroliftModelDeploymentMetrics(serviceId: GUID!, expectedClusterId: GUID!, expectedProviderId: GUID!, start: DateTime!, end: DateTime!): ModelDeploymentMetrics
   astroliftClusterModelDensity(clusterId: GUID!, expectedProviderId: GUID!, start: DateTime!, end: DateTime!): ClusterModelDensity
   astroliftHuggingFaceModels(search: String! = "", author: String! = "", pipelineTag: String! = "", library: String! = "", license: String! = "", gated: Boolean = null, sortBy: String! = "downloads", first: Int! = 20, after: String = null): HuggingFaceModelsPage!

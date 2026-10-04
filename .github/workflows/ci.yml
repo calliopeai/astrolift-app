@@ -358,6 +358,11 @@ jobs:
         run: |
           python scripts/prepare_collector_test_artifacts.py "$RUNNER_TEMP/collector-native"
           echo "COLLECTOR_RENDER_ARTIFACTS=$RUNNER_TEMP/collector-native" >> "$GITHUB_ENV"
+      - name: Prepare verified native subscription metrics test engine
+        if: ${{ matrix.name == 'services-platform' }}
+        run: |
+          python scripts/prepare_promtool_test_artifacts.py "$RUNNER_TEMP/prometheus-native"
+          echo "PROMTOOL_BINARY=$RUNNER_TEMP/prometheus-native/promtool" >> "$GITHUB_ENV"
       - name: Tune disposable PostgreSQL
         env:
           PGPASSWORD: Password123
