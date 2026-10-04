@@ -199,6 +199,7 @@ def _audit_emit(
     error_message: str | None,
     duration_ms: int,
     extra: dict[str, Any] | None,
+    redact_errors: bool = False,
 ) -> None:
     """Emit an audit event via ``core.mutations.emit_audit`` if available.
 
@@ -235,7 +236,9 @@ def _audit_emit(
         )
         emit_audit(entry)
     except Exception:
-        log.warning("driver_op audit emit failed for action=%s", action, exc_info=True)
+        # A writer failure can chain the original native exception while
+        # handling it; private operations must suppress that traceback too.
+        log.warning("driver_op audit emit failed for action=%s", action, exc_info=not redact_errors)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -248,6 +251,7 @@ class _OpContext:
     audit: bool
     sensitive_kind: str | None
     redact_args: tuple[str, ...]
+    redact_errors: bool
     heartbeat: bool
 
     @property
@@ -273,6 +277,7 @@ def _record_success(ctx: _OpContext, started: float, audit_extra: dict[str, Any]
             error_message=None,
             duration_ms=int(duration_s * 1000),
             extra=audit_extra,
+            redact_errors=ctx.redact_errors,
         )
 
 
@@ -287,9 +292,10 @@ def _record_error(ctx: _OpContext, started: float, exc: BaseException, audit_ext
             action=ctx.action,
             decision="ERROR",
             error_code=type(exc).__name__,
-            error_message=str(exc),
+            error_message="Private driver operation failed." if ctx.redact_errors else str(exc),
             duration_ms=int(duration_s * 1000),
             extra=audit_extra,
+            redact_errors=ctx.redact_errors,
         )
 
 
@@ -306,7 +312,8 @@ def _log_entry(ctx: _OpContext, safe_kwargs: dict[str, Any]) -> None:
 
 
 def _log_error(ctx: _OpContext, safe_kwargs: dict[str, Any], exc: BaseException) -> None:
-    log.exception(
+    logger = log.error if ctx.redact_errors else log.exception
+    logger(
         "driver_op error",
         extra={
             "cloud": ctx.metric_cloud,
@@ -327,6 +334,13 @@ def _start_span(ctx: _OpContext) -> Any:
     """
     if not _OTEL_AVAILABLE or _tracer is None:
         return _NullSpanCM()
+    if ctx.redact_errors:
+        return _tracer.start_as_current_span(
+            f"{ctx.driver}.{ctx.method}",
+            attributes={"cloud": ctx.metric_cloud, "driver": ctx.driver, "method": ctx.method},
+            record_exception=False,
+            set_status_on_exception=False,
+        )
     return _tracer.start_as_current_span(
         f"{ctx.driver}.{ctx.method}",
         attributes={"cloud": ctx.metric_cloud, "driver": ctx.driver, "method": ctx.method},
@@ -352,7 +366,7 @@ class _NullSpanCM:
         return None
 
 
-def _set_error_status(span: Any, exc: BaseException) -> None:
+def _set_error_status(span: Any, exc: BaseException, *, redact_errors: bool = False) -> None:
     """Mark an OTEL span errored, tolerating the no-op span.
 
     Real OTEL spans want ``Status(StatusCode.ERROR)``; the null span ignores
@@ -364,8 +378,9 @@ def _set_error_status(span: Any, exc: BaseException) -> None:
     try:
         from opentelemetry.trace import Status, StatusCode
 
-        span.set_status(Status(StatusCode.ERROR, str(exc)))
-        span.record_exception(exc)
+        span.set_status(Status(StatusCode.ERROR, "Private driver operation failed." if redact_errors else str(exc)))
+        if not redact_errors:
+            span.record_exception(exc)
     except Exception:
         pass
 
@@ -377,6 +392,7 @@ def driver_op(
     audit: bool = False,
     sensitive_kind: str | None = None,
     redact_args: tuple[str, ...] = (),
+    redact_errors: bool = False,
     heartbeat: bool = True,
 ) -> Callable[[F], F]:
     """Instrument a driver method with logging, metrics, traces, heartbeat, and audit.
@@ -394,6 +410,10 @@ def driver_op(
     ``redact_args`` is a tuple of keyword-arg names whose values must not
     appear in logs / spans. Use for bearer tokens, secret payload kvs, etc.
 
+    ``redact_errors=True`` omits exception messages and tracebacks from this
+    operation's logs, span and audit. The original exception still reaches
+    the caller; other enclosing telemetry must enforce its own privacy policy.
+
     ``heartbeat=False`` opts a method out of the entry-heartbeat (e.g. for
     pure-CPU helpers where the entry signal would just add noise). Long
     loops inside a method should still call :func:`maybe_heartbeat`
@@ -408,6 +428,7 @@ def driver_op(
             audit=audit,
             sensitive_kind=sensitive_kind,
             redact_args=redact_args,
+            redact_errors=redact_errors,
             heartbeat=heartbeat,
         )
 
@@ -421,12 +442,14 @@ def driver_op(
                     maybe_heartbeat(f"{ctx.driver}.{ctx.method}")
                 started = time.monotonic()
                 span = _start_span(ctx)
-                with span:
+                with span as active_span:
                     try:
                         result = await fn(self, *args, **kwargs)
                     except BaseException as exc:
                         _log_error(ctx, safe_kwargs, exc)
-                        _set_error_status(span, exc)
+                        _set_error_status(
+                            active_span if ctx.redact_errors else span, exc, redact_errors=ctx.redact_errors
+                        )
                         _record_error(ctx, started, exc, {"driver_args": safe_kwargs})
                         raise
                     _record_success(ctx, started, {"driver_args": safe_kwargs})
@@ -446,14 +469,16 @@ def driver_op(
                     maybe_heartbeat(f"{ctx.driver}.{ctx.method}")
                 started = time.monotonic()
                 span = _start_span(ctx)
-                with span:
+                with span as active_span:
                     try:
                         agen = fn(self, *args, **kwargs)
                         async for item in agen:
                             yield item
                     except BaseException as exc:
                         _log_error(ctx, safe_kwargs, exc)
-                        _set_error_status(span, exc)
+                        _set_error_status(
+                            active_span if ctx.redact_errors else span, exc, redact_errors=ctx.redact_errors
+                        )
                         _record_error(ctx, started, exc, {"driver_args": safe_kwargs})
                         raise
                     _record_success(ctx, started, {"driver_args": safe_kwargs})
@@ -470,12 +495,12 @@ def driver_op(
                 maybe_heartbeat(f"{ctx.driver}.{ctx.method}")
             started = time.monotonic()
             span = _start_span(ctx)
-            with span:
+            with span as active_span:
                 try:
                     result = fn(self, *args, **kwargs)
                 except BaseException as exc:
                     _log_error(ctx, safe_kwargs, exc)
-                    _set_error_status(span, exc)
+                    _set_error_status(active_span if ctx.redact_errors else span, exc, redact_errors=ctx.redact_errors)
                     _record_error(ctx, started, exc, {"driver_args": safe_kwargs})
                     raise
                 _record_success(ctx, started, {"driver_args": safe_kwargs})
