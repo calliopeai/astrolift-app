@@ -741,6 +741,8 @@ class NativeGCPIdentity:
             owned = set(next((row.grants for row in ledger.policies if row.resource == resource), ()))
             if pending:
                 if current_hash == pending.after_sha256:
+                    if submission_hook is not None and pending.submission_phase == PolicySubmissionPhase.UNSENT:
+                        raise NativeIdentityError("UNSENT_POLICY_CONFLICT")
                     owned = set(pending.owned_after)
                     if submission_hook is not None:
                         progress.note(

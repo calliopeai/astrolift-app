@@ -569,3 +569,26 @@ def test_invalid_checkpoint_after_held_sdk_response_refuses_without_submission(j
     assert not worker.is_alive() and len(results) == 1
     assert str(results[0]) == "CURRENT_ADMISSION_UNCONFIRMED"
     assert not journal.hooks and not journal.wire.setter_entries
+
+
+def test_unsent_foreign_after_policy_never_becomes_owned(journal):
+    journal.mode = lambda request, receipt: (setattr(journal, "current", False), receipt)[1]
+    with pytest.raises(NativeIdentityReconciliationError):
+        journal.call()
+    pending = journal.ledger.pending[0]
+    assert pending.submission_phase == PolicySubmissionPhase.UNSENT
+    assert not journal.wire.setter_entries and not journal.ledger.policies
+    external = journal.wire.policies[pending.resource]
+    for grant in pending.owned_after:
+        external.bindings.add(role=grant.role, members=[grant.member])
+    external.etag = b"foreign-writer-etag"
+    assert NativeGCPIdentity._policy_hash(external) == pending.after_sha256
+    original_ledger = journal.ledger
+    journal.mode, journal.current = None, True
+    with pytest.raises(NativeIdentityReconciliationError, match="UNSENT_POLICY_CONFLICT") as failure:
+        journal.call()
+    assert journal.ledger == original_ledger == failure.value.receipt.ledger
+    assert not failure.value.receipt.ledger.policies
+    assert failure.value.receipt.steps[0].state == PolicyStepState.UNSENT
+    assert not journal.wire.setter_entries and not journal.wire.writes
+    assert NativeGCPIdentity._policy_hash(journal.wire.policies[pending.resource]) == pending.after_sha256
