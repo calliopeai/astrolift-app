@@ -235,11 +235,17 @@ for (const computeMode of ["cpu", "gpu"] as const) {
     await page
       .getByRole("button", { name: "Controlled shared cluster · shared-fixture", exact: true })
       .click();
+    await expect(page.getByLabel("Deployment name", { exact: true })).toHaveValue("Qwen3-0.6B");
     await page.getByLabel("Deployment name", { exact: true }).fill(deploymentName);
     await page.getByLabel(computeMode.toUpperCase(), { exact: true }).check();
     if (computeMode === "gpu")
       await page.getByLabel("Requested GPU devices", { exact: true }).fill("1");
     await page.getByLabel("Enable named app subscriptions", { exact: true }).check();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(page.getByRole("radio", { name: "CPU", exact: true })).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Controlled shared cluster · shared-fixture", exact: true })
+    ).toHaveCount(0);
     const review = page.getByRole("button", { name: "Review deployment", exact: true });
     await expect(
       page.getByText("Read access confirmed for this repository and revision.", { exact: true })
@@ -308,7 +314,7 @@ for (const computeMode of ["cpu", "gpu"] as const) {
           cpuRequest: "2",
           memoryRequest: "8Gi",
           gpuCount: computeMode === "cpu" ? 0 : 1,
-          cpuKvCacheGiB: null,
+          cpuKvCacheGiB: computeMode === "cpu" ? 2 : null,
           allowSubscriptions: true,
         },
       },
@@ -416,4 +422,65 @@ test("shared catalogue reaches app-free CPU deployment, honest density and an ex
   await page.getByRole("link", { name: "Open full cluster catalogue", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Shared models", exact: true })).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test("small model wizard preserves steps and submits only its reviewed immutable CPU request", async ({
+  page,
+  context,
+}, testInfo) => {
+  const api = `http://127.0.0.1:${process.env.ROUTE_API_PORT ?? 6172}`;
+  expect((await context.request.post(`${api}/observations/reset`)).status()).toBe(204);
+  await context.addCookies([
+    { name: "sessionid", value: "owner", url: testInfo.project.use.baseURL! },
+    { name: "backend_jwt", value: "route-fixture-token", url: testInfo.project.use.baseURL! },
+  ]);
+  await page.goto("/models/deploy");
+  await page.getByRole("button", { name: "Choose a small test model", exact: true }).click();
+  await page.getByRole("button", { name: "Choose cluster and check access", exact: true }).click();
+  const name = page.getByLabel("Deployment name", { exact: true });
+  await expect(name).toHaveValue("Qwen2.5-0.5B-Instruct");
+  await expect(page.getByRole("button", { name: "Review deployment", exact: true })).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Controlled shared cluster · shared-fixture", exact: true })
+    .click();
+  await page.getByRole("radio", { name: "CPU", exact: true }).check();
+  await expect(page.getByLabel("CPU KV-cache request (GiB)", { exact: true })).toHaveValue("1");
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByRole("radio", { name: "CPU", exact: true })).toHaveCount(0);
+  const license = page.getByRole("checkbox", {
+    name: "I reviewed the model license and permitted use for this deployment.",
+    exact: true,
+  });
+  await license.check();
+  await page
+    .getByRole("link", { name: "Review CPU, memory and GPU requests", exact: true })
+    .click();
+  await expect(page.getByLabel("CPU request", { exact: true })).toBeFocused();
+  await expect(name).toHaveValue("Qwen2.5-0.5B-Instruct");
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(license).toBeChecked();
+  await expect(
+    page.getByRole("link", { name: "Review cluster runtime configuration", exact: true })
+  ).toHaveAttribute("target", "_blank");
+  expect(await (await context.request.get(`${api}/observations/model-writes`)).json()).toEqual([]);
+  await page.getByRole("button", { name: "Review deployment", exact: true }).click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Request deployment", exact: true })
+    .click();
+  await expect(page.getByRole("link", { name: "Open deployment", exact: true })).toBeVisible();
+  const writes = await (await context.request.get(`${api}/observations/model-writes`)).json();
+  expect(writes).toHaveLength(1);
+  expect(writes[0].input).toMatchObject({
+    name: "Qwen2.5-0.5B-Instruct",
+    modelRepo: "Qwen/Qwen2.5-0.5B-Instruct",
+    cpuRequest: "1",
+    memoryRequest: "4Gi",
+    revisionSha: "a".repeat(40),
+    clusterId,
+    expectedProviderId: providerId,
+    computeMode: "cpu",
+    gpuCount: 0,
+    cpuKvCacheGiB: 1,
+  });
 });

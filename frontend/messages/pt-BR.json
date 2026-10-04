@@ -5780,6 +5780,22 @@
         "sharingHelp": "Modelos compartilhados aceitam assinaturas de vários aplicativos. Modelos dedicados aceitam apenas o aplicativo selecionado. Revogue assinaturas incompatíveis e confirme a reconciliação antes de alterar o acesso.",
         "immutableSource": "A origem do modelo, o cluster e o modo de computação são preservados ao editar as configurações.",
         "chooseDedicatedApp": "Escolha um aplicativo disponível atualmente antes de revisar o acesso dedicado."
+      },
+      "usability": {
+        "nextStep": "Conclua a configuração para revisar a hospedagem",
+        "enterName": "Insira um nome para a implantação",
+        "selectCluster": "Selecione um cluster",
+        "selectCompute": "Escolha CPU ou GPU",
+        "enterCpu": "Insira uma solicitação de CPU",
+        "enterMemory": "Insira uma solicitação de memória",
+        "enterGpu": "Use 0 GPUs no modo CPU ou pelo menos 1 no modo GPU",
+        "enterCache": "Insira um tamanho válido para o cache KV da CPU",
+        "settingsNewTab": "As configurações do cluster abrem em uma nova aba para manter esta configuração de hospedagem aqui.",
+        "smallModel": "Escolha um modelo pequeno de teste",
+        "smallModelHelp": "Consulte Qwen/Qwen2.5-0.5B-Instruct no Hugging Face. As verificações de acesso, licença, ambiente de execução e recursos continuam necessárias.",
+        "previousStep": "Voltar",
+        "continueStep": "Avançar",
+        "cpuCacheHelp": "Obrigatório para CPU: 1–1024 GiB. A memória solicitada deve ser maior que esse cache."
       }
     }
   },

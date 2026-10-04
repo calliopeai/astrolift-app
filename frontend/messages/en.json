@@ -5860,6 +5860,22 @@
         "sharingHelp": "Shared models accept subscriptions from multiple apps. Dedicated models accept only the selected app. Revoke incompatible subscriptions and confirm reconciliation before changing access.",
         "immutableSource": "Model source, cluster and compute mode are preserved when editing settings.",
         "chooseDedicatedApp": "Choose a current app before reviewing dedicated access."
+      },
+      "usability": {
+        "nextStep": "Finish setup to review hosting",
+        "enterName": "Enter a deployment name",
+        "selectCluster": "Select a cluster",
+        "selectCompute": "Choose CPU or GPU",
+        "enterCpu": "Enter a CPU request",
+        "enterMemory": "Enter a memory request",
+        "enterGpu": "Use 0 GPUs for CPU, or at least 1 for GPU",
+        "enterCache": "Enter a valid CPU KV-cache size",
+        "settingsNewTab": "Cluster settings open in a new tab so this hosting setup stays here.",
+        "smallModel": "Choose a small test model",
+        "smallModelHelp": "Resolve Qwen/Qwen2.5-0.5B-Instruct from Hugging Face. Access, license, runtime and resource checks still apply.",
+        "previousStep": "Back",
+        "continueStep": "Next",
+        "cpuCacheHelp": "Required for CPU: 1–1024 GiB. Requested memory must exceed this cache."
       }
     }
   },

@@ -5780,6 +5780,22 @@
         "sharingHelp": "共有モデルは複数のアプリからのサブスクリプションを受け入れます。専用モデルは選択したアプリのみを受け入れます。アクセスを変更する前に、互換性のないサブスクリプションを取り消し、状態の同期を確認してください。",
         "immutableSource": "設定を編集しても、モデルのソース、クラスター、計算モードは維持されます。",
         "chooseDedicatedApp": "専用アクセスを確認する前に、現在利用可能なアプリを選択してください。"
+      },
+      "usability": {
+        "nextStep": "設定を完了してホスティング内容を確認してください",
+        "enterName": "デプロイ名を入力してください",
+        "selectCluster": "クラスターを選択してください",
+        "selectCompute": "CPU または GPU を選択してください",
+        "enterCpu": "CPU の要求量を入力してください",
+        "enterMemory": "メモリの要求量を入力してください",
+        "enterGpu": "CPU モードでは GPU を 0 個、GPU モードでは 1 個以上にしてください",
+        "enterCache": "CPU の KV キャッシュに有効なサイズを入力してください",
+        "settingsNewTab": "クラスター設定は新しいタブで開き、このホスティング設定はここに保持されます。",
+        "smallModel": "小さなテスト用モデルを選択",
+        "smallModelHelp": "Hugging Face から Qwen/Qwen2.5-0.5B-Instruct の情報を取得します。アクセス権、ライセンス、ランタイム、リソースの確認は引き続き必要です。",
+        "previousStep": "戻る",
+        "continueStep": "次へ",
+        "cpuCacheHelp": "CPU では必須です：1～1024 GiB。要求するメモリ容量はこのキャッシュ容量を上回る必要があります。"
       }
     }
   },

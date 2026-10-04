@@ -5780,6 +5780,22 @@
         "sharingHelp": "共享模型允许多个应用订阅。专用模型仅允许所选应用订阅。更改访问权限前，请撤销不兼容的订阅并确认协调已完成。",
         "immutableSource": "编辑设置时，模型来源、集群和计算模式保持不变。",
         "chooseDedicatedApp": "审查专用访问权限前，请选择当前可用的应用。"
+      },
+      "usability": {
+        "nextStep": "完成设置后检查托管配置",
+        "enterName": "请输入部署名称",
+        "selectCluster": "请选择集群",
+        "selectCompute": "请选择 CPU 或 GPU",
+        "enterCpu": "请输入 CPU 请求量",
+        "enterMemory": "请输入内存请求量",
+        "enterGpu": "CPU 模式使用 0 个 GPU，GPU 模式至少使用 1 个 GPU",
+        "enterCache": "请输入有效的 CPU KV 缓存大小",
+        "settingsNewTab": "集群设置将在新标签页中打开，此处的托管设置会保留。",
+        "smallModel": "选择一个小型测试模型",
+        "smallModelHelp": "从 Hugging Face 获取 Qwen/Qwen2.5-0.5B-Instruct 的信息。仍需检查访问权限、许可证、运行时和资源。",
+        "previousStep": "上一步",
+        "continueStep": "下一步",
+        "cpuCacheHelp": "CPU 必填：1–1024 GiB。请求的内存必须大于此缓存容量。"
       }
     }
   },

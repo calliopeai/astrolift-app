@@ -5780,6 +5780,22 @@
         "sharingHelp": "공유 모델은 여러 앱의 구독을 허용합니다. 전용 모델은 선택한 앱만 허용합니다. 액세스를 변경하기 전에 호환되지 않는 구독을 철회하고 상태 조정이 완료되었는지 확인하세요.",
         "immutableSource": "설정을 편집해도 모델 소스, 클러스터 및 컴퓨팅 모드는 유지됩니다.",
         "chooseDedicatedApp": "전용 액세스를 검토하기 전에 현재 사용 가능한 앱을 선택하세요."
+      },
+      "usability": {
+        "nextStep": "설정을 완료하여 호스팅 내용을 검토하세요",
+        "enterName": "배포 이름을 입력하세요",
+        "selectCluster": "클러스터를 선택하세요",
+        "selectCompute": "CPU 또는 GPU를 선택하세요",
+        "enterCpu": "CPU 요청량을 입력하세요",
+        "enterMemory": "메모리 요청량을 입력하세요",
+        "enterGpu": "CPU 모드에서는 GPU 0개, GPU 모드에서는 1개 이상을 사용하세요",
+        "enterCache": "CPU KV 캐시의 유효한 크기를 입력하세요",
+        "settingsNewTab": "클러스터 설정은 새 탭에서 열리므로 이 호스팅 설정은 여기에 유지됩니다.",
+        "smallModel": "작은 테스트 모델 선택",
+        "smallModelHelp": "Hugging Face에서 Qwen/Qwen2.5-0.5B-Instruct 정보를 조회합니다. 접근 권한, 라이선스, 런타임 및 리소스 확인은 계속 필요합니다.",
+        "previousStep": "뒤로",
+        "continueStep": "다음",
+        "cpuCacheHelp": "CPU 사용 시 필수: 1–1024 GiB. 요청 메모리는 이 캐시 크기보다 커야 합니다."
       }
     }
   },
