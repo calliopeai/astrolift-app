@@ -55,6 +55,15 @@ GRANDFATHERED_DESTRUCTIVE: frozenset[str] = frozenset(
         # constraints are replaced in this atomic migration; no rows or columns
         # are removed, and legacy/live uniqueness remains enforced.
         "astrolift_services/0028_cluster_model_subscriptions",
+        # Constraint-only replacement (#2269): the atomic 0037 replacement
+        # preserves app/project owners and org+cluster vLLM owners, adding only
+        # org+cluster model_endpoint/bedrock rows with both explicit existing-
+        # connection markers. organization changes help_text, not nullability
+        # or PROTECT. No rows/columns are removed. Reverse migration restores
+        # the old constraint and refuses while native rows (even tombstones)
+        # remain. This exact candidate rationale is visible for migration
+        # review; the ratchet entry is not production or review approval.
+        "astrolift_services/0037_native_bedrock_connection_owner",
         # Drops `TenantCluster.node_arch` after copying it into the new
         # `node_archs` list (#1604). Accepted deliberately, and the data loss
         # is bounded to a case that cannot occur in this tree: nothing has
