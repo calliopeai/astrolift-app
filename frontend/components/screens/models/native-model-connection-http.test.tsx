@@ -253,6 +253,30 @@ async function review() {
   await screen.findByRole("button", { name: "Register connection" });
 }
 describe("native connection actual SDL over HTTP", () => {
+  it("separates discovery, app settings and review while retaining selections on back", async () => {
+    const view = render(<View />);
+    await placement();
+    fireEvent.click(screen.getByRole("button", { name: "Load sources" }));
+    await screen.findByRole("button", { name: source.name });
+    expect(view.container.querySelectorAll("table")).toHaveLength(1);
+    await inspect();
+    expect(screen.queryByLabelText("Source ID or ARN")).toBeNull();
+    expect(view.container.querySelectorAll("table")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Dedicated" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Storefront" }));
+    expect(view.container.querySelectorAll("table")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Review connection" }));
+    await screen.findByRole("button", { name: "Register connection" });
+    expect(view.container.querySelectorAll("table")).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+    expect(screen.getByLabelText("Connection name")).toHaveValue(source.name);
+    expect(screen.getByText("Dedicated to Storefront")).toBeVisible();
+    expect(view.container.querySelectorAll("table")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Previous" }));
+    expect(screen.getByLabelText("Source ID or ARN")).toHaveValue(source.identity.sourceId);
+    expect(view.container.querySelectorAll("table")).toHaveLength(1);
+    expect(requests.some((row) => row.operationName === "RegisterBedrockModel")).toBe(false);
+  });
   it("registers the exact reviewed source without allocating runtime or claiming inference", async () => {
     render(<View />);
     await review();

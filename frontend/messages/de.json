@@ -5992,6 +5992,7 @@
         "steps": "Verbindungsschritte",
         "placementStep": "Anbieter und Cluster",
         "sourceStep": "Quelle auswählen",
+        "settingsStep": "Verbindungseinstellungen",
         "reviewStep": "Verbindung prüfen",
         "availability": "Verbindungsverfügbarkeit",
         "readFailed": "Verbindung konnte nicht überprüft werden",

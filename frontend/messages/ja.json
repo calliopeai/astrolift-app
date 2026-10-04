@@ -5989,6 +5989,7 @@
         "steps": "接続の手順",
         "placementStep": "プロバイダーとクラスター",
         "sourceStep": "ソースを選択",
+        "settingsStep": "接続設定",
         "reviewStep": "接続を確認",
         "availability": "接続の利用可否",
         "readFailed": "接続を検証できませんでした",

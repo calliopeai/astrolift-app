@@ -36,7 +36,7 @@ it.each(Object.entries({ en, es, fr, de, ja, ko, "pt-BR": pt, "zh-Hans": zh }))(
     const onError = vi.fn();
     const view = render(
       <NextIntlClientProvider locale={locale} messages={messages} timeZone="UTC" onError={onError}>
-        <rendered.Placement /> <rendered.BoundedPartial /> <rendered.Review />
+        <rendered.Placement /> <rendered.BoundedPartial /> <rendered.Settings /> <rendered.Review />
       </NextIntlClientProvider>
     );
     expect(view.container.textContent).toContain(nativeSource.identity.sourceArn);

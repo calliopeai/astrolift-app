@@ -28,7 +28,7 @@ export type NativeModelCluster =
   ListNativeModelClustersQuery["clusterModelPlacementClustersPage"]["items"][number];
 type App = ListModelDedicatedAppsQuery["clusterModelDedicatedAppsPage"]["items"][number];
 export type NativeModelConnectScreenProps = {
-  step: 1 | 2 | 3;
+  step: 1 | 2 | 3 | 4;
   allowed: boolean;
   supportLoading: boolean;
   supportReason: string | null;
@@ -105,7 +105,7 @@ export function NativeModelConnectScreen(props: NativeModelConnectScreenProps) {
     >
       <div className="space-y-6">
         <ol className="flex flex-wrap gap-4" aria-label={t("steps")}>
-          {["placementStep", "sourceStep", "reviewStep"].map((key, index) => (
+          {["placementStep", "sourceStep", "settingsStep", "reviewStep"].map((key, index) => (
             <li
               key={key}
               aria-current={props.step === index + 1 ? "step" : undefined}
@@ -131,7 +131,10 @@ export function NativeModelConnectScreen(props: NativeModelConnectScreenProps) {
         ) : (
           <>
             {props.error && <QueryError title={t("readFailed")} error={props.error} />}
-            {props.step === 1 && (
+            {props.step >= 2 && props.cluster && (
+              <p>{placement("selectedCluster", { cluster: props.cluster.name })}</p>
+            )}
+            {props.step === 1 ? (
               <Section title={t("placementStep")}>
                 <Label htmlFor={`${id}-provider`}>{t("provider")}</Label>
                 <select
@@ -178,11 +181,7 @@ export function NativeModelConnectScreen(props: NativeModelConnectScreenProps) {
                   }}
                 />
               </Section>
-            )}
-            {props.step >= 2 && props.cluster && (
-              <p>{placement("selectedCluster", { cluster: props.cluster.name })}</p>
-            )}
-            {props.step === 2 && (
+            ) : props.step === 2 ? (
               <>
                 <Section title={t("sourceStep")} description={t("bounded", { limit: 100 })}>
                   <div className="flex flex-wrap gap-2">
@@ -281,93 +280,89 @@ export function NativeModelConnectScreen(props: NativeModelConnectScreenProps) {
                     </Button>
                   </form>
                 </Section>
-                {props.detail && (
-                  <Section title={props.detail.name} description={props.detail.reason ?? undefined}>
-                    <DefinitionList
-                      items={[
-                        { term: t("account"), description: source!.accountId },
-                        { term: t("region"), description: source!.region },
-                        {
-                          term: inventory("source"),
-                          description: <code className="break-all">{source!.sourceArn}</code>,
-                        },
-                        {
-                          term: t("fingerprint"),
-                          description: (
-                            <code className="break-all">{source!.sourceFingerprint}</code>
-                          ),
-                        },
-                      ]}
-                    />
-                    <p>{t("accessUnknown")}</p>
-                    <Label htmlFor={`${id}-name`}>{t("name")}</Label>
-                    <Input
-                      id={`${id}-name`}
-                      value={props.name}
-                      disabled={locked}
-                      maxLength={128}
-                      onChange={(event) => props.onName(event.target.value)}
-                    />
-                    <label className="flex gap-2">
-                      <input
-                        type="checkbox"
-                        checked={props.subscriptions}
-                        disabled={locked}
-                        onChange={(event) => props.onSubscriptions(event.target.checked)}
-                      />
-                      {placement("allowSubscriptions")}
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {(["SHARED", "DEDICATED"] as const).map((mode) => (
-                        <Button
-                          key={mode}
-                          variant="outline"
-                          aria-pressed={props.mode === mode}
-                          disabled={locked}
-                          onClick={() => props.onMode(mode)}
-                        >
-                          {inventory(mode === "SHARED" ? "shared" : "dedicated")}
-                        </Button>
-                      ))}
-                    </div>
-                    <p className="text-muted-foreground text-sm">{inventory("sharingHelp")}</p>
-                    {props.mode === "DEDICATED" && (
-                      <ListPage
-                        embedded
-                        {...props.apps}
-                        label={inventory("selectApp")}
-                        getRowId={(row) => row.id}
-                        columns={[
-                          {
-                            id: "app",
-                            header: inventory("selectApp"),
-                            cell: (row) => (
-                              <Button
-                                variant="outline"
-                                disabled={locked}
-                                onClick={() => props.onApp(row)}
-                              >
-                                {row.name}
-                              </Button>
-                            ),
-                          },
-                        ]}
-                        empty={{
-                          icon: <BrainCircuitIcon />,
-                          title: inventory("appsEmpty"),
-                          description: inventory("appsEmptyHelp"),
-                        }}
-                      />
-                    )}
-                    {props.app && <p>{inventory("dedicatedApp", { app: props.app.name })}</p>}
-                    <Button disabled={!props.canReview} onClick={() => void props.onReview()}>
-                      {t("review")}
-                    </Button>
-                  </Section>
-                )}
               </>
-            )}
-            {props.step === 3 && props.review && source && (
+            ) : props.step === 3 && props.detail ? (
+              <Section title={props.detail.name} description={props.detail.reason ?? undefined}>
+                <DefinitionList
+                  items={[
+                    { term: t("account"), description: source!.accountId },
+                    { term: t("region"), description: source!.region },
+                    {
+                      term: inventory("source"),
+                      description: <code className="break-all">{source!.sourceArn}</code>,
+                    },
+                    {
+                      term: t("fingerprint"),
+                      description: <code className="break-all">{source!.sourceFingerprint}</code>,
+                    },
+                  ]}
+                />
+                <p>{t("accessUnknown")}</p>
+                <Label htmlFor={`${id}-name`}>{t("name")}</Label>
+                <Input
+                  id={`${id}-name`}
+                  value={props.name}
+                  disabled={locked}
+                  maxLength={128}
+                  onChange={(event) => props.onName(event.target.value)}
+                />
+                <label className="flex gap-2">
+                  <input
+                    type="checkbox"
+                    checked={props.subscriptions}
+                    disabled={locked}
+                    onChange={(event) => props.onSubscriptions(event.target.checked)}
+                  />
+                  {placement("allowSubscriptions")}
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {(["SHARED", "DEDICATED"] as const).map((mode) => (
+                    <Button
+                      key={mode}
+                      variant="outline"
+                      aria-pressed={props.mode === mode}
+                      disabled={locked}
+                      onClick={() => props.onMode(mode)}
+                    >
+                      {inventory(mode === "SHARED" ? "shared" : "dedicated")}
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-muted-foreground text-sm">{inventory("sharingHelp")}</p>
+                {props.mode === "DEDICATED" && (
+                  <ListPage
+                    embedded
+                    {...props.apps}
+                    label={inventory("selectApp")}
+                    getRowId={(row) => row.id}
+                    columns={[
+                      {
+                        id: "app",
+                        header: inventory("selectApp"),
+                        cell: (row) => (
+                          <Button
+                            variant="outline"
+                            disabled={locked}
+                            onClick={() => props.onApp(row)}
+                          >
+                            {row.name}
+                          </Button>
+                        ),
+                      },
+                    ]}
+                    empty={{
+                      icon: <BrainCircuitIcon />,
+                      title: inventory("appsEmpty"),
+                      description: inventory("appsEmptyHelp"),
+                    }}
+                  />
+                )}
+                {props.app && <p>{inventory("dedicatedApp", { app: props.app.name })}</p>}
+                <Button disabled={!props.canReview} onClick={() => void props.onReview()}>
+                  {t("review")}
+                </Button>
+              </Section>
+            ) : props.step === 4 && props.review && source ? (
               <Section title={t("reviewStep")} description={t("registerHelp")}>
                 <DefinitionList
                   items={[
@@ -413,7 +408,7 @@ export function NativeModelConnectScreen(props: NativeModelConnectScreenProps) {
                   </Button>
                 )}
               </Section>
-            )}
+            ) : null}
             {props.sent && !props.registeredId && <p role="status">{t("unconfirmed")}</p>}
             {props.step > 1 && (
               <Button variant="outline" disabled={locked} onClick={props.onBack}>

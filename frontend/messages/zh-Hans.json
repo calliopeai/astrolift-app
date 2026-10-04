@@ -5989,6 +5989,7 @@
         "steps": "连接步骤",
         "placementStep": "提供商与集群",
         "sourceStep": "选择来源",
+        "settingsStep": "连接设置",
         "reviewStep": "审核连接",
         "availability": "连接可用性",
         "readFailed": "无法验证连接",

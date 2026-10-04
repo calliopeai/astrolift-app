@@ -100,7 +100,7 @@ export const useNativeModelConnection = (): NativeModelConnectScreenProps => {
       skip: !allowed,
     }
   );
-  const [step, setStep] = useState<1 | 2 | 3>(1),
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1),
     [cluster, setCluster] = useState<NativeModelCluster | null>(null);
   const [kind, setKind] = useState<BedrockModelSourceKind>("FOUNDATION_MODEL"),
     [lookup, setLookup] = useState("");
@@ -382,6 +382,7 @@ export const useNativeModelConnection = (): NativeModelConnectScreenProps => {
           setLookup(source.identity.sourceId);
           setName(source.name.slice(0, 128));
           setReview(null);
+          setStep(3);
         }
       }),
     name,
@@ -441,7 +442,7 @@ export const useNativeModelConnection = (): NativeModelConnectScreenProps => {
         if (current()) {
           setDetail(fresh);
           setReview(input);
-          setStep(3);
+          setStep(4);
         }
       }),
     onRegister: () =>
@@ -486,7 +487,7 @@ export const useNativeModelConnection = (): NativeModelConnectScreenProps => {
     onBack: () => {
       if (!busy && !sent) {
         setReview(null);
-        setStep(step === 3 ? 2 : 1);
+        setStep(step === 4 ? 3 : step === 3 ? 2 : 1);
       }
     },
   };
