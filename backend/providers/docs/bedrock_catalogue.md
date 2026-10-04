@@ -18,6 +18,9 @@ session supplies STS and Bedrock. Every metadata request verifies actual STS
 account, partition, caller ARN and principal ID before and after transport;
 assumed-role mode additionally requires the configured role/session identity.
 Each client has five-second connect, twenty-second read and one-attempt bounds.
+Private SDK configuration ignores endpoint URLs from environment/shared config;
+native partition and FIPS routing remain available. Use the catalogue as a context
+manager or call `close()` to release its private STS/Bedrock clients.
 
 Foundation identities must have an empty account component, the selected region
 and partition, and matching native model ID/ARN. Profile identities must belong to
@@ -39,6 +42,11 @@ Pages distinguish complete metadata, bounded/truncated metadata, provider failur
 with partial admitted rows, and refusal. Identity-invalid rows or principal changes
 discard the entire result, including earlier pages. Fixed denial/not-found/error
 reasons omit raw provider diagnostics and continuation tokens.
+Projected metadata is validated independently of SDK decoding: names/provider text
+are bounded to 256 characters, profile names/status and capability strings to 64,
+capability arrays to 16 unique strings, and streaming to boolean or unknown.
+Malformed metadata returns a fixed error without projecting mismatched types or
+control characters. These bounds limit the projection, not native response bytes.
 
 Optional foundation availability calls `GetFoundationModelAvailability`. Native
 authorization, entitlement, agreement and region observations remain literal;

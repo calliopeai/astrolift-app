@@ -69,6 +69,7 @@ def wire():
         yield catalog, sts, bedrock
         sts.assert_no_pending_responses()
         bedrock.assert_no_pending_responses()
+    catalog.close()
 
 
 def identity(sts, *, account=ACCOUNT, arn=None, user_id="ROLE:fixture", times=1):
@@ -572,3 +573,151 @@ def test_unverified_post_availability_identity_cannot_escape_as_unknown_metadata
     result = catalog.detail(BedrockSourceKind.FOUNDATION_MODEL, MODEL, check_availability=True)
     assert result.state == CatalogueState.REFUSED and result.source is None
     assert result.reason == "IDENTITY_UNVERIFIED" and PRIVATE not in repr(result)
+
+
+@pytest.mark.parametrize(
+    "region,partition", [(REGION, "aws"), ("us-gov-west-1", "aws-us-gov"), ("cn-north-1", "aws-cn")]
+)
+def test_actual_client_construction_ignores_process_endpoint_overrides(monkeypatch, region, partition):
+    # Real private-session construction only: no request, factory or saved credentials.
+    for variable in ("AWS_ENDPOINT_URL", "AWS_ENDPOINT_URL_STS", "AWS_ENDPOINT_URL_BEDROCK"):
+        monkeypatch.setenv(variable, "https://untrusted-override.invalid/private")
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "fixture-only")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "fixture-only")
+    monkeypatch.setenv("AWS_SESSION_TOKEN", "fixture-only")
+    monkeypatch.delenv("AWS_PROFILE", raising=False)
+    with BedrockCatalogue(BedrockCatalogueConfig(region, CloudCredential("aws", declared_account=ACCOUNT))) as catalog:
+        catalog._clients()
+        for client in (catalog._sts, catalog._bedrock):
+            assert "untrusted-override.invalid" not in client.meta.endpoint_url
+            assert client.meta.partition == partition and client.meta.region_name == region
+            assert client.meta.config.connect_timeout == 5 and client.meta.config.read_timeout == 20
+            assert client.meta.config.retries["total_max_attempts"] == 1
+        assert catalog._session._session.get_default_client_config().ignore_configured_endpoint_urls is True
+
+
+def test_native_fips_routing_survives_endpoint_override_refusal(monkeypatch):
+    monkeypatch.setenv("AWS_ENDPOINT_URL", "https://untrusted-override.invalid")
+    monkeypatch.setenv("AWS_USE_FIPS_ENDPOINT", "true")
+    session = boto3.Session(aws_access_key_id="fixture-only", aws_secret_access_key="fixture-only", region_name=REGION)
+    with BedrockCatalogue(
+        BedrockCatalogueConfig(REGION, CloudCredential("aws", declared_account=ACCOUNT)), session=session
+    ) as catalog:
+        catalog._clients()
+        assert "fips" in catalog._sts.meta.endpoint_url
+        assert "fips" in catalog._bedrock.meta.endpoint_url
+        assert "untrusted" not in catalog._bedrock.meta.endpoint_url
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("modelName", {"private": PRIVATE}),
+        ("modelName", ""),
+        ("modelName", "x" * 257),
+        ("modelName", "unsafe\nname"),
+        ("providerName", 42),
+        ("providerName", "x" * 257),
+        ("inputModalities", "TEXT"),
+        ("inputModalities", [None]),
+        ("inputModalities", ["TEXT", "TEXT"]),
+        ("outputModalities", {"TEXT": True}),
+        ("outputModalities", ["x" * 65]),
+        ("inferenceTypesSupported", ["ON_DEMAND"] * 17),
+        ("inferenceTypesSupported", [False]),
+        ("responseStreamingSupported", "true"),
+        ("responseStreamingSupported", 1),
+        ("modelLifecycle", "ACTIVE"),
+        ("modelLifecycle", {"status": {"private": PRIVATE}}),
+        ("modelLifecycle", {"status": "x" * 65}),
+    ],
+)
+def test_projected_foundation_metadata_validator_rejects_malformed_native_values(wire, field, value):
+    # A validator boundary proof, deliberately not a malformed Stubber response.
+    catalog, sts, _ = wire
+    identity(sts)
+    catalog._verify()
+    with pytest.raises(BedrockCatalogueError, match="INVALID_METADATA") as caught:
+        catalog._foundation(foundation(**{field: value}))
+    assert catalog._failure(caught.value) == (CatalogueState.ERROR, "INVALID_METADATA")
+    assert PRIVATE not in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("inferenceProfileName", 42),
+        ("inferenceProfileName", {"private": PRIVATE}),
+        ("inferenceProfileName", "x" * 65),
+        ("status", {"private": PRIVATE}),
+        ("status", "x" * 65),
+        ("status", "unsafe\x7fstatus"),
+        ("models", [None]),
+    ],
+)
+def test_projected_profile_metadata_validator_rejects_malformed_native_values(wire, field, value):
+    catalog, sts, _ = wire
+    identity(sts)
+    catalog._verify()
+    with pytest.raises(BedrockCatalogueError, match="INVALID_METADATA") as caught:
+        catalog._profile(profile(**{field: value}))
+    assert catalog._failure(caught.value) == (CatalogueState.ERROR, "INVALID_METADATA")
+    assert PRIVATE not in str(caught.value)
+
+
+def test_missing_optional_foundation_metadata_has_typed_unknown_projection(wire):
+    catalog, sts, _ = wire
+    identity(sts)
+    catalog._verify()
+    result = catalog._foundation({"modelId": MODEL, "modelArn": MODEL_ARN})
+    assert result.name == MODEL and result.provider is None and result.streaming is None and result.lifecycle is None
+    assert result.input_modalities == result.output_modalities == result.inference_types == ()
+
+
+def test_context_closes_each_private_client_once_and_refuses_reuse(wire, monkeypatch):
+    catalog, _, _ = wire
+    closed = []
+    for label, client in (("sts", catalog._sts), ("bedrock", catalog._bedrock)):
+        original = client.close
+
+        def close(label=label, original=original):
+            closed.append(label)
+            original()
+
+        monkeypatch.setattr(client, "close", close)
+    with pytest.raises(RuntimeError, match="controlled"), catalog:
+        raise RuntimeError("controlled")
+    catalog.close()
+    assert sorted(closed) == ["bedrock", "sts"]
+    result = catalog.foundation_models()
+    assert result.state == CatalogueState.REFUSED and result.reason == "CLOSED"
+    with pytest.raises(BedrockCatalogueError, match="CLOSED"):
+        catalog.__enter__()
+
+
+def test_context_does_not_construct_clients_when_unused():
+    with BedrockCatalogue(BedrockCatalogueConfig(REGION, CloudCredential("aws", declared_account=ACCOUNT))) as catalog:
+        assert catalog._sts is None and catalog._bedrock is None
+    assert catalog._closed
+
+
+def test_actual_botocore_json_decoder_does_not_certify_projected_string_type(wire):
+    import json
+
+    from botocore.parsers import create_parser
+
+    catalog, sts, _ = wire
+    identity(sts)
+    catalog._verify()
+    shape = catalog._bedrock.meta.service_model.operation_model("GetFoundationModel").output_shape
+    parsed = create_parser("rest-json").parse(
+        {
+            "status_code": 200,
+            "headers": {"content-type": "application/json"},
+            "body": json.dumps({"modelDetails": foundation(modelName={"private": PRIVATE})}).encode(),
+        },
+        shape,
+    )
+    assert isinstance(parsed["modelDetails"]["modelName"], dict)
+    with pytest.raises(BedrockCatalogueError, match="INVALID_METADATA"):
+        catalog._foundation(parsed["modelDetails"])

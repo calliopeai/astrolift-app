@@ -5,7 +5,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 from _sdk.cloud_credentials import CloudCredential, CredentialMode
 from aws.session import aws_session
@@ -131,6 +134,28 @@ class BedrockCatalogue:
         self._sts: Any = None
         self._principal: tuple[str, str] | None = None
         self._identity: BedrockCatalogueIdentity | None = None
+        self._closed = False
+
+    def __enter__(self) -> BedrockCatalogue:
+        if self._closed:
+            raise BedrockCatalogueError("CLOSED")
+        return self
+
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        self.close()
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            if self._bedrock is not None:
+                self._bedrock.close()
+        finally:
+            if self._sts is not None:
+                self._sts.close()
 
     def foundation_models(self, *, limit: int = 100) -> BedrockCataloguePage:
         self._limits(limit)
@@ -178,7 +203,7 @@ class BedrockCatalogue:
             return BedrockCataloguePage(CatalogueState.METADATA, self._identity, tuple(items), truncated=bool(token))
         except Exception as exc:
             state, reason = self._failure(exc)
-            if state == CatalogueState.REFUSED:
+            if isinstance(exc, BedrockCatalogueError):
                 return BedrockCataloguePage(state, reason=reason)
             return BedrockCataloguePage(
                 state, self._identity, tuple(items), truncated=bool(items), partial=bool(items), reason=reason
@@ -205,21 +230,32 @@ class BedrockCatalogue:
             return BedrockCatalogueDetail(state, reason=reason)
 
     def _clients(self) -> None:
+        if self._closed:
+            raise BedrockCatalogueError("CLOSED")
         if self._sts is not None:
             return
         import boto3
         from botocore.config import Config
 
-        bounds = Config(connect_timeout=5, read_timeout=20, retries={"total_max_attempts": 1})
+        bounds = Config(
+            connect_timeout=5,
+            read_timeout=20,
+            retries={"total_max_attempts": 1},
+            ignore_configured_endpoint_urls=True,
+        )
         if self._session is None:
             # The initial AssumeRole client is private and bounded as well.
             ambient = boto3.Session(region_name=self.config.region)
             ambient._session.set_default_client_config(bounds)
-            self._session = aws_session(
-                region=self.config.region,
-                credential=self.config.credential,
-                sts=ambient.client("sts", config=bounds),
-            )
+            assumption_client = ambient.client("sts", config=bounds)
+            try:
+                self._session = aws_session(
+                    region=self.config.region,
+                    credential=self.config.credential,
+                    sts=assumption_client,
+                )
+            finally:
+                assumption_client.close()
         self._session._session.set_default_client_config(bounds)
         self._sts = self._session.client("sts", region_name=self.config.region, config=bounds)
         self._bedrock = self._session.client("bedrock", region_name=self.config.region, config=bounds)
@@ -284,23 +320,33 @@ class BedrockCatalogue:
         return identifier
 
     def _foundation(self, row: dict[str, Any]) -> BedrockCatalogueSource:
+        if not isinstance(row, dict):
+            raise BedrockCatalogueError("INVALID_METADATA")
         identifier = self._arn(row.get("modelArn"), "foundation-model")
         if identifier != row.get("modelId"):
             raise BedrockCatalogueError("IDENTITY_MISMATCH")
+        lifecycle = row.get("modelLifecycle")
+        if lifecycle is not None and not isinstance(lifecycle, dict):
+            raise BedrockCatalogueError("INVALID_METADATA")
+        streaming = row.get("responseStreamingSupported")
+        if streaming is not None and type(streaming) is not bool:
+            raise BedrockCatalogueError("INVALID_METADATA")
         return BedrockCatalogueSource(
             kind=BedrockSourceKind.FOUNDATION_MODEL,
             identifier=identifier,
             arn=row["modelArn"],
-            name=row.get("modelName") or identifier,
-            provider=row.get("providerName"),
-            input_modalities=tuple(row.get("inputModalities", ())),
-            output_modalities=tuple(row.get("outputModalities", ())),
-            inference_types=tuple(row.get("inferenceTypesSupported", ())),
-            streaming=row.get("responseStreamingSupported"),
-            lifecycle=(row.get("modelLifecycle") or {}).get("status"),
+            name=_text(row.get("modelName")) or identifier,
+            provider=_text(row.get("providerName")),
+            input_modalities=_strings(row.get("inputModalities")),
+            output_modalities=_strings(row.get("outputModalities")),
+            inference_types=_strings(row.get("inferenceTypesSupported")),
+            streaming=streaming,
+            lifecycle=_text(lifecycle.get("status") if lifecycle else None, limit=64),
         )
 
     def _profile(self, row: dict[str, Any]) -> BedrockCatalogueSource:
+        if not isinstance(row, dict):
+            raise BedrockCatalogueError("INVALID_METADATA")
         profile_type = row.get("type")
         if profile_type not in ("SYSTEM_DEFINED", "APPLICATION"):
             raise BedrockCatalogueError("INVALID_RESPONSE")
@@ -313,6 +359,8 @@ class BedrockCatalogue:
         models = row.get("models")
         if not isinstance(models, list) or not 1 <= len(models) <= 5:
             raise BedrockCatalogueError("INVALID_RESPONSE")
+        if any(not isinstance(model, dict) for model in models):
+            raise BedrockCatalogueError("INVALID_METADATA")
         destinations = tuple(model.get("modelArn") for model in models)
         for arn in destinations:
             self._arn(arn, "foundation-model", destination=True)
@@ -322,8 +370,8 @@ class BedrockCatalogue:
             BedrockSourceKind.INFERENCE_PROFILE,
             identifier,
             row["inferenceProfileArn"],
-            row.get("inferenceProfileName") or identifier,
-            lifecycle=row.get("status"),
+            _text(row.get("inferenceProfileName"), limit=64) or identifier,
+            lifecycle=_text(row.get("status"), limit=64),
             profile_type=profile_type,
             destination_model_arns=destinations,
         )
@@ -391,6 +439,8 @@ class BedrockCatalogue:
     @staticmethod
     def _failure(exc: Exception) -> tuple[CatalogueState, str]:
         if isinstance(exc, BedrockCatalogueError):
+            if str(exc) == "INVALID_METADATA":
+                return CatalogueState.ERROR, "INVALID_METADATA"
             return CatalogueState.REFUSED, str(exc)
         response = getattr(exc, "response", {})
         code = response.get("Error", {}).get("Code") if isinstance(response, dict) else None
@@ -405,3 +455,29 @@ def _partition(region: str) -> str:
     from botocore.session import get_session
 
     return str(get_session().get_partition_for_region(region))
+
+
+def _text(value: Any, *, limit: int = 256) -> str | None:
+    if value is None:
+        return None
+    if (
+        not isinstance(value, str)
+        or not 1 <= len(value) <= limit
+        or any(ord(char) < 32 or ord(char) == 127 for char in value)
+    ):
+        raise BedrockCatalogueError("INVALID_METADATA")
+    return value
+
+
+def _strings(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, list) or len(value) > 16:
+        raise BedrockCatalogueError("INVALID_METADATA")
+    result: list[str] = []
+    for item in value:
+        text = _text(item, limit=64)
+        if text is None or text in result:
+            raise BedrockCatalogueError("INVALID_METADATA")
+        result.append(text)
+    return tuple(result)

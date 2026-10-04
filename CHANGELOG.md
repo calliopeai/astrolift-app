@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Ignore process endpoint overrides during private Bedrock discovery, validate
+  bounded metadata projections after SDK decoding, and close private clients
+  explicitly without changing native partition/FIPS routing (#2269).
+
 - Add bounded, credential-verified Bedrock foundation-model and inference-profile
   metadata reads. Preserve native source identities, partial/truncated states and
   unknown invocation access; no resource allocation or public API is added (#2269).
