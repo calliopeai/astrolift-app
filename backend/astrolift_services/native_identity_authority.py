@@ -29,7 +29,10 @@ from astrolift_identity.models import ApiToken, AstroliftSession, Organization
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_lifecycle.visibility import live_lifecycle_rows
 from astrolift_registry.scopes import _app_scope
-from astrolift_workflows.native_identity_inputs import AcceptedAppIdentityAuthority
+from astrolift_workflows.native_identity_inputs import (
+    AcceptedAppIdentityAuthority,
+    DeploymentAuthorityContext,
+)
 from core.current_session import _ReadOnlyAuthSession, fresh_authenticated_session
 from core.permissions import Permission, PermissionDenied, ScopeKind, check_permission
 from core.tenancy import TenantContext, get_current_tenant, tenant_context
@@ -278,9 +281,24 @@ def capture_app_identity_authority(request, *, environment_guid, permission):
 
 
 @contextmanager
-def current_app_identity_authority(reference, *, deployment_guid=None, deployment_execution=False):
+def current_app_identity_authority(
+    reference, *, deployment_guid=None, deployment_execution=False, deployment_context=None
+):
     """Re-read original identity and current RBAC/ABAC; no request or system actor is invented."""
     permission, key = _validate_reference(reference)
+    if deployment_context is not None:
+        if (
+            type(deployment_context) is not DeploymentAuthorityContext
+            or deployment_guid is not None
+            or deployment_execution
+        ):
+            _refuse(permission)
+        try:
+            if str(UUID(deployment_context.deployment_guid)) != deployment_context.deployment_guid:
+                _refuse(permission)
+        except (TypeError, ValueError, AttributeError):
+            _refuse(permission)
+        deployment_guid, deployment_execution = deployment_context.deployment_guid, True
     if deployment_execution and deployment_guid is None:
         _refuse(permission)
     organization = Organization.objects.filter(guid=reference.organization_guid).first()
