@@ -180,6 +180,7 @@ def world(monkeypatch, client):
     w.cluster.provider_config = {
         "project_id": "fixture-project",
         "region": "us-central1",
+        "vertex_region": "us-central1",
         "endpoint_prediction_role": ROLE,
     }
     w.cluster.auth_config = {}
@@ -505,3 +506,16 @@ def test_current_complete_alias_source_queries_are_bounded_one_vs_twenty_five(wo
     assert len(initial.environments) == 1 and len(complete.environments) == 25
     assert len(complete.subjects) == 1 and len(complete.subjects[0].environment_ids) == 25
     assert len(complete.attachments) == 25 and len(complete.endpoints) == 1
+
+
+@pytest.mark.parametrize("region", [None, "us-central1-a", "us-east1"])
+def test_vertex_region_is_explicit_and_never_inferred_from_zonal_gke_location(world, region):
+    world.cluster.provider_config["location"] = "us-central1-a"
+    if region is None:
+        world.cluster.provider_config.pop("vertex_region")
+    else:
+        world.cluster.provider_config["vertex_region"] = region
+    world.cluster.save()
+    with pytest.raises(EndpointAppPlanError):
+        endpoint_app_snapshot(world.authority, world.identity)
+    assert not world.source.calls

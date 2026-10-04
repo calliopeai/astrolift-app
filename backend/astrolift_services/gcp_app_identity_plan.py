@@ -155,6 +155,19 @@ def endpoint_app_snapshot(authority, identity):
 
     if type(identity) is not NativeIdentityContext:
         raise EndpointAppPlanError("ORIGINAL_IDENTITY_REQUIRED")
+    return _endpoint_app_snapshot(authority, identity)
+
+
+def pre_identity_endpoint_snapshot(authority, scope):
+    """Fresh complete DB union admission before any GSA exists; no guessed UID."""
+    from gcp.identity_source import ProjectScope
+
+    if type(scope) is not ProjectScope:
+        raise EndpointAppPlanError("VERIFIED_PROJECT_SCOPE_REQUIRED")
+    return _endpoint_app_snapshot(authority, scope)
+
+
+def _endpoint_app_snapshot(authority, identity):
     with current_app_identity_authority(authority) as selected:
         app, cluster = selected.registered_app, selected.tenant_cluster
         provider = cluster.provider_plugin
@@ -170,7 +183,7 @@ def endpoint_app_snapshot(authority, identity):
             or identity.cluster_id != str(cluster.guid)
             or identity.credential != credential
             or config.get("project_id") not in (identity.project_id, identity.project_number)
-            or (config.get("region") or cluster.region) != identity.region
+            or config.get("vertex_region") != identity.region
         ):
             raise EndpointAppPlanError("CURRENT_IDENTITY_SOURCE_UNAVAILABLE")
         environments = tuple(
