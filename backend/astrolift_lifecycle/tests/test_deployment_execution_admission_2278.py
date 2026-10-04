@@ -136,5 +136,6 @@ async def test_actual_worker_refuses_genuinely_pending_protected_receipt(world, 
     assert world.headers["HTTP_AUTHORIZATION"] not in history.to_json()
     await Replayer(workflows=[DeployAppWorkflow]).replay_workflow(history)
     row = await sync_to_async(Deployment.objects.get)(pk=row.pk)
-    assert row.aborted_reason == "DEPLOYMENT_ORIGIN_REFUSED"
+    assert row.aborted_reason == ""
+    assert row.status == "pending_approval"
     assert not await sync_to_async(row.approval_votes.exists)()

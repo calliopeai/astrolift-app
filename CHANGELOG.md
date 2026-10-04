@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Pin native deployment enqueue intent and actual Temporal run in protected append-only receipts; refuse changed inputs or replacement runs before effects and keep failure status scoped to the accepted execution. Native pipeline activation remains staged (#2278).
+
 - Retain original-caller admission for GCP app bootstrap history on its exact app and physical cluster, including uncertain creates and empty desired service graphs; shared cluster pins alone do not gate unrelated app deployments (#2278).
 - Stage private GCP deployment rendering from current completed preparation/IAM receipts; retain recorded namespace/KSA identities, omit identity writes and bind final controller execution/placement fingerprints. Guarded apply, rename evolution and rollout acceptance remain separate (#2278).
 - Carry the exact protected Deployment approval context through private GCP source and producer checkpoints; bind pending source acceptance to that Deployment, keep sibling votes separate and evaluate application placement against each persisted cluster region (#2278).

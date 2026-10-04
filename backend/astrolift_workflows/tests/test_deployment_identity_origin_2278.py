@@ -29,7 +29,7 @@ def world(monkeypatch):
 async def test_actual_start_and_worker_refuse_before_any_downstream_activity(
     world, client, temporal_env, change
 ):
-    from astrolift_lifecycle.models import Deployment
+    from astrolift_lifecycle.models import Deployment, DeploymentExecutionReceipt
 
     result = await sync_to_async(start_public)(world, client)
     assert result["ok"], result["errors"]
@@ -58,7 +58,11 @@ async def test_actual_start_and_worker_refuse_before_any_downstream_activity(
             handle = await temporal_env.client.start_workflow(
                 DeployAppWorkflow.run,
                 payload,
-                id=queue,
+                id=await sync_to_async(
+                    lambda: DeploymentExecutionReceipt.objects.get(
+                        deployment_id=original.deployment_id, kind="EXPECTED"
+                    ).workflow_id
+                )(),
                 task_queue=queue,
             )
             outcome = await handle.result()
@@ -74,11 +78,11 @@ async def test_actual_start_and_worker_refuse_before_any_downstream_activity(
     assert world.headers["HTTP_AUTHORIZATION"].encode() not in history.to_json().encode()
     await Replayer(workflows=[DeployAppWorkflow]).replay_workflow(history)
     row = await sync_to_async(Deployment.objects.get)(pk=original.deployment_id)
-    assert row.status == ("pending" if change == "retarget" else "failed")
+    assert row.status == ("pending" if change in ("retarget", "lost_reference") else "failed")
     assert row.config_snapshot == {}
     assert row.aborted_reason == (
         ""
-        if change == "retarget"
+        if change in ("retarget", "lost_reference")
         else "NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED"
         if change == "none"
         else "DEPLOYMENT_ORIGIN_REFUSED"

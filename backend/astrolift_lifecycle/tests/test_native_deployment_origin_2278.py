@@ -339,6 +339,9 @@ def test_actual_migration_roundtrip_is_empty_only_and_retained_history_refuses(w
         executor.migrate([after])
         MigrationExecutor(connection).migrate([before])
         MigrationExecutor(connection).migrate([after])
+        MigrationExecutor(connection).migrate(original)
+        world.env.required_approvals = 1
+        world.env.save()
         result = start_public(world, client)
         assert result["ok"], result["errors"]
         origin = DeploymentIdentityOrigin.objects.get()
