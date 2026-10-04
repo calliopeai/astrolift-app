@@ -14,6 +14,7 @@ import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import en from "@/messages/en.json";
 import { ModelSubscriptionsClient } from "./ModelSubscriptionsClient";
+import { ModelSubscriptionsPanel } from "./ModelSubscriptionsPanel";
 import { useModelSubscriptions } from "./use-model-subscriptions";
 import { sharedModelDetailProps } from "./shared-model-detail.fixtures";
 import type { ClusterModelFieldsFragment } from "@/graphql/__generated__/operations";
@@ -21,6 +22,9 @@ import type { ClusterModelFieldsFragment } from "@/graphql/__generated__/operati
 const org = vi.hoisted(() => ({ id: "00000000-0000-4000-8000-000000000001" }));
 vi.mock("@/graphql/identity/identity.hooks", () => ({
   useActiveOrg: () => ({ org: { id: org.id }, loading: false, error: null }),
+}));
+vi.mock("@/graphql/user/user.hooks", () => ({
+  useMe: () => ({ user: { id: "current-subscription-reader" }, loading: false, error: null }),
 }));
 const model: ClusterModelFieldsFragment = {
   ...sharedModelDetailProps.model!,
@@ -152,10 +156,21 @@ function wrapper() {
     );
   };
 }
+// Keep the legacy subscription transport contract exercised independently of
+// the policy-aware production intake, covered by model-connection-http tests.
+function LegacyTransportAdapter({
+  current,
+  refresh,
+  blocked,
+}: {
+  current: ClusterModelFieldsFragment;
+  refresh: () => void;
+  blocked: boolean;
+}) {
+  return <ModelSubscriptionsPanel {...useModelSubscriptions(current, blocked, refresh)} />;
+}
 function client(current = model, refresh = vi.fn(), blocked = false) {
-  return (
-    <ModelSubscriptionsClient model={current} blocked={blocked} onRefreshDeployment={refresh} />
-  );
+  return <LegacyTransportAdapter current={current} blocked={blocked} refresh={refresh} />;
 }
 function writes() {
   return requests.filter((request) =>
@@ -175,7 +190,7 @@ beforeEach(() => {
   transport = async (request) => fixture(request);
 });
 
-describe("actual shared subscriptions Apollo boundary", () => {
+describe("legacy subscriptions and production revocation Apollo boundaries", () => {
   it.each(["production", "staging"])(
     "writes the exact %s target/version and named alias only after restart review",
     async (environment) => {
@@ -206,7 +221,14 @@ describe("actual shared subscriptions Apollo boundary", () => {
     }
   );
   it("revokes the exact subscription and deployment revisions with independent destination admission", async () => {
-    render(client({ ...model, subscriptionsEnabled: false }), { wrapper: wrapper() });
+    render(
+      <ModelSubscriptionsClient
+        model={{ ...model, subscriptionsEnabled: false }}
+        blocked={false}
+        onRefreshDeployment={vi.fn()}
+      />,
+      { wrapper: wrapper() }
+    );
     fireEvent.click(await screen.findByRole("button", { name: "Review revocation" }));
     expect(screen.getByRole("alertdialog")).toHaveTextContent("storefront");
     fireEvent.click(screen.getByRole("button", { name: "Request revocation" }));
