@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a provider-internal Foundry Chat-v1 gateway with existing attributed model authentication, fixed Azure origin and audience, bounded one-attempt delivery and private transport logging. Production source admission, gateway deployment and Azure workload rollout remain pending (#2280).
+
 - Retain accepted installation feature changes when refreshes fail, and require a fresh read after uncertain replies before another toggle (#2281).
 
 - Add an internal existing-UAMI Azure reconciliation port with real MSI7 clients,
