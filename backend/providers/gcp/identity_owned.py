@@ -641,20 +641,9 @@ class NativeGCPIdentity:
         self._bounded(value)
         return value
 
-    def _reconcile(
-        self,
-        permissions: Iterable[dict[str, str]],
-        *,
-        service_account_uids: tuple[str, ...],
-        ledger: OwnedGrantLedger,
-        checkpoint: Callable[[], None],
-        persist: Callable[[OwnedGrantLedger], None],
-        submission_hook: Callable[[PolicySubmission], DurableSubmissionReceipt] | None,
-        progress: _SubmissionProgress,
-    ) -> NativeIdentityResult:
-        from google.iam.v1 import iam_policy_pb2
-
-        self._ledger(ledger)
+    def _desired(
+        self, permissions: Iterable[dict[str, str]], *, service_account_uids: tuple[str, ...]
+    ) -> tuple[dict[str, set[OwnedGrant]], set[str], str]:
         desired: dict[str, set[OwnedGrant]] = {}
         roles: set[str] = set()
         for index, permission in enumerate(permissions):
@@ -682,6 +671,23 @@ class NativeGCPIdentity:
                 ),
             )
         )
+        return desired, roles, desired_union_sha256
+
+    def _reconcile(
+        self,
+        permissions: Iterable[dict[str, str]],
+        *,
+        service_account_uids: tuple[str, ...],
+        ledger: OwnedGrantLedger,
+        checkpoint: Callable[[], None],
+        persist: Callable[[OwnedGrantLedger], None],
+        submission_hook: Callable[[PolicySubmission], DurableSubmissionReceipt] | None,
+        progress: _SubmissionProgress,
+    ) -> NativeIdentityResult:
+        from google.iam.v1 import iam_policy_pb2
+
+        self._ledger(ledger)
+        desired, roles, desired_union_sha256 = self._desired(permissions, service_account_uids=service_account_uids)
         if submission_hook is not None:
             for intent in ledger.pending:
                 if not intent.submission_id:
@@ -920,3 +926,21 @@ class NativeGCPIdentity:
         return replace(
             ledger, policies=policies, pending=tuple(row for row in ledger.pending if row.resource != resource)
         )
+
+
+def desired_owned_union_sha256(
+    context: NativeIdentityContext,
+    permissions: Iterable[dict[str, str]],
+    *,
+    service_account_uids: tuple[str, ...],
+) -> str:
+    """Pure hash of the exact bounded native grant plan used by reconcile.
+
+    Does not discover credentials, construct clients or establish admission.
+    """
+    return NativeGCPIdentity(context)._desired(permissions, service_account_uids=service_account_uids)[2]
+
+
+def validate_owned_ledger(context: NativeIdentityContext, ledger: OwnedGrantLedger) -> None:
+    """Pure context/resource/grant checks; native ownership still needs readback."""
+    NativeGCPIdentity(context)._ledger(ledger)
