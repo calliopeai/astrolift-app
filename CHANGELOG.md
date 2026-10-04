@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Persist exact Bedrock throughput ARN/owner/intent handles across fresh activities.
+  Recover uncertain creation with stable AWS idempotency and exact native proof;
+  refuse false readiness, source/owner substitution, unsupported paid updates and
+  commitment bypass. Recover original legacy ownership without tag writes and
+  retain truthful log cleanup across deletion retries (#2276).
+
 - Bind model subscription finalization and traffic lookups explicitly to current
   service/app owners. Preserve admitted installation-shared cluster placement
   while keeping dedicated-app selectors tenant-bound (#2269, #2270).

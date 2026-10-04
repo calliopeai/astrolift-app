@@ -395,7 +395,11 @@ def test_deprovision_default_no_throughput_preserves_logs(
     _, record_id = parse_handle(provisioned.handle)
     log_group = f"/aws/astrolift/bedrock/{record_id}"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle, managed_service_id=_spec().managed_service_id),
+        DeprovisionSpec(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
     )
     assert result.ok
     assert "logs=preserved" in result.message
@@ -411,7 +415,11 @@ def test_deprovision_delete_data_drops_logs(
     _, record_id = parse_handle(provisioned.handle)
     log_group = f"/aws/astrolift/bedrock/{record_id}"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle, managed_service_id=_spec().managed_service_id),
+        DeprovisionSpec(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
         delete_data=True,
     )
     assert result.ok
@@ -426,7 +434,11 @@ def test_deprovision_default_refuses_with_active_commitment(
         _spec(config={"provisioned_throughput": "SixMonths"}),
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle, managed_service_id=_spec().managed_service_id),
+        DeprovisionSpec(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
     )
     assert not result.ok
     assert "commitment" in result.message
@@ -440,7 +452,11 @@ def test_deprovision_force_destroy_cannot_bypass_aws_commitment(
         _spec(config={"provisioned_throughput": "SixMonths"}),
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle, managed_service_id=_spec().managed_service_id),
+        DeprovisionSpec(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
         force_destroy=True,
     )
     assert not result.ok
@@ -460,7 +476,11 @@ def test_deprovision_atomic_both_flags(
     native["commitmentExpirationTime"] = datetime.now(UTC) - timedelta(seconds=1)
     log_group = f"/aws/astrolift/bedrock/{native['provisionedModelName']}"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle, managed_service_id=_spec().managed_service_id),
+        DeprovisionSpec(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
         delete_data=True,
         force_destroy=True,
     )
@@ -496,7 +516,11 @@ def test_deprovision_surfaces_pt_delete_failure(
     )
     bedrock_client.delete_provisioned_model_throughput = boom  # type: ignore[assignment]
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle, managed_service_id=_spec().managed_service_id),
+        DeprovisionSpec(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
         force_destroy=True,
     )
     assert not result.ok
@@ -528,7 +552,13 @@ def test_status_for_on_demand_record_is_available(
     driver: AmazonBedrockDriver,
 ) -> None:
     provisioned = driver.provision(_spec())
-    state = driver.status(ServiceHandle(handle=provisioned.handle, managed_service_id=_spec().managed_service_id))
+    state = driver.status(
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        )
+    )
     assert state.state == "available"
 
 
@@ -542,7 +572,13 @@ def test_status_for_provisioning_throughput(
     # Flip the throughput status into 'Creating'
     arn = next(iter(bedrock_client.provisioned))
     bedrock_client.provisioned[arn]["status"] = "Creating"
-    state = driver.status(ServiceHandle(handle=provisioned.handle, managed_service_id=_spec().managed_service_id))
+    state = driver.status(
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        )
+    )
     assert state.state == "provisioning"
 
 
@@ -555,7 +591,13 @@ def test_status_for_failed_throughput(
     )
     arn = next(iter(bedrock_client.provisioned))
     bedrock_client.provisioned[arn]["status"] = "Failed"
-    state = driver.status(ServiceHandle(handle=provisioned.handle, managed_service_id=_spec().managed_service_id))
+    state = driver.status(
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        )
+    )
     assert state.state == "error"
 
 
@@ -567,7 +609,11 @@ def test_binding_returns_connection_envelope(
 ) -> None:
     provisioned = driver.provision(_spec())
     binding = driver.binding(
-        ServiceHandle(handle=provisioned.handle, managed_service_id=_spec().managed_service_id),
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
     )
     env = binding.env_vars
     for key in (
@@ -590,7 +636,11 @@ def test_binding_iam_grants_cover_invoke_model(
 ) -> None:
     provisioned = driver.provision(_spec())
     binding = driver.binding(
-        ServiceHandle(handle=provisioned.handle, managed_service_id=_spec().managed_service_id),
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
     )
     actions = {a for g in binding.iam_grants for a in g.actions}
     assert "bedrock:InvokeModel" in actions
@@ -624,7 +674,13 @@ def test_binding_without_record_reconstructs_envelope(
         bedrock_client=FakeBedrockClient(),
         logs_client=FakeLogsClient(),
     )
-    binding = fresh.binding(ServiceHandle(handle=provisioned.handle, managed_service_id=_spec().managed_service_id))
+    binding = fresh.binding(
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        )
+    )
     assert binding.env_vars["MODEL_ENDPOINT_PROVIDER"].literal == "bedrock"
     assert binding.env_vars["BEDROCK_REGION"].literal == "us-east-1"
     assert "bedrock-runtime" in binding.env_vars["MODEL_ENDPOINT_URL"].literal
@@ -650,7 +706,11 @@ def test_binding_notes_mention_irsa_tag(
 ) -> None:
     provisioned = driver.provision(_spec())
     binding = driver.binding(
-        ServiceHandle(handle=provisioned.handle, managed_service_id=_spec().managed_service_id),
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
     )
     assert "astrolift.io/irsa-role" in binding.notes
 
@@ -668,7 +728,13 @@ def test_binding_endpoint_honours_override(
         logs_client=logs_client,
     )
     provisioned = d.provision(_spec())
-    binding = d.binding(ServiceHandle(handle=provisioned.handle, managed_service_id=_spec().managed_service_id))
+    binding = d.binding(
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        )
+    )
     assert binding.env_vars["MODEL_ENDPOINT_URL"].literal == "https://bedrock-runtime.acme.local"
 
 
@@ -679,7 +745,13 @@ def test_snapshot_returns_deterministic_id(
     driver: AmazonBedrockDriver,
 ) -> None:
     provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle, managed_service_id=_spec().managed_service_id))
+    snap = driver.snapshot(
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        )
+    )
     _, record_id = parse_handle(provisioned.handle)
     assert snap.snapshot_id.startswith(record_id)
 
@@ -695,7 +767,13 @@ def test_restore_provisions_target_record(
     driver: AmazonBedrockDriver,
 ) -> None:
     provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle, managed_service_id=_spec().managed_service_id))
+    snap = driver.snapshot(
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        )
+    )
 
     restore_spec = _spec(service_handle_hint="restored")
     result = driver.restore(snap, restore_spec)

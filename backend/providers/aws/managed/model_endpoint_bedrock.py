@@ -15,6 +15,7 @@ from typing import Any
 from _sdk._telemetry import driver_op
 from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.managed_service import (
+    UPDATE_NOT_SUPPORTED_IN_PLACE,
     Binding,
     BindingSchema,
     DeprovisionResult,
@@ -218,6 +219,8 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                         return UpdateResult(
                             ok=False, handle=spec.handle, message="Bedrock throughput is missing", errors=["not_found"]
                         )
+                    if paid is None:
+                        raise ManagedServiceError("Bedrock throughput durable identity is missing")
                     requested = cfg.get("model_id") or (_SIZE_TO_MODEL_ID.get(spec.size) if spec.size else None)
                     if (
                         (requested and digest(model_arn(requested, self._config)) != paid.model_hash)
@@ -227,11 +230,15 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                         )
                         or ("provisioned_throughput" in cfg and cfg["provisioned_throughput"] != paid.term)
                     ):
-                        return unsupported_update(
-                            spec.handle,
-                            reason=(
-                                "Provisioned throughput model, units and commitment changes require "
-                                "an explicitly reviewed replacement; no native update was performed"
+                        return UpdateResult(
+                            ok=False,
+                            handle=spec.handle,
+                            retryable=False,
+                            errors=[UPDATE_NOT_SUPPORTED_IN_PLACE],
+                            message=(
+                                "No native update was performed. Paid model, units or commitment changes "
+                                "need a separately reviewed replacement service with a new identity; "
+                                "automatic reprovision of this identity is not supported"
                             ),
                         )
                     if row.get("status") != "InService":
@@ -305,11 +312,17 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             paid = PaidHandle.parse(spec.handle)
             _, record_id = parse_handle(spec.handle)
             existing = self._describe(record_id)
+            if paid:
+                if delete_data and not paid.log_prefix_hash:
+                    raise ManagedServiceError("Bedrock paid log identity is not recorded; explicit recovery required")
+                record_id = paid.record_name
             if paid or not existing or (spec.config or {}).get("provisioned_throughput"):
                 paid, row = self._throughput.observe(
                     spec.handle, service=spec.managed_service_id, organization=spec.organization_id
                 )
                 if row:
+                    if paid is None:
+                        raise ManagedServiceError("Bedrock throughput durable identity is missing")
                     if self._throughput.commitment_active(row):
                         return DeprovisionResult(
                             ok=False,
@@ -320,7 +333,15 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                     self._bedrock.delete_provisioned_model_throughput(provisionedModelId=paid.arn)
                     record_id = row["provisionedModelName"]
             if delete_data:
-                self._delete_log_group(log_group=self._log_group_for(record_id=record_id))
+                if not self._delete_log_group(log_group=self._log_group_for(record_id=record_id)):
+                    return DeprovisionResult(
+                        ok=False,
+                        handle=spec.handle,
+                        message=(
+                            "Native throughput removal accepted or already gone; invocation log deletion unconfirmed"
+                        ),
+                        errors=["log_cleanup_unconfirmed"],
+                    )
                 self._records.pop(record_id, None)
             return DeprovisionResult(
                 ok=True,
@@ -338,7 +359,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
     # ---- read-only ops ------------------------------------------------
 
     @driver_op(cloud="aws", driver="model_endpoint_bedrock")
-    def status(self, handle: ServiceHandle) -> ServiceStatus:
+    def status(self, handle: ServiceHandle, config: dict[str, Any] | None = None) -> ServiceStatus:
         try:
             saved = PaidHandle.parse(handle.handle)
             _, record_id = parse_handle(handle.handle)
@@ -356,12 +377,16 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                     state="deprovisioned" if paid else "available",
                     message="Native throughput missing" if paid else "On-demand Bedrock capability binding",
                 )
+            if paid is None:
+                raise ManagedServiceError("Bedrock throughput durable identity is missing")
+            if config is not None:
+                self._assert_paid_config(paid, config)
             state = {
                 "Creating": "provisioning",
                 "Updating": "updating",
                 "InService": "available",
                 "Failed": "error",
-            }.get(row.get("status"), "error")
+            }.get(str(row.get("status")), "error")
             return ServiceStatus(
                 handle=handle.handle, state=state, message="Owned Bedrock throughput native state observed"
             )
@@ -389,12 +414,8 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             )
             if not paid or not row or row.get("status") != "InService":
                 raise ManagedServiceError("Bedrock provisioned throughput is not verified InService")
-            if (
-                (cfg.get("model_id") and digest(model_arn(cfg["model_id"], self._config)) != paid.model_hash)
-                or ("model_units" in cfg and (type(cfg["model_units"]) is not int or cfg["model_units"] != paid.units))
-                or ("provisioned_throughput" in cfg and cfg["provisioned_throughput"] != paid.term)
-            ):
-                raise ManagedServiceError("Bedrock binding configuration differs from recorded throughput")
+            if config is not None:
+                self._assert_paid_config(paid, cfg)
             existing = {"ModelId": paid.arn}
             record_id = row["provisionedModelName"]
             paid_grants = [Grant(resource=paid.arn, actions=list(_INVOKE_ACTIONS))]
@@ -558,6 +579,19 @@ class AmazonBedrockDriver(ManagedServiceDriver):
 
     # ---- internals ----------------------------------------------------
 
+    def _assert_paid_config(self, paid: PaidHandle, cfg: dict[str, Any]) -> None:
+        requested = (
+            cfg.get("model_id") or _SIZE_TO_MODEL_ID.get(str(cfg.get("size", "small"))) or self._config.default_model_id
+        )
+        units = cfg.get("model_units", 1)
+        if (
+            digest(model_arn(requested, self._config)) != paid.model_hash
+            or type(units) is not int
+            or units != paid.units
+            or cfg.get("provisioned_throughput") != paid.term
+        ):
+            raise ManagedServiceError("Bedrock current configuration differs from recorded throughput")
+
     def _provision_throughput(self, spec: ProvisionSpec) -> ProvisionResult:
         try:
             cfg = spec.config or {}
@@ -574,6 +608,8 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             )
             placeholder = f"arn:{partition}:bedrock:{self._config.region}:000000000000:provisioned-model/000000000000"
             replace(expected, arn=placeholder).encode()
+            if not re.fullmatch(r"[./_#A-Za-z0-9-]{1,512}", self._log_group_for(record_id=name)):
+                raise ManagedServiceError("Bedrock invocation log-group identity is invalid")
             if not re.fullmatch(r"[a-z0-9-]{1,20}", self._config.region):
                 raise ManagedServiceError("Bedrock region is invalid")
             candidates = (
@@ -585,11 +621,26 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                 ]
             )
             for candidate in dict.fromkeys(candidates):
-                saved, row = self._throughput.observe(
-                    candidate, service=expected.service, organization=expected.organization
-                )
+                if PaidHandle.parse(candidate):
+                    saved, row = self._throughput.observe(
+                        candidate, service=expected.service, organization=expected.organization
+                    )
+                else:
+                    row = self._throughput.get(parse_handle(candidate)[1])
+                    saved = None
+                    if row:
+                        original_row = row
+                        try:
+                            saved, row = self._throughput.observe(
+                                candidate, service=expected.service, organization=expected.organization
+                            )
+                        except ManagedServiceError:
+                            saved = self._throughput.recover_legacy(spec, expected, original_row)
+                            row = original_row
                 if row:
-                    if replace(saved, arn="") != expected:
+                    if saved is None:
+                        raise ManagedServiceError("Bedrock throughput durable identity is missing")
+                    if replace(saved, arn="", legacy_tags_hash="", legacy_name="") != expected:
                         raise ManagedServiceError("Bedrock recorded throughput does not match the requested intent")
                     if row.get("status") not in ("Creating", "Updating", "InService"):
                         raise ManagedServiceError("Bedrock throughput is failed or unknown")
@@ -704,8 +755,13 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         except Exception:
             return
 
-    def _delete_log_group(self, *, log_group: str) -> None:
+    def _delete_log_group(self, *, log_group: str) -> bool:
+        from botocore.exceptions import ClientError
+
         try:
             self._logs.delete_log_group(logGroupName=log_group)
+        except ClientError as exc:
+            return bool(exc.response.get("Error", {}).get("Code") == "ResourceNotFoundException")
         except Exception:
-            return
+            return False
+        return True

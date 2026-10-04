@@ -108,6 +108,14 @@ def _service_organization_id(svc: Any) -> str:
     return str(organization.guid)
 
 
+def _driver_organization_id(svc: Any, resolved: Any) -> str:
+    # Model handles carry paid native resources as well as capability bindings.
+    # The saved handle is not proof that the current database owner is unchanged.
+    if svc.kind == "model_endpoint" or is_spanner(resolved):
+        return _service_organization_id(svc)
+    return ""
+
+
 def _resolve_isolation(svc: Any, *, org: Any, cluster: Any) -> str:
     """The isolation mode this row provisions at.
 
@@ -721,7 +729,7 @@ def _deprovision_sync(
                 handle=svc.backend_ref,
                 managed_service_id=_service_identity(svc),
                 recorded_handle_exclusive=exclusive,
-                organization_id=_service_organization_id(svc) if is_spanner(resolved) else "",
+                organization_id=_driver_organization_id(svc, resolved),
                 recorded_container_exclusive=container_proof,
             )
         )
@@ -748,7 +756,7 @@ def _deprovision_sync(
         config=deprovision_config,
         managed_service_id=_service_identity(svc),
         recorded_handle_exclusive=exclusive,
-        organization_id=_service_organization_id(svc) if is_spanner(resolved) else "",
+        organization_id=_driver_organization_id(svc, resolved),
         recorded_container_exclusive=container_proof,
     )
     try:
@@ -1027,7 +1035,7 @@ def _update_sync(managed_service_id: int) -> dict[str, Any]:
             managed_service_id=_service_identity(svc),
             recorded_handle_exclusive=_recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg),
             cluster_model=_cluster_model_placement(svc, cluster=cluster) if svc.organization_id else None,
-            organization_id=_service_organization_id(svc) if is_spanner(resolved) else "",
+            organization_id=_driver_organization_id(svc, resolved),
             recorded_container_exclusive=container_exclusive(svc, resolved=resolved, cfg=cfg),
         ),
     )
@@ -1140,11 +1148,18 @@ def _check_ready_sync(managed_service_id: int, handle: str) -> str:
     probe = ServiceHandle(
         handle=handle,
         managed_service_id=_service_identity(svc),
-        organization_id=_service_organization_id(svc) if is_spanner(resolved) else "",
+        organization_id=_driver_organization_id(svc, resolved),
         recorded_handle_exclusive=_recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg),
         recorded_container_exclusive=container_exclusive(svc, resolved=resolved, cfg=cfg),
     )
-    return str(getattr(status_method(probe), "state", "available"))
+    import inspect
+
+    try:
+        accepts_config = "config" in inspect.signature(status_method).parameters
+    except (TypeError, ValueError):
+        accepts_config = False
+    observed = status_method(probe, config=dict(svc.config or {})) if accepts_config else status_method(probe)
+    return str(getattr(observed, "state", "available"))
 
 
 @activity.defn(name="astrolift.managed_service.check_ready")
@@ -1301,7 +1316,7 @@ def _managed_binding_for(svc: Any) -> Any:
         handle=svc.backend_ref,
         managed_service_id=_service_identity(svc),
         recorded_handle_exclusive=_recorded_handle_exclusive(svc, resolved=resolved, cfg=cfg),
-        organization_id=_service_organization_id(svc) if is_spanner(resolved) else "",
+        organization_id=_driver_organization_id(svc, resolved),
         recorded_container_exclusive=container_exclusive(svc, resolved=resolved, cfg=cfg),
     )
     # Thread the operator-supplied ``ManagedService.config`` into the
