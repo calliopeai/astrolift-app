@@ -117,6 +117,34 @@ references or reuse the selected environment's votes. Ordinary
 source-bootstrap consumers must explicitly carry this context when the real
 receipt-bound executor is wired; no ambient/thread/global vote count is supported.
 
+A private append-only `DeploymentExecutionReceipt` first records an EXPECTED
+intent inside the originating dispatch transaction, before `on_commit` starts
+Temporal. It pins the protected origin, Deployment/organization, canonical
+workflow ID/type, a domain-separated canonical pure-input hash and a server
+operation UUID. The input body, credentials and deployment configuration are
+not stored in this receipt. A pending approval does not create an enqueue intent
+until current original-caller quorum admission permits dispatch.
+
+The first activity rechecks original-caller execution admission and atomically
+adds the BOUND receipt using trusted `activity.info()` workflow/run IDs. The
+mutable `WorkflowRun` mirror can be written later; it is not authority. Subsequent
+`admitted_deployment_execution(input)` consumers must match the same protected
+input and actual run and reload the original caller and votes on every entry.
+Only current `pending` or `deploying` DeployApp execution can use the receipt;
+terminal states, pending approval and legacy `redeploying` cannot borrow it.
+Same-run retries/replay retain the same operation and binding. A new run, reset
+or continue-as-new for the same Deployment refuses; a new Deployment has a new
+intent. Any unresolved owned native journals still require their independent
+recovery fences. This run binding is not invocation, workload or readiness proof.
+
+Both EXPECTED and BOUND history refuse UPDATE/DELETE, including soft deletion.
+Migration 0047 reverses only with empty execution history; do not delete retained
+history to downgrade. Failure-status writes also require the expected input and
+actual workflow, and the original run when already bound. A tampered payload or
+different run cannot mark the accepted Deployment failed. A withdrawn original
+with an unchanged unbound intent may record fixed failure metadata; it cannot
+bind a run or proceed to native effects.
+
 The registered first activity checks the private receipt, pure workflow input and
 current original authority before manifest, build or native effects. Valid native
 requests then fail explicitly with `NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED`.

@@ -274,6 +274,10 @@ def _start_deploy_workflow_on_commit(
             replace(arg, actor=actor, identity_authority=origin) if isinstance(arg, DeployAppInput) else arg
             for arg in args
         ]
+    if origin is not None:
+        from astrolift_lifecycle.deployment_execution_receipt import expect_deployment_execution
+
+        expect_deployment_execution(deployment, workflow_kind, workflow_id, args)
     run_trigger = deployment_run_trigger(
         deployment.trigger_kind,
         via_token=origin.credential_kind == "api_token" if origin else get_current_api_token() is not None,

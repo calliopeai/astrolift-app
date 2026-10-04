@@ -3,6 +3,7 @@ from astrolift_lifecycle.models.app_environment import AppEnvironment
 from astrolift_lifecycle.models.deploy_token import DeployToken
 from astrolift_lifecycle.models.deployment import Deployment
 from astrolift_lifecycle.models.deployment_approval import DeploymentApproval
+from astrolift_lifecycle.models.deployment_execution_receipt import DeploymentExecutionReceipt
 from astrolift_lifecycle.models.deployment_identity_origin import DeploymentIdentityOrigin
 from astrolift_lifecycle.models.deployment_log import DeploymentLog
 from astrolift_lifecycle.models.dev_environment import DevEnvironment
@@ -31,6 +32,7 @@ __all__ = [
     "Deployment",
     "DeploymentApproval",
     "DeploymentIdentityOrigin",
+    "DeploymentExecutionReceipt",
     "DeploymentLog",
     "DevEnvironment",
     "DomainPathRoute",
