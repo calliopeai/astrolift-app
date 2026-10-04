@@ -159,6 +159,10 @@ export function managementModelResult(
     data.providerId !== model.providerId ||
     data.modelRepo !== model.modelRepo ||
     data.revisionSha !== model.revisionSha ||
+    data.sourceKind !== model.sourceKind ||
+    data.localArtifactId !== model.localArtifactId ||
+    data.localArtifactVersion !== model.localArtifactVersion ||
+    data.localManifestSha256 !== model.localManifestSha256 ||
     data.computeMode !== model.computeMode ||
     !Number.isSafeInteger(data.version) ||
     data.version <= input.ifMatchVersion ||
@@ -171,7 +175,17 @@ export function managementModelResult(
     return { accepted: false, message: fallback };
   if (
     update &&
-    (data.desiredResources.cpuRequest !== input.cpuRequest ||
+    (data.name !== (input.name ?? model.name) ||
+      data.sharingMode !== (input.sharingMode ?? model.sharingMode) ||
+      data.dedicatedAppId !==
+        (input.sharingMode === "SHARED"
+          ? null
+          : input.sharingMode === "DEDICATED"
+            ? input.dedicatedAppId
+            : model.dedicatedAppId) ||
+      (input.sharingMode === "DEDICATED" &&
+        data.dedicatedAppVersion !== input.ifMatchDedicatedAppVersion) ||
+      data.desiredResources.cpuRequest !== input.cpuRequest ||
       data.desiredResources.memoryRequest !== input.memoryRequest ||
       data.desiredResources.gpuCount !== input.gpuCount ||
       (data.desiredResources.cpuKvCacheGiB ?? null) !== (input.cpuKvCacheGiB ?? null) ||

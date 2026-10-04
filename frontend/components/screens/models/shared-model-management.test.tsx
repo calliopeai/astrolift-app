@@ -15,6 +15,7 @@ import zh from "@/messages/zh-Hans.json";
 import { SharedModelManagementClient } from "./SharedModelManagementClient";
 import { SharedModelManagementPanel } from "./SharedModelManagementPanel";
 import { sharedModelManagementProps } from "./shared-model-management.fixtures";
+import { modelSettingsRequest } from "./shared-model-settings";
 import type { ClusterModelFieldsFragment } from "@/graphql/__generated__/operations";
 const locales = { en, es, fr, de, "pt-BR": pt, ja, ko, "zh-Hans": zh };
 const org = vi.hoisted(() => ({ id: "00000000-0000-4000-8000-000000000001" }));
@@ -28,6 +29,9 @@ const model: ClusterModelFieldsFragment = {
   clusterId: "00000000-0000-4000-8000-000000000003",
   providerId: "00000000-0000-4000-8000-000000000004",
 };
+vi.mock("@/graphql/user/user.hooks", () => ({
+  useMe: () => ({ user: { id: "owner" }, loading: false, error: null }),
+}));
 type Request = { operationName: string; variables: Record<string, unknown> };
 let requests: Request[], transport: (request: Request) => Promise<Response>;
 function response(data: Record<string, unknown>) {
@@ -36,26 +40,11 @@ function response(data: Record<string, unknown>) {
   });
 }
 function fixture(request: Request): Response {
-  if (request.operationName === "Me")
+  if (request.operationName === "GetModelHostingAction")
+    return response({ modelHostingAction: { allowed: true, reason: null } });
+  if (request.operationName === "GetClusterModelUpdateAdmission")
     return response({
-      me: {
-        id: "00000000-0000-4000-8000-000000000009",
-        profile: { id: "00000000-0000-4000-8000-000000000008", username: "owner" },
-        modules: [
-          {
-            key: "models",
-            enabled: true,
-            canView: true,
-            canCreate: true,
-            canManage: true,
-            canRun: true,
-          },
-        ],
-      },
-    });
-  if (request.operationName === "GetClusterModelRuntimeAdmission")
-    return response({
-      clusterModelRuntimeAdmission: {
+      clusterModelUpdateAdmission: {
         eligible: true,
         reason: null,
         runtimeVersion: "0.15.1",
@@ -73,6 +62,9 @@ function fixture(request: Request): Response {
       errors: [],
       data: {
         ...model,
+        name: update ? input.name : model.name,
+        sharingMode: update ? input.sharingMode : model.sharingMode,
+        dedicatedAppId: update ? input.dedicatedAppId : model.dedicatedAppId,
         version: 7,
         status: update ? "updating" : "deprovisioning",
         operationId: "SharedModelReconcileWorkflow-actual-model-4",
@@ -153,7 +145,7 @@ describe("real shared model management boundary", () => {
   it("retries a failed capability read without issuing any management write", async () => {
     let failed = true;
     transport = async (request) =>
-      request.operationName === "Me" && failed
+      request.operationName === "GetModelHostingAction" && failed
         ? new Response(
             JSON.stringify({ errors: [{ message: "Management manifest unavailable" }] }),
             { headers: { "Content-Type": "application/json" } }
@@ -171,7 +163,9 @@ describe("real shared model management boundary", () => {
         screen.getByRole("button", { name: en.models.shared.management.reviewUpdate })
       ).toBeEnabled()
     );
-    expect(requests.filter((request) => request.operationName === "Me")).toHaveLength(2);
+    expect(
+      requests.filter((request) => request.operationName === "GetModelHostingAction")
+    ).toHaveLength(2);
     expect(writes()).toHaveLength(0);
   });
   it("updates persisted CPU with independent KV allocation and zero GPU without changing compute mode", async () => {
@@ -195,9 +189,9 @@ describe("real shared model management boundary", () => {
     expect(writes()[0].variables.input).toMatchObject({ gpuCount: 0, cpuKvCacheGiB: 4 });
     expect(
       requests
-        .filter((request) => request.operationName === "GetClusterModelRuntimeAdmission")
+        .filter((request) => request.operationName === "GetClusterModelUpdateAdmission")
         .at(-1)?.variables.input
-    ).toMatchObject({ computeMode: "cpu", gpuCount: 0, cpuKvCacheGiB: 4 });
+    ).toMatchObject({ id: model.id, gpuCount: 0, cpuKvCacheGiB: 4 });
   });
   it.each(["foreign", "missing"])(
     "refuses %s deprovision reply without claiming removal",
@@ -293,33 +287,21 @@ describe("real shared model management boundary", () => {
     expect(refresh).toHaveBeenCalledOnce();
     expect(
       requests
-        .filter((request) => request.operationName === "GetClusterModelRuntimeAdmission")
+        .filter((request) => request.operationName === "GetClusterModelUpdateAdmission")
         .at(-1)?.variables.input
-    ).toEqual({
-      organizationId: model.organizationId,
-      clusterId: model.clusterId,
-      expectedProviderId: model.providerId,
-      name: model.name,
-      modelRepo: model.modelRepo,
-      revisionSha: model.revisionSha,
-      computeMode: "gpu",
-      cpuRequest: "4",
-      memoryRequest: "16Gi",
-      gpuCount: 1,
-      cpuKvCacheGiB: null,
-      allowSubscriptions: true,
-      connectionId: null,
-      expectedConnectionVersion: null,
-      localArtifactId: null,
-      expectedArtifactVersion: null,
-    });
+    ).toEqual(writes()[0].variables.input);
+    expect(
+      requests
+        .filter((request) => request.operationName === "GetClusterModelUpdateAdmission")
+        .at(-1)?.variables.input
+    ).not.toHaveProperty("modelRepo");
     expect(screen.queryByText(en.models.shared.management.completedUpdate)).not.toBeInTheDocument();
   });
   it("allows retained-data cleanup of an idle failed model without configured runtime admission", async () => {
     transport = async (request) =>
-      request.operationName === "GetClusterModelRuntimeAdmission"
+      request.operationName === "GetClusterModelUpdateAdmission"
         ? response({
-            clusterModelRuntimeAdmission: {
+            clusterModelUpdateAdmission: {
               eligible: false,
               reason: "Runtime is not configured",
               runtimeVersion: null,
@@ -362,7 +344,7 @@ describe("real shared model management boundary", () => {
       let finishAdmission: (() => void) | undefined;
       let finishDeletion: (() => void) | undefined;
       transport = async (request) => {
-        if (request.operationName === "GetClusterModelRuntimeAdmission")
+        if (request.operationName === "GetClusterModelUpdateAdmission")
           return new Promise<Response>((resolve) => {
             finishAdmission = () => resolve(fixture(request));
           });
@@ -464,15 +446,15 @@ describe("real shared model management boundary", () => {
     "does not use Models visibility as management authority for %s",
     async (kind) => {
       transport = async (request) => {
-        if (request.operationName !== "Me") return fixture(request);
+        if (request.operationName !== "GetModelHostingAction") return fixture(request);
         if (kind === "denied")
           return new Response(
             JSON.stringify({ errors: [{ message: "Management manifest denied" }] }),
             { headers: { "Content-Type": "application/json" } }
           );
-        if (kind === "missing") return response({ me: null });
+        if (kind === "missing") return response({ modelHostingAction: null });
         const result = await fixture(request).json();
-        result.data.me.modules[0].canManage = false;
+        result.data.modelHostingAction.allowed = false;
         return response(result.data);
       };
       render(client(), { wrapper: wrapper() });
@@ -487,7 +469,7 @@ describe("real shared model management boundary", () => {
       expect(
         screen.getByRole("button", { name: en.models.shared.management.reviewUpdate })
       ).toBeDisabled();
-      expect(requests.map((request) => request.operationName)).toEqual(["Me"]);
+      expect(requests.map((request) => request.operationName)).toEqual(["GetModelHostingAction"]);
     }
   );
   it.each(["mixed", "missing", "foreign", "wrong_resources", "completed"])(
@@ -666,6 +648,25 @@ describe("real shared model management boundary", () => {
       />
     );
     expect(screen.getByText(en.models.shared.management.completedUpdate)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: en.models.shared.management.reviewUpdate })
+    ).toBeDisabled();
+    const current = {
+      ...props.model,
+      version: 7,
+      operationId: "accepted-operation",
+      operationCompletedAt: "2026-09-30T16:01:00Z",
+    };
+    rerender(
+      <SharedModelManagementPanel
+        {...props}
+        model={current}
+        admission={{
+          ...props.admission!,
+          requestKey: JSON.stringify(modelSettingsRequest(current, props.draft)),
+        }}
+      />
+    );
     expect(
       screen.getByRole("button", { name: en.models.shared.management.reviewUpdate })
     ).toBeEnabled();

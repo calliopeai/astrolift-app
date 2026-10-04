@@ -23,6 +23,10 @@ export type SharedModelListRow = {
   ready: boolean | null;
   readinessObservedAt: string | null;
   subscriptionsEnabled: boolean;
+  sharingMode?: "SHARED" | "DEDICATED";
+  dedicatedAppId?: string | null;
+  dedicatedAppName?: string | null;
+  dedicatedAppSlug?: string | null;
   sourceKind?: string;
   localManifestSha256?: string | null;
   desiredResources?: {
@@ -108,6 +112,25 @@ export function SharedModelsScreen({ page }: SharedModelsScreenProps) {
               : row.sourceKind === "huggingface"
                 ? inventory("huggingface")
                 : inventory("unknownSource"),
+        },
+        {
+          id: "access",
+          header: inventory("access"),
+          cell: (row) =>
+            row.sharingMode === "SHARED" ? (
+              inventory("shared")
+            ) : row.sharingMode === "DEDICATED" ? (
+              <span>
+                {inventory("dedicated")}
+                <span className="text-muted-foreground block">
+                  {row.dedicatedAppName
+                    ? inventory("dedicatedApp", { app: row.dedicatedAppName })
+                    : inventory("unknownAccess")}
+                </span>
+              </span>
+            ) : (
+              inventory("unknownAccess")
+            ),
         },
         {
           id: "resources",

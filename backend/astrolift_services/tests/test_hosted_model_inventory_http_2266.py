@@ -16,7 +16,7 @@ from core.tests.utils.scope_world import bind_role
 
 pytestmark = pytest.mark.django_db
 
-FIELDS = "id name organizationId clusterId providerId sourceKind localArtifactId localArtifactVersion localManifestSha256 modelRepo revisionSha computeMode status ready readinessObservedAt subscriptionsEnabled desiredResources{cpuRequest memoryRequest gpuCount}"
+FIELDS = "id name organizationId clusterId providerId sourceKind localArtifactId localArtifactVersion localManifestSha256 modelRepo revisionSha computeMode status ready readinessObservedAt subscriptionsEnabled sharingMode dedicatedAppId dedicatedAppVersion dedicatedAppName dedicatedAppSlug desiredResources{cpuRequest memoryRequest gpuCount}"
 PAGE = (
     "query($org:GUID!,$page:Int!,$filter:ClusterModelsFilterInput){clusterModelDeploymentsPage(organizationId:$org,page:$page,pageSize:1,filter:$filter){totalCount page items{"
     + FIELDS
@@ -28,7 +28,7 @@ DETAIL = "query($org:GUID!,$id:GUID!){clusterModelDeployment(organizationId:$org
 @pytest.fixture
 def world(monkeypatch):
     w = foundation_world.__wrapped__(monkeypatch)
-    w.member = Member.objects.create(user=w.user, scope_kind="ORG", scope_id=w.org.pk)
+    w.member, _ = Member.objects.get_or_create(user=w.user, scope_kind="ORG", scope_id=w.org.pk)
     bind_role(
         w.user,
         permissions=[Permission.ORG_READ],
@@ -115,6 +115,11 @@ def test_actual_paged_inventory_and_detail_preserve_local_source_without_claimin
         world.cluster.provider_plugin.guid
     )
     assert local["desiredResources"] == {"cpuRequest": "4", "memoryRequest": "16Gi", "gpuCount": 0}
+    assert local["sharingMode"] == "SHARED"
+    assert all(
+        local[field] is None
+        for field in ("dedicatedAppId", "dedicatedAppVersion", "dedicatedAppName", "dedicatedAppSlug")
+    )
     assert local["ready"] is False and local["readinessObservedAt"] is None
     assert first["data"]["clusterModelDeploymentsPage"]["items"][0]["ready"] is False
     status, detail = query(world, DETAIL, {"org": str(world.org.guid), "id": local["id"]})

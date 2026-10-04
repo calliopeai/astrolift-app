@@ -29,6 +29,7 @@ export const sharedModelsProps: SharedModelsScreenProps = {
         ready: true,
         readinessObservedAt: "2026-09-30T15:30:00Z",
         subscriptionsEnabled: true,
+        sharingMode: "SHARED",
       },
       {
         id: "shared-cpu",
@@ -48,6 +49,7 @@ export const sharedModelsProps: SharedModelsScreenProps = {
         ready: false,
         readinessObservedAt: null,
         subscriptionsEnabled: false,
+        sharingMode: "SHARED",
       },
     ],
   }),

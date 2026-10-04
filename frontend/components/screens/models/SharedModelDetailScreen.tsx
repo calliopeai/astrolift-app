@@ -196,6 +196,26 @@ export function SharedModelDetailScreen({
                     ),
                   },
                   {
+                    term: inventory("access"),
+                    description:
+                      model.sharingMode === "SHARED" ? (
+                        inventory("shared")
+                      ) : (
+                        <span>
+                          {inventory("dedicated")}
+                          <span className="block">
+                            {model.dedicatedAppSlug && model.dedicatedAppName ? (
+                              <Link href={`/apps/${encodeURIComponent(model.dedicatedAppSlug)}`}>
+                                {inventory("dedicatedApp", { app: model.dedicatedAppName })}
+                              </Link>
+                            ) : (
+                              inventory("unknownAccess")
+                            )}
+                          </span>
+                        </span>
+                      ),
+                  },
+                  {
                     term: common("subscriptions"),
                     description: model.subscriptionsEnabled
                       ? common("enabled")

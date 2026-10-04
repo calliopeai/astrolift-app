@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 import { SharedModelManagementPanel } from "./SharedModelManagementPanel";
+import { modelSettingsRequest } from "./shared-model-settings";
 import { sharedModelManagementProps } from "./shared-model-management.fixtures";
 const meta = {
   title: "Screens/Models/SharedModelManagementPanel",
@@ -44,5 +45,57 @@ export const DeleteReview: Story = {
     await expect(
       within(canvasElement.ownerDocument.body).getByRole("alertdialog")
     ).toHaveTextContent("retained");
+  },
+};
+const localEdit = {
+  model: {
+    ...sharedModelManagementProps.model,
+    sourceKind: "local_artifact",
+    localArtifactId: "artifact-one",
+    localArtifactVersion: 3,
+    localManifestSha256: "a".repeat(64),
+    revisionSha: null,
+    computeMode: "cpu",
+    desiredResources: {
+      cpuRequest: "2",
+      memoryRequest: "8Gi",
+      gpuCount: 0,
+      cpuKvCacheGiB: 2,
+      replicas: 1,
+    },
+  },
+  draft: {
+    ...sharedModelManagementProps.draft,
+    computeMode: "cpu",
+    gpuCount: "0",
+    cpuKvCacheGiB: "2",
+  },
+} as const;
+export const LocalSourceEdit: Story = {
+  args: {
+    ...localEdit,
+    admission: {
+      ...sharedModelManagementProps.admission!,
+      requestKey: JSON.stringify(modelSettingsRequest(localEdit.model, localEdit.draft)),
+    },
+  },
+};
+export const DedicatedAccess: Story = {
+  args: {
+    access: {
+      mode: "DEDICATED",
+      app: { id: "app-guid", version: 8, name: "Storefront", slug: "storefront" },
+    },
+    admission: {
+      ...sharedModelManagementProps.admission!,
+      requestKey: JSON.stringify(
+        modelSettingsRequest(sharedModelManagementProps.model, sharedModelManagementProps.draft, {
+          mode: "DEDICATED",
+          app: { id: "app-guid", version: 8, name: "Storefront", slug: "storefront" },
+        })
+      ),
+    },
+    onAccessChange: () => {},
+    onSelectDedicatedApp: () => {},
   },
 };
