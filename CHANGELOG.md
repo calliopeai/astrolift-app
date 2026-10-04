@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add internal read-only Microsoft Foundry deployment discovery through the native
+  Cognitive Services SDK. Bind results to the exact subscription/account/region,
+  bound pagination, block redirects and writes, and keep inference access unknown
+  until independently observed. Native UI connections remain separate work (#2269).
+
 - Bind model subscription finalization and traffic lookups explicitly to current
   service/app owners. Preserve admitted installation-shared cluster placement
   while keeping dedicated-app selectors tenant-bound (#2269, #2270).
