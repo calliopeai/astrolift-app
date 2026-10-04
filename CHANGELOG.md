@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Run the pinned AVX2 CPU runtime build and bounded model smoke in remote pull-request CI when its inputs change; keep registry publication explicit after verification (#2269).
+
 - Retain append-only GCP namespace/KSA and IAM response acknowledgments without advancing ownership or completion after caller withdrawal; guarded create recovery requires the original acknowledged UID (Refs: #2278).
 
 - Keep redeploy rebuilds on the original saved immutable source commit, including approval-delayed dispatch; refuse rebuilds with missing historical source pins before creating or enqueueing a deployment, while preserving artifact-only repeats and checking saved pins again before a delayed rebuild (#2282).
