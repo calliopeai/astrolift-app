@@ -5779,7 +5779,8 @@
         "appsEmptyHelp": "Os aplicativos precisam de um ambiente ativo no cluster desta implantação.",
         "sharingHelp": "Modelos compartilhados aceitam assinaturas de vários aplicativos. Modelos dedicados aceitam apenas o aplicativo selecionado. Revogue assinaturas incompatíveis e confirme a reconciliação antes de alterar o acesso.",
         "immutableSource": "A origem do modelo, o cluster e o modo de computação são preservados ao editar as configurações.",
-        "chooseDedicatedApp": "Escolha um aplicativo disponível atualmente antes de revisar o acesso dedicado."
+        "chooseDedicatedApp": "Escolha um aplicativo disponível atualmente antes de revisar o acesso dedicado.",
+        "nativeConnectionHelp": "As vinculações de aplicativos nativos usam identidade na nuvem. As revisões aplicadas não verificam o acesso à inferência do modelo."
       },
       "usability": {
         "nextStep": "Conclua a configuração para revisar a hospedagem",

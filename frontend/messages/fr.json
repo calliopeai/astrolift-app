@@ -5782,7 +5782,8 @@
         "appsEmptyHelp": "Les applications doivent avoir un environnement actif sur le cluster de ce déploiement.",
         "sharingHelp": "Les modèles partagés acceptent les abonnements de plusieurs applications. Les modèles dédiés acceptent uniquement l’application sélectionnée. Révoquez les abonnements incompatibles et confirmez la réconciliation avant de modifier l’accès.",
         "immutableSource": "La source du modèle, le cluster et le mode de calcul sont conservés lors de la modification des paramètres.",
-        "chooseDedicatedApp": "Choisissez une application actuelle avant de vérifier l’accès dédié."
+        "chooseDedicatedApp": "Choisissez une application actuelle avant de vérifier l’accès dédié.",
+        "nativeConnectionHelp": "Les liaisons des applications natives utilisent l’identité cloud. Les révisions appliquées ne vérifient pas l’accès à l’inférence du modèle."
       },
       "usability": {
         "nextStep": "Terminez la configuration pour vérifier l’hébergement",

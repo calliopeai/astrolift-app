@@ -5859,7 +5859,8 @@
         "appsEmptyHelp": "Apps need a live environment on this deployment’s cluster.",
         "sharingHelp": "Shared models accept subscriptions from multiple apps. Dedicated models accept only the selected app. Revoke incompatible subscriptions and confirm reconciliation before changing access.",
         "immutableSource": "Model source, cluster and compute mode are preserved when editing settings.",
-        "chooseDedicatedApp": "Choose a current app before reviewing dedicated access."
+        "chooseDedicatedApp": "Choose a current app before reviewing dedicated access.",
+        "nativeConnectionHelp": "Native app bindings use cloud identity. Applied binding revisions do not verify model inference access."
       },
       "usability": {
         "nextStep": "Finish setup to review hosting",

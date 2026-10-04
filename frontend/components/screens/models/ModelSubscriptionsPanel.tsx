@@ -43,6 +43,8 @@ export type SubscriptionModel = {
   organizationId: string;
   name: string;
   runtimeAdmission: "configured" | "unsupported" | "unknown";
+  nativeConnection?: boolean;
+  nativeConfigured?: boolean;
   clusterId: string;
   providerId: string;
   subscriptionsEnabled: boolean;
@@ -236,7 +238,7 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
   }
   const ready =
     deployment.subscriptionsEnabled &&
-    deployment.runtimeAdmission === "configured" &&
+    (deployment.runtimeAdmission === "configured" || deployment.nativeConfigured === true) &&
     !targetsLoading &&
     !targetsError &&
     !targets.stale;
@@ -272,7 +274,8 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
         {t("restartImpact")}
       </p>
       {!deployment.subscriptionsEnabled && <p role="status">{t("subscriptionsDisabled")}</p>}
-      {deployment.runtimeAdmission !== "configured" && (
+      {deployment.nativeConnection && <p role="status">{inventory("nativeConnectionHelp")}</p>}
+      {!deployment.nativeConnection && deployment.runtimeAdmission !== "configured" && (
         <p role="status">
           {t(
             deployment.runtimeAdmission === "unsupported" ? "unsupportedRuntime" : "unknownRuntime"
@@ -484,7 +487,7 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
                 disabled={
                   !row.canRevoke ||
                   subscriptions.stale ||
-                  deployment.runtimeAdmission !== "configured"
+                  (deployment.runtimeAdmission !== "configured" && !deployment.nativeConnection)
                 }
                 onClick={() => {
                   setFailure(null);
@@ -574,11 +577,13 @@ function reviewIsCurrent(
     current.deployment.version !== candidate.request.modelVersion ||
     current.deployment.clusterId !== candidate.request.expectedClusterId ||
     current.deployment.providerId !== candidate.request.expectedProviderId ||
-    current.deployment.runtimeAdmission !== "configured"
+    (current.deployment.runtimeAdmission !== "configured" && !current.deployment.nativeConnection)
   )
     return false;
   if (candidate.kind === "subscribe")
     return (
+      (current.deployment.runtimeAdmission === "configured" ||
+        current.deployment.nativeConfigured === true) &&
       current.deployment.subscriptionsEnabled &&
       !current.targets.stale &&
       !current.targets.loading &&

@@ -5779,7 +5779,8 @@
         "appsEmptyHelp": "应用需要在此部署的集群上拥有有效环境。",
         "sharingHelp": "共享模型允许多个应用订阅。专用模型仅允许所选应用订阅。更改访问权限前，请撤销不兼容的订阅并确认协调已完成。",
         "immutableSource": "编辑设置时，模型来源、集群和计算模式保持不变。",
-        "chooseDedicatedApp": "审查专用访问权限前，请选择当前可用的应用。"
+        "chooseDedicatedApp": "审查专用访问权限前，请选择当前可用的应用。",
+        "nativeConnectionHelp": "原生应用绑定使用云身份。已应用的绑定修订并不验证模型的推理访问权限。"
       },
       "usability": {
         "nextStep": "完成设置后检查托管配置",

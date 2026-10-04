@@ -12,6 +12,7 @@ import type { ModelSubscription } from "./ModelSubscriptionsPanel";
 import type { ClusterModelFieldsFragment } from "@/graphql/__generated__/operations";
 import { ModelSubscriptionsPanel } from "./ModelSubscriptionsPanel";
 import { useModelSubscriptions } from "./use-model-subscriptions";
+import { modelSourceMode } from "./native-model-source";
 export function ModelSubscriptionsClient(props: {
   model: ClusterModelFieldsFragment;
   blocked: boolean;
@@ -82,6 +83,7 @@ function Context({
     !props.subscriptions.loading &&
     !props.subscriptions.stale &&
     !props.subscriptions.error;
+  const trafficSupported = modelSourceMode(model) === "hosted";
   const selected =
     pageReady && selection.row && selection.pageKey === pageKey
       ? props.subscriptions.rows.find(
@@ -97,17 +99,21 @@ function Context({
       {...props}
       mode="connections"
       usageBlocked={!pageReady}
-      onSelectUsage={(row) => {
-        if (
-          pageReady &&
-          props.subscriptions.rows.some(
-            (candidate) => candidate.id === row.id && candidate.version === row.version
-          )
-        )
-          setSelection({ row, pageKey });
-      }}
+      onSelectUsage={
+        trafficSupported
+          ? (row) => {
+              if (
+                pageReady &&
+                props.subscriptions.rows.some(
+                  (candidate) => candidate.id === row.id && candidate.version === row.version
+                )
+              )
+                setSelection({ row, pageKey });
+            }
+          : undefined
+      }
       usage={
-        selected ? (
+        selected && trafficSupported ? (
           <ModelSubscriptionUsageClient
             key={`${selected.id}:${selected.version}`}
             model={model}

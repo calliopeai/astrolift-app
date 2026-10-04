@@ -5782,7 +5782,8 @@
         "appsEmptyHelp": "Apps benötigen eine aktive Umgebung auf dem Cluster dieser Bereitstellung.",
         "sharingHelp": "Gemeinsam genutzte Modelle akzeptieren Abonnements mehrerer Apps. Dedizierte Modelle akzeptieren nur die ausgewählte App. Widerrufen Sie inkompatible Abonnements und bestätigen Sie den Abgleich, bevor Sie den Zugriff ändern.",
         "immutableSource": "Modellquelle, Cluster und Rechenmodus bleiben beim Bearbeiten der Einstellungen erhalten.",
-        "chooseDedicatedApp": "Wählen Sie eine aktuell verfügbare App aus, bevor Sie den dedizierten Zugriff prüfen."
+        "chooseDedicatedApp": "Wählen Sie eine aktuell verfügbare App aus, bevor Sie den dedizierten Zugriff prüfen.",
+        "nativeConnectionHelp": "Native App-Bindungen verwenden Cloud-Identitäten. Angewendete Bindungsrevisionen prüfen keinen Inferenzzugriff auf das Modell."
       },
       "usability": {
         "nextStep": "Schließen Sie die Einrichtung ab, um das Hosting zu prüfen",

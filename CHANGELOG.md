@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add native Bedrock source query contracts and immutable registration outcome
+  guards. Keep app binding reconciliation separate from runtime/inference proof,
+  and suppress hosted-runtime usage queries for native connections (#2269).
+
 - Prepare translated hosting/native-connection choices and explicit unsupported
   native observation panels for the cloud model connection UI (#2269).
 

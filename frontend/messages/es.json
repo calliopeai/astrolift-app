@@ -5782,7 +5782,8 @@
         "appsEmptyHelp": "Las aplicaciones necesitan un entorno activo en el clúster de este despliegue.",
         "sharingHelp": "Los modelos compartidos aceptan suscripciones de varias aplicaciones. Los modelos dedicados solo aceptan la aplicación seleccionada. Revoca las suscripciones incompatibles y confirma la reconciliación antes de cambiar el acceso.",
         "immutableSource": "El origen del modelo, el clúster y el modo de cómputo se mantienen al editar la configuración.",
-        "chooseDedicatedApp": "Elige una aplicación vigente antes de revisar el acceso dedicado."
+        "chooseDedicatedApp": "Elige una aplicación vigente antes de revisar el acceso dedicado.",
+        "nativeConnectionHelp": "Los enlaces de aplicaciones nativas usan identidad en la nube. Las revisiones aplicadas no verifican el acceso a la inferencia del modelo."
       },
       "usability": {
         "nextStep": "Completa la configuración para revisar el alojamiento",

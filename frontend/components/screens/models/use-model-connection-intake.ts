@@ -13,6 +13,7 @@ import {
 import { REQUEST_MODEL_CONNECTION } from "@/graphql/models/model-connections.mutations";
 import { subscriptionModelResult } from "./shared-model-write-results";
 import { SUBSCRIBE_CLUSTER_MODEL } from "@/graphql/models/shared-models.mutations";
+import { validNativeSource } from "./native-model-source";
 import type {
   ClusterModelFieldsFragment,
   GetModelConnectionActionQuery,
@@ -392,6 +393,10 @@ export function useModelConnectionIntake(
       clusterId: model.clusterId,
       providerId: model.providerId,
       subscriptionsEnabled: model.subscriptionsEnabled,
+      nativeConnection: validNativeSource(model.nativeSource),
+      nativeConfigured:
+        validNativeSource(model.nativeSource) &&
+        model.nativeSource.configurationState === "configured",
     },
     supported: support.supported,
     supportError: support.error,

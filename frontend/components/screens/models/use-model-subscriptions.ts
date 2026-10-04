@@ -30,6 +30,7 @@ import type {
   RevokeSubscriptionRequest,
 } from "./ModelSubscriptionsPanel";
 import { subscriptionModelResult } from "./shared-model-write-results";
+import { validNativeSource } from "./native-model-source";
 
 const statuses: readonly string[] = ["pending", "active", "revoking", "revoked", "failed"];
 export function useModelSubscriptions(
@@ -41,6 +42,7 @@ export function useModelSubscriptions(
   const t = useTranslations("models.shared.subscriptions");
   const { org, loading: orgLoading, error: orgError } = useActiveOrg();
   const skipped = orgLoading || !!orgError || !org?.id || org.id !== model.organizationId;
+  const native = validNativeSource(model.nativeSource);
   const definitions = useMemo(() => {
     const list = (id: string, search: string): ListDefinition => ({
       id,
@@ -176,7 +178,8 @@ export function useModelSubscriptions(
         targetError ||
         targets.loading ||
         !model.subscriptionsEnabled ||
-        model.runtimeSupported !== true ||
+        (model.runtimeSupported !== true &&
+          !(native && model.nativeSource?.configurationState === "configured")) ||
         !/^[a-z][a-z0-9_]{0,31}$/.test(request.alias) ||
         !targetPage?.items.some(
           (row) =>
@@ -190,7 +193,7 @@ export function useModelSubscriptions(
     } else if (
       subscriptionError ||
       subscriptions.loading ||
-      model.runtimeSupported !== true ||
+      (model.runtimeSupported !== true && !native) ||
       !subscriptionPage?.items.some(
         (row) =>
           row.id === request.subscriptionId &&
@@ -253,6 +256,8 @@ export function useModelSubscriptions(
       clusterId: model.clusterId,
       providerId: model.providerId,
       subscriptionsEnabled: model.subscriptionsEnabled,
+      nativeConnection: native,
+      nativeConfigured: native && model.nativeSource?.configurationState === "configured",
       runtimeAdmission:
         model.runtimeSupported === true
           ? "configured"
