@@ -74,7 +74,8 @@ azure = [
     "azure-keyvault-secrets>=4.7",
     # CI push role on ACR provisions a User-Assigned Managed Identity +
     # AcrPush role assignment + GitHub OIDC Federated Identity Credential.
-    "azure-mgmt-msi>=7.0",
+    # Owned UAMI federation uses the MSI7 API2024-11-30 contract.
+    "azure-mgmt-msi>=7.1,<8",
     "azure-mgmt-authorization>=4.0",
     "azure-mgmt-network>=31.0.1",
     # Pinned: 36.0.0 introduced a regression where ApiClient drops the
