@@ -230,8 +230,6 @@ def deployment_app_identity_authority(reference, context):
     must evaluate each different environment with the ordinary zero-vote authority
     path; it must not pass this context to a re-signed sibling reference.
     """
-    if not isinstance(context, DeploymentAuthorityContext):
+    if type(context) is not DeploymentAuthorityContext:
         raise DeploymentOriginError("DEPLOYMENT_ORIGIN_INVALID")
-    return current_app_identity_authority(
-        reference, deployment_guid=context.deployment_guid, deployment_execution=True
-    )
+    return current_app_identity_authority(reference, deployment_context=context)

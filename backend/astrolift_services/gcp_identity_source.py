@@ -14,7 +14,7 @@ import ssl
 import time
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from django.db import connection
 from django.utils import timezone
@@ -48,6 +48,7 @@ from astrolift_services.gcp_workload_identity_journal import (
 )
 from astrolift_services.models import GCPAppIdentitySource, GCPClusterIdentitySource
 from astrolift_services.native_identity_authority import current_app_identity_authority
+from astrolift_workflows.native_identity_inputs import DeploymentAuthorityContext
 from core.cluster_credentials import credential_for_cluster
 from core.fields.uuid_v7 import uuid7
 
@@ -56,8 +57,8 @@ def _json(value):
     return json.loads(json.dumps(value, allow_nan=False))
 
 
-def _declaration(authority):
-    with current_app_identity_authority(authority) as selected:
+def _declaration(authority, *, deployment_context=None):
+    with current_app_identity_authority(authority, deployment_context=deployment_context) as selected:
         cluster, app = selected.tenant_cluster, selected.registered_app
         config = cluster.provider_config
         if (
@@ -110,8 +111,8 @@ def _native_source_sha256(observations):
     return _hash(tuple((name, values[:6] + values[7:]) for name, values in observations))
 
 
-def _configuration_sha256(authority):
-    with current_app_identity_authority(authority) as selected:
+def _configuration_sha256(authority, *, deployment_context=None):
+    with current_app_identity_authority(authority, deployment_context=deployment_context) as selected:
         cluster = selected.tenant_cluster
         return _hash((cluster.provider_config, cluster.auth_config))
 
@@ -151,7 +152,7 @@ class OriginalIdentity:
 
 
 @contextmanager
-def source_mutex(authority):
+def source_mutex(authority, *, deployment_context=None):
     _outside_atomic()
     if connection.vendor != "postgresql":
         raise IdentitySourceError("POSTGRESQL_REQUIRED")
@@ -173,7 +174,7 @@ def source_mutex(authority):
             cursor.execute("SELECT pg_try_advisory_lock(%s)", [lock_id])
             if not cursor.fetchone()[0]:
                 raise IdentitySourceError("SOURCE_BUSY")
-        store = SourceStore(authority, mutex, lock_id)
+        store = SourceStore(authority, mutex, lock_id, deployment_context=deployment_context)
         try:
             yield store
         finally:
@@ -188,9 +189,26 @@ def source_mutex(authority):
 
 
 class SourceStore:
-    def __init__(self, authority, mutex_connection, lock_id):
+    def __init__(self, authority, mutex_connection, lock_id, *, deployment_context=None):
         self.authority, self.active = authority, True
+        self.deployment_context = deployment_context
         self.mutex_connection, self.lock_id = mutex_connection, lock_id
+
+    def _accepted_reference(self):
+        reference = authority_reference_payload(self.authority)
+        if self.deployment_context is None:
+            return reference
+        context = self.deployment_context
+        try:
+            if (
+                type(context) is not DeploymentAuthorityContext
+                or str(UUID(context.deployment_guid)) != context.deployment_guid
+                or not UUID(context.deployment_guid).int
+            ):
+                raise ValueError
+        except (TypeError, ValueError, AttributeError):
+            raise IdentitySourceError("INVALID_DEPLOYMENT_CONTEXT") from None
+        return {**reference, "deployment_context": asdict(context)}
 
     def _ready(self):
         _outside_atomic()
@@ -257,7 +275,9 @@ class SourceStore:
             if pin and (pin.provider_plugin_id != provider.pk or pin.deleted_at is not None):
                 raise IdentitySourceError("ORIGINAL_CLUSTER_SOURCE_CHANGED")
             if current:
-                with current_app_identity_authority(a) as admitted:
+                with current_app_identity_authority(
+                    a, deployment_context=self.deployment_context
+                ) as admitted:
                     if (
                         admitted.registered_app.pk != app.pk
                         or admitted.tenant_cluster.pk != cluster.pk
@@ -267,6 +287,8 @@ class SourceStore:
                         and project.deleted_at is not None
                     ):
                         raise IdentitySourceError("CURRENT_SOURCE_UNAVAILABLE")
+                if row and row.state != "OBSERVED" and row.authority_reference != self._accepted_reference():
+                    raise IdentitySourceError("ORIGINAL_PENDING_OPERATION_REQUIRES_REVIEW")
             yield (org, app, cluster, provider, pin, row)
 
     def pin(self, operation, physical, native):
@@ -274,7 +296,7 @@ class SourceStore:
             raise IdentitySourceError("INVALID_CLUSTER_OBSERVATION")
         snapshot = _json({**physical, "native": asdict(native)})
         with self._locked() as (org, app, cluster, provider, pin, _):
-            _, current = _declaration(self.authority)
+            _, current = _declaration(self.authority, deployment_context=self.deployment_context)
             if current != physical:
                 raise IdentitySourceError("CURRENT_SOURCE_CHANGED")
             if pin:
@@ -328,7 +350,7 @@ class SourceStore:
     def reserve(self, operation, scope, physical, pin_id, snapshot, observations):
         if type(operation) is not SourceOperation or type(scope) is not ProjectScope:
             raise IdentitySourceError("INVALID_ORIGINAL_OPERATION")
-        reference = authority_reference_payload(self.authority)
+        reference = self._accepted_reference()
         original = _json(
             {
                 "project_id": scope.project_id,
@@ -347,7 +369,16 @@ class SourceStore:
                 or pin.original_snapshot["native"]["project_number"] != scope.project_number
             ):
                 raise IdentitySourceError("ORIGINAL_CLUSTER_PIN_REQUIRED")
-            if _hash(asdict(pre_identity_endpoint_snapshot(self.authority, scope))) != union:
+            if (
+                _hash(
+                    asdict(
+                        pre_identity_endpoint_snapshot(
+                            self.authority, scope, deployment_context=self.deployment_context
+                        )
+                    )
+                )
+                != union
+            ):
                 raise IdentitySourceError("CURRENT_COMPLETE_UNION_CHANGED")
             if row:
                 if row.original_snapshot != original or row.original_sha256 != _hash(original):
@@ -400,8 +431,14 @@ class SourceStore:
             if (
                 pin.original_sha256 != _hash(pin.original_snapshot)
                 or row.original_snapshot["physical"] != physical
-                or _declaration(self.authority)[1] != physical
-                or _hash(asdict(pre_identity_endpoint_snapshot(self.authority, scope)))
+                or _declaration(self.authority, deployment_context=self.deployment_context)[1] != physical
+                or _hash(
+                    asdict(
+                        pre_identity_endpoint_snapshot(
+                            self.authority, scope, deployment_context=self.deployment_context
+                        )
+                    )
+                )
                 != _hash(asdict(snapshot))
             ):
                 raise IdentitySourceError("CURRENT_COMPLETE_SOURCE_CHANGED")
@@ -414,8 +451,11 @@ class SourceStore:
                 raise IdentitySourceError("ACCOUNT_SEND_NOT_ADMITTED")
             # Re-evaluate after the final source row lock, not only before it.
             if (
-                _declaration(self.authority)[1] != physical
-                or pre_identity_endpoint_snapshot(self.authority, scope) != snapshot
+                _declaration(self.authority, deployment_context=self.deployment_context)[1] != physical
+                or pre_identity_endpoint_snapshot(
+                    self.authority, scope, deployment_context=self.deployment_context
+                )
+                != snapshot
             ):
                 raise IdentitySourceError("CURRENT_COMPLETE_SOURCE_CHANGED")
             row.state = "SENT"
@@ -440,7 +480,7 @@ class SourceStore:
         # This locks only retained original owners. It deliberately supplies no current authority.
         with self._locked(current=False) as (_, _, _, _, _, row):
             self._bound(row, reservation)
-            if row.authority_reference != authority_reference_payload(self.authority):
+            if row.authority_reference != self._accepted_reference():
                 raise IdentitySourceError("ORIGINAL_EFFECT_AUTHORITY_REFERENCE_CHANGED")
             if (
                 evidence.source_id != reservation.source_id
@@ -459,7 +499,7 @@ class SourceStore:
     def unknown(self, reservation):
         with self._locked(current=False) as (_, _, _, _, _, row):
             self._bound(row, reservation)
-            if row.authority_reference != authority_reference_payload(self.authority):
+            if row.authority_reference != self._accepted_reference():
                 raise IdentitySourceError("ORIGINAL_EFFECT_AUTHORITY_REFERENCE_CHANGED")
             if row.state == "SENT":
                 row.state = "UNKNOWN"
@@ -471,8 +511,11 @@ class SourceStore:
             if row.state not in ("EVIDENCE", "OBSERVED") or row.unique_id is None:
                 raise IdentitySourceError("ORIGINAL_ACCOUNT_NOT_OBSERVED")
             if (
-                _declaration(self.authority)[1] != physical
-                or pre_identity_endpoint_snapshot(self.authority, scope) != snapshot
+                _declaration(self.authority, deployment_context=self.deployment_context)[1] != physical
+                or pre_identity_endpoint_snapshot(
+                    self.authority, scope, deployment_context=self.deployment_context
+                )
+                != snapshot
             ):
                 raise IdentitySourceError("CURRENT_COMPLETE_SOURCE_CHANGED")
             if row.state != "OBSERVED":
@@ -500,21 +543,25 @@ class SourceStore:
             )
 
 
-def bootstrap_original_identity(authority, operation, *, native_factory=NativeIdentitySource):
+def bootstrap_original_identity(
+    authority, operation, *, native_factory=NativeIdentitySource, deployment_context=None
+):
     """Independent committed bootstrap; never call from an enclosing activity transaction."""
     if type(operation) is not SourceOperation:
         raise IdentitySourceError("INVALID_ORIGINAL_OPERATION")
-    with source_mutex(authority) as store:
+    with source_mutex(authority, deployment_context=deployment_context) as store:
         deadline = time.monotonic() + MAX_SOURCE_SECONDS
-        declaration, physical = _declaration(authority)
-        configuration = _configuration_sha256(authority)
+        declaration, physical = _declaration(authority, deployment_context=deployment_context)
+        configuration = _configuration_sha256(authority, deployment_context=deployment_context)
+        with store._locked():
+            pass
 
         def source_current():
             if time.monotonic() >= deadline:
                 raise IdentitySourceError("SOURCE_DEADLINE_EXCEEDED")
             if (
-                _declaration(authority) != (declaration, physical)
-                or _configuration_sha256(authority) != configuration
+                _declaration(authority, deployment_context=deployment_context) != (declaration, physical)
+                or _configuration_sha256(authority, deployment_context=deployment_context) != configuration
             ):
                 raise IdentitySourceError("CURRENT_REGISTERED_SOURCE_CHANGED")
 
@@ -523,11 +570,14 @@ def bootstrap_original_identity(authority, operation, *, native_factory=NativeId
         try:
             source_current()
             scope, pin = native.observe_cluster(current=source_current)
-            snapshot = pre_identity_endpoint_snapshot(authority, scope)
+            snapshot = pre_identity_endpoint_snapshot(authority, scope, deployment_context=deployment_context)
 
             def complete_current():
                 source_current()
-                if pre_identity_endpoint_snapshot(authority, scope) != snapshot:
+                if (
+                    pre_identity_endpoint_snapshot(authority, scope, deployment_context=deployment_context)
+                    != snapshot
+                ):
                     raise IdentitySourceError("CURRENT_COMPLETE_UNION_CHANGED")
 
             rows = native.observe_endpoints(scope, snapshot, cluster_pin=pin, current=complete_current)
@@ -577,16 +627,16 @@ def bootstrap_original_identity(authority, operation, *, native_factory=NativeId
             native.close()
 
 
-def original_identity_context(authority, *, native_factory=NativeIdentitySource):
+def original_identity_context(authority, *, native_factory=NativeIdentitySource, deployment_context=None):
     """Read/revalidate a retained observed source without creating or resuming an effect."""
-    with source_mutex(authority) as store:
+    with source_mutex(authority, deployment_context=deployment_context) as store:
         with store._locked() as (_, _, _, _, _, row):
             if row is None or row.state != "OBSERVED":
                 raise IdentitySourceError("ORIGINAL_OBSERVED_SOURCE_REQUIRED")
             reservation, request, uid = store._reservation(row), store._request(row), row.unique_id
         deadline = time.monotonic() + MAX_SOURCE_SECONDS
-        declaration, physical = _declaration(authority)
-        configuration = _configuration_sha256(authority)
+        declaration, physical = _declaration(authority, deployment_context=deployment_context)
+        configuration = _configuration_sha256(authority, deployment_context=deployment_context)
 
         snapshot = None
 
@@ -600,11 +650,17 @@ def original_identity_context(authority, *, native_factory=NativeIdentitySource)
                     or latest.unique_id != uid
                     or latest.original_snapshot["physical"] != physical
                     or pin.original_sha256 != _hash(pin.original_snapshot)
-                    or _declaration(authority) != (declaration, physical)
-                    or _configuration_sha256(authority) != configuration
+                    or _declaration(authority, deployment_context=deployment_context)
+                    != (declaration, physical)
+                    or _configuration_sha256(authority, deployment_context=deployment_context)
+                    != configuration
                 ):
                     raise IdentitySourceError("ORIGINAL_SOURCE_CHANGED")
-            if snapshot is not None and pre_identity_endpoint_snapshot(authority, scope) != snapshot:
+            if (
+                snapshot is not None
+                and pre_identity_endpoint_snapshot(authority, scope, deployment_context=deployment_context)
+                != snapshot
+            ):
                 raise IdentitySourceError("CURRENT_COMPLETE_UNION_CHANGED")
 
         current()
@@ -613,7 +669,7 @@ def original_identity_context(authority, *, native_factory=NativeIdentitySource)
             current()
             scope, cluster = native.observe_cluster(current=current)
             native.read_account(request, uid, current=current)
-            snapshot = pre_identity_endpoint_snapshot(authority, scope)
+            snapshot = pre_identity_endpoint_snapshot(authority, scope, deployment_context=deployment_context)
             rows = native.observe_endpoints(scope, snapshot, cluster_pin=cluster, current=current)
             _validate_observations(
                 snapshot, tuple(ObservedEndpoint(name, (values,)) for name, values in rows)
