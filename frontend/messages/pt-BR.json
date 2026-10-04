@@ -6011,6 +6011,24 @@
         "unconfirmed": "O resultado da gravação não foi confirmado. Atualize o inventário antes de tentar novamente; não repita o registro sem verificar.",
         "clusterSearch": "Pesquisar clusters",
         "changed": "A origem ou o posicionamento revisado mudou. Leia novamente antes de continuar."
+      },
+      "details": {
+        "title": "Conexão de modelo nativo",
+        "description": "Metadados da origem de nuvem são registrados localmente. A invocação continua não verificada.",
+        "configuration": "Configuração da origem",
+        "configured": "Configurada",
+        "unavailable": "Indisponível",
+        "partition": "Partição AWS",
+        "observedAt": "Metadados observados",
+        "unsupported": "Esta variante de origem nativa não é compatível. Ações de hospedagem, execução e inferência estão indisponíveis.",
+        "notApplicable": "Não se aplica a uma conexão de modelo de nuvem",
+        "settingsHelp": "Edite nome local, compartilhamento e admissão de assinaturas. Origem, conta e região são imutáveis; recursos pagos de nuvem não são alterados.",
+        "saveSettings": "Revisar configurações",
+        "remove": "Remover registro da conexão",
+        "removeHelp": "Remova apenas esta conexão local após aplicar todas as revogações. O modelo de nuvem nunca é excluído.",
+        "queued": "Configurações aceitas para reconciliação de vínculos. A invocação de nuvem continua não verificada.",
+        "removed": "Conexão local removida. A origem de nuvem não foi excluída.",
+        "restartImpact": "Isso altera o vínculo de identidade de nuvem do app e pode exigir reiniciá-lo. Não reinicia nem aloca o modelo de nuvem."
       }
     }
   },

@@ -9,10 +9,18 @@ export type ModelAddAction = { allowed: boolean | null; reason: string | null };
 export type ModelAddChoicePanelProps = {
   hosting: ModelAddAction;
   connection: ModelAddAction;
+  onRetry?: () => void;
+  retryDisabled?: boolean;
 };
 
-export function ModelAddChoicePanel({ hosting, connection }: ModelAddChoicePanelProps) {
-  const t = useTranslations("models.native.add");
+export function ModelAddChoicePanel({
+  hosting,
+  connection,
+  onRetry,
+  retryDisabled,
+}: ModelAddChoicePanelProps) {
+  const t = useTranslations("models.native.add"),
+    common = useTranslations("models.shared.hosting");
   return (
     <div className="grid gap-6 md:grid-cols-2">
       {(
@@ -38,6 +46,16 @@ export function ModelAddChoicePanel({ hosting, connection }: ModelAddChoicePanel
           </div>
         </Section>
       ))}
+      {onRetry && (hosting.allowed !== true || connection.allowed !== true) && (
+        <Button
+          variant="outline"
+          disabled={retryDisabled}
+          onClick={onRetry}
+          className="md:col-span-2"
+        >
+          {common("retry")}
+        </Button>
+      )}
     </div>
   );
 }

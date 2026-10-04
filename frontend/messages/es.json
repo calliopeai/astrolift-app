@@ -6014,6 +6014,24 @@
         "unconfirmed": "El resultado de escritura no está confirmado. Actualiza el inventario antes de reintentar; no envíes otro registro a ciegas.",
         "clusterSearch": "Buscar clústeres",
         "changed": "La fuente o ubicación revisada cambió. Vuelve a leerla antes de continuar."
+      },
+      "details": {
+        "title": "Conexión de modelo nativo",
+        "description": "Los metadatos de la fuente de nube se registran localmente. La invocación sigue sin verificarse.",
+        "configuration": "Configuración de fuente",
+        "configured": "Configurada",
+        "unavailable": "No disponible",
+        "partition": "Partición de AWS",
+        "observedAt": "Metadatos observados",
+        "unsupported": "Esta variante de fuente nativa no es compatible. Las acciones de alojamiento, ejecución e inferencia no están disponibles.",
+        "notApplicable": "No aplica a una conexión de modelo de nube",
+        "settingsHelp": "Edita el nombre local, uso compartido y admisión de suscripciones. Fuente, cuenta y región son inmutables; no se modifican recursos de nube de pago.",
+        "saveSettings": "Revisar ajustes de conexión",
+        "remove": "Eliminar registro de conexión",
+        "removeHelp": "Elimina solo esta conexión local tras aplicar todas las revocaciones de suscripción. Nunca se elimina el modelo de nube.",
+        "queued": "Ajustes aceptados para reconciliar vinculaciones. La invocación de nube sigue sin verificarse.",
+        "removed": "Conexión local eliminada. La fuente de nube no se eliminó.",
+        "restartImpact": "Esto cambia la vinculación de identidad de nube de la app y puede requerir reiniciarla. No reinicia ni asigna el modelo de nube."
       }
     }
   },

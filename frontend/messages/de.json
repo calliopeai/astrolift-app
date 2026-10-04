@@ -6014,6 +6014,24 @@
         "unconfirmed": "Das Schreibergebnis ist unbestätigt. Aktualisiere das Inventar vor einem erneuten Versuch; registriere nicht erneut ohne Prüfung.",
         "clusterSearch": "Cluster suchen",
         "changed": "Die geprüfte Quelle oder Platzierung hat sich geändert. Lies sie vor dem Fortfahren erneut."
+      },
+      "details": {
+        "title": "Native Modellverbindung",
+        "description": "Cloud-Quellmetadaten sind lokal registriert. Der Aufruf bleibt ungeprüft.",
+        "configuration": "Quellkonfiguration",
+        "configured": "Konfiguriert",
+        "unavailable": "Nicht verfügbar",
+        "partition": "AWS-Partition",
+        "observedAt": "Metadaten beobachtet",
+        "unsupported": "Diese native Quellvariante wird nicht unterstützt. Hosting-, Laufzeit- und Inferenzaktionen sind nicht verfügbar.",
+        "notApplicable": "Nicht auf eine Cloud-Modellverbindung anwendbar",
+        "settingsHelp": "Lokalen Namen, Freigabe und Abonnementzulassung bearbeiten. Quelle, Konto und Region sind unveränderlich; kostenpflichtige Cloud-Ressourcen bleiben unverändert.",
+        "saveSettings": "Verbindungseinstellungen prüfen",
+        "remove": "Verbindung deregistrieren",
+        "removeHelp": "Nur diese lokale Verbindung entfernen, nachdem alle Abonnementwiderrufe angewendet wurden. Das Cloud-Modell wird niemals gelöscht.",
+        "queued": "Einstellungen zur Bindungsabstimmung angenommen. Der Cloud-Aufruf bleibt ungeprüft.",
+        "removed": "Lokale Verbindung entfernt. Die Cloud-Quelle wurde nicht gelöscht.",
+        "restartImpact": "Dies ändert die Cloud-Identitätsbindung der App und kann ihren Neustart erfordern. Das Cloud-Modell wird nicht neu gestartet oder bereitgestellt."
       }
     }
   },

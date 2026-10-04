@@ -44,13 +44,15 @@ export const validNativeSource = (
 export const modelSourceMode = (
   model: Pick<ClusterModelFieldsFragment, "sourceKind" | "nativeSource">
 ) =>
-  model.nativeSource || model.sourceKind === "bedrock"
-    ? validNativeSource(model.nativeSource)
-      ? "native"
-      : "unsupported"
-    : ["huggingface", "local_artifact"].includes(model.sourceKind)
-      ? "hosted"
-      : "unsupported";
+  model.sourceKind === "bedrock" && model.nativeSource == null
+    ? "native_unavailable"
+    : model.nativeSource || model.sourceKind === "bedrock"
+      ? model.sourceKind === "bedrock" && validNativeSource(model.nativeSource)
+        ? "native"
+        : "unsupported"
+      : ["huggingface", "local_artifact"].includes(model.sourceKind)
+        ? "hosted"
+        : "unsupported";
 
 export const sameNativeSource = (
   left: NativeModelSourceFieldsFragment | null | undefined,

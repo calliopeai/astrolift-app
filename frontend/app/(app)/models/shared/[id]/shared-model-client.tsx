@@ -1,4 +1,8 @@
 "use client";
+import { useState } from "react";
+import { modelSourceMode } from "@/components/screens/models/native-model-source";
+import { NativeModelObservationsPanel } from "@/components/screens/models/NativeModelObservationsPanel";
+import { NativeModelSettingsClient } from "@/components/screens/models/NativeModelSettingsClient";
 import { ModelConnectionPolicyClient } from "@/components/screens/models/ModelConnectionPolicyClient";
 import { SharedModelDetailScreen } from "@/components/screens/models/SharedModelDetailScreen";
 import { useSharedModelDetail } from "@/components/screens/models/use-shared-model-detail";
@@ -15,11 +19,14 @@ export function SharedModelClient({ id }: { id: string }) {
 }
 function DetailContext({ id }: { id: string }) {
   const props = useSharedModelDetail(id);
+  const [removalConfirmed, setRemovalConfirmed] = useState(false);
+  const mode = props.model ? modelSourceMode(props.model) : "unsupported";
   return (
     <SharedModelDetailScreen
       {...props}
+      removalConfirmed={removalConfirmed}
       subscriptions={
-        props.model ? (
+        props.model && mode !== "unsupported" ? (
           <ModelSubscriptionsClient
             model={props.model}
             blocked={props.stale || !!props.error}
@@ -27,16 +34,33 @@ function DetailContext({ id }: { id: string }) {
           />
         ) : null
       }
-      observations={props.model ? <ModelObservationsClient model={props.model} /> : null}
-      prompt={props.model ? <SharedModelPromptClient model={props.model} /> : null}
+      observations={
+        props.model && mode === "hosted" ? (
+          <ModelObservationsClient model={props.model} />
+        ) : props.model && (mode === "native" || mode === "native_unavailable") ? (
+          <NativeModelObservationsPanel />
+        ) : null
+      }
+      prompt={
+        props.model && mode === "hosted" ? <SharedModelPromptClient model={props.model} /> : null
+      }
       management={
-        props.model ? (
+        props.model && mode !== "unsupported" ? (
           <>
-            <SharedModelManagementClient
-              model={props.model}
-              blocked={props.stale || !!props.error}
-              onRefresh={props.onRetry}
-            />
+            {mode === "native" || mode === "native_unavailable" ? (
+              <NativeModelSettingsClient
+                model={props.model}
+                blocked={props.stale || !!props.error}
+                onRefresh={props.onRetry}
+                onRemoved={() => setRemovalConfirmed(true)}
+              />
+            ) : mode === "hosted" ? (
+              <SharedModelManagementClient
+                model={props.model}
+                blocked={props.stale || !!props.error}
+                onRefresh={props.onRetry}
+              />
+            ) : null}
             <ModelConnectionPolicyClient
               model={props.model}
               blocked={props.stale || !!props.error}

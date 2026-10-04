@@ -1,4 +1,5 @@
 "use client";
+import { ModelAddChoiceClient } from "@/components/screens/models/ModelAddChoiceClient";
 import { SharedModelsScreen } from "@/components/screens/models/SharedModelsScreen";
 import { useSharedModels } from "@/components/screens/models/use-shared-models";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
@@ -9,5 +10,5 @@ export function ModelsClient() {
   return <InventoryContext key={`${org?.id ?? ""}:${user?.id ?? ""}`} />;
 }
 function InventoryContext() {
-  return <SharedModelsScreen {...useSharedModels()} />;
+  return <SharedModelsScreen {...useSharedModels()} addChoices={<ModelAddChoiceClient />} />;
 }

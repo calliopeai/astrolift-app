@@ -30,7 +30,7 @@ import type {
   RevokeSubscriptionRequest,
 } from "./ModelSubscriptionsPanel";
 import { subscriptionModelResult } from "./shared-model-write-results";
-import { validNativeSource } from "./native-model-source";
+import { modelSourceMode, sameNativeSource } from "./native-model-source";
 
 const statuses: readonly string[] = ["pending", "active", "revoking", "revoked", "failed"];
 export function useModelSubscriptions(
@@ -42,7 +42,7 @@ export function useModelSubscriptions(
   const t = useTranslations("models.shared.subscriptions");
   const { org, loading: orgLoading, error: orgError } = useActiveOrg();
   const skipped = orgLoading || !!orgError || !org?.id || org.id !== model.organizationId;
-  const native = validNativeSource(model.nativeSource);
+  const native = modelSourceMode(model) === "native";
   const definitions = useMemo(() => {
     const list = (id: string, search: string): ListDefinition => ({
       id,
@@ -237,6 +237,13 @@ export function useModelSubscriptions(
               })
             ).data?.revokeModelSubscription;
       if (!current()) return { accepted: false as const, message: t("changed") };
+      if (
+        native &&
+        (!sameNativeSource(envelope?.data?.deployment.nativeSource, model.nativeSource) ||
+          envelope?.data?.deployment.ready != null ||
+          envelope?.data?.deployment.runtimeSupported != null)
+      )
+        return { accepted: false, message: t("requestFailed") };
       return subscriptionModelResult(envelope, request, t("requestFailed"));
     } catch (error) {
       return {

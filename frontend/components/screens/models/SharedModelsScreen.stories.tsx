@@ -4,6 +4,7 @@ import { expect, userEvent, within } from "storybook/test";
 import fr from "@/messages/fr.json";
 import zh from "@/messages/zh-Hans.json";
 import { SharedModelsScreen } from "./SharedModelsScreen";
+import { nativeModelRow } from "./native-model.fixtures";
 import { sharedModelsProps, localizedSharedModelsProps } from "./shared-models.fixtures";
 const meta = {
   title: "Screens/Models/SharedModelsScreen",
@@ -109,6 +110,25 @@ export const LocalSource: Story = {
           localManifestSha256: "c".repeat(64),
           revisionSha: null,
           desiredResources: { cpuRequest: "2", memoryRequest: "8Gi", gpuCount: 0 },
+        },
+      ],
+    },
+  },
+};
+
+export const NativeConnection: Story = {
+  args: { page: { ...sharedModelsProps.page, rows: [nativeModelRow] } },
+};
+
+export const NativeMetadataUnavailable: Story = {
+  args: {
+    page: {
+      ...sharedModelsProps.page,
+      rows: [
+        {
+          ...nativeModelRow,
+          nativeSource: null,
+          reason: "Native source declaration is unavailable",
         },
       ],
     },

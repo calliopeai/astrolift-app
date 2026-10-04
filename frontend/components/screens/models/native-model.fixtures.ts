@@ -2,6 +2,7 @@ import type {
   BedrockModelSourceFieldsFragment,
   ClusterModelFieldsFragment,
 } from "@/graphql/__generated__/operations";
+import type { SharedModelListRow } from "./SharedModelsScreen";
 import { sharedModelDetailProps } from "./shared-model-detail.fixtures";
 
 export const nativeSource: BedrockModelSourceFieldsFragment = {
@@ -63,4 +64,18 @@ export const nativeModel: ClusterModelFieldsFragment = {
     maxNumSeqs: null,
   },
   appliedResources: null,
+};
+
+export const nativeModelRow: SharedModelListRow = {
+  ...nativeModel,
+  revisionSha: nativeModel.revisionSha ?? null,
+  computeMode: nativeModel.computeMode ?? null,
+  reason: nativeModel.reason ?? null,
+  ready: nativeModel.ready ?? null,
+  readinessObservedAt: nativeModel.readinessObservedAt ?? null,
+  desiredResources: {
+    cpuRequest: nativeModel.desiredResources.cpuRequest ?? null,
+    memoryRequest: nativeModel.desiredResources.memoryRequest ?? null,
+    gpuCount: nativeModel.desiredResources.gpuCount ?? null,
+  },
 };

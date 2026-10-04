@@ -124,6 +124,7 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
   const t = useTranslations("models.shared.subscriptions");
   const inventory = useTranslations("models.shared.inventory");
   const native = useTranslations("models.native");
+  const nativeDetails = useTranslations("models.native.details");
   const confirmedPage = !subscriptions.loading && !subscriptions.stale && !subscriptions.error;
   const visibleApps = confirmedPage
     ? [...new Set(subscriptions.rows.map((row) => row.appSlug))]
@@ -272,7 +273,7 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
         <p className="text-muted-foreground text-sm">{t("description")}</p>
       </div>
       <p className="border-warning-border bg-warning-bg text-warning-fg rounded-md border p-3 text-sm">
-        {t("restartImpact")}
+        {deployment.nativeConnection ? nativeDetails("restartImpact") : t("restartImpact")}
       </p>
       {!deployment.subscriptionsEnabled && <p role="status">{t("subscriptionsDisabled")}</p>}
       {deployment.nativeConnection && <p role="status">{native("bindingHelp")}</p>}
@@ -544,7 +545,9 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
                     alias: review.subscription.alias || t("legacyAlias"),
                   })}
             </span>
-            <span className="block">{t("restartImpact")}</span>
+            <span className="block">
+              {deployment.nativeConnection ? nativeDetails("restartImpact") : t("restartImpact")}
+            </span>
             {review && !reviewCurrent && (
               <span role="alert" className="text-destructive block">
                 {t("changed")}

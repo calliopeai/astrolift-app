@@ -6011,6 +6011,24 @@
         "unconfirmed": "写入结果尚未确认。重试前请刷新模型列表，不要在未经确认时重复注册。",
         "clusterSearch": "搜索集群",
         "changed": "已审核的来源或部署位置发生变化。请重新读取后再继续。"
+      },
+      "details": {
+        "title": "原生模型连接",
+        "description": "云来源元数据已在本地注册。调用仍未经验证。",
+        "configuration": "来源配置",
+        "configured": "已配置",
+        "unavailable": "不可用",
+        "partition": "AWS 分区",
+        "observedAt": "元数据观测时间",
+        "unsupported": "不支持此原生来源类型。托管、运行时和推理操作不可用。",
+        "notApplicable": "不适用于云模型连接",
+        "settingsHelp": "编辑本地名称、共享方式和订阅准入。来源、账户、区域不可更改，不会改变付费云资源。",
+        "saveSettings": "审核连接设置",
+        "remove": "取消注册连接",
+        "removeHelp": "仅在所有订阅撤销生效后移除此本地连接。绝不会删除云模型。",
+        "queued": "设置已接受，等待绑定协调。云调用仍未经验证。",
+        "removed": "本地连接已移除。云来源未删除。",
+        "restartImpact": "这将改变应用的云身份绑定，可能需要重启应用。不会重启或分配云模型。"
       }
     }
   },

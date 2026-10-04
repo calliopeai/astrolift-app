@@ -6014,6 +6014,24 @@
         "unconfirmed": "Le résultat de l’écriture est incertain. Actualisez l’inventaire avant de réessayer ; ne répétez pas l’enregistrement sans vérification.",
         "clusterSearch": "Rechercher des clusters",
         "changed": "La source ou le placement vérifié a changé. Relisez-le avant de continuer."
+      },
+      "details": {
+        "title": "Connexion à un modèle natif",
+        "description": "Les métadonnées cloud sont enregistrées localement. L’invocation reste non vérifiée.",
+        "configuration": "Configuration de la source",
+        "configured": "Configurée",
+        "unavailable": "Indisponible",
+        "partition": "Partition AWS",
+        "observedAt": "Métadonnées observées",
+        "unsupported": "Cette variante native n’est pas prise en charge. Les actions d’hébergement, d’exécution et d’inférence sont indisponibles.",
+        "notApplicable": "Non applicable à une connexion de modèle cloud",
+        "settingsHelp": "Modifiez le nom local, le partage et l’admission des abonnements. Source, compte et région sont immuables ; aucune ressource cloud payante n’est modifiée.",
+        "saveSettings": "Vérifier les paramètres",
+        "remove": "Désenregistrer la connexion",
+        "removeHelp": "Supprimez uniquement cette connexion locale une fois toutes les révocations appliquées. Le modèle cloud n’est jamais supprimé.",
+        "queued": "Paramètres acceptés pour la réconciliation des liaisons. L’invocation cloud reste non vérifiée.",
+        "removed": "Connexion locale supprimée. La source cloud n’a pas été supprimée.",
+        "restartImpact": "Cela modifie la liaison d’identité cloud de l’application et peut nécessiter son redémarrage. Le modèle cloud n’est ni redémarré ni alloué."
       }
     }
   },

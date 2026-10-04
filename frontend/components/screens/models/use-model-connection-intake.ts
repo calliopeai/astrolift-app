@@ -13,7 +13,7 @@ import {
 import { REQUEST_MODEL_CONNECTION } from "@/graphql/models/model-connections.mutations";
 import { subscriptionModelResult } from "./shared-model-write-results";
 import { SUBSCRIBE_CLUSTER_MODEL } from "@/graphql/models/shared-models.mutations";
-import { validNativeSource } from "./native-model-source";
+import { modelSourceMode, sameNativeSource } from "./native-model-source";
 import type {
   ClusterModelFieldsFragment,
   GetModelConnectionActionQuery,
@@ -336,7 +336,12 @@ export function useModelConnectionIntake(
         return { accepted: false, message: reply?.errors[0]?.message ?? t("connectionUncertain") };
       const data = reply.data;
       const correlated =
-        data?.deployment && data?.subscription
+        data?.deployment &&
+        data?.subscription &&
+        (modelSourceMode(model) !== "native" ||
+          (sameNativeSource(data.deployment.nativeSource, model.nativeSource) &&
+            data.deployment.ready == null &&
+            data.deployment.runtimeSupported == null))
           ? subscriptionModelResult(
               reply,
               {
@@ -393,10 +398,10 @@ export function useModelConnectionIntake(
       clusterId: model.clusterId,
       providerId: model.providerId,
       subscriptionsEnabled: model.subscriptionsEnabled,
-      nativeConnection: validNativeSource(model.nativeSource),
+      nativeConnection: modelSourceMode(model) === "native",
       nativeConfigured:
-        validNativeSource(model.nativeSource) &&
-        model.nativeSource.configurationState === "configured",
+        modelSourceMode(model) === "native" &&
+        model.nativeSource?.configurationState === "configured",
     },
     supported: support.supported,
     supportError: support.error,

@@ -29,17 +29,23 @@ function Views(props: {
 }) {
   const t = useTranslations("models.shared.connections");
   const [adding, setAdding] = useState(false);
+  const sourceMode = modelSourceMode(props.model);
+  const canAdd =
+    !props.blocked &&
+    (props.model.sourceKind !== "bedrock" ||
+      (sourceMode === "native" && props.model.nativeSource?.configurationState === "configured"));
+  const showIntake = adding && canAdd;
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap gap-2">
-        <Button variant="outline" onClick={() => setAdding(!adding)}>
-          {t(adding ? "connections" : "add")}
+        <Button variant="outline" disabled={!canAdd} onClick={() => setAdding(!showIntake)}>
+          {t(showIntake ? "connections" : "add")}
         </Button>
         <Button variant="outline" asChild>
           <Link href="/models/connections">{t("viewRequests")}</Link>
         </Button>
       </div>
-      {adding ? <IntakeContext {...props} /> : <Context {...props} />}
+      {showIntake ? <IntakeContext {...props} /> : <Context {...props} />}
     </section>
   );
 }

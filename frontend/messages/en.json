@@ -6091,6 +6091,24 @@
         "unconfirmed": "The write outcome is unconfirmed. Refresh the model inventory before retrying; do not submit another registration blindly.",
         "clusterSearch": "Search clusters",
         "changed": "The reviewed source or placement changed. Read it again before continuing."
+      },
+      "details": {
+        "title": "Native model connection",
+        "description": "Cloud source metadata is registered locally. Invocation remains unverified.",
+        "configuration": "Source configuration",
+        "configured": "Configured",
+        "unavailable": "Unavailable",
+        "partition": "AWS partition",
+        "observedAt": "Metadata observed",
+        "unsupported": "This native source variant is unsupported. Hosting, runtime and inference actions are unavailable.",
+        "notApplicable": "Not applicable to a cloud model connection",
+        "settingsHelp": "Edit the local name, sharing and subscription admission. Source/account/region are immutable; no paid cloud resources are changed.",
+        "saveSettings": "Review connection settings",
+        "remove": "Unregister connection",
+        "removeHelp": "Remove only this local connection after all subscription revocations are applied. This never deletes the cloud model.",
+        "queued": "Settings accepted for binding reconciliation. Cloud invocation is still unverified.",
+        "removed": "Local connection removed. The cloud source was not deleted.",
+        "restartImpact": "This changes the app cloud-identity binding and may require an app restart. It does not restart or allocate the cloud model."
       }
     }
   },

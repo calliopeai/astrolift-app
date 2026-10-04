@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Show native cloud connections in model inventory/detail with immutable source
+  metadata and guarded local settings/removal. Preserve app subscription policy,
+  expose unavailable native sources without hosted-runtime fallbacks, and keep
+  cloud inference/metrics explicitly unverified or unsupported (#2269).
+
 - Add a common cloud-model connection wizard with fresh versioned placement and
   exact source review, bounded native discovery, and synchronous metadata-only
   registration. Preserve unknown invocation access and refuse blind write retries

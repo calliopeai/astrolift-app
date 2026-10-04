@@ -82,7 +82,7 @@ export const useNativeModelConnection = (): NativeModelConnectScreenProps => {
     !skipped &&
     !support.loading &&
     !support.error &&
-    support.data?.bedrockModelConnectionSupport.enabled === true &&
+    support.data?.bedrockModelConnectionSupport?.enabled === true &&
     support.data.bedrockModelConnectionSupport.allowed === true;
   const clustersList = useLocalListState(
     useMemo(() => listDefinition("nativeModelPlacement", t("clusterSearch")), [t])
@@ -272,7 +272,7 @@ export const useNativeModelConnection = (): NativeModelConnectScreenProps => {
       orgError?.message ??
       actorError?.message ??
       support.error?.message ??
-      support.data?.bedrockModelConnectionSupport.reason ??
+      support.data?.bedrockModelConnectionSupport?.reason ??
       null,
     onRetrySupport: () => {
       if (!skipped) void support.refetch().catch(() => {});

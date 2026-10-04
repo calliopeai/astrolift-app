@@ -93,7 +93,10 @@ describe("native source boundaries", () => {
     ).toBe(false);
   });
   it("never treats missing native identity as a hosted model", () => {
-    expect(modelSourceMode({ ...nativeModel, nativeSource: null })).toBe("unsupported");
+    expect(modelSourceMode({ ...nativeModel, nativeSource: null })).toBe("native_unavailable");
     expect(modelSourceMode({ sourceKind: "huggingface", nativeSource: null })).toBe("hosted");
+    expect(
+      modelSourceMode({ sourceKind: "huggingface", nativeSource: nativeSource.identity })
+    ).toBe("unsupported");
   });
 });
