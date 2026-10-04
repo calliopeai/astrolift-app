@@ -179,5 +179,32 @@ The narrow post-send evidence path compares the original reservation and full
 stored acceptance, including its context, without looking up current approval
 or granting permission. Withdrawal after a reply can retain the original UID as
 evidence; it cannot authorize observation, another send or a different context.
-These private consumers still require actual receipt-bound Temporal execution
-and the remaining apply/runtime/inference chain before public activation.
+Registered native activities can open the private scoped
+`deployment_execution_checkpoint(input)` context and pass its `current` callback
+explicitly into source bootstrap, original-source reads and Endpoint plan
+production/refresh. Capture happens only inside the actual activity; every
+callback reloads the protected origin, votes, input/run binding and current
+Deployment status. Trusted SDK cancellation refuses both the bare admission
+helper and the scoped callback. The callback also refuses once its local scope
+closes, even if a copied Activity context remains available. A cancellation
+request or a closed scope is not a query of Temporal final state.
+
+Credential metadata threads run a fresh copy of the captured SDK context for
+that invocation, with no ambient or serialized execution authority. Their own
+default Django connection is closed after the complete callback; no global
+connection cleanup sweeps unrelated aliases. An existing default connection or
+transaction on an outer metadata invocation refuses without closing it. Nested
+checks inside the callback-owned source transaction re-admit without closing
+that transaction; the activity owner's active transaction stays open. No permission, votes or admission result survives a native wait. Current
+source transitions call the callback after acquiring their parent/source locks;
+post-send `current=False` evidence/unknown transitions retain only original
+acknowledgement evidence without current execution authority. Only first binding
+locks EXPECTED; later checks read immutable EXPECTED/BOUND history without row
+locks, avoiding waits while source/preparation/IAM parents are held. Missing or
+inconsistent binding still refuses.
+
+These callbacks are optional for existing standalone private consumers and do
+not activate the staged deployment path. The actual native pipeline must wire
+them at every source, preparation/IAM, render/apply and runtime boundary, close
+its clients within the activity scope, and complete the remaining
+apply/runtime/inference chain before public activation.

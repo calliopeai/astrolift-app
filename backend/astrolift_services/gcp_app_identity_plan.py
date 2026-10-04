@@ -17,6 +17,7 @@ from django.db.models import Q
 
 from astrolift_identity import abac
 from astrolift_identity.permission_resolver import _decide_from_grants, decide
+from astrolift_lifecycle.deployment_execution_checkpoint import compose_execution_checkpoint
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_registry.scopes import _app_scope
 from astrolift_services.models import (
@@ -504,10 +505,16 @@ def _template(authority, identity, snapshot, observations, *, deployment_context
     )
 
 
-def endpoint_app_checkpoint(plan):
+def _execution_current(callback):
+    if callback is not None and (not callable(callback) or callback() is not None):
+        raise EndpointAppPlanError("CURRENT_EXECUTION_UNCONFIRMED")
+
+
+def endpoint_app_checkpoint(plan, *, execution_checkpoint=None):
     """DB-only callable usable at journal checkpoints; no new model locks or cloud reads."""
 
     def current():
+        _execution_current(execution_checkpoint)
         snapshot = endpoint_app_snapshot(
             plan.authority, plan.identity, deployment_context=plan.deployment_context
         )
@@ -524,14 +531,14 @@ def endpoint_app_checkpoint(plan):
         ):
             raise EndpointAppPlanError("ACCEPTED_APP_SOURCE_CHANGED")
 
-    return current
+    return compose_execution_checkpoint(execution_checkpoint, current)
 
 
-def refresh_endpoint_app_sources(plan, *, observer_factory=NativeEndpointObserver):
+def refresh_endpoint_app_sources(plan, *, observer_factory=NativeEndpointObserver, execution_checkpoint=None):
     """Separate bounded native stage; never run from a database/journal transaction."""
     if connection.in_atomic_block or not connection.get_autocommit():
         raise EndpointAppPlanError("NATIVE_OBSERVATION_REQUIRES_COMMITTED_DATABASE")
-    current = endpoint_app_checkpoint(plan)
+    current = endpoint_app_checkpoint(plan, execution_checkpoint=execution_checkpoint)
     deadline = time.monotonic() + MAX_SOURCE_SECONDS
 
     def checkpoint():
@@ -539,6 +546,7 @@ def refresh_endpoint_app_sources(plan, *, observer_factory=NativeEndpointObserve
             raise EndpointAppPlanError("NATIVE_SOURCE_DEADLINE_EXCEEDED")
         current()
 
+    checkpoint = compose_execution_checkpoint(execution_checkpoint, checkpoint)
     checkpoint()
     if not plan.snapshot.endpoints:
         if (
@@ -570,19 +578,27 @@ def refresh_endpoint_app_sources(plan, *, observer_factory=NativeEndpointObserve
 
 
 def produce_endpoint_app_plan(
-    authority, identity, *, observer_factory=NativeEndpointObserver, deployment_context=None
+    authority,
+    identity,
+    *,
+    observer_factory=NativeEndpointObserver,
+    deployment_context=None,
+    execution_checkpoint=None,
 ):
     if connection.in_atomic_block or not connection.get_autocommit():
         raise EndpointAppPlanError("NATIVE_OBSERVATION_REQUIRES_COMMITTED_DATABASE")
+    _execution_current(execution_checkpoint)
     snapshot = endpoint_app_snapshot(authority, identity, deployment_context=deployment_context)
     deadline = time.monotonic() + MAX_SOURCE_SECONDS
 
     def checkpoint():
+        _execution_current(execution_checkpoint)
         if time.monotonic() >= deadline:
             raise EndpointAppPlanError("NATIVE_SOURCE_DEADLINE_EXCEEDED")
         if endpoint_app_snapshot(authority, identity, deployment_context=deployment_context) != snapshot:
             raise EndpointAppPlanError("ACCEPTED_APP_SOURCE_CHANGED")
 
+    checkpoint = compose_execution_checkpoint(execution_checkpoint, checkpoint)
     checkpoint()
     if not snapshot.endpoints:
         return AcceptedEndpointAppPlan(

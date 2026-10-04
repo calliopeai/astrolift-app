@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Scope private native execution checkpoints to the actual activity lifetime and cancellation; re-admit callbacks on SDK metadata threads and final source transitions, preserve acknowledged UID evidence after withdrawal, and avoid receipt-lock waits beneath source parents. Full native pipeline activation remains staged (#2278).
+
 - Pin native deployment enqueue intent and actual Temporal run in protected append-only receipts; refuse changed inputs or replacement runs before effects and keep failure status scoped to the accepted execution. Native pipeline activation remains staged (#2278).
 
 - Retain original-caller admission for GCP app bootstrap history on its exact app and physical cluster, including uncertain creates and empty desired service graphs; shared cluster pins alone do not gate unrelated app deployments (#2278).

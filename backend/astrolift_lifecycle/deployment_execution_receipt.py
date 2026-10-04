@@ -95,6 +95,8 @@ def admitted_deployment_execution(input, *, bind=False):
     the receipt; reset/continue-as-new/new runs require a new Deployment intent.
     """
     info = activity.info()
+    if activity.is_cancelled():
+        raise DeploymentExecutionError()
     try:
         run_id = str(UUID(info.workflow_run_id))
     except (ValueError, TypeError, AttributeError):
@@ -116,14 +118,13 @@ def admitted_deployment_execution(input, *, bind=False):
         input.identity_authority, DeploymentAuthorityContext(str(deployment.guid))
     ):
         with transaction.atomic():
-            expected = (
-                DeploymentExecutionReceipt.all_objects.select_for_update()
-                .filter(
-                    deployment=deployment,
-                    kind=DeploymentExecutionReceipt.Kind.EXPECTED,
-                )
-                .first()
-            )
+            receipts = DeploymentExecutionReceipt.all_objects
+            if bind:
+                receipts = receipts.select_for_update()
+            expected = receipts.filter(
+                deployment=deployment,
+                kind=DeploymentExecutionReceipt.Kind.EXPECTED,
+            ).first()
             if (
                 expected is None
                 or expected.deleted_at is not None
@@ -145,6 +146,8 @@ def admitted_deployment_execution(input, *, bind=False):
                 deployment=deployment,
                 kind=DeploymentExecutionReceipt.Kind.BOUND,
             ).first()
+            if activity.is_cancelled():
+                raise DeploymentExecutionError()
             if row is None and bind:
                 row = DeploymentExecutionReceipt.objects.create(
                     deployment=deployment,
@@ -179,6 +182,8 @@ def admitted_deployment_execution(input, *, bind=False):
                 row.input_sha256,
                 str(row.guid),
             )
+        if activity.is_cancelled():
+            raise DeploymentExecutionError()
         yield execution
 
 
