@@ -19,7 +19,7 @@ const locales = { en, es, fr, de, "pt-BR": pt, ja, ko, "zh-Hans": zh };
 function view(props: SharedModelDeploymentScreenProps, locale: keyof typeof locales = "en") {
   return (
     <NextIntlClientProvider locale={locale} messages={locales[locale]} timeZone="UTC">
-      <SharedModelDeploymentScreen {...props} />
+      <SharedModelDeploymentScreen initialStep={2} {...props} />
     </NextIntlClientProvider>
   );
 }
@@ -33,6 +33,32 @@ function pending() {
 }
 
 describe("shared model placement review", () => {
+  it.each(["", "0", "1025", "not-a-size"])(
+    "refuses incomplete CPU cache %s before runtime admission",
+    (cache) => {
+      const draft = {
+        ...sharedDeploymentProps.draft,
+        computeMode: "cpu" as const,
+        gpuCount: "0",
+        cpuKvCacheGiB: cache,
+      };
+      expect(
+        sharedModelRequest(
+          "org",
+          { id: "cluster-one", providerId: "provider-one" },
+          sharedDeploymentProps.model,
+          draft
+        )
+      ).toBeNull();
+      render(view({ ...sharedDeploymentProps, draft, initialStep: 1 }));
+      fireEvent.click(screen.getByRole("button", { name: en.models.shared.usability.enterCache }));
+      expect(screen.getByLabelText(en.models.shared.placement.cpuKvCacheGiB)).toHaveFocus();
+      expect(
+        screen.getByRole("button", { name: en.models.shared.usability.continueStep })
+      ).toBeDisabled();
+    }
+  );
+
   it("creates only the complete admitted immutable request, then reports accepted rather than ready", async () => {
     const onDeploy = vi.fn(
       async (_request: SharedModelRequest): Promise<Outcome> => ({

@@ -13,7 +13,11 @@ export const sharedModelDraftSchema = z
   .refine(
     (draft) =>
       draft.computeMode !== "" &&
-      (draft.computeMode === "cpu" ? Number(draft.gpuCount) === 0 : Number(draft.gpuCount) > 0)
+      (draft.computeMode === "cpu"
+        ? Number(draft.gpuCount) === 0 &&
+          /^[1-9]\d*$/.test(draft.cpuKvCacheGiB) &&
+          Number(draft.cpuKvCacheGiB) <= 1024
+        : Number(draft.gpuCount) > 0)
   );
 export type SharedModelDraft = {
   name: string;

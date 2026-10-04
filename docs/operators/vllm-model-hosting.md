@@ -6,14 +6,14 @@ Astrolift hosts open-weight models with **vLLM**, the same OpenAI-compatible ser
 
 vLLM runs one engine behind one of two HTTP frontends:
 
-| | Rust | Python |
-|---|---|---|
-| What it is | `vllm-rs`, enabled with `VLLM_USE_RUST_FRONTEND=1` | The original FastAPI server |
-| Speed | About 5x requests/s on preprocess-heavy loads (per upstream) | Baseline |
-| Chat and completions (streaming too) | Yes | Yes |
-| Tool calling and reasoning | Some model families (see below) | All parsers |
-| Embeddings, score, rerank | **Not yet** | Yes |
-| Anthropic Messages, Responses API | Not yet / in progress | Yes |
+|                                      | Rust                                                         | Python                      |
+| ------------------------------------ | ------------------------------------------------------------ | --------------------------- |
+| What it is                           | `vllm-rs`, enabled with `VLLM_USE_RUST_FRONTEND=1`           | The original FastAPI server |
+| Speed                                | About 5x requests/s on preprocess-heavy loads (per upstream) | Baseline                    |
+| Chat and completions (streaming too) | Yes                                                          | Yes                         |
+| Tool calling and reasoning           | Some model families (see below)                              | All parsers                 |
+| Embeddings, score, rerank            | **Not yet**                                                  | Yes                         |
+| Anthropic Messages, Responses API    | Not yet / in progress                                        | Yes                         |
 
 Upstream tracks the gaps in [vllm-project/vllm#44280](https://github.com/vllm-project/vllm/issues/44280). Astrolift keeps the same table in `providers/k8s_native/managed/model_endpoint_vllm.py` (`RUST_TASKS`, `RUST_TOOL_PARSERS`, `RUST_REASONING_PARSERS`), and it is updated as upstream closes items.
 
@@ -24,7 +24,12 @@ Four levels, where the most specific one that is set wins:
 1. **The service:** `frontend = "python"` in the service config.
 2. **The model:** `vllm_model_defaults` in the cluster's provider config, keyed by model id or glob:
    ```json
-   {"vllm_model_defaults": {"Qwen/*": {"frontend": "rust"}, "BAAI/*": {"frontend": "python"}}}
+   {
+     "vllm_model_defaults": {
+       "Qwen/*": { "frontend": "rust" },
+       "BAAI/*": { "frontend": "python" }
+     }
+   }
    ```
 3. **The cluster:** `"vllm_frontend": "python"` in the cluster's provider config.
 4. **The install:** the admin setting **Model hosting > `VLLM_FRONTEND_DEFAULT`**, which is `rust` by default.
@@ -83,7 +88,7 @@ label proves CPU compatibility.
       "image": "registry.example/operator-verified-vllm-cpu@sha256:<64-lowercase-hex-digest>",
       "architecture": "amd64",
       "hardware_certified": true,
-      "node_selector": {"example.com/vllm-cpu-certified": "true"}
+      "node_selector": { "example.com/vllm-cpu-certified": "true" }
     },
     "gpu": {
       "version": "0.15.1",
@@ -91,16 +96,16 @@ label proves CPU compatibility.
       "image": "registry.example/operator-verified-vllm-gpu@sha256:<64-lowercase-hex-digest>",
       "architecture": "amd64",
       "hardware_certified": true,
-      "node_selector": {"example.com/vllm-gpu-certified": "true"}
+      "node_selector": { "example.com/vllm-gpu-certified": "true" }
     }
   },
   "vllm_agent_test": {
     "namespace": "astrolift-system",
-    "pod_labels": {"app": "astrolift-agent"}
+    "pod_labels": { "app": "astrolift-agent" }
   },
   "vllm_metrics": {
     "namespace": "monitoring",
-    "labels": {"release": "kube-prometheus-stack"}
+    "labels": { "release": "kube-prometheus-stack" }
   }
 }
 ```
@@ -186,3 +191,28 @@ requires deprovisioning all its shared model deployments, including deployments
 without subscribers. This release adds no orphan-recovery or instant force-revoke
 API; investigate pre-existing corrupted/orphaned records with an operator before
 attempting cleanup.
+
+### Hosting wizard setup
+
+`/models/deploy` shows one active step at a time: source, cluster placement and
+resources, then the access/license/runtime/resource review. Back and Next preserve
+the selected model, cluster, request and unchanged license acknowledgement. Changes
+to the reviewed source, target or request still invalidate confirmation. Resource
+review actions return to placement and focus the corresponding input. Runtime
+settings open in a separate tab so the hosting draft stays in the wizard.
+
+The small-model action resolves `Qwen/Qwen2.5-0.5B-Instruct` through the catalogue
+and uses its returned immutable revision. It does not prove access, license
+acceptance, CPU/GPU compatibility or model fit. The suggested deployment name is
+editable. Cluster choice remains explicit. The small-model preset initializes
+1 CPU, 4 GiB memory and 1 GiB CPU KV cache; generic CPU setup starts with
+2 CPUs, 8 GiB memory and 2 GiB KV cache. These are editable requests rather than
+certified fit or available capacity. CPU KV cache must be an integer from 1 through 1024
+GiB, with memory greater than the cache as checked by server admission. GPU
+requests omit the CPU cache argument.
+
+Focused tests exercise actual schema-validated HttpLink requests in all eight
+locales. Controlled Next/Chromium journeys exercise CPU, GPU and the small-model
+preset through review and accepted requests. These fixture receipts prove UI and
+request behavior, not successful downloading, scheduling, vLLM inference or live
+readiness. Deployment health still requires the actual runtime observations.

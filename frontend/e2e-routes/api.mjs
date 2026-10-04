@@ -202,7 +202,7 @@ function value(type, field, args, role) {
     const accessible =
       role === "owner" &&
       args.organizationId === id &&
-      args.modelRepo === hubModel.repoId &&
+      [hubModel.repoId, "Qwen/Qwen2.5-0.5B-Instruct"].includes(args.modelRepo) &&
       args.revisionSha === hubModel.revisionSha &&
       args.connectionId == null &&
       args.expectedConnectionVersion == null;
@@ -210,7 +210,7 @@ function value(type, field, args, role) {
       accessible,
       reason: accessible ? null : "Controlled pinned-source access refusal.",
       observedAt,
-      model: accessible ? hubModel : null,
+      model: accessible ? { ...hubModel, repoId: args.modelRepo } : null,
     });
   }
   if (field === "astroliftHuggingFaceModels")
@@ -228,7 +228,9 @@ function value(type, field, args, role) {
       source: "controlled_hub_transport",
       observedAt,
       retryAfterSeconds: null,
-      model: args.repoId === hubModel.repoId ? hubModel : null,
+      model: [hubModel.repoId, "Qwen/Qwen2.5-0.5B-Instruct"].includes(args.repoId)
+        ? { ...hubModel, repoId: args.repoId }
+        : null,
     });
   if (field === "astroliftSharedModelPromptReadiness") {
     const ready =
@@ -608,11 +610,13 @@ createServer(async (req, res) => {
             args.input.organizationId === id &&
             args.input.clusterId === sharedClusterId &&
             args.input.expectedProviderId === sharedProviderId &&
-            args.input.modelRepo === hubModel.repoId &&
+            [hubModel.repoId, "Qwen/Qwen2.5-0.5B-Instruct"].includes(args.input.modelRepo) &&
             args.input.revisionSha === hubModel.revisionSha &&
             ((args.input.computeMode === "cpu" &&
               args.input.gpuCount === 0 &&
-              args.input.name === "Controlled newly created CPU model") ||
+              ["Controlled newly created CPU model", "Qwen2.5-0.5B-Instruct"].includes(
+                args.input.name
+              )) ||
               (args.input.computeMode === "gpu" &&
                 args.input.gpuCount === 1 &&
                 args.input.name === "Controlled newly created GPU model")) &&
@@ -625,6 +629,8 @@ createServer(async (req, res) => {
               id: createdModelId,
               version: 3,
               name: input.name,
+              modelRepo: input.modelRepo,
+              revisionSha: input.revisionSha,
               computeMode: input.computeMode,
               subscriptionsEnabled: input.allowSubscriptions,
               status: "updating",

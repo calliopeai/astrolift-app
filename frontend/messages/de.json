@@ -5740,6 +5740,22 @@
         "servedIdentifier": "Kennung des bereitgestellten Modells",
         "manifestRevision": "SHA-256 des geprüften Manifests",
         "localLicenseReview": "Ich habe die Lizenz und die Weiterverbreitungsrechte dieser lokalen Modelldateien geprüft."
+      },
+      "usability": {
+        "nextStep": "Schließen Sie die Einrichtung ab, um das Hosting zu prüfen",
+        "enterName": "Geben Sie einen Bereitstellungsnamen ein",
+        "selectCluster": "Wählen Sie einen Cluster aus",
+        "selectCompute": "Wählen Sie CPU oder GPU",
+        "enterCpu": "Geben Sie die angeforderte CPU-Menge ein",
+        "enterMemory": "Geben Sie die angeforderte Speichermenge ein",
+        "enterGpu": "Verwenden Sie im CPU-Modus 0 GPUs, im GPU-Modus mindestens 1",
+        "enterCache": "Geben Sie eine gültige Größe für den CPU-KV-Cache ein",
+        "settingsNewTab": "Die Cluster-Einstellungen öffnen sich in einem neuen Tab, damit diese Hosting-Einrichtung hier erhalten bleibt.",
+        "smallModel": "Wählen Sie ein kleines Testmodell aus",
+        "smallModelHelp": "Ermitteln Sie Qwen/Qwen2.5-0.5B-Instruct auf Hugging Face. Prüfungen zu Zugriff, Lizenz, Laufzeitumgebung und Ressourcen bleiben erforderlich.",
+        "previousStep": "Zurück",
+        "continueStep": "Weiter",
+        "cpuCacheHelp": "Für CPU erforderlich: 1–1024 GiB. Der angeforderte Arbeitsspeicher muss größer als dieser Cache sein."
       }
     }
   },
