@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Preserve GCP managed-service grant resources and refuse legacy Vertex grants
+  before project-wide IAM effects. Add an internal owned Endpoint IAM union/removal
+  port with current project/GSA/custom-role proof, etag-aware policy readback and
+  caller-durable retry ownership. GKE and app rollout integration remain pending;
+  no invocation readiness is claimed (#2278).
+
 - Add internal read-only Vertex Endpoint and registered Model catalogues with
   repeated ACTIVE project ID/number mapping, fixed regional native clients,
   bounded metadata/pagination and safe diagnostics. Preserve literal version

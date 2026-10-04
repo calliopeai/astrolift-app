@@ -113,9 +113,10 @@ def _permissions_for_binding(
                         "GCP managed-service grants must declare IAM roles, "
                         f"not raw permissions; received {action!r} for {resource!r}",
                     )
-                if action not in seen:
-                    permissions.append({"role": action})
-                    seen.add(action)
+                key = (action, str(resource))
+                if key not in seen:
+                    permissions.append({"role": action, "resource": str(resource)})
+                    seen.add(key)
             continue
         permissions.append(
             {
