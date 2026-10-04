@@ -30,7 +30,7 @@ import type {
   RevokeSubscriptionRequest,
 } from "./ModelSubscriptionsPanel";
 import { subscriptionModelResult } from "./shared-model-write-results";
-import { modelSourceMode, sameNativeSource } from "./native-model-source";
+import { modelSourceMode, sameNativeConnection } from "./native-model-source";
 
 const statuses: readonly string[] = ["pending", "active", "revoking", "revoked", "failed"];
 export function useModelSubscriptions(
@@ -239,7 +239,8 @@ export function useModelSubscriptions(
       if (!current()) return { accepted: false as const, message: t("changed") };
       if (
         native &&
-        (!sameNativeSource(envelope?.data?.deployment.nativeSource, model.nativeSource) ||
+        (!envelope?.data?.deployment ||
+          !sameNativeConnection(envelope.data.deployment, model) ||
           envelope?.data?.deployment.ready != null ||
           envelope?.data?.deployment.runtimeSupported != null)
       )

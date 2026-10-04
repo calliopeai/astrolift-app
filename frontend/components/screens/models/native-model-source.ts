@@ -44,19 +44,89 @@ export const validNativeSource = (
 export const isBedrockModelKind = (kind: string | undefined) =>
   ["bedrock_foundation_model", "bedrock_inference_profile"].includes(kind ?? "");
 
+type ModelSource = Partial<
+  Pick<ClusterModelFieldsFragment, "sourceKind" | "nativeSource" | "nativeConnection">
+>;
+const nativeKinds = {
+  bedrock_foundation_model: ["BEDROCK", "BEDROCK_FOUNDATION_MODEL"],
+  bedrock_inference_profile: ["BEDROCK", "BEDROCK_INFERENCE_PROFILE"],
+  bedrock_unknown: ["BEDROCK", "UNKNOWN"],
+  vertex_endpoint: ["VERTEX", "VERTEX_ENDPOINT"],
+  foundry_deployment: ["FOUNDRY", "FOUNDRY_DEPLOYMENT"],
+  unknown: ["UNKNOWN", "UNKNOWN"],
+} as const;
+const hexFingerprint = (value: unknown): value is string =>
+  typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+
+/** Family is display metadata. It never admits settings, invocation or adoption. */
+export const nativeModelFamily = (model: ModelSource) => {
+  const raw = nativeKinds[model.sourceKind as keyof typeof nativeKinds];
+  const family = model.nativeConnection?.family;
+  return raw && raw[0] === family ? family : (raw?.[0] ?? null);
+};
+
+/** Current queries advertise the common contract. Only an explicit older-server
+ * capability absence permits legacy Bedrock compatibility; absence in a current
+ * response is a refusal, never a substitute source or action approval. */
 export const modelSourceMode = (
-  model: Partial<Pick<ClusterModelFieldsFragment, "sourceKind" | "nativeSource">>
-) =>
-  isBedrockModelKind(model.sourceKind) && model.nativeSource == null
-    ? "native_unavailable"
-    : model.nativeSource || isBedrockModelKind(model.sourceKind)
-      ? validNativeSource(model.nativeSource) &&
-        model.sourceKind === `bedrock_${model.nativeSource.sourceKind.toLowerCase()}`
-        ? "native"
-        : "unsupported"
-      : ["huggingface", "local_artifact"].includes(model.sourceKind ?? "")
-        ? "hosted"
-        : "unsupported";
+  model: ModelSource,
+  commonMetadataSupported = true
+): "native" | "native_unavailable" | "hosted" | "unsupported" => {
+  const connection = model.nativeConnection;
+  if (["huggingface", "local_artifact"].includes(model.sourceKind ?? ""))
+    return connection == null && model.nativeSource == null ? "hosted" : "unsupported";
+  if (!commonMetadataSupported && connection === undefined)
+    return isBedrockModelKind(model.sourceKind) &&
+      validNativeSource(model.nativeSource) &&
+      model.sourceKind === `bedrock_${model.nativeSource.sourceKind.toLowerCase()}`
+      ? "native"
+      : "unsupported";
+  const raw = nativeKinds[model.sourceKind as keyof typeof nativeKinds];
+  if (
+    !raw ||
+    !connection ||
+    raw[0] !== connection.family ||
+    raw[1] !== connection.sourceKind ||
+    connection.invokeAccess !== "UNKNOWN"
+  )
+    return "unsupported";
+  if (connection.configurationState === "UNAVAILABLE")
+    return model.nativeSource == null &&
+      connection.source == null &&
+      connection.resourceIdentityFingerprint == null &&
+      connection.reviewedSourceFingerprint == null &&
+      connection.metadataObservedAt == null
+      ? "native_unavailable"
+      : "unsupported";
+  // These shapes declare future metadata only. Current adoption is Bedrock-only.
+  if (
+    connection.configurationState !== "CONFIGURED" ||
+    connection.family !== "BEDROCK" ||
+    connection.source?.__typename !== "NativeModelConnectionSource" ||
+    !validNativeSource(model.nativeSource) ||
+    !validNativeSource(connection.source) ||
+    model.nativeSource.configurationState !== "configured" ||
+    connection.source.configurationState !== "configured" ||
+    model.sourceKind !== `bedrock_${model.nativeSource.sourceKind.toLowerCase()}` ||
+    !sameNativeSource(model.nativeSource, connection.source) ||
+    !hexFingerprint(connection.resourceIdentityFingerprint) ||
+    connection.reviewedSourceFingerprint !== model.nativeSource.sourceFingerprint ||
+    connection.metadataObservedAt !== connection.source.metadataObservedAt ||
+    (connection.metadataObservedAt != null &&
+      !Number.isFinite(Date.parse(connection.metadataObservedAt)))
+  )
+    return "unsupported";
+  return "native";
+};
+
+export const sameNativeConnection = (left: ModelSource, right: ModelSource) =>
+  modelSourceMode(left) === "native" &&
+  modelSourceMode(right) === "native" &&
+  sameNativeSource(left.nativeSource, right.nativeSource) &&
+  left.nativeConnection?.resourceIdentityFingerprint ===
+    right.nativeConnection?.resourceIdentityFingerprint &&
+  left.nativeConnection?.reviewedSourceFingerprint ===
+    right.nativeConnection?.reviewedSourceFingerprint;
 
 export const sameNativeSource = (
   left: NativeModelSourceFieldsFragment | null | undefined,
@@ -104,6 +174,7 @@ export const nativeRegistrationResult = (
     (request.sharingMode === "DEDICATED" &&
       data.dedicatedAppVersion !== request.ifMatchDedicatedAppVersion) ||
     data.sourceKind !== `bedrock_${request.sourceKind.toLowerCase()}` ||
+    modelSourceMode(data) !== "native" ||
     !sameNativeSource(data.nativeSource, source) ||
     data.nativeSource?.sourceFingerprint !== request.sourceFingerprint ||
     data.nativeSource.configurationState !== "configured" ||

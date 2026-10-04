@@ -6116,6 +6116,21 @@
         "queued": "Settings accepted for binding reconciliation. Cloud invocation is still unverified.",
         "removed": "Local connection removed. The cloud source was not deleted.",
         "restartImpact": "This changes the app cloud-identity binding and may require an app restart. It does not restart or allocate the cloud model."
+      },
+      "common": {
+        "BEDROCK": "Amazon Bedrock",
+        "VERTEX": "Google Vertex AI",
+        "FOUNDRY": "Azure AI Foundry",
+        "UNKNOWN": "Unknown native family",
+        "title": "Native connection metadata",
+        "family": "Native family",
+        "resourceIdentity": "Resource identity fingerprint",
+        "reviewedSource": "Reviewed source fingerprint",
+        "identityHelp": "Identity and reviewed metadata are separate observations. Neither proves native resource incarnation or inference access.",
+        "unavailable": "Native configuration is unavailable. Hosting, connection and settings actions are not enabled by this metadata.",
+        "accessUnknown": "Inference access has not been verified.",
+        "vertexHelp": "Vertex prediction routes through the whole Endpoint and its deployed-model traffic configuration. Per-model routing and access isolation are not verified.",
+        "foundryHelp": "Foundry app access requires an independent gateway credential lifecycle. Account-key metadata does not prove app-specific access or revocation."
       }
     }
   },

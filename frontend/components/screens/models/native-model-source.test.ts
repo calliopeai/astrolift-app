@@ -4,11 +4,13 @@ import type {
   RegisterBedrockModelConnectionInput,
 } from "@/graphql/__generated__/operations";
 import projections from "./native-model-projection.fixture.json";
-import { nativeModel, nativeSource } from "./native-model.fixtures";
+import { nativeModel, nativeSource, projectedNativeModel } from "./native-model.fixtures";
 import {
   modelSourceMode,
   nativeRegistrationResult,
   sameNativeSource,
+  sameNativeConnection,
+  nativeModelFamily,
   validNativeSource,
 } from "./native-model-source";
 
@@ -94,7 +96,8 @@ describe("native source boundaries", () => {
     ).toBe(false);
   });
   it("never treats missing native identity as a hosted model", () => {
-    expect(modelSourceMode({ ...nativeModel, nativeSource: null })).toBe("native_unavailable");
+    expect(modelSourceMode(projectedNativeModel("withdrawn"))).toBe("native_unavailable");
+    expect(modelSourceMode({ ...nativeModel, nativeSource: null })).toBe("unsupported");
     expect(modelSourceMode({ sourceKind: "huggingface", nativeSource: null })).toBe("hosted");
     expect(
       modelSourceMode({ sourceKind: "huggingface", nativeSource: nativeSource.identity })
@@ -103,24 +106,23 @@ describe("native source boundaries", () => {
 });
 
 it("accepts the exact inference-profile discriminator and refuses cross-kind metadata", () => {
-  const identity: NativeModelSourceFieldsFragment = {
-    ...nativeSource.identity,
-    sourceKind: "INFERENCE_PROFILE",
-    sourceId: "reviewed-profile",
-    sourceArn: `arn:aws:bedrock:us-east-1:${nativeSource.identity.accountId}:inference-profile/reviewed-profile`,
-    destinationModelArns: [nativeSource.identity.sourceArn],
-  };
-  const model = { ...nativeModel, sourceKind: "bedrock_inference_profile", nativeSource: identity };
+  const model = projectedNativeModel("profile");
+  const identity = model.nativeSource!;
   expect(modelSourceMode(model)).toBe("native");
   expect(
     nativeRegistrationResult(
       { ok: true, errors: [], data: model },
-      { ...input, sourceKind: "INFERENCE_PROFILE", sourceIdentifier: identity.sourceId },
+      {
+        ...input,
+        sourceKind: "INFERENCE_PROFILE",
+        sourceIdentifier: identity.sourceId,
+        sourceFingerprint: identity.sourceFingerprint,
+      },
       identity,
       "refused"
     )
   ).toEqual({ accepted: true, id: model.id });
-  expect(modelSourceMode({ ...model, nativeSource: null })).toBe("native_unavailable");
+  expect(modelSourceMode({ ...model, nativeSource: null })).toBe("unsupported");
   expect(modelSourceMode({ ...model, sourceKind: "bedrock_foundation_model" })).toBe("unsupported");
   expect(modelSourceMode({ ...model, sourceKind: "bedrock_unknown", nativeSource: null })).toBe(
     "unsupported"
@@ -129,35 +131,92 @@ it("accepts the exact inference-profile discriminator and refuses cross-kind met
 });
 
 it.each(projections.rows)(
-  "consumes actual serialized backend projection $case",
-  ({ case: variant, serializedQueryData: wire }) => {
-    const base =
-      wire.nativeSource?.sourceKind === "INFERENCE_PROFILE"
-        ? {
-            ...nativeSource.identity,
-            sourceKind: "INFERENCE_PROFILE" as const,
-            sourceId: "reviewed-profile",
-            sourceArn: `arn:aws:bedrock:us-east-1:${nativeSource.identity.accountId}:inference-profile/reviewed-profile`,
-            destinationModelArns: [nativeSource.identity.sourceArn],
-          }
-        : nativeSource.identity;
-    const projected = {
-      sourceKind: wire.sourceKind,
-      nativeSource: wire.nativeSource
-        ? ({ ...base, ...wire.nativeSource } as NativeModelSourceFieldsFragment)
-        : null,
-    };
+  "consumes actual serialized producer $case with legacy equivalence",
+  ({ case: variant, serializedQueryData: wire, ...row }) => {
+    const projected = projectedNativeModel(variant);
     expect(modelSourceMode(projected)).toBe(
-      variant === "withdrawn"
-        ? "native_unavailable"
-        : variant === "unknown"
-          ? "unsupported"
-          : "native"
+      wire.nativeConnection.configurationState === "CONFIGURED" ? "native" : "native_unavailable"
     );
-    if (variant === "foundation") {
-      expect(nativeModel.sourceKind).toBe(wire.sourceKind);
-      expect(nativeSource.identity.protocol).toBe(wire.nativeSource!.protocol);
-      expect(nativeSource.identity.sourceKind).toBe(wire.nativeSource!.sourceKind);
-    }
+    expect(nativeModelFamily(projected)).toBe(wire.nativeConnection.family);
+    if ("legacyProjection" in row)
+      expect(row.legacyProjection).toEqual({
+        sourceKind: wire.sourceKind,
+        nativeSource: wire.nativeSource,
+      });
+  }
+);
+
+it.each([
+  { nativeConnection: null },
+  { nativeConnection: undefined },
+  { nativeConnection: { ...nativeModel.nativeConnection!, family: "VERTEX" } },
+  {
+    nativeConnection: { ...nativeModel.nativeConnection!, sourceKind: "BEDROCK_INFERENCE_PROFILE" },
+  },
+  { nativeConnection: { ...nativeModel.nativeConnection!, configurationState: "READY" } },
+  { nativeConnection: { ...nativeModel.nativeConnection!, invokeAccess: "AUTHORIZED" } },
+  {
+    nativeConnection: {
+      ...nativeModel.nativeConnection!,
+      resourceIdentityFingerprint: "private-url-marker",
+    },
+  },
+  {
+    nativeConnection: {
+      ...nativeModel.nativeConnection!,
+      reviewedSourceFingerprint: "b".repeat(64),
+    },
+  },
+  { nativeConnection: { ...nativeModel.nativeConnection!, metadataObservedAt: "invalid" } },
+  {
+    nativeConnection: {
+      ...nativeModel.nativeConnection!,
+      source: {
+        ...nativeModel.nativeConnection!.source!,
+        __typename: "FoundryDeploymentConnectionSource",
+      },
+    },
+  },
+])("refuses malformed or inconsistent advertised common contract %j", (change) => {
+  const model = { ...nativeModel, ...change } as typeof nativeModel;
+  expect(modelSourceMode(model)).toBe("unsupported");
+  expect(
+    nativeRegistrationResult(
+      { ok: true, errors: [], data: model },
+      input,
+      nativeSource.identity,
+      "refused"
+    ).accepted
+  ).toBe(false);
+});
+
+it("requires explicit absent capability for legacy compatibility and binds exact common identity", () => {
+  const old = { sourceKind: nativeModel.sourceKind, nativeSource: nativeModel.nativeSource };
+  expect(modelSourceMode(old)).toBe("unsupported");
+  expect(modelSourceMode(old, false)).toBe("native");
+  expect(modelSourceMode({ ...old, nativeConnection: null }, false)).toBe("unsupported");
+  expect(sameNativeConnection(nativeModel, projectedNativeModel("foundation"))).toBe(true);
+  expect(
+    sameNativeConnection(nativeModel, {
+      ...nativeModel,
+      nativeConnection: {
+        ...nativeModel.nativeConnection!,
+        resourceIdentityFingerprint: "b".repeat(64),
+      },
+    })
+  ).toBe(false);
+});
+
+it.each(["vertex_unadopted", "foundry_unadopted", "unknown_family"])(
+  "refuses invented configured adoption for %s",
+  (variant) => {
+    const model = projectedNativeModel(variant);
+    expect(
+      modelSourceMode({
+        ...model,
+        nativeConnection: { ...model.nativeConnection!, configurationState: "CONFIGURED" },
+      })
+    ).toBe("unsupported");
+    expect(modelSourceMode({ ...model, sourceKind: "huggingface" })).toBe("unsupported");
   }
 );

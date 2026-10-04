@@ -1,5 +1,8 @@
 import { gql } from "@apollo/client";
-import { NATIVE_MODEL_SOURCE_FIELDS } from "./native-models.queries";
+import {
+  COMMON_NATIVE_CONNECTION_FIELDS,
+  NATIVE_MODEL_SOURCE_FIELDS,
+} from "./native-models.queries";
 
 export const CLUSTER_MODEL_FIELDS = gql`
   fragment ClusterModelFields on ClusterModelDeployment {
@@ -15,6 +18,9 @@ export const CLUSTER_MODEL_FIELDS = gql`
     sourceKind
     nativeSource {
       ...NativeModelSourceFields
+    }
+    nativeConnection {
+      ...CommonNativeConnectionFields
     }
     localArtifactId
     localArtifactVersion
@@ -61,6 +67,7 @@ export const CLUSTER_MODEL_FIELDS = gql`
     }
   }
   ${NATIVE_MODEL_SOURCE_FIELDS}
+  ${COMMON_NATIVE_CONNECTION_FIELDS}
 `;
 
 export const LIST_CLUSTER_MODELS_PAGE = gql`

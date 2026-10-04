@@ -6039,6 +6039,21 @@
         "queued": "Einstellungen zur Bindungsabstimmung angenommen. Der Cloud-Aufruf bleibt ungeprüft.",
         "removed": "Lokale Verbindung entfernt. Die Cloud-Quelle wurde nicht gelöscht.",
         "restartImpact": "Dies ändert die Cloud-Identitätsbindung der App und kann ihren Neustart erfordern. Das Cloud-Modell wird nicht neu gestartet oder bereitgestellt."
+      },
+      "common": {
+        "BEDROCK": "Amazon Bedrock",
+        "VERTEX": "Google Vertex AI",
+        "FOUNDRY": "Azure AI Foundry",
+        "UNKNOWN": "Unbekannte native Familie",
+        "title": "Metadaten der nativen Verbindung",
+        "family": "Native Familie",
+        "resourceIdentity": "Fingerabdruck der Ressourcenidentität",
+        "reviewedSource": "Fingerabdruck der geprüften Quelle",
+        "identityHelp": "Identität und geprüfte Metadaten sind getrennte Beobachtungen. Keine davon belegt die native Ressourceninstanz oder den Inferenzzugriff.",
+        "unavailable": "Die native Konfiguration ist nicht verfügbar. Diese Metadaten aktivieren keine Hosting-, Verbindungs- oder Einstellungsaktionen.",
+        "accessUnknown": "Der Inferenzzugriff wurde nicht verifiziert.",
+        "vertexHelp": "Vertex-Vorhersagen nutzen den gesamten Endpoint und dessen Verkehrsverteilung zwischen bereitgestellten Modellen. Routing und Zugriffsisolation pro Modell sind nicht verifiziert.",
+        "foundryHelp": "App-Zugriff auf Foundry benötigt einen unabhängigen Lebenszyklus für Gateway-Zugangsdaten. Metadaten des Kontoschlüssels belegen weder App-Zugriff noch dessen Widerruf."
       }
     }
   },

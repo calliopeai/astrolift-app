@@ -14,7 +14,7 @@ import { SharedModelClient } from "@/app/(app)/models/shared/[id]/shared-model-c
 import { NativeModelSettingsClient } from "./NativeModelSettingsClient";
 import { ModelAddChoiceClient } from "./ModelAddChoiceClient";
 import { NativeModelConnectClient } from "./NativeModelConnectClient";
-import { nativeModel, nativeSource } from "./native-model.fixtures";
+import { nativeModel, nativeSource, projectedNativeModel } from "./native-model.fixtures";
 
 const identity = vi.hoisted(() => ({ org: "", actor: "" }));
 vi.mock("@/graphql/identity/identity.hooks", () => ({
@@ -572,8 +572,7 @@ it.each(["Native feature is disabled", "Provider declaration is unavailable"])(
   "known native detail preserves unavailable identity after %s",
   async (reason) => {
     enabled = false;
-    currentModel.nativeSource = null;
-    currentModel.reason = reason;
+    currentModel = { ...projectedNativeModel("withdrawn"), reason };
     render(
       <ApolloProvider client={client}>
         <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
@@ -662,8 +661,7 @@ it.each(["Native feature is disabled", "Provider declaration is unavailable"])(
   "mounted inventory preserves unavailable native row after %s",
   async (reason) => {
     enabled = false;
-    currentModel.nativeSource = null;
-    currentModel.reason = reason;
+    currentModel = { ...projectedNativeModel("withdrawn"), reason };
     render(
       <ApolloProvider client={client}>
         <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
@@ -690,3 +688,64 @@ it.each(["Native feature is disabled", "Provider declaration is unavailable"])(
     ).toBe(false);
   }
 );
+
+it.each(["vertex_unadopted", "foundry_unadopted", "unknown_family"])(
+  "mounted common %s metadata keeps unavailable family without cross-family transport or private fallback",
+  async (variant) => {
+    currentModel = {
+      ...projectedNativeModel(variant),
+      modelRepo: "PRIVATE_MODEL_URL",
+      revisionSha: "PRIVATE_REVISION",
+    };
+    const view = render(
+      <ApolloProvider client={client}>
+        <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
+          <SharedModelClient id={nativeModel.id} />
+        </NextIntlClientProvider>
+      </ApolloProvider>
+    );
+    await screen.findByRole("region", { name: en.models.shared.inventory.settings });
+    expect(
+      screen.getAllByText(en.models.native.common[currentModel.nativeConnection!.family]).length
+    ).toBeGreaterThan(0);
+    expect(requests.map((row) => row.operationName)).toEqual(["GetClusterModelDeployment"]);
+    expect(view.container.innerHTML).not.toContain("PRIVATE_");
+    expect(view.container.querySelector("#model-settings button")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Run model test" })).toBeNull();
+    expect(client.cache.extract()).toEqual({});
+    expect(failures).toEqual([]);
+  }
+);
+it("advertised but malformed common metadata blocks legacy Bedrock settings and all fallback transports", async () => {
+  currentModel = { ...nativeModel, nativeConnection: null, modelRepo: "PRIVATE_MODEL_URL" };
+  const view = render(
+    <ApolloProvider client={client}>
+      <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
+        <SharedModelClient id={nativeModel.id} />
+      </NextIntlClientProvider>
+    </ApolloProvider>
+  );
+  await screen.findByText(en.models.native.details.unsupported);
+  expect(requests.map((row) => row.operationName)).toEqual(["GetClusterModelDeployment"]);
+  expect(view.container.innerHTML).not.toContain("PRIVATE_MODEL_URL");
+  expect(view.container.querySelector('a[href="#model-settings"]')).toBeNull();
+});
+
+it("unknown Bedrock source remains unavailable and cannot enter hosted or native intake", async () => {
+  currentModel = projectedNativeModel("unknown");
+  render(
+    <ApolloProvider client={client}>
+      <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
+        <SharedModelClient id={nativeModel.id} />
+      </NextIntlClientProvider>
+    </ApolloProvider>
+  );
+  const add = await screen.findByRole("button", { name: en.models.shared.connections.add });
+  expect(add).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "Run model test" })).toBeNull();
+  expect(
+    requests.some((row) =>
+      /ModelConnectionTargets|BedrockModelSource|RuntimeAdmission|Prompt/.test(row.operationName)
+    )
+  ).toBe(false);
+});

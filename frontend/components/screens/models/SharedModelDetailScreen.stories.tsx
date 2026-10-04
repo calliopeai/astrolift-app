@@ -4,7 +4,7 @@ import { expect, userEvent, within } from "storybook/test";
 import fr from "@/messages/fr.json";
 import ja from "@/messages/ja.json";
 import { SharedModelDetailScreen } from "./SharedModelDetailScreen";
-import { nativeModel } from "./native-model.fixtures";
+import { nativeModel, projectedNativeModel } from "./native-model.fixtures";
 import { NativeModelObservationsPanel } from "./NativeModelObservationsPanel";
 import { sharedModelDetailProps } from "./shared-model-detail.fixtures";
 const meta = {
@@ -134,11 +134,7 @@ export const NativeConnection: Story = {
 export const NativeMetadataUnavailable: Story = {
   args: {
     ...sharedModelDetailProps,
-    model: {
-      ...nativeModel,
-      nativeSource: null,
-      reason: "Native source declaration is unavailable",
-    },
+    model: projectedNativeModel("withdrawn"),
     prompt: null,
   },
 };
