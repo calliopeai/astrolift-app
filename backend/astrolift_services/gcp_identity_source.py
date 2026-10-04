@@ -32,6 +32,7 @@ from gcp.identity_source import (
 
 from astrolift_clusters.models import ProviderPlugin, TenantCluster
 from astrolift_identity.models import Organization, Project, Team
+from astrolift_lifecycle.deployment_execution_checkpoint import compose_execution_checkpoint
 from astrolift_registry.models import RegisteredApp
 from astrolift_services.gcp_app_identity_plan import (
     MAX_SOURCE_SECONDS,
@@ -55,6 +56,11 @@ from core.fields.uuid_v7 import uuid7
 
 def _json(value):
     return json.loads(json.dumps(value, allow_nan=False))
+
+
+def _execution_current(callback):
+    if callback is not None and (not callable(callback) or callback() is not None):
+        raise IdentitySourceError("CURRENT_EXECUTION_UNCONFIRMED")
 
 
 def _declaration(authority, *, deployment_context=None):
@@ -152,8 +158,9 @@ class OriginalIdentity:
 
 
 @contextmanager
-def source_mutex(authority, *, deployment_context=None):
+def source_mutex(authority, *, deployment_context=None, execution_checkpoint=None):
     _outside_atomic()
+    _execution_current(execution_checkpoint)
     if connection.vendor != "postgresql":
         raise IdentitySourceError("POSTGRESQL_REQUIRED")
     _uuid(authority.app_guid)
@@ -174,7 +181,13 @@ def source_mutex(authority, *, deployment_context=None):
             cursor.execute("SELECT pg_try_advisory_lock(%s)", [lock_id])
             if not cursor.fetchone()[0]:
                 raise IdentitySourceError("SOURCE_BUSY")
-        store = SourceStore(authority, mutex, lock_id, deployment_context=deployment_context)
+        store = SourceStore(
+            authority,
+            mutex,
+            lock_id,
+            deployment_context=deployment_context,
+            execution_checkpoint=execution_checkpoint,
+        )
         try:
             yield store
         finally:
@@ -189,9 +202,12 @@ def source_mutex(authority, *, deployment_context=None):
 
 
 class SourceStore:
-    def __init__(self, authority, mutex_connection, lock_id, *, deployment_context=None):
+    def __init__(
+        self, authority, mutex_connection, lock_id, *, deployment_context=None, execution_checkpoint=None
+    ):
         self.authority, self.active = authority, True
         self.deployment_context = deployment_context
+        self.execution_checkpoint = execution_checkpoint
         self.mutex_connection, self.lock_id = mutex_connection, lock_id
 
     def _accepted_reference(self):
@@ -289,6 +305,8 @@ class SourceStore:
                         raise IdentitySourceError("CURRENT_SOURCE_UNAVAILABLE")
                 if row and row.state != "OBSERVED" and row.authority_reference != self._accepted_reference():
                     raise IdentitySourceError("ORIGINAL_PENDING_OPERATION_REQUIRES_REVIEW")
+            if current:
+                _execution_current(self.execution_checkpoint)
             yield (org, app, cluster, provider, pin, row)
 
     def pin(self, operation, physical, native):
@@ -544,12 +562,19 @@ class SourceStore:
 
 
 def bootstrap_original_identity(
-    authority, operation, *, native_factory=NativeIdentitySource, deployment_context=None
+    authority,
+    operation,
+    *,
+    native_factory=NativeIdentitySource,
+    deployment_context=None,
+    execution_checkpoint=None,
 ):
     """Independent committed bootstrap; never call from an enclosing activity transaction."""
     if type(operation) is not SourceOperation:
         raise IdentitySourceError("INVALID_ORIGINAL_OPERATION")
-    with source_mutex(authority, deployment_context=deployment_context) as store:
+    with source_mutex(
+        authority, deployment_context=deployment_context, execution_checkpoint=execution_checkpoint
+    ) as store:
         deadline = time.monotonic() + MAX_SOURCE_SECONDS
         declaration, physical = _declaration(authority, deployment_context=deployment_context)
         configuration = _configuration_sha256(authority, deployment_context=deployment_context)
@@ -557,6 +582,7 @@ def bootstrap_original_identity(
             pass
 
         def source_current():
+            _execution_current(execution_checkpoint)
             if time.monotonic() >= deadline:
                 raise IdentitySourceError("SOURCE_DEADLINE_EXCEEDED")
             if (
@@ -565,6 +591,7 @@ def bootstrap_original_identity(
             ):
                 raise IdentitySourceError("CURRENT_REGISTERED_SOURCE_CHANGED")
 
+        source_current = compose_execution_checkpoint(execution_checkpoint, source_current)
         source_current()
         native = native_factory(declaration)
         try:
@@ -580,6 +607,7 @@ def bootstrap_original_identity(
                 ):
                     raise IdentitySourceError("CURRENT_COMPLETE_UNION_CHANGED")
 
+            complete_current = compose_execution_checkpoint(execution_checkpoint, complete_current)
             rows = native.observe_endpoints(scope, snapshot, cluster_pin=pin, current=complete_current)
             _validate_observations(
                 snapshot, tuple(ObservedEndpoint(name, (values,)) for name, values in rows)
@@ -593,6 +621,7 @@ def bootstrap_original_identity(
                 source_current()
                 store.validate(reservation, scope=scope, physical=physical, snapshot=snapshot)
 
+            current = compose_execution_checkpoint(execution_checkpoint, current)
             if state in ("SENT", "UNKNOWN"):
                 raise IdentitySourceError("ACCOUNT_CREATE_UNKNOWN_REQUIRES_REVIEW")
             if state == "UNSENT":
@@ -627,9 +656,13 @@ def bootstrap_original_identity(
             native.close()
 
 
-def original_identity_context(authority, *, native_factory=NativeIdentitySource, deployment_context=None):
+def original_identity_context(
+    authority, *, native_factory=NativeIdentitySource, deployment_context=None, execution_checkpoint=None
+):
     """Read/revalidate a retained observed source without creating or resuming an effect."""
-    with source_mutex(authority, deployment_context=deployment_context) as store:
+    with source_mutex(
+        authority, deployment_context=deployment_context, execution_checkpoint=execution_checkpoint
+    ) as store:
         with store._locked() as (_, _, _, _, _, row):
             if row is None or row.state != "OBSERVED":
                 raise IdentitySourceError("ORIGINAL_OBSERVED_SOURCE_REQUIRED")
@@ -641,6 +674,7 @@ def original_identity_context(authority, *, native_factory=NativeIdentitySource,
         snapshot = None
 
         def current():
+            _execution_current(execution_checkpoint)
             if time.monotonic() >= deadline:
                 raise IdentitySourceError("SOURCE_DEADLINE_EXCEEDED")
             with store._locked() as (_, _, _, _, pin, latest):
@@ -663,6 +697,7 @@ def original_identity_context(authority, *, native_factory=NativeIdentitySource,
             ):
                 raise IdentitySourceError("CURRENT_COMPLETE_UNION_CHANGED")
 
+        current = compose_execution_checkpoint(execution_checkpoint, current)
         current()
         native = native_factory(declaration)
         try:
