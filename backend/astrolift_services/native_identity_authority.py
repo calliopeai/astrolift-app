@@ -278,9 +278,11 @@ def capture_app_identity_authority(request, *, environment_guid, permission):
 
 
 @contextmanager
-def current_app_identity_authority(reference, *, deployment_guid=None):
+def current_app_identity_authority(reference, *, deployment_guid=None, deployment_execution=False):
     """Re-read original identity and current RBAC/ABAC; no request or system actor is invented."""
     permission, key = _validate_reference(reference)
+    if deployment_execution and deployment_guid is None:
+        _refuse(permission)
     organization = Organization.objects.filter(guid=reference.organization_guid).first()
     user = get_user_model().objects.filter(pk=reference.actor_user_id, is_active=True).first()
     if organization is None or user is None:
@@ -325,7 +327,9 @@ def current_app_identity_authority(reference, *, deployment_guid=None):
             if deployment_guid is not None:
                 from astrolift_lifecycle.deployment_identity_origin import approval_context
 
-                attrs.approvals, attrs.approval_request = approval_context(reference, deployment_guid)
+                attrs.approvals, attrs.approval_request = approval_context(
+                    reference, deployment_guid, execution=deployment_execution
+                )
             with abac.request_attributes(attrs):
                 scope = _app_scope(pk=environment.registered_app_id, permission=permission)
                 if scope.kind != ScopeKind.APP or scope.id != environment.registered_app_id:

@@ -185,7 +185,7 @@ def original_actor(reference):
     return Actor(kind="user", user_id=reference.actor_user_id)
 
 
-def approval_context(reference, deployment_guid):
+def approval_context(reference, deployment_guid, *, execution=False):
     """Only an exact protected receipt can supply the recorded deployment's approval facts."""
     from astrolift_identity.operation_context import deployment_approval_count
 
@@ -197,6 +197,10 @@ def approval_context(reference, deployment_guid):
     if deployment is None or deployment_origin(deployment) != reference:
         raise DeploymentOriginError("DEPLOYMENT_ORIGIN_INVALID")
     count = deployment_approval_count(deployment)
+    if execution:
+        if count < deployment.approvals_required:
+            raise DeploymentOriginError("DEPLOYMENT_APPROVAL_PENDING")
+        return count, False
     received = deployment.approval_votes.count() if deployment.approvals_required <= 1 else count
     pending = (
         deployment.status == Deployment.Status.PENDING_APPROVAL.value
@@ -214,4 +218,6 @@ def deployment_app_identity_authority(reference, context):
     """
     if not isinstance(context, DeploymentAuthorityContext):
         raise DeploymentOriginError("DEPLOYMENT_ORIGIN_INVALID")
-    return current_app_identity_authority(reference, deployment_guid=context.deployment_guid)
+    return current_app_identity_authority(
+        reference, deployment_guid=context.deployment_guid, deployment_execution=True
+    )
