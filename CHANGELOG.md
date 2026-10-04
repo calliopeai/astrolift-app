@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Add explicit connected-app subscription traffic reads to hosted models, with
+  request/error rates, accepted response bytes and latency. Keep authenticated
+  subscription scope separate from deployment totals, preserve missing/zero/stale
+  states, and clarify active platform-super-admin hosting in all eight locales
+  (#2269).
+
 - Show hosted models with source, requested resources, exact deployment links and
   fresh actor/organization reads. Surface authorized subscription summaries and
   deployment metric states without claiming per-app traffic or measured cost (#2266).

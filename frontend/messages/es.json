@@ -5655,7 +5655,7 @@
         "useSource": "Usar esta revisión del repositorio",
         "invalidSource": "Introduce un ID de repositorio y un SHA de commit de 40 caracteres.",
         "adminChecking": "Comprobando el permiso de alojamiento…",
-        "adminRequired": "El alojamiento requiere permisos de configuración de la organización y de actualización del clúster. Pide a un administrador que aloje este modelo.",
+        "adminRequired": "Solo un superadministrador activo de la plataforma puede alojar o configurar modelos.",
         "adminUnavailable": "No se pudo comprobar el permiso de alojamiento. Vuelve a intentarlo.",
         "accessTitle": "Acceso al repositorio",
         "accessChecking": "Comprobando el acceso a la revisión fijada…",
@@ -5783,6 +5783,23 @@
         "sharingHelp": "Los modelos compartidos aceptan suscripciones de varias aplicaciones. Los modelos dedicados solo aceptan la aplicación seleccionada. Revoca las suscripciones incompatibles y confirma la reconciliación antes de cambiar el acceso.",
         "immutableSource": "El origen del modelo, el clúster y el modo de cómputo se mantienen al editar la configuración.",
         "chooseDedicatedApp": "Elige una aplicación vigente antes de revisar el acceso dedicado."
+      },
+      "subscriptionUsage": {
+        "title": "Tráfico de la aplicación",
+        "view": "Ver tráfico",
+        "scope": "Solo el tráfico de esta suscripción autenticada; los totales del despliegue se muestran por separado.",
+        "unavailable": "No se pudo leer el tráfico de la suscripción.",
+        "empty": "No hay muestras de tráfico en este intervalo.",
+        "unconfigured": "La recopilación del tráfico de la suscripción no está configurada.",
+        "bytes": "Bytes de respuesta aceptados por la aplicación que sirve el modelo; no son tokens ni una entrega de red confirmada.",
+        "unsupported": "Los tokens de entrada/salida y el coste no están disponibles.",
+        "boundary": "Los flujos fallidos pueden contar como errores incluso con un estado HTTP 200.",
+        "requests": "Solicitudes por segundo",
+        "errors": "Solicitudes con error por segundo",
+        "responseBytes": "Bytes de respuesta por segundo",
+        "latency": "Latencia del percentil 95",
+        "dismiss": "Cerrar tráfico",
+        "selectionHint": "Selecciona una suscripción de una app conectada para ver su tráfico; los totales del despliegue se muestran por separado."
       }
     }
   },

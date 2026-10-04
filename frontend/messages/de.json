@@ -5655,7 +5655,7 @@
         "useSource": "Diese Repository-Revision verwenden",
         "invalidSource": "Geben Sie eine Repository-ID und einen Commit-SHA mit 40 Zeichen ein.",
         "adminChecking": "Hosting-Berechtigung wird geprüft…",
-        "adminRequired": "Hosting erfordert Berechtigungen zur Organisationskonfiguration und zur Cluster-Aktualisierung. Bitten Sie einen Administrator, dieses Modell zu hosten.",
+        "adminRequired": "Nur ein aktiver Plattform-Superadministrator kann Modelle hosten oder konfigurieren.",
         "adminUnavailable": "Die Hosting-Berechtigung konnte nicht geprüft werden. Versuchen Sie es erneut.",
         "accessTitle": "Repository-Zugriff",
         "accessChecking": "Zugriff auf die festgelegte Revision wird geprüft…",
@@ -5783,6 +5783,23 @@
         "sharingHelp": "Gemeinsam genutzte Modelle akzeptieren Abonnements mehrerer Apps. Dedizierte Modelle akzeptieren nur die ausgewählte App. Widerrufen Sie inkompatible Abonnements und bestätigen Sie den Abgleich, bevor Sie den Zugriff ändern.",
         "immutableSource": "Modellquelle, Cluster und Rechenmodus bleiben beim Bearbeiten der Einstellungen erhalten.",
         "chooseDedicatedApp": "Wählen Sie eine aktuell verfügbare App aus, bevor Sie den dedizierten Zugriff prüfen."
+      },
+      "subscriptionUsage": {
+        "title": "App-Traffic",
+        "view": "Traffic anzeigen",
+        "scope": "Nur Traffic dieses authentifizierten Abonnements; die Gesamtwerte der Bereitstellung bleiben getrennt.",
+        "unavailable": "Der Traffic dieses Abonnements konnte nicht gelesen werden.",
+        "empty": "Keine Traffic-Messwerte in diesem Zeitraum.",
+        "unconfigured": "Die Traffic-Erfassung für dieses Abonnement ist nicht konfiguriert.",
+        "bytes": "Von der bereitstellenden App angenommene Antwortbytes; keine Modell-Token oder bestätigte Netzwerkzustellung.",
+        "unsupported": "Ein-/Ausgabe-Token und Kosten werden nicht unterstützt.",
+        "boundary": "Fehlgeschlagene Streams können auch bei HTTP-Status 200 als Fehler zählen.",
+        "requests": "Anfragen pro Sekunde",
+        "errors": "Fehlerhafte Anfragen pro Sekunde",
+        "responseBytes": "Antwortbytes pro Sekunde",
+        "latency": "Latenz im 95. Perzentil",
+        "dismiss": "Traffic schließen",
+        "selectionHint": "Wähle ein Abonnement einer verbundenen App, um dessen Datenverkehr zu sehen; die Gesamtwerte der Bereitstellung bleiben getrennt."
       }
     }
   },

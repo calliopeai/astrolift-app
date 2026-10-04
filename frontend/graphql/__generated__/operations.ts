@@ -16141,6 +16141,19 @@ export type TestSharedModelEndpointMutationVariables = Exact<{
 
 export type TestSharedModelEndpointMutation = { testSharedModelEndpoint: { ok: boolean, errors: Array<{ code: string, field?: string | null, message: string, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { status: string, reply: string, latencyMs?: number | null, promptTokens?: number | null, completionTokens?: number | null, totalTokens?: number | null, error: string } | null } };
 
+export type GetModelSubscriptionMetricsQueryVariables = Exact<{
+  organizationId: Scalars['GUID']['input'];
+  serviceId: Scalars['GUID']['input'];
+  subscriptionId: Scalars['GUID']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  start: Scalars['DateTime']['input'];
+  end: Scalars['DateTime']['input'];
+}>;
+
+
+export type GetModelSubscriptionMetricsQuery = { astroliftModelSubscriptionMetrics?: { serviceId: string, clusterId: string, subscriptionId: string, start: string, end: string, retrievedAt: string, stepSeconds: number, scope: string, metrics: Array<{ key: string, unit: string, source: string, state: ModelObservationState, observedAt?: string | null, value?: number | null, aggregationWindowSeconds: number, samples: Array<{ timestamp: string, value: number }> }> } | null };
+
 export type TelemetryAppsQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
   cursor?: InputMaybe<Scalars['String']['input']>;

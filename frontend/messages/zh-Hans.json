@@ -5652,7 +5652,7 @@
         "useSource": "使用此仓库修订版本",
         "invalidSource": "请输入仓库 ID 和 40 个字符的提交 SHA。",
         "adminChecking": "正在检查托管权限…",
-        "adminRequired": "托管需要组织配置权限和集群更新权限。请让管理员托管此模型。",
+        "adminRequired": "只有处于启用状态的平台超级管理员才能托管或配置模型。",
         "adminUnavailable": "无法检查托管权限。请重试。",
         "accessTitle": "仓库访问权限",
         "accessChecking": "正在检查固定修订版本的访问权限…",
@@ -5780,6 +5780,23 @@
         "sharingHelp": "共享模型允许多个应用订阅。专用模型仅允许所选应用订阅。更改访问权限前，请撤销不兼容的订阅并确认协调已完成。",
         "immutableSource": "编辑设置时，模型来源、集群和计算模式保持不变。",
         "chooseDedicatedApp": "审查专用访问权限前，请选择当前可用的应用。"
+      },
+      "subscriptionUsage": {
+        "title": "应用流量",
+        "view": "查看流量",
+        "scope": "仅显示此已认证订阅的流量；部署总量单独保留。",
+        "unavailable": "无法读取此订阅的流量。",
+        "empty": "此时间范围内没有流量样本。",
+        "unconfigured": "尚未配置此订阅的流量采集。",
+        "bytes": "提供模型的应用已接受的响应字节数；不是模型令牌数，也不代表网络交付已确认。",
+        "unsupported": "不支持输入/输出令牌数及费用。",
+        "boundary": "即使 HTTP 状态为 200，失败的流也可能计为错误。",
+        "requests": "每秒请求数",
+        "errors": "每秒错误请求数",
+        "responseBytes": "每秒响应字节数",
+        "latency": "第 95 百分位延迟",
+        "dismiss": "关闭流量",
+        "selectionHint": "选择已连接应用的订阅以查看其流量；部署总量单独显示。"
       }
     }
   },
