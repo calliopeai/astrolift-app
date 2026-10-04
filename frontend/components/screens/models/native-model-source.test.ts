@@ -3,6 +3,7 @@ import type {
   NativeModelSourceFieldsFragment,
   RegisterBedrockModelConnectionInput,
 } from "@/graphql/__generated__/operations";
+import projections from "./native-model-projection.fixture.json";
 import { nativeModel, nativeSource } from "./native-model.fixtures";
 import {
   modelSourceMode,
@@ -100,3 +101,63 @@ describe("native source boundaries", () => {
     ).toBe("unsupported");
   });
 });
+
+it("accepts the exact inference-profile discriminator and refuses cross-kind metadata", () => {
+  const identity: NativeModelSourceFieldsFragment = {
+    ...nativeSource.identity,
+    sourceKind: "INFERENCE_PROFILE",
+    sourceId: "reviewed-profile",
+    sourceArn: `arn:aws:bedrock:us-east-1:${nativeSource.identity.accountId}:inference-profile/reviewed-profile`,
+    destinationModelArns: [nativeSource.identity.sourceArn],
+  };
+  const model = { ...nativeModel, sourceKind: "bedrock_inference_profile", nativeSource: identity };
+  expect(modelSourceMode(model)).toBe("native");
+  expect(
+    nativeRegistrationResult(
+      { ok: true, errors: [], data: model },
+      { ...input, sourceKind: "INFERENCE_PROFILE", sourceIdentifier: identity.sourceId },
+      identity,
+      "refused"
+    )
+  ).toEqual({ accepted: true, id: model.id });
+  expect(modelSourceMode({ ...model, nativeSource: null })).toBe("native_unavailable");
+  expect(modelSourceMode({ ...model, sourceKind: "bedrock_foundation_model" })).toBe("unsupported");
+  expect(modelSourceMode({ ...model, sourceKind: "bedrock_unknown", nativeSource: null })).toBe(
+    "unsupported"
+  );
+  expect(modelSourceMode({ ...model, sourceKind: "bedrock" })).toBe("unsupported");
+});
+
+it.each(projections.rows)(
+  "consumes actual serialized backend projection $case",
+  ({ case: variant, serializedQueryData: wire }) => {
+    const base =
+      wire.nativeSource?.sourceKind === "INFERENCE_PROFILE"
+        ? {
+            ...nativeSource.identity,
+            sourceKind: "INFERENCE_PROFILE" as const,
+            sourceId: "reviewed-profile",
+            sourceArn: `arn:aws:bedrock:us-east-1:${nativeSource.identity.accountId}:inference-profile/reviewed-profile`,
+            destinationModelArns: [nativeSource.identity.sourceArn],
+          }
+        : nativeSource.identity;
+    const projected = {
+      sourceKind: wire.sourceKind,
+      nativeSource: wire.nativeSource
+        ? ({ ...base, ...wire.nativeSource } as NativeModelSourceFieldsFragment)
+        : null,
+    };
+    expect(modelSourceMode(projected)).toBe(
+      variant === "withdrawn"
+        ? "native_unavailable"
+        : variant === "unknown"
+          ? "unsupported"
+          : "native"
+    );
+    if (variant === "foundation") {
+      expect(nativeModel.sourceKind).toBe(wire.sourceKind);
+      expect(nativeSource.identity.protocol).toBe(wire.nativeSource!.protocol);
+      expect(nativeSource.identity.sourceKind).toBe(wire.nativeSource!.sourceKind);
+    }
+  }
+);

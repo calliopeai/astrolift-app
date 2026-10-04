@@ -41,16 +41,20 @@ export const validNativeSource = (
     (arn) => typeof arn === "string" && arn.startsWith(`arn:${value.partition}:bedrock:`)
   );
 
+export const isBedrockModelKind = (kind: string | undefined) =>
+  ["bedrock_foundation_model", "bedrock_inference_profile"].includes(kind ?? "");
+
 export const modelSourceMode = (
-  model: Pick<ClusterModelFieldsFragment, "sourceKind" | "nativeSource">
+  model: Partial<Pick<ClusterModelFieldsFragment, "sourceKind" | "nativeSource">>
 ) =>
-  model.sourceKind === "bedrock" && model.nativeSource == null
+  isBedrockModelKind(model.sourceKind) && model.nativeSource == null
     ? "native_unavailable"
-    : model.nativeSource || model.sourceKind === "bedrock"
-      ? model.sourceKind === "bedrock" && validNativeSource(model.nativeSource)
+    : model.nativeSource || isBedrockModelKind(model.sourceKind)
+      ? validNativeSource(model.nativeSource) &&
+        model.sourceKind === `bedrock_${model.nativeSource.sourceKind.toLowerCase()}`
         ? "native"
         : "unsupported"
-      : ["huggingface", "local_artifact"].includes(model.sourceKind)
+      : ["huggingface", "local_artifact"].includes(model.sourceKind ?? "")
         ? "hosted"
         : "unsupported";
 
@@ -99,7 +103,7 @@ export const nativeRegistrationResult = (
     data.dedicatedAppId !== request.dedicatedAppId ||
     (request.sharingMode === "DEDICATED" &&
       data.dedicatedAppVersion !== request.ifMatchDedicatedAppVersion) ||
-    data.sourceKind !== "bedrock" ||
+    data.sourceKind !== `bedrock_${request.sourceKind.toLowerCase()}` ||
     !sameNativeSource(data.nativeSource, source) ||
     data.nativeSource?.sourceFingerprint !== request.sourceFingerprint ||
     data.nativeSource.configurationState !== "configured" ||

@@ -3,6 +3,7 @@ import type {
   ClusterModelFieldsFragment,
 } from "@/graphql/__generated__/operations";
 import type { SharedModelListRow } from "./SharedModelsScreen";
+import projections from "./native-model-projection.fixture.json";
 import { sharedModelDetailProps } from "./shared-model-detail.fixtures";
 
 export const nativeSource: BedrockModelSourceFieldsFragment = {
@@ -39,7 +40,8 @@ export const nativeModel: ClusterModelFieldsFragment = {
   version: 1,
   name: "Native text",
   modelRepo: nativeSource.identity.sourceId,
-  sourceKind: "bedrock",
+  sourceKind: projections.rows.find((row) => row.case === "foundation")!.serializedQueryData
+    .sourceKind,
   nativeSource: nativeSource.identity,
   revisionSha: null,
   computeMode: null,
