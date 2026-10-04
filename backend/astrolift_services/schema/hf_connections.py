@@ -28,11 +28,13 @@ from core.secrets import encrypt_at_rest
 
 
 def require_host_admin(info, cluster=None):
+    from astrolift_services.hosting_authority import current_host_operator
     from astrolift_services.schema.cluster_model_mutations import _recheck_authority
 
     target = cluster or SimpleNamespace(region=None)
-    _recheck_authority(info, Permission.ORG_UPDATE, target)
-    _recheck_authority(info, Permission.CLUSTER_UPDATE, target)
+    with current_host_operator():
+        _recheck_authority(info, Permission.ORG_UPDATE, target)
+        _recheck_authority(info, Permission.CLUSTER_UPDATE, target)
 
 
 def locked_connection(connection_id, expected_version):
@@ -110,7 +112,7 @@ class HuggingFaceConnectionsQuery:
         except PermissionDenied:
             return ModelHostingAction(
                 allowed=False,
-                reason="Hosting requires organization configuration and cluster update permission.",
+                reason="Hosting requires an active platform operator with organization configuration and cluster update permission.",
             )
         return ModelHostingAction(allowed=True, reason=None)
 

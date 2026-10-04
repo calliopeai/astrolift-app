@@ -8,7 +8,24 @@ released. Deployment and browser verification must accompany the implementation.
 
 A shared model belongs to an organization and an eligible cluster. Creating it
 does not require an application or a placeholder project. Existing app-owned and
-project-owned managed services retain their ownership and access rules.
+project-owned managed services retain their owner scopes. Adding, importing,
+configuring, reprovisioning, adopting or deprovisioning a model now additionally
+requires a fresh installation platform operator: an active Django superuser.
+An organization owner or administrator with all role grants is insufficient.
+Bearer requests also require the existing `admin` scope, a live selected-org
+membership, and the existing organization/team credential ceilings. The existing
+`org.update` and `cluster.update` checks remain; no role-name inference is used.
+Session operators retain the existing selected-org operator semantics.
+
+`modelHostingAction` reports this current server admission decision, not model
+access, capacity or readiness. Hosting checkpoints reload the actor and bearer
+after model/cluster/source locks and bounded source reads. Already accepted
+workflow work keeps its existing admission/runtime contract; this gate does not
+claim cancellation of a previously queued job when an operator later loses access.
+
+App-environment subscription and revocation retain their existing `app.update`
+destination and source-catalogue checks; they do not require platform operator
+status. Subscription approval policy is a separate contract.
 
 The two journeys are separate:
 

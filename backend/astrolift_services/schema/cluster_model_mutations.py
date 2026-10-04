@@ -633,7 +633,9 @@ class ClusterModelMutations:
                 service = _locked_model(input)
                 if service is None or not _idle(service):
                     return _refusal()
-                _recheck_authority(info, Permission.CLUSTER_UPDATE, service.tenant_cluster)
+                from astrolift_services.schema.hf_connections import require_host_admin
+
+                require_host_admin(info, service.tenant_cluster)
                 if service.version != input.if_match_version:
                     return version_mismatch(
                         current_version=service.version,
@@ -656,6 +658,7 @@ class ClusterModelMutations:
                     cpu_kv_cache_gi_b=input.cpu_kv_cache_gi_b,
                 )
                 config, _ = validate_cluster_request(placement, service.tenant_cluster)
+                require_host_admin(info, service.tenant_cluster)
                 service.config = config
                 service.subscription_revision += 1
                 service.save(update_fields=["config", "subscription_revision", "updated_at", "version"])
@@ -685,7 +688,9 @@ class ClusterModelMutations:
                 service = _locked_model(input)
                 if service is None or not _idle(service):
                     return _refusal()
-                _recheck_authority(info, Permission.CLUSTER_UPDATE, service.tenant_cluster)
+                from astrolift_services.schema.hf_connections import require_host_admin
+
+                require_host_admin(info, service.tenant_cluster)
                 if service.version != input.if_match_version:
                     return version_mismatch(
                         current_version=service.version,

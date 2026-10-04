@@ -17,6 +17,7 @@ from astrolift_services.schema.hf_connections import (
     HuggingFaceConnectionsMutation,
     HuggingFaceConnectionsQuery,
 )
+from astrolift_services.tests.model_hosting_helpers import promote_host_operator
 from astrolift_services.tests.test_cluster_model_foundation_2213 import subject
 from astrolift_services.tests.test_cluster_model_foundation_2213 import world as foundation_world
 from astrolift_services.tests.test_cluster_model_queries_2213 import grant
@@ -54,6 +55,7 @@ def world(monkeypatch):
 
 
 def admin(w):
+    promote_host_operator(w)
     grant(w, Permission.ORG_READ)
     grant(w, Permission.ORG_UPDATE)
     grant(w, Permission.CLUSTER_UPDATE)
@@ -120,22 +122,24 @@ def test_host_action_is_actual_org_decision_and_revocation_is_current(world):
     query = HuggingFaceConnectionsQuery()
     with subject(world):
         assert not query.model_hosting_action(make_info(world.user), GUID(str(world.org.guid))).allowed
-    binding = grant(world, Permission.ORG_UPDATE)
+    grant(world, Permission.ORG_UPDATE)
     grant(world, Permission.CLUSTER_UPDATE)
+    with subject(world):
+        assert not query.model_hosting_action(make_info(world.user), GUID(str(world.org.guid))).allowed
+    promote_host_operator(world)
     with subject(world):
         assert query.model_hosting_action(make_info(world.user), GUID(str(world.org.guid))).allowed
         assert not query.model_hosting_action(make_info(world.user), GUID(str(world.other_org.guid))).allowed
-    binding.soft_delete()
+    type(world.user).objects.filter(pk=world.user.pk).update(is_superuser=False)
     with subject(world):
         assert not query.model_hosting_action(make_info(world.user), GUID(str(world.org.guid))).allowed
 
 
 def test_authority_revoked_during_account_read_does_not_save(world, monkeypatch):
     admin(world)
-    from astrolift_identity.models import RoleBinding
 
     def revoked(token):
-        RoleBinding.objects.filter(user=world.user).delete()
+        type(world.user).objects.filter(pk=world.user.pk).update(is_superuser=False)
         return "hosting-operator"
 
     monkeypatch.setattr("astrolift_services.schema.hf_connections.verify_account", revoked)
