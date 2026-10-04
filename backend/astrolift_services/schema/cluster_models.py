@@ -3,6 +3,7 @@
 from uuid import UUID
 
 import strawberry
+from django.db import transaction
 from django.db.models import CharField, Exists, F, Func, OuterRef, Q
 from strawberry.types import Info
 
@@ -22,8 +23,16 @@ from astrolift_services.model_admission import (
     current_org_id,
     in_current_org,
     shared_cluster_operation,
+    shared_model_operation,
     validate_cluster_request,
     with_canonical_model_handle,
+)
+from astrolift_services.model_settings import (
+    UpdateClusterModelInput,
+    allows_app,
+    sharing_config,
+    update_placement,
+    validate_updated_source,
 )
 from astrolift_services.models import ManagedService, ManagedServiceAttachment
 from astrolift_services.schema.model_types import (
@@ -120,8 +129,107 @@ class ModelPlacementClusterType:
     region: str | None
 
 
+@strawberry.type(name="ModelDedicatedApp")
+class ModelDedicatedAppType:
+    id: GUID
+    version: int
+    name: str
+    slug: str
+
+
 @strawberry.type
 class ClusterModelsQuery:
+    @strawberry.field
+    @require_permission(
+        Permission.ORG_UPDATE,
+        scope=cluster_model_org_scope(Permission.ORG_UPDATE),
+        operation=shared_cluster_operation("cluster_id"),
+    )
+    @tenant_scoped()
+    def cluster_model_dedicated_apps_page(
+        self,
+        info: Info,
+        organization_id: GUID,
+        cluster_id: GUID,
+        expected_provider_id: GUID,
+        search: str | None = None,
+        page: int = 1,
+        page_size: int = 25,
+    ) -> PageType[ModelDedicatedAppType]:
+        from astrolift_services.schema.hf_connections import require_host_admin
+
+        cluster = (
+            available_model_clusters(
+                TenantCluster.objects.filter(
+                    guid=_guid(cluster_id), provider_plugin__guid=_guid(expected_provider_id)
+                ),
+                current_org_id(),
+            ).first()
+            if in_current_org(organization_id)
+            else None
+        )
+        rows = live_app_owners(RegisteredApp.objects.filter(organization_id=current_org_id())).exclude(
+            provisioning_status__in=("tearing_down", "deregistered")
+        )
+        if cluster is None:
+            rows = rows.none()
+        else:
+            require_host_admin(info, cluster)
+            from astrolift_registry.visibility import visible_registry_apps
+
+            rows = visible_registry_apps(rows, Permission.APP_READ)
+            rows = rows.filter(
+                environments__tenant_cluster_id=cluster.pk,
+                environments__deleted_at__isnull=True,
+            ).distinct()
+        return _page(
+            _search(rows, search, ("name", "slug")),
+            page=page,
+            page_size=page_size,
+            projection=lambda app: ModelDedicatedAppType(
+                id=GUID(str(app.guid)), version=app.version, name=app.name, slug=app.slug
+            ),
+        )
+
+    @strawberry.field
+    @require_permission(
+        Permission.ORG_UPDATE,
+        scope=cluster_model_org_scope(Permission.ORG_UPDATE),
+        operation=shared_model_operation(),
+    )
+    @require_permission(
+        Permission.CLUSTER_UPDATE,
+        scope=cluster_model_org_scope(Permission.CLUSTER_UPDATE),
+        operation=shared_model_operation(),
+    )
+    @tenant_scoped()
+    def cluster_model_update_admission(
+        self, info: Info, input: UpdateClusterModelInput
+    ) -> ModelRuntimeAdmissionType:
+        from astrolift_services.schema.cluster_model_mutations import _locked_model
+        from astrolift_services.schema.hf_connections import require_host_admin
+
+        try:
+            with transaction.atomic():
+                service = _locked_model(input)
+                if service is None or service.version != input.if_match_version:
+                    raise ValueError("Model deployment changed or is unavailable. Refresh and retry.")
+                require_host_admin(info, service.tenant_cluster)
+                _, runtime = validate_updated_source(service, update_placement(service, input), locked=True)
+                sharing_config(service, input, locked=True)
+                require_host_admin(info, service.tenant_cluster)
+        except (TypeError, ValueError) as exc:
+            return ModelRuntimeAdmissionType(
+                eligible=False, reason=str(exc), runtime_version=None, architecture=None
+            )
+        return ModelRuntimeAdmissionType(
+            eligible=True,
+            reason=None,
+            runtime_version="0.15.1",
+            architecture=runtime.architecture,
+            hardware_admission="operator_declared",
+        )
+
     @strawberry.field
     @require_permission(Permission.ORG_READ, scope=cluster_model_org_scope(Permission.ORG_READ))
     @tenant_scoped()
@@ -338,6 +446,7 @@ class ClusterModelsQuery:
             eligible = (
                 admitted
                 and service.tenant_cluster_id == env.tenant_cluster_id
+                and allows_app(service, env.registered_app)
                 and supported_namespace
                 and supported_workloads
             )

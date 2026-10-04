@@ -235,6 +235,10 @@ def _cluster_model_placement(svc: Any, *, cluster: Any) -> Any:
             ).values_list("pk", flat=True)
         )
     consumers = []
+    from astrolift_services.model_settings import allows_app, dedicated_app
+
+    if (svc.config or {}).get("sharing_mode") == "dedicated" and dedicated_app(svc) is None:
+        raise ValueError("Dedicated model app is no longer live and coherent.")
     for row in desired.order_by("guid"):
         env = row.app_environment
         app = env.registered_app if env else None
@@ -247,6 +251,8 @@ def _cluster_model_placement(svc: Any, *, cluster: Any) -> Any:
         ):
             raise ValueError("Shared model subscription destination is no longer live and coherent.")
         expected = f"services/{svc.organization.guid}/{svc.guid}/subscriptions/{row.guid}#api_key"
+        if not allows_app(svc, app):
+            raise ValueError("Shared model subscription disagrees with the model sharing policy.")
         if row.credential_ref != expected:
             raise ValueError("Shared model subscription credential identity is invalid.")
         consumers.append(

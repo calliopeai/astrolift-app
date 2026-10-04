@@ -6,6 +6,7 @@ import strawberry
 
 from astrolift_graphql import GUID
 from astrolift_services.cluster_models import model_binding_prefix
+from astrolift_services.model_settings import ModelSharingMode, dedicated_app
 from astrolift_services.models import ManagedService
 
 
@@ -63,6 +64,11 @@ class ClusterModelDeploymentType:
     local_artifact_id: GUID | None = None
     local_artifact_version: int | None = None
     local_manifest_sha256: str | None = None
+    sharing_mode: ModelSharingMode = ModelSharingMode.SHARED
+    dedicated_app_id: GUID | None = None
+    dedicated_app_version: int | None = None
+    dedicated_app_name: str | None = None
+    dedicated_app_slug: str | None = None
 
 
 def cluster_model_to_type(service):
@@ -99,9 +105,17 @@ def cluster_model_to_type(service):
             source_kind = "local_artifact"
         except ValueError:
             artifact_id, artifact_version, manifest_sha256 = None, None, None
-    elif not config.get("model_source") and isinstance(config.get("model"), str):
+    elif config.get("model_source") in (None, "huggingface") and isinstance(config.get("model"), str):
         source_kind = "huggingface"
     revision = config.get("model_revision")
+    app = dedicated_app(service)
+    if app is not None:
+        from astrolift_registry.models import RegisteredApp
+        from astrolift_registry.visibility import visible_registry_apps
+        from core.permissions import Permission
+
+        if not visible_registry_apps(RegisteredApp.objects.filter(pk=app.pk), Permission.APP_READ).exists():
+            app = None
     revision = revision if isinstance(revision, str) and re.fullmatch(r"[0-9a-f]{40}", revision) else None
     ready = (
         available
@@ -135,6 +149,13 @@ def cluster_model_to_type(service):
         local_artifact_id=artifact_id,
         local_artifact_version=artifact_version,
         local_manifest_sha256=manifest_sha256,
+        sharing_mode=ModelSharingMode.DEDICATED
+        if config.get("sharing_mode") == "dedicated"
+        else ModelSharingMode.SHARED,
+        dedicated_app_id=GUID(str(app.guid)) if app else None,
+        dedicated_app_version=app.version if app else None,
+        dedicated_app_name=app.name if app else None,
+        dedicated_app_slug=app.slug if app else None,
         compute_mode=config.get("compute_mode") if config.get("compute_mode") in ("cpu", "gpu") else None,
         subscriptions_enabled=config.get("allow_subscriptions") is True,
         runtime_supported=runtime_supported,

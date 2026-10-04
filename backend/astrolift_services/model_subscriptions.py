@@ -2,7 +2,7 @@
 
 from copy import deepcopy
 
-from django.db.models import F
+from django.db.models import F, Q
 
 from astrolift_registry.models import Workload
 from astrolift_services.cluster_models import model_binding_prefix
@@ -44,6 +44,11 @@ def coherent_subscriptions(env, *, applied_only=True):
         return ManagedServiceAttachment.objects.none()
     models = live_cluster_models(ManagedService.objects.all(), env.registered_app.organization_id).filter(
         tenant_cluster_id=env.tenant_cluster_id
+    )
+    models = models.filter(
+        Q(config__sharing_mode__isnull=True)
+        | Q(config__sharing_mode="shared")
+        | Q(config__sharing_mode="dedicated", config__dedicated_app_id=str(env.registered_app.guid))
     )
     if applied_only:
         models = with_canonical_model_handle(models).filter(backend_ref=F("_canonical_model_handle"))

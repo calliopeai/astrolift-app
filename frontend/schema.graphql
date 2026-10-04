@@ -6644,6 +6644,11 @@ type ClusterModelDeployment {
   localArtifactId: GUID
   localArtifactVersion: Int
   localManifestSha256: String
+  sharingMode: ModelSharingMode!
+  dedicatedAppId: GUID
+  dedicatedAppVersion: Int
+  dedicatedAppName: String
+  dedicatedAppSlug: String
 }
 
 type ClusterModelDeploymentMutationResult {
@@ -7743,6 +7748,30 @@ enum ModelCompatibility {
   UNKNOWN
 }
 
+type ModelDedicatedApp {
+  id: GUID!
+  version: Int!
+  name: String!
+  slug: String!
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type ModelDedicatedAppPage {
+  items: [ModelDedicatedApp!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
 type ModelDeploymentMetrics {
   serviceId: GUID!
   clusterId: GUID!
@@ -7849,6 +7878,11 @@ type ModelRuntimeAdmission {
   runtimeVersion: String
   architecture: String
   hardwareAdmission: String!
+}
+
+enum ModelSharingMode {
+  SHARED
+  DEDICATED
 }
 
 type ModelSourceAccess {
@@ -9044,6 +9078,8 @@ type Query {
   astroliftSshDeployKeysPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftSshDeployKeyPage!
   astroliftAvailableRepos(connectionId: String!, search: String = null, limit: Int! = 100): AstroliftRemoteRepoList!
   astroliftSourceFile(connectionId: String!, repoFullName: String!, path: String!, ref: String!): AstroliftSourceFile!
+  clusterModelDedicatedAppsPage(organizationId: GUID!, clusterId: GUID!, expectedProviderId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelDedicatedAppPage!
+  clusterModelUpdateAdmission(input: UpdateClusterModelInput!): ModelRuntimeAdmission!
   clusterModelPlacementClustersPage(organizationId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelPlacementClusterPage!
   clusterModelDeploymentsPage(organizationId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25, filter: ClusterModelsFilterInput = null): ClusterModelDeploymentPage!
   clusterModelDeployment(organizationId: GUID!, id: GUID!): ClusterModelDeployment
@@ -10114,6 +10150,10 @@ input UpdateClusterModelInput {
   memoryRequest: String!
   gpuCount: Int!
   cpuKvCacheGiB: Int = null
+  name: String = null
+  sharingMode: ModelSharingMode = null
+  dedicatedAppId: GUID = null
+  ifMatchDedicatedAppVersion: Int = null
 }
 
 input UpdateEmailTemplateInput {

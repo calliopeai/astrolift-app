@@ -6217,6 +6217,10 @@ export type ClusterModelDeployment = {
   clusterName: Scalars['String']['output'];
   clusterSlug: Scalars['String']['output'];
   computeMode?: Maybe<Scalars['String']['output']>;
+  dedicatedAppId?: Maybe<Scalars['GUID']['output']>;
+  dedicatedAppName?: Maybe<Scalars['String']['output']>;
+  dedicatedAppSlug?: Maybe<Scalars['String']['output']>;
+  dedicatedAppVersion?: Maybe<Scalars['Int']['output']>;
   desiredResources: ModelResources;
   desiredSubscriptionRevision: Scalars['Int']['output'];
   id: Scalars['GUID']['output'];
@@ -6237,6 +6241,7 @@ export type ClusterModelDeployment = {
   revisionSha?: Maybe<Scalars['String']['output']>;
   runtimeReason?: Maybe<Scalars['String']['output']>;
   runtimeSupported?: Maybe<Scalars['Boolean']['output']>;
+  sharingMode: ModelSharingMode;
   sourceKind: Scalars['String']['output'];
   status: Scalars['String']['output'];
   subscriptionsEnabled: Scalars['Boolean']['output'];
@@ -7300,6 +7305,26 @@ export type ModelClusterCapacity = {
 export type ModelCompatibility =
   | 'UNKNOWN';
 
+export type ModelDedicatedApp = {
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type ModelDedicatedAppPage = {
+  items: Array<ModelDedicatedApp>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type ModelDeploymentMetrics = {
   clusterId: Scalars['GUID']['output'];
   end: Scalars['DateTime']['output'];
@@ -7401,6 +7426,10 @@ export type ModelRuntimeAdmission = {
   reason?: Maybe<Scalars['String']['output']>;
   runtimeVersion?: Maybe<Scalars['String']['output']>;
 };
+
+export type ModelSharingMode =
+  | 'DEDICATED'
+  | 'SHARED';
 
 export type ModelSourceAccess = {
   accessible: Scalars['Boolean']['output'];
@@ -10594,6 +10623,7 @@ export type Query = {
   /** Cursor-paginated mutation audit log. Superuser only. */
   auditLogsPage: AuditLogEntryPage;
   brief?: Maybe<AstroliftBrief>;
+  clusterModelDedicatedAppsPage: ModelDedicatedAppPage;
   clusterModelDeployment?: Maybe<ClusterModelDeployment>;
   clusterModelDeploymentsPage: ClusterModelDeploymentPage;
   clusterModelPlacementClustersPage: ModelPlacementClusterPage;
@@ -10601,6 +10631,7 @@ export type Query = {
   clusterModelSourceAccess: ModelSourceAccess;
   clusterModelSubscriptionTargetsPage: ModelSubscriptionTargetPage;
   clusterModelSubscriptionsPage: ModelSubscriptionPage;
+  clusterModelUpdateAdmission: ModelRuntimeAdmission;
   dispatchers: Array<AstroliftDispatcherInstance>;
   /** List all effective permissions for a user, with the role bindings that grant each one. */
   effectivePermissions: Array<PermissionEntry>;
@@ -12407,6 +12438,16 @@ export type QueryBriefArgs = {
 };
 
 
+export type QueryClusterModelDedicatedAppsPageArgs = {
+  clusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryClusterModelDeploymentArgs = {
   id: Scalars['GUID']['input'];
   organizationId: Scalars['GUID']['input'];
@@ -12460,6 +12501,11 @@ export type QueryClusterModelSubscriptionsPageArgs = {
   page?: Scalars['Int']['input'];
   pageSize?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryClusterModelUpdateAdmissionArgs = {
+  input: UpdateClusterModelInput;
 };
 
 
@@ -13657,13 +13703,17 @@ export type UpdateClusterModelInput = {
   allowSubscriptions: Scalars['Boolean']['input'];
   cpuKvCacheGiB: InputMaybe<Scalars['Int']['input']>;
   cpuRequest: Scalars['String']['input'];
+  dedicatedAppId: InputMaybe<Scalars['GUID']['input']>;
   expectedClusterId: Scalars['GUID']['input'];
   expectedProviderId: Scalars['GUID']['input'];
   gpuCount: Scalars['Int']['input'];
   id: Scalars['GUID']['input'];
+  ifMatchDedicatedAppVersion: InputMaybe<Scalars['Int']['input']>;
   ifMatchVersion: Scalars['Int']['input'];
   memoryRequest: Scalars['String']['input'];
+  name: InputMaybe<Scalars['String']['input']>;
   organizationId: Scalars['GUID']['input'];
+  sharingMode: InputMaybe<ModelSharingMode>;
 };
 
 export type UpdateEmailTemplateInput = {

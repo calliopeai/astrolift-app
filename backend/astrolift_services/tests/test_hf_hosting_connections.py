@@ -252,7 +252,7 @@ def test_actual_http_response_logs_and_audit_never_disclose_credential(world, ca
     from core.schema.audit import MutationAuditLog
 
     admin(world)
-    Member.objects.create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
+    Member.objects.get_or_create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
     minted = mint_token()
     ApiToken.objects.create(
         user=world.user,
