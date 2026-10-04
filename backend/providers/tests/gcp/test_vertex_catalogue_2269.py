@@ -425,6 +425,95 @@ def test_injected_clients_caller_owned_close_refuses_reads():
     assert not wire.calls and wire.closed == 0
 
 
+@pytest.mark.parametrize(
+    "method,name", [("endpoints", None), ("models", None), ("endpoint_detail", ENDPOINT), ("model_detail", MODEL)]
+)
+@pytest.mark.parametrize("after_calls", [1, 2, 3])
+def test_current_checkpoint_withdrawal_discards_each_native_response(method, name, after_calls):
+    wire = Wire()
+
+    def current():
+        if len(wire.calls) >= after_calls:
+            raise RuntimeError("PRIVATE_AUTHORITY_WITHDRAWN")
+
+    reader = VertexCatalogue(CONFIG, clients=wire.clients, checkpoint=current)
+    result = getattr(reader, method)(name) if name else getattr(reader, method)()
+    assert result.state == CatalogueState.REFUSED and result.reason == "CURRENT_SOURCE_UNAVAILABLE"
+    assert result.items == () and result.identity is None
+    assert len(wire.calls) == after_calls
+    assert "PRIVATE_AUTHORITY_WITHDRAWN" not in repr(result)
+
+
+@pytest.mark.parametrize("method", ["endpoints", "models"])
+def test_current_checkpoint_blocks_second_page_after_withdrawal(method):
+    wire = Wire()
+    if method == "endpoints":
+        wire.endpoint_pages = [vertex.ListEndpointsResponse(endpoints=[wire.endpoint], next_page_token="page2")]
+    else:
+        wire.model_pages = [vertex.ListModelsResponse(models=[wire.model], next_page_token="page2")]
+
+    def current():
+        if len(wire.calls) >= 4:
+            raise ValueError("PRIVATE_CURRENT_SOURCE_CHANGED")
+
+    result = getattr(VertexCatalogue(CONFIG, clients=wire.clients, checkpoint=current), method)()
+    assert result.state == CatalogueState.REFUSED and result.items == () and result.identity is None
+    assert len(wire.calls) == 4
+    assert len([name for name, _ in wire.calls if name.startswith("List")]) == 1
+
+
+@pytest.mark.parametrize("returned", [True, False, "not-current"])
+def test_current_checkpoint_requires_explicit_completion_not_boolean_admission(returned):
+    wire = Wire()
+    result = VertexCatalogue(CONFIG, clients=wire.clients, checkpoint=lambda: returned).endpoints()
+    assert result.state == CatalogueState.REFUSED and result.reason == "CURRENT_SOURCE_UNAVAILABLE"
+    assert wire.calls == []
+
+
+@pytest.mark.parametrize("after_adc", [False, True])
+def test_current_checkpoint_before_and_after_adc_prevents_client_construction(monkeypatch, after_adc):
+    discovered = []
+
+    def current():
+        if not after_adc or discovered:
+            raise RuntimeError("PRIVATE_WITHDRAWN_BEFORE_CLIENTS")
+
+    def discover(**kwargs):
+        discovered.append(kwargs)
+        return AnonymousCredentials(), PROJECT_ID
+
+    monkeypatch.setattr("google.auth.default", discover)
+    for transport in (ProjectsGrpcTransport, EndpointServiceGrpcTransport, ModelServiceGrpcTransport):
+        monkeypatch.setattr(
+            transport, "create_channel", staticmethod(lambda *args, **kwargs: pytest.fail("no channel"))
+        )
+    result = VertexCatalogue(CONFIG, checkpoint=current).endpoints()
+    assert result.state == CatalogueState.REFUSED and result.items == () and result.identity is None
+    assert len(discovered) == int(after_adc)
+
+
+@pytest.mark.parametrize("after_channels", [1, 2, 3])
+def test_current_checkpoint_client_construction_withdrawal_closes_owned_channels(monkeypatch, after_channels):
+    wire = Wire()
+    created = []
+
+    def current():
+        if len(created) >= after_channels:
+            raise RuntimeError("PRIVATE_CONSTRUCTION_WITHDRAWN")
+
+    def create(host, **kwargs):
+        created.append(host)
+        return wire
+
+    monkeypatch.setattr("google.auth.default", lambda **kwargs: (AnonymousCredentials(), PROJECT_ID))
+    for transport in (ProjectsGrpcTransport, EndpointServiceGrpcTransport, ModelServiceGrpcTransport):
+        monkeypatch.setattr(transport, "create_channel", staticmethod(create))
+    with VertexCatalogue(CONFIG, checkpoint=current) as reader:
+        result = reader.endpoints()
+    assert result.state == CatalogueState.REFUSED and result.items == () and result.identity is None
+    assert len(created) == after_channels and wire.closed == after_channels and wire.calls == []
+
+
 def test_production_factory_fixed_hosts_private_single_adc_bounded_channels_and_cleanup(monkeypatch, caplog):
     wire = Wire()
     wire.endpoint.labels["private"] = "PRIVATE_NATIVE_LABEL_MARKER"

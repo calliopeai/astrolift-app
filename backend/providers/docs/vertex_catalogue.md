@@ -16,6 +16,15 @@ modes, role pointers, arbitrary endpoints and caller continuation tokens are
 unsupported. One private ADC credential is shared by the native clients;
 its ambient default project is ignored. Credential objects are not returned.
 
+An optional trusted `checkpoint` callback revalidates the caller's current
+authority and source declaration before ADC discovery, after discovery, around
+private client construction, and before/after each native RPC. It must complete
+with `None` or raise; boolean results do not grant admission. Withdrawal discards
+all metadata, prevents later pages/reads and closes partially constructed owned
+clients. Any public consumer must supply a real current-admission callback;
+omitting it retains the internal caller-admission contract, not an authority
+proof. These checks are point-in-time observations, not an atomic native snapshot.
+
 Resource Manager `GetProject` resolves the configured spelling to a valid project
 ID and numeric `projects/<number>` name in `ACTIVE` state. Vertex list parents use
 that verified number. Every native metadata read is preceded and followed by the

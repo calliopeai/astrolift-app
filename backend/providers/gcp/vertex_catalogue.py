@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 from _sdk.cloud_credentials import CloudCredential, CredentialMode
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from types import TracebackType
 
 MAX_ITEMS = 500
@@ -93,7 +94,13 @@ class VertexCatalogue:
     Project metadata proves a resource mapping, never caller/tenant identity.
     """
 
-    def __init__(self, config: VertexCatalogueConfig, *, clients: tuple[Any, Any, Any] | None = None) -> None:
+    def __init__(
+        self,
+        config: VertexCatalogueConfig,
+        *,
+        clients: tuple[Any, Any, Any] | None = None,
+        checkpoint: Callable[[], object] | None = None,
+    ) -> None:
         credential = config.credential
         if (
             not (_PROJECT_ID.fullmatch(config.project) or _NUMBER.fullmatch(config.project))
@@ -103,6 +110,7 @@ class VertexCatalogue:
             or credential.declared_account != config.project
             or credential.role_arn
             or credential.external_id
+            or (checkpoint is not None and not callable(checkpoint))
         ):
             raise VertexCatalogueError("INVALID_CONFIGURATION")
         self.config = config
@@ -110,6 +118,21 @@ class VertexCatalogue:
         self._owned = clients is None
         self._identity: VertexCatalogueIdentity | None = None
         self._closed = False
+        self._checkpoint = checkpoint
+
+    def _admit(self) -> None:
+        if self._checkpoint is not None:
+            try:
+                if self._checkpoint() is not None:
+                    raise VertexCatalogueError("CURRENT_SOURCE_UNAVAILABLE")
+            except Exception:
+                raise VertexCatalogueError("CURRENT_SOURCE_UNAVAILABLE") from None
+
+    def _read(self, method: Callable[..., Any], request: dict[str, Any]) -> Any:
+        self._admit()
+        result = method(request=request, retry=None, timeout=TIMEOUT)
+        self._admit()
+        return result
 
     def __enter__(self) -> VertexCatalogue:
         if self._closed:
@@ -144,6 +167,7 @@ class VertexCatalogue:
     def _native(self) -> tuple[Any, Any, Any]:
         if self._closed:
             raise VertexCatalogueError("CLOSED")
+        self._admit()
         if self._clients is None:
             import google.auth
             from google.cloud import aiplatform_v1, resourcemanager_v3
@@ -163,6 +187,7 @@ class VertexCatalogue:
             from google.cloud.resourcemanager_v3.services.projects.transports.grpc import ProjectsGrpcTransport
 
             credential, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform.read-only"])
+            self._admit()
             made: list[Any] = []
             factories: tuple[tuple[Any, Any, str, Any], ...] = (
                 (
@@ -186,6 +211,7 @@ class VertexCatalogue:
             )
             try:
                 for client_type, transport_type, host, client_info in factories:
+                    self._admit()
                     channel = transport_type.create_channel(
                         host,
                         credentials=credential,
@@ -204,6 +230,7 @@ class VertexCatalogue:
                     except Exception:
                         channel.close()
                         raise
+                    self._admit()
             except Exception:
                 for client in made:
                     client.transport.close()
@@ -213,7 +240,7 @@ class VertexCatalogue:
 
     def _project(self) -> VertexCatalogueIdentity:
         projects, _, _ = self._native()
-        project = projects.get_project(request={"name": f"projects/{self.config.project}"}, retry=None, timeout=TIMEOUT)
+        project = self._read(projects.get_project, {"name": f"projects/{self.config.project}"})
         self._bounded(project)
         match = re.fullmatch(r"projects/([1-9][0-9]{0,19})", project.name)
         if not match or not _PROJECT_ID.fullmatch(project.project_id) or project.state != 1:
@@ -258,15 +285,14 @@ class VertexCatalogue:
                 client = endpoints if kind == "endpoints" else models
                 method = client.list_endpoints if kind == "endpoints" else client.list_models
                 size = min(100, limit - len(items))
-                pager = method(
-                    request={
+                pager = self._read(
+                    method,
+                    {
                         "parent": f"projects/{identity.project_number}/locations/{self.config.region}",
                         "page_size": size,
                         "page_token": token,
                         "read_mask": {"paths": self._mask(kind)},
                     },
-                    retry=None,
-                    timeout=TIMEOUT,
                 )
                 # Take exactly one generated page; iterating rows would secretly
                 # fetch subsequent pages outside the identity/limit boundary.
@@ -304,7 +330,7 @@ class VertexCatalogue:
             self._resource(name, kind, identity)
             _, endpoints, models = self._native()
             method = endpoints.get_endpoint if kind == "endpoints" else models.get_model
-            row = method(request={"name": name}, retry=None, timeout=TIMEOUT)
+            row = self._read(method, {"name": name})
             self._bounded(row)
             self._project()
             source = self._source(row, kind, identity)
