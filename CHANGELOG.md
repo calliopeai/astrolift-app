@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep Vertex in-place update completion and pending results explicit for the managed-service update contract; preserve native operation/refusal behavior and verify completed, pending and failed operation outcomes (#2284).
+
 - Instrument owned AWS identity reconciliation/verification and the Azure owned-reconciler factory with private operation telemetry; redact arguments and native error contents while preserving original exceptions and existing default telemetry behavior (#2284).
 
 - Run the pinned AVX2 CPU runtime build and bounded model smoke in remote pull-request CI when its inputs change; keep registry publication explicit after verification (#2269).
