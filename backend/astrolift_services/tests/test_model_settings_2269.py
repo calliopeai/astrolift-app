@@ -6,6 +6,7 @@ from astrolift_graphql import GUID
 from astrolift_services.model_settings import ModelSharingMode, UpdateClusterModelInput
 from astrolift_services.models import HuggingFaceConnection, ManagedServiceAttachment
 from astrolift_services.schema.cluster_model_mutations import ClusterModelMutations
+from astrolift_services.tests.model_hosting_helpers import promote_host_operator
 from astrolift_services.tests.test_cluster_model_foundation_2213 import subject
 from astrolift_services.tests.test_model_hosting_sources import (
     local_request,
@@ -51,10 +52,12 @@ def update(w, **changes):
     )
 
 
-def active(w, *, local=False):
+def active(w, *, local=False, hosting=True):
     from astrolift_services.model_admission import request_config
     from astrolift_services.tests.test_cluster_model_queries_2213 import request
 
+    if hosting:
+        promote_host_operator(w)
     with subject(w):
         w.model.config = request_config(local_request(w) if local else request(w))
     w.model.status = "active"
@@ -290,7 +293,7 @@ def test_dedicated_app_metadata_and_chooser_obey_actual_app_read_permission(worl
     from astrolift_services.tests.test_cluster_model_queries_2213 import grant
     from core.permissions import Permission
 
-    active(world)
+    active(world, hosting=False)
     world.model.config.update(sharing_mode="dedicated", dedicated_app_id=str(world.medops_app.guid))
     world.model.save()
 
@@ -305,9 +308,14 @@ def test_dedicated_app_metadata_and_chooser_obey_actual_app_read_permission(worl
     with subject(world):
         dto = cluster_model_to_type(world.model)
         assert dto.sharing_mode == ModelSharingMode.DEDICATED
-        assert dto.dedicated_app_name is None and dto.dedicated_app_id is None and read().total_count == 0
+        assert dto.dedicated_app_name is None and dto.dedicated_app_id is None
+        from core.permissions import PermissionDenied
+
+        with pytest.raises(PermissionDenied):
+            read()
         grant(world, Permission.APP_READ, "APP", world.medops_app.pk)
         assert cluster_model_to_type(world.model).dedicated_app_id == str(world.medops_app.guid)
+        promote_host_operator(world)
         assert read().total_count == 1
 
 
@@ -326,7 +334,7 @@ def test_update_admission_uses_stored_local_source_and_exact_version(world, queu
     assert world.model.config == before and not world.hf and not queue
 
 
-def test_session_membership_withdrawn_after_source_lock_refuses_before_write(world, queue, monkeypatch):
+def test_bearer_membership_withdrawn_after_source_lock_refuses_before_write(world, queue, monkeypatch):
     from django.utils import timezone
 
     from astrolift_identity.models import Member
@@ -344,7 +352,7 @@ def test_session_membership_withdrawn_after_source_lock_refuses_before_write(wor
         return result
 
     monkeypatch.setattr(mutations, "validate_updated_source", withdraw)
-    with subject(world):
+    with subject(world, scopes=["admin"]):
         result = ClusterModelMutations().update_cluster_model(make_info(world.user), input=update(world))
     assert not result.ok and not queue
     world.model.refresh_from_db()
@@ -352,13 +360,13 @@ def test_session_membership_withdrawn_after_source_lock_refuses_before_write(wor
 
 
 @pytest.mark.parametrize("operation", ["admission", "chooser"])
-def test_settings_queries_evaluate_the_actual_target_region(world, operation):
+def test_ordinary_settings_roles_remain_refused_in_both_policy_regions(world, operation):
     from astrolift_identity.models import Policy
     from astrolift_services.schema.cluster_models import ClusterModelsQuery
     from astrolift_services.tests.test_cluster_model_queries_2213 import grant
     from core.permissions import Permission, PermissionDenied
 
-    active(world)
+    active(world, hosting=False)
     grant(world, Permission.APP_READ, "APP", world.medops_app.pk)
     world.cluster.region = "us-west-2"
     world.cluster.save()
@@ -385,8 +393,8 @@ def test_settings_queries_evaluate_the_actual_target_region(world, operation):
         )
 
     with subject(world):
-        result = read()
-        assert result.eligible if operation == "admission" else result.total_count == 1
+        with pytest.raises(PermissionDenied):
+            read()
         world.cluster.region = "us-east-1"
         world.cluster.save()
         with pytest.raises(PermissionDenied):
