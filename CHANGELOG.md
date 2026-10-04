@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a private typed GCP IAM submission hook with exact UNSENT/SENT commit receipts, bounded partial-outcome evidence and guarded recovery; refuse unsent ownership adoption and blind resends after uncertainty. Durable backend journal and app orchestration remain separate prerequisites (#2278).
+
 - Add a private signed original-credential reference for native app identity work, rechecking actual browser/session or API-token authority, immutable placement and current RBAC/ABAC. Public dispatch capture and GCP journal/workflow integration remain pending (#2278).
 
 - Render typed native model family metadata in inventory, detail and settings; preserve Bedrock actions only for coherent current source identities, and keep unadopted Vertex/Foundry families read-only without hosted runtime fallbacks (#2269).
