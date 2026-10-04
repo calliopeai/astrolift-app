@@ -567,15 +567,17 @@ def test_withdrawn_checkpoint_precedes_adc_discovery_and_private_client_construc
     def withdrawn():
         raise NativeIdentityError("CURRENT_AUTHORITY_WITHDRAWN")
 
-    with NativeGCPIdentity(CONTEXT) as driver:
-        with pytest.raises(NativeIdentityError, match="CURRENT_AUTHORITY_WITHDRAWN"):
-            driver.reconcile(
-                PERMISSIONS,
-                service_account_uids=(UID,),
-                ledger=OwnedGrantLedger(CONTEXT.fingerprint),
-                checkpoint=withdrawn,
-                persist=lambda ledger: None,
-            )
+    with (
+        NativeGCPIdentity(CONTEXT) as driver,
+        pytest.raises(NativeIdentityError, match="CURRENT_AUTHORITY_WITHDRAWN"),
+    ):
+        driver.reconcile(
+            PERMISSIONS,
+            service_account_uids=(UID,),
+            ledger=OwnedGrantLedger(CONTEXT.fingerprint),
+            checkpoint=withdrawn,
+            persist=lambda ledger: None,
+        )
     assert discovered == [] and constructed == [] and not wire.calls
 
 
