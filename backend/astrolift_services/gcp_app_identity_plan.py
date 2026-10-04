@@ -27,6 +27,7 @@ from astrolift_services.models import (
 )
 from astrolift_services.native_identity_authority import current_app_identity_authority
 from astrolift_workflows.gcp_identity_inputs import AcceptedPreparationTemplate, EndpointGrant, LogicalSubject
+from astrolift_workflows.native_identity_inputs import DeploymentAuthorityContext
 from astrolift_workflows.vertex_managed_service import JOURNAL_KEY
 from core.app_deploy import namespace_for_environment, workload_identity_role_name
 from core.cluster_credentials import credential_for_cluster
@@ -94,6 +95,7 @@ class AcceptedEndpointAppPlan:
     snapshot: EndpointAppSnapshot
     observations: tuple[ObservedEndpoint, ...]
     template: AcceptedPreparationTemplate
+    deployment_context: DeploymentAuthorityContext | None = None
 
 
 def _lifecycle(service, app, cluster, identity):
@@ -149,26 +151,26 @@ def _lifecycle(service, app, cluster, identity):
     )
 
 
-def endpoint_app_snapshot(authority, identity):
+def endpoint_app_snapshot(authority, identity, *, deployment_context=None):
     """DB-only fresh admission; takes no model locks and makes no SDK/credential discovery calls."""
     from gcp.identity_owned import NativeIdentityContext
 
     if type(identity) is not NativeIdentityContext:
         raise EndpointAppPlanError("ORIGINAL_IDENTITY_REQUIRED")
-    return _endpoint_app_snapshot(authority, identity)
+    return _endpoint_app_snapshot(authority, identity, deployment_context=deployment_context)
 
 
-def pre_identity_endpoint_snapshot(authority, scope):
+def pre_identity_endpoint_snapshot(authority, scope, *, deployment_context=None):
     """Fresh complete DB union admission before any GSA exists; no guessed UID."""
     from gcp.identity_source import ProjectScope
 
     if type(scope) is not ProjectScope:
         raise EndpointAppPlanError("VERIFIED_PROJECT_SCOPE_REQUIRED")
-    return _endpoint_app_snapshot(authority, scope)
+    return _endpoint_app_snapshot(authority, scope, deployment_context=deployment_context)
 
 
-def _endpoint_app_snapshot(authority, identity):
-    with current_app_identity_authority(authority) as selected:
+def _endpoint_app_snapshot(authority, identity, *, deployment_context=None):
+    with current_app_identity_authority(authority, deployment_context=deployment_context) as selected:
         app, cluster = selected.registered_app, selected.tenant_cluster
         provider = cluster.provider_plugin
         credential = credential_for_cluster(cluster)
@@ -188,7 +190,7 @@ def _endpoint_app_snapshot(authority, identity):
             raise EndpointAppPlanError("CURRENT_IDENTITY_SOURCE_UNAVAILABLE")
         environments = tuple(
             AppEnvironment.objects.filter(registered_app=app, tenant_cluster=cluster)
-            .select_related("registered_app__organization")
+            .select_related("registered_app__organization", "tenant_cluster")
             .order_by("guid")[: MAX_ITEMS + 1]
         )
         if not environments or len(environments) > MAX_ITEMS:
@@ -198,8 +200,16 @@ def _endpoint_app_snapshot(authority, identity):
         decision = decide(tenant, permission, scope)
         aliases = {}
         for env in environments:
+            selected_alias = str(env.guid) == authority.environment_guid
+            facts = abac.current_attributes()
             with abac.request_attributes(
-                replace(abac.current_attributes(), environment=env.name, region=identity.region)
+                replace(
+                    facts,
+                    environment=env.name,
+                    region=env.tenant_cluster.region or None,
+                    approvals=facts.approvals if selected_alias else 0,
+                    approval_request=facts.approval_request if selected_alias else False,
+                )
             ):
                 _check_permission_decision(
                     permission,
@@ -465,7 +475,7 @@ def _validate_observations(snapshot, observations):
             raise EndpointAppPlanError("CURRENT_ENDPOINT_VERSION_OR_SERVING_CHANGED")
 
 
-def _template(authority, identity, snapshot, observations):
+def _template(authority, identity, snapshot, observations, *, deployment_context=None):
     _validate_observations(snapshot, observations)
     return AcceptedPreparationTemplate(
         tuple(
@@ -476,6 +486,7 @@ def _template(authority, identity, snapshot, observations):
         _hash(
             {
                 "schema": "astrolift.gcp-app-endpoint-source.v1",
+                **({"deployment": asdict(deployment_context)} if deployment_context is not None else {}),
                 "authority": asdict(authority),
                 "identity": asdict(identity),
                 "database": asdict(snapshot),
@@ -497,10 +508,19 @@ def endpoint_app_checkpoint(plan):
     """DB-only callable usable at journal checkpoints; no new model locks or cloud reads."""
 
     def current():
-        snapshot = endpoint_app_snapshot(plan.authority, plan.identity)
+        snapshot = endpoint_app_snapshot(
+            plan.authority, plan.identity, deployment_context=plan.deployment_context
+        )
         if (
             snapshot != plan.snapshot
-            or _template(plan.authority, plan.identity, snapshot, plan.observations) != plan.template
+            or _template(
+                plan.authority,
+                plan.identity,
+                snapshot,
+                plan.observations,
+                deployment_context=plan.deployment_context,
+            )
+            != plan.template
         ):
             raise EndpointAppPlanError("ACCEPTED_APP_SOURCE_CHANGED")
 
@@ -521,41 +541,67 @@ def refresh_endpoint_app_sources(plan, *, observer_factory=NativeEndpointObserve
 
     checkpoint()
     if not plan.snapshot.endpoints:
-        if plan.observations or _template(plan.authority, plan.identity, plan.snapshot, ()) != plan.template:
+        if (
+            plan.observations
+            or _template(
+                plan.authority, plan.identity, plan.snapshot, (), deployment_context=plan.deployment_context
+            )
+            != plan.template
+        ):
             raise EndpointAppPlanError("ACCEPTED_NATIVE_SOURCE_CHANGED")
         return
     observer = observer_factory(plan.identity, checkpoint=checkpoint)
     try:
         observations = observer.observe(plan.snapshot)
         checkpoint()
-        if _template(plan.authority, plan.identity, plan.snapshot, observations) != plan.template:
+        if (
+            _template(
+                plan.authority,
+                plan.identity,
+                plan.snapshot,
+                observations,
+                deployment_context=plan.deployment_context,
+            )
+            != plan.template
+        ):
             raise EndpointAppPlanError("ACCEPTED_NATIVE_SOURCE_CHANGED")
     finally:
         observer.close()
 
 
-def produce_endpoint_app_plan(authority, identity, *, observer_factory=NativeEndpointObserver):
+def produce_endpoint_app_plan(
+    authority, identity, *, observer_factory=NativeEndpointObserver, deployment_context=None
+):
     if connection.in_atomic_block or not connection.get_autocommit():
         raise EndpointAppPlanError("NATIVE_OBSERVATION_REQUIRES_COMMITTED_DATABASE")
-    snapshot = endpoint_app_snapshot(authority, identity)
+    snapshot = endpoint_app_snapshot(authority, identity, deployment_context=deployment_context)
     deadline = time.monotonic() + MAX_SOURCE_SECONDS
 
     def checkpoint():
         if time.monotonic() >= deadline:
             raise EndpointAppPlanError("NATIVE_SOURCE_DEADLINE_EXCEEDED")
-        if endpoint_app_snapshot(authority, identity) != snapshot:
+        if endpoint_app_snapshot(authority, identity, deployment_context=deployment_context) != snapshot:
             raise EndpointAppPlanError("ACCEPTED_APP_SOURCE_CHANGED")
 
     checkpoint()
     if not snapshot.endpoints:
         return AcceptedEndpointAppPlan(
-            authority, identity, snapshot, (), _template(authority, identity, snapshot, ())
+            authority,
+            identity,
+            snapshot,
+            (),
+            _template(authority, identity, snapshot, (), deployment_context=deployment_context),
+            deployment_context,
         )
     observer = observer_factory(identity, checkpoint=checkpoint)
     try:
         observations = observer.observe(snapshot)
         checkpoint()
-        template = _template(authority, identity, snapshot, observations)
-        return AcceptedEndpointAppPlan(authority, identity, snapshot, observations, template)
+        template = _template(
+            authority, identity, snapshot, observations, deployment_context=deployment_context
+        )
+        return AcceptedEndpointAppPlan(
+            authority, identity, snapshot, observations, template, deployment_context
+        )
     finally:
         observer.close()

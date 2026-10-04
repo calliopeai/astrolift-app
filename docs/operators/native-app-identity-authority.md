@@ -117,3 +117,32 @@ Its failure activity writes only fixed Deployment status metadata, without Secre
 restoration or GitHub reflection. Patch markers preserve replay of older histories;
 older native histories do not acquire these new guarantees. This is staged source,
 not an available complete deployment capability or live cloud acceptance.
+
+## Deeper deployment consumers
+
+The private producer, source bootstrap and original-source reader accept an
+explicit `deployment_context`. Each current checkpoint uses the same strict
+`DeploymentAuthorityContext` lookup, exact protected origin and fresh vote ledger;
+no approvals are copied into the signed authority or read from ambient state.
+The accepted producer template includes the Deployment lookup key in its source
+fingerprint. Every environment alias is evaluated against its persisted cluster
+placement region. The separate Vertex region identifies a native model source
+and supplies no application placement authority. Selected-environment votes and
+pre-vote deferral cannot authorize sibling aliases.
+
+Pending GSA source acceptance retains the exact Deployment context as separate
+metadata beside the unchanged signed authority fields in its protected
+`authority_reference`. Two starts by the same caller on the same environment can
+have identical signed references; this additional acceptance fence prevents one
+Deployment's approval from resuming the other's pending create. A legacy pending
+source without that context cannot acquire it retrospectively. Only the original
+pending acceptance may resume under restored current policy. An already
+`OBSERVED` source can be reused by a separately admitted later Deployment without
+changing its original acceptance, account identity or creation evidence.
+
+The narrow post-send evidence path compares the original reservation and full
+stored acceptance, including its context, without looking up current approval
+or granting permission. Withdrawal after a reply can retain the original UID as
+evidence; it cannot authorize observation, another send or a different context.
+These private consumers still require actual receipt-bound Temporal execution
+and the remaining apply/runtime/inference chain before public activation.

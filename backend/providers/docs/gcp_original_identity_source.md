@@ -65,11 +65,22 @@ GSA creation. Existing setup, admission and credential ceilings remain required.
 original `AcceptedAppIdentityAuthority`. Each current checkpoint reloads the
 credential, actor, member, target and current policy through the existing fresh
 authority helper; no fabricated request or system actor is used. Default approval
-facts remain zero. A future deployment-aware caller must pass an actual protected
-deployment context through deeper authority checks, not a supplied vote count.
-That consumer must also evaluate each logical alias against its actual persisted
-cluster placement region; the separate Vertex region identifies the native source,
-not application placement authority.
+facts remain zero. The private bootstrap, original-source reader and producer
+accept `deployment_context=DeploymentAuthorityContext(deployment_guid)`. Every
+current checkpoint reloads that exact protected Deployment origin, actual human
+vote ledger and current policy; a caller-supplied count is not accepted. The
+producer evaluates each logical alias against its persisted cluster placement
+region, with votes only for the selected environment and zero votes/no deferral
+for siblings. The separate Vertex region identifies the native source and does
+not determine application placement authority.
+
+Pending source acceptance retains the context as separate immutable metadata
+beside the unchanged signed authority fields. Identical caller references from
+repeated starts on the same environment cannot substitute a different Deployment
+for the pending operation. Legacy pending acceptance without a context refuses
+contextual takeover. Evidence-only retention compares the exact original stored
+acceptance without a fresh permission lookup. `OBSERVED` source reuse by a later
+separately admitted Deployment preserves the original acceptance and UID.
 
 The app/cluster advisory mutex uses an independent autocommit connection and
 performs no FK writes. Canonical short NOWAIT transactions lock org, cluster,
