@@ -39,11 +39,15 @@ storage prerequisites. A nominal 8 GiB node does not have 8 GiB allocatable.
 Use a selector identifying hardware actually checked by the operator. The
 shared runtime admission must still remain fail closed without certification.
 
-The current request admission hardcodes CPU `bfloat16`. This float32 candidate
-therefore requires a separately reviewed backend runtime dtype choice before
-use; do not override the launcher inside the image or weaken certification.
-The small-context/concurrency smoke settings also need to be reproduced by the
-reviewed deployment configuration. The new image's one-thread defaults do not
-prove that a currently unbounded model request fits a small node. After a
-future build, record its exact registry manifest digest and use that digest,
-then require actual deployment readiness and inference observations.
+Typed runtime admission now checks an installation Super-admin's declaration
+of supported data types and bounded context/concurrency values. An AVX2 float32
+candidate must be declared with `FLOAT32` support and the actual checked hardware
+selector before use. The small test preset requests float32, a 256-token context
+and one sequence; admission binds those values, the immutable source and the
+current cluster/provider. Saving the declaration does not build or certify the
+image, and its one-thread defaults do not prove model fit on a small node.
+
+After a future build, record and declare its exact registry manifest digest.
+Verify the selected nodes, image access and capacity before deployment, then
+require actual deployment readiness and inference observations. Keep launcher
+arguments and certification checks intact.
