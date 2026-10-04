@@ -110,7 +110,10 @@ def test_same_service_current_owner_retarget_cannot_admit_saved_handle(activity_
     assert len(native.creates) == 1 and not native.deletes
 
 
-@pytest.mark.parametrize("change", [{"model_id": "other.model"}, {"model_id": "", "size": "large"}])
+@pytest.mark.parametrize(
+    "change",
+    [{"model_id": "other.model"}, {"model_id": "", "size": "large"}, {"provisioned_throughput": None}],
+)
 def test_same_service_config_substitution_refuses_fresh_readiness_and_binding(activity_service, change):
     svc, native, _instances, _observed = activity_service
     provisioned = _provision_sync(svc.pk)
@@ -122,6 +125,7 @@ def test_same_service_config_substitution_refuses_fresh_readiness_and_binding(ac
     with pytest.raises(ManagedServiceError):
         _managed_binding_for(svc)
     assert not _provision_sync(svc.pk)["ok"]
+    assert not _update_sync(svc.pk)["ok"]
     assert len(native.creates) == 1 and not native.deletes
 
 

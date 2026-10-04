@@ -8,8 +8,8 @@ The Bedrock driver saves the exact native throughput ARN in a versioned
 `ManagedService.backend_ref` handle, with the service and organization UUIDs,
 model fingerprint, units, commitment and original provision-intent fingerprint.
 All fields fit the existing 512-character column; identities are never truncated.
-The original log-prefix fingerprint is also retained, so changed plugin settings
-cannot redirect cleanup after the native resource disappears. The intent digest
+New allocations retain their original log-prefix fingerprint, so changed plugin
+settings cannot redirect cleanup after the native resource disappears. The intent digest
 uses canonical base64url encoding of all 256 SHA bits, not a shortened hash; the
 longest supported recovered handle is 504 characters.
 The intent includes the original app, environment, cluster and region identities.
@@ -55,13 +55,14 @@ AWS's idempotency guarantee is described in
 
 For a legacy name-only **paid** handle, recovery requires the original explicit
 `model_id`, `model_units` and `provisioned_throughput` configuration and the original
-provision spec and original driver log-prefix configuration. Do not infer an old
-log prefix from today's settings. Every original ownership dimension must be present and exact:
+provision spec. Every original ownership dimension must be present and exact:
 platform marker, service UUID, organization/app/environment slugs, cluster and
 isolation, plus all originally supplied binding/custom tags. Native source, units
 and commitment must match. The driver returns an upgraded ARN handle with the
 original request-intent hash, full SHA-256 ownership-tag fingerprint and original
-name. It does not write AWS tags. Later fresh reads require that tag fingerprint
+name. Legacy tags do not prove the original CloudWatch log prefix, so recovery
+leaves log identity unknown even when today's prefix happens to match. It does
+not write AWS tags. Later fresh reads require that tag fingerprint
 and current owner to remain unchanged. Bare legacy status or binding cannot infer
 this intended source from today's defaults.
 
@@ -74,9 +75,9 @@ no paid resource exists; denial remains unknown rather than available.
 
 ## Updates, removal and rollback
 
-Only on-demand `model_id` is advertised as editable. An unchanged paid spec can
-be confirmed against live `InService` state; model, units or commitment changes
-are refused without a provider update. AWS's native update API does not expose
+Only on-demand `model_id` is advertised as editable. A full unchanged paid spec,
+including its commitment, can be confirmed against live `InService` state; model,
+units or commitment changes are refused without a provider update. AWS's native update API does not expose
 units or commitment changes, and restricts model changes:
 [UpdateProvisionedModelThroughput](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_UpdateProvisionedModelThroughput.html).
 This driver does not claim to implement paid custom-model replacement. Plan a
@@ -91,18 +92,20 @@ before its commitment ends:
 [DeleteProvisionedModelThroughput](https://docs.aws.amazon.com/bedrock/latest/APIReference/API_DeleteProvisionedModelThroughput.html).
 After expiry, deletion uses only the verified exact ARN. An accepted deletion or
 lost reply is retried by reading that ARN; absence is idempotent and does not start
-another allocation. Log deletion uses the saved original name (legacy) or exact
-service-derived name (new), even after throughput disappears. Changed log-prefix configuration refuses cleanup before deleting any group;
-restore the original configuration rather than guessing a new path. Older
-versioned handles lacking a saved log identity remain readable but cannot claim
-delete-data cleanup. Failed CloudWatch
-log deletion remains unconfirmed and retryable; it is not reported as deleted.
+another allocation. New allocations retain the exact service-derived log name
+and prefix fingerprint, even after throughput disappears. Changed log-prefix
+configuration refuses cleanup before effects; restore the original configuration
+rather than guessing a new path. Recovered legacy resources and older versioned
+handles lacking proved original log identity remain readable, but delete-data
+removal is blocked before native deletion or log cleanup. No automatic path
+certifies or deletes their historical log groups. Failed CloudWatch log deletion
+remains unconfirmed and retryable; it is not reported as deleted.
 
 Throughput has no snapshot/restore primitive. The generic data-preserving teardown
 requires a verifiable snapshot, so this driver refuses that workflow path for paid
 throughput. Explicit delete-data teardown can remove throughput after expiry and
-its owned invocation log group. Preserve/export any required logs separately before
-that destructive path; a metadata-only snapshot is not a replayable paid resource.
+its owned invocation log group only when its original log identity is proved.
+Preserve/export any required logs separately before that destructive path; a metadata-only snapshot is not a replayable paid resource.
 Direct driver removal with `delete_data=False` preserves invocation logs.
 
 Rollback to the prior application binding is useful only while that exact old

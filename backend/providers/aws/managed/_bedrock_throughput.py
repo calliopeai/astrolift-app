@@ -25,6 +25,15 @@ _HEX = re.compile(r"[0-9a-f]{64}\Z")
 _PT = re.compile(r"arn:(aws(?:-[a-z0-9-]+)?):bedrock:([a-z0-9-]{1,20}):(\d{12}):provisioned-model/[a-z0-9]{12}\Z")
 
 
+_PROFILE_ID = re.compile(r"^(?:us|eu|apac|us-gov|ca|jp|au|global)\.[a-z0-9-]+\.")
+_PROFILE_ARN = re.compile(r"^arn:aws[a-z-]*:bedrock:[a-z0-9-]+:\d{12}:(?:application-)?inference-profile/")
+
+
+def is_inference_profile(model_id: str) -> bool:
+    """Whether ``model_id`` names an inference profile, not a foundation model."""
+    return bool(_PROFILE_ID.match(model_id) or _PROFILE_ARN.match(model_id))
+
+
 def digest(value: Any) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
@@ -40,7 +49,7 @@ def identity(value: str) -> str:
 
 
 def model_arn(model: object, config: AmazonBedrockConfig) -> str:
-    if not isinstance(model, str) or len(model) > 1011:
+    if not isinstance(model, str) or len(model) > 1011 or is_inference_profile(model):
         raise ManagedServiceError("Bedrock throughput model identity is invalid")
     partition = (
         "aws-us-gov" if config.region.startswith("us-gov-") else "aws-cn" if config.region.startswith("cn-") else "aws"
@@ -321,6 +330,8 @@ class Throughput:
             arn=row["provisionedModelArn"],
             legacy_tags_hash=digest(tags),
             legacy_name=row["provisionedModelName"],
+            # Original tags prove throughput ownership, not the historical log prefix.
+            log_prefix_hash="",
         )
         saved.encode()
         self.verify(row, saved, service=expected.service, organization=expected.organization)

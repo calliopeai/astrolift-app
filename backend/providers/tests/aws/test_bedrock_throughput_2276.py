@@ -454,7 +454,9 @@ def test_explicit_original_spec_recovers_legacy_paid_resource_without_effects():
     assert len(result.handle) <= 512 and not native.creates
     native.row["status"] = "InService"
     assert fresh(native).status(selected(result.handle)).state == "available"
-    assert fresh(native).binding(selected(result.handle), spec().config).env_vars["BEDROCK_MODEL_ID"].literal == ARN
+    binding = fresh(native).binding(selected(result.handle), spec().config)
+    assert binding.env_vars["BEDROCK_MODEL_ID"].literal == ARN
+    assert "unproved" in binding.notes and "persist at" not in binding.notes
     assert fresh(native).provision(spec(recorded_handle=result.handle)).handle == result.handle
     native.tags[0]["value"] = "withdrawn"
     assert fresh(native).status(selected(result.handle)).state == "error"
@@ -577,7 +579,7 @@ def test_lost_native_delete_reply_and_log_failure_retry_exact_original_group():
     assert native.deletes == [ARN]
 
 
-def test_gone_recovered_legacy_removes_original_log_group():
+def test_gone_recovered_legacy_refuses_unproved_log_cleanup():
     native, logs = NativeBedrock(), StoredLogs()
     old = legacy(native)
     recovered = fresh(native).provision(spec(recorded_handle=old))
@@ -587,10 +589,12 @@ def test_gone_recovered_legacy_removes_original_log_group():
     driver = AmazonBedrockDriver(
         config=AmazonBedrockConfig(region="us-east-1"), bedrock_client=native, logs_client=logs
     )
-    assert driver.deprovision(
+    refused = driver.deprovision(
         DeprovisionSpec(handle=recovered.handle, managed_service_id=SID, organization_id=ORG), delete_data=True
-    ).ok
-    assert not logs.groups and logs.deleted == ["/aws/astrolift/bedrock/astrolift-acme-api-prod-model"]
+    )
+    assert not refused.ok
+    assert logs.groups == {"/aws/astrolift/bedrock/astrolift-acme-api-prod-model"} and not logs.deleted
+    assert not native.deletes
 
 
 def test_changed_log_prefix_after_native_gone_refuses_wrong_group_cleanup():
@@ -668,3 +672,49 @@ def test_installed_sdk_rejects_old_tag_shape_and_invalid_token(bad):
     validate_parameters(payload, shape)
     with pytest.raises(ParamValidationError):
         validate_parameters(payload | bad, shape)
+
+
+@pytest.mark.parametrize(
+    "profile",
+    ["us.anthropic.claude-sonnet-4-6", "eu.anthropic.claude-sonnet-4-6", "global.anthropic.claude-sonnet-4-6"],
+)
+def test_inference_profile_cannot_be_a_paid_foundation_model_source(profile):
+    native = NativeBedrock()
+    result = fresh(native).provision(
+        spec(config={"model_id": profile, "model_units": 1, "provisioned_throughput": "OneMonth"})
+    )
+    assert not result.ok and not native.creates
+
+
+def test_legacy_recovery_never_certifies_current_prefix_as_original_log_identity():
+    native, logs = NativeBedrock(), StoredLogs()
+    old = legacy(native)
+    original_group = "/aws/astrolift/bedrock/astrolift-acme-api-prod-model"
+    other_group = "/different-prefix/astrolift-acme-api-prod-model"
+    logs.groups.update((original_group, other_group))
+    driver = AmazonBedrockDriver(
+        config=AmazonBedrockConfig(region="us-east-1", invocation_log_group_prefix="/different-prefix"),
+        bedrock_client=native,
+        logs_client=logs,
+    )
+    recovered = driver.provision(spec(recorded_handle=old))
+    assert recovered.ok
+    native.row["commitmentExpirationTime"] = datetime.now(UTC) - timedelta(seconds=1)
+    refused = driver.deprovision(
+        DeprovisionSpec(handle=recovered.handle, managed_service_id=SID, organization_id=ORG), delete_data=True
+    )
+    assert not refused.ok
+    assert native.row is not None and not native.deletes
+    assert logs.groups == {original_group, other_group} and not logs.deleted
+
+
+@pytest.mark.parametrize("config", [{}, {"model_id": MODEL}, {"provisioned_throughput": None}])
+def test_paid_update_cannot_confirm_removed_commitment(config):
+    native = NativeBedrock()
+    result = fresh(native).provision(spec())
+    native.row["status"] = "InService"
+    refused = fresh(native).update(
+        UpdateSpec(handle=result.handle, managed_service_id=SID, organization_id=ORG, config=config)
+    )
+    assert not refused.ok and not refused.retryable
+    assert len(native.creates) == 1 and not native.deletes

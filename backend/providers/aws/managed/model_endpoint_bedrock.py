@@ -37,7 +37,7 @@ from aws.managed._base import (
     handle_for,
     parse_handle,
 )
-from aws.managed._bedrock_throughput import PaidHandle, Throughput, digest, model_arn
+from aws.managed._bedrock_throughput import PaidHandle, Throughput, digest, is_inference_profile, model_arn
 from aws.session import aws_client
 
 KIND = "model_endpoint"
@@ -45,15 +45,7 @@ KIND = "model_endpoint"
 # A system-defined cross-region inference profile id: a geography prefix
 # before the model id, e.g. ``us.anthropic.claude-sonnet-4-6`` (#2137). An
 # application profile or a system profile may also be named by its ARN.
-_PROFILE_ID = re.compile(r"^(?:us|eu|apac|us-gov|ca|jp|au|global)\.[a-z0-9-]+\.")
-_PROFILE_ARN = re.compile(r"^arn:aws[a-z-]*:bedrock:[a-z0-9-]+:\d{12}:(?:application-)?inference-profile/")
-
 _INVOKE_ACTIONS = ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"]
-
-
-def is_inference_profile(model_id: str) -> bool:
-    """Whether ``model_id`` names an inference profile, not a foundation model."""
-    return bool(_PROFILE_ID.match(model_id) or _PROFILE_ARN.match(model_id))
 
 
 # Size -> default foundation model id. Operators override per spec
@@ -221,15 +213,15 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                         )
                     if paid is None:
                         raise ManagedServiceError("Bedrock throughput durable identity is missing")
-                    requested = cfg.get("model_id") or (_SIZE_TO_MODEL_ID.get(spec.size) if spec.size else None)
-                    if (
-                        (requested and digest(model_arn(requested, self._config)) != paid.model_hash)
-                        or (
-                            "model_units" in cfg
-                            and (type(cfg["model_units"]) is not int or cfg["model_units"] != paid.units)
-                        )
-                        or ("provisioned_throughput" in cfg and cfg["provisioned_throughput"] != paid.term)
-                    ):
+                    unchanged = True
+                    try:
+                        desired = dict(cfg)
+                        if spec.size:
+                            desired.setdefault("size", spec.size)
+                        self._assert_paid_config(paid, desired)
+                    except ManagedServiceError:
+                        unchanged = False
+                    if not unchanged:
                         return UpdateResult(
                             ok=False,
                             handle=spec.handle,
@@ -432,6 +424,11 @@ class AmazonBedrockDriver(ManagedServiceDriver):
             record_id=record_id,
         )
         irsa_role_tag_value = f"{self._config.irsa_role_tag_value_prefix}-{record_id}"
+        log_note = (
+            "Original invocation log location is unproved; delete-data cleanup is blocked."
+            if paid and not paid.log_prefix_hash
+            else f"Configured invocation log group is {log_group}; this does not prove logging is enabled."
+        )
         return Binding(
             env_vars={
                 # Canonical contract envs
@@ -450,13 +447,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                 ),
             },
             iam_grants=paid_grants if paid_grants is not None else self._invoke_grants(model_id),
-            notes=(
-                f"IRSA role lookup uses tag "
-                f"{self._config.irsa_role_tag_key}="
-                f"{irsa_role_tag_value}. CloudWatch invocation logs "
-                f"persist at {log_group} -- retention "
-                f"governed by deprovision delete_data flag."
-            ),
+            notes=(f"IRSA role lookup uses tag {self._config.irsa_role_tag_key}={irsa_role_tag_value}. {log_note}"),
         )
 
     def _invoke_grants(self, model_id: str) -> list[Grant]:
@@ -640,7 +631,12 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                 if row:
                     if saved is None:
                         raise ManagedServiceError("Bedrock throughput durable identity is missing")
-                    if replace(saved, arn="", legacy_tags_hash="", legacy_name="") != expected:
+                    # A legacy tag fingerprint proves the native intent, but never proves
+                    # the old CloudWatch prefix. Compare intent without inventing that proof.
+                    comparable = replace(saved, arn="", legacy_tags_hash="", legacy_name="")
+                    if saved.legacy_tags_hash and not saved.log_prefix_hash:
+                        comparable = replace(comparable, log_prefix_hash=expected.log_prefix_hash)
+                    if comparable != expected:
                         raise ManagedServiceError("Bedrock recorded throughput does not match the requested intent")
                     if row.get("status") not in ("Creating", "Updating", "InService"):
                         raise ManagedServiceError("Bedrock throughput is failed or unknown")

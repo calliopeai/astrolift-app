@@ -6,7 +6,9 @@
   Recover uncertain creation with stable AWS idempotency and exact native proof;
   refuse false readiness, source/owner substitution, unsupported paid updates and
   commitment bypass. Recover original legacy ownership without tag writes and
-  retain truthful log cleanup across deletion retries (#2276).
+  retain truthful log cleanup across deletion retries. Block legacy cleanup when
+  its original log identity is unproved; reject paid commitment removal and paid
+  inference-profile sources before effects (#2276).
 
 - Bind model subscription finalization and traffic lookups explicitly to current
   service/app owners. Preserve admitted installation-shared cluster placement
