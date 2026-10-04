@@ -271,7 +271,9 @@ class ClusterModelsQuery:
         cluster = (
             available_model_clusters(
                 TenantCluster.objects.filter(
-                    guid=_guid(cluster_id), provider_plugin__guid=_guid(expected_provider_id)
+                    Q(organization_id=current_org_id()) | Q(organization_id__isnull=True),
+                    guid=_guid(cluster_id),
+                    provider_plugin__guid=_guid(expected_provider_id),
                 ),
                 current_org_id(),
             ).first()

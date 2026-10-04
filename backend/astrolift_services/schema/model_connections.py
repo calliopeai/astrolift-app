@@ -951,7 +951,13 @@ class ModelConnectionsMutation:
                     return result
                 from astrolift_services.models import ManagedServiceAttachment
 
-                row.subscription = ManagedServiceAttachment.objects.get(guid=str(result.data.subscription.id))
+                row.subscription = ManagedServiceAttachment.objects.get(
+                    guid=str(result.data.subscription.id),
+                    managed_service=service,
+                    managed_service__organization_id=get_current_tenant().organization_id,
+                    app_environment=env,
+                    app_environment__registered_app__organization_id=get_current_tenant().organization_id,
+                )
                 row.finalized_at = timezone.now()
                 row.updated_by = fresh_actor(info)
                 row.save(
