@@ -189,6 +189,7 @@ for (const action of ["inspect", "settings", "subscribe", "remove"] as const) {
       await dialog
         .getByRole("button", { name: en.models.native.details.remove, exact: true })
         .click();
+      await expect(settings).toHaveCount(0);
       await expect(page.getByText(en.models.native.details.removed, { exact: true })).toBeVisible();
       await expect(page.getByText(sourceArn, { exact: true })).toHaveCount(0);
       const writes = await (await context.request.get(`${api}/observations/model-writes`)).json();
