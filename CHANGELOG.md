@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Check the pinned vLLM CPU activation kernel through its registered PyTorch operator and validate numerical results before bounded model inference (#2269).
+
 - Run the pinned AVX2 CPU runtime build and bounded model smoke in remote pull-request CI when its inputs change; keep registry publication explicit after verification (#2269).
 
 - Retain append-only GCP namespace/KSA and IAM response acknowledgments without advancing ownership or completion after caller withdrawal; guarded create recovery requires the original acknowledged UID (Refs: #2278).
