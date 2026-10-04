@@ -4,6 +4,7 @@ from contextlib import contextmanager
 
 from django.contrib.auth import get_user_model
 from django.db.models import Q
+from django.http import HttpRequest
 from django.utils import timezone
 
 from astrolift_identity.api_tokens import (
@@ -19,7 +20,7 @@ from core.tenancy import get_current_tenant
 
 
 @contextmanager
-def current_host_operator():
+def current_host_operator(*, request=None):
     tenant = get_current_tenant()
     user = (
         get_user_model().objects.filter(pk=tenant.actor_user_id, is_active=True).first()
@@ -35,6 +36,12 @@ def current_host_operator():
         raise PermissionDenied(Permission.ORG_UPDATE, None, "Model hosting authority is unavailable.")
     token = get_current_api_token()
     marker = None
+    # Direct non-HTTP service fixtures have no session; actual browser requests
+    # must carry and revalidate their persisted authentication after every wait.
+    if token is None and (isinstance(request, HttpRequest) or hasattr(request, "session")):
+        from core.current_session import fresh_authenticated_session
+
+        fresh_authenticated_session(request, actor_user_id=user.pk, permission=Permission.ORG_UPDATE)
     try:
         if token is not None:
             fresh = with_active_org_member(

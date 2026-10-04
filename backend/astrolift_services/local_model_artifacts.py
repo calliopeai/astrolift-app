@@ -23,12 +23,12 @@ from providers._sdk.local_model_artifact import (
 )
 
 
-def import_authority(org_guid=None):
+def import_authority(org_guid=None, *, request=None):
     from astrolift_services.cluster_models import cluster_model_org_scope
     from astrolift_services.hosting_authority import current_host_operator
 
     tenant = get_current_tenant()
-    with current_host_operator():
+    with current_host_operator(request=request):
         check_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE)({}))
         check_permission(
             Permission.CLUSTER_UPDATE, scope=cluster_model_org_scope(Permission.CLUSTER_UPDATE)({})
@@ -108,15 +108,15 @@ def install_model_store(*, checkpoint=lambda: None):
     ), source
 
 
-def begin_artifact(*, organization_id, name, files):
-    org = import_authority(organization_id)
+def begin_artifact(*, organization_id, name, files, request=None):
+    org = import_authority(organization_id, request=request)
     if not isinstance(name, str) or not 1 <= len(name.strip()) <= 128 or any(ord(char) < 32 for char in name):
         raise ValueError("Model source name must contain 1 to 128 visible characters.")
     manifest, digest = model_manifest([ModelFile(**file) for file in files])
-    store, source = install_model_store(checkpoint=lambda: import_authority(organization_id))
+    store, source = install_model_store(checkpoint=lambda: import_authority(organization_id, request=request))
     store.require_versioning()
     with transaction.atomic():
-        org = import_authority(organization_id)
+        org = import_authority(organization_id, request=request)
         tenant = get_current_tenant()
         if tenant is None:
             scope = identity_organization_scope(Permission.ORG_UPDATE)({})
@@ -133,15 +133,15 @@ def begin_artifact(*, organization_id, name, files):
     return artifact
 
 
-def _artifact(artifact_id, expected_version, *, locked=False):
-    org = import_authority()
+def _artifact(artifact_id, expected_version, *, locked=False, request=None):
+    org = import_authority(request=request)
     if not isinstance(expected_version, int) or isinstance(expected_version, bool) or expected_version < 1:
         raise ValueError("Local model source requires its reviewed version.")
     rows = LocalModelArtifact.objects.select_for_update() if locked else LocalModelArtifact.objects
     artifact = rows.filter(guid=UUID(str(artifact_id)), organization=org).first()
     if locked:
         # A waited-on source lock must not retain withdrawn hosting authority.
-        import_authority(org.guid)
+        import_authority(org.guid, request=request)
     if artifact is None:
         raise ValueError("Local model source is unavailable.")
     if artifact.version != expected_version:
@@ -163,13 +163,13 @@ def _key(artifact, file):
     )
 
 
-def artifact_uploads(artifact_id, expected_version):
-    artifact = _artifact(artifact_id, expected_version)
+def artifact_uploads(artifact_id, expected_version, *, request=None):
+    artifact = _artifact(artifact_id, expected_version, request=request)
     if artifact.state != LocalModelArtifact.State.UPLOADING:
         raise ValueError("A verified source cannot issue further write grants.")
 
     def check():
-        return _artifact(artifact_id, expected_version)
+        return _artifact(artifact_id, expected_version, request=request)
 
     store = _store(artifact, check)
     uploads = []
@@ -182,13 +182,13 @@ def artifact_uploads(artifact_id, expected_version):
     return artifact, uploads
 
 
-def finalize_artifact(artifact_id, expected_version):
-    artifact = _artifact(artifact_id, expected_version)
+def finalize_artifact(artifact_id, expected_version, *, request=None):
+    artifact = _artifact(artifact_id, expected_version, request=request)
     if artifact.state == LocalModelArtifact.State.VERIFIED:
         return artifact
 
     def check():
-        return _artifact(artifact_id, expected_version)
+        return _artifact(artifact_id, expected_version, request=request)
 
     store = _store(artifact, check)
     receipt = {}
@@ -198,7 +198,7 @@ def finalize_artifact(artifact_id, expected_version):
             "version_id": store.verified_version(_key(artifact, file), file),
         }
     with transaction.atomic():
-        current = _artifact(artifact_id, expected_version, locked=True)
+        current = _artifact(artifact_id, expected_version, locked=True, request=request)
         if current.manifest != artifact.manifest or current.storage_receipt != artifact.storage_receipt:
             raise ValueError("Local model source changed during verification.")
         current.storage_receipt, current.state, current.verified_at = (
