@@ -12,7 +12,7 @@ import { renderToString } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { locales } from "@/i18n/config";
 import { useLocalListState } from "@/components/list/use-list-state";
-import { TeamMembersClient } from "@/app/(app)/administration/access/teams/[slug]/team-clients";
+import { LegacyTeamAssignmentsClient } from "@/components/screens/administration/access/team-memberships/LegacyTeamAssignmentsClient";
 import { TeamDetailScreen } from "./TeamDetailScreen";
 import { TeamMembersPanel } from "./TeamMembersPanel";
 import { useTeamDetail } from "./use-team-detail";
@@ -21,6 +21,12 @@ import { localizedTeamMembersList } from "./teams-list";
 import { TEAM_DETAIL, TEAMS, MEMBERS, ROLES, membersPanelProps } from "./teams.fixtures";
 const state = vi.hoisted(() => ({ can: true, success: vi.fn(), warning: vi.fn(), error: vi.fn() }));
 vi.mock("sonner", () => ({ toast: state }));
+vi.mock("@/graphql/identity/identity.hooks", () => ({
+  useActiveOrg: () => ({ org: { id: "fixture-org" }, loading: false, error: null }),
+}));
+vi.mock("@/graphql/user/user.hooks", () => ({
+  useMe: () => ({ user: { id: "fixture-owner" }, loading: false, error: null }),
+}));
 vi.mock("@/lib/permissions/use-my-permissions", () => ({
   useMyPermissions: () => ({ can: () => state.can, loading: false }),
 }));
@@ -71,6 +77,12 @@ function context(locale: string, mode: Mode = "ok") {
     counts.set(request.operationName, n);
     let data;
     switch (request.operationName) {
+      case "GetMembershipTeam":
+        data = { astroliftTeamMembershipTeam: { ...TEAMS[0], canManageMembers: true } };
+        break;
+      case "GetTeamAccessNavigation":
+        data = { me: { teamAccessNavigation: { canViewPeople: true, canViewTeams: true } } };
+        break;
       case "ListTeams":
         if (current === "team-failed") throw new Error("RAW_TEAM_READ_FAILURE");
         data = { astroliftTeams: current === "team-null" ? null : TEAMS };
@@ -191,7 +203,7 @@ beforeEach(() => {
   state.error.mockClear();
   window.localStorage.clear();
 });
-describe("Connected team detail/member locale and actual Apollo outcomes", () => {
+describe("Retained team frame and production bulk-role Apollo outcomes", () => {
   it.each(locales)(
     "%s genuine owned catalog with stable ICU and literal list filter values",
     (locale) => {
@@ -359,7 +371,9 @@ describe("Connected team detail/member locale and actual Apollo outcomes", () =>
     async (mode) => {
       const api = context("de", mode),
         t = translator("de", "teams.detail"),
-        view = render(<TeamMembersClient slug={TEAMS[0].slug} />, { wrapper: api.wrapper });
+        view = render(<RetainedDetailBoundaryAdapter slug={TEAMS[0].slug} />, {
+          wrapper: api.wrapper,
+        });
       try {
         await screen.findByText(
           mode === "team-failed" ? "RAW_TEAM_READ_FAILURE" : t("unavailable")
@@ -382,7 +396,9 @@ describe("Connected team detail/member locale and actual Apollo outcomes", () =>
       const api = context("es", mode),
         mt = translator("es"),
         t = translator("es", "lists.teamMembersBulk"),
-        view = render(<TeamMembersClient slug={TEAMS[0].slug} />, { wrapper: api.wrapper });
+        view = render(<LegacyTeamAssignmentsClient slug={TEAMS[0].slug} />, {
+          wrapper: api.wrapper,
+        });
       try {
         await screen.findByText(MEMBERS[0].user.username);
         await userEvent.click(screen.getAllByRole("checkbox")[1]);
@@ -415,7 +431,9 @@ describe("Connected team detail/member locale and actual Apollo outcomes", () =>
   );
   it("cached detail read failure preserves team identity and exposes real retry", async () => {
     const api = context("pt-BR"),
-      view = render(<TeamMembersClient slug={TEAMS[0].slug} />, { wrapper: api.wrapper });
+      view = render(<RetainedDetailBoundaryAdapter slug={TEAMS[0].slug} />, {
+        wrapper: api.wrapper,
+      });
     try {
       await screen.findByRole("heading", { name: new RegExp(TEAMS[0].name) });
       api.setMode("team-failed");
@@ -443,7 +461,7 @@ describe("Connected team detail/member locale and actual Apollo outcomes", () =>
   it("withdrawn existing team-management decision blocks a selected grant without losing the draft", async () => {
     const api = context("ko"),
       t = translator("ko", "lists.teamMembersBulk"),
-      view = render(<TeamMembersClient slug={TEAMS[0].slug} />, { wrapper: api.wrapper });
+      view = render(<LegacyTeamAssignmentsClient slug={TEAMS[0].slug} />, { wrapper: api.wrapper });
     try {
       await screen.findByText(MEMBERS[0].user.username);
       await userEvent.click(screen.getAllByRole("checkbox")[1]);
@@ -451,7 +469,7 @@ describe("Connected team detail/member locale and actual Apollo outcomes", () =>
       await userEvent.click(screen.getByRole("combobox", { name: t("assignDialog.roleLabel") }));
       await userEvent.click(screen.getByRole("option", { name: /RAW_ROLE_NAME/ }));
       state.can = false;
-      view.rerender(<TeamMembersClient slug={TEAMS[0].slug} />);
+      view.rerender(<LegacyTeamAssignmentsClient slug={TEAMS[0].slug} />);
       expect(screen.getByRole("button", { name: t("assignDialog.confirmLabel") })).toBeDisabled();
       expect(screen.getByRole("combobox", { name: t("assignDialog.roleLabel") })).toHaveTextContent(
         "literal-role-slug"
@@ -488,7 +506,9 @@ describe("Connected team detail/member locale and actual Apollo outcomes", () =>
     async (mode) => {
       const api = context("fr", mode),
         t = translator("fr", "lists.teamMembersBulk"),
-        view = render(<TeamMembersClient slug={TEAMS[0].slug} />, { wrapper: api.wrapper });
+        view = render(<LegacyTeamAssignmentsClient slug={TEAMS[0].slug} />, {
+          wrapper: api.wrapper,
+        });
       try {
         await screen.findByText(MEMBERS[0].user.username);
         const boxes = screen.getAllByRole("checkbox");
@@ -517,6 +537,16 @@ describe("Connected team detail/member locale and actual Apollo outcomes", () =>
     }
   );
 });
+/** Retained frame/hook transport contract; production membership routes have separate HTTP coverage. */
+function RetainedDetailBoundaryAdapter({ slug }: { slug: string }) {
+  const detail = useTeamDetail(slug);
+  const members = useTeamMembers(detail.team);
+  return (
+    <TeamDetailScreen {...detail} tab="members">
+      {detail.team && <TeamMembersPanel team={detail.team} {...members} />}
+    </TeamDetailScreen>
+  );
+}
 function FixtureMembers() {
   const mt = useTranslations("teams.members");
   const list = useLocalListState(localizedTeamMembersList(mt));
