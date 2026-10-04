@@ -14,6 +14,12 @@ import {
 } from "graphql";
 
 const schema = buildSchema(readFileSync(new URL("../schema.graphql", import.meta.url), "utf8"));
+const nativeProjection = JSON.parse(
+  readFileSync(
+    new URL("../components/screens/models/native-model-projection.fixture.json", import.meta.url),
+    "utf8"
+  )
+).rows.find((row) => row.case === "foundation").serializedQueryData;
 const permissions = [
   ...readFileSync(
     new URL("../lib/permissions/permissions.generated.ts", import.meta.url),
@@ -53,6 +59,7 @@ const sharedModel = {
   revisionSha: "a".repeat(40),
   computeMode: "cpu",
   sourceKind: "huggingface",
+  nativeSource: null,
   localArtifactId: null,
   localArtifactVersion: null,
   localManifestSha256: null,
@@ -77,6 +84,41 @@ const sharedModel = {
   desiredResources: sharedResources,
   appliedResources: sharedResources,
 };
+const nativeConnectionId = "99999999-9999-4999-8999-999999999999";
+const nativeSource = {
+  protocol: nativeProjection.nativeSource.protocol,
+  sourceKind: nativeProjection.nativeSource.sourceKind,
+  accountId: "123456789012",
+  region: "us-west-2",
+  partition: "aws",
+  sourceId: "amazon.titan-text-express-v1",
+  sourceArn: "arn:aws:bedrock:us-west-2::foundation-model/amazon.titan-text-express-v1",
+  destinationModelArns: [],
+  sourceFingerprint: "c".repeat(64),
+  metadataObservedAt: observedAt,
+  configurationState: "configured",
+  invokeAccess: "unknown",
+};
+const nativeSourceDetail = {
+  identity: nativeSource,
+  name: "Titan Text Express",
+  provider: "Amazon",
+  inputModalities: ["TEXT"],
+  outputModalities: ["TEXT"],
+  streaming: true,
+  lifecycle: "ACTIVE",
+  profileType: null,
+  registerable: true,
+  reason: null,
+};
+let registeredNativeModel = null,
+  nativeSubscriptionRows = [];
+const nativePlacement = (input) =>
+  input.organizationId === id &&
+  input.clusterId === sharedClusterId &&
+  input.expectedProviderId === sharedProviderId &&
+  input.expectedClusterVersion === 3 &&
+  input.expectedProviderVersion === 2;
 let currentSharedModel = sharedModel;
 const activeSubscription = {
   id: "88888888-8888-4888-8888-888888888888",
@@ -169,8 +211,12 @@ function value(type, field, args, role) {
   if (isNonNullType(type)) return value(type.ofType, field, args, role);
   if (field === "clusterModelDeploymentsPage")
     return object({
-      items: acceptedModel ? [currentSharedModel, acceptedModel] : [currentSharedModel],
-      totalCount: acceptedModel ? 2 : 1,
+      items: [
+        currentSharedModel,
+        ...(acceptedModel ? [acceptedModel] : []),
+        ...(registeredNativeModel ? [registeredNativeModel] : []),
+      ],
+      totalCount: 1 + (acceptedModel ? 1 : 0) + (registeredNativeModel ? 1 : 0),
       nextCursor: null,
       page: args.page,
       pageSize: args.pageSize,
@@ -180,11 +226,23 @@ function value(type, field, args, role) {
       ? currentSharedModel
       : args.id === acceptedModel?.id
         ? acceptedModel
-        : null;
+        : args.id === registeredNativeModel?.id
+          ? registeredNativeModel
+          : null;
   if (field === "clusterModelSubscriptionsPage")
     return object({
-      items: args.modelDeploymentId === sharedModelId ? subscriptionRows : [],
-      totalCount: args.modelDeploymentId === sharedModelId ? subscriptionRows.length : 0,
+      items:
+        args.modelDeploymentId === sharedModelId
+          ? subscriptionRows
+          : args.modelDeploymentId === registeredNativeModel?.id
+            ? nativeSubscriptionRows
+            : [],
+      totalCount:
+        args.modelDeploymentId === sharedModelId
+          ? subscriptionRows.length
+          : args.modelDeploymentId === registeredNativeModel?.id
+            ? nativeSubscriptionRows.length
+            : 0,
       nextCursor: null,
       page: args.page,
       pageSize: args.pageSize,
@@ -212,6 +270,49 @@ function value(type, field, args, role) {
       mode: "AUTO",
       requiredApprovals: 1,
       allowSelfApproval: true,
+    });
+  if (
+    field === "modelConnectionAction" &&
+    args.input?.modelDeploymentId === registeredNativeModel?.id
+  )
+    return object({
+      action: role === "owner" && registeredNativeModel.status === "active" ? "AUTO" : "DENY",
+      reason:
+        registeredNativeModel.status === "active"
+          ? "Controlled native binding connection is permitted."
+          : "Controlled native binding reconciliation remains pending.",
+      policyVersion: "controlled-native-policy",
+      requiredApprovals: 1,
+      allowSelfApproval: false,
+    });
+  if (
+    field === "modelConnectionTargetsPage" &&
+    args.input?.modelDeploymentId === registeredNativeModel?.id
+  )
+    return object({
+      page: args.page,
+      pageSize: args.pageSize,
+      totalCount: 1,
+      nextCursor: null,
+      items: [
+        {
+          environmentId: activeSubscription.environmentId,
+          environmentVersion: 4,
+          appVersion: 7,
+          appSlug: activeSubscription.appSlug,
+          environmentName: activeSubscription.environmentName,
+          clusterId: sharedClusterId,
+          eligible: registeredNativeModel.status === "active",
+          action: registeredNativeModel.status === "active" ? "AUTO" : "DENY",
+          reason:
+            registeredNativeModel.status === "active"
+              ? "Controlled native binding connection is permitted."
+              : "Controlled native binding reconciliation remains pending.",
+          policyVersion: "controlled-native-policy",
+          requiredApprovals: 1,
+          allowSelfApproval: false,
+        },
+      ],
     });
   if (field === "modelConnectionAction")
     return object({
@@ -281,6 +382,8 @@ function value(type, field, args, role) {
       items: [
         object({
           id: sharedClusterId,
+          version: 3,
+          providerVersion: 2,
           providerId: sharedProviderId,
           name: sharedModel.clusterName,
           slug: sharedModel.clusterSlug,
@@ -300,6 +403,32 @@ function value(type, field, args, role) {
       architecture: "amd64",
       hardwareAdmission: "unknown",
     });
+  if (field === "bedrockModelConnectionSupport")
+    return object({
+      enabled: true,
+      allowed: role === "owner" && args.organizationId === id,
+      reason: role === "owner" ? null : "Controlled native registration refusal.",
+    });
+  if (field === "bedrockModelConnectionAction")
+    return object({
+      enabled: true,
+      allowed: role === "owner" && nativePlacement(args.input),
+      reason: "Controlled native placement check.",
+    });
+  if (field === "bedrockModelSources")
+    return object({
+      items: role === "owner" && nativePlacement(args.input) ? [nativeSourceDetail] : [],
+      state: "metadata",
+      reason: null,
+      partial: false,
+      truncated: false,
+    });
+  if (field === "bedrockModelSource")
+    return role === "owner" &&
+      nativePlacement(args.input) &&
+      [nativeSource.sourceId, nativeSource.sourceArn].includes(args.input.sourceIdentifier)
+      ? nativeSourceDetail
+      : null;
   if (field === "modelHostingAction")
     return object({
       allowed: role === "owner" && args.organizationId === id,
@@ -565,6 +694,8 @@ createServer(async (req, res) => {
     observations.promptInvocations.length = 0;
     modelWriteRequests.length = 0;
     acceptedModel = null;
+    registeredNativeModel = null;
+    nativeSubscriptionRows = [];
     currentSharedModel = sharedModel;
     connectionRequest = pendingConnection;
     subscriptionRows = req.url.endsWith("model=unsubscribed")
@@ -598,6 +729,123 @@ createServer(async (req, res) => {
       fieldResolver(source, args, context, info) {
         if (info.parentType.name === "Mutation") {
           const input = args.input;
+          if (
+            info.fieldName === "registerBedrockModelConnection" &&
+            role === "owner" &&
+            nativePlacement(input) &&
+            input.sourceKind === "FOUNDATION_MODEL" &&
+            input.sourceIdentifier === nativeSource.sourceId &&
+            input.sourceFingerprint === nativeSource.sourceFingerprint &&
+            input.sharingMode === "SHARED"
+          ) {
+            modelWriteRequests.push({ operationName, input: { ...input } });
+            registeredNativeModel = {
+              ...sharedModel,
+              id: nativeConnectionId,
+              version: 1,
+              name: input.name,
+              sourceKind: nativeProjection.sourceKind,
+              nativeSource,
+              modelRepo: nativeSource.sourceId,
+              revisionSha: null,
+              computeMode: null,
+              runtimeSupported: null,
+              runtimeReason: null,
+              ready: null,
+              readinessObservedAt: null,
+              readinessGeneration: null,
+              subscriptionsEnabled: input.allowSubscriptions,
+              desiredSubscriptionRevision: 0,
+              appliedSubscriptionRevision: 0,
+              operationId: null,
+              operationStartedAt: null,
+              operationCompletedAt: null,
+              desiredResources: {
+                cpuRequest: null,
+                memoryRequest: null,
+                gpuCount: null,
+                replicas: null,
+                cpuKvCacheGiB: null,
+                dtype: null,
+                maxModelLen: null,
+                maxNumSeqs: null,
+              },
+              appliedResources: null,
+            };
+            return object({ ok: true, errors: [], data: registeredNativeModel });
+          }
+          if (
+            ["updateBedrockModelConnection", "unregisterBedrockModelConnection"].includes(
+              info.fieldName
+            ) &&
+            role === "owner" &&
+            input.id === registeredNativeModel?.id &&
+            input.organizationId === id &&
+            input.expectedClusterId === sharedClusterId &&
+            input.expectedProviderId === sharedProviderId &&
+            input.ifMatchVersion === registeredNativeModel.version
+          ) {
+            modelWriteRequests.push({ operationName, input: { ...input } });
+            if (info.fieldName === "unregisterBedrockModelConnection") {
+              const result = registeredNativeModel;
+              registeredNativeModel = null;
+              return object({ ok: true, errors: [], data: result });
+            }
+            registeredNativeModel = {
+              ...registeredNativeModel,
+              name: input.name,
+              subscriptionsEnabled: input.allowSubscriptions,
+              version: registeredNativeModel.version + 1,
+              status: "updating",
+              desiredSubscriptionRevision: registeredNativeModel.desiredSubscriptionRevision + 1,
+              operationId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+              operationStartedAt: observedAt,
+              operationCompletedAt: null,
+            };
+            return object({ ok: true, errors: [], data: registeredNativeModel });
+          }
+          if (
+            info.fieldName === "subscribeClusterModel" &&
+            role === "owner" &&
+            input.modelDeploymentId === registeredNativeModel?.id &&
+            input.organizationId === id &&
+            input.expectedClusterId === sharedClusterId &&
+            input.expectedProviderId === sharedProviderId &&
+            input.ifMatchVersion === registeredNativeModel.version &&
+            input.appEnvironmentId === activeSubscription.environmentId &&
+            input.ifMatchEnvironmentVersion === 4
+          ) {
+            modelWriteRequests.push({ operationName, input: { ...input } });
+            registeredNativeModel = {
+              ...registeredNativeModel,
+              version: registeredNativeModel.version + 1,
+              status: "updating",
+              desiredSubscriptionRevision: registeredNativeModel.desiredSubscriptionRevision + 1,
+              operationId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+              operationStartedAt: observedAt,
+              operationCompletedAt: null,
+            };
+            const row = {
+              ...activeSubscription,
+              id: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+              version: 1,
+              modelDeploymentId: registeredNativeModel.id,
+              alias: input.alias,
+              bindingPrefix: `MODEL_${input.alias.toUpperCase()}_`,
+              status: "pending",
+              desiredEnabled: true,
+              desiredRevision: registeredNativeModel.desiredSubscriptionRevision,
+              appliedRevision: 0,
+              reconciledAt: null,
+              canRevoke: false,
+            };
+            nativeSubscriptionRows.push(row);
+            return object({
+              ok: true,
+              errors: [],
+              data: { deployment: registeredNativeModel, subscription: row, restartRequired: true },
+            });
+          }
           const approve = info.fieldName === "approveModelConnectionRequest";
           const finalize = info.fieldName === "finalizeModelConnectionRequest";
           if (
