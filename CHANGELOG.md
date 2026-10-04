@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Observe exact Foundry account/deployment metadata through bounded private ARM reads, recheck caller admission, preserve reviewed routing/source fingerprints and suppress native logs/traces. Runtime compatibility, tenant/principal admission and gateway deployment remain separate prerequisites (#2280).
+
+- Observe current GKE project/cluster/workload-pool configuration and original namespace/ServiceAccount UIDs through verified native endpoints and CA. Refuse withdrawn admission or changed identity; workload rollout and impersonation remain unverified (#2278).
+
 - Add typed common native model metadata with an explicit capability, preserve existing Bedrock source fields, and refuse hosted readiness fallback for inconsistent native sources (#2269).
 
 - Recheck a trusted caller's current Vertex catalogue admission before credential discovery and around each native read; discard withdrawn responses and close partial clients (#2269).
