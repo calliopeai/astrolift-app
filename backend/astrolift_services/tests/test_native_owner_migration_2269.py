@@ -51,11 +51,15 @@ def test_real_native_owner_migration_preserves_rows_and_replaces_only_reviewed_c
     assert connection.vendor == "postgresql", "owner-check acceptance requires PostgreSQL"
     executor = MigrationExecutor(connection)
     original_targets = executor.loader.graph.leaf_nodes()
-    assert [(migration.name, backwards) for migration, backwards in executor.migration_plan([_BEFORE])] == [
-        (_AFTER[1], True)
-    ]
-    executor.migrate([_BEFORE])
     try:
+        # Later journal migrations must enforce their own reverse guards. This
+        # isolated test starts with no journals and never removes their rows.
+        executor.migrate([_AFTER])
+        executor = MigrationExecutor(connection)
+        assert [
+            (migration.name, backwards) for migration, backwards in executor.migration_plan([_BEFORE])
+        ] == [(_AFTER[1], True)]
+        executor.migrate([_BEFORE])
         old_apps = MigrationExecutor(connection).loader.project_state([_BEFORE]).apps
         service = old_apps.get_model(_APP, "ManagedService")
         world = ScopeWorld("native-owner-migration-2269")
@@ -185,4 +189,4 @@ def test_real_native_owner_migration_preserves_rows_and_replaces_only_reviewed_c
         assert _snapshot(service) == before
     finally:
         MigrationExecutor(connection).migrate(original_targets)
-    assert _AFTER in MigrationRecorder(connection).applied_migrations()
+    assert all(target in MigrationRecorder(connection).applied_migrations() for target in original_targets)
