@@ -70,6 +70,8 @@ prevent a late older write. The durable caller must still bind current operation
 generation, complete union, stopped/resolved attempt and accepted authority.
 Missing heartbeat/lease is not cancellation; no SENT takeover is provided here.
 An `UNSENT` retry requires the unchanged original etag, union and before policy.
+An independently appeared after-policy for an `UNSENT` intent refuses with
+`UNSENT_POLICY_CONFLICT`; it cannot establish that this caller owns those grants.
 
 Calls without a hook retain explicitly legacy behavior for legacy-only ledgers.
 They receive no typed durability claim. Typed pending intents require the strict
