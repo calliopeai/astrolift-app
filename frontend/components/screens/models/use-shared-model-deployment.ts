@@ -37,6 +37,9 @@ const initialDraft: SharedModelDraft = {
   gpuCount: "",
   cpuKvCacheGiB: "2",
   allowSubscriptions: false,
+  dtype: "",
+  maxModelLen: "",
+  maxNumSeqs: "",
 };
 export function useSharedModelDeployment() {
   const t = useTranslations("models.shared.placement");
@@ -62,6 +65,9 @@ export function useSharedModelDeployment() {
       form.setValue("cpuRequest", "1");
       form.setValue("memoryRequest", "4Gi");
       form.setValue("cpuKvCacheGiB", "1");
+      form.setValue("dtype", "FLOAT32");
+      form.setValue("maxModelLen", "256");
+      form.setValue("maxNumSeqs", "1");
     }
     presetRepo.current = null;
     setModel(source);
@@ -149,12 +155,17 @@ export function useSharedModelDeployment() {
         gpuCount: 0,
         cpuKvCacheGiB: null,
         allowSubscriptions: false,
+        dtype: null,
+        maxModelLen: null,
+        maxNumSeqs: null,
       },
     },
     skip: skipped || !request,
     fetchPolicy: "no-cache",
     context: { queryDeduplication: false },
   });
+  const [admissionLease, setAdmissionLease] = useState({ key: requestKey, fresh: true });
+  if (admissionLease.key !== requestKey) setAdmissionLease({ key: requestKey, fresh: true });
   const [provision] = useMutation<
     ProvisionClusterModelMutation,
     ProvisionClusterModelMutationVariables
@@ -244,7 +255,7 @@ export function useSharedModelDeployment() {
       },
     },
     admission:
-      request && admission.data?.clusterModelRuntimeAdmission
+      request && admissionLease.fresh && admission.data?.clusterModelRuntimeAdmission
         ? {
             ...admission.data.clusterModelRuntimeAdmission,
             reason: admission.data.clusterModelRuntimeAdmission.reason ?? null,
@@ -305,6 +316,22 @@ export function useSharedModelDeployment() {
       },
     },
     hostingProps: hosting.props,
+    refreshRuntimeAdmission: async () => {
+      if (!request || skipped) return;
+      const epoch = lifecycle.current;
+      setAdmissionLease({ key: requestKey, fresh: false });
+      await admission.refetch();
+      if (
+        mounted.current &&
+        lifecycle.current === epoch &&
+        latest.current.requestKey === requestKey
+      )
+        setAdmissionLease({ key: requestKey, fresh: true });
+    },
+    runtimeTarget:
+      !skipped && cluster
+        ? { organizationId, clusterId: cluster.id, expectedProviderId: cluster.providerId }
+        : null,
     sourceKind,
     onUseLocalArtifact: (artifact: {
       id: string;

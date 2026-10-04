@@ -38,6 +38,7 @@ export type ModelPlacementAdmission = {
 };
 export interface SharedModelDeploymentScreenProps {
   initialStep?: 0 | 1 | 2;
+  runtimeSetup?: ReactNode;
   organizationId: string;
   catalogue: ReactNode;
   sourceControls: ReactNode;
@@ -92,6 +93,7 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
   const hosting = useTranslations("models.shared.hosting");
   const usability = useTranslations("models.shared.usability");
   const local = useTranslations("models.shared.localImport");
+  const runtimeCopy = useTranslations("models.shared.runtimeSetup");
   const id = useId();
   const modelKey = JSON.stringify(model);
   const [navigation, setNavigation] = useState({
@@ -353,6 +355,7 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
                 </div>
               </div>
             )}
+            {step === 1 && props.runtimeSetup}
             <form
               className="grid gap-4 @lg:grid-cols-2"
               onSubmit={(event) => {
@@ -425,6 +428,38 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
                     </p>
                   </div>
                 ))}
+                <div className="space-y-2">
+                  <Label htmlFor={`${id}-dtype`}>{runtimeCopy("dtype")}</Label>
+                  <select
+                    id={`${id}-dtype`}
+                    value={draft.dtype ?? ""}
+                    onChange={(event) =>
+                      onDraftChange("dtype", event.target.value as SharedModelDraft["dtype"])
+                    }
+                  >
+                    <option value="">{runtimeCopy("declaredDefault")}</option>
+                    {(["AUTO", "FLOAT16", "BFLOAT16", "FLOAT32"] as const).map((value) => (
+                      <option key={value} value={value}>
+                        {value.toLowerCase()}
+                      </option>
+                    ))}
+                  </select>
+                  {(["maxModelLen", "maxNumSeqs"] as const).map((field) => (
+                    <div key={field}>
+                      <Label htmlFor={`${id}-${field}`}>{runtimeCopy(field)}</Label>
+                      <Input
+                        id={`${id}-${field}`}
+                        type="number"
+                        min={field === "maxModelLen" ? 256 : 1}
+                        max={field === "maxModelLen" ? 131072 : 4096}
+                        step={1}
+                        value={draft[field] ?? ""}
+                        onChange={(event) => onDraftChange(field, event.target.value)}
+                      />
+                    </div>
+                  ))}
+                  <p className="text-muted-foreground text-xs">{runtimeCopy("servingHelp")}</p>
+                </div>
               </fieldset>
               <div hidden={step !== 1} className="space-y-2 @lg:col-span-2">
                 <Label className="flex items-center gap-2">
@@ -661,6 +696,18 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
                         ? t("notRequested")
                         : `${review.request.cpuKvCacheGiB} GiB`,
                   })}
+                </span>
+              )}
+              {review && (
+                <span className="block">
+                  {(["dtype", "maxModelLen", "maxNumSeqs"] as const).map((field) => (
+                    <span key={field} className="block">
+                      {runtimeCopy(field)}:{" "}
+                      {review.request[field] === null
+                        ? runtimeCopy("declaredDefault")
+                        : String(review.request[field]).toLowerCase()}
+                    </span>
+                  ))}
                 </span>
               )}
               <span className="block">{t("hardwareUnknown")}</span>

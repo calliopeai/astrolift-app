@@ -90,6 +90,7 @@ _CONFIG_FIELDS = frozenset(
         "gpu_memory_utilization",
         "dtype",
         "max_num_seqs",
+        "runtime_controls_revision",
         "enable_prefix_caching",
         "tool_call_parser",
         "reasoning_parser",
@@ -493,6 +494,7 @@ class VLLMDriver(ManagedServiceDriver):
             - {
                 "model",
                 "model_revision",
+                "runtime_controls_revision",
                 "compute_mode",
                 "cpu_kv_cache_gib",
                 "allow_subscriptions",

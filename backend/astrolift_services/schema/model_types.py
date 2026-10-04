@@ -17,11 +17,17 @@ class ModelResourcesType:
     gpu_count: int | None
     replicas: int | None
     cpu_kv_cache_gi_b: int | None
+    dtype: str | None = None
+    max_model_len: int | None = None
+    max_num_seqs: int | None = None
 
 
 def model_resources(config):
     config = config if isinstance(config, dict) else {}
     return ModelResourcesType(
+        dtype=config.get("dtype") if isinstance(config.get("dtype"), str) else None,
+        max_model_len=config.get("max_model_len") if type(config.get("max_model_len")) is int else None,
+        max_num_seqs=config.get("max_num_seqs") if type(config.get("max_num_seqs")) is int else None,
         cpu_request=config.get("cpu") if isinstance(config.get("cpu"), str) else None,
         memory_request=config.get("memory") if isinstance(config.get("memory"), str) else None,
         gpu_count=config.get("gpu") if type(config.get("gpu")) is int else None,

@@ -6267,6 +6267,30 @@ export type ClusterModelDeploymentPage = {
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
+export type ClusterModelRuntimeModeSettings = {
+  computeMode: ModelRuntimeMode;
+  configured: Scalars['Boolean']['output'];
+  declaration?: Maybe<ModelRuntimeDeclaration>;
+  hardwareAdmission: Scalars['String']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+};
+
+export type ClusterModelRuntimeSettings = {
+  clusterId: Scalars['GUID']['output'];
+  clusterVersion: Scalars['Int']['output'];
+  modes: Array<ClusterModelRuntimeModeSettings>;
+  observedAt: Scalars['DateTime']['output'];
+  organizationId: Scalars['GUID']['output'];
+  providerId: Scalars['GUID']['output'];
+  providerVersion: Scalars['Int']['output'];
+};
+
+export type ClusterModelRuntimeSettingsMutationResult = {
+  data?: Maybe<ClusterModelRuntimeSettings>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type ClusterModelsFilterInput = {
   clusterId: InputMaybe<Scalars['GUID']['input']>;
   computeMode: InputMaybe<Scalars['String']['input']>;
@@ -7337,6 +7361,12 @@ export type ModelDeploymentMetrics = {
   stepSeconds: Scalars['Int']['output'];
 };
 
+export type ModelDtype =
+  | 'AUTO'
+  | 'BFLOAT16'
+  | 'FLOAT16'
+  | 'FLOAT32';
+
 export type ModelGating =
   | 'AUTO'
   | 'MANUAL'
@@ -7414,7 +7444,10 @@ export type ModelResourceRequests = {
 export type ModelResources = {
   cpuKvCacheGiB?: Maybe<Scalars['Int']['output']>;
   cpuRequest?: Maybe<Scalars['String']['output']>;
+  dtype?: Maybe<Scalars['String']['output']>;
   gpuCount?: Maybe<Scalars['Int']['output']>;
+  maxModelLen?: Maybe<Scalars['Int']['output']>;
+  maxNumSeqs?: Maybe<Scalars['Int']['output']>;
   memoryRequest?: Maybe<Scalars['String']['output']>;
   replicas?: Maybe<Scalars['Int']['output']>;
 };
@@ -7425,6 +7458,63 @@ export type ModelRuntimeAdmission = {
   hardwareAdmission: Scalars['String']['output'];
   reason?: Maybe<Scalars['String']['output']>;
   runtimeVersion?: Maybe<Scalars['String']['output']>;
+};
+
+export type ModelRuntimeArchitecture =
+  | 'AMD64'
+  | 'ARM64';
+
+export type ModelRuntimeDeclaration = {
+  architecture: ModelRuntimeArchitecture;
+  cpuRequestCeiling: Scalars['String']['output'];
+  defaultDtype: ModelDtype;
+  defaultMaxModelLen: Scalars['Int']['output'];
+  defaultMaxNumSeqs: Scalars['Int']['output'];
+  gpuCountCeiling: Scalars['Int']['output'];
+  hardwareCertified: Scalars['Boolean']['output'];
+  hardwareEvidence?: Maybe<Scalars['String']['output']>;
+  image: Scalars['String']['output'];
+  maxModelLenCeiling: Scalars['Int']['output'];
+  maxNumSeqsCeiling: Scalars['Int']['output'];
+  memoryRequestCeiling: Scalars['String']['output'];
+  nodeSelector: Array<ModelRuntimeSelector>;
+  packageVersion: Scalars['String']['output'];
+  supportedDtypes: Array<ModelDtype>;
+  version: Scalars['String']['output'];
+};
+
+export type ModelRuntimeDeclarationInput = {
+  architecture: ModelRuntimeArchitecture;
+  cpuRequestCeiling: Scalars['String']['input'];
+  defaultDtype: ModelDtype;
+  defaultMaxModelLen: Scalars['Int']['input'];
+  defaultMaxNumSeqs: Scalars['Int']['input'];
+  gpuCountCeiling: Scalars['Int']['input'];
+  hardwareAttested: Scalars['Boolean']['input'];
+  hardwareCertified: Scalars['Boolean']['input'];
+  hardwareEvidence: InputMaybe<Scalars['String']['input']>;
+  image: Scalars['String']['input'];
+  maxModelLenCeiling: Scalars['Int']['input'];
+  maxNumSeqsCeiling: Scalars['Int']['input'];
+  memoryRequestCeiling: Scalars['String']['input'];
+  nodeSelector: Array<ModelRuntimeSelectorInput>;
+  packageVersion: Scalars['String']['input'];
+  supportedDtypes: Array<ModelDtype>;
+  version: Scalars['String']['input'];
+};
+
+export type ModelRuntimeMode =
+  | 'CPU'
+  | 'GPU';
+
+export type ModelRuntimeSelector = {
+  key: Scalars['String']['output'];
+  value: Scalars['String']['output'];
+};
+
+export type ModelRuntimeSelectorInput = {
+  key: Scalars['String']['input'];
+  value: Scalars['String']['input'];
 };
 
 export type ModelSharingMode =
@@ -7911,6 +8001,7 @@ export type Mutation = {
   updateApp: AstroliftRegisteredAppMutationResult;
   updateAstroliftSecurityPolicy: AstroliftRegisteredAppMutationResult;
   updateClusterModel: ClusterModelDeploymentMutationResult;
+  updateClusterModelRuntime: ClusterModelRuntimeSettingsMutationResult;
   updateEmailTemplate: AstroliftEmailTemplateMutationResult;
   updateFormDefinition: AstroliftFormDefinitionMutationResult;
   updateIdentityProvider: AstroliftIdentityProviderMutationResult;
@@ -9764,6 +9855,11 @@ export type MutationUpdateClusterModelArgs = {
 };
 
 
+export type MutationUpdateClusterModelRuntimeArgs = {
+  input: UpdateClusterModelRuntimeInput;
+};
+
+
 export type MutationUpdateEmailTemplateArgs = {
   input: UpdateEmailTemplateInput;
 };
@@ -10243,11 +10339,14 @@ export type ProvisionClusterModelInput = {
   connectionId: InputMaybe<Scalars['GUID']['input']>;
   cpuKvCacheGiB: InputMaybe<Scalars['Int']['input']>;
   cpuRequest: Scalars['String']['input'];
+  dtype: InputMaybe<ModelDtype>;
   expectedArtifactVersion: InputMaybe<Scalars['Int']['input']>;
   expectedConnectionVersion: InputMaybe<Scalars['Int']['input']>;
   expectedProviderId: Scalars['GUID']['input'];
   gpuCount: Scalars['Int']['input'];
   localArtifactId: InputMaybe<Scalars['GUID']['input']>;
+  maxModelLen: InputMaybe<Scalars['Int']['input']>;
+  maxNumSeqs: InputMaybe<Scalars['Int']['input']>;
   memoryRequest: Scalars['String']['input'];
   modelRepo: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
@@ -10641,6 +10740,7 @@ export type Query = {
   clusterModelDeploymentsPage: ClusterModelDeploymentPage;
   clusterModelPlacementClustersPage: ModelPlacementClusterPage;
   clusterModelRuntimeAdmission: ModelRuntimeAdmission;
+  clusterModelRuntimeSettings?: Maybe<ClusterModelRuntimeSettings>;
   clusterModelSourceAccess: ModelSourceAccess;
   clusterModelSubscriptionTargetsPage: ModelSubscriptionTargetPage;
   clusterModelSubscriptionsPage: ModelSubscriptionPage;
@@ -12500,6 +12600,13 @@ export type QueryClusterModelRuntimeAdmissionArgs = {
 };
 
 
+export type QueryClusterModelRuntimeSettingsArgs = {
+  clusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
+
 export type QueryClusterModelSourceAccessArgs = {
   connectionId?: InputMaybe<Scalars['GUID']['input']>;
   expectedConnectionVersion?: InputMaybe<Scalars['Int']['input']>;
@@ -13728,16 +13835,29 @@ export type UpdateClusterModelInput = {
   cpuKvCacheGiB: InputMaybe<Scalars['Int']['input']>;
   cpuRequest: Scalars['String']['input'];
   dedicatedAppId: InputMaybe<Scalars['GUID']['input']>;
+  dtype: InputMaybe<ModelDtype>;
   expectedClusterId: Scalars['GUID']['input'];
   expectedProviderId: Scalars['GUID']['input'];
   gpuCount: Scalars['Int']['input'];
   id: Scalars['GUID']['input'];
   ifMatchDedicatedAppVersion: InputMaybe<Scalars['Int']['input']>;
   ifMatchVersion: Scalars['Int']['input'];
+  maxModelLen: InputMaybe<Scalars['Int']['input']>;
+  maxNumSeqs: InputMaybe<Scalars['Int']['input']>;
   memoryRequest: Scalars['String']['input'];
   name: InputMaybe<Scalars['String']['input']>;
   organizationId: Scalars['GUID']['input'];
   sharingMode: InputMaybe<ModelSharingMode>;
+};
+
+export type UpdateClusterModelRuntimeInput = {
+  clusterId: Scalars['GUID']['input'];
+  computeMode: ModelRuntimeMode;
+  declaration: ModelRuntimeDeclarationInput;
+  expectedProviderId: Scalars['GUID']['input'];
+  expectedProviderVersion: Scalars['Int']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  organizationId: Scalars['GUID']['input'];
 };
 
 export type UpdateEmailTemplateInput = {

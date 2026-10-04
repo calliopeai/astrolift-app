@@ -111,6 +111,7 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     # File uploads.
     "uploads.presigned",
     "models.admin_hosting",
+    "models.runtime_settings",
     "models.huggingface_connections",
     "models.local_artifacts",
     # Federation between Astrolift installs (#411 family).

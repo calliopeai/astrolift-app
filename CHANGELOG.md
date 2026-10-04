@@ -7,6 +7,12 @@
   subscription scope separate from deployment totals, preserve missing/zero/stale
   states, and clarify active platform-super-admin hosting in all eight locales
   (#2269).
+- Add typed, versioned platform-operator model runtime declarations without
+  exposing unrelated provider configuration. Require explicit hardware evidence
+  and attestation, preserve other compute modes, and admit only declared data
+  types and bounded context, concurrency and resource requests. Add a Placement
+  setup form and float32/256-token/single-sequence tiny CPU preset; saving a
+  declaration does not build, probe or deploy a model (Refs: #2269).
 
 - Show hosted models with source, requested resources, exact deployment links and
   fresh actor/organization reads. Surface authorized subscription summaries and
