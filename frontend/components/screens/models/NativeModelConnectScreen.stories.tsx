@@ -105,7 +105,7 @@ export const Settings: Story = {
   args: { ...sourceProps, step: 3, detail: nativeSource },
 };
 export const DedicatedSettings: Story = {
-  args: { ...sourceProps, step: 3, detail: nativeSource, mode: "DEDICATED" },
+  args: { ...sourceProps, step: 3, detail: nativeSource, mode: "DEDICATED", canReview: false },
 };
 export const BoundedPartial: Story = {
   args: {
