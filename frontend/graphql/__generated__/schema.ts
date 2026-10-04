@@ -6418,6 +6418,7 @@ export type ClusterModelDeployment = {
   localManifestSha256?: Maybe<Scalars['String']['output']>;
   modelRepo: Scalars['String']['output'];
   name: Scalars['String']['output'];
+  nativeConnection?: Maybe<NativeModelConnection>;
   nativeSource?: Maybe<NativeModelConnectionSource>;
   operationCompletedAt?: Maybe<Scalars['DateTime']['output']>;
   operationId?: Maybe<Scalars['String']['output']>;
@@ -7122,6 +7123,24 @@ export type FormDefinitionUpdateInput = {
   schema: InputMaybe<Scalars['JSON']['input']>;
   scoring: InputMaybe<Scalars['JSON']['input']>;
   slug: Scalars['String']['input'];
+};
+
+/** Deployment metadata only; application adoption requires an independent gateway credential lifecycle. */
+export type FoundryDeploymentConnectionSource = {
+  accountKind: Scalars['String']['output'];
+  accountResourceId: Scalars['String']['output'];
+  declaredCapacity?: Maybe<Scalars['Int']['output']>;
+  declaredSku?: Maybe<Scalars['String']['output']>;
+  deploymentName: Scalars['String']['output'];
+  deploymentResourceId: Scalars['String']['output'];
+  localAuthDisabled?: Maybe<Scalars['Boolean']['output']>;
+  modelFormat: Scalars['String']['output'];
+  modelName: Scalars['String']['output'];
+  modelVersion?: Maybe<Scalars['String']['output']>;
+  provisioningState?: Maybe<Scalars['String']['output']>;
+  region: Scalars['String']['output'];
+  resourceGroup: Scalars['String']['output'];
+  subscriptionId: Scalars['String']['output'];
 };
 
 export type GenerateInstallEnrollmentQrInput = {
@@ -10490,6 +10509,32 @@ export type MuteAlertRuleInput = {
   ruleId: Scalars['GUID']['input'];
 };
 
+export type NativeConnectionSource = FoundryDeploymentConnectionSource | NativeModelConnectionSource | VertexEndpointConnectionSource;
+
+export type NativeModelConfigurationState =
+  | 'CONFIGURED'
+  | 'UNAVAILABLE';
+
+export type NativeModelConnection = {
+  configurationState: NativeModelConfigurationState;
+  family: NativeModelFamily;
+  invokeAccess: NativeModelInvokeAccess;
+  metadataObservedAt?: Maybe<Scalars['DateTime']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  /** Hash of the validated recorded resource tuple; not native incarnation, ownership or invocation proof. */
+  resourceIdentityFingerprint?: Maybe<Scalars['String']['output']>;
+  reviewedSourceFingerprint?: Maybe<Scalars['String']['output']>;
+  source?: Maybe<NativeConnectionSource>;
+  sourceKind: NativeModelConnectionKind;
+};
+
+export type NativeModelConnectionKind =
+  | 'BEDROCK_FOUNDATION_MODEL'
+  | 'BEDROCK_INFERENCE_PROFILE'
+  | 'FOUNDRY_DEPLOYMENT'
+  | 'UNKNOWN'
+  | 'VERTEX_ENDPOINT';
+
 export type NativeModelConnectionSource = {
   accountId: Scalars['String']['output'];
   configurationState: Scalars['String']['output'];
@@ -10504,6 +10549,15 @@ export type NativeModelConnectionSource = {
   sourceId: Scalars['String']['output'];
   sourceKind: BedrockModelSourceKind;
 };
+
+export type NativeModelFamily =
+  | 'BEDROCK'
+  | 'FOUNDRY'
+  | 'UNKNOWN'
+  | 'VERTEX';
+
+export type NativeModelInvokeAccess =
+  | 'UNKNOWN';
 
 export type NativeModelProtocol =
   | 'BEDROCK';
@@ -14746,6 +14800,26 @@ export type VerifyManagedDomainPayloadMutationResult = {
   data?: Maybe<VerifyManagedDomainPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+/** Endpoint routing metadata. IAM covers the whole Endpoint; Predict does not select one deployed model. */
+export type VertexEndpointConnectionSource = {
+  deployedModels: Array<VertexEndpointDeployedModelObservation>;
+  endpointResourceName: Scalars['String']['output'];
+  projectId: Scalars['String']['output'];
+  projectNumber: Scalars['String']['output'];
+  region: Scalars['String']['output'];
+};
+
+export type VertexEndpointDeployedModelObservation = {
+  availableReplicas?: Maybe<Scalars['Int']['output']>;
+  deployedModelId: Scalars['String']['output'];
+  machineType?: Maybe<Scalars['String']['output']>;
+  maxReplicas?: Maybe<Scalars['Int']['output']>;
+  minReplicas?: Maybe<Scalars['Int']['output']>;
+  modelResourceName: Scalars['String']['output'];
+  modelVersionId?: Maybe<Scalars['String']['output']>;
+  trafficPercent: Scalars['Int']['output'];
 };
 
 export type WebhookSecretReveal = {

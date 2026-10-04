@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add typed common native model metadata with an explicit capability, preserve existing Bedrock source fields, and refuse hosted readiness fallback for inconsistent native sources (#2269).
+
 - Recheck a trusted caller's current Vertex catalogue admission before credential discovery and around each native read; discard withdrawn responses and close partial clients (#2269).
 
 - Add a provider-internal Foundry Chat-v1 gateway with existing attributed model authentication, fixed Azure origin and audience, bounded one-attempt delivery and private transport logging. Production source admission, gateway deployment and Azure workload rollout remain pending (#2280).

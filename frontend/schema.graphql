@@ -6847,6 +6847,7 @@ type ClusterModelDeployment {
   desiredResources: ModelResources!
   appliedResources: ModelResources
   nativeSource: NativeModelConnectionSource
+  nativeConnection: NativeModelConnection
   sourceKind: String!
   localArtifactId: GUID
   localArtifactVersion: Int
@@ -7560,6 +7561,26 @@ input FormDefinitionUpdateInput {
   scoring: JSON = null
   formType: String = null
   isPublic: Boolean = null
+}
+
+"""
+Deployment metadata only; application adoption requires an independent gateway credential lifecycle.
+"""
+type FoundryDeploymentConnectionSource {
+  subscriptionId: String!
+  resourceGroup: String!
+  accountResourceId: String!
+  region: String!
+  accountKind: String!
+  localAuthDisabled: Boolean
+  deploymentResourceId: String!
+  deploymentName: String!
+  modelFormat: String!
+  modelName: String!
+  modelVersion: String
+  declaredSku: String
+  declaredCapacity: Int
+  provisioningState: String
 }
 
 """UUID v7 — the platform's external identifier."""
@@ -8996,6 +9017,37 @@ input MuteAlertRuleInput {
   reason: String!
 }
 
+union NativeConnectionSource = NativeModelConnectionSource | VertexEndpointConnectionSource | FoundryDeploymentConnectionSource
+
+enum NativeModelConfigurationState {
+  CONFIGURED
+  UNAVAILABLE
+}
+
+type NativeModelConnection {
+  family: NativeModelFamily!
+  sourceKind: NativeModelConnectionKind!
+  configurationState: NativeModelConfigurationState!
+  invokeAccess: NativeModelInvokeAccess!
+  reason: String
+
+  """
+  Hash of the validated recorded resource tuple; not native incarnation, ownership or invocation proof.
+  """
+  resourceIdentityFingerprint: String
+  reviewedSourceFingerprint: String
+  metadataObservedAt: DateTime
+  source: NativeConnectionSource
+}
+
+enum NativeModelConnectionKind {
+  BEDROCK_FOUNDATION_MODEL
+  BEDROCK_INFERENCE_PROFILE
+  VERTEX_ENDPOINT
+  FOUNDRY_DEPLOYMENT
+  UNKNOWN
+}
+
 type NativeModelConnectionSource {
   protocol: NativeModelProtocol!
   sourceKind: BedrockModelSourceKind!
@@ -9009,6 +9061,17 @@ type NativeModelConnectionSource {
   metadataObservedAt: DateTime
   configurationState: String!
   invokeAccess: String!
+}
+
+enum NativeModelFamily {
+  BEDROCK
+  VERTEX
+  FOUNDRY
+  UNKNOWN
+}
+
+enum NativeModelInvokeAccess {
+  UNKNOWN
 }
 
 enum NativeModelProtocol {
@@ -11013,6 +11076,28 @@ type VerifyManagedDomainPayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: VerifyManagedDomainPayload
+}
+
+"""
+Endpoint routing metadata. IAM covers the whole Endpoint; Predict does not select one deployed model.
+"""
+type VertexEndpointConnectionSource {
+  projectId: String!
+  projectNumber: String!
+  region: String!
+  endpointResourceName: String!
+  deployedModels: [VertexEndpointDeployedModelObservation!]!
+}
+
+type VertexEndpointDeployedModelObservation {
+  deployedModelId: String!
+  modelResourceName: String!
+  modelVersionId: String
+  trafficPercent: Int!
+  machineType: String
+  minReplicas: Int
+  maxReplicas: Int
+  availableReplicas: Int
 }
 
 """Represents NULL values"""

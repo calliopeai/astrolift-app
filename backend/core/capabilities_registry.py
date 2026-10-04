@@ -117,6 +117,7 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "models.local_artifacts",
     "models.connection_approvals",
     "models.bedrock_connections",
+    "models.native_connection_metadata",
     # Federation between Astrolift installs (#411 family).
     "federation.peer_register",
     "federation.jwks_serve",

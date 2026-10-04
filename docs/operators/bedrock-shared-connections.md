@@ -7,6 +7,16 @@ flag is off by default. Only a current active installation superadministrator
 with the required administrator credential ceiling can change this model flag.
 The Django setting is `BEDROCK_MODEL_CONNECTIONS_ENABLED`.
 
+`models.native_connection_metadata` separately advertises the additive
+`ClusterModelDeployment.nativeConnection` projection. It includes typed family,
+source kind and configuration state, unknown invocation access, nullable source
+metadata and separate resource/reviewed-source hashes. Bedrock retains its
+existing `nativeSource` and raw `bedrock_*` discriminator. Withdrawal keeps the
+native family but clears source metadata and hashes; it never becomes a hosted
+vLLM model. The resource hash is a recorded tuple, not native incarnation,
+ownership, permission or inference proof. Vertex and Foundry union types alone
+do not enable their adoption or application connections.
+
 `bedrockModelConnectionSupport` admits opening the connection wizard using current
 organization authority and the global feature. It performs no cloud reads and
 does not authorize any cluster. The selected placement must independently pass
