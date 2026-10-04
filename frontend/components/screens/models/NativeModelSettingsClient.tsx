@@ -37,6 +37,8 @@ type Props = {
   blocked: boolean;
   onRefresh: () => void;
   onRemoved?: () => void;
+  onQueued?: (receipt: ClusterModelFieldsFragment) => void;
+  queuedConfirmed?: boolean;
 };
 const options = { fetchPolicy: "no-cache" as const, context: { queryDeduplication: false } };
 export function NativeModelSettingsClient(props: Props) {
@@ -49,7 +51,7 @@ export function NativeModelSettingsClient(props: Props) {
     />
   );
 }
-function Context({ model, blocked, onRefresh, onRemoved }: Props) {
+function Context({ model, blocked, onRefresh, onRemoved, onQueued, queuedConfirmed }: Props) {
   const t = useTranslations("models.native.connect"),
     inventory = useTranslations("models.shared.inventory");
   const { org, loading: orgLoading, error: orgError } = useActiveOrg(),
@@ -224,7 +226,7 @@ function Context({ model, blocked, onRefresh, onRemoved }: Props) {
     canUpdate: !!inputValid,
     busy,
     sent,
-    outcome,
+    outcome: outcome ?? (queuedConfirmed ? "queued" : null),
     error,
     review: review?.kind ?? null,
     canConfirm: currentReview,
@@ -331,6 +333,7 @@ function Context({ model, blocked, onRefresh, onRemoved }: Props) {
         setOutcome(kind === "update" ? "queued" : "removed");
         try {
           if (kind === "remove") onRemoved?.();
+          else onQueued?.(data);
           onRefresh();
         } catch {
           /* Read failure cannot undo an accepted write. */

@@ -8,6 +8,8 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import en from "@/messages/en.json";
+import type { UpdateBedrockModelConnectionInput } from "@/graphql/__generated__/operations";
+import { ModelsClient } from "@/app/(app)/models/models-client";
 import { SharedModelClient } from "@/app/(app)/models/shared/[id]/shared-model-client";
 import { NativeModelSettingsClient } from "./NativeModelSettingsClient";
 import { ModelAddChoiceClient } from "./ModelAddChoiceClient";
@@ -21,6 +23,10 @@ vi.mock("@/graphql/identity/identity.hooks", () => ({
 vi.mock("@/graphql/user/user.hooks", () => ({
   useMe: () => ({ user: { id: identity.actor }, loading: false, error: null }),
 }));
+vi.mock("@/components/list/use-list-state", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/components/list/use-list-state")>();
+  return { ...actual, useListState: actual.useLocalListState };
+});
 const schema = buildSchema(readFileSync(`${process.cwd()}/schema.graphql`, "utf8"));
 const cluster = {
   id: nativeModel.clusterId,
@@ -63,6 +69,13 @@ beforeEach(async () => {
   released = null;
   const roots = {
     astroliftServerInfo: () => ({ capabilities: [] }),
+    clusterModelDeploymentsPage: ({ page, pageSize }: { page: number; pageSize: number }) => ({
+      page,
+      pageSize,
+      totalCount: 1,
+      nextCursor: null,
+      items: [currentModel],
+    }),
     clusterModelSubscriptionsPage: ({ page, pageSize }: { page: number; pageSize: number }) => ({
       page,
       pageSize,
@@ -75,26 +88,26 @@ beforeEach(async () => {
       reason: enabled ? null : "Hosting authority unavailable",
     }),
     clusterModelDeployment: () => (gone ? null : currentModel),
-    updateBedrockModelConnection: ({ input }: { input: Record<string, unknown> }) =>
+    updateBedrockModelConnection: ({ input }: { input: UpdateBedrockModelConnectionInput }) =>
       unknownReply
         ? null
         : {
             ok: true,
             errors: [],
-            data: {
+            data: (currentModel = {
               ...currentModel,
               name: input.name,
               version: currentModel.version + 1,
               status: "updating",
               subscriptionsEnabled: input.allowSubscriptions,
-              sharingMode: input.sharingMode,
+              sharingMode: input.sharingMode ?? currentModel.sharingMode,
               dedicatedAppId: input.dedicatedAppId,
               dedicatedAppVersion: input.ifMatchDedicatedAppVersion,
               desiredSubscriptionRevision: currentModel.desiredSubscriptionRevision + 1,
               operationId: "019e1abc-0000-7000-8000-000000000011",
               operationStartedAt: "2026-10-04T01:00:00Z",
               operationCompletedAt: null,
-            },
+            }),
           },
     unregisterBedrockModelConnection: () => {
       if (unknownReply) return null;
@@ -612,3 +625,68 @@ it("retains accepted local removal when the fresh exact detail is missing", asyn
   expect(screen.queryByText(nativeSource.identity.sourceArn)).toBeNull();
   expect(requests.filter((row) => row.operationName === "UnregisterBedrockModel")).toHaveLength(1);
 });
+
+it("retains accepted native settings across version refresh and drops receipt on actor ABA", async () => {
+  const Wrapper = () => (
+    <ApolloProvider client={client}>
+      <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
+        <SharedModelClient id={nativeModel.id} />
+      </NextIntlClientProvider>
+    </ApolloProvider>
+  );
+  const view = render(<Wrapper />);
+  await screen.findByText(nativeSource.identity.sourceArn);
+  const dialog = await settingsReview();
+  fireEvent.click(dialog.getByRole("button", { name: en.models.native.details.saveSettings }));
+  await waitFor(() => expect(currentModel.version).toBe(nativeModel.version + 1));
+  await waitFor(() =>
+    expect(
+      requests.filter((row) => row.operationName === "GetClusterModelDeployment")
+    ).toHaveLength(3)
+  );
+  await screen.findByText(en.models.native.details.queued);
+  expect(
+    screen.getByRole("button", { name: en.models.native.details.saveSettings })
+  ).toBeDisabled();
+  const oldActor = identity.actor;
+  identity.actor = "019e1abc-0000-7000-8000-000000000099";
+  view.rerender(<Wrapper />);
+  identity.actor = oldActor;
+  view.rerender(<Wrapper />);
+  await screen.findByText(nativeSource.identity.sourceArn);
+  expect(screen.queryByText(en.models.native.details.queued)).toBeNull();
+  expect(requests.filter((row) => row.operationName === "UpdateBedrockModel")).toHaveLength(1);
+});
+
+it.each(["Native feature is disabled", "Provider declaration is unavailable"])(
+  "mounted inventory preserves unavailable native row after %s",
+  async (reason) => {
+    enabled = false;
+    currentModel.nativeSource = null;
+    currentModel.reason = reason;
+    render(
+      <ApolloProvider client={client}>
+        <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
+          <ModelsClient />
+        </NextIntlClientProvider>
+      </ApolloProvider>
+    );
+    await screen.findByText(nativeModel.name);
+    expect(screen.getAllByText(/Amazon Bedrock/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(en.models.native.details.unavailable).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(en.models.native.details.notApplicable).length).toBe(2);
+    expect(screen.getByRole("button", { name: en.models.native.add.connectAction })).toBeDisabled();
+    expect(screen.queryByText(en.models.native.details.unsupported)).toBeNull();
+    expect(
+      requests.find((row) => row.operationName === "ListClusterModelsPage")?.variables
+        .organizationId
+    ).toBe(nativeModel.organizationId);
+    expect(
+      requests.some((row) =>
+        /Metrics|Density|RuntimeAdmission|Prompt|UpdateAdmission|BedrockModelSource/.test(
+          row.operationName
+        )
+      )
+    ).toBe(false);
+  }
+);
