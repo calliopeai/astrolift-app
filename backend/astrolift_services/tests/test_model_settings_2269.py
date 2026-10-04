@@ -399,3 +399,27 @@ def test_ordinary_settings_roles_remain_refused_in_both_policy_regions(world, op
         world.cluster.save()
         with pytest.raises(PermissionDenied):
             read()
+
+
+@pytest.mark.parametrize("owner", ["organization", "installation_shared", "foreign"])
+def test_dedicated_app_selector_preserves_admitted_cluster_ownership(world, owner):
+    from astrolift_services.schema.cluster_models import ClusterModelsQuery
+
+    active(world)
+    world.cluster.organization = {
+        "organization": world.org,
+        "installation_shared": None,
+        "foreign": world.other_org,
+    }[owner]
+    world.cluster.save()
+    with subject(world):
+        result = ClusterModelsQuery().cluster_model_dedicated_apps_page(
+            make_info(world.user),
+            organization_id=GUID(str(world.org.guid)),
+            cluster_id=GUID(str(world.cluster.guid)),
+            expected_provider_id=GUID(str(world.cluster.provider_plugin.guid)),
+        )
+    assert result.total_count == (0 if owner == "foreign" else 1)
+    assert [str(item.id) for item in result.items] == (
+        [] if owner == "foreign" else [str(world.medops_app.guid)]
+    )

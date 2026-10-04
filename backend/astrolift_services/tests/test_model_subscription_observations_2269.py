@@ -336,3 +336,26 @@ def test_public_capability_discovery_advertises_surface_without_private_metrics(
     result = schema_public.execute_sync("{astroliftServerInfo{capabilities}}")
     assert not result.errors
     assert "models.authenticated_subscription_metrics" in result.data["astroliftServerInfo"]["capabilities"]
+
+
+@pytest.mark.parametrize("owner", ["organization", "installation_shared", "foreign"])
+def test_subscription_traffic_preserves_admitted_cluster_ownership(world, owner):
+    grant(world)
+    if owner == "foreign":
+        from astrolift_identity.models import Organization
+
+        world.cluster.organization = Organization.objects.create(name="Foreign", slug="foreign-metrics-owner")
+    else:
+        world.cluster.organization = world.org if owner == "organization" else None
+    world.cluster.save()
+    world.reply = matrix([series(world)])
+    if owner == "foreign":
+        with caller(world), pytest.raises(PermissionDenied):
+            read(world)
+        assert world.http_calls == []
+    else:
+        with caller(world):
+            result = read(world)
+        assert result is not None and world.http_calls
+        observed = next(item for item in result.metrics if item.key == "requests_per_second")
+        assert observed.state == State.AVAILABLE and observed.value == 0

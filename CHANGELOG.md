@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Bind model subscription finalization and traffic lookups explicitly to current
+  service/app owners. Preserve admitted installation-shared cluster placement
+  while keeping dedicated-app selectors tenant-bound (#2269, #2270).
+
 - Batch model target, request/reviewer and dedicated-inventory page projections
   while preserving current credential, session, SCIM and per-target policy gates.
   Keep list staleness read-only and exact-detail/effect checks locked; refuse old

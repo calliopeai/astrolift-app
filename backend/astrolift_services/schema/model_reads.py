@@ -187,6 +187,8 @@ class ModelReadsQuery:
                 guid=_identity(subscription_id),
                 managed_service=service,
                 model_subscription=True,
+                managed_service__organization_id=get_current_tenant().organization_id,
+                app_environment__registered_app__organization_id=get_current_tenant().organization_id,
                 app_environment__in=_environment_rows(Permission.APP_READ_METRICS),
                 app_environment__tenant_cluster_id=service.tenant_cluster_id,
             )
@@ -200,7 +202,10 @@ class ModelReadsQuery:
         )
         row.managed_service = service
         available = available_model_clusters(
-            TenantCluster.objects.filter(pk=service.tenant_cluster_id),
+            TenantCluster.objects.filter(
+                Q(organization_id=get_current_tenant().organization_id) | Q(organization_id__isnull=True),
+                pk=service.tenant_cluster_id,
+            ),
             get_current_tenant().organization_id,
         ).exists()
         result = subscription_metrics(row, start, end, transport_available=available)
@@ -215,6 +220,8 @@ class ModelReadsQuery:
                 guid=_identity(subscription_id),
                 managed_service=current_service,
                 model_subscription=True,
+                managed_service__organization_id=get_current_tenant().organization_id,
+                app_environment__registered_app__organization_id=get_current_tenant().organization_id,
                 app_environment__in=_environment_rows(Permission.APP_READ_METRICS),
                 app_environment__tenant_cluster_id=current_service.tenant_cluster_id,
             )
