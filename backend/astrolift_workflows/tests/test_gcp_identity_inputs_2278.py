@@ -24,7 +24,7 @@ def template():
                 "projects/test-project/roles/predict", "projects/123/locations/us-central1/endpoints/42"
             ),
         ),
-        (LogicalSubject("01988c1f-1058-7f4c-b1ae-a7e014e69b21", "app", "runtime"),),
+        (LogicalSubject(("01988c1f-1058-7f4c-b1ae-a7e014e69b21",), "app", "runtime"),),
         "a" * 64,
     )
 
@@ -43,7 +43,7 @@ def test_round_trip_and_source_snapshot_are_bound():
 def test_sorted_union_hash_is_order_independent_without_inventing_uids():
     original = template()
     second = EndpointGrant(original.permissions[0].role, "projects/123/locations/us-central1/endpoints/43")
-    subject = LogicalSubject("01988c1f-1058-7f4c-b1ae-a7e014e69b22", "app", "other")
+    subject = LogicalSubject(("01988c1f-1058-7f4c-b1ae-a7e014e69b22",), "app", "other")
     first = replace(
         original, permissions=(*original.permissions, second), subjects=(*original.subjects, subject)
     )
@@ -52,7 +52,7 @@ def test_sorted_union_hash_is_order_independent_without_inventing_uids():
     )
     assert first.sha256 == reversed_plan.sha256
     assert first.payload == reversed_plan.payload
-    assert all(set(row) == {"environment_guid", "namespace", "name"} for row in first.payload["subjects"])
+    assert all(set(row) == {"environment_ids", "namespace", "name"} for row in first.payload["subjects"])
 
 
 @pytest.mark.parametrize(
@@ -64,7 +64,7 @@ def test_sorted_union_hash_is_order_independent_without_inventing_uids():
         lambda row: row.update(sha256="a" * 64),
         lambda row: row["permissions"][0].update(role="roles/aiplatform.user"),
         lambda row: row["permissions"][0].update(resource="projects/123"),
-        lambda row: row["subjects"][0].update(environment_guid="00000000-0000-0000-0000-000000000000"),
+        lambda row: row["subjects"][0].update(environment_ids=["00000000-0000-0000-0000-000000000000"]),
         lambda row: row["subjects"][0].update(name="../other"),
         lambda row: row["subjects"][0].update(uid="invented"),
         lambda row: row["subjects"].append(copy.deepcopy(row["subjects"][0])),
@@ -94,3 +94,19 @@ def test_import_is_pure_in_fresh_interpreter():
         check=False,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_shared_physical_subject_retains_all_aliases_and_detach_changes_plan():
+    original = template()
+    first = original.subjects[0]
+    other = "01988c1f-1058-7f4c-b1ae-a7e014e69b22"
+    shared = replace(original, subjects=(replace(first, environment_ids=(*first.environment_ids, other)),))
+    assert len(shared.subjects) == 1
+    assert shared.payload["subjects"][0]["environment_ids"] == [*first.environment_ids, other]
+    assert accepted_preparation_template_from_payload(shared.payload) == shared
+    assert shared.sha256 != original.sha256
+    # A logical alias cannot acquire a second physical association.
+    with pytest.raises(ValueError, match="INVALID_ACCEPTED_PREPARATION_TEMPLATE"):
+        replace(shared, subjects=(*shared.subjects, LogicalSubject((other,), "app", "other")))
+    with pytest.raises(ValueError, match="INVALID_ACCEPTED_PREPARATION_TEMPLATE"):
+        replace(shared.subjects[0], environment_ids=(other, *first.environment_ids))

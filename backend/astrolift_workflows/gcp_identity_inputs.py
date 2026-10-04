@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from typing import NoReturn
 from uuid import UUID
 
-_DOMAIN = "astrolift.gcp.preparation.union-template.v1"
+_DOMAIN = "astrolift.gcp.preparation.union-template.v2"
 _SHA = re.compile(r"[0-9a-f]{64}\Z")
 _PROJECT = r"[a-z][a-z0-9-]{4,28}[a-z0-9]"
 _ROLE = re.compile(rf"projects/({_PROJECT})/roles/[A-Za-z0-9_.]{{1,64}}\Z")
@@ -39,16 +39,21 @@ class EndpointGrant:
 
 @dataclass(frozen=True, slots=True)
 class LogicalSubject:
-    environment_guid: str
+    environment_ids: tuple[str, ...]
     namespace: str
     name: str
 
     def __post_init__(self) -> None:
-        try:
-            guid = UUID(self.environment_guid)
-        except (ValueError, AttributeError, TypeError):
+        if type(self.environment_ids) is not tuple or not 1 <= len(self.environment_ids) <= 64:
             _refuse()
-        if str(guid) != self.environment_guid or guid.int == 0:
+        for value in self.environment_ids:
+            try:
+                guid = UUID(value)
+            except (ValueError, AttributeError, TypeError):
+                _refuse()
+            if str(guid) != value or guid.int == 0:
+                _refuse()
+        if tuple(sorted(set(self.environment_ids))) != self.environment_ids:
             _refuse()
         if any(type(value) is not str or not _DNS.fullmatch(value) for value in (self.namespace, self.name)):
             _refuse()
@@ -72,9 +77,11 @@ class AcceptedPreparationTemplate:
             or not _SHA.fullmatch(self.source_snapshot_sha256)
         ):
             _refuse()
+        environments = [guid for subject in self.subjects for guid in subject.environment_ids]
         if (
             len(set(self.permissions)) != len(self.permissions)
-            or len({value.environment_guid for value in self.subjects}) != len(self.subjects)
+            or len(environments) > 64
+            or len(set(environments)) != len(environments)
             or len({(value.namespace, value.name) for value in self.subjects}) != len(self.subjects)
         ):
             _refuse()
@@ -82,15 +89,19 @@ class AcceptedPreparationTemplate:
     @property
     def payload(self) -> dict:
         return {
-            "schema_version": 1,
+            "schema_version": 2,
             "domain": _DOMAIN,
             "permissions": [
                 {"role": value.role, "resource": value.resource}
                 for value in sorted(self.permissions, key=lambda value: (value.resource, value.role))
             ],
             "subjects": [
-                {"environment_guid": value.environment_guid, "namespace": value.namespace, "name": value.name}
-                for value in sorted(self.subjects, key=lambda value: value.environment_guid)
+                {
+                    "environment_ids": list(value.environment_ids),
+                    "namespace": value.namespace,
+                    "name": value.name,
+                }
+                for value in sorted(self.subjects, key=lambda value: (value.namespace, value.name))
             ],
             "source_snapshot_sha256": self.source_snapshot_sha256,
         }
@@ -115,7 +126,7 @@ def accepted_preparation_template_from_payload(payload: object) -> AcceptedPrepa
             _refuse()
         if (
             type(payload["schema_version"]) is not int
-            or payload["schema_version"] != 1
+            or payload["schema_version"] != 2
             or payload["domain"] != _DOMAIN
         ):
             _refuse()
@@ -127,11 +138,18 @@ def accepted_preparation_template_from_payload(payload: object) -> AcceptedPrepa
             if type(row) is not dict or set(row) != {"role", "resource"}:
                 _refuse()
         for row in payload["subjects"]:
-            if type(row) is not dict or set(row) != {"environment_guid", "namespace", "name"}:
+            if (
+                type(row) is not dict
+                or set(row) != {"environment_ids", "namespace", "name"}
+                or type(row["environment_ids"]) is not list
+            ):
                 _refuse()
         result = AcceptedPreparationTemplate(
             tuple(EndpointGrant(**row) for row in payload["permissions"]),
-            tuple(LogicalSubject(**row) for row in payload["subjects"]),
+            tuple(
+                LogicalSubject(tuple(row["environment_ids"]), row["namespace"], row["name"])
+                for row in payload["subjects"]
+            ),
             payload["source_snapshot_sha256"],
         )
         if result.payload != payload:
