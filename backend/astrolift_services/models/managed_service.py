@@ -75,7 +75,7 @@ class ManagedService(BaseCoreModel):
         null=True,
         blank=True,
         on_delete=models.PROTECT,
-        help_text="Explicit tenant owner only for a cluster-owned vLLM model.",
+        help_text="Explicit tenant owner for a cluster-owned model or existing native connection.",
     )
     app_environment = models.ForeignKey(
         "astrolift_lifecycle.AppEnvironment",
@@ -210,7 +210,15 @@ class ManagedService(BaseCoreModel):
                         app_environment__isnull=True,
                         project__isnull=True,
                         kind="model_endpoint",
-                        variant="vllm",
+                    )
+                    & (
+                        models.Q(variant="vllm")
+                        | models.Q(
+                            variant="bedrock",
+                            config__has_keys=["existing_connection_only", "model_source"],
+                            config__existing_connection_only=True,
+                            config__model_source="bedrock",
+                        )
                     )
                 ),
                 name="msvc_exactly_one_owner_scope",

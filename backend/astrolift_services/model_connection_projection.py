@@ -218,6 +218,10 @@ def source_page_facts(services):
             result[service.pk] = bool(
                 identity and (identity[0], service.organization_id, identity[1], identity[2]) in stored
             )
+        elif config.get("model_source") == "bedrock":
+            from astrolift_services.native_model_connections import current
+
+            result[service.pk] = current(service)
         elif config.get("model_source") not in (None, "huggingface"):
             result[service.pk] = False
         elif service.model_hf_connection_id:

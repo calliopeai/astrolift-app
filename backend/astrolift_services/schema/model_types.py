@@ -8,6 +8,7 @@ from astrolift_graphql import GUID
 from astrolift_services.cluster_models import model_binding_prefix
 from astrolift_services.model_settings import ModelSharingMode, dedicated_app
 from astrolift_services.models import ManagedService
+from astrolift_services.schema.bedrock_model_types import NativeModelConnectionSourceType
 
 
 @strawberry.type(name="ModelResources")
@@ -66,6 +67,7 @@ class ClusterModelDeploymentType:
     operation_completed_at: datetime | None
     desired_resources: ModelResourcesType
     applied_resources: ModelResourcesType | None
+    native_source: NativeModelConnectionSourceType | None = None
     source_kind: str = "unknown"
     local_artifact_id: GUID | None = None
     local_artifact_version: int | None = None
@@ -144,6 +146,9 @@ def cluster_model_to_type(service, *, dedicated=_DEDICATED_APP_UNSET):
     provider = cluster.provider_plugin
     available = cluster.is_active and cluster.lifecycle == "managed" and provider.is_enabled
     runtime_supported, runtime_reason = None, None
+    from astrolift_services.native_model_connections import is_bedrock_connection
+
+    native = is_bedrock_connection(service)
     try:
         shared_runtime(
             (cluster.provider_config if isinstance(cluster.provider_config, dict) else {}).get(
@@ -195,7 +200,24 @@ def cluster_model_to_type(service, *, dedicated=_DEDICATED_APP_UNSET):
         and type(service.applied_config.get("replicas", 1)) is int
         and service.applied_config.get("replicas", 1) > 0
     )
+    native_source = None
+    if native:
+        from astrolift_services.schema.bedrock_model_connections import native_source_to_type
+
+        native_source = native_source_to_type(service)
+        ready = runtime_supported = None
+        runtime_reason = "Native Bedrock connection; Kubernetes model runtime is inapplicable."
+        stored_native = config.get("native_connection")
+        stored_kind = stored_native.get("source_kind") if isinstance(stored_native, dict) else None
+        source_kind = "bedrock_" + (
+            native_source.source_kind.value
+            if native_source is not None
+            else stored_kind
+            if stored_kind in ("foundation_model", "inference_profile")
+            else "unknown"
+        )
     return ClusterModelDeploymentType(
+        native_source=native_source,
         id=GUID(str(service.guid)),
         version=service.version,
         name=service.name,

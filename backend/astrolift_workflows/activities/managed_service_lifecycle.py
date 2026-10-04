@@ -1308,6 +1308,10 @@ def _managed_binding_for(svc: Any) -> Any:
     identity activity (reads ``iam_grants``) so both resolve the driver the
     same way.
     """
+    from astrolift_services.native_model_connections import binding, is_bedrock_connection
+
+    if is_bedrock_connection(svc):
+        return binding(svc)
     from astrolift_drivers.managed_resolution import resolve_managed_driver
     from astrolift_drivers.registry import DriverNotFound
     from core.cluster_observability import managed_config_for
