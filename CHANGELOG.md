@@ -19,6 +19,10 @@
   policy, refuse ambiguous role/ServiceAccount ownership, and keep native readiness,
   invocation access and local serving metrics distinct (#2269).
 
+- Retain accepted native settings across exact version refresh and preserve app
+  connection acknowledgments during fresh reads, while stale reviews and actor
+  changes continue to refuse writes (#2269).
+
 - Show native cloud connections in model inventory/detail with immutable source
   metadata and guarded local settings/removal. Preserve app subscription policy,
   expose unavailable native sources without hosted-runtime fallbacks, and keep

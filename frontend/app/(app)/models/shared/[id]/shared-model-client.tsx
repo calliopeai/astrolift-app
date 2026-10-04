@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
-import { modelSourceMode } from "@/components/screens/models/native-model-source";
+import type { ClusterModelFieldsFragment } from "@/graphql/__generated__/operations";
+import { sameNativeSource, modelSourceMode } from "@/components/screens/models/native-model-source";
 import { NativeModelObservationsPanel } from "@/components/screens/models/NativeModelObservationsPanel";
 import { NativeModelSettingsClient } from "@/components/screens/models/NativeModelSettingsClient";
 import { ModelConnectionPolicyClient } from "@/components/screens/models/ModelConnectionPolicyClient";
@@ -20,6 +21,17 @@ export function SharedModelClient({ id }: { id: string }) {
 function DetailContext({ id }: { id: string }) {
   const props = useSharedModelDetail(id);
   const [removalConfirmed, setRemovalConfirmed] = useState(false);
+  const [settingsReceipt, setSettingsReceipt] = useState<ClusterModelFieldsFragment | null>(null);
+  const queuedConfirmed = !!(
+    settingsReceipt &&
+    props.model &&
+    settingsReceipt.id === props.model.id &&
+    settingsReceipt.organizationId === props.model.organizationId &&
+    settingsReceipt.clusterId === props.model.clusterId &&
+    settingsReceipt.providerId === props.model.providerId &&
+    settingsReceipt.version === props.model.version &&
+    sameNativeSource(settingsReceipt.nativeSource, props.model.nativeSource)
+  );
   const mode = props.model ? modelSourceMode(props.model) : "unsupported";
   return (
     <SharedModelDetailScreen
@@ -53,6 +65,8 @@ function DetailContext({ id }: { id: string }) {
                 blocked={props.stale || !!props.error}
                 onRefresh={props.onRetry}
                 onRemoved={() => setRemovalConfirmed(true)}
+                onQueued={setSettingsReceipt}
+                queuedConfirmed={queuedConfirmed}
               />
             ) : mode === "hosted" ? (
               <SharedModelManagementClient

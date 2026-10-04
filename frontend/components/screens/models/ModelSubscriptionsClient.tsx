@@ -34,7 +34,10 @@ function Views(props: {
     !props.blocked &&
     (props.model.sourceKind !== "bedrock" ||
       (sourceMode === "native" && props.model.nativeSource?.configurationState === "configured"));
-  const showIntake = adding && canAdd;
+  const showIntake =
+    adding &&
+    (props.model.sourceKind !== "bedrock" ||
+      (sourceMode === "native" && props.model.nativeSource?.configurationState === "configured"));
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap gap-2">
