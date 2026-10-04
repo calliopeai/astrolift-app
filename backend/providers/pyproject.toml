@@ -104,6 +104,8 @@ dev = [
     "prometheus-client>=0.20",
     # Standalone CI must record spans for private-delivery failure assertions.
     "opentelemetry-sdk>=1.41,<2",
+    # Gateway privacy tests exercise real client header/error instrumentation.
+    "opentelemetry-instrumentation-httpx>=0.62b0,<0.64",
     # Driver config_schema() output is asserted to be a well-formed JSON
     # Schema, and sample configs are validated against it. Test-only: no
     # driver imports jsonschema at runtime.
