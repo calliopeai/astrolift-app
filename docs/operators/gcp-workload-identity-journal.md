@@ -16,6 +16,16 @@ union digest and authority-reference digest. Digests identify accepted metadata;
 they are never grants. No token, session key, policy body, native error or cloud
 response belongs in the journal.
 
+Each physical KSA UID has one immutable `KSAIdentity` entry. Its `environment_id`
+is the original representative environment GUID retained with that identity,
+even if that environment later retires. It is historical target metadata, not
+the current alias list or permission evidence. The separate per-operation
+schema-2 `AcceptedPreparationTemplate` groups all current environment GUIDs by
+physical namespace/KSA name; each alias requires current source and authority
+checks. Adding or removing an alias cannot replace the original KSA UID or GSA.
+The pure template is available; durable preparation history and its production
+consumer remain separate integration work.
+
 ## Committed write protocol
 
 1. Refuse an enclosing Django transaction or disabled autocommit. Acquire a

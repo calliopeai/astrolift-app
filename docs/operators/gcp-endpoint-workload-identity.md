@@ -49,9 +49,15 @@ Before each native policy write, the port calls `persist` with a pending intent
 containing the observed and intended full-policy hashes plus owned grant pairs.
 It then rechecks current admission/project/GSA/custom-role identity, sends the
 observed `etag`, and separately reads the complete policy back. Only confirmed
-readback clears the pending intent. A lost reply is uncertain: retry with the
-same durably saved ledger. An exact before/after policy observation can resume;
-a different policy refuses for explicit recovery rather than adopting grants.
+readback clears the pending intent. Production integration must use the strict
+typed submission hook and committed journal described in the
+[submission contract](../../backend/providers/docs/gcp_owned_identity_submissions.md)
+and [journal contract](gcp-workload-identity-journal.md). A lost reply retains the
+original `SENT` intent. Exact after-policy observation can resolve that intent
+without another setter; a before-only observation cannot permit a resend.
+An `UNSENT` retry requires its unchanged original etag, union and before-policy;
+an independently appeared after-policy cannot establish owned grants. A different
+policy refuses for explicit recovery rather than adopting grants.
 If a journal commit fails, no corresponding provider write occurs. Multiple
 resource policies are separate cloud effects: partial progress is retained in
 the ledger and must remain pending/failed until all required observations succeed.
@@ -87,13 +93,29 @@ snapshot or guarantee against changes after a resource's final read. Matching an
 Endpoint resource name does not prove its deployed model or incarnation; those
 source observations remain the integrating caller's responsibility.
 
-## Remaining integration
+## Prepared components and remaining integration
 
-This foundation does not complete #2278 or expose native Vertex connections in
-the UI/API. Durable backend ledger storage and model subscription orchestration,
-custom-role configuration, exact current GKE pool/node metadata admission,
-Kubernetes ServiceAccount UID observation, coherent environment union, app rollout,
-readiness and actual inference are still required. It returns `workload_ready=false`;
-its annotation is configuration metadata, not proof of applied Kubernetes state.
+The private IAM journal now stores ownership, committed typed submissions and
+operation fences. Separate GKE observer and preparation ports check current native
+cluster/pool configuration and original namespace/KSA UIDs, and prepare subjects
+through committed hook receipts. Their provider tests do not establish backend
+preparation durability or a deployed workflow. See the
+[GKE preparation contract](../../backend/providers/docs/gcp_gke_identity_preparation.md).
+
+The pure schema-2 `AcceptedPreparationTemplate` retains every current environment
+GUID grouped by physical namespace/KSA name, plus the accepted Endpoint grants
+and source snapshot digest. This is metadata, not authority or UID observation.
+An empty Endpoint grant union removes owned Endpoint prediction permissions
+while retaining configured original GSA/KSA identity links for current subjects.
+Full identity decommission is a separate operation; detach does not remove all
+IAM rights or prove immediate revocation of externally granted access.
+
+These foundations do not complete #2278 or expose native Vertex connections in
+the UI/API. Backend preparation storage, public original-caller capture, current
+complete app union and subscription orchestration, receipt-bound rendering,
+rollout, actual token exchange and inference still require integration. GSA and
+custom-role creation are not implemented by these ports. The IAM port returns
+`workload_ready=false`; its annotation is configuration metadata, not proof of
+applied Kubernetes state.
 Existing project-wide grants must be separately reviewed and removed by their
 owner; this port neither searches for nor silently migrates them.
