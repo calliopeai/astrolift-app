@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Keep original native app identity references independent of Django imports for Temporal sandbox payloads, preserving signed JSON and service imports; verify actual HTTP-captured browser and bearer references through the real sandbox runner (#2278).
+
+- Prepare exact GKE namespace/ServiceAccount identities through committed submission and observation hooks, resolve all older sends before new effects, and gate guarded GSA annotation on the current complete IAM union. Backend durability and deployment integration remain separate prerequisites (#2278).
+
 - Record the exact native Bedrock owner-constraint replacement in the migration ratchet with PostgreSQL row-preservation and downgrade/refusal proof; retain required migration review and forward-schema rollback guidance (#2269).
 
 - Add a private typed GCP IAM submission hook with exact UNSENT/SENT commit receipts, bounded partial-outcome evidence and guarded recovery; refuse unsent ownership adoption and blind resends after uncertainty. Durable backend journal and app orchestration remain separate prerequisites (#2278).

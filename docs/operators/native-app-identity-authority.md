@@ -5,6 +5,13 @@ for the GCP identity journal. Existing public mutation/workflow contracts do not
 capture these references yet. The module enables no model connection or cloud
 effect on its own.
 
+The frozen reference dataclass lives in the Django-independent
+`astrolift_workflows.native_identity_inputs` module. The service module preserves
+its existing import as an alias. Its fields and signed JSON are unchanged; it can
+be serialized and returned by a real sandboxed Temporal workflow without importing
+ORM/session code. Deserialization supplies no authority: the receiving activity
+must still run the original-credential and current-target checks below.
+
 At an actual authenticated HTTP boundary,
 `capture_app_identity_authority(request, environment_guid=..., permission=...)`
 requires the exact live app environment and either `app.update` or `app.deploy`.

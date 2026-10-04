@@ -5,7 +5,7 @@ import hmac
 import json
 import re
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, replace
 from types import SimpleNamespace
 from uuid import UUID
 
@@ -29,32 +29,13 @@ from astrolift_identity.models import ApiToken, AstroliftSession, Organization
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_lifecycle.visibility import live_lifecycle_rows
 from astrolift_registry.scopes import _app_scope
+from astrolift_workflows.native_identity_inputs import AcceptedAppIdentityAuthority
 from core.current_session import _ReadOnlyAuthSession, fresh_authenticated_session
 from core.permissions import Permission, PermissionDenied, ScopeKind, check_permission
 from core.tenancy import TenantContext, get_current_tenant, tenant_context
 
 _PERMISSIONS = frozenset({Permission.APP_UPDATE, Permission.APP_DEPLOY})
 _HEX = re.compile(r"[a-f0-9]{64}\Z")
-
-
-@dataclass(frozen=True, slots=True)
-class AcceptedAppIdentityAuthority:
-    organization_guid: str
-    actor_user_id: int
-    environment_guid: str
-    app_guid: str
-    team_guid: str | None
-    project_guid: str | None
-    cluster_guid: str
-    provider_guid: str
-    permission: str
-    credential_kind: str
-    credential_guid: str
-    credential_binding: str
-    accepted_token_scopes: tuple[str, ...]
-    token_team_guid: str | None
-    signature: str
-    schema: int = 1
 
 
 def _refuse(permission=Permission.APP_UPDATE):

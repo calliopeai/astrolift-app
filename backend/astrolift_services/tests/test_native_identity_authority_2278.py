@@ -2,8 +2,11 @@
 
 import asyncio
 import json
+import subprocess
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, replace
+from pathlib import Path
 from threading import Event
 from uuid import uuid4
 
@@ -35,6 +38,60 @@ from core.tenancy import get_current_tenant
 
 pytestmark = pytest.mark.django_db(transaction=True)
 QUERY = "mutation($input:SubscribeClusterModelInput!){subscribeClusterModel(input:$input){ok errors{code}}}"
+
+
+def test_workflow_reference_import_requires_no_django_or_settings():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys; from astrolift_workflows.native_identity_inputs import AcceptedAppIdentityAuthority; "
+                "assert 'django' not in sys.modules; assert 'astrolift_services.native_identity_authority' not in sys.modules"
+            ),
+        ],
+        env={"PYTHONPATH": str(Path(__file__).resolve().parents[2]), "DJANGO_SETTINGS_MODULE": "unavailable"},
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["api_token", "browser_session"])
+async def test_real_sandbox_workflow_preserves_actual_http_reference(
+    world, client, monkeypatch, temporal_env, kind
+):
+    from asgiref.sync import sync_to_async
+    from temporalio.worker import Worker
+    from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
+
+    from astrolift_workflows.tests.native_identity_reference_fixture import NativeIdentityReferenceWorkflow
+
+    ref = await sync_to_async(capture)(world, client, monkeypatch, kind)
+    queue = "native-identity-reference-" + str(uuid4())
+    async with Worker(
+        temporal_env.client,
+        task_queue=queue,
+        workflows=[NativeIdentityReferenceWorkflow],
+        workflow_runner=SandboxedWorkflowRunner(),
+        workflow_failure_exception_types=[Exception],
+    ):
+        restored = await temporal_env.client.execute_workflow(
+            NativeIdentityReferenceWorkflow.run,
+            ref,
+            id=queue,
+            task_queue=queue,
+        )
+    assert restored == ref
+    assert world.private_key not in json.dumps(asdict(restored))
+
+    def read_current():
+        with current_app_identity_authority(restored) as env:
+            assert env.pk == world.env.pk
+
+    await sync_to_async(read_current)()
 
 
 @pytest.fixture
