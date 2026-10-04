@@ -3698,6 +3698,7 @@ type AstroliftMarkOnboardingCompletePayloadMutationResult {
 type AstroliftMe {
   id: String!
   profile: AstroliftUserProfile
+  teamAccessNavigation: AstroliftTeamAccessNavigation!
   modules: [AstroliftModuleEntitlement!]!
 }
 
@@ -5703,6 +5704,152 @@ type AstroliftTeam {
   deletedAt: DateTime
 }
 
+type AstroliftTeamAccessNavigation {
+  canViewTeams: Boolean!
+  canManageTeamMembers: Boolean!
+  canViewPeople: Boolean!
+  canViewRoles: Boolean!
+  canViewPolicies: Boolean!
+  canCheckAccess: Boolean!
+}
+
+type AstroliftTeamAccessSource {
+  id: GUID!
+  source: String!
+  scopeKind: String!
+  roleName: String!
+  roleId: GUID!
+  sourceHref: String
+  expiresAt: DateTime
+  expired: Boolean!
+  removable: Boolean!
+}
+
+type AstroliftTeamMembership {
+  team: AstroliftTeamMembershipTeam!
+  person: AstroliftTeamMembershipPerson!
+  teamMemberId: GUID
+  lifecycle: String
+  sources: [AstroliftTeamAccessSource!]!
+  canRemove: Boolean!
+}
+
+type AstroliftTeamMembershipChange {
+  requestId: GUID!
+  changeId: GUID!
+  committed: Boolean!
+  replayed: Boolean!
+  teamId: GUID!
+  orgMemberId: GUID!
+  teamMemberId: GUID
+  removedBindingIds: [GUID!]!
+  remainingSources: [AstroliftTeamAccessSource!]!
+}
+
+type AstroliftTeamMembershipChangeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftTeamMembershipChange
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type AstroliftTeamMembershipPage {
+  items: [AstroliftTeamMembership!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
+type AstroliftTeamMembershipPerson {
+  orgMemberId: GUID!
+  name: String!
+  email: String!
+  active: Boolean!
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type AstroliftTeamMembershipPersonPage {
+  items: [AstroliftTeamMembershipPerson!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
+type AstroliftTeamMembershipReview {
+  kind: TeamMembershipChangeKind!
+  expectedSource: String!
+  membership: AstroliftTeamMembership!
+  roles: [AstroliftTeamMembershipRole!]!
+  remainingSources: [AstroliftTeamAccessSource!]!
+}
+
+type AstroliftTeamMembershipRole {
+  id: GUID!
+  version: Int!
+  name: String!
+  permissions: [String!]!
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type AstroliftTeamMembershipRolePage {
+  items: [AstroliftTeamMembershipRole!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
+type AstroliftTeamMembershipTeam {
+  id: GUID!
+  version: Int!
+  name: String!
+  slug: String!
+  canManageMembers: Boolean!
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type AstroliftTeamMembershipTeamPage {
+  items: [AstroliftTeamMembershipTeam!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
 type AstroliftTeamMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
@@ -6530,6 +6677,15 @@ enum CatalogueState {
   NO_DATA
   UNAVAILABLE
   RATE_LIMITED
+}
+
+input ChangeAstroliftTeamMembershipInput {
+  requestId: GUID!
+  kind: TeamMembershipChangeKind!
+  teamId: GUID!
+  orgMemberId: GUID!
+  expectedSource: String!
+  roleId: GUID = null
 }
 
 input CiWorkflowSyncActionInput {
@@ -8462,6 +8618,7 @@ type Mutation {
   Reorder a definition's stages (spec 40 §6). Pass stage guids in the new order.
   """
   reorderWorkflowStages(definitionSlug: String!, stageGuids: [ID!]!): MutationResult!
+  changeAstroliftTeamMembership(input: ChangeAstroliftTeamMembershipInput!): AstroliftTeamMembershipChangeMutationResult!
   astroliftAnonymizeUser(input: AstroliftAnonymizeUserInput!): AstroliftAnonymizeUserPayloadMutationResult!
   astroliftConnectUserSourceProvider(input: ConnectUserSourceProviderInput!): AstroliftConnectUserSourceProviderPayloadMutationResult!
   astroliftDisconnectUserSourceProvider(input: DisconnectUserSourceProviderInput!): AstroliftDisconnectUserSourceProviderPayloadMutationResult!
@@ -9245,6 +9402,14 @@ type Query {
   Open human_gate stage executions across the org's runs that the caller may decide, newest first (#1820).
   """
   pendingHumanGates(orgId: ID = null, limit: Int! = 50): [PendingHumanGate!]!
+  astroliftTeamMembershipTeam(teamId: GUID = null, slug: String = null): AstroliftTeamMembershipTeam
+  astroliftTeamMembershipPerson(orgMemberId: GUID!): AstroliftTeamMembershipPerson
+  astroliftTeamMembershipsPage(teamId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): AstroliftTeamMembershipPage!
+  astroliftPersonTeamMembershipsPage(orgMemberId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): AstroliftTeamMembershipPage!
+  astroliftTeamMemberCandidatesPage(teamId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): AstroliftTeamMembershipPersonPage!
+  astroliftTeamMembershipRolesPage(teamId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): AstroliftTeamMembershipRolePage!
+  astroliftMembershipTeamsPage(search: String = null, page: Int! = 1, pageSize: Int! = 25): AstroliftTeamMembershipTeamPage!
+  astroliftTeamMembershipReview(teamId: GUID!, orgMemberId: GUID!, kind: TeamMembershipChangeKind!, roleId: GUID = null): AstroliftTeamMembershipReview
   astroliftMyConnectedAccounts: [AstroliftMyConnectedAccount!]!
 }
 
@@ -9923,6 +10088,11 @@ type SwitchUserResult {
 
 input SyncManifestFromRepoInput {
   id: GUID!
+}
+
+enum TeamMembershipChangeKind {
+  ADD
+  REMOVE
 }
 
 input TearDownAppInput {

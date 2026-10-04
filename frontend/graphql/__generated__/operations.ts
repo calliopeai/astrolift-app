@@ -3557,6 +3557,7 @@ export type AstroliftMe = {
   id: Scalars['String']['output'];
   modules: Array<AstroliftModuleEntitlement>;
   profile?: Maybe<AstroliftUserProfile>;
+  teamAccessNavigation: AstroliftTeamAccessNavigation;
 };
 
 export type AstroliftMember = {
@@ -5359,6 +5360,136 @@ export type AstroliftTeam = {
   updatedAt: Scalars['DateTime']['output'];
 };
 
+export type AstroliftTeamAccessNavigation = {
+  canCheckAccess: Scalars['Boolean']['output'];
+  canManageTeamMembers: Scalars['Boolean']['output'];
+  canViewPeople: Scalars['Boolean']['output'];
+  canViewPolicies: Scalars['Boolean']['output'];
+  canViewRoles: Scalars['Boolean']['output'];
+  canViewTeams: Scalars['Boolean']['output'];
+};
+
+export type AstroliftTeamAccessSource = {
+  expired: Scalars['Boolean']['output'];
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['GUID']['output'];
+  removable: Scalars['Boolean']['output'];
+  roleId: Scalars['GUID']['output'];
+  roleName: Scalars['String']['output'];
+  scopeKind: Scalars['String']['output'];
+  source: Scalars['String']['output'];
+  sourceHref?: Maybe<Scalars['String']['output']>;
+};
+
+export type AstroliftTeamMembership = {
+  canRemove: Scalars['Boolean']['output'];
+  lifecycle?: Maybe<Scalars['String']['output']>;
+  person: AstroliftTeamMembershipPerson;
+  sources: Array<AstroliftTeamAccessSource>;
+  team: AstroliftTeamMembershipTeam;
+  teamMemberId?: Maybe<Scalars['GUID']['output']>;
+};
+
+export type AstroliftTeamMembershipChange = {
+  changeId: Scalars['GUID']['output'];
+  committed: Scalars['Boolean']['output'];
+  orgMemberId: Scalars['GUID']['output'];
+  remainingSources: Array<AstroliftTeamAccessSource>;
+  removedBindingIds: Array<Scalars['GUID']['output']>;
+  replayed: Scalars['Boolean']['output'];
+  requestId: Scalars['GUID']['output'];
+  teamId: Scalars['GUID']['output'];
+  teamMemberId?: Maybe<Scalars['GUID']['output']>;
+};
+
+export type AstroliftTeamMembershipChangeMutationResult = {
+  data?: Maybe<AstroliftTeamMembershipChange>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftTeamMembershipPage = {
+  items: Array<AstroliftTeamMembership>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftTeamMembershipPerson = {
+  active: Scalars['Boolean']['output'];
+  email: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  orgMemberId: Scalars['GUID']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftTeamMembershipPersonPage = {
+  items: Array<AstroliftTeamMembershipPerson>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftTeamMembershipReview = {
+  expectedSource: Scalars['String']['output'];
+  kind: TeamMembershipChangeKind;
+  membership: AstroliftTeamMembership;
+  remainingSources: Array<AstroliftTeamAccessSource>;
+  roles: Array<AstroliftTeamMembershipRole>;
+};
+
+export type AstroliftTeamMembershipRole = {
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  permissions: Array<Scalars['String']['output']>;
+  version: Scalars['Int']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftTeamMembershipRolePage = {
+  items: Array<AstroliftTeamMembershipRole>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftTeamMembershipTeam = {
+  canManageMembers: Scalars['Boolean']['output'];
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftTeamMembershipTeamPage = {
+  items: Array<AstroliftTeamMembershipTeam>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AstroliftTeamMutationResult = {
   data?: Maybe<AstroliftTeam>;
   errors: Array<MutationError>;
@@ -6130,6 +6261,15 @@ export type CatalogueState =
   | 'NO_DATA'
   | 'RATE_LIMITED'
   | 'UNAVAILABLE';
+
+export type ChangeAstroliftTeamMembershipInput = {
+  expectedSource: Scalars['String']['input'];
+  kind: TeamMembershipChangeKind;
+  orgMemberId: Scalars['GUID']['input'];
+  requestId: Scalars['GUID']['input'];
+  roleId: InputMaybe<Scalars['GUID']['input']>;
+  teamId: Scalars['GUID']['input'];
+};
 
 export type CiWorkflowSyncActionInput = {
   appId: Scalars['GUID']['input'];
@@ -7530,6 +7670,7 @@ export type Mutation = {
   cancelPipelineRun: AstroliftPipelineRunMutationResult;
   cancelTask: NoneTypeMutationResult;
   cancelWorkflowInstance: MutationResult;
+  changeAstroliftTeamMembership: AstroliftTeamMembershipChangeMutationResult;
   clearAgentQuarantine: NoneTypeMutationResult;
   clearAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
   clearEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
@@ -8137,6 +8278,11 @@ export type MutationCancelTaskArgs = {
 export type MutationCancelWorkflowInstanceArgs = {
   runId?: InputMaybe<Scalars['String']['input']>;
   workflowId: Scalars['String']['input'];
+};
+
+
+export type MutationChangeAstroliftTeamMembershipArgs = {
+  input: ChangeAstroliftTeamMembershipInput;
 };
 
 
@@ -10455,6 +10601,7 @@ export type Query = {
   astroliftMembers: Array<AstroliftMember>;
   astroliftMembersCsv: AstroliftIdentityCsvExport;
   astroliftMembersPage: AstroliftMemberPage;
+  astroliftMembershipTeamsPage: AstroliftTeamMembershipTeamPage;
   astroliftModelDeploymentMetrics?: Maybe<ModelDeploymentMetrics>;
   astroliftModelEndpoint?: Maybe<AstroliftManagedService>;
   astroliftModelEndpoints: Array<AstroliftManagedService>;
@@ -10477,6 +10624,7 @@ export type Query = {
   astroliftOrganization?: Maybe<AstroliftOrganization>;
   astroliftOrganizationAllowlistDomains: Array<AstroliftOrganizationAllowlistedDomain>;
   astroliftOrganizations: Array<AstroliftOrganization>;
+  astroliftPersonTeamMembershipsPage: AstroliftTeamMembershipPage;
   astroliftPipeline?: Maybe<AstroliftPipeline>;
   astroliftPipelineRun?: Maybe<AstroliftPipelineRun>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftPipelineRunsPage. */
@@ -10557,7 +10705,13 @@ export type Query = {
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftTaskRunsPage. */
   astroliftTaskRuns: Array<AstroliftTaskRun>;
   astroliftTaskRunsPage: AstroliftTaskRunPage;
+  astroliftTeamMemberCandidatesPage: AstroliftTeamMembershipPersonPage;
   astroliftTeamMembers: Array<AstroliftMember>;
+  astroliftTeamMembershipPerson?: Maybe<AstroliftTeamMembershipPerson>;
+  astroliftTeamMembershipReview?: Maybe<AstroliftTeamMembershipReview>;
+  astroliftTeamMembershipRolesPage: AstroliftTeamMembershipRolePage;
+  astroliftTeamMembershipTeam?: Maybe<AstroliftTeamMembershipTeam>;
+  astroliftTeamMembershipsPage: AstroliftTeamMembershipPage;
   astroliftTeamSlugAvailable: Scalars['Boolean']['output'];
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftTeamsPage. */
   astroliftTeams: Array<AstroliftTeam>;
@@ -11754,6 +11908,13 @@ export type QueryAstroliftMembersPageArgs = {
 };
 
 
+export type QueryAstroliftMembershipTeamsPageArgs = {
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryAstroliftModelDeploymentMetricsArgs = {
   end: Scalars['DateTime']['input'];
   expectedClusterId: Scalars['GUID']['input'];
@@ -11833,6 +11994,14 @@ export type QueryAstroliftOrgMembersForApprovalPickerArgs = {
 
 export type QueryAstroliftOrganizationArgs = {
   slug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftPersonTeamMembershipsPageArgs = {
+  orgMemberId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -12221,7 +12390,50 @@ export type QueryAstroliftTaskRunsPageArgs = {
 };
 
 
+export type QueryAstroliftTeamMemberCandidatesPageArgs = {
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftTeamMembersArgs = {
+  teamId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftTeamMembershipPersonArgs = {
+  orgMemberId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftTeamMembershipReviewArgs = {
+  kind: TeamMembershipChangeKind;
+  orgMemberId: Scalars['GUID']['input'];
+  roleId?: InputMaybe<Scalars['GUID']['input']>;
+  teamId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftTeamMembershipRolesPageArgs = {
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftTeamMembershipTeamArgs = {
+  slug?: InputMaybe<Scalars['String']['input']>;
+  teamId?: InputMaybe<Scalars['GUID']['input']>;
+};
+
+
+export type QueryAstroliftTeamMembershipsPageArgs = {
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
   teamId: Scalars['GUID']['input'];
 };
 
@@ -13477,6 +13689,10 @@ export type SwitchUserResult = {
 export type SyncManifestFromRepoInput = {
   id: Scalars['GUID']['input'];
 };
+
+export type TeamMembershipChangeKind =
+  | 'ADD'
+  | 'REMOVE';
 
 export type TearDownAppInput = {
   deleteData: Scalars['Boolean']['input'];
@@ -15356,6 +15572,93 @@ export type ExportRoleBindingsCsvQueryVariables = Exact<{
 
 
 export type ExportRoleBindingsCsvQuery = { astroliftRoleBindingsCsv: { filename: string, content: string, rowCount: number, contentType: string } };
+
+export type ReviewedTeamMembershipFragment = { teamMemberId?: string | null, lifecycle?: string | null, canRemove: boolean, team: { id: string, version: number, name: string, slug: string, canManageMembers: boolean }, person: { orgMemberId: string, name: string, email: string, active: boolean }, sources: Array<{ id: string, source: string, scopeKind: string, roleName: string, roleId: string, sourceHref?: string | null, expiresAt?: string | null, expired: boolean, removable: boolean }> };
+
+export type GetTeamAccessNavigationQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetTeamAccessNavigationQuery = { me?: { teamAccessNavigation: { canViewTeams: boolean, canManageTeamMembers: boolean, canViewPeople: boolean, canViewRoles: boolean, canViewPolicies: boolean, canCheckAccess: boolean } } | null };
+
+export type GetMembershipTeamQueryVariables = Exact<{
+  slug: Scalars['String']['input'];
+}>;
+
+
+export type GetMembershipTeamQuery = { astroliftTeamMembershipTeam?: { id: string, version: number, name: string, slug: string, canManageMembers: boolean } | null };
+
+export type GetMembershipPersonQueryVariables = Exact<{
+  orgMemberId: Scalars['GUID']['input'];
+}>;
+
+
+export type GetMembershipPersonQuery = { astroliftTeamMembershipPerson?: { orgMemberId: string, name: string, email: string, active: boolean } | null };
+
+export type ListReviewedTeamMembershipsQueryVariables = Exact<{
+  teamId: Scalars['GUID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type ListReviewedTeamMembershipsQuery = { astroliftTeamMembershipsPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ teamMemberId?: string | null, lifecycle?: string | null, canRemove: boolean, team: { id: string, version: number, name: string, slug: string, canManageMembers: boolean }, person: { orgMemberId: string, name: string, email: string, active: boolean }, sources: Array<{ id: string, source: string, scopeKind: string, roleName: string, roleId: string, sourceHref?: string | null, expiresAt?: string | null, expired: boolean, removable: boolean }> }> } };
+
+export type ListReviewedPersonTeamsQueryVariables = Exact<{
+  orgMemberId: Scalars['GUID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type ListReviewedPersonTeamsQuery = { astroliftPersonTeamMembershipsPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ teamMemberId?: string | null, lifecycle?: string | null, canRemove: boolean, team: { id: string, version: number, name: string, slug: string, canManageMembers: boolean }, person: { orgMemberId: string, name: string, email: string, active: boolean }, sources: Array<{ id: string, source: string, scopeKind: string, roleName: string, roleId: string, sourceHref?: string | null, expiresAt?: string | null, expired: boolean, removable: boolean }> }> } };
+
+export type ListTeamMemberCandidatesQueryVariables = Exact<{
+  teamId: Scalars['GUID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type ListTeamMemberCandidatesQuery = { astroliftTeamMemberCandidatesPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ orgMemberId: string, name: string, email: string, active: boolean }> } };
+
+export type ListMembershipTeamsQueryVariables = Exact<{
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type ListMembershipTeamsQuery = { astroliftMembershipTeamsPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, version: number, name: string, slug: string, canManageMembers: boolean }> } };
+
+export type GetTeamMembershipReviewQueryVariables = Exact<{
+  teamId: Scalars['GUID']['input'];
+  orgMemberId: Scalars['GUID']['input'];
+  kind: TeamMembershipChangeKind;
+  roleId?: InputMaybe<Scalars['GUID']['input']>;
+}>;
+
+
+export type GetTeamMembershipReviewQuery = { astroliftTeamMembershipReview?: { kind: TeamMembershipChangeKind, expectedSource: string, membership: { teamMemberId?: string | null, lifecycle?: string | null, canRemove: boolean, team: { id: string, version: number, name: string, slug: string, canManageMembers: boolean }, person: { orgMemberId: string, name: string, email: string, active: boolean }, sources: Array<{ id: string, source: string, scopeKind: string, roleName: string, roleId: string, sourceHref?: string | null, expiresAt?: string | null, expired: boolean, removable: boolean }> }, roles: Array<{ id: string, version: number, name: string, permissions: Array<string> }>, remainingSources: Array<{ id: string, source: string, scopeKind: string, roleName: string, roleId: string, sourceHref?: string | null, expiresAt?: string | null, expired: boolean, removable: boolean }> } | null };
+
+export type ChangeTeamMembershipMutationVariables = Exact<{
+  input: ChangeAstroliftTeamMembershipInput;
+}>;
+
+
+export type ChangeTeamMembershipMutation = { changeAstroliftTeamMembership: { ok: boolean, errors: Array<{ code: string, message: string, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { requestId: string, changeId: string, committed: boolean, replayed: boolean, teamId: string, orgMemberId: string, teamMemberId?: string | null, removedBindingIds: Array<string>, remainingSources: Array<{ id: string, source: string, scopeKind: string, roleName: string, roleId: string, sourceHref?: string | null, expiresAt?: string | null, expired: boolean, removable: boolean }> } | null } };
+
+export type ListTeamMembershipRolesQueryVariables = Exact<{
+  teamId: Scalars['GUID']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type ListTeamMembershipRolesQuery = { astroliftTeamMembershipRolesPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, version: number, name: string, permissions: Array<string> }> } };
 
 export type UpdateMyUiPreferencesMutationVariables = Exact<{
   input: UpdateMyUiPreferencesInput;

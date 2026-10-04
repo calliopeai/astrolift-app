@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add reviewed, paged direct user/team membership APIs with exact public GUIDs,
+  current team-manager and credential checks, role ceilings, concurrent source
+  refusal and actor-bound retry receipts. Preserve inherited/IdP/other-scope
+  access and refuse withdrawn sessions after lock waits (#2273).
+
 - Bind browser SSO step-up to the verified issuer/subject, active actor and current
   persisted authenticated session. Recheck proof freshness after admission locks,
   preserve concurrent logout and suppress stale response-session writes (#2202).

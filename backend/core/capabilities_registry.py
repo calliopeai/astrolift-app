@@ -99,6 +99,7 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "identity.session_cookie",
     "identity.invitation_accept",
     "identity.organization_switch",
+    "identity.reviewed_team_membership",
     # Webhook subscription surfaces.
     "webhooks.subscribe",
     "webhooks.secret_rotation",
