@@ -650,7 +650,9 @@ def test_real_arm_sdk_tracing_suppressed_without_mutating_unrelated_spans(wire, 
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     settings.tracing_implementation = None
     settings.tracing_enabled = True
-    previous_provider = trace.get_tracer_provider()
+    # The effective provider can be a proxy over this raw sentinel; installing
+    # that proxy back as the global provider makes it delegate to itself.
+    previous_provider = trace._TRACER_PROVIDER
     trace._TRACER_PROVIDER = provider
     try:
         if failure == "credential":
@@ -672,3 +674,14 @@ def test_real_arm_sdk_tracing_suppressed_without_mutating_unrelated_spans(wire, 
         settings.tracing_enabled = previous_enabled
         trace._TRACER_PROVIDER = previous_provider
         provider.shutdown()
+    assert trace._TRACER_PROVIDER is previous_provider
+    # The next ordinary driver must still be able to enter its real tracing
+    # boundary, even when this test started before global SDK initialization.
+    from _sdk._telemetry import driver_op
+
+    class OrdinaryDriver:
+        @driver_op(cloud="azure", driver="tracing-isolation-control")
+        def observe(self) -> str:
+            return "observed"
+
+    assert OrdinaryDriver().observe() == "observed"

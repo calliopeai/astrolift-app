@@ -150,6 +150,7 @@ class AzureFederatedIdentityDriver(WorkloadIdentityDriver):
         self._grant_assignments: list[GrantAssignment] = []
         self._prune_refusals: list[str] = []
 
+    @driver_op(cloud="azure", driver="identity", heartbeat=False, redact_errors=True)
     def owned_reconciler(self) -> AzureOwnedIdentityDriver:
         """Build real MSI7/authorization clients without enabling legacy writes."""
         from azure.identity_owned import AzureOwnedIdentityDriver

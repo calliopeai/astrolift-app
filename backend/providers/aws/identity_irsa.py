@@ -447,6 +447,13 @@ class IRSADriver(WorkloadIdentityDriver):
             raise ValueError("Native identity document is invalid")
         return value
 
+    @driver_op(
+        cloud="aws",
+        driver="identity",
+        audit=True,
+        redact_args=("name", "permissions", "owner", "subjects"),
+        redact_errors=True,
+    )
     def reconcile_managed_identity(
         self, *, name: str, permissions: list[dict[str, Any]], owner: dict[str, str], subjects: list[str]
     ) -> str:
@@ -500,6 +507,12 @@ class IRSADriver(WorkloadIdentityDriver):
                 self._iam.delete_role_policy(RoleName=name, PolicyName="astrolift-workload-policy")
         return self._role_arn(name)
 
+    @driver_op(
+        cloud="aws",
+        driver="identity",
+        redact_args=("name", "permissions", "owner", "subjects"),
+        redact_errors=True,
+    )
     def verify_managed_identity(
         self, *, name: str, permissions: list[dict[str, Any]], owner: dict[str, str], subjects: list[str]
     ) -> bool:
