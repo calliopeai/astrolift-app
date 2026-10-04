@@ -156,7 +156,7 @@ def smoke(image, proof):
                 ) as response:
                     if response.status == 200:
                         break
-            except (urllib.error.URLError, TimeoutError):
+            except (urllib.error.URLError, TimeoutError, ConnectionError):
                 pass
             time.sleep(2)
         else:
