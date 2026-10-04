@@ -317,7 +317,7 @@ def test_actual_pod_snapshot_and_independent_revocation(enforce_network):
                 eventually(lambda key=key: probe(key, first) == "blocked")
             assert probe("app_b", second) == 200
         # Updating projected credentials alone must not pretend the old process restarted.
-        snapshot.update(revision=2, subscription_keys=[second])
+        snapshot.update(revision=2, subscription_keys=[second], subscription_ids=[consumers[1].subscription_id])
         core.patch_namespaced_secret(
             stored_secret.metadata.name, namespace, {"stringData": {"keys.json": json.dumps(snapshot)}}
         )

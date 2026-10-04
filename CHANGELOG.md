@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Shared model runtimes attribute admitted inference request counts, ASGI
+  response bytes and duration histograms to validated subscription UUIDs through
+  operator-only metrics. Legacy snapshots remain supported without false
+  attribution; per-app token and cost metrics remain unavailable.
+
 - Bind browser SSO step-up to the verified issuer/subject, active actor and current
   persisted authenticated session. Recheck proof freshness after admission locks,
   preserve concurrent logout and suppress stale response-session writes (#2202).

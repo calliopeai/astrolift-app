@@ -647,10 +647,11 @@ class VLLMDriver(ManagedServiceDriver):
                 raise ValueError("Shared model subscriber credential snapshot is invalid.")
             secret_data["keys.json"] = json.dumps(
                 {
-                    "version": 1,
+                    "version": 2,
                     "revision": spec.cluster_model.revision,
                     "operator_key": api_key,
                     "subscription_keys": keys,
+                    "subscription_ids": [consumer.subscription_id for consumer in spec.cluster_model.consumers],
                 },
                 separators=(",", ":"),
             )
@@ -1119,7 +1120,11 @@ class VLLMDriver(ManagedServiceDriver):
         del namespace, name
         identities = set()
         for consumer in placement.consumers:
-            UUID(consumer.subscription_id)
+            if (
+                str(UUID(consumer.subscription_id)) != consumer.subscription_id
+                or not UUID(consumer.subscription_id).int
+            ):
+                raise ValueError("Shared model consumer identity must be a canonical UUID.")
             if consumer.subscription_id in identities:
                 raise ValueError("Duplicate shared model consumer identity.")
             identities.add(consumer.subscription_id)
