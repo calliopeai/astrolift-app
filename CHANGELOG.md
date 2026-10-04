@@ -12,6 +12,8 @@
 
 - Observe original GKE workload/controller/KSA identities, current Ready Pod ownership and admitted node placement through bounded private native reads; distinguish pending rollout and completed Job execution from unverified token exchange/inference. Production orchestration remains separate (#2278).
 
+- Add a private durable GKE preparation journal with committed create/annotation receipts, protected accepted-operation history, current original-credential admission and once-bound native IAM plans. Preserve uncertain sends, shared environment aliases and original physical UIDs across Endpoint detach; public caller orchestration and workload acceptance remain open (#2278).
+
 - Keep original native app identity references independent of Django imports for Temporal sandbox payloads, preserving signed JSON and service imports; verify actual HTTP-captured browser and bearer references through the real sandbox runner (#2278).
 
 - Prepare exact GKE namespace/ServiceAccount identities through committed submission and observation hooks, resolve all older sends before new effects, and gate guarded GSA annotation on the current complete IAM union. Backend durability and deployment integration remain separate prerequisites (#2278).
