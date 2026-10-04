@@ -344,6 +344,9 @@ describe("shared model create Apollo boundary", () => {
         cpuRequest: "1",
         memoryRequest: "4Gi",
         cpuKvCacheGiB: 1,
+        dtype: "FLOAT32",
+        maxModelLen: 256,
+        maxNumSeqs: 1,
         revisionSha: "a".repeat(40),
         clusterId,
         expectedProviderId: providerId,
@@ -442,6 +445,9 @@ describe("shared model create Apollo boundary", () => {
         expectedConnectionVersion: null,
         localArtifactId: null,
         expectedArtifactVersion: null,
+        dtype: null,
+        maxModelLen: null,
+        maxNumSeqs: null,
       });
       expect(
         requests

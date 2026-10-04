@@ -5,6 +5,7 @@ from enum import Enum
 import strawberry
 
 from astrolift_graphql import GUID
+from astrolift_services.model_runtime_settings import ModelDtype
 
 
 @strawberry.enum
@@ -29,6 +30,9 @@ class UpdateClusterModelInput:
     sharing_mode: ModelSharingMode | None = None
     dedicated_app_id: GUID | None = None
     if_match_dedicated_app_version: int | None = None
+    dtype: ModelDtype | None = None
+    max_model_len: int | None = None
+    max_num_seqs: int | None = None
 
 
 def update_placement(service, input):
@@ -56,6 +60,9 @@ def update_placement(service, input):
         gpu_count=input.gpu_count,
         allow_subscriptions=input.allow_subscriptions,
         cpu_kv_cache_gi_b=input.cpu_kv_cache_gi_b,
+        dtype=input.dtype,
+        max_model_len=input.max_model_len,
+        max_num_seqs=input.max_num_seqs,
         **source,
     )
 
@@ -97,6 +104,12 @@ def validate_updated_source(service, placement, *, locked=False):
             preserved[key] = config[key]
         else:
             preserved.pop(key, None)
+    for key in ("dtype", "max_model_len", "max_num_seqs"):
+        if getattr(placement, key) is not None or key not in stored:
+            if key in config:
+                preserved[key] = config[key]
+    if "runtime_controls_revision" in config:
+        preserved["runtime_controls_revision"] = config["runtime_controls_revision"]
     config = VLLMDriver(config=VLLMConfig())._normalize(preserved)
     runtime = shared_runtime(
         (service.tenant_cluster.provider_config or {}).get("vllm_shared_runtimes", {}), config, "python"

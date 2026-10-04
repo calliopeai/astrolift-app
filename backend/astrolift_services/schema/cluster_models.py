@@ -27,6 +27,7 @@ from astrolift_services.model_admission import (
     validate_cluster_request,
     with_canonical_model_handle,
 )
+from astrolift_services.model_runtime_settings import ModelDtype
 from astrolift_services.model_settings import (
     UpdateClusterModelInput,
     allows_app,
@@ -66,6 +67,9 @@ class ProvisionClusterModelInput:
     cpu_kv_cache_gi_b: int | None = None
     connection_id: GUID | None = None
     expected_connection_version: int | None = None
+    dtype: ModelDtype | None = None
+    max_model_len: int | None = None
+    max_num_seqs: int | None = None
 
 
 @strawberry.input

@@ -73,7 +73,10 @@ legacy `MODEL_*` bindings retain their contracts. Shared creation requires
 and an available enabled managed cluster. In-org catalogue reads require
 `ORG_READ`; metadata visibility does not grant deployment authority.
 
-Configure certified runtimes in the cluster's `provider_config` before creation.
+Configure certified runtimes before creation using the Placement step's runtime
+setup form or the typed `clusterModelRuntimeSettings` / `updateClusterModelRuntime`
+API described below. Existing legacy declarations remain readable by admission;
+new setup declarations include serving and resource bounds.
 This example is a declaration template: replace both digest placeholders with
 verified image digests and certify the actual hardware/node labels first.
 Unconfigured modes are refused; neither zero requested GPUs nor an architecture
@@ -216,3 +219,73 @@ locales. Controlled Next/Chromium journeys exercise CPU, GPU and the small-model
 preset through review and accepted requests. These fixture receipts prove UI and
 request behavior, not successful downloading, scheduling, vLLM inference or live
 readiness. Deployment health still requires the actual runtime observations.
+
+
+## Typed runtime setup and serving bounds
+
+`models.runtime_settings` advertises this additive API, not permission or runtime
+readiness. Both reads and writes require a fresh active installation platform
+operator, the existing exact organization/cluster gates, and bearer admin,
+organization/team and live membership ceilings. The server rechecks authority
+and eligible cluster/provider after the final placement lock. Only the selected
+`vllm_shared_runtimes.cpu` or `.gpu` entry changes; unrelated provider/auth
+configuration and the other compute mode are preserved and never projected.
+
+```graphql
+query RuntimeSetup($organizationId: GUID!, $clusterId: GUID!, $expectedProviderId: GUID!) {
+  clusterModelRuntimeSettings(organizationId: $organizationId, clusterId: $clusterId,
+    expectedProviderId: $expectedProviderId) {
+    organizationId clusterId providerId clusterVersion providerVersion
+    modes { computeMode configured reason hardwareAdmission
+      declaration { image version packageVersion architecture
+        nodeSelector { key value } supportedDtypes defaultDtype
+        defaultMaxModelLen maxModelLenCeiling defaultMaxNumSeqs maxNumSeqsCeiling
+        cpuRequestCeiling memoryRequestCeiling gpuCountCeiling hardwareCertified hardwareEvidence }
+    }
+  }
+}
+```
+
+`updateClusterModelRuntime(input: UpdateClusterModelRuntimeInput!)` requires those
+exact organization/cluster/provider identities, reviewed `ifMatchVersion` and
+`expectedProviderVersion`, a `CPU` or `GPU` compute mode, and a typed declaration.
+The declaration requires a digest-pinned image, exact supported vLLM version
+`0.15.1`, CPU package `0.15.1+cpu` or supported GPU release package, architecture
+and at least one explicit certified hardware selector beyond architecture alone.
+It also requires supported/default data types, default/maximum context and
+concurrency, positive CPU/memory ceilings and the mode-appropriate GPU ceiling.
+Context bounds are 256–131072 tokens and concurrency is 1–4096 sequences.
+
+`hardwareCertified: true` additionally requires `hardwareAttested: true` and a
+bounded evidence reference. Record image smoke and node inspection evidence
+without credentials/private URLs; the server records the actor and time. An
+uncertified declaration may be saved but remains ineligible. This is an operator
+assertion, not an automated hardware probe or successful model launch. A tagged
+image or a claimed architecture is insufficient for new declarations.
+
+Provisioning and source-preserving settings updates accept optional `dtype`
+(`AUTO`, `FLOAT16`, `BFLOAT16`, `FLOAT32`), `maxModelLen` and `maxNumSeqs`. New
+runtime declarations supply defaults when creating a model; explicit requests
+must match declared dtype support and bounds. Omitting these settings during an
+update preserves stored advanced values, including local/HF source identity.
+Current declarations are checked again by the actual worker/provider before
+credential or Kubernetes writes. Removing certification or narrowing support can
+therefore refuse a queued operation. Existing declarations without these new
+controls retain their old admission contract; they cannot admit a request that
+claims the new serving-controls contract.
+
+The tiny CPU preset requests 1 CPU, 4 GiB memory, 1 GiB CPU KV cache, float32,
+256-token context and one concurrent sequence. These limits match the prepared
+AVX2 image smoke plan; that plan is not a built image or hardware/runtime proof.
+The operator still needs a built digest, image smoke and actual compatible node
+inspection. Requested memory above KV cache does not prove weight/KV fit, and
+node capacity/selector declarations do not prove successful scheduling. Only
+existing generation, auth snapshot, pod rollout and model-server `/health`
+observations establish hosted-model readiness. Runtime setup performs no build,
+cluster apply, model download or inference.
+
+An accepted setup write survives a failed follow-up read, with a saved-but-read
+unconfirmed warning. Refused writes preserve the draft and do not refresh. The
+browser binds review/drafts to the actor/organization, selected cluster/provider,
+mode and observed versions; server identity/version and authority checks remain
+canonical. Retry current reads before another write after an unknown response.

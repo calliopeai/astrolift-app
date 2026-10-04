@@ -81,6 +81,14 @@ def request_config(input, *, lock_source=False):
         if input.expected_artifact_version is not None:
             raise ValueError("Select a current verified local model artifact.")
         cfg.update(model=input.model_repo, model_revision=input.revision_sha)
+    if input.dtype is not None:
+        cfg["dtype"] = input.dtype.value
+    for key in ("max_model_len", "max_num_seqs"):
+        value = getattr(input, key)
+        if value is not None:
+            cfg[key] = value
+    if any(getattr(input, key) is not None for key in ("dtype", "max_model_len", "max_num_seqs")):
+        cfg["runtime_controls_revision"] = 1
     if input.cpu_kv_cache_gi_b is not None:
         cfg["cpu_kv_cache_gib"] = input.cpu_kv_cache_gi_b
     if (
@@ -97,7 +105,18 @@ def validate_cluster_request(input, cluster, *, lock_source=False):
 
     config = request_config(input, lock_source=lock_source)
     provider_config = cluster.provider_config if isinstance(cluster.provider_config, dict) else {}
-    runtime = shared_runtime(provider_config.get("vllm_shared_runtimes", {}), config, "python")
+    runtimes = provider_config.get("vllm_shared_runtimes", {})
+    declaration = runtimes.get(input.compute_mode) if isinstance(runtimes, dict) else None
+    if isinstance(declaration, dict) and declaration.get("supported_dtypes") is not None:
+        for key, default in (
+            ("dtype", "default_dtype"),
+            ("max_model_len", "default_max_model_len"),
+            ("max_num_seqs", "default_max_num_seqs"),
+        ):
+            if getattr(input, key) is None:
+                config[key] = declaration.get(default)
+        config["runtime_controls_revision"] = 1
+    runtime = shared_runtime(runtimes, config, "python")
     return config, runtime
 
 

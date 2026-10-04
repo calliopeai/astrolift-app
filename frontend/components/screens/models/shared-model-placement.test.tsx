@@ -94,6 +94,9 @@ describe("shared model placement review", () => {
         expectedConnectionVersion: null,
         localArtifactId: null,
         expectedArtifactVersion: null,
+        dtype: null,
+        maxModelLen: null,
+        maxNumSeqs: null,
       })
     );
     expect(

@@ -6674,6 +6674,30 @@ type ClusterModelDeploymentPage {
   pageSize: Int
 }
 
+type ClusterModelRuntimeModeSettings {
+  computeMode: ModelRuntimeMode!
+  declaration: ModelRuntimeDeclaration
+  configured: Boolean!
+  reason: String
+  hardwareAdmission: String!
+}
+
+type ClusterModelRuntimeSettings {
+  organizationId: GUID!
+  clusterId: GUID!
+  providerId: GUID!
+  clusterVersion: Int!
+  providerVersion: Int!
+  modes: [ClusterModelRuntimeModeSettings!]!
+  observedAt: DateTime!
+}
+
+type ClusterModelRuntimeSettingsMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ClusterModelRuntimeSettings
+}
+
 input ClusterModelsFilterInput {
   clusterId: GUID = null
   computeMode: String = null
@@ -7784,6 +7808,13 @@ type ModelDeploymentMetrics {
   sampleLimit: Int!
 }
 
+enum ModelDtype {
+  AUTO
+  FLOAT16
+  BFLOAT16
+  FLOAT32
+}
+
 enum ModelGating {
   NONE
   AUTO
@@ -7870,6 +7901,9 @@ type ModelResources {
   gpuCount: Int
   replicas: Int
   cpuKvCacheGiB: Int
+  dtype: String
+  maxModelLen: Int
+  maxNumSeqs: Int
 }
 
 type ModelRuntimeAdmission {
@@ -7878,6 +7912,65 @@ type ModelRuntimeAdmission {
   runtimeVersion: String
   architecture: String
   hardwareAdmission: String!
+}
+
+enum ModelRuntimeArchitecture {
+  AMD64
+  ARM64
+}
+
+type ModelRuntimeDeclaration {
+  image: String!
+  version: String!
+  packageVersion: String!
+  architecture: ModelRuntimeArchitecture!
+  nodeSelector: [ModelRuntimeSelector!]!
+  supportedDtypes: [ModelDtype!]!
+  defaultDtype: ModelDtype!
+  defaultMaxModelLen: Int!
+  maxModelLenCeiling: Int!
+  defaultMaxNumSeqs: Int!
+  maxNumSeqsCeiling: Int!
+  cpuRequestCeiling: String!
+  memoryRequestCeiling: String!
+  gpuCountCeiling: Int!
+  hardwareCertified: Boolean!
+  hardwareEvidence: String
+}
+
+input ModelRuntimeDeclarationInput {
+  image: String!
+  version: String!
+  packageVersion: String!
+  architecture: ModelRuntimeArchitecture!
+  nodeSelector: [ModelRuntimeSelectorInput!]!
+  supportedDtypes: [ModelDtype!]!
+  defaultDtype: ModelDtype!
+  defaultMaxModelLen: Int!
+  maxModelLenCeiling: Int!
+  defaultMaxNumSeqs: Int!
+  maxNumSeqsCeiling: Int!
+  cpuRequestCeiling: String!
+  memoryRequestCeiling: String!
+  gpuCountCeiling: Int!
+  hardwareCertified: Boolean!
+  hardwareAttested: Boolean! = false
+  hardwareEvidence: String = null
+}
+
+enum ModelRuntimeMode {
+  CPU
+  GPU
+}
+
+type ModelRuntimeSelector {
+  key: String!
+  value: String!
+}
+
+input ModelRuntimeSelectorInput {
+  key: String!
+  value: String!
 }
 
 enum ModelSharingMode {
@@ -8313,6 +8406,7 @@ type Mutation {
   beginLocalModelArtifact(input: BeginLocalModelArtifactInput!): LocalModelArtifactMutationResult!
   authorizeLocalModelUploads(input: LocalModelArtifactIdentityInput!): LocalModelUploadAuthorizationMutationResult!
   finalizeLocalModelArtifact(input: LocalModelArtifactIdentityInput!): LocalModelArtifactMutationResult!
+  updateClusterModelRuntime(input: UpdateClusterModelRuntimeInput!): ClusterModelRuntimeSettingsMutationResult!
   setAppSecret(input: SetAppSecretInput!): AppsecretwritepayloadMutationResult!
   rotateAppSecret(input: RotateAppSecretInput!): AppsecretwritepayloadMutationResult!
   deleteAppSecret(input: DeleteAppSecretInput!): AppsecretwritepayloadMutationResult!
@@ -8786,6 +8880,9 @@ input ProvisionClusterModelInput {
   cpuKvCacheGiB: Int = null
   connectionId: GUID = null
   expectedConnectionVersion: Int = null
+  dtype: ModelDtype = null
+  maxModelLen: Int = null
+  maxNumSeqs: Int = null
 }
 
 type ProvisionManagedDomainPayload {
@@ -9090,6 +9187,7 @@ type Query {
   huggingFaceConnectionsPage(organizationId: GUID!, page: Int! = 1, pageSize: Int! = 25): HuggingFaceConnectionTypePage!
   clusterModelSourceAccess(organizationId: GUID!, modelRepo: String!, revisionSha: String!, connectionId: GUID = null, expectedConnectionVersion: Int = null): ModelSourceAccess!
   astroliftLocalModelArtifactsPage(search: String = null, limit: Int! = 25, after: String = null): LocalModelArtifactPage!
+  clusterModelRuntimeSettings(organizationId: GUID!, clusterId: GUID!, expectedProviderId: GUID!): ClusterModelRuntimeSettings
   astroliftProjectManagedServiceAttachmentOwner(projectId: GUID!, attachmentId: GUID!): AstroliftManagedServiceContext
   astroliftProjectManagedServicesPage(projectId: GUID!, search: String = null, name: String = null, kinds: [String!] = null, statuses: [String!] = null, environmentName: String = null, clusterId: GUID = null, limit: Int! = 50, after: String = null): AstroliftManagedServiceContextPage!
   astroliftProjectManagedService(projectId: GUID!, id: GUID!, expectedContextRevision: String = null): AstroliftManagedServiceContext
@@ -10154,6 +10252,19 @@ input UpdateClusterModelInput {
   sharingMode: ModelSharingMode = null
   dedicatedAppId: GUID = null
   ifMatchDedicatedAppVersion: Int = null
+  dtype: ModelDtype = null
+  maxModelLen: Int = null
+  maxNumSeqs: Int = null
+}
+
+input UpdateClusterModelRuntimeInput {
+  organizationId: GUID!
+  clusterId: GUID!
+  expectedProviderId: GUID!
+  ifMatchVersion: Int!
+  expectedProviderVersion: Int!
+  computeMode: ModelRuntimeMode!
+  declaration: ModelRuntimeDeclarationInput!
 }
 
 input UpdateEmailTemplateInput {
