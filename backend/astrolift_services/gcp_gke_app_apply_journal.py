@@ -30,6 +30,7 @@ from gcp.gke_app_apply import (
     ledger_from_payload,
     ledger_payload,
 )
+from gcp.gke_app_runtime_handoff import RuntimeHandoff
 
 from astrolift_lifecycle.deployment_execution_receipt import BoundDeploymentExecution
 from astrolift_lifecycle.models import Deployment, DeploymentExecutionReceipt
@@ -487,6 +488,8 @@ class AppApplyStore:
             row.save()
 
     def reserve(self, *, checkpoint):
+        if self.accepted.plan.placement is None:
+            raise AppApplyJournalError("PLACEMENT_ACCEPTANCE_REQUIRED")
         with self._locked(checkpoint) as (journal, prior):
             ctx = self._context
             plan, identity = self.accepted.plan, self.accepted.prepared
@@ -719,6 +722,48 @@ class AppApplyStore:
                     raise AppApplyJournalError("APPLY_OBSERVATION_CHANGED")
             row.observed_at = op.observed_at = timezone.now()
             self._save(row, op, receipt.ledger, "OBSERVED")
+
+    def runtime_handoff(self, reservation, *, checkpoint):
+        """Read actual current completed records; metadata never substitutes admission."""
+        with self._locked(checkpoint) as (row, op):
+            row, op = self._bound(row, op, reservation)
+            ledger = ledger_from_payload(row.ledger)
+            if (
+                row.state != "OBSERVED"
+                or op.state != "OBSERVED"
+                or row.observed_at is None
+                or op.observed_at is None
+                or ledger.pending
+                or ledger.rejection
+                or self.accepted.plan.placement is None
+                or {r.resource.path for r in ledger.resources}
+                != {r.path for r in self.accepted.plan.resources}
+                or any(
+                    r.resource not in self.accepted.plan.resources
+                    or r.native_projection_sha256 != r.resource.projection_sha256
+                    for r in ledger.resources
+                )
+            ):
+                raise AppApplyJournalError("RUNTIME_APPLY_NOT_COMPLETED")
+            return RuntimeHandoff(
+                str(row.guid),
+                row.version,
+                str(op.operation_id),
+                op.generation,
+                self.accepted.plan,
+                self.accepted.prepared.service_account_name,
+                tuple(
+                    r
+                    for r in ledger.resources
+                    if r.resource.kind in ("Deployment", "StatefulSet", "DaemonSet")
+                ),
+            )
+
+    def validate_runtime_handoff(self, reservation, handoff, *, checkpoint):
+        if type(handoff) is not RuntimeHandoff or handoff != self.runtime_handoff(
+            reservation, checkpoint=checkpoint
+        ):
+            raise AppApplyJournalError("CURRENT_RUNTIME_HANDOFF_CHANGED")
 
 
 @contextmanager

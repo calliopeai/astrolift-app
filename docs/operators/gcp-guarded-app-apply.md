@@ -20,10 +20,12 @@ submission, observation, completion, and around native operations. Native
 source reads belong outside database transactions; the final database callback
 must check the current protected receipts and accepted source snapshot. The
 caller must use trusted activity execution admission, not a delayed
-`WorkflowRun` mirror or caller-supplied workflow/run strings. The original
-blocking execution-admission implementation is not suitable inside these
-parent locks; production integration requires the separately reviewed bound
-read/checkpoint successor.
+`WorkflowRun` mirror or caller-supplied workflow/run strings. The actual activity
+opens `deployment_execution_checkpoint(input)` and composes its DB-only checks;
+the scoped callback re-admits the original execution on each invocation and SDK
+metadata thread. It must remain open for the operation and refuse after closure
+or cancellation. Bound receipt reads do not wait on EXPECTED row locks beneath
+the source/apply parent locks.
 
 Acquire the preparation, IAM, then app-apply advisory mutexes without waiting.
 The app mutex is physical app/cluster/namespace ownership, independent of
@@ -97,13 +99,47 @@ robust backoff, partial-revision supersession, autoscaling, capacity changes,
 physical-subject evolution, selected-environment handoff in shared namespaces
 and whole-pipeline rename support remain open.
 
-Runtime acceptance must separately protect a typed Standard node-pool ceiling,
-GKE incarnation/mode and placement fingerprints before the first controller
-write. It must use that same accepted ceiling afterward; a later fresh pool
-read is not original apply admission. Autoscaling nodes inside the admitted
-pools remains normal. Controller observation here does not prove Pod readiness,
-token exchange, workload impersonation, endpoint inference, or successful
-production workflow orchestration.
+The private placement handoff now requires actual native acceptance before a
+new durable reservation or controller write. `capture_placement` binds the
+original GKE incarnation, Standard/Autopilot mode, sorted Standard node-pool
+ceiling and final compiled controller execution/placement digest. The protected
+accepted-plan JSON retains these bytes without adding a migration. Current
+original-caller/source callbacks remain mandatory; this snapshot is not
+authority. A historical plan without acceptance remains history only and cannot
+be enriched in place or emit effects/runtime receipts. A genuinely new accepted
+operation may capture a fresh ceiling through the guarded generation path.
+
+`runtime_handoff` reads only the actual current completed operation and exact
+committed UID/generation/configuration ledger, under the same source,
+preparation, IAM and execution fences. `validate_runtime_handoff` binds every
+subsequent callback to that current receipt; a caller-fabricated or stale typed
+object does not acquire database authority. Native target construction then
+rechecks the original controller UID/generation, current approved projection and
+actual observed template/placement hashes. Reviewed API defaults can distinguish
+the compiled digest from the recorded native effective template; neither hash
+can silently replace the other.
+
+Runtime targets retain the original admitted ceiling. Unrelated eligible new
+pools do not expand it or alone prevent observation; a Pod on an unadmitted
+pool fails runtime acceptance. Node autoscaling inside the admitted pools remains
+normal. No new node selector is injected to change the reviewed template. A
+removed/ineligible original pool, changed GKE incarnation or mode refuses.
+Autopilot records its distinct mode and no invented Standard pool list.
+
+Deployment and StatefulSet targets use their recorded original UID/generation
+and accepted positive static replica count. A DaemonSet target requires its
+current original UID/generation and matching observedGeneration, then an actual
+integer desiredNumberScheduled from 1 to 256. Missing/zero desired count or
+unobserved generation is pending with no fabricated target; malformed, negative
+or oversized counts refuse. Runtime compares scheduled/updated/ready/available
+counts to that observed target. A count or controller change during observation
+cannot become success from an earlier sample.
+
+This handoff can feed the existing read-only runtime observer, which checks
+current owned Pods and Nodes. It does not activate the production executor,
+prove token exchange, workload impersonation, Endpoint inference or successful
+production workflow orchestration. Capacity/HPA/zero-replica support and the
+other staged limits above remain open.
 
 The Kubernetes [update and concurrency contract](https://kubernetes.io/docs/reference/using-api/api-concepts/#updates-to-existing-resources)
 defines resourceVersion handling; the controller shapes are documented in the
@@ -112,3 +148,5 @@ defines resourceVersion handling; the controller shapes are documented in the
 and [DaemonSet](https://kubernetes.io/docs/reference/kubernetes-api/apps/daemon-set-v1/)
 API references. DaemonSet scheduling counts are observed status, not supplied
 replica configuration.
+
+Runtime placement validates the complete bounded pool inventory but retains only the original admitted pool ceiling. An unrelated provisioning pool or pool without GKE_METADATA neither expands that ceiling nor invalidates eligible original pools. Initial capture includes only eligible RUNNING/GKE_METADATA pools and does not establish capacity or model compatibility. Standalone identity observation retains its stricter all-pools check.

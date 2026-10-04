@@ -11,6 +11,10 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
 from gcp.gke_identity_observation import (
+    _NAME as _POOL_NAME,
+)
+from gcp.gke_identity_observation import (
+    MAX_POOLS,
     GKEIdentityObserver,
     GKEObservationContext,
     GKEObservationError,
@@ -599,7 +603,14 @@ class GKEIdentityRuntimeObserver:
     def _subjects(self, adapter: Any, checkpoint: Callable[[], None]) -> Any:
         return self._source._subjects(adapter, checkpoint)
 
-    def _pool_snapshot(self, cluster: Any, pools: tuple[str, ...], checkpoint: Callable[[], None]) -> tuple[Any, ...]:
+    def _pool_snapshot(
+        self,
+        cluster: Any,
+        pools: tuple[str, ...],
+        checkpoint: Callable[[], None],
+        *,
+        accepted_node_pools: tuple[str, ...] | None = None,
+    ) -> tuple[Any, ...]:
         if cluster.autopilot.enabled:
             locations = tuple(cluster.locations)
             if (
@@ -613,6 +624,14 @@ class GKEIdentityRuntimeObserver:
         _, native = self._source._native(checkpoint)
         response = self._source._call(native.list_node_pools, {"parent": self.context.cluster_resource}, checkpoint)
         rows = tuple(response.node_pools)
+        if accepted_node_pools is not None:
+            if (
+                not 1 <= len(rows) <= MAX_POOLS
+                or len({row.name for row in rows}) != len(rows)
+                or any(not _POOL_NAME.fullmatch(row.name) for row in rows)
+            ):
+                raise GKEObservationError("NODE_CONFIGURATION_UNVERIFIED")
+            rows = tuple(row for row in rows if row.name in accepted_node_pools)
         if len(rows) != len(pools) or {row.name for row in rows} != set(pools):
             raise GKEObservationError("NODE_CONFIGURATION_CHANGED")
         snapshots = []
