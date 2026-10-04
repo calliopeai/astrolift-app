@@ -718,3 +718,218 @@ def test_batched_person_roster_keeps_exact_permission_and_grant_negatives(world,
     else:
         assert not rows[str(w.sibling.guid)]["canRemove"]
         assert rows[str(w.sibling.guid)]["team"]["canManageMembers"] == (negative == "superior-role")
+
+
+NAVIGATION = """{me{teamAccessNavigation{canViewTeams canManageTeamMembers canViewPeople canViewRoles canViewPolicies canCheckAccess}}}"""
+NO_NAVIGATION = {
+    "canViewTeams": False,
+    "canManageTeamMembers": False,
+    "canViewPeople": False,
+    "canViewRoles": False,
+    "canViewPolicies": False,
+    "canCheckAccess": False,
+}
+
+
+def _navigation(w, **kwargs):
+    result = http(w, NAVIGATION, **kwargs)
+    assert not result.get("errors"), result
+    return result["data"]["me"]["teamAccessNavigation"]
+
+
+def test_navigation_read_only_team_reader_keeps_only_the_scoped_read_hint(world):
+    w = world
+    w.manager.permissions = ["team.read"]
+    w.manager.save()
+    assert _navigation(w) == {**NO_NAVIGATION, "canViewTeams": True}
+
+
+def test_navigation_org_reader_is_not_required_to_have_a_team_grant(world):
+    w = world
+    w.actor_binding.soft_delete()
+    role = Role.objects.create(
+        organization=w.org,
+        name="Org metadata reader",
+        slug="navigation-org-reader",
+        scope_level="ORG",
+        permissions=["org.read"],
+    )
+    RoleBinding.objects.create(user=w.actor, role=role, scope_kind="ORG", scope_id=w.org.pk)
+    assert _navigation(w) == {**NO_NAVIGATION, "canViewRoles": True, "canViewPolicies": True}
+
+
+@pytest.mark.parametrize("withdrawal", ["binding", "member", "role", "foreign-scope", "foreign-role"])
+def test_navigation_current_withdrawal_and_foreign_authority_leave_all_hints_false(world, withdrawal):
+    w = world
+    assert _navigation(w)["canManageTeamMembers"]
+    if withdrawal == "binding":
+        w.actor_binding.soft_delete()
+    elif withdrawal == "member":
+        w.actor_member.is_active = False
+        w.actor_member.save()
+    elif withdrawal == "role":
+        w.manager.soft_delete()
+    elif withdrawal == "foreign-scope":
+        w.actor_binding.scope_id = w.foreign.pk
+        w.actor_binding.save()
+    else:
+        foreign = Role.objects.create(
+            organization=w.other_org,
+            name="Foreign navigation manager",
+            slug="navigation-foreign-manager",
+            scope_level="TEAM",
+            permissions=["team.read", "team.manage_members", "org.read", "org.manage_members"],
+        )
+        w.actor_binding.role = foreign
+        w.actor_binding.save()
+    assert _navigation(w) == NO_NAVIGATION
+
+
+@pytest.mark.parametrize("credential", ["read-only", "team-admin", "revoked", "withdrawn-member"])
+def test_navigation_actual_bearer_caps_are_not_account_grants(world, credential):
+    w = world
+    role = Role.objects.create(
+        organization=w.org,
+        name="Org navigation administrator",
+        slug="navigation-org-admin",
+        scope_level="ORG",
+        permissions=["org.read", "org.manage_members", "team.read", "team.manage_members"],
+    )
+    RoleBinding.objects.create(user=w.actor, role=role, scope_kind="ORG", scope_id=w.org.pk)
+    issued = mint_token()
+    token = ApiToken.objects.create(
+        user=w.actor,
+        organization=w.org,
+        team=w.team if credential == "team-admin" else None,
+        name="Navigation credential",
+        token_hash=issued.token_hash,
+        scopes=["read:apps"] if credential == "read-only" else ["admin"],
+    )
+    if credential == "revoked":
+        token.is_revoked = True
+        token.save()
+    elif credential == "withdrawn-member":
+        w.actor_member.is_active = False
+        w.actor_member.save()
+    if credential in ("revoked", "withdrawn-member"):
+        response = Client().post(
+            f"/{settings.BASE_URL}gql/config/",
+            data=json.dumps({"query": NAVIGATION}),
+            content_type="application/json",
+            HTTP_X_ASTROLIFT_ORGANIZATION=str(w.org.guid),
+            HTTP_AUTHORIZATION="Bearer " + issued.plaintext,
+            HTTP_X_PLATFORM="WEB",
+        )
+        assert response.status_code == 401
+        assert "teamAccessNavigation" not in response.json()
+    else:
+        result = http(w, NAVIGATION, client=Client(), bearer=issued.plaintext)
+        assert not result.get("errors"), result
+        expected = {
+            **NO_NAVIGATION,
+            "canViewTeams": True,
+            "canViewRoles": True,
+            "canViewPolicies": True,
+        }
+        if credential == "team-admin":
+            expected = {**NO_NAVIGATION, "canViewTeams": True, "canManageTeamMembers": True}
+        assert result["data"]["me"]["teamAccessNavigation"] == expected
+
+
+@pytest.mark.parametrize("organization", ["none", "unknown", "foreign"])
+def test_navigation_actual_http_missing_or_unadmitted_org_is_all_false(world, organization):
+    w = world
+    headers = {"HTTP_X_PLATFORM": "WEB"}
+    if organization == "none":
+        # Multiple live memberships prevent the existing single-org fallback.
+        Member.objects.create(user=w.actor, scope_kind="ORG", scope_id=w.other_org.pk)
+    if organization != "none":
+        headers["HTTP_X_ASTROLIFT_ORGANIZATION"] = (
+            str(uuid.uuid4()) if organization == "unknown" else str(w.other_org.guid)
+        )
+    response = w.client.post(
+        f"/{settings.BASE_URL}gql/config/",
+        data=json.dumps({"query": NAVIGATION}),
+        content_type="application/json",
+        **headers,
+    )
+    assert response.status_code == 200
+    result = response.json()
+    assert not result.get("errors"), result
+    assert result["data"]["me"]["teamAccessNavigation"] == NO_NAVIGATION
+
+
+def test_navigation_actual_http_anonymous_has_no_self_hints(world):
+    response = Client().post(
+        f"/{settings.BASE_URL}gql/config/",
+        data=json.dumps({"query": NAVIGATION}),
+        content_type="application/json",
+        HTTP_X_ASTROLIFT_ORGANIZATION=str(world.org.guid),
+        HTTP_X_PLATFORM="WEB",
+    )
+    assert response.status_code == 403
+    assert b"teamAccessNavigation" not in response.content
+
+
+@pytest.mark.parametrize("owner", ["current", "global", "foreign"])
+@pytest.mark.parametrize("principal", ["user", "group"])
+@pytest.mark.parametrize("level", ["ORG", "TEAM"])
+def test_role_owner_admits_only_current_or_global_user_and_group_sources(world, owner, principal, level):
+    w = world
+    input = command(w, reviewed(w))
+    w.actor_binding.soft_delete()
+    role = Role.objects.create(
+        organization={"current": w.org, "global": None, "foreign": w.other_org}[owner],
+        name="Navigation authority source",
+        slug="navigation-authority-source",
+        scope_level=level,
+        permissions=["team.read", "team.manage_members", "org.read", "org.manage_members"],
+    )
+    if principal == "group":
+        w.actor_member.idp_groups = ["navigation-operators"]
+        w.actor_member.save()
+    RoleBinding.objects.create(
+        user=w.actor if principal == "user" else None,
+        group_external_id="navigation-operators" if principal == "group" else "",
+        role=role,
+        scope_kind=level,
+        scope_id=w.org.pk if level == "ORG" else w.team.pk,
+    )
+    expected = (
+        NO_NAVIGATION
+        if owner == "foreign"
+        else {
+            **NO_NAVIGATION,
+            "canViewTeams": True,
+            "canManageTeamMembers": True,
+            "canViewPeople": level == "ORG",
+            "canViewRoles": level == "ORG",
+            "canViewPolicies": level == "ORG",
+            "canCheckAccess": level == "ORG",
+        }
+    )
+    nav = _navigation(w)
+    review = http(
+        w,
+        REVIEW,
+        {
+            "team": str(w.team.guid),
+            "person": str(w.member.guid),
+            "kind": "ADD",
+            "role": str(w.role.guid),
+        },
+    )
+    result = mutate(w, input)
+    if owner == "foreign":
+        assert not result["ok"]
+        assert review.get("errors") or review["data"]["astroliftTeamMembershipReview"] is None
+        assert result["errors"][0]["code"] == "PERMISSION_DENIED"
+        assert not TeamMembershipAction.objects.exists()
+        assert not Member.objects.filter(user=w.subject, scope_kind="TEAM", scope_id=w.team.pk).exists()
+        assert not RoleBinding.objects.filter(user=w.subject, scope_kind="TEAM", scope_id=w.team.pk).exists()
+    else:
+        assert not review.get("errors"), review
+        assert review["data"]["astroliftTeamMembershipReview"] is not None
+        assert result["ok"] and result["data"]["committed"]
+        assert TeamMembershipAction.objects.count() == 1
+    assert nav == expected

@@ -92,6 +92,11 @@
   response bytes and duration histograms to validated subscription UUIDs through
   operator-only metrics. Legacy snapshots remain supported without false
   attribution; per-app token and cost metrics remain unavailable.
+- Confine user and group role bindings to global or current-organization roles
+  before navigation, permission and reviewed membership decisions. Preserve the
+  self-readable team navigation contract and exact auxiliary module ordering;
+  withdrawn or foreign authority cannot enable hints or membership writes (#2273).
+
 - Make team and person membership tabs discoverable with paged selectors,
   explicit direct-grant review and original-request recovery in all eight
   locales. Keep team-only navigation scoped and retain the guarded legacy

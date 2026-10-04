@@ -307,6 +307,7 @@ class TestModulesPerRole:
             "agent_live_attach",
             "chat_studio_agent_runs",
             "agent_policy_enforcement",
+            "team_access",
         }
 
 

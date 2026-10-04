@@ -37,6 +37,13 @@ manager can see and manage bindings in that team and its covered descendants,
 without seeing sibling or organization bindings. Bulk revocation filters
 rows first and retains per-row refusal and result envelopes.
 
+User and group role bindings contribute authority only when the role definition
+belongs to the current organization or is installation/global (`organization`
+is null). A custom role owned by another organization cannot authorize a
+current-org binding, even if its permission values match. Current-org custom
+roles and global roles retain their existing scope, inheritance, expiry and
+credential checks; group role mappings use the same owner boundary.
+
 Organization-bound bearers retain the actor's real grants and their permission
 ceiling. Team-bound credentials cannot borrow broader organization authority,
 even from a platform operator. Named team/project/binding operations remain

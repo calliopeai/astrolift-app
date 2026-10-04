@@ -172,6 +172,8 @@ class MeType:
     id: str
     profile: UserProfileType | None
 
+    # Self-readable hints use admitted() and per-scope checks in navigation;
+    # no-tenant/no-grant must remain all-false, not a collection refusal.
     @strawberry.field
     def team_access_navigation(self, info: Info) -> TeamAccessNavigationType:
         """Fresh self-readable navigation hints, not exact-target approval."""

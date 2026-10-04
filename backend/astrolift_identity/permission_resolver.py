@@ -182,7 +182,11 @@ def _live_grants(tenant: TenantContext, scopes: Iterable[tuple[str, int]] | None
     principal = Q(user_id=tenant.actor_user_id)
     if groups:
         principal |= Q(user__isnull=True, group_external_id__in=sorted(groups))
-    qs = RoleBinding.objects.select_related("role").filter(principal, role__deleted_at__isnull=True)
+    qs = RoleBinding.objects.select_related("role").filter(
+        principal,
+        Q(role__organization_id=tenant.organization_id) | Q(role__organization__isnull=True),
+        role__deleted_at__isnull=True,
+    )
     if scope_list is not None:
         qs = qs.filter(_scope_filter(scope_list))
     out: list[Grant] = []
