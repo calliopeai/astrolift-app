@@ -19,6 +19,8 @@ from gcp.identity_acknowledgement import AcknowledgementReceipt, PolicyAcknowled
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
 
+    from google.api_core.gapic_v1.client_info import ClientInfo
+
 TIMEOUT = 10.0
 MAX_BYTES = 2 * 1024 * 1024
 MAX_RESOURCES = 65
@@ -363,16 +365,14 @@ class NativeGCPIdentity:
                 self._checkpoint(checkpoint)
             made: list[Any] = []
             try:
-                for client_type, transport_type, host, client_info in (
+                for transport_type, host, client_info in (
                     (
-                        resourcemanager_v3.ProjectsClient,
                         ProjectsGrpcTransport,
                         "cloudresourcemanager.googleapis.com",
                         PROJECT_INFO,
                     ),
-                    (iam_admin_v1.IAMClient, IAMGrpcTransport, "iam.googleapis.com", IAM_INFO),
+                    (IAMGrpcTransport, "iam.googleapis.com", IAM_INFO),
                     (
-                        aiplatform_v1beta1.EndpointServiceClient,
                         EndpointServiceGrpcTransport,
                         f"{self.context.region}-aiplatform.googleapis.com",
                         EP_INFO,
@@ -390,8 +390,16 @@ class NativeGCPIdentity:
                         transport._logged_channel = channel
                         transport._stubs.clear()
                         transport._wrapped_methods.clear()
-                        transport._prep_wrapped_messages(client_info)
-                        made.append(client_type(transport=transport))
+                        # Each supported generated base takes ClientInfo and
+                        # returns None, but leaves this private method untyped.
+                        prepare_messages: Callable[[ClientInfo], None] = transport._prep_wrapped_messages
+                        prepare_messages(client_info)
+                        if isinstance(transport, ProjectsGrpcTransport):
+                            made.append(resourcemanager_v3.ProjectsClient(transport=transport))
+                        elif isinstance(transport, IAMGrpcTransport):
+                            made.append(iam_admin_v1.IAMClient(transport=transport))
+                        else:
+                            made.append(aiplatform_v1beta1.EndpointServiceClient(transport=transport))
                     except Exception:
                         channel.close()
                         raise
