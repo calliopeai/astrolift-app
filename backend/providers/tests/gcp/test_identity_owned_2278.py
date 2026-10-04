@@ -144,7 +144,7 @@ class Wire(grpc.Channel):
                 assert typed.name == ROLE
                 response = self.role
             elif name == "GetEndpoint":
-                assert typed.name in (ENDPOINT, SECOND)
+                assert typed.name in self.policies and typed.name != CONTEXT.service_account_resource
                 response = vertex.Endpoint(name=typed.name)
             elif name == "GetIamPolicy":
                 assert typed.options.requested_policy_version == 3
@@ -524,3 +524,22 @@ def test_successful_write_with_unverified_readback_retains_pending_not_success(w
     with pytest.raises(NativeIdentityError, match="POLICY_READBACK_MISMATCH"):
         reconcile()
     assert wire.writes == 1 and state["ledger"].pending
+
+
+@pytest.mark.parametrize("endpoint_id", ["a", "named-endpoint-12", "a" * 63])
+def test_actual_v1beta1_letter_led_endpoint_ids_are_supported(world, endpoint_id):
+    wire, _state, reconcile = world
+    resource = ENDPOINT.rsplit("/", 1)[0] + "/" + endpoint_id
+    wire.policies[resource] = policy_pb2.Policy(version=3, etag=b"named")
+    result = reconcile([{"role": ROLE, "resource": resource}])
+    assert any(row.resource == resource for row in result.ledger.policies)
+    assert (ROLE, "serviceAccount:" + CONTEXT.email) in grants(wire.policies[resource])
+
+
+@pytest.mark.parametrize("endpoint_id", ["a" * 64, "named-", "UPPER", "../foreign", "0"])
+def test_invalid_native_endpoint_ids_refuse_before_effect(world, endpoint_id):
+    wire, _state, reconcile = world
+    resource = ENDPOINT.rsplit("/", 1)[0] + "/" + endpoint_id
+    with pytest.raises(NativeIdentityError, match="INVALID_ENDPOINT_RESOURCE"):
+        reconcile([{"role": ROLE, "resource": resource}])
+    assert not wire.calls

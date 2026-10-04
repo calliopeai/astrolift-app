@@ -29,6 +29,7 @@ _REGION = re.compile(r"[a-z]+(?:-[a-z0-9]+)+[0-9]\Z")
 _ACCOUNT = re.compile(r"[a-z][a-z0-9-]{4,28}[a-z0-9]\Z")
 _ROLE_ID = re.compile(r"[A-Za-z0-9_.]{1,64}\Z")
 _DIGEST = re.compile(r"[0-9a-f]{64}\Z")
+_ENDPOINT_ID = r"(?:[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?|[1-9][0-9]{0,19})"
 
 
 class NativeIdentityError(ValueError):
@@ -276,7 +277,7 @@ class NativeGCPIdentity:
         context = self.context
         if resource == context.service_account_resource:
             return resource
-        match = re.fullmatch(r"projects/([^/]+)/locations/([^/]+)/endpoints/([0-9]{1,20})", resource)
+        match = re.fullmatch(rf"projects/([^/]+)/locations/([^/]+)/endpoints/({_ENDPOINT_ID})", resource)
         if not match or match[1] not in (context.project_id, context.project_number) or match[2] != context.region:
             raise NativeIdentityError("INVALID_ENDPOINT_RESOURCE")
         return f"projects/{context.project_number}/locations/{context.region}/endpoints/{match[3]}"
