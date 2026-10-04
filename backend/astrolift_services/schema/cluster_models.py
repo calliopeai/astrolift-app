@@ -108,7 +108,7 @@ def _search(rows, search, fields):
     return rows.filter(predicate)
 
 
-def _environment_rows(permission):
+def _environment_rows(permission, *, approvals=0):
     owners = live_app_owners(
         RegisteredApp.objects.filter(
             organization_id=current_org_id(),
@@ -121,7 +121,97 @@ def _environment_rows(permission):
     ).select_related("registered_app__organization", "tenant_cluster")
     if permission == Permission.APP_UPDATE:
         rows = rows.exclude(registered_app__provisioning_status__in=("tearing_down", "deregistered"))
+    if approvals:
+        from django.db.models import IntegerField, Value
+
+        rows = rows.annotate(_model_connection_approvals=Value(approvals, output_field=IntegerField()))
+        return visible_operation_rows(
+            rows, permission, environment_path="self", approvals_field="_model_connection_approvals"
+        )
     return visible_operation_rows(rows, permission, environment_path="self")
+
+
+def _subscription_targets_page(service, rows, *, search, page, page_size, projection=None):
+    from astrolift_services.model_subscriptions import LONG_RUNNING_KINDS
+
+    workloads = Workload.objects.filter(registered_app_id=OuterRef("registered_app_id"))
+    rows = rows.annotate(
+        _has_workloads=Exists(workloads),
+        _unsupported_workloads=Exists(workloads.exclude(kind__in=LONG_RUNNING_KINDS)),
+    )
+    if service is None:
+        rows = rows.none()
+    admitted = bool(
+        service
+        and (service.config or {}).get("allow_subscriptions") is True
+        and service.status in ("active", "updating")
+        and service.backend_ref
+        and service.applied_config is not None
+    )
+    if service is not None:
+        admitted = (
+            admitted
+            and available_model_clusters(
+                TenantCluster.objects.filter(
+                    Q(organization_id=current_org_id()) | Q(organization_id__isnull=True),
+                    pk=service.tenant_cluster_id,
+                ),
+                current_org_id(),
+            ).exists()
+        )
+        decision = cluster_model_to_type(service)
+        admitted = (
+            admitted
+            and decision.runtime_supported is True
+            and decision.ready is True
+            and service.status == "active"
+        )
+
+    def project(env):
+        from _sdk.k8s_naming import app_namespace
+
+        from core.app_deploy import namespace_for_environment
+
+        canonical_namespace = app_namespace(
+            organization_slug=env.registered_app.organization.slug, app_slug=env.registered_app.slug
+        )
+        supported_namespace = namespace_for_environment(env) == canonical_namespace
+        supported_workloads = env._has_workloads and not env._unsupported_workloads
+        eligible = (
+            admitted
+            and service.tenant_cluster_id == env.tenant_cluster_id
+            and allows_app(service, env.registered_app)
+            and supported_namespace
+            and supported_workloads
+        )
+        return ModelSubscriptionTargetType(
+            environment_id=GUID(str(env.guid)),
+            environment_version=env.version,
+            app_id=GUID(str(env.registered_app.guid)),
+            app_slug=env.registered_app.slug,
+            app_name=env.registered_app.name,
+            environment_name=env.name,
+            cluster_id=GUID(str(env.tenant_cluster.guid)),
+            eligible=eligible,
+            reason=None
+            if eligible
+            else (
+                "Custom or preview namespaces are not supported for shared model subscriptions."
+                if not supported_namespace
+                else (
+                    "Shared model subscriptions require existing long-running Deployment or StatefulSet workloads."
+                    if not supported_workloads
+                    else "Environment and model placement or subscription admission is unavailable."
+                )
+            ),
+        )
+
+    return _page(
+        _search(rows, search, ("name", "registered_app__slug", "registered_app__name")),
+        page=page,
+        page_size=page_size,
+        projection=(lambda env: projection(env, project(env))) if projection else project,
+    )
 
 
 @strawberry.type(name="ModelPlacementCluster")
@@ -406,85 +496,8 @@ class ClusterModelsQuery:
     ) -> PageType[ModelSubscriptionTargetType]:
         check_permission(Permission.ORG_READ, scope=cluster_model_org_scope(Permission.ORG_READ)({}))
         service = live_cluster_model_by_guid(model_deployment_id) if in_current_org(organization_id) else None
-        from astrolift_services.model_subscriptions import LONG_RUNNING_KINDS
-
-        workloads = Workload.objects.filter(registered_app_id=OuterRef("registered_app_id"))
-        rows = _environment_rows(Permission.APP_UPDATE).annotate(
-            _has_workloads=Exists(workloads),
-            _unsupported_workloads=Exists(workloads.exclude(kind__in=LONG_RUNNING_KINDS)),
-        )
-        if service is None:
-            rows = rows.none()
-        admitted = bool(
-            service
-            and (service.config or {}).get("allow_subscriptions") is True
-            and service.status in ("active", "updating")
-            and service.backend_ref
-            and service.applied_config is not None
-        )
-        if service is not None:
-            admitted = (
-                admitted
-                and available_model_clusters(
-                    TenantCluster.objects.filter(
-                        Q(organization_id=current_org_id()) | Q(organization_id__isnull=True),
-                        pk=service.tenant_cluster_id,
-                    ),
-                    current_org_id(),
-                ).exists()
-            )
-            decision = cluster_model_to_type(service)
-            admitted = (
-                admitted
-                and decision.runtime_supported is True
-                and decision.ready is True
-                and service.status == "active"
-            )
-
-        def project(env):
-            from _sdk.k8s_naming import app_namespace
-
-            from core.app_deploy import namespace_for_environment
-
-            canonical_namespace = app_namespace(
-                organization_slug=env.registered_app.organization.slug, app_slug=env.registered_app.slug
-            )
-            supported_namespace = namespace_for_environment(env) == canonical_namespace
-            supported_workloads = env._has_workloads and not env._unsupported_workloads
-            eligible = (
-                admitted
-                and service.tenant_cluster_id == env.tenant_cluster_id
-                and allows_app(service, env.registered_app)
-                and supported_namespace
-                and supported_workloads
-            )
-            return ModelSubscriptionTargetType(
-                environment_id=GUID(str(env.guid)),
-                environment_version=env.version,
-                app_id=GUID(str(env.registered_app.guid)),
-                app_slug=env.registered_app.slug,
-                app_name=env.registered_app.name,
-                environment_name=env.name,
-                cluster_id=GUID(str(env.tenant_cluster.guid)),
-                eligible=eligible,
-                reason=None
-                if eligible
-                else (
-                    "Custom or preview namespaces are not supported for shared model subscriptions."
-                    if not supported_namespace
-                    else (
-                        "Shared model subscriptions require existing long-running Deployment or StatefulSet workloads."
-                        if not supported_workloads
-                        else "Environment and model placement or subscription admission is unavailable."
-                    )
-                ),
-            )
-
-        return _page(
-            _search(rows, search, ("name", "registered_app__slug", "registered_app__name")),
-            page=page,
-            page_size=page_size,
-            projection=project,
+        return _subscription_targets_page(
+            service, _environment_rows(Permission.APP_UPDATE), search=search, page=page, page_size=page_size
         )
 
     @strawberry.field

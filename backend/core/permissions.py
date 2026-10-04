@@ -692,6 +692,7 @@ def require_permission(
     scope: Callable[[dict[str, Any]], PermissionScope | None] | None = None,
     any_scope: bool = False,
     operation: Callable[[dict[str, Any]], Iterable[OperationContext]] | None = None,
+    approval_request: bool = False,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
     """Resolver-entry permission gate.
 
@@ -719,6 +720,11 @@ def require_permission(
     It is deliberately weaker than the scoped check, so a resolver using
     it MUST filter its rows down to the caller's granted scopes; see
     ``check_permission_any_scope``. Mutually exclusive with ``scope``.
+
+    ``approval_request=True`` is a trusted pending-request admission seam: only
+    well-formed unsatisfied ALLOW approval conditions may defer. It never supplies
+    approval counts and is removed before the resolver/effect runs. Ordinary
+    gates retain the default false value.
 
     The check raises :class:`PermissionDenied`; mutation wrappers
     (``@mutation_audit``) translate that into the ``MutationResult``
@@ -762,7 +768,7 @@ def require_permission(
                 if memo is not None:
                     _scopes_memo.reset(memo)
 
-        def check(args, kwargs) -> None:
+        def check_bound(args, kwargs) -> None:
             if any_scope:
                 for perm in permissions:
                     check_permission_any_scope(perm)
@@ -774,6 +780,13 @@ def require_permission(
                 target_scope = scope(bound.arguments)
             for perm in permissions:
                 check_permission(perm, scope=target_scope)
+
+        def check(args, kwargs) -> None:
+            from astrolift_identity.abac import operation_attributes
+
+            # Request admission may defer quorum; the resolver/effect never inherits it.
+            with operation_attributes(approval_request=approval_request):
+                check_bound(args, kwargs)
 
         def operation_contexts(args, kwargs):
             contexts = (None,)

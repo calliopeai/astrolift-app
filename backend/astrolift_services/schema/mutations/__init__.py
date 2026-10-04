@@ -7,6 +7,7 @@ import strawberry
 from astrolift_services.schema.cluster_model_mutations import ClusterModelMutations
 from astrolift_services.schema.hf_connections import HuggingFaceConnectionsMutation
 from astrolift_services.schema.local_model_artifacts import ModelArtifactsMutation
+from astrolift_services.schema.model_connections import ModelConnectionsMutation
 from astrolift_services.schema.model_runtime_settings import ModelRuntimeSettingsMutation
 from astrolift_services.schema.mutations.bundles import SecretBundleMutations
 from astrolift_services.schema.mutations.email import EmailServiceMutations
@@ -81,6 +82,7 @@ from astrolift_services.schema.mutations.types import (  # noqa: F401
 @strawberry.type
 class ServicesMutation(
     ClusterModelMutations,
+    ModelConnectionsMutation,
     HuggingFaceConnectionsMutation,
     ModelArtifactsMutation,
     ModelRuntimeSettingsMutation,
