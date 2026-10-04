@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep accepted installation feature changes read-only when a refresh returns malformed inventory or cache updates fail; recover through fresh inventory and viewer reads without resending the write (#2281).
+
 - Stage private receipt-bound GKE controller and ancillary configuration with protected physical ownership, committed send/evidence history, guarded UID/resourceVersion updates and bounded definitive rejection recovery. Keep uncertain sends unresolved and distinguish configuration from rollout; public activation, complete removals, node-pool runtime admission and identity evolution remain separate (#2278).
 - Scope private native execution checkpoints to the actual activity lifetime and cancellation; re-admit callbacks on SDK metadata threads and final source transitions, preserve acknowledged UID evidence after withdrawal, and avoid receipt-lock waits beneath source parents. Full native pipeline activation remains staged (#2278).
 

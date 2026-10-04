@@ -3,7 +3,7 @@ import { ApolloProvider } from "@apollo/client/react";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import en from "@/messages/en.json";
 import { GET_ME } from "@/graphql/user/user.queries";
@@ -99,6 +99,114 @@ const normalRead = (op: string, enabled = false) =>
   op === "Me" ? { data: { me: viewer() } } : inventory(enabled);
 
 describe("feature flag write and read outcomes over actual HttpLink", () => {
+  it.each(["null flag", "null build feature"])(
+    "keeps recovery read-only for a fresh %s inventory",
+    async (kind) => {
+      let written = false;
+      const h = mount((op) =>
+        op === "SetFeatureFlag"
+          ? ((written = true), accepted())
+          : written && op === "AdminFeatureInventory"
+            ? {
+                data: {
+                  astroliftServerInfo: {
+                    featureFlags: kind === "null flag" ? [null] : [{ ...flag, enabled: true }],
+                    buildTimeFeatures: kind === "null build feature" ? [null] : [],
+                  },
+                },
+              }
+            : normalRead(op, written)
+      );
+      await click();
+      await waitFor(() =>
+        expect(screen.getByLabelText("read error")).toHaveTextContent("Could not refresh")
+      );
+      expect(screen.getByLabelText("recovery")).toHaveTextContent("accepted");
+      expect(screen.getByLabelText("current value")).toHaveTextContent("true");
+      expect(screen.getByRole("button", { name: "Enable models" })).toBeDisabled();
+      expect(h.writes).toHaveLength(1);
+      h.client.stop();
+    }
+  );
+
+  it("retains accepted recovery when invalidating a changed viewer cache throws", async () => {
+    const h = mount((op) =>
+      op === "SetFeatureFlag" ? accepted() : op === "Me" ? { data: { me: null } } : normalRead(op)
+    );
+    const writeQuery = h.client.writeQuery.bind(h.client);
+    vi.spyOn(h.client, "writeQuery").mockImplementation((options) => {
+      if (options.query === GET_ME && (options.data as { me?: unknown } | undefined)?.me === null)
+        throw new Error("Cache invalidation unavailable");
+      return writeQuery(options);
+    });
+    await click();
+    await waitFor(() =>
+      expect(screen.getByLabelText("read error")).toHaveTextContent("viewer changed")
+    );
+    expect(screen.getByLabelText("recovery")).toHaveTextContent("accepted");
+    expect(screen.getByRole("button", { name: "Enable models" })).toBeDisabled();
+    expect(h.writes).toHaveLength(1);
+    h.client.stop();
+  });
+
+  it("resolves an uncertain reply from the fresh opposite current state without resending", async () => {
+    const h = mount((op) => {
+      if (op === "SetFeatureFlag") throw new Error("Reply unavailable");
+      return normalRead(op, false);
+    });
+    await click();
+    await waitFor(() => expect(screen.getByLabelText("recovery")).toHaveTextContent("uncertain"));
+    fireEvent.click(screen.getByRole("button", { name: "Read again" }));
+    await waitFor(() => expect(screen.getByLabelText("recovery")).toHaveTextContent("none"));
+    expect(screen.getByLabelText("current value")).toHaveTextContent("false");
+    expect(screen.getByRole("button", { name: "Enable models" })).toBeEnabled();
+    expect(h.writes).toHaveLength(1);
+    h.client.stop();
+  });
+
+  it("retains accepted state across a navigation cache failure and recovers through reads only", async () => {
+    let written = false;
+    const h = mount((op) =>
+      op === "SetFeatureFlag" ? ((written = true), accepted()) : normalRead(op, written)
+    );
+    const original = h.client.writeQuery.bind(h.client);
+    let fail = true;
+    vi.spyOn(h.client, "writeQuery").mockImplementation((options) => {
+      if (options.query === SERVER_INFO && fail) throw new Error("Cache write unavailable");
+      return original(options);
+    });
+    await click();
+    await waitFor(() =>
+      expect(screen.getByLabelText("read error")).toHaveTextContent("Could not refresh")
+    );
+    expect(screen.getByLabelText("recovery")).toHaveTextContent("accepted");
+    expect(screen.getByLabelText("current value")).toHaveTextContent("true");
+    expect(screen.getByRole("button", { name: "Enable models" })).toBeDisabled();
+    fail = false;
+    fireEvent.click(screen.getByRole("button", { name: "Read again" }));
+    await waitFor(() => expect(screen.getByLabelText("recovery")).toHaveTextContent("none"));
+    expect(h.writes).toHaveLength(1);
+    h.client.stop();
+  });
+
+  it("contains synchronous refresh failures without reverting the accepted write", async () => {
+    const h = mount((op) => (op === "SetFeatureFlag" ? accepted() : normalRead(op)));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Enable models" })).toBeEnabled()
+    );
+    vi.spyOn(h.client, "query").mockImplementation(() => {
+      throw new Error("Read setup unavailable");
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enable models" }));
+    await waitFor(() =>
+      expect(screen.getByLabelText("read error")).toHaveTextContent("Could not refresh")
+    );
+    expect(screen.getByLabelText("recovery")).toHaveTextContent("accepted");
+    expect(screen.getByRole("button", { name: "Enable models" })).toBeDisabled();
+    expect(h.writes).toHaveLength(1);
+    h.client.stop();
+  });
+
   it("keeps exact accepted state and closes confirmation when inventory refresh fails", async () => {
     let written = false;
     const h = mount(
@@ -278,6 +386,11 @@ describe("feature flag write and read outcomes over actual HttpLink", () => {
     );
     await click();
     await waitFor(() => expect(h.operations).toContain("AstroliftServerInfo"));
+    const original = h.client.writeQuery.bind(h.client);
+    const cacheWrite = vi.spyOn(h.client, "writeQuery").mockImplementation((options) => {
+      if (options.query === SERVER_INFO) throw new Error("Stale cache write must not run");
+      return original(options);
+    });
     await act(async () => h.client.writeQuery({ query: GET_ME, data: { me: viewer("viewer-b") } }));
     written = false;
     await act(async () => h.client.writeQuery({ query: GET_ME, data: { me: viewer() } }));
@@ -285,6 +398,7 @@ describe("feature flag write and read outcomes over actual HttpLink", () => {
     await act(async () => held.resolve(inventory(true)));
     expect(screen.getByLabelText("current value")).toHaveTextContent("false");
     expect(h.client.readQuery({ query: SERVER_INFO })).toBeNull();
+    expect(cacheWrite.mock.calls.some(([options]) => options.query === SERVER_INFO)).toBe(false);
     expect(screen.getByRole("button", { name: "Enable models" })).toBeEnabled();
     h.client.stop();
   });
