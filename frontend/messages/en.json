@@ -6028,6 +6028,12 @@
         "connectionUncertain": "The connection reply was not confirmed. Inspect current connections and deployment state before trying again.",
         "connectionRecorded": "A subscription is recorded for this request. Inspect its current reconciliation and readiness.",
         "acceptedUnverified": "The write was accepted, but its returned target metadata could not be verified. Read the current state before another action."
+      },
+      "storedControls": {
+        "keepStored": "Keep the stored value",
+        "storedValue": "Stored value: {value}",
+        "notRecorded": "Not recorded",
+        "preserveHelp": "Leaving a control blank preserves its stored value. Changes require current runtime admission and a model restart; saving does not prove readiness."
       }
     }
   },

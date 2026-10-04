@@ -5948,6 +5948,12 @@
         "connectionUncertain": "未能确认连接响应。重试前，请检查当前连接和部署状态。",
         "connectionRecorded": "此请求已记录订阅。请检查其当前协调和就绪状态。",
         "acceptedUnverified": "写入已受理，但无法验证返回的目标元数据。执行其他操作前，请读取当前状态。"
+      },
+      "storedControls": {
+        "keepStored": "保留已存储的值",
+        "storedValue": "已存储的值：{value}",
+        "notRecorded": "未记录",
+        "preserveHelp": "将控件留空会保留其已存储的值。更改需要通过当前运行时的准入检查并重启模型；保存并不能证明模型已就绪。"
       }
     }
   },

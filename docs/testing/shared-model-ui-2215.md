@@ -180,3 +180,15 @@ live approval, model inference, hardware fit or notification delivery. The exist
 Next route fixture now follows the separate Add connection and connection-list
 states with actual AUTO decision reads; production-route execution belongs to the
 composed build gate.
+
+## Stored runtime settings controls
+
+The additional settings tests read real desired/applied DTO fields through a
+schema-validated HttpLink before editing dtype, context length and concurrency.
+They prove all-eight-locale reviewed inputs, immutable-source omission, unknown
+and absent metadata preservation, exact admission/update agreement, raw refusal,
+accepted feedback after a failed refresh, bounded values, runtime/hosting denial,
+review ABA and a newer desired version replacing the draft. Portable settings
+stories and SSR hydration checks cover literal unknown values and label/input
+identity. These remain fixture transport and recorded configuration checks; they
+do not launch a model or establish hardware fit or rollout readiness.

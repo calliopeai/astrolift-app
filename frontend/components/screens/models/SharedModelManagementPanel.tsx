@@ -62,6 +62,8 @@ function ManagementPanel(props: SharedModelManagementPanelProps) {
   const t = useTranslations("models.shared.management"),
     placement = useTranslations("models.shared.placement");
   const inventory = useTranslations("models.shared.inventory");
+  const runtime = useTranslations("models.shared.runtimeSetup"),
+    stored = useTranslations("models.shared.storedControls");
   const id = useId();
   const access = props.access ?? modelAccessDraft(model);
   const request = modelSettingsRequest(model, draft, access),
@@ -312,6 +314,54 @@ function ManagementPanel(props: SharedModelManagementPanelProps) {
             <p className="text-muted-foreground text-xs">{placement(`${field}Help`)}</p>
           </div>
         ))}
+        <div className="space-y-2">
+          <Label htmlFor={`${id}-dtype`}>{runtime("dtype")}</Label>
+          <select
+            id={`${id}-dtype`}
+            value={draft.dtype ?? ""}
+            disabled={!manageable}
+            onChange={(event) =>
+              onDraftChange("dtype", event.target.value as SharedModelDraft["dtype"])
+            }
+          >
+            <option value="">{stored("keepStored")}</option>
+            {(["AUTO", "FLOAT16", "BFLOAT16", "FLOAT32"] as const).map((value) => (
+              <option key={value} value={value}>
+                {value.toLowerCase()}
+              </option>
+            ))}
+          </select>
+          <p className="text-muted-foreground text-xs">
+            {stored("storedValue", {
+              value: model.desiredResources.dtype ?? stored("notRecorded"),
+            })}
+          </p>
+        </div>
+        {(["maxModelLen", "maxNumSeqs"] as const).map((field) => (
+          <div key={field} className="space-y-2">
+            <Label htmlFor={`${id}-${field}`}>{runtime(field)}</Label>
+            <Input
+              id={`${id}-${field}`}
+              type="number"
+              step={1}
+              min={field === "maxModelLen" ? 256 : 1}
+              max={field === "maxModelLen" ? 131072 : 4096}
+              placeholder={stored("keepStored")}
+              value={draft[field] ?? ""}
+              disabled={!manageable}
+              onChange={(event) => onDraftChange(field, event.target.value)}
+            />
+            <p className="text-muted-foreground text-xs">
+              {stored("storedValue", {
+                value:
+                  model.desiredResources[field] == null
+                    ? stored("notRecorded")
+                    : String(model.desiredResources[field]),
+              })}
+            </p>
+          </div>
+        ))}
+        <p className="text-muted-foreground text-sm sm:col-span-2">{stored("preserveHelp")}</p>
         <Label className="flex items-center gap-2 sm:col-span-2">
           <input
             type="checkbox"
@@ -427,6 +477,18 @@ function ManagementPanel(props: SharedModelManagementPanelProps) {
                       ? placement("notRequested")
                       : `${review.input.cpuKvCacheGiB} GiB`,
                 })}
+              </span>
+            )}
+            {review?.kind === "update" && (
+              <span className="block">
+                {(["dtype", "maxModelLen", "maxNumSeqs"] as const).map((field) => (
+                  <span key={field} className="block">
+                    {runtime(field)}:{" "}
+                    {review.input[field] == null
+                      ? stored("keepStored")
+                      : String(review.input[field])}
+                  </span>
+                ))}
               </span>
             )}
             <span className="block">

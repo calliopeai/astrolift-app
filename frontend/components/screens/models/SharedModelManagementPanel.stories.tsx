@@ -99,3 +99,70 @@ export const DedicatedAccess: Story = {
     onSelectDedicatedApp: () => {},
   },
 };
+
+const storedModel = {
+  ...sharedModelManagementProps.model,
+  desiredResources: {
+    ...sharedModelManagementProps.model.desiredResources,
+    dtype: "float32",
+    maxModelLen: 512,
+    maxNumSeqs: 1,
+  },
+  appliedResources: {
+    ...sharedModelManagementProps.model.desiredResources,
+    dtype: "bfloat16",
+    maxModelLen: 2048,
+    maxNumSeqs: 8,
+  },
+};
+export const StoredRuntimeControls: Story = {
+  args: {
+    model: storedModel,
+    draft: {
+      ...sharedModelManagementProps.draft,
+      dtype: "FLOAT32",
+      maxModelLen: "512",
+      maxNumSeqs: "1",
+    },
+    admission: {
+      ...sharedModelManagementProps.admission!,
+      requestKey: JSON.stringify(
+        modelSettingsRequest(storedModel, {
+          ...sharedModelManagementProps.draft,
+          dtype: "FLOAT32",
+          maxModelLen: "512",
+          maxNumSeqs: "1",
+        })
+      ),
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByLabelText("Model data type")).toHaveValue("FLOAT32");
+    await expect(canvas.getByLabelText("Model context length")).toHaveValue(512);
+    await expect(canvas.getByLabelText("Concurrent sequences")).toHaveValue(1);
+    await userEvent.click(canvas.getByRole("button", { name: "Review resource update" }));
+    await expect(
+      within(canvasElement.ownerDocument.body).getByRole("alertdialog")
+    ).toHaveTextContent("FLOAT32");
+  },
+};
+export const UnknownStoredRuntimeControls: Story = {
+  args: {
+    model: {
+      ...sharedModelManagementProps.model,
+      desiredResources: {
+        ...sharedModelManagementProps.model.desiredResources,
+        dtype: "vendor_future_dtype",
+        maxModelLen: null,
+        maxNumSeqs: null,
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByLabelText("Model data type")).toHaveValue("");
+    await expect(canvas.getByText(/vendor_future_dtype/)).toBeVisible();
+    await expect(canvas.getByLabelText("Model context length")).toHaveValue(null);
+  },
+};

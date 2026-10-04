@@ -5948,6 +5948,12 @@
         "connectionUncertain": "Não foi possível confirmar a resposta da conexão. Verifique as conexões atuais e o estado da implantação antes de tentar novamente.",
         "connectionRecorded": "Uma assinatura foi registrada para esta solicitação. Verifique o estado atual da reconciliação e da prontidão.",
         "acceptedUnverified": "A gravação foi aceita, mas não foi possível verificar os metadados do destino retornados. Leia o estado atual antes de outra ação."
+      },
+      "storedControls": {
+        "keepStored": "Manter o valor salvo",
+        "storedValue": "Valor salvo: {value}",
+        "notRecorded": "Não registrado",
+        "preserveHelp": "Deixar um campo em branco preserva seu valor salvo. As alterações exigem a admissão atual do ambiente de execução e a reinicialização do modelo; salvar não comprova que ele está pronto."
       }
     }
   },

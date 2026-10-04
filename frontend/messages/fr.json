@@ -5951,6 +5951,12 @@
         "connectionUncertain": "La réponse de connexion n’a pas été confirmée. Consultez les connexions actuelles et l’état du déploiement avant de réessayer.",
         "connectionRecorded": "Un abonnement est enregistré pour cette demande. Consultez son état actuel de réconciliation et de disponibilité.",
         "acceptedUnverified": "L’écriture a été acceptée, mais les métadonnées de destination renvoyées n’ont pas pu être vérifiées. Consultez l’état actuel avant une autre action."
+      },
+      "storedControls": {
+        "keepStored": "Conserver la valeur enregistrée",
+        "storedValue": "Valeur enregistrée : {value}",
+        "notRecorded": "Non enregistré",
+        "preserveHelp": "Laisser un champ vide conserve sa valeur enregistrée. Les modifications nécessitent une nouvelle validation du runtime et un redémarrage du modèle ; l’enregistrement ne confirme pas que le modèle est prêt."
       }
     }
   },

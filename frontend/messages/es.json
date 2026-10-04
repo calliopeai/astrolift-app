@@ -5951,6 +5951,12 @@
         "connectionUncertain": "No se pudo confirmar la respuesta de conexión. Consulta las conexiones actuales y el estado del despliegue antes de volver a intentarlo.",
         "connectionRecorded": "Hay una suscripción registrada para esta solicitud. Consulta su reconciliación y estado de preparación actuales.",
         "acceptedUnverified": "La escritura se aceptó, pero no se pudieron verificar los metadatos del destino devueltos. Consulta el estado actual antes de otra acción."
+      },
+      "storedControls": {
+        "keepStored": "Conservar el valor guardado",
+        "storedValue": "Valor guardado: {value}",
+        "notRecorded": "No registrado",
+        "preserveHelp": "Dejar un control en blanco conserva su valor guardado. Los cambios requieren la admisión actual del entorno de ejecución y reiniciar el modelo; guardar no confirma que esté listo."
       }
     }
   },

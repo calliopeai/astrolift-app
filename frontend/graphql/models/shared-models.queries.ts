@@ -41,6 +41,9 @@ export const CLUSTER_MODEL_FIELDS = gql`
       gpuCount
       replicas
       cpuKvCacheGiB
+      dtype
+      maxModelLen
+      maxNumSeqs
     }
     appliedResources {
       cpuRequest
@@ -48,6 +51,9 @@ export const CLUSTER_MODEL_FIELDS = gql`
       gpuCount
       replicas
       cpuKvCacheGiB
+      dtype
+      maxModelLen
+      maxNumSeqs
     }
   }
 `;

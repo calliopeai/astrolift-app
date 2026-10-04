@@ -284,3 +284,23 @@ clusters without a verified mapping to that organization's node pool.
 - [Hugging Face Hub API](https://huggingface.co/docs/huggingface_hub/en/package_reference/hf_api)
 - [vLLM CPU installation](https://docs.vllm.ai/en/latest/getting_started/installation/cpu/)
 - [vLLM production metrics](https://docs.vllm.ai/en/latest/usage/metrics/)
+
+## Editing stored runtime controls
+
+The hosted model's Settings form initializes data type, context length and
+concurrent sequences from its recorded **desired** resources. Last-applied
+resources are read separately and do not overwrite the edit draft. A missing
+record is not a guessed runtime default; an unknown recorded data type is shown
+literally. Leaving a control blank sends the existing nullable preserve input,
+including when clearing a previously populated field; it does not reset the
+stored value to a new declaration's default.
+
+An explicit edit is included in current version/cluster/provider runtime
+admission, the confirmation fingerprint and the existing model update. Context
+length remains bounded to 256–131072 and concurrent sequences to 1–4096; the
+selected runtime may impose stricter limits or reject a data type. The server
+retains immutable local-artifact or Hugging Face source and other omitted advanced
+settings. Changing the target/version or admission invalidates an old review;
+new desired metadata replaces the draft only for the newly observed version.
+Accepted updates remain pending reconciliation and a model restart, not live
+readiness or hardware-fit proof. Existing superadmin and bearer admission apply.

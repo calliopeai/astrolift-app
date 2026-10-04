@@ -23,6 +23,26 @@ export function modelAccessDraft(model: ClusterModelFieldsFragment): ModelAccess
         : null,
   };
 }
+export function modelSettingsDraft(model: ClusterModelFieldsFragment): SharedModelDraft {
+  const resources = model.desiredResources;
+  const dtype = resources.dtype?.toUpperCase();
+  return {
+    name: model.name,
+    computeMode:
+      model.computeMode === "cpu" || model.computeMode === "gpu" ? model.computeMode : "",
+    cpuRequest: resources.cpuRequest ?? "",
+    memoryRequest: resources.memoryRequest ?? "",
+    gpuCount: resources.gpuCount == null ? "" : String(resources.gpuCount),
+    cpuKvCacheGiB: resources.cpuKvCacheGiB == null ? "" : String(resources.cpuKvCacheGiB),
+    allowSubscriptions: model.subscriptionsEnabled,
+    dtype:
+      dtype === "AUTO" || dtype === "FLOAT16" || dtype === "BFLOAT16" || dtype === "FLOAT32"
+        ? dtype
+        : "",
+    maxModelLen: resources.maxModelLen == null ? "" : String(resources.maxModelLen),
+    maxNumSeqs: resources.maxNumSeqs == null ? "" : String(resources.maxNumSeqs),
+  };
+}
 /** The server derives the stored immutable source; this request carries no repo, token or artifact URL. */
 export function modelSettingsRequest(
   model: ClusterModelFieldsFragment,
@@ -52,6 +72,13 @@ export function modelSettingsRequest(
       (!access.app?.id || !Number.isSafeInteger(access.app.version) || access.app.version < 1))
   )
     return null;
+  for (const [raw, low, high] of [
+    [value.maxModelLen, 256, 131072],
+    [value.maxNumSeqs, 1, 4096],
+  ] as const) {
+    if (raw && (!Number.isSafeInteger(Number(raw)) || Number(raw) < low || Number(raw) > high))
+      return null;
+  }
   return {
     organizationId: model.organizationId,
     id: model.id,
@@ -64,9 +91,9 @@ export function modelSettingsRequest(
     gpuCount,
     cpuKvCacheGiB: cache,
     allowSubscriptions: value.allowSubscriptions,
-    dtype: null,
-    maxModelLen: null,
-    maxNumSeqs: null,
+    dtype: value.dtype || null,
+    maxModelLen: value.maxModelLen ? Number(value.maxModelLen) : null,
+    maxNumSeqs: value.maxNumSeqs ? Number(value.maxNumSeqs) : null,
     sharingMode: access.mode,
     dedicatedAppId: access.mode === "DEDICATED" ? access.app!.id : null,
     ifMatchDedicatedAppVersion: access.mode === "DEDICATED" ? access.app!.version : null,

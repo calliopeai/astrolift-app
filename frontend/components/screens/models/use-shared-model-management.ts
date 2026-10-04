@@ -9,7 +9,11 @@ import { useMe } from "@/graphql/user/user.hooks";
 import { GET_MODEL_HOSTING_ACTION } from "@/graphql/models/hosting.queries";
 import { useLocalListState } from "@/components/list/use-list-state";
 import type { ListDefinition } from "@/components/list/list-state";
-import { modelAccessDraft, modelSettingsRequest } from "./shared-model-settings";
+import {
+  modelAccessDraft,
+  modelSettingsDraft,
+  modelSettingsRequest,
+} from "./shared-model-settings";
 import {
   GET_CLUSTER_MODEL_UPDATE_ADMISSION,
   LIST_MODEL_DEDICATED_APPS,
@@ -39,22 +43,6 @@ import type {
   ManagementResult,
 } from "./SharedModelManagementPanel";
 import { managementModelResult } from "./shared-model-write-results";
-function draftFor(model: ClusterModelFieldsFragment): SharedModelDraft {
-  return {
-    name: model.name,
-    computeMode:
-      model.computeMode === "cpu" || model.computeMode === "gpu" ? model.computeMode : "",
-    cpuRequest: model.desiredResources.cpuRequest ?? "",
-    memoryRequest: model.desiredResources.memoryRequest ?? "",
-    gpuCount:
-      model.desiredResources.gpuCount == null ? "" : String(model.desiredResources.gpuCount),
-    cpuKvCacheGiB:
-      model.desiredResources.cpuKvCacheGiB == null
-        ? ""
-        : String(model.desiredResources.cpuKvCacheGiB),
-    allowSubscriptions: model.subscriptionsEnabled,
-  };
-}
 export function useSharedModelManagement(
   model: ClusterModelFieldsFragment,
   blocked: boolean,
@@ -122,15 +110,15 @@ export function useSharedModelManagement(
   );
   const form = useForm<SharedModelDraft>({
     resolver: zodResolver(sharedModelDraftSchema),
-    defaultValues: draftFor(model),
+    defaultValues: modelSettingsDraft(model),
   });
   const values = useWatch({ control: form.control }),
-    draft: SharedModelDraft = { ...draftFor(model), ...values };
+    draft: SharedModelDraft = { ...modelSettingsDraft(model), ...values };
   const formVersion = useRef(model.version);
   useLayoutEffect(() => {
     if (formVersion.current !== model.version) {
       formVersion.current = model.version;
-      form.reset(draftFor(model));
+      form.reset(modelSettingsDraft(model));
     }
   }, [model, form]);
   const request = modelSettingsRequest(model, draft, access),
@@ -327,6 +315,15 @@ export function useSharedModelManagement(
             break;
           case "gpuCount":
             form.setValue("gpuCount", value);
+            break;
+          case "dtype":
+            form.setValue("dtype", value as SharedModelDraft["dtype"]);
+            break;
+          case "maxModelLen":
+            form.setValue("maxModelLen", value);
+            break;
+          case "maxNumSeqs":
+            form.setValue("maxNumSeqs", value);
             break;
           case "cpuKvCacheGiB":
             form.setValue("cpuKvCacheGiB", value);

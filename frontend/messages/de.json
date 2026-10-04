@@ -5951,6 +5951,12 @@
         "connectionUncertain": "Die Verbindungsantwort wurde nicht bestätigt. Prüfe die aktuellen Verbindungen und den Bereitstellungszustand vor einem weiteren Versuch.",
         "connectionRecorded": "Für diese Anfrage ist ein Abonnement erfasst. Prüfe den aktuellen Abgleichs- und Bereitschaftszustand.",
         "acceptedUnverified": "Der Schreibvorgang wurde angenommen, aber die zurückgegebenen Zielmetadaten konnten nicht überprüft werden. Lies den aktuellen Zustand vor einer weiteren Aktion."
+      },
+      "storedControls": {
+        "keepStored": "Gespeicherten Wert beibehalten",
+        "storedValue": "Gespeicherter Wert: {value}",
+        "notRecorded": "Nicht erfasst",
+        "preserveHelp": "Ein leeres Feld behält seinen gespeicherten Wert bei. Änderungen erfordern eine aktuelle Laufzeitfreigabe und einen Neustart des Modells; das Speichern bestätigt keine Betriebsbereitschaft."
       }
     }
   },

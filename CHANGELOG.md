@@ -10,6 +10,11 @@
   automatic model connection or subscription revocation effects after lock waits.
   Preserve withdrawn session tracking when refusing stale requests (#2270).
 
+- Edit a hosted model's stored data type, context length and concurrent sequences
+  through the existing versioned runtime admission and update. Show actual desired
+  values, preserve blank and unknown settings without invented defaults, and retain
+  immutable local/Hugging Face sources and accepted-pending feedback (#2269, #2270).
+
 - Add policy-aware hosted-model app connections, separate requester/reviewer
   queues and exact-version approval detail with an explicit approved-to-Connect
   step. Keep durable request-key recovery, neutral superadmin restriction overlays,
