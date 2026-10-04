@@ -5,11 +5,8 @@ import json
 from dataclasses import dataclass, replace
 from types import SimpleNamespace
 
-from django.contrib.auth import get_user, get_user_model
-from django.contrib.sessions.backends.db import SessionStore
-from django.contrib.sessions.models import Session
+from django.contrib.auth import get_user_model
 from django.db.models import Q
-from django.utils import timezone
 
 from astrolift_identity import abac
 from astrolift_identity.api_tokens import get_current_api_token, session_may_act_in
@@ -18,6 +15,7 @@ from astrolift_identity.permission_resolver import _candidate_scopes, decide
 from astrolift_registry.scopes import app_scope_by_guid
 from astrolift_services.models import ModelConnectionPolicy
 from core.current_credential import current_dispatch_credential
+from core.current_session import fresh_authenticated_session
 from core.permissions import Permission, PermissionDenied, _check_permission_decision
 from core.tenancy import get_current_tenant
 
@@ -40,17 +38,6 @@ def locked_organization():
     return org
 
 
-class _ReadOnlyAuthSession(SessionStore):
-    key_salt = SessionStore().key_salt
-
-    def cycle_key(self):
-        pass
-
-    def flush(self):
-        self._session_cache = {}
-        self._session_key = None
-
-
 def fresh_actor(info):
     tenant = get_current_tenant()
     request = getattr(info.context, "request", None)
@@ -65,26 +52,7 @@ def fresh_actor(info):
     ):
         raise PermissionDenied(Permission.APP_UPDATE, None, "authentication is unavailable")
     if get_current_api_token() is None:
-        key = getattr(getattr(request, "session", None), "session_key", None)
-        stored = (
-            Session.objects.filter(session_key=key, expire_date__gt=timezone.now()).first() if key else None
-        )
-        if stored is None:
-            raise PermissionDenied(Permission.APP_UPDATE, None, "current session is unavailable")
-        store = _ReadOnlyAuthSession(key)
-        # Supply the freshly decoded DB bag without using the request's cached auth/session.
-        store._session_cache = stored.get_decoded()
-        user = get_user(SimpleNamespace(session=store))
-        if not user.is_authenticated or user.pk != actor.pk or store.session_key != key:
-            raise PermissionDenied(Permission.APP_UPDATE, None, "current session is unavailable")
-        from astrolift_identity.models import AstroliftSession
-
-        if (
-            AstroliftSession.all_objects.filter(session_key=key)
-            .filter(Q(deleted_at__isnull=False) | Q(revoked_at__isnull=False))
-            .exists()
-        ):
-            raise PermissionDenied(Permission.APP_UPDATE, None, "current session is unavailable")
+        store = fresh_authenticated_session(request, actor_user_id=actor.pk, permission=Permission.APP_UPDATE)
         request._model_connection_auth_session = store
     else:
         request._model_connection_auth_session = {}

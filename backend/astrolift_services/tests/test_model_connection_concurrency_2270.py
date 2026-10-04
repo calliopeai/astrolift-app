@@ -598,3 +598,91 @@ def test_actual_http_org_policy_wait_reloads_persisted_authentication_facts(worl
         and not ManagedServiceAttachment.objects.exists()
         and queue == []
     )
+
+
+@pytest.mark.parametrize("operation", ["request", "approve"])
+@pytest.mark.parametrize("withdrawal", ["revoked", "expired", "deleted", "foreign_actor"])
+def test_actual_http_sidecar_withdrawal_after_lock_remains_withdrawn_after_response(
+    world, queue, client, monkeypatch, operation, withdrawal
+):
+    from datetime import timedelta
+
+    import astrolift_services.model_connection_requests as orchestration
+    from astrolift_identity.models import AstroliftSession
+    from astrolift_services.models import ModelConnectionApproval
+
+    settings(world)
+    if operation == "approve":
+        pending = create_request(world)
+        actor = reviewer(world, "sidecar-revalidation")
+        query = "mutation($input:DecideModelConnectionRequestInput!){approveModelConnectionRequest(input:$input){ok errors{code}}}"
+        variables = {"input": {"id": str(pending.guid), "ifMatchVersion": pending.version}}
+        field = "approveModelConnectionRequest"
+    else:
+        actor = world.user
+        query = "mutation($input:RequestModelConnectionInput!){requestModelConnection(input:$input){ok errors{code}}}"
+        variables = {"input": request_wire(world)}
+        field = "requestModelConnection"
+    client.force_login(actor)
+    headers = {"HTTP_X_ASTROLIFT_ORGANIZATION": str(world.org.guid), "HTTP_X_PLATFORM": "web"}
+    graphql_http(client, headers, "query{__typename}", {})
+    sidecar = AstroliftSession.objects.get(session_key=client.session.session_key)
+    assert sidecar.user_id == actor.pk and sidecar.revoked_at is None
+    results, errors, pids = [], [], []
+    entered = Event()
+    original = orchestration.locked_organization
+
+    def observed_lock():
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT pg_backend_pid()")
+            pids.append(cursor.fetchone()[0])
+        entered.set()
+        return original()
+
+    monkeypatch.setattr(orchestration, "locked_organization", observed_lock)
+
+    def worker():
+        close_old_connections()
+        try:
+            results.append(graphql_http(client, headers, query, variables))
+        except BaseException as exc:
+            errors.append(exc)
+        finally:
+            connection.close()
+
+    with transaction.atomic():
+        type(world.org).objects.select_for_update().get(pk=world.org.pk)
+        thread = Thread(target=worker, daemon=True)
+        thread.start()
+        assert entered.wait(10), errors
+        wait_for_actual_lock(pids[0])
+        value = timezone.now()
+        change = {
+            "revoked": {"revoked_at": value},
+            "expired": {"expires_at": value - timedelta(seconds=1)},
+            "deleted": {"deleted_at": value},
+            "foreign_actor": {"user_id": reviewer(world, "foreign-sidecar").pk},
+        }[withdrawal]
+        AstroliftSession.all_objects.filter(pk=sidecar.pk).update(**change)
+        expected = (
+            AstroliftSession.all_objects.filter(pk=sidecar.pk)
+            .values("user_id", "revoked_at", "expires_at", "deleted_at")
+            .get()
+        )
+    thread.join(15)
+    assert not thread.is_alive() and not errors, errors
+    assert results and not results[0].get("errors"), results
+    assert not results[0]["data"][field]["ok"], results
+    assert (
+        AstroliftSession.all_objects.filter(pk=sidecar.pk)
+        .values("user_id", "revoked_at", "expires_at", "deleted_at")
+        .get()
+        == expected
+    )
+    assert not ModelConnectionApproval.objects.exists()
+    if operation == "request":
+        assert not ModelConnectionRequest.objects.exists()
+    else:
+        pending.refresh_from_db()
+        assert pending.status == "pending"
+    assert not ManagedServiceAttachment.objects.exists() and queue == []

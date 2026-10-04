@@ -32,6 +32,10 @@
   permission-scoped API reads for request/error rates, accepted response bytes
   and p95 duration. Preserve measured zero and unavailable states; leave token
   counts and cost unsupported without an actual usage source (#2269).
+- Reuse persisted browser-session admission for model connection requests and
+  reviews; preserve revoked, expired, deleted or foreign-actor session tracking
+  after a waiting request is refused (#2270).
+
 - Govern app connections to hosted models with organization defaults, tighter
   model restrictions and version-bound approval requests. Keep approved requests
   separate from current-owner Connect and reconciliation; recheck scoped authority
