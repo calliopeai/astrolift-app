@@ -207,7 +207,10 @@ class MeType:
 
         Models additionally uses current account/membership and bearer checks:
         view needs ORG_READ at the actual ORG or a live credential-visible app
-        with APP_READ; create/manage/run need CLUSTER_UPDATE at that ORG.
+        with APP_READ; create/manage require fresh installation-superadmin hosting
+        admission, including current bearer/session and ORG_UPDATE/CLUSTER_UPDATE.
+        Run retains CLUSTER_UPDATE for the shared prompt surface; legacy app
+        prompts and subscriptions retain their separate exact app gates.
         Descendant grants and the selected team cannot supply owner authority.
         """
         from astrolift_identity.model_entitlements import models_entitlement

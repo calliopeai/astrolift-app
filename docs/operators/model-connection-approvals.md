@@ -6,6 +6,16 @@ connect an already admitted, ready model through their current `app.update` gran
 Organization policy administration uses current `org.update` in the selected
 organization; an app owner cannot change that policy or a model restriction.
 
+The Models navigation manifest advertises `canCreate`/`canManage` only after
+current installation-superadmin hosting admission, including organization/cluster
+checks and current bearer or persisted browser credentials. A `cluster.update`
+permission slug alone does not grant these hosting hints. `canRun` retains the
+ordinary organization `cluster.update` permission for the shared prompt surface;
+legacy app prompts and subscription actions keep their own scoped `app.update`
+gates. Model hosting hints do not gate the separate organization connection-policy
+editor, whose authority remains `org.update`. All manifest flags are advisory:
+selected target, source, policy and readiness still require concrete checks.
+
 ## Admission and configuration
 
 `MODEL_CONNECTION_DEFAULT_MODE` is `AUTO` by default, preserving the existing

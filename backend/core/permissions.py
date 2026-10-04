@@ -326,7 +326,7 @@ def module_entitlements(
     ``apps``                      app.read         app.create         app.update | app.delete       app.deploy
     ``agents``                    agent.read       agent.create       agent.update | agent.delete   agent.dispatch
     ``workflows``                 workflow.read    workflow.create    workflow.update|.delete       workflow.trigger
-    ``models``                    org.read|app.read cluster.update     cluster.update                cluster.update
+    ``models``                    org.read|app.read operator (refined) operator (refined)            cluster.update
     ``admin``                     any admin slug   cluster.register   same as can_view              (always false)
                                   OR staff/super   | org.manage_members
     ``chat_studio_integration``   app.read         app.create         app.update | app.delete       app.deploy
@@ -359,7 +359,11 @@ def module_entitlements(
     ``enabled``: a superuser cannot use a module that is off for the org.
     The Models row is recomputed in ``AstroliftMe.modules`` with current live
     membership, credential ceilings and actual ORG/app scopes. This pure
-    mapping alone cannot establish organization-level model authority.
+    mapping alone cannot establish current hosting authority: ordinary permission
+    slugs never advertise model create/manage. Explicit superuser input is still
+    only an advisory identity hint, replaced by current credentials and hosting
+    admission in ``AstroliftMe.modules``. Model run remains the shared prompt
+    owner permission; app prompts/subscriptions have their own concrete gates.
     The ``admin`` module additionally lights its view/manage capability
     for staff (``is_staff``) even without an explicit admin slug.
     """
@@ -418,8 +422,8 @@ def module_entitlements(
     models = ModuleEntitlement(
         key="models",
         can_view=has("org.read") or has("app.read"),
-        can_create=has("cluster.update"),
-        can_manage=has("cluster.update"),
+        can_create=False,
+        can_manage=False,
         can_run=has("cluster.update"),
         enabled=True,
     )

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Match Models create/manage hints to current installation-superadmin hosting
+  admission and bearer/session ceilings. Preserve ordinary shared-prompt run
+  authority and legacy app visibility; hints never replace target checks (#2270).
+
 - Revalidate persisted browser sessions and current authentication facts before
   automatic model connection or subscription revocation effects after lock waits.
   Preserve withdrawn session tracking when refusing stale requests (#2270).
