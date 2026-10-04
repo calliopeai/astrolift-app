@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add bounded, credential-verified Bedrock foundation-model and inference-profile
+  metadata reads. Preserve native source identities, partial/truncated states and
+  unknown invocation access; no resource allocation or public API is added (#2269).
+
 - Bind model subscription finalization and traffic lookups explicitly to current
   service/app owners. Preserve admitted installation-shared cluster placement
   while keeping dedicated-app selectors tenant-bound (#2269, #2270).
