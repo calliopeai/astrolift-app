@@ -97,7 +97,12 @@ does not redesign initial deployment decorators or silently change quorum.
 
 The private `DeploymentAuthorityContext(deployment_guid)` is a lookup key, not
 proof. `deployment_app_identity_authority(reference, context)` reloads the exact
-protected receipt and current vote ledger on each entry. It applies votes only
+protected receipt and current vote ledger on each entry. Execution requires at
+least the stored quorum of distinct identified human votes and evaluates current
+policy with `approval_request=False`; a pending receipt cannot execute through
+pre-vote deferral. Counters and an unidentified credential-link vote cannot
+substitute for distinct human approval evidence. The pre-vote helper keeps its
+existing bounded deferral behavior. The consumer applies votes only
 to that original Deployment/app/environment. Different aliases in the complete
 app union retain ordinary `approvals=0`; callers must not re-sign sibling
 references or reuse the selected environment's votes. Ordinary
