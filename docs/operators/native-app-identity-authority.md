@@ -208,3 +208,40 @@ not activate the staged deployment path. The actual native pipeline must wire
 them at every source, preparation/IAM, render/apply and runtime boundary, close
 its clients within the activity scope, and complete the remaining
 apply/runtime/inference chain before public activation.
+
+
+### Private native response acknowledgments
+
+The staged configuration executor requires strict preparation acknowledgments.
+A verified create or annotation response may append only its original native
+UID/resourceVersion and request digest; IAM replies retain normalized policy and
+etag digests only. The dedicated services0042 table protects the original SENT
+reservation nonce/generation, accepted preparation operation (when applicable),
+and protected BOUND Deployment execution receipt. Original target/union/authority
+and SENT submission digests are copied into the immutable acknowledgment, with
+a separate domain-separated binding digest, so later journal generations do not
+replace those forensic facts. It uses PROTECT foreign keys and
+an unconditional PostgreSQL UPDATE/DELETE refusal. No credentials, raw policy,
+response body or signed URL is stored there.
+
+Acknowledgment retention does not re-admit the caller, claim owned grants, alter
+the ledger, mark PREPARED/OBSERVED, or prove workload readiness. Original reply
+metadata can therefore survive caller/token/status withdrawal; retention still
+requires structurally matching original journal/reservation/receipt identities.
+Parent reassignment or journal generation advancement can refuse retention.
+Physical parent deletion is protected, and rollback refuses all retained
+acknowledgments. Empty-history reverse/forward is supported; deletion of history
+is not a rollback procedure.
+
+After admission is restored, a fresh native read and current checkpoints must
+observe that exact UID before preparation advances. A lost create reply with no
+recorded UID refuses even when the name and operation/request annotations match.
+The legacy private preparation consumer remains explicit compatibility behavior;
+the future guarded executor must always enable strict acknowledgments. An IAM
+acknowledgment never certifies grant ownership: the current admitted policy
+readback and existing ownership reconciliation remain mandatory.
+
+These are private prerequisites only. The public native Deployment path remains
+`NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED`; configuration, accepted node-pool
+placement, runtime readiness, token identity and actual prediction acceptance
+must be composed and proved before activation.

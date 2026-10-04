@@ -3,6 +3,7 @@ from astrolift_services.models.gcp_gke_preparation_journal import (
     GCPGKEPreparationJournal,
     GCPGKEPreparationOperation,
 )
+from astrolift_services.models.gcp_identity_acknowledgement import GCPIdentityAcknowledgement
 from astrolift_services.models.gcp_identity_source import GCPAppIdentitySource, GCPClusterIdentitySource
 from astrolift_services.models.gcp_workload_identity_journal import GCPWorkloadIdentityJournal
 from astrolift_services.models.hugging_face_connection import HuggingFaceConnection
@@ -31,6 +32,7 @@ from astrolift_services.models.workload_identity_grant import (
 )
 
 __all__ = [
+    "GCPIdentityAcknowledgement",
     "GCPAppIdentitySource",
     "GCPClusterIdentitySource",
     "GCPGKEPreparationJournal",

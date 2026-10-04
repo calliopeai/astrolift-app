@@ -19,6 +19,7 @@ from gcp.gke_identity_observation import (
     _checkpoint,
     _http,
 )
+from gcp.identity_acknowledgement import AcknowledgementReceipt, PreparationAcknowledgement, acknowledgement_sha256
 from gcp.identity_owned import MAX_BYTES, _guid, _hash
 
 if TYPE_CHECKING:
@@ -162,7 +163,14 @@ def _body_sha(body: Any) -> str:
 class KubernetesPreparationAdapter(KubernetesReadAdapter):
     """Private native endpoint/CA/ADC adapter; bounded exact Kubernetes operations."""
 
-    def request(self, path: str, *, method: str = "GET", body: Any = None) -> tuple[int, dict[str, Any] | None]:
+    def request(
+        self,
+        path: str,
+        *,
+        method: str = "GET",
+        body: Any = None,
+        acknowledge: Callable[[dict[str, Any]], None] | None = None,
+    ) -> tuple[int, dict[str, Any] | None]:
         if not re.fullmatch(r"/api/v1/namespaces(?:/[a-z0-9-]{1,63}(?:/serviceaccounts(?:/[a-z0-9-]{1,63})?)?)?", path):
             raise GKEObservationError("INVALID_SUBJECT_PATH")
         if method not in ("GET", "POST", "PATCH"):
@@ -192,17 +200,25 @@ class KubernetesPreparationAdapter(KubernetesReadAdapter):
         except Exception:
             _checkpoint(self.checkpoint)
             raise GKEObservationError("KUBERNETES_TRANSPORT_UNCONFIRMED") from None
-        _checkpoint(self.checkpoint)
         if response.status == 404 and method == "GET":
+            _checkpoint(self.checkpoint)
             return 404, None
         if response.status not in (200, 201):
+            _checkpoint(self.checkpoint)
             raise GKEObservationError("KUBERNETES_OPERATION_REFUSED")
         try:
             value = json.loads(response.data)
         except Exception:
+            _checkpoint(self.checkpoint)
             raise GKEObservationError("KUBERNETES_RESPONSE_INVALID") from None
         if not isinstance(value, dict):
+            _checkpoint(self.checkpoint)
             raise GKEObservationError("KUBERNETES_RESPONSE_INVALID")
+        if acknowledge is not None:
+            if method not in ("POST", "PATCH"):
+                raise GKEObservationError("ACKNOWLEDGEMENT_METHOD_INVALID")
+            acknowledge(value)
+        _checkpoint(self.checkpoint)
         return response.status, value
 
 
@@ -361,9 +377,64 @@ class GKEIdentityPreparation:
         checkpoint: Callable[[], None],
         iam_receipt: VerifiedIAMConfigurationReceipt | None,
         expected_desired_union_sha256: str | None,
+        acknowledgement_hook: Callable[[PreparationAcknowledgement], AcknowledgementReceipt] | None,
+        acknowledgements: tuple[PreparationAcknowledgement, ...],
+        strict_acknowledgements: bool,
     ) -> GKEPreparationReceipt:
         steps: dict[str, PreparationStep] = {}
         journal_id, version = "", 0
+        acknowledged = {}
+        if (
+            type(strict_acknowledgements) is not bool
+            or type(acknowledgements) is not tuple
+            or any(type(value) is not PreparationAcknowledgement for value in acknowledgements)
+        ):
+            raise GKEPreparationError("ACKNOWLEDGEMENT_INVALID", GKEPreparationReceipt(ledger))
+        if not strict_acknowledgements and (acknowledgement_hook is not None or acknowledgements):
+            raise GKEPreparationError("ACKNOWLEDGEMENT_MODE_REQUIRED", GKEPreparationReceipt(ledger))
+        if strict_acknowledgements and not callable(acknowledgement_hook):
+            raise GKEPreparationError("ACKNOWLEDGEMENT_HOOK_REQUIRED", GKEPreparationReceipt(ledger))
+        for value in acknowledgements:
+            if value.submission_id in acknowledged:
+                raise GKEPreparationError("ACKNOWLEDGEMENT_INVALID", GKEPreparationReceipt(ledger))
+            acknowledged[value.submission_id] = value
+
+        def acknowledge(intent: PreparationIntent, subject: KSASubject, namespace: bool, value: dict[str, Any]) -> None:
+            actual = self._metadata(value, subject, namespace=namespace, uid=intent.original_uid)
+            annotations = value["metadata"].get("annotations", {})
+            if intent.method == "POST" and (
+                annotations.get(_OPERATION) != operation_id or annotations.get(_REQUEST) != intent.request_sha256
+            ):
+                raise GKEObservationError("CREATE_OWNERSHIP_UNPROVED")
+            if intent.method == "PATCH" and annotations.get(_LINK) != self.context.identity.email:
+                raise GKEObservationError("SERVICE_ACCOUNT_LINK_UNCONFIRMED")
+            ack = PreparationAcknowledgement(
+                intent.submission_id, intent.request_sha256, actual.uid, actual.resource_version
+            )
+            try:
+                if acknowledgement_hook is None:
+                    raise ValueError
+                receipt = acknowledgement_hook(ack)
+            except Exception:
+                raise GKEObservationError("ACKNOWLEDGEMENT_COMMIT_UNCONFIRMED") from None
+            if type(receipt) is not AcknowledgementReceipt or receipt.acknowledgement_sha256 != acknowledgement_sha256(
+                ack
+            ):
+                raise GKEObservationError("ACKNOWLEDGEMENT_RECEIPT_REQUIRED")
+            acknowledged[intent.submission_id] = ack
+
+        def write(
+            adapter: Any, intent: PreparationIntent, subject: KSASubject, namespace: bool, path: str, body: Any
+        ) -> None:
+            if strict_acknowledgements:
+                adapter.request(
+                    path,
+                    method=intent.method,
+                    body=body,
+                    acknowledge=lambda value: acknowledge(intent, subject, namespace, value),
+                )
+            else:
+                adapter.request(path, method=intent.method, body=body)
 
         def note(intent: PreparationIntent, phase: str, invoked: bool = False) -> None:
             old = steps.get(intent.path)
@@ -433,6 +504,19 @@ class GKEIdentityPreparation:
                 if intent.operation_id != operation_id:
                     raise GKEObservationError("PENDING_OPERATION_CHANGED")
                 note(intent, "UNKNOWN" if intent.phase == PreparationPhase.SENT else "UNSENT")
+                if (
+                    strict_acknowledgements
+                    and intent.phase == PreparationPhase.SENT
+                    and intent.method == "POST"
+                    and intent.submission_id not in acknowledged
+                ):
+                    raise GKEObservationError("CREATE_UID_ACKNOWLEDGEMENT_REQUIRED")
+                ack = acknowledged.get(intent.submission_id)
+                if ack is not None and (
+                    ack.request_sha256 != intent.request_sha256
+                    or (intent.original_uid and ack.uid != intent.original_uid)
+                ):
+                    raise GKEObservationError("ACKNOWLEDGEMENT_SUBMISSION_CHANGED")
             if iam_receipt is not None:
                 self._iam(iam_receipt, operation_id, ledger, expected_desired_union_sha256)
             adapter = admit()
@@ -456,7 +540,9 @@ class GKEIdentityPreparation:
                         or annotations.get(_REQUEST) != old_intent.request_sha256
                     ):
                         raise GKEObservationError("CREATE_OWNERSHIP_UNPROVED")
-                    observe(value, subject, namespace, row.uid if row else "", operation_id)
+                    ack = acknowledged.get(old_intent.submission_id)
+                    original_uid = row.uid if row else (ack.uid if strict_acknowledgements and ack else "")
+                    observe(value, subject, namespace, original_uid, operation_id)
                 else:
                     if iam_receipt is None:
                         raise GKEObservationError("IAM_CONFIGURATION_RECEIPT_REQUIRED")
@@ -511,7 +597,16 @@ class GKEIdentityPreparation:
                                 or annotations.get(_REQUEST) != pending.request_sha256
                             ):
                                 raise GKEObservationError("CREATE_OWNERSHIP_UNPROVED")
-                            row = observe(value, subject, namespace, creation_id=operation_id)
+                            ack = acknowledged.get(pending.submission_id)
+                            if strict_acknowledgements and ack is None:
+                                raise GKEObservationError("CREATE_UID_ACKNOWLEDGEMENT_REQUIRED")
+                            row = observe(
+                                value,
+                                subject,
+                                namespace,
+                                uid=ack.uid if strict_acknowledgements and ack else "",
+                                creation_id=operation_id,
+                            )
                             note(pending, "OBSERVED")
                         else:
                             raise GKEObservationError("EXISTING_SUBJECT_UID_UNRECORDED")
@@ -546,7 +641,7 @@ class GKEIdentityPreparation:
                         )
                         _checkpoint(checkpoint)
                         note(sent, "UNKNOWN", True)
-                        adapter.request(path.rsplit("/", 1)[0], method="POST", body=body)
+                        write(adapter, sent, subject, namespace, path.rsplit("/", 1)[0], body)
                         adapter = admit()
                         _, fresh = adapter.request(path)
                         if (
@@ -555,7 +650,14 @@ class GKEIdentityPreparation:
                             or fresh.get("metadata", {}).get("annotations", {}).get(_OPERATION) != operation_id
                         ):
                             raise GKEObservationError("CREATE_READBACK_UNCONFIRMED")
-                        row = observe(fresh, subject, namespace, creation_id=operation_id)
+                        ack = acknowledged.get(sent.submission_id)
+                        row = observe(
+                            fresh,
+                            subject,
+                            namespace,
+                            uid=ack.uid if strict_acknowledgements and ack else "",
+                            creation_id=operation_id,
+                        )
                         note(sent, "OBSERVED")
                     if not namespace and iam_receipt is not None:
                         adapter = admit()
@@ -619,7 +721,7 @@ class GKEIdentityPreparation:
                         )
                         _checkpoint(checkpoint)
                         note(sent, "UNKNOWN", True)
-                        adapter.request(path, method="PATCH", body=patch)
+                        write(adapter, sent, subject, False, path, patch)
                         adapter = admit()
                         _, fresh = adapter.request(path)
                         if (
@@ -691,6 +793,9 @@ class GKEIdentityPreparation:
         commit_submission: Callable[[PreparationSubmission], PreparationCommitReceipt],
         commit_observation: Callable[[ObjectObservation], PreparationCommitReceipt],
         checkpoint: Callable[[], None],
+        acknowledgement_hook: Callable[[PreparationAcknowledgement], AcknowledgementReceipt] | None = None,
+        acknowledgements: tuple[PreparationAcknowledgement, ...] = (),
+        strict_acknowledgements: bool = False,
     ) -> GKEPreparationReceipt:
         return self._run(
             operation_id=operation_id,
@@ -700,6 +805,9 @@ class GKEIdentityPreparation:
             checkpoint=checkpoint,
             iam_receipt=None,
             expected_desired_union_sha256=None,
+            acknowledgement_hook=acknowledgement_hook,
+            acknowledgements=acknowledgements,
+            strict_acknowledgements=strict_acknowledgements,
         )
 
     def annotate(
@@ -712,6 +820,9 @@ class GKEIdentityPreparation:
         checkpoint: Callable[[], None],
         iam_receipt: VerifiedIAMConfigurationReceipt,
         expected_desired_union_sha256: str,
+        acknowledgement_hook: Callable[[PreparationAcknowledgement], AcknowledgementReceipt] | None = None,
+        acknowledgements: tuple[PreparationAcknowledgement, ...] = (),
+        strict_acknowledgements: bool = False,
     ) -> GKEPreparationReceipt:
         if type(iam_receipt) is not VerifiedIAMConfigurationReceipt:
             raise GKEPreparationError("IAM_CONFIGURATION_RECEIPT_REQUIRED", GKEPreparationReceipt(ledger))
@@ -723,4 +834,7 @@ class GKEIdentityPreparation:
             checkpoint=checkpoint,
             iam_receipt=iam_receipt,
             expected_desired_union_sha256=expected_desired_union_sha256,
+            acknowledgement_hook=acknowledgement_hook,
+            acknowledgements=acknowledgements,
+            strict_acknowledgements=strict_acknowledgements,
         )
