@@ -355,6 +355,9 @@ for (const computeMode of ["cpu", "gpu"] as const) {
           gpuCount: computeMode === "cpu" ? 0 : 1,
           cpuKvCacheGiB: computeMode === "cpu" ? 2 : null,
           allowSubscriptions: true,
+          dtype: null,
+          maxModelLen: null,
+          maxNumSeqs: null,
         },
       },
     ]);
@@ -521,5 +524,8 @@ test("small model wizard preserves steps and submits only its reviewed immutable
     computeMode: "cpu",
     gpuCount: 0,
     cpuKvCacheGiB: 1,
+    dtype: "FLOAT32",
+    maxModelLen: 256,
+    maxNumSeqs: 1,
   });
 });
