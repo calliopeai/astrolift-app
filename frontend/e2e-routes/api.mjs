@@ -107,6 +107,41 @@ const siblingSubscription = {
   bindingPrefix: "MODEL_SEARCH_",
 };
 let subscriptionRows = [activeSubscription, siblingSubscription];
+const pendingConnection = {
+  id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+  version: 2,
+  status: "PENDING",
+  organizationId: id,
+  modelDeploymentId: sharedModelId,
+  appId: activeSubscription.appId,
+  appEnvironmentId: activeSubscription.environmentId,
+  clusterId: sharedClusterId,
+  providerId: sharedProviderId,
+  alias: "reviewed",
+  modelName: sharedModel.name,
+  appName: activeSubscription.appName,
+  environmentName: activeSubscription.environmentName,
+  requesterUsername: "controlled-requester",
+  policyVersion: "controlled-request-policy",
+  requiredApprovals: 1,
+  approvalCount: 0,
+  subscriptionId: null,
+  createdAt: observedAt,
+  decidedAt: null,
+  finalizedAt: null,
+};
+let connectionRequest = pendingConnection;
+function connectionProjection(review, queue = false) {
+  return object({
+    ...connectionRequest,
+    version: queue && connectionRequest.version === 2 ? 1 : connectionRequest.version,
+    canApprove: review && connectionRequest.status === "PENDING",
+    canReject: review && connectionRequest.status === "PENDING",
+    canCancel: !review && !connectionRequest.subscriptionId,
+    canFinalize:
+      !review && connectionRequest.status === "APPROVED" && !connectionRequest.subscriptionId,
+  });
+}
 const hubModel = {
   repoId: sharedModel.modelRepo,
   revisionSha: sharedModel.revisionSha,
@@ -155,6 +190,21 @@ function value(type, field, args, role) {
       pageSize: args.pageSize,
     });
   if (field === "capabilities") return ["models.connection_approvals"];
+  if (field === "modelConnectionRequestsPage" || field === "modelConnectionApprovalRequestsPage")
+    return object({
+      items:
+        role === "owner" && args.organizationId === id
+          ? [connectionProjection(field === "modelConnectionApprovalRequestsPage", true)]
+          : [],
+      totalCount: role === "owner" && args.organizationId === id ? 1 : 0,
+      page: args.page,
+      pageSize: args.pageSize,
+      nextCursor: null,
+    });
+  if (field === "modelConnectionRequest" || field === "modelConnectionReviewRequest")
+    return role === "owner" && args.input.id === connectionRequest.id
+      ? connectionProjection(field === "modelConnectionReviewRequest")
+      : null;
   if (field === "modelConnectionRestriction" || field === "organizationModelConnectionPolicy")
     return object({
       id: null,
@@ -166,7 +216,9 @@ function value(type, field, args, role) {
   if (field === "modelConnectionAction")
     return object({
       action: role === "owner" && currentSharedModel.ready ? "AUTO" : "DENY",
-      reason: currentSharedModel.ready ? null : "Controlled reconciliation remains pending.",
+      reason: currentSharedModel.ready
+        ? "Controlled automatic connection is permitted."
+        : "Controlled reconciliation remains pending.",
       policyVersion: "controlled-auto-policy",
       requiredApprovals: 1,
       allowSelfApproval: true,
@@ -514,6 +566,7 @@ createServer(async (req, res) => {
     modelWriteRequests.length = 0;
     acceptedModel = null;
     currentSharedModel = sharedModel;
+    connectionRequest = pendingConnection;
     subscriptionRows = req.url.endsWith("model=unsubscribed")
       ? []
       : [activeSubscription, siblingSubscription];
@@ -545,6 +598,61 @@ createServer(async (req, res) => {
       fieldResolver(source, args, context, info) {
         if (info.parentType.name === "Mutation") {
           const input = args.input;
+          const approve = info.fieldName === "approveModelConnectionRequest";
+          const finalize = info.fieldName === "finalizeModelConnectionRequest";
+          if (
+            (approve || finalize) &&
+            role === "owner" &&
+            input.id === connectionRequest.id &&
+            input.ifMatchVersion === connectionRequest.version &&
+            (approve
+              ? connectionRequest.status === "PENDING"
+              : connectionRequest.status === "APPROVED")
+          ) {
+            modelWriteRequests.push({ operationName, input: { ...input } });
+            connectionRequest = {
+              ...connectionRequest,
+              version: connectionRequest.version + 1,
+              status: "APPROVED",
+              approvalCount: 1,
+              decidedAt: observedAt,
+              ...(finalize
+                ? {
+                    subscriptionId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+                    finalizedAt: observedAt,
+                  }
+                : {}),
+            };
+            if (finalize) {
+              currentSharedModel = {
+                ...sharedModel,
+                version: 7,
+                status: "updating",
+                ready: false,
+                readinessObservedAt: null,
+                readinessGeneration: null,
+                desiredSubscriptionRevision: 3,
+                operationId: "controlled-approved-subscription",
+                operationCompletedAt: null,
+              };
+              subscriptionRows = [
+                ...subscriptionRows,
+                {
+                  ...activeSubscription,
+                  id: connectionRequest.subscriptionId,
+                  version: 1,
+                  alias: connectionRequest.alias,
+                  bindingPrefix: "MODEL_REVIEWED_",
+                  status: "pending",
+                  desiredRevision: 3,
+                  appliedRevision: 0,
+                  reconciledAt: null,
+                  canRevoke: false,
+                },
+              ];
+            }
+            return object({ ok: true, errors: [], data: connectionProjection(approve) });
+          }
           const update = info.fieldName === "updateClusterModel";
           const deprovision = info.fieldName === "deprovisionClusterModel";
           if (

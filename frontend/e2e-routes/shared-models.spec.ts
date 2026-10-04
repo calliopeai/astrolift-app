@@ -247,7 +247,9 @@ for (const computeMode of ["cpu", "gpu"] as const) {
     ]);
     page.setDefaultTimeout(15_000);
     await page.goto("/models");
-    await page.getByRole("link", { name: "Host a model", exact: true }).click();
+    await page
+      .getByRole("link", { name: en.models.shared.inventory.addModel, exact: true })
+      .click();
     await expect(page.getByRole("heading", { name: "Host a model", exact: true })).toBeVisible();
     const journey = page.getByRole("navigation", { name: "Hosting setup", exact: true });
     await expect(journey).toContainText("Choose model");
@@ -264,7 +266,7 @@ for (const computeMode of ["cpu", "gpu"] as const) {
     await expect(modelChoice).toBeVisible();
     if (computeMode === "cpu")
       await page.screenshot({
-        path: "/tmp/astrolift-hosting-ux-source.png",
+        path: testInfo.outputPath("hosting-source.png"),
         animations: "disabled",
       });
     await modelChoice.click();
@@ -306,12 +308,12 @@ for (const computeMode of ["cpu", "gpu"] as const) {
         .getByRole("heading", { name: "3. Review hosting checks", exact: true })
         .scrollIntoViewIfNeeded();
       await page.screenshot({
-        path: "/tmp/astrolift-hosting-ux-checks.png",
+        path: testInfo.outputPath("hosting-checks.png"),
         animations: "disabled",
       });
       await page.setViewportSize({ width: 768, height: 1024 });
       await page.screenshot({
-        path: "/tmp/astrolift-hosting-ux-checks-768.png",
+        path: testInfo.outputPath("hosting-checks-768.png"),
         animations: "disabled",
       });
       await page.setViewportSize({ width: 1440, height: 1000 });
@@ -416,7 +418,9 @@ test("shared catalogue reaches app-free CPU deployment, honest density and an ex
   page.on("pageerror", (error) => errors.push(error.message));
   page.setDefaultTimeout(15_000);
   await page.goto("/models");
-  await expect(page.getByRole("heading", { name: "Shared models", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: en.models.shared.inventory.title, exact: true })
+  ).toBeVisible();
   await page.getByRole("link", { name: /Controlled shared CPU model/ }).click();
   await expect(page).toHaveURL(new RegExp(`/models/shared/${modelId}$`));
   await expect(
@@ -424,7 +428,7 @@ test("shared catalogue reaches app-free CPU deployment, honest density and an ex
   ).toBeVisible();
   await expect(page.getByText("Qwen/Qwen3-0.6B", { exact: true })).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Observed model metrics", exact: true })
+    page.getByRole("heading", { name: en.models.shared.inventory.metrics, exact: true })
   ).toBeVisible();
   await expect(page.getByText("Showing 1 of 1 shared models; snapshot limit 20.")).toBeVisible();
   await expect(
@@ -462,7 +466,9 @@ test("shared catalogue reaches app-free CPU deployment, honest density and an ex
     ],
   });
   await page.getByRole("link", { name: "Open full cluster catalogue", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Shared models", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: en.models.shared.inventory.title, exact: true })
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });
 
