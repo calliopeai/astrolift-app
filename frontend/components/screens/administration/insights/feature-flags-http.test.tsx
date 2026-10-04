@@ -207,6 +207,56 @@ describe("feature flag write and read outcomes over actual HttpLink", () => {
     h.client.stop();
   });
 
+  it("settles an earlier pending read when a later refresh query setup throws", async () => {
+    const held = deferred<unknown>();
+    let written = false;
+    const h = mount((op) =>
+      op === "SetFeatureFlag"
+        ? ((written = true), accepted())
+        : written && op === "AdminFeatureInventory"
+          ? held.promise
+          : normalRead(op)
+    );
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    process.on("unhandledRejection", onUnhandled);
+    try {
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Enable models" })).toBeEnabled()
+      );
+      const query = h.client.query.bind(h.client);
+      let setupFailed = false;
+      // A Vitest spy observes returned promises and would hide the orphaned rejection.
+      h.client.query = ((options: Parameters<typeof h.client.query>[0]) => {
+        if (options.query === SERVER_INFO) {
+          setupFailed = true;
+          throw new Error("Navigation setup unavailable");
+        }
+        return query(options);
+      }) as typeof h.client.query;
+      fireEvent.click(screen.getByRole("button", { name: "Enable models" }));
+      await waitFor(() =>
+        expect(h.operations.filter((op) => op === "AdminFeatureInventory")).toHaveLength(2)
+      );
+      await act(async () => {
+        held.resolve({ errors: [{ message: "Earlier inventory read unavailable" }] });
+        await new Promise((done) => setTimeout(done, 20));
+      });
+      await waitFor(() =>
+        expect(screen.getByLabelText("read error")).toHaveTextContent("Could not refresh")
+      );
+      expect(setupFailed).toBe(true);
+      expect(unhandled).toEqual([]);
+      expect(screen.getByLabelText("recovery")).toHaveTextContent("accepted");
+      expect(screen.getByLabelText("current value")).toHaveTextContent("true");
+      expect(screen.getByRole("button", { name: "Enable models" })).toBeDisabled();
+      expect(h.writes).toHaveLength(1);
+    } finally {
+      process.off("unhandledRejection", onUnhandled);
+      h.client.stop();
+    }
+  });
+
   it("keeps exact accepted state and closes confirmation when inventory refresh fails", async () => {
     let written = false;
     const h = mount(

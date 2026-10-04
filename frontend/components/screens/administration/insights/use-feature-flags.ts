@@ -102,23 +102,29 @@ export function useFeatureFlags() {
       );
       try {
         const result = await Promise.allSettled([
-          client.query<AdminFeatureInventoryQuery>({
-            query: ADMIN_FEATURE_INVENTORY,
-            fetchPolicy: "no-cache",
-            context: { queryDeduplication: false },
-          }),
+          Promise.resolve().then(() =>
+            client.query<AdminFeatureInventoryQuery>({
+              query: ADMIN_FEATURE_INVENTORY,
+              fetchPolicy: "no-cache",
+              context: { queryDeduplication: false },
+            })
+          ),
           ...(navigation
             ? [
-                client.query({
-                  query: SERVER_INFO,
-                  fetchPolicy: "no-cache",
-                  context: { queryDeduplication: false },
-                }),
-                client.query<MeQueryData>({
-                  query: GET_ME,
-                  fetchPolicy: "no-cache",
-                  context: { queryDeduplication: false },
-                }),
+                Promise.resolve().then(() =>
+                  client.query({
+                    query: SERVER_INFO,
+                    fetchPolicy: "no-cache",
+                    context: { queryDeduplication: false },
+                  })
+                ),
+                Promise.resolve().then(() =>
+                  client.query<MeQueryData>({
+                    query: GET_ME,
+                    fetchPolicy: "no-cache",
+                    context: { queryDeduplication: false },
+                  })
+                ),
               ]
             : []),
         ]);
