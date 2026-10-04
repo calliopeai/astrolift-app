@@ -26,6 +26,30 @@ A capped initial page is not the complete set of eligible applications. Failed,
 pending and unavailable deployments remain inspectable; metadata visibility is
 separate from permission and readiness to perform cluster operations.
 
+## Edit a hosted model
+
+`updateClusterModel` requires both organization configuration and cluster update
+permission. Its exact organization, cluster, provider and deployment version must
+match the reviewed deployment. Optional `name` renames the existing deployment.
+Resource edits preserve the admitted local artifact GUID, version and manifest,
+or the immutable Hub revision and service-owned private Hub credential reference.
+An unavailable or changed source refuses before reconciliation is queued.
+
+Review settings with `clusterModelUpdateAdmission(input: UpdateClusterModelInput)`.
+This derives the source from the deployment, rather than reconstructing a public
+Hub request from display metadata. Admission checks configuration; an observed
+ready generation is still required to establish a running model.
+
+Models use `SHARED` access unless explicitly changed to `DEDICATED`. Shared models
+accept independent subscriptions from multiple authorized apps. A dedicated model
+remains owned by the organization and cluster, and only the selected app's
+environments may subscribe. This does not reserve additional physical hardware.
+Select from `clusterModelDedicatedAppsPage`, and submit `dedicatedAppId` with
+`ifMatchDedicatedAppVersion` when changing the mode. Other apps' existing bindings
+must be fully revoked before the change is accepted; pending revocation is not
+sufficient. Retiring or unavailable apps cannot be selected. Subscription writes,
+runtime reconciliation and app binding reads enforce the same policy.
+
 ## Search and placement evidence
 
 Hugging Face results report upstream metadata and its observation time. A license

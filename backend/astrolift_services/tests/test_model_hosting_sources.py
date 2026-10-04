@@ -39,7 +39,7 @@ def queue(monkeypatch):
 @pytest.fixture
 def world(monkeypatch):
     w = foundation_world.__wrapped__(monkeypatch)
-    Member.objects.create(user=w.user, scope_kind="ORG", scope_id=w.org.pk)
+    Member.objects.get_or_create(user=w.user, scope_kind="ORG", scope_id=w.org.pk)
     actual = ProviderPlugin.objects.filter(slug="k8s_native").first()
     if actual is not None:
         w.cluster.provider_plugin = actual

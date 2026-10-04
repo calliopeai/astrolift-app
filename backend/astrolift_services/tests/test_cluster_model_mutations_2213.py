@@ -330,7 +330,7 @@ def test_creation_refreshes_authority_after_hub_observation(world, queue, monkey
 
     binding = grant(world, Permission.CLUSTER_UPDATE)
     grant(world, Permission.ORG_UPDATE)
-    Member.objects.create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
+    Member.objects.get_or_create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
     actual = ProviderPlugin.objects.filter(slug="k8s_native").first()
     if actual is None:
         world.cluster.provider_plugin.slug = "k8s_native"
@@ -400,7 +400,7 @@ def test_subscription_http_bearer_envelope_and_revocation_recheck(world, queue, 
     from astrolift_identity.models import ApiToken, Member
 
     allowed(world)
-    Member.objects.create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
+    Member.objects.get_or_create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
     minted = mint_token()
     token = ApiToken.objects.create(
         user=world.user,
@@ -814,7 +814,7 @@ def test_subscription_rechecks_current_source_and_bearer_after_locks(world, queu
     from astrolift_services.schema import cluster_model_mutations as module
 
     allowed(world)
-    Member.objects.create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
+    Member.objects.get_or_create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
     original = module._locked_environment
 
     def raced_environment(value):

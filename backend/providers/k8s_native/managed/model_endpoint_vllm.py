@@ -103,6 +103,8 @@ _CONFIG_FIELDS = frozenset(
         "model_revision",
         "cpu_kv_cache_gib",
         "allow_subscriptions",
+        "sharing_mode",
+        "dedicated_app_id",
         "model_source",
         "model_artifact_id",
         "model_artifact_version",
@@ -549,6 +551,17 @@ class VLLMDriver(ManagedServiceDriver):
             raise ValueError("compute_mode must be cpu or gpu")
         if cfg.get("allow_subscriptions") is not None and not isinstance(cfg["allow_subscriptions"], bool):
             raise ValueError("allow_subscriptions must be boolean")
+        if cfg.get("sharing_mode", "shared") not in ("shared", "dedicated"):
+            raise ValueError("sharing_mode must be shared or dedicated")
+        if cfg.get("sharing_mode") == "dedicated":
+            from uuid import UUID
+
+            try:
+                UUID(str(cfg.get("dedicated_app_id")))
+            except (TypeError, ValueError):
+                raise ValueError("Dedicated models require a valid app identity.") from None
+        elif cfg.get("dedicated_app_id") is not None:
+            raise ValueError("Shared models cannot select a dedicated app.")
         if cfg.get("frontend") is not None and cfg["frontend"] not in FRONTENDS:
             raise ValueError(f"frontend must be one of {list(FRONTENDS)}")
         return cfg
