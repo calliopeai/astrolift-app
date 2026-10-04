@@ -36,6 +36,9 @@ const sharedResources = {
   gpuCount: 0,
   replicas: 1,
   cpuKvCacheGiB: 2,
+  dtype: "float32",
+  maxModelLen: 512,
+  maxNumSeqs: 1,
 };
 const sharedModel = {
   id: sharedModelId,
@@ -49,6 +52,15 @@ const sharedModel = {
   modelRepo: "Qwen/Qwen3-0.6B",
   revisionSha: "a".repeat(40),
   computeMode: "cpu",
+  sourceKind: "huggingface",
+  localArtifactId: null,
+  localArtifactVersion: null,
+  localManifestSha256: null,
+  sharingMode: "SHARED",
+  dedicatedAppId: null,
+  dedicatedAppVersion: null,
+  dedicatedAppName: null,
+  dedicatedAppSlug: null,
   subscriptionsEnabled: true,
   runtimeSupported: true,
   runtimeReason: null,
@@ -228,7 +240,7 @@ function value(type, field, args, role) {
       page: args.page,
       pageSize: args.pageSize,
     });
-  if (field === "clusterModelRuntimeAdmission")
+  if (field === "clusterModelRuntimeAdmission" || field === "clusterModelUpdateAdmission")
     return object({
       eligible: role === "owner",
       reason: null,

@@ -20,7 +20,10 @@ for (const action of ["update", "deprovision", "refuse-deprovision"] as const) {
     page.setDefaultTimeout(15_000);
     await page.goto("/models");
     await page.getByRole("link", { name: /Controlled shared CPU model/ }).click();
-    const section = page.getByRole("region", { name: "Deployment management", exact: true });
+    const section = page.getByRole("region", {
+      name: en.models.shared.inventory.settings,
+      exact: true,
+    });
     await page
       .getByLabel("Prompt", { exact: true })
       .fill("Inspect admission without running a prompt.");
@@ -54,11 +57,18 @@ for (const action of ["update", "deprovision", "refuse-deprovision"] as const) {
       ifMatchVersion: 5,
       ...(action === "update"
         ? {
+            name: "Controlled shared CPU model",
             cpuRequest: "3",
             memoryRequest: "8Gi",
             gpuCount: 0,
             cpuKvCacheGiB: 2,
             allowSubscriptions: true,
+            dtype: "FLOAT32",
+            maxModelLen: 512,
+            maxNumSeqs: 1,
+            sharingMode: "SHARED",
+            dedicatedAppId: null,
+            ifMatchDedicatedAppVersion: null,
           }
         : { deleteData: false }),
     };
