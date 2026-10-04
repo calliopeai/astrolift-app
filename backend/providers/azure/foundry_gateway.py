@@ -24,7 +24,7 @@ MAX_REQUEST_BYTES = 1024 * 1024
 MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 WALL_TIMEOUT_SECONDS = 30
 _TOKEN_FILE = "/var/run/secrets/azure/tokens/azure-identity-token"
-_NAME = re.compile(r"[a-z0-9](?:[a-z0-9-]{1,62}[a-z0-9])?\Z", re.ASCII)
+_NAME = re.compile(r"[a-z0-9][a-z0-9-]{0,62}[a-z0-9]\Z", re.ASCII)
 _DEPLOYMENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\Z", re.ASCII)
 _DIGEST = re.compile(r"[a-f0-9]{64}\Z", re.ASCII)
 
@@ -391,7 +391,11 @@ class FoundryChatGateway:
                 if result is None:
                     return
                 status, data = result
-            except (RequestError, ValueError, UnicodeError, RecursionError):
+            except RequestError:
+                status, data = 400, {"error": {"code": "unsupported_request"}}
+            except GatewayError:
+                status, data = 503, {"error": {"code": "source_unavailable"}}
+            except (ValueError, UnicodeError, RecursionError):
                 status, data = 400, {"error": {"code": "unsupported_request"}}
             except Exception:
                 status, data = 503, {"error": {"code": "request_outcome_unconfirmed"}}
@@ -410,8 +414,11 @@ class FoundryChatGateway:
         await send({"type": "http.response.body", "body": b"" if method == "HEAD" else content})
 
     async def _current(self) -> None:
-        if await self._checkpoint(self.source) is not None:
-            raise GatewayError("Current source admission is unavailable.")
+        try:
+            if await self._checkpoint(self.source) is not None:
+                raise GatewayError("Current source admission is unavailable.")
+        except Exception:
+            raise GatewayError("Current source admission is unavailable.") from None
 
     async def _dispatch(self, scope: Scope, receive: Receive) -> tuple[int, dict[str, Any]] | None:
         await self._current()

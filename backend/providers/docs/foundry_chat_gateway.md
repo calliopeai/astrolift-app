@@ -27,6 +27,16 @@ before a future connection is advertised as available.
 
 The public-Azure account name derives the sole HTTPS origin:
 `https://<account>.services.ai.azure.com/openai/v1/chat/completions?api-version=v1`.
+The declared account name must also be the observed AIServices custom subdomain.
+This seam accepts only canonical lowercase 2–64 character DNS labels, not every
+ARM resource-name shape. Microsoft distinguishes the ARM account name from its
+[custom subdomain](https://learn.microsoft.com/en-us/azure/ai-services/cognitive-services-custom-subdomains).
+The future checkpoint must verify the actual native account endpoint, matching
+custom subdomain, account kind and supported protocol/capabilities against this
+fixed origin. The current catalogue does not project the custom subdomain and
+cannot prove this correspondence; no arbitrary endpoint override is provided.
+Unavailable/withdrawn checkpoint state returns safe HTTP 503 on initial health,
+model-list or inference admission; malformed request data remains HTTP 400.
 The native credential receives only
 `https://cognitiveservices.azure.com/.default`. This follows the
 [Chat REST reference](https://learn.microsoft.com/en-us/rest/api/microsoft-foundry/azureopenai/chat).

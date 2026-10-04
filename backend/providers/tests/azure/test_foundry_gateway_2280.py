@@ -612,3 +612,49 @@ async def test_checkpoint_must_explicitly_complete_or_raise_not_boolean_admissio
         )
         assert reply.status_code != 200 and wire.calls == [] and credential.scopes == []
     await transport.close()
+
+
+async def test_two_character_native_origin_uses_only_fixed_services_host(source, snapshot, wire):
+    selected = replace(source, account_name="aa")
+    credential = Credential()
+    transport = gateway.HTTPXNativeTransport(transport=LoopbackTransport(wire.port))
+    app = gateway.authenticated_gateway(
+        selected, credential=credential, transport=transport, checkpoint=Admission(selected)
+    )
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://gateway") as client:
+        reply = await client.post(
+            "/v1/chat/completions", json=request(selected), headers={"authorization": "Bearer " + APP_A}
+        )
+        assert reply.status_code == 200
+    assert transport._client._transport.original[0][0] == (
+        "https://aa.services.ai.azure.com/openai/v1/chat/completions?api-version=v1"
+    )
+    assert len(wire.calls) == 1
+    await transport.close()
+
+
+def test_single_character_native_subdomain_is_not_supported(source):
+    with pytest.raises(gateway.GatewayError):
+        replace(source, account_name="a")
+
+
+@pytest.mark.parametrize("path", ["/health", "/v1/models", "/v1/chat/completions"])
+async def test_admission_gateway_error_is_unavailable_not_bad_request(source, snapshot, wire, path):
+    async def unavailable(_source):
+        raise gateway.GatewayError(PRIVATE_ERROR)
+
+    credential = Credential()
+    transport = gateway.HTTPXNativeTransport(transport=LoopbackTransport(wire.port))
+    app = gateway.authenticated_gateway(source, credential=credential, transport=transport, checkpoint=unavailable)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://gateway") as client:
+        headers = {"authorization": "Bearer " + APP_A}
+        reply = (
+            await client.post(path, json=request(source), headers=headers)
+            if path == "/v1/chat/completions"
+            else await client.get(path, headers=headers)
+        )
+        assert reply.status_code == 503
+        assert reply.json()["error"]["code"] == "source_unavailable"
+        assert PRIVATE_ERROR not in reply.text
+    assert credential.scopes == [] and wire.calls == []
+    await transport.close()
