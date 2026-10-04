@@ -6136,6 +6136,7 @@
       "retry": "Réessayer"
     },
     "memberships": {
+      "activity": "Activité",
       "people": "Personnes",
       "teams": "Équipes",
       "addPeople": "Ajouter des personnes",

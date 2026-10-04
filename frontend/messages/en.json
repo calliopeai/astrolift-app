@@ -6213,6 +6213,7 @@
       "retry": "Retry"
     },
     "memberships": {
+      "activity": "Activity",
       "people": "People",
       "teams": "Teams",
       "addPeople": "Add people",

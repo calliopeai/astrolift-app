@@ -6133,6 +6133,7 @@
       "retry": "Tentar novamente"
     },
     "memberships": {
+      "activity": "Atividade",
       "people": "Pessoas",
       "teams": "Equipes",
       "addPeople": "Adicionar pessoas",

@@ -230,7 +230,12 @@ function MembershipContext(props: Target & { ready: boolean; scopeError: string 
       }
       tabs={tabs.map((tab) => ({
         ...tab,
-        label: tab.key === "teams" ? t("teams") : detailT(tab.key),
+        label:
+          tab.key === "teams"
+            ? t("teams")
+            : tab.key === "activity"
+              ? t("activity")
+              : detailT(tab.key),
       }))}
       loading={!props.ready || teamQuery.loading || personQuery.loading}
       error={error ? { message: error } : null}

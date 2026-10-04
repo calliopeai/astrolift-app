@@ -6133,6 +6133,7 @@
       "retry": "重试"
     },
     "memberships": {
+      "activity": "活动",
       "people": "用户",
       "teams": "团队",
       "addPeople": "添加用户",

@@ -798,3 +798,27 @@ it.each(Object.entries(locales))(
     ).toBeEnabled();
   }
 );
+
+it.each(Object.entries(locales))(
+  "renders person membership navigation including Activity without catalogue errors in %s",
+  async (locale, messages) => {
+    transport = async (request) =>
+      request.operationName === "GetTeamAccessNavigation"
+        ? response({ me: { teamAccessNavigation: { ...navigation, canViewPeople: true } } })
+        : fixture(request);
+    const { client } = provider(locale as keyof typeof locales);
+    const errors = vi.fn();
+    render(
+      <NextIntlClientProvider locale={locale} messages={messages} timeZone="UTC" onError={errors}>
+        <ApolloProvider client={client}>
+          <MembershipRouteClient direction="person" orgMemberId={row.person.orgMemberId} />
+        </ApolloProvider>
+      </NextIntlClientProvider>
+    );
+    await screen.findByRole("link", { name: messages.teams.memberships.activity, exact: true });
+    expect(
+      screen.getByRole("link", { name: messages.teams.memberships.activity, exact: true })
+    ).toHaveAttribute("href", `/administration/access/people/${row.person.orgMemberId}/activity`);
+    expect(errors).not.toHaveBeenCalled();
+  }
+);

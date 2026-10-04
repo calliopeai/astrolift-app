@@ -6133,6 +6133,7 @@
       "retry": "再試行"
     },
     "memberships": {
+      "activity": "アクティビティ",
       "people": "ユーザー",
       "teams": "チーム",
       "addPeople": "ユーザーを追加",
