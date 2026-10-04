@@ -1,4 +1,5 @@
 "use client";
+import { ModelConnectionPolicyClient } from "@/components/screens/models/ModelConnectionPolicyClient";
 import { SharedModelDetailScreen } from "@/components/screens/models/SharedModelDetailScreen";
 import { useSharedModelDetail } from "@/components/screens/models/use-shared-model-detail";
 import { ModelObservationsClient } from "@/components/screens/models/ModelObservationsClient";
@@ -30,11 +31,17 @@ function DetailContext({ id }: { id: string }) {
       prompt={props.model ? <SharedModelPromptClient model={props.model} /> : null}
       management={
         props.model ? (
-          <SharedModelManagementClient
-            model={props.model}
-            blocked={props.stale || !!props.error}
-            onRefresh={props.onRetry}
-          />
+          <>
+            <SharedModelManagementClient
+              model={props.model}
+              blocked={props.stale || !!props.error}
+              onRefresh={props.onRetry}
+            />
+            <ModelConnectionPolicyClient
+              model={props.model}
+              blocked={props.stale || !!props.error}
+            />
+          </>
         ) : null
       }
     />

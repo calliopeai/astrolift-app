@@ -1,3 +1,4 @@
+import en from "../messages/en.json";
 import { expect, test } from "@playwright/test";
 
 const modelId = "22222222-2222-4222-8222-222222222222";
@@ -116,13 +117,27 @@ for (const action of ["subscribe", "revoke"] as const) {
     page.setDefaultTimeout(15_000);
     await page.goto("/models");
     await page.getByRole("link", { name: /Controlled shared CPU model/ }).click();
-    const section = page.getByRole("region", { name: "App subscriptions", exact: true });
+    if (action === "subscribe")
+      await page
+        .getByRole("button", { name: en.models.shared.connections.add, exact: true })
+        .click();
+    const section = page.getByRole("region", {
+      name:
+        action === "subscribe"
+          ? en.models.shared.connections.add
+          : en.models.shared.inventory.connections,
+      exact: true,
+    });
     if (action === "subscribe") {
       await section
         .getByRole("button", { name: "controlled-app / production", exact: true })
         .click();
-      await section.getByLabel("Subscription alias", { exact: true }).fill("assistant");
-      await section.getByRole("button", { name: "Review subscription", exact: true }).click();
+      await section
+        .getByLabel(en.models.shared.connections.alias, { exact: true })
+        .fill("assistant");
+      await section
+        .getByRole("button", { name: en.models.shared.connections.review, exact: true })
+        .click();
     } else {
       await section
         .getByRole("row")
@@ -131,24 +146,38 @@ for (const action of ["subscribe", "revoke"] as const) {
         .click();
     }
     const confirmation = page.getByRole("alertdialog");
-    await expect(confirmation).toContainText("All consumers may temporarily lose access.");
+    await expect(confirmation).toContainText(
+      action === "subscribe"
+        ? en.models.shared.connections.restartNotice
+        : "All consumers may temporarily lose access."
+    );
     expect(await (await context.request.get(`${api}/observations/model-writes`)).json()).toEqual(
       []
     );
     await confirmation
       .getByRole("button", {
-        name: action === "subscribe" ? "Request subscription" : "Request revocation",
+        name: action === "subscribe" ? en.models.shared.connections.connect : "Request revocation",
         exact: true,
       })
       .click();
     await expect(
       section.getByText(
-        "Request accepted. Waiting for restart and readiness; the requested access change is not yet confirmed.",
+        action === "subscribe"
+          ? en.models.shared.connections.connectionQueued
+          : "Request accepted. Waiting for restart and readiness; the requested access change is not yet confirmed.",
         { exact: true }
       )
     ).toBeVisible();
+    if (action === "subscribe")
+      await page
+        .getByRole("button", { name: en.models.shared.connections.connections, exact: true })
+        .click();
+    const currentConnections = page.getByRole("region", {
+      name: en.models.shared.inventory.connections,
+      exact: true,
+    });
     await expect(
-      section
+      currentConnections
         .getByRole("row")
         .filter({ hasText: action === "subscribe" ? "MODEL_ASSISTANT_" : "MODEL_CHAT_" })
     ).toContainText(
@@ -156,9 +185,9 @@ for (const action of ["subscribe", "revoke"] as const) {
         ? "Pending restart and readiness"
         : "Revocation pending restart and readiness"
     );
-    await expect(section.getByRole("row").filter({ hasText: "MODEL_SEARCH_" })).toContainText(
-      "Active"
-    );
+    await expect(
+      currentConnections.getByRole("row").filter({ hasText: "MODEL_SEARCH_" })
+    ).toContainText("Active");
     const input =
       action === "subscribe"
         ? {

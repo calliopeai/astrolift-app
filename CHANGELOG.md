@@ -10,6 +10,12 @@
   automatic model connection or subscription revocation effects after lock waits.
   Preserve withdrawn session tracking when refusing stale requests (#2270).
 
+- Add policy-aware hosted-model app connections, separate requester/reviewer
+  queues and exact-version approval detail with an explicit approved-to-Connect
+  step. Keep durable request-key recovery, neutral superadmin restriction overlays,
+  organization policy administration, accepted-write/read-failure feedback and
+  source/actor review invalidation explicit across all eight locales (Refs: #2270).
+
 - Add explicit connected-app subscription traffic reads to hosted models, with
   request/error rates, accepted response bytes and latency. Keep authenticated
   subscription scope separate from deployment totals, preserve missing/zero/stale
