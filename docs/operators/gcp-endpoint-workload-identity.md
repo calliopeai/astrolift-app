@@ -39,6 +39,23 @@ pod rollout/inference remain unverified by the offline provider tests.
 
 ## Durable policy ownership
 
+IAM journal short transactions use nonblocking row locks for every original
+organization/cluster/provider/team/project/app parent and journal row. Existing
+workload and preview writers can acquire app/environment rows before the cluster;
+waiting while holding the opposite parent order can deadlock. A collision rolls
+back the entire short transaction before returning fixed `JOURNAL_BUSY`; only
+PostgreSQL lock-unavailable SQLSTATE `55P03` receives that classification. Other
+database failures remain failed/uncertain outcomes under the existing durable
+submission protocol, never acknowledgements or proof that an effect was unsent.
+
+Retain the original advisory mutex/operation tuple and committed ledger on retry.
+Reacquire admission and all current source checks after contention clears; an
+authority/source withdrawal still refuses. Busy does not create a reservation,
+advance a receipt or permit a provider effect. This policy applies to every
+explicit parent/journal row acquisition, since app-only NOWAIT would leave waits
+on other parents while holding earlier rows. It does not change shared writers
+or promise bounded acquisition during unrelated database DDL/connection failures.
+
 The caller must durably store `OwnedGrantLedger` in an internal org/app/cluster-
 bound record and implement `persist(ledger)` as a committed write before returning.
 An empty ledger is valid only for a genuinely new identity integration; never
