@@ -36,8 +36,12 @@ Known pending operations retain their receipt for an original-workflow retry.
 Failed or malformed operations never imply that the model is deployed.
 
 Provision readiness requires a completed deploy operation, an owned endpoint,
-the exact observed deployed-model ID/artifact and available replicas meeting its
-positive configured minimum. Status and binding only read resources/operations;
+the exact observed deployed-model ID/artifact, machine type, minimum/maximum
+replicas and traffic matching the saved reviewed serving request, and available
+replicas meeting that requested positive minimum. Native settings cannot lower
+the saved minimum or substitute another machine to make a request appear ready.
+Divergent or not-yet-converged observations stay pending without redeploying.
+Status and binding only read resources/operations;
 they never create, deploy, mutate or delete. A binding uses the actual endpoint
 and deployed-model IDs. This is not an inference, IAM, network-reachability or
 model-quality test.
@@ -65,10 +69,16 @@ require one coherent service owner in the configured project/region. Missing,
 ambiguous, contradictory or incomplete inventory refuses; a display name is
 never converted into a fabricated resource ID. A legacy endpoint with no saved
 deployment operation is not reported ready simply because it exists. An
-explicit reviewed update/removal can recover a unique observed deployment ID,
+explicit reviewed removal can recover a unique observed deployment ID,
 but an unreviewed direct write or the legacy app-onboarding allocator refuses
 before provisioning. Existing Temporal workflow inputs and command order remain
 unchanged.
+
+An old record with no saved serving request cannot infer its desired settings
+from the current endpoint: status/binding remain unavailable and in-place update
+refuses with an operator-recovery reason. The original reviewed provision may
+record its exact unchanged requested configuration; this does not resend an
+unknown reservation or create an automatic repair path.
 
 ## Update and removal limits
 
@@ -82,7 +92,9 @@ unchanged.
 - Removal refuses endpoints containing other deployments. Live traffic requires
   explicit `force_destroy`; undeploy and endpoint delete have separate recorded
   operations. The registered Model is preserved. `delete_data=true` refuses
-  because ownership of that artifact has not been proven.
+  because ownership of that artifact has not been proven, including when the
+  recorded Endpoint is already absent. Endpoint absence never establishes Model
+  artifact deletion.
 - Endpoint snapshot/export and restore are unsupported. Retaining a registered
   Model is not a replayable endpoint snapshot. The legacy
   `public_endpoint_enabled` configuration field does not verify private routing;

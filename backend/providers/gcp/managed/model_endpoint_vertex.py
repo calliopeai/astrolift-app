@@ -275,10 +275,49 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
         return model
 
     @staticmethod
-    def _replicas_available(model: Any) -> bool:
-        minimum = _get(_get(model, "dedicated_resources"), "min_replica_count")
+    def _replicas_available(model: Any, minimum: int) -> bool:
         available = _get(_get(model, "status"), "available_replica_count")
         return type(minimum) is int and type(available) is int and minimum > 0 and available >= minimum
+
+    @staticmethod
+    def _serving_request(state: dict[str, Any]) -> dict[str, Any] | None:
+        expected = state.get("serving_request", {})
+        if not isinstance(expected, dict):
+            return None
+        minimum = expected.get("min_replica_count")
+        maximum = expected.get("max_replica_count")
+        traffic = expected.get("traffic_percentage")
+        machine = expected.get("machine_type")
+        if (
+            type(minimum) is not int
+            or type(maximum) is not int
+            or not 1 <= minimum <= maximum <= 1000
+            or type(traffic) is not int
+            or traffic not in (0, 100)
+            or not isinstance(machine, str)
+            or not machine
+        ):
+            return None
+        return expected
+
+    def _serving_observed(self, endpoint: Any, state: dict[str, Any]) -> bool:
+        model = self._selected(endpoint, state)
+        expected = self._serving_request(state)
+        if expected is None:
+            return False
+        resources = _get(model, "dedicated_resources")
+        minimum = expected["min_replica_count"]
+        maximum = expected["max_replica_count"]
+        machine = expected["machine_type"]
+        traffic = expected["traffic_percentage"]
+        desired_traffic = {state["deployed_model_id"]: traffic} if traffic else {}
+        return (
+            _get(resources, "min_replica_count") == minimum
+            and _get(resources, "max_replica_count") == maximum
+            and _get(_get(resources, "machine_spec"), "machine_type") == machine
+            and self._replicas_available(model, minimum)
+            and dict(_get(endpoint, "traffic_split", {}) or {}) == desired_traffic
+        )
 
     def operation_plan(
         self, action: str, spec: Any, *, delete_data: bool = False, force_destroy: bool = False
@@ -290,6 +329,10 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
         source = UUID(str(spec.managed_service_id))
         if not source.int:
             raise VertexAIEndpointError("Vertex managed-service identity is invalid")
+        if action == "deprovision" and delete_data:
+            raise VertexAIEndpointError(
+                "Vertex model artifact ownership is not proven; delete_data refused, preserve the registered model"
+            )
         endpoint = self._target(spec, state)
         if action == "provision":
             model = (spec.config or {}).get("model_artifact") or self._config.default_model_artifact
@@ -298,6 +341,25 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
             state.setdefault("deployment_display_name", f"astrolift-{source.hex}")
             if state["model_artifact"] != model:
                 raise VertexAIEndpointError("Vertex desired model changed during provisioning")
+            cfg = spec.config or {}
+            minimum = int(cfg.get("min_replica_count", _SIZE_TO_REPLICAS.get(spec.size, 1)))
+            maximum = int(cfg.get("max_replica_count", max(minimum, 1) * 2))
+            if minimum < 1 or maximum < minimum or maximum > 1000:
+                raise VertexAIEndpointError("Vertex replica request is invalid")
+            traffic = int(cfg.get("traffic_percentage", self._config.default_traffic_percentage))
+            if traffic != 100:
+                raise VertexAIEndpointError("A new single Vertex deployment requires 100 percent traffic")
+            requested = {
+                "machine_type": cfg.get("machine_type") or _SIZE_TO_MACHINE_TYPE.get(spec.size, "n1-standard-2"),
+                "min_replica_count": minimum,
+                "max_replica_count": maximum,
+                "traffic_percentage": traffic,
+            }
+            if state.get("serving_request") and state["serving_request"] != requested:
+                raise VertexAIEndpointError("Vertex reviewed serving request changed during provisioning")
+            state["serving_request"] = requested
+            if self._serving_request(state) is None:
+                raise VertexAIEndpointError("Vertex reviewed serving request is invalid")
             if endpoint is None and not state.get("endpoint"):
                 endpoint = self._recover_endpoint(spec, self._base_name_for(spec=spec))
                 if endpoint is not None:
@@ -327,13 +389,6 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
             if deployed is None:
                 return VertexPlan(state, pending=True, message="Vertex model deployment pending")
             if not deployed and selected is None:
-                cfg = spec.config or {}
-                minimum = int(cfg.get("min_replica_count", _SIZE_TO_REPLICAS.get(spec.size, 1)))
-                maximum = int(cfg.get("max_replica_count", max(minimum, 1) * 2))
-                if minimum < 1 or maximum < minimum or maximum > 1000:
-                    raise VertexAIEndpointError("Vertex replica request is invalid")
-                if int(cfg.get("traffic_percentage", self._config.default_traffic_percentage)) != 100:
-                    raise VertexAIEndpointError("A new single Vertex deployment requires 100 percent traffic")
                 return VertexPlan(
                     state,
                     phase="deploy",
@@ -344,10 +399,7 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
                             "model": model,
                             "display_name": state["deployment_display_name"],
                             "dedicated_resources": {
-                                "machine_spec": {
-                                    "machine_type": cfg.get("machine_type")
-                                    or _SIZE_TO_MACHINE_TYPE.get(spec.size, "n1-standard-2")
-                                },
+                                "machine_spec": {"machine_type": requested["machine_type"]},
                                 "min_replica_count": minimum,
                                 "max_replica_count": maximum,
                             },
@@ -355,8 +407,10 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
                         "traffic_split": {"0": 100},
                     },
                 )
-            if not self._replicas_available(self._selected(endpoint, state)):
-                return VertexPlan(state, pending=True, message="Vertex deployment replicas not yet available")
+            if not self._serving_observed(endpoint, state):
+                return VertexPlan(
+                    state, pending=True, message="Vertex requested serving configuration/replicas not yet observable"
+                )
             return VertexPlan(state, complete=True, message="Vertex deployment operation completed and model observed")
 
         if endpoint is None:
@@ -387,6 +441,11 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
             requested_machine = cfg.get("machine_type") or (_SIZE_TO_MACHINE_TYPE.get(spec.size) if spec.size else None)
             if requested_machine and requested_machine != current_machine:
                 raise VertexAIEndpointError("Vertex machine type cannot be mutated in place; reprovision required")
+            expected = self._serving_request(state)
+            if expected is None:
+                raise VertexAIEndpointError(
+                    "Vertex reviewed serving request is not recorded; operator recovery required"
+                )
             change = {}
             for key in ("min_replica_count", "max_replica_count"):
                 value = cfg.get(key)
@@ -396,6 +455,7 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
                     value = int(value)
                     if not 1 <= value <= 1000:
                         raise VertexAIEndpointError("Vertex replica request is invalid")
+                    expected[key] = value
                     if value != _get(resources, key):
                         change[key] = value
             done = self._step(state, "mutate", "MutateDeployedModelResponse")
@@ -424,6 +484,7 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
                     raise VertexAIEndpointError(
                         "Vertex single-model traffic must be 0 or 100; multi-model changes require operator review"
                     )
+                expected["traffic_percentage"] = traffic
                 desired = {state["deployed_model_id"]: traffic} if traffic else {}
                 observed = dict(_get(endpoint, "traffic_split", {}) or {}) == desired
                 traffic_done = self._step(state, "traffic", "Endpoint", recovered=observed)
@@ -442,13 +503,13 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
                             "update_mask": {"paths": ["traffic_split"]},
                         },
                     )
+            if not self._serving_observed(endpoint, state):
+                return VertexPlan(
+                    state, pending=True, message="Vertex requested serving configuration/replicas not yet observable"
+                )
             return VertexPlan(state, complete=True, message="Vertex update confirmed")
         if action != "deprovision":
             raise VertexAIEndpointError("Vertex operation is unsupported")
-        if delete_data:
-            raise VertexAIEndpointError(
-                "Vertex model artifact ownership is not proven; delete_data refused, preserve the registered model"
-            )
         if len(list(_get(endpoint, "deployed_models", []) or [])) > 1:
             raise VertexAIEndpointError("Vertex endpoint has other deployed models; destructive operation refused")
         if "undeploy" in state.get("steps", {}):
@@ -580,8 +641,12 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
                     return ServiceStatus(handle=handle.handle, state="provisioning", message="Vertex operation pending")
             if not state.get("deployed_model_id"):
                 raise VertexAIEndpointError("Vertex deployment operation identity is not recorded; recovery required")
-            if not self._replicas_available(self._selected(endpoint, state)):
-                return ServiceStatus(handle=handle.handle, state="provisioning", message="Vertex replicas unavailable")
+            if not self._serving_observed(endpoint, state):
+                return ServiceStatus(
+                    handle=handle.handle,
+                    state="provisioning",
+                    message="Vertex requested serving configuration/replicas unavailable",
+                )
             return ServiceStatus(
                 handle=handle.handle, state="available", message="Vertex completed deployment observed"
             )

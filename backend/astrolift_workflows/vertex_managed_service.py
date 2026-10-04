@@ -140,7 +140,13 @@ def _load(service_id, binding, action, delete_data, force_destroy):
             raise ValueError("Vertex original operation or placement changed; operator recovery required")
         state = {
             k: state[k]
-            for k in ("endpoint", "deployed_model_id", "model_artifact", "deployment_display_name")
+            for k in (
+                "endpoint",
+                "deployed_model_id",
+                "model_artifact",
+                "deployment_display_name",
+                "serving_request",
+            )
             if k in state
         }
     state["context"] = context
