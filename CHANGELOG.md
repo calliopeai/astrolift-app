@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Retain append-only GCP namespace/KSA and IAM response acknowledgments without advancing ownership or completion after caller withdrawal; guarded create recovery requires the original acknowledged UID (Refs: #2278).
+
 - Scope private native execution checkpoints to the actual activity lifetime and cancellation; re-admit callbacks on SDK metadata threads and final source transitions, preserve acknowledged UID evidence after withdrawal, and avoid receipt-lock waits beneath source parents. Full native pipeline activation remains staged (#2278).
 - Stage private receipt-bound GKE controller and ancillary configuration with protected physical ownership, committed send/evidence history, guarded UID/resourceVersion updates and bounded definitive rejection recovery. Keep uncertain sends unresolved and distinguish configuration from rollout; public activation, complete removals, node-pool runtime admission and identity evolution remain separate (#2278).
 

@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 from _sdk.cloud_credentials import CloudCredential, CredentialMode
+from gcp.identity_acknowledgement import AcknowledgementReceipt, PolicyAcknowledgement, acknowledgement_sha256
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -578,9 +579,12 @@ class NativeGCPIdentity:
         checkpoint: Callable[[], None],
         persist: Callable[[OwnedGrantLedger], None],
         submission_hook: Callable[[PolicySubmission], DurableSubmissionReceipt] | None = None,
+        acknowledgement_hook: Callable[[PolicyAcknowledgement], AcknowledgementReceipt] | None = None,
     ) -> NativeIdentityResult:
         if submission_hook is None and any(row.submission_id for row in ledger.pending):
             raise NativeIdentityError("TYPED_SUBMISSION_HOOK_REQUIRED")
+        if acknowledgement_hook is not None and submission_hook is None:
+            raise NativeIdentityError("SUBMISSION_HOOK_REQUIRED")
         progress = _SubmissionProgress(ledger)
         if submission_hook is not None:
             for intent in ledger.pending:
@@ -609,6 +613,7 @@ class NativeGCPIdentity:
                 checkpoint=checkpoint,
                 persist=tracked_persist,
                 submission_hook=submission_hook,
+                acknowledgement_hook=acknowledgement_hook,
                 progress=progress,
             )
             return replace(result, receipt=progress.receipt()) if submission_hook is not None else result
@@ -667,6 +672,7 @@ class NativeGCPIdentity:
         checkpoint: Callable[[], None],
         submission: PolicySubmission,
         progress: _SubmissionProgress,
+        acknowledgement_hook: Callable[[PolicyAcknowledgement], AcknowledgementReceipt] | None,
     ) -> Any:
         self._checkpoint(checkpoint)
         progress.note(submission, PolicyStepState.UNKNOWN, invoked=True)
@@ -675,8 +681,24 @@ class NativeGCPIdentity:
         except Exception:
             self._checkpoint(checkpoint)
             raise NativeIdentityError("NATIVE_SET_UNCONFIRMED") from None
-        self._checkpoint(checkpoint)
         self._bounded(value)
+        if acknowledgement_hook is not None:
+            self._policy(value)
+            ack = PolicyAcknowledgement(
+                submission.intent.submission_id,
+                submission.submission_sha256,
+                self._policy_hash(value),
+                hashlib.sha256(value.etag).hexdigest(),
+            )
+            try:
+                receipt = acknowledgement_hook(ack)
+            except Exception:
+                raise NativeIdentityError("ACKNOWLEDGEMENT_COMMIT_UNCONFIRMED") from None
+            if type(receipt) is not AcknowledgementReceipt or receipt.acknowledgement_sha256 != acknowledgement_sha256(
+                ack
+            ):
+                raise NativeIdentityError("ACKNOWLEDGEMENT_RECEIPT_REQUIRED")
+        self._checkpoint(checkpoint)
         return value
 
     def _desired(
@@ -720,6 +742,7 @@ class NativeGCPIdentity:
         checkpoint: Callable[[], None],
         persist: Callable[[OwnedGrantLedger], None],
         submission_hook: Callable[[PolicySubmission], DurableSubmissionReceipt] | None,
+        acknowledgement_hook: Callable[[PolicyAcknowledgement], AcknowledgementReceipt] | None,
         progress: _SubmissionProgress,
     ) -> NativeIdentityResult:
         from google.iam.v1 import iam_policy_pb2
@@ -893,6 +916,7 @@ class NativeGCPIdentity:
                         checkpoint,
                         PolicySubmission(self.context.fingerprint, intent, ledger),
                         progress,
+                        acknowledgement_hook,
                     )
                 else:
                     self._call(client.set_iam_policy, request, checkpoint)
