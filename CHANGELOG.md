@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Make team and person membership tabs discoverable with paged selectors,
+  explicit direct-grant review and original-request recovery in all eight
+  locales. Keep team-only navigation scoped and retain the guarded legacy
+  bulk-assignment route with its stated limits (#2273).
+
 - Add reviewed, paged direct user/team membership APIs with exact public GUIDs,
   current team-manager and credential checks, role ceilings, concurrent source
   refusal and actor-bound retry receipts. Preserve inherited/IdP/other-scope
