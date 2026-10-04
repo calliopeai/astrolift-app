@@ -209,6 +209,11 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
     def _validated_roles(permissions: list[dict[str, Any]]) -> list[str]:
         roles: list[str] = []
         for permission in permissions:
+            resource = permission.get("resource")
+            if permission.get("role") == "roles/aiplatform.user" or (
+                isinstance(resource, str) and "/endpoints/" in resource
+            ):
+                raise ValueError("Endpoint grants require owned resource-scoped GCP reconciliation")
             role = permission.get("role")
             if not isinstance(role, str) or not _ROLE_RE.fullmatch(role):
                 raise ValueError(
