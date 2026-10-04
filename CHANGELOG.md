@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Reuse persisted browser-session admission for model connection requests and
+  reviews; preserve revoked, expired, deleted or foreign-actor session tracking
+  after a waiting request is refused (#2270).
+
 - Govern app connections to hosted models with organization defaults, tighter
   model restrictions and version-bound approval requests. Keep approved requests
   separate from current-owner Connect and reconciliation; recheck scoped authority
