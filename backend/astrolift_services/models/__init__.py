@@ -8,6 +8,11 @@ from astrolift_services.models.managed_service import (
     ManagedServiceBinding,
     ManagedServiceVolumeBinding,
 )
+from astrolift_services.models.model_connection_request import (
+    ModelConnectionApproval,
+    ModelConnectionPolicy,
+    ModelConnectionRequest,
+)
 from astrolift_services.models.secret_bundle import AppSecretBundleRef, SecretBundle
 from astrolift_services.models.secret_change_proposal import (
     SecretChangeApproval,
@@ -20,6 +25,9 @@ from astrolift_services.models.workload_identity_grant import (
 )
 
 __all__ = [
+    "ModelConnectionApproval",
+    "ModelConnectionPolicy",
+    "ModelConnectionRequest",
     "AppSecretBundleRef",
     "AppSecretMetadata",
     "EmailEvent",

@@ -32,6 +32,10 @@
   permission-scoped API reads for request/error rates, accepted response bytes
   and p95 duration. Preserve measured zero and unavailable states; leave token
   counts and cost unsupported without an actual usage source (#2269).
+- Govern app connections to hosted models with organization defaults, tighter
+  model restrictions and version-bound approval requests. Keep approved requests
+  separate from current-owner Connect and reconciliation; recheck scoped authority
+  and distinct human quorum after lock waits without exposing credentials (#2270).
 
 - Preserve immutable local and private Hugging Face model sources when editing
   hosted model settings. Add versioned names and shared or dedicated app access,

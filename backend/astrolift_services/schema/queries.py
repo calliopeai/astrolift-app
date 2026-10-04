@@ -48,6 +48,7 @@ from astrolift_services.models import (
 from astrolift_services.schema.cluster_models import ClusterModelsQuery
 from astrolift_services.schema.hf_connections import HuggingFaceConnectionsQuery
 from astrolift_services.schema.local_model_artifacts import ModelArtifactsQuery
+from astrolift_services.schema.model_connections import ModelConnectionsQuery
 from astrolift_services.schema.model_runtime_settings import ModelRuntimeSettingsQuery
 from astrolift_services.schema.resource_reads import (
     ManagedResourceReadsQuery,
@@ -686,6 +687,7 @@ class ServicesQuery(
     HuggingFaceConnectionsQuery,
     ModelArtifactsQuery,
     ModelRuntimeSettingsQuery,
+    ModelConnectionsQuery,
     ManagedResourceReadsQuery,
 ):
     @strawberry.field

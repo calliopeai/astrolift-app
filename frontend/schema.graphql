@@ -7029,6 +7029,11 @@ scalar Date
 """Date with time (isoformat)"""
 scalar DateTime
 
+input DecideModelConnectionRequestInput {
+  id: GUID!
+  ifMatchVersion: Int!
+}
+
 input DecommissionClusterInputType {
   clusterId: GUID!
   deleteCloudInfra: Boolean! = false
@@ -7772,6 +7777,148 @@ enum ModelCompatibility {
   UNKNOWN
 }
 
+enum ModelConnectionAction {
+  AUTO
+  REQUEST
+  DENY
+}
+
+type ModelConnectionDestination {
+  environmentId: GUID!
+  environmentVersion: Int!
+  appId: GUID!
+  appSlug: String!
+  appName: String!
+  environmentName: String!
+  clusterId: GUID!
+  eligible: Boolean!
+  reason: String
+  appVersion: Int!
+  action: ModelConnectionAction!
+  policyVersion: String
+  requiredApprovals: Int
+  allowSelfApproval: Boolean
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type ModelConnectionDestinationPage {
+  items: [ModelConnectionDestination!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
+type ModelConnectionEligibility {
+  action: ModelConnectionAction!
+  reason: String!
+  policyVersion: String
+  requiredApprovals: Int
+  allowSelfApproval: Boolean
+}
+
+enum ModelConnectionMode {
+  AUTO
+  REQUIRE_APPROVAL
+  DENY
+}
+
+input ModelConnectionPlacementInput {
+  organizationId: GUID!
+  modelDeploymentId: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+}
+
+type ModelConnectionPolicy {
+  id: GUID
+  version: Int!
+  mode: ModelConnectionMode!
+  requiredApprovals: Int!
+  allowSelfApproval: Boolean!
+}
+
+type ModelConnectionPolicyMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ModelConnectionPolicy
+}
+
+type ModelConnectionRequest {
+  id: GUID!
+  version: Int!
+  status: ModelConnectionRequestStatus!
+  organizationId: GUID!
+  modelDeploymentId: GUID!
+  appId: GUID!
+  appEnvironmentId: GUID!
+  clusterId: GUID!
+  providerId: GUID!
+  alias: String!
+  modelName: String
+  appName: String
+  environmentName: String
+  requesterUsername: String
+  policyVersion: String!
+  requiredApprovals: Int!
+  approvalCount: Int!
+  canApprove: Boolean!
+  canReject: Boolean!
+  canCancel: Boolean!
+  canFinalize: Boolean!
+  subscriptionId: GUID
+  createdAt: DateTime!
+  decidedAt: DateTime
+  finalizedAt: DateTime
+}
+
+type ModelConnectionRequestMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ModelConnectionRequest
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type ModelConnectionRequestPage {
+  items: [ModelConnectionRequest!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
+enum ModelConnectionRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  STALE
+}
+
+input ModelConnectionTargetInput {
+  organizationId: GUID!
+  modelDeploymentId: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  appEnvironmentId: GUID!
+}
+
 type ModelDedicatedApp {
   id: GUID!
   version: Int!
@@ -8413,6 +8560,13 @@ type Mutation {
   revokeModelSubscription(input: RevokeModelSubscriptionInput!): ModelSubscriptionOperationMutationResult!
   updateClusterModel(input: UpdateClusterModelInput!): ClusterModelDeploymentMutationResult!
   deprovisionClusterModel(input: DeprovisionClusterModelInput!): ClusterModelDeploymentMutationResult!
+  updateOrganizationModelConnectionPolicy(input: UpdateOrganizationModelConnectionPolicyInput!): ModelConnectionPolicyMutationResult!
+  setModelConnectionRestriction(input: SetModelConnectionRestrictionInput!): ModelConnectionPolicyMutationResult!
+  requestModelConnection(input: RequestModelConnectionInput!): ModelConnectionRequestMutationResult!
+  approveModelConnectionRequest(input: DecideModelConnectionRequestInput!): ModelConnectionRequestMutationResult!
+  rejectModelConnectionRequest(input: DecideModelConnectionRequestInput!): ModelConnectionRequestMutationResult!
+  cancelModelConnectionRequest(input: DecideModelConnectionRequestInput!): ModelConnectionRequestMutationResult!
+  finalizeModelConnectionRequest(input: DecideModelConnectionRequestInput!): ModelConnectionRequestMutationResult!
   disconnectHuggingFace(input: DisconnectHuggingFaceInput!): HuggingFaceConnectionTypeMutationResult!
   connectHuggingFace(input: ConnectHuggingFaceInput!): HuggingFaceConnectionTypeMutationResult!
   beginLocalModelArtifact(input: BeginLocalModelArtifactInput!): LocalModelArtifactMutationResult!
@@ -9187,6 +9341,14 @@ type Query {
   astroliftSshDeployKeysPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftSshDeployKeyPage!
   astroliftAvailableRepos(connectionId: String!, search: String = null, limit: Int! = 100): AstroliftRemoteRepoList!
   astroliftSourceFile(connectionId: String!, repoFullName: String!, path: String!, ref: String!): AstroliftSourceFile!
+  organizationModelConnectionPolicy(organizationId: GUID!): ModelConnectionPolicy!
+  modelConnectionRestriction(input: ModelConnectionPlacementInput!): ModelConnectionPolicy!
+  modelConnectionTargetsPage(input: ModelConnectionPlacementInput!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelConnectionDestinationPage!
+  modelConnectionAction(input: ModelConnectionTargetInput!): ModelConnectionEligibility!
+  modelConnectionRequestsPage(organizationId: GUID!, page: Int! = 1, pageSize: Int! = 25): ModelConnectionRequestPage!
+  modelConnectionRequest(input: DecideModelConnectionRequestInput!): ModelConnectionRequest
+  modelConnectionApprovalRequestsPage(organizationId: GUID!, page: Int! = 1, pageSize: Int! = 25): ModelConnectionRequestPage!
+  modelConnectionReviewRequest(input: DecideModelConnectionRequestInput!): ModelConnectionRequest
   clusterModelDedicatedAppsPage(organizationId: GUID!, clusterId: GUID!, expectedProviderId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelDedicatedAppPage!
   clusterModelUpdateAdmission(input: UpdateClusterModelInput!): ModelRuntimeAdmission!
   clusterModelPlacementClustersPage(organizationId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelPlacementClusterPage!
@@ -9580,6 +9742,20 @@ input RequestAttestationChallengeInput {
   kind: String!
 }
 
+input RequestModelConnectionInput {
+  organizationId: GUID!
+  modelDeploymentId: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  appEnvironmentId: GUID!
+  alias: String!
+  ifMatchVersion: Int!
+  ifMatchEnvironmentVersion: Int!
+  ifMatchAppVersion: Int!
+  policyVersion: String!
+  idempotencyKey: GUID!
+}
+
 input RequestQuotaIncreaseInput {
   quotaId: GUID!
   factor: Float!
@@ -9915,6 +10091,18 @@ input SetEnvironmentSettingInput {
   environmentId: GUID!
   key: String!
   value: String!
+}
+
+input SetModelConnectionRestrictionInput {
+  organizationId: GUID!
+  ifMatchVersion: Int!
+  mode: ModelConnectionMode!
+  requiredApprovals: Int!
+  allowSelfApproval: Boolean!
+  modelDeploymentId: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  ifMatchDeploymentVersion: Int!
 }
 
 input SetNotificationPreferenceInput {
@@ -10363,6 +10551,14 @@ input UpdateOrganizationInput {
   appearanceDefault: JSON = null
   appearanceLocked: Boolean = null
   restrictedSettingsDefault: String = null
+}
+
+input UpdateOrganizationModelConnectionPolicyInput {
+  organizationId: GUID!
+  ifMatchVersion: Int!
+  mode: ModelConnectionMode!
+  requiredApprovals: Int!
+  allowSelfApproval: Boolean!
 }
 
 input UpdatePipelineInput {
