@@ -120,8 +120,10 @@ visible. Other subscriptions retain their credentials and access.
 The runtime hook is `astrolift_shared_model_auth.SharedModelAuth`, mounted from
 the dependency-free provider module using the supported Python vLLM middleware
 hook. It reads `/var/run/astrolift/model-auth/keys.json` once at startup. The
-snapshot has version 1, the expected revision, one private operator key and at
-most 64 distinct subscription keys. `ASTROLIFT_MODEL_AUTH_REVISION` must match;
+snapshot has version 2, the expected revision, one private operator key and at
+most 64 distinct subscription keys with aligned canonical subscription GUIDs.
+Existing version 1 snapshots retain their authorization behavior and cannot
+supply per-subscription traffic attribution. `ASTROLIFT_MODEL_AUTH_REVISION` must match;
 missing, malformed, duplicate or replaced snapshots refuse startup.
 
 Supported inference paths accept a current subscription key or operator key.
@@ -131,6 +133,42 @@ are public. Administrative `/v1` paths do not inherit inference access, and
 WebSocket traffic has no supported subscription contract. The ServiceMonitor
 must authenticate with the operator Secret. Kubernetes NetworkPolicy cannot
 enforce these HTTP path boundaries on its own.
+
+## Per-application traffic
+
+`astroliftModelSubscriptionMetrics` reads one exact subscription under the
+caller's current `app.read_metrics` grant and organization visibility. Supply
+`organizationId`, `serviceId`, `subscriptionId`, `expectedClusterId`,
+`expectedProviderId`, `start` and `end`. Its `scope` is
+`authenticated_subscription`; it does not expose another app's traffic or require
+permission to configure models. The time window is one minute to 24 hours, with
+at most 120 samples per measure and a five-minute rate window.
+The public server-info handshake advertises
+`models.authenticated_subscription_metrics`; it contains no model or app usage.
+
+The version 2 runtime mapping attributes admitted inference POST requests to
+the authenticated subscription GUID. Caller-supplied identity headers cannot
+choose this identity. Operator traffic, invalid credentials and other routes
+are excluded. Prometheus must scrape the authenticated model ServiceMonitor and
+retain its canonical managed-service, namespace, service and pod labels.
+Existing version 1 deployments require reconciliation to install this mapping.
+
+Available measures are requests per second, errors per second, accepted response
+bytes per second and p95 request duration in seconds. Errors include completed
+4xx/5xx responses and interrupted, disconnected or failed ASGI calls. Bytes are
+those accepted by ASGI `send`; duration covers the ASGI application call. They
+do not establish bytes received by the caller, token use or billable cost.
+Token counts and cost remain `UNSUPPORTED` until an actual attributable usage
+source exists. No prompt or response body is parsed or used as a metric label.
+
+An idle, initialized and scraped counter can report measured zero. Missing
+meters, missing rate windows or absent histogram observations report `NO_DATA`;
+no collector configuration reports `UNCONFIGURED`. Failed transport or invalid
+series report `UNAVAILABLE`, and old samples report `STALE`. Duplicate scrape
+jobs for the same pod are deduplicated before aggregation. Immutable subscription
+identities retain history across credential revisions; process counters reset
+with their model process. Both current authority and target ownership are
+rechecked after the bounded Prometheus request.
 
 ASGI transport checks prove this hook's routing and startup-snapshot behavior,
 including removal of one key while preserving another. They do not establish
