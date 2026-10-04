@@ -301,15 +301,27 @@ def test_owner_migration_rollback_refuses_persisted_native_rows(world, client, d
     from django.db.migrations.executor import MigrationExecutor
     from django.db.migrations.recorder import MigrationRecorder
 
-    row, _ = register(world, client)
-    if deleted:
-        row.soft_delete()
-    with pytest.raises(IntegrityError, match="msvc_exactly_one_owner_scope"):
-        MigrationExecutor(connection).migrate([("astrolift_services", "0036_model_connection_requests")])
-    assert ("astrolift_services", "0037_native_bedrock_connection_owner") in (
-        MigrationRecorder(connection).applied_migrations()
-    )
-    assert ManagedService.all_objects.filter(pk=row.pk).exists()
+    original = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    original_records = set(MigrationRecorder(connection).applied_migrations())
+    original_tables = set(connection.introspection.table_names())
+    after = ("astrolift_services", "0037_native_bedrock_connection_owner")
+    try:
+        # Later empty migrations may reverse before this constraint refuses.
+        # Test the exact boundary and restore the full graph even on failure.
+        MigrationExecutor(connection).migrate([after])
+        row, _ = register(world, client)
+        if deleted:
+            row.soft_delete()
+        recorded = set(MigrationRecorder(connection).applied_migrations())
+        with pytest.raises(IntegrityError, match="msvc_exactly_one_owner_scope"):
+            MigrationExecutor(connection).migrate([("astrolift_services", "0036_model_connection_requests")])
+        assert after in MigrationRecorder(connection).applied_migrations()
+        assert set(MigrationRecorder(connection).applied_migrations()) == recorded
+        assert ManagedService.all_objects.filter(pk=row.pk).exists()
+    finally:
+        MigrationExecutor(connection).migrate(original)
+        assert set(MigrationRecorder(connection).applied_migrations()) == original_records
+        assert set(connection.introspection.table_names()) == original_tables
 
 
 @pytest.mark.parametrize("withdrawal", ["global_flag", "credential_declaration"])

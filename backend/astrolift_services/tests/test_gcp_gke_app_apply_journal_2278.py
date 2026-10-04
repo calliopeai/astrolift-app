@@ -493,12 +493,25 @@ def test_original_incarnation_replaced_after_uid_commit_refuses_no_followon(brid
 
 def test_retained_history_blocks_rollback_before_trigger_removal(bridge):
     from django.db.migrations.executor import MigrationExecutor
+    from django.db.migrations.recorder import MigrationRecorder
 
-    with pytest.raises(RuntimeError, match="APP_APPLY_ROLLBACK_REQUIRES_REVIEW"):
-        MigrationExecutor(connection).migrate([("astrolift_services", "0040_gcp_identity_sources")])
-    assert GCPGKEAppApplyJournal.objects.count() == 1
-    with pytest.raises(DatabaseError), transaction.atomic():
-        GCPGKEAppApplyJournal._unscoped.update(original_target={})
+    original = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    original_records = set(MigrationRecorder(connection).applied_migrations())
+    original_tables = set(connection.introspection.table_names())
+    try:
+        # Keep later empty migrations outside the boundary under test.
+        MigrationExecutor(connection).migrate([("astrolift_services", "0041_gcp_gke_app_apply_journal")])
+        recorded = set(MigrationRecorder(connection).applied_migrations())
+        with pytest.raises(RuntimeError, match="APP_APPLY_ROLLBACK_REQUIRES_REVIEW"):
+            MigrationExecutor(connection).migrate([("astrolift_services", "0040_gcp_identity_sources")])
+        assert set(MigrationRecorder(connection).applied_migrations()) == recorded
+        assert GCPGKEAppApplyJournal.objects.count() == 1
+        with pytest.raises(DatabaseError), transaction.atomic():
+            GCPGKEAppApplyJournal._unscoped.update(original_target={})
+    finally:
+        MigrationExecutor(connection).migrate(original)
+        assert set(MigrationRecorder(connection).applied_migrations()) == original_records
+        assert set(connection.introspection.table_names()) == original_tables
 
 
 def test_empty_migration_roundtrip_restores_all_newest_targets():

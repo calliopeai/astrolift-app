@@ -758,17 +758,21 @@ def test_real_migration_rollback_refuses_any_retained_history_then_empty_roundtr
     from django.db.migrations.recorder import MigrationRecorder
 
     original = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    original_records = set(MigrationRecorder(connection).applied_migrations())
+    original_tables = set(connection.introspection.table_names())
     before = ("astrolift_services", "0038_gcp_workload_identity_journal")
     after = ("astrolift_services", "0039_gcp_gke_preparation_journal")
-    with preparation_journal_mutex(world.target) as store:
-        reservation = store.reserve(world.operation, checkpoint=admitted)
-    if retired:
-        GCPGKEPreparationJournal._unscoped.all().update(deleted_at=timezone.now())
-        GCPGKEPreparationOperation._unscoped.all().update(deleted_at=timezone.now())
-    rows = list(GCPGKEPreparationJournal._unscoped.values())
-    history = list(GCPGKEPreparationOperation._unscoped.values())
-    recorded = set(MigrationRecorder(connection).applied_migrations())
     try:
+        # Isolate this guard from legitimate reversal of later empty migrations.
+        MigrationExecutor(connection).migrate([after])
+        with preparation_journal_mutex(world.target) as store:
+            reservation = store.reserve(world.operation, checkpoint=admitted)
+        if retired:
+            GCPGKEPreparationJournal._unscoped.all().update(deleted_at=timezone.now())
+            GCPGKEPreparationOperation._unscoped.all().update(deleted_at=timezone.now())
+        rows = list(GCPGKEPreparationJournal._unscoped.values())
+        history = list(GCPGKEPreparationOperation._unscoped.values())
+        recorded = set(MigrationRecorder(connection).applied_migrations())
         with pytest.raises(RuntimeError, match="GCP_PREPARATION_ROLLBACK_REQUIRES_EMPTY_HISTORY"):
             MigrationExecutor(connection).migrate([before])
         assert list(GCPGKEPreparationJournal._unscoped.values()) == rows
@@ -791,3 +795,5 @@ def test_real_migration_rollback_refuses_any_retained_history_then_empty_roundtr
         assert not GCPGKEPreparationJournal._unscoped.exists()
     finally:
         MigrationExecutor(connection).migrate(original)
+        assert set(MigrationRecorder(connection).applied_migrations()) == original_records
+        assert set(connection.introspection.table_names()) == original_tables
