@@ -6587,6 +6587,11 @@ export type DataImportUploadResult = {
   publicUrl?: Maybe<Scalars['String']['output']>;
 };
 
+export type DecideModelConnectionRequestInput = {
+  id: Scalars['GUID']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+};
+
 export type DecommissionClusterInputType = {
   clusterId: Scalars['GUID']['input'];
   deleteCloudInfra: Scalars['Boolean']['input'];
@@ -7305,6 +7310,137 @@ export type ModelClusterCapacity = {
 export type ModelCompatibility =
   | 'UNKNOWN';
 
+export type ModelConnectionAction =
+  | 'AUTO'
+  | 'DENY'
+  | 'REQUEST';
+
+export type ModelConnectionDestination = {
+  action: ModelConnectionAction;
+  allowSelfApproval?: Maybe<Scalars['Boolean']['output']>;
+  appId: Scalars['GUID']['output'];
+  appName: Scalars['String']['output'];
+  appSlug: Scalars['String']['output'];
+  appVersion: Scalars['Int']['output'];
+  clusterId: Scalars['GUID']['output'];
+  eligible: Scalars['Boolean']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  environmentVersion: Scalars['Int']['output'];
+  policyVersion?: Maybe<Scalars['String']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  requiredApprovals?: Maybe<Scalars['Int']['output']>;
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type ModelConnectionDestinationPage = {
+  items: Array<ModelConnectionDestination>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ModelConnectionEligibility = {
+  action: ModelConnectionAction;
+  allowSelfApproval?: Maybe<Scalars['Boolean']['output']>;
+  policyVersion?: Maybe<Scalars['String']['output']>;
+  reason: Scalars['String']['output'];
+  requiredApprovals?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ModelConnectionMode =
+  | 'AUTO'
+  | 'DENY'
+  | 'REQUIRE_APPROVAL';
+
+export type ModelConnectionPlacementInput = {
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
+export type ModelConnectionPolicy = {
+  allowSelfApproval: Scalars['Boolean']['output'];
+  id?: Maybe<Scalars['GUID']['output']>;
+  mode: ModelConnectionMode;
+  requiredApprovals: Scalars['Int']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type ModelConnectionPolicyMutationResult = {
+  data?: Maybe<ModelConnectionPolicy>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type ModelConnectionRequest = {
+  alias: Scalars['String']['output'];
+  appEnvironmentId: Scalars['GUID']['output'];
+  appId: Scalars['GUID']['output'];
+  appName?: Maybe<Scalars['String']['output']>;
+  approvalCount: Scalars['Int']['output'];
+  canApprove: Scalars['Boolean']['output'];
+  canCancel: Scalars['Boolean']['output'];
+  canFinalize: Scalars['Boolean']['output'];
+  canReject: Scalars['Boolean']['output'];
+  clusterId: Scalars['GUID']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  decidedAt?: Maybe<Scalars['DateTime']['output']>;
+  environmentName?: Maybe<Scalars['String']['output']>;
+  finalizedAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['GUID']['output'];
+  modelDeploymentId: Scalars['GUID']['output'];
+  modelName?: Maybe<Scalars['String']['output']>;
+  organizationId: Scalars['GUID']['output'];
+  policyVersion: Scalars['String']['output'];
+  providerId: Scalars['GUID']['output'];
+  requesterUsername?: Maybe<Scalars['String']['output']>;
+  requiredApprovals: Scalars['Int']['output'];
+  status: ModelConnectionRequestStatus;
+  subscriptionId?: Maybe<Scalars['GUID']['output']>;
+  version: Scalars['Int']['output'];
+};
+
+export type ModelConnectionRequestMutationResult = {
+  data?: Maybe<ModelConnectionRequest>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type ModelConnectionRequestPage = {
+  items: Array<ModelConnectionRequest>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ModelConnectionRequestStatus =
+  | 'APPROVED'
+  | 'CANCELLED'
+  | 'PENDING'
+  | 'REJECTED'
+  | 'STALE';
+
+export type ModelConnectionTargetInput = {
+  appEnvironmentId: Scalars['GUID']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
 export type ModelDedicatedApp = {
   id: Scalars['GUID']['output'];
   name: Scalars['String']['output'];
@@ -7529,6 +7665,7 @@ export type Mutation = {
   applyStagedManifest: ManifeststagepayloadMutationResult;
   approveDeployment: AstroliftDeploymentMutationResult;
   approveDeploymentByToken: AstroliftDeploymentMutationResult;
+  approveModelConnectionRequest: ModelConnectionRequestMutationResult;
   approveSecretChange: AstroliftSecretChangeProposalMutationResult;
   archiveApp: AstroliftRegisteredAppMutationResult;
   archiveAppRegistryRepo: AstroliftCapabilityDeprovisionPayloadMutationResult;
@@ -7556,6 +7693,7 @@ export type Mutation = {
   bulkRevokeAstroliftRoleBindings: AstroliftBulkRevokeRoleBindingsPayloadMutationResult;
   bulkRollingRestart: BulkOperationResult;
   cancelAstroliftDeregister: AstroliftCancelDeregisterPayloadMutationResult;
+  cancelModelConnectionRequest: ModelConnectionRequestMutationResult;
   cancelPipelineRun: AstroliftPipelineRunMutationResult;
   cancelTask: NoneTypeMutationResult;
   cancelWorkflowInstance: MutationResult;
@@ -7661,6 +7799,7 @@ export type Mutation = {
   /** Upload a file and get a pre-signed URL. Creates a FileUpload wrapper around the Upload. */
   fileUpload: FileUploadResult;
   finalizeLocalModelArtifact: LocalModelArtifactMutationResult;
+  finalizeModelConnectionRequest: ModelConnectionRequestMutationResult;
   forceAstroliftRedeploy: AstroliftForceRedeployPayloadMutationResult;
   generateInstallEnrollmentQr: AstroliftEnrollmentQrPayloadMutationResult;
   /** Generate a temporary authentication token for Rocket.Chat. TTL is configured on the Rocket.Chat server. */
@@ -7764,6 +7903,7 @@ export type Mutation = {
   reissueManagedDomainCert: ReissueManagedDomainCertPayloadMutationResult;
   rejectDeployment: AstroliftDeploymentMutationResult;
   rejectDeploymentByToken: AstroliftDeploymentMutationResult;
+  rejectModelConnectionRequest: ModelConnectionRequestMutationResult;
   rejectSecretChange: AstroliftSecretChangeProposalMutationResult;
   releaseObservabilityRetentionHold: ObservabilityRetentionHoldTypeMutationResult;
   removeAgentSecretRef: AstroliftAgentSecretStatusMutationResult;
@@ -7777,6 +7917,7 @@ export type Mutation = {
   reprovisionManagedService: AstroliftManagedServiceMutationResult;
   reprovisionProjectManagedService: AstroliftManagedServiceMutationResult;
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
+  requestModelConnection: ModelConnectionRequestMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
   rerunAstroliftOnboarding: AstroliftRerunOnboardingPayloadMutationResult;
   resendInvitation: AstroliftInvitationCreatedMutationResult;
@@ -7841,6 +7982,7 @@ export type Mutation = {
   setEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
   /** Toggle a public runtime feature flag (the admin 'feature flipper'). Platform-admin only. ``key`` is the public dotted key from ``astroliftServerInfo.featureFlags`` (e.g. ``zentinelle.enabled``); the backing Constance value is set and the updated flag is returned. Unknown / non-public keys are rejected with a VALIDATION error. Install-time features (``astroliftServerInfo.buildTimeFeatures``) are NOT settable here — they require a redeploy. */
   setFeatureFlag: FeatureFlagInfoMutationResult;
+  setModelConnectionRestriction: ModelConnectionPolicyMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
   setNotificationProfile: AstroliftNotificationProfileMutationResult;
   /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with PRECONDITION; turning one off always succeeds. */
@@ -7909,6 +8051,7 @@ export type Mutation = {
   updateMyUiPreferences: AstroliftUiPreferencesMutationResult;
   updateOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
   updateOrganization: AstroliftOrganizationMutationResult;
+  updateOrganizationModelConnectionPolicy: ModelConnectionPolicyMutationResult;
   updatePipeline: AstroliftPipelineMutationResult;
   updatePolicy: AstroliftPolicyMutationResult;
   updateProject: AstroliftProjectMutationResult;
@@ -8005,6 +8148,11 @@ export type MutationApproveDeploymentArgs = {
 
 export type MutationApproveDeploymentByTokenArgs = {
   input: ApproveByTokenInput;
+};
+
+
+export type MutationApproveModelConnectionRequestArgs = {
+  input: DecideModelConnectionRequestInput;
 };
 
 
@@ -8146,6 +8294,11 @@ export type MutationBulkRollingRestartArgs = {
 
 export type MutationCancelAstroliftDeregisterArgs = {
   input: CancelDeregisterInput;
+};
+
+
+export type MutationCancelModelConnectionRequestArgs = {
+  input: DecideModelConnectionRequestInput;
 };
 
 
@@ -8677,6 +8830,11 @@ export type MutationFinalizeLocalModelArtifactArgs = {
 };
 
 
+export type MutationFinalizeModelConnectionRequestArgs = {
+  input: DecideModelConnectionRequestInput;
+};
+
+
 export type MutationForceAstroliftRedeployArgs = {
   input: ForceRedeployInput;
 };
@@ -9093,6 +9251,11 @@ export type MutationRejectDeploymentByTokenArgs = {
 };
 
 
+export type MutationRejectModelConnectionRequestArgs = {
+  input: DecideModelConnectionRequestInput;
+};
+
+
 export type MutationRejectSecretChangeArgs = {
   input: RejectSecretChangeInput;
 };
@@ -9154,6 +9317,11 @@ export type MutationReprovisionProjectManagedServiceArgs = {
 
 export type MutationRequestAttestationChallengeArgs = {
   input: RequestAttestationChallengeInput;
+};
+
+
+export type MutationRequestModelConnectionArgs = {
+  input: RequestModelConnectionInput;
 };
 
 
@@ -9482,6 +9650,11 @@ export type MutationSetFeatureFlagArgs = {
 };
 
 
+export type MutationSetModelConnectionRestrictionArgs = {
+  input: SetModelConnectionRestrictionInput;
+};
+
+
 export type MutationSetNotificationPreferenceArgs = {
   input: SetNotificationPreferenceInput;
 };
@@ -9799,6 +9972,11 @@ export type MutationUpdateOrgSkillRepoArgs = {
 
 export type MutationUpdateOrganizationArgs = {
   input: UpdateOrganizationInput;
+};
+
+
+export type MutationUpdateOrganizationModelConnectionPolicyArgs = {
+  input: UpdateOrganizationModelConnectionPolicyInput;
 };
 
 
@@ -10646,11 +10824,19 @@ export type Query = {
   members: Array<OrganizationMemberType>;
   /** Cursor-paginated list of members in the caller's organizations. */
   membersPage: OrganizationMemberTypePage;
+  modelConnectionAction: ModelConnectionEligibility;
+  modelConnectionApprovalRequestsPage: ModelConnectionRequestPage;
+  modelConnectionRequest?: Maybe<ModelConnectionRequest>;
+  modelConnectionRequestsPage: ModelConnectionRequestPage;
+  modelConnectionRestriction: ModelConnectionPolicy;
+  modelConnectionReviewRequest?: Maybe<ModelConnectionRequest>;
+  modelConnectionTargetsPage: ModelConnectionDestinationPage;
   modelHostingAction: ModelHostingAction;
   orgSkillRepos: Array<AstroliftOrgSkillRepo>;
   orgToolDefs: Array<AstroliftToolDef>;
   orgToolDefsPage: AstroliftToolDefPage;
   organization?: Maybe<OrganizationType>;
+  organizationModelConnectionPolicy: ModelConnectionPolicy;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use organizationsPage. */
   organizations: Array<OrganizationType>;
   /** Cursor-paginated list of the caller's organizations. */
@@ -12549,6 +12735,48 @@ export type QueryMembersPageArgs = {
 };
 
 
+export type QueryModelConnectionActionArgs = {
+  input: ModelConnectionTargetInput;
+};
+
+
+export type QueryModelConnectionApprovalRequestsPageArgs = {
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+};
+
+
+export type QueryModelConnectionRequestArgs = {
+  input: DecideModelConnectionRequestInput;
+};
+
+
+export type QueryModelConnectionRequestsPageArgs = {
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+};
+
+
+export type QueryModelConnectionRestrictionArgs = {
+  input: ModelConnectionPlacementInput;
+};
+
+
+export type QueryModelConnectionReviewRequestArgs = {
+  input: DecideModelConnectionRequestInput;
+};
+
+
+export type QueryModelConnectionTargetsPageArgs = {
+  input: ModelConnectionPlacementInput;
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryModelHostingActionArgs = {
   organizationId: Scalars['GUID']['input'];
 };
@@ -12576,6 +12804,11 @@ export type QueryOrgToolDefsPageArgs = {
 
 export type QueryOrganizationArgs = {
   id: Scalars['ID']['input'];
+};
+
+
+export type QueryOrganizationModelConnectionPolicyArgs = {
+  organizationId: Scalars['GUID']['input'];
 };
 
 
@@ -12994,6 +13227,20 @@ export type RequestAttestationChallengeInput = {
   kind: Scalars['String']['input'];
 };
 
+export type RequestModelConnectionInput = {
+  alias: Scalars['String']['input'];
+  appEnvironmentId: Scalars['GUID']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  idempotencyKey: Scalars['GUID']['input'];
+  ifMatchAppVersion: Scalars['Int']['input'];
+  ifMatchEnvironmentVersion: Scalars['Int']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+  policyVersion: Scalars['String']['input'];
+};
+
 export type RequestQuotaIncreaseInput = {
   factor: Scalars['Float']['input'];
   quotaId: Scalars['GUID']['input'];
@@ -13329,6 +13576,18 @@ export type SetEnvironmentSettingInput = {
   environmentId: Scalars['GUID']['input'];
   key: Scalars['String']['input'];
   value: Scalars['String']['input'];
+};
+
+export type SetModelConnectionRestrictionInput = {
+  allowSelfApproval: Scalars['Boolean']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  ifMatchDeploymentVersion: Scalars['Int']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  mode: ModelConnectionMode;
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+  requiredApprovals: Scalars['Int']['input'];
 };
 
 export type SetNotificationPreferenceInput = {
@@ -13799,6 +14058,14 @@ export type UpdateOrganizationInput = {
   restrictedSettingsDefault: InputMaybe<Scalars['String']['input']>;
   traceRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
   website: InputMaybe<Scalars['String']['input']>;
+};
+
+export type UpdateOrganizationModelConnectionPolicyInput = {
+  allowSelfApproval: Scalars['Boolean']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  mode: ModelConnectionMode;
+  organizationId: Scalars['GUID']['input'];
+  requiredApprovals: Scalars['Int']['input'];
 };
 
 export type UpdatePipelineInput = {

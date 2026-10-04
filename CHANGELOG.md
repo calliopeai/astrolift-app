@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Govern app connections to hosted models with organization defaults, tighter
+  model restrictions and version-bound approval requests. Keep approved requests
+  separate from current-owner Connect and reconciliation; recheck scoped authority
+  and distinct human quorum after lock waits without exposing credentials (#2270).
+
 - Preserve immutable local and private Hugging Face model sources when editing
   hosted model settings. Add versioned names and shared or dedicated app access,
   with admin admission and matching subscription/reconciliation guards (#2269).
