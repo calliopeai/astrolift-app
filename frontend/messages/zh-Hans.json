@@ -4387,7 +4387,14 @@
       "enable": "启用功能",
       "updateError": "无法更新功能。",
       "enabled": "已启用 {key}",
-      "disabled": "已禁用 {key}"
+      "disabled": "已禁用 {key}",
+      "acceptedRecovery": "{key} 的更改已被接受。再次更改前，请刷新。",
+      "uncertainRecovery": "{key} 的结果未知。再次更改前，请读取当前值。",
+      "refreshError": "无法刷新列表和导航。",
+      "refresh": "刷新当前状态",
+      "refreshing": "正在刷新…",
+      "readRequired": "再次更改前，请读取功能的当前状态。",
+      "contextChanged": "当前用户已更改。请重新检查功能。"
     },
     "metrics": {
       "title": "平台指标",

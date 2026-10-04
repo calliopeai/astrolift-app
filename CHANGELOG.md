@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Retain accepted installation feature changes when refreshes fail, and require a fresh read after uncertain replies before another toggle (#2281).
+
 - Add an internal existing-UAMI Azure reconciliation port with real MSI7 clients,
   current subscription/tenant/native owner checks, bounded federation/grant union
   inventories and foreign-preserving removal. Keep legacy ambient writes refused,

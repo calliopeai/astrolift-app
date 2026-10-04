@@ -4467,7 +4467,14 @@
       "enable": "Enable flag",
       "updateError": "Could not update the feature flag.",
       "enabled": "{key} enabled",
-      "disabled": "{key} disabled"
+      "disabled": "{key} disabled",
+      "acceptedRecovery": "The change to {key} was accepted. Refresh before making another change.",
+      "uncertainRecovery": "The result for {key} is unknown. Read the current value before making another change.",
+      "refreshError": "Could not refresh the inventory and navigation.",
+      "refresh": "Refresh current state",
+      "refreshing": "Refreshing…",
+      "readRequired": "Read the current feature state before making another change.",
+      "contextChanged": "The current viewer changed. Review the feature again."
     },
     "metrics": {
       "title": "Platform metrics",

@@ -4387,7 +4387,14 @@
       "enable": "機能を有効にする",
       "updateError": "機能を更新できませんでした。",
       "enabled": "{key}を有効にしました",
-      "disabled": "{key}を無効にしました"
+      "disabled": "{key}を無効にしました",
+      "acceptedRecovery": "{key} の変更は受け付けられました。次の変更前に更新してください。",
+      "uncertainRecovery": "{key} の結果は不明です。次の変更前に現在の値を確認してください。",
+      "refreshError": "一覧とナビゲーションを更新できませんでした。",
+      "refresh": "現在の状態を更新",
+      "refreshing": "更新中…",
+      "readRequired": "次の変更前に機能の現在の状態を確認してください。",
+      "contextChanged": "現在のユーザーが変わりました。機能を再確認してください。"
     },
     "metrics": {
       "title": "プラットフォームのメトリクス",

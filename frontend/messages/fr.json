@@ -4390,7 +4390,14 @@
       "enable": "Activer la fonctionnalité",
       "updateError": "Impossible de mettre à jour la fonctionnalité.",
       "enabled": "{key} activée",
-      "disabled": "{key} désactivée"
+      "disabled": "{key} désactivée",
+      "acceptedRecovery": "La modification de {key} a été acceptée. Actualisez avant une autre modification.",
+      "uncertainRecovery": "Le résultat pour {key} est inconnu. Consultez la valeur actuelle avant une autre modification.",
+      "refreshError": "Impossible d’actualiser l’inventaire et la navigation.",
+      "refresh": "Actualiser l’état actuel",
+      "refreshing": "Actualisation…",
+      "readRequired": "Consultez l’état actuel de la fonctionnalité avant une autre modification.",
+      "contextChanged": "L’utilisateur actuel a changé. Vérifiez à nouveau la fonctionnalité."
     },
     "metrics": {
       "title": "Métriques de la plateforme",

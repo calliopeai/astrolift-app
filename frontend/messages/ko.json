@@ -4387,7 +4387,14 @@
       "enable": "기능 켜기",
       "updateError": "기능을 업데이트하지 못했습니다.",
       "enabled": "{key} 기능을 켰습니다",
-      "disabled": "{key} 기능을 껐습니다"
+      "disabled": "{key} 기능을 껐습니다",
+      "acceptedRecovery": "{key} 변경이 수락되었습니다. 다른 변경 전에 새로 고치세요.",
+      "uncertainRecovery": "{key} 결과를 알 수 없습니다. 다른 변경 전에 현재 값을 확인하세요.",
+      "refreshError": "목록과 탐색 메뉴를 새로 고칠 수 없습니다.",
+      "refresh": "현재 상태 새로 고침",
+      "refreshing": "새로 고치는 중…",
+      "readRequired": "다른 변경 전에 현재 기능 상태를 확인하세요.",
+      "contextChanged": "현재 사용자가 변경되었습니다. 기능을 다시 검토하세요."
     },
     "metrics": {
       "title": "플랫폼 지표",
