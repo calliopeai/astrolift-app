@@ -49,8 +49,20 @@ async function register(page: Page, context: BrowserContext, baseURL: string) {
     page.getByRole("heading", { name: "Controlled native connection", exact: true })
   ).toBeVisible();
   await expect(page.getByText(sourceArn, { exact: true })).toBeVisible();
+  const metadata = page.getByRole("region", { name: en.models.native.common.title, exact: true });
   await expect(
-    page.getByText(en.models.native.observations.inferenceUnknown, { exact: true })
+    metadata.getByText(common.resourceIdentityFingerprint!, { exact: true })
+  ).toBeVisible();
+  await expect(
+    metadata.getByText(common.reviewedSourceFingerprint!, { exact: true })
+  ).toBeVisible();
+  await expect(
+    metadata.getByText(en.models.native.common.identityHelp, { exact: true })
+  ).toBeVisible();
+  await expect(
+    page
+      .locator("#model-metrics")
+      .getByText(en.models.native.observations.inferenceUnknown, { exact: true })
   ).toBeVisible();
   await expect(
     page.getByText(en.models.native.observations.trafficUnsupported, { exact: true })
