@@ -437,34 +437,34 @@ class GKEIdentityPreparation:
                 self._iam(iam_receipt, operation_id, ledger, expected_desired_union_sha256)
             adapter = admit()
             # Resolve every older send before introducing any new effect.
-            for pending in tuple(ledger.pending):
-                if pending.phase != PreparationPhase.SENT:
+            for old_intent in tuple(ledger.pending):
+                if old_intent.phase != PreparationPhase.SENT:
                     continue
                 subject = next(
-                    s for s in self.context.subjects if _path(s, pending.kind == "Namespace") == pending.path
+                    s for s in self.context.subjects if _path(s, old_intent.kind == "Namespace") == old_intent.path
                 )
-                namespace = pending.kind == "Namespace"
-                _, value = adapter.request(pending.path)
+                namespace = old_intent.kind == "Namespace"
+                _, value = adapter.request(old_intent.path)
                 _checkpoint(checkpoint)
                 if value is None:
                     raise GKEObservationError("SENT_SUBMISSION_UNRESOLVED")
-                row = next((o for o in ledger.objects if o.path == pending.path), None)
-                if pending.method == "POST":
+                row = next((o for o in ledger.objects if o.path == old_intent.path), None)
+                if old_intent.method == "POST":
                     annotations = value.get("metadata", {}).get("annotations", {})
                     if (
                         annotations.get(_OPERATION) != operation_id
-                        or annotations.get(_REQUEST) != pending.request_sha256
+                        or annotations.get(_REQUEST) != old_intent.request_sha256
                     ):
                         raise GKEObservationError("CREATE_OWNERSHIP_UNPROVED")
                     observe(value, subject, namespace, row.uid if row else "", operation_id)
                 else:
                     if iam_receipt is None:
                         raise GKEObservationError("IAM_CONFIGURATION_RECEIPT_REQUIRED")
-                    actual = self._metadata(value, subject, namespace=False, uid=pending.original_uid)
+                    actual = self._metadata(value, subject, namespace=False, uid=old_intent.original_uid)
                     if value["metadata"].get("annotations", {}).get(_LINK) != self.context.identity.email:
                         raise GKEObservationError("SENT_SUBMISSION_UNRESOLVED")
                     observe(value, subject, False, actual.uid, row.creation_operation_id if row else "")
-                note(pending, "OBSERVED")
+                note(old_intent, "OBSERVED")
                 adapter = admit()
             for subject in self.context.subjects:
                 for namespace in (True, False):
