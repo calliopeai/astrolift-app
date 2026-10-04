@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Retain original-caller admission for GCP app bootstrap history on its exact app and physical cluster, including uncertain creates and empty desired service graphs; shared cluster pins alone do not gate unrelated app deployments (#2278).
+
 - Require a satisfied protected Deployment quorum and full current approval policy before native execution admission; preserve pre-vote deferral separately and refuse counters or nonhuman credential votes as identified approvers (#2278).
 
 - Stage private original-caller receipts for human GCP Endpoint deployments and exact-environment approval handoff; validate them in the real worker before downstream effects and explicitly refuse until the native pipeline is configured. Public caller inputs and ordinary non-native deployments remain unchanged (#2278).
