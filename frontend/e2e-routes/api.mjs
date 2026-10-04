@@ -142,6 +142,51 @@ function value(type, field, args, role) {
       page: args.page,
       pageSize: args.pageSize,
     });
+  if (field === "capabilities") return ["models.connection_approvals"];
+  if (field === "modelConnectionRestriction" || field === "organizationModelConnectionPolicy")
+    return object({
+      id: null,
+      version: 0,
+      mode: "AUTO",
+      requiredApprovals: 1,
+      allowSelfApproval: true,
+    });
+  if (field === "modelConnectionAction")
+    return object({
+      action: role === "owner" && currentSharedModel.ready ? "AUTO" : "DENY",
+      reason: currentSharedModel.ready ? null : "Controlled reconciliation remains pending.",
+      policyVersion: "controlled-auto-policy",
+      requiredApprovals: 1,
+      allowSelfApproval: true,
+    });
+  if (field === "modelConnectionTargetsPage")
+    return object({
+      page: args.page,
+      pageSize: args.pageSize,
+      nextCursor: null,
+      totalCount: args.input?.modelDeploymentId === sharedModelId ? 1 : 0,
+      items:
+        args.input?.modelDeploymentId === sharedModelId
+          ? [
+              object({
+                environmentId: activeSubscription.environmentId,
+                environmentVersion: 4,
+                appVersion: 7,
+                appSlug: activeSubscription.appSlug,
+                environmentName: activeSubscription.environmentName,
+                clusterId: sharedClusterId,
+                eligible: role === "owner" && currentSharedModel.ready,
+                action: role === "owner" && currentSharedModel.ready ? "AUTO" : "DENY",
+                reason: currentSharedModel.ready
+                  ? null
+                  : "Controlled reconciliation remains pending.",
+                policyVersion: "controlled-auto-policy",
+                requiredApprovals: 1,
+                allowSelfApproval: true,
+              }),
+            ]
+          : [],
+    });
   if (field === "clusterModelSubscriptionTargetsPage")
     return object({
       items:

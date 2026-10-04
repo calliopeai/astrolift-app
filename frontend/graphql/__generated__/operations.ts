@@ -16343,6 +16343,113 @@ export type FinalizeLocalModelArtifactMutationVariables = Exact<{
 
 export type FinalizeLocalModelArtifactMutation = { finalizeLocalModelArtifact: { ok: boolean, data?: { id: string, name: string, version: number, state: string, manifestSha256: string, fileCount: number, sizeBytes: string } | null, errors: Array<{ code: string, field?: string | null, message: string, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }> } };
 
+export type RequestModelConnectionMutationVariables = Exact<{
+  input: RequestModelConnectionInput;
+}>;
+
+
+export type RequestModelConnectionMutation = { requestModelConnection: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null } | null } };
+
+export type ApproveModelConnectionRequestMutationVariables = Exact<{
+  input: DecideModelConnectionRequestInput;
+}>;
+
+
+export type ApproveModelConnectionRequestMutation = { approveModelConnectionRequest: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null } | null } };
+
+export type RejectModelConnectionRequestMutationVariables = Exact<{
+  input: DecideModelConnectionRequestInput;
+}>;
+
+
+export type RejectModelConnectionRequestMutation = { rejectModelConnectionRequest: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null } | null } };
+
+export type CancelModelConnectionRequestMutationVariables = Exact<{
+  input: DecideModelConnectionRequestInput;
+}>;
+
+
+export type CancelModelConnectionRequestMutation = { cancelModelConnectionRequest: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null } | null } };
+
+export type FinalizeModelConnectionRequestMutationVariables = Exact<{
+  input: DecideModelConnectionRequestInput;
+}>;
+
+
+export type FinalizeModelConnectionRequestMutation = { finalizeModelConnectionRequest: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null } | null } };
+
+export type UpdateOrganizationModelConnectionPolicyMutationVariables = Exact<{
+  input: UpdateOrganizationModelConnectionPolicyInput;
+}>;
+
+
+export type UpdateOrganizationModelConnectionPolicyMutation = { updateOrganizationModelConnectionPolicy: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id?: string | null, version: number, mode: ModelConnectionMode, requiredApprovals: number, allowSelfApproval: boolean } | null } };
+
+export type SetModelConnectionRestrictionMutationVariables = Exact<{
+  input: SetModelConnectionRestrictionInput;
+}>;
+
+
+export type SetModelConnectionRestrictionMutation = { setModelConnectionRestriction: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null, requestedVersion?: number | null, requiresAttestation?: boolean | null, supportedMethods?: Array<string> | null }>, data?: { id?: string | null, version: number, mode: ModelConnectionMode, requiredApprovals: number, allowSelfApproval: boolean } | null } };
+
+export type ModelConnectionPolicyFieldsFragment = { id?: string | null, version: number, mode: ModelConnectionMode, requiredApprovals: number, allowSelfApproval: boolean };
+
+export type ModelConnectionRequestFieldsFragment = { id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null };
+
+export type GetModelConnectionCapabilitiesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetModelConnectionCapabilitiesQuery = { astroliftServerInfo: { capabilities: Array<string> } };
+
+export type ListModelConnectionTargetsQueryVariables = Exact<{
+  input: ModelConnectionPlacementInput;
+  search?: InputMaybe<Scalars['String']['input']>;
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type ListModelConnectionTargetsQuery = { modelConnectionTargetsPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, nextCursor?: string | null, items: Array<{ environmentId: string, environmentVersion: number, clusterId: string, appSlug: string, environmentName: string, eligible: boolean, reason?: string | null, appVersion: number, action: ModelConnectionAction, policyVersion?: string | null, requiredApprovals?: number | null, allowSelfApproval?: boolean | null }> } };
+
+export type GetModelConnectionActionQueryVariables = Exact<{
+  input: ModelConnectionTargetInput;
+}>;
+
+
+export type GetModelConnectionActionQuery = { modelConnectionAction: { action: ModelConnectionAction, reason: string, policyVersion?: string | null, requiredApprovals?: number | null, allowSelfApproval?: boolean | null } };
+
+export type GetOrganizationModelConnectionPolicyQueryVariables = Exact<{
+  organizationId: Scalars['GUID']['input'];
+}>;
+
+
+export type GetOrganizationModelConnectionPolicyQuery = { organizationModelConnectionPolicy: { id?: string | null, version: number, mode: ModelConnectionMode, requiredApprovals: number, allowSelfApproval: boolean } };
+
+export type GetModelConnectionRestrictionQueryVariables = Exact<{
+  input: ModelConnectionPlacementInput;
+}>;
+
+
+export type GetModelConnectionRestrictionQuery = { modelConnectionRestriction: { id?: string | null, version: number, mode: ModelConnectionMode, requiredApprovals: number, allowSelfApproval: boolean } };
+
+export type ListModelConnectionRequestsQueryVariables = Exact<{
+  organizationId: Scalars['GUID']['input'];
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+  review: Scalars['Boolean']['input'];
+}>;
+
+
+export type ListModelConnectionRequestsQuery = { own?: { totalCount?: number | null, page?: number | null, pageSize?: number | null, nextCursor?: string | null, items: Array<{ id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null }> }, inbox?: { totalCount?: number | null, page?: number | null, pageSize?: number | null, nextCursor?: string | null, items: Array<{ id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null }> } };
+
+export type GetModelConnectionRequestQueryVariables = Exact<{
+  input: DecideModelConnectionRequestInput;
+  review: Scalars['Boolean']['input'];
+}>;
+
+
+export type GetModelConnectionRequestQuery = { own?: { id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null } | null, inbox?: { id: string, version: number, status: ModelConnectionRequestStatus, organizationId: string, modelDeploymentId: string, appId: string, appEnvironmentId: string, clusterId: string, providerId: string, alias: string, modelName?: string | null, appName?: string | null, environmentName?: string | null, requesterUsername?: string | null, policyVersion: string, requiredApprovals: number, approvalCount: number, canApprove: boolean, canReject: boolean, canCancel: boolean, canFinalize: boolean, subscriptionId?: string | null, createdAt: string, decidedAt?: string | null, finalizedAt?: string | null } | null };
+
 export type UpdateClusterModelRuntimeMutationVariables = Exact<{
   input: UpdateClusterModelRuntimeInput;
 }>;

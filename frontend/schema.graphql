@@ -9341,14 +9341,6 @@ type Query {
   astroliftSshDeployKeysPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftSshDeployKeyPage!
   astroliftAvailableRepos(connectionId: String!, search: String = null, limit: Int! = 100): AstroliftRemoteRepoList!
   astroliftSourceFile(connectionId: String!, repoFullName: String!, path: String!, ref: String!): AstroliftSourceFile!
-  organizationModelConnectionPolicy(organizationId: GUID!): ModelConnectionPolicy!
-  modelConnectionRestriction(input: ModelConnectionPlacementInput!): ModelConnectionPolicy!
-  modelConnectionTargetsPage(input: ModelConnectionPlacementInput!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelConnectionDestinationPage!
-  modelConnectionAction(input: ModelConnectionTargetInput!): ModelConnectionEligibility!
-  modelConnectionRequestsPage(organizationId: GUID!, page: Int! = 1, pageSize: Int! = 25): ModelConnectionRequestPage!
-  modelConnectionRequest(input: DecideModelConnectionRequestInput!): ModelConnectionRequest
-  modelConnectionApprovalRequestsPage(organizationId: GUID!, page: Int! = 1, pageSize: Int! = 25): ModelConnectionRequestPage!
-  modelConnectionReviewRequest(input: DecideModelConnectionRequestInput!): ModelConnectionRequest
   clusterModelDedicatedAppsPage(organizationId: GUID!, clusterId: GUID!, expectedProviderId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelDedicatedAppPage!
   clusterModelUpdateAdmission(input: UpdateClusterModelInput!): ModelRuntimeAdmission!
   clusterModelPlacementClustersPage(organizationId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelPlacementClusterPage!
@@ -9362,6 +9354,14 @@ type Query {
   clusterModelSourceAccess(organizationId: GUID!, modelRepo: String!, revisionSha: String!, connectionId: GUID = null, expectedConnectionVersion: Int = null): ModelSourceAccess!
   astroliftLocalModelArtifactsPage(search: String = null, limit: Int! = 25, after: String = null): LocalModelArtifactPage!
   clusterModelRuntimeSettings(organizationId: GUID!, clusterId: GUID!, expectedProviderId: GUID!): ClusterModelRuntimeSettings
+  organizationModelConnectionPolicy(organizationId: GUID!): ModelConnectionPolicy!
+  modelConnectionRestriction(input: ModelConnectionPlacementInput!): ModelConnectionPolicy!
+  modelConnectionTargetsPage(input: ModelConnectionPlacementInput!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelConnectionDestinationPage!
+  modelConnectionAction(input: ModelConnectionTargetInput!): ModelConnectionEligibility!
+  modelConnectionRequestsPage(organizationId: GUID!, page: Int! = 1, pageSize: Int! = 25): ModelConnectionRequestPage!
+  modelConnectionRequest(input: DecideModelConnectionRequestInput!): ModelConnectionRequest
+  modelConnectionApprovalRequestsPage(organizationId: GUID!, page: Int! = 1, pageSize: Int! = 25): ModelConnectionRequestPage!
+  modelConnectionReviewRequest(input: DecideModelConnectionRequestInput!): ModelConnectionRequest
   astroliftProjectManagedServiceAttachmentOwner(projectId: GUID!, attachmentId: GUID!): AstroliftManagedServiceContext
   astroliftProjectManagedServicesPage(projectId: GUID!, search: String = null, name: String = null, kinds: [String!] = null, statuses: [String!] = null, environmentName: String = null, clusterId: GUID = null, limit: Int! = 50, after: String = null): AstroliftManagedServiceContextPage!
   astroliftProjectManagedService(projectId: GUID!, id: GUID!, expectedContextRevision: String = null): AstroliftManagedServiceContext

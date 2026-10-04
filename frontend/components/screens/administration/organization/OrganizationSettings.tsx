@@ -2,6 +2,7 @@
 
 import { ClockIcon, InfoIcon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { SettingsPage, SettingsSection } from "@/components/settings/SettingsPage";
 import type { SectionSelection } from "@/components/settings/use-settings-section";
@@ -36,6 +37,7 @@ export type OrganizationSettingsProps = ReturnType<typeof useOrganizationSetting
   houseTheme: React.ReactNode;
   trustedDomains: React.ReactNode;
   modules: React.ReactNode;
+  modelConnections?: React.ReactNode;
 };
 
 /**
@@ -51,8 +53,10 @@ export function OrganizationSettings({
   houseTheme,
   trustedDomains,
   modules,
+  modelConnections,
   section,
 }: OrganizationSettingsProps) {
+  const connections = useTranslations("models.shared.connections");
   const saved = React.useMemo(
     () => ({
       name: org?.name ?? "",
@@ -285,6 +289,9 @@ export function OrganizationSettings({
       : []),
     { id: "trusted-domains", title: "Trusted domains", content: trustedDomains },
     { id: "modules", title: "Modules", content: modules },
+    ...(modelConnections
+      ? [{ id: "model-connections", title: connections("policyTitle"), content: modelConnections }]
+      : []),
     {
       id: "identity-provider",
       title: "Identity provider",

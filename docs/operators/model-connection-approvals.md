@@ -100,3 +100,53 @@ Requests and votes are durable, with soft deletion and standard tracking. The
 existing model mutation audit boundary applies; this feature does not add a
 strict audit-persistence guarantee, outbound notifications, token usage/cost,
 provider account discovery or a new approval framework.
+
+## Web request and policy workflow
+
+Open **Models → Connection requests** to see your server-paged requests, or switch
+explicitly to the reviewer inbox. The active tab calls only its own endpoint; the
+API has no free-text request search or model-only request filter. Safe labels and
+literal GUIDs identify the returned targets; these pages do not infer permission
+from an account role or aggregate grant list.
+
+In a hosted model's app connections section, choose **Add connection** to open the
+separate server-paged destination chooser. Each returned row carries its current
+`AUTO`, `REQUEST` or `DENY` decision, app/environment versions and policy fingerprint.
+The browser rechecks the selected action before its reviewed write. An automatic
+connection uses the existing subscription mutation; an approval-required row records
+only a request. A denied, unknown, failed or changed source cannot start either.
+
+Open a request using the current version from the queue. The detail exposes only
+current server action hints for approval, rejection, requester cancellation and
+finalization. Approval and **Connect** have separate confirmations. Only the final
+response's subscription identity establishes a recorded connection; pending runtime
+reconciliation and observed readiness remain distinct. These hints do not replace
+fresh server authorization, and no browser review promises an immutable server
+incarnation or delivery of a notification.
+
+The browser retains a request's exact public target/version/alias/policy metadata
+and its caller-generated UUID in this tab's session storage before sending intake.
+An unconfirmed reply offers restoration of that exact review and key. Repeating it
+asks the server for the same request rather than issuing a new identity. A changed
+review must inspect the current request queue or explicitly discard its local
+recovery record first. Discarding local recovery does **not** cancel a stored
+request. Storage is optional and contains no model credential; losing the tab's
+record requires inspecting your requests before creating another.
+
+Organization settings has a **Model connection policy** section using the exact
+organization policy and its version. This remains `org.update` administration,
+independent of superadmin hosting module hints. A model's settings also offers its
+separate versioned superadmin restriction overlay; a missing overlay is neutral,
+not a copy of organization defaults. The server prevents an overlay from relaxing
+the effective organization policy. Saving either policy does not connect or revoke
+existing subscriptions.
+
+Capability `models.connection_approvals` is required for these new controls. An
+older, unavailable or malformed capability response leaves intake and policy writes
+unavailable; it never falls back to a broader legacy intake. Existing connection
+read/revoke/traffic views retain their contracts. All new confirmations and feedback
+use the current locale, and raw server refusals remain literal. Actor, organization,
+model, placement, request, source or action changes invalidate an open review;
+late replies cannot decorate a later context. An accepted write remains accepted
+when a follow-up read fails, while its unverified target metadata or read failure
+is stated separately.

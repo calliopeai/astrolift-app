@@ -40,6 +40,7 @@ export type SharedModelsScreenProps = { page: ModelPage<SharedModelListRow> };
 export function SharedModelsScreen({ page }: SharedModelsScreenProps) {
   const t = useTranslations("models.shared.deployments");
   const inventory = useTranslations("models.shared.inventory");
+  const connections = useTranslations("models.shared.connections");
   const format = useFormatter();
   return (
     <ListPage
@@ -50,6 +51,9 @@ export function SharedModelsScreen({ page }: SharedModelsScreenProps) {
         context: inventory("description"),
         primaryAction: (
           <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" asChild>
+              <Link href="/models/connections">{connections("viewRequests")}</Link>
+            </Button>
             <Button size="sm" variant="outline" asChild>
               <Link href="/models/endpoints">{t("legacy")}</Link>
             </Button>
