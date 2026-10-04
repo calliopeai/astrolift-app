@@ -225,6 +225,16 @@ def _build_image_sync(inp: BuildImageInput) -> dict:
         )
         return _stub(inp.image_tag)
 
+    # A repeat admitted while builds were off may wait for approval while
+    # configuration changes. Never turn its saved artifact into a moving-ref
+    # rebuild. MANUAL + retained lineage is the existing redeploy row shape;
+    # rollback and promotion have separate trigger kinds.
+    if deployment.trigger_kind == Deployment.TriggerKind.MANUAL.value and deployment.promoted_from_id:
+        from astrolift_scm.providers.revisions import is_resolved_commit_sha
+
+        if not is_resolved_commit_sha(deployment.commit_sha) or inp.commit_sha != deployment.commit_sha:
+            raise RuntimeError("Redeploy rebuild requires the original saved immutable source commit.")
+
     from core.app_deploy import AppDeployError, cluster_for_deployment
 
     try:

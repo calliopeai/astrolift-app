@@ -23,6 +23,11 @@ from astrolift_scm.providers import (
 )
 
 
+def is_resolved_commit_sha(value: object) -> bool:
+    """Whether a source host's value is a full immutable SHA-1 or SHA-256 commit."""
+    return isinstance(value, str) and re.fullmatch(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})", value) is not None
+
+
 def fetch_commit(connection, *, repo_full_name: str, ref: str) -> str:
     """Resolve a branch, tag, or commit; never substitute a mutable fallback."""
     if not repo_full_name.strip() or not ref.strip():
@@ -100,6 +105,6 @@ def fetch_commit(connection, *, repo_full_name: str, ref: str) -> str:
         raise ProviderError("UNEXPECTED_SHAPE", "Source host returned an invalid commit response") from exc
 
     sha = payload.get(sha_field) if isinstance(payload, dict) else None
-    if not isinstance(sha, str) or not re.fullmatch(r"(?:[0-9a-fA-F]{40}|[0-9a-fA-F]{64})", sha):
+    if not is_resolved_commit_sha(sha):
         raise ProviderError("UNEXPECTED_SHAPE", "Source host did not return a full commit SHA")
     return sha.lower()
