@@ -78,8 +78,15 @@ reference, credential, approval count or private receipt. `config_snapshot`
 contains no authority reference.
 
 Admission concerns the complete app graph on the **selected physical cluster**,
-including direct and attached Endpoint sources and retained IAM/preparation
-journals. Protected preparation operations retain their journal parent through
+including direct and attached Endpoint sources, retained IAM/preparation
+journals, and retained `GCPAppIdentitySource` bootstrap history for that exact
+original app/cluster tuple. Every retained source state requires origin capture,
+including uncertain sends and an empty desired Endpoint graph. Capture refuses
+if the retained app source’s original organization or provider registration no
+longer matches current ownership, even when a replacement provider also calls
+itself GCP. A shared
+`GCPClusterIdentitySource` pin alone does not imply an app has native effect
+history or change unrelated app deployments. Protected preparation operations retain their journal parent through
 `PROTECT`; an empty desired graph cannot erase that origin requirement.
 A separate GCP environment does not change ordinary AWS/local target deployment
 behavior. A missing target is never guessed as a supported native origin.

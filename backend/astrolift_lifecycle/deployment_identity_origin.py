@@ -10,6 +10,7 @@ from django.db.models import Q
 
 from astrolift_lifecycle.models import AppEnvironment, Deployment, DeploymentIdentityOrigin
 from astrolift_services.models import (
+    GCPAppIdentitySource,
     GCPGKEPreparationJournal,
     GCPWorkloadIdentityJournal,
     ManagedService,
@@ -52,13 +53,15 @@ def native_origin_required(app, environment=None, *, tenant_cluster=None):
     )
     journals = GCPWorkloadIdentityJournal.all_objects.filter(registered_app=app)
     preparation = GCPGKEPreparationJournal.all_objects.filter(registered_app=app)
+    original_source = GCPAppIdentitySource.all_objects.filter(registered_app=app)
     environments = AppEnvironment.all_objects.filter(registered_app=app)
     if cluster_id is not None:
         journals = journals.filter(tenant_cluster_id=cluster_id)
         preparation = preparation.filter(tenant_cluster_id=cluster_id)
+        original_source = original_source.filter(tenant_cluster_id=cluster_id)
         environments = environments.filter(tenant_cluster_id=cluster_id)
     # Protected preparation operations cannot survive without their PROTECT parent.
-    if journals.exists() or preparation.exists():
+    if journals.exists() or preparation.exists() or original_source.exists():
         return True
     attachments = ManagedServiceAttachment.all_objects.filter(app_environment__in=environments)
     services = ManagedService.all_objects.filter(
@@ -80,6 +83,17 @@ def capture_deployment_origin(request, app, environment):
     if not native_origin_required(app, environment):
         return None
     if environment.tenant_cluster.provider_plugin.slug != "gcp":
+        raise DeploymentOriginError("NATIVE_ORIGIN_PLACEMENT_UNSUPPORTED")
+    if (
+        GCPAppIdentitySource.all_objects.filter(
+            registered_app=app, tenant_cluster_id=environment.tenant_cluster_id
+        )
+        .exclude(
+            organization_id=app.organization_id,
+            provider_plugin_id=environment.tenant_cluster.provider_plugin_id,
+        )
+        .exists()
+    ):
         raise DeploymentOriginError("NATIVE_ORIGIN_PLACEMENT_UNSUPPORTED")
     environments = AppEnvironment.objects.filter(
         registered_app=app, tenant_cluster_id=environment.tenant_cluster_id
