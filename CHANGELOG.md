@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Require Vertex native machine, replica bounds and traffic to match the saved
+  reviewed serving request before completion/readiness; keep divergent observations
+  pending without a second deployment. Refuse unproved Model deletion even when
+  its Endpoint is absent, and never infer unknown legacy serving intent (#2277).
+
 - Retain Vertex Endpoint resource IDs, deployed-model IDs and long-running
   operation receipts across fresh reviewed lifecycle activities. Commit bounded
   per-phase reservations before cloud submission; refuse unknown outcomes without
