@@ -110,12 +110,61 @@ while retaining configured original GSA/KSA identity links for current subjects.
 Full identity decommission is a separate operation; detach does not remove all
 IAM rights or prove immediate revocation of externally granted access.
 
+### Server-produced Endpoint-only app plan
+
+The internal `astrolift_services.gcp_app_identity_plan` seam consumes an original
+HTTP-captured, signed `AcceptedAppIdentityAuthority` and the server's retained
+`NativeIdentityContext`. Configure the private cluster provider field
+`endpoint_prediction_role` as the exact `projects/{project_id}/roles/{role_id}`
+custom role described above. The field is a declaration; current native role
+verification remains mandatory whenever desired Endpoint grants exist.
+
+`produce_endpoint_app_plan` reads the complete current app environment, direct
+service, attachment and binding graph. It refuses foreign, incomplete or mixed
+Cloud SQL/GCS/Pub/Sub graphs before native calls. The first supported source is
+an owned, completed Vertex lifecycle with exactly one deployed model and its
+saved machine/minimum/maximum/traffic intent. Fresh generated SDK reads verify
+the original active project mapping and GSA unique ID/owner, exact Endpoint owner
+labels, current model version and complete routing tuple. Missing model versions
+or unreviewed sibling deployments refuse; the original lifecycle did not record
+a model version, so this is newly accepted current metadata, not proof of an
+original reviewed version or Endpoint incarnation.
+
+The returned schema-v2 `AcceptedPreparationTemplate` groups environments sharing
+one physical namespace/ServiceAccount and retains every current environment GUID.
+Fresh original-actor/token RBAC/ABAC is evaluated for each alias. The source digest
+binds current owner/provider/credential declarations, complete row identities and
+versions, and routing metadata. Vertex's [available replica count](https://docs.cloud.google.com/python/docs/reference/aiplatform/latest/google.cloud.aiplatform_v1.types.DeployedModel.Status)
+is retained as runtime observation only; it neither changes grant identity nor
+proves invocation or workload readiness. Original GSA identity is never rederived
+from a renamed app slug. Naming/namespace changes alter the logical plan and
+require explicit integration/migration against the retained physical target.
+
+`endpoint_app_checkpoint(plan)` is DB-only and can run inside an existing journal
+transaction without taking new model locks. `refresh_endpoint_app_sources(plan)`
+is the separate fresh native stage; it refuses both atomic blocks and manual
+transactions before constructing credentials or clients. Current admission runs
+around each bounded native call; each checkpoint reloads the original credential,
+grants and full source. It cannot prevent external changes after the final read.
+
+An empty desired Endpoint union needs no custom-role or Endpoint catalogue/ADC
+lookup. It carries an empty permission set while retaining current aliases and
+source facts, so revoked/deleted role metadata cannot obstruct owned-grant removal.
+Actual IAM cleanup still validates the original project/GSA/target and retained
+owned ledger; empty source metadata never means an empty replacement ledger.
+
+Returning a plan does not persist acceptance, prepare Kubernetes objects, bind
+observed UIDs, write IAM or deploy workloads. The caller must durably pin its
+template and original authority in the accepted operation, retain prior unknown
+sends, and run the separate source and DB checkpoints in the real deployment
+workflow. This internal seam adds no public dispatch/API or connection capability.
+
 These foundations do not complete #2278 or expose native Vertex connections in
-the UI/API. Backend preparation storage, public original-caller capture, current
-complete app union and subscription orchestration, receipt-bound rendering,
-rollout, actual token exchange and inference still require integration. GSA and
-custom-role creation are not implemented by these ports. The IAM port returns
-`workload_ready=false`; its annotation is configuration metadata, not proof of
-applied Kubernetes state.
+the UI/API. Backend preparation storage, public original-caller capture,
+consumption of the accepted Endpoint-only app plan, subscription orchestration,
+receipt-bound rendering, rollout, actual token exchange and inference still
+require integration. Complete mixed-service unions and GSA/custom-role creation
+are not implemented by these ports. The IAM port returns `workload_ready=false`;
+its annotation is configuration metadata, not proof of applied Kubernetes state.
 Existing project-wide grants must be separately reviewed and removed by their
 owner; this port neither searches for nor silently migrates them.
