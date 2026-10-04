@@ -601,8 +601,14 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
     def update(self, spec: UpdateSpec) -> UpdateResult:
         try:
             plan = self._lifecycle("update", spec)
+            if plan.complete:
+                return UpdateResult(
+                    ok=True,
+                    handle=f"{KIND}/{plan.state.get('endpoint', '')}",
+                    message=plan.message or "Vertex update pending",
+                )
             return UpdateResult(
-                ok=plan.complete,
+                ok=False,
                 handle=f"{KIND}/{plan.state.get('endpoint', '')}",
                 message=plan.message or "Vertex update pending",
             )

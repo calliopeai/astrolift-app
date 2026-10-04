@@ -175,6 +175,35 @@ def test_replica_update_binds_output_id_and_supported_mask():
     assert not request.deployed_model.dedicated_resources.machine_spec.machine_type
 
 
+@pytest.mark.parametrize("outcome", ["completed", "pending", "failed"])
+def test_update_result_matches_actual_native_operation_outcome_without_resubmission(outcome):
+    from google.rpc import status_pb2
+
+    wire, state = provisioned()
+    state = new_steps(state)
+    spec = UpdateSpec(handle=handle().handle, managed_service_id=SOURCE_ID, config={"min_replica_count": 2})
+    advance(wire, state, "update", spec)
+    operation = wire.operations[state["steps"]["mutate"]["operation"]]
+    if outcome == "pending":
+        operation.done = False
+        operation.ClearField("response")
+    elif outcome == "failed":
+        operation.ClearField("response")
+        operation.error.CopyFrom(status_pb2.Status(code=3, message="controlled mutation refused"))
+    result = _driver(wire, state).update(spec)
+    assert result.ok is (outcome == "completed")
+    assert result.handle == handle().handle
+    if outcome == "pending":
+        assert "pending" in result.message and not result.errors
+    elif outcome == "failed":
+        assert "operation failed" in result.message
+        assert result.errors == ["vertex_refused"] and result.retryable is False
+    else:
+        assert wire.endpoint.deployed_models[0].dedicated_resources.min_replica_count == 2
+        assert not result.errors
+    assert len([request for name, request in wire.calls if name == "mutate"]) == 1
+
+
 def test_mutation_receipt_for_other_deployment_cannot_confirm_update():
     from google.cloud import aiplatform_v1
 
