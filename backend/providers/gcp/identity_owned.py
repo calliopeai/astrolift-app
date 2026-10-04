@@ -8,9 +8,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass, field, replace
+from dataclasses import asdict, dataclass, field, replace
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from _sdk.cloud_credentials import CloudCredential, CredentialMode
 
@@ -125,12 +126,28 @@ class PolicyOwnership:
     grants: tuple[OwnedGrant, ...] = ()
 
 
+class PolicySubmissionPhase(StrEnum):
+    UNSENT = "UNSENT"
+    SENT = "SENT"
+
+
+class PolicyStepState(StrEnum):
+    UNSENT = "UNSENT"
+    SENT = "SENT"
+    UNKNOWN = "UNKNOWN"
+    OBSERVED = "OBSERVED"
+
+
 @dataclass(frozen=True)
 class PolicyIntent:
     resource: str
     before_sha256: str
     after_sha256: str
     owned_after: tuple[OwnedGrant, ...]
+    submission_id: str = ""
+    submission_phase: PolicySubmissionPhase | None = None
+    etag_sha256: str = ""
+    desired_union_sha256: str = ""
 
 
 @dataclass(frozen=True)
@@ -141,12 +158,155 @@ class OwnedGrantLedger:
     removals: tuple[PolicyOwnership, ...] = ()
 
 
+def owned_ledger_payload(ledger: OwnedGrantLedger) -> dict[str, Any]:
+    return {"schema_version": 2, **asdict(ledger)}
+
+
+def owned_ledger_from_payload(payload: dict[str, Any]) -> OwnedGrantLedger:
+    try:
+        if (
+            set(payload) != {"schema_version", "context_sha256", "policies", "pending", "removals"}
+            or type(payload["schema_version"]) is not int
+            or payload["schema_version"] != 2
+            or len(json.dumps(payload).encode()) > MAX_BYTES
+            or not isinstance(payload["context_sha256"], str)
+            or not _DIGEST.fullmatch(payload["context_sha256"])
+        ):
+            raise ValueError
+
+        def grants(rows: Any) -> tuple[OwnedGrant, ...]:
+            if not isinstance(rows, (tuple, list)) or len(rows) > MAX_MEMBERS:
+                raise ValueError
+            result = []
+            for row in rows:
+                if set(row) != {"role", "member"} or any(not isinstance(v, str) for v in row.values()):
+                    raise ValueError
+                result.append(OwnedGrant(**row))
+            return tuple(result)
+
+        result: dict[str, Any] = {}
+        for key in ("policies", "pending", "removals"):
+            rows = payload[key]
+            if not isinstance(rows, (tuple, list)) or len(rows) > MAX_RESOURCES:
+                raise ValueError
+            values: list[Any] = []
+            for row in rows:
+                if key == "pending":
+                    expected = {
+                        "resource",
+                        "before_sha256",
+                        "after_sha256",
+                        "owned_after",
+                        "submission_id",
+                        "submission_phase",
+                        "etag_sha256",
+                        "desired_union_sha256",
+                    }
+                    if set(row) != expected or any(
+                        not isinstance(v, str) for k, v in row.items() if k not in ("owned_after", "submission_phase")
+                    ):
+                        raise ValueError
+                    phase = (
+                        PolicySubmissionPhase(row["submission_phase"]) if row["submission_phase"] is not None else None
+                    )
+                    values.append(
+                        PolicyIntent(**{**row, "owned_after": grants(row["owned_after"]), "submission_phase": phase})
+                    )
+                else:
+                    if set(row) != {"resource", "grants"} or not isinstance(row["resource"], str):
+                        raise ValueError
+                    values.append(PolicyOwnership(row["resource"], grants(row["grants"])))
+            result[key] = tuple(values)
+        return OwnedGrantLedger(payload["context_sha256"], **result)
+    except Exception:
+        raise NativeIdentityError("INVALID_LEDGER_PAYLOAD") from None
+
+
+@dataclass(frozen=True)
+class PolicySubmission:
+    context_sha256: str
+    intent: PolicyIntent
+    ledger: OwnedGrantLedger
+
+    @property
+    def ledger_sha256(self) -> str:
+        return _hash(owned_ledger_payload(self.ledger))
+
+    @property
+    def submission_sha256(self) -> str:
+        return _hash(
+            (
+                self.context_sha256,
+                self.intent.submission_id,
+                self.intent.resource,
+                self.intent.before_sha256,
+                self.intent.after_sha256,
+                self.intent.etag_sha256,
+                self.intent.desired_union_sha256,
+                tuple((grant.role, grant.member) for grant in self.intent.owned_after),
+            )
+        )
+
+
+@dataclass(frozen=True)
+class DurableSubmissionReceipt:
+    journal_id: str
+    journal_version: int
+    submission_id: str
+    submission_sha256: str
+    phase: PolicySubmissionPhase
+    ledger_sha256: str
+
+
+@dataclass(frozen=True)
+class PolicyStepReceipt:
+    submission_id: str
+    resource: str
+    submission_sha256: str
+    state: PolicyStepState
+    transport_invoked: bool = False
+
+
+@dataclass(frozen=True)
+class PolicyReconcileReceipt:
+    ledger: OwnedGrantLedger
+    steps: tuple[PolicyStepReceipt, ...] = ()
+
+
+class NativeIdentityReconciliationError(NativeIdentityError):
+    def __init__(self, reason: str, receipt: PolicyReconcileReceipt) -> None:
+        super().__init__(reason)
+        self.receipt = receipt
+
+
 @dataclass(frozen=True)
 class NativeIdentityResult:
     ledger: OwnedGrantLedger
     annotations: dict[str, str]
     external_equivalent_grants: int = 0
     workload_ready: bool = False
+    receipt: PolicyReconcileReceipt | None = None
+
+
+@dataclass
+class _SubmissionProgress:
+    ledger: OwnedGrantLedger
+    steps: dict[str, PolicyStepReceipt] = field(default_factory=dict)
+    journal_id: str = ""
+    journal_version: int = 0
+
+    def note(self, submission: PolicySubmission, state: PolicyStepState, *, invoked: bool | None = None) -> None:
+        old = self.steps.get(submission.intent.resource)
+        self.steps[submission.intent.resource] = PolicyStepReceipt(
+            submission.intent.submission_id,
+            submission.intent.resource,
+            submission.submission_sha256,
+            state,
+            invoked if invoked is not None else bool(old and old.transport_invoked),
+        )
+
+    def receipt(self) -> PolicyReconcileReceipt:
+        return PolicyReconcileReceipt(self.ledger, tuple(self.steps[key] for key in sorted(self.steps)))
 
 
 class NativeGCPIdentity:
@@ -242,19 +402,24 @@ class NativeGCPIdentity:
         if len(data) > MAX_BYTES:
             raise NativeIdentityError("OVERSIZED_RESPONSE")
 
+    @staticmethod
+    def _checkpoint(checkpoint: Callable[[], object]) -> None:
+        if checkpoint() is not None:
+            raise NativeIdentityError("CURRENT_ADMISSION_UNCONFIRMED")
+
     def _call(self, fn: Any, request: Any, checkpoint: Callable[[], None]) -> Any:
-        checkpoint()
+        self._checkpoint(checkpoint)
         try:
             value = fn(request=request, retry=None, timeout=TIMEOUT)
         except Exception:
-            checkpoint()
+            self._checkpoint(checkpoint)
             raise NativeIdentityError("NATIVE_READ_OR_WRITE_UNCONFIRMED") from None
-        checkpoint()
+        self._checkpoint(checkpoint)
         self._bounded(value)
         return value
 
     def _admit(self, checkpoint: Callable[[], None]) -> None:
-        checkpoint()
+        self._checkpoint(checkpoint)
         projects, iam, _ = self._native()
         context = self.context
         project = self._call(projects.get_project, {"name": f"projects/{context.project_number}"}, checkpoint)
@@ -333,6 +498,17 @@ class NativeGCPIdentity:
                     _DIGEST.fullmatch(row.before_sha256) and _DIGEST.fullmatch(row.after_sha256)
                 ):
                     raise NativeIdentityError("INVALID_LEDGER_INTENT")
+                if isinstance(row, PolicyIntent):
+                    if row.submission_id:
+                        _guid(row.submission_id)
+                        if (
+                            type(row.submission_phase) is not PolicySubmissionPhase
+                            or not _DIGEST.fullmatch(row.etag_sha256)
+                            or not _DIGEST.fullmatch(row.desired_union_sha256)
+                        ):
+                            raise NativeIdentityError("INVALID_SUBMISSION_INTENT")
+                    elif row.submission_phase is not None or row.etag_sha256 or row.desired_union_sha256:
+                        raise NativeIdentityError("INVALID_SUBMISSION_INTENT")
 
     @staticmethod
     def _policy_hash(policy: Any) -> str:
@@ -363,6 +539,118 @@ class NativeGCPIdentity:
         ledger: OwnedGrantLedger,
         checkpoint: Callable[[], None],
         persist: Callable[[OwnedGrantLedger], None],
+        submission_hook: Callable[[PolicySubmission], DurableSubmissionReceipt] | None = None,
+    ) -> NativeIdentityResult:
+        if submission_hook is None and any(row.submission_id for row in ledger.pending):
+            raise NativeIdentityError("TYPED_SUBMISSION_HOOK_REQUIRED")
+        progress = _SubmissionProgress(ledger)
+        if submission_hook is not None:
+            for intent in ledger.pending:
+                submission = PolicySubmission(self.context.fingerprint, intent, ledger)
+                progress.note(
+                    submission,
+                    PolicyStepState.UNKNOWN
+                    if intent.submission_phase != PolicySubmissionPhase.UNSENT
+                    else PolicyStepState.UNSENT,
+                )
+
+        def tracked_persist(value: OwnedGrantLedger) -> None:
+            try:
+                persist(value)
+            except Exception:
+                if submission_hook is None:
+                    raise
+                raise NativeIdentityError("JOURNAL_PERSISTENCE_UNCONFIRMED") from None
+            progress.ledger = value
+
+        try:
+            result = self._reconcile(
+                permissions,
+                service_account_uids=service_account_uids,
+                ledger=ledger,
+                checkpoint=checkpoint,
+                persist=tracked_persist,
+                submission_hook=submission_hook,
+                progress=progress,
+            )
+            return replace(result, receipt=progress.receipt()) if submission_hook is not None else result
+        except NativeIdentityError as error:
+            if submission_hook is None:
+                raise
+            raise NativeIdentityReconciliationError(str(error), progress.receipt()) from None
+        except Exception:
+            if submission_hook is None:
+                raise
+            raise NativeIdentityReconciliationError("CURRENT_OPERATION_UNCONFIRMED", progress.receipt()) from None
+
+    def _submit(
+        self,
+        submission: PolicySubmission,
+        hook: Callable[[PolicySubmission], DurableSubmissionReceipt],
+        progress: _SubmissionProgress,
+        checkpoint: Callable[[], None],
+    ) -> None:
+        self._checkpoint(checkpoint)
+        progress.note(
+            submission,
+            PolicyStepState.UNKNOWN
+            if submission.intent.submission_phase == PolicySubmissionPhase.SENT
+            else PolicyStepState.UNSENT,
+        )
+        try:
+            receipt = hook(submission)
+        except Exception:
+            raise NativeIdentityError("SUBMISSION_COMMIT_UNCONFIRMED") from None
+        if (
+            type(receipt) is not DurableSubmissionReceipt
+            or type(receipt.journal_version) is not int
+            or receipt.journal_version <= progress.journal_version
+            or receipt.submission_id != submission.intent.submission_id
+            or receipt.submission_sha256 != submission.submission_sha256
+            or receipt.ledger_sha256 != submission.ledger_sha256
+            or type(receipt.phase) is not PolicySubmissionPhase
+            or receipt.phase != submission.intent.submission_phase
+        ):
+            raise NativeIdentityError("DURABLE_SUBMISSION_RECEIPT_REQUIRED")
+        _guid(receipt.journal_id)
+        if progress.journal_id and receipt.journal_id != progress.journal_id:
+            raise NativeIdentityError("SUBMISSION_JOURNAL_CHANGED")
+        progress.journal_id, progress.journal_version = receipt.journal_id, receipt.journal_version
+        progress.ledger = submission.ledger
+        progress.note(
+            submission,
+            PolicyStepState.UNSENT if receipt.phase == PolicySubmissionPhase.UNSENT else PolicyStepState.SENT,
+        )
+
+    def _set(
+        self,
+        fn: Any,
+        request: Any,
+        checkpoint: Callable[[], None],
+        submission: PolicySubmission,
+        progress: _SubmissionProgress,
+    ) -> Any:
+        self._checkpoint(checkpoint)
+        progress.note(submission, PolicyStepState.UNKNOWN, invoked=True)
+        try:
+            value = fn(request=request, retry=None, timeout=TIMEOUT)
+        except Exception:
+            self._checkpoint(checkpoint)
+            raise NativeIdentityError("NATIVE_SET_UNCONFIRMED") from None
+        self._checkpoint(checkpoint)
+        self._bounded(value)
+        return value
+
+    def _reconcile(
+        self,
+        permissions: Iterable[dict[str, str]],
+        *,
+        service_account_uids: tuple[str, ...],
+        ledger: OwnedGrantLedger,
+        checkpoint: Callable[[], None],
+        persist: Callable[[OwnedGrantLedger], None],
+        submission_hook: Callable[[PolicySubmission], DurableSubmissionReceipt] | None,
+        progress: _SubmissionProgress,
     ) -> NativeIdentityResult:
         from google.iam.v1 import iam_policy_pb2
 
@@ -385,6 +673,21 @@ class NativeGCPIdentity:
         desired[self.context.service_account_resource] = {
             OwnedGrant("roles/iam.workloadIdentityUser", self.context.principal(uid)) for uid in service_account_uids
         }
+        desired_union_sha256 = _hash(
+            (
+                self.context.fingerprint,
+                tuple(
+                    (resource, tuple((grant.role, grant.member) for grant in sorted(grants)))
+                    for resource, grants in sorted(desired.items())
+                ),
+            )
+        )
+        if submission_hook is not None:
+            for intent in ledger.pending:
+                if not intent.submission_id:
+                    raise NativeIdentityError("AMBIGUOUS_LEGACY_SUBMISSION")
+                if intent.desired_union_sha256 != desired_union_sha256:
+                    raise NativeIdentityError("PENDING_SUBMISSION_UNION_CHANGED")
         self._admit(checkpoint)
         _, iam, endpoints = self._native()
         self._verify_roles(roles, checkpoint)
@@ -396,6 +699,24 @@ class NativeGCPIdentity:
         )
         if len(resources) > MAX_RESOURCES:
             raise NativeIdentityError("TOO_MANY_RESOURCES")
+        if submission_hook is not None:
+            for intent in tuple(ledger.pending):
+                if intent.submission_phase != PolicySubmissionPhase.SENT:
+                    continue
+                client = iam if intent.resource == self.context.service_account_resource else endpoints
+                observed = self._call(
+                    client.get_iam_policy,
+                    iam_policy_pb2.GetIamPolicyRequest(
+                        resource=intent.resource, options={"requested_policy_version": 3}
+                    ),
+                    checkpoint,
+                )
+                self._policy(observed)
+                if self._policy_hash(observed) != intent.after_sha256:
+                    raise NativeIdentityError("SENT_SUBMISSION_UNRESOLVED")
+                progress.note(PolicySubmission(self.context.fingerprint, intent, ledger), PolicyStepState.OBSERVED)
+                ledger = self._record(ledger, intent.resource, set(intent.owned_after))
+                persist(ledger)
         for resource in sorted(resources):
             self._admit(checkpoint)
             client = iam if resource == self.context.service_account_resource else endpoints
@@ -415,10 +736,18 @@ class NativeGCPIdentity:
             if pending:
                 if current_hash == pending.after_sha256:
                     owned = set(pending.owned_after)
+                    if submission_hook is not None:
+                        progress.note(
+                            PolicySubmission(self.context.fingerprint, pending, ledger), PolicyStepState.OBSERVED
+                        )
                     ledger = self._record(ledger, resource, owned)
                     persist(ledger)
+                elif submission_hook is not None and pending.submission_phase == PolicySubmissionPhase.SENT:
+                    raise NativeIdentityError("SENT_SUBMISSION_UNRESOLVED")
                 elif current_hash != pending.before_sha256:
                     raise NativeIdentityError("PENDING_POLICY_CONFLICT")
+                elif submission_hook is not None and hashlib.sha256(policy.etag).hexdigest() != pending.etag_sha256:
+                    raise NativeIdentityError("UNSENT_POLICY_ETAG_CHANGED")
             owned.update(next((row.grants for row in ledger.removals if row.resource == resource), ()))
             wanted = desired.get(resource, set())
             removed = owned - wanted
@@ -475,19 +804,52 @@ class NativeGCPIdentity:
             after_hash = self._policy_hash(changed)
             if after_hash != current_hash:
                 intent = PolicyIntent(resource, current_hash, after_hash, tuple(sorted(owned_after)))
+                if submission_hook is not None:
+                    intent = replace(
+                        intent,
+                        submission_id=pending.submission_id if pending else str(uuid4()),
+                        submission_phase=PolicySubmissionPhase.UNSENT,
+                        etag_sha256=hashlib.sha256(policy.etag).hexdigest(),
+                        desired_union_sha256=desired_union_sha256,
+                    )
                 ledger = replace(
                     ledger, pending=(*tuple(row for row in ledger.pending if row.resource != resource), intent)
                 )
-                persist(ledger)
+                if submission_hook is None:
+                    persist(ledger)
+                if submission_hook is not None:
+                    self._submit(
+                        PolicySubmission(self.context.fingerprint, intent, ledger),
+                        submission_hook,
+                        progress,
+                        checkpoint,
+                    )
                 self._admit(checkpoint)
                 self._verify_roles(roles, checkpoint)
-                self._call(
-                    client.set_iam_policy,
-                    iam_policy_pb2.SetIamPolicyRequest(
-                        resource=resource, policy=changed, update_mask={"paths": ["bindings", "etag", "version"]}
-                    ),
-                    checkpoint,
+                if submission_hook is not None:
+                    intent = replace(intent, submission_phase=PolicySubmissionPhase.SENT)
+                    ledger = replace(
+                        ledger, pending=(*tuple(row for row in ledger.pending if row.resource != resource), intent)
+                    )
+                    self._submit(
+                        PolicySubmission(self.context.fingerprint, intent, ledger),
+                        submission_hook,
+                        progress,
+                        checkpoint,
+                    )
+                request = iam_policy_pb2.SetIamPolicyRequest(
+                    resource=resource, policy=changed, update_mask={"paths": ["bindings", "etag", "version"]}
                 )
+                if submission_hook is not None:
+                    self._set(
+                        client.set_iam_policy,
+                        request,
+                        checkpoint,
+                        PolicySubmission(self.context.fingerprint, intent, ledger),
+                        progress,
+                    )
+                else:
+                    self._call(client.set_iam_policy, request, checkpoint)
                 readback = self._call(
                     client.get_iam_policy,
                     iam_policy_pb2.GetIamPolicyRequest(resource=resource, options={"requested_policy_version": 3}),
@@ -496,6 +858,8 @@ class NativeGCPIdentity:
                 self._policy(readback)
                 if self._policy_hash(readback) != after_hash:
                     raise NativeIdentityError("POLICY_READBACK_MISMATCH")
+                if submission_hook is not None:
+                    progress.note(PolicySubmission(self.context.fingerprint, intent, ledger), PolicyStepState.OBSERVED)
             ledger = self._record(ledger, resource, owned_after)
             persist(ledger)
         self._admit(checkpoint)
