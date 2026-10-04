@@ -25,11 +25,27 @@ export type FeatureRecovery = { kind: "accepted" | "uncertain"; key: string; ena
 
 const inventoryValid = (data: AdminFeatureInventoryQuery | undefined) => {
   const flags = data?.astroliftServerInfo?.featureFlags;
+  const build = data?.astroliftServerInfo?.buildTimeFeatures;
   return (
     Array.isArray(flags) &&
-    Array.isArray(data?.astroliftServerInfo?.buildTimeFeatures) &&
-    flags.every((flag) => typeof flag.key === "string" && typeof flag.enabled === "boolean") &&
-    new Set(flags.map((flag) => flag.key)).size === flags.length
+    Array.isArray(build) &&
+    flags.every(
+      (flag) =>
+        !!flag &&
+        typeof flag.key === "string" &&
+        typeof flag.enabled === "boolean" &&
+        (flag.description == null || typeof flag.description === "string")
+    ) &&
+    build.every(
+      (feature) =>
+        !!feature &&
+        typeof feature.key === "string" &&
+        typeof feature.enabled === "boolean" &&
+        typeof feature.envVar === "string" &&
+        (feature.description == null || typeof feature.description === "string")
+    ) &&
+    new Set(flags.map((flag) => flag.key)).size === flags.length &&
+    new Set(build.map((feature) => feature.key)).size === build.length
   );
 };
 
@@ -84,71 +100,99 @@ export function useFeatureFlags() {
           ? { ...prior, loading: true, error: null }
           : { epoch, loading: true, error: null, recovery: null }
       );
-      const result = await Promise.allSettled([
-        client.query<AdminFeatureInventoryQuery>({
-          query: ADMIN_FEATURE_INVENTORY,
-          fetchPolicy: "no-cache",
-          context: { queryDeduplication: false },
-        }),
-        ...(navigation
-          ? [
-              client.query({
-                query: SERVER_INFO,
-                fetchPolicy: "no-cache",
-                context: { queryDeduplication: false },
-              }),
-              client.query<MeQueryData>({
-                query: GET_ME,
-                fetchPolicy: "no-cache",
-                context: { queryDeduplication: false },
-              }),
-            ]
-          : []),
-      ]);
-      if (!current(epoch) || sequence !== reads.current) return;
-      const inventory = result[0];
-      const recoveryKey = stateRef.current?.recovery?.key;
-      const succeeded =
-        inventory.status === "fulfilled" &&
-        inventoryValid(inventory.value.data) &&
-        (!recoveryKey ||
-          inventory.value.data?.astroliftServerInfo.featureFlags.some(
-            (flag) => flag.key === recoveryKey
-          )) &&
-        result.every((read) => read.status === "fulfilled");
-      const me = navigation ? result[2] : null;
-      if (me?.status === "fulfilled" && (me.value.data as MeQueryData)?.me?.id !== user?.id) {
-        client.writeQuery({ query: GET_ME, data: { me: null } });
-        setSnapshot((prior) => ({
-          ...prior,
-          loading: false,
-          error: new Error(t("contextChanged")),
-        }));
-        return;
-      }
-      if (!succeeded) {
-        setSnapshot((prior) => ({ ...prior, loading: false, error: new Error(t("refreshError")) }));
-        return;
-      }
-      if (inventory.status !== "fulfilled") return;
       try {
-        if (navigation) {
-          const nav = result[1];
-          if (nav.status === "fulfilled")
-            client.writeQuery({ query: SERVER_INFO, data: nav.value.data });
-          if (me?.status === "fulfilled") client.writeQuery({ query: GET_ME, data: me.value.data });
+        const result = await Promise.allSettled([
+          Promise.resolve().then(() =>
+            client.query<AdminFeatureInventoryQuery>({
+              query: ADMIN_FEATURE_INVENTORY,
+              fetchPolicy: "no-cache",
+              context: { queryDeduplication: false },
+            })
+          ),
+          ...(navigation
+            ? [
+                Promise.resolve().then(() =>
+                  client.query({
+                    query: SERVER_INFO,
+                    fetchPolicy: "no-cache",
+                    context: { queryDeduplication: false },
+                  })
+                ),
+                Promise.resolve().then(() =>
+                  client.query<MeQueryData>({
+                    query: GET_ME,
+                    fetchPolicy: "no-cache",
+                    context: { queryDeduplication: false },
+                  })
+                ),
+              ]
+            : []),
+        ]);
+        if (!current(epoch) || sequence !== reads.current) return;
+        const inventory = result[0];
+        const recoveryKey = stateRef.current?.recovery?.key;
+        const succeeded =
+          inventory.status === "fulfilled" &&
+          inventoryValid(inventory.value.data) &&
+          (!recoveryKey ||
+            inventory.value.data?.astroliftServerInfo.featureFlags.some(
+              (flag) => flag.key === recoveryKey
+            )) &&
+          result.every((read) => read.status === "fulfilled");
+        const me = navigation ? result[2] : null;
+        if (me?.status === "fulfilled" && (me.value.data as MeQueryData)?.me?.id !== user?.id) {
+          try {
+            client.writeQuery({ query: GET_ME, data: { me: null } });
+          } catch {
+            // A failed cache invalidation cannot authorize another installation write.
+          }
+          setSnapshot((prior) => ({
+            ...prior,
+            loading: false,
+            error: new Error(t("contextChanged")),
+          }));
+          return;
         }
+        if (!succeeded) {
+          setSnapshot((prior) => ({
+            ...prior,
+            loading: false,
+            error: new Error(t("refreshError")),
+          }));
+          return;
+        }
+        if (inventory.status !== "fulfilled") return;
+        try {
+          if (navigation) {
+            const nav = result[1];
+            if (nav.status === "fulfilled")
+              client.writeQuery({ query: SERVER_INFO, data: nav.value.data });
+            if (me?.status === "fulfilled")
+              client.writeQuery({ query: GET_ME, data: me.value.data });
+          }
+        } catch {
+          setSnapshot((prior) => ({
+            ...prior,
+            loading: false,
+            error: new Error(t("refreshError")),
+          }));
+          return;
+        }
+        setSnapshot({
+          epoch,
+          data: inventory.value.data as AdminFeatureInventoryQuery,
+          loading: false,
+          error: null,
+          recovery: null,
+        });
       } catch {
-        setSnapshot((prior) => ({ ...prior, loading: false, error: new Error(t("refreshError")) }));
-        return;
+        if (current(epoch) && sequence === reads.current)
+          setSnapshot((prior) => ({
+            ...prior,
+            loading: false,
+            error: new Error(t("refreshError")),
+          }));
       }
-      setSnapshot({
-        epoch,
-        data: inventory.value.data as AdminFeatureInventoryQuery,
-        loading: false,
-        error: null,
-        recovery: null,
-      });
     },
     [client, t, user?.id]
   );
