@@ -26,6 +26,7 @@ aws = [
 ]
 gcp = [
     "google-cloud-aiplatform>=1.142,<2",
+    "google-cloud-resource-manager>=1.19,<2",
     "google-cloud-container>=2.40",
     "google-cloud-secret-manager>=2.20",
     "google-cloud-dns>=0.34",
