@@ -103,9 +103,11 @@ def patch_ar_module(monkeypatch: pytest.MonkeyPatch) -> None:
         "google.cloud",
         types.ModuleType("google.cloud"),
     )
-    sys.modules.setdefault("google", google_module)
-    sys.modules.setdefault("google.cloud", cloud_module)
-    sys.modules["google.cloud.artifactregistry_v1"] = fake_module
+    monkeypatch.setitem(sys.modules, "google", google_module)
+    monkeypatch.setitem(sys.modules, "google.cloud", cloud_module)
+    monkeypatch.setitem(sys.modules, "google.cloud.artifactregistry_v1", fake_module)
+    monkeypatch.setattr(google_module, "cloud", cloud_module, raising=False)
+    monkeypatch.setattr(cloud_module, "artifactregistry_v1", fake_module, raising=False)
 
 
 @pytest.fixture
@@ -456,9 +458,11 @@ def patch_resourcemanager(monkeypatch: pytest.MonkeyPatch) -> None:
         "google.cloud",
         types.ModuleType("google.cloud"),
     )
-    sys.modules.setdefault("google", google_module)
-    sys.modules.setdefault("google.cloud", cloud_module)
-    sys.modules["google.cloud.resourcemanager_v3"] = fake_module
+    monkeypatch.setitem(sys.modules, "google", google_module)
+    monkeypatch.setitem(sys.modules, "google.cloud", cloud_module)
+    monkeypatch.setitem(sys.modules, "google.cloud.resourcemanager_v3", fake_module)
+    monkeypatch.setattr(google_module, "cloud", cloud_module, raising=False)
+    monkeypatch.setattr(cloud_module, "resourcemanager_v3", fake_module, raising=False)
 
 
 @pytest.fixture
