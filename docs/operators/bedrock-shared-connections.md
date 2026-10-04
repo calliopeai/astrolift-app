@@ -54,6 +54,24 @@ Reverting it fails while any Bedrock connection row remains, including a
 soft-deleted row. Disable the feature and retain the forward schema instead;
 never purge or recast native sources to force the old constraint to accept them.
 
+The replacement preserves the existing app/environment, project/cluster and
+organization/cluster-owned vLLM branches. The additional organization-owned
+branch requires `kind=model_endpoint`, `variant=bedrock`, no app/project owner,
+and explicit JSON keys `existing_connection_only=true` and `model_source=bedrock`.
+It changes no rows or columns; the organization field keeps nullable/PROTECT
+semantics and changes only its help text. This database check enforces structural
+ownership, not current actor, credential, account, placement or feature admission.
+
+The exact migration is recorded in the migration ratchet's reviewer-visible list
+because the conservative classifier reports the removed constraint as destructive.
+That entry documents this candidate's constraint-replacement rationale; it does
+not waive required owner/security/migration review or approve a production run.
+The isolated PostgreSQL test executes the actual forward/reverse migration,
+preserves full representative old-row snapshots and restores the prior constraint
+after removing only its disposable native fixture. It also proves atomic
+downgrade refusal for live and soft-deleted native rows. This is local migration
+compatibility evidence, not a production rollback or native connection guarantee.
+
 ## Application subscriptions and reconciliation
 
 Application owners use the same organization/model AUTO, REQUIRE_APPROVAL or DENY

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Record the exact native Bedrock owner-constraint replacement in the migration ratchet with PostgreSQL row-preservation and downgrade/refusal proof; retain required migration review and forward-schema rollback guidance (#2269).
+
 - Observe exact Foundry account/deployment metadata through bounded private ARM reads, recheck caller admission, preserve reviewed routing/source fingerprints and suppress native logs/traces. Runtime compatibility, tenant/principal admission and gateway deployment remain separate prerequisites (#2280).
 
 - Observe current GKE project/cluster/workload-pool configuration and original namespace/ServiceAccount UIDs through verified native endpoints and CA. Refuse withdrawn admission or changed identity; workload rollout and impersonation remain unverified (#2278).
