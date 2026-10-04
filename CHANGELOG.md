@@ -88,6 +88,15 @@
   response bytes and duration histograms to validated subscription UUIDs through
   operator-only metrics. Legacy snapshots remain supported without false
   attribution; per-app token and cost metrics remain unavailable.
+- Make team and person membership tabs discoverable with paged selectors,
+  explicit direct-grant review and original-request recovery in all eight
+  locales. Keep team-only navigation scoped and retain the guarded legacy
+  bulk-assignment route with its stated limits (#2273).
+
+- Add reviewed, paged direct user/team membership APIs with exact public GUIDs,
+  current team-manager and credential checks, role ceilings, concurrent source
+  refusal and actor-bound retry receipts. Preserve inherited/IdP/other-scope
+  access and refuse withdrawn sessions after lock waits (#2273).
 
 - Bind browser SSO step-up to the verified issuer/subject, active actor and current
   persisted authenticated session. Recheck proof freshness after admission locks,

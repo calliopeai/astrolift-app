@@ -42,7 +42,7 @@ import {
   WrenchIcon,
 } from "lucide-react";
 
-export type ModuleKey = "apps" | "agents" | "workflows" | "models" | "admin";
+export type ModuleKey = "apps" | "agents" | "workflows" | "models" | "admin" | "team_access";
 
 export interface NavFunction {
   key: string;
@@ -51,6 +51,8 @@ export interface NavFunction {
   icon: LucideIcon;
   /** The module whose `canView` shows this row; none means always shown. */
   module?: ModuleKey;
+  /** A second server-derived capability for this function alone. */
+  alternativeModule?: ModuleKey;
   /** Anchor for the first-run spotlight tour (`data-onboarding-tour`). */
   tourTarget?: string;
   /** Other path prefixes this row owns (a function whose pages sit under several routes). */
@@ -229,6 +231,7 @@ export const NAV: NavArea[] = [
             href: "/administration/access",
             icon: UsersIcon,
             module: "admin",
+            alternativeModule: "team_access",
             also: ["/administration/permissions", "/administration/policies"],
           },
           {
@@ -346,7 +349,12 @@ export function visibleNav(nav: NavArea[], canView: (module: ModuleKey) => boole
       groups: area.groups
         .map((g) => ({
           ...g,
-          functions: g.functions.filter((f) => !f.module || canView(f.module)),
+          functions: g.functions.filter(
+            (f) =>
+              !f.module ||
+              canView(f.module) ||
+              Boolean(f.alternativeModule && canView(f.alternativeModule))
+          ),
         }))
         .filter((g) => g.functions.length > 0),
     }))

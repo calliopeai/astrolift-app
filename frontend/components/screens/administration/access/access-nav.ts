@@ -44,17 +44,25 @@ function adminKey(): string {
  * `Admin ▾ › Access ▾ › People` on a list, `Admin ▾ › Access ▾ › People ›
  * ada` on a detail (at most four crumbs, spec 44 §4.4 rule 2).
  */
-export function accessCrumbs(fn: AccessFunction, detail?: string): Crumb[] {
+export function accessCrumbs(
+  fn: AccessFunction,
+  detail?: string,
+  permitted?: readonly AccessFunction[]
+): Crumb[] {
   const current = ACCESS_FUNCTIONS.find((f) => f.key === fn)!;
   const crumbs: Crumb[] = [
-    adminCrumb(adminKey()),
+    permitted
+      ? { label: "Admin", switcher: [{ label: "Access", href: ACCESS_BASE, active: true }] }
+      : adminCrumb(adminKey()),
     {
       label: "Access",
-      switcher: ACCESS_FUNCTIONS.map((f) => ({
-        label: f.label,
-        href: f.href,
-        active: f.key === fn,
-      })),
+      switcher: ACCESS_FUNCTIONS.filter((f) => !permitted || permitted.includes(f.key)).map(
+        (f) => ({
+          label: f.label,
+          href: f.href,
+          active: f.key === fn,
+        })
+      ),
     },
   ];
   if (detail === undefined) {

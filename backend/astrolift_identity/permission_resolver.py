@@ -1038,6 +1038,37 @@ def resolve_effective_permissions_for_apps(
     return result
 
 
+@_memoized
+def resolve_effective_permissions_for_teams(tenant: TenantContext, teams: Iterable) -> dict[int, set[str]]:
+    """Current-org TEAM projection with one ownership/grant read per page.
+
+    Identical target chains and ABAC reduction to the single-target resolver;
+    these sets are advisory and do not replace mutation admission.
+    """
+    from astrolift_identity.models import Team
+
+    ids = {team.pk for team in teams}
+    result = {pk: set() for pk in ids}
+    if not ids or tenant.actor_user_id is None or tenant.organization_id is None:
+        return result
+    current = set(
+        Team.objects.filter(
+            pk__in=ids, organization_id=tenant.organization_id, organization__deleted_at__isnull=True
+        ).values_list("pk", flat=True)
+    )
+    if _is_superuser(tenant.actor_user_id):
+        full = {permission.value for permission in Permission}
+        return {pk: set(full) if pk in current else set() for pk in ids}
+    chains = {pk: [("TEAM", pk), ("ORG", tenant.organization_id)] for pk in current}
+    candidates = {point for chain in chains.values() for point in chain}
+    grants = _live_grants(tenant, candidates)
+    for pk, chain in chains.items():
+        covering = [grant for grant in grants if grant.covers(chain)]
+        effective = {permission for grant in covering for permission in (grant.role.permissions or ())}
+        result[pk] = _abac_filter(tenant, effective, chain, covering)
+    return result
+
+
 def _prefetch_app_slugs(tenant: TenantContext, app_ids: Iterable[int]) -> None:
     """Load the slugs a policy on ``app_slug`` reads in one query, and only
     when the org has policies at all."""
