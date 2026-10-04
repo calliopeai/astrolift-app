@@ -256,6 +256,8 @@ def record_session(request: HttpRequest) -> AstroliftSession | None:
     query every few seconds) only writes ``last_seen_at`` once per
     :data:`LAST_SEEN_WRITE_THROTTLE_SECONDS`.
     """
+    if getattr(request, "_astrolift_session_unavailable", False):
+        return None
     user = getattr(request, "user", None)
     if user is None or isinstance(user, AnonymousUser) or not user.is_authenticated:
         return None

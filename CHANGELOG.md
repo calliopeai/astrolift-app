@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Revalidate persisted browser authentication after model-hosting and runtime
+  admission waits, including expiry, revocation and password-hash changes. Keep
+  refused stale requests from reviving session-tracking state; keep bearer
+  ceilings and direct native service fixtures unchanged (#2269).
+
 - Add typed, versioned platform-operator model runtime declarations without
   exposing unrelated provider configuration. Require explicit hardware evidence
   and attestation, preserve other compute modes, and admit only declared data

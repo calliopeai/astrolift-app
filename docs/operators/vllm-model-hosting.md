@@ -285,7 +285,11 @@ observations establish hosted-model readiness. Runtime setup performs no build,
 cluster apply, model download or inference.
 
 An accepted setup write survives a failed follow-up read, with a saved-but-read
-unconfirmed warning. Refused writes preserve the draft and do not refresh. The
+unconfirmed warning. Refused writes preserve the draft and do not refresh.
+Browser hosting and runtime checks re-read the persisted Django session, its
+current authentication hash and any recorded session revocation/expiry after
+admission waits. The validation is read-only and does not lock out a later
+concurrent logout; it is not an atomic logout/dispatch guarantee. The
 browser binds review/drafts to the actor/organization, selected cluster/provider,
 mode and observed versions; server identity/version and authority checks remain
 canonical. Retry current reads before another write after an unknown response.

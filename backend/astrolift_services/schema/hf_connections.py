@@ -32,7 +32,7 @@ def require_host_admin(info, cluster=None):
     from astrolift_services.schema.cluster_model_mutations import _recheck_authority
 
     target = cluster or SimpleNamespace(region=None)
-    with current_host_operator():
+    with current_host_operator(request=getattr(info.context, "request", None)):
         _recheck_authority(info, Permission.ORG_UPDATE, target)
         _recheck_authority(info, Permission.CLUSTER_UPDATE, target)
 
