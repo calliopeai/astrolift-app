@@ -23,7 +23,8 @@ from gcp.identity_owned import (
     owned_ledger_payload,
     validate_owned_ledger,
 )
-from tests.gcp.test_identity_owned_2278 import CONTEXT, PERMISSIONS, SECOND, UID, Wire
+
+from .test_identity_owned_2278 import CONTEXT, PERMISSIONS, SECOND, UID, Wire
 
 JOURNAL_ID = "12345678-0000-4000-8000-000000000009"
 

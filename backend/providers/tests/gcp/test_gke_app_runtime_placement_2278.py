@@ -9,19 +9,20 @@ import pytest
 from gcp.gke_app_apply import ApplyError, compile_app_plan
 from gcp.gke_app_runtime_handoff import RuntimeHandoff, current_runtime_targets, observe_handoff_runtime
 from gcp.gke_identity_observation import GKEObservationError
-from tests.gcp.test_gke_app_apply_2278 import (
+
+from .test_gke_app_apply_2278 import (
     SUBJECT,
     MemoryHooks,
     compiled,
     resources,
 )
-from tests.gcp.test_gke_app_apply_2278 import (
+from .test_gke_app_apply_2278 import (
     app_native as app_native_fixture,
 )
-from tests.gcp.test_gke_app_apply_2278 import (
+from .test_gke_app_apply_2278 import (
     native as native_fixture,
 )
-from tests.gcp.test_gke_identity_runtime_2278 import RuntimeKube, owner
+from .test_gke_identity_runtime_2278 import RuntimeKube, owner
 
 
 @pytest.fixture

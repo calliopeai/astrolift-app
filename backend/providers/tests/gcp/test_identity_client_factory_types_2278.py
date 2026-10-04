@@ -11,7 +11,8 @@ from google.cloud.resourcemanager_v3 import ProjectsClient
 from google.cloud.resourcemanager_v3.services.projects.transports.grpc import ProjectsGrpcTransport
 
 from gcp.identity_owned import NativeGCPIdentity
-from tests.gcp.test_identity_owned_2278 import CONTEXT, PROJECT, Wire
+
+from .test_identity_owned_2278 import CONTEXT, PROJECT, Wire
 
 TRANSPORTS = (ProjectsGrpcTransport, IAMGrpcTransport, EndpointServiceGrpcTransport)
 

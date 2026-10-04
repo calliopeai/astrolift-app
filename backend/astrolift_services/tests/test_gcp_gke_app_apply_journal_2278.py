@@ -150,7 +150,9 @@ def bridge(monkeypatch, client, tmp_path, request):
         w.reference = w.authority
         prep_driver.context = prep_driver.observer.context = context
         w.driver, w.http, w.wire = prep_driver, http, wire
-        monkeypatch.setattr("tests.gcp.test_identity_owned_2278.ROLE", plan.template.permissions[0].role)
+        monkeypatch.setattr(
+            "providers.tests.gcp.test_identity_owned_2278.ROLE", plan.template.permissions[0].role
+        )
         w.iam_wire = SubmissionWire()
         w.iam_wire.account.name = (
             f"projects/{original.identity.project_id}/serviceAccounts/{original.identity.email}"
