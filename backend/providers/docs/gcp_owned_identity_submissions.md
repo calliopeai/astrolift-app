@@ -36,8 +36,15 @@ The hook is `Callable[[PolicySubmission], DurableSubmissionReceipt]`:
 - `owned_ledger_payload` and `owned_ledger_from_payload` provide the strict
   `schema_version: 2` snake-case JSON representation. Phases serialize as strings;
   old intents have empty submission identity/hash fields and a null phase. The
-  caller must additionally apply the port's exact context/resource/grant validation;
-  the codec does not establish native ownership or admission.
+  caller applies `validate_owned_ledger(context, ledger)` for the exact bounded
+  context/resource/grant validation; the codec and validator do not establish native
+  ownership or admission.
+- `desired_owned_union_sha256(context, permissions, *, service_account_uids)` is
+  the pure canonical desired-plan digest used by reconciliation. A durable caller
+  binds its accepted operation to this exact digest rather than a different app
+  snapshot hash. Resource/grant order and duplicate permission entries do not change
+  the digest; the same resource, custom-role, principal and size checks apply. Both
+  helpers perform no ADC discovery, client construction or native transport.
 
 Strict success adds `NativeIdentityResult.receipt`. Failures raise the sanitized
 `NativeIdentityReconciliationError(reason, receipt)`; the receipt contains the

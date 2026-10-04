@@ -13,11 +13,15 @@ from gcp.identity_owned import (
     NativeGCPIdentity,
     NativeIdentityError,
     NativeIdentityReconciliationError,
+    OwnedGrant,
     OwnedGrantLedger,
+    PolicyOwnership,
     PolicyStepState,
     PolicySubmissionPhase,
+    desired_owned_union_sha256,
     owned_ledger_from_payload,
     owned_ledger_payload,
+    validate_owned_ledger,
 )
 from tests.gcp.test_identity_owned_2278 import CONTEXT, PERMISSIONS, SECOND, UID, Wire
 
@@ -335,3 +339,233 @@ def test_versioned_codec_roundtrip_legacy_and_typed_metadata(journal):
     bad["pending"][0]["submission_phase"] = "APPROVED"
     with pytest.raises(NativeIdentityError, match="INVALID_LEDGER_PAYLOAD"):
         owned_ledger_from_payload(bad)
+
+
+def test_pure_plan_and_ledger_helpers_never_discover_credentials_or_construct_clients(monkeypatch, journal):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("pure helper attempted native discovery")
+
+    monkeypatch.setattr(NativeGCPIdentity, "_native", forbidden)
+    extra = {"role": PERMISSIONS[0]["role"], "resource": SECOND}
+    digest = desired_owned_union_sha256(CONTEXT, [*PERMISSIONS, extra], service_account_uids=(UID,))
+    assert digest == desired_owned_union_sha256(CONTEXT, [extra, *PERMISSIONS, extra], service_account_uids=(UID,))
+    validate_owned_ledger(CONTEXT, journal.ledger)
+    assert not journal.wire.calls
+
+
+def test_pure_union_digest_is_the_exact_actual_submission_digest(journal):
+    digest = desired_owned_union_sha256(CONTEXT, PERMISSIONS, service_account_uids=(UID,))
+    journal.call()
+    assert all(row.intent.desired_union_sha256 == digest for row in journal.hooks)
+    assert digest != desired_owned_union_sha256(CONTEXT, [], service_account_uids=())
+
+
+@pytest.mark.parametrize(
+    "permissions,uids",
+    [
+        ([{"role": "roles/aiplatform.user", "resource": SECOND}], (UID,)),
+        ([{"role": PERMISSIONS[0]["role"], "resource": "projects/foreign/locations/us-central1/endpoints/1"}], (UID,)),
+        (PERMISSIONS, ()),
+        (PERMISSIONS, (UID, UID)),
+        (PERMISSIONS, ("invalid",)),
+    ],
+)
+def test_pure_union_helper_refuses_invalid_native_grant_plan(permissions, uids):
+    with pytest.raises(NativeIdentityError):
+        desired_owned_union_sha256(CONTEXT, permissions, service_account_uids=uids)
+
+
+def test_pure_ledger_validator_confines_context_resource_and_grants():
+    grant = OwnedGrant(PERMISSIONS[0]["role"], f"serviceAccount:{CONTEXT.email}")
+    valid = OwnedGrantLedger(CONTEXT.fingerprint, (PolicyOwnership(SECOND, (grant,)),))
+    validate_owned_ledger(CONTEXT, valid)
+    for invalid in (
+        replace(valid, context_sha256="f" * 64),
+        replace(valid, policies=(PolicyOwnership(SECOND, (replace(grant, member="user:foreign@example.invalid"),)),)),
+        replace(valid, policies=(PolicyOwnership("projects/foreign/locations/us-central1/endpoints/1", (grant,)),)),
+    ):
+        with pytest.raises(NativeIdentityError):
+            validate_owned_ledger(CONTEXT, invalid)
+
+
+def test_unsent_withdrawal_is_known_no_setter_and_same_etag_resumes_same_identity(journal):
+    def withdraw(request, receipt):
+        journal.current = False
+        return receipt
+
+    journal.mode = withdraw
+    with pytest.raises(NativeIdentityReconciliationError, match="CURRENT_AUTHORITY_WITHDRAWN") as failure:
+        journal.call()
+    original_id = journal.ledger.pending[0].submission_id
+    assert failure.value.receipt.steps[0].state == PolicyStepState.UNSENT
+    assert not failure.value.receipt.steps[0].transport_invoked and not journal.wire.setter_entries
+    journal.mode, journal.current = None, True
+    journal.call()
+    assert journal.hooks[1].intent.submission_id == original_id
+
+
+def test_unsent_unchanged_body_with_changed_etag_refuses_before_setter(journal):
+    journal.mode = lambda request, receipt: (setattr(journal, "current", False), receipt)[1]
+    with pytest.raises(NativeIdentityReconciliationError):
+        journal.call()
+    resource = journal.ledger.pending[0].resource
+    journal.wire.policies[resource].etag = b"changed-etag-same-policy"
+    journal.mode, journal.current = None, True
+    with pytest.raises(NativeIdentityReconciliationError, match="UNSENT_POLICY_ETAG_CHANGED"):
+        journal.call()
+    assert not journal.wire.setter_entries
+
+
+def test_journal_identity_change_at_sent_commit_is_uncertain_without_setter(journal):
+    journal.mode = lambda request, receipt: (
+        replace(receipt, journal_id="12345678-0000-4000-8000-000000000008")
+        if request.intent.submission_phase == PolicySubmissionPhase.SENT
+        else receipt
+    )
+    with pytest.raises(NativeIdentityReconciliationError, match="SUBMISSION_JOURNAL_CHANGED") as failure:
+        journal.call()
+    assert failure.value.receipt.steps[0].state == PolicyStepState.UNKNOWN
+    assert not journal.wire.setter_entries
+
+
+@pytest.mark.parametrize("withdraw", ["role", "gsa"])
+def test_native_authority_withdrawal_after_unsent_never_commits_sent(journal, withdraw):
+    def changed(request, receipt):
+        if withdraw == "role":
+            journal.wire.role.included_permissions.append("aiplatform.endpoints.update")
+        else:
+            journal.wire.account.description = "foreign-owner"
+        return receipt
+
+    journal.mode = changed
+    with pytest.raises(NativeIdentityReconciliationError):
+        journal.call()
+    assert [row.intent.submission_phase for row in journal.hooks] == [PolicySubmissionPhase.UNSENT]
+    assert not journal.wire.setter_entries
+
+
+def test_readback_failure_retains_sent_unknown_after_actual_setter(journal):
+    def after_call(name):
+        if name == "SetIamPolicy":
+            journal.wire.error = PermissionDenied
+
+    journal.wire.after_call = after_call
+    with pytest.raises(NativeIdentityReconciliationError) as failure:
+        journal.call()
+    assert journal.wire.writes == 1
+    assert failure.value.receipt.steps[0].state == PolicyStepState.UNKNOWN
+    assert journal.ledger.pending[0].submission_phase == PolicySubmissionPhase.SENT
+    journal.wire.error, journal.wire.after_call = None, None
+    journal.call()
+    assert journal.wire.writes == 2  # the observed first resource was not sent again
+
+
+def test_lost_observed_persistence_reply_preserves_acknowledged_sent_snapshot(journal):
+    original = journal.persist
+
+    def persist(ledger):
+        original(ledger)
+        if journal.wire.writes and not ledger.pending:
+            raise RuntimeError("private-persistence-canary")
+
+    journal.persist = persist
+    with pytest.raises(NativeIdentityReconciliationError, match="JOURNAL_PERSISTENCE_UNCONFIRMED") as failure:
+        journal.call()
+    assert failure.value.receipt.steps[0].state == PolicyStepState.OBSERVED
+    assert failure.value.receipt.ledger.pending[0].submission_phase == PolicySubmissionPhase.SENT
+    assert not journal.ledger.pending  # commit may have succeeded; receipt cannot assert journal bytes
+    assert "private-persistence-canary" not in str(failure.value)
+
+
+@pytest.mark.parametrize("value", [False, True, "accepted"])
+def test_invalid_checkpoint_refuses_before_adc_or_sdk(monkeypatch, value):
+    def forbidden(*args, **kwargs):
+        raise AssertionError("ADC or client construction before admission")
+
+    monkeypatch.setattr(NativeGCPIdentity, "_native", forbidden)
+    with pytest.raises(NativeIdentityReconciliationError, match="CURRENT_ADMISSION_UNCONFIRMED") as failure:
+        NativeGCPIdentity(CONTEXT).reconcile(
+            PERMISSIONS,
+            service_account_uids=(UID,),
+            ledger=OwnedGrantLedger(CONTEXT.fingerprint),
+            checkpoint=lambda: value,
+            persist=lambda ledger: None,
+            submission_hook=lambda submission: True,
+        )
+    assert failure.value.receipt.steps == ()
+
+
+@pytest.mark.parametrize("failure_mode", ["none", "native", "journal"])
+def test_strict_actual_factory_does_not_log_native_or_journal_payloads(monkeypatch, caplog, failure_mode):
+    import google.auth
+    from google.auth.credentials import AnonymousCredentials
+    from google.cloud.aiplatform_v1beta1.services.endpoint_service.transports.grpc import (
+        EndpointServiceGrpcTransport,
+    )
+    from google.cloud.iam_admin_v1.services.iam.transports.grpc import IAMGrpcTransport
+    from google.cloud.resourcemanager_v3.services.projects.transports.grpc import ProjectsGrpcTransport
+
+    wire = SubmissionWire()
+    state = Journal(wire)
+    hosts = []
+
+    def channel(host, **kwargs):
+        hosts.append(host)
+        return wire
+
+    for transport in (ProjectsGrpcTransport, IAMGrpcTransport, EndpointServiceGrpcTransport):
+        monkeypatch.setattr(transport, "create_channel", channel)
+    monkeypatch.setattr(google.auth, "default", lambda **kwargs: (AnonymousCredentials(), CONTEXT.project_id))
+    if failure_mode == "native":
+        wire.before_set = lambda request: (_ for _ in ()).throw(ServiceUnavailable("synthetic-private-canary"))
+    elif failure_mode == "journal":
+        state.mode = lambda request, receipt: (_ for _ in ()).throw(RuntimeError("synthetic-private-canary"))
+    caplog.set_level("DEBUG")
+    with NativeGCPIdentity(CONTEXT) as driver:
+        if failure_mode == "none":
+            assert not state.call(driver=driver).workload_ready
+        else:
+            with pytest.raises(NativeIdentityReconciliationError) as failure:
+                state.call(driver=driver)
+            assert "synthetic-private-canary" not in str(failure.value)
+    assert hosts == [
+        "cloudresourcemanager.googleapis.com",
+        "iam.googleapis.com",
+        f"{CONTEXT.region}-aiplatform.googleapis.com",
+    ]
+    assert wire.closed == 3
+    for marker in ("synthetic-private-canary", CONTEXT.email, "foreign@example.invalid", JOURNAL_ID):
+        assert marker not in caplog.text
+
+
+@pytest.mark.parametrize("value", [False, True])
+def test_invalid_checkpoint_after_held_sdk_response_refuses_without_submission(journal, value):
+    entered, release = threading.Event(), threading.Event()
+    results = []
+    current = [None]
+
+    def after_call(name):
+        if name == "GetProject":
+            entered.set()
+            assert release.wait(timeout=3)
+
+    journal.wire.after_call = after_call
+    journal.checkpoint = lambda: current[0]
+
+    def run():
+        try:
+            journal.call()
+        except NativeIdentityReconciliationError as failure:
+            results.append(failure)
+
+    worker = threading.Thread(target=run)
+    worker.start()
+    try:
+        assert entered.wait(timeout=2)
+        current[0] = value
+    finally:
+        release.set()
+        worker.join(timeout=3)
+    assert not worker.is_alive() and len(results) == 1
+    assert str(results[0]) == "CURRENT_ADMISSION_UNCONFIRMED"
+    assert not journal.hooks and not journal.wire.setter_entries
