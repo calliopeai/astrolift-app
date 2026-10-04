@@ -5955,6 +5955,28 @@
         "notRecorded": "未记录",
         "preserveHelp": "将控件留空会保留其已存储的值。更改需要通过当前运行时的准入检查并重启模型；保存并不能证明模型已就绪。"
       }
+    },
+    "native": {
+      "add": {
+        "hostTitle": "托管模型",
+        "hostDescription": "在集群的 CPU 或 GPU 上运行 Hugging Face 模型或本地导入的模型。",
+        "hostAction": "托管模型",
+        "connectTitle": "连接云端模型",
+        "connectDescription": "注册现有的云端模型或推理配置文件。这不会分配模型，也不会验证推理访问权限。",
+        "connectAction": "连接云端模型",
+        "checking": "正在检查当前权限和功能可用性…",
+        "unavailable": "当前账户或安装环境无法使用此操作。"
+      },
+      "observations": {
+        "title": "原生模型观测",
+        "description": "注册来源元数据并不能证明推理连接可用。",
+        "inference": "推理访问",
+        "inferenceUnknown": "尚未验证推理访问权限。",
+        "traffic": "应用流量和延迟",
+        "trafficUnsupported": "此处不支持原生模型的流量和延迟观测。缺少观测并不表示流量为零。",
+        "tokensCost": "令牌和费用",
+        "tokensCostUnsupported": "此处不支持令牌用量和费用观测。"
+      }
     }
   },
   "home": {

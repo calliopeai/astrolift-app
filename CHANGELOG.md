@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Prepare translated hosting/native-connection choices and explicit unsupported
+  native observation panels for the cloud model connection UI (#2269).
+
 - Add internal read-only Microsoft Foundry deployment discovery through the native
   Cognitive Services SDK. Bind results to the exact subscription/account/region,
   bound pagination, block redirects and writes, and keep inference access unknown

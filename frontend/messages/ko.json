@@ -5955,6 +5955,28 @@
         "notRecorded": "기록 없음",
         "preserveHelp": "항목을 비워 두면 저장된 값이 유지됩니다. 변경하려면 현재 런타임의 허용 조건을 충족하고 모델을 다시 시작해야 합니다. 저장만으로 모델의 준비 상태가 확인되지는 않습니다."
       }
+    },
+    "native": {
+      "add": {
+        "hostTitle": "모델 호스팅",
+        "hostDescription": "Hugging Face 모델 또는 로컬에서 가져온 모델을 클러스터 CPU나 GPU에서 실행합니다.",
+        "hostAction": "모델 호스팅",
+        "connectTitle": "클라우드 모델 연결",
+        "connectDescription": "기존 클라우드 모델이나 추론 프로필을 등록합니다. 모델을 할당하거나 추론 접근 권한을 검증하지 않습니다.",
+        "connectAction": "클라우드 모델 연결",
+        "checking": "현재 권한과 기능 가용성을 확인하는 중…",
+        "unavailable": "현재 계정 또는 설치에서는 이 작업을 사용할 수 없습니다."
+      },
+      "observations": {
+        "title": "네이티브 모델 관측",
+        "description": "소스 메타데이터를 등록해도 추론 연결의 작동 여부가 증명되지는 않습니다.",
+        "inference": "추론 접근",
+        "inferenceUnknown": "추론 접근 권한이 검증되지 않았습니다.",
+        "traffic": "앱 트래픽 및 지연 시간",
+        "trafficUnsupported": "여기서는 네이티브 모델의 트래픽과 지연 시간 관측을 지원하지 않습니다. 관측이 없다고 트래픽이 0인 것은 아닙니다.",
+        "tokensCost": "토큰 및 비용",
+        "tokensCostUnsupported": "여기서는 토큰 사용량 및 비용 관측을 지원하지 않습니다."
+      }
     }
   },
   "home": {

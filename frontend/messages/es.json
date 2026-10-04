@@ -5958,6 +5958,28 @@
         "notRecorded": "No registrado",
         "preserveHelp": "Dejar un control en blanco conserva su valor guardado. Los cambios requieren la admisión actual del entorno de ejecución y reiniciar el modelo; guardar no confirma que esté listo."
       }
+    },
+    "native": {
+      "add": {
+        "hostTitle": "Alojar un modelo",
+        "hostDescription": "Ejecuta un modelo de Hugging Face o importado localmente con CPU o GPU del clúster.",
+        "hostAction": "Alojar un modelo",
+        "connectTitle": "Conectar un modelo en la nube",
+        "connectDescription": "Registra un modelo en la nube o un perfil de inferencia existente. No asigna un modelo ni verifica el acceso a la inferencia.",
+        "connectAction": "Conectar un modelo en la nube",
+        "checking": "Comprobando permisos actuales y disponibilidad…",
+        "unavailable": "Esta acción no está disponible para la cuenta o instalación actual."
+      },
+      "observations": {
+        "title": "Observaciones del modelo nativo",
+        "description": "Registrar los metadatos del origen no demuestra que la conexión de inferencia funcione.",
+        "inference": "Acceso a la inferencia",
+        "inferenceUnknown": "No se ha verificado el acceso a la inferencia.",
+        "traffic": "Tráfico y latencia de las aplicaciones",
+        "trafficUnsupported": "Aquí no se admiten observaciones de tráfico ni latencia de modelos nativos. La ausencia de observaciones no significa tráfico cero.",
+        "tokensCost": "Tokens y coste",
+        "tokensCostUnsupported": "Aquí no se admiten observaciones del uso de tokens ni del coste."
+      }
     }
   },
   "home": {

@@ -6035,6 +6035,28 @@
         "notRecorded": "Not recorded",
         "preserveHelp": "Leaving a control blank preserves its stored value. Changes require current runtime admission and a model restart; saving does not prove readiness."
       }
+    },
+    "native": {
+      "add": {
+        "hostTitle": "Host a model",
+        "hostDescription": "Run a Hugging Face or imported local model on cluster CPU or GPU resources.",
+        "hostAction": "Host a model",
+        "connectTitle": "Connect a cloud model",
+        "connectDescription": "Register an existing cloud model or inference profile. This does not allocate a model or verify inference access.",
+        "connectAction": "Connect a cloud model",
+        "checking": "Checking current permissions and feature availability…",
+        "unavailable": "This action is unavailable for the current account or installation."
+      },
+      "observations": {
+        "title": "Native model observations",
+        "description": "Registering source metadata does not prove a working inference connection.",
+        "inference": "Inference access",
+        "inferenceUnknown": "Inference access has not been verified.",
+        "traffic": "App traffic and latency",
+        "trafficUnsupported": "Native model traffic and latency observations are not supported here. Missing observations do not mean zero traffic.",
+        "tokensCost": "Tokens and cost",
+        "tokensCostUnsupported": "Token usage and cost observations are not supported here."
+      }
     }
   },
   "home": {

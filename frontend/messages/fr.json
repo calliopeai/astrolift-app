@@ -5958,6 +5958,28 @@
         "notRecorded": "Non enregistré",
         "preserveHelp": "Laisser un champ vide conserve sa valeur enregistrée. Les modifications nécessitent une nouvelle validation du runtime et un redémarrage du modèle ; l’enregistrement ne confirme pas que le modèle est prêt."
       }
+    },
+    "native": {
+      "add": {
+        "hostTitle": "Héberger un modèle",
+        "hostDescription": "Exécutez un modèle Hugging Face ou importé localement sur les CPU ou GPU du cluster.",
+        "hostAction": "Héberger un modèle",
+        "connectTitle": "Connecter un modèle cloud",
+        "connectDescription": "Enregistrez un modèle cloud ou un profil d’inférence existant. Cela n’alloue aucun modèle et ne vérifie pas l’accès à l’inférence.",
+        "connectAction": "Connecter un modèle cloud",
+        "checking": "Vérification des autorisations et de la disponibilité…",
+        "unavailable": "Cette action est indisponible pour le compte ou l’installation actuelle."
+      },
+      "observations": {
+        "title": "Observations du modèle natif",
+        "description": "L’enregistrement des métadonnées de la source ne prouve pas que la connexion d’inférence fonctionne.",
+        "inference": "Accès à l’inférence",
+        "inferenceUnknown": "L’accès à l’inférence n’a pas été vérifié.",
+        "traffic": "Trafic et latence des applications",
+        "trafficUnsupported": "Les observations du trafic et de la latence des modèles natifs ne sont pas prises en charge ici. Leur absence ne signifie pas un trafic nul.",
+        "tokensCost": "Tokens et coût",
+        "tokensCostUnsupported": "Les observations de l’utilisation des tokens et du coût ne sont pas prises en charge ici."
+      }
     }
   },
   "home": {

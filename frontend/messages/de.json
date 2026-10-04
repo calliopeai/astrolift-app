@@ -5958,6 +5958,28 @@
         "notRecorded": "Nicht erfasst",
         "preserveHelp": "Ein leeres Feld behält seinen gespeicherten Wert bei. Änderungen erfordern eine aktuelle Laufzeitfreigabe und einen Neustart des Modells; das Speichern bestätigt keine Betriebsbereitschaft."
       }
+    },
+    "native": {
+      "add": {
+        "hostTitle": "Modell hosten",
+        "hostDescription": "Führen Sie ein Hugging-Face-Modell oder ein lokal importiertes Modell auf Cluster-CPUs oder -GPUs aus.",
+        "hostAction": "Modell hosten",
+        "connectTitle": "Cloud-Modell verbinden",
+        "connectDescription": "Registrieren Sie ein vorhandenes Cloud-Modell oder Inferenzprofil. Dies stellt kein Modell bereit und prüft keinen Inferenzzugriff.",
+        "connectAction": "Cloud-Modell verbinden",
+        "checking": "Aktuelle Berechtigungen und Verfügbarkeit werden geprüft…",
+        "unavailable": "Diese Aktion ist für das aktuelle Konto oder die Installation nicht verfügbar."
+      },
+      "observations": {
+        "title": "Beobachtungen zum nativen Modell",
+        "description": "Das Registrieren von Quellmetadaten belegt keine funktionierende Inferenzverbindung.",
+        "inference": "Inferenzzugriff",
+        "inferenceUnknown": "Der Inferenzzugriff wurde nicht geprüft.",
+        "traffic": "App-Verkehr und Latenz",
+        "trafficUnsupported": "Beobachtungen zu Verkehr und Latenz nativer Modelle werden hier nicht unterstützt. Fehlende Beobachtungen bedeuten nicht, dass kein Verkehr vorliegt.",
+        "tokensCost": "Tokens und Kosten",
+        "tokensCostUnsupported": "Beobachtungen zur Token-Nutzung und zu Kosten werden hier nicht unterstützt."
+      }
     }
   },
   "home": {
