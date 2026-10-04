@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep redeploy rebuilds on the original saved immutable source commit, including approval-delayed dispatch; refuse rebuilds with missing historical source pins before creating or enqueueing a deployment, while preserving artifact-only repeats and checking saved pins again before a delayed rebuild (#2282).
+
 - Settle every installation-feature refresh read even when another query fails during setup, preventing an orphaned rejection while retaining accepted read-only recovery (#2281).
 
 - Keep accepted installation feature changes read-only when a refresh returns malformed inventory or cache updates fail; recover through fresh inventory and viewer reads without resending the write (#2281).

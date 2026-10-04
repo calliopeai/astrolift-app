@@ -77,6 +77,7 @@ from astrolift_lifecycle.scopes import deployment_app_scope
 from astrolift_lifecycle.visibility import live_app_rows, live_lifecycle_rows
 from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import app_scope_by_slug
+from astrolift_scm.providers.revisions import is_resolved_commit_sha
 from astrolift_services.capability_projection import check_promotion
 from astrolift_workflows.client import (
     signal_workflow,
@@ -915,6 +916,16 @@ class DeploymentMutations:
                 return mismatch
             recheck_action(Permission.APP_DEPLOY, source, source.app_environment, deployment=True)
 
+            if (
+                source.registered_app.effective_build_strategy != RegisteredApp.BuildStrategy.OFF.value
+                and not is_resolved_commit_sha(source.commit_sha)
+            ):
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    "The original deployment has no valid immutable source commit. "
+                    "Start a new deployment with an explicitly reviewed source ref.",
+                )
+
             actor = _actor_from_request(info)
             env = source.app_environment
             try:
@@ -951,6 +962,7 @@ class DeploymentMutations:
                     approvals_required=approvals_required,
                     approvals_received=0,
                     promoted_from=source,
+                    commit_sha=source.commit_sha,
                 )
 
                 persist_deployment_origin(new_deploy, origin)
@@ -969,6 +981,7 @@ class DeploymentMutations:
                                 image_tags={"app": source.image_tag},
                                 trigger_kind=Deployment.TriggerKind.MANUAL.value,
                                 actor=actor,
+                                commit_sha=source.commit_sha,
                             )
                         ],
                         organization_id=tenant.organization_id if tenant else None,
