@@ -86,8 +86,10 @@ environment and request in that order. Fresh current credential/actor/membership
 checks run after target lock waits. The final attachment checkpoint also reloads
 the reviewed policy/source and currently eligible human quorum after its last
 blocking row lock, before subscription or reconciliation effects. Browser admission reads the current persisted
-Django session and validates expiry, actor and auth hash; revoked/deleted tracked
-sessions refuse. This is a fresh admission check, not a global atomic snapshot of
+Django session through the shared read-only validator and validates expiry, actor
+and auth hash; revoked, deleted, expired or foreign-actor tracked sessions refuse.
+A request-local refusal marker prevents response tracking from reviving the
+withdrawn sidecar. This is a fresh admission check, not a global atomic snapshot of
 all authority rows or a logout/response-persistence linearization guarantee.
 
 Votes retain an internal link to the review credential so expired/revoked tokens
