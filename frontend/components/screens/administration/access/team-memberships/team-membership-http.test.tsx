@@ -815,9 +815,9 @@ it.each(Object.entries(locales))(
         </ApolloProvider>
       </NextIntlClientProvider>
     );
-    await screen.findByRole("link", { name: messages.teams.memberships.activity, exact: true });
+    await screen.findByRole("link", { name: messages.teams.memberships.activity });
     expect(
-      screen.getByRole("link", { name: messages.teams.memberships.activity, exact: true })
+      screen.getByRole("link", { name: messages.teams.memberships.activity })
     ).toHaveAttribute("href", `/administration/access/people/${row.person.orgMemberId}/activity`);
     expect(errors).not.toHaveBeenCalled();
   }
