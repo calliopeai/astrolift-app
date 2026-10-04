@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Retry startup connection resets within the existing bounded CPU runtime health poll; retain container-exit and readiness-deadline failures before inference (#2284).
+
 - Check the pinned vLLM CPU activation kernel through its registered PyTorch operator and validate numerical results before bounded model inference (#2269).
 
 - Separate native model discovery, connection settings and final registration review into distinct wizard steps, with one primary list per step (#2284).
