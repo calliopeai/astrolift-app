@@ -25,6 +25,7 @@ aws = [
     "PyYAML>=6.0",
 ]
 gcp = [
+    "google-cloud-aiplatform>=1.142,<2",
     "google-cloud-container>=2.40",
     "google-cloud-secret-manager>=2.20",
     "google-cloud-dns>=0.34",

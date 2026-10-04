@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Retain Vertex Endpoint resource IDs, deployed-model IDs and long-running
+  operation receipts across fresh reviewed lifecycle activities. Commit bounded
+  per-phase reservations before cloud submission; refuse unknown outcomes without
+  resending and keep status/binding read-only. Confirm available replicas before
+  ready, use supported update masks/traffic etags, preserve unproved Model
+  artifacts and document legacy/recovery limits (#2277).
+
 - Bind model subscription finalization and traffic lookups explicitly to current
   service/app owners. Preserve admitted installation-shared cluster placement
   while keeping dedicated-app selectors tenant-bound (#2269, #2270).

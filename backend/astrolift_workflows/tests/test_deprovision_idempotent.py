@@ -250,11 +250,15 @@ def test_retryable_in_progress_result_survives_activity_adapter():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("retryable,non_retryable", [(True, False), (False, True)])
+@pytest.mark.django_db(transaction=True)
 async def test_activity_marks_only_permanent_failures_non_retryable(
     retryable,
     non_retryable,
 ):
+    from asgiref.sync import sync_to_async
     from temporalio.exceptions import ApplicationError
+
+    _, _, _, svc = await sync_to_async(_scaffold)()
 
     result = {
         "ok": False,
@@ -271,7 +275,7 @@ async def test_activity_marks_only_permanent_failures_non_retryable(
         ),
         pytest.raises(ApplicationError) as raised,
     ):
-        await deprovision_managed_service(1, False, False)
+        await deprovision_managed_service(svc.pk, False, False)
 
     assert raised.value.non_retryable is non_retryable
 

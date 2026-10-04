@@ -820,6 +820,17 @@ async def deprovision_managed_service(
     """
     from asgiref.sync import sync_to_async
 
+    from astrolift_workflows.vertex_managed_service import is_vertex_service, vertex_lifecycle_call
+
+    if await sync_to_async(is_vertex_service)(managed_service_id):
+        return await vertex_lifecycle_call(
+            managed_service_id,
+            reviewed_binding,
+            "deprovision",
+            delete_data=delete_data,
+            force_destroy=force_destroy,
+        )
+
     activity.heartbeat()
     result = await sync_to_async(reviewed_service_call)(
         _deprovision_sync,
@@ -1050,6 +1061,11 @@ async def update_managed_service(
     from asgiref.sync import sync_to_async
     from temporalio.exceptions import ApplicationError
 
+    from astrolift_workflows.vertex_managed_service import is_vertex_service, vertex_lifecycle_call
+
+    if await sync_to_async(is_vertex_service)(managed_service_id):
+        return await vertex_lifecycle_call(managed_service_id, reviewed_binding, "update")
+
     activity.heartbeat()
     try:
         result = await sync_to_async(reviewed_service_call)(
@@ -1082,6 +1098,11 @@ async def provision_managed_service(
     Raises on ``ok=False`` so Temporal honors the RetryPolicy.
     """
     from asgiref.sync import sync_to_async
+
+    from astrolift_workflows.vertex_managed_service import is_vertex_service, vertex_lifecycle_call
+
+    if await sync_to_async(is_vertex_service)(managed_service_id):
+        return await vertex_lifecycle_call(managed_service_id, reviewed_binding, "provision")
 
     activity.heartbeat()
     from temporalio.exceptions import ApplicationError
@@ -1131,6 +1152,9 @@ def _check_ready_sync(managed_service_id: int, handle: str) -> str:
         return "available"
     validate_observed_placement(svc, resolved)
     cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
+    from astrolift_workflows.vertex_managed_service import vertex_read_config
+
+    cfg = vertex_read_config(svc, cfg)
     driver = resolved.driver_cls(config=cfg)
     status_method = getattr(driver, "status", None)
     if not callable(status_method):
@@ -1290,6 +1314,9 @@ def _managed_binding_for(svc: Any) -> Any:
         return None
     validate_observed_placement(svc, resolved)
     cfg = managed_config_for(resolved.plugin_slug, cluster, kind=svc.kind, variant=variant)
+    from astrolift_workflows.vertex_managed_service import vertex_read_config
+
+    cfg = vertex_read_config(svc, cfg)
     driver = resolved.driver_cls(config=cfg)
 
     binding_method = getattr(driver, "binding", None)

@@ -440,6 +440,12 @@ def _provision_managed_services_initial_sync(
         return []
     provisioned: list[int] = []
     for ms in rows:
+        from astrolift_workflows.vertex_managed_service import is_vertex_service
+
+        if is_vertex_service(ms.pk):
+            raise AppDeployError(
+                "Vertex allocation requires a reviewed managed-service operation; legacy onboarding cannot provision it"
+            )
         cluster = ms.app_environment.tenant_cluster
         if cluster is None:
             raise AppDeployError(
