@@ -46,12 +46,12 @@ def queue(monkeypatch):
     ],
 )
 def test_native_read_rechecks_current_authority_before_intent_effects(
-    world,
+    world,  # noqa: F811 -- imported real world fixture
     client,
     queue,
     monkeypatch,
     operation,
-    withdrawal,  # noqa: F811 -- imported real world fixture
+    withdrawal,
 ):
     w = world
     w.model, _ = register(w, client)
