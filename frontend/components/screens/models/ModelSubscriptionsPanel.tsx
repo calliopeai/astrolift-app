@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useId, useLayoutEffect } from "react";
+import { useRef, useState, useId, useLayoutEffect, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 import { useForm, useWatch } from "react-hook-form";
@@ -91,6 +91,9 @@ export interface ModelSubscriptionsPanelProps {
   onSubscribe: (request: SubscriptionRequest) => Promise<SubscriptionActionResult>;
   onRevoke: (request: RevokeSubscriptionRequest) => Promise<SubscriptionActionResult>;
   onAccepted?: () => void;
+  onSelectUsage?: (subscription: ModelSubscription) => void;
+  usageBlocked?: boolean;
+  usage?: ReactNode;
 }
 
 type Review = { scopeRevision: number; modelName: string } & (
@@ -122,6 +125,7 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
     ? [...new Set(subscriptions.rows.map((row) => row.appSlug))]
     : [];
 
+  const traffic = useTranslations("models.shared.subscriptionUsage");
   const id = useId();
   const form = useForm<z.infer<typeof draftSchema>>({
     resolver: zodResolver(draftSchema),
@@ -446,6 +450,25 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
               </div>
             ),
           },
+          ...(props.onSelectUsage
+            ? [
+                {
+                  id: "traffic",
+                  header: traffic("title"),
+                  cell: (row: ModelSubscription) => (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!confirmedPage || props.usageBlocked}
+                      onClick={() => props.onSelectUsage?.(row)}
+                    >
+                      {traffic("view")}
+                    </Button>
+                  ),
+                },
+              ]
+            : []),
           {
             id: "actions",
             header: t("actions"),
@@ -484,6 +507,7 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
           },
         ]}
       />
+      {props.usage}
       <ConfirmDialog
         open={Boolean(review)}
         onOpenChange={(open) => {

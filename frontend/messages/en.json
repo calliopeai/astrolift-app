@@ -5732,7 +5732,7 @@
         "useSource": "Use this repository revision",
         "invalidSource": "Enter a repository ID and a 40-character commit SHA.",
         "adminChecking": "Checking hosting permission…",
-        "adminRequired": "Hosting requires organization configuration and cluster update permission. Ask an administrator to host this model.",
+        "adminRequired": "Only an active platform super-admin can host or configure models.",
         "adminUnavailable": "Hosting permission could not be checked. Retry.",
         "accessTitle": "Repository access",
         "accessChecking": "Checking access to the pinned revision…",
@@ -5876,6 +5876,23 @@
         "previousStep": "Back",
         "continueStep": "Next",
         "cpuCacheHelp": "Required for CPU: 1–1024 GiB. Requested memory must exceed this cache."
+      },
+      "subscriptionUsage": {
+        "title": "App traffic",
+        "view": "View traffic",
+        "scope": "Traffic from this authenticated subscription only; deployment totals remain separate.",
+        "unavailable": "Subscription traffic could not be read.",
+        "empty": "No traffic samples in this window.",
+        "unconfigured": "Subscription traffic collection is not configured.",
+        "bytes": "Response bytes accepted by the serving app; not model tokens or confirmed network delivery.",
+        "unsupported": "Input/output tokens and cost are unsupported.",
+        "boundary": "Failed streams may count as errors even when the HTTP status was 200.",
+        "requests": "Requests per second",
+        "errors": "Error requests per second",
+        "responseBytes": "Response bytes per second",
+        "latency": "95th percentile latency",
+        "dismiss": "Close traffic",
+        "selectionHint": "Select a connected app subscription to read its traffic; deployment totals remain separate."
       }
     }
   },

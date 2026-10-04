@@ -5655,7 +5655,7 @@
         "useSource": "Utiliser cette révision du dépôt",
         "invalidSource": "Saisissez un identifiant de dépôt et un SHA de commit de 40 caractères.",
         "adminChecking": "Vérification des permissions d’hébergement…",
-        "adminRequired": "L’hébergement nécessite les permissions de configuration de l’organisation et de mise à jour du cluster. Demandez à un administrateur d’héberger ce modèle.",
+        "adminRequired": "Seul un super-administrateur actif de la plateforme peut héberger ou configurer des modèles.",
         "adminUnavailable": "Les permissions d’hébergement n’ont pas pu être vérifiées. Réessayez.",
         "accessTitle": "Accès au dépôt",
         "accessChecking": "Vérification de l’accès à la révision épinglée…",
@@ -5799,6 +5799,23 @@
         "previousStep": "Retour",
         "continueStep": "Suivant",
         "cpuCacheHelp": "Requis pour le CPU : 1–1024 GiB. La mémoire demandée doit dépasser ce cache."
+      },
+      "subscriptionUsage": {
+        "title": "Trafic de l’application",
+        "view": "Voir le trafic",
+        "scope": "Uniquement le trafic de cet abonnement authentifié ; les totaux du déploiement restent séparés.",
+        "unavailable": "Impossible de lire le trafic de cet abonnement.",
+        "empty": "Aucun échantillon de trafic sur cette période.",
+        "unconfigured": "La collecte du trafic de cet abonnement n’est pas configurée.",
+        "bytes": "Octets de réponse acceptés par l’application servant le modèle ; ni jetons du modèle ni livraison réseau confirmée.",
+        "unsupported": "Les jetons d’entrée/sortie et le coût ne sont pas pris en charge.",
+        "boundary": "Les flux échoués peuvent compter comme erreurs même avec un statut HTTP 200.",
+        "requests": "Requêtes par seconde",
+        "errors": "Requêtes en erreur par seconde",
+        "responseBytes": "Octets de réponse par seconde",
+        "latency": "Latence au 95e percentile",
+        "dismiss": "Fermer le trafic",
+        "selectionHint": "Sélectionnez un abonnement d’application connectée pour consulter son trafic ; les totaux du déploiement restent séparés."
       }
     }
   },

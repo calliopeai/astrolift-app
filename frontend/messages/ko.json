@@ -5652,7 +5652,7 @@
         "useSource": "이 저장소 리비전 사용",
         "invalidSource": "저장소 ID와 40자의 커밋 SHA를 입력하세요.",
         "adminChecking": "호스팅 권한 확인 중…",
-        "adminRequired": "호스팅하려면 조직 설정 및 클러스터 업데이트 권한이 필요합니다. 관리자에게 이 모델의 호스팅을 요청하세요.",
+        "adminRequired": "활성 플랫폼 최고 관리자만 모델을 호스팅하거나 설정할 수 있습니다.",
         "adminUnavailable": "호스팅 권한을 확인하지 못했습니다. 다시 시도하세요.",
         "accessTitle": "저장소 접근",
         "accessChecking": "고정된 리비전에 대한 접근 권한 확인 중…",
@@ -5796,6 +5796,23 @@
         "previousStep": "뒤로",
         "continueStep": "다음",
         "cpuCacheHelp": "CPU 사용 시 필수: 1–1024 GiB. 요청 메모리는 이 캐시 크기보다 커야 합니다."
+      },
+      "subscriptionUsage": {
+        "title": "앱 트래픽",
+        "view": "트래픽 보기",
+        "scope": "이 인증된 구독의 트래픽만 표시합니다. 배포 전체 합계는 별도로 유지됩니다.",
+        "unavailable": "구독 트래픽을 읽지 못했습니다.",
+        "empty": "이 기간에는 트래픽 샘플이 없습니다.",
+        "unconfigured": "구독 트래픽 수집이 설정되지 않았습니다.",
+        "bytes": "모델 제공 앱이 수락한 응답 바이트 수입니다. 모델 토큰 수나 확인된 네트워크 전송량이 아닙니다.",
+        "unsupported": "입출력 토큰 수와 비용은 지원되지 않습니다.",
+        "boundary": "HTTP 상태가 200이어도 실패한 스트림은 오류로 집계될 수 있습니다.",
+        "requests": "초당 요청 수",
+        "errors": "초당 오류 요청 수",
+        "responseBytes": "초당 응답 바이트 수",
+        "latency": "95번째 백분위 지연 시간",
+        "dismiss": "트래픽 닫기",
+        "selectionHint": "연결된 앱 구독을 선택하면 해당 트래픽을 확인할 수 있습니다. 배포 전체 합계와는 별도로 표시됩니다."
       }
     }
   },

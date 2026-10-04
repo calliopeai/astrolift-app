@@ -72,6 +72,7 @@ export function ModelObservationsPanel({
   onRefresh,
 }: ModelObservationsPanelProps) {
   const inventory = useTranslations("models.shared.inventory");
+  const usage = useTranslations("models.shared.subscriptionUsage");
   const t = useTranslations("models.shared.observations"),
     format = useFormatter();
   const time = (value: string | null | undefined) =>
@@ -173,7 +174,11 @@ export function ModelObservationsPanel({
               </>
             )
           )}
-          <p>{inventory("appTrafficUnavailable")}</p>
+          <p>
+            <a href="#model-connections" className="underline">
+              {usage("selectionHint")}
+            </a>
+          </p>
           <p>{inventory("costUnavailable")}</p>
           <Button variant="outline" size="sm" asChild>
             <Link href="/documentation/cluster-prerequisites">{inventory("metricsSetup")}</Link>

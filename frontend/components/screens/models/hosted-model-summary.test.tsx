@@ -81,7 +81,7 @@ describe("hosted model connection and usage summaries", () => {
       />
     );
     expect(screen.getByText(en.models.shared.inventory.metricsUnconfigured)).toBeInTheDocument();
-    expect(screen.getByText(en.models.shared.inventory.appTrafficUnavailable)).toBeInTheDocument();
+    expect(screen.getByText(en.models.shared.subscriptionUsage.selectionHint)).toBeInTheDocument();
     expect(screen.getByText(en.models.shared.inventory.costUnavailable)).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: en.models.shared.inventory.metricsSetup })
@@ -114,7 +114,9 @@ describe("hosted model connection and usage summaries", () => {
       view(<ModelObservationsPanel {...modelObservationsProps} />, locale);
       const copy = locales[locale].models.shared.inventory;
       expect(screen.getByRole("heading", { name: copy.metrics })).toBeInTheDocument();
-      expect(screen.getByText(copy.appTrafficUnavailable)).toBeInTheDocument();
+      expect(
+        screen.getByText(locales[locale].models.shared.subscriptionUsage.selectionHint)
+      ).toBeInTheDocument();
       expect(screen.getByText(copy.costUnavailable)).toBeInTheDocument();
     }
   );

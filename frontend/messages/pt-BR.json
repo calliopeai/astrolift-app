@@ -5652,7 +5652,7 @@
         "useSource": "Usar esta revisão do repositório",
         "invalidSource": "Insira um ID de repositório e um SHA de commit com 40 caracteres.",
         "adminChecking": "Verificando permissão de hospedagem…",
-        "adminRequired": "A hospedagem requer permissões de configuração da organização e de atualização do cluster. Peça a um administrador para hospedar este modelo.",
+        "adminRequired": "Somente um superadministrador ativo da plataforma pode hospedar ou configurar modelos.",
         "adminUnavailable": "Não foi possível verificar a permissão de hospedagem. Tente novamente.",
         "accessTitle": "Acesso ao repositório",
         "accessChecking": "Verificando acesso à revisão fixada…",
@@ -5796,6 +5796,23 @@
         "previousStep": "Voltar",
         "continueStep": "Avançar",
         "cpuCacheHelp": "Obrigatório para CPU: 1–1024 GiB. A memória solicitada deve ser maior que esse cache."
+      },
+      "subscriptionUsage": {
+        "title": "Tráfego do aplicativo",
+        "view": "Ver tráfego",
+        "scope": "Somente o tráfego desta assinatura autenticada; os totais da implantação permanecem separados.",
+        "unavailable": "Não foi possível ler o tráfego desta assinatura.",
+        "empty": "Não há amostras de tráfego neste intervalo.",
+        "unconfigured": "A coleta de tráfego desta assinatura não está configurada.",
+        "bytes": "Bytes de resposta aceitos pelo aplicativo que serve o modelo; não são tokens nem entrega de rede confirmada.",
+        "unsupported": "Tokens de entrada/saída e custo não são suportados.",
+        "boundary": "Fluxos que falham podem contar como erros mesmo com status HTTP 200.",
+        "requests": "Solicitações por segundo",
+        "errors": "Solicitações com erro por segundo",
+        "responseBytes": "Bytes de resposta por segundo",
+        "latency": "Latência do percentil 95",
+        "dismiss": "Fechar tráfego",
+        "selectionHint": "Selecione uma assinatura de um app conectado para ver seu tráfego; os totais da implantação são separados."
       }
     }
   },
