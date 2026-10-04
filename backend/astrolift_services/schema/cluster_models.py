@@ -30,7 +30,6 @@ from astrolift_services.model_admission import (
 from astrolift_services.model_runtime_settings import ModelDtype
 from astrolift_services.model_settings import (
     UpdateClusterModelInput,
-    allows_app,
     sharing_config,
     update_placement,
     validate_updated_source,
@@ -42,6 +41,7 @@ from astrolift_services.schema.model_types import (
     ModelSubscriptionTargetType,
     ModelSubscriptionType,
     cluster_model_to_type,
+    cluster_models_to_types,
     model_subscription_to_type,
 )
 from core.decorators import tenant_scoped
@@ -89,10 +89,10 @@ def _guid(value):
         return None
 
 
-def _page(rows, *, page, page_size, projection):
+def _page(rows, *, page, page_size, projection, batch_projection=None):
     result = numbered_page(rows, order_by=["pk"], page=page, page_size=page_size, max_page_size=50)
     return PageType(
-        items=[projection(row) for row in result.rows],
+        items=batch_projection(result.rows) if batch_projection else [projection(row) for row in result.rows],
         page=result.page,
         page_size=result.page_size,
         total_count=result.total_count,
@@ -131,7 +131,9 @@ def _environment_rows(permission, *, approvals=0):
     return visible_operation_rows(rows, permission, environment_path="self")
 
 
-def _subscription_targets_page(service, rows, *, search, page, page_size, projection=None):
+def _subscription_targets_page(
+    service, rows, *, search, page, page_size, projection=None, projection_factory=None
+):
     from astrolift_services.model_subscriptions import LONG_RUNNING_KINDS
 
     workloads = Workload.objects.filter(registered_app_id=OuterRef("registered_app_id"))
@@ -159,13 +161,18 @@ def _subscription_targets_page(service, rows, *, search, page, page_size, projec
                 current_org_id(),
             ).exists()
         )
-        decision = cluster_model_to_type(service)
+        decision = cluster_model_to_type(service, dedicated=None)
         admitted = (
             admitted
             and decision.runtime_supported is True
             and decision.ready is True
             and service.status == "active"
         )
+
+    from astrolift_services.model_settings import dedicated_app
+
+    dedicated = dedicated_app(service) if service is not None else None
+    sharing = (service.config or {}).get("sharing_mode", "shared") if service else None
 
     def project(env):
         from _sdk.k8s_naming import app_namespace
@@ -180,7 +187,11 @@ def _subscription_targets_page(service, rows, *, search, page, page_size, projec
         eligible = (
             admitted
             and service.tenant_cluster_id == env.tenant_cluster_id
-            and allows_app(service, env.registered_app)
+            and (
+                env.registered_app.organization_id == service.organization_id
+                if sharing == "shared"
+                else dedicated is not None and dedicated.pk == env.registered_app_id
+            )
             and supported_namespace
             and supported_workloads
         )
@@ -206,11 +217,16 @@ def _subscription_targets_page(service, rows, *, search, page, page_size, projec
             ),
         )
 
+    def batch_project(environments):
+        project_extra = projection_factory(environments) if projection_factory else projection
+        return [project_extra(env, project(env)) if project_extra else project(env) for env in environments]
+
     return _page(
         _search(rows, search, ("name", "registered_app__slug", "registered_app__name")),
         page=page,
         page_size=page_size,
-        projection=(lambda env: projection(env, project(env))) if projection else project,
+        projection=project,
+        batch_projection=batch_project,
     )
 
 
@@ -419,6 +435,7 @@ class ClusterModelsQuery:
             page=page,
             page_size=page_size,
             projection=cluster_model_to_type,
+            batch_projection=cluster_models_to_types,
         )
 
     @strawberry.field

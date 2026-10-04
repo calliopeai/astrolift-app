@@ -10,8 +10,8 @@ from django.db.models import Q
 
 from astrolift_identity import abac
 from astrolift_identity.api_tokens import get_current_api_token, session_may_act_in
-from astrolift_identity.models import Organization
-from astrolift_identity.permission_resolver import _candidate_scopes, decide
+from astrolift_identity.models import Member, Organization
+from astrolift_identity.permission_resolver import _candidate_scopes, _decide_from_grants, decide
 from astrolift_registry.scopes import app_scope_by_guid
 from astrolift_services.models import ModelConnectionPolicy
 from core.current_credential import current_dispatch_credential
@@ -55,8 +55,37 @@ def fresh_actor(info):
         store = fresh_authenticated_session(request, actor_user_id=actor.pk, permission=Permission.APP_UPDATE)
         request._model_connection_auth_session = store
     else:
+        # Bearer admission always needs current organization membership, even
+        # when its owner is a platform operator. Browser operator rules differ.
+        if not Member.objects.filter(
+            user_id=actor.pk, scope_kind="ORG", scope_id=tenant.organization_id, is_active=True
+        ).exists():
+            raise PermissionDenied(Permission.APP_UPDATE, None, "authentication is unavailable")
         request._model_connection_auth_session = {}
     return actor
+
+
+def connection_permission_decision(tenant, permission, scope):
+    """A model connection never borrows a role owned by another organization."""
+    decision = decide(tenant, permission, scope)
+    if decision.superuser or not decision.chain:
+        return decision
+    return _decide_from_grants(
+        tenant,
+        permission,
+        list(decision.chain),
+        tuple(g for g in decision.grants if g.role.organization_id in (None, tenant.organization_id)),
+        tuple(s for s in decision.shares if s.grant.role.organization_id in (None, tenant.organization_id)),
+        decision.groups,
+    )
+
+
+def check_connection_permission(permission, *, scope):
+    _check_permission_decision(
+        permission,
+        scope,
+        lambda: connection_permission_decision(get_current_tenant(), permission, scope).as_tuple(),
+    )
 
 
 def admission(info, environment, permission=Permission.APP_UPDATE, *, approvals=0, request_only=False):
@@ -82,7 +111,7 @@ def admission(info, environment, permission=Permission.APP_UPDATE, *, approvals=
             scope = app_scope_by_guid("id", permission=permission)(
                 {"id": str(environment.registered_app.guid)}
             )
-            decision = decide(tenant, permission, scope)
+            decision = connection_permission_decision(tenant, permission, scope)
             # Model connection policy remains enforceable for operators too.
             result = decision.abac
             if decision.superuser:
@@ -119,23 +148,31 @@ def admission(info, environment, permission=Permission.APP_UPDATE, *, approvals=
             return required
 
 
-def effective_policy(service, *, approval_minimum=0):
+def effective_policy(service, *, approval_minimum=0, page_facts=None):
     from constance import config
 
     from astrolift_identity.models import Policy
 
     try:
-        defaults = [
-            config.MODEL_CONNECTION_DEFAULT_MODE,
-            config.MODEL_CONNECTION_DEFAULT_QUORUM,
-            config.MODEL_CONNECTION_ALLOW_SELF_APPROVAL,
-        ]
+        defaults = (
+            [
+                config.MODEL_CONNECTION_DEFAULT_MODE,
+                config.MODEL_CONNECTION_DEFAULT_QUORUM,
+                config.MODEL_CONNECTION_ALLOW_SELF_APPROVAL,
+            ]
+            if page_facts is None
+            else page_facts[2]
+        )
     except Exception:
         raise PermissionDenied(Permission.APP_UPDATE, None, "connection policy is unavailable") from None
-    rows = list(
-        ModelConnectionPolicy.objects.filter(organization_id=service.organization_id)
-        .filter(Q(model_deployment_id__isnull=True) | Q(model_deployment_id=service.pk))
-        .order_by("pk")
+    rows = (
+        list(
+            ModelConnectionPolicy.objects.filter(organization_id=service.organization_id)
+            .filter(Q(model_deployment_id__isnull=True) | Q(model_deployment_id=service.pk))
+            .order_by("pk")
+        )
+        if page_facts is None
+        else [row for row in page_facts[0] if row.model_deployment_id in (None, service.pk)]
     )
     org = next((row for row in rows if row.model_deployment_id is None), None)
     restriction = next((row for row in rows if row.model_deployment_id is not None), None)
@@ -167,7 +204,11 @@ def effective_policy(service, *, approval_minimum=0):
         if mode == "AUTO":
             mode = "REQUIRE_APPROVAL"
         quorum = max(quorum, approval_minimum)
-    policies = list(Policy.objects.filter(organization_id=service.organization_id).order_by("pk"))
+    policies = (
+        list(Policy.objects.filter(organization_id=service.organization_id).order_by("pk"))
+        if page_facts is None
+        else page_facts[1]
+    )
     revision = {
         "defaults": defaults,
         "settings": [

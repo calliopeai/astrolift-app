@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Batch model target, request/reviewer and dedicated-inventory page projections
+  while preserving current credential, session, SCIM and per-target policy gates.
+  Keep list staleness read-only and exact-detail/effect checks locked; refuse old
+  approvals after same-version environment reassignment. Ignore foreign-owned
+  connection roles and withdrawn bearer memberships when requalifying votes (#2270).
+
 - Match Models create/manage hints to current installation-superadmin hosting
   admission and bearer/session ceilings. Preserve ordinary shared-prompt run
   authority and legacy app visibility; hints never replace target checks (#2270).

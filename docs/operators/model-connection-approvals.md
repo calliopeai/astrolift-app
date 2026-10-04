@@ -89,6 +89,19 @@ never credential IDs/material or network capabilities. `approvalCount` reports
 currently qualified distinct live votes; finalization requalifies them again.
 Action hints are advisory and never replace the mutation's fresh target check.
 
+Target, requester and reviewer pages load current ownership, policy, source and
+credential facts in batches for that HTTP request. Each destination and voter
+still receives its own permission and ABAC evaluation; snapshots never survive
+the request or supply mutation authority. Session votes validate the persisted
+session, current user hash and tracked withdrawal state. Page projections do not
+lock or write request rows. A computed STALE status retains the stored version;
+open the exact request detail before a decision. Detail reads and mutations retain
+the locked durable stale transition and fresh finalization checks. Dedicated-app
+inventory labels remain subject to live ownership and APP_READ visibility.
+The locked request also compares its recorded app, environment, model, cluster
+and provider identities with the current tuple. Reassigning an environment to a
+different app cannot reuse its old approval, even when numeric versions match.
+
 ## Concurrency and limits
 
 Decisions serialize on the live organization, then lock model, cluster/provider, app,
@@ -171,3 +184,11 @@ model, placement, request, source or action changes invalidate an open review;
 late replies cannot decorate a later context. An accepted write remains accepted
 when a follow-up read fails, while its unverified target metadata or read failure
 is stated separately.
+
+Model connection admission ignores roles owned by a different organization,
+including roles attached to current-organization scopes. Global and current-org
+roles retain their existing meaning. A stored bearer vote always needs current
+active organization membership, including when its actor is a platform operator;
+the existing browser operator membership rule is separate. Requests whose recorded
+app/environment/model/cluster/provider tuple has become incoherent are excluded
+before page counts and refused by exact detail and effects.

@@ -77,7 +77,62 @@ class ClusterModelDeploymentType:
     dedicated_app_slug: str | None = None
 
 
-def cluster_model_to_type(service):
+_DEDICATED_APP_UNSET = object()
+
+
+def dedicated_apps_for_services(services, *, permission=None):
+    """Resolve coherent current dedicated owners without per-service fan-out."""
+    from uuid import UUID
+
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_registry.models import RegisteredApp
+    from astrolift_registry.scopes import live_app_owners
+    from astrolift_registry.visibility import visible_registry_apps
+
+    identities = {}
+    for service in services:
+        config = service.config or {}
+        if config.get("sharing_mode") == "dedicated":
+            try:
+                identities[service.pk] = UUID(str(config.get("dedicated_app_id")))
+            except (TypeError, ValueError):
+                pass
+    if not identities:
+        return {service.pk: None for service in services}
+    rows = live_app_owners(RegisteredApp.objects.filter(guid__in=identities.values())).exclude(
+        provisioning_status__in=("tearing_down", "deregistered")
+    )
+    if permission is not None:
+        rows = visible_registry_apps(rows, permission)
+    apps = {(app.organization_id, app.guid): app for app in rows} if identities else {}
+    placements = (
+        set(
+            AppEnvironment.objects.filter(
+                registered_app_id__in=[app.pk for app in apps.values()],
+                tenant_cluster_id__in=[service.tenant_cluster_id for service in services],
+            ).values_list("registered_app_id", "tenant_cluster_id")
+        )
+        if apps
+        else set()
+    )
+    selected = {}
+    for service in services:
+        app = apps.get((service.organization_id, identities.get(service.pk)))
+        if app is not None and (app.pk, service.tenant_cluster_id) not in placements:
+            app = None
+        selected[service.pk] = app
+    return selected
+
+
+def cluster_models_to_types(services):
+    """Project one page with the scalar dedicated-app privacy boundary."""
+    from core.permissions import Permission
+
+    apps = dedicated_apps_for_services(services, permission=Permission.APP_READ)
+    return [cluster_model_to_type(service, dedicated=apps.get(service.pk)) for service in services]
+
+
+def cluster_model_to_type(service, *, dedicated=_DEDICATED_APP_UNSET):
     import re
 
     from k8s_native.managed.shared_model_runtime import shared_runtime
@@ -114,8 +169,8 @@ def cluster_model_to_type(service):
     elif config.get("model_source") in (None, "huggingface") and isinstance(config.get("model"), str):
         source_kind = "huggingface"
     revision = config.get("model_revision")
-    app = dedicated_app(service)
-    if app is not None:
+    app = dedicated_app(service) if dedicated is _DEDICATED_APP_UNSET else dedicated
+    if app is not None and dedicated is _DEDICATED_APP_UNSET:
         from astrolift_registry.models import RegisteredApp
         from astrolift_registry.visibility import visible_registry_apps
         from core.permissions import Permission

@@ -21,6 +21,7 @@ from astrolift_lifecycle.scopes import app_scope_via, environment_app_scope
 from astrolift_services.cluster_models import live_cluster_model_by_guid
 from astrolift_services.model_connection_policy import (
     admission,
+    check_connection_permission,
     effective_policy,
     fresh_actor,
     locked_organization,
@@ -45,7 +46,7 @@ from astrolift_services.schema.model_mutation_audit import model_mutation_audit
 from astrolift_services.schema.model_types import ModelSubscriptionTargetType
 from core.current_credential import current_dispatch_credential
 from core.decorators import tenant_scoped
-from core.permissions import Permission, PermissionDenied, check_permission, require_permission
+from core.permissions import Permission, PermissionDenied, require_permission
 from core.tenancy import get_current_tenant
 
 
@@ -229,7 +230,7 @@ def _org_admission(info):
                 approval_request=False,
             )
         ):
-            check_permission(
+            check_connection_permission(
                 Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE)({})
             )
     return actor
@@ -262,7 +263,7 @@ def _policy_type(row):
     )
 
 
-def _request_type(row, *, approve=False, cancel=False, finalize=False):
+def _request_type(row, *, approve=False, cancel=False, finalize=False, approval_count=None):
     return ModelConnectionRequestType(
         id=GUID(str(row.guid)),
         version=row.version,
@@ -284,7 +285,9 @@ def _request_type(row, *, approve=False, cancel=False, finalize=False):
         ),
         policy_version=row.policy_version,
         required_approvals=row.required_approvals,
-        approval_count=eligible_vote_count(row, row.app_environment),
+        approval_count=eligible_vote_count(row, row.app_environment)
+        if approval_count is None
+        else approval_count,
         can_approve=approve,
         can_reject=approve,
         can_cancel=cancel,
@@ -331,42 +334,6 @@ def _fresh_visibility(info, permission):
         )
         with abac.request_attributes(attrs):
             yield
-
-
-def _project_request(info, row, *, review=False):
-    permission = Permission.APP_APPROVE_DEPLOY if review else Permission.APP_UPDATE
-    try:
-        with transaction.atomic():
-            current, service, env, policy = locked_request(
-                info,
-                DecideModelConnectionRequestInput(id=GUID(str(row.guid)), if_match_version=row.version),
-                permission=permission,
-            )
-            stale_request(current, service, env, policy)
-            actor = approver_admission(info, env) if review else fresh_actor(info)
-            own = current.requester_id == actor.pk
-            approve = False
-            if current.status == "pending" and (not own or current.allow_self_approval):
-                if review:
-                    approve = True
-                else:
-                    try:
-                        approver_admission(info, env)
-                        approve = True
-                    except PermissionDenied:
-                        pass
-            return _request_type(
-                current,
-                approve=approve,
-                cancel=own and current.status in ("pending", "approved") and not current.subscription_id,
-                finalize=own
-                and current.status == "approved"
-                and not current.subscription_id
-                and eligible_vote_count(current, env) >= current.required_approvals,
-            )
-    except ConnectionUnavailable:
-        # A history row may outlive its target. It cannot offer a current action.
-        return _request_type(row)
 
 
 @strawberry.type
@@ -461,16 +428,38 @@ class ModelConnectionsQuery:
         ):
             service = None
 
-        def project(env, target):
+        def projection_factory(environments):
+            from astrolift_services.model_connection_projection import PageAuthority, policy_page_facts
+            from astrolift_services.schema.model_reads import _catalogue_audience
+
+            authority = PageAuthority(info, environments)
+            facts = policy_page_facts(tenant.organization_id)
+            source_available = service is not None and source_current(service)
+            try:
+                _catalogue_audience(info)
+                automatic_audience = True
+            except Exception:
+                automatic_audience = False
+
+            return lambda env, target: project(
+                env, target, authority, facts, source_available, automatic_audience
+            )
+
+        def project(env, target, authority, facts, source_available, automatic_audience):
             values = {name: getattr(target, name) for name in ModelSubscriptionTargetType.__annotations__}
             action = ModelConnectionAction.DENY
             policy = None
-            if target.eligible and service is not None and source_current(service):
+            if target.eligible and source_available:
                 try:
-                    minimum = admission(info, env, request_only=True)
-                    candidate = effective_policy(service, approval_minimum=minimum)
+                    minimum = authority.admission(env)
+                    candidate = effective_policy(service, approval_minimum=minimum, page_facts=facts)
                     if candidate.mode == "AUTO":
-                        _automatic_admission(info, env)
+                        if not automatic_audience:
+                            raise PermissionDenied(
+                                Permission.APP_UPDATE, None, "authentication is unavailable"
+                            )
+                        authority.admission(env, request_only=False)
+                        authority.organization(Permission.ORG_READ, env)
                     if candidate.mode != "DENY":
                         policy = candidate
                         action = (
@@ -512,7 +501,7 @@ class ModelConnectionsQuery:
                     search=search,
                     page=page,
                     page_size=page_size,
-                    projection=project,
+                    projection_factory=projection_factory,
                 )
 
     @strawberry.field
@@ -563,7 +552,14 @@ class ModelConnectionsQuery:
             page_result = numbered_page(
                 rows, order_by=["-created_at", "-guid"], page=page, page_size=page_size
             )
-            return page_result.map(lambda row: _project_request(info, row))
+            from astrolift_services.model_connection_projection import project_request_page
+
+            return PageType(
+                items=project_request_page(info, page_result.rows),
+                page=page_result.page,
+                page_size=page_result.page_size,
+                total_count=page_result.total_count,
+            )
 
     @strawberry.field
     @require_permission(
@@ -617,7 +613,14 @@ class ModelConnectionsQuery:
             page_result = numbered_page(
                 rows, order_by=["-created_at", "-guid"], page=page, page_size=page_size
             )
-            return page_result.map(lambda row: _project_request(info, row, review=True))
+            from astrolift_services.model_connection_projection import project_request_page
+
+            return PageType(
+                items=project_request_page(info, page_result.rows, review=True),
+                page=page_result.page,
+                page_size=page_result.page_size,
+                total_count=page_result.total_count,
+            )
 
     @strawberry.field
     @require_permission(

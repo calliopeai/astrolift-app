@@ -3,6 +3,7 @@
 from dataclasses import replace
 from types import SimpleNamespace
 
+from django.db.models import F
 from django.utils import timezone
 
 from astrolift_identity import abac
@@ -18,6 +19,7 @@ from astrolift_registry.models import RegisteredApp
 from astrolift_registry.scopes import live_app_owners
 from astrolift_services.model_connection_policy import (
     admission,
+    check_connection_permission,
     effective_policy,
     fresh_actor,
     locked_organization,
@@ -25,7 +27,7 @@ from astrolift_services.model_connection_policy import (
 from astrolift_services.model_settings import allows_app
 from astrolift_services.models import ModelConnectionRequest
 from core.current_credential import current_dispatch_credential
-from core.permissions import Permission, PermissionDenied, check_permission
+from core.permissions import Permission, PermissionDenied
 from core.tenancy import TenantContext, get_current_tenant, tenant_context
 
 
@@ -180,7 +182,14 @@ def locked_request(info, input, *, ready=False, permission=Permission.APP_UPDATE
         request_only=permission == Permission.APP_UPDATE,
     )
     row = request_rows().select_for_update(of=("self",)).filter(pk=initial.pk).first()
-    if row is None or row.organization_id != tenant.organization_id:
+    if row is None or (
+        row.organization_id != tenant.organization_id
+        or row.model_deployment_id != service.pk
+        or row.app_environment_id != env.pk
+        or row.registered_app_id != env.registered_app_id
+        or row.tenant_cluster_id != service.tenant_cluster_id
+        or row.provider_plugin_id != service.tenant_cluster.provider_plugin_id
+    ):
         raise ConnectionUnavailable("Model connection request is unavailable.")
     minimum = admission(info, env, permission, request_only=permission == Permission.APP_UPDATE)
     policy = effective_policy(service, approval_minimum=minimum)
@@ -192,12 +201,23 @@ def request_rows():
     return ModelConnectionRequest.objects.filter(
         organization_id=tenant.organization_id if tenant else None,
         organization__deleted_at__isnull=True,
+        registered_app_id=F("app_environment__registered_app_id"),
+        registered_app__organization_id=F("organization_id"),
+        model_deployment__organization_id=F("organization_id"),
+        tenant_cluster_id=F("model_deployment__tenant_cluster_id"),
+        app_environment__tenant_cluster_id=F("tenant_cluster_id"),
+        provider_plugin_id=F("tenant_cluster__provider_plugin_id"),
     ).select_related(
         "organization",
         "requester",
         "model_deployment",
+        "model_deployment__model_hf_connection",
+        "model_deployment__organization",
+        "model_deployment__tenant_cluster__provider_plugin",
         "registered_app",
         "app_environment",
+        "app_environment__registered_app__organization",
+        "app_environment__tenant_cluster",
         "tenant_cluster",
         "provider_plugin",
         "subscription",
@@ -237,7 +257,7 @@ def approver_admission(info, env):
             approval_request=False,
         )
         with abac.request_attributes(attrs):
-            check_permission(
+            check_connection_permission(
                 Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE)({})
             )
     admission(info, env, Permission.APP_APPROVE_DEPLOY, request_only=False)

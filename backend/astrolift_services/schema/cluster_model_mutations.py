@@ -221,7 +221,12 @@ def _recheck_authority(info, permission, cluster, *, environment=None):
                 if environment is not None
                 else cluster_model_org_scope(permission)({})
             )
-            check_permission(permission, scope=scope)
+            if environment is not None:
+                from astrolift_services.model_connection_policy import check_connection_permission
+
+                check_connection_permission(permission, scope=scope)
+            else:
+                check_permission(permission, scope=scope)
             # A platform operator is not exempt from a connection approval/deny policy.
             if environment is not None and permission == Permission.APP_UPDATE:
                 from astrolift_identity.permission_resolver import _candidate_scopes, decide
@@ -243,7 +248,9 @@ def _recheck_authority(info, permission, cluster, *, environment=None):
                             permission, scope, "model connection policy denies this operation"
                         )
             if environment is not None:
-                check_permission(Permission.ORG_READ, scope=cluster_model_org_scope(Permission.ORG_READ)({}))
+                check_connection_permission(
+                    Permission.ORG_READ, scope=cluster_model_org_scope(Permission.ORG_READ)({})
+                )
     finally:
         if marker is not None:
             reset_current_api_token(marker)
