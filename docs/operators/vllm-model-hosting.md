@@ -216,3 +216,55 @@ locales. Controlled Next/Chromium journeys exercise CPU, GPU and the small-model
 preset through review and accepted requests. These fixture receipts prove UI and
 request behavior, not successful downloading, scheduling, vLLM inference or live
 readiness. Deployment health still requires the actual runtime observations.
+
+### Authenticated subscription traffic
+
+New shared-model rollouts mount a version 2 authentication snapshot. Its
+`subscription_ids` list contains the canonical subscription UUIDs in exactly
+the same order as `subscription_keys`, both derived from the reviewed SDK
+consumer snapshot. Startup rejects duplicate or noncanonical UUIDs, mismatched
+list lengths, duplicate keys and operator-key collisions. Version 1 snapshots
+remain usable but emit no attributed series. Updating the Secret alone does
+not update a running server; the existing revision rollout still needs a new
+loaded snapshot and observed readiness.
+
+The existing operator-only `/metrics` scrape includes process-local
+`astrolift_model_subscription_info` (schema version 2) and
+`astrolift_model_subscription_auth_revision` gauges for each loaded UUID.
+Request and response-byte counters and duration histograms initialize to zero
+for each UUID and the five fixed inference route groups. This distinguishes a
+known instrumented subscription from legacy or absent telemetry. A rate still
+requires valid scrape samples over its time window. Counters reset when the
+process restarts; observe every replica and use counter-aware aggregation.
+
+Only authenticated subscriber POSTs to admitted inference routes contribute.
+The identity comes from the loaded credential mapping, never app headers or
+request data. Operator prompts, denied credentials, metadata GETs and metrics
+scrapes do not contribute. The series are:
+
+- `astrolift_model_subscription_requests_total`, with `subscription_id`,
+  `route`, `status_class` and `outcome` labels;
+- `astrolift_model_subscription_response_bytes_total`, with `subscription_id`
+  and `route` labels;
+- `astrolift_model_subscription_request_duration_seconds`, a histogram with
+  `subscription_id` and `route` labels and fixed buckets from 0.01 to 300 seconds.
+
+Outcomes are `completed`, `disconnected`, `interrupted` or `error`. Cancellation
+without an observed disconnect is interrupted. A stream that started with
+HTTP 200 can still end in an error; count failures without double-counting
+status and outcome. Each admitted request is recorded once. Byte counts measure
+body bytes accepted by ASGI's send callback, not confirmed client delivery,
+model tokens or billable usage. Duration measures the ASGI application call,
+including interrupted streams and cleanup. No prompt, response content,
+credential, caller-supplied label or token parsing is added. Per-app token and
+cost attribution remain unsupported.
+
+Scraping negotiates plain text and identity encoding. Appending preserves
+upstream series, handles bounded gzip bodies and keeps a single terminal
+OpenMetrics EOF when needed. The response length is recomputed and stale
+content digests removed. Unsupported encodings, non-text/non-200 responses,
+trailers or upstream bodies exceeding 2 MiB pass through without appended
+series. Missing attribution series must therefore remain unavailable rather
+than imply zero traffic. The API must select the authorized immutable
+subscription UUID and exact model namespace/service selectors; these runtime
+labels alone do not authorize a query or identify user accounts.
