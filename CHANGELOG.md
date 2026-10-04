@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Produce complete server-owned Endpoint-only app grant templates with signed original authority, every shared-ServiceAccount environment alias, current row/configuration guards and fresh model-version/routing evidence. Keep database checkpoints separate from native reads, allow empty detach without source lookup, and require future durable operation/deployment integration (#2278).
+
 - Verify current GCP prediction custom-role and managed Endpoint owner metadata through checkpointed, read-only native clients; refuse withdrawn admission before credential discovery and preserve owned-grant cleanup without role metadata reads (#2278).
 
 - Keep original native app identity references independent of Django imports for Temporal sandbox payloads, preserving signed JSON and service imports; verify actual HTTP-captured browser and bearer references through the real sandbox runner (#2278).
