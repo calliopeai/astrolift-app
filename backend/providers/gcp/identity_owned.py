@@ -334,7 +334,7 @@ class NativeGCPIdentity:
     def __exit__(self, *args: Any) -> None:
         self.close()
 
-    def _native(self) -> tuple[Any, Any, Any]:
+    def _native(self, checkpoint: Callable[[], None] | None = None) -> tuple[Any, Any, Any]:
         if self._closed:
             raise NativeIdentityError("CLOSED")
         if self._clients is None:
@@ -355,7 +355,11 @@ class NativeGCPIdentity:
             )
             from google.cloud.resourcemanager_v3.services.projects.transports.grpc import ProjectsGrpcTransport
 
+            if checkpoint is not None:
+                self._checkpoint(checkpoint)
             credentials, _ = google.auth.default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+            if checkpoint is not None:
+                self._checkpoint(checkpoint)
             made: list[Any] = []
             try:
                 for client_type, transport_type, host, client_info in (
@@ -373,6 +377,8 @@ class NativeGCPIdentity:
                         EP_INFO,
                     ),
                 ):
+                    if checkpoint is not None:
+                        self._checkpoint(checkpoint)
                     channel = transport_type.create_channel(
                         host, credentials=credentials, options=[("grpc.max_receive_message_length", MAX_BYTES)]
                     )
@@ -388,6 +394,8 @@ class NativeGCPIdentity:
                     except Exception:
                         channel.close()
                         raise
+                    if checkpoint is not None:
+                        self._checkpoint(checkpoint)
             except Exception:
                 for client in made:
                     client.transport.close()
@@ -420,7 +428,7 @@ class NativeGCPIdentity:
 
     def _admit(self, checkpoint: Callable[[], None]) -> None:
         self._checkpoint(checkpoint)
-        projects, iam, _ = self._native()
+        projects, iam, _ = self._native(checkpoint)
         context = self.context
         project = self._call(projects.get_project, {"name": f"projects/{context.project_number}"}, checkpoint)
         if (
@@ -454,7 +462,7 @@ class NativeGCPIdentity:
         return role.startswith(prefix) and bool(_ROLE_ID.fullmatch(role[len(prefix) :]))
 
     def _verify_roles(self, roles: set[str], checkpoint: Callable[[], None]) -> None:
-        _, iam, _ = self._native()
+        _, iam, _ = self._native(checkpoint)
         for role in sorted(roles):
             observed = self._call(iam.get_role, {"name": role}, checkpoint)
             if (
@@ -464,6 +472,36 @@ class NativeGCPIdentity:
                 or set(observed.included_permissions) != {"aiplatform.endpoints.predict"}
             ):
                 raise NativeIdentityError("PREDICTION_ROLE_UNVERIFIED")
+
+    def verify_prediction_roles(self, roles: tuple[str, ...], *, checkpoint: Callable[[], None]) -> None:
+        """Read-only current project/GSA/custom-role evidence; no IAM policy reads or writes."""
+        self._checkpoint(checkpoint)
+        if (
+            type(roles) is not tuple
+            or not 1 <= len(roles) < MAX_RESOURCES
+            or any(not isinstance(role, str) or not self._role(role) for role in roles)
+            or len(set(roles)) != len(roles)
+        ):
+            raise NativeIdentityError("PREDICTION_CUSTOM_ROLE_REQUIRED")
+        self._admit(checkpoint)
+        self._verify_roles(set(roles), checkpoint)
+        self._admit(checkpoint)
+
+    def verify_owned_endpoint(self, resource: str, service_guid: str, *, checkpoint: Callable[[], None]) -> None:
+        """Observe exact lifecycle owner labels, without adopting legacy unlabelled resources."""
+        from gcp.managed._ownership import is_marked_for
+
+        self._checkpoint(checkpoint)
+        _guid(service_guid)
+        normalized = self._resource(resource)
+        if normalized == self.context.service_account_resource:
+            raise NativeIdentityError("INVALID_ENDPOINT_RESOURCE")
+        self._admit(checkpoint)
+        _, _, endpoints = self._native(checkpoint)
+        observed = self._call(endpoints.get_endpoint, {"name": resource}, checkpoint)
+        if self._resource(observed.name) != normalized or not is_marked_for(dict(observed.labels), service_guid):
+            raise NativeIdentityError("ENDPOINT_LIFECYCLE_OWNER_UNVERIFIED")
+        self._admit(checkpoint)
 
     def _grant(self, resource: str, grant: OwnedGrant) -> None:
         if resource == self.context.service_account_resource:

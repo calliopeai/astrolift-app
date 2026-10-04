@@ -4,6 +4,8 @@
 
 - Bind private Endpoint preparation templates to every current environment alias while retaining original physical KSA identity; clarify typed uncertain-send recovery and model detach versus full identity decommission (#2278).
 
+- Verify current GCP prediction custom-role and managed Endpoint owner metadata through checkpointed, read-only native clients; refuse withdrawn admission before credential discovery and preserve owned-grant cleanup without role metadata reads (#2278).
+
 - Keep original native app identity references independent of Django imports for Temporal sandbox payloads, preserving signed JSON and service imports; verify actual HTTP-captured browser and bearer references through the real sandbox runner (#2278).
 
 - Prepare exact GKE namespace/ServiceAccount identities through committed submission and observation hooks, resolve all older sends before new effects, and gate guarded GSA annotation on the current complete IAM union. Backend durability and deployment integration remain separate prerequisites (#2278).
