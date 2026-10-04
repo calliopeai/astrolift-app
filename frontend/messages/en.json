@@ -6069,6 +6069,7 @@
         "steps": "Connection steps",
         "placementStep": "Provider and cluster",
         "sourceStep": "Choose a source",
+        "settingsStep": "Connection settings",
         "reviewStep": "Review connection",
         "availability": "Connection availability",
         "readFailed": "Could not verify the connection",

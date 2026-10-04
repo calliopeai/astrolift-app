@@ -5992,6 +5992,7 @@
         "steps": "Étapes de connexion",
         "placementStep": "Fournisseur et cluster",
         "sourceStep": "Choisir une source",
+        "settingsStep": "Paramètres de connexion",
         "reviewStep": "Vérifier la connexion",
         "availability": "Disponibilité de la connexion",
         "readFailed": "Impossible de vérifier la connexion",

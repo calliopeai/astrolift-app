@@ -26,6 +26,17 @@ Registration, editing and removal require current hosting authority, including
 fresh persisted browser-session or bearer admission after blocking locks and
 metadata reads. Ordinary application owners do not gain hosting authority.
 
+## Connection wizard
+
+The native connection wizard separates provider/cluster selection, source
+discovery, connection settings and final review. Inspecting an exact source opens
+the settings step, where the administrator names the connection and chooses
+shared or dedicated app access. Dedicated access provides its own eligible-app
+list on that step. Source discovery and app selection never render together.
+Previous returns to the earlier step with current selections preserved; review
+and submission still recheck placement and source metadata. An unconfirmed
+registration keeps submission locked until its outcome is resolved.
+
 ## Exact existing source
 
 `bedrockModelSources` returns bounded metadata with explicit partial and truncated

@@ -5989,6 +5989,7 @@
         "steps": "연결 단계",
         "placementStep": "공급자 및 클러스터",
         "sourceStep": "소스 선택",
+        "settingsStep": "연결 설정",
         "reviewStep": "연결 검토",
         "availability": "연결 사용 가능 여부",
         "readFailed": "연결을 확인할 수 없습니다",

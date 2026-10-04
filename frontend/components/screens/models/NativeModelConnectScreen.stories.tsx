@@ -61,7 +61,7 @@ const sourceProps = {
   ...nativeConnectProps,
   step: 2 as const,
   cluster: nativeConnectProps.clusters.rows[0],
-  detail: nativeSource,
+  detail: null,
   canReview: true,
   catalogue: {
     items: [nativeSource],
@@ -73,7 +73,8 @@ const sourceProps = {
 };
 const reviewProps = {
   ...sourceProps,
-  step: 3 as const,
+  step: 4 as const,
+  detail: nativeSource,
   review: {
     organizationId: nativeModel.organizationId,
     clusterId: nativeModel.clusterId,
@@ -100,6 +101,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 export const Placement: Story = {};
 export const Source: Story = { args: sourceProps };
+export const Settings: Story = {
+  args: { ...sourceProps, step: 3, detail: nativeSource },
+};
+export const DedicatedSettings: Story = {
+  args: { ...sourceProps, step: 3, detail: nativeSource, mode: "DEDICATED" },
+};
 export const BoundedPartial: Story = {
   args: {
     ...sourceProps,

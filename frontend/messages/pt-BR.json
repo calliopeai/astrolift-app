@@ -5989,6 +5989,7 @@
         "steps": "Etapas da conexão",
         "placementStep": "Provedor e cluster",
         "sourceStep": "Escolher origem",
+        "settingsStep": "Configurações da conexão",
         "reviewStep": "Revisar conexão",
         "availability": "Disponibilidade da conexão",
         "readFailed": "Não foi possível verificar a conexão",
