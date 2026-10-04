@@ -107,6 +107,10 @@ from astrolift_workflows.activities.custom_domain import (
     probe_required_records,
     transition_domain_status,
 )
+from astrolift_workflows.activities.deployment_identity_origin import (
+    mark_deployment_identity_refused,
+    validate_deployment_identity_origin,
+)
 from astrolift_workflows.activities.deprovision_managed_domain import (
     deprovision_managed_domain_resources,
 )

@@ -268,7 +268,11 @@ def ci_deploy(request: HttpRequest, app_slug: str) -> JsonResponse:
             ).values_list("name", flat=True)
         )
 
+    from astrolift_lifecycle.deployment_identity_origin import native_origin_required
+
     registered_envs: tuple[str, ...] = _active_env_names()
+    if not registered_envs and native_origin_required(app):
+        return JsonResponse({"detail": "NATIVE_HUMAN_ORIGIN_REQUIRED"}, status=409)
 
     # Zero environments (#1223). Registration already bootstraps a default
     # environment, so an app with none either predates that or had its only
@@ -336,6 +340,9 @@ def ci_deploy(request: HttpRequest, app_slug: str) -> JsonResponse:
             {"detail": f"environment {ci_req.environment!r} not found"},
             status=400,
         )
+
+    if native_origin_required(app, env):
+        return JsonResponse({"detail": "NATIVE_HUMAN_ORIGIN_REQUIRED"}, status=409)
 
     if env.deploys_paused:
         return JsonResponse(

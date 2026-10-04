@@ -12,6 +12,8 @@ from __future__ import annotations
 import dataclasses
 from typing import Any
 
+from astrolift_workflows.native_identity_inputs import AcceptedAppIdentityAuthority
+
 
 @dataclasses.dataclass(slots=True, frozen=True)
 class Actor:
@@ -42,6 +44,7 @@ class DeployAppInput:
     # back to the app's default branch. Carried here so the
     # platform-build path has the SHA without re-reading the Deployment row.
     commit_sha: str = ""
+    identity_authority: AcceptedAppIdentityAuthority | None = None
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

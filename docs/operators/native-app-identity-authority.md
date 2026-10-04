@@ -1,9 +1,9 @@
 # Original app authority for native identity work
 
 `astrolift_services.native_identity_authority` is a private integration boundary
-for the GCP identity journal. Existing public mutation/workflow contracts do not
-capture these references yet. The module enables no model connection or cloud
-effect on its own.
+for the GCP identity journal. The staged human deployment path captures a private
+Deployment-bound original reference for the selected cluster’s Endpoint-only
+consumer graph. It does not install or activate the native identity pipeline.
 
 Bearer authentication and browser-session tracking remain separate. A request
 authenticated by an API token does not create, refresh, reassign, or revive the
@@ -65,3 +65,50 @@ SENT/UNKNOWN recovery remain independent requirements. An accepted reference
 does not grant permission, prove cloud identity or establish rollout/inference
 readiness. Actual public dispatch capture, Temporal activity integration and
 the full GCP connection lifecycle remain separate work.
+
+
+## Staged deployment handoff
+
+Authenticated human GraphQL start, redeploy and target promotion capture the
+actual browser or API-token origin. The private `DeploymentIdentityOrigin`
+receipt binds that signed reference to the exact Deployment GUID and organization
+with a keyed digest. It is append-only at both model and PostgreSQL levels;
+rollback of its migration refuses retained history. No public input accepts a
+reference, credential, approval count or private receipt. `config_snapshot`
+contains no authority reference.
+
+Admission concerns the complete app graph on the **selected physical cluster**,
+including direct and attached Endpoint sources and retained IAM/preparation
+journals. Protected preparation operations retain their journal parent through
+`PROTECT`; an empty desired graph cannot erase that origin requirement.
+A separate GCP environment does not change ordinary AWS/local target deployment
+behavior. A missing target is never guessed as a supported native origin.
+Unsupported mixed-service unions refuse before creating a Deployment. Deploy-token,
+webhook, scheduled, rollback and legacy promotion origins refuse relevant native
+work before dispatch rather than manufacture a worker actor.
+
+Approval retains the initiating actor and credential; the approver cannot replace
+that authority. Before recording a vote, the original credential and all current
+non-approval admission are checked. Only a valid unsatisfied ALLOW
+`approval_required` condition may defer while the existing pending quorum waits.
+At dispatch, full policy uses actual distinct recorded human votes. A changed
+policy requiring more than the recorded deployment quorum refuses; this path
+does not redesign initial deployment decorators or silently change quorum.
+
+The private `DeploymentAuthorityContext(deployment_guid)` is a lookup key, not
+proof. `deployment_app_identity_authority(reference, context)` reloads the exact
+protected receipt and current vote ledger on each entry. It applies votes only
+to that original Deployment/app/environment. Different aliases in the complete
+app union retain ordinary `approvals=0`; callers must not re-sign sibling
+references or reuse the selected environment's votes. Ordinary
+`current_app_identity_authority(reference)` defaults remain zero. Producer and
+source-bootstrap consumers must explicitly carry this context when the real
+receipt-bound executor is wired; no ambient/thread/global vote count is supported.
+
+The registered first activity checks the private receipt, pure workflow input and
+current original authority before manifest, build or native effects. Valid native
+requests then fail explicitly with `NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED`.
+Its failure activity writes only fixed Deployment status metadata, without Secret
+restoration or GitHub reflection. Patch markers preserve replay of older histories;
+older native histories do not acquire these new guarantees. This is staged source,
+not an available complete deployment capability or live cloud acceptance.

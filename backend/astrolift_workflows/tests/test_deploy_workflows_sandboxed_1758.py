@@ -66,6 +66,11 @@ def fake_activities(calls: list[str]) -> list:
     """Stand-ins for every activity deploy, promote and rollback schedule.
     Each records its name, so a test can read the order the workflow chose."""
 
+    @activity.defn(name="validate_deployment_identity_origin")
+    async def validate_deployment_identity_origin(input: DeployAppInput) -> None:
+        assert input.identity_authority is None
+        calls.append("validate_deployment_identity_origin")
+
     @activity.defn(name="astrolift.app.resync_manifest_for_deploy")
     async def resync_manifest_for_deploy(deployment_id: int) -> dict:
         calls.append("resync_manifest_for_deploy")
@@ -177,6 +182,7 @@ def fake_activities(calls: list[str]) -> list:
         return True
 
     return [
+        validate_deployment_identity_origin,
         resync_manifest_for_deploy,
         pre_flight,
         mark_deploying,

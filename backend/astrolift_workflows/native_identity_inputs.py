@@ -21,3 +21,10 @@ class AcceptedAppIdentityAuthority:
     token_team_guid: str | None
     signature: str
     schema: int = 1
+
+
+@dataclass(frozen=True, slots=True)
+class DeploymentAuthorityContext:
+    """A private receipt lookup key, never caller-supplied approval evidence."""
+
+    deployment_guid: str
