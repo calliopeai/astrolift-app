@@ -4387,7 +4387,14 @@
       "enable": "Ativar recurso",
       "updateError": "Não foi possível atualizar o recurso.",
       "enabled": "{key} ativado",
-      "disabled": "{key} desativado"
+      "disabled": "{key} desativado",
+      "acceptedRecovery": "A alteração de {key} foi aceita. Atualize antes de outra alteração.",
+      "uncertainRecovery": "O resultado de {key} é desconhecido. Leia o valor atual antes de outra alteração.",
+      "refreshError": "Não foi possível atualizar o inventário e a navegação.",
+      "refresh": "Atualizar estado atual",
+      "refreshing": "Atualizando…",
+      "readRequired": "Leia o estado atual do recurso antes de outra alteração.",
+      "contextChanged": "O usuário atual mudou. Revise o recurso novamente."
     },
     "metrics": {
       "title": "Métricas da plataforma",

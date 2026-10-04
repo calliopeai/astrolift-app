@@ -4390,7 +4390,14 @@
       "enable": "Funktion aktivieren",
       "updateError": "Die Funktion konnte nicht aktualisiert werden.",
       "enabled": "{key} aktiviert",
-      "disabled": "{key} deaktiviert"
+      "disabled": "{key} deaktiviert",
+      "acceptedRecovery": "Die Änderung von {key} wurde angenommen. Aktualisieren Sie vor einer weiteren Änderung.",
+      "uncertainRecovery": "Das Ergebnis für {key} ist unbekannt. Lesen Sie den aktuellen Wert vor einer weiteren Änderung.",
+      "refreshError": "Bestand und Navigation konnten nicht aktualisiert werden.",
+      "refresh": "Aktuellen Zustand aktualisieren",
+      "refreshing": "Wird aktualisiert…",
+      "readRequired": "Lesen Sie den aktuellen Funktionszustand vor einer weiteren Änderung.",
+      "contextChanged": "Der aktuelle Benutzer hat gewechselt. Prüfen Sie die Funktion erneut."
     },
     "metrics": {
       "title": "Plattformmetriken",

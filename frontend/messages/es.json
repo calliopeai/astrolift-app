@@ -4390,7 +4390,14 @@
       "enable": "Activar función",
       "updateError": "No se pudo actualizar la función.",
       "enabled": "{key} activada",
-      "disabled": "{key} desactivada"
+      "disabled": "{key} desactivada",
+      "acceptedRecovery": "Se aceptó el cambio de {key}. Actualiza antes de realizar otro cambio.",
+      "uncertainRecovery": "Se desconoce el resultado de {key}. Lee el valor actual antes de realizar otro cambio.",
+      "refreshError": "No se pudieron actualizar el inventario y la navegación.",
+      "refresh": "Actualizar estado actual",
+      "refreshing": "Actualizando…",
+      "readRequired": "Lee el estado actual de la función antes de realizar otro cambio.",
+      "contextChanged": "Cambió el usuario actual. Revisa la función de nuevo."
     },
     "metrics": {
       "title": "Métricas de la plataforma",
