@@ -9,6 +9,7 @@ import pytest
 
 from astrolift_identity.models import ApiToken, Member
 from astrolift_services import local_model_artifacts as artifacts
+from astrolift_services.tests.model_hosting_helpers import promote_host_operator
 from astrolift_services.tests.test_local_model_artifacts import (
     caller,
     configured,  # noqa: F401 -- actual private TLS SDK boundary
@@ -35,6 +36,7 @@ def local_worker(runtime_world, configured, monkeypatch):  # noqa: F811
         user=user, organization=w.org, token_hash=uuid4().hex, scopes=["admin"], name="Owned fixture"
     )
     owner = SimpleNamespace(user=user, org=w.org, token=token)
+    promote_host_operator(owner)
     with caller(owner):
         row = import_uploaded(owner, configured)
         row = artifacts.finalize_artifact(row.guid, row.version)
