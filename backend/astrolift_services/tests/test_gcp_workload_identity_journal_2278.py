@@ -1,10 +1,8 @@
 """Real PostgreSQL durability/mutex controls; no cloud operation is performed."""
 
 import json
-import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
-from queue import Queue
 from threading import Event
 from uuid import uuid4
 
@@ -332,10 +330,9 @@ def test_checkpoint_is_mandatory_explicit_and_never_boolean_authority(world, res
     assert not GCPWorkloadIdentityJournal.objects.exists()
 
 
-def test_current_source_withdrawal_after_last_parent_wait_prevents_commit(world):
+def test_current_source_withdrawal_after_parent_collision_refuses_fresh_retry(world):
     held = Event()
     release = Event()
-    pids = Queue()
 
     def holder():
         close_old_connections()
@@ -352,17 +349,8 @@ def test_current_source_withdrawal_after_last_parent_wait_prevents_commit(world)
     def worker():
         close_old_connections()
         try:
-
-            def fresh(context):
-                admitted(context)
-                if not context.provider.is_enabled:
-                    raise JournalError("CURRENT_SOURCE_WITHDRAWN")
-
             with journal_mutex(world.target) as store:
-                with connection.cursor() as cursor:
-                    cursor.execute("SELECT pg_backend_pid()")
-                    pids.put(cursor.fetchone()[0])
-                return store.reserve(world.operation, checkpoint=fresh)
+                return store.reserve(world.operation, checkpoint=admitted)
         finally:
             close_old_connections()
 
@@ -370,21 +358,21 @@ def test_current_source_withdrawal_after_last_parent_wait_prevents_commit(world)
         lock = pool.submit(holder)
         assert held.wait(5)
         pending = pool.submit(worker)
-        worker_pid = pids.get(timeout=5)
-        deadline = time.monotonic() + 5
-        waiting = False
-        while time.monotonic() < deadline:
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT cardinality(pg_blocking_pids(%s))", [worker_pid])
-                waiting = cursor.fetchone()[0] > 0
-            if waiting:
-                break
-            time.sleep(0.01)
-        release.set()
-        assert waiting
+        try:
+            with pytest.raises(JournalError, match="^JOURNAL_BUSY$"):
+                pending.result(timeout=1)
+        finally:
+            release.set()
         lock.result(timeout=5)
+
+    def fresh(context):
+        admitted(context)
+        if not context.provider.is_enabled:
+            raise JournalError("CURRENT_SOURCE_WITHDRAWN")
+
+    with journal_mutex(world.target) as store:
         with pytest.raises(JournalError, match="CURRENT_SOURCE_WITHDRAWN"):
-            pending.result(timeout=5)
+            store.reserve(world.operation, checkpoint=fresh)
     assert not GCPWorkloadIdentityJournal.objects.exists()
 
 
@@ -914,10 +902,9 @@ def test_lost_mutex_connection_cannot_validate_or_commit_effect(world):
         assert independent_row(reservation.journal_id)[0] == "RESERVED"
 
 
-def test_cluster_then_app_writer_and_journal_have_no_lock_inversion(world):
+def test_cluster_then_app_writer_collision_refuses_without_wait_and_retries_current_source(world):
     held = Event()
     attempt_app = Event()
-    pids = Queue()
 
     def writer():
         close_old_connections()
@@ -925,7 +912,7 @@ def test_cluster_then_app_writer_and_journal_have_no_lock_inversion(world):
             with transaction.atomic():
                 type(world.cluster)._unscoped.select_for_update().get(pk=world.cluster.pk)
                 held.set()
-                assert attempt_app.wait(10)
+                assert attempt_app.wait(5)
                 app = type(world.medops_app)._unscoped.select_for_update().get(pk=world.medops_app.pk)
                 type(app)._unscoped.filter(pk=app.pk).update(name="Current observed app")
         finally:
@@ -935,9 +922,6 @@ def test_cluster_then_app_writer_and_journal_have_no_lock_inversion(world):
         close_old_connections()
         try:
             with journal_mutex(world.target) as store:
-                with connection.cursor() as cursor:
-                    cursor.execute("SELECT pg_backend_pid()")
-                    pids.put(cursor.fetchone()[0])
                 return store.reserve(world.operation, checkpoint=admitted)
         finally:
             close_old_connections()
@@ -946,20 +930,14 @@ def test_cluster_then_app_writer_and_journal_have_no_lock_inversion(world):
         write = pool.submit(writer)
         assert held.wait(5)
         pending = pool.submit(reserve)
-        worker_pid = pids.get(timeout=5)
-        deadline = time.monotonic() + 5
-        waiting = False
-        while time.monotonic() < deadline:
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT cardinality(pg_blocking_pids(%s))", [worker_pid])
-                waiting = cursor.fetchone()[0] > 0
-            if waiting:
-                break
-            time.sleep(0.01)
-        attempt_app.set()
-        assert waiting
-        write.result(timeout=10)
-        reservation = pending.result(timeout=10)
+        try:
+            with pytest.raises(JournalError, match="^JOURNAL_BUSY$"):
+                pending.result(timeout=1)
+        finally:
+            attempt_app.set()
+        write.result(timeout=5)
+    with journal_mutex(world.target) as store:
+        reservation = store.reserve(world.operation, checkpoint=admitted)
     assert independent_row(reservation.journal_id)[0] == "RESERVED"
     world.medops_app.refresh_from_db()
     assert world.medops_app.name == "Current observed app"

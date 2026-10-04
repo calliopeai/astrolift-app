@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Refuse GCP IAM journal row-lock contention without waiting across existing workload writer lock orders; return fixed busy only after rollback, preserve committed receipts and require fresh source/authority on retry (#2278).
+
 - Bind private Endpoint preparation templates to every current environment alias while retaining original physical KSA identity; clarify typed uncertain-send recovery and model detach versus full identity decommission (#2278).
 
 - Produce complete server-owned Endpoint-only app grant templates with signed original authority, every shared-ServiceAccount environment alias, current row/configuration guards and fresh model-version/routing evidence. Keep database checkpoints separate from native reads, allow empty detach without source lookup, and require future durable operation/deployment integration (#2278).

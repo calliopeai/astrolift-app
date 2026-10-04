@@ -15,7 +15,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 from uuid import UUID, uuid4
 
-from django.db import connection, transaction
+from django.db import DatabaseError, connection, transaction
 from django.utils import timezone
 from gcp.identity_owned import (
     DurableSubmissionReceipt,
@@ -47,6 +47,18 @@ _MAX_LEDGER = 2 * 1024 * 1024
 
 class JournalError(ValueError):
     """Fixed reasons only; never return native bodies or caller metadata."""
+
+
+@contextmanager
+def _short_transaction() -> Iterator[None]:
+    try:
+        with transaction.atomic():
+            yield
+    except DatabaseError as error:
+        cause = error.__cause__
+        if getattr(cause, "sqlstate", None) == "55P03" or getattr(cause, "pgcode", None) == "55P03":
+            raise JournalError("JOURNAL_BUSY") from None
+        raise
 
 
 def _uuid(value: str) -> str:
@@ -252,30 +264,30 @@ class JournalStore:
         if not callable(checkpoint):
             raise JournalError("CURRENT_AUTHORITY_REQUIRED")
         target = self.target
-        with transaction.atomic():
+        with _short_transaction():
             try:
-                org = Organization._unscoped.select_for_update().get(
+                org = Organization._unscoped.select_for_update(nowait=True).get(
                     guid=target.organization_id, deleted_at__isnull=True
                 )
-                cluster = TenantCluster._unscoped.select_for_update().get(
+                cluster = TenantCluster._unscoped.select_for_update(nowait=True).get(
                     guid=target.cluster_id, deleted_at__isnull=True
                 )
-                provider = ProviderPlugin._unscoped.select_for_update().get(
+                provider = ProviderPlugin._unscoped.select_for_update(nowait=True).get(
                     guid=target.provider_id, deleted_at__isnull=True
                 )
                 observed = RegisteredApp._unscoped.get(guid=target.app_id)
-                team = Team._unscoped.select_for_update().get(
+                team = Team._unscoped.select_for_update(nowait=True).get(
                     pk=observed.team_id, organization_id=org.pk, deleted_at__isnull=True
                 )
                 project = None
                 if observed.project_id:
-                    project = Project._unscoped.select_for_update().get(
+                    project = Project._unscoped.select_for_update(nowait=True).get(
                         pk=observed.project_id,
                         organization_id=org.pk,
                         team_id=team.pk,
                         deleted_at__isnull=True,
                     )
-                app = RegisteredApp._unscoped.select_for_update().get(
+                app = RegisteredApp._unscoped.select_for_update(nowait=True).get(
                     guid=target.app_id,
                     organization_id=org.pk,
                     team_id=team.pk,
@@ -297,7 +309,7 @@ class JournalStore:
                 or provider.slug != "gcp"
             ):
                 raise JournalError("CURRENT_TARGET_CHANGED")
-            rows = GCPWorkloadIdentityJournal._unscoped.select_for_update().filter(
+            rows = GCPWorkloadIdentityJournal._unscoped.select_for_update(nowait=True).filter(
                 registered_app=app, tenant_cluster=cluster
             )
             if rows.filter(deleted_at__isnull=False).exists():
