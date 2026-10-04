@@ -455,6 +455,21 @@ def test_every_known_unreachable_entry_sits_inside_a_guarded_tree():
 
 KNOWN_TEST_ONLY: frozenset[str] = frozenset(
     {
+        # #2278 tracks the missing receipt-bound GCP deployment caller:
+        # astrolift_workflows/native_endpoint_configuration.py, its registered
+        # activities/native_endpoint_configuration.py and worker integration.
+        # That private executor is held out of this release pending source
+        # corrections and orchestration/runtime acceptance. The ordinary
+        # workflow still refuses NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED.
+        # These exact staged dependencies are retained, not production-wired.
+        # Remove them when the reviewed real caller lands; anti-rot stays live.
+        "astrolift_lifecycle.deployment_execution_checkpoint",
+        "astrolift_services.gcp_app_identity_plan",
+        "astrolift_services.gcp_gke_app_apply_journal",
+        "astrolift_services.gcp_gke_preparation_journal",
+        "astrolift_services.gcp_identity_acknowledgement",
+        "astrolift_services.gcp_identity_source",
+        "astrolift_workflows.gcp_identity_inputs",
         # The finding: 53 modules whose only route in is a test.
         #
         # Baselined from this detector's first stable run, reviewed as
