@@ -20,7 +20,7 @@ import { localizedTeamsList, teamsFilter } from "./teams-list";
  * for it (search, Mine, sort and page on the server), and the soft-delete
  * mutation. The data half of TeamsScreen.
  */
-export function useTeams() {
+export function useTeams(options: { freshOnly?: boolean; skip?: boolean } = {}) {
   const t = useTranslations("teams");
   const perms = useMyPermissions();
   const list = useListState(localizedTeamsList(t));
@@ -29,7 +29,7 @@ export function useTeams() {
     list,
     (d) =>
       (d as { astroliftTeamsPage?: CursorPage<AstroliftTeam> } | undefined)?.astroliftTeamsPage,
-    { toFilter: teamsFilter }
+    { toFilter: teamsFilter, ...options }
   );
 
   const [softDeleteTeam, { loading: deleting }] = useMutation<{

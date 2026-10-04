@@ -156,6 +156,7 @@ def test_me_modules_keeps_the_entity_modules_enabled(org_b, user):
         ATTACH,
         RUNS,
         "agent_policy_enforcement",
+        "team_access",
     ]
     for key in ("apps", "agents", "workflows", "admin"):
         assert mods[key].enabled is True, key

@@ -47,6 +47,16 @@ EXEMPT: dict[str, str] = {
         "TenantRequired. The viewer's own effective permissions ARE the "
         "gate; no other tenant's data is reachable."
     ),
+    "MeType.team_access_navigation": (
+        "self-service navigation hints, like MeType.modules: no tenant or no grants "
+        "returns all-false rather than TenantRequired. navigation() first re-admits "
+        "the current actor/org/credential, then checks TEAM read/manage and ORG "
+        "read/manage independently at their actual scopes. No fixed permission "
+        "gate represents those independent hints; requiring an org-wide grant "
+        "would exclude TEAM-only managers. Returns only the viewer's booleans, "
+        "not tenant rows or exact-target authority. Dedicated HTTP negatives and "
+        "the delegation test below preserve this classification."
+    ),
     "IdentityQuery.astrolift_my_profile": "self-service: editable profile fields",
     "IdentityQuery.astrolift_my_ui_preferences": (
         "self-service (#2154): the caller's own UI preferences, read by viewer pk; "
@@ -454,3 +464,16 @@ def test_resolvers_have_tenancy_and_permission_guards(path: Path) -> None:
             "EXEMPT in this file with a written justification."
         )
         pytest.fail(msg)
+
+
+def test_team_navigation_self_hints_keep_the_reviewed_admission_delegate():
+    path = BACKEND / "astrolift_identity/schema/queries.py"
+    methods = dict(_resolvers_in_file(path))
+    fn = methods["MeType.team_access_navigation"]
+    assert len(fn.body) == 3
+    assert isinstance(fn.body[0], ast.Expr) and isinstance(fn.body[0].value, ast.Constant)
+    delegated_import = fn.body[1]
+    assert isinstance(delegated_import, ast.ImportFrom)
+    assert delegated_import.module == "astrolift_identity.team_memberships"
+    assert [(item.name, item.asname) for item in delegated_import.names] == [("navigation", None)]
+    assert ast.dump(fn.body[2]) == ast.dump(ast.parse("return navigation(info)").body[0])

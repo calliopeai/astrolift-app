@@ -38,6 +38,16 @@ describe("visibleNav", () => {
     ]);
   });
 
+  it("exposes only Access for the auxiliary team capability", () => {
+    const nav = visibleNav(NAV, only("team_access"));
+    expect(nav.map((area) => area.key)).toEqual(["home", "admin"]);
+    expect(
+      nav
+        .find((area) => area.key === "admin")
+        ?.groups.flatMap((group) => group.functions.map((fn) => fn.key))
+    ).toEqual(["access"]);
+  });
+
   it("drops Admin's empty groups with the module", () => {
     expect(visibleNav(NAV, only("apps", "agents")).some((a) => a.key === "admin")).toBe(false);
   });
