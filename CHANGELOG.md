@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Attribute hosted-model traffic to authenticated app subscriptions, with bounded
+  permission-scoped API reads for request/error rates, accepted response bytes
+  and p95 duration. Preserve measured zero and unavailable states; leave token
+  counts and cost unsupported without an actual usage source (#2269).
+
 - Preserve immutable local and private Hugging Face model sources when editing
   hosted model settings. Add versioned names and shared or dedicated app access,
   with admin admission and matching subscription/reconciliation guards (#2269).
