@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Register native Bedrock reconciliation in the production Temporal worker.
+  Prove configuration observation, mixed-source cleanup, bounded timeout and
+  stale/error/deletion refusal through actual worker execution (#2269).
+
 - Register existing Bedrock on-demand models and inference profiles as explicitly
   native, organization-owned shared or dedicated connections. Require the default-off
   global feature and current hosting authority; reconcile exact app-owned IAM grants
