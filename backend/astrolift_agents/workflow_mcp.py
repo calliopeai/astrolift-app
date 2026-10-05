@@ -245,6 +245,36 @@ def get_execution(request, args):
     return {"execution": _payload(row) if row is not None else None}
 
 
+def list_human_gates(request, args):
+    from astrolift_workflows.schema.queries import WorkflowsQuery
+
+    page = WorkflowsQuery().pending_human_gates_page(
+        _info(request), limit=args.get("limit", 50), after=args.get("cursor")
+    )
+    # Omit the legacy internal execution PK; consumers act with the public GUIDs.
+    return {
+        "gates": [
+            {key: value for key, value in _payload(row).items() if key != "execution_id"}
+            for row in page.items
+        ],
+        "next_cursor": page.next_cursor,
+    }
+
+
+def get_human_gate_decision(request, args):
+    from astrolift_workflows.schema.queries import WorkflowsQuery
+
+    row = WorkflowsQuery().human_gate_decision(_info(request), **args)
+    return {"gate": _payload(row) if row is not None else None}
+
+
+def decide_human_gate(request, args):
+    from astrolift_workflows.schema.mutations import WorkflowsMutation
+
+    decide = cast(Callable[..., object], WorkflowsMutation().decide_human_gate)
+    return _mutation_payload(decide(_info(request), **args))
+
+
 def _stage_payload(row):
     from strawberry.types.base import get_object_definition
 

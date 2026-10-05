@@ -120,10 +120,64 @@ no identity is inferred or backfilled. A retry of an already-bound activity
 recovers the original stage without creating a second row. A different activity
 cannot take over an already-bound logical stage.
 
-Constrained, recoverable human decisions are tracked in
-[#2314](https://github.com/calliopeai/astrolift-app/issues/2314). The current
-general signal route retains its existing delivery semantics. These additive
-reads do not introduce an MCP approval tool or change approver resolution.
+## Explicit human decisions and recovery
+
+`astrolift_list_human_gates` uses native `pendingHumanGatesPage`. Follow
+`next_cursor` until null, including when a page has no eligible gates after
+named-approver filtering. Closed parent runs are excluded. The legacy
+`pendingHumanGates` query remains available.
+
+`astrolift_decide_human_gate` calls native `decideHumanGate` with these identities:
+
+| Decision argument | Value from the gate list |
+| --- | --- |
+| `execution_id` | `run_guid`, the enclosing workflow run's public GUID |
+| `stage_execution_id` | `execution_guid`, this specific gate attempt's public GUID |
+| `temporal_run_id` | `temporal_execution.run_id`, which may belong to a collection child |
+
+Supply `decision: "approved"` or `"rejected"`, `confirmed: true`, and an optional
+note (at most 4,096 characters). Relay the user's explicit choice. Confirmation
+is the caller's assertion of that choice; it is not independent proof of human
+presence. An agent's own assessment must not be presented as a human decision.
+The server records the authenticated caller, including when a token acts for a
+user. Callers cannot supply an approver identity. Named address lists restrict
+who may act; opaque role/team references retain the native fallback to
+`workflow.trigger` authority, rather than independent group resolution.
+
+The worker admits the request through a durable Temporal update bound to the
+stage GUID and its captured namespace/workflow/run. Only one decision is
+admitted for that gate. A retry returns the original receipt; a conflicting
+decision, note or caller is refused by the API. Once admitted, a later legacy
+signal cannot replace it. Admission does not mean persistence or workflow
+completion has happened.
+
+After a timeout, disconnect, or lost response, call
+`astrolift_get_human_gate_decision` / native `humanGateDecision` with the same
+run and stage GUIDs. This is read-only and never resubmits:
+
+| `request_state` | Meaning |
+| --- | --- |
+| `not_requested` | The exact engine incarnation has no admitted receipt for this gate |
+| `requested` | Temporal durably admitted the decision; inspect again for persistence |
+| `recorded` | The stage outcome contains this request's decision and actual approver |
+| `closed` | The gate or its parent closed; inspect the recorded outcome and run |
+| `unbound` | A legacy stage has no captured engine identity; this operation cannot decide it |
+| `unknown` | Engine observation or delivery could not be confirmed; retain the exact IDs |
+| `refused` | The worker rejected admission; inspect the current gate before retrying |
+
+`requested_decision` and `recorded_decision` remain separate. `decided_by_me`
+identifies whether the recorded/admitted approver is the current caller without
+exposing an internal user primary key. A recorded approval does not imply the
+whole workflow succeeded. Existing run/stage observation remains authoritative
+for later work and cleanup.
+
+All three tools require current native `workflow.trigger` authority and the
+matching token scope. Reads use `mcp:read`; submission uses `mcp:dispatch`.
+Project/team ceilings and execution policy apply to the actual target. Upgrade
+the worker protocol before relying on these tools; old workers may refuse or
+time out. There is no automatic fallback to an unpinned signal or a newer run.
+The legacy generic signal API remains available with its existing semantics
+for gates without an admitted durable update.
 
 ## Configure and maintain workflows
 

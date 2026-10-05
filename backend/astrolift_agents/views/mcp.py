@@ -113,6 +113,9 @@ TOOL_SCOPES: dict[str, Any] = {
     "astrolift_get_workflow_execution": execution_scope_by_id(),
     "astrolift_list_workflow_execution_stages": execution_scope_by_id(),
     "astrolift_control_workflow_execution": execution_scope_by_id(permission=Permission.WORKFLOW_TRIGGER),
+    "astrolift_list_human_gates": ANY_SCOPE,
+    "astrolift_get_human_gate_decision": execution_scope_by_id(permission=Permission.WORKFLOW_TRIGGER),
+    "astrolift_decide_human_gate": execution_scope_by_id(permission=Permission.WORKFLOW_TRIGGER),
     "astrolift_list_workflow_definitions": ANY_SCOPE,
     "astrolift_get_workflow_definition": definition_scope_by_guid(permission=Permission.WORKFLOW_READ),
     "astrolift_list_workflows": ANY_SCOPE,
@@ -175,6 +178,8 @@ def _operation_for_tool(name: str, args: dict[str, Any]):
         "astrolift_get_workflow_execution",
         "astrolift_list_workflow_execution_stages",
         "astrolift_control_workflow_execution",
+        "astrolift_get_human_gate_decision",
+        "astrolift_decide_human_gate",
     }:
         from astrolift_identity.operation_context import execution_operation
 
@@ -1036,6 +1041,9 @@ _HANDLERS: dict[str, ToolHandler] = {
     "astrolift_get_workflow_execution": workflow_mcp.get_execution,
     "astrolift_list_workflow_execution_stages": workflow_mcp.list_execution_stages,
     "astrolift_control_workflow_execution": workflow_mcp.control_execution,
+    "astrolift_list_human_gates": workflow_mcp.list_human_gates,
+    "astrolift_get_human_gate_decision": workflow_mcp.get_human_gate_decision,
+    "astrolift_decide_human_gate": workflow_mcp.decide_human_gate,
     "astrolift_list_workflow_definitions": workflow_mcp.list_definitions,
     "astrolift_get_workflow_definition": workflow_mcp.get_definition,
     "astrolift_list_workflows": workflow_mcp.list_workflows,

@@ -200,7 +200,12 @@ def test_exact_target_checks_never_use_selected_team_as_authority(mcp, target, n
 )
 def test_authority_is_checked_again_on_each_request(mcp, change):
     binding = grant(mcp)
-    read_tools = {name for name in WORKFLOW_TOOL_NAMES if MCP_TOOL_META[name]["scope"] == SCOPE_MCP_READ}
+    read_tools = {
+        name
+        for name in WORKFLOW_TOOL_NAMES
+        if MCP_TOOL_META[name]["scope"] == SCOPE_MCP_READ
+        and MCP_TOOL_META[name]["permission"] == Permission.WORKFLOW_READ
+    }
     assert read_tools <= {row["name"] for row in rpc(mcp, "tools/list").json()["result"]["tools"]}
     if change == "revoke_role":
         binding.deleted_at = timezone.now()

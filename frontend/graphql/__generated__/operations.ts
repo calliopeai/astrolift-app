@@ -7206,6 +7206,27 @@ export type HuggingFaceModelsPage = {
   state: CatalogueState;
 };
 
+export type HumanGateDecisionResult = {
+  errors: Array<ValidationError>;
+  gate?: Maybe<HumanGateDecisionState>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type HumanGateDecisionState = {
+  decidedByMe?: Maybe<Scalars['Boolean']['output']>;
+  executionGuid: Scalars['String']['output'];
+  note: Scalars['String']['output'];
+  observationError: Scalars['String']['output'];
+  recordedDecision?: Maybe<Scalars['String']['output']>;
+  requestState: Scalars['String']['output'];
+  requestedDecision?: Maybe<Scalars['String']['output']>;
+  runStatus: Scalars['String']['output'];
+  stageExecutionGuid: Scalars['String']['output'];
+  stageGuid: Scalars['String']['output'];
+  stageStatus: Scalars['String']['output'];
+  temporalExecution?: Maybe<WorkflowStageTemporalExecution>;
+};
+
 export type ImportGapType = {
   code: Scalars['String']['output'];
   message: Scalars['String']['output'];
@@ -7893,6 +7914,8 @@ export type Mutation = {
   createWorkflowStage: CreateWorkflowStageResult;
   /** Create an inbound webhook trigger for a workflow definition (platform operator only). */
   createWorkflowTrigger: CreateWorkflowTriggerResult;
+  /** Submit an explicit user decision to one exact human gate. Recover by the same execution and stage IDs after an uncertain response. */
+  decideHumanGate: HumanGateDecisionResult;
   decommissionCluster: AstroliftTenantClusterMutationResult;
   deelevateAdminSession: AstroliftDeelevatePayloadMutationResult;
   /** Delete an object by its global ID (soft-delete via delete_check). */
@@ -8737,6 +8760,16 @@ export type MutationCreateWorkflowStageArgs = {
 
 export type MutationCreateWorkflowTriggerArgs = {
   workflowSlug: Scalars['String']['input'];
+};
+
+
+export type MutationDecideHumanGateArgs = {
+  confirmed: Scalars['Boolean']['input'];
+  decision: Scalars['String']['input'];
+  executionId: Scalars['ID']['input'];
+  note?: Scalars['String']['input'];
+  stageExecutionId: Scalars['ID']['input'];
+  temporalRunId: Scalars['String']['input'];
 };
 
 
@@ -10453,6 +10486,19 @@ export type PendingHumanGate = {
   workflowId: Scalars['String']['output'];
 };
 
+/** One page of a cursor-paginated or numbered list. */
+export type PendingHumanGatePage = {
+  items: Array<PendingHumanGate>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type PermissionComparison = {
   differences: Array<PermissionDiff>;
   onlyA: Array<Scalars['String']['output']>;
@@ -11004,6 +11050,8 @@ export type Query = {
   formFieldTypes: Array<Scalars['String']['output']>;
   formSubmissions: Array<AstroliftFormSubmission>;
   huggingFaceConnectionsPage: HuggingFaceConnectionTypePage;
+  /** Recover a human decision by exact execution and stage GUIDs without resubmitting it. */
+  humanGateDecision?: Maybe<HumanGateDecisionState>;
   me?: Maybe<AstroliftMe>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use membersPage. */
   members: Array<OrganizationMemberType>;
@@ -11020,6 +11068,8 @@ export type Query = {
   organizationsPage: OrganizationTypePage;
   /** Open human_gate stage executions across the org's runs that the caller may decide, newest first (#1820). */
   pendingHumanGates: Array<PendingHumanGate>;
+  /** Page through open gates. Named-approver filtering can produce an empty page with a next cursor; continue until nextCursor is null. */
+  pendingHumanGatesPage: PendingHumanGatePage;
   /** Compare effective permissions between two users, anywhere in the active organization or on a target scope (scopeType, scopeId). Superuser or org.manage_members; both users must be members of the active organization. */
   permissionCompare?: Maybe<PermissionComparison>;
   /** Diagnose why a user can or can't perform a specific permission, optionally on a target scope (scopeType ORG, TEAM, PROJECT, APP or AGENT; scopeId its guid). Self, superuser or org.manage_members; the user must be a member of the active organization. */
@@ -12953,6 +13003,12 @@ export type QueryHuggingFaceConnectionsPageArgs = {
 };
 
 
+export type QueryHumanGateDecisionArgs = {
+  executionId: Scalars['ID']['input'];
+  stageExecutionId: Scalars['ID']['input'];
+};
+
+
 export type QueryMembersPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
@@ -13005,6 +13061,12 @@ export type QueryOrganizationsPageArgs = {
 export type QueryPendingHumanGatesArgs = {
   limit?: Scalars['Int']['input'];
   orgId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
+export type QueryPendingHumanGatesPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
 };
 
 
