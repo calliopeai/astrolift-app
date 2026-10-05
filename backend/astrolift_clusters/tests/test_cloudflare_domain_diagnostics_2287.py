@@ -104,6 +104,7 @@ def test_tenant_public_diagnostics_never_read_provider_credentials(attached, wir
     assert not reply.get("errors")
     data = reply["data"]["astroliftManagedDomainDiagnostics"]
     assert data["providerZone"]["state"] == "UNSUPPORTED" and data["providerZone"]["records"] == []
+    assert data["providerZone"]["reason"] == "PLATFORM_OPERATOR_REQUIRED"
     assert len([row for row in data["checks"] if row["key"] == "delegation"]) == 2
     assert wire.calls == []
 

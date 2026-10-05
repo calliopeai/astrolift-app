@@ -117,3 +117,27 @@ describe("all-eight DNS connection copy", () => {
     }
   );
 });
+
+it.each(locales)("%s explains platform operator refusal instead of a raw code", (locale) => {
+  const errors: Error[] = [];
+  render(
+    <NextIntlClientProvider
+      locale={locale}
+      messages={catalogs[locale]}
+      timeZone="UTC"
+      onError={(e) => errors.push(e)}
+    >
+      <DnsConnectionWizard
+        {...DNS_SETUP}
+        allowed={false}
+        support={{ ...DNS_SETUP.support!, allowed: false, reason: "PLATFORM_OPERATOR_REQUIRED" }}
+      />
+    </NextIntlClientProvider>
+  );
+  expect(
+    screen.getByText(catalogs[locale].managedDomains.platformOperatorRequired)
+  ).toBeInTheDocument();
+  expect(screen.queryByText("PLATFORM_OPERATOR_REQUIRED")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Cloudflare" })).toBeDisabled();
+  expect(errors).toEqual([]);
+});

@@ -32,6 +32,8 @@ let server: Server,
   refusedDelete: boolean,
   unknownDelete: boolean,
   canVerify: boolean,
+  supportAllowed: boolean,
+  supportFailure: boolean,
   hold: string | null,
   release: (() => void) | null;
 beforeEach(async () => {
@@ -43,9 +45,22 @@ beforeEach(async () => {
   failures = [];
   missing = refused = probeForeign = refusedDelete = unknownDelete = false;
   canVerify = false;
+  supportAllowed = true;
+  supportFailure = false;
   hold = null;
   release = null;
   const roots = {
+    dnsProviderConnectionSupport: () => {
+      if (supportFailure) throw new Error("Current connection support unavailable");
+      return {
+        allowed: supportAllowed,
+        reason: supportAllowed ? "" : "PLATFORM_OPERATOR_REQUIRED",
+        apiTokenSupported: supportAllowed,
+        oauthConfigured: false,
+        oauthSetupReason: "",
+        dnsWritesSupported: false,
+      };
+    },
     astroliftManagedDomain: () => {
       if (refused) throw new Error("Current domain admission unavailable");
       return missing ? null : domain;
@@ -121,7 +136,7 @@ beforeEach(async () => {
         release = resolve;
       });
     for (const error of result.errors ?? []) {
-      if (!refused && !error.message.includes("Domain version changed"))
+      if (!refused && !supportFailure && !error.message.includes("Domain version changed"))
         failures.push(error.message);
     }
     res.writeHead(200, { "content-type": "application/json" });
@@ -350,4 +365,48 @@ describe("actual exported domain schema over HttpLink", () => {
     await screen.findByText(en.managedDomains.acceptedUnverified);
     expect(screen.queryByText(en.managedDomains.removed)).not.toBeInTheDocument();
   });
+});
+
+it.each(["denied", "unavailable"])(
+  "does not query protected binding when safe support is %s",
+  async (kind) => {
+    supportAllowed = false;
+    supportFailure = kind === "unavailable";
+    domain.verificationState = "pending";
+    canVerify = true;
+    render(<View />);
+    await ready();
+    await waitFor(() =>
+      expect(requests.some((r) => r.operationName === "DnsConnectionSupport")).toBe(true)
+    );
+    expect(requests.some((r) => r.operationName === "DnsDomainBinding")).toBe(false);
+    expect(screen.getByRole("button", { name: en.domainConnections.verify })).toBeDisabled();
+    expect(screen.getByRole("heading", { name: domain.zone })).toBeInTheDocument();
+  }
+);
+
+it("waits for safe current support before protected binding and disables verification after withdrawal", async () => {
+  domain.verificationState = "pending";
+  canVerify = true;
+  hold = "DnsConnectionSupport";
+  render(<View />);
+  await ready();
+  await waitFor(() => expect(release).not.toBeNull());
+  expect(requests.some((r) => r.operationName === "DnsDomainBinding")).toBe(false);
+  const verify = screen.getByRole("button", { name: en.domainConnections.verify });
+  expect(verify).toBeDisabled();
+  await act(async () => {
+    hold = null;
+    release?.();
+  });
+  await waitFor(() => expect(verify).toBeEnabled());
+  expect(requests.filter((r) => r.operationName === "DnsDomainBinding")).toHaveLength(1);
+  supportAllowed = false;
+  fireEvent.click(screen.getAllByRole("button", { name: en.managedDomains.refreshCheck })[0]);
+  await waitFor(() =>
+    expect(requests.filter((r) => r.operationName === "DnsConnectionSupport")).toHaveLength(2)
+  );
+  await waitFor(() => expect(verify).toBeDisabled());
+  expect(requests.filter((r) => r.operationName === "DnsDomainBinding")).toHaveLength(1);
+  expect(requests.some((r) => r.operationName === "VerifyDnsDomain")).toBe(false);
 });

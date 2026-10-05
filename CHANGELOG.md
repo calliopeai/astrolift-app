@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Explain DNS operator admission and no-data/ICMP timeout observations in eight languages; skip protected connection bindings until current support permits the read (#2287).
+
 - Add a current-operator SMTP alert diagnostic in notification settings with explicit own-mailbox/source review, stable request UUIDs, recovery-only uncertain outcomes, cursor history and eight-language copy (#2289).
 - Keep mail review and history usable on narrow screens with accessible navigation drawers, wrapped empty states and an accurate DKIM action label (#2289).
 - Reuse fresh persisted-session and platform-operator admission for DNS connections and email diagnostics; retain current main migration predecessors for the standalone domain/mail release (#2287, #2289).

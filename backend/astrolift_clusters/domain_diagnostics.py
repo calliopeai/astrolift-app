@@ -338,6 +338,7 @@ def _zone(info, domain, current):
     )
     with _auth(info) as user:
         if not _operator(user):
+            unsupported.reason = "PLATFORM_OPERATOR_REQUIRED"
             return unsupported
     # A protected attachment is authoritative for discovery even when an
     # older Route53 writer remains configured. Invalid or withdrawn binding

@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { domainDiagnosticReasonKey } from "./domain-diagnostic-reasons";
 import type { DnsConnection, DnsConnectionSetupState } from "./use-dns-connection-setup";
 
 export type DnsConnectionWizardProps = DnsConnectionSetupState & { initialStep?: Step };
@@ -26,6 +27,7 @@ export function DnsConnectionWizard(props: DnsConnectionWizardProps) {
   const [disconnect, setDisconnect] = React.useState<DnsConnection | null>(null);
   const [filter, setFilter] = React.useState("");
   const [copyMessage, setCopyMessage] = React.useState<string | null>(null);
+  const supportReasonKey = domainDiagnosticReasonKey(props.support?.reason ?? "");
   const readBusy = props.busy || props.supportLoading || props.targetLoading;
   const canReview =
     props.allowed &&
@@ -116,7 +118,11 @@ export function DnsConnectionWizard(props: DnsConnectionWizardProps) {
                 Cloudflare
               </Button>
               {props.support && !props.support.allowed && (
-                <p role="status">{props.support.reason || t("unavailable")}</p>
+                <p role="status">
+                  {supportReasonKey
+                    ? d(supportReasonKey)
+                    : props.support.reason || t("unavailable")}
+                </p>
               )}
             </article>
             <article className="space-y-3 rounded-lg border p-4">

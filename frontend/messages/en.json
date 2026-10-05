@@ -7943,7 +7943,10 @@
     "listSearch": "Search displayed zones and nameservers…",
     "mineNote": "Managed domains do not record who added them, so this view is empty.",
     "listBounded": "Up to 200 readable domains are loaded. Search and filters apply to these rows; exact domain links load current details.",
-    "cloudflareReadOnly": "Cloudflare (read-only)"
+    "cloudflareReadOnly": "Cloudflare (read-only)",
+    "platformOperatorRequired": "Ask a platform super-admin to inspect provider records or manage DNS connections. Connection changes also require provider configuration permission in this organization.",
+    "dnsNoData": "The resolver returned no records of the selected type for this hostname. This does not prove that the domain is unavailable.",
+    "icmpTimeout": "No ICMP reply arrived before the deadline. ICMP may be blocked; this does not prove that the host or HTTPS is unavailable."
   },
   "domainConnections": {
     "title": "Connect DNS",

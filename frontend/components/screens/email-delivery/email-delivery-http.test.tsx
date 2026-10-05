@@ -82,6 +82,14 @@ beforeEach(async () => {
       version: DOMAIN_ACTIVE.version,
       zone: DOMAIN_ACTIVE.zone,
     }),
+    dnsProviderConnectionSupport: () => ({
+      allowed: false,
+      reason: "PLATFORM_OPERATOR_REQUIRED",
+      apiTokenSupported: false,
+      oauthConfigured: false,
+      oauthSetupReason: "",
+      dnsWritesSupported: false,
+    }),
     dnsProviderDomainBinding: () => null,
     astroliftAppsPage: () => ({ items: apps, nextCursor: null, totalCount: 1 }),
     astroliftApp: () => apps[0],
@@ -281,6 +289,10 @@ describe("actual mounted SDL email HttpLink boundary", () => {
     fireEvent.change(screen.getByLabelText(c.services), { target: { value: id } });
     await waitFor(() => expect(screen.getByText("sender@acme.example")).toBeInTheDocument());
     expect(screen.getByText(c.different)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(requests.some((r) => r.operationName === "DnsConnectionSupport")).toBe(true)
+    );
+    expect(requests.some((r) => r.operationName === "DnsDomainBinding")).toBe(false);
     for (const [label, hostname, type] of [
       [c.mx, DOMAIN_ACTIVE.zone, "MX"],
       [c.spf, DOMAIN_ACTIVE.zone, "TXT"],

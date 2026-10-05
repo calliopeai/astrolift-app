@@ -7866,7 +7866,10 @@
     "listSearch": "Buscar zonas y servidores de nombres mostrados…",
     "mineNote": "Los dominios gestionados no registran quién los añadió, por lo que esta vista está vacía.",
     "listBounded": "Se cargan hasta 200 dominios accesibles. La búsqueda y los filtros se aplican a esas filas; los enlaces exactos cargan los detalles actuales.",
-    "cloudflareReadOnly": "Cloudflare (solo lectura)"
+    "cloudflareReadOnly": "Cloudflare (solo lectura)",
+    "platformOperatorRequired": "Pide a un superadministrador de la plataforma que revise los registros del proveedor o gestione las conexiones DNS. Los cambios de conexión también requieren permiso para configurar proveedores en esta organización.",
+    "dnsNoData": "El resolutor no devolvió registros del tipo seleccionado para este nombre de host. Esto no demuestra que el dominio no esté disponible.",
+    "icmpTimeout": "No llegó ninguna respuesta ICMP antes del límite de tiempo. ICMP puede estar bloqueado; esto no demuestra que el host o HTTPS no estén disponibles."
   },
   "domainConnections": {
     "title": "Conectar DNS",

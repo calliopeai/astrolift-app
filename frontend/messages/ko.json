@@ -7863,7 +7863,10 @@
     "listSearch": "표시된 영역 및 네임서버 검색…",
     "mineNote": "관리형 도메인은 추가한 사용자를 기록하지 않으므로 이 보기는 비어 있습니다.",
     "listBounded": "읽을 수 있는 도메인을 최대 200개 불러옵니다. 검색과 필터는 이 행에 적용되며, 정확한 도메인 링크는 현재 세부 정보를 불러옵니다.",
-    "cloudflareReadOnly": "Cloudflare(읽기 전용)"
+    "cloudflareReadOnly": "Cloudflare(읽기 전용)",
+    "platformOperatorRequired": "공급자 레코드 확인이나 DNS 연결 관리는 플랫폼 최고 관리자에게 요청하세요. 연결을 변경하려면 이 조직의 공급자 설정 권한도 필요합니다.",
+    "dnsNoData": "리졸버가 이 호스트 이름에 대해 선택한 유형의 레코드를 반환하지 않았습니다. 이것만으로 도메인을 사용할 수 없다고 판단할 수는 없습니다.",
+    "icmpTimeout": "제한 시간 안에 ICMP 응답이 도착하지 않았습니다. ICMP가 차단되었을 수 있으므로, 이것만으로 호스트나 HTTPS를 사용할 수 없다고 판단할 수는 없습니다."
   },
   "domainConnections": {
     "title": "DNS 연결",

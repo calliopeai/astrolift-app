@@ -152,7 +152,13 @@ def dns_answers(wire, *, match=False):
     ]
 
 
-def test_pending_owned_zone_has_public_mismatch_but_no_provider_inventory(world, client, dns_wire, aws_wire):
+@pytest.mark.parametrize("driver", ["route53", "cloudflare_read_only"])
+def test_pending_owned_zone_has_public_mismatch_but_no_provider_inventory(
+    world, client, dns_wire, aws_wire, driver
+):
+    world.domain.dns_driver = driver
+    world.domain.save(update_fields=["dns_driver"])
+    world.domain.refresh_from_db()
     dns_answers(dns_wire)
     reply = ask(client, world)
     assert not reply.get("errors"), reply.get("errors")
@@ -160,6 +166,8 @@ def test_pending_owned_zone_has_public_mismatch_but_no_provider_inventory(world,
     assert data["zone"] == "example.test"
     assert [row["state"] for row in data["checks"] if row["key"] == "delegation"] == ["MISMATCH", "MISMATCH"]
     assert data["providerZone"]["state"] == "UNSUPPORTED" and not aws_wire["requests"]
+    assert data["providerZone"]["reason"] == "PLATFORM_OPERATOR_REQUIRED"
+    assert data["providerZone"]["zoneId"] is None and data["providerZone"]["records"] == []
     assert data["provisionClusterId"] == str(world.cluster.guid) and not data["actions"]["canRevalidate"]
     world.domain.refresh_from_db()
     assert world.domain.verification_state == "pending"
@@ -457,3 +465,19 @@ def test_private_route53_client_ignores_process_endpoint_override(monkeypatch):
         assert len(gates) >= 2
     finally:
         client.close()
+
+
+def test_operator_unsupported_driver_remains_distinct_without_provider_transport(
+    world, client, dns_wire, aws_wire
+):
+    world.user.is_superuser = True
+    world.user.save(update_fields=["is_superuser"])
+    world.domain.dns_driver = "unsupported_fixture"
+    world.domain.save(update_fields=["dns_driver"])
+    world.domain.refresh_from_db()
+    dns_answers(dns_wire)
+    reply = ask(client, world)
+    assert not reply.get("errors"), reply.get("errors")
+    zone = reply["data"]["astroliftManagedDomainDiagnostics"]["providerZone"]
+    assert zone["state"] == "UNSUPPORTED" and zone["reason"] == "PROVIDER_INVENTORY_UNSUPPORTED"
+    assert zone["zoneId"] is None and zone["records"] == [] and not aws_wire["requests"]

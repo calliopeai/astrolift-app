@@ -7863,7 +7863,10 @@
     "listSearch": "搜索已显示的区域和名称服务器…",
     "mineNote": "托管域名不记录添加者，因此此视图为空。",
     "listBounded": "最多加载 200 个可读取的域名。搜索和筛选仅应用于这些行；精确域名链接会加载当前详情。",
-    "cloudflareReadOnly": "Cloudflare（只读）"
+    "cloudflareReadOnly": "Cloudflare（只读）",
+    "platformOperatorRequired": "请联系平台超级管理员检查提供商记录或管理 DNS 连接。更改连接还需要此组织的提供商配置权限。",
+    "dnsNoData": "解析器未返回此主机名所选类型的记录。这不能证明该域名不可用。",
+    "icmpTimeout": "在截止时间前未收到 ICMP 回复。ICMP 可能被阻止；这不能证明主机或 HTTPS 不可用。"
   },
   "domainConnections": {
     "title": "连接 DNS",

@@ -7,7 +7,7 @@ import {
   DOMAIN_UNPROVISIONED,
   MANAGED_DOMAIN,
 } from "./domains-environments.fixtures";
-import { ManagedDomainDetail } from "./ManagedDomainDetail";
+import { ManagedDomainDetail, type ManagedDomainDetailProps } from "./ManagedDomainDetail";
 
 const meta: Meta<typeof ManagedDomainDetail> = {
   title: "Screens/Domains/ManagedDomainDetail",
@@ -107,3 +107,51 @@ export const ProbeUnavailable: Story = {
     },
   },
 };
+
+export const OPERATOR_REQUIRED: ManagedDomainDetailProps = {
+  ...MANAGED_DOMAIN,
+  initialTab: "records",
+  diagnostics: {
+    ...DOMAIN_DIAGNOSTICS,
+    actions: { canCreate: false, canDelete: false, canRevalidate: false },
+    providerZone: {
+      ...DOMAIN_DIAGNOSTICS.providerZone,
+      state: "UNSUPPORTED",
+      reason: "PLATFORM_OPERATOR_REQUIRED",
+      zoneId: null,
+      zoneName: null,
+      nameservers: [],
+      records: [],
+    },
+  },
+};
+export const DNS_NO_DATA: ManagedDomainDetailProps = {
+  ...MANAGED_DOMAIN,
+  initialTab: "diagnostics",
+  probe: {
+    state: "UNKNOWN",
+    perspective: "public_dns:1.1.1.1",
+    checkedAt: DOMAIN_DIAGNOSTICS.checkedAt,
+    reason: "DNS_NO_DATA",
+    hostname: DOMAIN_DIAGNOSTICS.zone,
+    tool: "LOOKUP",
+    recordType: "A",
+    values: [],
+    publicAddress: null,
+    httpStatus: null,
+    tlsVerified: null,
+    latencyMs: null,
+  },
+};
+export const ICMP_TIMEOUT: ManagedDomainDetailProps = {
+  ...DNS_NO_DATA,
+  probe: {
+    ...DNS_NO_DATA.probe!,
+    tool: "PING",
+    reason: "ICMP_TIMEOUT",
+    perspective: "control_plane_network",
+  },
+};
+export const OperatorRequired: Story = { args: OPERATOR_REQUIRED };
+export const DnsNoData: Story = { args: DNS_NO_DATA };
+export const IcmpTimeout: Story = { args: ICMP_TIMEOUT };
