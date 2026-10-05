@@ -34,6 +34,9 @@ from typing import Final
 # surface that clients should be able to detect. Removing an entry is
 # a breaking change — bump the apiVersion fingerprint and announce.
 SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
+    "email.exact_service_delivery_tests",
+    "email.delivery_test_history",
+    "email.signed_delivery_observations",
     "models.hugging_face_catalogue",
     "models.deployment_observations",
     "models.cluster_density",
@@ -61,8 +64,10 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "clusters.capabilities_probe",
     "clusters.reviewed_agent_install",
     "clusters.reviewed_log_collector_install",
+    "domains.cloudflare_connections",
     "apps.dependency_context",
     "providers.reference_read",
+    "domains.managed_diagnostics",
     "workloads.environment_targets",
     "previews.exact_identity",
     "previews.reviewed_routes",

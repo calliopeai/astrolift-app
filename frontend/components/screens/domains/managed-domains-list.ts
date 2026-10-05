@@ -23,7 +23,7 @@ export const MANAGED_DOMAINS_LIST: ListDefinition = {
       key: "state",
       label: "Status",
       options: [
-        { value: "active", label: "active" },
+        { value: "active", label: "provisioned" },
         { value: "provisioning", label: "provisioning" },
         { value: "unprovisioned", label: "not provisioned" },
       ],
@@ -46,7 +46,7 @@ export const MANAGED_DOMAINS_LIST: ListDefinition = {
   defaultSort: [{ key: "zone", dir: "asc" }],
   views: standardViews(
     { owner: "me" },
-    [{ key: "pending", label: "Not active", filters: { pending: "yes" } }],
+    [{ key: "pending", label: "Not provisioned", filters: { pending: "yes" } }],
     { mineNote: "Managed domains do not record who added them yet, so Mine is empty." }
   ),
   paging: "numbered",

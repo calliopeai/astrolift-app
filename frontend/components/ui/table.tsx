@@ -6,7 +6,10 @@ import { cn } from "@/lib/utils";
 
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
-    <div data-slot="table-container" className="relative w-full overflow-x-auto">
+    <div
+      data-slot="table-container"
+      className="[container-type:inline-size] relative w-full overflow-x-auto"
+    >
       <table
         data-slot="table"
         className={cn("w-full caption-bottom text-sm", className)}
@@ -58,7 +61,7 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
     <th
       data-slot="table-head"
       className={cn(
-        "text-muted-foreground text-2xs h-10 px-2 text-left align-middle font-semibold tracking-[0.08em] uppercase whitespace-nowrap [&:has([role=checkbox])]:pr-0",
+        "text-muted-foreground text-2xs h-10 px-2 text-left align-middle font-semibold tracking-[0.08em] whitespace-nowrap uppercase [&:has([role=checkbox])]:pr-0",
         className
       )}
       {...props}

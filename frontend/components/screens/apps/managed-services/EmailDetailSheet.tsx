@@ -53,6 +53,7 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
@@ -196,6 +197,7 @@ function emailList(
 
 /** The panels that carry data of their own, rendered by the route's containers. */
 export interface EmailDetailPanels {
+  delivery?: React.ReactNode;
   cost?: React.ReactNode;
   suppression?: React.ReactNode;
   senderConfig?: React.ReactNode;
@@ -207,6 +209,7 @@ export interface EmailDetailPanels {
 
 /** The sheet's sections; one shows at a time. */
 export type EmailDetailSection =
+  | "delivery"
   | "health"
   | "sending"
   | "suppressions"
@@ -236,8 +239,10 @@ export function EmailDetailSheetView({
   panels,
   defaultSection = "health",
 }: EmailDetailSheetViewProps) {
+  const deliveryText = useTranslations("emailDelivery");
   const [section, setSection] = React.useState<EmailDetailSection>(defaultSection);
   const sections: { id: EmailDetailSection; label: string; shown: boolean }[] = [
+    { id: "delivery", label: deliveryText("title"), shown: !!panels?.delivery },
     { id: "health", label: "Health", shown: true },
     { id: "sending", label: "Identity & sending", shown: true },
     { id: "suppressions", label: "Suppressions", shown: Boolean(panels?.suppression) },
@@ -258,7 +263,15 @@ export function EmailDetailSheetView({
           </SheetDescription>
         </SheetHeader>
 
-        {loading && !detail ? (
+        {panels?.delivery ? (
+          <div className="p-1">
+            <Button variant="outline" onClick={() => setSection("delivery")}>
+              {deliveryText("title")}
+            </Button>
+            {active === "delivery" ? panels.delivery : null}
+          </div>
+        ) : null}
+        {active === "delivery" ? null : loading && !detail ? (
           <div className="space-y-4 p-1">
             <Skeleton className="h-24 w-full" />
             <Skeleton className="h-32 w-full" />

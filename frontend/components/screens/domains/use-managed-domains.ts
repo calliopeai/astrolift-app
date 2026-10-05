@@ -4,6 +4,10 @@ import { useMutation, useQuery } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
+import { MANAGED_DOMAIN_ACTIONS } from "@/graphql/domains/domains.queries";
+import type { ManagedDomainActionsQuery } from "@/graphql/__generated__/operations";
 
 import { selectRows } from "@/components/list/select-rows";
 import { useListState } from "@/components/list/use-list-state";
@@ -43,9 +47,69 @@ export interface CreateManagedDomainInput {
  */
 export function useManagedDomains() {
   const router = useRouter();
-  const list = useListState(MANAGED_DOMAINS_LIST);
-  const { data, loading, error, refetch, startPolling, stopPolling } =
-    useQuery<Resp>(LIST_MANAGED_DOMAINS);
+  const t = useTranslations("managedDomains");
+  const { org, loading: orgLoading, error: orgError } = useActiveOrg();
+  const actions = useQuery<ManagedDomainActionsQuery>(MANAGED_DOMAIN_ACTIONS, {
+    skip: !org?.id || orgLoading || Boolean(orgError),
+    fetchPolicy: "no-cache",
+    context: { queryDeduplication: false },
+  });
+  const canCreate =
+    !actions.loading &&
+    !actions.error &&
+    actions.data?.astroliftManagedDomainActions.canCreate === true;
+  const definition = React.useMemo(
+    () => ({
+      ...MANAGED_DOMAINS_LIST,
+      searchPlaceholder: t("listSearch"),
+      fields: MANAGED_DOMAINS_LIST.fields.map((field) => ({
+        ...field,
+        label:
+          field.key === "state"
+            ? t("status")
+            : field.key === "driver"
+              ? t("driver")
+              : t("defaultFor"),
+        options:
+          field.key === "driver"
+            ? [
+                ...(field.options ?? []),
+                { value: "cloudflare_read_only", label: t("cloudflareReadOnly") },
+              ]
+            : field.options?.map((option) => ({
+                ...option,
+                label: t(
+                  (
+                    {
+                      active: "provisioned",
+                      provisioning: "provisioning",
+                      unprovisioned: "unprovisioned",
+                      tenant_apps: "tenantApps",
+                      preview_envs: "previewEnvironments",
+                      both: "both",
+                      none: "none",
+                    } as Record<string, string>
+                  )[option.value] ?? option.value
+                ),
+              })),
+      })),
+      views: MANAGED_DOMAINS_LIST.views.map((view) => ({
+        ...view,
+        label: t(view.key === "all" ? "all" : view.key === "mine" ? "mine" : "unprovisioned"),
+        note: view.key === "mine" ? t("mineNote") : view.note,
+      })),
+    }),
+    [t]
+  );
+  const list = useListState(definition);
+  const { data, loading, error, refetch, startPolling, stopPolling } = useQuery<Resp>(
+    LIST_MANAGED_DOMAINS,
+    {
+      skip: !org?.id || orgLoading || Boolean(orgError),
+      fetchPolicy: "no-cache",
+      context: { queryDeduplication: false },
+    }
+  );
 
   // NS records land on the row a few seconds after the provisioning
   // workflow creates the zone; poll until every domain settles so the
@@ -61,10 +125,7 @@ export function useManagedDomains() {
 
   const [createDomain, { loading: creating }] = useMutation<{
     createManagedDomain: MutationResult<AstroliftManagedDomain>;
-  }>(CREATE_MANAGED_DOMAIN, {
-    refetchQueries: [{ query: LIST_MANAGED_DOMAINS }],
-    awaitRefetchQueries: true,
-  });
+  }>(CREATE_MANAGED_DOMAIN);
 
   const [softDelete, { loading: deleting }] = useMutation<{
     softDeleteManagedDomain: MutationResult<{ id: string; deleted: boolean }>;
@@ -94,6 +155,7 @@ export function useManagedDomains() {
 
   /** Resolves true when the zone was created (close the sheet). */
   async function onCreate(input: CreateManagedDomainInput): Promise<boolean> {
+    if (!canCreate || creating) return false;
     const { data } = await createDomain({
       variables: {
         input: {
@@ -105,7 +167,8 @@ export function useManagedDomains() {
       },
     });
     if (data?.createManagedDomain.ok) {
-      toast.success(`Created ${input.zone} — provisioning; nameservers will appear shortly`);
+      toast.success(t("createAccepted"));
+      await refetch().catch(() => toast.error(t("refreshFailed")));
       return true;
     }
     toast.error(data?.createManagedDomain.errors?.[0]?.message ?? "Failed");
@@ -124,14 +187,14 @@ export function useManagedDomains() {
 
   async function onCopyNameservers(d: AstroliftManagedDomain) {
     await navigator.clipboard.writeText(d.provisionNameservers.join("\n"));
-    toast.success("Nameservers copied");
+    toast.success(t("copied"));
   }
 
   function onOpen(d: AstroliftManagedDomain) {
     router.push(`/domains/${d.id}`);
   }
 
-  const all = data?.astroliftManagedDomains ?? [];
+  const all = error || orgError || !org?.id ? [] : (data?.astroliftManagedDomains ?? []);
   const { state } = list;
   const page = selectRows(
     all,
@@ -149,12 +212,16 @@ export function useManagedDomains() {
     list,
     rows: page.rows,
     totalCount: page.totalCount,
-    loading: loading && all.length === 0,
-    error: error && all.length === 0 ? { message: error.message } : null,
+    loading: orgLoading || loading,
+    error:
+      orgError || error
+        ? { message: orgError?.message ?? error?.message ?? t("readFailed") }
+        : null,
     onRetry: () => {
       void refetch();
     },
     creating,
+    canCreate,
     deleting,
     revalidating,
     onCreate,

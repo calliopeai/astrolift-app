@@ -17,10 +17,11 @@ import {
   POSTGRES,
   QUEUE,
   REFRESH,
-  SEND,
   SERVICES,
   SERVICES_LONG,
 } from "./app-overview-cards-b.fixtures";
+import { EmailDeliveryPanel } from "@/components/screens/email-delivery/EmailDeliveryPanel";
+import { DELIVERY_PANEL } from "@/components/screens/email-delivery/EmailDeliveryPanel.stories";
 import {
   ListObjectsDialogView,
   type ManagedServiceDialogSlots,
@@ -34,7 +35,9 @@ const dialogs: ManagedServiceDialogSlots = {
   reveal: (p) => (
     <RevealConnectionDialogView {...p} revealed={CONNECTION} loading={false} onCopy={COPY} />
   ),
-  sendEmail: (p) => <SendTestEmailDialogView {...p} sending={false} onSend={SEND} />,
+  sendEmail: (p) => (
+    <SendTestEmailDialogView {...p} body={<EmailDeliveryPanel {...DELIVERY_PANEL} />} />
+  ),
   objects: (p) => (
     <ListObjectsDialogView {...p} result={OBJECTS} loading={false} onRefresh={REFRESH} />
   ),
@@ -111,12 +114,22 @@ export const RevealConnectionFailed: StoryObj = {
 
 export const SendTestEmail: StoryObj = {
   render: () => (
-    <SendTestEmailDialogView {...DIALOG_BASE} svc={EMAIL} sending={false} onSend={SEND} />
+    <SendTestEmailDialogView
+      {...DIALOG_BASE}
+      svc={EMAIL}
+      body={<EmailDeliveryPanel {...DELIVERY_PANEL} />}
+    />
   ),
 };
 
 export const SendTestEmailSending: StoryObj = {
-  render: () => <SendTestEmailDialogView {...DIALOG_BASE} svc={EMAIL} sending onSend={SEND} />,
+  render: () => (
+    <SendTestEmailDialogView
+      {...DIALOG_BASE}
+      svc={EMAIL}
+      body={<EmailDeliveryPanel {...DELIVERY_PANEL} busy />}
+    />
+  ),
 };
 
 export const ListObjects: StoryObj = {
@@ -188,7 +201,11 @@ export const FrenchEmailWidth768: StoryObj = {
   render: () => (
     <NextIntlClientProvider locale="fr" messages={fr}>
       <div style={{ width: 768 }}>
-        <SendTestEmailDialogView {...DIALOG_BASE} svc={EMAIL} sending={false} onSend={SEND} />
+        <SendTestEmailDialogView
+          {...DIALOG_BASE}
+          svc={EMAIL}
+          body={<EmailDeliveryPanel {...DELIVERY_PANEL} />}
+        />
       </div>
     </NextIntlClientProvider>
   ),

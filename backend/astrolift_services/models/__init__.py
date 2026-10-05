@@ -1,3 +1,4 @@
+from astrolift_services.models.email_delivery_test import EmailDeliveryObservation, EmailDeliveryTest
 from astrolift_services.models.email_event import EmailEvent, EmailEventKind
 from astrolift_services.models.hugging_face_connection import HuggingFaceConnection
 from astrolift_services.models.local_model_artifact import LocalModelArtifact
@@ -24,6 +25,8 @@ __all__ = [
     "AppSecretMetadata",
     "EmailEvent",
     "EmailEventKind",
+    "EmailDeliveryObservation",
+    "EmailDeliveryTest",
     "HuggingFaceConnection",
     "LocalModelArtifact",
     "ManagedResourceAdoption",

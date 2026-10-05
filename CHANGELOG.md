@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Keep mail review and history usable on narrow screens with accessible navigation drawers, wrapped empty states and an accurate DKIM action label (#2289).
+- Reuse fresh persisted-session and platform-operator admission for DNS connections and email diagnostics; retain current main migration predecessors for the standalone domain/mail release (#2287, #2289).
+- Return an editable content refusal for invalid Unicode in email delivery tests before creating send intent or contacting the provider (#2289).
+- Preserve accepted domain creation when refresh fails; require fresh connection inventory and explicit selection after an uncertain Cloudflare token write before further setup writes (#2287, #1787).
+- Read Cloudflare diagnostic inventory through exact protected domain/connection/zone versions with fresh operator checks around every native response; retain tenant public DNS reads and explicit read-only/proxy metadata without provider writes (Refs: #2287, #1787).
+- Add exact managed-domain read-only DNS/delegation/provider/routing diagnostics and bounded public HTTPS/ICMP probes with fresh actor/source admission, explicit unknown states and network throttles (Refs: #2287).
+- Add encrypted org-owned Cloudflare read-only connections, conditional PKCE OAuth, bounded zone/record discovery and versioned domain attachment/registration; preserve current DNS writers, require fresh platform-operator admission and distinguish local disconnect from confirmed or unconfirmed OAuth revocation (#1787, #2287).
+- Refuse SES test sends when the cluster's verified account disagrees with its current credential declaration, recheck verified-account changes around native reads and acknowledgments, and distinguish mailbox/domain configuration-set identities without changing legacy secret-reference names (#2289).
+- Add reviewed, replay-safe SES email delivery tests for the exact app/environment/account/region binding, current caller admission, suppression checks, signed delivery/bounce/complaint/delay/rejection observations and paginated content-free history. Legacy test sends now require a reviewed service version and stable request ID instead of using the install-wide transport (#2289).
+- Bound private AWS email credential refresh and native requests, retain acknowledged message IDs before public readmission, protect retained diagnostic history on rollback and generate valid, collision-resistant SES configuration-set names while preserving secret references (#2289).
+- Add current domain DNS diagnostics and a read-only Cloudflare connection wizard, with separate TXT ownership verification, public delegation and effective-domain checks, exact versioned actions, and eight-language UI copy (#2287, #1787).
+- Review the current SES sender and service version before an explicit recipient test, retain a content-free replay key after uncertain replies, and distinguish provider acceptance from signed delivery observations.
+- Add the domain Email delivery entry with authorized app/service selection and bounded MX, SPF, DMARC and explicit-selector DKIM reads. Existing quick-send and service-sheet entries use the reviewed test API. SMTP, Azure and alert test transports remain unsupported.
+- Reject invalid mailbox, UTF-8 content and malformed Unicode before recording a test request.
+
 - Bind browser SSO step-up to the verified issuer/subject, active actor and current
   persisted authenticated session. Recheck proof freshness after admission locks,
   preserve concurrent logout and suppress stale response-session writes (#2202).

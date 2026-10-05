@@ -2,8 +2,15 @@
 
 import { ManagedDomainDetail } from "@/components/screens/domains/ManagedDomainDetail";
 import { useManagedDomain } from "@/components/screens/domains/use-managed-domain";
+import { useActiveOrg } from "@/graphql/identity/identity.hooks";
+import { useMe } from "@/graphql/user/user.hooks";
 
-/** Managed domain detail (#1106), the drill-in target for a /domains row. */
-export function DomainDetailClient({ id }: { id: string }) {
+function DomainContext({ id }: { id: string }) {
   return <ManagedDomainDetail id={id} {...useManagedDomain(id)} />;
+}
+
+export function DomainDetailClient({ id }: { id: string }) {
+  const { org } = useActiveOrg();
+  const { user } = useMe();
+  return <DomainContext key={`${org?.id ?? ""}:${user?.id ?? ""}:${id}`} id={id} />;
 }

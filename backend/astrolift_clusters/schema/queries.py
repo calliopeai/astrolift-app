@@ -471,7 +471,22 @@ class ClustersQuery:
             .select_related("organization")
             .order_by("zone")[:200]
         )
-        return [domain_to_type(d) for d in qs]
+        from astrolift_clusters.domain_diagnostics import provision_clusters
+
+        domains = list(qs)
+        clusters = provision_clusters(domains)
+        return [domain_to_type(d, provision_clusters=clusters) for d in domains]
+
+    @strawberry.field
+    @require_permission(
+        Permission.PROVIDER_PLUGIN_READ, scope=cluster_catalog_org_scope(Permission.PROVIDER_PLUGIN_READ)
+    )
+    @tenant_scoped()
+    def astrolift_managed_domain(self, info: Info, domain_id: GUID) -> ManagedDomainType | None:
+        from astrolift_clusters.domain_diagnostics import read_domain
+
+        domain = read_domain(info, domain_id)
+        return domain_to_type(domain) if domain else None
 
     @strawberry.field
     def astrolift_provider_plugins(self, info: Info) -> list[ProviderPluginType]:

@@ -6,10 +6,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import type { MutationResult } from "@/graphql/identity/identity.types";
-import {
-  REVEAL_MANAGED_SERVICE_CONNECTION,
-  SEND_MANAGED_SERVICE_TEST_EMAIL,
-} from "@/graphql/services/services.mutations";
+import { REVEAL_MANAGED_SERVICE_CONNECTION } from "@/graphql/services/services.mutations";
 import {
   GET_MANAGED_SERVICE_QUEUE_DEPTH,
   LIST_MANAGED_SERVICES,
@@ -20,7 +17,6 @@ import type {
   AstroliftManagedServiceConnection,
   AstroliftManagedServiceObjects,
   AstroliftManagedServiceQueueDepth,
-  AstroliftManagedServiceTestEmailResult,
 } from "@/graphql/services/services.types";
 
 interface Resp {
@@ -29,10 +25,6 @@ interface Resp {
 
 interface RevealResp {
   revealManagedServiceConnection: MutationResult<AstroliftManagedServiceConnection>;
-}
-
-interface SendTestEmailResp {
-  sendManagedServiceTestEmail: MutationResult<AstroliftManagedServiceTestEmailResult>;
 }
 
 interface ObjectsResp {
@@ -149,58 +141,6 @@ export function useRevealConnection(svc: SummaryService, open: boolean) {
   }
 
   return { revealed, loading, onCopy };
-}
-
-export interface TestEmailValues {
-  recipient: string;
-  subject: string;
-  body: string;
-}
-
-/** Send-test-email mutation for an email managed service. */
-export function useSendTestEmail(svc: SummaryService) {
-  const t = useTranslations("apps.settings.managedServicesSummary.sendEmailDialog");
-  const [send, { loading: sending }] = useMutation<SendTestEmailResp>(
-    SEND_MANAGED_SERVICE_TEST_EMAIL
-  );
-
-  /** Resolves true when the email was sent (close the dialog). */
-  async function onSend({ recipient, subject, body }: TestEmailValues): Promise<boolean> {
-    if (!recipient.trim()) return false;
-    try {
-      const { data } = await send({
-        variables: {
-          input: {
-            managedServiceId: svc.id,
-            recipient: recipient.trim(),
-            subject: subject.trim() || null,
-            body: body.trim() || null,
-          },
-        },
-      });
-      const env = data?.sendManagedServiceTestEmail;
-      if (!env) {
-        toast.error(t("noResponse"));
-        return false;
-      }
-      if (!env.ok) {
-        toast.error(env.errors[0]?.message ?? t("failed"));
-        return false;
-      }
-      const payload = env.data;
-      if (!payload) {
-        toast.error(t("noPayload"));
-        return false;
-      }
-      toast.success(t("sent", { recipient: payload.recipient, transport: payload.transport }));
-      return true;
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("failed"));
-      return false;
-    }
-  }
-
-  return { sending, onSend };
 }
 
 /** Object-store listing, loaded when the dialog opens. */

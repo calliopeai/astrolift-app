@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import strawberry
-from django.utils import timezone
 from strawberry.types import Info
 
 from astrolift_graphql import MutationResultType
@@ -13,6 +12,7 @@ from astrolift_identity.operation_context import managed_service_operation
 from astrolift_services.models import (
     ManagedService,
 )
+from astrolift_services.schema.email_delivery import EmailDeliveryMutations, email_test_audit
 from astrolift_services.schema.mutations.helpers import (
     _caller_org_id,
     _client_ip,
@@ -36,14 +36,14 @@ from astrolift_services.schema.types import (
 from astrolift_services.scopes import managed_service_scope_by_guid
 from core.decorators import tenant_scoped
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
-from core.permissions import Permission, require_permission
+from core.permissions import Permission, PermissionDenied, require_permission
 from core.tenancy import get_current_tenant
 
 
 @strawberry.type
-class EmailServiceMutations:
+class EmailServiceMutations(EmailDeliveryMutations):
     @strawberry.field
-    @mutation_audit(
+    @email_test_audit(
         action="managed_service.test_email.send",
         extras=lambda result: (
             {
@@ -73,162 +73,67 @@ class EmailServiceMutations:
         info: Info,
         input: SendManagedServiceTestEmailInput,
     ) -> MutationResultType[ManagedServiceTestEmailResultType]:
-        """Operator-fired test send through a bound `email` kind managed
-        service (#401).
+        """Compatibility entry point for the same durable, exact-source diagnostic."""
+        from _sdk.email_delivery import EmailDeliveryUnavailable
+        from aws.email_delivery import _mailbox
 
-        Rides the existing `astrolift_operations.email_infra` plumbing —
-        the configured transport (SES / SendGrid / Postmark / SMTP)
-        receives the rendered payload.  Suppression list checks fire
-        normally so a hard-bounced address won't be retried; bypasses
-        UNSUBSCRIBE since the operator triggered it deliberately to
-        verify deliverability.
-        """
-        # Lazy imports — keep mutation module light when email infra
-        # isn't reached.
-        from astrolift_operations.email_infra import (
-            Email,
-            EmailError,
-            EmailKind,
-            configured_transport,
-            is_configured,
-        )
-        from astrolift_operations.email_infra import (
-            send as email_send,
-        )
+        from astrolift_services import email_delivery
 
-        svc = (
-            ManagedService.objects.select_related("app_environment", "registered_app")
-            .filter(
-                guid=str(input.managed_service_id),
-                registered_app__organization_id=_caller_org_id(),
-                deleted_at__isnull=True,
-            )
-            .first()
-        )
+        svc = ManagedService.objects.filter(
+            guid=str(input.managed_service_id),
+            registered_app__organization_id=_caller_org_id(),
+            deleted_at__isnull=True,
+        ).first()
         if svc is None:
             return gql_failure(
-                ErrorCode.NOT_FOUND.value,
-                "managed service not found",
-                field="managedServiceId",
+                ErrorCode.NOT_FOUND.value, "managed service not found", field="managedServiceId"
             )
         if svc.kind != ManagedService.Kind.EMAIL:
             return gql_failure(
-                ErrorCode.PRECONDITION.value,
-                (
-                    f"managed service is {svc.kind!r}, not 'email'; "
-                    "test-email is only supported for email kinds (SES, "
-                    "SendGrid, Postmark, SMTP variants)"
-                ),
-                field="managedServiceId",
+                ErrorCode.PRECONDITION.value, "An email service is required.", field="managedServiceId"
             )
-
         recipient = (input.recipient or "").strip()
-        if not recipient:
+        try:
+            _mailbox(recipient)
+        except EmailDeliveryUnavailable:
             return gql_failure(
-                ErrorCode.VALIDATION.value,
-                "recipient is required",
-                field="recipient",
+                ErrorCode.VALIDATION.value, "A single valid email recipient is required.", field="recipient"
             )
-
-        # Resolve a sane from_address from the binding config; falls
-        # back to a synthesized address scoped to the app so the email's
-        # provenance is obvious in the recipient's mailbox.
-        config = svc.config or {}
-        from_address = (
-            config.get("email_from")
-            or config.get("EMAIL_FROM")
-            or f"noreply@{svc.registered_app.slug}.astrolift.local"
-        )
-        subject = (input.subject or "").strip() or (f"[Astrolift] Test email from {svc.name or svc.kind}")
-        body = (input.body or "").strip() or (
-            f"This is a deliverability test fired from the {svc.registered_app.slug} "
-            f"settings page against managed service {svc.name or svc.kind} "
-            f"({svc.app_environment.name}).  If you received this, the email "
-            "binding is working."
-        )
-
-        if not is_configured():
+        if input.expected_version is None or input.request_id is None:
             return gql_failure(
                 ErrorCode.PRECONDITION.value,
-                (
-                    "no email transport configured on this install; admin "
-                    "must set EMAIL_BACKEND before test sends will land"
-                ),
+                "Review emailDeliveryTestSupport and supply expectedVersion and a stable requestId before sending.",
                 field="managedServiceId",
             )
-
         try:
-            email = Email(
-                to_address=recipient,
-                subject=subject,
-                html_body=f"<p>{body}</p>",
-                plain_body=body,
-                from_address=from_address,
-                kind=EmailKind.MANAGED_SERVICE_TEST,
+            row = email_delivery.send_test(
+                info,
+                service_id=input.managed_service_id,
+                request_id=input.request_id,
+                expected_version=input.expected_version,
+                recipient=recipient,
+                subject=input.subject,
+                body=input.body,
             )
-        except EmailError as exc:
-            field = "recipient" if "to_address" in str(exc) else "managedServiceId"
+        except (email_delivery.EmailTestUnavailable, EmailDeliveryUnavailable) as exc:
+            return gql_failure(ErrorCode.PRECONDITION.value, str(exc), field="managedServiceId")
+        except PermissionDenied:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "Email test authority is unavailable.")
+        except Exception:
+            return gql_failure(ErrorCode.INTERNAL.value, "Email delivery test is unavailable.")
+        if row.accepted_at is None:
             return gql_failure(
-                ErrorCode.VALIDATION.value,
-                str(exc),
-                field=field,
-            )
-
-        try:
-            email_send(email, suppression_lookup=lambda _addr: None)
-        except EmailError as exc:
-            return gql_failure(
-                ErrorCode.INTERNAL.value,
-                str(exc),
+                ErrorCode.PRECONDITION.value,
+                "Provider acceptance is unconfirmed; inspect emailDeliveryTests before attempting another test.",
                 field="managedServiceId",
             )
-
-        transport = configured_transport().value
-
-        # Cache the operator action for the summary card.
-        now = timezone.now()
-        svc.last_action_at = now
-        svc.last_action_kind = "test_email.send"
-        svc.save(update_fields=["last_action_at", "last_action_kind", "updated_at", "version"])
-
-        # Sibling audit row carrying client IP + recipient so the trail
-        # captures the disclosure source (operators triggering a test
-        # send to an unfamiliar address should be obvious in audit).
-        ip = _client_ip(info)
-        tenant = get_current_tenant()
-        emit_audit(
-            AuditEntry(
-                actor_user_id=tenant.actor_user_id if tenant else None,
-                organization_id=tenant.organization_id if tenant else None,
-                action="managed_service.test_email.send.disclosure",
-                decision="ALLOW",
-                target_kind="managed_service",
-                target_id=str(svc.guid),
-                duration_ms=0,
-                permissions=(
-                    Permission.APP_UPDATE.value,
-                    Permission.MANAGED_SERVICE_UPDATE.value,
-                ),
-                extra={
-                    "kind": svc.kind,
-                    "name": svc.name,
-                    "app_slug": svc.registered_app.slug,
-                    "environment_name": svc.app_environment.name,
-                    "recipient": recipient,
-                    "from_address": from_address,
-                    "transport": transport,
-                    "client_ip": ip,
-                },
-            )
-        )
-
         return gql_success(
             ManagedServiceTestEmailResultType(
                 managed_service_id=input.managed_service_id,
-                recipient=recipient,
-                subject=subject,
-                sent_at=now,
-                transport=transport,
+                recipient=row.recipient,
+                subject=(input.subject or "").strip() or "[Astrolift] Email delivery test",
+                sent_at=row.accepted_at,
+                transport="aws_ses",
             )
         )
 

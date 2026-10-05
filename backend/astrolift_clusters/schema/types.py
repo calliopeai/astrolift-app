@@ -175,6 +175,7 @@ class ClustersListFilterInput:
 @strawberry.type(name="AstroliftManagedDomain")
 class ManagedDomainType:
     id: GUID
+    version: int
     zone: str
     organization_slug: str | None
     dns_driver: str
@@ -368,10 +369,14 @@ def cluster_to_type(cluster) -> TenantClusterType:
     )
 
 
-def domain_to_type(domain) -> ManagedDomainType:
+def domain_to_type(domain, *, provision_clusters=None) -> ManagedDomainType:
+    from astrolift_clusters.domain_diagnostics import provision_cluster
+
+    cluster = provision_cluster(domain) if provision_clusters is None else provision_clusters.get(domain.pk)
     delegation_check = (domain.dns_config or {}).get("delegation_check", {})
     return ManagedDomainType(
         id=GUID(str(domain.guid)),
+        version=domain.version,
         zone=domain.zone,
         organization_slug=domain.organization.slug if domain.organization_id else None,
         dns_driver=domain.dns_driver,
@@ -382,11 +387,7 @@ def domain_to_type(domain) -> ManagedDomainType:
         provision_nameservers=domain.provision_nameservers or [],
         provision_validation_records=domain.provision_validation_records or [],
         delegation_check=delegation_check,
-        provision_cluster_id=(
-            str((domain.dns_config or {}).get("provision_cluster_id"))
-            if (domain.dns_config or {}).get("provision_cluster_id")
-            else None
-        ),
+        provision_cluster_id=(str(cluster.guid) if cluster else None),
         verification_state=domain.verification_state,
         challenge_record_name=(f"_astrolift-challenge.{domain.zone}" if domain.verification_token else ""),
         challenge_record_value=domain.verification_token,

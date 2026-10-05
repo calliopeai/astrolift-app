@@ -3380,6 +3380,7 @@ type AstroliftLogoutAllSessionsPayloadMutationResult {
 
 type AstroliftManagedDomain {
   id: GUID!
+  version: Int!
   zone: String!
   organizationSlug: String
   dnsDriver: String!
@@ -6352,6 +6353,15 @@ type AstroliftZentinelleDisconnectMutationResult {
   data: AstroliftZentinelleDisconnect
 }
 
+input AttachCloudflareDnsZoneInput {
+  domainId: GUID!
+  expectedDomainVersion: Int!
+  connectionId: GUID!
+  expectedConnectionVersion: Int!
+  zoneId: String!
+  zoneName: String!
+}
+
 input AttachProjectManagedServiceInput {
   managedServiceId: GUID!
   expectedContextRevision: String = null
@@ -6418,6 +6428,11 @@ type AvailableTransition {
   toState: String!
   label: String!
   conditionsMet: Boolean!
+}
+
+input BeginCloudflareDnsOAuthInput {
+  organizationId: GUID!
+  name: String!
 }
 
 input BeginLocalModelArtifactInput {
@@ -6566,6 +6581,58 @@ type CloudOrphanType {
   clusterSlug: String!
   reapKey: String!
   reason: String!
+}
+
+input CloudflareDnsConnectionInput {
+  connectionId: GUID!
+  expectedVersion: Int!
+}
+
+type CloudflareDnsOAuthStart {
+  authorizationUrl: String!
+}
+
+type CloudflareDnsOAuthStartMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: CloudflareDnsOAuthStart
+}
+
+type CloudflareDnsRecord {
+  id: String!
+  name: String!
+  type: String!
+  content: String!
+  ttl: Int!
+  proxied: Boolean!
+  priority: Int
+}
+
+input CloudflareDnsRecordsInput {
+  connectionId: GUID!
+  expectedVersion: Int!
+  zoneId: String!
+  zoneName: String!
+}
+
+type CloudflareDnsRecordsInventory {
+  complete: Boolean!
+  reason: String!
+  items: [CloudflareDnsRecord!]!
+}
+
+type CloudflareDnsZone {
+  id: String!
+  name: String!
+  accountId: String!
+  status: String!
+  nameServers: [String!]!
+}
+
+type CloudflareDnsZonesInventory {
+  complete: Boolean!
+  reason: String!
+  items: [CloudflareDnsZone!]!
 }
 
 enum ClusterAgentInstallStatus {
@@ -6736,6 +6803,12 @@ type ConfiguredWorkflowPage {
 
 type ConfirmUploadResult {
   ack: Boolean!
+}
+
+input ConnectCloudflareDnsTokenInput {
+  organizationId: GUID!
+  name: String!
+  token: String!
 }
 
 input ConnectExistingGithubAppInput {
@@ -7148,6 +7221,51 @@ input DisconnectZentinelleInput {
   force: Boolean! = false
 }
 
+type DnsProviderConnectionSupport {
+  allowed: Boolean!
+  reason: String!
+  apiTokenSupported: Boolean!
+  oauthConfigured: Boolean!
+  oauthSetupReason: String!
+  dnsWritesSupported: Boolean!
+}
+
+type DnsProviderConnectionType {
+  id: GUID!
+  version: Int!
+  name: String!
+  provider: String!
+  authMethod: String!
+  state: String!
+  revocationState: String!
+  verifiedAt: DateTime
+  expiresAt: DateTime
+  dnsWritesSupported: Boolean!
+}
+
+type DnsProviderConnectionTypeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: DnsProviderConnectionType
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type DnsProviderConnectionTypePage {
+  items: [DnsProviderConnectionType!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
 input DomainPathRouteInput {
   pathPrefix: String!
   targetWorkloadSlug: String!
@@ -7169,6 +7287,60 @@ input ElevateAdminSessionInput {
   method: String!
   credential: String!
   ttlSeconds: Int = null
+}
+
+type EmailDeliveryTest {
+  id: GUID!
+  managedServiceId: GUID!
+  version: Int!
+  requestId: GUID!
+  sender: String!
+  recipient: String!
+  status: String!
+  accountId: String!
+  region: String!
+  identity: String!
+  transport: String!
+  providerMessageId: String
+  eventTrackingConfigured: Boolean!
+  simulator: Boolean!
+  createdAt: DateTime!
+  acceptedAt: DateTime
+  observedAt: DateTime
+  reasonCode: String
+}
+
+type EmailDeliveryTestMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: EmailDeliveryTest
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type EmailDeliveryTestPage {
+  items: [EmailDeliveryTest!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
+type EmailDeliveryTestSupport {
+  allowed: Boolean!
+  reason: String
+  serviceVersion: Int
+  sender: String
+  identity: String
+  accountId: String
+  region: String
 }
 
 type Emailsuppressionaddpayload {
@@ -7642,6 +7814,151 @@ input LogoutAllSessionsInput {
   keepCurrent: Boolean! = true
 }
 
+type ManagedDomainActions {
+  canCreate: Boolean!
+  canDelete: Boolean!
+  canRevalidate: Boolean!
+}
+
+enum ManagedDomainCheckState {
+  OK
+  MISMATCH
+  UNKNOWN
+  ERROR
+  UNSUPPORTED
+}
+
+type ManagedDomainDiagnosticCheck {
+  key: String!
+  state: ManagedDomainCheckState!
+  perspective: String!
+  checkedAt: DateTime!
+  reason: String!
+  expected: [String!]!
+  observed: [String!]!
+}
+
+type ManagedDomainDiagnosticRecord {
+  name: String!
+  type: String!
+  ttl: Int
+  values: [String!]!
+  aliasTarget: String
+  aliasZoneId: String
+  evaluateTargetHealth: Boolean
+  proxied: Boolean
+  priority: Int
+}
+
+type ManagedDomainDiagnostics {
+  id: GUID!
+  version: Int!
+  zone: String!
+  verificationState: String!
+  provisionState: String!
+  checkedAt: DateTime!
+  checks: [ManagedDomainDiagnosticCheck!]!
+  providerZone: ManagedDomainProviderZone!
+  routes: [ManagedDomainRoute!]!
+  routesTruncated: Boolean!
+  actions: ManagedDomainActions!
+  provisionClusterId: GUID
+}
+
+type ManagedDomainDnsBindingReference {
+  domainId: GUID!
+  domainVersion: Int!
+  state: String!
+  connectionId: GUID
+  connectionVersion: Int
+  currentConnectionVersion: Int
+  zoneId: String
+  zoneName: String!
+  canVerify: Boolean!
+  dnsWritesSupported: Boolean!
+}
+
+type ManagedDomainDnsConnectionBinding {
+  domainId: GUID!
+  domainVersion: Int!
+  connectionId: GUID!
+  connectionVersion: Int!
+  zone: CloudflareDnsZone!
+  verificationState: String!
+  verificationRecordName: String
+  verificationRecordValue: String
+  dnsWritesSupported: Boolean!
+}
+
+type ManagedDomainDnsConnectionBindingMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ManagedDomainDnsConnectionBinding
+}
+
+type ManagedDomainProbe {
+  state: ManagedDomainCheckState!
+  perspective: String!
+  checkedAt: DateTime!
+  reason: String!
+  hostname: String!
+  tool: ManagedDomainProbeTool!
+  recordType: ManagedDomainRecordType!
+  values: [String!]!
+  publicAddress: String
+  httpStatus: Int
+  tlsVerified: Boolean
+  latencyMs: Float
+}
+
+enum ManagedDomainProbeTool {
+  LOOKUP
+  DIG
+  PING
+  TRACEROUTE
+  HTTPS
+}
+
+type ManagedDomainProviderZone {
+  state: ManagedDomainCheckState!
+  reason: String!
+  checkedAt: DateTime!
+  zoneId: String
+  zoneName: String
+  privateZone: Boolean
+  nameservers: [String!]!
+  records: [ManagedDomainDiagnosticRecord!]!
+  truncated: Boolean!
+  bindingSource: String!
+}
+
+enum ManagedDomainRecordType {
+  A
+  AAAA
+  CNAME
+  NS
+  SOA
+  TXT
+  MX
+  SRV
+  CAA
+}
+
+type ManagedDomainRoute {
+  appId: GUID!
+  appName: String!
+  appSlug: String!
+  environmentId: GUID!
+  environmentName: String!
+  recordedUrl: String!
+  hostname: String!
+  clusterId: GUID
+  clusterName: String
+  clusterSlug: String
+  ingressClass: String
+  observedState: ManagedDomainCheckState!
+}
+
 type Managedresourceadoptionpayload {
   id: GUID!
   managedServiceId: GUID!
@@ -7943,6 +8260,13 @@ input MoveAppToTeamInput {
 }
 
 type Mutation {
+  connectCloudflareDnsToken(input: ConnectCloudflareDnsTokenInput!): DnsProviderConnectionTypeMutationResult!
+  retestDnsProviderConnection(input: CloudflareDnsConnectionInput!): DnsProviderConnectionTypeMutationResult!
+  disconnectDnsProviderConnection(input: CloudflareDnsConnectionInput!): DnsProviderConnectionTypeMutationResult!
+  beginCloudflareDnsOAuth(input: BeginCloudflareDnsOAuthInput!): CloudflareDnsOAuthStartMutationResult!
+  attachCloudflareDnsZone(input: AttachCloudflareDnsZoneInput!): ManagedDomainDnsConnectionBindingMutationResult!
+  registerCloudflareDnsZone(input: RegisterCloudflareDnsZoneInput!): ManagedDomainDnsConnectionBindingMutationResult!
+
   """Authenticate a user with username and password."""
   login(username: String!, password: String!): LoginResult!
 
@@ -8307,6 +8631,7 @@ type Mutation {
   adoptManagedResource(input: AdoptManagedResourceInput!): ManagedresourceadoptionpayloadMutationResult!
   revealManagedServiceConnection(input: RevealManagedServiceConnectionInput!): AstroliftManagedServiceConnectionMutationResult!
   testModelEndpoint(input: TestModelEndpointInput!): AstroliftModelEndpointTestMutationResult!
+  sendEmailDeliveryTest(input: SendEmailDeliveryTestInput!): EmailDeliveryTestMutationResult!
   sendManagedServiceTestEmail(input: SendManagedServiceTestEmailInput!): AstroliftManagedServiceTestEmailResultMutationResult!
   addEmailSuppressionEntry(input: AddEmailSuppressionEntryInput!): EmailsuppressionaddpayloadMutationResult!
   removeEmailSuppressionEntry(input: RemoveEmailSuppressionEntryInput!): EmailsuppressionremovepayloadMutationResult!
@@ -8814,6 +9139,15 @@ input PushManifestToRepoInput {
 }
 
 type Query {
+  astroliftManagedDomainDiagnostics(domainId: GUID!, expectedVersion: Int!, hostname: String = null, recordType: ManagedDomainRecordType! = NS): ManagedDomainDiagnostics
+  astroliftManagedDomainProbe(domainId: GUID!, expectedVersion: Int!, hostname: String!, tool: ManagedDomainProbeTool!, recordType: ManagedDomainRecordType! = A): ManagedDomainProbe
+  astroliftManagedDomainActions: ManagedDomainActions!
+  dnsProviderDomainBinding(domainId: GUID!): ManagedDomainDnsBindingReference
+  dnsProviderConnectionSupport: DnsProviderConnectionSupport!
+  dnsProviderConnectionsPage(page: Int! = 1, pageSize: Int! = 20): DnsProviderConnectionTypePage!
+  cloudflareDnsZones(input: CloudflareDnsConnectionInput!): CloudflareDnsZonesInventory!
+  cloudflareDnsRecords(input: CloudflareDnsRecordsInput!): CloudflareDnsRecordsInventory!
+
   """
   List all effective permissions for a user, with the role bindings that grant each one.
   """
@@ -9004,6 +9338,7 @@ type Query {
   astroliftCluster(slug: String!): AstroliftTenantCluster
   astroliftClusterCount: Int!
   astroliftManagedDomains: [AstroliftManagedDomain!]!
+  astroliftManagedDomain(domainId: GUID!): AstroliftManagedDomain
   astroliftProviderPlugins: [AstroliftProviderPlugin!]!
 
   """
@@ -9044,6 +9379,9 @@ type Query {
   astroliftSshDeployKeysPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftSshDeployKeyPage!
   astroliftAvailableRepos(connectionId: String!, search: String = null, limit: Int! = 100): AstroliftRemoteRepoList!
   astroliftSourceFile(connectionId: String!, repoFullName: String!, path: String!, ref: String!): AstroliftSourceFile!
+  emailDeliveryTestsPage(managedServiceId: GUID!, after: String = null, limit: Int! = 25): EmailDeliveryTestPage!
+  emailDeliveryTests(managedServiceId: GUID!, limit: Int! = 25): [EmailDeliveryTest!]!
+  emailDeliveryTestSupport(managedServiceId: GUID!): EmailDeliveryTestSupport!
   clusterModelPlacementClustersPage(organizationId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelPlacementClusterPage!
   clusterModelDeploymentsPage(organizationId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25, filter: ClusterModelsFilterInput = null): ClusterModelDeploymentPage!
   clusterModelDeployment(organizationId: GUID!, id: GUID!): ClusterModelDeployment
@@ -9350,6 +9688,13 @@ input RegisterAppRepoInput {
   ref: String! = "main"
   defaultBranch: String = null
   deployBranch: String = null
+}
+
+input RegisterCloudflareDnsZoneInput {
+  connectionId: GUID!
+  expectedConnectionVersion: Int!
+  zoneId: String!
+  zoneName: String!
 }
 
 input RegisterMobileDeviceInput {
@@ -9680,11 +10025,22 @@ input ScaleWorkloadInput {
   expectedNamespace: String = null
 }
 
+input SendEmailDeliveryTestInput {
+  managedServiceId: GUID!
+  expectedVersion: Int!
+  requestId: GUID!
+  recipient: String!
+  subject: String = null
+  body: String = null
+}
+
 input SendManagedServiceTestEmailInput {
   managedServiceId: GUID!
   recipient: String!
   subject: String = null
   body: String = null
+  expectedVersion: Int = null
+  requestId: GUID = null
 }
 
 input SetActiveIdentityProviderInput {
