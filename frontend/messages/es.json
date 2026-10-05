@@ -7869,7 +7869,8 @@
     "cloudflareReadOnly": "Cloudflare (solo lectura)",
     "platformOperatorRequired": "Pide a un superadministrador de la plataforma que revise los registros del proveedor o gestione las conexiones DNS. Los cambios de conexión también requieren permiso para configurar proveedores en esta organización.",
     "dnsNoData": "El resolutor no devolvió registros del tipo seleccionado para este nombre de host. Esto no demuestra que el dominio no esté disponible.",
-    "icmpTimeout": "No llegó ninguna respuesta ICMP antes del límite de tiempo. ICMP puede estar bloqueado; esto no demuestra que el host o HTTPS no estén disponibles."
+    "icmpTimeout": "No llegó ninguna respuesta ICMP antes del límite de tiempo. ICMP puede estar bloqueado; esto no demuestra que el host o HTTPS no estén disponibles.",
+    "dnsNoDataStatus": "No se devolvieron registros DNS"
   },
   "domainConnections": {
     "title": "Conectar DNS",

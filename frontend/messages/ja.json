@@ -7866,7 +7866,8 @@
     "cloudflareReadOnly": "Cloudflare（読み取り専用）",
     "platformOperatorRequired": "プロバイダーのレコード確認やDNS接続の管理は、プラットフォームのスーパー管理者に依頼してください。接続の変更には、この組織のプロバイダー設定権限も必要です。",
     "dnsNoData": "リゾルバーは、このホスト名について選択された種類のレコードを返しませんでした。これだけでは、ドメインが利用できないとは判断できません。",
-    "icmpTimeout": "期限内にICMP応答がありませんでした。ICMPがブロックされている可能性があり、これだけではホストやHTTPSが利用できないとは判断できません。"
+    "icmpTimeout": "期限内にICMP応答がありませんでした。ICMPがブロックされている可能性があり、これだけではホストやHTTPSが利用できないとは判断できません。",
+    "dnsNoDataStatus": "DNSレコードが返されませんでした"
   },
   "domainConnections": {
     "title": "DNS を接続",

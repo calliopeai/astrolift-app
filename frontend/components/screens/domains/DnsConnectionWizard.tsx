@@ -27,7 +27,10 @@ export function DnsConnectionWizard(props: DnsConnectionWizardProps) {
   const [disconnect, setDisconnect] = React.useState<DnsConnection | null>(null);
   const [filter, setFilter] = React.useState("");
   const [copyMessage, setCopyMessage] = React.useState<string | null>(null);
-  const supportReasonKey = domainDiagnosticReasonKey(props.support?.reason ?? "");
+  function explanation(value: string) {
+    const key = domainDiagnosticReasonKey(value);
+    return key ? d(key) : value;
+  }
   const readBusy = props.busy || props.supportLoading || props.targetLoading;
   const canReview =
     props.allowed &&
@@ -83,10 +86,10 @@ export function DnsConnectionWizard(props: DnsConnectionWizardProps) {
           </li>
         ))}
       </ol>
-      {props.supportError && <p role="alert">{props.supportError}</p>}
-      {props.targetError && <p role="alert">{props.targetError}</p>}
+      {props.supportError && <p role="alert">{explanation(props.supportError)}</p>}
+      {props.targetError && <p role="alert">{explanation(props.targetError)}</p>}
       {props.message && <p role="status">{props.message}</p>}
-      {props.actionError && <p role="alert">{props.actionError}</p>}
+      {props.actionError && <p role="alert">{explanation(props.actionError)}</p>}
       {props.uncertain && (
         <Link className="block text-sm underline" href="/domains">
           {d("back")}
@@ -95,7 +98,9 @@ export function DnsConnectionWizard(props: DnsConnectionWizardProps) {
       {step === "verify" && (props.bindingLoading || props.targetLoading) && (
         <p role="status">{d("loading")}</p>
       )}
-      {step === "verify" && props.bindingError && <p role="alert">{props.bindingError}</p>}
+      {step === "verify" && props.bindingError && (
+        <p role="alert">{explanation(props.bindingError)}</p>
+      )}
       {step === "verify" &&
         !props.verification &&
         !props.bindingLoading &&
@@ -118,11 +123,7 @@ export function DnsConnectionWizard(props: DnsConnectionWizardProps) {
                 Cloudflare
               </Button>
               {props.support && !props.support.allowed && (
-                <p role="status">
-                  {supportReasonKey
-                    ? d(supportReasonKey)
-                    : props.support.reason || t("unavailable")}
-                </p>
+                <p role="status">{explanation(props.support.reason) || t("unavailable")}</p>
               )}
             </article>
             <article className="space-y-3 rounded-lg border p-4">
@@ -148,7 +149,7 @@ export function DnsConnectionWizard(props: DnsConnectionWizardProps) {
           {props.route53Loading ? (
             <p role="status">{d("loading")}</p>
           ) : props.route53Error ? (
-            <p role="alert">{props.route53Error}</p>
+            <p role="alert">{explanation(props.route53Error)}</p>
           ) : (
             <ul className="divide-y rounded-lg border">
               {props.route53Domains.map((domain) => (
@@ -248,7 +249,7 @@ export function DnsConnectionWizard(props: DnsConnectionWizardProps) {
           {props.connectionsLoading ? (
             <p role="status">{d("loading")}</p>
           ) : props.connectionsError ? (
-            <p role="alert">{props.connectionsError}</p>
+            <p role="alert">{explanation(props.connectionsError)}</p>
           ) : props.connections ? (
             <>
               <ul className="divide-y rounded-lg border">
@@ -329,7 +330,7 @@ export function DnsConnectionWizard(props: DnsConnectionWizardProps) {
           {props.zonesLoading ? (
             <p role="status">{d("loading")}</p>
           ) : props.zonesError ? (
-            <p role="alert">{props.zonesError}</p>
+            <p role="alert">{explanation(props.zonesError)}</p>
           ) : props.zones ? (
             <>
               {!props.zones.complete && (
@@ -412,7 +413,7 @@ export function DnsConnectionWizard(props: DnsConnectionWizardProps) {
           {props.recordsLoading ? (
             <p role="status">{d("running")}</p>
           ) : props.recordsError ? (
-            <p role="alert">{props.recordsError}</p>
+            <p role="alert">{explanation(props.recordsError)}</p>
           ) : props.records ? (
             <>
               {!props.records.complete && (

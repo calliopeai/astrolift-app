@@ -129,7 +129,7 @@ export const DNS_NO_DATA: ManagedDomainDetailProps = {
   ...MANAGED_DOMAIN,
   initialTab: "diagnostics",
   probe: {
-    state: "UNKNOWN",
+    state: "OK",
     perspective: "public_dns:1.1.1.1",
     checkedAt: DOMAIN_DIAGNOSTICS.checkedAt,
     reason: "DNS_NO_DATA",
@@ -147,6 +147,7 @@ export const ICMP_TIMEOUT: ManagedDomainDetailProps = {
   ...DNS_NO_DATA,
   probe: {
     ...DNS_NO_DATA.probe!,
+    state: "UNKNOWN",
     tool: "PING",
     reason: "ICMP_TIMEOUT",
     perspective: "control_plane_network",

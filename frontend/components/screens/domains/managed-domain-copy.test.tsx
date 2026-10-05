@@ -20,6 +20,7 @@ const keys = [
   "platformOperatorRequired",
   "dnsNoData",
   "icmpTimeout",
+  "dnsNoDataStatus",
   "mine",
   "status",
   "listSearch",
@@ -233,7 +234,12 @@ it.each(locales)(
       );
       expect(screen.getByText(catalogs[locale].managedDomains[key])).toBeInTheDocument();
       expect(screen.getByText(code)).toBeInTheDocument();
-      const expectedState = code === "PLATFORM_OPERATOR_REQUIRED" ? "unsupported" : "unknown";
+      const expectedState =
+        code === "PLATFORM_OPERATOR_REQUIRED"
+          ? "unsupported"
+          : code === "DNS_NO_DATA"
+            ? "dnsNoDataStatus"
+            : "unknown";
       expect(
         screen.getAllByText(catalogs[locale].managedDomains[expectedState]).length
       ).toBeGreaterThan(0);

@@ -96,9 +96,9 @@ function DetailTabs({
       effective_tenant_apps_domain: t("effectiveTenant"),
       effective_preview_domain: t("effectivePreview"),
     })[key] ?? key;
-  const state = (value: keyof typeof stateKeys) => (
+  const state = (value: keyof typeof stateKeys, reason?: string) => (
     <Badge variant={value === "MISMATCH" || value === "ERROR" ? "destructive" : "outline"}>
-      {t(stateKeys[value])}
+      {reason === "DNS_NO_DATA" && value === "OK" ? t("dnsNoDataStatus") : t(stateKeys[value])}
     </Badge>
   );
   async function copy(value: string) {
@@ -176,7 +176,7 @@ function DetailTabs({
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-medium">{checkName(check.key)}</h3>
-            {state(check.state)}
+            {state(check.state, check.reason)}
           </div>
           {meta(check.perspective, check.checkedAt)}
           {reason(check.reason)}
@@ -613,7 +613,7 @@ function DetailTabs({
             {props.probeError && <p role="alert">{props.probeError}</p>}
             {props.probe ? (
               <section className="space-y-3 rounded-lg border p-4" aria-label={t("response")}>
-                {state(props.probe.state)}
+                {state(props.probe.state, props.probe.reason)}
                 {meta(props.probe.perspective, props.probe.checkedAt)}
                 {reason(props.probe.reason)}
                 {values(props.probe.values)}

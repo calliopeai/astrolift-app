@@ -4,6 +4,25 @@ const d = en.managedDomains;
 
 const story = (id: string) => `/iframe.html?id=screens-domains-${id}&viewMode=story`;
 
+test("operator refusal and successful empty DNS query retain distinct explanations", async ({
+  page,
+}) => {
+  await page.goto(story("manageddomaindetail--operator-required"));
+  await page.getByRole("tab", { name: d.records, exact: true }).click();
+  await expect(page.getByText(d.platformOperatorRequired, { exact: true })).toBeVisible();
+  await expect(page.getByText("PLATFORM_OPERATOR_REQUIRED", { exact: true })).toBeVisible();
+  await page.goto(story("manageddomaindetail--dns-no-data"));
+  await page.getByRole("tab", { name: d.diagnostics, exact: true }).click();
+  const result = page.getByRole("region", { name: d.response, exact: true });
+  await expect(result.getByText(d.dnsNoDataStatus, { exact: true })).toBeVisible();
+  await expect(result.getByText(d.dnsNoData, { exact: true })).toBeVisible();
+  await expect(result.getByText(d.ok, { exact: true })).toHaveCount(0);
+  await page.goto(story("manageddomaindetail--icmp-timeout"));
+  await page.getByRole("tab", { name: d.diagnostics, exact: true }).click();
+  await expect(page.getByText(d.icmpTimeout, { exact: true })).toBeVisible();
+  await expect(page.getByText("ICMP_TIMEOUT", { exact: true })).toBeVisible();
+});
+
 test("domain detail changes one active panel and preserves truthful public delegation", async ({
   page,
 }) => {

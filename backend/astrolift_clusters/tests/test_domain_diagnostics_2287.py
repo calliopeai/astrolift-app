@@ -481,3 +481,12 @@ def test_operator_unsupported_driver_remains_distinct_without_provider_transport
     zone = reply["data"]["astroliftManagedDomainDiagnostics"]["providerZone"]
     assert zone["state"] == "UNSUPPORTED" and zone["reason"] == "PROVIDER_INVENTORY_UNSUPPORTED"
     assert zone["zoneId"] is None and zone["records"] == [] and not aws_wire["requests"]
+
+
+def test_empty_lookup_reports_no_data_without_provider_inventory(world, client, dns_wire, aws_wire):
+    dns_wire["answers"] = []
+    reply = ask(client, world, query=PROBE, hostname=world.domain.zone, tool="LOOKUP")
+    assert not reply.get("errors"), reply.get("errors")
+    data = reply["data"]["astroliftManagedDomainProbe"]
+    assert data["state"] == "OK" and data["reason"] == "DNS_NO_DATA" and data["values"] == []
+    assert not aws_wire["requests"]

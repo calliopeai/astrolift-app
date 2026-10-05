@@ -34,6 +34,7 @@ let server: Server,
   canVerify: boolean,
   supportAllowed: boolean,
   supportFailure: boolean,
+  probeReason: string | null,
   hold: string | null,
   release: (() => void) | null;
 beforeEach(async () => {
@@ -47,6 +48,7 @@ beforeEach(async () => {
   canVerify = false;
   supportAllowed = true;
   supportFailure = false;
+  probeReason = null;
   hold = null;
   release = null;
   const roots = {
@@ -70,14 +72,16 @@ beforeEach(async () => {
       return observation;
     },
     astroliftManagedDomainProbe: (args: Record<string, string>) => ({
-      state: args.tool === "PING" ? "UNSUPPORTED" : "OK",
+      state:
+        probeReason === "ICMP_TIMEOUT" ? "UNKNOWN" : args.tool === "PING" ? "UNSUPPORTED" : "OK",
       perspective: "public_dns:1.1.1.1",
       checkedAt: observation.checkedAt,
-      reason: args.tool === "PING" ? "ICMP_TOOL_UNAVAILABLE" : "DNS_ANSWER_OBSERVED",
+      reason:
+        probeReason ?? (args.tool === "PING" ? "ICMP_TOOL_UNAVAILABLE" : "DNS_ANSWER_OBSERVED"),
       hostname: probeForeign ? "foreign.example" : args.hostname,
       tool: args.tool,
       recordType: args.recordType,
-      values: ["observed-current-answer"],
+      values: probeReason ? [] : ["observed-current-answer"],
       publicAddress: null,
       httpStatus: null,
       tlsVerified: null,
@@ -410,3 +414,29 @@ it("waits for safe current support before protected binding and disables verific
   expect(requests.filter((r) => r.operationName === "DnsDomainBinding")).toHaveLength(1);
   expect(requests.some((r) => r.operationName === "VerifyDnsDomain")).toBe(false);
 });
+
+it.each(["DNS_NO_DATA", "ICMP_TIMEOUT"])(
+  "explains actual probe reason %s without a fake observed match",
+  async (reason) => {
+    probeReason = reason;
+    render(<View />);
+    await diagnostics();
+    fireEvent.change(screen.getByLabelText(en.managedDomains.tool), {
+      target: { value: reason === "ICMP_TIMEOUT" ? "PING" : "LOOKUP" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: en.managedDomains.run }));
+    await screen.findByText(reason);
+    const response = within(screen.getByRole("region", { name: en.managedDomains.response }));
+    expect(
+      response.getByText(
+        reason === "DNS_NO_DATA" ? en.managedDomains.dnsNoData : en.managedDomains.icmpTimeout
+      )
+    ).toBeInTheDocument();
+    expect(response.queryByText(en.managedDomains.ok)).not.toBeInTheDocument();
+    expect(
+      response.getAllByText(
+        reason === "DNS_NO_DATA" ? en.managedDomains.dnsNoDataStatus : en.managedDomains.unknown
+      ).length
+    ).toBeGreaterThan(0);
+  }
+);
