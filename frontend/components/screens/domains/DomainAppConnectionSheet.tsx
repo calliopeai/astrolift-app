@@ -67,6 +67,18 @@ export type DomainAppConnectionSheetProps = {
   busy: boolean;
   outcome: "none" | "pending" | "unknown" | "recorded";
   onRecover?: () => void;
+  blockedReason?: string | null;
+  operation?: {
+    id: string;
+    status: string;
+    purpose: string;
+    dns: string;
+    endpoint: string;
+    tls: string;
+    reason: string;
+  } | null;
+  onReconcile?: () => void;
+  onContinueAfterPrepare?: () => void;
 };
 
 export function DomainAppConnectionSheet(props: DomainAppConnectionSheetProps) {
@@ -119,13 +131,51 @@ function OpenConnectionSheet(props: DomainAppConnectionSheetProps) {
               </li>
             ))}
           </ol>
+          {props.blockedReason && (
+            <p role="alert" className="rounded-lg border p-3 break-words">
+              {props.blockedReason}
+            </p>
+          )}
           {props.outcome !== "none" && (
             <div role="status" className="space-y-3 rounded-lg border p-3">
               <p>{t(props.outcome === "unknown" ? "unknownHelp" : "recordedHelp")}</p>
               <p className="text-muted-foreground text-sm">{t("routeObservationHelp")}</p>
+              {props.operation && (
+                <dl className="space-y-2 text-sm">
+                  {[
+                    [t("operationId"), props.operation.id],
+                    [t("configurationStatus"), props.operation.status],
+                    [t("dnsProposal"), props.operation.dns],
+                    [t("endpoint"), props.operation.endpoint],
+                    [t("tlsStatus"), props.operation.tls],
+                  ].map(([label, value]) => (
+                    <div key={label}>
+                      <dt className="text-muted-foreground">{label}</dt>
+                      <dd className="break-all">
+                        <code>{value}</code>
+                      </dd>
+                    </div>
+                  ))}
+                  {props.operation.reason && (
+                    <dd className="break-all">
+                      <code>{props.operation.reason}</code>
+                    </dd>
+                  )}
+                </dl>
+              )}
               <Button disabled={props.busy || !props.onRecover} onClick={props.onRecover}>
                 {t("recover")}
               </Button>
+              {props.onReconcile && (
+                <Button variant="outline" disabled={props.busy} onClick={props.onReconcile}>
+                  {t("reconcile")}
+                </Button>
+              )}
+              {props.onContinueAfterPrepare && (
+                <Button disabled={props.busy} onClick={props.onContinueAfterPrepare}>
+                  {t("continueAfterPrepare")}
+                </Button>
+              )}
             </div>
           )}
           {step === 0 && (

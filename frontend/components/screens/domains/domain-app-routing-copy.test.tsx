@@ -20,7 +20,7 @@ import { DEFAULT_SETTINGS } from "./DomainDefaultSettings.stories";
 
 const catalogues = { en, es, fr, de, ja, ko, "zh-Hans": zh, "pt-BR": pt };
 const routeKeys =
-  "connect intro steps hostnameStep targetStep reviewStep apex subdomain subdomainHelp next targetHelp empty selectTarget previousPage nextPage review reviewHelp workload dnsProposal manualHelp prepare attach unknownHelp recordedHelp observationHelp recover targetKind deploymentHosting httpApiHosting endpoint tlsStatus endpointReviewHelp routeObservationHelp targetPending dnsUnavailable apiId apiStage functionReference certificateStatus".split(
+  "connect intro steps hostnameStep targetStep reviewStep apex subdomain subdomainHelp next targetHelp empty selectTarget previousPage nextPage review reviewHelp workload dnsProposal manualHelp prepare attach unknownHelp recordedHelp observationHelp recover targetKind deploymentHosting httpApiHosting endpoint tlsStatus endpointReviewHelp routeObservationHelp targetPending dnsUnavailable apiId apiStage functionReference certificateStatus operationId configurationStatus reconcile continueAfterPrepare storageUnavailable".split(
     " "
   );
 const defaultKeys =

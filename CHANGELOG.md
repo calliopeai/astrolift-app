@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Stage typed app-domain route adapters against the mounted routing contract, with exact target review, browser-held original request recovery and fresh versioned reconciliation; public activation and native readiness remain separate (#2299).
+
 - Prepare the domain connection view for deployment and app-managed HTTP API targets with generic endpoint/TLS observations, localized hosting labels and retained-review invalidation; routing API activation remains separate (#2299).
 
 - Show typed Route53 policy configuration and health/traffic-policy references per DNS record in the Domains Records tab, retaining unknown and non-Route53 states without claiming measured health or traffic (#2287).

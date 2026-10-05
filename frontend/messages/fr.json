@@ -8110,7 +8110,12 @@
     "apiId": "Identifiant API",
     "apiStage": "Étape API",
     "functionReference": "Référence de la fonction",
-    "certificateStatus": "État du certificat"
+    "certificateStatus": "État du certificat",
+    "operationId": "Identifiant de l’opération",
+    "configurationStatus": "État de la configuration native",
+    "reconcile": "Revérifier l’opération enregistrée",
+    "continueAfterPrepare": "Vérifier la connexion après la préparation",
+    "storageUnavailable": "La récupération de la demande initiale n’a pas pu être enregistrée ou lue. Aucune nouvelle écriture ne sera envoyée. Rétablissez le stockage de session du navigateur avant de continuer."
   },
   "domainDefaults": {
     "title": "Paramètres du domaine",

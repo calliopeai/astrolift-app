@@ -8187,7 +8187,12 @@
     "apiId": "API identifier",
     "apiStage": "API stage",
     "functionReference": "Function reference",
-    "certificateStatus": "Certificate state"
+    "certificateStatus": "Certificate state",
+    "operationId": "Operation identifier",
+    "configurationStatus": "Native configuration state",
+    "reconcile": "Recheck recorded operation",
+    "continueAfterPrepare": "Review connection after preparation",
+    "storageUnavailable": "The original request recovery could not be stored or read. No new write will be sent. Restore browser session storage before continuing."
   },
   "domainDefaults": {
     "title": "Domain settings",

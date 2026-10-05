@@ -8107,7 +8107,12 @@
     "apiId": "API 식별자",
     "apiStage": "API 단계",
     "functionReference": "함수 참조",
-    "certificateStatus": "인증서 상태"
+    "certificateStatus": "인증서 상태",
+    "operationId": "작업 식별자",
+    "configurationStatus": "네이티브 구성 상태",
+    "reconcile": "기록된 작업 다시 확인",
+    "continueAfterPrepare": "준비 후 연결 검토",
+    "storageUnavailable": "원래 요청의 복구 정보를 저장하거나 읽을 수 없습니다. 새 쓰기 요청은 전송되지 않습니다. 계속하기 전에 브라우저 세션 저장소를 복구하세요."
   },
   "domainDefaults": {
     "title": "도메인 설정",

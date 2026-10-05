@@ -8110,7 +8110,12 @@
     "apiId": "API-Kennung",
     "apiStage": "API-Stufe",
     "functionReference": "Funktionsreferenz",
-    "certificateStatus": "Zertifikatsstatus"
+    "certificateStatus": "Zertifikatsstatus",
+    "operationId": "Vorgangskennung",
+    "configurationStatus": "Status der nativen Konfiguration",
+    "reconcile": "Gespeicherten Vorgang erneut prüfen",
+    "continueAfterPrepare": "Verbindung nach der Vorbereitung prüfen",
+    "storageUnavailable": "Die Wiederherstellung der ursprünglichen Anfrage konnte nicht gespeichert oder gelesen werden. Es wird kein neuer Schreibvorgang gesendet. Stellen Sie vor dem Fortfahren den Sitzungsspeicher des Browsers wieder her."
   },
   "domainDefaults": {
     "title": "Domain-Einstellungen",

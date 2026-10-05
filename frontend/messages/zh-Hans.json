@@ -8107,7 +8107,12 @@
     "apiId": "API 标识符",
     "apiStage": "API 阶段",
     "functionReference": "函数引用",
-    "certificateStatus": "证书状态"
+    "certificateStatus": "证书状态",
+    "operationId": "操作标识符",
+    "configurationStatus": "原生配置状态",
+    "reconcile": "重新检查已记录的操作",
+    "continueAfterPrepare": "准备后审核连接",
+    "storageUnavailable": "无法保存或读取原始请求的恢复信息。不会发送新的写入请求。请先恢复浏览器会话存储再继续。"
   },
   "domainDefaults": {
     "title": "域名设置",

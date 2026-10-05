@@ -8107,7 +8107,12 @@
     "apiId": "API の識別子",
     "apiStage": "API ステージ",
     "functionReference": "関数の参照",
-    "certificateStatus": "証明書の状態"
+    "certificateStatus": "証明書の状態",
+    "operationId": "操作識別子",
+    "configurationStatus": "ネイティブ設定の状態",
+    "reconcile": "記録済みの操作を再確認",
+    "continueAfterPrepare": "準備後に接続を確認",
+    "storageUnavailable": "元のリクエストの復元情報を保存または読み取れませんでした。新たな書き込みは送信されません。続行する前にブラウザーのセッションストレージを復旧してください。"
   },
   "domainDefaults": {
     "title": "ドメイン設定",

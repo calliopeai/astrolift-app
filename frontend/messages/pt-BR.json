@@ -8107,7 +8107,12 @@
     "apiId": "Identificador da API",
     "apiStage": "Estágio da API",
     "functionReference": "Referência da função",
-    "certificateStatus": "Estado do certificado"
+    "certificateStatus": "Estado do certificado",
+    "operationId": "Identificador da operação",
+    "configurationStatus": "Estado da configuração nativa",
+    "reconcile": "Verificar novamente a operação registrada",
+    "continueAfterPrepare": "Revisar a conexão após a preparação",
+    "storageUnavailable": "Não foi possível armazenar ou ler a recuperação da solicitação original. Nenhuma nova gravação será enviada. Restaure o armazenamento de sessão do navegador antes de continuar."
   },
   "domainDefaults": {
     "title": "Configurações do domínio",

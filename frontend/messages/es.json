@@ -8110,7 +8110,12 @@
     "apiId": "Identificador de la API",
     "apiStage": "Etapa de la API",
     "functionReference": "Referencia de la función",
-    "certificateStatus": "Estado del certificado"
+    "certificateStatus": "Estado del certificado",
+    "operationId": "Identificador de la operación",
+    "configurationStatus": "Estado de la configuración nativa",
+    "reconcile": "Volver a comprobar la operación registrada",
+    "continueAfterPrepare": "Revisar la conexión tras la preparación",
+    "storageUnavailable": "No se pudo guardar o leer la recuperación de la solicitud original. No se enviará ninguna escritura nueva. Restablece el almacenamiento de sesión del navegador antes de continuar."
   },
   "domainDefaults": {
     "title": "Configuración del dominio",
