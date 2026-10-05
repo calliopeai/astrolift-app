@@ -34,6 +34,7 @@ from astrolift_workflows.client import (
     list_workflow_instances,
     workflow_history,
 )
+from astrolift_workflows.configuration_targets import configured_workflow_scope, find_configured_workflow
 from astrolift_workflows.schema.execution_types import WorkflowExecutionStages, WorkflowExecutionType
 from astrolift_workflows.schema.types import (
     WorkflowInstanceDetailType,
@@ -77,12 +78,12 @@ from workflows.scopes import (
     definition_start_scope,
     execution_scope_by_id,
     may_decide_human_gate,
+    reviewed_definition_scope,
     visible_project_owned,
     visible_runs,
     workflow_run_scope,
     workflow_run_scope_by_id,
     workflow_scope_by_guid,
-    workflow_scope_by_slug,
 )
 
 
@@ -607,24 +608,28 @@ class WorkflowsQuery:
         )
         return page.map(workflow_to_type)
 
-    @strawberry.field(description="One configured Workflow by slug, with its recent runs.")
-    @require_permission(Permission.WORKFLOW_READ, scope=workflow_scope_by_slug("slug"))
+    @strawberry.field(
+        description="One configured Workflow by exact ID or legacy slug, with its recent runs. A supplied slug must match the ID."
+    )
+    @require_permission(Permission.WORKFLOW_READ, scope=configured_workflow_scope(Permission.WORKFLOW_READ))
     @tenant_scoped()
     def workflow(
-        self, info: Info, slug: str, org_id: strawberry.ID | None = None
+        self,
+        info: Info,
+        slug: str | None = None,
+        org_id: strawberry.ID | None = None,
+        workflow_id: GUID | None = None,  # type: ignore[valid-type]
     ) -> ConfiguredWorkflowType | None:
         caller, ok = _org_pk_matches(org_id)
         if not ok:
             return None
-        from workflows.models import Workflow
-
-        wf = (
-            Workflow.objects.filter(organization_id=caller, slug=slug, deleted_at__isnull=True)
-            .select_related("definition", "organization")
-            .first()
-        )
+        wf = find_configured_workflow(caller, workflow_id=workflow_id, slug=slug)
         if wf is None:
             return None
+        check_permission(
+            Permission.WORKFLOW_READ,
+            scope=reviewed_definition_scope(wf.definition, caller, permission=Permission.WORKFLOW_READ),
+        )
         return workflow_to_type(wf, with_runs=True)
 
     @strawberry.field(

@@ -164,6 +164,7 @@ class ConfiguredWorkflowType:
     inputs: JSON
     stage_bindings: JSON
     organization_guid: str | None
+    definition_guid: str
     definition_slug: str
     definition_name: str
     pattern_kind: str
@@ -358,6 +359,7 @@ def workflow_to_type(workflow, *, with_runs: bool = False) -> ConfiguredWorkflow
         inputs=workflow.inputs or {},
         stage_bindings=workflow.stage_bindings or {},
         organization_guid=(None if workflow.organization_id is None else str(workflow.organization.guid)),
+        definition_guid=str(workflow.definition.guid),
         definition_slug=workflow.definition.slug or "",
         definition_name=workflow.definition.name,
         pattern_kind=workflow.definition.pattern_kind,
