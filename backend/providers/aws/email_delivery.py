@@ -13,7 +13,12 @@ from typing import Any
 from uuid import UUID
 
 from _sdk.cloud_credentials import CloudCredential
-from _sdk.email_delivery import EmailAcceptance, EmailDeliveryUnavailable, EmailTestMessage
+from _sdk.email_delivery import (
+    EMAIL_DELIVERY_SERVICE_TAG,
+    EmailAcceptance,
+    EmailDeliveryUnavailable,
+    EmailTestMessage,
+)
 from aws.managed._base import live_ownership_refusal
 from aws.session import aws_client
 
@@ -251,7 +256,7 @@ class AmazonSESTestDelivery:
                     ConfigurationSetName=self.config.configuration_set,
                     EmailTags=[
                         {"Name": "astrolift_test_id", "Value": message.test_id},
-                        {"Name": "astrolift_managed_service_id", "Value": message.managed_service_id},
+                        {"Name": EMAIL_DELIVERY_SERVICE_TAG, "Value": message.managed_service_id},
                     ],
                 )
             identifier = response.get("MessageId")

@@ -168,7 +168,7 @@ def test_acceptance_is_exact_source_and_tagged_not_delivery(wire):
     assert payload["ConfigurationSetName"] == config().configuration_set
     assert payload["EmailTags"] == [
         {"Name": "astrolift_test_id", "Value": msg.test_id},
-        {"Name": "astrolift_managed_service_id", "Value": SERVICE},
+        {"Name": "astrolift_delivery_service", "Value": SERVICE},
     ]
     assert len(sends(wire)) == 1
 

@@ -259,7 +259,7 @@ def event(row, *, kind="Delivery", message_id=None, topic=None, account=None):
                 "timestamp": now,
                 "tags": {
                     "astrolift_test_id": [str(row.guid)],
-                    "astrolift_managed_service_id": [str(row.managed_service.guid)],
+                    "astrolift_delivery_service": [str(row.managed_service.guid)],
                 },
                 "commonHeaders": {"subject": MARKER},
             },

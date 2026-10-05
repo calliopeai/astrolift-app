@@ -355,6 +355,8 @@ def _apply_observation(row, observation):
 
 def observe_test(sns_body, ses_message):
     """Called only after SNS signature verification; consume tagged diagnostics privately."""
+    from _sdk.email_delivery import EMAIL_DELIVERY_SERVICE_TAG
+
     mail = ses_message.get("mail") or {}
     if not isinstance(mail, dict):
         return False
@@ -372,7 +374,7 @@ def observe_test(sns_body, ses_message):
         row = EmailDeliveryTest.objects.select_for_update().filter(guid=guid).first()
         if row is None:
             return True
-        service_ids = tags.get("astrolift_managed_service_id")
+        service_ids = tags.get(EMAIL_DELIVERY_SERVICE_TAG)
         if (
             sns_body.get("TopicArn") not in row.feedback_topic_arns
             or service_ids != [str(row.managed_service.guid)]

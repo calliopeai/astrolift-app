@@ -4,6 +4,10 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Protocol
 
+# SES message-event correlation has a restricted alphabet. It is distinct from
+# resource ownership/cost tags, whose canonical AWS key includes a dot and slash.
+EMAIL_DELIVERY_SERVICE_TAG = "astrolift_delivery_service"
+
 
 class EmailDeliveryUnavailable(ValueError):
     """Safe fixed reason; native errors and message contents stay private."""
