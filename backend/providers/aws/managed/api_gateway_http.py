@@ -31,7 +31,7 @@ from __future__ import annotations
 import contextlib
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from _sdk._telemetry import driver_op
 from _sdk.cloud_credentials import CredentialedConfig
@@ -59,6 +59,10 @@ from aws.managed._base import (
     tags_for,
 )
 from aws.session import aws_client
+
+if TYPE_CHECKING:
+    from aws.domain_route_api_gateway import HttpApiDomainPort
+
 
 log = logging.getLogger("aws.managed.api_gateway_http")
 
@@ -104,6 +108,12 @@ class ApiGatewayHttpDriver:
             self._lambda = lambda_client
         else:
             self._lambda = aws_client("lambda", region=config.region, credential=config.credential)
+
+    def domain_route_http_api(self, *, api_client: Any, lambda_client: Any, sts_client: Any) -> HttpApiDomainPort:
+        """Optional exact domain port; caller supplies bounded admitted clients."""
+        from aws.domain_route_api_gateway import HttpApiDomainPort
+
+        return HttpApiDomainPort(api_client=api_client, lambda_client=lambda_client, sts_client=sts_client)
 
     # ---- lifecycle ------------------------------------------------
 
