@@ -35,6 +35,8 @@ function source(s: AlertMailSupport | null | undefined) {
 }
 function validRow(r: AlertMailTest, event: string) {
   return (
+    !!r &&
+    typeof r === "object" &&
     guid(r.id) &&
     guid(r.requestId) &&
     Number.isSafeInteger(r.version) &&
@@ -116,8 +118,11 @@ export function useInstallAlertMail(
       live.current = false;
     };
   }, [key, event]);
-  const page = admitted && !h.loading && !h.error ? h.data?.installAlertMailTestsPage : null;
-  const bad = page?.items.some((r) => !validRow(r, event));
+  const historyReady = admitted && !h.loading && !h.error;
+  const page = historyReady ? h.data?.installAlertMailTestsPage : null;
+  const bad =
+    historyReady &&
+    (!page || !Array.isArray(page.items) || page.items.some((r) => !validRow(r, event)));
   const recovered =
     !bad && page && intent ? page.items.find((r) => r.requestId === intent.requestId) : null;
   const current = recovered ?? replyRow;

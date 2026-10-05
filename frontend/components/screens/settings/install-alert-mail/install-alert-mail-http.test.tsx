@@ -37,6 +37,7 @@ let lose: boolean,
   noHistory: boolean,
   hold: boolean,
   release: (() => void) | null;
+let malformedHistory: "nullRow" | "itemsObject" | null;
 beforeEach(async () => {
   sessionStorage.clear();
   identity.actor = "a0000000-0000-4000-8000-000000000001";
@@ -47,6 +48,7 @@ beforeEach(async () => {
   errors = [];
   lose = refuseAfterSend = historyDenied = permissionDenied = forged = noHistory = hold = false;
   release = null;
+  malformedHistory = null;
   server = createServer(async (req, res) => {
     let body = "";
     for await (const b of req) body += b;
@@ -110,7 +112,21 @@ beforeEach(async () => {
       return;
     }
     res.setHeader("content-type", "application/json");
-    res.end(JSON.stringify(result));
+    res.end(
+      JSON.stringify(
+        malformedHistory && input.operationName === "InstallAlertMailHistory"
+          ? {
+              data: {
+                installAlertMailTestsPage: {
+                  items: malformedHistory === "nullRow" ? [null] : { invalid: true },
+                  totalCount: 1,
+                  nextCursor: null,
+                },
+              },
+            }
+          : result
+      )
+    );
   });
   await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
   client = new ApolloClient({
@@ -264,6 +280,27 @@ it("history withdrawal hides completion and cannot release uncertain intent", as
   expect(screen.queryByRole("button", { name: c.another })).not.toBeInTheDocument();
   expect(sends()).toHaveLength(1);
 });
+it.each(["nullRow", "itemsObject"] as const)(
+  "malformed %s history preserves the original intent until valid history recovers",
+  async (shape) => {
+    await reviewed();
+    fireEvent.click(screen.getByRole("button", { name: c.send }));
+    await screen.findByText(c.acceptance);
+    const saved = intent();
+    malformedHistory = shape;
+    fireEvent.click(screen.getByRole("button", { name: c.refresh }));
+    await screen.findByText(c.historyUnavailable);
+    expect(screen.queryByText(c.acceptance)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: c.another })).not.toBeInTheDocument();
+    expect(intent()).toEqual(saved);
+    expect(sends()).toHaveLength(1);
+    malformedHistory = null;
+    fireEvent.click(screen.getByRole("button", { name: c.refresh }));
+    await screen.findByText(c.acceptance);
+    expect(intent()).toEqual(saved);
+    expect(sends()).toHaveLength(1);
+  }
+);
 it("actor A-B-A held reply cannot restore prior review or authorize new send", async () => {
   await reviewed();
   hold = true;
