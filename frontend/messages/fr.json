@@ -8108,6 +8108,15 @@
     "useFor": "Utiliser pour les nouvelles URL applicatives",
     "review": "Vérifier le choix par défaut",
     "reviewHelp": "Cela change le domaine effectif pour les usages sélectionnés et retire les choix par défaut qui se chevauchent. Les URL existantes ne sont pas migrées et le domaine racine n’est pas relié à une application.",
-    "save": "Appliquer le choix vérifié"
+    "save": "Appliquer le choix vérifié",
+    "reasonReadOnly": "Cette connexion de domaine est en lecture seule. Utilisez un fournisseur DNS configuré pour les nouvelles URL applicatives.",
+    "reasonProof": "Vérifiez la propriété du domaine avant de le choisir pour les nouvelles URL applicatives.",
+    "reasonProvisioning": "Terminez le provisionnement du domaine avant de le choisir pour les nouvelles URL applicatives.",
+    "reasonWriter": "Le fournisseur DNS configuré ou son cluster est indisponible ou a changé. Vérifiez la configuration du domaine.",
+    "reasonOverride": "Un domaine explicitement défini pour l’organisation remplace ces choix. Cette action ne modifie pas ce paramètre.",
+    "reasonPrecedence": "Un domaine appartenant à l’organisation est prioritaire sur ce choix partagé.",
+    "reasonPermission": "L’autorisation actuelle de configuration du domaine est requise.",
+    "reasonChanged": "Le domaine ou d’autres choix par défaut ont changé. Actualisez et vérifiez la sélection actuelle.",
+    "applied": "La sélection a été acceptée. Vérifiez le domaine effectif actualisé ; les URL existantes restent inchangées."
   }
 }

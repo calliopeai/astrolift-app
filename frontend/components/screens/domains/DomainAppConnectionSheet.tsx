@@ -81,6 +81,8 @@ function OpenConnectionSheet(props: DomainAppConnectionSheetProps) {
   const preview = props.hostnameKind === "apex" ? props.zone : `${props.subdomain}.${props.zone}`;
   const currentReview = Boolean(
     props.hostnameValid &&
+    !props.reviewing &&
+    !props.reviewError &&
     freshTargets &&
     props.review &&
     props.review.hostname === preview &&
@@ -222,7 +224,12 @@ function OpenConnectionSheet(props: DomainAppConnectionSheetProps) {
                 </Button>
                 <Button
                   disabled={
-                    locked || !freshTargets || !selected || !props.canReview || !props.onReview
+                    locked ||
+                    props.reviewing ||
+                    !freshTargets ||
+                    !selected ||
+                    !props.canReview ||
+                    !props.onReview
                   }
                   onClick={() => {
                     props.onReview?.();

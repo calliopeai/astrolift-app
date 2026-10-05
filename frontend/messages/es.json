@@ -8108,6 +8108,15 @@
     "useFor": "Usar para nuevas URL de aplicaciones",
     "review": "Revisar selección predeterminada",
     "reviewHelp": "Esto cambia el dominio efectivo para los usos seleccionados y elimina las marcas predeterminadas superpuestas. No migra las URL existentes ni conecta el dominio raíz a una aplicación.",
-    "save": "Aplicar selección revisada"
+    "save": "Aplicar selección revisada",
+    "reasonReadOnly": "Esta conexión de dominio es de solo lectura. Usa un proveedor DNS configurado para las nuevas URL de aplicaciones.",
+    "reasonProof": "Verifica la propiedad del dominio antes de seleccionarlo para nuevas URL de aplicaciones.",
+    "reasonProvisioning": "Completa el aprovisionamiento del dominio antes de seleccionarlo para nuevas URL de aplicaciones.",
+    "reasonWriter": "El proveedor DNS configurado o su clúster no está disponible o cambió. Revisa la configuración del dominio.",
+    "reasonOverride": "Un dominio explícito de la organización tiene prioridad sobre estas marcas. Esta acción no reemplaza ese ajuste.",
+    "reasonPrecedence": "Un dominio de la organización tiene prioridad sobre este valor compartido.",
+    "reasonPermission": "Se requiere el permiso actual para configurar el dominio.",
+    "reasonChanged": "El dominio u otros valores predeterminados cambiaron. Actualiza y revisa la selección actual.",
+    "applied": "La selección se aceptó. Comprueba el dominio efectivo actualizado; las URL existentes no cambiaron."
   }
 }

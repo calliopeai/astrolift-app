@@ -296,7 +296,7 @@ describe("actual exported domain schema over HttpLink", () => {
     expect(screen.queryByText(en.managedDomains.notFound)).not.toBeInTheDocument();
     refused = false;
     missing = true;
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    fireEvent.click(screen.getByRole("button", { name: en.managedDomains.refresh }));
     await screen.findByText(en.managedDomains.notFound);
     view.unmount();
   });
@@ -392,13 +392,24 @@ describe("actual exported domain schema over HttpLink", () => {
     expect(screen.queryByText("observed-current-answer")).not.toBeInTheDocument();
   });
   it("uses only current exact action hints and the safe cluster GUID for revalidation", async () => {
-    observation.actions = { canCreate: false, canDelete: false, canRevalidate: false };
+    observation.actions = {
+      ...DOMAIN_DIAGNOSTICS.actions,
+      canCreate: false,
+      canDelete: false,
+      canRevalidate: false,
+    };
     render(<View />);
     await ready();
     expect(screen.getByRole("button", { name: "Remove domain" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Revalidate recorded DNS setup" })).toBeDisabled();
     observation.actions.canRevalidate = true;
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    fireEvent.click(
+      within(
+        screen.getByRole("region", {
+          name: `${en.managedDomains.publicDelegation} · public resolver`,
+        })
+      ).getByRole("button", { name: en.managedDomains.refreshCheck })
+    );
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Revalidate recorded DNS setup" })).toBeEnabled()
     );

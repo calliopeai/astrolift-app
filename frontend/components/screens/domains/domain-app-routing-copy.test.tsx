@@ -23,9 +23,10 @@ const routeKeys =
   "connect intro steps hostnameStep targetStep reviewStep apex subdomain subdomainHelp next targetHelp empty selectTarget previousPage nextPage review reviewHelp workload dnsProposal manualHelp prepare attach unknownHelp recordedHelp observationHelp recover".split(
     " "
   );
-const defaultKeys = "title help declared unavailable uncertain useFor review reviewHelp save".split(
-  " "
-);
+const defaultKeys =
+  "title help declared unavailable uncertain useFor review reviewHelp save reasonReadOnly reasonProof reasonProvisioning reasonWriter reasonOverride reasonPrecedence reasonPermission reasonChanged applied".split(
+    " "
+  );
 const wrap = (children: React.ReactNode) => (
   <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
     {children}
@@ -68,7 +69,11 @@ describe("domain routing and defaults pure views", () => {
             initialStep={2}
             review={{ ...APP_CONNECTION.review!, mode: "manual" }}
           />
-          <DomainDefaultSettings {...DEFAULT_SETTINGS} />
+          <DomainDefaultSettings
+            {...DEFAULT_SETTINGS}
+            reason="READ_ONLY_DOMAIN"
+            canSetDefaults={false}
+          />
         </NextIntlClientProvider>
       );
       expect(screen.getByText(messages.domainAppRouting.manualHelp)).toBeInTheDocument();
@@ -77,6 +82,7 @@ describe("domain routing and defaults pure views", () => {
         screen.getByRole("button", { name: messages.managedDomains.cancel })
       ).toBeInTheDocument();
       expect(screen.getByText(messages.domainDefaults.help)).toBeInTheDocument();
+      expect(screen.getByText(messages.domainDefaults.reasonReadOnly)).toBeInTheDocument();
       expect(onError).not.toHaveBeenCalled();
     }
   );
@@ -160,6 +166,28 @@ describe("domain routing and defaults pure views", () => {
       expect(onAttach).not.toHaveBeenCalled();
     }
   );
+
+  it.each(["loading", "error"])("retained review %s cannot prepare or attach", (state) => {
+    const onPrepare = vi.fn(),
+      onAttach = vi.fn();
+    render(
+      wrap(
+        <DomainAppConnectionSheet
+          {...APP_CONNECTION}
+          initialStep={2}
+          canPrepare
+          onPrepare={onPrepare}
+          onAttach={onAttach}
+          reviewing={state === "loading"}
+          reviewError={state === "error" ? "Current review unavailable" : null}
+        />
+      )
+    );
+    fireEvent.click(screen.getByRole("button", { name: en.domainAppRouting.prepare }));
+    fireEvent.click(screen.getByRole("button", { name: en.domainAppRouting.attach }));
+    expect(onPrepare).not.toHaveBeenCalled();
+    expect(onAttach).not.toHaveBeenCalled();
+  });
 
   it("unknown outcome retains recovery-only controls and locks target changes", () => {
     const onAttach = vi.fn(),

@@ -8185,6 +8185,15 @@
     "useFor": "Use for new app URLs",
     "review": "Review default selection",
     "reviewHelp": "This changes the effective domain for the selected use cases and removes overlapping default flags. It does not migrate existing app URLs or connect the root domain to an app.",
-    "save": "Apply reviewed selection"
+    "save": "Apply reviewed selection",
+    "reasonReadOnly": "This domain connection is read-only. Use a configured DNS writer for new app URLs.",
+    "reasonProof": "Verify domain ownership before selecting it for new app URLs.",
+    "reasonProvisioning": "Complete domain provisioning before selecting it for new app URLs.",
+    "reasonWriter": "The configured DNS writer or its cluster is unavailable or changed. Review the domain configuration.",
+    "reasonOverride": "An explicit organization domain overrides these flags. This action does not replace that setting.",
+    "reasonPrecedence": "An organization-owned domain takes precedence over this shared default.",
+    "reasonPermission": "Current domain configuration permission is required.",
+    "reasonChanged": "The domain or other defaults changed. Refresh and review the current selection.",
+    "applied": "The selection was accepted. Check the refreshed effective domain; existing app URLs are unchanged."
   }
 }

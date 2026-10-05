@@ -8108,6 +8108,15 @@
     "useFor": "Für neue App-URLs verwenden",
     "review": "Standardauswahl prüfen",
     "reviewHelp": "Dies ändert die wirksame Domain für die gewählten Zwecke und entfernt überlappende Standardmarkierungen. Bestehende App-URLs werden nicht migriert und die Stammdomain wird nicht mit einer App verbunden.",
-    "save": "Geprüfte Auswahl anwenden"
+    "save": "Geprüfte Auswahl anwenden",
+    "reasonReadOnly": "Diese Domain-Verbindung ist schreibgeschützt. Verwenden Sie einen konfigurierten DNS-Anbieter für neue App-URLs.",
+    "reasonProof": "Bestätigen Sie den Domain-Besitz, bevor Sie sie für neue App-URLs auswählen.",
+    "reasonProvisioning": "Schließen Sie die Domain-Bereitstellung ab, bevor Sie sie für neue App-URLs auswählen.",
+    "reasonWriter": "Der konfigurierte DNS-Anbieter oder sein Cluster ist nicht verfügbar oder hat sich geändert. Prüfen Sie die Domain-Konfiguration.",
+    "reasonOverride": "Eine explizite Organisationsdomain hat Vorrang vor diesen Markierungen. Diese Aktion ersetzt diese Einstellung nicht.",
+    "reasonPrecedence": "Eine organisationseigene Domain hat Vorrang vor dieser gemeinsamen Vorgabe.",
+    "reasonPermission": "Die aktuelle Berechtigung zur Domain-Konfiguration ist erforderlich.",
+    "reasonChanged": "Die Domain oder andere Vorgaben haben sich geändert. Aktualisieren und prüfen Sie die aktuelle Auswahl.",
+    "applied": "Die Auswahl wurde angenommen. Prüfen Sie die aktualisierte wirksame Domain; bestehende App-URLs bleiben unverändert."
   }
 }

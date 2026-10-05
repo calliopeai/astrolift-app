@@ -52,3 +52,14 @@ export const UnknownReply: Story = { args: { ...DEFAULT_SETTINGS, uncertain: tru
 export const RemoveOnly: Story = {
   args: { ...DEFAULT_SETTINGS, canSetDefaults: false, reason: "DOMAIN_WRITER_UNAVAILABLE" },
 };
+
+export const AcceptedAndRefreshed: Story = {
+  args: {
+    ...DEFAULT_SETTINGS,
+    actionMessage: en.domainDefaults.applied,
+    effectiveTenant: "new.example",
+  },
+};
+export const ImpactChanged: Story = {
+  args: { ...DEFAULT_SETTINGS, uncertain: true, actionError: en.domainDefaults.reasonChanged },
+};

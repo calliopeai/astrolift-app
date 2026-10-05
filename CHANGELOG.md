@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connect domain settings to fresh effective-default admission with a reviewed domain version and impact fingerprint, localized refusal reasons and explicit refresh/review after uncertain replies; preserve existing app URLs (#2299).
+
 - Prepare reusable, localized app-domain connection and effective-domain settings
   views with explicit review, current capability gates and uncertain-outcome
   recovery. API adapters and product activation remain separate (#2299).

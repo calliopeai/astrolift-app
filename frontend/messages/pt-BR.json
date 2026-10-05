@@ -8105,6 +8105,15 @@
     "useFor": "Usar para novas URLs de aplicativos",
     "review": "Revisar seleção padrão",
     "reviewHelp": "Isso altera o domínio efetivo para os usos selecionados e remove marcações padrão sobrepostas. Não migra URLs existentes nem conecta o domínio raiz a um aplicativo.",
-    "save": "Aplicar seleção revisada"
+    "save": "Aplicar seleção revisada",
+    "reasonReadOnly": "Esta conexão de domínio é somente leitura. Use um provedor DNS configurado para novas URLs de aplicativos.",
+    "reasonProof": "Verifique a propriedade do domínio antes de selecioná-lo para novas URLs de aplicativos.",
+    "reasonProvisioning": "Conclua o provisionamento do domínio antes de selecioná-lo para novas URLs de aplicativos.",
+    "reasonWriter": "O provedor DNS configurado ou seu cluster está indisponível ou mudou. Revise a configuração do domínio.",
+    "reasonOverride": "Um domínio explícito da organização tem prioridade sobre estas marcações. Esta ação não substitui essa configuração.",
+    "reasonPrecedence": "Um domínio da organização tem prioridade sobre este padrão compartilhado.",
+    "reasonPermission": "É necessária a permissão atual para configurar o domínio.",
+    "reasonChanged": "O domínio ou outros padrões mudaram. Atualize e revise a seleção atual.",
+    "applied": "A seleção foi aceita. Confira o domínio efetivo atualizado; as URLs existentes não mudaram."
   }
 }

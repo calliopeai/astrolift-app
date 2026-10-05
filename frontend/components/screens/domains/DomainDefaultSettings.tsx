@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { domainDefaultReasonKey } from "./domain-default-reasons";
 
 export type DomainDefaultChoice = "none" | "tenant_apps" | "preview_envs" | "both";
 export type DomainDefaultSettingsProps = {
@@ -20,6 +21,8 @@ export type DomainDefaultSettingsProps = {
   busy: boolean;
   reason: string | null;
   uncertain: boolean;
+  actionMessage?: string | null;
+  actionError?: string | null;
   onSave?: (
     choice: DomainDefaultChoice,
     expectedVersion: number,
@@ -88,11 +91,13 @@ function DefaultSettingsView(props: DomainDefaultSettingsProps) {
       {props.loading && <p role="status">{d("loading")}</p>}
       {props.reason && (
         <p role="alert" className="text-sm break-words">
-          <span>{t("unavailable")}</span>
+          <span>{t(domainDefaultReasonKey(props.reason))}</span>
           <code className="mt-1 block text-xs break-all">{props.reason}</code>
         </p>
       )}
       {props.uncertain && <p role="status">{t("uncertain")}</p>}
+      {props.actionMessage && <p role="status">{props.actionMessage}</p>}
+      {props.actionError && <p role="alert">{props.actionError}</p>}
       <div className="space-y-2">
         <Label htmlFor={id}>{t("useFor")}</Label>
         <select

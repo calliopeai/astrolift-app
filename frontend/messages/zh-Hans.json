@@ -8105,6 +8105,15 @@
     "useFor": "用于新应用 URL",
     "review": "审核默认选择",
     "reviewHelp": "这会更改所选用途的实际域名，并清除重叠的默认标记。不会迁移现有应用 URL，也不会将根域名连接到应用。",
-    "save": "应用已审核选择"
+    "save": "应用已审核选择",
+    "reasonReadOnly": "此域名连接为只读。请为新应用 URL 使用已配置的 DNS 写入功能。",
+    "reasonProof": "为新应用 URL 选择此域名前，请验证域名所有权。",
+    "reasonProvisioning": "为新应用 URL 选择此域名前，请完成域名预配。",
+    "reasonWriter": "已配置的 DNS 写入功能或其集群不可用或已更改。请审核域名配置。",
+    "reasonOverride": "组织明确设置的域名优先于这些标记。此操作不会替换该设置。",
+    "reasonPrecedence": "组织拥有的域名优先于此共享默认设置。",
+    "reasonPermission": "需要当前有效的域名配置权限。",
+    "reasonChanged": "域名或其他默认设置已更改。请刷新并审核当前选择。",
+    "applied": "选择已受理。请查看刷新后的实际域名；现有应用 URL 保持不变。"
   }
 }
