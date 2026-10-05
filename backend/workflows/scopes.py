@@ -317,6 +317,24 @@ def covered_project_ids(org_id: int | None, permission: Permission):
 
 
 def visible_project_owned(qs, org_id: int | None, permission: Permission, path: str):
+    from astrolift_identity.api_tokens import get_current_api_token
+
+    token = get_current_api_token()
+    if token is not None:
+        if token.organization_id != org_id:
+            return qs.none()
+        if token.team_id is not None:
+            # A broad user role does not widen a team-limited credential.
+            # Apply the ceiling before the org-wide grant's early return.
+            qs = qs.filter(
+                **{
+                    f"{path}__organization_id": org_id,
+                    f"{path}__deleted_at__isnull": True,
+                    f"{path}__team_id": token.team_id,
+                    f"{path}__team__organization_id": org_id,
+                    f"{path}__team__deleted_at__isnull": True,
+                }
+            )
     projects = covered_project_ids(org_id, permission)
     if projects is None:
         return qs

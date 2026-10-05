@@ -17,6 +17,141 @@
   },
   "tools": [
     {
+      "description": "Discover permitted native workflow definitions and stage topology, with search and pagination.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "description": "Native next_cursor from the preceding page; malformed cursors restart the page.",
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "limit": {
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "project_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "search": {
+            "maxLength": 1024,
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "name": "astrolift_list_workflow_definitions",
+      "required_permissions": [
+        "workflow.read"
+      ],
+      "required_scopes": [
+        "mcp:read"
+      ]
+    },
+    {
+      "description": "Review an exact workflow definition ID with its native revision and input-schema contract. Does not start a run.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "definition_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "definition_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_get_workflow_definition",
+      "required_permissions": [
+        "workflow.read"
+      ],
+      "required_scopes": [
+        "mcp:read"
+      ]
+    },
+    {
+      "description": "Discover permitted configured native workflows, inputs, bindings and trigger settings, with search and pagination.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "description": "Native next_cursor from the preceding page; malformed cursors restart the page.",
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "limit": {
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "search": {
+            "maxLength": 1024,
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "name": "astrolift_list_workflows",
+      "required_permissions": [
+        "workflow.read"
+      ],
+      "required_scopes": [
+        "mcp:read"
+      ]
+    },
+    {
+      "description": "Validate native Workflow TOML and preview its stages or structured parse errors. Does not save, enable or dispatch anything.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "toml": {
+            "maxLength": 262144,
+            "type": "string"
+          }
+        },
+        "required": [
+          "toml"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_preview_workflow_manifest",
+      "required_permissions": [
+        "workflow.read"
+      ],
+      "required_scopes": [
+        "mcp:read"
+      ]
+    },
+    {
+      "description": "Export canonical native Workflow TOML for an exact permitted definition ID. Read-only; no slug substitution.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "definition_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "definition_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_export_workflow_manifest",
+      "required_permissions": [
+        "workflow.read"
+      ],
+      "required_scopes": [
+        "mcp:read"
+      ]
+    },
+    {
       "description": "List registered agents and their source/package delivery state.",
       "inputSchema": {
         "additionalProperties": false,

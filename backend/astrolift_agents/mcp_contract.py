@@ -30,7 +30,59 @@ def _schema(properties: dict[str, Any], *, required: tuple[str, ...] = ()) -> di
     }
 
 
+WORKFLOW_TOOL_NAMES = frozenset(
+    {
+        "astrolift_list_workflow_definitions",
+        "astrolift_get_workflow_definition",
+        "astrolift_list_workflows",
+        "astrolift_preview_workflow_manifest",
+        "astrolift_export_workflow_manifest",
+    }
+)
+
+_WORKFLOW_PAGE_PROPERTIES = {
+    "search": {"type": "string", "maxLength": 1024},
+    "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+    "cursor": {
+        "type": "string",
+        "maxLength": 4096,
+        "description": "Native next_cursor from the preceding page; malformed cursors restart the page.",
+    },
+}
+_DEFINITION_ID = {"type": "string", "format": "uuid"}
+
+
 MCP_TOOL_META: dict[str, dict[str, Any]] = {
+    "astrolift_list_workflow_definitions": {
+        "description": "Discover permitted native workflow definitions and stage topology, with search and pagination.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema({**_WORKFLOW_PAGE_PROPERTIES, "project_id": _DEFINITION_ID}),
+    },
+    "astrolift_get_workflow_definition": {
+        "description": "Review an exact workflow definition ID with its native revision and input-schema contract. Does not start a run.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema({"definition_id": _DEFINITION_ID}, required=("definition_id",)),
+    },
+    "astrolift_list_workflows": {
+        "description": "Discover permitted configured native workflows, inputs, bindings and trigger settings, with search and pagination.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema(_WORKFLOW_PAGE_PROPERTIES),
+    },
+    "astrolift_preview_workflow_manifest": {
+        "description": "Validate native Workflow TOML and preview its stages or structured parse errors. Does not save, enable or dispatch anything.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema({"toml": {"type": "string", "maxLength": 262144}}, required=("toml",)),
+    },
+    "astrolift_export_workflow_manifest": {
+        "description": "Export canonical native Workflow TOML for an exact permitted definition ID. Read-only; no slug substitution.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema({"definition_id": _DEFINITION_ID}, required=("definition_id",)),
+    },
     "astrolift_list_agents": {
         "description": "List registered agents and their source/package delivery state.",
         "scope": SCOPE_MCP_READ,

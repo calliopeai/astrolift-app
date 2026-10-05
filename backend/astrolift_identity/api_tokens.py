@@ -215,7 +215,7 @@ def token_scope_allows_permission(token, permission: str) -> bool:
         return True
     if SCOPE_SECRET_WRITE in scopes and permission in {"secret.write", "pipeline.secret_manage"}:
         return True
-    if SCOPE_MCP_READ in scopes and permission == "agent.read":
+    if SCOPE_MCP_READ in scopes and permission in {"agent.read", "workflow.read"}:
         return True
     if SCOPE_MCP_DISPATCH in scopes and permission in {
         "agent.dispatch",
@@ -303,7 +303,10 @@ SCOPE_CATALOG: tuple[ScopeInfo, ...] = (
         "Set, rotate and delete secrets without revealing them.",
     ),
     ScopeInfo(
-        SCOPE_MCP_READ, "MCP read", "agents", "List agent packages and inspect runs through remote MCP."
+        SCOPE_MCP_READ,
+        "MCP read",
+        "agents",
+        "Inspect agent packages, runs and native workflows; preview workflow manifests through remote MCP.",
     ),
     ScopeInfo(
         SCOPE_MCP_DISPATCH,
