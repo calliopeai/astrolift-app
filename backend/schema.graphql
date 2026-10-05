@@ -6767,6 +6767,7 @@ input ConfigureProviderPluginInput {
 
 type ConfiguredWorkflow {
   guid: String!
+  version: Int!
   name: String!
   slug: String!
   description: String!
@@ -8780,12 +8781,12 @@ type Mutation {
   """
   Update a configured Workflow by exact workflowId or legacy slug (bindings / inputs / trigger / enabled). A supplied slug must match its ID. definitionId or definitionSlug repoints it at another visible definition: the fallback for a versioned importWorkflowManifest(replace: true) (#1822), or any manual repoint. The existing stage_bindings must still validate against the new definition's stages, or the update is refused.
   """
-  updateWorkflow(slug: String = null, name: String = null, description: String = null, stageBindings: JSON = null, inputs: JSON = null, triggerKind: String = null, scheduleCron: String = null, isEnabled: Boolean = null, definitionSlug: String = null, orgId: ID = null, workflowId: GUID = null, definitionId: GUID = null): CreateWorkflowResult!
+  updateWorkflow(slug: String = null, name: String = null, description: String = null, stageBindings: JSON = null, inputs: JSON = null, triggerKind: String = null, scheduleCron: String = null, isEnabled: Boolean = null, definitionSlug: String = null, orgId: ID = null, workflowId: GUID = null, definitionId: GUID = null, expectedVersion: Int = null): CreateWorkflowResult!
 
   """
   Soft-delete a configured Workflow by exact workflowId or legacy slug and request schedule removal. A supplied slug must match its ID.
   """
-  deleteWorkflow(slug: String = null, orgId: ID = null, workflowId: GUID = null): WorkflowScheduleResult!
+  deleteWorkflow(slug: String = null, orgId: ID = null, workflowId: GUID = null, expectedVersion: Int = null): WorkflowScheduleResult!
 
   """Run a configured Workflow now via Temporal (spec 40 §3)."""
   runWorkflow(workflowId: ID!, inputs: JSON = null, orgId: ID = null): RunWorkflowResult!

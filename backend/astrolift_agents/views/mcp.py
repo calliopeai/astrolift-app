@@ -46,6 +46,10 @@ from astrolift_services.scopes import (
     managed_service_scope_by_guid,
     services_project_scope_by_guid,
 )
+from astrolift_workflows.configuration_targets import (
+    configuration_definition_scope,
+    configured_workflow_scope,
+)
 from astrolift_workflows.import_scopes import workflow_manifest_import_scope
 from astrolift_workflows.schedule_operations import workflow_schedule_scope
 from config.features import Feature, is_enabled
@@ -94,6 +98,10 @@ ANY_SCOPE = "any_scope"
 #: stands in for the target; the surface guardrail allows that only for the
 #: tools on its allowlist.
 TOOL_SCOPES: dict[str, Any] = {
+    "astrolift_get_workflow": configured_workflow_scope(Permission.WORKFLOW_READ),
+    "astrolift_create_workflow": configuration_definition_scope,
+    "astrolift_update_workflow": configured_workflow_scope(Permission.WORKFLOW_UPDATE),
+    "astrolift_delete_workflow": configured_workflow_scope(Permission.WORKFLOW_DELETE),
     "astrolift_get_workflow_schedule": workflow_schedule_scope(Permission.WORKFLOW_READ),
     "astrolift_reconcile_workflow_schedule": workflow_schedule_scope(Permission.WORKFLOW_UPDATE),
     "astrolift_start_workflow_definition": definition_scope_by_guid(),
@@ -1010,6 +1018,10 @@ def _deprovision_project_resource(request: HttpRequest, args: dict[str, Any]) ->
 
 
 _HANDLERS: dict[str, ToolHandler] = {
+    "astrolift_get_workflow": workflow_mcp.get_workflow,
+    "astrolift_create_workflow": workflow_mcp.create_workflow,
+    "astrolift_update_workflow": workflow_mcp.update_workflow,
+    "astrolift_delete_workflow": workflow_mcp.delete_workflow,
     "astrolift_start_workflow_definition": workflow_mcp.start_definition,
     "astrolift_get_workflow_start": workflow_mcp.get_start,
     "astrolift_list_workflow_runs": workflow_mcp.list_runs,

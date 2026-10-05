@@ -6376,6 +6376,7 @@ export type ConfiguredWorkflow = {
   slug: Scalars['String']['output'];
   stageBindings: Scalars['JSON']['output'];
   triggerKind: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
 };
 
 /** One page of a cursor-paginated or numbered list. */
@@ -8867,6 +8868,7 @@ export type MutationDeleteWebhookSubscriptionArgs = {
 
 
 export type MutationDeleteWorkflowArgs = {
+  expectedVersion?: InputMaybe<Scalars['Int']['input']>;
   orgId?: InputMaybe<Scalars['ID']['input']>;
   slug?: InputMaybe<Scalars['String']['input']>;
   workflowId?: InputMaybe<Scalars['GUID']['input']>;
@@ -10216,6 +10218,7 @@ export type MutationUpdateWorkflowArgs = {
   definitionId?: InputMaybe<Scalars['GUID']['input']>;
   definitionSlug?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
+  expectedVersion?: InputMaybe<Scalars['Int']['input']>;
   inputs?: InputMaybe<Scalars['JSON']['input']>;
   isEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;

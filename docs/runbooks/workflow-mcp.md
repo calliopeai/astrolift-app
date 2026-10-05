@@ -72,6 +72,47 @@ Successful persisted imports return the exact `definition_id`, actual
 validation failures set `isError: true` and preserve the full native envelope
 in both JSON text content and `structuredContent`.
 
+## Configure and maintain workflows
+
+| Tool | Authority and result |
+| --- | --- |
+| `astrolift_get_workflow` | `mcp:read` and owner `workflow.read`; exact `workflow_id` UUID, native configuration under `workflow` |
+| `astrolift_create_workflow` | `mcp:write`, `workflow:write` and owner `workflow.create`; exact `definition_id` and `name`, defaults to disabled |
+| `astrolift_update_workflow` | `mcp:write`, `workflow:write` and owner `workflow.update`; exact `workflow_id` and reviewed `expected_version` |
+| `astrolift_delete_workflow` | `mcp:write`, `workflow:write` and owner `workflow.delete`; exact `workflow_id` and reviewed `expected_version`, soft deletion |
+
+Read the returned workflow `version` before an edit or deletion. The assertion is
+checked after acquiring the native row lock. A stale version refuses the write;
+read again and reassess the changed configuration. Native GraphQL exposes the
+same optional `expectedVersion` argument for compatibility with existing callers;
+MCP requires it. An exact ID is never replaced by a same-slug object.
+
+Create and update accept native `stage_bindings`, `inputs`, `description`,
+`trigger_kind` (`manual` or `schedule`), `schedule_cron` and `is_enabled`.
+Binding values are objects keyed by stage order, for example
+`{"0":{"agent_workload_id":"<agent-guid>"}}`. The existing model validates their
+shape and agent resolution. Omitted update fields remain unchanged; `{}` clears
+inputs/bindings, `false` disables, and an empty cron string clears recurrence.
+Repointing with `definition_id` additionally requires create authority at the new
+definition's owner, and the bindings must still validate. Every call rechecks
+current target grants and token organization/team ceilings.
+
+Disabled preparation needs no dispatch scope. Any resulting active schedule,
+including an input-only edit to an already active configuration, additionally
+requires `mcp:dispatch`, `workflow:trigger` and native trigger permission. This is
+checked against the locked effective configuration before saving and again during
+post-save schedule reconciliation. Pausing and deleting do not need dispatch
+scope. Manual enablement configures the workflow but does not start a run.
+
+The tools return native `configuration_saved`, `workflow` (create/update) and
+`schedule` fields. Failure responses retain the full envelope in JSON text and
+`structuredContent`. A write can be saved while engine application fails: preserve
+the exact workflow ID, version and observation, inspect the current state and use
+the schedule recovery tools. A successful soft delete alone does not establish
+schedule absence. See [configuration and schedule recovery](workflow-configuration.md).
+Create has no request-key idempotency contract; inspect existing configurations
+after a lost response instead of blindly creating another one.
+
 ## Reviewed execution and recovery
 
 | Tool | Required token scopes and permission | Result |

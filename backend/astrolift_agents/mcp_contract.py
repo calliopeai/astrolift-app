@@ -37,6 +37,10 @@ WORKFLOW_TOOL_NAMES = frozenset(
         "astrolift_list_workflow_definitions",
         "astrolift_get_workflow_definition",
         "astrolift_list_workflows",
+        "astrolift_get_workflow",
+        "astrolift_create_workflow",
+        "astrolift_update_workflow",
+        "astrolift_delete_workflow",
         "astrolift_preview_workflow_manifest",
         "astrolift_export_workflow_manifest",
         "astrolift_import_workflow_manifest",
@@ -61,6 +65,23 @@ _WORKFLOW_PAGE_PROPERTIES = {
     },
 }
 _DEFINITION_ID = {"type": "string", "format": "uuid"}
+_CONFIGURATION_VERSION = {"type": "integer", "minimum": 1, "maximum": 2147483647}
+_WORKFLOW_CONFIGURATION = {
+    "name": {"type": "string", "minLength": 1, "maxLength": 255},
+    "description": {"type": "string", "maxLength": 65536},
+    "stage_bindings": {
+        "type": "object",
+        "description": "Native stage-order keys mapped to binding objects, including agent_workload_id; validated by the workflow model.",
+    },
+    "inputs": {"type": "object"},
+    "trigger_kind": {"type": "string", "enum": ["manual", "schedule"]},
+    "schedule_cron": {
+        "type": "string",
+        "maxLength": 1024,
+        "description": "Native cron expression; empty string clears it.",
+    },
+    "is_enabled": {"type": "boolean"},
+}
 _EXECUTION_ID = {
     "type": "string",
     "minLength": 1,
@@ -76,6 +97,61 @@ _START_REQUEST_ID = {
 
 
 MCP_TOOL_META: dict[str, dict[str, Any]] = {
+    "astrolift_get_workflow": {
+        "description": "Read one exact configured workflow ID, including its configuration version, bindings, inputs and recent runs.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema({"workflow_id": _DEFINITION_ID}, required=("workflow_id",)),
+    },
+    "astrolift_create_workflow": {
+        "description": (
+            "Configure an exact visible definition ID. Defaults to disabled; does not start a run. "
+            "Active schedules additionally require mcp:dispatch and workflow:trigger. "
+            "Retain configuration_saved and schedule results even on failure; do not blindly retry creation."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WORKFLOW_WRITE,),
+        "permission": Permission.WORKFLOW_CREATE,
+        "inputSchema": _schema(
+            {
+                **_WORKFLOW_CONFIGURATION,
+                "definition_id": _DEFINITION_ID,
+                "slug": {"type": "string", "maxLength": 255},
+                "is_enabled": {"type": "boolean", "default": False},
+            },
+            required=("definition_id", "name"),
+        ),
+    },
+    "astrolift_update_workflow": {
+        "description": (
+            "Edit an exact configured workflow at its reviewed version. Omitted fields remain unchanged. "
+            "Repointing a definition also requires create permission at the new owner. "
+            "Any resulting active schedule requires mcp:dispatch and workflow:trigger, including edits to inputs. "
+            "A saved configuration is separate from confirmed engine state; inspect and reconcile uncertain results."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WORKFLOW_WRITE,),
+        "permission": Permission.WORKFLOW_UPDATE,
+        "inputSchema": _schema(
+            {
+                **_WORKFLOW_CONFIGURATION,
+                "workflow_id": _DEFINITION_ID,
+                "definition_id": _DEFINITION_ID,
+                "expected_version": _CONFIGURATION_VERSION,
+            },
+            required=("workflow_id", "expected_version"),
+        ),
+    },
+    "astrolift_delete_workflow": {
+        "description": "Soft-delete an exact configured workflow at its reviewed version and request schedule cleanup. Preserve the returned schedule identity even when cleanup is unconfirmed.",
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WORKFLOW_WRITE,),
+        "permission": Permission.WORKFLOW_DELETE,
+        "inputSchema": _schema(
+            {"workflow_id": _DEFINITION_ID, "expected_version": _CONFIGURATION_VERSION},
+            required=("workflow_id", "expected_version"),
+        ),
+    },
     "astrolift_get_workflow_schedule": {
         "description": "Inspect engine-confirmed schedule state for an exact configured workflow ID, including pending cleanup after deletion.",
         "scope": SCOPE_MCP_READ,

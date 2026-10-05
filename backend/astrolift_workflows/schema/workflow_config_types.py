@@ -155,6 +155,7 @@ class ConfiguredWorkflowType:
     entitlement gates."""
 
     guid: str
+    version: int
     name: str
     slug: str
     description: str
@@ -350,6 +351,7 @@ def workflow_to_type(workflow, *, with_runs: bool = False) -> ConfiguredWorkflow
         ]
     return ConfiguredWorkflowType(
         guid=str(workflow.guid),
+        version=workflow.version,
         name=workflow.name,
         slug=workflow.slug or "",
         description=workflow.description or "",

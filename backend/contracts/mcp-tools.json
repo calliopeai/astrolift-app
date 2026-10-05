@@ -17,6 +17,185 @@
   },
   "tools": [
     {
+      "description": "Read one exact configured workflow ID, including its configuration version, bindings, inputs and recent runs.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "workflow_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_get_workflow",
+      "required_permissions": [
+        "workflow.read"
+      ],
+      "required_scopes": [
+        "mcp:read"
+      ]
+    },
+    {
+      "description": "Configure an exact visible definition ID. Defaults to disabled; does not start a run. Active schedules additionally require mcp:dispatch and workflow:trigger. Retain configuration_saved and schedule results even on failure; do not blindly retry creation.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "definition_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 65536,
+            "type": "string"
+          },
+          "inputs": {
+            "type": "object"
+          },
+          "is_enabled": {
+            "default": false,
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "schedule_cron": {
+            "description": "Native cron expression; empty string clears it.",
+            "maxLength": 1024,
+            "type": "string"
+          },
+          "slug": {
+            "maxLength": 255,
+            "type": "string"
+          },
+          "stage_bindings": {
+            "description": "Native stage-order keys mapped to binding objects, including agent_workload_id; validated by the workflow model.",
+            "type": "object"
+          },
+          "trigger_kind": {
+            "enum": [
+              "manual",
+              "schedule"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "definition_id",
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_create_workflow",
+      "required_permissions": [
+        "workflow.create"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "workflow:write"
+      ]
+    },
+    {
+      "description": "Edit an exact configured workflow at its reviewed version. Omitted fields remain unchanged. Repointing a definition also requires create permission at the new owner. Any resulting active schedule requires mcp:dispatch and workflow:trigger, including edits to inputs. A saved configuration is separate from confirmed engine state; inspect and reconcile uncertain results.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "definition_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "description": {
+            "maxLength": 65536,
+            "type": "string"
+          },
+          "expected_version": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "inputs": {
+            "type": "object"
+          },
+          "is_enabled": {
+            "type": "boolean"
+          },
+          "name": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "schedule_cron": {
+            "description": "Native cron expression; empty string clears it.",
+            "maxLength": 1024,
+            "type": "string"
+          },
+          "stage_bindings": {
+            "description": "Native stage-order keys mapped to binding objects, including agent_workload_id; validated by the workflow model.",
+            "type": "object"
+          },
+          "trigger_kind": {
+            "enum": [
+              "manual",
+              "schedule"
+            ],
+            "type": "string"
+          },
+          "workflow_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow_id",
+          "expected_version"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_update_workflow",
+      "required_permissions": [
+        "workflow.update"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "workflow:write"
+      ]
+    },
+    {
+      "description": "Soft-delete an exact configured workflow at its reviewed version and request schedule cleanup. Preserve the returned schedule identity even when cleanup is unconfirmed.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_version": {
+            "maximum": 2147483647,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "workflow_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow_id",
+          "expected_version"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_delete_workflow",
+      "required_permissions": [
+        "workflow.delete"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "workflow:write"
+      ]
+    },
+    {
       "description": "Inspect engine-confirmed schedule state for an exact configured workflow ID, including pending cleanup after deletion.",
       "inputSchema": {
         "additionalProperties": false,

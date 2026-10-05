@@ -576,7 +576,7 @@ class WorkflowsMutation:
 
             wf.schedule_managed = schedule_inactive_reason(wf) is None
             if wf.schedule_managed:
-                authorize_schedule(wf, Permission.WORKFLOW_CREATE)
+                _configuration_authorizer(info, Permission.WORKFLOW_CREATE)(wf)
             try:
                 # Model.save validates bindings (every agent_dispatch stage resolves).
                 wf.save()
@@ -590,7 +590,7 @@ class WorkflowsMutation:
                     ok=False, errors=[ValidationError(field="slug", messages=[str(e)])]
                 )
 
-        return _configured_schedule_result(wf, Permission.WORKFLOW_CREATE)
+        return _configured_schedule_result(wf, Permission.WORKFLOW_CREATE, info)
 
     @strawberry.mutation(
         description=(
@@ -620,6 +620,7 @@ class WorkflowsMutation:
         org_id: strawberry.ID | None = None,
         workflow_id: GUID | None = None,  # type: ignore[valid-type]
         definition_id: GUID | None = None,  # type: ignore[valid-type]
+        expected_version: int | None = None,
     ) -> CreateWorkflowResult:
         from django.core.exceptions import ValidationError as DjangoValidationError
 
@@ -677,6 +678,19 @@ class WorkflowsMutation:
                 Permission.WORKFLOW_UPDATE,
                 scope=reviewed_definition_scope(wf.definition, org.pk, permission=Permission.WORKFLOW_UPDATE),
             )
+            if expected_version is not None and (
+                isinstance(expected_version, bool) or expected_version < 1 or wf.version != expected_version
+            ):
+                return CreateWorkflowResult(
+                    ok=False,
+                    errors=[
+                        ValidationError(
+                            field="expected_version",
+                            messages=["Workflow configuration changed; inspect it again before editing."],
+                        )
+                    ],
+                )
+
             from workflows.schedule_sync import schedule_inactive_reason
 
             previously_active = schedule_inactive_reason(wf) is None
@@ -715,7 +729,7 @@ class WorkflowsMutation:
             active = schedule_inactive_reason(wf) is None
             wf.schedule_managed = wf.schedule_managed or previously_active or active
             if active:
-                authorize_schedule(wf)
+                _configuration_authorizer(info, Permission.WORKFLOW_UPDATE)(wf)
             try:
                 wf.save()
             except DjangoValidationError as e:
@@ -723,7 +737,7 @@ class WorkflowsMutation:
                     ok=False, errors=[ValidationError(field="stage_bindings", messages=list(e.messages))]
                 )
 
-        return _configured_schedule_result(wf, Permission.WORKFLOW_UPDATE)
+        return _configured_schedule_result(wf, Permission.WORKFLOW_UPDATE, info)
 
     @strawberry.mutation(
         description="Soft-delete a configured Workflow by exact workflowId or legacy slug and request schedule removal. A supplied slug must match its ID."
@@ -738,6 +752,7 @@ class WorkflowsMutation:
         slug: str | None = None,
         org_id: strawberry.ID | None = None,
         workflow_id: GUID | None = None,  # type: ignore[valid-type]
+        expected_version: int | None = None,
     ) -> WorkflowScheduleResult:
         from django.utils import timezone
 
@@ -762,6 +777,19 @@ class WorkflowsMutation:
                 Permission.WORKFLOW_DELETE,
                 scope=reviewed_definition_scope(wf.definition, org.pk, permission=Permission.WORKFLOW_DELETE),
             )
+            if expected_version is not None and (
+                isinstance(expected_version, bool) or expected_version < 1 or wf.version != expected_version
+            ):
+                return WorkflowScheduleResult(
+                    ok=False,
+                    errors=[
+                        ValidationError(
+                            field="expected_version",
+                            messages=["Workflow configuration changed; inspect it again before editing."],
+                        )
+                    ],
+                )
+
             from workflows.schedule_sync import schedule_inactive_reason
 
             wf.schedule_managed = wf.schedule_managed or schedule_inactive_reason(wf) is None
@@ -771,7 +799,7 @@ class WorkflowsMutation:
                 update_fields=["deleted_at", "deleted_by", "updated_at", "version", "schedule_managed"],
                 skip_binding_validation=True,
             )
-        result = _configured_schedule_result(wf, Permission.WORKFLOW_DELETE)
+        result = _configured_schedule_result(wf, Permission.WORKFLOW_DELETE, info)
         return WorkflowScheduleResult(
             ok=result.ok, errors=result.errors, configuration_saved=True, schedule=result.schedule
         )
@@ -1090,13 +1118,23 @@ class WorkflowsMutation:
         return MutationResult.success()
 
 
-def _configured_schedule_result(workflow, permission):
+def _configuration_authorizer(info, permission):
+    def authorize(current):
+        from workflows.schedule_sync import schedule_inactive_reason
+
+        authorize_schedule(current, permission)
+        activation_check = getattr(info.context, "workflow_activation_check", None)
+        if schedule_inactive_reason(current) is None and activation_check is not None:
+            activation_check()
+
+    return authorize
+
+
+def _configured_schedule_result(workflow, permission, info):
     from workflows.schedule_sync import sync_workflow_schedule, unrequested_schedule
 
     if workflow.schedule_managed:
-        observed = sync_workflow_schedule(
-            workflow, authorize=lambda current: authorize_schedule(current, permission)
-        )
+        observed = sync_workflow_schedule(workflow, authorize=_configuration_authorizer(info, permission))
     else:
         observed = unrequested_schedule(workflow)
     ok = observed.confirmed or observed.observed_state == "not_requested"
