@@ -82,6 +82,29 @@
       ]
     },
     {
+      "description": "Recover the caller's visible task by dispatch request UUID without dispatching. Returns task: null when no accessible task matches.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "client_request_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_request_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_get_task_by_client_request_id",
+      "required_permissions": [
+        "agent.read"
+      ],
+      "required_scopes": [
+        "mcp:read"
+      ]
+    },
+    {
       "description": "Discover agent runs, lifecycle and runtime placement, newest first, with pagination.",
       "inputSchema": {
         "additionalProperties": false,
@@ -139,6 +162,11 @@
         "additionalProperties": false,
         "properties": {
           "agent_slug": {
+            "type": "string"
+          },
+          "client_request_id": {
+            "description": "Persist a UUID before dispatch. Reusing it with the same request returns the same task for this organization and requester; changed inputs conflict.",
+            "format": "uuid",
             "type": "string"
           },
           "environment_spec_id": {
