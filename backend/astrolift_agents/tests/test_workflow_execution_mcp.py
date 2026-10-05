@@ -11,7 +11,7 @@ from asgiref.sync import sync_to_async
 from django.utils import timezone
 from temporalio.client import WorkflowFailureError
 
-from astrolift_agents.mcp_contract import WORKFLOW_TOOL_NAMES
+from astrolift_agents.mcp_contract import MCP_TOOL_META, WORKFLOW_TOOL_NAMES
 from astrolift_agents.tests.test_fleet_scopes_1745 import no_opensearch as no_opensearch
 from astrolift_agents.tests.test_workflow_mcp import data, rpc, tool
 from astrolift_agents.tests.test_workflow_mcp import mcp as mcp_fixture
@@ -106,9 +106,14 @@ def recorded_run(execution, definition=None, **values):
 
 def test_capabilities_require_both_native_trigger_and_mcp_dispatch(execution):
     writes = {"astrolift_start_workflow_definition", "astrolift_control_workflow_execution"}
-    assert WORKFLOW_TOOL_NAMES <= {
-        row["name"] for row in rpc(execution, "tools/list").json()["result"]["tools"]
+    execution_tools = {
+        name
+        for name in WORKFLOW_TOOL_NAMES
+        if MCP_TOOL_META[name]["scope"] in {SCOPE_MCP_READ, SCOPE_MCP_DISPATCH}
     }
+    names = {row["name"] for row in rpc(execution, "tools/list").json()["result"]["tools"]}
+    assert execution_tools <= names
+    assert "astrolift_import_workflow_manifest" not in names
     args = reviewed_args(execution)
     for scopes in ([SCOPE_MCP_READ, SCOPE_MCP_DISPATCH], [SCOPE_MCP_READ, SCOPE_WORKFLOW_TRIGGER]):
         execution.token.scopes = scopes

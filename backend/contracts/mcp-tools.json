@@ -393,6 +393,42 @@
       ]
     },
     {
+      "description": "Import native Workflow TOML into the organization or an explicit project. Defaults to preview only; set preview=false to persist a disabled new definition and receive its exact ID. replace=true updates the same-slug definition or versions it and repoints compatible configured workflows, retaining owner and enabled state. Replacement can affect future scheduled runs. Never transfers ownership or starts a run. A new import may uniquify its slug; do not blindly retry writes.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "preview": {
+            "default": true,
+            "type": "boolean"
+          },
+          "project_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "replace": {
+            "default": false,
+            "type": "boolean"
+          },
+          "toml": {
+            "maxLength": 262144,
+            "type": "string"
+          }
+        },
+        "required": [
+          "toml"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_import_workflow_manifest",
+      "required_permissions": [
+        "workflow.create"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "workflow:write"
+      ]
+    },
+    {
       "description": "List registered agents and their source/package delivery state.",
       "inputSchema": {
         "additionalProperties": false,

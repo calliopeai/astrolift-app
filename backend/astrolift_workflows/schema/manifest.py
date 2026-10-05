@@ -13,7 +13,7 @@ Two read surfaces for the builder's Code view (§5.1) plus the write path:
   surface (#970/#972): ``preview = true`` mirrors the preview query;
   ``preview = false`` persists via the same
   :func:`workflows.manifest.create_definition_from_manifest` routine the
-  visual-flow importers use, always into the caller's org (never global).
+  visual-flow importers use, into the caller's org or an explicit project (never global).
 
 Reads are ``WORKFLOW_READ``-gated, the import is ``WORKFLOW_CREATE``-gated;
 all are ``@tenant_scoped``.
@@ -24,10 +24,12 @@ from __future__ import annotations
 import strawberry
 from strawberry.types import Info
 
+from astrolift_graphql import GUID
 from astrolift_manifest.parser import ManifestError
 from astrolift_workflows.import_scopes import (
     import_definition_owner_scope,
     manifest_destination_scope,
+    resolve_import_project,
     workflow_manifest_import_scope,
 )
 from core.decorators import tenant_scoped
@@ -203,6 +205,7 @@ class ImportWorkflowManifestResult(MutationResult):
     """
 
     created_slug: str | None = None
+    definition_id: GUID | None = None  # type: ignore[valid-type]  # Strawberry's runtime scalar wraps str.
     manifest: WorkflowManifestPreviewType | None = None
     mode: str | None = None
     repointed_slugs: list[str] = strawberry.field(default_factory=list)
@@ -214,14 +217,14 @@ class WorkflowManifestMutation:
         description=(
             "Import a workflow manifest TOML. preview=true (default) returns "
             "the parsed shape without persisting; preview=false creates a "
-            "disabled, org-scoped WorkflowDefinition + stages in the caller's "
-            "org and returns the (possibly uniquified) slug. replace=true "
+            "disabled WorkflowDefinition + stages in the caller's org, optionally "
+            "owned by projectId, and returns its exact ID and (possibly uniquified) slug. replace=true "
             "instead upserts the org's own definition sharing the manifest's "
             "slug: in place when the stage kinds are unchanged (configured "
             "Workflows, bindings and schedules all keep working untouched), "
             "otherwise as a new version with every configured Workflow "
             "repointed to it, or a clear refusal when a repoint would break "
-            "one's bindings."
+            "one's bindings. Replacement preserves ownership; projectId cannot transfer it."
         )
     )
     @require_permission(Permission.WORKFLOW_CREATE, scope=workflow_manifest_import_scope)
@@ -233,6 +236,7 @@ class WorkflowManifestMutation:
         preview: bool = True,
         replace: bool = False,
         org_id: strawberry.ID | None = None,
+        project_id: GUID | None = None,  # type: ignore[valid-type]
     ) -> ImportWorkflowManifestResult:
         try:
             parsed = parse_workflow_manifest(toml)
@@ -253,24 +257,43 @@ class WorkflowManifestMutation:
             return ImportWorkflowManifestResult(ok=err.ok, errors=err.errors)
 
         if replace:
-            return _import_replace(info, parsed, org)
+            try:
+                return _import_replace(info, parsed, org, project_id=project_id)
+            except ManifestError as exc:
+                return ImportWorkflowManifestResult(
+                    ok=False, errors=[ValidationError(field=exc.path or "toml", messages=[str(exc)])]
+                )
 
         from django.db import transaction
 
         from workflows.manifest import create_definition_from_manifest
 
         with transaction.atomic():
+            check_permission(
+                Permission.WORKFLOW_CREATE,
+                scope=manifest_destination_scope(None, project_id),
+            )
             definition = create_definition_from_manifest(
-                parsed, organization=org, created_by=info.context.user
+                parsed,
+                organization=org,
+                created_by=info.context.user,
+                project=resolve_import_project(project_id),
             )
 
         manifest_type = _preview_type(parsed)
         # Report the slug that actually persisted (uniquified on collision).
         manifest_type.definition.slug = definition.slug
-        return ImportWorkflowManifestResult(ok=True, created_slug=definition.slug, manifest=manifest_type)
+        return ImportWorkflowManifestResult(
+            ok=True,
+            created_slug=definition.slug,
+            definition_id=GUID(str(definition.guid)),
+            manifest=manifest_type,
+        )
 
 
-def _import_replace(info: Info, parsed: ParsedWorkflowManifest, org) -> ImportWorkflowManifestResult:
+def _import_replace(
+    info: Info, parsed: ParsedWorkflowManifest, org, *, project_id=None
+) -> ImportWorkflowManifestResult:
     """``importWorkflowManifest(replace: true)`` (#1822): upsert the org's
     own definition sharing ``parsed.definition.slug``. See
     ``workflows.manifest.replace_definition_from_manifest`` for the
@@ -302,8 +325,7 @@ def _import_replace(info: Info, parsed: ParsedWorkflowManifest, org) -> ImportWo
             .first()
         )
         if existing is not None:
-            # Freeze the shape before deciding whether this writes a project
-            # recipe or creates a new organization version.
+            # Freeze the stage shape before replacing content or versioning it.
             list(
                 existing.stages.select_for_update()
                 .filter(deleted_at__isnull=True)
@@ -318,12 +340,14 @@ def _import_replace(info: Info, parsed: ParsedWorkflowManifest, org) -> ImportWo
                 Permission.WORKFLOW_UPDATE,
                 scope=import_definition_owner_scope(existing, permission=Permission.WORKFLOW_UPDATE),
             )
-        check_permission(Permission.WORKFLOW_CREATE, scope=manifest_destination_scope(parsed, existing))
+        check_permission(Permission.WORKFLOW_CREATE, scope=manifest_destination_scope(existing, project_id))
         if existing is None:
             # A concurrent new same-slug row must never become an unchecked
             # replacement target; normal create only uniquifies its slug.
             outcome = ReplaceOutcome(
-                definition=create_definition_from_manifest(parsed, organization=org, created_by=user),
+                definition=create_definition_from_manifest(
+                    parsed, organization=org, created_by=user, project=resolve_import_project(project_id)
+                ),
                 mode="created",
             )
         else:
@@ -337,10 +361,12 @@ def _import_replace(info: Info, parsed: ParsedWorkflowManifest, org) -> ImportWo
         return ImportWorkflowManifestResult(ok=False, errors=errors)
 
     manifest_type = _preview_type(parsed)
+    assert outcome.definition is not None
     manifest_type.definition.slug = outcome.definition.slug
     return ImportWorkflowManifestResult(
         ok=True,
         created_slug=outcome.definition.slug,
+        definition_id=GUID(str(outcome.definition.guid)),
         manifest=manifest_type,
         mode=outcome.mode,
         repointed_slugs=outcome.repointed_slugs,

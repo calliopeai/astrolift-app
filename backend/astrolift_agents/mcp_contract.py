@@ -12,6 +12,7 @@ from astrolift_identity.api_tokens import (
     SCOPE_PROJECT_WRITE,
     SCOPE_READ_APPS,
     SCOPE_WORKFLOW_TRIGGER,
+    SCOPE_WORKFLOW_WRITE,
 )
 from core.permissions import Permission
 
@@ -38,6 +39,7 @@ WORKFLOW_TOOL_NAMES = frozenset(
         "astrolift_list_workflows",
         "astrolift_preview_workflow_manifest",
         "astrolift_export_workflow_manifest",
+        "astrolift_import_workflow_manifest",
         "astrolift_start_workflow_definition",
         "astrolift_get_workflow_start",
         "astrolift_list_workflow_runs",
@@ -195,6 +197,27 @@ MCP_TOOL_META: dict[str, dict[str, Any]] = {
         "scope": SCOPE_MCP_READ,
         "permission": Permission.WORKFLOW_READ,
         "inputSchema": _schema({"definition_id": _DEFINITION_ID}, required=("definition_id",)),
+    },
+    "astrolift_import_workflow_manifest": {
+        "description": (
+            "Import native Workflow TOML into the organization or an explicit project. Defaults to "
+            "preview only; set preview=false to persist a disabled new definition and receive its exact ID. "
+            "replace=true updates the same-slug definition or versions it and repoints compatible configured "
+            "workflows, retaining owner and enabled state. Replacement can affect future scheduled runs. "
+            "Never transfers ownership or starts a run. A new import may uniquify its slug; do not blindly retry writes."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WORKFLOW_WRITE,),
+        "permission": Permission.WORKFLOW_CREATE,
+        "inputSchema": _schema(
+            {
+                "toml": {"type": "string", "maxLength": 262144},
+                "preview": {"type": "boolean", "default": True},
+                "replace": {"type": "boolean", "default": False},
+                "project_id": {"type": "string", "format": "uuid"},
+            },
+            required=("toml",),
+        ),
     },
     "astrolift_list_agents": {
         "description": "List registered agents and their source/package delivery state.",

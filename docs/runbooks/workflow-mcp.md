@@ -40,6 +40,38 @@ The discovery and preview tools are read-only: preview/export do not create or
 enable definitions, configure schedules, dispatch agents, start Temporal
 executions, or approve human gates.
 
+## Import into an organization or project
+
+`astrolift_import_workflow_manifest` requires both `mcp:write` and
+`workflow:write`, plus `workflow.create` at the actual destination. Pass
+`toml` (at most 262,144 characters) and optionally an exact `project_id` UUID.
+The project and its team must be live in the credential's organization; selected
+headers cannot supply or expand the destination. Without `project_id`, a new
+import is organization-owned and requires organization-level create authority.
+
+`preview` defaults to true and returns the native parsed manifest without
+writing. Set `preview: false` to persist. Save the returned `definition_id`
+and `created_slug`, then review the exact ID with
+`astrolift_get_workflow_definition`. New definitions are disabled; import does
+not start an execution or configure a schedule. A slug collision is uniquified,
+so a new import is not an idempotent operation: inspect definitions after a lost
+response instead of blindly retrying the write.
+
+`replace: true` requires `workflow.update` on the existing same-slug definition
+as well as create authority. Compatible stages update in place; changed shapes
+create a new version and repoint configured workflows only if their bindings
+remain valid. A blocked replacement rolls back the candidate version entirely.
+Replacement retains the existing project and enabled state; an explicit
+`project_id` that differs from the existing owner is refused. Source-managed
+definitions retain the native write restrictions. Replacing an enabled workflow
+can change future scheduled runs, so review the replacement before persisting.
+
+Successful persisted imports return the exact `definition_id`, actual
+`created_slug`, parsed `manifest`, and, for replacements, `mode` and
+`repointed_slugs`. Preview and failure responses have no persisted ID. Native
+validation failures set `isError: true` and preserve the full native envelope
+in both JSON text content and `structuredContent`.
+
 ## Reviewed execution and recovery
 
 | Tool | Required token scopes and permission | Result |
@@ -90,6 +122,6 @@ execution. A successful `requested` response acknowledges delivery, so inspect
 again for engine-confirmed closure and cleanup progress. A delayed control for
 one incarnation cannot select a newer execution that reuses the workflow ID.
 
-Native definition import/configuration/bindings and independent human-gate
+Native configured-workflow authoring/bindings and independent human-gate
 decision adapters remain tracked in #2283. Execution authority does not grant
 human approval authority.
