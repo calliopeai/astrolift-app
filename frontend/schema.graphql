@@ -7647,6 +7647,27 @@ type HuggingFaceModelsPage {
   source: String!
 }
 
+type HumanGateDecisionResult {
+  ok: Boolean!
+  errors: [ValidationError!]!
+  gate: HumanGateDecisionState
+}
+
+type HumanGateDecisionState {
+  executionGuid: String!
+  stageExecutionGuid: String!
+  stageGuid: String!
+  temporalExecution: WorkflowStageTemporalExecution
+  stageStatus: String!
+  runStatus: String!
+  requestState: String!
+  requestedDecision: String
+  recordedDecision: String
+  note: String!
+  decidedByMe: Boolean
+  observationError: String!
+}
+
 type ImportGapType {
   code: String!
   message: String!
@@ -8770,6 +8791,11 @@ type Mutation {
   """
   importWorkflowManifest(toml: String!, preview: Boolean! = true, replace: Boolean! = false, orgId: ID = null, projectId: GUID = null): ImportWorkflowManifestResult!
 
+  """
+  Submit an explicit user decision to one exact human gate. Recover by the same execution and stage IDs after an uncertain response.
+  """
+  decideHumanGate(executionId: ID!, stageExecutionId: ID!, temporalRunId: String!, decision: String!, confirmed: Boolean!, note: String! = ""): HumanGateDecisionResult!
+
   """Cancel, terminate, or retry cleanup for an exact owned execution."""
   controlWorkflowExecution(executionId: ID!, workflowId: String!, runId: String!, action: String!, reason: String! = ""): WorkflowExecutionControlResult!
 
@@ -8954,6 +8980,23 @@ type PendingHumanGate {
   stageRole: String!
   stageApprovers: [String!]!
   startedAt: DateTime
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type PendingHumanGatePage {
+  items: [PendingHumanGate!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
 }
 
 type PermissionComparison {
@@ -9542,6 +9585,16 @@ type Query {
   workflowStageExecutions(workflowId: String!, runId: String!): [WorkflowStageExecutionType!]!
   previewWorkflowManifest(toml: String!): WorkflowManifestPreviewType!
   exportWorkflowManifest(definitionSlug: String!): WorkflowManifestExportType!
+
+  """
+  Page through open gates. Named-approver filtering can produce an empty page with a next cursor; continue until nextCursor is null.
+  """
+  pendingHumanGatesPage(limit: Int! = 50, after: String = null): PendingHumanGatePage!
+
+  """
+  Recover a human decision by exact execution and stage GUIDs without resubmitting it.
+  """
+  humanGateDecision(executionId: ID!, stageExecutionId: ID!): HumanGateDecisionState
 
   """
   Observe a configured workflow's exact schedule identity, desired version and engine state, including cleanup after soft deletion.

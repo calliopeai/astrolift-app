@@ -38,6 +38,7 @@ from astrolift_workflows.schedule_operations import (
     workflow_schedule_scope,
 )
 from astrolift_workflows.schema.execution_types import WorkflowExecutionControlResult, WorkflowExecutionType
+from astrolift_workflows.schema.human_gate_types import HumanGateDecisionResult
 from astrolift_workflows.schema.schedule_types import (
     WorkflowScheduleResult,
     WorkflowScheduleState,
@@ -395,6 +396,56 @@ def _resolve_execution_id(raw: object, workflow_id: str) -> str | None:
 
 @strawberry.type
 class WorkflowsMutation:
+    @strawberry.mutation(
+        description="Submit an explicit user decision to one exact human gate. Recover by the same execution and stage IDs after an uncertain response."
+    )
+    @require_permission(
+        Permission.WORKFLOW_TRIGGER,
+        scope=execution_scope_by_id(permission=Permission.WORKFLOW_TRIGGER),
+        operation=execution_operation,
+    )
+    @tenant_scoped()
+    def decide_human_gate(
+        self,
+        info: Info,
+        execution_id: strawberry.ID,
+        stage_execution_id: strawberry.ID,
+        temporal_run_id: str,
+        decision: str,
+        confirmed: bool,
+        note: str = "",
+    ) -> HumanGateDecisionResult:
+        from astrolift_workflows.human_gates import decide_gate, find_gate
+
+        row = find_gate(info.context.user, execution_id, stage_execution_id)
+        if row is None:
+            return HumanGateDecisionResult(
+                ok=False,
+                errors=[
+                    ValidationError(
+                        field="stageExecutionId", messages=["Human gate not found or not permitted"]
+                    )
+                ],
+            )
+        try:
+            state, error = decide_gate(
+                row,
+                info.context.user,
+                decision=decision,
+                note=note,
+                confirmed=confirmed,
+                temporal_run_id=temporal_run_id,
+            )
+        except (ValueError, TypeError) as exc:
+            return HumanGateDecisionResult(
+                ok=False, errors=[ValidationError(field="decision", messages=[str(exc)])]
+            )
+        return HumanGateDecisionResult(
+            ok=not error,
+            gate=state,
+            errors=[ValidationError(field="decision", messages=[error])] if error else [],
+        )
+
     """Configured-Workflow write surface (spec 40 §3/§6). Every resolver is
     ``WORKFLOW_*``-gated + ``@tenant_scoped`` and applies a real caller-org
     filter in the body (#1042). Definition + stage CREATE / clone + the

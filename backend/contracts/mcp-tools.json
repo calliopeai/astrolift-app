@@ -527,6 +527,113 @@
       ]
     },
     {
+      "description": "Page through open gates the authenticated caller may decide. Continue next_cursor even on an empty filtered page. Returns public stage/run GUIDs and captured Temporal identities. Named addresses restrict approvers; role/team references defer to workflow.trigger authority.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "limit": {
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "name": "astrolift_list_human_gates",
+      "required_permissions": [
+        "workflow.trigger"
+      ],
+      "required_scopes": [
+        "mcp:read",
+        "workflow:trigger"
+      ]
+    },
+    {
+      "description": "Recover a decision for an exact gate without sending another request. Distinguishes requested, recorded, closed, unbound and unknown states. Requested does not prove the workflow advanced.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "execution_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "stage_execution_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "execution_id",
+          "stage_execution_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_get_human_gate_decision",
+      "required_permissions": [
+        "workflow.trigger"
+      ],
+      "required_scopes": [
+        "mcp:read",
+        "workflow:trigger"
+      ]
+    },
+    {
+      "description": "Submit the user's explicit approved/rejected decision to an exact reviewed human gate. Requires confirmed=true; never infer approval from the agent's assessment. The server attributes the authenticated caller, not an impersonated user. Recover uncertain responses with get_human_gate_decision. A conflicting retry cannot replace the accepted decision. Requires workers supporting durable gate updates.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmed": {
+            "const": true,
+            "type": "boolean"
+          },
+          "decision": {
+            "enum": [
+              "approved",
+              "rejected"
+            ],
+            "type": "string"
+          },
+          "execution_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "note": {
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "stage_execution_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "temporal_run_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "execution_id",
+          "stage_execution_id",
+          "temporal_run_id",
+          "decision",
+          "confirmed"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_decide_human_gate",
+      "required_permissions": [
+        "workflow.trigger"
+      ],
+      "required_scopes": [
+        "mcp:dispatch",
+        "workflow:trigger"
+      ]
+    },
+    {
       "description": "Discover permitted native workflow definitions and stage topology, with search and pagination.",
       "inputSchema": {
         "additionalProperties": false,

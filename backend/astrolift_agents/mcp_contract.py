@@ -51,6 +51,9 @@ WORKFLOW_TOOL_NAMES = frozenset(
         "astrolift_get_workflow_execution",
         "astrolift_list_workflow_execution_stages",
         "astrolift_control_workflow_execution",
+        "astrolift_list_human_gates",
+        "astrolift_get_human_gate_decision",
+        "astrolift_decide_human_gate",
         "astrolift_get_workflow_schedule",
         "astrolift_reconcile_workflow_schedule",
     }
@@ -288,6 +291,45 @@ MCP_TOOL_META: dict[str, dict[str, Any]] = {
                 "reason": {"type": "string", "maxLength": 2048},
             },
             required=("execution_id", "workflow_id", "run_id", "action"),
+        ),
+    },
+    "astrolift_list_human_gates": {
+        "description": "Page through open gates the authenticated caller may decide. Continue next_cursor even on an empty filtered page. Returns public stage/run GUIDs and captured Temporal identities. Named addresses restrict approvers; role/team references defer to workflow.trigger authority.",
+        "scope": SCOPE_MCP_READ,
+        "additional_scopes": (SCOPE_WORKFLOW_TRIGGER,),
+        "permission": Permission.WORKFLOW_TRIGGER,
+        "inputSchema": _schema(
+            {
+                "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+                "cursor": {"type": "string", "maxLength": 4096},
+            }
+        ),
+    },
+    "astrolift_get_human_gate_decision": {
+        "description": "Recover a decision for an exact gate without sending another request. Distinguishes requested, recorded, closed, unbound and unknown states. Requested does not prove the workflow advanced.",
+        "scope": SCOPE_MCP_READ,
+        "additional_scopes": (SCOPE_WORKFLOW_TRIGGER,),
+        "permission": Permission.WORKFLOW_TRIGGER,
+        "inputSchema": _schema(
+            {"execution_id": _DEFINITION_ID, "stage_execution_id": _DEFINITION_ID},
+            required=("execution_id", "stage_execution_id"),
+        ),
+    },
+    "astrolift_decide_human_gate": {
+        "description": "Submit the user's explicit approved/rejected decision to an exact reviewed human gate. Requires confirmed=true; never infer approval from the agent's assessment. The server attributes the authenticated caller, not an impersonated user. Recover uncertain responses with get_human_gate_decision. A conflicting retry cannot replace the accepted decision. Requires workers supporting durable gate updates.",
+        "scope": SCOPE_MCP_DISPATCH,
+        "additional_scopes": (SCOPE_WORKFLOW_TRIGGER,),
+        "permission": Permission.WORKFLOW_TRIGGER,
+        "inputSchema": _schema(
+            {
+                "execution_id": _DEFINITION_ID,
+                "stage_execution_id": _DEFINITION_ID,
+                "temporal_run_id": _DEFINITION_ID,
+                "decision": {"type": "string", "enum": ["approved", "rejected"]},
+                "confirmed": {"type": "boolean", "const": True},
+                "note": {"type": "string", "maxLength": 4096},
+            },
+            required=("execution_id", "stage_execution_id", "temporal_run_id", "decision", "confirmed"),
         ),
     },
     "astrolift_list_workflow_definitions": {

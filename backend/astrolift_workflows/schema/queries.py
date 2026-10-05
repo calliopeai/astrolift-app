@@ -38,6 +38,7 @@ from astrolift_workflows.configuration_targets import configured_workflow_scope,
 from astrolift_workflows.import_scopes import import_definition_owner_scope
 from astrolift_workflows.schedule_operations import schedule_workflow, workflow_schedule_scope
 from astrolift_workflows.schema.execution_types import WorkflowExecutionStages, WorkflowExecutionType
+from astrolift_workflows.schema.human_gate_types import HumanGateDecisionState
 from astrolift_workflows.schema.schedule_types import WorkflowScheduleState, schedule_to_type
 from astrolift_workflows.schema.types import (
     WorkflowInstanceDetailType,
@@ -533,6 +534,68 @@ def _workflow_definitions_qs(
 @strawberry.type
 class WorkflowsQuery:
     @strawberry.field(
+        description="Page through open gates. Named-approver filtering can produce an empty page with a next cursor; continue until nextCursor is null."
+    )
+    @require_permission(Permission.WORKFLOW_TRIGGER, any_scope=True)
+    @tenant_scoped()
+    def pending_human_gates_page(
+        self,
+        info: Info,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[PendingHumanGateType]:
+        from workflows.models import WorkflowStageExecution
+
+        caller = _caller_org_pk()
+        runs = visible_runs(
+            WorkflowRun.objects.filter(organization_id=caller), caller, Permission.WORKFLOW_TRIGGER
+        )
+        page: KeysetPage[WorkflowStageExecution] = keyset_page(
+            WorkflowStageExecution.objects.filter(
+                workflow_run_id__in=runs.values("pk"),
+                workflow_run__status="running",
+                workflow_run__ended_at__isnull=True,
+                workflow_run__deleted_at__isnull=True,
+                stage__kind="human_gate",
+                stage__deleted_at__isnull=True,
+                deleted_at__isnull=True,
+                status="running",
+            ).select_related("stage__definition", "workflow_run"),
+            cursor=after,
+            limit=limit,
+            with_total=False,
+            cursor_scope=f"pending-gates:{caller}:{info.context.user.pk}",
+        )
+        return PageType(
+            items=[
+                pending_gate_to_type(row)
+                for row in page.rows
+                if may_decide_human_gate(info.context.user, row.stage.approvers)
+            ],
+            next_cursor=page.next_cursor,
+        )
+
+    @strawberry.field(
+        description="Recover a human decision by exact execution and stage GUIDs without resubmitting it."
+    )
+    @require_permission(
+        Permission.WORKFLOW_TRIGGER,
+        scope=execution_scope_by_id(permission=Permission.WORKFLOW_TRIGGER),
+        operation=execution_operation,
+    )
+    @tenant_scoped()
+    def human_gate_decision(
+        self,
+        info: Info,
+        execution_id: strawberry.ID,
+        stage_execution_id: strawberry.ID,
+    ) -> HumanGateDecisionState | None:
+        from astrolift_workflows.human_gates import find_gate, gate_state
+
+        row = find_gate(info.context.user, execution_id, stage_execution_id)
+        return gate_state(row, info.context.user)[0] if row is not None else None
+
+    @strawberry.field(
         description="Observe a configured workflow's exact schedule identity, desired version and engine state, including cleanup after soft deletion."
     )
     @require_permission(Permission.WORKFLOW_READ, scope=workflow_schedule_scope(Permission.WORKFLOW_READ))
@@ -990,6 +1053,12 @@ class WorkflowsQuery:
         rows = (
             WorkflowStageExecution.objects.filter(
                 stage__kind=WorkflowStage.StageKind.HUMAN_GATE,
+                stage__deleted_at__isnull=True,
+                deleted_at__isnull=True,
+                status="running",
+                workflow_run__status="running",
+                workflow_run__ended_at__isnull=True,
+                workflow_run__deleted_at__isnull=True,
                 workflow_run_id__in=runs.values("pk"),
             )
             .exclude(status__in=WorkflowStageExecution.TERMINAL_STATUSES)
