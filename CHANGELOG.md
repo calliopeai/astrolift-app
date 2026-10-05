@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Make explicit managed-domain default selection effective for its reviewed use cases, preserve sibling preview/app flags and existing URLs, and reject stale impact, incomplete writers or overriding organization defaults. Refs: #2299.
+
 - Certificate registration records the actual provisioning cluster and preserves
   existing domain configuration, retaining exact cluster links and authorized
   DNS revalidation after the certificate step.

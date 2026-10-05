@@ -48,6 +48,10 @@ class ManagedDomainActions:
     can_create: bool
     can_delete: bool = False
     can_revalidate: bool = False
+    can_update: bool = False
+    can_set_defaults: bool = False
+    default_update_reason: str = "DOMAIN_SELECTION_REQUIRED"
+    defaults_fingerprint: str | None = None
 
 
 @strawberry.type
