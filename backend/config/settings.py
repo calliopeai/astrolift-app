@@ -222,6 +222,14 @@ AWS_SES_REGION_ENDPOINT = os.environ.get("AWS_SES_REGION_ENDPOINT", "email.us-we
 EMAIL_BACKEND = env_str("DJANGO_EMAIL_BACKEND", "django_ses.SESBackend")
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 25))
+# Standard Django SMTP settings are explicit install configuration. Defaults
+# preserve the existing SES path; the diagnostic refuses unverified SMTP.
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", False)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+EMAIL_HOST_USER = env_str("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = env_str("EMAIL_HOST_PASSWORD", "")
+EMAIL_SSL_KEYFILE = env_str("EMAIL_SSL_KEYFILE") or None
+EMAIL_SSL_CERTFILE = env_str("EMAIL_SSL_CERTFILE") or None
 FROM_EMAIL = os.environ.get("FROM_EMAIL", "no-reply@example.com")
 
 # SES → SNS event publishing (#756). When set, the AmazonSES driver

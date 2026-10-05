@@ -117,3 +117,7 @@ export const DnsNoData: Story = {
   args: { probe: { ...DnsRecords.args!.probe!, state: "UNKNOWN", values: [] } },
 };
 export const DnsFailed: Story = { args: { probeError: "DNS_QUERY_UNAVAILABLE" } };
+
+export const InstallAlertEntry: Story = {
+  args: { installAlertMailHref: "/settings/notifications?section=install-email" },
+};

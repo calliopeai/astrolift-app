@@ -16,6 +16,7 @@ import type {
 type AppChoice = EmailDeliveryAppsQuery["astroliftAppsPage"]["items"][number];
 type ServiceChoice = EmailDeliveryServicesQuery["astroliftManagedServicesPage"]["items"][number];
 export type DomainEmailScreenProps = {
+  installAlertMailHref?: string;
   domain: ManagedDomainState["domain"];
   domainLoading: boolean;
   domainError: string | null;
@@ -58,6 +59,7 @@ const states = {
 /** Authorized app/service selection and actual bounded mail DNS observations. */
 export function DomainEmailScreen(p: DomainEmailScreenProps) {
   const t = useTranslations("emailDelivery"),
+    installMail = useTranslations("installAlertMail"),
     dns = useTranslations("managedDomains"),
     paging = useTranslations("domainConnections"),
     fmt = useFormatters();
@@ -74,9 +76,19 @@ export function DomainEmailScreen(p: DomainEmailScreenProps) {
       title={t("domainTitle")}
       description={p.domain ? <Link href={`/domains/${p.domain.id}`}>{p.domain.zone}</Link> : null}
       actions={
-        <Button variant="outline" onClick={p.onRefresh}>
-          {t("refresh")}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {p.installAlertMailHref ? (
+            <Link
+              className="inline-flex items-center rounded-md border px-3 py-2 text-sm"
+              href={p.installAlertMailHref}
+            >
+              {installMail("open")}
+            </Link>
+          ) : null}
+          <Button variant="outline" onClick={p.onRefresh}>
+            {t("refresh")}
+          </Button>
+        </div>
       }
     >
       {p.domainLoading ? (

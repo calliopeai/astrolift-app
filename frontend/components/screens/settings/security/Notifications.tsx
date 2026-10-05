@@ -1,6 +1,7 @@
 "use client";
 
 import type * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { PageShell } from "@/components/PageShell";
 import { SettingsPage } from "@/components/settings/SettingsPage";
@@ -13,6 +14,7 @@ export interface NotificationsScreenProps {
   inbox: React.ReactNode;
   /** The alert-subscriptions list (AlertSubscriptionsView), filled by the route. */
   alertSubscriptions: React.ReactNode;
+  installAlertMail?: React.ReactNode;
 }
 
 /**
@@ -24,7 +26,9 @@ export function NotificationsScreen({
   section,
   inbox,
   alertSubscriptions,
+  installAlertMail,
 }: NotificationsScreenProps) {
+  const t = useTranslations("installAlertMail");
   return (
     <PageShell
       title="Notifications"
@@ -35,6 +39,9 @@ export function NotificationsScreen({
         sections={[
           { id: "inbox", title: "Inbox", content: inbox },
           { id: "alerts", title: "App alert subscriptions", content: alertSubscriptions },
+          ...(installAlertMail
+            ? [{ id: "install-email", title: t("title"), content: installAlertMail }]
+            : []),
         ]}
       />
     </PageShell>

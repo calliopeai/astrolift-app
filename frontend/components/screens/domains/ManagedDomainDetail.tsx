@@ -15,6 +15,7 @@ import type {
   ManagedDomainRecordType,
 } from "@/graphql/__generated__/operations";
 import { useFormatters } from "@/lib/i18n/formatters";
+import { domainDiagnosticReasonKey } from "./domain-diagnostic-reasons";
 import type { ManagedDomainState } from "./use-managed-domain";
 
 export type ManagedDomainDetailProps = ManagedDomainState & { id: string; initialTab?: Tab };
@@ -95,9 +96,13 @@ function DetailTabs({
       effective_tenant_apps_domain: t("effectiveTenant"),
       effective_preview_domain: t("effectivePreview"),
     })[key] ?? key;
-  const state = (value: keyof typeof stateKeys) => (
+  const state = (value: keyof typeof stateKeys, reason?: string) => (
     <Badge variant={value === "MISMATCH" || value === "ERROR" ? "destructive" : "outline"}>
-      {t(stateKeys[value])}
+      {reason === "DNS_NO_DATA" && value === "OK"
+        ? t("dnsNoDataStatus")
+        : reason === "DNS_ANSWER" && value === "OK"
+          ? t("answerObserved")
+          : t(stateKeys[value])}
     </Badge>
   );
   async function copy(value: string) {
@@ -151,6 +156,19 @@ function DetailTabs({
     props.onResetProbe();
     change();
   }
+  function reason(value: string) {
+    const key = domainDiagnosticReasonKey(value);
+    return (
+      <>
+        <p className="text-sm">{key ? t(key) : value}</p>
+        {key && (
+          <p className="text-muted-foreground text-xs">
+            {t("reason")}: <code>{value}</code>
+          </p>
+        )}
+      </>
+    );
+  }
   const checks = (
     <div className="grid gap-3 lg:grid-cols-2">
       {observation?.checks.map((check) => (
@@ -162,10 +180,13 @@ function DetailTabs({
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="font-medium">{checkName(check.key)}</h3>
-            {state(check.state)}
+            {state(check.state, check.reason)}
           </div>
           {meta(check.perspective, check.checkedAt)}
-          <p className="text-sm">{check.reason}</p>
+          {reason(check.reason)}
+          {check.key === "delegation" && (
+            <p className="text-muted-foreground text-sm">{t("delegationScopeHelp")}</p>
+          )}
           {check.state === "MISMATCH" && (
             <p className="text-sm font-medium">
               {check.key === "delegation"
@@ -380,7 +401,7 @@ function DetailTabs({
                   {state(observation.providerZone.state)}
                 </div>
                 {meta(d.dnsDriver, observation.providerZone.checkedAt)}
-                <p className="text-sm">{observation.providerZone.reason}</p>
+                {reason(observation.providerZone.reason)}
                 <dl className="grid gap-2 text-sm sm:grid-cols-2">
                   <div>
                     <dt>{t("zone")}</dt>
@@ -599,9 +620,9 @@ function DetailTabs({
             {props.probeError && <p role="alert">{props.probeError}</p>}
             {props.probe ? (
               <section className="space-y-3 rounded-lg border p-4" aria-label={t("response")}>
-                {state(props.probe.state)}
+                {state(props.probe.state, props.probe.reason)}
                 {meta(props.probe.perspective, props.probe.checkedAt)}
-                <p>{props.probe.reason}</p>
+                {reason(props.probe.reason)}
                 {values(props.probe.values)}
                 <dl className="grid gap-2 text-sm sm:grid-cols-2">
                   {[

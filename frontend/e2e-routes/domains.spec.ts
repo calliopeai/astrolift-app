@@ -89,7 +89,18 @@ test("Route53 provisioning and effective declarations remain separate from publi
         .getByRole("region", { name: `${d.effectiveTenant} · server_configuration`, exact: true })
         .getByText(d.defaultHelp, { exact: true })
     ).toBeVisible();
-    await expect(page.getByText("ns-0.awsdns-00.com", { exact: true })).toBeVisible();
+    const delegation = page.getByRole("region", {
+      name: `${d.publicDelegation} · public_dns:1.1.1.1`,
+      exact: true,
+    });
+    await expect(delegation.getByText("ns-0.awsdns-00.com", { exact: true })).toBeVisible();
+    const lookup = page.getByRole("region", {
+      name: `${d.lookup} · public_dns:1.1.1.1`,
+      exact: true,
+    });
+    await expect(lookup.getByText("ns-0.awsdns-00.com", { exact: true })).toBeVisible();
+    await expect(lookup.getByText(d.answerObserved, { exact: true })).toBeVisible();
+    await expect(lookup.getByText(d.ok, { exact: true })).toHaveCount(0);
     await page.getByRole("tab", { name: d.routing, exact: true }).click();
     await expect(page.getByText(d.routeHelp, { exact: true })).toBeVisible();
     await page.getByRole("tab", { name: d.diagnostics, exact: true }).click();

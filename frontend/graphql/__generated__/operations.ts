@@ -7229,6 +7229,51 @@ export type ImportWorkflowManifestResult = {
   repointedSlugs: Array<Scalars['String']['output']>;
 };
 
+export type InstallAlertMailSupport = {
+  allowed: Scalars['Boolean']['output'];
+  checkedAt: Scalars['DateTime']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+  recipient?: Maybe<Scalars['String']['output']>;
+  sender?: Maybe<Scalars['String']['output']>;
+  sourceFingerprint?: Maybe<Scalars['String']['output']>;
+  tlsMode?: Maybe<Scalars['String']['output']>;
+  transport?: Maybe<Scalars['String']['output']>;
+};
+
+export type InstallAlertMailTest = {
+  acceptedAt?: Maybe<Scalars['DateTime']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  deliveryObserved: Scalars['Boolean']['output'];
+  eventKind: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  reasonCode?: Maybe<Scalars['String']['output']>;
+  recipient: Scalars['String']['output'];
+  requestId: Scalars['GUID']['output'];
+  sender: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  transport: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type InstallAlertMailTestMutationResult = {
+  data?: Maybe<InstallAlertMailTest>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type InstallAlertMailTestPage = {
+  items: Array<InstallAlertMailTest>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type InstallClusterAgentInput = {
   clusterId: Scalars['GUID']['input'];
   expectedSource: Scalars['String']['input'];
@@ -8107,6 +8152,7 @@ export type Mutation = {
   scaleServiceAgent: AstroliftAgentScaleResult;
   sendAgentTaskInput: AstroliftAgentTaskInputMessageMutationResult;
   sendEmailDeliveryTest: EmailDeliveryTestMutationResult;
+  sendInstallAlertMailTest: InstallAlertMailTestMutationResult;
   sendManagedServiceTestEmail: AstroliftManagedServiceTestEmailResultMutationResult;
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
   setAgentBundleSecretValue: AstroliftAgentSecretBundleMutationResult;
@@ -9709,6 +9755,11 @@ export type MutationSendEmailDeliveryTestArgs = {
 };
 
 
+export type MutationSendInstallAlertMailTestArgs = {
+  input: SendInstallAlertMailTestInput;
+};
+
+
 export type MutationSendManagedServiceTestEmailArgs = {
   input: SendManagedServiceTestEmailInput;
 };
@@ -10970,6 +11021,8 @@ export type Query = {
   formFieldTypes: Array<Scalars['String']['output']>;
   formSubmissions: Array<AstroliftFormSubmission>;
   huggingFaceConnectionsPage: HuggingFaceConnectionTypePage;
+  installAlertMailSupport: InstallAlertMailSupport;
+  installAlertMailTestsPage: InstallAlertMailTestPage;
   me?: Maybe<AstroliftMe>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use membersPage. */
   members: Array<OrganizationMemberType>;
@@ -12917,6 +12970,18 @@ export type QueryHuggingFaceConnectionsPageArgs = {
 };
 
 
+export type QueryInstallAlertMailSupportArgs = {
+  eventKind?: Scalars['String']['input'];
+};
+
+
+export type QueryInstallAlertMailTestsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  eventKind?: Scalars['String']['input'];
+  limit?: Scalars['Int']['input'];
+};
+
+
 export type QueryMembersPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
@@ -13630,6 +13695,12 @@ export type SendEmailDeliveryTestInput = {
   recipient: Scalars['String']['input'];
   requestId: Scalars['GUID']['input'];
   subject: InputMaybe<Scalars['String']['input']>;
+};
+
+export type SendInstallAlertMailTestInput = {
+  eventKind: Scalars['String']['input'];
+  expectedSourceFingerprint: Scalars['String']['input'];
+  requestId: Scalars['GUID']['input'];
 };
 
 export type SendManagedServiceTestEmailInput = {
@@ -16659,6 +16730,31 @@ export type ExplorerSpansQueryVariables = Exact<{
 
 
 export type ExplorerSpansQuery = { astroliftTraceSpansResult: { reason: AstroliftObservabilityPanelReason, scope?: { organizationId: string, appId: string, environmentId: string, environmentName: string, clusterId: string, namespace: string } | null, items: Array<{ traceId: string, spanId: string, parentSpanId?: string | null, operation: string, service: string, startTime: string, durationMs: number, statusCode: string, attributes: unknown, resourceAttributes: unknown }> } };
+
+export type InstallAlertMailTestFieldsFragment = { id: string, requestId: string, version: number, eventKind: string, transport: string, sender: string, recipient: string, status: string, reasonCode?: string | null, createdAt: string, acceptedAt?: string | null, deliveryObserved: boolean };
+
+export type InstallAlertMailSupportQueryVariables = Exact<{
+  eventKind: Scalars['String']['input'];
+}>;
+
+
+export type InstallAlertMailSupportQuery = { installAlertMailSupport: { allowed: boolean, reason?: string | null, transport?: string | null, sender?: string | null, recipient?: string | null, tlsMode?: string | null, sourceFingerprint?: string | null, checkedAt: string } };
+
+export type InstallAlertMailHistoryQueryVariables = Exact<{
+  eventKind: Scalars['String']['input'];
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+}>;
+
+
+export type InstallAlertMailHistoryQuery = { installAlertMailTestsPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, requestId: string, version: number, eventKind: string, transport: string, sender: string, recipient: string, status: string, reasonCode?: string | null, createdAt: string, acceptedAt?: string | null, deliveryObserved: boolean }> } };
+
+export type SendInstallAlertMailTestMutationVariables = Exact<{
+  input: SendInstallAlertMailTestInput;
+}>;
+
+
+export type SendInstallAlertMailTestMutation = { sendInstallAlertMailTest: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null }>, data?: { id: string, requestId: string, version: number, eventKind: string, transport: string, sender: string, recipient: string, status: string, reasonCode?: string | null, createdAt: string, acceptedAt?: string | null, deliveryObserved: boolean } | null } };
 
 export type CreateWebhookMutationVariables = Exact<{
   input: CreateWebhookSubscriptionInput;

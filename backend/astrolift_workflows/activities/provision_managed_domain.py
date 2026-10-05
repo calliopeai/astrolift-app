@@ -280,12 +280,13 @@ def _register_managed_domain_row_sync(
     cluster = TenantCluster.objects.select_related("provider_plugin").get(pk=cluster_id)
     plugin_slug = cluster.provider_plugin.slug
 
-    dns_config: dict = {
-        "zone_id": zone_id,
-        "certificate_arn": cert_id,
-    }
-
     existing = ManagedDomain.objects.filter(zone=zone, deleted_at__isnull=True).first()
+    dns_config = dict(existing.dns_config or {}) if existing is not None else {}
+    dns_config.update(
+        zone_id=zone_id,
+        certificate_arn=cert_id,
+        provision_cluster_id=cluster_id,
+    )
     if existing is not None:
         existing.dns_driver = plugin_slug
         existing.dns_config = dns_config
