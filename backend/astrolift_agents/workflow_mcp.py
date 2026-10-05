@@ -109,6 +109,31 @@ def _mutation_payload(result):
     raise McpCallError(message, code=str(error.get("code", "validation")).lower(), result=payload)
 
 
+def get_schedule(request, args):
+    from astrolift_workflows.schema.queries import WorkflowsQuery
+
+    row = WorkflowsQuery().workflow_schedule(_info(request), workflow_id=args["workflow_id"])
+    return {"schedule": _payload(row) if row is not None else None}
+
+
+def reconcile_schedule(request, args):
+    from astrolift_agents.views.mcp import _authorize
+    from astrolift_identity.api_tokens import SCOPE_MCP_DISPATCH, SCOPE_WORKFLOW_TRIGGER
+    from astrolift_workflows.schema.mutations import WorkflowsMutation
+
+    if args["expected_active"]:
+        _authorize(request, (SCOPE_MCP_DISPATCH, SCOPE_WORKFLOW_TRIGGER))
+    reconcile = cast(Callable[..., object], WorkflowsMutation().reconcile_workflow_schedule)
+    return _mutation_payload(
+        reconcile(
+            _info(request),
+            workflow_id=args["workflow_id"],
+            expected_version=args["expected_version"],
+            expected_active=args["expected_active"],
+        )
+    )
+
+
 def start_definition(request, args):
     from astrolift_graphql import GUID
     from workflows.schema.mutations import Mutation

@@ -42,13 +42,14 @@ def find_configuration_definition(org_id, *, definition_id=None, definition_slug
     return rows.filter(organization_id=org_id).first() or rows.filter(organization__isnull=True).first()
 
 
-def find_configured_workflow(org_id, *, workflow_id=None, slug=None, lock=False):
+def find_configured_workflow(org_id, *, workflow_id=None, slug=None, lock=False, include_deleted=False):
     from workflows.models import Workflow
 
+    candidates = Workflow.objects.filter(organization_id=org_id)
+    if not include_deleted:
+        candidates = candidates.filter(deleted_at__isnull=True)
     rows = _target(
-        Workflow.objects.filter(organization_id=org_id, deleted_at__isnull=True).select_related(
-            "definition__project__team", "organization"
-        ),
+        candidates.select_related("definition__project__team", "organization"),
         guid=workflow_id,
         slug=slug,
         lock=lock,

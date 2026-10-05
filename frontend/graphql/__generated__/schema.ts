@@ -6631,8 +6631,10 @@ export type CreateWebhookSubscriptionInput = {
 };
 
 export type CreateWorkflowResult = {
+  configurationSaved: Scalars['Boolean']['output'];
   errors: Array<ValidationError>;
   ok: Scalars['Boolean']['output'];
+  schedule?: Maybe<WorkflowScheduleState>;
   workflow?: Maybe<ConfiguredWorkflow>;
 };
 
@@ -7918,7 +7920,7 @@ export type Mutation = {
   deleteToolDef: AstroliftToolDefMutationResult;
   deleteWebhookSubscription: SoftdeletepayloadMutationResult;
   /** Soft-delete a configured Workflow by exact workflowId or legacy slug and request schedule removal. A supplied slug must match its ID. */
-  deleteWorkflow: MutationResult;
+  deleteWorkflow: WorkflowScheduleResult;
   /** Soft-delete an org-owned workflow definition by slug. */
   deleteWorkflowDefinition: MutationResult;
   /** Soft-delete a stage from a writable definition (spec 40 §6). */
@@ -8032,6 +8034,8 @@ export type Mutation = {
   reapCloudOrphan: ReapCloudOrphanPayloadMutationResult;
   recheckDomainValidation: AstroliftAppDomainMutationResult;
   reconcileClusterIngresses: ReconcileClusterIngressesResultMutationResult;
+  /** Reconcile the exact reviewed configuration version with its native Temporal schedule. Does not start an immediate run. Active reconciliation requires workflow.trigger; deleted workflow cleanup also requires workflow.delete. */
+  reconcileWorkflowSchedule: WorkflowScheduleResult;
   recordClusterBootstrapRun: BootstraprunrecordedpayloadMutationResult;
   redeliverAgentTaskCallback: AstroliftAgentTaskMutationResult;
   redeployApp: AstroliftDeploymentMutationResult;
@@ -9322,6 +9326,13 @@ export type MutationRecheckDomainValidationArgs = {
 
 export type MutationReconcileClusterIngressesArgs = {
   input: ReconcileClusterIngressesInput;
+};
+
+
+export type MutationReconcileWorkflowScheduleArgs = {
+  expectedActive: Scalars['Boolean']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  workflowId: Scalars['GUID']['input'];
 };
 
 
@@ -11043,6 +11054,8 @@ export type Query = {
   workflowInstances: Array<WorkflowInstanceType>;
   /** Runs (tier 3) of one configured Workflow, newest first. */
   workflowRuns: Array<WorkflowRun>;
+  /** Observe a configured workflow's exact schedule identity, desired version and engine state, including cleanup after soft deletion. */
+  workflowSchedule?: Maybe<WorkflowScheduleState>;
   /** List stage executions for a WorkflowRun (by workflow_id + run_id). */
   workflowStageExecutions: Array<WorkflowStageExecutionType>;
   /** List stages for a workflow definition by slug. */
@@ -13170,6 +13183,11 @@ export type QueryWorkflowRunsArgs = {
 };
 
 
+export type QueryWorkflowScheduleArgs = {
+  workflowId: Scalars['GUID']['input'];
+};
+
+
 export type QueryWorkflowStageExecutionsArgs = {
   runId: Scalars['String']['input'];
   workflowId: Scalars['String']['input'];
@@ -14610,6 +14628,29 @@ export type WorkflowRun = {
   startedAt: Scalars['DateTime']['output'];
   temporalRunId?: Maybe<Scalars['String']['output']>;
   temporalWorkflowId?: Maybe<Scalars['String']['output']>;
+};
+
+export type WorkflowScheduleResult = {
+  configurationSaved: Scalars['Boolean']['output'];
+  errors: Array<ValidationError>;
+  ok: Scalars['Boolean']['output'];
+  schedule?: Maybe<WorkflowScheduleState>;
+};
+
+export type WorkflowScheduleState = {
+  actionCount?: Maybe<Scalars['Int']['output']>;
+  configurationVersion: Scalars['Int']['output'];
+  confirmed: Scalars['Boolean']['output'];
+  desiredActive: Scalars['Boolean']['output'];
+  desiredRevision: Scalars['String']['output'];
+  engineCreatedAt?: Maybe<Scalars['DateTime']['output']>;
+  engineUpdatedAt?: Maybe<Scalars['DateTime']['output']>;
+  errorCode: Scalars['String']['output'];
+  message: Scalars['String']['output'];
+  observedAt: Scalars['DateTime']['output'];
+  observedState: Scalars['String']['output'];
+  scheduleId: Scalars['String']['output'];
+  workflowId: Scalars['String']['output'];
 };
 
 export type WorkflowStageExecutionType = {

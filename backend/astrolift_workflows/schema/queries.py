@@ -35,7 +35,10 @@ from astrolift_workflows.client import (
     workflow_history,
 )
 from astrolift_workflows.configuration_targets import configured_workflow_scope, find_configured_workflow
+from astrolift_workflows.import_scopes import import_definition_owner_scope
+from astrolift_workflows.schedule_operations import schedule_workflow, workflow_schedule_scope
 from astrolift_workflows.schema.execution_types import WorkflowExecutionStages, WorkflowExecutionType
+from astrolift_workflows.schema.schedule_types import WorkflowScheduleState, schedule_to_type
 from astrolift_workflows.schema.types import (
     WorkflowInstanceDetailType,
     WorkflowInstancePageType,
@@ -529,6 +532,33 @@ def _workflow_definitions_qs(
 
 @strawberry.type
 class WorkflowsQuery:
+    @strawberry.field(
+        description="Observe a configured workflow's exact schedule identity, desired version and engine state, including cleanup after soft deletion."
+    )
+    @require_permission(Permission.WORKFLOW_READ, scope=workflow_schedule_scope(Permission.WORKFLOW_READ))
+    @tenant_scoped()
+    def workflow_schedule(self, info: Info, workflow_id: GUID) -> WorkflowScheduleState | None:  # type: ignore[valid-type]
+        from workflows.schedule_sync import observe_workflow_schedule
+
+        workflow = schedule_workflow(workflow_id)
+        if workflow is None:
+            return None
+        check_permission(
+            Permission.WORKFLOW_READ,
+            scope=import_definition_owner_scope(workflow.definition, permission=Permission.WORKFLOW_READ),
+        )
+        return schedule_to_type(
+            observe_workflow_schedule(
+                workflow,
+                authorize=lambda current: check_permission(
+                    Permission.WORKFLOW_READ,
+                    scope=import_definition_owner_scope(
+                        current.definition, permission=Permission.WORKFLOW_READ
+                    ),
+                ),
+            )
+        )
+
     """Configured-Workflow read surface (spec 40 §6). Every resolver is
     ``WORKFLOW_READ``-gated + ``@tenant_scoped`` and applies the caller's
     org filter in the body (#1042 — the decorator only asserts a context

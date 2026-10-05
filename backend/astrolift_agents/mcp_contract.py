@@ -46,6 +46,8 @@ WORKFLOW_TOOL_NAMES = frozenset(
         "astrolift_get_workflow_execution",
         "astrolift_list_workflow_execution_stages",
         "astrolift_control_workflow_execution",
+        "astrolift_get_workflow_schedule",
+        "astrolift_reconcile_workflow_schedule",
     }
 )
 
@@ -74,6 +76,30 @@ _START_REQUEST_ID = {
 
 
 MCP_TOOL_META: dict[str, dict[str, Any]] = {
+    "astrolift_get_workflow_schedule": {
+        "description": "Inspect engine-confirmed schedule state for an exact configured workflow ID, including pending cleanup after deletion.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema({"workflow_id": _DEFINITION_ID}, required=("workflow_id",)),
+    },
+    "astrolift_reconcile_workflow_schedule": {
+        "description": (
+            "Reconcile the reviewed configuration version against Temporal and report observed state. "
+            "Active schedules additionally require mcp:dispatch and workflow:trigger scopes and trigger permission; "
+            "cleanup of deleted workflows requires delete permission. Inspect again after stale or uncertain results."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WORKFLOW_WRITE,),
+        "permission": Permission.WORKFLOW_UPDATE,
+        "inputSchema": _schema(
+            {
+                "workflow_id": _DEFINITION_ID,
+                "expected_version": {"type": "integer", "minimum": 1},
+                "expected_active": {"type": "boolean"},
+            },
+            required=("workflow_id", "expected_version", "expected_active"),
+        ),
+    },
     "astrolift_start_workflow_definition": {
         "description": (
             "Start an explicitly reviewed native workflow. Requires the exact definition ID, revision "

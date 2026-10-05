@@ -47,6 +47,7 @@ from astrolift_services.scopes import (
     services_project_scope_by_guid,
 )
 from astrolift_workflows.import_scopes import workflow_manifest_import_scope
+from astrolift_workflows.schedule_operations import workflow_schedule_scope
 from config.features import Feature, is_enabled
 from core.permissions import (
     Permission,
@@ -93,6 +94,8 @@ ANY_SCOPE = "any_scope"
 #: stands in for the target; the surface guardrail allows that only for the
 #: tools on its allowlist.
 TOOL_SCOPES: dict[str, Any] = {
+    "astrolift_get_workflow_schedule": workflow_schedule_scope(Permission.WORKFLOW_READ),
+    "astrolift_reconcile_workflow_schedule": workflow_schedule_scope(Permission.WORKFLOW_UPDATE),
     "astrolift_start_workflow_definition": definition_scope_by_guid(),
     "astrolift_get_workflow_start": definition_start_scope(),
     "astrolift_list_workflow_runs": ANY_SCOPE,
@@ -1019,6 +1022,8 @@ _HANDLERS: dict[str, ToolHandler] = {
     "astrolift_preview_workflow_manifest": workflow_mcp.preview_manifest,
     "astrolift_export_workflow_manifest": workflow_mcp.export_manifest,
     "astrolift_import_workflow_manifest": workflow_mcp.import_manifest,
+    "astrolift_get_workflow_schedule": workflow_mcp.get_schedule,
+    "astrolift_reconcile_workflow_schedule": workflow_mcp.reconcile_schedule,
     "astrolift_list_agents": _list_agents,
     "astrolift_get_agent": _get_agent,
     "astrolift_get_task": _get_task,
