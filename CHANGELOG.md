@@ -2,8 +2,11 @@
 
 ## Unreleased
 
+- Add a current-operator SMTP alert diagnostic in notification settings with explicit own-mailbox/source review, stable request UUIDs, recovery-only uncertain outcomes, cursor history and eight-language copy (#2289).
 - Keep mail review and history usable on narrow screens with accessible navigation drawers, wrapped empty states and an accurate DKIM action label (#2289).
 - Reuse fresh persisted-session and platform-operator admission for DNS connections and email diagnostics; retain current main migration predecessors for the standalone domain/mail release (#2287, #2289).
+- Add operator-only, source-reviewed install SMTP alert-mail diagnostics with verified TLS, durable nonce recovery, content-free history and acceptance distinct from delivery. Preserve default SES configuration and refuse unsupported channels. Refs: #2289.
+
 - Return an editable content refusal for invalid Unicode in email delivery tests before creating send intent or contacting the provider (#2289).
 - Preserve accepted domain creation when refresh fails; require fresh connection inventory and explicit selection after an uncertain Cloudflare token write before further setup writes (#2287, #1787).
 - Read Cloudflare diagnostic inventory through exact protected domain/connection/zone versions with fresh operator checks around every native response; retain tenant public DNS reads and explicit read-only/proxy metadata without provider writes (Refs: #2287, #1787).

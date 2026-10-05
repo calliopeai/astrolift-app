@@ -7670,6 +7670,55 @@ type ImportWorkflowManifestResult {
   repointedSlugs: [String!]!
 }
 
+type InstallAlertMailSupport {
+  allowed: Boolean!
+  reason: String
+  transport: String
+  sender: String
+  recipient: String
+  tlsMode: String
+  sourceFingerprint: String
+  checkedAt: DateTime!
+}
+
+type InstallAlertMailTest {
+  id: GUID!
+  requestId: GUID!
+  version: Int!
+  eventKind: String!
+  transport: String!
+  sender: String!
+  recipient: String!
+  status: String!
+  reasonCode: String
+  createdAt: DateTime!
+  acceptedAt: DateTime
+  deliveryObserved: Boolean!
+}
+
+type InstallAlertMailTestMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: InstallAlertMailTest
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type InstallAlertMailTestPage {
+  items: [InstallAlertMailTest!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
 input InstallClusterAgentInput {
   clusterId: GUID!
   expectedVersion: Int!
@@ -8464,6 +8513,7 @@ type Mutation {
   archiveApp(input: ArchiveAppInput!): AstroliftRegisteredAppMutationResult!
   restoreApp(input: RestoreAppInput!): AstroliftRegisteredAppMutationResult!
   setAppAccess(input: SetAppAccessInput!): AstroliftAppAccessMutationResult!
+  sendInstallAlertMailTest(input: SendInstallAlertMailTestInput!): InstallAlertMailTestMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
   updateWebhookSubscription(input: UpdateWebhookSubscriptionInput!): AstroliftWebhookSubscriptionMutationResult!
   deleteWebhookSubscription(input: DeleteWebhookSubscriptionInput!): SoftdeletepayloadMutationResult!
@@ -9228,6 +9278,8 @@ type Query {
   astroliftActiveIdentityProvider: AstroliftIdentityProvider
   astroliftActiveSessions: [AstroliftActiveSession!]!
   astroliftElevationStatus: AstroliftElevationStatus!
+  installAlertMailSupport(eventKind: String! = "deploy.failed"): InstallAlertMailSupport!
+  installAlertMailTestsPage(eventKind: String! = "deploy.failed", after: String = null, limit: Int! = 25): InstallAlertMailTestPage!
   astroliftTopologyTraffic(appSlug: String!, start: DateTime!, end: DateTime!, environmentName: String = null): TopologyTraffic
   astroliftEvent(id: GUID!): AstroliftEvent
   astroliftAlertRule(id: GUID!): AstroliftAlertRule
@@ -10032,6 +10084,12 @@ input SendEmailDeliveryTestInput {
   recipient: String!
   subject: String = null
   body: String = null
+}
+
+input SendInstallAlertMailTestInput {
+  requestId: GUID!
+  expectedSourceFingerprint: String!
+  eventKind: String! = "deploy.failed"
 }
 
 input SendManagedServiceTestEmailInput {

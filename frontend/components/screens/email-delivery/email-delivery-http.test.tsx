@@ -74,6 +74,7 @@ beforeEach(async () => {
     },
   ];
   const roots = {
+    astroliftMyPermissions: () => ["org.update"],
     astroliftManagedDomain: () => DOMAIN_ACTIVE,
     astroliftManagedDomainDiagnostics: () => ({
       ...DOMAIN_DIAGNOSTICS,
