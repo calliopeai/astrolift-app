@@ -156,7 +156,10 @@ def test_new_import_does_not_start_real_temporal_execution(mcp):
     from temporalio.client import Client
 
     async def executions():
-        client = await Client.connect(os.environ["ASTROLIFT_TEST_TEMPORAL_ADDRESS"])
+        client = await Client.connect(
+            os.environ.get("ASTROLIFT_TEST_TEMPORAL_ADDRESS") or os.environ["TEMPORAL_ADDRESS"],
+            namespace=os.environ.get("TEMPORAL_NAMESPACE", "default"),
+        )
         return {(row.id, row.run_id) async for row in client.list_workflows()}
 
     authorize(mcp)
