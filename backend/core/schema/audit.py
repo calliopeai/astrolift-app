@@ -77,6 +77,10 @@ DOTENV_TEXT_KEYS = {"dotenvtext"}
 # fails if a rename orphans an entry.
 SENSITIVE_INPUT_FIELDS = frozenset(
     {
+        "SendEmailDeliveryTestInput.subject",
+        "SendEmailDeliveryTestInput.body",
+        "SendManagedServiceTestEmailInput.subject",
+        "SendManagedServiceTestEmailInput.body",
         "BeginLocalModelArtifactInput.files",
         "BeginLocalModelArtifactInput.name",
         "CreateIdentityProviderInput.config",

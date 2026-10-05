@@ -1512,6 +1512,12 @@ class ClustersMutation:
     def create_managed_domain(
         self, info: Info, input: CreateManagedDomainInput
     ) -> MutationResultType[ManagedDomainType]:
+        if input.dns_driver == "cloudflare_read_only":
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "Use registerCloudflareDnsZone with a reviewed connection and zone.",
+                field="dnsDriver",
+            )
         # One spelling per DNS zone (#1931): the DNS driver resolves a zone by
         # canonical name, so ``Globex.example.`` and ``globex.example`` are one
         # zone. Stored canonical, and unique on that form, so a variant can't
@@ -1615,7 +1621,20 @@ class ClustersMutation:
         _require_operator_for_shared(info, domain, Permission.PROVIDER_PLUGIN_CONFIGURE)
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
+        if domain.dns_driver == "cloudflare_read_only":
+            from astrolift_clusters.dns_provider_connections import admitted
+
+            with admitted(info.context.request, write=True):
+                pass
         if input.default_for is not None:
+            if (
+                domain.dns_driver == "cloudflare_read_only"
+                and input.default_for != ManagedDomain.DefaultFor.NONE
+            ):
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    "Read-only DNS discovery cannot be a managed routing default.",
+                )
             domain.default_for = input.default_for
         if input.is_wildcard_managed is not None:
             domain.is_wildcard_managed = input.is_wildcard_managed
@@ -1641,13 +1660,18 @@ class ClustersMutation:
         _require_operator_for_shared(info, domain, Permission.PROVIDER_PLUGIN_CONFIGURE)
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
+        if domain.dns_driver == "cloudflare_read_only":
+            from astrolift_clusters.dns_provider_connections import admitted
+
+            with admitted(info.context.request, write=True):
+                pass
         domain.soft_delete()
 
         # The cloud resources must die with the row: a delete that only
         # soft-deletes leaves the hosted zone billing monthly and the
         # wildcard cert orphaned (found live: myastrolift.net survived
         # its own deletion). Fire-and-forget; the activity is idempotent.
-        cluster = _first_dns_cluster()
+        cluster = None if domain.dns_driver == "cloudflare_read_only" else _first_dns_cluster()
         if cluster is not None:
             start_workflow(
                 "DeprovisionManagedDomainWorkflow",
@@ -1704,6 +1728,20 @@ class ClustersMutation:
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found", field="zone")
 
+        if domain.dns_driver == "cloudflare_read_only":
+            from astrolift_clusters.dns_provider_connections import verify_read_only_domain
+
+            verified = verify_read_only_domain(info.context.request, domain)
+            return gql_success(
+                VerifyManagedDomainPayload(
+                    zone=zone,
+                    verified=verified,
+                    message="TXT challenge verified; DNS writes remain unavailable."
+                    if verified
+                    else "TXT challenge has not been confirmed; publish it and retry verification.",
+                )
+            )
+
         if domain.verification_state != ManagedDomain.VerificationState.PENDING:
             return gql_success(
                 VerifyManagedDomainPayload(
@@ -1748,7 +1786,8 @@ class ClustersMutation:
         domain.save(update_fields=["verification_state", "verified_at", "updated_at", "version"])
 
         message = "verified"
-        cluster = _first_dns_cluster()
+        # A read-only Cloudflare binding grants no DNS/certificate write port.
+        cluster = None if domain.dns_driver == "cloudflare_read_only" else _first_dns_cluster()
         if cluster is not None:
             start_workflow(
                 "ProvisionManagedDomainWorkflow",

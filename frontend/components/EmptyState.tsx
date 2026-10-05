@@ -47,7 +47,7 @@ export function EmptyState({
   const isExternal = learnMoreHref?.startsWith("http://") || learnMoreHref?.startsWith("https://");
 
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed px-6 py-12 text-center">
+    <div className="flex flex-col items-center justify-center gap-3 rounded-md border border-dashed px-6 py-12 text-center whitespace-normal">
       <div className="bg-muted text-muted-foreground rounded-md p-2">{icon}</div>
       <div>
         <p className="font-medium">{title}</p>

@@ -14,9 +14,9 @@ import {
   useManagedServicesSummary,
   useQueueDepth,
   useRevealConnection,
-  useSendTestEmail,
 } from "@/components/screens/apps/overview/use-managed-services-summary";
 
+import { EmailDeliveryClient } from "@/components/screens/email-delivery/EmailDeliveryClient";
 import { appPath, useAppChrome } from "@/lib/app-chrome-context";
 
 /**
@@ -39,8 +39,14 @@ function RevealConnectionDialog(p: ManagedServiceDialogSlotProps) {
   return <RevealConnectionDialogView {...p} {...useRevealConnection(p.svc, p.open)} />;
 }
 
-function SendTestEmailDialog(p: ManagedServiceDialogSlotProps) {
-  return <SendTestEmailDialogView {...p} {...useSendTestEmail(p.svc)} />;
+export function SendTestEmailDialog(p: ManagedServiceDialogSlotProps) {
+  if (!p.open) return null;
+  return (
+    <SendTestEmailDialogView
+      {...p}
+      body={<EmailDeliveryClient id={p.svc.id} name={p.svc.name || p.svc.kind} />}
+    />
+  );
 }
 
 function ListObjectsDialog(p: ManagedServiceDialogSlotProps) {

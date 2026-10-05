@@ -482,20 +482,14 @@ class _EmailTemplateDeletedPayload:
 
 @strawberry.input
 class SendManagedServiceTestEmailInput:
-    """Operator-fired 'send test email' against a bound `email` kind
-    managed service (#401).
-
-    `subject` / `body` are optional — sensible defaults are used so the
-    common case is a one-field interaction (recipient).  The send rides
-    the existing `astrolift_operations.email_infra.send()` plumbing —
-    the configured transport (SES / SendGrid / Postmark / SMTP) receives
-    the payload; suppression list checks fire normally; bypasses
-    UNSUBSCRIBE since the operator triggered it deliberately."""
+    """Reviewed test send through the exact applied service, with a replay key."""
 
     managed_service_id: GUID
     recipient: str
     subject: str | None = None
     body: str | None = None
+    expected_version: int | None = None
+    request_id: GUID | None = None
 
 
 @strawberry.type

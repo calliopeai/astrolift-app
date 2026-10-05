@@ -22,6 +22,7 @@ import {
   useSuppressionList,
   useTemplateStats,
 } from "@/components/screens/apps/managed-services/use-email-detail";
+import { EmailDeliveryClient } from "@/components/screens/email-delivery/EmailDeliveryClient";
 import type { AstroliftEmailServiceDetail } from "@/graphql/services/services.types";
 
 interface EmailDetailSheetProps {
@@ -59,6 +60,9 @@ export function EmailDetailSheet({
       panels={
         detail
           ? {
+              delivery: open ? (
+                <EmailDeliveryClient id={managedServiceId} name={serviceName} />
+              ) : null,
               cost: (
                 <CostPanel
                   managedServiceId={detail.managedServiceId}
@@ -86,7 +90,11 @@ export function EmailDetailSheet({
               messageLog: <MessageLogPanel managedServiceId={managedServiceId} />,
               templates: <TemplateManagementPanel managedServiceId={managedServiceId} />,
             }
-          : undefined
+          : {
+              delivery: open ? (
+                <EmailDeliveryClient id={managedServiceId} name={serviceName} />
+              ) : null,
+            }
       }
     />
   );

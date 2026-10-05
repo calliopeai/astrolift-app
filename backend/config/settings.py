@@ -244,6 +244,11 @@ SES_EVENTS_SNS_TOPIC_ARN = env_str("ASTROLIFT_SES_EVENTS_SNS_TOPIC_ARN", "")
 # "Hook url is not supported because it isn't reachable over the
 # public Internet (localhost)".
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "").rstrip("/")
+# Operator-provisioned Cloudflare OAuth client; never returned via GraphQL.
+# Use exact read scope IDs from Cloudflare's OAuth scopes catalogue.
+ASTROLIFT_CLOUDFLARE_OAUTH_CLIENT_ID = env_str("ASTROLIFT_CLOUDFLARE_OAUTH_CLIENT_ID", "")
+ASTROLIFT_CLOUDFLARE_OAUTH_CLIENT_SECRET = env_str("ASTROLIFT_CLOUDFLARE_OAUTH_CLIENT_SECRET", "")
+ASTROLIFT_CLOUDFLARE_OAUTH_READ_SCOPES = tuple(env_str("ASTROLIFT_CLOUDFLARE_OAUTH_READ_SCOPES", "").split())
 
 # GitHub-App connection reuse scope. Controls whether the "Connect
 # GitHub" manifest flow mints a brand-new GitHub App on every connect

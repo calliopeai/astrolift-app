@@ -44,6 +44,14 @@ selected sibling teams, project/foreign-org grants and bearer ceilings. The
 surface guardrail has no `#2108` gap exemptions. API fields and database schema
 are unchanged.
 
+## Managed-domain diagnostics
+
+[Read-only domain diagnostics](managed-domain-diagnostics.md) require current
+organization provider-read authority. Shared-domain diagnostics and install-wide
+Route53 inventory additionally require the current platform operator.
+Registered-zone boundaries, fresh source checks and pre-network throttles do not
+expand existing DNS/certificate mutation authority.
+
 ## Unregistration review and feedback
 
 The list/detail unregister flow retains the exact `unregisterTenantCluster`

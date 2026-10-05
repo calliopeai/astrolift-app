@@ -3264,6 +3264,7 @@ export type AstroliftManagedDomain = {
   provisionValidationRecords: Scalars['JSON']['output'];
   verificationState: Scalars['String']['output'];
   verifiedAt?: Maybe<Scalars['DateTime']['output']>;
+  version: Scalars['Int']['output'];
   zone: Scalars['String']['output'];
 };
 
@@ -5958,6 +5959,15 @@ export type AstroliftZentinelleDisconnectMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AttachCloudflareDnsZoneInput = {
+  connectionId: Scalars['GUID']['input'];
+  domainId: Scalars['GUID']['input'];
+  expectedConnectionVersion: Scalars['Int']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+  zoneId: Scalars['String']['input'];
+  zoneName: Scalars['String']['input'];
+};
+
 export type AttachProjectManagedServiceInput = {
   agentEnvironmentSpecSlug: InputMaybe<Scalars['String']['input']>;
   appEnvironmentId: InputMaybe<Scalars['GUID']['input']>;
@@ -6020,6 +6030,11 @@ export type AvailableTransition = {
   fromState: Scalars['String']['output'];
   label: Scalars['String']['output'];
   toState: Scalars['String']['output'];
+};
+
+export type BeginCloudflareDnsOAuthInput = {
+  name: Scalars['String']['input'];
+  organizationId: Scalars['GUID']['input'];
 };
 
 export type BeginLocalModelArtifactInput = {
@@ -6164,6 +6179,58 @@ export type CloudOrphanType = {
   identifier: Scalars['String']['output'];
   kind: Scalars['String']['output'];
   reapKey: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+};
+
+export type CloudflareDnsConnectionInput = {
+  connectionId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+};
+
+export type CloudflareDnsOAuthStart = {
+  authorizationUrl: Scalars['String']['output'];
+};
+
+export type CloudflareDnsOAuthStartMutationResult = {
+  data?: Maybe<CloudflareDnsOAuthStart>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type CloudflareDnsRecord = {
+  content: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  priority?: Maybe<Scalars['Int']['output']>;
+  proxied: Scalars['Boolean']['output'];
+  ttl: Scalars['Int']['output'];
+  type: Scalars['String']['output'];
+};
+
+export type CloudflareDnsRecordsInput = {
+  connectionId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  zoneId: Scalars['String']['input'];
+  zoneName: Scalars['String']['input'];
+};
+
+export type CloudflareDnsRecordsInventory = {
+  complete: Scalars['Boolean']['output'];
+  items: Array<CloudflareDnsRecord>;
+  reason: Scalars['String']['output'];
+};
+
+export type CloudflareDnsZone = {
+  accountId: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  nameServers: Array<Scalars['String']['output']>;
+  status: Scalars['String']['output'];
+};
+
+export type CloudflareDnsZonesInventory = {
+  complete: Scalars['Boolean']['output'];
+  items: Array<CloudflareDnsZone>;
   reason: Scalars['String']['output'];
 };
 
@@ -6325,6 +6392,12 @@ export type ConfiguredWorkflowPage = {
 
 export type ConfirmUploadResult = {
   ack: Scalars['Boolean']['output'];
+};
+
+export type ConnectCloudflareDnsTokenInput = {
+  name: Scalars['String']['input'];
+  organizationId: Scalars['GUID']['input'];
+  token: Scalars['String']['input'];
 };
 
 export type ConnectExistingGithubAppInput = {
@@ -6729,6 +6802,47 @@ export type DisconnectZentinelleInput = {
   force: Scalars['Boolean']['input'];
 };
 
+export type DnsProviderConnectionSupport = {
+  allowed: Scalars['Boolean']['output'];
+  apiTokenSupported: Scalars['Boolean']['output'];
+  dnsWritesSupported: Scalars['Boolean']['output'];
+  oauthConfigured: Scalars['Boolean']['output'];
+  oauthSetupReason: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+};
+
+export type DnsProviderConnectionType = {
+  authMethod: Scalars['String']['output'];
+  dnsWritesSupported: Scalars['Boolean']['output'];
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  provider: Scalars['String']['output'];
+  revocationState: Scalars['String']['output'];
+  state: Scalars['String']['output'];
+  verifiedAt?: Maybe<Scalars['DateTime']['output']>;
+  version: Scalars['Int']['output'];
+};
+
+export type DnsProviderConnectionTypeMutationResult = {
+  data?: Maybe<DnsProviderConnectionType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type DnsProviderConnectionTypePage = {
+  items: Array<DnsProviderConnectionType>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type DomainPathRouteInput = {
   pathPrefix: Scalars['String']['input'];
   priority: Scalars['Int']['input'];
@@ -6750,6 +6864,56 @@ export type ElevateAdminSessionInput = {
   credential: Scalars['String']['input'];
   method: Scalars['String']['input'];
   ttlSeconds: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type EmailDeliveryTest = {
+  acceptedAt?: Maybe<Scalars['DateTime']['output']>;
+  accountId: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  eventTrackingConfigured: Scalars['Boolean']['output'];
+  id: Scalars['GUID']['output'];
+  identity: Scalars['String']['output'];
+  managedServiceId: Scalars['GUID']['output'];
+  observedAt?: Maybe<Scalars['DateTime']['output']>;
+  providerMessageId?: Maybe<Scalars['String']['output']>;
+  reasonCode?: Maybe<Scalars['String']['output']>;
+  recipient: Scalars['String']['output'];
+  region: Scalars['String']['output'];
+  requestId: Scalars['GUID']['output'];
+  sender: Scalars['String']['output'];
+  simulator: Scalars['Boolean']['output'];
+  status: Scalars['String']['output'];
+  transport: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type EmailDeliveryTestMutationResult = {
+  data?: Maybe<EmailDeliveryTest>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type EmailDeliveryTestPage = {
+  items: Array<EmailDeliveryTest>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type EmailDeliveryTestSupport = {
+  accountId?: Maybe<Scalars['String']['output']>;
+  allowed: Scalars['Boolean']['output'];
+  identity?: Maybe<Scalars['String']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  region?: Maybe<Scalars['String']['output']>;
+  sender?: Maybe<Scalars['String']['output']>;
+  serviceVersion?: Maybe<Scalars['Int']['output']>;
 };
 
 export type Emailsuppressionaddpayload = {
@@ -7200,6 +7364,148 @@ export type LogoutAllSessionsInput = {
   keepCurrent: Scalars['Boolean']['input'];
 };
 
+export type ManagedDomainActions = {
+  canCreate: Scalars['Boolean']['output'];
+  canDelete: Scalars['Boolean']['output'];
+  canRevalidate: Scalars['Boolean']['output'];
+};
+
+export type ManagedDomainCheckState =
+  | 'ERROR'
+  | 'MISMATCH'
+  | 'OK'
+  | 'UNKNOWN'
+  | 'UNSUPPORTED';
+
+export type ManagedDomainDiagnosticCheck = {
+  checkedAt: Scalars['DateTime']['output'];
+  expected: Array<Scalars['String']['output']>;
+  key: Scalars['String']['output'];
+  observed: Array<Scalars['String']['output']>;
+  perspective: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  state: ManagedDomainCheckState;
+};
+
+export type ManagedDomainDiagnosticRecord = {
+  aliasTarget?: Maybe<Scalars['String']['output']>;
+  aliasZoneId?: Maybe<Scalars['String']['output']>;
+  evaluateTargetHealth?: Maybe<Scalars['Boolean']['output']>;
+  name: Scalars['String']['output'];
+  priority?: Maybe<Scalars['Int']['output']>;
+  proxied?: Maybe<Scalars['Boolean']['output']>;
+  ttl?: Maybe<Scalars['Int']['output']>;
+  type: Scalars['String']['output'];
+  values: Array<Scalars['String']['output']>;
+};
+
+export type ManagedDomainDiagnostics = {
+  actions: ManagedDomainActions;
+  checkedAt: Scalars['DateTime']['output'];
+  checks: Array<ManagedDomainDiagnosticCheck>;
+  id: Scalars['GUID']['output'];
+  providerZone: ManagedDomainProviderZone;
+  provisionClusterId?: Maybe<Scalars['GUID']['output']>;
+  provisionState: Scalars['String']['output'];
+  routes: Array<ManagedDomainRoute>;
+  routesTruncated: Scalars['Boolean']['output'];
+  verificationState: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+  zone: Scalars['String']['output'];
+};
+
+export type ManagedDomainDnsBindingReference = {
+  canVerify: Scalars['Boolean']['output'];
+  connectionId?: Maybe<Scalars['GUID']['output']>;
+  connectionVersion?: Maybe<Scalars['Int']['output']>;
+  currentConnectionVersion?: Maybe<Scalars['Int']['output']>;
+  dnsWritesSupported: Scalars['Boolean']['output'];
+  domainId: Scalars['GUID']['output'];
+  domainVersion: Scalars['Int']['output'];
+  state: Scalars['String']['output'];
+  zoneId?: Maybe<Scalars['String']['output']>;
+  zoneName: Scalars['String']['output'];
+};
+
+export type ManagedDomainDnsConnectionBinding = {
+  connectionId: Scalars['GUID']['output'];
+  connectionVersion: Scalars['Int']['output'];
+  dnsWritesSupported: Scalars['Boolean']['output'];
+  domainId: Scalars['GUID']['output'];
+  domainVersion: Scalars['Int']['output'];
+  verificationRecordName?: Maybe<Scalars['String']['output']>;
+  verificationRecordValue?: Maybe<Scalars['String']['output']>;
+  verificationState: Scalars['String']['output'];
+  zone: CloudflareDnsZone;
+};
+
+export type ManagedDomainDnsConnectionBindingMutationResult = {
+  data?: Maybe<ManagedDomainDnsConnectionBinding>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type ManagedDomainProbe = {
+  checkedAt: Scalars['DateTime']['output'];
+  hostname: Scalars['String']['output'];
+  httpStatus?: Maybe<Scalars['Int']['output']>;
+  latencyMs?: Maybe<Scalars['Float']['output']>;
+  perspective: Scalars['String']['output'];
+  publicAddress?: Maybe<Scalars['String']['output']>;
+  reason: Scalars['String']['output'];
+  recordType: ManagedDomainRecordType;
+  state: ManagedDomainCheckState;
+  tlsVerified?: Maybe<Scalars['Boolean']['output']>;
+  tool: ManagedDomainProbeTool;
+  values: Array<Scalars['String']['output']>;
+};
+
+export type ManagedDomainProbeTool =
+  | 'DIG'
+  | 'HTTPS'
+  | 'LOOKUP'
+  | 'PING'
+  | 'TRACEROUTE';
+
+export type ManagedDomainProviderZone = {
+  bindingSource: Scalars['String']['output'];
+  checkedAt: Scalars['DateTime']['output'];
+  nameservers: Array<Scalars['String']['output']>;
+  privateZone?: Maybe<Scalars['Boolean']['output']>;
+  reason: Scalars['String']['output'];
+  records: Array<ManagedDomainDiagnosticRecord>;
+  state: ManagedDomainCheckState;
+  truncated: Scalars['Boolean']['output'];
+  zoneId?: Maybe<Scalars['String']['output']>;
+  zoneName?: Maybe<Scalars['String']['output']>;
+};
+
+export type ManagedDomainRecordType =
+  | 'A'
+  | 'AAAA'
+  | 'CAA'
+  | 'CNAME'
+  | 'MX'
+  | 'NS'
+  | 'SOA'
+  | 'SRV'
+  | 'TXT';
+
+export type ManagedDomainRoute = {
+  appId: Scalars['GUID']['output'];
+  appName: Scalars['String']['output'];
+  appSlug: Scalars['String']['output'];
+  clusterId?: Maybe<Scalars['GUID']['output']>;
+  clusterName?: Maybe<Scalars['String']['output']>;
+  clusterSlug?: Maybe<Scalars['String']['output']>;
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  hostname: Scalars['String']['output'];
+  ingressClass?: Maybe<Scalars['String']['output']>;
+  observedState: ManagedDomainCheckState;
+  recordedUrl: Scalars['String']['output'];
+};
+
 export type Managedresourceadoptionpayload = {
   acknowledgedPriorOwner: Scalars['String']['output'];
   actorDisplay: Scalars['String']['output'];
@@ -7512,10 +7818,12 @@ export type Mutation = {
   astroliftDisconnectUserSourceProvider: AstroliftDisconnectUserSourceProviderPayloadMutationResult;
   astroliftInstallClusterLogCollector: AstroliftClusterLogCollectorOperationMutationResult;
   attachAgentSecretBundle: AstroliftAgentSecretBundleAttachmentMutationResult;
+  attachCloudflareDnsZone: ManagedDomainDnsConnectionBindingMutationResult;
   attachProjectManagedService: AstroliftManagedServiceAttachmentMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
   attestSession: AstroliftAttestationResultMutationResult;
   authorizeLocalModelUploads: LocalModelUploadAuthorizationMutationResult;
+  beginCloudflareDnsOAuth: CloudflareDnsOAuthStartMutationResult;
   beginLocalModelArtifact: LocalModelArtifactMutationResult;
   bringClusterIntoManagement: AstroliftTenantClusterMutationResult;
   bulkApproveDeployments: AstroliftBulkDeploymentResultDataMutationResult;
@@ -7539,6 +7847,7 @@ export type Mutation = {
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
+  connectCloudflareDnsToken: DnsProviderConnectionTypeMutationResult;
   connectExistingGithubApp: AstroliftSourceConnectionMutationResult;
   connectHuggingFace: HuggingFaceConnectionTypeMutationResult;
   connectSource: AstroliftSourceConnectionMutationResult;
@@ -7621,6 +7930,7 @@ export type Mutation = {
   detachAgentSecretBundle: AstroliftAgentSecretBundleAttachmentMutationResult;
   detachProjectManagedService: AstroliftManagedServiceAttachmentMutationResult;
   detachSecretBundle: AttachmentremovedpayloadMutationResult;
+  disconnectDnsProviderConnection: DnsProviderConnectionTypeMutationResult;
   disconnectHuggingFace: HuggingFaceConnectionTypeMutationResult;
   disconnectSource: AstroliftSourceConnectionMutationResult;
   disconnectZentinelle: AstroliftZentinelleDisconnectMutationResult;
@@ -7728,6 +8038,7 @@ export type Mutation = {
   registerAgentRepo: AstroliftRegisterAgentRepoResultMutationResult;
   registerApp: AstroliftRegisteredAppMutationResult;
   registerAppRepo: AstroliftRegisterAppRepoResultMutationResult;
+  registerCloudflareDnsZone: ManagedDomainDnsConnectionBindingMutationResult;
   registerMobileDevice: AstroliftDeviceRegistrationMutationResult;
   registerOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
   registerTenantCluster: AstroliftTenantClusterMutationResult;
@@ -7760,6 +8071,7 @@ export type Mutation = {
   resyncAllAstroliftCiWorkflows: AstroliftCiWorkflowResyncAllResultMutationResult;
   resyncAstroliftCiWorkflow: AstroliftCiWorkflowSyncStatusMutationResult;
   resyncAstroliftManifestFromRepo: ResyncManifestPayloadMutationResult;
+  retestDnsProviderConnection: DnsProviderConnectionTypeMutationResult;
   retryAgentTask: AstroliftAgentTaskMutationResult;
   retryAstroliftAutowire: AstroliftRetryAutowirePayloadMutationResult;
   revalidateManagedDomain: RevalidateManagedDomainPayloadMutationResult;
@@ -7794,6 +8106,7 @@ export type Mutation = {
   scaleAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
   scaleServiceAgent: AstroliftAgentScaleResult;
   sendAgentTaskInput: AstroliftAgentTaskInputMessageMutationResult;
+  sendEmailDeliveryTest: EmailDeliveryTestMutationResult;
   sendManagedServiceTestEmail: AstroliftManagedServiceTestEmailResultMutationResult;
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
   setAgentBundleSecretValue: AstroliftAgentSecretBundleMutationResult;
@@ -8045,6 +8358,11 @@ export type MutationAttachAgentSecretBundleArgs = {
 };
 
 
+export type MutationAttachCloudflareDnsZoneArgs = {
+  input: AttachCloudflareDnsZoneInput;
+};
+
+
 export type MutationAttachProjectManagedServiceArgs = {
   input: AttachProjectManagedServiceInput;
 };
@@ -8062,6 +8380,11 @@ export type MutationAttestSessionArgs = {
 
 export type MutationAuthorizeLocalModelUploadsArgs = {
   input: LocalModelArtifactIdentityInput;
+};
+
+
+export type MutationBeginCloudflareDnsOAuthArgs = {
+  input: BeginCloudflareDnsOAuthInput;
 };
 
 
@@ -8177,6 +8500,11 @@ export type MutationConfirmPreSignedUrlImageUploadArgs = {
   metadata?: InputMaybe<Scalars['JSON']['input']>;
   publicUrl?: InputMaybe<Scalars['String']['input']>;
   uploadId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
+export type MutationConnectCloudflareDnsTokenArgs = {
+  input: ConnectCloudflareDnsTokenInput;
 };
 
 
@@ -8589,6 +8917,11 @@ export type MutationDetachProjectManagedServiceArgs = {
 
 export type MutationDetachSecretBundleArgs = {
   input: DetachSecretBundleInput;
+};
+
+
+export type MutationDisconnectDnsProviderConnectionArgs = {
+  input: CloudflareDnsConnectionInput;
 };
 
 
@@ -9027,6 +9360,11 @@ export type MutationRegisterAppRepoArgs = {
 };
 
 
+export type MutationRegisterCloudflareDnsZoneArgs = {
+  input: RegisterCloudflareDnsZoneInput;
+};
+
+
 export type MutationRegisterMobileDeviceArgs = {
   input: RegisterMobileDeviceInput;
 };
@@ -9181,6 +9519,11 @@ export type MutationResyncAstroliftCiWorkflowArgs = {
 
 export type MutationResyncAstroliftManifestFromRepoArgs = {
   input: ResyncManifestFromRepoInput;
+};
+
+
+export type MutationRetestDnsProviderConnectionArgs = {
+  input: CloudflareDnsConnectionInput;
 };
 
 
@@ -9358,6 +9701,11 @@ export type MutationSendAgentTaskInputArgs = {
   clientRequestId?: InputMaybe<Scalars['String']['input']>;
   message: Scalars['String']['input'];
   taskId: Scalars['ID']['input'];
+};
+
+
+export type MutationSendEmailDeliveryTestArgs = {
+  input: SendEmailDeliveryTestInput;
 };
 
 
@@ -10442,6 +10790,10 @@ export type Query = {
   astroliftInvitationsCsv: AstroliftIdentityCsvExport;
   astroliftInvitationsPage: AstroliftInvitationPage;
   astroliftLocalModelArtifactsPage: LocalModelArtifactPage;
+  astroliftManagedDomain?: Maybe<AstroliftManagedDomain>;
+  astroliftManagedDomainActions: ManagedDomainActions;
+  astroliftManagedDomainDiagnostics?: Maybe<ManagedDomainDiagnostics>;
+  astroliftManagedDomainProbe?: Maybe<ManagedDomainProbe>;
   astroliftManagedDomains: Array<AstroliftManagedDomain>;
   astroliftManagedService?: Maybe<AstroliftManagedServiceContext>;
   astroliftManagedServiceAttachmentsPage?: Maybe<AstroliftManagedServiceAttachmentContextPage>;
@@ -10594,6 +10946,8 @@ export type Query = {
   /** Cursor-paginated mutation audit log. Superuser only. */
   auditLogsPage: AuditLogEntryPage;
   brief?: Maybe<AstroliftBrief>;
+  cloudflareDnsRecords: CloudflareDnsRecordsInventory;
+  cloudflareDnsZones: CloudflareDnsZonesInventory;
   clusterModelDeployment?: Maybe<ClusterModelDeployment>;
   clusterModelDeploymentsPage: ClusterModelDeploymentPage;
   clusterModelPlacementClustersPage: ModelPlacementClusterPage;
@@ -10602,8 +10956,14 @@ export type Query = {
   clusterModelSubscriptionTargetsPage: ModelSubscriptionTargetPage;
   clusterModelSubscriptionsPage: ModelSubscriptionPage;
   dispatchers: Array<AstroliftDispatcherInstance>;
+  dnsProviderConnectionSupport: DnsProviderConnectionSupport;
+  dnsProviderConnectionsPage: DnsProviderConnectionTypePage;
+  dnsProviderDomainBinding?: Maybe<ManagedDomainDnsBindingReference>;
   /** List all effective permissions for a user, with the role bindings that grant each one. */
   effectivePermissions: Array<PermissionEntry>;
+  emailDeliveryTestSupport: EmailDeliveryTestSupport;
+  emailDeliveryTests: Array<EmailDeliveryTest>;
+  emailDeliveryTestsPage: EmailDeliveryTestPage;
   exportWorkflowManifest: WorkflowManifestExportType;
   formDefinition?: Maybe<AstroliftFormDefinition>;
   formDefinitions: Array<AstroliftFormDefinition>;
@@ -11685,6 +12045,28 @@ export type QueryAstroliftLocalModelArtifactsPageArgs = {
 };
 
 
+export type QueryAstroliftManagedDomainArgs = {
+  domainId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftManagedDomainDiagnosticsArgs = {
+  domainId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  hostname?: InputMaybe<Scalars['String']['input']>;
+  recordType?: ManagedDomainRecordType;
+};
+
+
+export type QueryAstroliftManagedDomainProbeArgs = {
+  domainId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  hostname: Scalars['String']['input'];
+  recordType?: ManagedDomainRecordType;
+  tool: ManagedDomainProbeTool;
+};
+
+
 export type QueryAstroliftManagedServiceArgs = {
   expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
@@ -12407,6 +12789,16 @@ export type QueryBriefArgs = {
 };
 
 
+export type QueryCloudflareDnsRecordsArgs = {
+  input: CloudflareDnsRecordsInput;
+};
+
+
+export type QueryCloudflareDnsZonesArgs = {
+  input: CloudflareDnsConnectionInput;
+};
+
+
 export type QueryClusterModelDeploymentArgs = {
   id: Scalars['GUID']['input'];
   organizationId: Scalars['GUID']['input'];
@@ -12463,8 +12855,37 @@ export type QueryClusterModelSubscriptionsPageArgs = {
 };
 
 
+export type QueryDnsProviderConnectionsPageArgs = {
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+};
+
+
+export type QueryDnsProviderDomainBindingArgs = {
+  domainId: Scalars['GUID']['input'];
+};
+
+
 export type QueryEffectivePermissionsArgs = {
   userId: Scalars['ID']['input'];
+};
+
+
+export type QueryEmailDeliveryTestSupportArgs = {
+  managedServiceId: Scalars['GUID']['input'];
+};
+
+
+export type QueryEmailDeliveryTestsArgs = {
+  limit?: Scalars['Int']['input'];
+  managedServiceId: Scalars['GUID']['input'];
+};
+
+
+export type QueryEmailDeliveryTestsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  managedServiceId: Scalars['GUID']['input'];
 };
 
 
@@ -12867,6 +13288,13 @@ export type RegisterAppRepoInput = {
   sourceUrl: InputMaybe<Scalars['String']['input']>;
 };
 
+export type RegisterCloudflareDnsZoneInput = {
+  connectionId: Scalars['GUID']['input'];
+  expectedConnectionVersion: Scalars['Int']['input'];
+  zoneId: Scalars['String']['input'];
+  zoneName: Scalars['String']['input'];
+};
+
 export type RegisterMobileDeviceInput = {
   deviceToken: Scalars['String']['input'];
   label: InputMaybe<Scalars['String']['input']>;
@@ -13195,10 +13623,21 @@ export type ScaleWorkloadInput = {
   workloadId: Scalars['GUID']['input'];
 };
 
-export type SendManagedServiceTestEmailInput = {
+export type SendEmailDeliveryTestInput = {
   body: InputMaybe<Scalars['String']['input']>;
+  expectedVersion: Scalars['Int']['input'];
   managedServiceId: Scalars['GUID']['input'];
   recipient: Scalars['String']['input'];
+  requestId: Scalars['GUID']['input'];
+  subject: InputMaybe<Scalars['String']['input']>;
+};
+
+export type SendManagedServiceTestEmailInput = {
+  body: InputMaybe<Scalars['String']['input']>;
+  expectedVersion: InputMaybe<Scalars['Int']['input']>;
+  managedServiceId: Scalars['GUID']['input'];
+  recipient: Scalars['String']['input'];
+  requestId: InputMaybe<Scalars['GUID']['input']>;
   subject: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -15057,6 +15496,120 @@ export type GetProviderPluginReferenceQueryVariables = Exact<{
 
 export type GetProviderPluginReferenceQuery = { astroliftProviderPlugin?: { id: string, slug: string, name: string, version: string, capabilitiesManifest: unknown, isEnabled: boolean } | null };
 
+export type ManagedDomainQueryVariables = Exact<{
+  domainId: Scalars['GUID']['input'];
+}>;
+
+
+export type ManagedDomainQuery = { astroliftManagedDomain?: { id: string, version: number, zone: string, dnsDriver: string, defaultFor: string, isWildcardManaged: boolean, organizationSlug?: string | null, createdAt: string, provisionState: string, provisionNameservers: unknown, provisionValidationRecords: unknown, provisionClusterId?: string | null, verificationState: string, verifiedAt?: string | null, challengeRecordName: string, challengeRecordValue: string, delegationCheck: unknown } | null };
+
+export type ManagedDomainActionsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ManagedDomainActionsQuery = { astroliftManagedDomainActions: { canCreate: boolean, canDelete: boolean, canRevalidate: boolean } };
+
+export type ManagedDomainDiagnosticsQueryVariables = Exact<{
+  domainId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+}>;
+
+
+export type ManagedDomainDiagnosticsQuery = { astroliftManagedDomainDiagnostics?: { id: string, version: number, zone: string, verificationState: string, provisionState: string, provisionClusterId?: string | null, checkedAt: string, routesTruncated: boolean, checks: Array<{ key: string, state: ManagedDomainCheckState, perspective: string, checkedAt: string, reason: string, expected: Array<string>, observed: Array<string> }>, providerZone: { bindingSource: string, state: ManagedDomainCheckState, reason: string, checkedAt: string, zoneId?: string | null, zoneName?: string | null, privateZone?: boolean | null, nameservers: Array<string>, truncated: boolean, records: Array<{ name: string, type: string, ttl?: number | null, values: Array<string>, aliasTarget?: string | null, aliasZoneId?: string | null, evaluateTargetHealth?: boolean | null, proxied?: boolean | null, priority?: number | null }> }, routes: Array<{ appId: string, appName: string, appSlug: string, environmentId: string, environmentName: string, recordedUrl: string, hostname: string, clusterId?: string | null, clusterName?: string | null, clusterSlug?: string | null, ingressClass?: string | null, observedState: ManagedDomainCheckState }>, actions: { canCreate: boolean, canDelete: boolean, canRevalidate: boolean } } | null };
+
+export type ManagedDomainProbeQueryVariables = Exact<{
+  domainId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  hostname: Scalars['String']['input'];
+  tool: ManagedDomainProbeTool;
+  recordType: ManagedDomainRecordType;
+}>;
+
+
+export type ManagedDomainProbeQuery = { astroliftManagedDomainProbe?: { state: ManagedDomainCheckState, perspective: string, checkedAt: string, reason: string, hostname: string, tool: ManagedDomainProbeTool, recordType: ManagedDomainRecordType, values: Array<string>, publicAddress?: string | null, httpStatus?: number | null, tlsVerified?: boolean | null, latencyMs?: number | null } | null };
+
+export type DnsConnectionSupportQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type DnsConnectionSupportQuery = { dnsProviderConnectionSupport: { allowed: boolean, reason: string, apiTokenSupported: boolean, oauthConfigured: boolean, oauthSetupReason: string, dnsWritesSupported: boolean } };
+
+export type DnsConnectionsPageQueryVariables = Exact<{
+  page: Scalars['Int']['input'];
+  pageSize: Scalars['Int']['input'];
+}>;
+
+
+export type DnsConnectionsPageQuery = { dnsProviderConnectionsPage: { page?: number | null, pageSize?: number | null, totalCount?: number | null, nextCursor?: string | null, items: Array<{ id: string, version: number, name: string, provider: string, authMethod: string, state: string, revocationState: string, verifiedAt?: string | null, expiresAt?: string | null, dnsWritesSupported: boolean }> } };
+
+export type ConnectCloudflareTokenMutationVariables = Exact<{
+  input: ConnectCloudflareDnsTokenInput;
+}>;
+
+
+export type ConnectCloudflareTokenMutation = { connectCloudflareDnsToken: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, version: number, name: string, provider: string, authMethod: string, state: string, revocationState: string, verifiedAt?: string | null, expiresAt?: string | null, dnsWritesSupported: boolean } | null } };
+
+export type BeginCloudflareOAuthMutationVariables = Exact<{
+  input: BeginCloudflareDnsOAuthInput;
+}>;
+
+
+export type BeginCloudflareOAuthMutation = { beginCloudflareDnsOAuth: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { authorizationUrl: string } | null } };
+
+export type RetestDnsConnectionMutationVariables = Exact<{
+  input: CloudflareDnsConnectionInput;
+}>;
+
+
+export type RetestDnsConnectionMutation = { retestDnsProviderConnection: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, version: number, name: string, provider: string, authMethod: string, state: string, revocationState: string, verifiedAt?: string | null, expiresAt?: string | null, dnsWritesSupported: boolean } | null } };
+
+export type DisconnectDnsConnectionMutationVariables = Exact<{
+  input: CloudflareDnsConnectionInput;
+}>;
+
+
+export type DisconnectDnsConnectionMutation = { disconnectDnsProviderConnection: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, version: number, name: string, provider: string, authMethod: string, state: string, revocationState: string, verifiedAt?: string | null, expiresAt?: string | null, dnsWritesSupported: boolean } | null } };
+
+export type CloudflareZonesQueryVariables = Exact<{
+  input: CloudflareDnsConnectionInput;
+}>;
+
+
+export type CloudflareZonesQuery = { cloudflareDnsZones: { complete: boolean, reason: string, items: Array<{ id: string, name: string, accountId: string, status: string, nameServers: Array<string> }> } };
+
+export type CloudflareRecordsQueryVariables = Exact<{
+  input: CloudflareDnsRecordsInput;
+}>;
+
+
+export type CloudflareRecordsQuery = { cloudflareDnsRecords: { complete: boolean, reason: string, items: Array<{ id: string, name: string, type: string, content: string, ttl: number, proxied: boolean, priority?: number | null }> } };
+
+export type RegisterCloudflareZoneMutationVariables = Exact<{
+  input: RegisterCloudflareDnsZoneInput;
+}>;
+
+
+export type RegisterCloudflareZoneMutation = { registerCloudflareDnsZone: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { domainId: string, domainVersion: number, connectionId: string, connectionVersion: number, dnsWritesSupported: boolean, verificationState: string, verificationRecordName?: string | null, verificationRecordValue?: string | null, zone: { id: string, name: string, accountId: string, status: string, nameServers: Array<string> } } | null } };
+
+export type AttachCloudflareZoneMutationVariables = Exact<{
+  input: AttachCloudflareDnsZoneInput;
+}>;
+
+
+export type AttachCloudflareZoneMutation = { attachCloudflareDnsZone: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { domainId: string, domainVersion: number, connectionId: string, connectionVersion: number, dnsWritesSupported: boolean, verificationState: string, verificationRecordName?: string | null, verificationRecordValue?: string | null, zone: { id: string, name: string, accountId: string, status: string, nameServers: Array<string> } } | null } };
+
+export type VerifyDnsDomainMutationVariables = Exact<{
+  input: VerifyManagedDomainInput;
+}>;
+
+
+export type VerifyDnsDomainMutation = { verifyManagedDomain: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { zone: string, verified: boolean, message: string } | null } };
+
+export type DnsDomainBindingQueryVariables = Exact<{
+  domainId: Scalars['GUID']['input'];
+}>;
+
+
+export type DnsDomainBindingQuery = { dnsProviderDomainBinding?: { domainId: string, domainVersion: number, state: string, connectionId?: string | null, connectionVersion?: number | null, currentConnectionVersion?: number | null, zoneId?: string | null, zoneName: string, dnsWritesSupported: boolean, canVerify: boolean } | null };
+
 export type IdentityTimestampsFragment = { createdAt: string, updatedAt: string, deletedAt?: string | null };
 
 export type ListOrganizationsQueryVariables = Exact<{ [key: string]: never; }>;
@@ -16762,6 +17315,56 @@ export type AdminFeatureInventoryQueryVariables = Exact<{ [key: string]: never; 
 
 
 export type AdminFeatureInventoryQuery = { astroliftServerInfo: { featureFlags: Array<{ key: string, enabled: boolean, description?: string | null }>, buildTimeFeatures: Array<{ key: string, enabled: boolean, envVar: string, description?: string | null }> } };
+
+export type EmailDeliveryTestFieldsFragment = { id: string, managedServiceId: string, version: number, requestId: string, sender: string, recipient: string, status: string, accountId: string, region: string, identity: string, transport: string, providerMessageId?: string | null, eventTrackingConfigured: boolean, simulator: boolean, createdAt: string, acceptedAt?: string | null, observedAt?: string | null, reasonCode?: string | null };
+
+export type EmailDeliverySupportQueryVariables = Exact<{
+  managedServiceId: Scalars['GUID']['input'];
+}>;
+
+
+export type EmailDeliverySupportQuery = { emailDeliveryTestSupport: { allowed: boolean, reason?: string | null, serviceVersion?: number | null, sender?: string | null, identity?: string | null, accountId?: string | null, region?: string | null } };
+
+export type EmailDeliveryTestsPageQueryVariables = Exact<{
+  managedServiceId: Scalars['GUID']['input'];
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+}>;
+
+
+export type EmailDeliveryTestsPageQuery = { emailDeliveryTestsPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, managedServiceId: string, version: number, requestId: string, sender: string, recipient: string, status: string, accountId: string, region: string, identity: string, transport: string, providerMessageId?: string | null, eventTrackingConfigured: boolean, simulator: boolean, createdAt: string, acceptedAt?: string | null, observedAt?: string | null, reasonCode?: string | null }> } };
+
+export type SendEmailDeliveryTestMutationVariables = Exact<{
+  input: SendEmailDeliveryTestInput;
+}>;
+
+
+export type SendEmailDeliveryTestMutation = { sendEmailDeliveryTest: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null }>, data?: { id: string, managedServiceId: string, version: number, requestId: string, sender: string, recipient: string, status: string, accountId: string, region: string, identity: string, transport: string, providerMessageId?: string | null, eventTrackingConfigured: boolean, simulator: boolean, createdAt: string, acceptedAt?: string | null, observedAt?: string | null, reasonCode?: string | null } | null } };
+
+export type EmailDeliveryAppsQueryVariables = Exact<{
+  search?: InputMaybe<Scalars['String']['input']>;
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+}>;
+
+
+export type EmailDeliveryAppsQuery = { astroliftAppsPage: { nextCursor?: string | null, totalCount: number, items: Array<{ id: string, name: string, slug: string, organizationSlug: string, version: number }> } };
+
+export type EmailDeliveryServicesQueryVariables = Exact<{
+  appSlug: Scalars['String']['input'];
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+}>;
+
+
+export type EmailDeliveryServicesQuery = { astroliftManagedServicesPage: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ id: string, name: string, kind: string, variant: string, status: string, environmentName: string, registeredAppSlug: string }> } };
+
+export type EmailDeliveryAppQueryVariables = Exact<{
+  slug: Scalars['String']['input'];
+}>;
+
+
+export type EmailDeliveryAppQuery = { astroliftApp?: { id: string, name: string, slug: string, organizationSlug: string, version: number } | null };
 
 export type ManagedResourceContextFragment = { id: string, contextRevision: string, version: number, name: string, kind: string, variant: string, status: string, ownerScope: string, organizationId: string, projectId?: string | null, projectSlug: string, registeredAppId?: string | null, registeredAppSlug: string, clusterId: string, clusterSlug: string, clusterVersion: number, environmentId?: string | null, environmentName: string, environmentVersion?: number | null, createdAt: string, updatedAt: string, operationKind: string, operationWorkflowId: string, operationRunId: string, operationStartedAt?: string | null, operationCompletedAt?: string | null };
 

@@ -50,6 +50,8 @@ no IAM secret value lands in the rendered manifest.
 
 from __future__ import annotations
 
+import hashlib
+import re
 import secrets
 import string
 from dataclasses import dataclass
@@ -705,7 +707,7 @@ class AmazonSESDriver(ManagedServiceDriver):
         )
 
     def _configuration_set_name_for(self, identity: str) -> str:
-        return (f"{self._config.configuration_set_name_prefix}-{_safe(identity)}")[:64]
+        return configuration_set_name(identity, prefix=self._config.configuration_set_name_prefix)
 
     def _ensure_configuration_set(
         self,
@@ -1045,6 +1047,15 @@ def _not_found(exc: Exception) -> bool:
     response = getattr(exc, "response", {}) or {}
     code = str((response.get("Error") or {}).get("Code") or "")
     return code in {"NotFound", "NotFoundException"} or "not found" in str(exc).lower()
+
+
+def configuration_set_name(identity: str, *, prefix: str = "astrolift") -> str:
+    raw = f"{prefix}-{_safe(identity)}"
+    if re.fullmatch(r"[A-Za-z0-9_-]{1,64}", raw):
+        return raw
+    safe = re.sub(r"[^A-Za-z0-9_-]", "-", raw)
+    suffix = hashlib.sha256(f"{prefix}\0{identity}".encode()).hexdigest()[:8]
+    return f"{safe[:55]}-{suffix}"
 
 
 def _safe(value: str) -> str:
