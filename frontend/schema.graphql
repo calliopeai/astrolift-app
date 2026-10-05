@@ -7901,6 +7901,7 @@ type ManagedDomainDiagnosticRecord {
   evaluateTargetHealth: Boolean
   proxied: Boolean
   priority: Int
+  routing: ManagedDomainRecordRouting
 }
 
 type ManagedDomainDiagnostics {
@@ -7985,6 +7986,44 @@ type ManagedDomainProviderZone {
   bindingSource: String!
 }
 
+type ManagedDomainRecordCidrRouting {
+  collectionId: String!
+  locationName: String!
+}
+
+type ManagedDomainRecordCoordinates {
+  latitude: String!
+  longitude: String!
+}
+
+type ManagedDomainRecordGeoLocation {
+  continentCode: String
+  countryCode: String
+  subdivisionCode: String
+}
+
+type ManagedDomainRecordGeoProximity {
+  awsRegion: String
+  localZoneGroup: String
+  coordinates: ManagedDomainRecordCoordinates
+  bias: Int
+}
+
+type ManagedDomainRecordRouting {
+  policy: ManagedDomainRoutingPolicy!
+  reason: String!
+  setIdentifier: String
+  weight: Int
+  region: String
+  failover: String
+  geoLocation: ManagedDomainRecordGeoLocation
+  geoProximity: ManagedDomainRecordGeoProximity
+  cidr: ManagedDomainRecordCidrRouting
+  multiValueAnswer: Boolean
+  healthCheckId: String
+  trafficPolicyInstanceId: String
+}
+
 enum ManagedDomainRecordType {
   A
   AAAA
@@ -8010,6 +8049,18 @@ type ManagedDomainRoute {
   clusterSlug: String
   ingressClass: String
   observedState: ManagedDomainCheckState!
+}
+
+enum ManagedDomainRoutingPolicy {
+  SIMPLE
+  WEIGHTED
+  LATENCY
+  FAILOVER
+  GEOLOCATION
+  MULTIVALUE
+  GEOPROXIMITY
+  CIDR
+  UNKNOWN
 }
 
 type Managedresourceadoptionpayload {
