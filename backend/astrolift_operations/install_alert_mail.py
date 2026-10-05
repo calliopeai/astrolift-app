@@ -9,7 +9,7 @@ from uuid import UUID
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.db import transaction
+from django.db import connection, transaction
 from django.utils import timezone
 from django.utils.crypto import salted_hmac
 
@@ -174,11 +174,13 @@ def send_test(info, *, request_id, expected_source, event_kind):
     from astrolift_operations.install_alert_smtp import send_notice
 
     org, actor = admitted(info)
+    if connection.in_atomic_block or not connection.get_autocommit():
+        raise AlertMailUnavailable("ALERT_MAIL_ENCLOSING_TRANSACTION_UNSUPPORTED")
     try:
         request_id = UUID(str(request_id))
     except (TypeError, ValueError, AttributeError):
         raise AlertMailUnavailable("ALERT_MAIL_REQUEST_INVALID") from None
-    with transaction.atomic():
+    with transaction.atomic(durable=True):
         Organization.objects.select_for_update().get(pk=org.pk)
         org, actor = admitted(info)
         prior = InstallAlertMailTest._base_manager.filter(organization=org, request_id=request_id).first()
@@ -207,7 +209,7 @@ def send_test(info, *, request_id, expected_source, event_kind):
         current_source(info, event_kind, source.fingerprint)
 
     def before_data():
-        with transaction.atomic():
+        with transaction.atomic(durable=True):
             current()
             locked = InstallAlertMailTest.objects.select_for_update().get(pk=row.pk)
             if locked.status != "reserved" or locked.source_sha256 != source.fingerprint:

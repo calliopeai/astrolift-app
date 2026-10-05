@@ -55,6 +55,13 @@ mutation InstallAlertMailTest($input: SendInstallAlertMailTestInput!) {
 }
 ```
 
+The send service refuses an enclosing database transaction or disabled
+autocommit with `ALERT_MAIL_ENCLOSING_TRANSACTION_UNSUPPORTED`, after current
+permission admission and before reserving an intent or contacting SMTP. Its
+intent and pre-DATA transitions commit independently before native effects;
+callers must not wrap the service in a transaction that could discard nonce
+history after sending.
+
 The message uses the ordinary notice composer with fixed bounded text and its
 test GUID as a correlation identifier. The receipt stores source/intent metadata,
 addresses and state, with no subject, body, host, login password or native reply.

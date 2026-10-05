@@ -19,7 +19,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.db import close_old_connections
+from django.db import close_old_connections, connection, transaction
 
 from astrolift_identity.models import Member, Organization
 from astrolift_operations.models import InstallAlertMailTest, NotificationPreference
@@ -713,3 +713,50 @@ def test_actual_own_mailbox_change_before_data_refuses_original_target(world):
     assert not result["ok"] and not world.wire["messages"]
     row = InstallAlertMailTest.objects.get()
     assert row.recipient == "operator@example.test"
+
+
+@pytest.mark.parametrize("transaction_mode", ["atomic", "autocommit_disabled"])
+def test_enclosing_transaction_refuses_before_intent_or_smtp_and_nonce_remains_usable(
+    world, transaction_mode
+):
+    nonce = uuid4()
+    fingerprint = support(world)["sourceFingerprint"]
+    if transaction_mode == "atomic":
+        with transaction.atomic():
+            nested = send(world, nonce, fingerprint)
+            nested_rows = InstallAlertMailTest._base_manager.filter(request_id=nonce).count()
+            transaction.set_rollback(True)
+    else:
+        connection.set_autocommit(False)
+        try:
+            nested = send(world, nonce, fingerprint)
+            nested_rows = InstallAlertMailTest._base_manager.filter(request_id=nonce).count()
+        finally:
+            connection.rollback()
+            connection.set_autocommit(True)
+    assert not InstallAlertMailTest._base_manager.filter(request_id=nonce).exists()
+    original = send(world, nonce, fingerprint)
+    assert original["ok"] and original["data"]["status"] == "accepted"
+    assert (nested["ok"], nested_rows, len(world.wire["messages"]), world.wire["connections"]) == (
+        False,
+        0,
+        1,
+        1,
+    )
+    assert nested["errors"] == [
+        {"code": "PRECONDITION", "message": "ALERT_MAIL_ENCLOSING_TRANSACTION_UNSUPPORTED"}
+    ]
+    repeated = send(world, nonce, fingerprint)
+    assert repeated["data"]["id"] == original["data"]["id"]
+    assert len(world.wire["messages"]) == 1 and world.wire["connections"] == 1
+
+
+def test_enclosing_transaction_does_not_replace_current_authority_refusal(world):
+    world.member.is_active = False
+    world.member.save(update_fields=["is_active"])
+    with transaction.atomic():
+        result = send(world, uuid4(), "0" * 64)
+    assert not result["ok"] and result["data"] is None
+    assert result["errors"][0]["code"] == "PERMISSION_DENIED"
+    assert not InstallAlertMailTest._base_manager.exists()
+    assert world.wire["messages"] == [] and world.wire["connections"] == 0
