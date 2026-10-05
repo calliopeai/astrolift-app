@@ -8094,7 +8094,20 @@
     "unknownHelp": "未确认响应。再次写入前请恢复原始请求。",
     "recordedHelp": "已记录连接请求。请检查其当前协调状态。",
     "observationHelp": "记录连接并不证明公共 DNS、入口或 TLS 已就绪。",
-    "recover": "恢复当前请求"
+    "recover": "恢复当前请求",
+    "targetKind": "托管方式",
+    "deploymentHosting": "集群工作负载",
+    "httpApiHosting": "应用管理的 HTTP API",
+    "endpoint": "端点观测",
+    "tlsStatus": "TLS 观测",
+    "endpointReviewHelp": "检查当前目标和建议的记录。DNS、端点可达性和 TLS 分别检查。",
+    "routeObservationHelp": "记录连接并不能证明公共 DNS、端点可达性或 TLS 已就绪。",
+    "targetPending": "API 自定义域名的 DNS 目标尚未分配。连接时会分配目标，然后将返回的原生目标用于 DNS。DNS 和 HTTPS 的就绪状态仍未验证。",
+    "dnsUnavailable": "建议的 DNS 目标不可用。连接前请刷新当前审核。",
+    "apiId": "API 标识符",
+    "apiStage": "API 阶段",
+    "functionReference": "函数引用",
+    "certificateStatus": "证书状态"
   },
   "domainDefaults": {
     "title": "域名设置",

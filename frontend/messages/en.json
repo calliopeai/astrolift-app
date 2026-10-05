@@ -8174,7 +8174,20 @@
     "unknownHelp": "The reply was not confirmed. Recover the original request before another write.",
     "recordedHelp": "A connection request is recorded. Check its current reconciliation state.",
     "observationHelp": "Recording a connection does not prove public DNS, ingress or TLS readiness.",
-    "recover": "Recover current request"
+    "recover": "Recover current request",
+    "targetKind": "Hosting method",
+    "deploymentHosting": "Cluster workload",
+    "httpApiHosting": "App-managed HTTP API",
+    "endpoint": "Endpoint observation",
+    "tlsStatus": "TLS observation",
+    "endpointReviewHelp": "Review the current target and proposed records. DNS, endpoint reachability and TLS are checked separately.",
+    "routeObservationHelp": "Recording a connection does not prove public DNS, endpoint reachability or TLS readiness.",
+    "targetPending": "The API custom-domain DNS target has not been allocated. Connecting allocates it, then uses the returned native target for DNS. DNS and HTTPS readiness remain unverified.",
+    "dnsUnavailable": "The proposed DNS destination is unavailable. Refresh the current review before connecting.",
+    "apiId": "API identifier",
+    "apiStage": "API stage",
+    "functionReference": "Function reference",
+    "certificateStatus": "Certificate state"
   },
   "domainDefaults": {
     "title": "Domain settings",

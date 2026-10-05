@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Prepare the domain connection view for deployment and app-managed HTTP API targets with generic endpoint/TLS observations, localized hosting labels and retained-review invalidation; routing API activation remains separate (#2299).
+
 - Show typed Route53 policy configuration and health/traffic-policy references per DNS record in the Domains Records tab, retaining unknown and non-Route53 states without claiming measured health or traffic (#2287).
 
 - Connect domain settings to fresh effective-default admission with a reviewed domain version and impact fingerprint, localized refusal reasons and explicit refresh/review after uncertain replies; preserve existing app URLs (#2299).

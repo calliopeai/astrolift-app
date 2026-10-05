@@ -8094,7 +8094,20 @@
     "unknownHelp": "応答を確認できませんでした。次の書き込み前に元のリクエストを復元してください。",
     "recordedHelp": "接続リクエストが記録されています。現在の反映状態を確認してください。",
     "observationHelp": "接続の記録は、公開 DNS、Ingress、TLS の準備完了を証明しません。",
-    "recover": "現在のリクエストを復元"
+    "recover": "現在のリクエストを復元",
+    "targetKind": "ホスティング方式",
+    "deploymentHosting": "クラスターのワークロード",
+    "httpApiHosting": "アプリ管理の HTTP API",
+    "endpoint": "エンドポイントの観測",
+    "tlsStatus": "TLS の観測",
+    "endpointReviewHelp": "現在の接続先と提案されたレコードを確認します。DNS、エンドポイントへの到達性、TLS は個別に確認されます。",
+    "routeObservationHelp": "接続が記録されても、パブリック DNS、エンドポイントへの到達性、TLS の準備が完了した証明にはなりません。",
+    "targetPending": "API のカスタムドメインの DNS 接続先はまだ割り当てられていません。接続時に割り当てられ、返されたネイティブの接続先が DNS に使用されます。DNS と HTTPS の準備状態は未確認です。",
+    "dnsUnavailable": "提案された DNS 接続先を利用できません。接続する前に現在の確認結果を更新してください。",
+    "apiId": "API の識別子",
+    "apiStage": "API ステージ",
+    "functionReference": "関数の参照",
+    "certificateStatus": "証明書の状態"
   },
   "domainDefaults": {
     "title": "ドメイン設定",

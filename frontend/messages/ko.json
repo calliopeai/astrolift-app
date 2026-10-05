@@ -8094,7 +8094,20 @@
     "unknownHelp": "응답이 확인되지 않았습니다. 다시 쓰기 전에 원래 요청을 복구하세요.",
     "recordedHelp": "연결 요청이 기록되었습니다. 현재 조정 상태를 확인하세요.",
     "observationHelp": "연결 기록은 공개 DNS, 인그레스 또는 TLS 준비 완료를 증명하지 않습니다.",
-    "recover": "현재 요청 복구"
+    "recover": "현재 요청 복구",
+    "targetKind": "호스팅 방식",
+    "deploymentHosting": "클러스터 워크로드",
+    "httpApiHosting": "앱에서 관리하는 HTTP API",
+    "endpoint": "엔드포인트 관측",
+    "tlsStatus": "TLS 관측",
+    "endpointReviewHelp": "현재 대상과 제안된 레코드를 검토하세요. DNS, 엔드포인트 접근 가능 여부, TLS는 각각 확인됩니다.",
+    "routeObservationHelp": "연결이 기록되어도 공용 DNS, 엔드포인트 접근 가능 여부 또는 TLS 준비가 완료되었다는 증거는 아닙니다.",
+    "targetPending": "API 사용자 지정 도메인의 DNS 대상이 아직 할당되지 않았습니다. 연결 시 할당한 후 반환된 네이티브 대상을 DNS에 사용합니다. DNS와 HTTPS 준비 상태는 아직 확인되지 않았습니다.",
+    "dnsUnavailable": "제안된 DNS 대상을 사용할 수 없습니다. 연결하기 전에 현재 검토 결과를 새로 고치세요.",
+    "apiId": "API 식별자",
+    "apiStage": "API 단계",
+    "functionReference": "함수 참조",
+    "certificateStatus": "인증서 상태"
   },
   "domainDefaults": {
     "title": "도메인 설정",

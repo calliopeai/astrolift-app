@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/sheet";
 
 export type RouteTargetView = {
+  kind: "DEPLOYMENT" | "FAAS_HTTP_API";
   key: string;
   app: string;
   environment: string;
@@ -26,8 +27,11 @@ export type RouteReviewView = {
   hostname: string;
   target: RouteTargetView;
   records: readonly string[];
+  recordState: "proposed" | "pending" | "unavailable";
+  certificate: string;
+  api?: { id: string; stage: string; functionReference: string } | null;
   mode: "managed" | "manual";
-  ingress: string;
+  endpoint: string;
   tls: string;
   checkedAt: string;
   reason: string | null;
@@ -77,6 +81,7 @@ function OpenConnectionSheet(props: DomainAppConnectionSheetProps) {
   const targetId = React.useId();
   const locked = props.busy || props.outcome !== "none";
   const freshTargets = props.readState === "ready";
+  const targetKinds = { DEPLOYMENT: "deploymentHosting", FAAS_HTTP_API: "httpApiHosting" } as const;
   const selected = props.targets.find((target) => target.key === props.targetKey);
   const preview = props.hostnameKind === "apex" ? props.zone : `${props.subdomain}.${props.zone}`;
   const currentReview = Boolean(
@@ -84,7 +89,9 @@ function OpenConnectionSheet(props: DomainAppConnectionSheetProps) {
     !props.reviewing &&
     !props.reviewError &&
     freshTargets &&
+    selected &&
     props.review &&
+    props.review.target.kind === selected.kind &&
     props.review.hostname === preview &&
     props.review.target.key === props.targetKey
   );
@@ -115,7 +122,7 @@ function OpenConnectionSheet(props: DomainAppConnectionSheetProps) {
           {props.outcome !== "none" && (
             <div role="status" className="space-y-3 rounded-lg border p-3">
               <p>{t(props.outcome === "unknown" ? "unknownHelp" : "recordedHelp")}</p>
-              <p className="text-muted-foreground text-sm">{t("observationHelp")}</p>
+              <p className="text-muted-foreground text-sm">{t("routeObservationHelp")}</p>
               <Button disabled={props.busy || !props.onRecover} onClick={props.onRecover}>
                 {t("recover")}
               </Button>
@@ -184,7 +191,8 @@ function OpenConnectionSheet(props: DomainAppConnectionSheetProps) {
                     <option value="">{t("selectTarget")}</option>
                     {props.targets.map((target) => (
                       <option key={target.key} value={target.key}>
-                        {target.app} · {target.environment} · {target.workload}
+                        {t(targetKinds[target.kind])} · {target.app} · {target.environment} ·{" "}
+                        {target.workload}
                       </option>
                     ))}
                   </select>
@@ -243,7 +251,7 @@ function OpenConnectionSheet(props: DomainAppConnectionSheetProps) {
           )}
           {step === 2 && (
             <section className="space-y-4">
-              <p className="text-muted-foreground text-sm">{t("reviewHelp")}</p>
+              <p className="text-muted-foreground text-sm">{t("endpointReviewHelp")}</p>
               {props.reviewing && <p role="status">{d("running")}</p>}
               {props.reviewError && (
                 <p role="alert" className="break-words">
@@ -257,10 +265,12 @@ function OpenConnectionSheet(props: DomainAppConnectionSheetProps) {
                       [d("hostname"), props.review.hostname],
                       [d("application"), props.review.target.app],
                       [d("environment"), props.review.target.environment],
+                      [t("targetKind"), t(targetKinds[props.review.target.kind])],
                       [t("workload"), props.review.target.workload],
                       [d("cluster"), props.review.target.cluster],
-                      [d("ingress"), props.review.ingress],
-                      [d("tls"), props.review.tls],
+                      [t("endpoint"), props.review.endpoint],
+                      [t("certificateStatus"), props.review.certificate],
+                      [t("tlsStatus"), props.review.tls],
                       [d("checkedAt"), props.review.checkedAt],
                     ].map(([label, value]) => (
                       <div key={label}>
@@ -269,13 +279,34 @@ function OpenConnectionSheet(props: DomainAppConnectionSheetProps) {
                       </div>
                     ))}
                   </dl>
+                  {props.review.target.kind === "FAAS_HTTP_API" && props.review.api && (
+                    <dl className="space-y-3 text-sm">
+                      {[
+                        [t("apiId"), props.review.api.id],
+                        [t("apiStage"), props.review.api.stage],
+                        [t("functionReference"), props.review.api.functionReference],
+                      ].map(([label, value]) => (
+                        <div key={label}>
+                          <dt className="text-muted-foreground">{label}</dt>
+                          <dd className="break-all">{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
                   <div className="space-y-2 rounded-lg border p-3">
                     <h3 className="font-medium">{t("dnsProposal")}</h3>
-                    {props.review.records.map((record, index) => (
-                      <p key={index} className="font-mono text-xs break-all">
-                        {record}
-                      </p>
-                    ))}
+                    {props.review.recordState === "pending" && (
+                      <p role="status">{t("targetPending")}</p>
+                    )}
+                    {props.review.recordState === "unavailable" && (
+                      <p role="alert">{t("dnsUnavailable")}</p>
+                    )}
+                    {props.review.recordState === "proposed" &&
+                      props.review.records.map((record, index) => (
+                        <p key={index} className="font-mono text-xs break-all">
+                          {record}
+                        </p>
+                      ))}
                   </div>
                   {props.review.reason && (
                     <code className="block text-xs break-all">{props.review.reason}</code>
@@ -302,6 +333,19 @@ function OpenConnectionSheet(props: DomainAppConnectionSheetProps) {
                     props.reviewing ||
                     !currentReview ||
                     props.review?.mode !== "managed" ||
+                    !props.review ||
+                    !(
+                      (props.review.recordState === "proposed" &&
+                        props.review.records.length > 0) ||
+                      (props.review.recordState === "pending" &&
+                        props.review.target.kind === "FAAS_HTTP_API" &&
+                        props.review.records.length === 0 &&
+                        Boolean(
+                          props.review.api?.id.trim() &&
+                          props.review.api.stage.trim() &&
+                          props.review.api.functionReference.trim()
+                        ))
+                    ) ||
                     !props.canAttach ||
                     !props.onAttach
                   }

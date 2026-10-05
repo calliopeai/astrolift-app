@@ -8097,7 +8097,20 @@
     "unknownHelp": "La respuesta no se confirmó. Recupera la solicitud original antes de otra escritura.",
     "recordedHelp": "Se registró una solicitud de conexión. Comprueba su estado actual de conciliación.",
     "observationHelp": "Registrar una conexión no demuestra que DNS público, ingreso o TLS estén listos.",
-    "recover": "Recuperar solicitud actual"
+    "recover": "Recuperar solicitud actual",
+    "targetKind": "Tipo de alojamiento",
+    "deploymentHosting": "Carga de trabajo del clúster",
+    "httpApiHosting": "API HTTP administrada por la app",
+    "endpoint": "Observación del endpoint",
+    "tlsStatus": "Observación de TLS",
+    "endpointReviewHelp": "Revisa el destino actual y los registros propuestos. El DNS, la accesibilidad del endpoint y TLS se comprueban por separado.",
+    "routeObservationHelp": "Registrar una conexión no demuestra que el DNS público, el endpoint o TLS estén listos.",
+    "targetPending": "El destino DNS del dominio personalizado de la API aún no se ha asignado. Al conectar, se asigna y se usa el destino nativo devuelto para el DNS. La preparación del DNS y de HTTPS sigue sin verificarse.",
+    "dnsUnavailable": "El destino DNS propuesto no está disponible. Actualiza la revisión actual antes de conectar.",
+    "apiId": "Identificador de la API",
+    "apiStage": "Etapa de la API",
+    "functionReference": "Referencia de la función",
+    "certificateStatus": "Estado del certificado"
   },
   "domainDefaults": {
     "title": "Configuración del dominio",

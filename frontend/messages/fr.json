@@ -8097,7 +8097,20 @@
     "unknownHelp": "La réponse n’a pas été confirmée. Récupérez la demande initiale avant toute nouvelle écriture.",
     "recordedHelp": "Une demande de connexion est enregistrée. Vérifiez son état actuel de rapprochement.",
     "observationHelp": "L’enregistrement d’une connexion ne prouve pas que le DNS public, l’ingress ou TLS sont prêts.",
-    "recover": "Récupérer la demande actuelle"
+    "recover": "Récupérer la demande actuelle",
+    "targetKind": "Mode d’hébergement",
+    "deploymentHosting": "Charge de travail du cluster",
+    "httpApiHosting": "API HTTP gérée par l’application",
+    "endpoint": "Observation du point de terminaison",
+    "tlsStatus": "Observation TLS",
+    "endpointReviewHelp": "Vérifiez la cible actuelle et les enregistrements proposés. Le DNS, l’accessibilité du point de terminaison et TLS sont contrôlés séparément.",
+    "routeObservationHelp": "L’enregistrement d’une connexion ne prouve pas que le DNS public, le point de terminaison ou TLS sont prêts.",
+    "targetPending": "La cible DNS du domaine personnalisé de l’API n’a pas encore été allouée. La connexion l’alloue, puis utilise la cible native renvoyée pour le DNS. La disponibilité du DNS et de HTTPS reste à vérifier.",
+    "dnsUnavailable": "La destination DNS proposée est indisponible. Actualisez la vérification avant de vous connecter.",
+    "apiId": "Identifiant API",
+    "apiStage": "Étape API",
+    "functionReference": "Référence de la fonction",
+    "certificateStatus": "État du certificat"
   },
   "domainDefaults": {
     "title": "Paramètres du domaine",

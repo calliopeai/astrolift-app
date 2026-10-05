@@ -4,9 +4,11 @@ import en from "@/messages/en.json";
 import {
   DomainAppConnectionSheet,
   type DomainAppConnectionSheetProps,
+  type RouteTargetView,
 } from "./DomainAppConnectionSheet";
 
-const target = {
+const target: RouteTargetView = {
+  kind: "DEPLOYMENT",
   key: "reviewed-target",
   app: "Sample app",
   environment: "production",
@@ -33,8 +35,10 @@ export const APP_CONNECTION: DomainAppConnectionSheetProps = {
     hostname: "sample.example",
     target,
     records: ["sample.example. A ALIAS reviewed-alb.example"],
+    recordState: "proposed",
+    certificate: "Not observed",
     mode: "managed",
-    ingress: "Observed target",
+    endpoint: "Observed target",
     tls: "Pending",
     checkedAt: "2026-10-04T10:00:00Z",
     reason: null,
@@ -137,7 +141,7 @@ export const ReviewFailed: Story = {
     ...APP_CONNECTION,
     initialStep: 2,
     review: null,
-    reviewError: "Current ingress could not be verified.",
+    reviewError: "Current endpoint could not be verified.",
     canAttach: false,
   },
 };
@@ -149,4 +153,73 @@ export const RecordedPending: Story = {
 };
 export const MoreTargets: Story = {
   args: { ...APP_CONNECTION, initialStep: 1, hasNextPage: true, onNextPage: () => {} },
+};
+
+const httpApiTarget: RouteTargetView = {
+  kind: "FAAS_HTTP_API",
+  key: "reviewed-http-api-target",
+  app: "Sample function app",
+  environment: "production",
+  workload: "public-handler",
+  cluster: "AWS cluster",
+};
+export const HTTP_API_CONNECTION: DomainAppConnectionSheetProps = {
+  ...APP_CONNECTION,
+  targets: [httpApiTarget],
+  targetKey: httpApiTarget.key,
+  review: {
+    ...APP_CONNECTION.review!,
+    target: httpApiTarget,
+    endpoint: "https://sample.execute-api.us-west-2.amazonaws.com",
+    records: [],
+    recordState: "pending",
+    api: {
+      id: "sample-api",
+      stage: "$default",
+      functionReference: "arn:aws:lambda:us-west-2:123456789012:function:sample-handler",
+    },
+    certificate: "Pending",
+    tls: "HTTPS not observed",
+    reason: "DOMAIN_CERTIFICATE_PENDING",
+  },
+  canAttach: false,
+};
+export const HttpApiTarget: Story = { args: { ...HTTP_API_CONNECTION, initialStep: 1 } };
+export const HttpApiReview: Story = { args: { ...HTTP_API_CONNECTION, initialStep: 2 } };
+export const HttpApiPreparation: Story = {
+  args: { ...HTTP_API_CONNECTION, initialStep: 2, canPrepare: true, onPrepare: () => {} },
+};
+export const HttpApiManual: Story = {
+  args: {
+    ...HTTP_API_CONNECTION,
+    initialStep: 2,
+    review: { ...HTTP_API_CONNECTION.review!, mode: "manual" },
+  },
+};
+export const HttpApiUnknown: Story = { args: { ...HTTP_API_CONNECTION, outcome: "unknown" } };
+
+export const HttpApiConnectReview: Story = {
+  args: {
+    ...HTTP_API_CONNECTION,
+    initialStep: 2,
+    review: {
+      ...HTTP_API_CONNECTION.review!,
+      certificate: "Issued",
+      reason: "NATIVE_DOMAIN_ALLOCATION_PENDING",
+    },
+    canAttach: true,
+  },
+};
+export const HttpApiSourceUnavailable: Story = {
+  args: {
+    ...HTTP_API_CONNECTION,
+    initialStep: 2,
+    review: {
+      ...HTTP_API_CONNECTION.review!,
+      recordState: "unavailable",
+      api: null,
+      endpoint: "Not observed",
+    },
+    canAttach: false,
+  },
 };

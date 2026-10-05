@@ -14,13 +14,13 @@ import {
   DomainAppConnectionSheet,
   type DomainAppConnectionSheetProps,
 } from "./DomainAppConnectionSheet";
-import { APP_CONNECTION } from "./DomainAppConnectionSheet.stories";
+import { APP_CONNECTION, HTTP_API_CONNECTION } from "./DomainAppConnectionSheet.stories";
 import { DomainDefaultSettings } from "./DomainDefaultSettings";
 import { DEFAULT_SETTINGS } from "./DomainDefaultSettings.stories";
 
 const catalogues = { en, es, fr, de, ja, ko, "zh-Hans": zh, "pt-BR": pt };
 const routeKeys =
-  "connect intro steps hostnameStep targetStep reviewStep apex subdomain subdomainHelp next targetHelp empty selectTarget previousPage nextPage review reviewHelp workload dnsProposal manualHelp prepare attach unknownHelp recordedHelp observationHelp recover".split(
+  "connect intro steps hostnameStep targetStep reviewStep apex subdomain subdomainHelp next targetHelp empty selectTarget previousPage nextPage review reviewHelp workload dnsProposal manualHelp prepare attach unknownHelp recordedHelp observationHelp recover targetKind deploymentHosting httpApiHosting endpoint tlsStatus endpointReviewHelp routeObservationHelp targetPending dnsUnavailable apiId apiStage functionReference certificateStatus".split(
     " "
   );
 const defaultKeys =
@@ -65,9 +65,9 @@ describe("domain routing and defaults pure views", () => {
           onError={onError}
         >
           <DomainAppConnectionSheet
-            {...APP_CONNECTION}
+            {...HTTP_API_CONNECTION}
             initialStep={2}
-            review={{ ...APP_CONNECTION.review!, mode: "manual" }}
+            review={{ ...HTTP_API_CONNECTION.review!, mode: "manual" }}
           />
           <DomainDefaultSettings
             {...DEFAULT_SETTINGS}
@@ -77,6 +77,11 @@ describe("domain routing and defaults pure views", () => {
         </NextIntlClientProvider>
       );
       expect(screen.getByText(messages.domainAppRouting.manualHelp)).toBeInTheDocument();
+      expect(screen.getByText(messages.domainAppRouting.httpApiHosting)).toBeInTheDocument();
+      expect(screen.getByText(messages.domainAppRouting.endpoint)).toBeInTheDocument();
+      expect(screen.getByText(messages.domainAppRouting.tlsStatus)).toBeInTheDocument();
+      expect(screen.getByText(messages.domainAppRouting.targetPending)).toBeInTheDocument();
+      expect(screen.getByText(messages.domainAppRouting.certificateStatus)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: messages.domainAppRouting.attach })).toBeDisabled();
       expect(
         screen.getByRole("button", { name: messages.managedDomains.cancel })
@@ -204,7 +209,7 @@ describe("domain routing and defaults pure views", () => {
       )
     );
     expect(screen.getByText(en.domainAppRouting.unknownHelp)).toBeInTheDocument();
-    expect(screen.getByText(en.domainAppRouting.observationHelp)).toBeInTheDocument();
+    expect(screen.getByText(en.domainAppRouting.routeObservationHelp)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: en.domainAppRouting.attach })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: en.domainAppRouting.recover }));
     expect(onRecover).toHaveBeenCalledOnce();
@@ -249,6 +254,115 @@ describe("domain routing and defaults pure views", () => {
       const save = screen.queryByRole("button", { name: en.domainDefaults.save });
       if (save) fireEvent.click(save);
       expect(onSave).not.toHaveBeenCalled();
+    }
+  );
+});
+
+describe("HTTP API domain connection render boundaries", () => {
+  it("keeps the same admitted workload picker with explicit hosting kinds", () => {
+    const onTarget = vi.fn();
+    render(
+      wrap(
+        <DomainAppConnectionSheet
+          {...HTTP_API_CONNECTION}
+          initialStep={1}
+          targets={[...APP_CONNECTION.targets, ...HTTP_API_CONNECTION.targets]}
+          onTarget={onTarget}
+        />
+      )
+    );
+    expect(
+      screen.getByRole("option", {
+        name: `${en.domainAppRouting.deploymentHosting} · Sample app · production · web`,
+      })
+    ).toHaveValue(APP_CONNECTION.targetKey);
+    expect(
+      screen.getByRole("option", {
+        name: `${en.domainAppRouting.httpApiHosting} · Sample function app · production · public-handler`,
+      })
+    ).toHaveValue(HTTP_API_CONNECTION.targetKey);
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: APP_CONNECTION.targetKey } });
+    expect(onTarget).toHaveBeenCalledExactlyOnceWith(APP_CONNECTION.targetKey);
+  });
+  it("discloses pending native allocation without inventing an ALIAS or another approval step", () => {
+    const onAttach = vi.fn();
+    render(
+      wrap(
+        <DomainAppConnectionSheet
+          {...HTTP_API_CONNECTION}
+          initialStep={2}
+          review={{ ...HTTP_API_CONNECTION.review!, certificate: "Issued" }}
+          canAttach
+          onAttach={onAttach}
+        />
+      )
+    );
+    expect(screen.getByText(en.domainAppRouting.targetPending)).toBeInTheDocument();
+    expect(screen.getByText("$default")).toBeInTheDocument();
+    expect(
+      screen.getByText(HTTP_API_CONNECTION.review!.api!.functionReference)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/ A ALIAS /)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: en.domainAppRouting.attach })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: en.domainAppRouting.attach }));
+    expect(onAttach).toHaveBeenCalledOnce();
+  });
+  it.each(["disappeared", "kind"])(
+    "refuses a retained review after selected source %s change",
+    (condition) => {
+      const onAttach = vi.fn(),
+        onPrepare = vi.fn();
+      const targets =
+        condition === "disappeared"
+          ? []
+          : [{ ...HTTP_API_CONNECTION.targets[0], kind: "DEPLOYMENT" as const }];
+      render(
+        wrap(
+          <DomainAppConnectionSheet
+            {...HTTP_API_CONNECTION}
+            initialStep={2}
+            targets={targets}
+            canAttach
+            canPrepare
+            onAttach={onAttach}
+            onPrepare={onPrepare}
+          />
+        )
+      );
+      expect(screen.getByRole("button", { name: en.domainAppRouting.attach })).toBeDisabled();
+      expect(screen.getByRole("button", { name: en.domainAppRouting.prepare })).toBeDisabled();
+      fireEvent.click(screen.getByRole("button", { name: en.domainAppRouting.attach }));
+      expect(onAttach).not.toHaveBeenCalled();
+      expect(onPrepare).not.toHaveBeenCalled();
+    }
+  );
+  it.each(["unavailable", "absent-api", "empty-api", "pending-deployment", "invented-record"])(
+    "refuses %s proposal despite a supplied action hint",
+    (condition) => {
+      const onAttach = vi.fn();
+      const review = { ...HTTP_API_CONNECTION.review! };
+      if (condition === "unavailable") review.recordState = "unavailable";
+      if (condition === "absent-api") review.api = null;
+      if (condition === "empty-api") review.api = { ...review.api!, id: "" };
+      if (condition === "pending-deployment")
+        review.target = { ...review.target, kind: "DEPLOYMENT" };
+      if (condition === "invented-record")
+        review.records = ["sample.example. A ALIAS guessed-target.example"];
+      render(
+        wrap(
+          <DomainAppConnectionSheet
+            {...HTTP_API_CONNECTION}
+            initialStep={2}
+            review={review}
+            canAttach
+            onAttach={onAttach}
+          />
+        )
+      );
+      expect(screen.getByRole("button", { name: en.domainAppRouting.attach })).toBeDisabled();
+      expect(screen.queryByText(/guessed-target/)).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: en.domainAppRouting.attach }));
+      expect(onAttach).not.toHaveBeenCalled();
     }
   );
 });
