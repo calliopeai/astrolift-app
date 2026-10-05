@@ -87,6 +87,7 @@ ANY_SCOPE = "any_scope"
 TOOL_SCOPES: dict[str, Any] = {
     "astrolift_list_agents": ANY_SCOPE,
     "astrolift_list_tasks": ANY_SCOPE,
+    "astrolift_get_task_by_client_request_id": ANY_SCOPE,
     "astrolift_list_runtimes": ANY_SCOPE,
     "astrolift_get_agent": agent_workload_app_scope("agent_slug"),
     "astrolift_get_task": agent_task_scope("task_id"),
@@ -355,6 +356,20 @@ def _get_task(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
     return _serialize_task(task)
 
 
+def _get_task_by_client_request_id(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    request_id = _public_id(args.get("client_request_id"), "client_request_id")
+    task = (
+        _task_rows()
+        .filter(
+            organization_id=_org_id(),
+            created_by_id=_token(request).user_id,
+            client_request_id=request_id,
+        )
+        .first()
+    )
+    return {"task": _serialize_task(task) if task is not None else None}
+
+
 def _list_tasks(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
     from django.core.exceptions import ValidationError
 
@@ -428,6 +443,7 @@ def _run_agent(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
             environment_spec_guid=str(args.get("environment_spec_id") or ""),
             trigger_payload=args.get("trigger_payload") or None,
             timeout_seconds=args.get("timeout_seconds"),
+            client_request_id=args.get("client_request_id"),
             trigger="mcp",
             trigger_kind=RunTrigger.API,
         )
@@ -964,6 +980,7 @@ _HANDLERS: dict[str, ToolHandler] = {
     "astrolift_list_agents": _list_agents,
     "astrolift_get_agent": _get_agent,
     "astrolift_get_task": _get_task,
+    "astrolift_get_task_by_client_request_id": _get_task_by_client_request_id,
     "astrolift_list_tasks": _list_tasks,
     "astrolift_list_runtimes": _list_runtimes,
     "astrolift_run_agent": _run_agent,
