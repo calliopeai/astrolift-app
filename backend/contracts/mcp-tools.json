@@ -17,6 +17,247 @@
   },
   "tools": [
     {
+      "description": "Start an explicitly reviewed native workflow. Requires the exact definition ID, revision and input-schema digest, a persisted request ID, and confirmation. Retry the same request after an uncertain response; never generate a replacement ID. Tool errors preserve the native result including reserved execution IDs when available.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmed": {
+            "type": "boolean"
+          },
+          "definition_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "expected_input_schema_digest": {
+            "maxLength": 64,
+            "minLength": 64,
+            "type": "string"
+          },
+          "expected_revision": {
+            "maxLength": 64,
+            "minLength": 64,
+            "type": "string"
+          },
+          "inputs": {
+            "type": "object"
+          },
+          "request_id": {
+            "description": "Persist a unique request ID before starting. Recovery is scoped to the original organization and actor.",
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "definition_id",
+          "expected_revision",
+          "expected_input_schema_digest",
+          "request_id",
+          "confirmed"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_start_workflow_definition",
+      "required_permissions": [
+        "workflow.trigger"
+      ],
+      "required_scopes": [
+        "mcp:dispatch",
+        "workflow:trigger"
+      ]
+    },
+    {
+      "description": "Recover the authenticated actor's original workflow start request. Reconciles recorded state against Temporal without starting a new execution. Returns start: null for no visible request.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "request_id": {
+            "description": "Persist a unique request ID before starting. Recovery is scoped to the original organization and actor.",
+            "maxLength": 128,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_get_workflow_start",
+      "required_permissions": [
+        "workflow.read"
+      ],
+      "required_scopes": [
+        "mcp:read"
+      ]
+    },
+    {
+      "description": "Discover permitted native definition runs with pagination, search and status/definition/project filters.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "description": "Native next_cursor from the preceding page; malformed cursors restart the page.",
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "definition_slugs": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "limit": {
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "project_slugs": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array"
+          },
+          "search": {
+            "maxLength": 1024,
+            "type": "string"
+          },
+          "started_by_me": {
+            "type": "boolean"
+          },
+          "statuses": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "type": "array"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "name": "astrolift_list_workflow_runs",
+      "required_permissions": [
+        "workflow.read"
+      ],
+      "required_scopes": [
+        "mcp:read"
+      ]
+    },
+    {
+      "description": "Observe one exact permitted native execution, including terminal state, cleanup state and engine observation errors.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "execution_id": {
+            "description": "Exact WorkflowRun record ID or GUID returned by the native start or run list.",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "execution_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_get_workflow_execution",
+      "required_permissions": [
+        "workflow.read"
+      ],
+      "required_scopes": [
+        "mcp:read"
+      ]
+    },
+    {
+      "description": "Page through the stage history of one exact permitted execution, including child runs and pending human gates.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "cursor": {
+            "description": "Execution-bound next_cursor from the preceding stage page.",
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "execution_id": {
+            "description": "Exact WorkflowRun record ID or GUID returned by the native start or run list.",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "limit": {
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "execution_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_list_workflow_execution_stages",
+      "required_permissions": [
+        "workflow.read"
+      ],
+      "required_scopes": [
+        "mcp:read"
+      ]
+    },
+    {
+      "description": "Request native cancel, terminate or cleanup for an exact execution/workflow/run triple. A delivered request is not proof of closure: inspect the execution again. Termination requires a reason; cleanup requires an already-terminal execution.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "cancel",
+              "terminate",
+              "cleanup"
+            ],
+            "type": "string"
+          },
+          "execution_id": {
+            "description": "Exact WorkflowRun record ID or GUID returned by the native start or run list.",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          "run_id": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "workflow_id": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "execution_id",
+          "workflow_id",
+          "run_id",
+          "action"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_control_workflow_execution",
+      "required_permissions": [
+        "workflow.trigger"
+      ],
+      "required_scopes": [
+        "mcp:dispatch",
+        "workflow:trigger"
+      ]
+    },
+    {
       "description": "Discover permitted native workflow definitions and stage topology, with search and pagination.",
       "inputSchema": {
         "additionalProperties": false,

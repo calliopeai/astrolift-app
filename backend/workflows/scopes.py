@@ -128,13 +128,22 @@ def workflow_run_scope_by_id(field: str = "workflow_id", run_field: str | None =
     return _scope
 
 
-def execution_scope_by_id(field: str = "execution_id"):
+def execution_scope_by_id(field: str = "execution_id", permission=Permission.WORKFLOW_READ):
     def _scope(args: dict[str, Any]) -> PermissionScope:
+        from astrolift_identity.api_tokens import get_current_api_token
+        from astrolift_registry.scopes import _credential_scope
         from astrolift_workflows.execution_controls import find_execution
 
         org_id = _org_id()
         run = find_execution(org_id, str(read_arg(args, field) or ""))
-        return run_scope(run, org_id) if run is not None else org_scope(org_id)
+        token = get_current_api_token()
+        if token is not None and token.team_id is not None and (run is None or run.registered_app_id is None):
+            return reviewed_definition_scope(
+                run.workflow_definition if run is not None else None, org_id, permission=permission
+            )
+        # Preserve org-authorized access to historical runs with retired owners,
+        # while applying the app ownership/share ceiling for team credentials.
+        return _credential_scope(run_scope(run, org_id) if run is not None else org_scope(org_id), permission)
 
     return _scope
 
@@ -352,8 +361,28 @@ def visible_runs(qs, org_id: int | None, permission: Permission):
     app's project and team cover it only while they are live, as in the
     resolver's ``_app_scope_chains``.
     """
+    from astrolift_identity.api_tokens import get_current_api_token
     from astrolift_identity.operation_visibility import visible_workflow_operation_rows
     from astrolift_registry.models import RegisteredApp
+    from astrolift_registry.scopes import _credential_app_ids
+
+    token = get_current_api_token()
+    if token is not None:
+        if token.organization_id != org_id:
+            return qs.none()
+        if token.team_id is not None:
+            app_ids = qs.order_by().values_list("registered_app_id", flat=True).distinct()
+            qs = qs.filter(
+                Q(registered_app_id__in=_credential_app_ids(app_ids, permission))
+                | Q(
+                    registered_app__isnull=True,
+                    workflow_definition__project__organization_id=org_id,
+                    workflow_definition__project__deleted_at__isnull=True,
+                    workflow_definition__project__team_id=token.team_id,
+                    workflow_definition__project__team__organization_id=org_id,
+                    workflow_definition__project__team__deleted_at__isnull=True,
+                )
+            )
 
     qs = visible_workflow_operation_rows(qs, permission)
 
