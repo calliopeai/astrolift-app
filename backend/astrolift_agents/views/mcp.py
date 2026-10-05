@@ -46,6 +46,7 @@ from astrolift_services.scopes import (
     managed_service_scope_by_guid,
     services_project_scope_by_guid,
 )
+from astrolift_workflows.import_scopes import workflow_manifest_import_scope
 from config.features import Feature, is_enabled
 from core.permissions import (
     Permission,
@@ -103,6 +104,7 @@ TOOL_SCOPES: dict[str, Any] = {
     "astrolift_list_workflows": ANY_SCOPE,
     "astrolift_preview_workflow_manifest": ANY_SCOPE,
     "astrolift_export_workflow_manifest": definition_scope_by_guid(permission=Permission.WORKFLOW_READ),
+    "astrolift_import_workflow_manifest": workflow_manifest_import_scope,
     "astrolift_list_agents": ANY_SCOPE,
     "astrolift_list_tasks": ANY_SCOPE,
     "astrolift_get_task_by_client_request_id": ANY_SCOPE,
@@ -1016,6 +1018,7 @@ _HANDLERS: dict[str, ToolHandler] = {
     "astrolift_list_workflows": workflow_mcp.list_workflows,
     "astrolift_preview_workflow_manifest": workflow_mcp.preview_manifest,
     "astrolift_export_workflow_manifest": workflow_mcp.export_manifest,
+    "astrolift_import_workflow_manifest": workflow_mcp.import_manifest,
     "astrolift_list_agents": _list_agents,
     "astrolift_get_agent": _get_agent,
     "astrolift_get_task": _get_task,

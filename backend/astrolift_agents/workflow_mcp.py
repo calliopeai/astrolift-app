@@ -81,6 +81,21 @@ def export_manifest(request, args):
     return {"ok": True, "toml": emit_workflow_manifest(definition_to_manifest(definition)), "error": None}
 
 
+def import_manifest(request, args):
+    from astrolift_workflows.schema.manifest import WorkflowManifestMutation
+
+    native_import = cast(Callable[..., object], WorkflowManifestMutation().import_workflow_manifest)
+    return _mutation_payload(
+        native_import(
+            _info(request),
+            toml=args["toml"],
+            preview=args.get("preview", True),
+            replace=args.get("replace", False),
+            project_id=args.get("project_id"),
+        )
+    )
+
+
 def _mutation_payload(result):
     from astrolift_agents.views.mcp import McpCallError
 

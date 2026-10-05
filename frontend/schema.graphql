@@ -7665,6 +7665,7 @@ type ImportWorkflowManifestResult {
   ok: Boolean!
   errors: [ValidationError!]!
   createdSlug: String
+  definitionId: GUID
   manifest: WorkflowManifestPreviewType
   mode: String
   repointedSlugs: [String!]!
@@ -8756,9 +8757,9 @@ type Mutation {
   importWorkflowFlow(format: String!, payload: JSON!, preview: Boolean! = true): ImportWorkflowFlowResult!
 
   """
-  Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled, org-scoped WorkflowDefinition + stages in the caller's org and returns the (possibly uniquified) slug. replace=true instead upserts the org's own definition sharing the manifest's slug: in place when the stage kinds are unchanged (configured Workflows, bindings and schedules all keep working untouched), otherwise as a new version with every configured Workflow repointed to it, or a clear refusal when a repoint would break one's bindings.
+  Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled WorkflowDefinition + stages in the caller's org, optionally owned by projectId, and returns its exact ID and (possibly uniquified) slug. replace=true instead upserts the org's own definition sharing the manifest's slug: in place when the stage kinds are unchanged (configured Workflows, bindings and schedules all keep working untouched), otherwise as a new version with every configured Workflow repointed to it, or a clear refusal when a repoint would break one's bindings. Replacement preserves ownership; projectId cannot transfer it.
   """
-  importWorkflowManifest(toml: String!, preview: Boolean! = true, replace: Boolean! = false, orgId: ID = null): ImportWorkflowManifestResult!
+  importWorkflowManifest(toml: String!, preview: Boolean! = true, replace: Boolean! = false, orgId: ID = null, projectId: GUID = null): ImportWorkflowManifestResult!
 
   """Cancel, terminate, or retry cleanup for an exact owned execution."""
   controlWorkflowExecution(executionId: ID!, workflowId: String!, runId: String!, action: String!, reason: String! = ""): WorkflowExecutionControlResult!

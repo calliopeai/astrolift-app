@@ -207,20 +207,16 @@ def test_replace_requires_both_declared_create_and_existing_update(world, permis
     assert definition.name == "Feature Dev"
 
 
-@pytest.mark.parametrize("kind,allowed", [("PROJECT", False), ("TEAM", False), ("ORG", True)])
-def test_shape_changed_replace_creates_an_org_version_and_requires_org_create(world, kind, allowed):
+@pytest.mark.parametrize("kind", ["PROJECT", "TEAM", "ORG"])
+def test_shape_changed_replace_preserves_project_owner(world, kind):
     definition = owned(world)
     grant(world, Permission.WORKFLOW_CREATE, Permission.WORKFLOW_UPDATE, kind=kind)
     with tenant(world):
-        if allowed:
-            result = run_import(world, "manifest", replace=True, toml=CHANGED_SHAPE)
-            assert result.mode == "versioned"
-            created = WorkflowDefinition.objects.get(organization=world.org, slug=result.created_slug)
-            assert created.project_id is None
-        else:
-            with pytest.raises(PermissionDenied):
-                run_import(world, "manifest", replace=True, toml=CHANGED_SHAPE)
-    assert WorkflowDefinition.objects.filter(organization=world.org).count() == (2 if allowed else 1)
+        result = run_import(world, "manifest", replace=True, toml=CHANGED_SHAPE)
+    assert result.mode == "versioned"
+    created = WorkflowDefinition.objects.get(organization=world.org, slug=result.created_slug)
+    assert created.project_id == definition.project_id
+    assert WorkflowDefinition.objects.filter(organization=world.org).count() == 2
     assert definition.stages.count() == 1
 
 
@@ -278,27 +274,21 @@ def test_stale_or_incoherent_replace_owner_falls_back_to_explicit_org(world, sta
     assert WorkflowDefinition.objects.filter(organization=world.org).count() == 1
 
 
-def test_replacement_rechecks_destination_after_admission_before_any_write(world, monkeypatch):
-    import workflows.manifest as manifest
+def test_replacement_rechecks_owner_after_admission_before_any_write(world, monkeypatch):
+    import astrolift_workflows.schema.manifest as schema
 
     definition = owned(world)
     grant(world, Permission.WORKFLOW_CREATE, Permission.WORKFLOW_UPDATE)
-    original = manifest.shape_compatible
-    calls = []
+    original = schema._import_replace
 
-    def changed_after_admission(existing, parsed):
-        calls.append(True)
-        if len(calls) == 2:
-            existing.stages.filter(order=0).update(kind=WorkflowStage.StageKind.HUMAN_GATE)
-        return original(existing, parsed)
+    def owner_changed(info, parsed, org, **kwargs):
+        WorkflowDefinition.objects.filter(pk=definition.pk).update(project=world.platform_project)
+        return original(info, parsed, org, **kwargs)
 
-    monkeypatch.setattr(manifest, "shape_compatible", changed_after_admission)
+    monkeypatch.setattr(schema, "_import_replace", owner_changed)
     with tenant(world), pytest.raises(PermissionDenied):
         run_import(world, "manifest", replace=True)
-    assert len(calls) == 2
     assert WorkflowDefinition.objects.filter(organization=world.org).count() == 1
-    # The simulated concurrent shape change took place in the handler's
-    # transaction and was rolled back along with the refused replacement.
     assert definition.stages.get().kind == WorkflowStage.StageKind.AGENT_DISPATCH
 
 

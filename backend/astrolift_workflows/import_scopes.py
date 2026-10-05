@@ -43,12 +43,44 @@ def import_definition_owner_scope(definition, *, permission=Permission.WORKFLOW_
     return _credential_scope(org_scope(org_id), permission=permission)
 
 
-def manifest_destination_scope(parsed, existing):
-    from workflows.manifest import shape_compatible
+def resolve_import_project(project_id):
+    from django.db import connection
 
-    # A replacement with a different shape creates a new ORG version.
-    if existing is not None and shape_compatible(existing, parsed):
+    from astrolift_identity.models import Project
+
+    if project_id is None:
+        return None
+    projects = Project.objects.filter(
+        guid=project_id,
+        organization_id=_org_id(),
+        deleted_at__isnull=True,
+        team__organization_id=_org_id(),
+        team__deleted_at__isnull=True,
+    ).select_related("team")
+    if connection.in_atomic_block:
+        projects = projects.select_for_update(of=("self", "team"))
+    project = projects.first()
+    if project is None:
+        raise PermissionDenied(
+            Permission.WORKFLOW_CREATE, org_scope(_org_id()), "no live project at this destination"
+        )
+    return project
+
+
+def manifest_destination_scope(existing, project_id=None):
+    project = resolve_import_project(project_id)
+    if existing is not None:
+        if project is not None and existing.project_id != project.pk:
+            raise PermissionDenied(
+                Permission.WORKFLOW_CREATE,
+                org_scope(_org_id()),
+                "manifest replacement cannot transfer workflow ownership",
+            )
         return import_definition_owner_scope(existing)
+    if project is not None:
+        return _credential_scope(
+            PermissionScope(kind=ScopeKind.PROJECT, id=project.pk), team_id=project.team_id
+        )
     return workflow_import_org_scope({})
 
 
@@ -57,12 +89,13 @@ def workflow_manifest_import_scope(args):
     from workflows.manifest import parse_workflow_manifest
     from workflows.models import WorkflowDefinition
 
+    project_id = read_arg(args, "project_id")
     if read_arg(args, "preview") is not False or not read_arg(args, "replace"):
-        return workflow_import_org_scope(args)
+        return manifest_destination_scope(None, project_id)
     try:
         parsed = parse_workflow_manifest(read_arg(args, "toml") or "")
     except ManifestError:
-        return workflow_import_org_scope(args)
+        return manifest_destination_scope(None, project_id)
     existing = (
         WorkflowDefinition.objects.filter(
             organization_id=_org_id(), slug=parsed.definition.slug, deleted_at__isnull=True
@@ -70,4 +103,4 @@ def workflow_manifest_import_scope(args):
         .select_related("project__team")
         .first()
     )
-    return manifest_destination_scope(parsed, existing)
+    return manifest_destination_scope(existing, project_id)
