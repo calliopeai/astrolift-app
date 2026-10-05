@@ -330,6 +330,28 @@ class HttpApiDomainPort:
         self._account(target, current)
         return acknowledgement
 
+    def inspect_allocation(self, target: HttpApiRouteTarget, *, current: Callable[[], None]) -> bool:
+        """Return confirmed absence, or refuse an existing/unconfirmed native domain.
+
+        This is an exact read for review, never an ownership/adoption receipt.
+        Create performs its own fresh inspection before each native send.
+        """
+        self.observe_target(target, current=current)
+        with _private_io():
+            current()
+            try:
+                self.api.get_domain_name(DomainName=target.hostname)
+            except self.api.exceptions.NotFoundException:
+                current()
+            except Exception:
+                current()
+                _refuse("HTTP_API_NATIVE_READ_UNAVAILABLE")
+            else:
+                current()
+                _refuse("HTTP_API_DOMAIN_ALREADY_EXISTS")
+        self._account(target, current)
+        return True
+
     def create_domain(
         self, target: HttpApiRouteTarget, *, hooks: HttpApiEffectHooks, current: Callable[[], None]
     ) -> HttpApiDomainReceipt:
@@ -337,19 +359,7 @@ class HttpApiDomainPort:
             _refuse("HTTP_API_REVIEW_REQUIRED")
 
         def before_send() -> None:
-            self.observe_target(target, current=current)
-            with _private_io():
-                current()
-                try:
-                    self.api.get_domain_name(DomainName=target.hostname)
-                except self.api.exceptions.NotFoundException:
-                    current()
-                except Exception:
-                    current()
-                    _refuse("HTTP_API_NATIVE_READ_UNAVAILABLE")
-                else:
-                    current()
-                    _refuse("HTTP_API_DOMAIN_ALREADY_EXISTS")
+            self.inspect_allocation(target, current=current)
 
         before_send()
         payload = {

@@ -486,3 +486,40 @@ def test_original_domain_replaced_during_mapping_sent_commit_prevents_mapping(wo
     with pytest.raises(HttpApiRouteUnavailable, match="DOMAIN_REPLACED"):
         port.create_mapping(target, domain, hooks=HttpApiEffectHooks(replace_domain, hooks.record_ack), current=current)
     assert len(state["sent"]) == 2 and len(state["writes"]) == len(state["acks"]) == 1
+
+
+def test_inspect_allocation_confirms_absence_without_sent_or_writes(world):
+    target, port, state, current, _hooks = world
+    assert port.inspect_allocation(replace(target, certificate_arn=""), current=current) is True
+    assert not state["writes"] and not state["sent"] and not state["acks"]
+
+
+def test_inspect_allocation_refuses_existing_owned_domain_without_adoption(world):
+    target, port, state, current, hooks = reviewed(world)
+    port.create_domain(target, hooks=hooks, current=current)
+    with pytest.raises(HttpApiRouteUnavailable, match="DOMAIN_ALREADY_EXISTS"):
+        port.inspect_allocation(target, current=current)
+    assert len(state["writes"]) == len(state["sent"]) == len(state["acks"]) == 1
+
+
+def test_inspect_allocation_denied_is_not_absence(world):
+    target, port, state, current, _hooks = world
+    state["deny"] = "/v2/domainnames/"
+    with pytest.raises(HttpApiRouteUnavailable, match="NATIVE_READ_UNAVAILABLE"):
+        port.inspect_allocation(target, current=current)
+    assert not state["writes"] and not state["sent"] and not state["acks"]
+
+
+def test_inspect_allocation_rechecks_actual_account_after_absence(world):
+    target, port, state, current, _hooks = world
+
+    def on_reply(path):
+        if "/domainnames/" in path:
+            state["account"] = "999999999999"
+        else:
+            state["before_reply"] = on_reply
+
+    state["before_reply"] = on_reply
+    with pytest.raises(HttpApiRouteUnavailable, match="ACCOUNT_MISMATCH"):
+        port.inspect_allocation(target, current=current)
+    assert not state["writes"] and not state["sent"] and not state["acks"]
