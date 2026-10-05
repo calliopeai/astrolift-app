@@ -76,8 +76,7 @@ beforeEach(async () => {
         probeReason === "ICMP_TIMEOUT" ? "UNKNOWN" : args.tool === "PING" ? "UNSUPPORTED" : "OK",
       perspective: "public_dns:1.1.1.1",
       checkedAt: observation.checkedAt,
-      reason:
-        probeReason ?? (args.tool === "PING" ? "ICMP_TOOL_UNAVAILABLE" : "DNS_ANSWER_OBSERVED"),
+      reason: probeReason ?? (args.tool === "PING" ? "ICMP_TOOL_UNAVAILABLE" : "DNS_ANSWER"),
       hostname: probeForeign ? "foreign.example" : args.hostname,
       tool: args.tool,
       recordType: args.recordType,
@@ -182,6 +181,65 @@ async function diagnostics() {
 }
 
 describe("actual exported domain schema over HttpLink", () => {
+  it("shows a successful NS answer without a configured comparison as observation, not a match", async () => {
+    observation.checks = [
+      {
+        key: "lookup",
+        state: "OK",
+        reason: "DNS_ANSWER",
+        perspective: "public_dns:1.1.1.1",
+        checkedAt: observation.checkedAt,
+        expected: [],
+        observed: ["ns.provider.example"],
+      },
+      {
+        key: "internal_dns",
+        state: "UNSUPPORTED",
+        reason: "INTERNAL_DNS_PROBE_NOT_CONFIGURED",
+        perspective: "cluster_internal_dns",
+        checkedAt: observation.checkedAt,
+        expected: [],
+        observed: [],
+      },
+      ...["public_dns:1.1.1.1", "public_dns:8.8.8.8"].map((perspective) => ({
+        key: "delegation",
+        state: "OK" as const,
+        reason: "PUBLIC_DELEGATION_MATCH",
+        perspective,
+        checkedAt: observation.checkedAt,
+        expected: ["ns.provider.example"],
+        observed: ["ns.provider.example"],
+      })),
+    ];
+    render(<View />);
+    await screen.findByRole("heading", { name: DOMAIN_ACTIVE.zone });
+    const lookup = await screen.findByRole("region", {
+      name: `${en.managedDomains.lookup} · public_dns:1.1.1.1`,
+    });
+    expect(within(lookup).getByText(en.managedDomains.answerObserved)).toBeInTheDocument();
+    expect(within(lookup).queryByText(en.managedDomains.ok)).not.toBeInTheDocument();
+    expect(within(lookup).getByText(en.managedDomains.dnsAnswerHelp)).toBeInTheDocument();
+    expect(screen.getByText(en.managedDomains.internalDnsUnavailable)).toBeInTheDocument();
+    expect(screen.getAllByText(en.managedDomains.delegationScopeHelp)).toHaveLength(2);
+    fireEvent.click(screen.getByRole("tab", { name: en.managedDomains.diagnostics }));
+    fireEvent.change(screen.getByLabelText(en.managedDomains.recordType), {
+      target: { value: "NS" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: en.managedDomains.run }));
+    const result = await screen.findByRole("region", { name: en.managedDomains.response });
+    await within(result).findByText(en.managedDomains.answerObserved);
+    expect(within(result).queryByText(en.managedDomains.ok)).not.toBeInTheDocument();
+    expect(requests.find((r) => r.operationName === "ManagedDomainProbe")?.variables).toMatchObject(
+      { hostname: domain.zone, tool: "LOOKUP", recordType: "NS" }
+    );
+    expect(
+      requests.some((r) =>
+        ["VerifyDnsDomain", "RevalidateManagedDomain", "SoftDeleteManagedDomain"].includes(
+          r.operationName
+        )
+      )
+    ).toBe(false);
+  });
   it("reads the selected GUID directly, binds diagnostics to its current version and distinguishes provisioned/mismatch", async () => {
     render(<View />);
     await ready();

@@ -134,3 +134,34 @@ test("operator retains exact pending verification and provider inventory", async
   expect(operations).toContain("DnsConnectionSupport");
   await clean(context, runtime);
 });
+
+test("DNS answers without expected comparison cannot claim a match or cluster/app readiness", async ({
+  page,
+  context,
+}, info) => {
+  const { runtime } = await begin(page, context, info.project.use.baseURL!, "owner");
+  await page.goto(`/domains/${domainId}`);
+  const lookup = page.getByRole("region", {
+    name: `${d.lookup} · public_dns:1.1.1.1`,
+    exact: true,
+  });
+  await expect(lookup.getByText(d.answerObserved, { exact: true })).toBeVisible();
+  await expect(lookup.getByText(d.ok, { exact: true })).toHaveCount(0);
+  await expect(lookup.getByText(d.unknown, { exact: true })).toBeVisible();
+  await expect(page.getByText(d.delegationScopeHelp, { exact: true })).toBeVisible();
+  await expect(page.getByText(d.internalDnsUnavailable, { exact: true })).toBeVisible();
+  await expect(page.getByText("INTERNAL_DNS_PROBE_NOT_CONFIGURED", { exact: true })).toBeVisible();
+  await page.getByRole("tab", { name: d.diagnostics, exact: true }).click();
+  await page.getByLabel(d.recordType, { exact: true }).selectOption("NS");
+  await page.getByRole("button", { name: d.run, exact: true }).click();
+  const result = page.getByRole("region", { name: d.response, exact: true });
+  await expect(result.getByText(d.answerObserved, { exact: true })).toBeVisible();
+  await expect(result.getByText(d.dnsAnswerHelp, { exact: true })).toBeVisible();
+  await expect(result.getByText("DNS_ANSWER", { exact: true })).toBeVisible();
+  await expect(result.getByText(d.ok, { exact: true })).toHaveCount(0);
+  await screenshot(page, "dns-observed-answer-1440");
+  await page.setViewportSize({ width: 390, height: 1000 });
+  expect((await page.locator("#main-content").boundingBox())!.width).toBeGreaterThan(360);
+  await screenshot(page, "dns-observed-answer-390");
+  await clean(context, runtime);
+});

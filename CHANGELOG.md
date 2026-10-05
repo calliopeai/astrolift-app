@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Domain diagnostics distinguish observed DNS answers from configured comparisons,
+  explain the limited scope of nameserver matches, and show the unavailable
+  cluster DNS perspective in all eight locales without hiding technical evidence.
+
 - Explain DNS operator admission and no-data/ICMP timeout observations in eight languages; skip protected connection bindings until current support permits the read (#2287).
 
 - Add a current-operator SMTP alert diagnostic in notification settings with explicit own-mailbox/source review, stable request UUIDs, recovery-only uncertain outcomes, cursor history and eight-language copy (#2289).

@@ -7870,7 +7870,12 @@
     "platformOperatorRequired": "Demandez à un super-administrateur de la plateforme de consulter les enregistrements du fournisseur ou de gérer les connexions DNS. Les modifications de connexion nécessitent aussi le droit de configurer les fournisseurs de cette organisation.",
     "dnsNoData": "Le résolveur n’a renvoyé aucun enregistrement du type sélectionné pour ce nom d’hôte. Cela ne prouve pas que le domaine est indisponible.",
     "icmpTimeout": "Aucune réponse ICMP n’est arrivée avant le délai. ICMP peut être bloqué ; cela ne prouve pas que l’hôte ou HTTPS est indisponible.",
-    "dnsNoDataStatus": "Aucun enregistrement DNS renvoyé"
+    "dnsNoDataStatus": "Aucun enregistrement DNS renvoyé",
+    "answerObserved": "Réponse observée",
+    "dnsAnswerHelp": "Le résolveur a renvoyé les enregistrements affichés. Aucune réponse attendue n’est configurée pour cette requête ; il ne s’agit donc pas d’un contrôle de correspondance.",
+    "delegationMatch": "Les serveurs de noms publics observés correspondent aux serveurs de noms attendus configurés.",
+    "delegationScopeHelp": "Une correspondance des serveurs de noms confirme uniquement cette comparaison de délégation. Vérifiez séparément A ou AAAA pour le domaine racine et le nom d’hôte réel de l’application ; cela ne prouve ni le routage générique, ni TLS, ni l’accessibilité de l’application.",
+    "internalDnsUnavailable": "La vérification DNS depuis le cluster n’est pas configurée. Les réponses du résolveur public ne prouvent ni le DNS ni la connectivité depuis les Pods de l’application."
   },
   "domainConnections": {
     "title": "Connecter le DNS",

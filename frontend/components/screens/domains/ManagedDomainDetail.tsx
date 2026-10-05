@@ -98,7 +98,11 @@ function DetailTabs({
     })[key] ?? key;
   const state = (value: keyof typeof stateKeys, reason?: string) => (
     <Badge variant={value === "MISMATCH" || value === "ERROR" ? "destructive" : "outline"}>
-      {reason === "DNS_NO_DATA" && value === "OK" ? t("dnsNoDataStatus") : t(stateKeys[value])}
+      {reason === "DNS_NO_DATA" && value === "OK"
+        ? t("dnsNoDataStatus")
+        : reason === "DNS_ANSWER" && value === "OK"
+          ? t("answerObserved")
+          : t(stateKeys[value])}
     </Badge>
   );
   async function copy(value: string) {
@@ -180,6 +184,9 @@ function DetailTabs({
           </div>
           {meta(check.perspective, check.checkedAt)}
           {reason(check.reason)}
+          {check.key === "delegation" && (
+            <p className="text-muted-foreground text-sm">{t("delegationScopeHelp")}</p>
+          )}
           {check.state === "MISMATCH" && (
             <p className="text-sm font-medium">
               {check.key === "delegation"

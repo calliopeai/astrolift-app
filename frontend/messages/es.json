@@ -7870,7 +7870,12 @@
     "platformOperatorRequired": "Pide a un superadministrador de la plataforma que revise los registros del proveedor o gestione las conexiones DNS. Los cambios de conexión también requieren permiso para configurar proveedores en esta organización.",
     "dnsNoData": "El resolutor no devolvió registros del tipo seleccionado para este nombre de host. Esto no demuestra que el dominio no esté disponible.",
     "icmpTimeout": "No llegó ninguna respuesta ICMP antes del límite de tiempo. ICMP puede estar bloqueado; esto no demuestra que el host o HTTPS no estén disponibles.",
-    "dnsNoDataStatus": "No se devolvieron registros DNS"
+    "dnsNoDataStatus": "No se devolvieron registros DNS",
+    "answerObserved": "Respuesta observada",
+    "dnsAnswerHelp": "El resolutor devolvió los registros mostrados. No hay una respuesta esperada configurada para esta consulta, por lo que no se comprueba una coincidencia.",
+    "delegationMatch": "Los servidores de nombres públicos observados coinciden con los servidores de nombres esperados configurados.",
+    "delegationScopeHelp": "Una coincidencia de servidores de nombres solo confirma esta comparación de delegación. Compruebe A o AAAA para el dominio raíz y el nombre de host real de la aplicación por separado; no demuestra enrutamiento comodín, TLS ni accesibilidad de la aplicación.",
+    "internalDnsUnavailable": "La comprobación de DNS desde el clúster no está configurada. Las respuestas del resolutor público no demuestran DNS ni conectividad desde los Pods de la aplicación."
   },
   "domainConnections": {
     "title": "Conectar DNS",

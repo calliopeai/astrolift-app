@@ -217,6 +217,24 @@ export function domainFixture(field, args, role, parent) {
           expected: [zone.name],
           observed: ["legacy.example"],
         },
+        {
+          key: "lookup",
+          state: "OK",
+          perspective: "public_dns:1.1.1.1",
+          checkedAt: timestamp,
+          reason: "DNS_ANSWER",
+          expected: [],
+          observed: expected,
+        },
+        {
+          key: "internal_dns",
+          state: "UNSUPPORTED",
+          perspective: "cluster_internal_dns",
+          checkedAt: timestamp,
+          reason: "INTERNAL_DNS_PROBE_NOT_CONFIGURED",
+          expected: [],
+          observed: [],
+        },
       ],
       providerZone: {
         bindingSource: connected ? "PROTECTED_CLOUDFLARE_CONNECTION" : "PLATFORM_WRITTEN",
@@ -279,7 +297,9 @@ export function domainFixture(field, args, role, parent) {
           ? args.tool === "PING"
             ? "ICMP_TIMEOUT"
             : "DNS_NO_DATA"
-          : "CONTROLLED_PUBLIC_CHECK",
+          : ["LOOKUP", "DIG"].includes(args.tool)
+            ? "DNS_ANSWER"
+            : "CONTROLLED_PUBLIC_CHECK",
       hostname: args.hostname,
       tool: args.tool,
       recordType: args.recordType,

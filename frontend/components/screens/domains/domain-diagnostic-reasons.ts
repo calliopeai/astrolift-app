@@ -6,6 +6,12 @@ export function domainDiagnosticReasonKey(reason: string) {
       return "dnsNoData";
     case "ICMP_TIMEOUT":
       return "icmpTimeout";
+    case "DNS_ANSWER":
+      return "dnsAnswerHelp";
+    case "PUBLIC_DELEGATION_MATCH":
+      return "delegationMatch";
+    case "INTERNAL_DNS_PROBE_NOT_CONFIGURED":
+      return "internalDnsUnavailable";
     default:
       return null;
   }

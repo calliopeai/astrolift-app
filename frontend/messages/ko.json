@@ -7867,7 +7867,12 @@
     "platformOperatorRequired": "공급자 레코드 확인이나 DNS 연결 관리는 플랫폼 최고 관리자에게 요청하세요. 연결을 변경하려면 이 조직의 공급자 설정 권한도 필요합니다.",
     "dnsNoData": "리졸버가 이 호스트 이름에 대해 선택한 유형의 레코드를 반환하지 않았습니다. 이것만으로 도메인을 사용할 수 없다고 판단할 수는 없습니다.",
     "icmpTimeout": "제한 시간 안에 ICMP 응답이 도착하지 않았습니다. ICMP가 차단되었을 수 있으므로, 이것만으로 호스트나 HTTPS를 사용할 수 없다고 판단할 수는 없습니다.",
-    "dnsNoDataStatus": "반환된 DNS 레코드 없음"
+    "dnsNoDataStatus": "반환된 DNS 레코드 없음",
+    "answerObserved": "응답 확인됨",
+    "dnsAnswerHelp": "리졸버가 표시된 레코드를 반환했습니다. 이 조회에는 예상 응답이 설정되어 있지 않으므로 일치 여부를 검사하는 확인이 아닙니다.",
+    "delegationMatch": "확인된 공개 네임서버가 설정된 예상 네임서버와 일치합니다.",
+    "delegationScopeHelp": "네임서버 일치는 이 위임 비교만 확인합니다. 루트 도메인과 실제 앱 호스트 이름의 A 또는 AAAA를 각각 확인하세요. 와일드카드 라우팅, TLS 또는 앱 접근 가능성을 입증하지 않습니다.",
+    "internalDnsUnavailable": "클러스터 내부 DNS 확인이 설정되지 않았습니다. 공개 리졸버 응답은 앱 Pod에서의 DNS 또는 연결 가능성을 입증하지 않습니다."
   },
   "domainConnections": {
     "title": "DNS 연결",

@@ -7870,7 +7870,12 @@
     "platformOperatorRequired": "Bitten Sie einen Plattform-Superadministrator, Anbieter-Einträge zu prüfen oder DNS-Verbindungen zu verwalten. Verbindungsänderungen erfordern außerdem die Berechtigung zur Anbieterkonfiguration in dieser Organisation.",
     "dnsNoData": "Der Resolver hat für diesen Hostnamen keine Einträge des ausgewählten Typs zurückgegeben. Das beweist nicht, dass die Domain nicht verfügbar ist.",
     "icmpTimeout": "Vor Ablauf der Frist ist keine ICMP-Antwort eingegangen. ICMP kann blockiert sein; das beweist nicht, dass der Host oder HTTPS nicht verfügbar ist.",
-    "dnsNoDataStatus": "Keine DNS-Einträge zurückgegeben"
+    "dnsNoDataStatus": "Keine DNS-Einträge zurückgegeben",
+    "answerObserved": "Antwort beobachtet",
+    "dnsAnswerHelp": "Der Resolver hat die angezeigten Einträge zurückgegeben. Für diese Abfrage ist keine erwartete Antwort konfiguriert; daher wird keine Übereinstimmung geprüft.",
+    "delegationMatch": "Die beobachteten öffentlichen Nameserver stimmen mit den konfigurierten erwarteten Nameservern überein.",
+    "delegationScopeHelp": "Eine Nameserver-Übereinstimmung bestätigt nur diesen Delegationsvergleich. Prüfen Sie A oder AAAA für die Stammdomain und den tatsächlichen App-Hostnamen getrennt; dies belegt weder Wildcard-Routing noch TLS oder die Erreichbarkeit der App.",
+    "internalDnsUnavailable": "Die DNS-Prüfung aus dem Cluster ist nicht konfiguriert. Antworten öffentlicher Resolver belegen weder DNS noch die Verbindung aus den App-Pods."
   },
   "domainConnections": {
     "title": "DNS verbinden",

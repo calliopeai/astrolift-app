@@ -156,3 +156,46 @@ export const ICMP_TIMEOUT: ManagedDomainDetailProps = {
 export const OperatorRequired: Story = { args: OPERATOR_REQUIRED };
 export const DnsNoData: Story = { args: DNS_NO_DATA };
 export const IcmpTimeout: Story = { args: ICMP_TIMEOUT };
+
+export const DNS_ANSWER_OBSERVATION: ManagedDomainDetailProps = {
+  ...DNS_NO_DATA,
+  diagnostics: {
+    ...DOMAIN_DIAGNOSTICS,
+    checks: [
+      ...["public_dns:1.1.1.1", "public_dns:8.8.8.8"].map((perspective) => ({
+        key: "delegation",
+        state: "OK" as const,
+        perspective,
+        checkedAt: DOMAIN_DIAGNOSTICS.checkedAt,
+        reason: "PUBLIC_DELEGATION_MATCH",
+        expected: ["ns.provider.example"],
+        observed: ["ns.provider.example"],
+      })),
+      {
+        key: "lookup",
+        state: "OK",
+        perspective: "public_dns:1.1.1.1",
+        checkedAt: DOMAIN_DIAGNOSTICS.checkedAt,
+        reason: "DNS_ANSWER",
+        expected: [],
+        observed: ["ns.provider.example"],
+      },
+      {
+        key: "internal_dns",
+        state: "UNSUPPORTED",
+        perspective: "cluster_internal_dns",
+        checkedAt: DOMAIN_DIAGNOSTICS.checkedAt,
+        reason: "INTERNAL_DNS_PROBE_NOT_CONFIGURED",
+        expected: [],
+        observed: [],
+      },
+    ],
+  },
+  probe: {
+    ...DNS_NO_DATA.probe!,
+    reason: "DNS_ANSWER",
+    recordType: "NS",
+    values: ["ns.provider.example"],
+  },
+};
+export const ObservedAnswer: Story = { args: DNS_ANSWER_OBSERVATION };

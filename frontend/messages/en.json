@@ -7947,7 +7947,12 @@
     "platformOperatorRequired": "Ask a platform super-admin to inspect provider records or manage DNS connections. Connection changes also require provider configuration permission in this organization.",
     "dnsNoData": "The resolver returned no records of the selected type for this hostname. This does not prove that the domain is unavailable.",
     "icmpTimeout": "No ICMP reply arrived before the deadline. ICMP may be blocked; this does not prove that the host or HTTPS is unavailable.",
-    "dnsNoDataStatus": "No DNS records returned"
+    "dnsNoDataStatus": "No DNS records returned",
+    "answerObserved": "Answer observed",
+    "dnsAnswerHelp": "The resolver returned the shown records. No expected answer is configured for this lookup, so this is not a match check.",
+    "delegationMatch": "The observed public nameservers match the configured expected nameservers.",
+    "delegationScopeHelp": "A nameserver match confirms this delegation comparison only. Check A or AAAA for the apex and actual app hostname separately; it does not prove wildcard routing, TLS or app reachability.",
+    "internalDnsUnavailable": "Internal DNS checking from the cluster is not configured. Public resolver answers do not prove DNS or connectivity from app Pods."
   },
   "domainConnections": {
     "title": "Connect DNS",
