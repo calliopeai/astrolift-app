@@ -55,6 +55,7 @@ from core.permissions import (
 from core.tenancy import get_current_tenant
 
 from . import domain_diagnostic_network as network
+from .domain_record_routing import route53_routing
 
 P = Permission.PROVIDER_PLUGIN_READ
 MAX_RECORDS = 100
@@ -411,6 +412,7 @@ def _zone(info, domain, current):
                         alias_target=alias.get("DNSName"),
                         alias_zone_id=alias.get("HostedZoneId"),
                         evaluate_target_health=alias.get("EvaluateTargetHealth"),
+                        routing=route53_routing(raw),
                     )
                 )
             if len(records) > MAX_RECORDS:

@@ -62,6 +62,62 @@ class ManagedDomainDiagnosticCheck:
 
 
 @strawberry.type
+class ManagedDomainRecordGeoLocation:
+    continent_code: str | None = None
+    country_code: str | None = None
+    subdivision_code: str | None = None
+
+
+@strawberry.type
+class ManagedDomainRecordCoordinates:
+    latitude: str
+    longitude: str
+
+
+@strawberry.type
+class ManagedDomainRecordGeoProximity:
+    aws_region: str | None = None
+    local_zone_group: str | None = None
+    coordinates: ManagedDomainRecordCoordinates | None = None
+    bias: int | None = None
+
+
+@strawberry.type
+class ManagedDomainRecordCidrRouting:
+    collection_id: str
+    location_name: str
+
+
+@strawberry.enum
+class ManagedDomainRoutingPolicy(Enum):
+    SIMPLE = "SIMPLE"
+    WEIGHTED = "WEIGHTED"
+    LATENCY = "LATENCY"
+    FAILOVER = "FAILOVER"
+    GEOLOCATION = "GEOLOCATION"
+    MULTIVALUE = "MULTIVALUE"
+    GEOPROXIMITY = "GEOPROXIMITY"
+    CIDR = "CIDR"
+    UNKNOWN = "UNKNOWN"
+
+
+@strawberry.type
+class ManagedDomainRecordRouting:
+    policy: ManagedDomainRoutingPolicy
+    reason: str
+    set_identifier: str | None = None
+    weight: int | None = None
+    region: str | None = None
+    failover: str | None = None
+    geo_location: ManagedDomainRecordGeoLocation | None = None
+    geo_proximity: ManagedDomainRecordGeoProximity | None = None
+    cidr: ManagedDomainRecordCidrRouting | None = None
+    multi_value_answer: bool | None = None
+    health_check_id: str | None = None
+    traffic_policy_instance_id: str | None = None
+
+
+@strawberry.type
 class ManagedDomainDiagnosticRecord:
     name: str
     type: str
@@ -72,6 +128,7 @@ class ManagedDomainDiagnosticRecord:
     evaluate_target_health: bool | None = None
     proxied: bool | None = None
     priority: int | None = None
+    routing: ManagedDomainRecordRouting | None = None
 
 
 @strawberry.type

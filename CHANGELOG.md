@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Preserve native Route53 record routing policies, target identifiers, weights,
+  geographic and CIDR configuration and health/traffic-policy references in
+  read-only domain diagnostics; keep incomplete policies explicitly unknown
+  without implying current endpoint health or request distribution (#2287).
+
 - Certificate registration records the actual provisioning cluster and preserves
   existing domain configuration, retaining exact cluster links and authorized
   DNS revalidation after the certificate step.

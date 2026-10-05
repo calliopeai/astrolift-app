@@ -79,3 +79,24 @@ the workflow. A legacy row missing this association needs an authorized resume
 with the reviewed cluster through `revalidateManagedDomain(clusterId, zone)`;
 this change does not backfill live rows or select a new app default. Revalidation
 and certificate setup are separate from app ingress records and redeployment.
+
+Route53 inventory also exposes `providerZone.records.routing`. The typed policy
+is SIMPLE, WEIGHTED, LATENCY, FAILOVER, GEOLOCATION, MULTIVALUE, GEOPROXIMITY,
+CIDR or UNKNOWN. Native set identifiers, zero weights, regions, failover sides,
+geographic locations, geoproximity coordinates/bias and CIDR collection/location
+are preserved. Health-check and traffic-policy IDs are references, not current
+health observations; weights describe configured DNS selection rather than
+measured application traffic. The existing alias target and target-health setting
+remain separate from routing policy. Cloudflare discovery returns no Route53
+routing object.
+
+Missing policy details or incompatible combinations remain UNKNOWN with a
+reason. Malformed or oversized native values refuse the provider observation
+without exposing raw provider replies. The projection uses fields recognized by
+the installed AWS SDK; it does not claim visibility into fields that SDK drops.
+It adds no record-write or health-check call. Public DNS answers, app ingress and
+TLS observations still need their separate checks.
+
+The field shapes follow the [Route53 record-set API](https://docs.aws.amazon.com/Route53/latest/APIReference/API_ResourceRecordSet.html),
+including its [geoproximity configuration](https://docs.aws.amazon.com/Route53/latest/APIReference/API_GeoProximityLocation.html)
+and [CIDR locations](https://docs.aws.amazon.com/Route53/latest/APIReference/API_CidrRoutingConfig.html).

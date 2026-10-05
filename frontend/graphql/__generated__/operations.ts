@@ -7439,6 +7439,7 @@ export type ManagedDomainDiagnosticRecord = {
   name: Scalars['String']['output'];
   priority?: Maybe<Scalars['Int']['output']>;
   proxied?: Maybe<Scalars['Boolean']['output']>;
+  routing?: Maybe<ManagedDomainRecordRouting>;
   ttl?: Maybe<Scalars['Int']['output']>;
   type: Scalars['String']['output'];
   values: Array<Scalars['String']['output']>;
@@ -7525,6 +7526,44 @@ export type ManagedDomainProviderZone = {
   zoneName?: Maybe<Scalars['String']['output']>;
 };
 
+export type ManagedDomainRecordCidrRouting = {
+  collectionId: Scalars['String']['output'];
+  locationName: Scalars['String']['output'];
+};
+
+export type ManagedDomainRecordCoordinates = {
+  latitude: Scalars['String']['output'];
+  longitude: Scalars['String']['output'];
+};
+
+export type ManagedDomainRecordGeoLocation = {
+  continentCode?: Maybe<Scalars['String']['output']>;
+  countryCode?: Maybe<Scalars['String']['output']>;
+  subdivisionCode?: Maybe<Scalars['String']['output']>;
+};
+
+export type ManagedDomainRecordGeoProximity = {
+  awsRegion?: Maybe<Scalars['String']['output']>;
+  bias?: Maybe<Scalars['Int']['output']>;
+  coordinates?: Maybe<ManagedDomainRecordCoordinates>;
+  localZoneGroup?: Maybe<Scalars['String']['output']>;
+};
+
+export type ManagedDomainRecordRouting = {
+  cidr?: Maybe<ManagedDomainRecordCidrRouting>;
+  failover?: Maybe<Scalars['String']['output']>;
+  geoLocation?: Maybe<ManagedDomainRecordGeoLocation>;
+  geoProximity?: Maybe<ManagedDomainRecordGeoProximity>;
+  healthCheckId?: Maybe<Scalars['String']['output']>;
+  multiValueAnswer?: Maybe<Scalars['Boolean']['output']>;
+  policy: ManagedDomainRoutingPolicy;
+  reason: Scalars['String']['output'];
+  region?: Maybe<Scalars['String']['output']>;
+  setIdentifier?: Maybe<Scalars['String']['output']>;
+  trafficPolicyInstanceId?: Maybe<Scalars['String']['output']>;
+  weight?: Maybe<Scalars['Int']['output']>;
+};
+
 export type ManagedDomainRecordType =
   | 'A'
   | 'AAAA'
@@ -7550,6 +7589,17 @@ export type ManagedDomainRoute = {
   observedState: ManagedDomainCheckState;
   recordedUrl: Scalars['String']['output'];
 };
+
+export type ManagedDomainRoutingPolicy =
+  | 'CIDR'
+  | 'FAILOVER'
+  | 'GEOLOCATION'
+  | 'GEOPROXIMITY'
+  | 'LATENCY'
+  | 'MULTIVALUE'
+  | 'SIMPLE'
+  | 'UNKNOWN'
+  | 'WEIGHTED';
 
 export type Managedresourceadoptionpayload = {
   acknowledgedPriorOwner: Scalars['String']['output'];
