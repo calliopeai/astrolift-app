@@ -385,7 +385,9 @@ class WorkflowsMutation:
 
     @strawberry.mutation(description="Cancel, terminate, or retry cleanup for an exact owned execution.")
     @require_permission(
-        Permission.WORKFLOW_TRIGGER, scope=execution_scope_by_id(), operation=execution_operation
+        Permission.WORKFLOW_TRIGGER,
+        scope=execution_scope_by_id(permission=Permission.WORKFLOW_TRIGGER),
+        operation=execution_operation,
     )
     @tenant_scoped()
     def control_workflow_execution(

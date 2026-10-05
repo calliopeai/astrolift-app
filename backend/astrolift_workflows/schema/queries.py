@@ -23,7 +23,11 @@ from astrolift_graphql import (
     parse_sort_spec,
     search_q,
 )
-from astrolift_identity.operation_context import execution_operation, workflow_id_operation
+from astrolift_identity.operation_context import (
+    agent_region_operation,
+    execution_operation,
+    workflow_id_operation,
+)
 from astrolift_operations.models import WorkflowRun
 from astrolift_workflows.client import (
     describe_workflow_instance,
@@ -752,7 +756,9 @@ class WorkflowsQuery:
     @strawberry.field(
         description="Reconcile the authenticated actor's original reviewed start request without dispatching another run."
     )
-    @require_permission(Permission.WORKFLOW_READ, scope=definition_start_scope("request_id"))
+    @require_permission(
+        Permission.WORKFLOW_READ, scope=definition_start_scope("request_id"), operation=agent_region_operation
+    )
     @tenant_scoped()
     def workflow_definition_start_request(
         self, info: Info, request_id: str

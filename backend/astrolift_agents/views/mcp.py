@@ -57,7 +57,7 @@ from core.permissions import (
 )
 from core.run_trigger import RunTrigger
 from core.tenancy import get_current_tenant
-from workflows.scopes import definition_scope_by_guid
+from workflows.scopes import definition_scope_by_guid, definition_start_scope, execution_scope_by_id
 
 log = logging.getLogger(__name__)
 
@@ -65,8 +65,11 @@ _SESSION_SALT = "astrolift.mcp.session.v1"
 
 
 class McpCallError(RuntimeError):
-    def __init__(self, message: str, *, code: str = "tool_error") -> None:
+    def __init__(
+        self, message: str, *, code: str = "tool_error", result: dict[str, Any] | None = None
+    ) -> None:
         self.code = code
+        self.result = result
         super().__init__(message)
 
 
@@ -89,6 +92,12 @@ ANY_SCOPE = "any_scope"
 #: stands in for the target; the surface guardrail allows that only for the
 #: tools on its allowlist.
 TOOL_SCOPES: dict[str, Any] = {
+    "astrolift_start_workflow_definition": definition_scope_by_guid(),
+    "astrolift_get_workflow_start": definition_start_scope(),
+    "astrolift_list_workflow_runs": ANY_SCOPE,
+    "astrolift_get_workflow_execution": execution_scope_by_id(),
+    "astrolift_list_workflow_execution_stages": execution_scope_by_id(),
+    "astrolift_control_workflow_execution": execution_scope_by_id(permission=Permission.WORKFLOW_TRIGGER),
     "astrolift_list_workflow_definitions": ANY_SCOPE,
     "astrolift_get_workflow_definition": definition_scope_by_guid(permission=Permission.WORKFLOW_READ),
     "astrolift_list_workflows": ANY_SCOPE,
@@ -140,6 +149,16 @@ TOOL_SCOPES: dict[str, Any] = {
 def _operation_for_tool(name: str, args: dict[str, Any]):
     from astrolift_identity.operation_context import agent_region_operation, agent_task_operation
 
+    if name in {"astrolift_start_workflow_definition", "astrolift_get_workflow_start"}:
+        return agent_region_operation(args)[0]
+    if name in {
+        "astrolift_get_workflow_execution",
+        "astrolift_list_workflow_execution_stages",
+        "astrolift_control_workflow_execution",
+    }:
+        from astrolift_identity.operation_context import execution_operation
+
+        return execution_operation(args)[0]
     if name in {"astrolift_get_task", "astrolift_cancel_task"}:
         return agent_task_operation("task_id")(args)[0]
     if name in {"astrolift_get_agent", "astrolift_run_agent"}:
@@ -986,6 +1005,12 @@ def _deprovision_project_resource(request: HttpRequest, args: dict[str, Any]) ->
 
 
 _HANDLERS: dict[str, ToolHandler] = {
+    "astrolift_start_workflow_definition": workflow_mcp.start_definition,
+    "astrolift_get_workflow_start": workflow_mcp.get_start,
+    "astrolift_list_workflow_runs": workflow_mcp.list_runs,
+    "astrolift_get_workflow_execution": workflow_mcp.get_execution,
+    "astrolift_list_workflow_execution_stages": workflow_mcp.list_execution_stages,
+    "astrolift_control_workflow_execution": workflow_mcp.control_execution,
     "astrolift_list_workflow_definitions": workflow_mcp.list_definitions,
     "astrolift_get_workflow_definition": workflow_mcp.get_definition,
     "astrolift_list_workflows": workflow_mcp.list_workflows,
@@ -1124,6 +1149,8 @@ def _validate_tool_arguments(meta: dict[str, Any], args: dict[str, Any]) -> None
         if "enum" in rule and value not in rule["enum"]:
             raise McpCallError(f"{name} must be one of {rule['enum']}", code="invalid_arguments")
         if expected == "string":
+            if "minLength" in rule and len(value) < rule["minLength"]:
+                raise McpCallError(f"{name} is below its minimum length", code="invalid_arguments")
             if "maxLength" in rule and len(value) > rule["maxLength"]:
                 raise McpCallError(f"{name} exceeds its maximum length", code="invalid_arguments")
             if rule.get("format") == "uuid":
@@ -1134,6 +1161,8 @@ def _validate_tool_arguments(meta: dict[str, Any], args: dict[str, Any]) -> None
             if "maximum" in rule and value > rule["maximum"]:
                 raise McpCallError(f"{name} exceeds its maximum", code="invalid_arguments")
         if expected == "array" and (rule.get("items") or {}).get("type") == "string":
+            if "maxItems" in rule and len(value) > rule["maxItems"]:
+                raise McpCallError(f"{name} exceeds its maximum size", code="invalid_arguments")
             if any(not isinstance(item, str) for item in value):
                 raise McpCallError(f"{name} items must be strings", code="invalid_arguments")
 
@@ -1394,8 +1423,17 @@ def mcp_gateway(request: HttpRequest) -> HttpResponse:
             return _rpc_result(
                 request_id,
                 {
-                    "content": [{"type": "text", "text": str(exc)}],
-                    "structuredContent": {"code": exc.code, "message": str(exc)},
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": json.dumps(exc.result, sort_keys=True, default=str)
+                            if exc.result is not None
+                            else str(exc),
+                        }
+                    ],
+                    "structuredContent": exc.result
+                    if exc.result is not None
+                    else {"code": exc.code, "message": str(exc)},
                     "isError": True,
                 },
                 protocol=protocol,

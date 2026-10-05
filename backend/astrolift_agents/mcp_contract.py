@@ -11,6 +11,7 @@ from astrolift_identity.api_tokens import (
     SCOPE_MCP_WRITE,
     SCOPE_PROJECT_WRITE,
     SCOPE_READ_APPS,
+    SCOPE_WORKFLOW_TRIGGER,
 )
 from core.permissions import Permission
 
@@ -37,6 +38,12 @@ WORKFLOW_TOOL_NAMES = frozenset(
         "astrolift_list_workflows",
         "astrolift_preview_workflow_manifest",
         "astrolift_export_workflow_manifest",
+        "astrolift_start_workflow_definition",
+        "astrolift_get_workflow_start",
+        "astrolift_list_workflow_runs",
+        "astrolift_get_workflow_execution",
+        "astrolift_list_workflow_execution_stages",
+        "astrolift_control_workflow_execution",
     }
 )
 
@@ -50,9 +57,115 @@ _WORKFLOW_PAGE_PROPERTIES = {
     },
 }
 _DEFINITION_ID = {"type": "string", "format": "uuid"}
+_EXECUTION_ID = {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 64,
+    "description": "Exact WorkflowRun record ID or GUID returned by the native start or run list.",
+}
+_START_REQUEST_ID = {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 128,
+    "description": "Persist a unique request ID before starting. Recovery is scoped to the original organization and actor.",
+}
 
 
 MCP_TOOL_META: dict[str, dict[str, Any]] = {
+    "astrolift_start_workflow_definition": {
+        "description": (
+            "Start an explicitly reviewed native workflow. Requires the exact definition ID, revision "
+            "and input-schema digest, a persisted request ID, and confirmation. Retry the same request "
+            "after an uncertain response; never generate a replacement ID. Tool errors preserve the "
+            "native result including reserved execution IDs when available."
+        ),
+        "scope": SCOPE_MCP_DISPATCH,
+        "additional_scopes": (SCOPE_WORKFLOW_TRIGGER,),
+        "permission": Permission.WORKFLOW_TRIGGER,
+        "inputSchema": _schema(
+            {
+                "definition_id": _DEFINITION_ID,
+                "expected_revision": {"type": "string", "minLength": 64, "maxLength": 64},
+                "expected_input_schema_digest": {"type": "string", "minLength": 64, "maxLength": 64},
+                "request_id": _START_REQUEST_ID,
+                "inputs": {"type": "object"},
+                "confirmed": {"type": "boolean"},
+            },
+            required=(
+                "definition_id",
+                "expected_revision",
+                "expected_input_schema_digest",
+                "request_id",
+                "confirmed",
+            ),
+        ),
+    },
+    "astrolift_get_workflow_start": {
+        "description": (
+            "Recover the authenticated actor's original workflow start request. Reconciles recorded "
+            "state against Temporal without starting a new execution. Returns start: null for no visible request."
+        ),
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema({"request_id": _START_REQUEST_ID}, required=("request_id",)),
+    },
+    "astrolift_list_workflow_runs": {
+        "description": "Discover permitted native definition runs with pagination, search and status/definition/project filters.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema(
+            {
+                **_WORKFLOW_PAGE_PROPERTIES,
+                "statuses": {"type": "array", "items": {"type": "string"}, "maxItems": 32},
+                "definition_slugs": {"type": "array", "items": {"type": "string"}, "maxItems": 100},
+                "project_slugs": {"type": "array", "items": {"type": "string"}, "maxItems": 100},
+                "started_by_me": {"type": "boolean"},
+            }
+        ),
+    },
+    "astrolift_get_workflow_execution": {
+        "description": "Observe one exact permitted native execution, including terminal state, cleanup state and engine observation errors.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema({"execution_id": _EXECUTION_ID}, required=("execution_id",)),
+    },
+    "astrolift_list_workflow_execution_stages": {
+        "description": "Page through the stage history of one exact permitted execution, including child runs and pending human gates.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema(
+            {
+                "execution_id": _EXECUTION_ID,
+                "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+                "cursor": {
+                    "type": "string",
+                    "maxLength": 4096,
+                    "description": "Execution-bound next_cursor from the preceding stage page.",
+                },
+            },
+            required=("execution_id",),
+        ),
+    },
+    "astrolift_control_workflow_execution": {
+        "description": (
+            "Request native cancel, terminate or cleanup for an exact execution/workflow/run triple. "
+            "A delivered request is not proof of closure: inspect the execution again. "
+            "Termination requires a reason; cleanup requires an already-terminal execution."
+        ),
+        "scope": SCOPE_MCP_DISPATCH,
+        "additional_scopes": (SCOPE_WORKFLOW_TRIGGER,),
+        "permission": Permission.WORKFLOW_TRIGGER,
+        "inputSchema": _schema(
+            {
+                "execution_id": _EXECUTION_ID,
+                "workflow_id": {"type": "string", "minLength": 1, "maxLength": 255},
+                "run_id": {"type": "string", "minLength": 1, "maxLength": 255},
+                "action": {"type": "string", "enum": ["cancel", "terminate", "cleanup"]},
+                "reason": {"type": "string", "maxLength": 2048},
+            },
+            required=("execution_id", "workflow_id", "run_id", "action"),
+        ),
+    },
     "astrolift_list_workflow_definitions": {
         "description": "Discover permitted native workflow definitions and stage topology, with search and pagination.",
         "scope": SCOPE_MCP_READ,

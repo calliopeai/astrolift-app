@@ -12,7 +12,7 @@ from asgiref.sync import async_to_sync
 from django.test import Client
 from django.utils import timezone
 
-from astrolift_agents.mcp_contract import WORKFLOW_TOOL_NAMES
+from astrolift_agents.mcp_contract import MCP_TOOL_META, WORKFLOW_TOOL_NAMES
 from astrolift_agents.models import AgentTask
 from astrolift_agents.tests.test_fleet_scopes_1745 import no_opensearch as no_opensearch
 from astrolift_identity.api_tokens import SCOPE_MCP_READ, mint_token
@@ -200,7 +200,8 @@ def test_exact_target_checks_never_use_selected_team_as_authority(mcp, target, n
 )
 def test_authority_is_checked_again_on_each_request(mcp, change):
     binding = grant(mcp)
-    assert WORKFLOW_TOOL_NAMES <= {row["name"] for row in rpc(mcp, "tools/list").json()["result"]["tools"]}
+    read_tools = {name for name in WORKFLOW_TOOL_NAMES if MCP_TOOL_META[name]["scope"] == SCOPE_MCP_READ}
+    assert read_tools <= {row["name"] for row in rpc(mcp, "tools/list").json()["result"]["tools"]}
     if change == "revoke_role":
         binding.deleted_at = timezone.now()
         binding.save(update_fields=["deleted_at"])
