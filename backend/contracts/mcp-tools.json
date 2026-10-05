@@ -17,6 +17,62 @@
   },
   "tools": [
     {
+      "description": "Inspect engine-confirmed schedule state for an exact configured workflow ID, including pending cleanup after deletion.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "workflow_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow_id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_get_workflow_schedule",
+      "required_permissions": [
+        "workflow.read"
+      ],
+      "required_scopes": [
+        "mcp:read"
+      ]
+    },
+    {
+      "description": "Reconcile the reviewed configuration version against Temporal and report observed state. Active schedules additionally require mcp:dispatch and workflow:trigger scopes and trigger permission; cleanup of deleted workflows requires delete permission. Inspect again after stale or uncertain results.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "expected_active": {
+            "type": "boolean"
+          },
+          "expected_version": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "workflow_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow_id",
+          "expected_version",
+          "expected_active"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_reconcile_workflow_schedule",
+      "required_permissions": [
+        "workflow.update"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "workflow:write"
+      ]
+    },
+    {
       "description": "Start an explicitly reviewed native workflow. Requires the exact definition ID, revision and input-schema digest, a persisted request ID, and confirmation. Retry the same request after an uncertain response; never generate a replacement ID. Tool errors preserve the native result including reserved execution IDs when available.",
       "inputSchema": {
         "additionalProperties": false,

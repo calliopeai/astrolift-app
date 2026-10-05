@@ -31,7 +31,18 @@ from astrolift_workflows.configuration_targets import (
     find_configuration_definition,
     find_configured_workflow,
 )
+from astrolift_workflows.schedule_operations import (
+    authorize_schedule,
+    schedule_workflow,
+    validate_schedule_configuration,
+    workflow_schedule_scope,
+)
 from astrolift_workflows.schema.execution_types import WorkflowExecutionControlResult, WorkflowExecutionType
+from astrolift_workflows.schema.schedule_types import (
+    WorkflowScheduleResult,
+    WorkflowScheduleState,
+    schedule_to_type,
+)
 from astrolift_workflows.schema.workflow_config_types import (
     ConfiguredWorkflowType,
     workflow_to_type,
@@ -166,6 +177,8 @@ def _gate_instance_op(user, workflow_id: str) -> MutationResult | None:
 @strawberry.type
 class CreateWorkflowResult(MutationResult):
     workflow: ConfiguredWorkflowType | None = None
+    configuration_saved: bool = False
+    schedule: WorkflowScheduleState | None = None
 
 
 @strawberry.type
@@ -424,6 +437,44 @@ class WorkflowsMutation:
             ok=True, requested=True, execution=WorkflowExecutionType(**state)
         )
 
+    @strawberry.mutation(
+        description="Reconcile the exact reviewed configuration version with its native Temporal schedule. Does not start an immediate run. Active reconciliation requires workflow.trigger; deleted workflow cleanup also requires workflow.delete."
+    )
+    @require_permission(Permission.WORKFLOW_UPDATE, scope=workflow_schedule_scope(Permission.WORKFLOW_UPDATE))
+    @tenant_scoped()
+    def reconcile_workflow_schedule(
+        self,
+        info: Info,
+        workflow_id: GUID,  # type: ignore[valid-type]
+        expected_version: int,
+        expected_active: bool,
+    ) -> WorkflowScheduleResult:
+        from workflows.schedule_sync import reconcile_workflow_schedule
+
+        workflow = schedule_workflow(workflow_id)
+        if workflow is None:
+            return WorkflowScheduleResult(
+                ok=False, errors=[ValidationError(field="workflow_id", messages=["Workflow not found"])]
+            )
+        result = reconcile_workflow_schedule(
+            workflow,
+            expected_version=expected_version,
+            expected_active=expected_active,
+            authorize=authorize_schedule,
+        )
+        return WorkflowScheduleResult(
+            ok=result.confirmed,
+            schedule=schedule_to_type(result),
+            errors=[]
+            if result.confirmed
+            else [
+                ValidationError(
+                    field="schedule",
+                    messages=[result.message or "Schedule does not match the reviewed configuration."],
+                )
+            ],
+        )
+
     # ── tier-2 Workflow CRUD ────────────────────────────────────────────
 
     @strawberry.mutation(
@@ -518,6 +569,14 @@ class WorkflowsMutation:
                 created_by=user,
                 updated_by=user,
             )
+            schedule_error = validate_schedule_configuration(wf)
+            if schedule_error is not None:
+                return CreateWorkflowResult(ok=False, errors=[schedule_error])
+            from workflows.schedule_sync import schedule_inactive_reason
+
+            wf.schedule_managed = schedule_inactive_reason(wf) is None
+            if wf.schedule_managed:
+                authorize_schedule(wf, Permission.WORKFLOW_CREATE)
             try:
                 # Model.save validates bindings (every agent_dispatch stage resolves).
                 wf.save()
@@ -531,8 +590,7 @@ class WorkflowsMutation:
                     ok=False, errors=[ValidationError(field="slug", messages=[str(e)])]
                 )
 
-        _sync_schedule(wf)
-        return CreateWorkflowResult(ok=True, workflow=workflow_to_type(wf, with_runs=True))
+        return _configured_schedule_result(wf, Permission.WORKFLOW_CREATE)
 
     @strawberry.mutation(
         description=(
@@ -619,6 +677,9 @@ class WorkflowsMutation:
                 Permission.WORKFLOW_UPDATE,
                 scope=reviewed_definition_scope(wf.definition, org.pk, permission=Permission.WORKFLOW_UPDATE),
             )
+            from workflows.schedule_sync import schedule_inactive_reason
+
+            previously_active = schedule_inactive_reason(wf) is None
             if new_definition is not None:
                 wf.definition = new_definition
 
@@ -648,6 +709,13 @@ class WorkflowsMutation:
                 wf.is_enabled = is_enabled
             wf.updated_by = info.context.user
 
+            schedule_error = validate_schedule_configuration(wf)
+            if schedule_error is not None:
+                return CreateWorkflowResult(ok=False, errors=[schedule_error])
+            active = schedule_inactive_reason(wf) is None
+            wf.schedule_managed = wf.schedule_managed or previously_active or active
+            if active:
+                authorize_schedule(wf)
             try:
                 wf.save()
             except DjangoValidationError as e:
@@ -655,8 +723,7 @@ class WorkflowsMutation:
                     ok=False, errors=[ValidationError(field="stage_bindings", messages=list(e.messages))]
                 )
 
-        _sync_schedule(wf)
-        return CreateWorkflowResult(ok=True, workflow=workflow_to_type(wf, with_runs=True))
+        return _configured_schedule_result(wf, Permission.WORKFLOW_UPDATE)
 
     @strawberry.mutation(
         description="Soft-delete a configured Workflow by exact workflowId or legacy slug and request schedule removal. A supplied slug must match its ID."
@@ -671,33 +738,43 @@ class WorkflowsMutation:
         slug: str | None = None,
         org_id: strawberry.ID | None = None,
         workflow_id: GUID | None = None,  # type: ignore[valid-type]
-    ) -> MutationResult:
+    ) -> WorkflowScheduleResult:
         from django.utils import timezone
 
         org, err = _resolve_caller_org(org_id)
         if err is not None:
-            return err
+            return WorkflowScheduleResult(ok=err.ok, errors=err.errors)
 
         with transaction.atomic():
             wf = find_configured_workflow(org.pk, workflow_id=workflow_id, slug=slug, lock=True)
             if wf is None:
-                return _failure(
-                    "workflow_id" if workflow_id is not None else "slug",
-                    "Workflow not found or identity assertion does not match",
+                return WorkflowScheduleResult(
+                    ok=False,
+                    errors=[
+                        ValidationError(
+                            field="workflow_id",
+                            messages=["Workflow not found or identity assertion does not match"],
+                        )
+                    ],
                 )
 
             check_permission(
                 Permission.WORKFLOW_DELETE,
                 scope=reviewed_definition_scope(wf.definition, org.pk, permission=Permission.WORKFLOW_DELETE),
             )
+            from workflows.schedule_sync import schedule_inactive_reason
+
+            wf.schedule_managed = wf.schedule_managed or schedule_inactive_reason(wf) is None
             wf.deleted_at = timezone.now()
             wf.deleted_by = info.context.user
             wf.save(
-                update_fields=["deleted_at", "deleted_by", "updated_at", "version"],
+                update_fields=["deleted_at", "deleted_by", "updated_at", "version", "schedule_managed"],
                 skip_binding_validation=True,
             )
-        _delete_schedule(wf)
-        return MutationResult.success()
+        result = _configured_schedule_result(wf, Permission.WORKFLOW_DELETE)
+        return WorkflowScheduleResult(
+            ok=result.ok, errors=result.errors, configuration_saved=True, schedule=result.schedule
+        )
 
     # ── run mapping (spec 40 §3) ────────────────────────────────────────
 
@@ -1013,28 +1090,29 @@ class WorkflowsMutation:
         return MutationResult.success()
 
 
-def _sync_schedule(workflow) -> None:
-    """Best-effort Temporal schedule sync for a saved Workflow (spec 40 §3)."""
-    try:
-        from workflows.schedule_sync import sync_workflow_schedule
+def _configured_schedule_result(workflow, permission):
+    from workflows.schedule_sync import sync_workflow_schedule, unrequested_schedule
 
-        sync_workflow_schedule(workflow)
-    except Exception:  # noqa: BLE001 — schedule sync never blocks the save
-        import logging
-
-        logging.getLogger(__name__).exception(
-            "create/update_workflow: schedule sync failed for workflow %s", workflow.pk
+    if workflow.schedule_managed:
+        observed = sync_workflow_schedule(
+            workflow, authorize=lambda current: authorize_schedule(current, permission)
         )
-
-
-def _delete_schedule(workflow) -> None:
-    try:
-        from workflows.schedule_sync import delete_workflow_schedule
-
-        delete_workflow_schedule(workflow)
-    except Exception:  # noqa: BLE001
-        import logging
-
-        logging.getLogger(__name__).exception(
-            "delete_workflow: schedule delete failed for workflow %s", workflow.pk
-        )
+    else:
+        observed = unrequested_schedule(workflow)
+    ok = observed.confirmed or observed.observed_state == "not_requested"
+    return CreateWorkflowResult(
+        ok=ok,
+        configuration_saved=True,
+        workflow=workflow_to_type(workflow, with_runs=True),
+        schedule=schedule_to_type(observed),
+        errors=[]
+        if ok
+        else [
+            ValidationError(
+                field="schedule",
+                messages=[
+                    "Configuration was saved, but schedule state is unconfirmed. Inspect and reconcile this workflow ID."
+                ],
+            )
+        ],
+    )

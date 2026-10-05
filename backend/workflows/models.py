@@ -695,6 +695,9 @@ class Workflow(BaseCoreModel):
         default=TriggerKind.MANUAL,
     )
     schedule_cron = models.CharField(max_length=128, null=True, blank=True)
+    schedule_managed = models.BooleanField(default=False, editable=False)
+    schedule_revision = models.CharField(max_length=64, blank=True, default="", editable=False)
+    schedule_spec_hash = models.CharField(max_length=64, blank=True, default="", editable=False)
     trigger_ref = models.CharField(max_length=200, null=True, blank=True)
     is_enabled = models.BooleanField(default=True)
 

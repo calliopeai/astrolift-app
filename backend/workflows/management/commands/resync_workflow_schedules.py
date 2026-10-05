@@ -28,6 +28,9 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--apply", action="store_true", default=False, help="Rewrite the schedules.")
+        parser.add_argument(
+            "--workflow-id", type=str, help="Reconcile only this exact configured Workflow GUID."
+        )
 
     def handle(self, *args, **options):
         from astrolift_workflows.client import _temporal_enabled
@@ -44,10 +47,27 @@ class Command(BaseCommand):
             raise CommandError("Temporal is disabled on this install; there is no schedule to rewrite.")
         prefix = "" if apply else "[REPORT] "
         rewritten = failed = inactive = 0
-        for wf in Workflow.objects.select_related("organization").order_by("pk"):
+        rows = Workflow.objects.select_related("organization", "definition__project__team").order_by("pk")
+        if options.get("workflow_id"):
+            from uuid import UUID
+
+            try:
+                guid = UUID(options["workflow_id"])
+            except ValueError as exc:
+                raise CommandError("--workflow-id must be a configured Workflow GUID.") from exc
+            rows = rows.filter(guid=guid)
+            if not rows.exists():
+                raise CommandError("No configured Workflow has this GUID.")
+        for wf in rows:
             if schedule_inactive_reason(wf) is not None:
                 if apply:
-                    delete_workflow_schedule(wf)
+                    result = delete_workflow_schedule(wf)
+                    if not result.confirmed:
+                        self.stdout.write(
+                            f"  FAILED  {schedule_id_for(wf)}: {result.error_code or 'schedule_not_confirmed'}"
+                        )
+                        failed += 1
+                        continue
                 inactive += 1
                 continue
             label = f"{schedule_id_for(wf)} org={wf.organization.slug} workflow={wf.slug} cron={wf.schedule_cron!r}"
@@ -57,8 +77,8 @@ class Command(BaseCommand):
                 continue
             try:
                 write_workflow_schedule(wf)
-            except Exception as exc:  # noqa: BLE001 - report the Workflow, keep going
-                self.stdout.write(f"  FAILED  {label}: {exc}")
+            except Exception:  # noqa: BLE001 - report the Workflow, keep going without leaking engine errors
+                self.stdout.write(f"  FAILED  {label}: schedule_not_confirmed")
                 failed += 1
                 continue
             self.stdout.write(f"  REWROTE {label}")
@@ -71,7 +91,7 @@ class Command(BaseCommand):
             )
             return
         self.stdout.write(
-            f"{rewritten} rewritten, {failed} failed; delete issued for {inactive} workflow(s) "
+            f"{rewritten} rewritten, {failed} failed; absence confirmed for {inactive} workflow(s) "
             "that should have no schedule."
         )
         if failed:

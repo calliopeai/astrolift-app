@@ -7046,6 +7046,8 @@ type CreateWorkflowResult {
   ok: Boolean!
   errors: [ValidationError!]!
   workflow: ConfiguredWorkflow
+  configurationSaved: Boolean!
+  schedule: WorkflowScheduleState
 }
 
 type CreateWorkflowStageResult {
@@ -8766,6 +8768,11 @@ type Mutation {
   controlWorkflowExecution(executionId: ID!, workflowId: String!, runId: String!, action: String!, reason: String! = ""): WorkflowExecutionControlResult!
 
   """
+  Reconcile the exact reviewed configuration version with its native Temporal schedule. Does not start an immediate run. Active reconciliation requires workflow.trigger; deleted workflow cleanup also requires workflow.delete.
+  """
+  reconcileWorkflowSchedule(workflowId: GUID!, expectedVersion: Int!, expectedActive: Boolean!): WorkflowScheduleResult!
+
+  """
   Create a configured Workflow from an exact definitionId or legacy definitionSlug. When both are supplied the slug must match the ID. Set isEnabled=false to prepare configuration without activation; the legacy default is true.
   """
   createWorkflow(name: String!, definitionSlug: String = null, slug: String = null, description: String = null, stageBindings: JSON = null, inputs: JSON = null, triggerKind: String! = "manual", scheduleCron: String = null, orgId: ID = null, definitionId: GUID = null, isEnabled: Boolean! = true): CreateWorkflowResult!
@@ -8778,7 +8785,7 @@ type Mutation {
   """
   Soft-delete a configured Workflow by exact workflowId or legacy slug and request schedule removal. A supplied slug must match its ID.
   """
-  deleteWorkflow(slug: String = null, orgId: ID = null, workflowId: GUID = null): MutationResult!
+  deleteWorkflow(slug: String = null, orgId: ID = null, workflowId: GUID = null): WorkflowScheduleResult!
 
   """Run a configured Workflow now via Temporal (spec 40 §3)."""
   runWorkflow(workflowId: ID!, inputs: JSON = null, orgId: ID = null): RunWorkflowResult!
@@ -9526,6 +9533,11 @@ type Query {
   workflowStageExecutions(workflowId: String!, runId: String!): [WorkflowStageExecutionType!]!
   previewWorkflowManifest(toml: String!): WorkflowManifestPreviewType!
   exportWorkflowManifest(definitionSlug: String!): WorkflowManifestExportType!
+
+  """
+  Observe a configured workflow's exact schedule identity, desired version and engine state, including cleanup after soft deletion.
+  """
+  workflowSchedule(workflowId: GUID!): WorkflowScheduleState
 
   """Recorded stage history of an exact owned execution, newest first."""
   workflowExecutionStages(executionId: ID!, limit: Int! = 100, after: String = null): WorkflowExecutionStages
@@ -10993,6 +11005,29 @@ type WorkflowRun {
   startedAt: DateTime!
   completedAt: DateTime
   isCompleted: Boolean!
+}
+
+type WorkflowScheduleResult {
+  ok: Boolean!
+  errors: [ValidationError!]!
+  configurationSaved: Boolean!
+  schedule: WorkflowScheduleState
+}
+
+type WorkflowScheduleState {
+  workflowId: String!
+  scheduleId: String!
+  configurationVersion: Int!
+  desiredRevision: String!
+  desiredActive: Boolean!
+  observedState: String!
+  confirmed: Boolean!
+  observedAt: DateTime!
+  errorCode: String!
+  message: String!
+  engineCreatedAt: DateTime
+  engineUpdatedAt: DateTime
+  actionCount: Int
 }
 
 type WorkflowStageExecutionType {
