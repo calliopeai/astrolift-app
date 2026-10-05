@@ -7,6 +7,10 @@ import strawberry_django
 from django.core.exceptions import ObjectDoesNotExist
 from strawberry.types import Info
 
+from astrolift_workflows.schema.stage_temporal_types import (
+    WorkflowStageTemporalExecution,
+    stage_temporal_execution,
+)
 from workflows.models import (
     WorkflowDefinition,
     WorkflowInstance,
@@ -87,6 +91,10 @@ class WorkflowStageExecutionType:
     failure: strawberry.scalars.JSON | None
     error_message: str
     created_at: datetime
+
+    @strawberry_django.field
+    def temporal_execution(self) -> WorkflowStageTemporalExecution | None:
+        return stage_temporal_execution(self)
 
     @strawberry_django.field
     def caused_by(self) -> WorkflowLoopCause | None:

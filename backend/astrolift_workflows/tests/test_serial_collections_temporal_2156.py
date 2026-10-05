@@ -289,6 +289,10 @@ async def test_no_done_or_next_item_before_gate_approval_and_worker_restart(
         )
         assert child_id == first.collection_workflow_id and child_id != plan[3]
         child = temporal_env.client.get_workflow_handle(child_id)
+        child_description = await child.describe()
+        assert first.temporal_workflow_id == child_id
+        assert first.temporal_run_id == child_description.run_id != (await handle.describe()).run_id
+        assert first.temporal_namespace == temporal_env.client.namespace
         for _ in range(200):
             history = await child.fetch_history()
             if any(event.event_type == EventType.EVENT_TYPE_TIMER_STARTED for event in history.events):
@@ -311,6 +315,8 @@ async def test_no_done_or_next_item_before_gate_approval_and_worker_restart(
         )
         second = await wait_gate(plan[2], 1)
         assert first.pk != second.pk
+        assert second.temporal_workflow_id == second.collection_workflow_id != first.temporal_workflow_id
+        assert second.temporal_run_id != first.temporal_run_id
         await temporal_env.client.get_workflow_handle(second.collection_workflow_id).signal(
             "human_gate_decision",
             {"execution_id": str(second.pk), "decision": "approved"},

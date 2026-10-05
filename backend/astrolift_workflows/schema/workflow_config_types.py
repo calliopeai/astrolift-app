@@ -13,6 +13,11 @@ from datetime import datetime
 
 import strawberry
 
+from astrolift_workflows.schema.stage_temporal_types import (
+    WorkflowStageTemporalExecution,
+    stage_temporal_execution,
+)
+
 JSON = strawberry.scalars.JSON
 
 
@@ -139,6 +144,9 @@ class PendingHumanGateType:
     """
 
     execution_id: str
+    execution_guid: str
+    stage_guid: str
+    temporal_execution: WorkflowStageTemporalExecution | None
     run_guid: str
     workflow_id: str
     definition_slug: str
@@ -333,6 +341,9 @@ def pending_gate_to_type(execution) -> PendingHumanGateType:
     approvers = stage.approvers if isinstance(stage.approvers, list) else []
     return PendingHumanGateType(
         execution_id=str(execution.pk),
+        execution_guid=str(execution.guid),
+        stage_guid=str(stage.guid),
+        temporal_execution=stage_temporal_execution(execution),
         run_guid=str(run.guid),
         workflow_id=run.workflow_id,
         definition_slug=definition.slug or "",

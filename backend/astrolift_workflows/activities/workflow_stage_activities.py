@@ -42,6 +42,8 @@ import uuid
 
 from temporalio import activity
 
+from workflows.stage_incarnations import StageIncarnation
+
 log = logging.getLogger("astrolift_workflows.activities.workflow_stage")
 
 
@@ -528,6 +530,8 @@ def _create_stage_execution_sync(
     stage_id: str,
     attempt_number: int,
     context: dict | None = None,
+    *,
+    temporal_identity: StageIncarnation | None = None,
 ) -> str:
     """Create a RUNNING ``WorkflowStageExecution`` and point the run's
     ``current_stage_execution`` at it. Returns the execution pk as str."""
@@ -539,6 +543,20 @@ def _create_stage_execution_sync(
 
     with transaction.atomic():
         run = WorkflowRun.objects.select_for_update().get(pk=_parent_run_pk(workflow_run_id))
+        identity_fields = temporal_identity.fields() if temporal_identity is not None else {}
+        if identity_fields:
+            existing = WorkflowStageExecution.objects.filter(
+                temporal_activity_key=identity_fields["temporal_activity_key"]
+            ).first()
+            if existing is not None:
+                if (
+                    existing.workflow_run_id != run.pk
+                    or existing.stage_id != int(stage_id)
+                    or existing.attempt_number != max(1, int(attempt_number))
+                    or any(getattr(existing, key) != value for key, value in identity_fields.items())
+                ):
+                    raise RuntimeError("Stage activity identity conflicts with its recorded execution")
+                return str(existing.pk)
         if run.status != "running" or run.ended_at is not None:
             raise RuntimeError("Cannot open a stage on a closed workflow")
         stage = WorkflowStage.objects.get(pk=int(stage_id))
@@ -557,6 +575,7 @@ def _create_stage_execution_sync(
             attempt_number=attempt,
             started_at=timezone.now(),
             **metadata,
+            **identity_fields,
         )
         if context is None:
             execution = WorkflowStageExecution.objects.create(**execution_fields)
@@ -573,6 +592,12 @@ def _create_stage_execution_sync(
                 slug=key, defaults=execution_fields
             )
             if not created:
+                if (
+                    identity_fields
+                    and execution.temporal_activity_key
+                    and any(getattr(execution, key) != value for key, value in identity_fields.items())
+                ):
+                    raise RuntimeError("Stage execution belongs to a different Temporal activity")
                 return str(execution.pk)
 
         run.current_stage_execution = execution
@@ -1523,8 +1548,17 @@ async def create_stage_execution(
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
+    source = activity.info()
+    if source.workflow_namespace is None or source.workflow_id is None or source.workflow_run_id is None:
+        raise ValueError("Stage creation requires a workflow activity identity")
     return await sync_to_async(_create_stage_execution_sync)(
-        workflow_run_id, stage_id, attempt_number, context
+        workflow_run_id,
+        stage_id,
+        attempt_number,
+        context,
+        temporal_identity=StageIncarnation(
+            source.workflow_namespace, source.workflow_id, source.workflow_run_id, source.activity_id
+        ),
     )
 
 

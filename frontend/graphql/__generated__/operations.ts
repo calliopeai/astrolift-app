@@ -10442,11 +10442,14 @@ export type PauseAppWebhookDeploysInput = {
 export type PendingHumanGate = {
   definitionName: Scalars['String']['output'];
   definitionSlug: Scalars['String']['output'];
+  executionGuid: Scalars['String']['output'];
   executionId: Scalars['String']['output'];
   runGuid: Scalars['String']['output'];
   stageApprovers: Array<Scalars['String']['output']>;
+  stageGuid: Scalars['String']['output'];
   stageRole: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
+  temporalExecution?: Maybe<WorkflowStageTemporalExecution>;
   workflowId: Scalars['String']['output'];
 };
 
@@ -14704,6 +14707,7 @@ export type WorkflowStageExecutionType = {
   stageRole: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
+  temporalExecution?: Maybe<WorkflowStageTemporalExecution>;
 };
 
 /** One page of a cursor-paginated or numbered list. */
@@ -14717,6 +14721,12 @@ export type WorkflowStageExecutionTypePage = {
   pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type WorkflowStageTemporalExecution = {
+  namespace: Scalars['String']['output'];
+  runId: Scalars['String']['output'];
+  workflowId: Scalars['String']['output'];
 };
 
 export type WorkflowStageType = {

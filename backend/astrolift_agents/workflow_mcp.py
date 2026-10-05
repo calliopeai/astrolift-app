@@ -253,6 +253,7 @@ def _stage_payload(row):
     public_fields = (
         "guid",
         "execution_id",
+        "temporal_execution",
         "status",
         "attempt_number",
         "round_number",
