@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Prepare reusable, localized app-domain connection and effective-domain settings
+  views with explicit review, current capability gates and uncertain-outcome
+  recovery. API adapters and product activation remain separate (#2299).
+
 - Certificate registration records the actual provisioning cluster and preserves
   existing domain configuration, retaining exact cluster links and authorized
   DNS revalidation after the certificate step.
