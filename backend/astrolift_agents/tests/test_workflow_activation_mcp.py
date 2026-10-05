@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 from uuid import uuid4
 
 import pytest
@@ -198,9 +199,24 @@ def test_workflow_feature_flag_hides_and_refuses_activation(activation, monkeypa
     assert activate(activation)["structuredContent"]["code"] == "not_found"
 
 
+@pytest.fixture
+async def activation_engine():
+    from temporalio.client import Client
+    from temporalio.testing import WorkflowEnvironment
+
+    # The time-skipping test server does not implement execution visibility.
+    client = await Client.connect(
+        os.environ.get("ASTROLIFT_TEST_TEMPORAL_ADDRESS") or os.environ["TEMPORAL_ADDRESS"],
+        namespace=os.environ.get("TEMPORAL_NAMESPACE", "default"),
+    )
+    async with WorkflowEnvironment.from_client(client) as env:
+        yield env
+
+
 async def test_activate_review_start_and_reconnect_to_real_execution(
-    activation, temporal_env, monkeypatch, settings
+    activation, activation_engine, monkeypatch, settings
 ):
+    temporal_env = activation_engine
     async with await connect_real_engine(temporal_env, monkeypatch, settings):
         before = {(r.id, r.run_id) async for r in temporal_env.client.list_workflows()}
         old = await sync_to_async(reviewed_args)(activation)
