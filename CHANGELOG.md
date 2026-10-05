@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Certificate registration records the actual provisioning cluster and preserves
+  existing domain configuration, retaining exact cluster links and authorized
+  DNS revalidation after the certificate step.
+
 - Domain diagnostics distinguish observed DNS answers from configured comparisons,
   explain the limited scope of nameserver matches, and show the unavailable
   cluster DNS perspective in all eight locales without hiding technical evidence.
