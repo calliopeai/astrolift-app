@@ -8140,6 +8140,8 @@ export type Mutation = {
   setPreviewPinned: AstroliftPreviewEnvironmentMutationResult;
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
+  /** Enable or disable an exact owned workflow definition at its reviewed revision. Does not start a run or confirm schedule state. */
+  setWorkflowDefinitionEnabled: WorkflowDefinitionActivationResult;
   setZentinelleGatewayEnabled: AstroliftZentinelleClusterGatewayMutationResult;
   /** Cancel a sign request. Sign requests are not available: this always refuses. */
   signRequestCancel: Scalars['Boolean']['output'];
@@ -9852,6 +9854,13 @@ export type MutationSetProjectBundleSecretValueArgs = {
 
 export type MutationSetRetentionPolicyArgs = {
   input: SetRetentionPolicyInput;
+};
+
+
+export type MutationSetWorkflowDefinitionEnabledArgs = {
+  definitionId: Scalars['GUID']['input'];
+  expectedRevision: Scalars['String']['input'];
+  isEnabled: Scalars['Boolean']['input'];
 };
 
 
@@ -14402,6 +14411,15 @@ export type WebhookSecretRevealMutationResult = {
 
 export type WithdrawSecretChangeInput = {
   proposalId: Scalars['GUID']['input'];
+};
+
+export type WorkflowDefinitionActivationResult = {
+  changed: Scalars['Boolean']['output'];
+  definitionId?: Maybe<Scalars['GUID']['output']>;
+  errors: Array<ValidationError>;
+  isEnabled?: Maybe<Scalars['Boolean']['output']>;
+  ok: Scalars['Boolean']['output'];
+  revision?: Maybe<Scalars['String']['output']>;
 };
 
 export type WorkflowDefinitionRun = {

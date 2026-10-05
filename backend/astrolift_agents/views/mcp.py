@@ -98,6 +98,9 @@ ANY_SCOPE = "any_scope"
 #: stands in for the target; the surface guardrail allows that only for the
 #: tools on its allowlist.
 TOOL_SCOPES: dict[str, Any] = {
+    "astrolift_set_workflow_definition_enabled": definition_scope_by_guid(
+        permission=Permission.WORKFLOW_UPDATE
+    ),
     "astrolift_get_workflow": configured_workflow_scope(Permission.WORKFLOW_READ),
     "astrolift_create_workflow": configuration_definition_scope,
     "astrolift_update_workflow": configured_workflow_scope(Permission.WORKFLOW_UPDATE),
@@ -162,7 +165,11 @@ TOOL_SCOPES: dict[str, Any] = {
 def _operation_for_tool(name: str, args: dict[str, Any]):
     from astrolift_identity.operation_context import agent_region_operation, agent_task_operation
 
-    if name in {"astrolift_start_workflow_definition", "astrolift_get_workflow_start"}:
+    if name in {
+        "astrolift_start_workflow_definition",
+        "astrolift_get_workflow_start",
+        "astrolift_set_workflow_definition_enabled",
+    }:
         return agent_region_operation(args)[0]
     if name in {
         "astrolift_get_workflow_execution",
@@ -1018,6 +1025,7 @@ def _deprovision_project_resource(request: HttpRequest, args: dict[str, Any]) ->
 
 
 _HANDLERS: dict[str, ToolHandler] = {
+    "astrolift_set_workflow_definition_enabled": workflow_mcp.set_definition_enabled,
     "astrolift_get_workflow": workflow_mcp.get_workflow,
     "astrolift_create_workflow": workflow_mcp.create_workflow,
     "astrolift_update_workflow": workflow_mcp.update_workflow,

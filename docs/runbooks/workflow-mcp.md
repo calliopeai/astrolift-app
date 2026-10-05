@@ -72,6 +72,32 @@ Successful persisted imports return the exact `definition_id`, actual
 validation failures set `isError: true` and preserve the full native envelope
 in both JSON text content and `structuredContent`.
 
+## Enable a reviewed definition
+
+`astrolift_set_workflow_definition_enabled` accepts an exact `definition_id`,
+the `expected_revision` returned by `astrolift_get_workflow_definition`, and an
+explicit `is_enabled` boolean. It requires `mcp:write`, `workflow:write` and
+current `workflow.update` permission at the definition's actual owner. Enabling
+also requires `mcp:dispatch`, `workflow:trigger` and owner trigger permission.
+Disabling does not require dispatch authority.
+
+The native `setWorkflowDefinitionEnabled` GraphQL mutation performs the same
+operation. It locks the owned definition and the canonical review graph, checks
+the reviewed revision, and uses the existing definition writer. Global templates
+cannot be targeted by this owned-definition operation; clone them first. Existing
+source-managed and nested-parent write restrictions remain in force.
+
+Success returns `definition_id`, resulting `revision`, `is_enabled` and `changed`.
+An unchanged request with a current review does not rewrite the row. Enabling
+changes the revision: obtain a fresh review/input contract before a subsequent
+reviewed start. A lost activation response is recovered by reading the exact ID;
+replaying an old revision is refused, even if the desired enabled state matches.
+
+Activation does not submit an execution or confirm engine schedule state. It can
+change eligibility for existing configured workflows and webhook triggers, so
+inspect affected work before changing a shared definition. Use the configured
+workflow schedule observation/reconciliation tools for actual engine state.
+
 ## Configure and maintain workflows
 
 | Tool | Authority and result |

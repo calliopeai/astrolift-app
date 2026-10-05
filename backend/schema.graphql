@@ -8734,6 +8734,11 @@ type Mutation {
   """Create a new workflow definition (platform operator only)."""
   createWorkflowDefinition(name: String!, slug: String!, modelLabel: String!, states: JSON!, transitions: JSON!, description: String = null, isEnabled: Boolean! = false, patternKind: String = null, inputSchema: JSON = null): MutationResult!
 
+  """
+  Enable or disable an exact owned workflow definition at its reviewed revision. Does not start a run or confirm schedule state.
+  """
+  setWorkflowDefinitionEnabled(definitionId: GUID!, expectedRevision: String!, isEnabled: Boolean!): WorkflowDefinitionActivationResult!
+
   """Update an org-owned workflow definition (globals are read-only)."""
   updateWorkflowDefinition(slug: String!, name: String = null, description: String = null, modelLabel: String = null, states: JSON = null, transitions: JSON = null, isEnabled: Boolean = null, patternKind: String = null, inputSchema: JSON = null): MutationResult!
 
@@ -10762,6 +10767,15 @@ type WebhookSecretRevealMutationResult {
 
 input WithdrawSecretChangeInput {
   proposalId: GUID!
+}
+
+type WorkflowDefinitionActivationResult {
+  ok: Boolean!
+  errors: [ValidationError!]!
+  definitionId: GUID
+  revision: String
+  isEnabled: Boolean
+  changed: Boolean!
 }
 
 type WorkflowDefinitionRun {

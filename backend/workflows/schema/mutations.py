@@ -62,6 +62,14 @@ class RunWorkflowDefinitionResult(MutationResult):
     dispatch_status: str | None = None
 
 
+@strawberry.type
+class WorkflowDefinitionActivationResult(MutationResult):
+    definition_id: GUID | None = None  # type: ignore[valid-type]
+    revision: str | None = None
+    is_enabled: bool | None = None
+    changed: bool = False
+
+
 def _reviewed_start_audit(fn):
     audited = mutation_audit(action="workflow.definition.start")(fn)
 
@@ -563,6 +571,91 @@ class Mutation:
             raise GraphQLError(f"Failed to create workflow definition: {e}") from e
 
         return MutationResult.success()
+
+    @strawberry.mutation(
+        description="Enable or disable an exact owned workflow definition at its reviewed revision. Does not start a run or confirm schedule state."
+    )
+    @require_permission(
+        Permission.WORKFLOW_UPDATE,
+        scope=definition_scope_by_guid(permission=Permission.WORKFLOW_UPDATE),
+        operation=agent_region_operation,
+    )
+    @tenant_scoped()
+    def set_workflow_definition_enabled(
+        self,
+        info: Info,
+        definition_id: GUID,  # type: ignore[valid-type]
+        expected_revision: str,
+        is_enabled: bool,
+    ) -> WorkflowDefinitionActivationResult:
+        import re
+        from uuid import UUID
+
+        from workflows.reviewed_starts import ReviewedStartError, _definition_graph, definition_revision
+        from workflows.scopes import reviewed_definition_scope
+
+        def refused(field, message):
+            return WorkflowDefinitionActivationResult(
+                ok=False, errors=[GQLValidationError(field=field, messages=[message])]
+            )
+
+        try:
+            identity = UUID(str(definition_id))
+        except (ValueError, TypeError, AttributeError):
+            return refused("definition_id", "An exact workflow definition GUID is required")
+        if not re.fullmatch(r"[0-9a-f]{64}", expected_revision):
+            return refused("expected_revision", "A reviewed definition revision is required")
+
+        with transaction.atomic():
+            definition = (
+                WorkflowDefinition.objects.select_for_update(of=("self",))
+                .select_related("project__team")
+                .filter(guid=identity, organization_id=_caller_org_pk(), deleted_at__isnull=True)
+                .first()
+            )
+            if definition is None:
+                return refused("definition_id", "Owned workflow definition not found")
+            check_permission(
+                Permission.WORKFLOW_UPDATE,
+                scope=reviewed_definition_scope(definition, _caller_org_pk(), Permission.WORKFLOW_UPDATE),
+            )
+            if is_enabled:
+                check_permission(
+                    Permission.WORKFLOW_TRIGGER,
+                    scope=reviewed_definition_scope(
+                        definition, _caller_org_pk(), Permission.WORKFLOW_TRIGGER
+                    ),
+                )
+            write_error = _definition_write_error(info.context.user, definition)
+            if write_error is not None:
+                return refused(*write_error)
+            try:
+                graph = _definition_graph(definition, lock=True)
+                revision = definition_revision(definition, graph=graph)
+            except ReviewedStartError:
+                return refused(
+                    "definition_id", "Workflow graph cannot be reviewed; inspect its native validation errors"
+                )
+            if revision != expected_revision:
+                return refused(
+                    "expected_revision", "Workflow definition changed; review it again before activation"
+                )
+            changed = definition.is_enabled != is_enabled
+            if changed:
+                result = Mutation.update_workflow_definition(
+                    self, info, slug=definition.slug, is_enabled=is_enabled
+                )
+                if not result.ok:
+                    return WorkflowDefinitionActivationResult(ok=False, errors=result.errors)
+                definition.refresh_from_db()
+                revision = definition_revision(definition, graph=graph)
+            return WorkflowDefinitionActivationResult(
+                ok=True,
+                definition_id=GUID(str(definition.guid)),
+                revision=revision,
+                is_enabled=definition.is_enabled,
+                changed=changed,
+            )
 
     @strawberry.mutation(description="Update an org-owned workflow definition (globals are read-only).")
     @require_permission(Permission.WORKFLOW_UPDATE, scope=definition_scope_by_slug("slug"))
