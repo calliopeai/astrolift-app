@@ -42,6 +42,17 @@ def get_definition(request, args):
     return {"definition": _payload(reviewed) if reviewed is not None else None}
 
 
+def set_definition_enabled(request, args):
+    from astrolift_agents.views.mcp import _authorize
+    from astrolift_identity.api_tokens import SCOPE_MCP_DISPATCH, SCOPE_WORKFLOW_TRIGGER
+    from workflows.schema.mutations import Mutation
+
+    if args["is_enabled"]:
+        _authorize(request, (SCOPE_MCP_DISPATCH, SCOPE_WORKFLOW_TRIGGER))
+    activate = cast(Callable[..., object], Mutation().set_workflow_definition_enabled)
+    return _mutation_payload(activate(_info(request), **args))
+
+
 def list_workflows(request, args):
     from astrolift_workflows.schema.queries import WorkflowsQuery
 

@@ -36,6 +36,7 @@ WORKFLOW_TOOL_NAMES = frozenset(
     {
         "astrolift_list_workflow_definitions",
         "astrolift_get_workflow_definition",
+        "astrolift_set_workflow_definition_enabled",
         "astrolift_list_workflows",
         "astrolift_get_workflow",
         "astrolift_create_workflow",
@@ -97,6 +98,25 @@ _START_REQUEST_ID = {
 
 
 MCP_TOOL_META: dict[str, dict[str, Any]] = {
+    "astrolift_set_workflow_definition_enabled": {
+        "description": (
+            "Enable or disable an exact owned definition at its reviewed revision. "
+            "Enabling also requires mcp:dispatch, workflow:trigger and current trigger permission. "
+            "Source-managed and nested-parent restrictions still apply. Returns the resulting revision; "
+            "review it before starting. This does not start a run or confirm schedule state."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WORKFLOW_WRITE,),
+        "permission": Permission.WORKFLOW_UPDATE,
+        "inputSchema": _schema(
+            {
+                "definition_id": _DEFINITION_ID,
+                "expected_revision": {"type": "string", "minLength": 64, "maxLength": 64},
+                "is_enabled": {"type": "boolean"},
+            },
+            required=("definition_id", "expected_revision", "is_enabled"),
+        ),
+    },
     "astrolift_get_workflow": {
         "description": "Read one exact configured workflow ID, including its configuration version, bindings, inputs and recent runs.",
         "scope": SCOPE_MCP_READ,

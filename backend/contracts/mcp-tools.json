@@ -17,6 +17,40 @@
   },
   "tools": [
     {
+      "description": "Enable or disable an exact owned definition at its reviewed revision. Enabling also requires mcp:dispatch, workflow:trigger and current trigger permission. Source-managed and nested-parent restrictions still apply. Returns the resulting revision; review it before starting. This does not start a run or confirm schedule state.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "definition_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "expected_revision": {
+            "maxLength": 64,
+            "minLength": 64,
+            "type": "string"
+          },
+          "is_enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "definition_id",
+          "expected_revision",
+          "is_enabled"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_set_workflow_definition_enabled",
+      "required_permissions": [
+        "workflow.update"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "workflow:write"
+      ]
+    },
+    {
       "description": "Read one exact configured workflow ID, including its configuration version, bindings, inputs and recent runs.",
       "inputSchema": {
         "additionalProperties": false,
