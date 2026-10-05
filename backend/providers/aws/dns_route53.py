@@ -11,17 +11,22 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from _sdk import UnsupportedOperationError  # noqa: F401 (re-exported via raises)
 from _sdk._telemetry import driver_op
-from _sdk.dns import DnsDriver, DnsRecord, Record
+from _sdk.dns import AliasRouteObservation, DnsDriver, DnsRecord, ExactAliasRoute, Record, ReviewedDnsHostname
 from aws._errors import ConflictError, NotFoundError, map_client_error
+from aws.session import aws_client
+
+if TYPE_CHECKING:
+    from _sdk.cloud_credentials import CloudCredential
 
 
 @dataclass
 class Route53Config:
     region: str = "us-east-1"
+    credential: CloudCredential | None = None
     """Route53 is a global service but boto3 still wants a region."""
 
 
@@ -53,17 +58,255 @@ class Route53Driver(DnsDriver):
         client: Any | None = None,
     ) -> None:
         self._config = config or Route53Config()
-        if client is not None:
-            self._r53 = client
-        else:
-            import boto3
-
-            self._r53 = boto3.client(
-                "route53",
-                region_name=self._config.region,
-            )
+        self._r53_native = client
         self._zone_cache: dict[str, str] = {}
         self._acm: Any | None = None
+        self._exact_client = client
+
+    @property
+    def _r53(self):
+        # Reviewed ports construct only bounded, freshly admitted clients.
+        # Defer the legacy client so driver resolution cannot assume a role
+        # before those checkpoints/privacy limits are installed.
+        if self._r53_native is None:
+            self._r53_native = aws_client("route53", region=self._config.region, credential=self._config.credential)
+        return self._r53_native
+
+    @_r53.setter
+    def _r53(self, client):
+        self._r53_native = client
+
+    def _reviewed_clients(self, checkpoint, expected_account_id):
+        from aws.domain_route_clients import clients
+
+        if (
+            not isinstance(expected_account_id, str)
+            or len(expected_account_id) != 12
+            or not expected_account_id.isascii()
+            or not expected_account_id.isdigit()
+        ):
+            from aws.domain_route import DomainRouteError
+
+            raise DomainRouteError("ORIGINAL_NATIVE_ACCOUNT_REQUIRED")
+        return clients(
+            region=self._config.region,
+            credential=self._config.credential,
+            checkpoint=checkpoint,
+            expected_account_id=expected_account_id,
+        )
+
+    @driver_op(
+        cloud="aws",
+        driver="dns",
+        redact_args=(
+            "checkpoint",
+            "record_ack",
+            "zone",
+            "hostname",
+            "arn",
+            "zone_id",
+            "name",
+            "value",
+            "expected_account_id",
+            "operation_id",
+        ),
+    )
+    def observe_reviewed_hostname(self, target: ReviewedDnsHostname, *, checkpoint) -> bool:
+        from aws.domain_route import observe_hostname
+
+        if self._exact_client is not None:
+            return observe_hostname(self._exact_client, target, checkpoint=checkpoint)
+        with self._reviewed_clients(checkpoint, target.expected_account_id) as (native, _account):
+            return observe_hostname(native["route53"], target, checkpoint=checkpoint)
+
+    @driver_op(
+        cloud="aws",
+        driver="dns",
+        redact_args=(
+            "checkpoint",
+            "record_ack",
+            "zone",
+            "hostname",
+            "arn",
+            "zone_id",
+            "name",
+            "value",
+            "expected_account_id",
+            "operation_id",
+        ),
+    )
+    def observe_exact_alias_route(self, route: ExactAliasRoute, *, checkpoint) -> AliasRouteObservation:
+        from aws.domain_route import observe_alias
+
+        client = self._exact_client
+        if client is None:
+            with self._reviewed_clients(checkpoint, route.expected_account_id) as (native, _account):
+                return observe_alias(native["route53"], route, checkpoint=checkpoint)
+        return observe_alias(client, route, checkpoint=checkpoint)
+
+    @driver_op(
+        cloud="aws",
+        driver="dns",
+        redact_args=(
+            "checkpoint",
+            "record_ack",
+            "zone",
+            "hostname",
+            "arn",
+            "zone_id",
+            "name",
+            "value",
+            "expected_account_id",
+            "operation_id",
+        ),
+    )
+    def create_exact_alias_route(self, route: ExactAliasRoute, *, checkpoint, record_ack) -> AliasRouteObservation:
+        from aws.domain_route import create_alias
+
+        client = self._exact_client
+        if client is None:
+            with self._reviewed_clients(checkpoint, route.expected_account_id) as (native, _account):
+                return create_alias(native["route53"], route, checkpoint=checkpoint, record_ack=record_ack)
+        return create_alias(client, route, checkpoint=checkpoint, record_ack=record_ack)
+
+    @driver_op(
+        cloud="aws",
+        driver="dns",
+        redact_args=(
+            "checkpoint",
+            "record_ack",
+            "zone",
+            "hostname",
+            "arn",
+            "zone_id",
+            "name",
+            "value",
+            "expected_account_id",
+            "operation_id",
+        ),
+    )
+    def observe_reviewed_dns_change(self, change_id, *, expected_account_id, checkpoint):
+        from aws.domain_route_validation import observe_change
+
+        with self._reviewed_clients(checkpoint, expected_account_id) as (native, _account):
+            return observe_change(native["route53"], change_id=change_id, checkpoint=checkpoint)
+
+    @driver_op(
+        cloud="aws",
+        driver="dns",
+        redact_args=(
+            "checkpoint",
+            "record_ack",
+            "zone",
+            "hostname",
+            "arn",
+            "zone_id",
+            "name",
+            "value",
+            "expected_account_id",
+            "operation_id",
+        ),
+    )
+    def request_reviewed_domain_certificate(
+        self, *, zone, hostname, operation_id, expected_account_id, checkpoint, record_ack
+    ):
+        from aws.domain_route_certificate import request_certificate
+
+        with self._reviewed_clients(checkpoint, expected_account_id) as (native, account):
+            return request_certificate(
+                native["acm"],
+                zone=zone,
+                hostname=hostname,
+                region=self._config.region,
+                account=account,
+                operation_id=operation_id,
+                checkpoint=checkpoint,
+                record_ack=record_ack,
+            )
+
+    @driver_op(
+        cloud="aws",
+        driver="dns",
+        redact_args=(
+            "checkpoint",
+            "record_ack",
+            "zone",
+            "hostname",
+            "arn",
+            "zone_id",
+            "name",
+            "value",
+            "expected_account_id",
+            "operation_id",
+        ),
+    )
+    def observe_reviewed_domain_certificate(self, *, zone, hostname, arn, expected_account_id, checkpoint):
+        from aws.domain_route_certificate import observe_certificate
+
+        with self._reviewed_clients(checkpoint, expected_account_id) as (native, account):
+            return observe_certificate(
+                native["acm"],
+                zone=zone,
+                hostname=hostname,
+                region=self._config.region,
+                account=account,
+                arn=arn,
+                checkpoint=checkpoint,
+            )
+
+    @driver_op(
+        cloud="aws",
+        driver="dns",
+        redact_args=(
+            "checkpoint",
+            "record_ack",
+            "zone",
+            "hostname",
+            "arn",
+            "zone_id",
+            "name",
+            "value",
+            "expected_account_id",
+            "operation_id",
+        ),
+    )
+    def observe_reviewed_certificate_validation(self, *, zone_id, zone, name, value, expected_account_id, checkpoint):
+        from aws.domain_route_validation import observe
+
+        with self._reviewed_clients(checkpoint, expected_account_id) as (native, _account):
+            return observe(native["route53"], zone_id=zone_id, zone=zone, name=name, value=value, checkpoint=checkpoint)
+
+    @driver_op(
+        cloud="aws",
+        driver="dns",
+        redact_args=(
+            "checkpoint",
+            "record_ack",
+            "zone",
+            "hostname",
+            "arn",
+            "zone_id",
+            "name",
+            "value",
+            "expected_account_id",
+            "operation_id",
+        ),
+    )
+    def create_reviewed_certificate_validation(
+        self, *, zone_id, zone, name, value, expected_account_id, checkpoint, record_ack
+    ):
+        from aws.domain_route_validation import create
+
+        with self._reviewed_clients(checkpoint, expected_account_id) as (native, _account):
+            return create(
+                native["route53"],
+                zone_id=zone_id,
+                zone=zone,
+                name=name,
+                value=value,
+                checkpoint=checkpoint,
+                record_ack=record_ack,
+            )
 
     @driver_op(cloud="aws", driver="dns", audit=True, sensitive_kind="dns.ensure_record")
     def ensure_record(
@@ -473,14 +716,13 @@ class Route53Driver(DnsDriver):
 
     def _acm_client(self) -> Any:
         if self._acm is None:
-            import boto3
-
             # ACM certs for CloudFront + global ALBs must be in us-east-1;
             # the driver defaults to us-east-1 via Route53Config, which is
             # also the correct region for ACM DNS-validated wildcard certs.
-            self._acm = boto3.client(
+            self._acm = aws_client(
                 "acm",
-                region_name=self._config.region,
+                region=self._config.region,
+                credential=self._config.credential,
             )
         return self._acm
 

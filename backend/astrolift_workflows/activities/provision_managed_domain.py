@@ -98,6 +98,9 @@ def pin_managed_zone(dns_driver: Any, domain: Any) -> None:
 
 
 def _provision_dns_zone_sync(cluster_id: int, zone: str) -> dict[str, Any]:
+    from astrolift_lifecycle.domain_app_route import require_unbound_zone
+
+    require_unbound_zone(zone=zone)
     from astrolift_clusters.dns_layout import ZoneRegistrationStep
     from astrolift_clusters.models import ManagedDomain
 
@@ -166,6 +169,9 @@ async def provision_dns_zone(cluster_id: int, zone: str) -> dict[str, Any]:
 
 
 def _request_wildcard_cert_sync(cluster_id: int, zone: str, zone_id: str) -> str:
+    from astrolift_lifecycle.domain_app_route import require_unbound_zone
+
+    require_unbound_zone(zone=zone)
     from astrolift_clusters.dns_layout import ZoneRegistrationStep
     from astrolift_clusters.models import ManagedDomain
 

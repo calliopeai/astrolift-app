@@ -7869,6 +7869,132 @@ type ManagedDomainActions {
   canRevalidate: Boolean!
 }
 
+type ManagedDomainAppRouteOperation {
+  kind: String!
+  appId: GUID!
+  clusterId: GUID!
+  allocationState: String!
+  records: [ManagedDomainAppRouteRecord!]!
+  observedAt: DateTime
+  id: GUID!
+  version: Int!
+  requestId: GUID!
+  domainId: GUID!
+  environmentId: GUID!
+  workloadId: GUID!
+  customDomainId: GUID
+  hostname: String!
+  purpose: String!
+  status: String!
+  reason: String!
+  dnsState: String!
+  ingressState: String!
+  tlsState: String!
+  canReconcile: Boolean!
+}
+
+input ManagedDomainAppRouteOperationInput {
+  domainId: GUID!
+  requestId: GUID!
+}
+
+type ManagedDomainAppRouteOperationMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ManagedDomainAppRouteOperation
+}
+
+input ManagedDomainAppRouteReconcileInput {
+  operationId: GUID!
+  expectedVersion: Int!
+  requestId: GUID!
+}
+
+type ManagedDomainAppRouteRecord {
+  name: String!
+  type: String!
+  target: String
+  targetZoneId: String
+}
+
+type ManagedDomainAppRouteReview {
+  kind: String!
+  appId: GUID!
+  appVersion: Int!
+  domainId: GUID!
+  domainVersion: Int!
+  environmentId: GUID!
+  environmentVersion: Int!
+  workloadId: GUID!
+  workloadVersion: Int!
+  clusterId: GUID!
+  clusterVersion: Int!
+  hostname: String!
+  reviewSha256: String!
+  writer: String!
+  records: [ManagedDomainAppRouteRecord!]!
+  certificateStatus: String!
+  allocationState: String!
+  apiId: String
+  apiEndpoint: String
+  stage: String
+  functionArn: String
+  sourceFingerprint: String
+  canPrepare: Boolean!
+  canAttach: Boolean!
+  reason: String!
+}
+
+type ManagedDomainAppRouteSupport {
+  domainId: GUID!
+  version: Int!
+  allowed: Boolean!
+  reason: String!
+  writer: String!
+}
+
+type ManagedDomainAppRouteTarget {
+  kind: String!
+  appId: GUID!
+  appName: String!
+  appVersion: Int!
+  environmentId: GUID!
+  environmentName: String!
+  environmentVersion: Int!
+  workloadId: GUID!
+  workloadName: String!
+  workloadVersion: Int!
+  clusterId: GUID!
+  clusterName: String!
+  clusterVersion: Int!
+}
+
+input ManagedDomainAppRouteTargetInput {
+  domainId: GUID!
+  expectedDomainVersion: Int!
+  environmentId: GUID!
+  expectedEnvironmentVersion: Int!
+  workloadId: GUID!
+  hostname: String!
+}
+
+type ManagedDomainAppRouteTargetsPage {
+  items: [ManagedDomainAppRouteTarget!]!
+  nextCursor: String
+  hasNextPage: Boolean!
+}
+
+input ManagedDomainAppRouteWriteInput {
+  domainId: GUID!
+  expectedDomainVersion: Int!
+  environmentId: GUID!
+  expectedEnvironmentVersion: Int!
+  workloadId: GUID!
+  hostname: String!
+  reviewSha256: String!
+  requestId: GUID!
+}
+
 enum ManagedDomainCheckState {
   OK
   MISMATCH
@@ -8575,6 +8701,9 @@ type Mutation {
   deleteClusterAuthUser(input: ClusterAuthUserRefInput!): AstroliftClusterAuthUserChangeMutationResult!
   setClusterAuthUserGroups(input: SetClusterAuthUserGroupsInput!): AstroliftClusterAuthUserChangeMutationResult!
   createClusterAuthGroup(input: CreateClusterAuthGroupInput!): AstroliftClusterAuthUserChangeMutationResult!
+  prepareManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
+  connectManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
+  reconcileManagedDomainAppRoute(input: ManagedDomainAppRouteReconcileInput!): ManagedDomainAppRouteOperationMutationResult!
   startDeployment(input: StartDeploymentInput!): AstroliftDeploymentMutationResult!
   approveDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   rejectDeployment(input: AbortDeploymentInput!): AstroliftDeploymentMutationResult!
@@ -9343,6 +9472,10 @@ type Query {
   scanAppManifests(sourceRepo: String!, sourceKind: String! = "github", ref: String! = "main"): AstroliftScanAppManifestsResult!
   astroliftAppAccess(appSlug: String!): AstroliftAppAccess
   astroliftAppAccessPreview(appSlug: String!, groups: [String!]!, users: [String!]!): AstroliftAppAccessPreview
+  managedDomainAppRouteSupport(domainId: GUID!, expectedDomainVersion: Int!): ManagedDomainAppRouteSupport!
+  managedDomainAppTargetsPage(domainId: GUID!, expectedDomainVersion: Int!, first: Int! = 20, after: String = null): ManagedDomainAppRouteTargetsPage!
+  managedDomainAppRouteReview(input: ManagedDomainAppRouteTargetInput!): ManagedDomainAppRouteReview!
+  managedDomainAppRouteOperation(input: ManagedDomainAppRouteOperationInput!): ManagedDomainAppRouteOperation
   scanCloudOrphans: CloudOrphanReportType!
   astroliftEnvironments(appSlug: String = null): [AstroliftAppEnvironment!]!
   astroliftEnvironmentsPage(appSlug: String = null, search: String = null, filter: AstroliftEnvironmentsFilter = null, sort: String = null, page: Int = null, pageSize: Int = null): AstroliftAppEnvironmentPage!

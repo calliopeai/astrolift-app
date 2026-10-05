@@ -196,7 +196,11 @@ def assert_credential_supported(cluster: TenantCluster, *, capability: str) -> N
     credential block fails here rather than at some later cloud call.
     """
     credential = credential_for_cluster(cluster)
-    if credential.is_ambient or capability in CREDENTIAL_AWARE_CAPABILITIES:
+    if (
+        credential.is_ambient
+        or capability in CREDENTIAL_AWARE_CAPABILITIES
+        or (_cloud_for(cluster) == "aws" and capability == "dns")
+    ):
         return
     raise ClusterCredentialUnsupported(
         f"cluster {_slug_for(cluster)}: declares credential mode {credential.mode.value!r}, but the "
