@@ -106,7 +106,7 @@ export function useDomainDefaultSettings(
           value.zone === domain.zone &&
           value.organizationSlug === domain.organizationSlug &&
           Number.isSafeInteger(value.version) &&
-          value.version >= expectedVersion &&
+          value.version > expectedVersion &&
           value.defaultFor === choice;
         setActionMessage(correlated ? t("applied") : d("acceptedUnverified"));
         if (!correlated) setUncertain(true);

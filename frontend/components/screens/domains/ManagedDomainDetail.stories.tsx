@@ -1,3 +1,4 @@
+import { ROUTING_EXAMPLES } from "./DomainRecordRouting.stories";
 import { DEFAULT_SETTINGS } from "./DomainDefaultSettings.stories";
 import { NextIntlClientProvider } from "next-intl";
 import en from "@/messages/en.json";
@@ -219,6 +220,20 @@ export const EffectiveDefaultSettings: Story = {
       ...DEFAULT_SETTINGS,
       zone: DOMAIN_ACTIVE.zone,
       version: DOMAIN_ACTIVE.version,
+    },
+  },
+};
+
+export const NativeRoutingConfiguration: Story = {
+  args: {
+    ...MANAGED_DOMAIN,
+    initialTab: "records",
+    diagnostics: {
+      ...DOMAIN_DIAGNOSTICS,
+      providerZone: {
+        ...DOMAIN_DIAGNOSTICS.providerZone,
+        records: [{ ...DOMAIN_DIAGNOSTICS.providerZone.records[0], routing: ROUTING_EXAMPLES[1] }],
+      },
     },
   },
 };

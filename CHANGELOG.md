@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Show typed Route53 policy configuration and health/traffic-policy references per DNS record in the Domains Records tab, retaining unknown and non-Route53 states without claiming measured health or traffic (#2287).
+
 - Connect domain settings to fresh effective-default admission with a reviewed domain version and impact fingerprint, localized refusal reasons and explicit refresh/review after uncertain replies; preserve existing app URLs (#2299).
 
 - Prepare reusable, localized app-domain connection and effective-domain settings

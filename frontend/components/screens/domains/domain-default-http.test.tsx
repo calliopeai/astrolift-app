@@ -26,7 +26,7 @@ let server: Server,
   facts: typeof DOMAIN_DIAGNOSTICS,
   requests: Request[],
   errors: string[],
-  outcome: "accepted" | "lost" | "stale" | "foreign" | "invalid",
+  outcome: "accepted" | "lost" | "stale" | "foreign" | "invalid" | "equal-version",
   hold: boolean,
   release: (() => void) | null,
   refuseRead: boolean;
@@ -97,6 +97,7 @@ beforeEach(async () => {
         errors: [],
         data: {
           ...domain,
+          version: outcome === "equal-version" ? domain.version - 1 : domain.version,
           id: outcome === "foreign" ? "a0000000-0000-4000-8000-000000000099" : domain.id,
         },
       };
@@ -247,6 +248,25 @@ describe("default review through actual schema HttpLink", () => {
     await submit();
     await screen.findByText(en.managedDomains.acceptedUnverified);
     expect(screen.getByLabelText(en.domainDefaults.useFor)).toBeDisabled();
+    expect(writes()).toHaveLength(1);
+  });
+  it("holds accepted-unverified when the acknowledgement has the unchanged reviewed version", async () => {
+    outcome = "equal-version";
+    render(<View />);
+    await ready();
+    await submit();
+    await screen.findByText(en.managedDomains.acceptedUnverified);
+    await waitFor(() =>
+      expect(
+        within(section()).getByRole("button", { name: en.managedDomains.refresh })
+      ).toBeEnabled()
+    );
+    expect(domain.version).toBe(8);
+    expect(screen.queryByText(en.domainDefaults.applied)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(en.domainDefaults.useFor)).toBeDisabled();
+    expect(writes()).toHaveLength(1);
+    fireEvent.click(within(section()).getByRole("button", { name: en.managedDomains.refresh }));
+    await waitFor(() => expect(screen.getByLabelText(en.domainDefaults.useFor)).toBeEnabled());
     expect(writes()).toHaveLength(1);
   });
   it("holds uncertainty on malformed envelope", async () => {

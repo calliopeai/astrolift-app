@@ -324,6 +324,106 @@ describe("actual exported domain schema over HttpLink", () => {
     );
     expect(screen.getByText(en.managedDomains.routeHelp)).toBeInTheDocument();
   });
+  it("renders actual Route53 policy configuration and inert references without measuring health or traffic", async () => {
+    observation.providerZone.records = [
+      {
+        name: domain.zone,
+        type: "A",
+        ttl: null,
+        values: [],
+        aliasTarget: "native-lb.example",
+        aliasZoneId: "Z-NATIVE",
+        evaluateTargetHealth: false,
+        routing: {
+          policy: "WEIGHTED",
+          reason: "",
+          setIdentifier: "blue",
+          weight: 0,
+          multiValueAnswer: false,
+          healthCheckId: "health-reference",
+          trafficPolicyInstanceId: "traffic-reference",
+        },
+      },
+    ];
+    render(<View />);
+    await ready();
+    fireEvent.click(screen.getByRole("tab", { name: en.managedDomains.records }));
+    const record = screen.getByRole("list", { name: en.managedDomains.records });
+    const summary = within(record).getByText(
+      `${en.domainRecordRouting.title}: ${en.domainRecordRouting.weighted}`
+    );
+    const panel = summary.closest("details")!;
+    expect(panel.open).toBe(false);
+    fireEvent.click(summary);
+    expect(panel.open).toBe(true);
+    expect(within(panel).getByText("0")).toHaveRole("definition");
+    expect(within(panel).getByText(en.domainRecordRouting.no)).toHaveRole("definition");
+    expect(within(panel).getByText("health-reference")).toHaveRole("definition");
+    expect(within(panel).getByText("traffic-reference")).toHaveRole("definition");
+    expect(within(panel).getByText(en.domainRecordRouting.help)).toBeInTheDocument();
+    expect(panel.querySelector("a,button")).toBeNull();
+    expect(
+      requests.every((row) =>
+        [
+          "ManagedDomain",
+          "ManagedDomainDiagnostics",
+          "DnsConnectionSupport",
+          "DnsDomainBinding",
+        ].includes(row.operationName)
+      )
+    ).toBe(true);
+    expect(within(record).getByText("native-lb.example")).toBeInTheDocument();
+  });
+  it("keeps incomplete native routing explicitly unknown while retaining observed configuration", async () => {
+    observation.providerZone.records = [
+      {
+        name: domain.zone,
+        type: "A",
+        ttl: 60,
+        values: ["192.0.2.1"],
+        routing: {
+          policy: "UNKNOWN",
+          reason: "INCOMPLETE_ROUTING_POLICY",
+          setIdentifier: "retained-id",
+        },
+      },
+    ];
+    render(<View />);
+    await ready();
+    fireEvent.click(screen.getByRole("tab", { name: en.managedDomains.records }));
+    const panel = screen
+      .getByText(`${en.domainRecordRouting.title}: ${en.domainRecordRouting.unknownPolicy}`)
+      .closest("details")!;
+    expect(within(panel).getByRole("note")).toHaveTextContent(en.domainRecordRouting.incomplete);
+    expect(within(panel).getByText("retained-id")).toHaveRole("definition");
+    expect(within(panel).getByText(en.domainRecordRouting.help)).toBeInTheDocument();
+    expect(requests.some((row) => row.operationName === "ManagedDomainProbe")).toBe(false);
+  });
+  it("omits Route53 routing configuration for null Cloudflare metadata without implying SIMPLE", async () => {
+    observation.providerZone.bindingSource = "PROTECTED_CLOUDFLARE_CONNECTION";
+    observation.providerZone.records = [
+      {
+        name: domain.zone,
+        type: "A",
+        ttl: 300,
+        values: ["192.0.2.1"],
+        routing: null,
+        proxied: true,
+      },
+    ];
+    render(<View />);
+    await ready();
+    fireEvent.click(screen.getByRole("tab", { name: en.managedDomains.records }));
+    const record = screen.getByRole("list", { name: en.managedDomains.records });
+    expect(record.querySelector("details")).toBeNull();
+    expect(
+      within(record).queryByText(
+        `${en.domainRecordRouting.title}: ${en.domainRecordRouting.simple}`
+      )
+    ).not.toBeInTheDocument();
+    expect(within(record).getByText("192.0.2.1")).toBeInTheDocument();
+    expect(within(record).getByText(en.domainConnections.proxied)).toBeInTheDocument();
+  });
   it("uses actual probe variables for dig/CAA and keeps HTTPS TLS unknown when the server has no proof", async () => {
     render(<View />);
     await diagnostics();

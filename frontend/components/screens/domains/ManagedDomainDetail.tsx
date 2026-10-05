@@ -17,6 +17,7 @@ import type {
 import { useFormatters } from "@/lib/i18n/formatters";
 import { domainDiagnosticReasonKey } from "./domain-diagnostic-reasons";
 import type { ManagedDomainState } from "./use-managed-domain";
+import { DomainRecordRouting } from "./DomainRecordRouting";
 import { DomainDefaultSettings, type DomainDefaultSettingsProps } from "./DomainDefaultSettings";
 
 export type ManagedDomainDetailProps = ManagedDomainState & {
@@ -496,6 +497,7 @@ function DetailTabs({
                             </p>
                           </div>
                         )}
+                        <DomainRecordRouting routing={r.routing} />
                       </div>
                     </li>
                   ))}

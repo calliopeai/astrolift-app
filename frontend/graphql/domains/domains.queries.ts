@@ -73,6 +73,35 @@ export const MANAGED_DOMAIN_DIAGNOSTICS = gql`
           evaluateTargetHealth
           proxied
           priority
+          routing {
+            policy
+            reason
+            setIdentifier
+            weight
+            region
+            failover
+            geoLocation {
+              continentCode
+              countryCode
+              subdivisionCode
+            }
+            geoProximity {
+              awsRegion
+              localZoneGroup
+              coordinates {
+                latitude
+                longitude
+              }
+              bias
+            }
+            cidr {
+              collectionId
+              locationName
+            }
+            multiValueAnswer
+            healthCheckId
+            trafficPolicyInstanceId
+          }
         }
       }
       routes {
