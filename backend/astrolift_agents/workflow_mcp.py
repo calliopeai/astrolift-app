@@ -54,6 +54,52 @@ def list_workflows(request, args):
     return _payload(page)
 
 
+def get_workflow(request, args):
+    from astrolift_workflows.schema.queries import WorkflowsQuery
+
+    row = WorkflowsQuery().workflow(_info(request), workflow_id=args["workflow_id"])
+    return {"workflow": _payload(row) if row is not None else None}
+
+
+def _configuration_info(request):
+    from astrolift_agents.views.mcp import McpCallError, _authorize
+    from astrolift_identity.api_tokens import SCOPE_MCP_DISPATCH, SCOPE_WORKFLOW_TRIGGER
+    from core.permissions import Permission, PermissionDenied
+
+    def activation_check():
+        try:
+            _authorize(request, (SCOPE_MCP_DISPATCH, SCOPE_WORKFLOW_TRIGGER))
+        except McpCallError as exc:
+            raise PermissionDenied(Permission.WORKFLOW_TRIGGER, None, str(exc)) from exc
+
+    info = _info(request)
+    # Native writes call this on the locked resulting configuration and during
+    # post-save schedule application, not on a potentially stale gateway read.
+    info.context.workflow_activation_check = activation_check
+    return info
+
+
+def create_workflow(request, args):
+    from astrolift_workflows.schema.mutations import WorkflowsMutation
+
+    create = cast(Callable[..., object], WorkflowsMutation().create_workflow)
+    return _mutation_payload(create(_configuration_info(request), **{"is_enabled": False, **args}))
+
+
+def update_workflow(request, args):
+    from astrolift_workflows.schema.mutations import WorkflowsMutation
+
+    update = cast(Callable[..., object], WorkflowsMutation().update_workflow)
+    return _mutation_payload(update(_configuration_info(request), **args))
+
+
+def delete_workflow(request, args):
+    from astrolift_workflows.schema.mutations import WorkflowsMutation
+
+    delete = cast(Callable[..., object], WorkflowsMutation().delete_workflow)
+    return _mutation_payload(delete(_configuration_info(request), **args))
+
+
 def preview_manifest(request, args):
     from astrolift_workflows.schema.manifest import WorkflowManifestQuery
 

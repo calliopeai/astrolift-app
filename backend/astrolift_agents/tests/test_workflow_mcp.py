@@ -123,8 +123,8 @@ def rpc(mcp, method, params=None):
     )
 
 
-def tool(mcp, name, **arguments):
-    response = rpc(mcp, "tools/call", {"name": f"astrolift_{name}", "arguments": arguments})
+def tool(mcp, tool_name, **arguments):
+    response = rpc(mcp, "tools/call", {"name": f"astrolift_{tool_name}", "arguments": arguments})
     assert response.status_code == 200, response.content
     return response.json()["result"]
 

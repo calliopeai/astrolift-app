@@ -33,6 +33,12 @@ edit it through `updateWorkflow(workflowId: ...)`, or soft-delete it through
 over MCP, expose `definitionGuid` (`definition_guid` over MCP) so subsequent
 reviews can resolve the exact definition without a slug lookup.
 
+Configured results also expose `version`. Pass the reviewed value as
+`expectedVersion` to update/delete to reject stale edits under the row lock.
+The argument is optional for legacy GraphQL callers and required by the native
+MCP update/delete tools. Re-read and reassess on mismatch; a failed assertion
+does not save configuration or apply a schedule change.
+
 Legacy slug arguments remain supported. If an ID is supplied, it is
 authoritative: a missing, malformed, foreign or deleted ID never substitutes a
 same-slug row. Supplying both ID and slug asserts that they identify the same
