@@ -323,7 +323,7 @@ it("another intentional test requires a new review and distinct UUID", async () 
   fireEvent.click(screen.getByRole("button", { name: c.send }));
   await screen.findByText(c.acceptance);
   const original = intent().requestId;
-  fireEvent.click(screen.getByRole("button", { name: c.another }));
+  fireEvent.click(await screen.findByRole("button", { name: c.another }));
   await loaded();
   expect(screen.getByRole("button", { name: c.send })).toBeDisabled();
   expect(sends()).toHaveLength(1);
