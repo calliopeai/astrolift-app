@@ -209,7 +209,6 @@ def test_db_immutable_original_owner_and_history_and_reverse_refusal(admitted):
 
 @pytest.fixture
 def admitted_faas(admitted):
-
     w = admitted
     w.medops_app.manifest_raw = """name = "owned"
 [[workloads]]
