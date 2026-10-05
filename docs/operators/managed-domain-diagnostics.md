@@ -71,3 +71,11 @@ read-only registration without recorded expected nameservers can show UNKNOWN
 public delegation for a tenant reader until an authorized provider observation
 is available. The TXT ownership challenge and provider read access remain
 separate from writer support, effective domain selection and public activation.
+
+Certificate registration preserves the existing domain configuration and records
+its actual provisioning cluster. This keeps exact cluster links and revalidation
+available after the certificate step, including when a delegation check pauses
+the workflow. A legacy row missing this association needs an authorized resume
+with the reviewed cluster through `revalidateManagedDomain(clusterId, zone)`;
+this change does not backfill live rows or select a new app default. Revalidation
+and certificate setup are separate from app ingress records and redeployment.
