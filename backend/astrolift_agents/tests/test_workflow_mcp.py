@@ -72,7 +72,7 @@ def mcp():
             organization=org,
         )
         definition.project = project
-        definition.name = f"Workflow {i}"
+        definition.name = f"MCP scope 2301 Workflow {i}"
         definition.save(update_fields=["project", "name"])
         definitions.append(definition)
         if org:
@@ -80,7 +80,7 @@ def mcp():
                 Workflow.objects.create(
                     organization=org,
                     definition=definition,
-                    name=f"Configured {i}",
+                    name=f"MCP scope 2301 Configured {i}",
                     slug=f"configured-{i}",
                     inputs={"topic": "release notes"},
                     is_enabled=False,
@@ -147,7 +147,16 @@ def test_authenticated_discovery_pages_only_permitted_rows(mcp, kind, surface):
     seen = []
     cursor = None
     for _ in range(len(allowed)):
-        page = data(tool(mcp, f"list_{surface}", limit=1, **({"cursor": cursor} if cursor else {})))
+        # Organization readers also see migration-seeded global templates.
+        page = data(
+            tool(
+                mcp,
+                f"list_{surface}",
+                search="MCP scope 2301",
+                limit=1,
+                **({"cursor": cursor} if cursor else {}),
+            )
+        )
         assert page["total_count"] == len(allowed)
         assert len(page["items"]) == 1
         seen.append(page["items"][0]["guid"])
@@ -155,7 +164,8 @@ def test_authenticated_discovery_pages_only_permitted_rows(mcp, kind, surface):
     assert cursor is None
     assert set(seen) == {str(row.guid) for row in allowed}
     assert len(seen) == len(set(seen))
-    matched = data(tool(mcp, f"list_{surface}", search="1"))
+    term = "Workflow 1" if surface == "workflow_definitions" else "Configured 1"
+    matched = data(tool(mcp, f"list_{surface}", search=term))
     assert [item["guid"] for item in matched["items"]] == [str(expected[1].guid)]
 
 
