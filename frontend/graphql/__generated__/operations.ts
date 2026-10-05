@@ -6360,6 +6360,7 @@ export type ConfigureProviderPluginInput = {
 
 export type ConfiguredWorkflow = {
   createdAt: Scalars['DateTime']['output'];
+  definitionGuid: Scalars['String']['output'];
   definitionName: Scalars['String']['output'];
   definitionSlug: Scalars['String']['output'];
   description: Scalars['String']['output'];
@@ -7881,7 +7882,7 @@ export type Mutation = {
   createToolDef: AstroliftToolDefMutationResult;
   createTrigger: AstroliftTriggerMutationResult;
   createWebhookSubscription: WebhookSecretRevealMutationResult;
-  /** Create a configured Workflow from a visible definition (spec 40 §2.2). */
+  /** Create a configured Workflow from an exact definitionId or legacy definitionSlug. When both are supplied the slug must match the ID. Set isEnabled=false to prepare configuration without activation; the legacy default is true. */
   createWorkflow: CreateWorkflowResult;
   /** Create a new workflow definition (platform operator only). */
   createWorkflowDefinition: MutationResult;
@@ -7916,7 +7917,7 @@ export type Mutation = {
   deleteSshDeployKey: AstroliftSshDeployKeyMutationResult;
   deleteToolDef: AstroliftToolDefMutationResult;
   deleteWebhookSubscription: SoftdeletepayloadMutationResult;
-  /** Soft-delete a configured Workflow and tear down its schedule. */
+  /** Soft-delete a configured Workflow by exact workflowId or legacy slug and request schedule removal. A supplied slug must match its ID. */
   deleteWorkflow: MutationResult;
   /** Soft-delete an org-owned workflow definition by slug. */
   deleteWorkflowDefinition: MutationResult;
@@ -8208,7 +8209,7 @@ export type Mutation = {
   updateTenantCluster: AstroliftTenantClusterMutationResult;
   updateToolDef: AstroliftToolDefMutationResult;
   updateWebhookSubscription: AstroliftWebhookSubscriptionMutationResult;
-  /** Update a configured Workflow (bindings / inputs / trigger / enabled). definitionSlug repoints it at another visible definition: the fallback for a versioned importWorkflowManifest(replace: true) (#1822), or any manual repoint. The existing stage_bindings must still validate against the new definition's stages, or the update is refused. */
+  /** Update a configured Workflow by exact workflowId or legacy slug (bindings / inputs / trigger / enabled). A supplied slug must match its ID. definitionId or definitionSlug repoints it at another visible definition: the fallback for a versioned importWorkflowManifest(replace: true) (#1822), or any manual repoint. The existing stage_bindings must still validate against the new definition's stages, or the update is refused. */
   updateWorkflow: CreateWorkflowResult;
   /** Update an org-owned workflow definition (globals are read-only). */
   updateWorkflowDefinition: MutationResult;
@@ -8678,9 +8679,11 @@ export type MutationCreateWebhookSubscriptionArgs = {
 
 
 export type MutationCreateWorkflowArgs = {
-  definitionSlug: Scalars['String']['input'];
+  definitionId?: InputMaybe<Scalars['GUID']['input']>;
+  definitionSlug?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   inputs?: InputMaybe<Scalars['JSON']['input']>;
+  isEnabled?: Scalars['Boolean']['input'];
   name: Scalars['String']['input'];
   orgId?: InputMaybe<Scalars['ID']['input']>;
   scheduleCron?: InputMaybe<Scalars['String']['input']>;
@@ -8861,7 +8864,8 @@ export type MutationDeleteWebhookSubscriptionArgs = {
 
 export type MutationDeleteWorkflowArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
-  slug: Scalars['String']['input'];
+  slug?: InputMaybe<Scalars['String']['input']>;
+  workflowId?: InputMaybe<Scalars['GUID']['input']>;
 };
 
 
@@ -10198,6 +10202,7 @@ export type MutationUpdateWebhookSubscriptionArgs = {
 
 
 export type MutationUpdateWorkflowArgs = {
+  definitionId?: InputMaybe<Scalars['GUID']['input']>;
   definitionSlug?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   inputs?: InputMaybe<Scalars['JSON']['input']>;
@@ -10205,9 +10210,10 @@ export type MutationUpdateWorkflowArgs = {
   name?: InputMaybe<Scalars['String']['input']>;
   orgId?: InputMaybe<Scalars['ID']['input']>;
   scheduleCron?: InputMaybe<Scalars['String']['input']>;
-  slug: Scalars['String']['input'];
+  slug?: InputMaybe<Scalars['String']['input']>;
   stageBindings?: InputMaybe<Scalars['JSON']['input']>;
   triggerKind?: InputMaybe<Scalars['String']['input']>;
+  workflowId?: InputMaybe<Scalars['GUID']['input']>;
 };
 
 
@@ -11006,7 +11012,7 @@ export type Query = {
   skillsPage: AstroliftSkillPage;
   toolDef?: Maybe<AstroliftToolDef>;
   toolDefs: Array<AstroliftToolDef>;
-  /** One configured Workflow by slug, with its recent runs. */
+  /** One configured Workflow by exact ID or legacy slug, with its recent runs. A supplied slug must match the ID. */
   workflow?: Maybe<ConfiguredWorkflow>;
   /** One visible workflow definition by slug (prefers the org's over a global). */
   workflowDefinition?: Maybe<WorkflowDefinitionSummary>;
@@ -13075,7 +13081,8 @@ export type QueryToolDefsArgs = {
 
 export type QueryWorkflowArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
-  slug: Scalars['String']['input'];
+  slug?: InputMaybe<Scalars['String']['input']>;
+  workflowId?: InputMaybe<Scalars['GUID']['input']>;
 };
 
 

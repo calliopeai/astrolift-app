@@ -6776,6 +6776,7 @@ type ConfiguredWorkflow {
   inputs: JSON!
   stageBindings: JSON!
   organizationGuid: String
+  definitionGuid: String!
   definitionSlug: String!
   definitionName: String!
   patternKind: String!
@@ -8764,16 +8765,20 @@ type Mutation {
   """Cancel, terminate, or retry cleanup for an exact owned execution."""
   controlWorkflowExecution(executionId: ID!, workflowId: String!, runId: String!, action: String!, reason: String! = ""): WorkflowExecutionControlResult!
 
-  """Create a configured Workflow from a visible definition (spec 40 §2.2)."""
-  createWorkflow(name: String!, definitionSlug: String!, slug: String = null, description: String = null, stageBindings: JSON = null, inputs: JSON = null, triggerKind: String! = "manual", scheduleCron: String = null, orgId: ID = null): CreateWorkflowResult!
+  """
+  Create a configured Workflow from an exact definitionId or legacy definitionSlug. When both are supplied the slug must match the ID. Set isEnabled=false to prepare configuration without activation; the legacy default is true.
+  """
+  createWorkflow(name: String!, definitionSlug: String = null, slug: String = null, description: String = null, stageBindings: JSON = null, inputs: JSON = null, triggerKind: String! = "manual", scheduleCron: String = null, orgId: ID = null, definitionId: GUID = null, isEnabled: Boolean! = true): CreateWorkflowResult!
 
   """
-  Update a configured Workflow (bindings / inputs / trigger / enabled). definitionSlug repoints it at another visible definition: the fallback for a versioned importWorkflowManifest(replace: true) (#1822), or any manual repoint. The existing stage_bindings must still validate against the new definition's stages, or the update is refused.
+  Update a configured Workflow by exact workflowId or legacy slug (bindings / inputs / trigger / enabled). A supplied slug must match its ID. definitionId or definitionSlug repoints it at another visible definition: the fallback for a versioned importWorkflowManifest(replace: true) (#1822), or any manual repoint. The existing stage_bindings must still validate against the new definition's stages, or the update is refused.
   """
-  updateWorkflow(slug: String!, name: String = null, description: String = null, stageBindings: JSON = null, inputs: JSON = null, triggerKind: String = null, scheduleCron: String = null, isEnabled: Boolean = null, definitionSlug: String = null, orgId: ID = null): CreateWorkflowResult!
+  updateWorkflow(slug: String = null, name: String = null, description: String = null, stageBindings: JSON = null, inputs: JSON = null, triggerKind: String = null, scheduleCron: String = null, isEnabled: Boolean = null, definitionSlug: String = null, orgId: ID = null, workflowId: GUID = null, definitionId: GUID = null): CreateWorkflowResult!
 
-  """Soft-delete a configured Workflow and tear down its schedule."""
-  deleteWorkflow(slug: String!, orgId: ID = null): MutationResult!
+  """
+  Soft-delete a configured Workflow by exact workflowId or legacy slug and request schedule removal. A supplied slug must match its ID.
+  """
+  deleteWorkflow(slug: String = null, orgId: ID = null, workflowId: GUID = null): MutationResult!
 
   """Run a configured Workflow now via Temporal (spec 40 §3)."""
   runWorkflow(workflowId: ID!, inputs: JSON = null, orgId: ID = null): RunWorkflowResult!
@@ -9536,8 +9541,10 @@ type Query {
   """Cursor-paginated page of the org's configured Workflows (tier 2)."""
   workflowsPage(orgId: ID = null, search: String = null, limit: Int! = 50, after: String = null): ConfiguredWorkflowPage!
 
-  """One configured Workflow by slug, with its recent runs."""
-  workflow(slug: String!, orgId: ID = null): ConfiguredWorkflow
+  """
+  One configured Workflow by exact ID or legacy slug, with its recent runs. A supplied slug must match the ID.
+  """
+  workflow(slug: String = null, orgId: ID = null, workflowId: GUID = null): ConfiguredWorkflow
 
   """
   Workflow definitions visible to the caller: their org's UNION all platform-global (spec 40 §2.1).
