@@ -8944,6 +8944,9 @@ input PauseAppWebhookDeploysInput {
 
 type PendingHumanGate {
   executionId: String!
+  executionGuid: String!
+  stageGuid: String!
+  temporalExecution: WorkflowStageTemporalExecution
   runGuid: String!
   workflowId: String!
   definitionSlug: String!
@@ -11058,6 +11061,7 @@ type WorkflowStageExecutionType {
   failure: JSON
   errorMessage: String!
   createdAt: DateTime!
+  temporalExecution: WorkflowStageTemporalExecution
   causedBy: WorkflowLoopCause
   fanoutStageId: String
   fanoutParentExecutionGuid: String
@@ -11092,6 +11096,12 @@ type WorkflowStageExecutionTypePage {
 
   """Rows per page on a numbered page; null on a cursor page."""
   pageSize: Int
+}
+
+type WorkflowStageTemporalExecution {
+  namespace: String!
+  workflowId: String!
+  runId: String!
 }
 
 type WorkflowStageType {

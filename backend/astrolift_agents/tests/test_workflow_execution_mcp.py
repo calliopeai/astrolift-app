@@ -346,6 +346,47 @@ def test_execution_stage_pages_are_bound_to_exact_run(execution):
         assert result["isError"] and result["structuredContent"]["code"] == "invalid_arguments"
 
 
+def test_stage_temporal_identity_and_pending_gate_ids_have_api_mcp_parity(execution):
+    from types import SimpleNamespace
+
+    from config.schema import schema
+    from core.tenancy import TenantContext, tenant_context
+    from workflows.stage_incarnations import StageIncarnation
+
+    run = recorded_run(execution)
+    execution.stage.kind = "human_gate"
+    execution.stage.save()
+    identity = StageIncarnation("default", run.workflow_id, run.run_id, "3")
+    pk = activities._create_stage_execution_sync(
+        str(run.pk), str(execution.stage.pk), 1, temporal_identity=identity
+    )
+    row = WorkflowStageExecution.objects.get(pk=pk)
+    observed = data(tool(execution, "list_workflow_execution_stages", execution_id=str(run.guid)))[
+        "execution"
+    ]
+    assert observed["stages"]["items"][0]["temporal_execution"] == {
+        "namespace": "default",
+        "workflow_id": run.workflow_id,
+        "run_id": run.run_id,
+    }
+    with tenant_context(TenantContext(actor_user_id=execution.user.pk, organization_id=run.organization_id)):
+        result = schema.execute_sync(
+            "query($id:ID!){workflowExecutionStages(executionId:$id){stages{items{guid temporalExecution{namespace workflowId runId}}}} pendingHumanGates{executionGuid stageGuid temporalExecution{namespace workflowId runId}}}",
+            variable_values={"id": str(run.guid)},
+            context_value=SimpleNamespace(user=execution.user),
+        )
+    assert result.errors is None
+    stage = result.data["workflowExecutionStages"]["stages"]["items"][0]
+    gate = result.data["pendingHumanGates"][0]
+    assert stage["guid"] == gate["executionGuid"] == str(row.guid)
+    assert gate["stageGuid"] == str(execution.stage.guid)
+    assert (
+        stage["temporalExecution"]
+        == gate["temporalExecution"]
+        == {"namespace": "default", "workflowId": run.workflow_id, "runId": run.run_id}
+    )
+
+
 @pytest.mark.parametrize("change", ["revoke", "foreign_team", "role", "owner"])
 def test_recovery_and_observation_recheck_live_authority(execution, change):
     args = reviewed_args(execution)

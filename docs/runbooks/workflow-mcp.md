@@ -98,6 +98,33 @@ change eligibility for existing configured workflows and webhook triggers, so
 inspect affected work before changing a shared definition. Use the configured
 workflow schedule observation/reconciliation tools for actual engine state.
 
+## Stage engine identities and human gates
+
+Stage items from `astrolift_list_workflow_execution_stages` and native
+`workflowExecutionStages` expose `temporal_execution` / `temporalExecution`:
+`namespace`, `workflow_id` / `workflowId`, and `run_id` / `runId`. The worker
+captures these from the activity that opened the stage. A collection item's
+identity belongs to its child execution; a nested workflow's stages belong to
+that nested execution. The enclosing run's identity is not substituted.
+
+Native `pendingHumanGates` also returns `executionGuid`, `stageGuid` and the same
+`temporalExecution` object, alongside its existing fields. A gate's exact public
+execution GUID identifies its database record; the Temporal object identifies
+the engine incarnation that opened it. It does not prove that incarnation is
+still running or that an approval was delivered or recorded.
+
+Migration `workflows.0019_stage_temporal_incarnation` adds these fields and a
+unique activity key. Apply it before upgrading web and workers. Old workers and
+existing stage records remain compatible but unbound (`temporalExecution: null`);
+no identity is inferred or backfilled. A retry of an already-bound activity
+recovers the original stage without creating a second row. A different activity
+cannot take over an already-bound logical stage.
+
+Constrained, recoverable human decisions are tracked in
+[#2314](https://github.com/calliopeai/astrolift-app/issues/2314). The current
+general signal route retains its existing delivery semantics. These additive
+reads do not introduce an MCP approval tool or change approver resolution.
+
 ## Configure and maintain workflows
 
 | Tool | Authority and result |
