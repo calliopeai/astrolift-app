@@ -230,6 +230,17 @@ def actions(info, domain=None):
             result.can_delete = (domain.organization_id is not None or operator) and _allowed(
                 configure, domain_org_scope(configure, "domain_id")({"domain_id": str(domain.guid)})
             )
+            from astrolift_clusters.managed_domain_defaults import default_refusal, defaults_fingerprint
+
+            result.can_update = result.can_delete and (
+                domain.dns_driver != "cloudflare_read_only" or operator
+            )
+            organization = Organization.objects.get(pk=get_current_tenant().organization_id)
+            result.default_update_reason = (
+                default_refusal(domain, organization) if result.can_update else "PERMISSION_DENIED"
+            )
+            result.can_set_defaults = result.can_update and not result.default_update_reason
+            result.defaults_fingerprint = defaults_fingerprint(domain, organization)
             cluster = provision_cluster(domain)
             manage = Permission.CLUSTER_MANAGE
             result.can_revalidate = bool(

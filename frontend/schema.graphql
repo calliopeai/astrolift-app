@@ -7867,6 +7867,10 @@ type ManagedDomainActions {
   canCreate: Boolean!
   canDelete: Boolean!
   canRevalidate: Boolean!
+  canUpdate: Boolean!
+  canSetDefaults: Boolean!
+  defaultUpdateReason: String!
+  defaultsFingerprint: String
 }
 
 enum ManagedDomainCheckState {
@@ -10551,6 +10555,8 @@ input UpdateIdentityProviderInput {
 
 input UpdateManagedDomainInput {
   id: GUID!
+  expectedVersion: Int = null
+  expectedDefaultsFingerprint: String = null
   defaultFor: String = null
   isWildcardManaged: Boolean = null
   dnsConfig: JSON = null

@@ -7413,6 +7413,10 @@ export type ManagedDomainActions = {
   canCreate: Scalars['Boolean']['output'];
   canDelete: Scalars['Boolean']['output'];
   canRevalidate: Scalars['Boolean']['output'];
+  canSetDefaults: Scalars['Boolean']['output'];
+  canUpdate: Scalars['Boolean']['output'];
+  defaultUpdateReason: Scalars['String']['output'];
+  defaultsFingerprint?: Maybe<Scalars['String']['output']>;
 };
 
 export type ManagedDomainCheckState =
@@ -14198,6 +14202,8 @@ export type UpdateIdentityProviderInput = {
 export type UpdateManagedDomainInput = {
   defaultFor: InputMaybe<Scalars['String']['input']>;
   dnsConfig: InputMaybe<Scalars['JSON']['input']>;
+  expectedDefaultsFingerprint: InputMaybe<Scalars['String']['input']>;
+  expectedVersion: InputMaybe<Scalars['Int']['input']>;
   id: Scalars['GUID']['input'];
   isWildcardManaged: InputMaybe<Scalars['Boolean']['input']>;
 };

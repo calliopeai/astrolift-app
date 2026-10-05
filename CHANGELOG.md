@@ -5,6 +5,7 @@
 - Prepare reusable, localized app-domain connection and effective-domain settings
   views with explicit review, current capability gates and uncertain-outcome
   recovery. API adapters and product activation remain separate (#2299).
+- Make explicit managed-domain default selection effective for its reviewed use cases, preserve sibling preview/app flags and existing URLs, and reject stale impact, incomplete writers or overriding organization defaults. Refs: #2299.
 
 - Certificate registration records the actual provisioning cluster and preserves
   existing domain configuration, retaining exact cluster links and authorized
