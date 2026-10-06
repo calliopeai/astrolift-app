@@ -567,6 +567,63 @@ def test_start_per_org_installs_the_app_on_a_further_account(org_user_member, se
     assert "scm_connected=" in again["Location"]
 
 
+def test_setup_records_the_account_each_installation_sits_on(org_user_member, settings):
+    """Adversarial review (#2297): the first row carries the App owner's
+    login although GitHub installed it on another account. The setup
+    callback reads /app/installations and relabels the org's rows, so
+    repo-owner routing sees the real accounts."""
+    settings.GITHUB_APP_CONNECTION_SCOPE = "per_org"
+    org, user = org_user_member
+    first = _make_installed_app(org, slug="astrolift-acme", app_id="555", owner="acme-corp")
+    client = Client()
+    _login(client, user)
+    client.get("/app/auth1/scm/github/app-manifest/start", {"org": "ragelink"})
+    install_state = client.session["scm_github_install_state"]
+
+    installations = [
+        {"id": 111222, "account": {"login": "BigCo"}},
+        {"id": 424242, "account": {"login": "RageLink"}},
+    ]
+    with (
+        patch("astrolift_scm.providers.github_app._mint_jwt", return_value="jwt"),
+        patch(
+            "astrolift_scm.providers.github_app.list_app_installations", return_value=(installations, None)
+        ),
+    ):
+        client.get(
+            "/app/auth1/scm/github/app-manifest/setup",
+            {"state": install_state["state"], "installation_id": "424242", "setup_action": "install"},
+        )
+
+    first.refresh_from_db()
+    assert first.account_login == "BigCo"
+    second = SourceConnection.objects.get(organization=org, installation_id="424242")
+    assert second.account_login == "RageLink"
+    assert second.is_active is True
+
+
+def test_start_per_org_replaces_a_dead_row_on_the_further_account(org_user_member, settings):
+    """Adversarial review: an orphaned row already keyed by the account
+    (App uninstalled there) used to collide with the new pending row on
+    the (organization, kind, account_login) key and 500."""
+    settings.GITHUB_APP_CONNECTION_SCOPE = "per_org"
+    org, user = org_user_member
+    _make_installed_app(org, slug="astrolift-acme", app_id="555", owner="acme-corp")
+    dead = _make_installed_app(
+        org, slug="astrolift-acme", app_id="555", owner="ragelink", installation_id="999", is_orphaned=True
+    )
+    client = Client()
+    _login(client, user)
+
+    resp = client.get("/app/auth1/scm/github/app-manifest/start", {"org": "RageLink"})
+
+    assert resp.status_code == 302
+    assert resp["Location"].startswith("https://github.com/apps/astrolift-acme/installations/new")
+    assert not SourceConnection.objects.filter(pk=dead.pk).exists()
+    pending = SourceConnection.objects.get(organization=org, is_active=False)
+    assert pending.account_login == "RageLink"
+
+
 def test_start_per_org_creates_when_no_app(org_user_member, settings):
     """per_org, case (c): the first connect in an org with no App falls
     through to the existing manifest CREATE flow (200 auto-submit form +

@@ -290,23 +290,19 @@ def test_several_installations_resolve_by_repo_owner(org, purpose, repo):
     assert got.pk == second.pk
 
 
-def test_several_installations_none_on_the_owner_is_a_precondition(org):
-    _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ")
+@pytest.mark.parametrize("purpose", [PLATFORM_REPO_WRITE, ORG_REPO_WRITE])
+def test_several_installations_none_on_the_owner_keeps_the_old_pick(org, purpose):
+    """Adversarial review: rows from the manifest flow carry the App owner,
+    not the installed account, so a login that matches no installation
+    proves nothing. Adding a second installation must not cut off the apps
+    the first one served: with no match the oldest installation still wins."""
+    first = _mk(
+        org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ"
+    )
     _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="2", account_login="ragelink")
-    with pytest.raises(ConnectionResolutionError) as exc:
-        resolve_connection(org, purpose=PLATFORM_REPO_WRITE, source_kind="github", repo="someone-else/app")
-    assert exc.value.code == "PRECONDITION"
-    assert "someone-else" in exc.value.message
-
-
-def test_org_write_falls_back_past_installations_that_miss_the_owner(org):
-    """A PAT or OAuth connection may reach any owner; only installations are
-    bound to one account."""
-    _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ")
-    _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="2", account_login="ragelink")
-    pat = _mk(org, SourceConnection.Kind.GITHUB_PAT, account_login="ci-bot")
-    got = resolve_connection(org, purpose=ORG_REPO_WRITE, source_kind="github", repo="someone-else/app")
-    assert got.pk == pat.pk
+    _mk(org, SourceConnection.Kind.GITHUB_PAT, account_login="ci-bot")
+    got = resolve_connection(org, purpose=purpose, source_kind="github", repo="installed-elsewhere/app")
+    assert got.pk == first.pk
 
 
 def test_a_single_installation_still_resolves_for_any_owner(org):

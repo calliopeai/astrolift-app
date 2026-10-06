@@ -466,42 +466,37 @@ _NO_CONNECTION_PUBLIC_READ = (
 )
 
 
-def _resync_app_manifest_from_repo(
+def repo_manifest_fetch_error(app: RegisteredApp) -> str:
+    """Why the platform cannot read ``app``'s manifest from its repo right
+    now, or "" when it can. A live probe, so a stale registration-time
+    ``fetch_failed`` never stands in for the repo's current state (#2296)."""
+    _text, error = _fetch_repo_manifest_text(app)
+    return error
+
+
+def _fetch_repo_manifest_text(
     app: RegisteredApp,
     *,
     fetch: _FetchFn | None = None,
     ref: str = "",
-) -> ResyncResult:
-    """Re-fetch + reconcile ``app``'s manifest from its source repo.
-
-    See module docstring for the full contract. Returns a
-    :class:`ResyncResult` describing what happened; never raises
-    (mutations / API callers translate this into the GraphQL
-    envelope).
-    """
+) -> tuple[str | None, str]:
+    """Fetch ``app``'s manifest text from its source repo: ``(text, "")``,
+    or ``(None, error)`` when it can't be read. Never raises."""
     from astrolift_scm.providers import ProviderError
 
     fetch_fn: _FetchFn = fetch if fetch is not None else _default_fetch
 
     if not app.source_repo:
-        return ResyncResult(
-            status="fetch_failed",
-            changes=ResyncChanges(),
-            error="app has no source_repo configured",
-        )
+        return None, "app has no source_repo configured"
 
     connection = _pick_source_connection(app)
     # No connection: a public GitHub repo is still readable anonymously, the
     # same way the build clones it (#2051). A test-injected ``fetch`` opts out.
     anonymous = connection is None and fetch is None and app.source_kind == RegisteredApp.SourceKind.GITHUB
     if connection is None and not anonymous:
-        return ResyncResult(
-            status="fetch_failed",
-            changes=ResyncChanges(),
-            error=(
-                "no active source connection found for this organization — "
-                "reconnect the source host under Settings -> Source connections"
-            ),
+        return None, (
+            "no active source connection found for this organization — "
+            "reconnect the source host under Settings -> Source connections"
         )
 
     deploy_branch = ref or app.deploy_branch or app.default_branch or "main"
@@ -517,41 +512,46 @@ def _resync_app_manifest_from_repo(
         else:
             repo_text = fetch_fn(connection, app.source_repo, manifest_path, deploy_branch)
     except ProviderError as exc:
-        return ResyncResult(
-            status="fetch_failed",
-            changes=ResyncChanges(),
-            error=f"{exc.code}: {exc.message}",
-        )
+        return None, f"{exc.code}: {exc.message}"
     except Exception as exc:  # noqa: BLE001 — surface anything as fetch_failed
         if anonymous:
-            return ResyncResult(
-                status="fetch_failed",
-                changes=ResyncChanges(),
-                error=_NO_CONNECTION_PUBLIC_READ.format(repo=app.source_repo, reason=exc),
-            )
+            return None, _NO_CONNECTION_PUBLIC_READ.format(repo=app.source_repo, reason=exc)
         log.exception(
             "resync fetch crashed for app %s (repo=%s)",
             app.pk,
             app.source_repo,
         )
-        return ResyncResult(
-            status="fetch_failed",
-            changes=ResyncChanges(),
-            error=str(exc) or exc.__class__.__name__,
-        )
+        return None, str(exc) or exc.__class__.__name__
 
     if repo_text is None:
-        return ResyncResult(
-            status="fetch_failed",
-            changes=ResyncChanges(),
-            error=(
-                _NO_CONNECTION_PUBLIC_READ.format(
-                    repo=app.source_repo, reason=f"{manifest_path!r} not found on {deploy_branch!r}"
-                )
-                if anonymous
-                else f"{manifest_path!r} not found on {deploy_branch!r} of {app.source_repo!r}"
-            ),
+        return None, (
+            _NO_CONNECTION_PUBLIC_READ.format(
+                repo=app.source_repo, reason=f"{manifest_path!r} not found on {deploy_branch!r}"
+            )
+            if anonymous
+            else f"{manifest_path!r} not found on {deploy_branch!r} of {app.source_repo!r}"
         )
+    return repo_text, ""
+
+
+def _resync_app_manifest_from_repo(
+    app: RegisteredApp,
+    *,
+    fetch: _FetchFn | None = None,
+    ref: str = "",
+) -> ResyncResult:
+    """Re-fetch + reconcile ``app``'s manifest from its source repo.
+
+    See module docstring for the full contract. Returns a
+    :class:`ResyncResult` describing what happened; never raises
+    (mutations / API callers translate this into the GraphQL
+    envelope).
+    """
+    repo_text, error = _fetch_repo_manifest_text(app, fetch=fetch, ref=ref)
+    if repo_text is None:
+        return ResyncResult(status="fetch_failed", changes=ResyncChanges(), error=error)
+    deploy_branch = ref or app.deploy_branch or app.default_branch or "main"
+    manifest_path = app.manifest_path or "astrolift.toml"
 
     # Parse the repo content first. A repo with broken TOML is a
     # ``fetch_failed`` from the operator's perspective — we never

@@ -143,8 +143,8 @@ def resolve_connection(
     ``organization``, or raise ``ConnectionResolutionError``.
 
     ``repo`` (``owner/name`` or a clone URL) picks among several GitHub App
-    installations: each covers one GitHub account, so only the one on the
-    repo's owner can reach it (#2297). See :func:`covering_repo_owner`.
+    installations: each covers one GitHub account, so the one recorded on
+    the repo's owner is preferred (#2297). See :func:`covering_repo_owner`.
     """
     if purpose is PLATFORM_REPO_WRITE:
         return _resolve_org_ranked(
@@ -205,8 +205,6 @@ def _resolve_org_ranked(
     if not rows:
         raise ConnectionResolutionError("PRECONDITION", no_conn_message)
     rows = covering_repo_owner(rows, repo)
-    if not rows:
-        raise ConnectionResolutionError("PRECONDITION", _no_owner_conn_message(repo))
     # Preference order first (App-install wins on GitHub), then oldest
     # pk so repeated resolutions against the same org are stable.
     rank = {k: i for i, k in enumerate(accepted)}
@@ -222,18 +220,18 @@ def _repo_owner(repo: str | None) -> str:
 
 
 def covering_repo_owner(rows: list[SourceConnection], repo: str | None) -> list[SourceConnection]:
-    """Drop the GitHub App installations that cannot reach ``repo`` (#2297).
+    """Prefer the GitHub App installation on ``repo``'s owner (#2297).
 
     An installation covers one GitHub account, so when an org holds several
-    only the one whose ``account_login`` is the repo's owner can read it.
-    Other connection kinds pass through untouched. A lone installation is
-    kept whatever its login, as before: rows from the manifest flow record
-    the App's owner rather than the account it was installed on, so a
-    mismatch there proves nothing.
+    and one of them is recorded on the repo's owner, the others are dropped.
+    When none is, every row is kept and ranking picks as before: rows from
+    the manifest flow and older reuse installs record the App's owner rather
+    than the account it was installed on, so a login mismatch proves
+    nothing. Other connection kinds pass through untouched.
     """
     owner = _repo_owner(repo)
     install = SourceConnection.Kind.GITHUB_APP_INSTALL
-    if not owner or sum(1 for r in rows if r.kind == install) < 2:
+    if not owner or not any(r.kind == install and (r.account_login or "").lower() == owner for r in rows):
         return rows
     return [r for r in rows if r.kind != install or (r.account_login or "").lower() == owner]
 
@@ -280,14 +278,6 @@ def _no_platform_conn_message(source_kind: str) -> str:
         )
     label = _HOST_LABEL.get(source_kind, source_kind)
     return f"no active {label} connection for this organization; connect {label} and retry."
-
-
-def _no_owner_conn_message(repo: str | None) -> str:
-    owner = _repo_owner(repo)
-    return (
-        f"no GitHub App installation in this organization covers {owner!r}; "
-        f"install the App on {owner!r} under Settings → Connections and retry."
-    )
 
 
 def _no_org_conn_message(source_kind: str) -> str:

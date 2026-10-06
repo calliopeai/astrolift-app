@@ -626,11 +626,13 @@ def test_apply_staged_manifest_rejects_when_the_repo_has_no_working_connection(
 
 def test_apply_staged_manifest_rejects_when_the_app_can_push_to_its_repo(
     permission_resolver,
+    monkeypatch,
 ):
     """An app with a working source connection keeps using
     pushManifestToRepo -- direct apply would skip the PR review step."""
     org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc")
     _scaffold_github_conn(org)
+    _repo_reads(monkeypatch, _VALID_TOML)
     app.manifest_raw_staged = _UPDATED_TOML
     app.save(update_fields=["manifest_raw_staged"])
     permission_resolver.grant(Permission.APP_UPDATE)
@@ -650,12 +652,26 @@ def test_apply_staged_manifest_rejects_when_the_app_can_push_to_its_repo(
 # --- #2296: a repo-backed app the platform cannot reach -------------------
 
 
+def _repo_reads(monkeypatch, text=None, *, error=None):
+    """Stub the live manifest fetch (connection and anonymous paths alike):
+    return ``text``, or raise ``error``."""
+
+    def _fetch(*_args, **_kwargs):
+        if error is not None:
+            raise error
+        return text
+
+    monkeypatch.setattr("astrolift_registry.services.manifest_sync._default_fetch", _fetch)
+    monkeypatch.setattr("astrolift_scm.providers.repo_tree.fetch_public_file", _fetch)
+
+
 def test_apply_staged_manifest_bootstraps_a_workloadless_app_with_no_connection(
-    permission_resolver, audit_capture
+    permission_resolver, audit_capture, monkeypatch
 ):
-    """No connection covers the repo and the app has no workloads: the
-    staged manifest applies, with an audit entry naming the fallback."""
+    """No connection covers the private repo and the app has no workloads:
+    the staged manifest applies, with an audit entry naming the fallback."""
     org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc", source_repo="ragelink/leo-brain")
+    _repo_reads(monkeypatch, error=RuntimeError("404 Not Found"))
     app.manifest_raw_staged = _UPDATED_TOML
     app.save(update_fields=["manifest_raw_staged"])
     permission_resolver.grant(Permission.APP_UPDATE)
@@ -673,21 +689,25 @@ def test_apply_staged_manifest_bootstraps_a_workloadless_app_with_no_connection(
     assert Workload.objects.filter(registered_app=app, slug="web").exists()
     fallback = [e for e in audit_capture if e.action == "app.manifest.apply_unreachable_repo"]
     assert len(fallback) == 1
-    assert fallback[0].extra == {"reason": "no_connection", "source_repo": "ragelink/leo-brain"}
+    assert fallback[0].extra["reason"] == "fetch_failed"
+    assert fallback[0].extra["source_repo"] == "ragelink/leo-brain"
+    assert "404" in fallback[0].extra["error"]
 
 
+@pytest.mark.parametrize("bootstrap_status", ["", "persist_failed", "diverged"])
 def test_apply_staged_manifest_materialises_the_stored_manifest_when_nothing_is_staged(
-    permission_resolver,
+    permission_resolver, monkeypatch, bootstrap_status
 ):
     """The leo-brain shape: manifest_raw stored, zero workloads, a
-    connection that cannot read the repo (the registration fetch failed).
+    connection that cannot read the repo. The live fetch decides, not the
+    registration-time status, which may say anything (adversarial review).
     updateManifest refuses to stage a copy of the stored text, so apply
     materialises manifest_raw itself and clears the bootstrap failure."""
     org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc", source_repo="ragelink/leo-brain")
     _scaffold_github_conn(org)
-    app.manifest_bootstrap_status = "fetch_failed"
-    app.manifest_bootstrap_error = "GitHub couldn't find ragelink/leo-brain"
-    app.save(update_fields=["manifest_bootstrap_status", "manifest_bootstrap_error"])
+    _repo_reads(monkeypatch, error=RuntimeError("GitHub couldn't find ragelink/leo-brain"))
+    app.manifest_bootstrap_status = bootstrap_status
+    app.save(update_fields=["manifest_bootstrap_status"])
     permission_resolver.grant(Permission.APP_UPDATE)
 
     with _ctx(org):
@@ -700,15 +720,24 @@ def test_apply_staged_manifest_materialises_the_stored_manifest_when_nothing_is_
     assert Workload.objects.filter(registered_app=app, slug="web").exists()
     app.refresh_from_db()
     assert app.manifest_raw.strip() == _VALID_TOML.strip()
-    assert app.manifest_bootstrap_status == "applied"
+    assert app.manifest_bootstrap_status in ("", "applied")
     assert app.manifest_bootstrap_error == ""
 
 
-def test_apply_staged_manifest_keeps_review_when_a_connection_covers_the_repo(permission_resolver):
-    """Zero workloads alone is not enough: with a working connection the
-    stored manifest is not applied behind the repo's back."""
+@pytest.mark.parametrize("bootstrap_status", ["", "fetch_failed"])
+def test_apply_staged_manifest_keeps_review_when_the_repo_is_readable(
+    permission_resolver, monkeypatch, bootstrap_status
+):
+    """Zero workloads alone is not enough: when the repo reads, the stored
+    or staged manifest is not applied behind its back, even if a stale
+    registration-time ``fetch_failed`` is still recorded (adversarial
+    review)."""
     org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc")
     _scaffold_github_conn(org)
+    _repo_reads(monkeypatch, _VALID_TOML)
+    app.manifest_bootstrap_status = bootstrap_status
+    app.manifest_raw_staged = _UPDATED_TOML
+    app.save(update_fields=["manifest_bootstrap_status", "manifest_raw_staged"])
     permission_resolver.grant(Permission.APP_UPDATE)
 
     with _ctx(org):

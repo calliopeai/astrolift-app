@@ -89,32 +89,22 @@ def _audit_secret_change(
 def _unreachable_repo_reason(app: RegisteredApp) -> str:
     """Why a repo-backed app may apply its manifest directly, or "" (#2296).
 
-    Only an app holding no workloads qualifies, and only when the platform
-    cannot reach its repo: the registration fetch failed, or no source
-    connection covers the repo's owner. Such an app has nothing deployed for
-    a review to protect, and pushManifestToRepo / resync fail on the same
-    missing access, so without this its only way out is deregistering.
+    Only an app holding no workloads qualifies, and only when a live fetch
+    of its manifest fails now: no connection covers the repo, or the one
+    that does cannot read it. Such an app has nothing deployed for a review
+    to protect, and pushManifestToRepo / resync fail on the same missing
+    access, so without this its only way out is deregistering. A stored
+    ``manifest_bootstrap_status`` is not consulted: it can be stale either
+    way.
     """
-    from astrolift_scm.services.connection_resolver import (
-        ORG_REPO_WRITE,
-        ConnectionResolutionError,
-        resolve_connection,
-    )
+    from astrolift_registry.services.manifest_sync import repo_manifest_fetch_error
 
     if app.workloads.filter(deleted_at__isnull=True).exists():
         return ""
-    if app.manifest_bootstrap_status == "fetch_failed":
-        return "fetch_failed"
-    try:
-        resolve_connection(
-            app.organization_id, purpose=ORG_REPO_WRITE, source_kind=app.source_kind, repo=app.source_repo
-        )
-    except ConnectionResolutionError:
-        return "no_connection"
-    return ""
+    return repo_manifest_fetch_error(app)
 
 
-def _audit_unreachable_repo_apply(app: RegisteredApp, *, reason: str) -> None:
+def _audit_unreachable_repo_apply(app: RegisteredApp, *, error: str) -> None:
     """Sibling audit entry recording that a repo-backed app applied its
     manifest without review because its repo is unreachable (#2296)."""
     tenant = get_current_tenant()
@@ -129,7 +119,7 @@ def _audit_unreachable_repo_apply(app: RegisteredApp, *, reason: str) -> None:
                 target_id=str(app.guid),
                 duration_ms=0,
                 permissions=(Permission.APP_UPDATE.value,),
-                extra={"reason": reason, "source_repo": app.source_repo},
+                extra={"reason": "fetch_failed", "error": error[:500], "source_repo": app.source_repo},
             )
         )
     except Exception:  # noqa: BLE001 -- audit emission must never break the caller
@@ -550,7 +540,7 @@ class ManifestMutations:
             # H2 (adversarial review): a repo-backed app pushes through
             # pushManifestToRepo for review, whatever its connection
             # health. The one exception is an app with no workloads whose
-            # repo the platform cannot reach (#2296): it bootstraps from
+            # repo the platform cannot read right now (#2296): it bootstraps from
             # the staged manifest, or the stored one when nothing is staged.
             fallback = _unreachable_repo_reason(app) if app.source_repo else ""
             if app.source_repo and not fallback:
@@ -653,7 +643,7 @@ class ManifestMutations:
             if allowed is not None:
                 _audit_secret_change(app, decision="ALLOW", **allowed)
             if fallback:
-                _audit_unreachable_repo_apply(app, reason=fallback)
+                _audit_unreachable_repo_apply(app, error=fallback)
 
             return _result(app)
 

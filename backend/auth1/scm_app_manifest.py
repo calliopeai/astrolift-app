@@ -381,6 +381,50 @@ def _org_has_install_on(org_id: int, account_login: str) -> bool:
     )
 
 
+def _record_installed_accounts(connection: SourceConnection) -> None:
+    """Relabel this org's rows for ``connection``'s App with the GitHub
+    account each installation actually sits on (#2297).
+
+    The manifest flow keys its row by the App's owner and a reuse install by
+    the login the operator typed, but the resolver routes a repo by the
+    installation's account. GitHub's ``/app/installations`` is the source of
+    truth, so a setup callback backfills every row of this org for the App.
+    A login another row already holds is left alone (unique key). Best
+    effort: any failure keeps the stored logins and never breaks setup."""
+    from astrolift_scm.providers import github_app as gh_app
+
+    issuer = connection.app_client_id or connection.oauth_client_id
+    if not issuer or not connection.oauth_client_id:
+        return
+    try:
+        jwt_token = gh_app._mint_jwt(issuer, gh_app._decrypt_pem(connection))
+    except Exception:  # noqa: BLE001 -- unreadable PEM: keep the stored logins
+        logger.warning(
+            "Cannot sign a JWT for connection %s; installation accounts not recorded", connection.guid
+        )
+        return
+    installations, err = gh_app.list_app_installations(gh_app._api_base(connection), jwt_token)
+    if err is not None:
+        logger.warning("Cannot list installations for connection %s: %s", connection.guid, err.message)
+        return
+    accounts = {str(i.get("id")): (i.get("account") or {}).get("login") or "" for i in installations}
+
+    org_rows = list(
+        SourceConnection.objects.filter(organization_id=connection.organization_id, kind="github_app_install")
+    )
+    taken = {(r.account_login or "").lower() for r in org_rows}
+    for row in org_rows:
+        login = accounts.get(row.installation_id or "", "")
+        if row.oauth_client_id != connection.oauth_client_id or not login or login == row.account_login:
+            continue
+        if login.lower() in taken and login.lower() != (row.account_login or "").lower():
+            continue
+        taken.discard((row.account_login or "").lower())
+        taken.add(login.lower())
+        row.account_login = login
+        row.save(update_fields=["account_login"])
+
+
 def _decrypt_optional(backend_kind: str, ciphertext: Any) -> bytes:
     """Decrypt a stored secret, tolerating the empty/unset case."""
     raw = bytes(ciphertext or b"")
@@ -447,15 +491,17 @@ def _start_reuse_install(
         return None
 
     owner = account_login or canonical.account_login
-    # Clear any never-installed pending row for this org that would collide
-    # with the copy's unique key (organization, kind, account_login) — same
-    # spirit as the create-path cleanup below.
+    # Clear any row for this org that would collide with the copy's unique
+    # key (organization, kind, account_login) and is not a live install: a
+    # never-installed pending row, or a dead one (inactive, orphaned) left on
+    # the same account. Same spirit as the create-path cleanup below.
+    live = Q(is_active=True, is_orphaned=False) & ~Q(installation_id="")
     SourceConnection.objects.filter(
         organization_id=org_id,
         kind="github_app_install",
-        is_active=False,
-        installation_id="",
-    ).filter(Q(account_login="") | Q(account_login=owner)).update(deleted_at=timezone.now())
+    ).filter(
+        Q(account_login="", is_active=False, installation_id="") | Q(account_login__iexact=owner)
+    ).exclude(live).update(deleted_at=timezone.now())
 
     pending = SourceConnection.objects.create(
         organization_id=org_id,
@@ -536,7 +582,7 @@ def github_app_manifest_start(request: HttpRequest) -> Any:
             canonical,
             org_id=org_id,
             return_to=return_to,
-            account_login=gh_org if existing is not None else "",
+            account_login=gh_org,
         )
         if reused is not None:
             return reused
@@ -815,6 +861,8 @@ def github_app_manifest_setup(request: HttpRequest) -> Any:
     connection.orphaned_at = None
     connection.orphaned_reason = ""
     connection.save()
+    _record_installed_accounts(connection)
+    connection.refresh_from_db()
     label = connection.display_name or connection.account_login or "GitHub App"
     return _redirect_with_ok(return_to, label)
 
