@@ -533,6 +533,40 @@ def test_start_per_org_reuses_existing_app(org_user_member, settings):
     ).exists()
 
 
+def test_start_per_org_installs_the_app_on_a_further_account(org_user_member, settings):
+    """#2297: an org whose App is installed on acme-corp asks to connect a
+    second GitHub account. Case (a) used to short-circuit; now the existing
+    App is installed there on its own row, keyed by that account."""
+    settings.GITHUB_APP_CONNECTION_SCOPE = "per_org"
+    org, user = org_user_member
+    first = _make_installed_app(org, slug="astrolift-acme", app_id="555", owner="acme-corp")
+    client = Client()
+    _login(client, user)
+
+    resp = client.get("/app/auth1/scm/github/app-manifest/start", {"org": "ragelink"})
+
+    assert resp.status_code == 302
+    assert resp["Location"].startswith("https://github.com/apps/astrolift-acme/installations/new")
+    pending = SourceConnection.objects.get(organization=org, kind="github_app_install", is_active=False)
+    assert pending.account_login == "ragelink"
+    assert pending.oauth_client_id == "555"
+
+    install_state = client.session["scm_github_install_state"]
+    client.get(
+        "/app/auth1/scm/github/app-manifest/setup",
+        {"state": install_state["state"], "installation_id": "424242", "setup_action": "install"},
+    )
+    pending.refresh_from_db()
+    assert pending.is_active is True
+    assert pending.installation_id == "424242"
+    first.refresh_from_db()
+    assert first.installation_id == "111222"
+
+    # Asking for the same account again is case (a) now.
+    again = client.get("/app/auth1/scm/github/app-manifest/start", {"org": "RageLink"})
+    assert "scm_connected=" in again["Location"]
+
+
 def test_start_per_org_creates_when_no_app(org_user_member, settings):
     """per_org, case (c): the first connect in an org with no App falls
     through to the existing manifest CREATE flow (200 auto-submit form +

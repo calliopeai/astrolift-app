@@ -79,7 +79,7 @@ _RENDERERS = {
 # The version these hashes belong to. Kept as its own constant (rather than
 # reading TEMPLATE_VERSION) so that bumping TEMPLATE_VERSION without refreshing
 # the pins trips ``test_template_version_matches_pins`` loudly.
-PINNED_TEMPLATE_VERSION = 9
+PINNED_TEMPLATE_VERSION = 10
 
 # content_hash (sha256, stamp removed) of each host's rendered body at
 # PINNED_TEMPLATE_VERSION, computed against GOLDEN_API_URL and _golden_app().
@@ -90,7 +90,7 @@ PINNED_TEMPLATE_VERSION = 9
 # skip-if-built ECR probe. The deploy-only render (blank registry_repo_uri)
 # is covered by ``test_deploy_only_workflow.py`` instead.
 PINNED_CONTENT_HASHES = {
-    "github": "abb1f0c4a693f9c8bada57595415974169773b744f5e0543cb510ff6ffecaa4b",
+    "github": "630aa557283580ea8d401f61779e2ba36f5a2991ebeebb3bd0db0812a8bfc479",
     "gitlab": "77f0d228c7b159e6040b7ec10a348b039f94ef188a565ea901b7c422b6dbcbc8",
     "gitea": "d370f2cf4f0080e7c04ad7e00ee735163c688a4222f8415114d894f6a9b83170",
     "bitbucket": "7821f3ac5724b4b30b3e48473652c39eb3f1edff8d771dcdad7e89b10e43e213",

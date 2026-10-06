@@ -160,6 +160,7 @@ def _resolve_context(deployment) -> _ReflectContext | None:
             app.organization_id,
             purpose=ORG_REPO_WRITE,
             source_kind="github",
+            repo=app.source_repo,
         )
     except ConnectionResolutionError:
         # No App / OAuth / PAT connection for this org — nothing to

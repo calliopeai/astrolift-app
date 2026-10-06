@@ -62,6 +62,7 @@ from astrolift_manifest.types import (
 )
 from astrolift_registry.models import RegisteredApp
 from astrolift_scm.models import SourceConnection
+from astrolift_scm.services.connection_resolver import covering_repo_owner
 from core.events import Event
 
 log = logging.getLogger(__name__)
@@ -201,6 +202,9 @@ def _pick_source_connection(app: RegisteredApp) -> SourceConnection | None:
             deleted_at__isnull=True,
         )
     )
+    # An org with installations on several GitHub accounts reads through
+    # the one on the repo's owner (#2297).
+    rows = covering_repo_owner(rows, app.source_repo)
     if not rows:
         return None
     rank = {k: i for i, k in enumerate(accepted)}
@@ -872,10 +876,10 @@ def _scan_repo_for_agents(
     tree_fn: _TreeFn = tree if tree is not None else _default_tree_fetch
 
     # Reuse the per-app connection picker by constructing a throwaway
-    # RegisteredApp-shaped lookup: the picker only reads ``organization_id``
-    # + ``source_kind``, so a lightweight unsaved instance is enough and
-    # avoids duplicating the preference-ranking logic.
-    probe = RegisteredApp(organization_id=organization_id, source_kind=source_kind)
+    # RegisteredApp-shaped lookup: the picker only reads ``organization_id``,
+    # ``source_kind`` and ``source_repo``, so a lightweight unsaved instance
+    # is enough and avoids duplicating the preference-ranking logic.
+    probe = RegisteredApp(organization_id=organization_id, source_kind=source_kind, source_repo=source_repo)
     connection = _pick_source_connection(probe)
 
     files: dict[str, str] = {}
@@ -1367,7 +1371,7 @@ def _registration_source_archive(
 
     from astrolift_scm.providers import ProviderError, fetch_zipball
 
-    probe = RegisteredApp(organization_id=organization_id, source_kind=source_kind)
+    probe = RegisteredApp(organization_id=organization_id, source_kind=source_kind, source_repo=source_repo)
     connection = _pick_source_connection(probe)
     primary_error = ""
     if connection is not None:
@@ -1778,7 +1782,7 @@ def _scan_repo_for_apps(
 
     tree_fn: _TreeFn = tree if tree is not None else _default_tree_fetch
 
-    probe = RegisteredApp(organization_id=organization_id, source_kind=source_kind)
+    probe = RegisteredApp(organization_id=organization_id, source_kind=source_kind, source_repo=source_repo)
     connection = _pick_source_connection(probe)
     if connection is None:
         return (

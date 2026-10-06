@@ -86,6 +86,56 @@ def _audit_secret_change(
         log.exception("apply_staged_manifest: audit emit failed for app=%s", app.guid)
 
 
+def _unreachable_repo_reason(app: RegisteredApp) -> str:
+    """Why a repo-backed app may apply its manifest directly, or "" (#2296).
+
+    Only an app holding no workloads qualifies, and only when the platform
+    cannot reach its repo: the registration fetch failed, or no source
+    connection covers the repo's owner. Such an app has nothing deployed for
+    a review to protect, and pushManifestToRepo / resync fail on the same
+    missing access, so without this its only way out is deregistering.
+    """
+    from astrolift_scm.services.connection_resolver import (
+        ORG_REPO_WRITE,
+        ConnectionResolutionError,
+        resolve_connection,
+    )
+
+    if app.workloads.filter(deleted_at__isnull=True).exists():
+        return ""
+    if app.manifest_bootstrap_status == "fetch_failed":
+        return "fetch_failed"
+    try:
+        resolve_connection(
+            app.organization_id, purpose=ORG_REPO_WRITE, source_kind=app.source_kind, repo=app.source_repo
+        )
+    except ConnectionResolutionError:
+        return "no_connection"
+    return ""
+
+
+def _audit_unreachable_repo_apply(app: RegisteredApp, *, reason: str) -> None:
+    """Sibling audit entry recording that a repo-backed app applied its
+    manifest without review because its repo is unreachable (#2296)."""
+    tenant = get_current_tenant()
+    try:
+        emit_audit(
+            AuditEntry(
+                actor_user_id=tenant.actor_user_id if tenant else None,
+                organization_id=tenant.organization_id if tenant else None,
+                action="app.manifest.apply_unreachable_repo",
+                decision="ALLOW",
+                target_kind="RegisteredApp",
+                target_id=str(app.guid),
+                duration_ms=0,
+                permissions=(Permission.APP_UPDATE.value,),
+                extra={"reason": reason, "source_repo": app.source_repo},
+            )
+        )
+    except Exception:  # noqa: BLE001 -- audit emission must never break the caller
+        log.exception("apply_staged_manifest: audit emit failed for app=%s", app.guid)
+
+
 class _RollBack(Exception):
     """Unwinds a savepoint whose writes must not survive, carrying its result out."""
 
@@ -412,7 +462,10 @@ class ManifestMutations:
         shape, which otherwise had no way to ever change its manifest
         after the first staged edit (the only way out was deregister,
         which tears down the namespace + registry repo, and register
-        again).
+        again). The one repo-backed exception is an app with no workloads
+        whose repo the platform cannot reach (#2296,
+        ``_unreachable_repo_reason``), which applies its staged manifest,
+        or its stored one when nothing is staged, with an audit entry.
 
         An edit that changes env or a managed-service binding is gated the
         same way ``setAppSecret`` gates a direct secret write (adversarial
@@ -494,11 +547,13 @@ class ManifestMutations:
                     "app is archived -- unarchive it before applying a manifest change",
                 )
 
-            # H2 (adversarial review): a repo-backed app always pushes
-            # through pushManifestToRepo for review, whatever its
-            # connection health -- only an app with no source_repo at
-            # all has nothing else to apply the staged edit through.
-            if app.source_repo:
+            # H2 (adversarial review): a repo-backed app pushes through
+            # pushManifestToRepo for review, whatever its connection
+            # health. The one exception is an app with no workloads whose
+            # repo the platform cannot reach (#2296): it bootstraps from
+            # the staged manifest, or the stored one when nothing is staged.
+            fallback = _unreachable_repo_reason(app) if app.source_repo else ""
+            if app.source_repo and not fallback:
                 return gql_failure(
                     "SCM_REPO_CONFIGURED",
                     "this app pushes changes through its source repo -- use "
@@ -515,12 +570,15 @@ class ManifestMutations:
                     "the staged manifest changed since you loaded it -- refresh and try again",
                 )
 
+            if fallback and not staged.strip():
+                staged = app.manifest_raw or ""
+
             if not staged.strip():
                 # Nothing staged -- a no-op success, same spirit as
                 # pushManifestToRepo's 'nothing_to_push'.
                 return _result(app)
 
-            if staged == (app.manifest_raw or ""):
+            if staged == (app.manifest_raw or "") and not fallback:
                 # The staged text already matches what's applied -- clear
                 # the redundant copy (same convention updateManifest uses
                 # for an edit that converges back to the synced content)
@@ -584,11 +642,18 @@ class ManifestMutations:
             # ``astrolift_registry.schema.types._repo_hash_for``'s own
             # convention for "no known repo hash") already reads this as
             # in_sync.
-            app.save(update_fields=["manifest_raw_staged", "updated_at", "version"])
+            update_fields = ["manifest_raw_staged", "updated_at", "version"]
+            if fallback:
+                from astrolift_registry.services.manifest_sync import _clear_stale_bootstrap_failure
+
+                update_fields += _clear_stale_bootstrap_failure(app)
+            app.save(update_fields=update_fields)
             # Only now: an ALLOW entry for an apply that then failed would
             # record a secret change that never happened.
             if allowed is not None:
                 _audit_secret_change(app, decision="ALLOW", **allowed)
+            if fallback:
+                _audit_unreachable_repo_apply(app, reason=fallback)
 
             return _result(app)
 

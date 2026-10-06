@@ -434,6 +434,18 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
         raise ValueError(
             "ci_pushed requires a Dockerfile path and build context; configure the selected app's build inputs."
         )
+    if platform_built and getattr(app, "pk", None) is not None:
+        # The manifest's primary container decides any field the app has
+        # left at its default, with the precedence the platform build
+        # applies (#2300). An unsaved app has no containers to consult.
+        from types import SimpleNamespace
+
+        from astrolift_workflows.activities.build_image import _resolve_build_paths
+
+        try:
+            dockerfile, context = _resolve_build_paths(app, SimpleNamespace(workload=None))
+        except RuntimeError as exc:
+            raise ValueError(f"ci_pushed build inputs: {exc}") from exc
     if platform_built:
         from astrolift_manifest.path_safety import resolve_repo_relative
 
@@ -478,7 +490,11 @@ def render_astrolift_ci_workflow(app: RegisteredApp) -> str:
     }
     if any("${{" in values[key] for key in values if key != "image"):
         raise ValueError("Managed CI configuration cannot contain GitHub Actions expressions.")
-    values = {key: json.dumps(value) for key, value in values.items()}
+    # An expression accepts only single-quoted string literals (#2300); the
+    # secret name is ``<NAME>_<hex guid>``, so it never holds a quote.
+    values = {
+        key: f"'{value}'" if key == "token_secret" else json.dumps(value) for key, value in values.items()
+    }
 
     def _replace(match: re.Match[str]) -> str:
         name = match.group(1)
@@ -742,6 +758,7 @@ def _pick_source_connection(app: RegisteredApp) -> SourceConnection | None:
             app.organization_id,
             purpose=ORG_REPO_WRITE,
             source_kind=app.source_kind,
+            repo=app.source_repo,
         )
     except ConnectionResolutionError:
         return None

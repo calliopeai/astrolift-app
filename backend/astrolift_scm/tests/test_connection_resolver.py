@@ -265,3 +265,55 @@ def test_user_discovery_scoped_to_the_requesting_user(org):
             user_id=get_user_model().objects.create(username="fresh").pk,
         )
     assert exc.value.code == "PRECONDITION"
+
+
+# ---------------------------------------------------------------------------
+# repo owner — one GitHub App installation per account (#2297)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("purpose", [PLATFORM_REPO_WRITE, ORG_REPO_WRITE])
+@pytest.mark.parametrize(
+    "repo",
+    [
+        "ragelink/leo-brain",
+        "https://github.com/RageLink/leo-brain.git",
+        "git@github.com:ragelink/leo-brain.git",
+    ],
+)
+def test_several_installations_resolve_by_repo_owner(org, purpose, repo):
+    """The oldest installation (ConflictHQ) used to win for every repo, so
+    a repo on a second account was never reachable."""
+    _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ")
+    second = _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="2", account_login="ragelink")
+    got = resolve_connection(org, purpose=purpose, source_kind="github", repo=repo)
+    assert got.pk == second.pk
+
+
+def test_several_installations_none_on_the_owner_is_a_precondition(org):
+    _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ")
+    _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="2", account_login="ragelink")
+    with pytest.raises(ConnectionResolutionError) as exc:
+        resolve_connection(org, purpose=PLATFORM_REPO_WRITE, source_kind="github", repo="someone-else/app")
+    assert exc.value.code == "PRECONDITION"
+    assert "someone-else" in exc.value.message
+
+
+def test_org_write_falls_back_past_installations_that_miss_the_owner(org):
+    """A PAT or OAuth connection may reach any owner; only installations are
+    bound to one account."""
+    _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ")
+    _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="2", account_login="ragelink")
+    pat = _mk(org, SourceConnection.Kind.GITHUB_PAT, account_login="ci-bot")
+    got = resolve_connection(org, purpose=ORG_REPO_WRITE, source_kind="github", repo="someone-else/app")
+    assert got.pk == pat.pk
+
+
+def test_a_single_installation_still_resolves_for_any_owner(org):
+    """Manifest-flow rows record the App owner, not the installed account,
+    so a lone installation keeps the org-wide behaviour."""
+    only = _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ")
+    got = resolve_connection(
+        org, purpose=PLATFORM_REPO_WRITE, source_kind="github", repo="ragelink/leo-brain"
+    )
+    assert got.pk == only.pk

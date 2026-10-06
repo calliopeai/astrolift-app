@@ -70,7 +70,11 @@ import re
 # retains legacy or edited files and binds the inspected blob SHA. ci_pushed
 # renders persisted Dockerfile/context/arguments and refuses
 # missing image/build configuration instead of producing a notify-only job.
-TEMPLATE_VERSION = 9
+# v10 (#2300): the notify step's ``secrets['...']`` lookup is single-quoted
+# (v9's double quotes failed every run at parse time), and ci_pushed reads
+# the manifest's primary-container dockerfile_path/build_context for any
+# field the app left at its default, as the platform build does.
+TEMPLATE_VERSION = 10
 
 # The stamp is a host-agnostic ``#`` comment so it's inert on GitHub
 # Actions / GitLab CI / Bitbucket Pipelines / Gitea alike — it never

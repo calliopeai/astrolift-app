@@ -600,12 +600,13 @@ def test_apply_staged_manifest_applies_when_there_is_no_source_repo(permission_r
 def test_apply_staged_manifest_rejects_when_the_repo_has_no_working_connection(
     permission_resolver,
 ):
-    """H2 (adversarial review): a repo-backed app always goes through
-    pushManifestToRepo for review, whatever its connection health -- a
-    dead/missing SourceConnection is not a second escape hatch into a
-    direct apply. Only an app with no source_repo at all (asserted
-    above) has nothing else to apply the staged edit through."""
+    """H2 (adversarial review): a repo-backed app that has workloads goes
+    through pushManifestToRepo for review, whatever its connection health
+    -- a dead/missing SourceConnection is not a second escape hatch into a
+    direct apply. Only an app with no source_repo at all (asserted above),
+    or one never bootstrapped (#2296, below), applies directly."""
     org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc")
+    Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
     app.manifest_raw_staged = _UPDATED_TOML
     app.save(update_fields=["manifest_raw_staged"])
     permission_resolver.grant(Permission.APP_UPDATE)
@@ -644,6 +645,81 @@ def test_apply_staged_manifest_rejects_when_the_app_can_push_to_its_repo(
     assert result.errors[0].code == "SCM_REPO_CONFIGURED"
     app.refresh_from_db()
     assert app.manifest_raw_staged == _UPDATED_TOML
+
+
+# --- #2296: a repo-backed app the platform cannot reach -------------------
+
+
+def test_apply_staged_manifest_bootstraps_a_workloadless_app_with_no_connection(
+    permission_resolver, audit_capture
+):
+    """No connection covers the repo and the app has no workloads: the
+    staged manifest applies, with an audit entry naming the fallback."""
+    org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc", source_repo="ragelink/leo-brain")
+    app.manifest_raw_staged = _UPDATED_TOML
+    app.save(update_fields=["manifest_raw_staged"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid)),
+        )
+
+    assert result.ok, result.errors
+    app.refresh_from_db()
+    assert app.manifest_raw.strip() == _UPDATED_TOML.strip()
+    assert app.manifest_raw_staged == ""
+    assert Workload.objects.filter(registered_app=app, slug="web").exists()
+    fallback = [e for e in audit_capture if e.action == "app.manifest.apply_unreachable_repo"]
+    assert len(fallback) == 1
+    assert fallback[0].extra == {"reason": "no_connection", "source_repo": "ragelink/leo-brain"}
+
+
+def test_apply_staged_manifest_materialises_the_stored_manifest_when_nothing_is_staged(
+    permission_resolver,
+):
+    """The leo-brain shape: manifest_raw stored, zero workloads, a
+    connection that cannot read the repo (the registration fetch failed).
+    updateManifest refuses to stage a copy of the stored text, so apply
+    materialises manifest_raw itself and clears the bootstrap failure."""
+    org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc", source_repo="ragelink/leo-brain")
+    _scaffold_github_conn(org)
+    app.manifest_bootstrap_status = "fetch_failed"
+    app.manifest_bootstrap_error = "GitHub couldn't find ragelink/leo-brain"
+    app.save(update_fields=["manifest_bootstrap_status", "manifest_bootstrap_error"])
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid)),
+        )
+
+    assert result.ok, result.errors
+    assert Workload.objects.filter(registered_app=app, slug="web").exists()
+    app.refresh_from_db()
+    assert app.manifest_raw.strip() == _VALID_TOML.strip()
+    assert app.manifest_bootstrap_status == "applied"
+    assert app.manifest_bootstrap_error == ""
+
+
+def test_apply_staged_manifest_keeps_review_when_a_connection_covers_the_repo(permission_resolver):
+    """Zero workloads alone is not enough: with a working connection the
+    stored manifest is not applied behind the repo's back."""
+    org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc")
+    _scaffold_github_conn(org)
+    permission_resolver.grant(Permission.APP_UPDATE)
+
+    with _ctx(org):
+        result = RegistryMutation().apply_staged_manifest(
+            _info(),
+            input=ApplyStagedManifestInput(id=str(app.guid)),
+        )
+
+    assert not result.ok
+    assert result.errors[0].code == "SCM_REPO_CONFIGURED"
+    assert not Workload.objects.filter(registered_app=app).exists()
 
 
 def test_apply_staged_manifest_with_nothing_staged_is_a_noop(permission_resolver):

@@ -365,6 +365,22 @@ def _current_org_installed_app(org_id: int, canonical: SourceConnection) -> Sour
     )
 
 
+def _org_has_install_on(org_id: int, account_login: str) -> bool:
+    """Whether this org already holds an installed App connection for the
+    GitHub account ``account_login`` (case-insensitive)."""
+    return (
+        SourceConnection.objects.filter(
+            organization_id=org_id,
+            kind="github_app_install",
+            is_active=True,
+            is_orphaned=False,
+            account_login__iexact=account_login,
+        )
+        .exclude(installation_id="")
+        .exists()
+    )
+
+
 def _decrypt_optional(backend_kind: str, ciphertext: Any) -> bytes:
     """Decrypt a stored secret, tolerating the empty/unset case."""
     raw = bytes(ciphertext or b"")
@@ -411,11 +427,13 @@ def _start_reuse_install(
     *,
     org_id: int,
     return_to: str,
+    account_login: str = "",
 ) -> HttpResponseRedirect | None:
     """Case (b): the App exists elsewhere in the install but not on this
-    org. Create a pending connection that copies the canonical App's
-    credentials and bounce the operator to GitHub's install page for the
-    EXISTING App. The existing install/setup callback then attaches this
+    org, or this org wants it on a further GitHub account
+    (``account_login``, #2297). Create a pending connection that copies
+    the canonical App's credentials and bounce the operator to GitHub's
+    install page for the EXISTING App. The existing install/setup callback then attaches this
     org's ``installation_id`` to the pending row (anchored via the
     ``scm_github_install_state`` we prime here). Returns None (→ caller
     falls back to the create flow) when we can't recover the App slug to
@@ -428,7 +446,7 @@ def _start_reuse_install(
         )
         return None
 
-    owner = canonical.account_login
+    owner = account_login or canonical.account_login
     # Clear any never-installed pending row for this org that would collide
     # with the copy's unique key (organization, kind, account_login) — same
     # spirit as the create-path cleanup below.
@@ -506,12 +524,20 @@ def github_app_manifest_start(request: HttpRequest) -> Any:
     canonical = _find_canonical_app(org_id, _connection_scope())
     if canonical is not None:
         existing = _current_org_installed_app(org_id, canonical)
-        if existing is not None:
+        if existing is not None and (not gh_org or _org_has_install_on(org_id, gh_org)):
             # (a) This org already has the App installed — nothing to do.
             return _redirect_with_ok(return_to, existing.display_name or "GitHub App")
-        # (b) The App exists elsewhere in the install but not on this org —
-        # install the EXISTING App here instead of creating a duplicate.
-        reused = _start_reuse_install(request, canonical, org_id=org_id, return_to=return_to)
+        # (b) The App exists elsewhere in the install but not on this org,
+        # or this org names a GitHub account it has no installation on yet
+        # (#2297); install the EXISTING App there instead of creating a
+        # duplicate.
+        reused = _start_reuse_install(
+            request,
+            canonical,
+            org_id=org_id,
+            return_to=return_to,
+            account_login=gh_org if existing is not None else "",
+        )
         if reused is not None:
             return reused
         # Slug unrecoverable → fall through to the create flow (c).
