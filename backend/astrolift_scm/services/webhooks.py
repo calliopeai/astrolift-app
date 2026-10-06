@@ -41,6 +41,7 @@ from astrolift_scm.providers.github import (
     GithubProviderError,
     github_installation_includes_repo,
 )
+from astrolift_scm.services.connection_resolver import covering_repo_owner
 from core.secrets import encrypt_at_rest
 
 # ---------------------------------------------------------------------------
@@ -144,6 +145,9 @@ def _pick_source_connection(app: RegisteredApp) -> SourceConnection | None:
             deleted_at__isnull=True,
         )
     )
+    # An org with installations on several GitHub accounts installs the
+    # hook through the one on the repo's owner (#2297).
+    rows = covering_repo_owner(rows, app.source_repo)
     if not rows:
         return None
     rank = {k: i for i, k in enumerate(accepted)}

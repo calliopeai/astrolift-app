@@ -601,7 +601,7 @@ def test_render_substitutes_all_variables(settings, app_with_repo):
     from astrolift_scm.ci_identity import github_ci_secret_name
 
     name = github_ci_secret_name(app_with_repo, "ASTROLIFT_DEPLOY_TOKEN")
-    assert '${{ secrets["' + name + '"] }}' in rendered
+    assert "${{ secrets['" + name + "'] }}" in rendered
     # Header marker so downstream operators don't hand-edit.
     assert "Managed by Astrolift" in rendered
 

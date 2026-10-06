@@ -58,7 +58,9 @@ def _fetch_from_github(pipeline: Pipeline, ref: str, path: str) -> str:
     import base64
     import json
 
-    connection = _org_connection(pipeline.organization, source_kind="github")
+    connection = _org_connection(
+        pipeline.organization, source_kind="github", repo=_extract_owner_repo_github(pipeline.repo_url)
+    )
     token = _connection_token(connection, source_kind="github")
 
     # Extract owner/repo from URL
@@ -136,7 +138,7 @@ def _fetch_generic_git(pipeline: Pipeline, ref: str, path: str) -> str:
     )
 
 
-def _org_connection(org, *, source_kind: str):
+def _org_connection(org, *, source_kind: str, repo: str | None = None):
     """The SourceConnection that authenticates a manifest read for ``org``.
 
     Replaces two hand-rolled lookups that could never succeed (#1608).
@@ -158,7 +160,7 @@ def _org_connection(org, *, source_kind: str):
     )
 
     try:
-        return resolve_connection(org, purpose=ORG_REPO_WRITE, source_kind=source_kind)
+        return resolve_connection(org, purpose=ORG_REPO_WRITE, source_kind=source_kind, repo=repo)
     except ConnectionResolutionError as exc:
         raise TomlFetchError(exc.message) from exc
 

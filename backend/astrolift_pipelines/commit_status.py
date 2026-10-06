@@ -417,6 +417,7 @@ def _resolve_connection(pipeline, *, source_kind: str):
             pipeline.organization_id,
             purpose=ORG_REPO_WRITE,
             source_kind=source_kind,
+            repo=pipeline.repo_url,
         )
     except ConnectionResolutionError:
         return None
