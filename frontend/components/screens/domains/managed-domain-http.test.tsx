@@ -52,6 +52,8 @@ beforeEach(async () => {
   hold = null;
   release = null;
   const roots = {
+    // The page reads what the install withholds; nothing, as on every install before #447.
+    astroliftWithheldCapabilities: () => [],
     dnsProviderConnectionSupport: () => {
       if (supportFailure) throw new Error("Current connection support unavailable");
       return {

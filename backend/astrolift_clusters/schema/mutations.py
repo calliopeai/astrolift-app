@@ -1530,13 +1530,6 @@ class ClustersMutation:
                 "Use registerCloudflareDnsZone with a reviewed connection and zone.",
                 field="dnsDriver",
             )
-        # A Route53 zone the platform manages is one it writes records into,
-        # which an install that withholds DNS denies (calliope-installer#447).
-        if input.dns_driver == "route53":
-            from core.install_restrictions import reason
-
-            if refusal := reason("dns"):
-                return gql_failure(ErrorCode.PRECONDITION.value, refusal, field="dnsDriver")
         # One spelling per DNS zone (#1931): the DNS driver resolves a zone by
         # canonical name, so ``Globex.example.`` and ``globex.example`` are one
         # zone. Stored canonical, and unique on that form, so a variant can't
@@ -1582,6 +1575,25 @@ class ClustersMutation:
         # until verifyManagedDomain confirms the caller published the TXT
         # challenge this returns.
         requires_verification = bool(dns_config.get("zone_id")) or _zone_exists_in_provider(cluster, zone)
+        # A zone the platform would create is a hosted zone it writes, which
+        # an install that withholds DNS denies (calliope-installer#447). The
+        # provisioning workflow writes through the DNS cluster's driver
+        # whatever the row's dns_driver says, so every driver is refused. A
+        # zone that already exists is registered pending verification; its
+        # certificate records are then left to the operator to publish.
+        if (
+            not requires_verification
+            and getattr(getattr(cluster, "provider_plugin", None), "slug", "") == "aws"
+        ):
+            from core.install_restrictions import reason
+
+            if refusal := reason("dns"):
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    f"{refusal} Astrolift cannot create this hosted zone; register a zone that "
+                    "already exists in the account and verify it.",
+                    field="dnsDriver",
+                )
         verification_token = secrets.token_hex(16) if requires_verification else ""
 
         domain = ManagedDomain.objects.create(

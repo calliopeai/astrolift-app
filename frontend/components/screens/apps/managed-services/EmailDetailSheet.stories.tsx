@@ -27,6 +27,7 @@ import {
   TemplatesPanelView,
   TemplateStatsView,
 } from "./EmailDetailSheet";
+import { DNS_WITHHELD } from "../../domains/domains-environments.fixtures";
 
 const meta: Meta = {
   title: "Screens/Apps/ManagedServices/EmailDetailSheet",
@@ -55,6 +56,41 @@ export const Full: Story = {
 /** Identity, DNS auth and sender settings: the second section. */
 export const IdentityAndSending: Story = {
   render: () => <EmailDetailSheetView {...EMAIL_SHEET} panels={panels} defaultSection="sending" />,
+};
+
+/**
+ * calliope-installer#447: DNS withheld, so a pending domain identity says its
+ * verification records are the operator's to publish. IdentityPendingDnsUnset
+ * is the same pending identity without the restriction: no note.
+ */
+const pendingIdentity = {
+  ...EMAIL_DETAIL,
+  identityVerification: { ...EMAIL_DETAIL.identityVerification!, status: "Pending" },
+};
+const identityNotePlay =
+  (withheld: boolean): Story["play"] =>
+  async () => {
+    const sheet = within(document.body);
+    await expect(sheet.getByText("Identity verification")).toBeVisible();
+    if (withheld) await expect(sheet.getByText(/publishes no verification records/)).toBeVisible();
+    else await expect(sheet.queryByText(/publishes no verification records/)).toBeNull();
+  };
+export const IdentityPendingDnsWithheld: Story = {
+  render: () => (
+    <EmailDetailSheetView
+      {...EMAIL_SHEET}
+      detail={pendingIdentity}
+      defaultSection="sending"
+      dnsRestriction={DNS_WITHHELD}
+    />
+  ),
+  play: identityNotePlay(true),
+};
+export const IdentityPendingDnsUnset: Story = {
+  render: () => (
+    <EmailDetailSheetView {...EMAIL_SHEET} detail={pendingIdentity} defaultSection="sending" />
+  ),
+  play: identityNotePlay(false),
 };
 
 /** Each list has a section of its own, so one shows at a time. */

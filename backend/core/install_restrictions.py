@@ -21,11 +21,14 @@ from __future__ import annotations
 import os
 
 try:
-    from temporalio.exceptions import ApplicationError as _ErrorBase
+    from temporalio.exceptions import ApplicationError
+except ImportError:  # pragma: no cover - the provider test job imports core without the SDK
 
-    _NON_RETRYABLE: dict = {"non_retryable": True}
-except ImportError:  # the providers test environment has no Temporal
-    _ErrorBase, _NON_RETRYABLE = Exception, {}
+    class ApplicationError(Exception):  # type: ignore[no-redef]
+        def __init__(self, message: str, *, non_retryable: bool = False) -> None:
+            super().__init__(message)
+            self.non_retryable = non_retryable
+
 
 ENV_VAR = "ASTROLIFT_WITHHELD_CAPABILITIES"
 
@@ -193,15 +196,16 @@ def cluster_delete_refusal(cluster) -> str:
     return reason("clusters") if _on_aws(cluster) else ""
 
 
-class WithheldCapabilityError(_ErrorBase):
+class WithheldCapabilityError(ApplicationError):
     """A call the install withholds, refused before it reaches AWS or the apiserver.
 
-    Non-retryable: the restriction is fixed at install, so a Temporal retry
-    would only refuse again.
+    Non-retryable wherever it is raised: inside a Temporal activity it fails
+    the activity at once instead of retrying, because AWS or the apiserver
+    would refuse every attempt the same way. ``str()`` is the reason alone.
     """
 
     def __init__(self, message: str) -> None:
-        super().__init__(message, **_NON_RETRYABLE)
+        super().__init__(message, non_retryable=True)
 
 
 #: Route53Driver methods that change DNS: every one the WithheldDns Deny

@@ -43,6 +43,8 @@ export type DomainsScreenProps = AppDomainsState & {
   slug: string;
   /** The app's tab bar, rendered under the page header. */
   tabs: React.ReactNode;
+  /** Why Astrolift writes no DNS records on this install (calliope-installer#447). */
+  dnsRestriction?: string | null;
 };
 
 /**
@@ -99,6 +101,7 @@ export function DomainsScreen({
   saveRedirects,
   savePathRoutes,
   toggleIngress,
+  dnsRestriction,
 }: DomainsScreenProps) {
   const t = useTranslations("apps.domains");
   const tCert = useTranslations("apps.domains.cert");
@@ -299,6 +302,7 @@ export function DomainsScreen({
             onUploadCert={() => setByoTarget(shown)}
             onSaveRedirects={(rules) => saveRedirects(shown, rules)}
             onSavePathRoutes={(routes) => savePathRoutes(shown, routes)}
+            dnsRestriction={clusterProviderSlug === "aws" ? dnsRestriction : null}
           />
         )}
 

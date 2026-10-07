@@ -124,6 +124,31 @@ def test_platform_dns_drivers_carry_the_guard(monkeypatch):
         _us_east_1_dns_driver().ensure_record(zone="z", name="n", type="CNAME", value="v")
 
 
+class _AwsCluster:
+    slug = "prod"
+    region = "us-west-2"
+    provider_plugin = SimpleNamespace(slug="aws")
+    provider_plugin_id = "aws"
+    provider_config = {"region": "us-west-2", "base_domain": "mail.acme.example"}
+    auth_config: dict = {}
+    cloud_account_id = ""
+    cloud_account_verified_at = None
+
+
+@pytest.mark.django_db
+def test_the_ses_driver_config_carries_the_dns_refusal(monkeypatch):
+    """The SES driver writes its verification records into Route53 from
+    inside the provider package, which cannot import this guard; the one
+    config funnel every SES driver is built from carries the decision."""
+    from core.cluster_observability import managed_config_for
+
+    assert managed_config_for("aws", _AwsCluster(), kind="email").dns_withheld_reason == ""
+    monkeypatch.setenv(ir.ENV_VAR, "dns")
+    assert managed_config_for("aws", _AwsCluster(), kind="email").dns_withheld_reason.startswith(
+        "DNS is withheld"
+    )
+
+
 # ---- databases: the catalogue and the activity -------------------------------
 
 
