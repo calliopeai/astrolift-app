@@ -65,6 +65,8 @@ ALLOWED: dict[str, str] = {
     "Query.formFieldTypes": "the static palette of form widget kinds; no tenant data",
     "Query.agentRuntimes": "install-wide agent runtime catalog, the same for every org; refuses anonymous callers",
     "Query.astroliftServerInfo": "public: install and build metadata the shell renders, no tenant data",
+    "Query.astroliftWithheldCapabilities": "install-wide: what the installer withholds from the control plane, the same for every org; refuses anonymous callers (calliope-installer#447)",
+    "Query.astroliftInstallManagedModel": "install-wide: the model id and replica count of the install's own shared model, no endpoint; refuses anonymous callers (calliope-installer#446)",
     "/app/metrics/": "install-wide: Prometheus registry, active platform operator only with an admin bearer ceiling (#2174)",
     "Mutation.confirmPreSignedUrlImageUpload": (
         "self-service: own live upload in the active legacy org with live membership, or its platform operator; "

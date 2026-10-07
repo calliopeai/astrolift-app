@@ -5,6 +5,7 @@ import { BrainCircuitIcon, RocketIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { ListPage } from "@/components/list/ListPage";
 import { Button } from "@/components/ui/button";
+import { type InstallManagedModel, InstallManagedModelCard } from "./InstallManagedModelCard";
 import type { ModelPage } from "./ModelSubscriptionsPanel";
 import { SHARED_MODEL_STATUSES } from "./shared-models-list";
 
@@ -24,9 +25,13 @@ export type SharedModelListRow = {
   readinessObservedAt: string | null;
   subscriptionsEnabled: boolean;
 };
-export type SharedModelsScreenProps = { page: ModelPage<SharedModelListRow> };
+export type SharedModelsScreenProps = {
+  page: ModelPage<SharedModelListRow>;
+  /** The install's own model (calliope-installer#446), listed read-only above the deployments. */
+  installModel?: InstallManagedModel | null;
+};
 
-export function SharedModelsScreen({ page }: SharedModelsScreenProps) {
+export function SharedModelsScreen({ page, installModel }: SharedModelsScreenProps) {
   const t = useTranslations("models.shared.deployments");
   const hosting = useTranslations("models.shared.hosting");
   const format = useFormatter();
@@ -52,6 +57,7 @@ export function SharedModelsScreen({ page }: SharedModelsScreenProps) {
         ),
       }}
       label={t("label")}
+      notice={installModel ? <InstallManagedModelCard model={installModel} /> : undefined}
       getRowId={(row) => row.id}
       rowHref={(row) => `/models/shared/${encodeURIComponent(row.id)}`}
       empty={{

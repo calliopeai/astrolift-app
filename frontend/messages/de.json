@@ -5741,6 +5741,13 @@
         "manifestRevision": "SHA-256 des geprüften Manifests",
         "localLicenseReview": "Ich habe die Lizenz und die Weiterverbreitungsrechte dieser lokalen Modelldateien geprüft."
       }
+    },
+    "installModel": {
+      "title": "Von der Installation verwaltet",
+      "badge": "schreibgeschützt",
+      "description": "Die Installation stellt dieses Modell auf eigenen GPUs bereit. Hier ist es schreibgeschützt; ändern Sie es im Installer.",
+      "replicas": "{count, plural, one {# Replikat} other {# Replikate}}, je eine GPU",
+      "replicasUnknown": "Replikate von der Installation nicht gemeldet"
     }
   },
   "home": {
@@ -6323,6 +6330,7 @@
       "unknown": "unbekannt",
       "installed": "durch das Rezept installiert",
       "outsideRecipe": "außerhalb des Rezepts aktiv",
+      "withheld": "von der Installation zurückgehalten",
       "requires": "benötigt: {requirement}",
       "selected": "{count, number} von {total, number} ausgewählt",
       "requesting": "Wird angefordert…",

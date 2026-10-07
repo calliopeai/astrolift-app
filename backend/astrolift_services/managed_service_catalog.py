@@ -24,6 +24,7 @@ from _sdk.coverage import OPT_IN_TIER
 
 from astrolift_drivers.managed_resolution import IN_CLUSTER_PLUGIN
 from astrolift_drivers.registry import plugins
+from core.install_restrictions import database_refusal
 
 _SIZE_OPTIONS = ("small", "medium", "large", "xlarge", "custom")
 _SIZED_KINDS = {
@@ -276,7 +277,11 @@ def list_catalog(
     native_by_kind: dict[str, list[str]] = defaultdict(list)
     for kind, variant in keys:
         meta = metadata.get((kind, variant))
-        if (kind, variant) in drivers and (meta is None or meta.status in {"ga", "preview"}):
+        if (
+            (kind, variant) in drivers
+            and (meta is None or meta.status in {"ga", "preview"})
+            and not database_refusal(kind, variant)
+        ):
             available_by_kind[kind].append(variant)
             if (kind, variant) not in borrowed:
                 native_by_kind[kind].append(variant)
@@ -320,6 +325,11 @@ def list_catalog(
             unavailable_reason = "Provider driver is not installed in this control plane."
         else:
             unavailable_reason = ""
+        # What the install withholds (calliope-installer#447): offered, with
+        # the reason, rather than refused by AWS halfway through a workflow.
+        if available and (withheld := database_refusal(kind, variant)):
+            available = False
+            unavailable_reason = withheld
         default_pool = native_by_kind.get(kind) or available_by_kind.get(kind, [])
         configured_default = _DEFAULT_VARIANTS.get((plugin_slug, kind))
         is_default = available and (
@@ -401,6 +411,11 @@ def resolve_variant(*, plugin_slug: str, kind: str, requested_variant: str | Non
     if len(defaults) == 1:
         return defaults[0]
     available = [row.variant for row in rows if row.available]
+    # The kind's default is one the install withholds: say so, not "pick one".
+    if withheld := next(filter(None, (database_refusal(row.kind, row.variant) for row in rows)), ""):
+        raise CatalogResolutionError(
+            f"{withheld} Available variants: {available}." if available else withheld
+        )
     raise CatalogResolutionError(
         f"provider {plugin_slug!r} requires an explicit variant for kind {kind!r}; choose one of {available}"
     )

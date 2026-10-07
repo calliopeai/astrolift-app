@@ -1990,6 +1990,7 @@ type AstroliftClusterBootstrapComponent {
   options: [AstroliftClusterBootstrapOption!]!
   installedByRecipe: Boolean!
   runningOutsideRecipe: Boolean!
+  withheldReason: String
 }
 
 type AstroliftClusterBootstrapOption {
@@ -3227,6 +3228,11 @@ type AstroliftImportSkillsResultMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftImportSkillsResult
+}
+
+type AstroliftInstallManagedModel {
+  modelId: String!
+  replicas: Int
 }
 
 type AstroliftInstallSourceWebhookPayload {
@@ -6066,6 +6072,11 @@ type AstroliftWebhookTestResultMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftWebhookTestResult
+}
+
+type AstroliftWithheldCapability {
+  capability: String!
+  reason: String!
 }
 
 type AstroliftWorkflowHistoryEvent {
@@ -9223,6 +9234,16 @@ type Query {
   Multi-install handshake. Returns version, capabilities, feature flags, install identity, and server time so a mobile / CLI / SDK client can decide which UI to render before logging in.
   """
   astroliftServerInfo: AstroliftServerInfo!
+
+  """
+  What the install withholds from Astrolift (calliope-installer#447): dns, databases, load_balancers, clusters, each with the reason to show. Empty when nothing is withheld.
+  """
+  astroliftWithheldCapabilities: [AstroliftWithheldCapability!]!
+
+  """
+  The model the install serves on its own GPUs (calliope-installer#446), read-only in the console; null when the platform model is a cloud API or off.
+  """
+  astroliftInstallManagedModel: AstroliftInstallManagedModel
   organization(id: ID!): OrganizationType
   organizations(query: String = null): [OrganizationType!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use organizationsPage.")
 

@@ -1041,7 +1041,9 @@ def _org_gpus_in_use(org_id: int, *, excluding_env_id: int) -> int:
     """GPUs the org's running deploys and vLLM models hold, bar one env.
 
     A running deploy counts its app's saved manifest; the env being deployed
-    is excluded because this deploy replaces what runs there.
+    is excluded because this deploy replaces what runs there. The install's
+    shared model (calliope-installer#446) counts too: its GPUs are the
+    install's, which every org on it draws from.
     """
     from django.db.models import Q
 
@@ -1077,7 +1079,15 @@ def _org_gpus_in_use(org_id: int, *, excluding_env_id: int) -> int:
     for svc in models_:
         cfg = svc.config or {}
         total += int(cfg.get("gpu", 1) or 0) * int(cfg.get("replicas", 1) or 0)
-    return total
+    return total + _install_model_gpus()
+
+
+def _install_model_gpus() -> int:
+    """GPUs the install's shared model holds, one per replica it reports."""
+    from astrolift_agents.services.platform_model import install_managed_model
+
+    shared = install_managed_model()
+    return shared.gpus if shared else 0
 
 
 def gpu_quota_refusal(deployment, manifest) -> str | None:
@@ -1100,8 +1110,10 @@ def gpu_quota_refusal(deployment, manifest) -> str | None:
         return None
     in_use = _org_gpus_in_use(org_id, excluding_env_id=deployment.app_environment_id)
     if in_use + wanted > quota.hard_limit:
+        shared = _install_model_gpus()
+        including = f" (including {shared} for the install's shared model)" if shared else ""
         return (
-            f"this deploy needs {wanted} GPU(s); the organization already runs {in_use} of its "
+            f"this deploy needs {wanted} GPU(s); the organization already runs {in_use}{including} of its "
             f"{int(quota.hard_limit)}-GPU quota. Stop a GPU workload or request a quota increase"
         )
     return None
@@ -1233,7 +1245,11 @@ def render_resources_for_deployment(
         resources.extend(
             envoy_custom_domain_routes(deployment, manifest, namespace=namespace, cluster=cluster)
         )
-    if managed_domain is not None and cluster is not None:
+    from core.install_restrictions import app_ingress_refusal
+
+    if managed_domain is not None and cluster is not None and (refusal := app_ingress_refusal(cluster)):
+        log.info("render_resources_for_deployment: no app Ingress for %s: %s", app.slug, refusal)
+    elif managed_domain is not None and cluster is not None:
         ingress_resources = (
             _render_managed_subdomain_ingress(deployment, manifest, namespace, managed_domain, cluster) or []
         )

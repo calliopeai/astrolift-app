@@ -731,6 +731,15 @@ def _install_cluster_prereqs_sync(
     if additive:
         selected_set |= _edge_controllers_for_additive_run(cluster, components, selected_set)
 
+    # Controllers acting for what the install withholds (calliope-installer#447)
+    # are never installed: their IRSA roles are denied, so the release would
+    # only sit failing. The cluster owner's own copies, if any, do the work.
+    from core.install_restrictions import controller_refusal
+
+    if withheld := {key for key in selected_set if controller_refusal(key)}:
+        log.info("install_cluster_prereqs: skipping %s, withheld by the install", sorted(withheld))
+        selected_set -= withheld
+
     # Self-provision the AWS controllers' IRSA roles before their HelmReleases
     # land, so each controller can assume its role as soon as its pods start
     # (#1032 EBS-CSI, #1044 ALB controller + external-dns). No-op for non-AWS

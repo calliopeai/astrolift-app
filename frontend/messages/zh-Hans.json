@@ -5738,6 +5738,13 @@
         "manifestRevision": "已验证清单的 SHA-256",
         "localLicenseReview": "我已审查这些本地模型文件的许可证和再分发权利。"
       }
+    },
+    "installModel": {
+      "title": "由安装管理",
+      "badge": "只读",
+      "description": "安装在其自有 GPU 上提供此模型。此处为只读；请在安装程序中更改。",
+      "replicas": "{count, plural, other {# 个副本}}，每个一块 GPU",
+      "replicasUnknown": "安装未报告副本数"
     }
   },
   "home": {
@@ -6320,6 +6327,7 @@
       "unknown": "未知",
       "installed": "由此方案安装",
       "outsideRecipe": "在此方案之外运行",
+      "withheld": "已被安装保留",
       "requires": "需要：{requirement}",
       "selected": "已选择 {count, number} / {total, number} 项",
       "requesting": "正在请求…",

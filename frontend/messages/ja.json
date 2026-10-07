@@ -5738,6 +5738,13 @@
         "manifestRevision": "検証済みマニフェストの SHA-256",
         "localLicenseReview": "これらのローカルモデルファイルのライセンスと再配布権を確認しました。"
       }
+    },
+    "installModel": {
+      "title": "インストールが管理",
+      "badge": "読み取り専用",
+      "description": "このモデルはインストール自身の GPU で提供されています。ここでは読み取り専用です。変更はインストーラーで行ってください。",
+      "replicas": "{count, plural, other {# 個のレプリカ}}、各 1 GPU",
+      "replicasUnknown": "インストールからレプリカ数が報告されていません"
     }
   },
   "home": {
@@ -6320,6 +6327,7 @@
       "unknown": "不明",
       "installed": "この手順でインストール済み",
       "outsideRecipe": "この手順とは別に稼働中",
+      "withheld": "インストールにより保留",
       "requires": "必要: {requirement}",
       "selected": "{total, number} 件中 {count, number} 件を選択",
       "requesting": "要求中…",

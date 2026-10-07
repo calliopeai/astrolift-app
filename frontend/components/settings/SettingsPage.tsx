@@ -310,6 +310,8 @@ export interface DangerActionProps {
   onConfirm: (reason: string) => Promise<unknown> | unknown;
   /** Ask for a reason the audit trail keeps. */
   reasonLabel?: string;
+  /** Why this action is not offered here: the button is disabled and this is shown. */
+  disabledReason?: string | null;
 }
 
 /** A row in the Danger zone: what it does, and a button behind a ConfirmDialog. */
@@ -321,19 +323,28 @@ export function DangerAction({
   confirmDescription,
   onConfirm,
   reasonLabel,
+  disabledReason,
 }: DangerActionProps) {
   const [open, setOpen] = React.useState(false);
+  const reasonId = React.useId();
   return (
     <div className="flex min-w-0 flex-col gap-3 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <p className="text-sm font-medium">{title}</p>
         <p className="text-muted-foreground text-sm [overflow-wrap:anywhere]">{description}</p>
+        {disabledReason && (
+          <p id={reasonId} className="text-warning-fg mt-1 text-sm [overflow-wrap:anywhere]">
+            {disabledReason}
+          </p>
+        )}
       </div>
       <Button
         type="button"
         variant="destructive"
         size="sm"
         className="shrink-0"
+        disabled={!!disabledReason}
+        aria-describedby={disabledReason ? reasonId : undefined}
         onClick={() => setOpen(true)}
       >
         {actionLabel}

@@ -116,6 +116,44 @@ def resolve() -> tuple[PlatformModel | None, str]:
     return None, "no model is configured and the control plane's cloud could not be told"
 
 
+@dataclass(frozen=True)
+class InstallManagedModel:
+    """The open-weight model the install itself serves (calliope-installer#446).
+
+    The installer runs one vLLM on GPU node groups of its own, one node and
+    one GPU per replica, and points the platform model at it as
+    ``openai_compatible``. Nothing in the app created it and nothing in the
+    app may change it, so it is shown read-only and its GPUs count against
+    quota.
+    """
+
+    model: str
+    endpoint: str
+    #: ``None`` when the install does not report it
+    #: (``ASTROLIFT_PLATFORM_MODEL_REPLICAS``).
+    replicas: int | None
+
+    @property
+    def gpus(self) -> int:
+        """GPUs it holds: one per replica, none counted when unreported."""
+        return self.replicas or 0
+
+
+def install_managed_model() -> InstallManagedModel | None:
+    """The install-managed model, or ``None`` when the platform model is not one.
+
+    An ``openai_compatible`` platform model is configured by the install's
+    environment, never by a tenant, so it is the install's model. Bedrock,
+    Vertex, Azure OpenAI and Anthropic are cloud APIs with no GPUs here.
+    """
+    model, _ = resolve()
+    if model is None or model.provider != "openai_compatible":
+        return None
+    raw = _env("ASTROLIFT_PLATFORM_MODEL_REPLICAS")
+    replicas = int(raw) if raw.isdigit() else None
+    return InstallManagedModel(model=model.model, endpoint=model.endpoint, replicas=replicas)
+
+
 def complete(model: PlatformModel, *, system: str, prompt: str, max_tokens: int = 1024) -> str:
     """One answer from ``model``. Raises :class:`PlatformModelError`."""
     try:

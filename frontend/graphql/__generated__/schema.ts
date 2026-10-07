@@ -1924,6 +1924,7 @@ export type AstroliftClusterBootstrapComponent = {
   requires: Array<Scalars['String']['output']>;
   runningOutsideRecipe: Scalars['Boolean']['output'];
   title: Scalars['String']['output'];
+  withheldReason?: Maybe<Scalars['String']['output']>;
 };
 
 export type AstroliftClusterBootstrapOption = {
@@ -3108,6 +3109,11 @@ export type AstroliftImportSkillsResultMutationResult = {
   data?: Maybe<AstroliftImportSkillsResult>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftInstallManagedModel = {
+  modelId: Scalars['String']['output'];
+  replicas?: Maybe<Scalars['Int']['output']>;
 };
 
 export type AstroliftInstallSourceWebhookPayload = {
@@ -5695,6 +5701,11 @@ export type AstroliftWebhookTestResultMutationResult = {
   data?: Maybe<AstroliftWebhookTestResult>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftWithheldCapability = {
+  capability: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
 };
 
 export type AstroliftWorkflowHistoryEvent = {
@@ -10836,6 +10847,8 @@ export type Query = {
   astroliftHuggingFaceModel: HuggingFaceModelResult;
   astroliftHuggingFaceModels: HuggingFaceModelsPage;
   astroliftIdentityProviders: Array<AstroliftIdentityProvider>;
+  /** The model the install serves on its own GPUs (calliope-installer#446), read-only in the console; null when the platform model is a cloud API or off. */
+  astroliftInstallManagedModel?: Maybe<AstroliftInstallManagedModel>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage. */
   astroliftInvitations: Array<AstroliftInvitation>;
   astroliftInvitationsCsv: AstroliftIdentityCsvExport;
@@ -10974,6 +10987,8 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftWebhookSubscriptionsPage. */
   astroliftWebhookSubscriptions: Array<AstroliftWebhookSubscription>;
   astroliftWebhookSubscriptionsPage: AstroliftWebhookSubscriptionPage;
+  /** What the install withholds from Astrolift (calliope-installer#447): dns, databases, load_balancers, clusters, each with the reason to show. Empty when nothing is withheld. */
+  astroliftWithheldCapabilities: Array<AstroliftWithheldCapability>;
   astroliftWorkflowInstance?: Maybe<AstroliftWorkflowInstance>;
   astroliftWorkflowInstanceDetail?: Maybe<AstroliftWorkflowInstanceDetail>;
   astroliftWorkflowInstances: AstroliftWorkflowInstancePage;

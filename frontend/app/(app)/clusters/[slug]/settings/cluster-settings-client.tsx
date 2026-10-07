@@ -16,6 +16,7 @@ import { useClusterAgent } from "@/components/screens/clusters/settings/use-clus
 import { useClusterSettings } from "@/components/screens/clusters/settings/use-cluster-settings";
 import { useIngressAuth } from "@/components/screens/clusters/settings/use-ingress-auth";
 import { useSettingsSection } from "@/components/settings/use-settings-section";
+import { useWithheldCapabilities } from "@/hooks/use-install-policy";
 
 import { AuthUsersCard } from "./auth-users-card";
 import { CentralAuthCard, IngressClassCard } from "./central-auth-card";
@@ -29,12 +30,16 @@ import { CentralAuthCard, IngressClassCard } from "./central-auth-card";
 export function ClusterSettingsClient({ slug }: { slug: string }) {
   const settings = useClusterSettings(slug);
   const cluster = settings.cluster;
+  const section = useSettingsSection();
+  // Read only while the Danger zone, where cluster deletion is offered, is shown.
+  const withheld = useWithheldCapabilities({ skip: section.active !== "danger-zone" });
 
   return (
     <ClusterSettingsScreen
       {...settings}
       slug={slug}
-      section={useSettingsSection()}
+      section={section}
+      deleteWithheldReason={withheld.clusters}
       cards={
         cluster
           ? {

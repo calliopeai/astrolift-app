@@ -1242,6 +1242,13 @@ class ClustersMutation:
 
             if has_cluster_owned_models(cluster.pk):
                 return gql_failure(ErrorCode.PRECONDITION.value, MODEL_CLEANUP_REQUIRED)
+            # Deleting the cloud cluster is cluster lifecycle; retiring the row
+            # (delete_cloud_infra=False) only lifts the platform's RBAC.
+            if input.delete_cloud_infra:
+                from core.install_restrictions import reason
+
+                if refusal := reason("clusters"):
+                    return gql_failure(ErrorCode.PRECONDITION.value, refusal, field="deleteCloudInfra")
             actor = _actor_from_request(info)
             _kick_decommission_cluster(
                 cluster=cluster,
@@ -1298,6 +1305,11 @@ class ClustersMutation:
             from astrolift_clusters.edge_install import edge_support_refusal
 
             if refusal := edge_support_refusal(cluster):
+                return gql_failure(ErrorCode.PRECONDITION.value, refusal, field="selectedComponents")
+        from core.install_restrictions import controller_refusal
+
+        for key in input.selected_components:
+            if refusal := controller_refusal(key):
                 return gql_failure(ErrorCode.PRECONDITION.value, refusal, field="selectedComponents")
         overrides: dict[str, dict[str, str]] = {}
         for o in input.option_overrides or []:
