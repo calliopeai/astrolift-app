@@ -1581,7 +1581,10 @@ class ClustersMutation:
         # whatever the row's dns_driver says, so every driver is refused. A
         # zone that already exists is registered pending verification; its
         # certificate records are then left to the operator to publish.
-        if not requires_verification and getattr(getattr(cluster, "provider_plugin", None), "slug", "") == "aws":
+        if (
+            not requires_verification
+            and getattr(getattr(cluster, "provider_plugin", None), "slug", "") == "aws"
+        ):
             from core.install_restrictions import reason
 
             if refusal := reason("dns"):
