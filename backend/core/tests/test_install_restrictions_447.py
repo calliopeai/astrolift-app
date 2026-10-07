@@ -58,6 +58,8 @@ def test_reads_the_installer_list_and_ignores_unknown_names(monkeypatch):
     monkeypatch.setenv(ir.ENV_VAR, " dns , clusters,,storage")
     assert ir.withheld() == {"dns", "clusters"}
     monkeypatch.setenv(ir.ENV_VAR, ALL)
+    assert ir.withheld() == set(ir.CAPABILITIES) - {"controllers"}
+    monkeypatch.setenv(ir.ENV_VAR, f"{ALL},controllers")
     assert ir.withheld() == set(ir.CAPABILITIES)
 
 

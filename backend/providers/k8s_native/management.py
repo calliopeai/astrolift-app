@@ -297,19 +297,21 @@ def _cluster_role_binding_manifest() -> dict[str, Any]:
     }
 
 
-def platform_rbac_manifests() -> list[dict[str, Any]]:
+def platform_rbac_manifests(*, cluster_rbac: bool = True) -> list[dict[str, Any]]:
     """Ordered list of platform-RBAC manifests for the apply step.
 
     Ordering matters: the Namespace MUST land before the
     ServiceAccount that targets it, and the ClusterRole MUST land
     before the binding that references it.
+
+    ``cluster_rbac=False`` leaves out the ClusterRole and its binding: under
+    the minimal RBAC contract (calliope-installer#447) cluster roles are the
+    cluster owner's, and no workload runs as the platform account.
     """
-    return [
-        _namespace_manifest(),
-        _service_account_manifest(),
-        _cluster_role_manifest(),
-        _cluster_role_binding_manifest(),
-    ]
+    manifests = [_namespace_manifest(), _service_account_manifest()]
+    if cluster_rbac:
+        manifests += [_cluster_role_manifest(), _cluster_role_binding_manifest()]
+    return manifests
 
 
 def _preflight_job_manifest(*, name: str) -> dict[str, Any]:
@@ -826,6 +828,7 @@ def _apply_platform_rbac(
     *,
     backend: ManagementBackend,
     cluster: ClusterContext,
+    cluster_rbac: bool = True,
 ) -> _RbacOutcome:
     """Apply each manifest in ``platform_rbac_manifests()`` in order.
     Any single-manifest failure short-circuits the run — partial RBAC
@@ -833,7 +836,7 @@ def _apply_platform_rbac(
     failure was the SA or the binding."""
     auth = cluster.to_auth()
     messages: list[str] = []
-    for manifest in platform_rbac_manifests():
+    for manifest in platform_rbac_manifests(cluster_rbac=cluster_rbac):
         kind = manifest.get("kind", "")
         name = manifest.get("metadata", {}).get("name", "")
         ref = f"{kind}/{name}"
@@ -854,6 +857,7 @@ def run_bring_into_management(
     backend: ManagementBackend,
     cluster: ClusterContext,
     run_preflight: bool = True,
+    cluster_rbac: bool = True,
 ) -> ManagementReport:
     """Canonical orchestrator. Subclasses with cloud-specific auth
     quirks construct a backend whose ``apply_manifest`` / probe calls
@@ -869,7 +873,7 @@ def run_bring_into_management(
     failure reason in ``error``; capability data collected before the
     failure still ships back so the UI can show what was learned.
     """
-    rbac = _apply_platform_rbac(backend=backend, cluster=cluster)
+    rbac = _apply_platform_rbac(backend=backend, cluster=cluster, cluster_rbac=cluster_rbac)
     messages: list[str] = list(rbac.messages)
     if not rbac.success:
         return ManagementReport(

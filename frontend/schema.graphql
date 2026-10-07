@@ -9236,7 +9236,7 @@ type Query {
   astroliftServerInfo: AstroliftServerInfo!
 
   """
-  What the install withholds from Astrolift (calliope-installer#447): dns, databases, load_balancers, clusters, each with the reason to show. Empty when nothing is withheld.
+  What the install withholds from Astrolift (calliope-installer#447): dns, databases, load_balancers, clusters, controllers, each with the reason to show. Empty when nothing is withheld.
   """
   astroliftWithheldCapabilities: [AstroliftWithheldCapability!]!
 

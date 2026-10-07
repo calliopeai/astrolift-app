@@ -11,8 +11,16 @@ import {
   WITHHELD_CAPABILITIES,
 } from "@/graphql/install/install-policy.queries";
 
-/** One of the four the installer may withhold (calliope-installer#447). */
-export type WithheldCapability = "dns" | "databases" | "load_balancers" | "clusters";
+/**
+ * What the installer may withhold (calliope-installer#447). `controllers`
+ * holds the control plane to the minimal Kubernetes RBAC contract.
+ */
+export type WithheldCapability =
+  | "dns"
+  | "databases"
+  | "load_balancers"
+  | "clusters"
+  | "controllers";
 
 /**
  * Why each withheld capability is refused, keyed by capability. Empty while

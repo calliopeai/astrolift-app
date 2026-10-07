@@ -716,6 +716,15 @@ def _install_cluster_prereqs_sync(
     cluster = TenantCluster.objects.select_related(
         "provider_plugin",
     ).get(pk=cluster_id)
+    # Every recipe component is cluster-scoped work (Flux and its CRDs,
+    # HelmReleases that helm-controller applies as cluster admin, storage
+    # classes). Under the minimal RBAC contract none of it is the control
+    # plane's, so the run refuses before it touches the cluster, and removes
+    # nothing a previous run installed (calliope-installer#447).
+    from core.install_restrictions import WithheldCapabilityError, cluster_scope_refusal
+
+    if refusal := cluster_scope_refusal(cluster):
+        raise WithheldCapabilityError(refusal)
     if "envoy-gateway" in selected_keys:
         from astrolift_clusters.edge_install import edge_support_refusal
 

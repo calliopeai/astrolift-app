@@ -70,7 +70,9 @@ def edge_install_wanted(cluster: Any) -> bool:
 
     if (cluster.ingress_class or "") != EDGE_INGRESS_CLASS:
         return False
-    refusal = edge_support_refusal(cluster)
+    from core.install_restrictions import cluster_scope_refusal
+
+    refusal = edge_support_refusal(cluster) or cluster_scope_refusal(cluster)
     if refusal:
         logger.error("edge install refused for cluster %s: %s", cluster.slug, refusal)
         return False

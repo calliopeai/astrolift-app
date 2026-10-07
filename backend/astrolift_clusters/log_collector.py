@@ -113,6 +113,11 @@ def _support(cluster, plugin, retention_days):
         )
     if cluster.auth_method != TenantCluster.AuthMethod.EXEC_PLUGIN:
         raise CollectorError("TRANSPORT_UNSUPPORTED", "Registered EKS exec-plugin authentication is required")
+    from core.install_restrictions import cluster_scope_refusal
+
+    # A ClusterRole and a node DaemonSet: beyond the minimal RBAC contract.
+    if refusal := cluster_scope_refusal(cluster):
+        raise CollectorError("WITHHELD", refusal)
     try:
         credential = credential_for_cluster(cluster)
         if credential.cloud != "aws" or credential.mode.value not in {"ambient", "aws_assume_role"}:

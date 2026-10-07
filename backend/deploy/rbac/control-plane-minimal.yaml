@@ -1,0 +1,218 @@
+# The minimal Kubernetes RBAC the Astrolift control plane runs with on a
+# tenant cluster when the install withholds cluster-wide changes
+# (ASTROLIFT_WITHHELD_CAPABILITIES contains "controllers";
+# calliope-installer#447).
+#
+# How the installer uses it: apply this file to the cluster, give the control
+# plane's EKS access entry kubernetes_groups = ["astrolift:control-plane"] and
+# no access policy (in place of AmazonEKSClusterAdminPolicy), and add
+# "controllers" to ASTROLIFT_WITHHELD_CAPABILITIES. With that variable set, the
+# control plane refuses, with the reason, every call this file does not grant,
+# before it reaches the apiserver.
+#
+# What it leaves out on purpose, and what refuses instead:
+#   - CustomResourceDefinitions, ClusterRoles, ClusterRoleBindings,
+#     StorageClasses, VolumeSnapshotClasses, GatewayClasses, webhooks: the
+#     bootstrap recipe (Flux, its HelmReleases, Knative, the Envoy edge, CSI
+#     classes) is refused as a whole. Those controllers are the cluster
+#     owner's.
+#   - Flux HelmRelease and HelmRepository: helm-controller applies a release
+#     with its own cluster-admin account, so writing one is cluster admin by
+#     another name.
+#   - PersistentVolumes: a static PV can name any volume, hostPath included.
+#     CSI filesystem bindings are refused; dynamic claims still work.
+#   - DaemonSets: the CloudWatch log collector and the keep-alive agent are
+#     refused (both also need a ClusterRole).
+#
+# Scope: the namespaced grants are bound cluster-wide because the control
+# plane creates its namespaces at run time (one per project and environment,
+# astrolift-agents-<org> for agent runs), and a RoleBinding cannot be written
+# ahead of a namespace that does not exist yet. RBAC cannot narrow a grant to
+# "namespaces Astrolift created".
+#
+# backend/core/tests/test_control_plane_rbac_contract.py fails when backend
+# code starts using a resource or verb this file does not grant. Change both
+# together.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: astrolift-control-plane-cluster
+  labels:
+    astrolift.io/rbac-contract: control-plane-minimal
+rules:
+  # Projects, environments and agent runs each get a namespace.
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, list, watch, create, update, patch, delete]
+  # Capability probe: architectures, GPUs, storage, installed operators,
+  # the gVisor RuntimeClass agent runs need.
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get, list, watch]
+  - apiGroups: [storage.k8s.io]
+    resources: [storageclasses, csidrivers]
+    verbs: [get, list, watch]
+  - apiGroups: [snapshot.storage.k8s.io]
+    resources: [volumesnapshotclasses]
+    verbs: [get, list, watch]
+  - apiGroups: [apiextensions.k8s.io]
+    resources: [customresourcedefinitions]
+    verbs: [get, list, watch]
+  - apiGroups: [node.k8s.io]
+    resources: [runtimeclasses]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: astrolift-control-plane-namespaced
+  labels:
+    astrolift.io/rbac-contract: control-plane-minimal
+rules:
+  # Workloads: app deploys, agent runs, builds, pipeline jobs, managed
+  # services that run in the cluster.
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+  # The console terminal, the agent VNC viewer and in-pod checks.
+  - apiGroups: [""]
+    resources: [pods/exec, pods/portforward]
+    verbs: [get, create]
+  - apiGroups: [""]
+    resources: [services, configmaps, secrets, serviceaccounts, persistentvolumeclaims, resourcequotas]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [""]
+    resources: [events]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  # Reads only: rollout ownership checks and workload metrics. DaemonSets are
+  # the cluster owner's; the control plane never writes one.
+  - apiGroups: [apps]
+    resources: [replicasets, daemonsets]
+    verbs: [get, list, watch]
+  - apiGroups: [batch]
+    resources: [jobs, cronjobs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [batch]
+    resources: [jobs/status]
+    verbs: [get]
+  - apiGroups: [autoscaling]
+    resources: [horizontalpodautoscalers]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses, networkpolicies]
+    verbs: [get, list, watch, create, update, patch, delete]
+  # Namespaced roles the managed services render (Argo workflows, the vLLM
+  # test-prompt grant). The apiserver's escalation check still refuses a
+  # Role that grants more than this file does.
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [roles, rolebindings]
+    verbs: [get, list, watch, create, update, patch, delete]
+  # App routing on whichever edge the cluster owner runs.
+  - apiGroups: [gateway.networking.k8s.io]
+    resources: [gateways, httproutes, referencegrants]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [gateway.envoyproxy.io]
+    resources: [securitypolicies, httproutefilters, backendtrafficpolicies]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [networking.istio.io]
+    resources: [gateways, virtualservices]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [cert-manager.io]
+    resources: [certificates]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [externaldns.k8s.io]
+    resources: [dnsendpoints]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [external-secrets.io]
+    resources: [externalsecrets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [monitoring.coreos.com]
+    resources: [podmonitors, servicemonitors, prometheusrules]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [monitoring.coreos.com]
+    resources: [prometheuses]
+    verbs: [get, list, watch]
+  - apiGroups: [snapshot.storage.k8s.io]
+    resources: [volumesnapshots]
+    verbs: [get, list, watch, create, update, patch, delete]
+  # In-cluster managed services. Each needs its operator, which the cluster
+  # owner installs; the control plane only writes the operator's resources.
+  - apiGroups: [serving.knative.dev]
+    resources: [services]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [eventing.knative.dev]
+    resources: [brokers, triggers]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [serving.kserve.io]
+    resources: [inferenceservices]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [postgresql.cnpg.io]
+    resources: [clusters, databases]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [k8s.mariadb.com]
+    resources: [mariadbs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [pxc.percona.com]
+    resources: [perconaxtradbclusters]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [psmdb.percona.com]
+    resources: [perconaservermongodbs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [redis.redis.opstreelabs.in]
+    resources: [redis, redisreplications]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [rabbitmq.com]
+    resources: [rabbitmqclusters]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [kafka.strimzi.io]
+    resources: [kafkas, kafkanodepools, kafkausers]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [opensearch.opster.io, opensearch.org]
+    resources: [opensearchclusters, opensearchroles, opensearchusers, opensearchuserrolebindings]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [seaweed.seaweedfs.com]
+    resources: [seaweeds, buckets, s3identities, s3credentials, s3policies, s3policybindings]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [argoproj.io]
+    resources: [workflowtemplates]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [temporal.io]
+    resources: [temporalclusters, temporalnamespaces, temporalclusterclients]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: astrolift-control-plane-cluster
+  labels:
+    astrolift.io/rbac-contract: control-plane-minimal
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: astrolift-control-plane-cluster
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: astrolift:control-plane
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: astrolift-control-plane-namespaced
+  labels:
+    astrolift.io/rbac-contract: control-plane-minimal
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: astrolift-control-plane-namespaced
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: astrolift:control-plane
