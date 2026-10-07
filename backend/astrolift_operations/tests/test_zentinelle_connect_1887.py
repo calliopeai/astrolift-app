@@ -100,6 +100,8 @@ class FakeZentinelle:
             return FakeResponse(201, {"install": install, "credential": self.install_credential})
         if self.revoked or headers.get("Authorization") != f"Bearer {self.install_credential}":
             return FakeResponse(401, {"detail": "Invalid Astrolift install credential"})
+        if (method, path) == ("GET", f"{API}/install"):
+            return FakeResponse(200, {"install": {"id": "inst-1", "status": "connected"}})
         if (method, path) == ("DELETE", f"{API}/install"):
             self.revoked = True
             return FakeResponse(200, {"install": {"id": "inst-1", "status": "revoked"}})
