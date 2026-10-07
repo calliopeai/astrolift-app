@@ -1,7 +1,9 @@
 import { NextIntlClientProvider } from "next-intl";
 import en from "@/messages/en.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import {
+  DNS_WITHHELD,
   DOMAIN_DIAGNOSTICS,
   DOMAIN_LONG,
   DOMAIN_UNPROVISIONED,
@@ -41,6 +43,29 @@ export const Unprovisioned: Story = {
 };
 export const LongStrings: Story = {
   args: { ...MANAGED_DOMAIN, domain: DOMAIN_LONG, diagnostics: null },
+};
+/**
+ * calliope-installer#447: DNS withheld on a route53 zone pending verification.
+ * Verify and Revalidate write its certificate records, so both are disabled
+ * with the reason; Delete, which retires the row, stays.
+ */
+export const DnsWithheld: Story = {
+  args: {
+    ...MANAGED_DOMAIN,
+    domain: { ...MANAGED_DOMAIN.domain!, verificationState: "pending" },
+    canVerify: true,
+    dnsRestriction: DNS_WITHHELD,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText(/DNS is withheld/)).toBeVisible();
+    for (const name of ["Verify TXT ownership", "Revalidate recorded DNS setup"]) {
+      const button = canvas.getByRole("button", { name });
+      await expect(button).toBeDisabled();
+      await expect(button).toHaveAttribute("aria-describedby");
+    }
+    await expect(canvas.getByRole("button", { name: "Remove domain" })).toBeEnabled();
+  },
 };
 export const Records: Story = { args: { ...MANAGED_DOMAIN, initialTab: "records" } };
 export const Routing: Story = { args: { ...MANAGED_DOMAIN, initialTab: "routing" } };

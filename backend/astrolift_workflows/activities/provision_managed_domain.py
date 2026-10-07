@@ -46,6 +46,8 @@ from typing import Any
 
 from temporalio import activity
 
+from core.install_restrictions import WithheldCapabilityError
+
 log = logging.getLogger("astrolift_workflows.activities.provision_managed_domain")
 
 
@@ -192,6 +194,10 @@ def _request_wildcard_cert_sync(cluster_id: int, zone: str, zone_id: str) -> str
                 value=record["value"],
                 ttl=300,
             )
+        except WithheldCapabilityError:
+            # The install withholds DNS: refuse with the reason rather than
+            # leave a certificate that can never validate (installer #447).
+            raise
         except Exception as exc:  # noqa: BLE001
             log.warning(
                 "request_wildcard_cert_for_zone: failed to write validation record %s: %s",
@@ -511,6 +517,8 @@ def _reissue_cert_sync(
                     value=record["value"],
                     ttl=300,
                 )
+            except WithheldCapabilityError:
+                raise
             except Exception as exc:  # noqa: BLE001
                 log.warning(
                     "reissue_cert: failed to write validation record %s: %s",

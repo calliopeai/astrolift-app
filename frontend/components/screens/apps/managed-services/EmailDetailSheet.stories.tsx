@@ -27,6 +27,7 @@ import {
   TemplatesPanelView,
   TemplateStatsView,
 } from "./EmailDetailSheet";
+import { DNS_WITHHELD } from "../../domains/domains-environments.fixtures";
 
 const meta: Meta = {
   title: "Screens/Apps/ManagedServices/EmailDetailSheet",
@@ -55,6 +56,28 @@ export const Full: Story = {
 /** Identity, DNS auth and sender settings: the second section. */
 export const IdentityAndSending: Story = {
   render: () => <EmailDetailSheetView {...EMAIL_SHEET} panels={panels} defaultSection="sending" />,
+};
+
+/**
+ * calliope-installer#447: DNS withheld, so the SES verification records were
+ * not published and the domain identity says why it is pending.
+ */
+export const IdentityPendingDnsWithheld: Story = {
+  render: () => (
+    <EmailDetailSheetView
+      {...EMAIL_SHEET}
+      detail={{
+        ...EMAIL_DETAIL,
+        identityVerification: { ...EMAIL_DETAIL.identityVerification!, status: "Pending" },
+      }}
+      defaultSection="sending"
+      dnsRestriction={DNS_WITHHELD}
+    />
+  ),
+  play: async () => {
+    const sheet = within(document.body);
+    await expect(sheet.getByText(/Astrolift did not publish these records/)).toBeVisible();
+  },
 };
 
 /** Each list has a section of its own, so one shows at a time. */

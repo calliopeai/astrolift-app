@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, within } from "storybook/test";
 
 import { selectRows } from "@/components/list/select-rows";
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
@@ -7,6 +8,7 @@ import {
   DOMAIN_ACTIVE,
   DOMAIN_LONG,
   DOMAIN_PROVISIONING,
+  DNS_WITHHELD,
   DOMAIN_UNPROVISIONED,
   MANAGED_DOMAINS,
   type ManagedDomainsFixture,
@@ -91,4 +93,18 @@ export const Width768: Story = {
       <Screen {...MANAGED_DOMAINS} domains={[DOMAIN_LONG, DOMAIN_ACTIVE]} />
     </div>
   ),
+};
+
+/** calliope-installer#447: DNS withheld, so a route53 zone (the default driver) cannot be added. */
+export const AddZoneDnsWithheld: Story = {
+  render: () => <Screen {...MANAGED_DOMAINS} dnsRestriction={DNS_WITHHELD} />,
+  play: async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole("button", { name: "Add zone" }));
+    const sheet = within(document.body);
+    await expect(sheet.getByText(/DNS is withheld/)).toBeVisible();
+    await userEvent.type(sheet.getByLabelText(/^Zone \(fully qualified/), "apps.acme.example");
+    const submit = sheet.getAllByRole("button", { name: "Add zone" }).at(-1)!;
+    await expect(submit).toBeDisabled();
+    await expect(submit).toHaveAttribute("aria-describedby", "md-withheld");
+  },
 };

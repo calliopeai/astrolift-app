@@ -33,7 +33,14 @@ import { useFormatters } from "@/lib/i18n/formatters";
 
 import type { ManagedDomainsState } from "./use-managed-domains";
 
-export type ManagedDomainsScreenProps = ManagedDomainsState;
+export type ManagedDomainsScreenProps = ManagedDomainsState & {
+  /**
+   * Why Astrolift writes no DNS on this install (DNS withheld,
+   * calliope-installer#447): a route53 zone, which the platform writes
+   * itself, cannot be added.
+   */
+  dnsRestriction?: string | null;
+};
 
 const defaultForBadge: Record<string, string> = {
   tenant_apps: "bg-info/15 text-info-fg",
@@ -70,6 +77,7 @@ export function ManagedDomainsScreen({
   canCreate,
   onCreate,
   onCopyNameservers,
+  dnsRestriction,
 }: ManagedDomainsScreenProps) {
   const t = useTranslations("managedDomains");
   const connectionText = useTranslations("domainConnections");
@@ -79,6 +87,7 @@ export function ManagedDomainsScreen({
   const [dnsDriver, setDnsDriver] = React.useState("route53");
   const [defaultFor, setDefaultFor] = React.useState("none");
   const [wildcard, setWildcard] = React.useState(false);
+  const withheld = Boolean(dnsRestriction && dnsDriver === "route53");
 
   function changeCreateOpen(next: boolean) {
     if (!next) {
@@ -255,6 +264,11 @@ export function ManagedDomainsScreen({
                     <SelectItem value="external_dns">external_dns</SelectItem>
                   </SelectContent>
                 </Select>
+                {withheld && (
+                  <p id="md-withheld" className="text-warning-fg text-xs">
+                    {dnsRestriction}
+                  </p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="default-for">{t("defaultFor")}</Label>
@@ -283,7 +297,11 @@ export function ManagedDomainsScreen({
               <Button type="button" variant="outline" onClick={() => changeCreateOpen(false)}>
                 {t("cancel")}
               </Button>
-              <Button type="submit" disabled={creating || !zone}>
+              <Button
+                type="submit"
+                disabled={creating || !zone || withheld}
+                aria-describedby={withheld ? "md-withheld" : undefined}
+              >
                 {creating ? t("adding") : t("add")}
               </Button>
             </SheetFooter>

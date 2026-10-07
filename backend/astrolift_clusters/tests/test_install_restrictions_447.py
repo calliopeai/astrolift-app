@@ -17,8 +17,8 @@ from astrolift_clusters.schema.mutations import (
 from astrolift_clusters.schema.types import bootstrap_plan_to_type
 from astrolift_graphql import GUID
 from astrolift_identity.models import Member
-from core.cluster_management import ClusterManagementError, teardown_cluster_dispatch
-from core.install_restrictions import ENV_VAR
+from core.cluster_management import teardown_cluster_dispatch
+from core.install_restrictions import ENV_VAR, WithheldCapabilityError
 from core.permissions import Permission
 from core.tenancy import TenantContext, tenant_context
 from core.tests.utils.scope_world import ScopeWorld, bind_role, make_cluster, make_info, make_user
@@ -105,9 +105,25 @@ def test_teardown_refuses_before_building_a_driver(world, monkeypatch):
     monkeypatch.setenv(ENV_VAR, "clusters")
     built = []
     monkeypatch.setattr("core.cluster_management._driver_for_cluster", lambda c: built.append(c))
-    with pytest.raises(ClusterManagementError, match="Cluster lifecycle is withheld"):
+    with pytest.raises(WithheldCapabilityError, match="Cluster lifecycle is withheld"):
         teardown_cluster_dispatch(cluster=world.cluster, delete_cloud_infra=True)
     assert built == []
+
+
+def test_teardown_activity_refuses_without_retrying(world, monkeypatch):
+    """The activity used to wrap the refusal in a RuntimeError, which
+    Temporal retried against a Deny that answers the same every time."""
+    from astrolift_workflows.activities.cluster_management import _teardown_cluster_infra_sync
+
+    monkeypatch.setenv(ENV_VAR, "clusters")
+    monkeypatch.setattr(
+        "astrolift_workflows.activities.cluster_management._ensure_cluster_drained_sync", lambda _pk: None
+    )
+    world.cluster.lifecycle = "decommissioning"
+    world.cluster.save()
+    with pytest.raises(WithheldCapabilityError, match="Cluster lifecycle is withheld") as caught:
+        _teardown_cluster_infra_sync(world.cluster.pk, True)
+    assert caught.value.non_retryable
 
 
 @pytest.mark.parametrize(

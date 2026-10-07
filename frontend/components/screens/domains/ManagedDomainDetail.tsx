@@ -18,8 +18,19 @@ import { useFormatters } from "@/lib/i18n/formatters";
 import { domainDiagnosticReasonKey } from "./domain-diagnostic-reasons";
 import type { ManagedDomainState } from "./use-managed-domain";
 
-export type ManagedDomainDetailProps = ManagedDomainState & { id: string; initialTab?: Tab };
+export type ManagedDomainDetailProps = ManagedDomainState & {
+  id: string;
+  initialTab?: Tab;
+  /**
+   * Why Astrolift writes no DNS on this install (DNS withheld,
+   * calliope-installer#447). Verify and Revalidate write a Route53 zone's
+   * certificate records, so they are disabled for one.
+   */
+  dnsRestriction?: string | null;
+};
 type Tab = "overview" | "records" | "routing" | "diagnostics";
+// Drivers whose records the control plane writes into Route53 itself.
+const ROUTE53_DRIVERS = new Set(["route53", "aws"]);
 const recordTypes = [
   "A",
   "AAAA",
@@ -88,6 +99,9 @@ function DetailTabs({
     props.verifying ||
     props.deleting ||
     props.removed;
+  const dnsWithheld =
+    props.dnsRestriction && ROUTE53_DRIVERS.has(d.dnsDriver) ? props.dnsRestriction : null;
+  const withheldId = `${tabId}-withheld`;
   const checkName = (key: string) =>
     ({
       delegation: t("publicDelegation"),
@@ -229,7 +243,8 @@ function DetailTabs({
         {d.verificationState === "pending" && (
           <Button
             variant="outline"
-            disabled={busy || !props.canVerify}
+            disabled={busy || !props.canVerify || Boolean(dnsWithheld)}
+            aria-describedby={dnsWithheld ? withheldId : undefined}
             onClick={() => void props.onVerify()}
           >
             {connectionText("verify")}
@@ -237,7 +252,13 @@ function DetailTabs({
         )}
         <Button
           variant="outline"
-          disabled={busy || !observation?.actions.canRevalidate || !observation.provisionClusterId}
+          disabled={
+            busy ||
+            !observation?.actions.canRevalidate ||
+            !observation.provisionClusterId ||
+            Boolean(dnsWithheld)
+          }
+          aria-describedby={dnsWithheld ? withheldId : undefined}
           onClick={() => void props.onRevalidate()}
         >
           {t("revalidate")}
@@ -250,6 +271,11 @@ function DetailTabs({
           {t("delete")}
         </Button>
       </div>
+      {dnsWithheld && (
+        <p id={withheldId} className="text-warning-fg text-sm">
+          {dnsWithheld}
+        </p>
+      )}
       {props.actionMessage && <p role="status">{props.actionMessage}</p>}
       {props.actionError && <p role="alert">{props.actionError}</p>}
       <ConfirmDialog
