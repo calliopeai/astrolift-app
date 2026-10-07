@@ -179,23 +179,54 @@ def test_a_cluster_off_aws_is_not_withheld(world, monkeypatch):
     assert bootstrap_plan_to_type(world.cluster, components).components[0].withheld_reason is None
 
 
-def test_a_route53_managed_domain_is_refused_when_dns_is_withheld(permission_resolver, monkeypatch):
-    import uuid
+def _create_zone(w, zone, driver):
     from types import SimpleNamespace
 
-    from astrolift_clusters.models import ManagedDomain
     from astrolift_clusters.schema.mutations import CreateManagedDomainInput
-    from astrolift_identity.models import Organization
 
-    monkeypatch.setattr("core.documents.ProfileDocument.index_profile", classmethod(lambda *_: None))
-    permission_resolver.grant(Permission.PROVIDER_PLUGIN_CONFIGURE)
-    monkeypatch.setenv(ENV_VAR, "dns")
-    org = Organization.objects.create(name="D447", slug=f"d447-{uuid.uuid4().hex[:6]}")
-    with tenant_context(TenantContext(organization_id=org.id)):
-        result = ClustersMutation().create_managed_domain(
+    with tenant_context(TenantContext(organization_id=w.org.pk)):
+        return ClustersMutation().create_managed_domain(
             SimpleNamespace(context=SimpleNamespace(user=None, request=None)),
-            CreateManagedDomainInput(zone="apps.d447.example", dns_driver="route53"),
+            CreateManagedDomainInput(zone=zone, dns_driver=driver),
         )
+
+
+@pytest.mark.parametrize("driver", ["route53", "external_dns", "cloud_dns"])
+def test_a_zone_the_platform_would_create_is_refused_when_dns_is_withheld(
+    world, permission_resolver, monkeypatch, driver
+):
+    """The provisioning workflow writes through the DNS cluster's Route53
+    driver whatever the row's dns_driver says, so no driver gets through."""
+    from astrolift_clusters.models import ManagedDomain
+
+    permission_resolver.grant(Permission.PROVIDER_PLUGIN_CONFIGURE)
+    monkeypatch.setattr(mutations, "_zone_exists_in_provider", lambda *_: False)
+    monkeypatch.setenv(ENV_VAR, "dns")
+    result = _create_zone(world, "apps.d447.example", driver)
     assert not result.ok and result.errors[0].code == "PRECONDITION"
     assert "DNS is withheld" in result.errors[0].message
     assert not ManagedDomain.objects.filter(zone="apps.d447.example").exists()
+    assert world.queued == []
+
+
+def test_an_existing_zone_registers_pending_verification_when_dns_is_withheld(
+    world, permission_resolver, monkeypatch
+):
+    """A zone already in the account needs no hosted-zone write: it is stored
+    pending verification, and its certificate records go to the operator."""
+    from astrolift_clusters.models import ManagedDomain
+
+    permission_resolver.grant(Permission.PROVIDER_PLUGIN_CONFIGURE)
+    monkeypatch.setattr(mutations, "_zone_exists_in_provider", lambda *_: True)
+    monkeypatch.setenv(ENV_VAR, "dns")
+    assert _create_zone(world, "owned.d447.example", "route53").ok
+    row = ManagedDomain.objects.get(zone="owned.d447.example")
+    assert row.verification_state == ManagedDomain.VerificationState.PENDING
+    assert world.queued == []
+
+
+def test_unset_a_new_zone_is_provisioned_as_before(world, permission_resolver, monkeypatch):
+    permission_resolver.grant(Permission.PROVIDER_PLUGIN_CONFIGURE)
+    monkeypatch.setattr(mutations, "_zone_exists_in_provider", lambda *_: False)
+    assert _create_zone(world, "new.d447.example", "external_dns").ok
+    assert [args[0] for args, _ in world.queued] == ["ProvisionManagedDomainWorkflow"]

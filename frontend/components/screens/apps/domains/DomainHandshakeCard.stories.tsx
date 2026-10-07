@@ -60,8 +60,10 @@ export const WildcardIssuing: Story = {
 /**
  * calliope-installer#447: DNS withheld on a platform-managed zone. The records
  * are not written for the operator, so the card gives the reason instead of
- * "no operator action needed". Recheck, a probe, stays.
+ * "no operator action needed". Recheck, a probe, stays. PlatformZoneDnsUnset
+ * is the same domain without the restriction.
  */
+const platformHelp = /No operator action needed/;
 export const PlatformZoneDnsWithheld: Story = {
   render: () => (
     <DomainHandshakeCard
@@ -73,7 +75,17 @@ export const PlatformZoneDnsWithheld: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(canvas.getByText(/DNS is withheld/)).toBeVisible();
-    await expect(canvas.queryByText(/No operator action needed/)).toBeNull();
+    await expect(canvas.queryByText(platformHelp)).toBeNull();
+  },
+};
+export const PlatformZoneDnsUnset: Story = {
+  render: () => (
+    <DomainHandshakeCard {...HANDSHAKE_CARD} domain={DOMAIN_WILDCARD} dnsRestriction={null} />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText(platformHelp)).toBeVisible();
+    await expect(canvas.queryByText(/DNS is withheld/)).toBeNull();
   },
 };
 

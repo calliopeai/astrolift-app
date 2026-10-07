@@ -45,27 +45,30 @@ export const LongStrings: Story = {
   args: { ...MANAGED_DOMAIN, domain: DOMAIN_LONG, diagnostics: null },
 };
 /**
- * calliope-installer#447: DNS withheld on a route53 zone pending verification.
- * Verify and Revalidate write its certificate records, so both are disabled
- * with the reason; Delete, which retires the row, stays.
+ * calliope-installer#447: DNS withheld on a zone pending verification. Verify
+ * and Revalidate still run (the certificate is requested and its validation
+ * records are left for the operator), so they stay enabled and the page says
+ * why the records are not written. DnsUnset is the same zone without the
+ * restriction: no note.
  */
-export const DnsWithheld: Story = {
-  args: {
-    ...MANAGED_DOMAIN,
-    domain: { ...MANAGED_DOMAIN.domain!, verificationState: "pending" },
-    canVerify: true,
-    dnsRestriction: DNS_WITHHELD,
-  },
-  play: async ({ canvasElement }) => {
+const pendingZone = { ...MANAGED_DOMAIN.domain!, verificationState: "pending" as const };
+const dnsActionsPlay =
+  (withheld: boolean): Story["play"] =>
+  async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByText(/DNS is withheld/)).toBeVisible();
-    for (const name of ["Verify TXT ownership", "Revalidate recorded DNS setup"]) {
-      const button = canvas.getByRole("button", { name });
-      await expect(button).toBeDisabled();
-      await expect(button).toHaveAttribute("aria-describedby");
+    if (withheld) await expect(canvas.getByText(/DNS is withheld/)).toBeVisible();
+    else await expect(canvas.queryByText(/DNS is withheld/)).toBeNull();
+    for (const name of ["Verify TXT ownership", "Revalidate recorded DNS setup", "Remove domain"]) {
+      await expect(canvas.getByRole("button", { name })).toBeEnabled();
     }
-    await expect(canvas.getByRole("button", { name: "Remove domain" })).toBeEnabled();
-  },
+  };
+export const DnsWithheld: Story = {
+  args: { ...MANAGED_DOMAIN, domain: pendingZone, canVerify: true, dnsRestriction: DNS_WITHHELD },
+  play: dnsActionsPlay(true),
+};
+export const DnsUnset: Story = {
+  args: { ...MANAGED_DOMAIN, domain: pendingZone, canVerify: true, dnsRestriction: null },
+  play: dnsActionsPlay(false),
 };
 export const Records: Story = { args: { ...MANAGED_DOMAIN, initialTab: "records" } };
 export const Routing: Story = { args: { ...MANAGED_DOMAIN, initialTab: "routing" } };

@@ -229,8 +229,9 @@ export interface EmailDetailSheetViewProps {
   defaultSection?: EmailDetailSection;
   /**
    * Why Astrolift writes no DNS on this install (DNS withheld,
-   * calliope-installer#447): the SES verification records are not
-   * published for the operator, which is why a domain identity stays pending.
+   * calliope-installer#447). A pending domain identity's records are the
+   * operator's to publish. The note states that, not a cause: the driver only
+   * ever publishes inside base_domain, which this view does not know.
    */
   dnsRestriction?: string | null;
 }
@@ -594,7 +595,8 @@ function IdentityPanel({
       </p>
       {iv.isDomain && !verified && !failed && dnsRestriction ? (
         <p className="text-warning-fg mb-3 text-xs">
-          Pending because Astrolift did not publish these records. {dnsRestriction}
+          Astrolift publishes no verification records on this install; publish them in the
+          identity&apos;s DNS zone. {dnsRestriction}
         </p>
       ) : null}
       {iv.verificationToken ? (

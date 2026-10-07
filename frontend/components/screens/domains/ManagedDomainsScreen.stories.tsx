@@ -95,16 +95,31 @@ export const Width768: Story = {
   ),
 };
 
-/** calliope-installer#447: DNS withheld, so a route53 zone (the default driver) cannot be added. */
-export const AddZoneDnsWithheld: Story = {
-  render: () => <Screen {...MANAGED_DOMAINS} dnsRestriction={DNS_WITHHELD} />,
-  play: async ({ canvasElement }) => {
+/**
+ * calliope-installer#447: DNS withheld. The note shows whichever driver is
+ * picked, because provisioning writes through the DNS cluster's driver; submit
+ * stays enabled for a zone that already exists. AddZoneDnsUnset opens the
+ * same sheet without the restriction: no note.
+ */
+const addZonePlay =
+  (withheld: boolean): Story["play"] =>
+  async ({ canvasElement }) => {
     await userEvent.click(within(canvasElement).getByRole("button", { name: "Add zone" }));
     const sheet = within(document.body);
-    await expect(sheet.getByText(/DNS is withheld/)).toBeVisible();
     await userEvent.type(sheet.getByLabelText(/^Zone \(fully qualified/), "apps.acme.example");
-    const submit = sheet.getAllByRole("button", { name: "Add zone" }).at(-1)!;
-    await expect(submit).toBeDisabled();
-    await expect(submit).toHaveAttribute("aria-describedby", "md-withheld");
-  },
+    for (const driver of ["route53", "external_dns"]) {
+      await userEvent.click(sheet.getByRole("combobox", { name: "DNS driver" }));
+      await userEvent.click(sheet.getByRole("option", { name: driver }));
+      if (withheld) await expect(sheet.getByText(/DNS is withheld/)).toBeVisible();
+      else await expect(sheet.queryByText(/DNS is withheld/)).toBeNull();
+      await expect(sheet.getAllByRole("button", { name: "Add zone" }).at(-1)!).toBeEnabled();
+    }
+  };
+export const AddZoneDnsWithheld: Story = {
+  render: () => <Screen {...MANAGED_DOMAINS} dnsRestriction={DNS_WITHHELD} />,
+  play: addZonePlay(true),
+};
+export const AddZoneDnsUnset: Story = {
+  render: () => <Screen {...MANAGED_DOMAINS} />,
+  play: addZonePlay(false),
 };

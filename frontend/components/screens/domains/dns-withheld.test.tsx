@@ -8,24 +8,25 @@ import * as email from "../apps/managed-services/EmailDetailSheet.stories";
 import * as detail from "./ManagedDomainDetail.stories";
 import * as list from "./ManagedDomainsScreen.stories";
 
-// calliope-installer#447: with DNS withheld every action that would write
-// DNS is disabled with the reason, and the plays assert it. Unset shows none.
+// calliope-installer#447: with DNS withheld each surface gives the reason.
+// Every unset story renders the same fixture and interaction as its withheld
+// pair with only dnsRestriction removed, and its play asserts the note absent.
 setProjectAnnotations(preview);
-const { AddZoneDnsWithheld, Full: ListFull } = composeStories(list);
-const { DnsWithheld, Full: DetailFull } = composeStories(detail);
-const { PlatformZoneDnsWithheld, Full: HandshakeFull } = composeStories(handshake);
-const { IdentityPendingDnsWithheld, IdentityAndSending } = composeStories(email);
+const { AddZoneDnsWithheld, AddZoneDnsUnset } = composeStories(list);
+const { DnsWithheld, DnsUnset } = composeStories(detail);
+const { PlatformZoneDnsWithheld, PlatformZoneDnsUnset } = composeStories(handshake);
+const { IdentityPendingDnsWithheld, IdentityPendingDnsUnset } = composeStories(email);
 
-describe("DNS-writing actions with DNS withheld", () => {
+describe("DNS withheld notes", () => {
   it.each([
     ["add zone, withheld", AddZoneDnsWithheld, true],
-    ["zones, unset", ListFull, false],
+    ["add zone, unset", AddZoneDnsUnset, false],
     ["zone detail, withheld", DnsWithheld, true],
-    ["zone detail, unset", DetailFull, false],
+    ["zone detail, unset", DnsUnset, false],
     ["platform zone domain, withheld", PlatformZoneDnsWithheld, true],
-    ["custom domain, unset", HandshakeFull, false],
+    ["platform zone domain, unset", PlatformZoneDnsUnset, false],
     ["SES identity, withheld", IdentityPendingDnsWithheld, true],
-    ["SES identity, unset", IdentityAndSending, false],
+    ["SES identity, unset", IdentityPendingDnsUnset, false],
   ] as const)("%s", async (_name, Story, shown) => {
     const canvasElement = document.createElement("div");
     document.body.append(canvasElement);
