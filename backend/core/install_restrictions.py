@@ -20,7 +20,12 @@ from __future__ import annotations
 
 import os
 
-from temporalio.exceptions import ApplicationError
+try:
+    from temporalio.exceptions import ApplicationError as _ErrorBase
+
+    _NON_RETRYABLE: dict = {"non_retryable": True}
+except ImportError:  # the providers test environment has no Temporal
+    _ErrorBase, _NON_RETRYABLE = Exception, {}
 
 ENV_VAR = "ASTROLIFT_WITHHELD_CAPABILITIES"
 
@@ -136,7 +141,7 @@ def cluster_delete_refusal(cluster) -> str:
     return reason("clusters") if _on_aws(cluster) else ""
 
 
-class WithheldCapabilityError(ApplicationError):
+class WithheldCapabilityError(_ErrorBase):
     """A call the install withholds, refused before it reaches AWS or the apiserver.
 
     Non-retryable: the restriction is fixed at install, so a Temporal retry
@@ -144,7 +149,7 @@ class WithheldCapabilityError(ApplicationError):
     """
 
     def __init__(self, message: str) -> None:
-        super().__init__(message, non_retryable=True)
+        super().__init__(message, **_NON_RETRYABLE)
 
 
 #: Route53Driver methods that change DNS: every one the WithheldDns Deny
