@@ -425,19 +425,40 @@ def edge_post_install_manifests(
             ]
         )
     if edge_configured(config):
-        for entry in access_rules or []:
-            for route in entry.get("custom_routes", []):
-                out.extend(
-                    custom_domain_security_policies(
-                        config,
-                        hostname=route["hostname"],
-                        name=route["name"],
-                        labels=route["labels"],
-                        access=entry,
-                    )
-                )
+        out.extend(_custom_route_policies(config, access_rules))
     out.extend(front or [])
     return out
+
+
+def _custom_route_policies(config: dict[str, Any], access_rules: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for entry in access_rules or []:
+        for route in entry.get("custom_routes", []):
+            out.extend(
+                custom_domain_security_policies(
+                    config,
+                    hostname=route["hostname"],
+                    name=route["name"],
+                    labels=route["labels"],
+                    access=entry,
+                )
+            )
+    return out
+
+
+def edge_access_manifests(
+    oidc_auth_config: dict[str, Any] | None, access_rules: list[dict[str, Any]] | None
+) -> list[dict[str, Any]]:
+    """The policies that carry per-app access (#2132), and nothing else.
+
+    The shared SecurityPolicy and each custom domain's own, all in the edge
+    namespace. Where the recipe run is refused (the minimal RBAC contract,
+    calliope-installer#447), the control plane re-applies these on their own.
+    """
+    config = oidc_auth_config or {}
+    if not edge_configured(config):
+        return []
+    return [edge_security_policy(config, access_rules), *_custom_route_policies(config, access_rules)]
 
 
 def alb_front(oidc_auth_config: dict[str, Any] | None, *, namespace: str) -> list[dict[str, Any]]:

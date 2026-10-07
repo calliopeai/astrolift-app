@@ -24,6 +24,7 @@ tests pin behaviour at the verb level instead of mocking
 from __future__ import annotations
 
 import logging
+import os
 import random
 import re
 import string
@@ -53,6 +54,9 @@ manages with one ``kubectl get all -n astrolift-system``."""
 PLATFORM_SA = "astrolift-control-plane"
 PLATFORM_CLUSTER_ROLE = "astrolift-control-plane"
 PLATFORM_CLUSTER_ROLE_BINDING = "astrolift-control-plane"
+
+# Mirrors core.control_plane_rbac: the providers package does not import core.
+_EKS_ENDPOINT = re.compile(r"\.eks\.amazonaws\.com(\.cn)?(:\d+)?/?$", re.IGNORECASE)
 
 PREFLIGHT_TIMEOUT_SECONDS = 600
 """Cap on how long the workflow waits for the preflight Job. The
@@ -295,6 +299,21 @@ def _cluster_role_binding_manifest() -> dict[str, Any]:
             "name": PLATFORM_CLUSTER_ROLE,
         },
     }
+
+
+def cluster_rbac_withheld(endpoint: str | None = None) -> bool:
+    """Whether registration leaves out the platform ClusterRole (calliope-installer#447).
+
+    ``controllers`` in ``ASTROLIFT_WITHHELD_CAPABILITIES`` holds the control
+    plane to the minimal RBAC contract on EKS clusters, where the installer
+    binds it to deploy/rbac/control-plane-minimal.yaml instead of cluster
+    admin. ``endpoint`` is the apiserver URL; ``None`` means the caller is
+    the EKS driver.
+    """
+    raw = os.environ.get("ASTROLIFT_WITHHELD_CAPABILITIES") or ""
+    if "controllers" not in {part.strip() for part in raw.split(",")}:
+        return False
+    return endpoint is None or bool(_EKS_ENDPOINT.search(endpoint))
 
 
 def platform_rbac_manifests(*, cluster_rbac: bool = True) -> list[dict[str, Any]]:

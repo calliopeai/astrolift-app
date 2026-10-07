@@ -198,12 +198,174 @@ def test_registration_skips_the_platform_cluster_role_under_the_contract():
     assert backend.applied == ["Namespace", "ServiceAccount"]
 
 
-def test_the_eks_driver_reads_the_contract_from_the_install(monkeypatch):
-    from aws.cluster_eks import _cluster_scope_withheld
+EKS_ENDPOINT = "https://0123456789ABCDEF.gr7.us-east-1.eks.amazonaws.com"
+
+
+def test_registration_reads_the_contract_from_the_install(monkeypatch):
+    """The EKS driver (no endpoint passed) and a kubeconfig-registered EKS
+    cluster leave out the platform ClusterRole; any other cluster keeps it."""
+    from k8s_native.management import cluster_rbac_withheld
 
     monkeypatch.delenv(ir.ENV_VAR, raising=False)
-    assert not _cluster_scope_withheld()
+    assert not cluster_rbac_withheld()
     monkeypatch.setenv(ir.ENV_VAR, "dns,clusters")
-    assert not _cluster_scope_withheld()
+    assert not cluster_rbac_withheld()
     monkeypatch.setenv(ir.ENV_VAR, "clusters, controllers")
-    assert _cluster_scope_withheld()
+    assert cluster_rbac_withheld()
+    assert cluster_rbac_withheld(EKS_ENDPOINT)
+    assert not cluster_rbac_withheld("https://k8s.onprem.example:6443")
+
+
+def test_an_eks_cluster_registered_by_kubeconfig_is_held_to_the_contract(monkeypatch):
+    """The up-front refusals and the transport guard agree on which clusters
+    the contract holds on, so nothing is offered that fails partway."""
+    eks = SimpleNamespace(provider_plugin=SimpleNamespace(slug="k8s_native"), endpoint=EKS_ENDPOINT)
+    onprem = SimpleNamespace(
+        provider_plugin=SimpleNamespace(slug="k8s_native"), endpoint="https://k8s.onprem.example:6443"
+    )
+    monkeypatch.delenv(ir.ENV_VAR, raising=False)
+    assert ir.cluster_scope_refusal(eks) == ""
+    monkeypatch.setenv(ir.ENV_VAR, "controllers")
+    assert REASON in ir.cluster_scope_refusal(eks)
+    assert REASON in ir.controller_refusal("cert-manager", eks)
+    assert ir.cluster_scope_refusal(onprem) == ""
+
+
+# ---- CSI-mounted services ---------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("kind", "variant", "config"),
+    [
+        ("filesystem", "efs", {}),
+        ("filesystem", "fsx_lustre", {}),
+        ("filesystem", "fsx_openzfs", {}),
+        ("filesystem", "fsx_windows", {}),
+        ("filesystem", "nfs_csi", {}),
+        ("object_store", "s3", {"mount_path": "/data"}),
+    ],
+)
+def test_a_csi_mounted_service_is_refused_before_it_exists(monkeypatch, kind, variant, config):
+    from astrolift_workflows.activities.managed_service_lifecycle import (
+        ManagedServicePreflightError,
+        _assert_not_withheld,
+    )
+
+    svc = SimpleNamespace(kind=kind, variant=variant, config=config)
+    monkeypatch.delenv(ir.ENV_VAR, raising=False)
+    _assert_not_withheld(svc, AWS)
+    monkeypatch.setenv(ir.ENV_VAR, "controllers")
+    with pytest.raises(ManagedServicePreflightError, match=REASON):
+        _assert_not_withheld(svc, AWS)
+    gcp = SimpleNamespace(provider_plugin=SimpleNamespace(slug="gcp"), endpoint="")
+    _assert_not_withheld(svc, gcp)
+
+
+@pytest.mark.parametrize(
+    ("kind", "variant", "config"),
+    [
+        ("object_store", "s3", {}),
+        ("filesystem", "storage_class_pvc", {}),
+        ("filesystem", "rook_cephfs", {}),
+    ],
+)
+def test_services_without_a_static_volume_are_still_provisioned(monkeypatch, kind, variant, config):
+    from astrolift_workflows.activities.managed_service_lifecycle import _assert_not_withheld
+
+    monkeypatch.setenv(ir.ENV_VAR, "controllers")
+    _assert_not_withheld(SimpleNamespace(kind=kind, variant=variant, config=config), AWS)
+
+
+def test_the_catalog_offers_aws_filesystems_disabled_with_the_reason(monkeypatch):
+    from astrolift_services.managed_service_catalog import list_catalog
+
+    def efs():
+        rows = [
+            r
+            for r in list_catalog("aws", include_extended=True)
+            if (r.kind, r.variant) == ("filesystem", "efs")
+        ]
+        assert len(rows) == 1
+        return rows[0]
+
+    monkeypatch.delenv(ir.ENV_VAR, raising=False)
+    before = efs()
+    monkeypatch.setenv(ir.ENV_VAR, "controllers")
+    after = efs()
+    assert not after.available and REASON in after.unavailable_reason
+    assert before.available or REASON not in before.unavailable_reason
+
+
+# ---- per-app edge access ------------------------------------------------------------
+
+
+class _ApplyingDriver:
+    def __init__(self):
+        self.applied = []
+
+    def apply_manifests(self, slug, namespace, manifests):
+        self.applied.append((slug, namespace, [m["kind"] for m in manifests]))
+        return SimpleNamespace(ok=True, errors=[])
+
+
+OIDC = {
+    "discovery_url": "https://idp.example/.well-known/openid-configuration",
+    "client_id": "client",
+    "client_secret": "secret",
+    "auth_proxy_host": "auth.apps.example.com",
+}
+
+
+def test_edge_access_is_written_without_the_recipe_run(world, monkeypatch):  # noqa: F811
+    """The recipe run is refused under the contract, but the access policies
+    are granted, so a change to who may enter an app still reaches the edge."""
+    from core import edge_access
+    from providers.k8s_native.edge_gateway import EDGE_NAMESPACE
+
+    driver = _ApplyingDriver()
+    started = []
+    monkeypatch.setattr("core.cluster_management._driver_for_cluster", lambda c: driver)
+    monkeypatch.setattr("astrolift_workflows.client.start_workflow", lambda *a, **k: started.append(a))
+    world.cluster.oidc_auth_config = OIDC
+    world.cluster.edge_access_rules = {
+        "app/ns": {"name": "app-ns", "hosts": ["app.apps.example.com"], "groups": ["eng"], "users": []}
+    }
+    monkeypatch.setenv(ir.ENV_VAR, "controllers")
+    assert edge_access.reapply_edge(world.cluster)
+    assert started == []
+    assert driver.applied == [(world.cluster.slug, EDGE_NAMESPACE, ["SecurityPolicy"])]
+
+
+def test_edge_access_failure_is_reported(world, monkeypatch):  # noqa: F811
+    from core import edge_access
+
+    class _Refusing(_ApplyingDriver):
+        def apply_manifests(self, slug, namespace, manifests):
+            return SimpleNamespace(ok=False, errors=["forbidden"])
+
+    monkeypatch.setattr("core.cluster_management._driver_for_cluster", lambda c: _Refusing())
+    world.cluster.oidc_auth_config = OIDC
+    world.cluster.edge_access_rules = {}
+    monkeypatch.setenv(ir.ENV_VAR, "controllers")
+    assert not edge_access.reapply_edge(world.cluster)
+
+
+# ---- the periodic agent reconcile ---------------------------------------------------
+
+
+def test_the_agent_reconcile_leaves_a_contract_cluster_alone(world, monkeypatch):  # noqa: F811
+    from astrolift_workflows.activities.cron_deploy import _reconcile_agent_deployments_sync
+
+    calls = []
+    monkeypatch.setattr(
+        "core.cluster_management.deploy_agent_dispatch", lambda *, cluster: calls.append(cluster.slug)
+    )
+    world.cluster.agent_key_hash = "hash"
+    world.cluster.is_active = True
+    world.cluster.last_management_error = ""
+    world.cluster.save()
+    monkeypatch.setenv(ir.ENV_VAR, "controllers")
+    summary = _reconcile_agent_deployments_sync()
+    assert world.cluster.slug not in calls and summary.failed_count == 0
+    world.cluster.refresh_from_db()
+    assert world.cluster.last_management_error == ""

@@ -60,7 +60,16 @@ export function ClusterSettingsClient({ slug }: { slug: string }) {
 }
 
 function ClusterAgentCard({ cluster }: { cluster: ClusterWithHeartbeat }) {
-  return <ClusterAgentView {...useClusterAgent(cluster)} />;
+  // The keep-alive agent's ClusterRole is beyond the minimal RBAC contract the
+  // installer holds the control plane to on AWS (calliope-installer#447).
+  const onAws = cluster.providerPluginSlug === "aws";
+  const withheld = useWithheldCapabilities({ skip: !onAws });
+  return (
+    <ClusterAgentView
+      {...useClusterAgent(cluster)}
+      deployWithheldReason={onAws ? withheld.controllers : null}
+    />
+  );
 }
 
 function IngressAuthCard({ cluster }: { cluster: ClusterWithHeartbeat }) {

@@ -12,7 +12,9 @@ Two things here hold the code to it:
   sends to an EKS apiserver against the file, and refuses one it does not
   grant with the restriction reason before it leaves the process. The
   apiserver would answer 403; this way a workflow learns why, and Temporal
-  does not retry it.
+  does not retry it. It also labels every namespace the control plane
+  writes with :data:`SCOPE_LABEL`, which the file's admission policy
+  confines the control plane's writes to.
 * ``core/tests/test_control_plane_rbac_contract.py`` scans backend code for
   every resource it touches and fails when one is not granted here and is
   not on a path that refuses up front (:data:`BEYOND_MINIMAL`).
@@ -32,6 +34,11 @@ MANIFEST_PATH = Path(__file__).resolve().parent.parent / "deploy" / "rbac" / "co
 
 #: The group the installer maps the control plane's access entry to.
 GROUP = "astrolift:control-plane"
+
+#: The namespace label the file's admission policy confines the group's
+#: writes to. The guard adds it to every namespace the control plane writes,
+#: so the namespaces it creates are in scope and no other namespace is.
+SCOPE_LABEL = "astrolift.io/control-plane-scope"
 
 #: Resources the minimal contract leaves to the cluster's owner, keyed by
 #: kind, with the backend files allowed to render them. Each of those paths
@@ -163,8 +170,25 @@ def refusal(request: ApiRequest) -> str:
     return f"{why} Refused: {request.describe()}."
 
 
-def _host_is_eks(host: str) -> bool:
+def host_is_eks(host: str) -> bool:
+    """Whether ``host`` is an EKS apiserver endpoint."""
     return bool(_EKS_HOST.search(host or ""))
+
+
+def _scoped_namespace_body(api_client, body):
+    """``body`` for a namespace write, carrying :data:`SCOPE_LABEL`.
+
+    Covers a create, a replace, a server-side apply and a merge patch, which
+    all send the object (or part of it) as a mapping. A JSON patch (a list)
+    is left alone; the admission policy refuses it if it drops the label.
+    """
+    if body is not None and not isinstance(body, dict | list | str | bytes):
+        body = api_client.sanitize_for_serialization(body)
+    if not isinstance(body, dict):
+        return body
+    metadata = dict(body.get("metadata") or {})
+    metadata["labels"] = {**(metadata.get("labels") or {}), SCOPE_LABEL: "true"}
+    return {**body, "metadata": metadata}
 
 
 def guarded_call_api(original):
@@ -174,7 +198,7 @@ def guarded_call_api(original):
     def call_api(self, resource_path, method, path_params=None, query_params=None, *args, **kwargs):
         if enforced():
             host = kwargs.get("_host") or getattr(getattr(self, "configuration", None), "host", "")
-            if _host_is_eks(host):
+            if host_is_eks(host):
                 path = resource_path
                 if path_params:
                     for key, value in dict(path_params).items():
@@ -184,6 +208,16 @@ def guarded_call_api(original):
                     from core.install_restrictions import WithheldCapabilityError
 
                     raise WithheldCapabilityError(why)
+                if (
+                    request is not None
+                    and request.group == ""
+                    and request.resource == "namespaces"
+                    and request.verb in {"create", "update", "patch"}
+                ):
+                    if "body" in kwargs:
+                        kwargs["body"] = _scoped_namespace_body(self, kwargs["body"])
+                    elif len(args) >= 2:
+                        args = (args[0], _scoped_namespace_body(self, args[1]), *args[2:])
         return original(self, resource_path, method, path_params, query_params, *args, **kwargs)
 
     call_api._astrolift_rbac_guard = True

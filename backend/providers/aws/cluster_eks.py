@@ -102,6 +102,7 @@ from k8s_native.central_auth import central_auth_component
 from k8s_native.edge_gateway import alb_front, edge_component
 from k8s_native.management import (
     ManagementBackend,
+    cluster_rbac_withheld,
     default_management_backend,
     probe_cluster_capabilities,
     read_cluster_job_status,
@@ -115,19 +116,6 @@ from k8s_native.observability import (
 )
 
 log = logging.getLogger("astrolift_providers.aws.cluster_eks")
-
-
-def _cluster_scope_withheld() -> bool:
-    """Whether the install holds the control plane to the minimal RBAC contract.
-
-    ``controllers`` in ``ASTROLIFT_WITHHELD_CAPABILITIES`` (calliope-installer#447):
-    the installer binds the control plane to the ClusterRoles in
-    ``deploy/rbac/control-plane-minimal.yaml`` instead of cluster admin, so the
-    platform ClusterRole is not written at registration.
-    """
-    raw = os.environ.get("ASTROLIFT_WITHHELD_CAPABILITIES") or ""
-    return "controllers" in {part.strip() for part in raw.split(",")}
-
 
 # ---- Managed model (Bedrock) defaults -------------------------------
 #
@@ -998,7 +986,7 @@ class EKSClusterDriver(ClusterDriver):
             backend=self._management_backend,
             cluster=self._resolve_eks_auth_context(cluster),
             run_preflight=run_preflight,
-            cluster_rbac=not _cluster_scope_withheld(),
+            cluster_rbac=not cluster_rbac_withheld(),
         )
 
     @driver_op(cloud="aws", driver="cluster")

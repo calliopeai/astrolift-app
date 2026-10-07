@@ -10,8 +10,12 @@ else with the reason instead of letting the apiserver answer 403.
 The scan reads every non-test module under ``backend/`` for:
 
 * manifest literals: dicts with ``apiVersion`` and ``kind`` (module
-  constants and ``a if c else b`` resolved), ``_manifest("group/v", "Kind")``
-  style helpers, and ``"group/version/Kind"`` strings;
+  constants, f-strings of them and ``a if c else b`` resolved; a ``kind``
+  held in a variable is paired with the module's ``*_KIND`` constants),
+  ``_manifest("group/v", "Kind")`` style helpers, ``{"Kind": API_VERSION}``
+  lookup tables, and ``"group/version/Kind"`` strings;
+* the rules of every Role the code renders, which the apiserver's
+  escalation check holds to what the contract grants;
 * kinds passed to the driver and dynamic-client reads and deletes
   (``kind=`` keywords, and ``get_manifest(slug, ns, "Kind", name)``);
 * typed kubernetes-client methods (``CoreV1Api.list_namespaced_pod`` …);
@@ -25,6 +29,7 @@ from __future__ import annotations
 
 import ast
 import inspect
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -85,6 +90,10 @@ READ_ONLY = {
     "StorageClass",
     "VolumeSnapshotClass",
 }
+
+#: Modules whose ``{"Kind": apiVersion}`` tables describe every kind a
+#: generic client can address, not kinds the code uses.
+GENERIC_KIND_TABLES = {"providers/_sdk/k8s_dynamic_client.py"}
 
 #: Dicts shaped like manifests that are not API objects.
 NOT_API_OBJECTS = {"Config", "DeleteOptions"}
@@ -162,7 +171,30 @@ def _strings(node: ast.AST | None, consts: dict[str, str]) -> list[str]:
         return [consts[node.id]]
     if isinstance(node, ast.IfExp):
         return _strings(node.body, consts) + _strings(node.orelse, consts)
+    if isinstance(node, ast.JoinedStr):
+        parts: list[str] = []
+        for value in node.values:
+            inner = value.value if isinstance(value, ast.FormattedValue) else value
+            resolved = _strings(inner, consts)
+            if len(resolved) != 1:
+                return []
+            parts.append(resolved[0])
+        return ["".join(parts)]
     return []
+
+
+_VERSION = re.compile(r"v\d+((alpha|beta)\d+)?")
+
+
+def _is_kind(value: str) -> bool:
+    return value[:1].isupper() and value.isidentifier()
+
+
+def _str_list(node: ast.AST | None) -> list[str] | None:
+    if not isinstance(node, ast.List | ast.Tuple):
+        return None
+    values = [e.value for e in node.elts if isinstance(e, ast.Constant) and isinstance(e.value, str)]
+    return values if len(values) == len(node.elts) else None
 
 
 def _is_api_version(value: str) -> bool:
@@ -198,9 +230,11 @@ def scan() -> SimpleNamespace:
     typed: list[tuple[str, str]] = []
     requests: list[tuple[str, str, str]] = []
     unresolved: list[str] = []
+    role_rules: list[tuple[str, tuple[str, ...], tuple[str, ...], tuple[str, ...]]] = []
 
     for rel, tree in _sources():
         consts = _module_constants(tree)
+        kind_consts = [v for k, v in consts.items() if k.endswith("KIND") and _is_kind(v)]
         for node in ast.walk(tree):
             where = f"{rel}:{getattr(node, 'lineno', 0)}"
             if isinstance(node, ast.Dict):
@@ -212,6 +246,9 @@ def scan() -> SimpleNamespace:
                 if "apiVersion" in fields and "kind" in fields:
                     names = _strings(fields["kind"], consts)
                     versions = _strings(fields["apiVersion"], consts)
+                    if not names and versions and isinstance(fields["kind"], ast.Name):
+                        # ``"kind": kind`` from a loop over the module's kinds.
+                        names = kind_consts
                     for kind in names:
                         if versions:
                             kinds.extend(((_group(v),), kind, where) for v in versions)
@@ -219,6 +256,22 @@ def scan() -> SimpleNamespace:
                             kinds.append((RUNTIME_GROUPS[kind], kind, where))
                         elif kind not in NOT_API_OBJECTS:
                             unresolved.append(f"{kind} at {where}")
+                elif (
+                    fields
+                    and rel not in GENERIC_KIND_TABLES
+                    and all(isinstance(k, str) and _is_kind(k) for k in fields)
+                ):
+                    # ``{"HTTPRoute": API_VERSION, ...}``: a table of the kinds a driver renders.
+                    for kind, value in fields.items():
+                        versions = [
+                            v for v in _strings(value, consts) if _VERSION.fullmatch(v.rsplit("/", 1)[-1])
+                        ]
+                        kinds.extend(((_group(v),), kind, where) for v in versions)
+                groups, resources, verbs = (
+                    _str_list(fields.get(f)) for f in ("apiGroups", "resources", "verbs")
+                )
+                if groups is not None and resources is not None and verbs is not None:
+                    role_rules.append((where, tuple(groups), tuple(resources), tuple(verbs)))
             elif isinstance(node, ast.Constant) and isinstance(node.value, str):
                 parts = node.value.split("/")
                 if (
@@ -257,7 +310,9 @@ def scan() -> SimpleNamespace:
                             continue  # domain kinds ("user", "APP", workflow names), not Kubernetes
                         group = BARE_KIND_GROUPS[kind]
                     kinds.append(((group,), kind, where))
-    return SimpleNamespace(kinds=kinds, typed=typed, requests=requests, unresolved=unresolved)
+    return SimpleNamespace(
+        kinds=kinds, typed=typed, requests=requests, unresolved=unresolved, role_rules=role_rules
+    )
 
 
 @pytest.fixture(scope="module")
@@ -274,7 +329,12 @@ def _docs():
 
 def test_the_manifest_is_cluster_roles_bound_to_the_control_plane_group():
     docs = _docs()
-    assert {d["kind"] for d in docs} == {"ClusterRole", "ClusterRoleBinding"}
+    assert {d["kind"] for d in docs} == {
+        "ClusterRole",
+        "ClusterRoleBinding",
+        "ValidatingAdmissionPolicy",
+        "ValidatingAdmissionPolicyBinding",
+    }
     roles = {d["metadata"]["name"] for d in docs if d["kind"] == "ClusterRole"}
     bindings = [d for d in docs if d["kind"] == "ClusterRoleBinding"]
     assert {b["roleRef"]["name"] for b in bindings} == roles
@@ -335,6 +395,68 @@ def test_beyond_minimal_kinds_are_not_granted():
         assert not rbac.allows("create", group, plural(kind)), kind
 
 
+def _policies() -> dict[str, dict]:
+    return {d["metadata"]["name"]: d for d in _docs() if d["kind"] == "ValidatingAdmissionPolicy"}
+
+
+def test_admission_confines_the_group_to_labelled_namespaces():
+    """RBAC binds the namespaced grants cluster-wide; admission keeps the
+    group's writes, and exec, out of every namespace it did not create.
+    The CEL itself was exercised against a kind apiserver (1.37): see the PR."""
+    docs = _docs()
+    bindings = {d["spec"]["policyName"]: d for d in docs if d["kind"] == "ValidatingAdmissionPolicyBinding"}
+    policies = _policies()
+    assert (
+        set(bindings)
+        == set(policies)
+        == {
+            "astrolift-control-plane-scope",
+            "astrolift-control-plane-pod-security",
+        }
+    )
+    for name, policy in policies.items():
+        assert policy["spec"]["failurePolicy"] == "Fail", name
+        assert bindings[name]["spec"]["validationActions"] == ["Deny"], name
+
+    scope = policies["astrolift-control-plane-scope"]["spec"]
+    assert scope["matchConditions"] == [
+        {"name": "control-plane", "expression": f"'{rbac.GROUP}' in request.userInfo.groups"}
+    ]
+    namespaced, namespaces = scope["matchConstraints"]["resourceRules"]
+    assert namespaced["resources"] == ["*/*"] and namespaced["apiGroups"] == ["*"]
+    assert set(namespaced["operations"]) == {"CREATE", "UPDATE", "DELETE", "CONNECT"}
+    assert namespaces["resources"] == ["namespaces"]
+    assert set(namespaces["operations"]) == {"CREATE", "UPDATE", "DELETE"}
+    text = yaml.safe_dump(scope)
+    assert text.count(rbac.SCOPE_LABEL) >= 3
+
+    pods = policies["astrolift-control-plane-pod-security"]["spec"]
+    assert "matchConditions" not in pods, "controllers create the pods; every creator is checked"
+    assert pods["matchConstraints"]["namespaceSelector"] == {"matchLabels": {rbac.SCOPE_LABEL: "true"}}
+    rules = yaml.safe_dump(pods["validations"])
+    for field in ("hostNetwork", "hostPID", "hostIPC", "hostPath", "privileged", "capabilities"):
+        assert field in rules, field
+
+
+def test_the_argo_executor_role_and_the_gateway_kinds_are_granted():
+    """The kinds the review found missing (#2324): each is now granted."""
+    for resource in ("workflows", "cronworkflows", "workfloweventbindings", "workflowtemplates"):
+        for verb in APPLY_VERBS:
+            assert rbac.allows(verb, "argoproj.io", resource), (verb, resource)
+    for verb in ("create", "patch"):
+        assert rbac.allows(verb, "argoproj.io", "workflowtaskresults")
+    for resource in (
+        "grpcroutes",
+        "tlsroutes",
+        "tcproutes",
+        "udproutes",
+        "backendtlspolicies",
+        "listenersets",
+    ):
+        for verb in APPLY_VERBS:
+            assert rbac.allows(verb, "gateway.networking.k8s.io", resource), (verb, resource)
+
+
 # ---- the code against the manifest -------------------------------------------
 
 
@@ -344,6 +466,29 @@ def test_the_scan_sees_the_code(usage):
     assert {"Deployment", "Secret", "Namespace", "Job", "Ingress", "HelmRelease", "ClusterRole"} <= seen
     assert {"list_namespaced_pod", "connect_get_namespaced_pod_exec"} <= {name for name, _ in usage.typed}
     assert usage.requests
+    # Kinds held in f-strings, lookup tables and loop variables.
+    assert {"Workflow", "CronWorkflow", "WorkflowEventBinding", "GRPCRoute", "ListenerSet"} <= seen
+    assert {where.split(":")[0] for where, *_ in usage.role_rules} >= {
+        "providers/k8s_native/managed/workflow_argo.py",
+        "providers/k8s_native/managed/model_endpoint_vllm.py",
+    }
+
+
+def test_every_role_the_code_renders_grants_only_what_the_contract_holds(usage):
+    """The apiserver refuses a Role that grants more than its creator holds."""
+    cluster_roles = set(rbac.BEYOND_MINIMAL["ClusterRole"])
+    missing = [
+        f"{verb} {resource}.{group or 'core'} ({where})"
+        for where, groups, resources, verbs in usage.role_rules
+        if where.rsplit(":", 1)[0] not in cluster_roles
+        for group in groups
+        for resource in resources
+        for verb in verbs
+        if not rbac.allows(verb, group, resource)
+    ]
+    assert (
+        missing == []
+    ), "a Role the code renders grants what deploy/rbac/control-plane-minimal.yaml does not"
 
 
 def test_every_manifest_the_code_renders_has_a_known_group(usage):
@@ -457,16 +602,26 @@ class _Response:
         return default
 
 
+class _Seen(list):
+    """(method, url) of each request that reached the fake apiserver, and its body."""
+
+    def __init__(self):
+        super().__init__()
+        self.bodies: list = []
+
+
 @pytest.fixture
 def apiserver(monkeypatch):
     """A fake apiserver behind the real kubernetes client: records every request that reaches it."""
     from kubernetes import client
 
     assert rbac.install_transport_guard()
-    seen: list[tuple[str, str]] = []
+    seen = _Seen()
+    bodies = seen.bodies
 
     def request(self, method, url, *args, **kwargs):
         seen.append((method, url))
+        bodies.append(kwargs.get("body"))
         return _Response()
 
     monkeypatch.setattr(client.ApiClient, "request", request)
@@ -513,6 +668,49 @@ def test_withheld_sends_what_the_contract_grants(apiserver, monkeypatch):
         body={"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": "n"}}, _preload_content=False
     )
     assert [m for m, _ in apiserver] == ["GET", "POST"]
+
+
+def _namespace(**labels):
+    return {"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": "n", "labels": labels}}
+
+
+def test_withheld_labels_every_namespace_the_control_plane_writes(apiserver, monkeypatch):
+    """The admission policy lets the group write only in labelled namespaces;
+    the guard labels each namespace it creates or applies, keeping its labels."""
+    from kubernetes import client
+
+    monkeypatch.setenv(ir.ENV_VAR, "controllers")
+    core = client.CoreV1Api(_api())
+    core.create_namespace(body=_namespace(team="a"), _preload_content=False)
+    core.create_namespace(
+        body=client.V1Namespace(metadata=client.V1ObjectMeta(name="m")), _preload_content=False
+    )
+    _api().call_api(
+        "/api/v1/namespaces/{name}",
+        "PATCH",
+        {"name": "n"},
+        [("fieldManager", "astrolift")],
+        {"Content-Type": "application/apply-patch+yaml"},
+        body=_namespace(),
+        _preload_content=False,
+    )
+    core.create_namespaced_config_map("n", body={"metadata": {"name": "c"}}, _preload_content=False)
+    first, model, applied, config_map = apiserver.bodies
+    assert first["metadata"]["labels"] == {"team": "a", rbac.SCOPE_LABEL: "true"}
+    assert model["metadata"] == {"name": "m", "labels": {rbac.SCOPE_LABEL: "true"}}
+    assert applied["metadata"]["labels"] == {rbac.SCOPE_LABEL: "true"}
+    assert config_map == {"metadata": {"name": "c"}}
+
+
+@pytest.mark.parametrize(
+    ("withheld", "host"), [("", EKS), ("controllers", "https://k8s.onprem.example:6443")]
+)
+def test_namespaces_are_not_labelled_outside_the_contract(apiserver, monkeypatch, withheld, host):
+    from kubernetes import client
+
+    monkeypatch.setenv(ir.ENV_VAR, withheld)
+    client.CoreV1Api(_api(host)).create_namespace(body=_namespace(), _preload_content=False)
+    assert apiserver.bodies == [_namespace()]
 
 
 def test_withheld_refuses_through_the_dynamic_client(apiserver, monkeypatch):

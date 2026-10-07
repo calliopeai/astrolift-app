@@ -24,7 +24,7 @@ from _sdk.coverage import OPT_IN_TIER
 
 from astrolift_drivers.managed_resolution import IN_CLUSTER_PLUGIN
 from astrolift_drivers.registry import plugins
-from core.install_restrictions import database_refusal
+from core.install_restrictions import variant_refusal
 
 _SIZE_OPTIONS = ("small", "medium", "large", "xlarge", "custom")
 _SIZED_KINDS = {
@@ -327,7 +327,7 @@ def list_catalog(
             unavailable_reason = ""
         # What the install withholds (calliope-installer#447): offered, with
         # the reason, rather than refused by AWS halfway through a workflow.
-        if available and (withheld := database_refusal(kind, variant)):
+        if available and (withheld := variant_refusal(kind, variant, plugin_slug)):
             available = False
             unavailable_reason = withheld
         default_pool = native_by_kind.get(kind) or available_by_kind.get(kind, [])
@@ -412,7 +412,9 @@ def resolve_variant(*, plugin_slug: str, kind: str, requested_variant: str | Non
         return defaults[0]
     available = [row.variant for row in rows if row.available]
     # The kind's default is one the install withholds: say so, not "pick one".
-    if withheld := next(filter(None, (database_refusal(row.kind, row.variant) for row in rows)), ""):
+    if withheld := next(
+        filter(None, (variant_refusal(row.kind, row.variant, plugin_slug) for row in rows)), ""
+    ):
         raise CatalogResolutionError(
             f"{withheld} Available variants: {available}." if available else withheld
         )
