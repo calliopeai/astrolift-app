@@ -41,6 +41,15 @@ def preflight_bindings(
                     f"{service_cluster.slug!r}, not runtime cluster {cluster_slug!r}",
                 )
         if str(binding.source_kind) == "csi":
+            # A static PersistentVolume is cluster-scoped and can name any
+            # volume, so the minimal RBAC contract leaves it to the cluster's
+            # owner (calliope-installer#447).
+            from core.install_restrictions import cluster_scope_refusal
+
+            if hasattr(service, "effective_cluster") and (
+                refusal := cluster_scope_refusal(service.effective_cluster)
+            ):
+                raise FilesystemBindingError(refusal)
             if csi_drivers is None:
                 list_csi = getattr(cluster_driver, "list_csi_drivers", None)
                 if not callable(list_csi):

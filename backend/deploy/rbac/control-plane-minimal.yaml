@@ -1,0 +1,367 @@
+# The minimal Kubernetes RBAC the Astrolift control plane runs with on a
+# tenant cluster when the install withholds cluster-wide changes
+# (ASTROLIFT_WITHHELD_CAPABILITIES contains "controllers";
+# calliope-installer#447).
+#
+# How the installer uses it: apply this file to the cluster, give the control
+# plane's EKS access entry kubernetes_groups = ["astrolift:control-plane"] and
+# no access policy (in place of AmazonEKSClusterAdminPolicy), and add
+# "controllers" to ASTROLIFT_WITHHELD_CAPABILITIES. With that variable set, the
+# control plane refuses, with the reason, every call this file does not grant,
+# before it reaches the apiserver.
+#
+# What it leaves out on purpose, and what refuses instead:
+#   - CustomResourceDefinitions, ClusterRoles, ClusterRoleBindings,
+#     StorageClasses, VolumeSnapshotClasses, GatewayClasses, webhooks: the
+#     bootstrap recipe (Flux, its HelmReleases, Knative, the Envoy edge, CSI
+#     classes) is refused as a whole. Those controllers are the cluster
+#     owner's.
+#   - Flux HelmRelease and HelmRepository: helm-controller applies a release
+#     with its own cluster-admin account, so writing one is cluster admin by
+#     another name.
+#   - PersistentVolumes: a static PV can name any volume, hostPath included.
+#     CSI-mounted services (EFS, FSx, NFS, S3 with a mount path) are refused
+#     at provisioning and at binding; dynamic claims still work.
+#   - DaemonSets: the CloudWatch log collector and the keep-alive agent are
+#     refused (both also need a ClusterRole).
+#
+# Scope: the namespaced grants are bound cluster-wide because the control
+# plane creates its namespaces at run time (one per project and environment,
+# astrolift-agents-<org> for agent runs), and a RoleBinding cannot be written
+# ahead of a namespace that does not exist yet. RBAC alone would let that
+# grant run a pod as any service account in kube-system or flux-system, mint
+# a token for one, patch aws-auth or delete kube-system. Two
+# ValidatingAdmissionPolicies below close that:
+#   - astrolift-control-plane-scope: the group writes (and execs) only in
+#     namespaces labelled astrolift.io/control-plane-scope=true. It may create
+#     a namespace only with that label, and may change or delete only a
+#     namespace that already carries it. The control plane adds the label to
+#     every namespace it writes, so namespaces it creates are in scope and
+#     nothing else is.
+#   - astrolift-control-plane-pod-security: in those namespaces no pod, from
+#     anyone, runs privileged, on the host's network, PID or IPC namespace,
+#     with a hostPath volume, or with a capability beyond Pod Security
+#     baseline. A pod with node access would reach every other pod's token.
+# Both need Kubernetes 1.30 or later (ValidatingAdmissionPolicy v1).
+#
+# Before the contract, the control plane created namespaces without the
+# label. The installer labels the ones the control plane should keep using
+# (app and environment namespaces, astrolift-edge, astrolift-system once the
+# platform ClusterRoleBinding astrolift-control-plane is gone). Never label a
+# namespace that holds a service account bound to a ClusterRole, such as the
+# keep-alive agent's: the group could run a pod as it. The same goes for a
+# ClusterRoleBinding, IRSA trust or Pod Identity association that names a
+# service account in a namespace that does not exist yet.
+#
+# What stays cluster-wide: reads. Admission never sees a read, so the group
+# can still get and list secrets, config maps and pods in every namespace.
+#
+# backend/core/tests/test_control_plane_rbac_contract.py fails when backend
+# code starts using a resource or verb this file does not grant. Change both
+# together.
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: astrolift-control-plane-cluster
+  labels:
+    astrolift.io/rbac-contract: control-plane-minimal
+rules:
+  # Projects, environments and agent runs each get a namespace.
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, list, watch, create, update, patch, delete]
+  # Capability probe: architectures, GPUs, storage, installed operators,
+  # the gVisor RuntimeClass agent runs need.
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get, list, watch]
+  - apiGroups: [storage.k8s.io]
+    resources: [storageclasses, csidrivers]
+    verbs: [get, list, watch]
+  - apiGroups: [snapshot.storage.k8s.io]
+    resources: [volumesnapshotclasses]
+    verbs: [get, list, watch]
+  - apiGroups: [apiextensions.k8s.io]
+    resources: [customresourcedefinitions]
+    verbs: [get, list, watch]
+  - apiGroups: [node.k8s.io]
+    resources: [runtimeclasses]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: astrolift-control-plane-namespaced
+  labels:
+    astrolift.io/rbac-contract: control-plane-minimal
+rules:
+  # Workloads: app deploys, agent runs, builds, pipeline jobs, managed
+  # services that run in the cluster.
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [""]
+    resources: [pods/log]
+    verbs: [get]
+  # The console terminal, the agent VNC viewer and in-pod checks.
+  - apiGroups: [""]
+    resources: [pods/exec, pods/portforward]
+    verbs: [get, create]
+  - apiGroups: [""]
+    resources: [services, configmaps, secrets, serviceaccounts, persistentvolumeclaims, resourcequotas]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [""]
+    resources: [events]
+    verbs: [get, list, watch]
+  - apiGroups: [apps]
+    resources: [deployments, statefulsets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  # Reads only: rollout ownership checks and workload metrics. DaemonSets are
+  # the cluster owner's; the control plane never writes one.
+  - apiGroups: [apps]
+    resources: [replicasets, daemonsets]
+    verbs: [get, list, watch]
+  - apiGroups: [batch]
+    resources: [jobs, cronjobs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [batch]
+    resources: [jobs/status]
+    verbs: [get]
+  - apiGroups: [autoscaling]
+    resources: [horizontalpodautoscalers]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [networking.k8s.io]
+    resources: [ingresses, networkpolicies]
+    verbs: [get, list, watch, create, update, patch, delete]
+  # Namespaced roles the managed services render (Argo workflows, the vLLM
+  # test-prompt grant). The apiserver's escalation check still refuses a
+  # Role that grants more than this file does, so every rule those Roles
+  # carry is granted here too.
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [roles, rolebindings]
+    verbs: [get, list, watch, create, update, patch, delete]
+  # App routing on whichever edge the cluster owner runs.
+  - apiGroups: [gateway.networking.k8s.io]
+    resources: [gateways, httproutes, grpcroutes, tlsroutes, tcproutes, udproutes, referencegrants, backendtlspolicies, listenersets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [gateway.envoyproxy.io]
+    resources: [securitypolicies, httproutefilters, backendtrafficpolicies]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [networking.istio.io]
+    resources: [gateways, virtualservices]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [cert-manager.io]
+    resources: [certificates]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [externaldns.k8s.io]
+    resources: [dnsendpoints]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [external-secrets.io]
+    resources: [externalsecrets]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [monitoring.coreos.com]
+    resources: [podmonitors, servicemonitors, prometheusrules]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [monitoring.coreos.com]
+    resources: [prometheuses]
+    verbs: [get, list, watch]
+  - apiGroups: [snapshot.storage.k8s.io]
+    resources: [volumesnapshots]
+    verbs: [get, list, watch, create, update, patch, delete]
+  # In-cluster managed services. Each needs its operator, which the cluster
+  # owner installs; the control plane only writes the operator's resources.
+  - apiGroups: [serving.knative.dev]
+    resources: [services]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [eventing.knative.dev]
+    resources: [brokers, triggers]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [serving.kserve.io]
+    resources: [inferenceservices]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [postgresql.cnpg.io]
+    resources: [clusters, databases]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [k8s.mariadb.com]
+    resources: [mariadbs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [pxc.percona.com]
+    resources: [perconaxtradbclusters]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [psmdb.percona.com]
+    resources: [perconaservermongodbs]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [redis.redis.opstreelabs.in]
+    resources: [redis, redisreplications]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [rabbitmq.com]
+    resources: [rabbitmqclusters]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [kafka.strimzi.io]
+    resources: [kafkas, kafkanodepools, kafkausers]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [opensearch.opster.io, opensearch.org]
+    resources: [opensearchclusters, opensearchroles, opensearchusers, opensearchuserrolebindings]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [seaweed.seaweedfs.com]
+    resources: [seaweeds, buckets, s3identities, s3credentials, s3policies, s3policybindings]
+    verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [argoproj.io]
+    resources: [workflowtemplates, workflows, cronworkflows, workfloweventbindings]
+    verbs: [get, list, watch, create, update, patch, delete]
+  # Held only so the Argo executor Role can grant it (escalation check).
+  - apiGroups: [argoproj.io]
+    resources: [workflowtaskresults]
+    verbs: [create, patch]
+  - apiGroups: [temporal.io]
+    resources: [temporalclusters, temporalnamespaces, temporalclusterclients]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: astrolift-control-plane-cluster
+  labels:
+    astrolift.io/rbac-contract: control-plane-minimal
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: astrolift-control-plane-cluster
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: astrolift:control-plane
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: astrolift-control-plane-namespaced
+  labels:
+    astrolift.io/rbac-contract: control-plane-minimal
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: astrolift-control-plane-namespaced
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: astrolift:control-plane
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: astrolift-control-plane-scope
+  labels:
+    astrolift.io/rbac-contract: control-plane-minimal
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ["*"]
+        apiVersions: ["*"]
+        operations: [CREATE, UPDATE, DELETE, CONNECT]
+        resources: ["*/*"]
+        scope: Namespaced
+      - apiGroups: [""]
+        apiVersions: ["*"]
+        operations: [CREATE, UPDATE, DELETE]
+        resources: [namespaces]
+        scope: Cluster
+  matchConditions:
+    - name: control-plane
+      expression: "'astrolift:control-plane' in request.userInfo.groups"
+  variables:
+    - name: isNamespace
+      expression: "request.resource.group == '' && request.resource.resource == 'namespaces'"
+    - name: newScoped
+      expression: >-
+        object != null && has(object.metadata.labels) &&
+        object.metadata.labels.exists(k, k == 'astrolift.io/control-plane-scope' && object.metadata.labels[k] == 'true')
+    - name: oldScoped
+      expression: >-
+        oldObject != null && has(oldObject.metadata.labels) &&
+        oldObject.metadata.labels.exists(k, k == 'astrolift.io/control-plane-scope' && oldObject.metadata.labels[k] == 'true')
+    - name: inScope
+      expression: >-
+        namespaceObject != null && has(namespaceObject.metadata.labels) &&
+        namespaceObject.metadata.labels.exists(k, k == 'astrolift.io/control-plane-scope' && namespaceObject.metadata.labels[k] == 'true')
+  validations:
+    - expression: >-
+        !variables.isNamespace ||
+        (request.operation == 'CREATE' ? variables.newScoped :
+         request.operation == 'DELETE' ? variables.oldScoped :
+         variables.oldScoped && variables.newScoped)
+      messageExpression: >-
+        'Astrolift may only create, change or delete a namespace labelled astrolift.io/control-plane-scope=true; '
+        + request.name + ' is not (calliope-installer#447).'
+    - expression: "variables.isNamespace || variables.inScope"
+      messageExpression: >-
+        'Astrolift writes only in namespaces labelled astrolift.io/control-plane-scope=true; '
+        + request.namespace + ' is not (calliope-installer#447).'
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: astrolift-control-plane-scope
+  labels:
+    astrolift.io/rbac-contract: control-plane-minimal
+spec:
+  policyName: astrolift-control-plane-scope
+  validationActions: [Deny]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: astrolift-control-plane-pod-security
+  labels:
+    astrolift.io/rbac-contract: control-plane-minimal
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchLabels:
+        astrolift.io/control-plane-scope: "true"
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["*"]
+        operations: [CREATE]
+        resources: [pods]
+      - apiGroups: [""]
+        apiVersions: ["*"]
+        operations: [UPDATE]
+        resources: [pods/ephemeralcontainers]
+  variables:
+    - name: containers
+      expression: >-
+        (has(object.spec.containers) ? object.spec.containers : [])
+        + (has(object.spec.initContainers) ? object.spec.initContainers : [])
+        + (has(object.spec.ephemeralContainers) ? object.spec.ephemeralContainers : [])
+  validations:
+    - expression: >-
+        !(has(object.spec.hostNetwork) && object.spec.hostNetwork) &&
+        !(has(object.spec.hostPID) && object.spec.hostPID) &&
+        !(has(object.spec.hostIPC) && object.spec.hostIPC)
+      message: "Pods in Astrolift's namespaces may not share the host's network, PID or IPC namespace (calliope-installer#447)."
+    - expression: "!has(object.spec.volumes) || object.spec.volumes.all(v, !has(v.hostPath))"
+      message: "Pods in Astrolift's namespaces may not mount a hostPath volume (calliope-installer#447)."
+    - expression: >-
+        variables.containers.all(c, !has(c.securityContext) || !has(c.securityContext.privileged)
+        || !c.securityContext.privileged)
+      message: "Pods in Astrolift's namespaces may not run a privileged container (calliope-installer#447)."
+    - expression: >-
+        variables.containers.all(c, !has(c.securityContext) || !has(c.securityContext.capabilities)
+        || !has(c.securityContext.capabilities.add) || c.securityContext.capabilities.add.all(cap, cap in
+        ['AUDIT_WRITE', 'CHOWN', 'DAC_OVERRIDE', 'FOWNER', 'FSETID', 'KILL', 'MKNOD', 'NET_BIND_SERVICE',
+        'SETFCAP', 'SETGID', 'SETPCAP', 'SETUID', 'SYS_CHROOT']))
+      message: "Pods in Astrolift's namespaces may add only Pod Security baseline capabilities (calliope-installer#447)."
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: astrolift-control-plane-pod-security
+  labels:
+    astrolift.io/rbac-contract: control-plane-minimal
+spec:
+  policyName: astrolift-control-plane-pod-security
+  validationActions: [Deny]

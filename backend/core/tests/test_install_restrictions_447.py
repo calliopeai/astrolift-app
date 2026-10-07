@@ -58,6 +58,8 @@ def test_reads_the_installer_list_and_ignores_unknown_names(monkeypatch):
     monkeypatch.setenv(ir.ENV_VAR, " dns , clusters,,storage")
     assert ir.withheld() == {"dns", "clusters"}
     monkeypatch.setenv(ir.ENV_VAR, ALL)
+    assert ir.withheld() == set(ir.CAPABILITIES) - {"controllers"}
+    monkeypatch.setenv(ir.ENV_VAR, f"{ALL},controllers")
     assert ir.withheld() == set(ir.CAPABILITIES)
 
 
@@ -192,11 +194,11 @@ def test_withholding_does_not_promote_an_in_cluster_variant_to_default(monkeypat
 
 def test_activity_refuses_an_rds_backed_service_without_retrying(monkeypatch):
     svc = SimpleNamespace(kind="postgres", variant="rds")
-    _assert_not_withheld(svc)
+    _assert_not_withheld(svc, None)
     monkeypatch.setenv(ir.ENV_VAR, "databases")
     with pytest.raises(ManagedServicePreflightError, match="Databases are withheld"):
-        _assert_not_withheld(svc)
-    _assert_not_withheld(SimpleNamespace(kind="postgres", variant="cnpg"))
+        _assert_not_withheld(svc, None)
+    _assert_not_withheld(SimpleNamespace(kind="postgres", variant="cnpg"), None)
 
 
 # ---- the console's read -------------------------------------------------------

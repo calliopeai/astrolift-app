@@ -466,16 +466,22 @@ def _signals_already_gone(*parts: object) -> bool:
     return any(marker in blob for marker in _ALREADY_GONE_MARKERS)
 
 
-def _assert_not_withheld(svc: Any) -> None:
-    """Refuse an RDS-backed service on an install that withholds databases.
+def _assert_not_withheld(svc: Any, cluster: Any) -> None:
+    """Refuse a service the install withholds before its cloud resource exists.
 
+    An RDS-backed service when databases are withheld; a CSI-mounted one
+    (EFS, FSx, NFS, S3 with a mount path) on a cluster held to the minimal
+    RBAC contract, where every workload mounting it would be refused.
     Every path that books one (the mutation, a manifest, a project resource)
     reaches this activity, so this is the one place that cannot be missed.
-    Non-retryable: AWS would answer AccessDenied on every attempt.
+    Non-retryable: the restriction is fixed at install.
     """
-    from core.install_restrictions import database_refusal
+    from core.install_restrictions import database_refusal, filesystem_refusal
 
-    if refusal := database_refusal(str(svc.kind), str(getattr(svc, "variant", "") or "")):
+    kind, variant = str(svc.kind), str(getattr(svc, "variant", "") or "")
+    if refusal := database_refusal(kind, variant) or filesystem_refusal(
+        kind, variant, getattr(svc, "config", None) or {}, cluster
+    ):
         raise ManagedServicePreflightError(refusal)
 
 
@@ -938,7 +944,7 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     plugin_slug = cluster.provider_plugin.slug
     variant = getattr(svc, "variant", "") or ""
     _assert_config_secret_refs_scoped(svc, cluster)
-    _assert_not_withheld(svc)
+    _assert_not_withheld(svc, cluster)
     restore = dict((getattr(svc, "lifecycle_policy", None) or {}).get("restore") or {})
     source = _recorded_restore_source(svc, restore) if restore and not svc.backend_ref else None
     _run_managed_service_preflight(svc, cluster)
@@ -1009,7 +1015,7 @@ def _update_sync(managed_service_id: int) -> dict[str, Any]:
     plugin_slug = cluster.provider_plugin.slug
     variant = getattr(svc, "variant", "") or ""
     _assert_config_secret_refs_scoped(svc, cluster)
-    _assert_not_withheld(svc)
+    _assert_not_withheld(svc, cluster)
     _run_managed_service_preflight(svc, cluster)
     try:
         resolved = resolve_managed_driver(

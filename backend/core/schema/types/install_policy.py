@@ -16,7 +16,7 @@ class WithheldCapabilityType:
     """A capability the install withholds from Astrolift, with the reason to show."""
 
     capability: str
-    """``dns``, ``databases``, ``load_balancers`` or ``clusters``."""
+    """``dns``, ``databases``, ``load_balancers``, ``clusters`` or ``controllers``."""
     reason: str
 
 
@@ -41,7 +41,8 @@ class InstallPolicyQuery:
     @strawberry.field(
         description=(
             "What the install withholds from Astrolift (calliope-installer#447): dns, databases, "
-            "load_balancers, clusters, each with the reason to show. Empty when nothing is withheld."
+            "load_balancers, clusters, controllers, each with the reason to show. Empty when nothing "
+            "is withheld."
         )
     )
     def astrolift_withheld_capabilities(self, info: Info) -> list[WithheldCapabilityType]:

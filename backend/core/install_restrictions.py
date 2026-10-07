@@ -5,7 +5,10 @@ databases, load balancers and the tenant cluster's lifecycle. The installer
 removes those grants from the control plane's task role, adds an explicit
 Deny for each, and sets ``ASTROLIFT_WITHHELD_CAPABILITIES`` to a comma list
 of ``dns``, ``databases``, ``load_balancers`` and ``clusters``
-(terraform/aws/astrolift-deployment-ecs/restrictions.tf). AWS would refuse
+(terraform/aws/astrolift-deployment-ecs/restrictions.tf). ``controllers``
+means the control plane holds only the minimal Kubernetes RBAC in
+``deploy/rbac/control-plane-minimal.yaml`` on the clusters it is handed,
+not cluster admin (see :mod:`core.control_plane_rbac`). AWS would refuse
 the calls anyway; this module lets the console refuse them first, with the
 reason, instead of failing on AccessDenied halfway through a workflow.
 
@@ -30,7 +33,7 @@ except ImportError:  # pragma: no cover - the provider test job imports core wit
 ENV_VAR = "ASTROLIFT_WITHHELD_CAPABILITIES"
 
 #: In the order the installer writes them.
-CAPABILITIES: tuple[str, ...] = ("dns", "databases", "load_balancers", "clusters")
+CAPABILITIES: tuple[str, ...] = ("dns", "databases", "load_balancers", "clusters", "controllers")
 
 _REASONS: dict[str, str] = {
     "dns": (
@@ -51,6 +54,12 @@ _REASONS: dict[str, str] = {
     "clusters": (
         "Cluster lifecycle is withheld from Astrolift on this install: it runs on clusters it is "
         "handed and may not create or delete one."
+    ),
+    "controllers": (
+        "Cluster-wide changes are withheld from Astrolift on this install: on AWS clusters it holds "
+        "the minimal Kubernetes RBAC in deploy/rbac/control-plane-minimal.yaml, not cluster admin. "
+        "Controllers, CRDs, cluster roles, storage classes and persistent volumes are the cluster "
+        "owner's to install."
     ),
 }
 
@@ -112,10 +121,74 @@ def _on_aws(cluster) -> bool:
     return getattr(getattr(cluster, "provider_plugin", None), "slug", "") == "aws"
 
 
+def _on_eks(cluster) -> bool:
+    """Whether the minimal RBAC contract holds on ``cluster``.
+
+    An AWS cluster, or any cluster whose apiserver is an EKS endpoint (one
+    registered through the kubeconfig path), the same test the transport
+    guard in :mod:`core.control_plane_rbac` applies to every request.
+    """
+    from core.control_plane_rbac import host_is_eks
+
+    return _on_aws(cluster) or host_is_eks(str(getattr(cluster, "endpoint", "") or ""))
+
+
+def cluster_scope_refusal(cluster) -> str:
+    """Why work beyond the minimal RBAC contract on ``cluster`` is refused, or ``""``.
+
+    The bootstrap recipe, platform cluster roles, the keep-alive agent, the
+    log collector and static PersistentVolumes all write cluster-scoped
+    objects, which the minimal contract leaves to the cluster's owner.
+    """
+    return reason("controllers") if _on_eks(cluster) else ""
+
+
+#: Managed-service variants whose every binding is a CSI volume, which the
+#: workload mounts through a static PersistentVolume: cluster-scoped, so
+#: beyond the minimal RBAC contract. S3 joins them when ``mount_path`` is set.
+CSI_BACKED: frozenset[tuple[str, str]] = frozenset(
+    {
+        ("filesystem", "efs"),
+        ("filesystem", "fsx_lustre"),
+        ("filesystem", "fsx_openzfs"),
+        ("filesystem", "fsx_windows"),
+        ("filesystem", "nfs_csi"),
+    }
+)
+
+
+def _csi_backed(kind: str, variant: str, config: dict | None = None) -> bool:
+    if (str(kind), str(variant or "")) in CSI_BACKED:
+        return True
+    return (
+        str(kind) == "object_store" and str(variant or "") == "s3" and bool((config or {}).get("mount_path"))
+    )
+
+
+def filesystem_refusal(kind: str, variant: str, config: dict | None, cluster) -> str:
+    """Why provisioning a CSI-mounted service on ``cluster`` is refused, or ``""``.
+
+    Refused before the cloud resource exists: every workload that mounts it
+    would be refused at its binding preflight anyway.
+    """
+    return cluster_scope_refusal(cluster) if _csi_backed(kind, variant, config) else ""
+
+
+def variant_refusal(kind: str, variant: str, plugin_slug: str) -> str:
+    """Why the catalog offers ``(kind, variant)`` on ``plugin_slug`` disabled, or ``""``."""
+    if refusal := database_refusal(kind, variant):
+        return refusal
+    if plugin_slug == "aws" and (str(kind), str(variant or "")) in CSI_BACKED:
+        return reason("controllers")
+    return ""
+
+
 def controller_refusal(component_key: str, cluster) -> str:
     """Why installing a bootstrap component on ``cluster`` is refused, or ``""``."""
     capability = CONTROLLERS.get(component_key)
-    return reason(capability) if capability and _on_aws(cluster) else ""
+    if capability and _on_aws(cluster) and (why := reason(capability)):
+        return why
+    return cluster_scope_refusal(cluster)
 
 
 def cluster_delete_refusal(cluster) -> str:
@@ -124,11 +197,11 @@ def cluster_delete_refusal(cluster) -> str:
 
 
 class WithheldCapabilityError(ApplicationError):
-    """A call the install withholds, refused before it reaches AWS.
+    """A call the install withholds, refused before it reaches AWS or the apiserver.
 
     Non-retryable wherever it is raised: inside a Temporal activity it fails
-    the activity at once instead of retrying, because AWS would refuse every
-    attempt the same way. ``str()`` is the reason alone.
+    the activity at once instead of retrying, because AWS or the apiserver
+    would refuse every attempt the same way. ``str()`` is the reason alone.
     """
 
     def __init__(self, message: str) -> None:

@@ -576,6 +576,12 @@ def deploy_agent_dispatch(*, cluster: TenantCluster) -> Any:
     with transaction.atomic():
         cluster = TenantCluster.objects.select_for_update().get(pk=cluster.pk)
         from astrolift_clusters.agent_install import installation_busy, reconcile_installed_agent
+        from core.install_restrictions import cluster_scope_refusal
+
+        # The agent's ClusterRole is cluster-scoped RBAC, which the minimal
+        # contract leaves to the cluster's owner (calliope-installer#447).
+        if refusal := cluster_scope_refusal(cluster):
+            raise ClusterManagementError(refusal)
 
         if installation_busy(cluster):
             raise ClusterManagementError("A server-owned agent installation is pending")

@@ -400,11 +400,13 @@ describe.each(locales)("Cluster settings source in %s", (locale) => {
     await userEvent.click(screen.getByRole("button", { name: sourceT("retry") }));
     expect(await screen.findByRole("button", { name: tFor(locale)("rotate") })).toBeTruthy();
     expect(screen.queryByRole("alert")).toBeNull();
-    expect(ctx.requests.map((r) => r.variables)).toEqual([
-      { slug: CLUSTER.slug },
-      { slug: CLUSTER.slug },
-    ]);
-    expect(ctx.requests.every((r) => r.operationName === "GetCluster")).toBe(true);
+    // The agent card also reads what the install withholds (calliope-installer#447).
+    expect(
+      ctx.requests.filter((r) => r.operationName === "GetCluster").map((r) => r.variables)
+    ).toEqual([{ slug: CLUSTER.slug }, { slug: CLUSTER.slug }]);
+    expect(
+      ctx.requests.every((r) => ["GetCluster", "WithheldCapabilities"].includes(r.operationName))
+    ).toBe(true);
   });
   it("keeps the actual route's once-issued key visible after an accepted write and failed refresh", async () => {
     const ctx = context(locale, "accepted", false, false);
@@ -437,11 +439,9 @@ describe.each(locales)("Cluster settings source in %s", (locale) => {
     ctx.setMode("accepted");
     await userEvent.click(screen.getByRole("button", { name: sourceT("retry") }));
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
-    expect(ctx.requests.map((r) => r.variables)).toEqual([
-      { slug: CLUSTER.slug },
-      { slug: CLUSTER.slug },
-      { slug: CLUSTER.slug },
-    ]);
+    expect(
+      ctx.requests.filter((r) => r.operationName === "GetCluster").map((r) => r.variables)
+    ).toEqual([{ slug: CLUSTER.slug }, { slug: CLUSTER.slug }, { slug: CLUSTER.slug }]);
   });
   it.each(["read-null", "read-unknown"] as const)(
     "%s keeps confirmed not-found distinct from unavailable and sends no mutation",
