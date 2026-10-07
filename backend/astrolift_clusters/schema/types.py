@@ -464,6 +464,10 @@ class BootstrapComponentType:
     # it (for example the ALB controller installed by hand into kube-system).
     # Never pre-selected: a second copy fights the first (#2119).
     running_outside_recipe: bool = False
+    # Why the install refuses it (calliope-installer#447): external-dns with
+    # DNS withheld, the ALB controller with load balancers withheld. Offered
+    # disabled with this reason; the install mutation refuses it too.
+    withheld_reason: str | None = None
 
 
 @strawberry.type(name="AstroliftClusterBootstrapPlan")
@@ -492,9 +496,12 @@ def _bootstrap_option_to_type(opt) -> BootstrapOptionType:
 
 
 def _bootstrap_component_to_type(
-    component, *, installed_by_recipe: bool = False, running_outside_recipe: bool = False
+    component, *, cluster=None, installed_by_recipe: bool = False, running_outside_recipe: bool = False
 ) -> BootstrapComponentType:
+    from core.install_restrictions import controller_refusal
+
     return BootstrapComponentType(
+        withheld_reason=controller_refusal(component.key, cluster) or None,
         installed_by_recipe=installed_by_recipe,
         running_outside_recipe=running_outside_recipe,
         key=component.key,
@@ -517,7 +524,10 @@ def bootstrap_plan_to_type(cluster, components) -> BootstrapPlanType:
         provider_plugin_slug=cluster.provider_plugin.slug if cluster.provider_plugin_id else "",
         components=[
             _bootstrap_component_to_type(
-                c, installed_by_recipe=c.key in recipe, running_outside_recipe=c.key in outside
+                c,
+                cluster=cluster,
+                installed_by_recipe=c.key in recipe,
+                running_outside_recipe=c.key in outside,
             )
             for c in components
         ],

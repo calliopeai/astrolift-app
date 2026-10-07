@@ -5738,6 +5738,13 @@
         "manifestRevision": "SHA-256 do manifesto verificado",
         "localLicenseReview": "Revisei a licença e os direitos de redistribuição destes arquivos locais do modelo."
       }
+    },
+    "installModel": {
+      "title": "Gerenciado pela instalação",
+      "badge": "somente leitura",
+      "description": "A instalação serve este modelo em suas próprias GPUs. Aqui ele é somente leitura; altere-o no instalador.",
+      "replicas": "{count, plural, one {# réplica} other {# réplicas}}, uma GPU cada",
+      "replicasUnknown": "Réplicas não informadas pela instalação"
     }
   },
   "home": {
@@ -6320,6 +6327,7 @@
       "unknown": "desconhecido",
       "installed": "instalado pela receita",
       "outsideRecipe": "em execução fora da receita",
+      "withheld": "retido pela instalação",
       "requires": "requer: {requirement}",
       "selected": "{count, number} de {total, number} selecionados",
       "requesting": "Solicitando…",

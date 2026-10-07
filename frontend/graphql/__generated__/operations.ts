@@ -1924,6 +1924,7 @@ export type AstroliftClusterBootstrapComponent = {
   requires: Array<Scalars['String']['output']>;
   runningOutsideRecipe: Scalars['Boolean']['output'];
   title: Scalars['String']['output'];
+  withheldReason?: Maybe<Scalars['String']['output']>;
 };
 
 export type AstroliftClusterBootstrapOption = {
@@ -3108,6 +3109,11 @@ export type AstroliftImportSkillsResultMutationResult = {
   data?: Maybe<AstroliftImportSkillsResult>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftInstallManagedModel = {
+  modelId: Scalars['String']['output'];
+  replicas?: Maybe<Scalars['Int']['output']>;
 };
 
 export type AstroliftInstallSourceWebhookPayload = {
@@ -5695,6 +5701,11 @@ export type AstroliftWebhookTestResultMutationResult = {
   data?: Maybe<AstroliftWebhookTestResult>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftWithheldCapability = {
+  capability: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
 };
 
 export type AstroliftWorkflowHistoryEvent = {
@@ -10836,6 +10847,8 @@ export type Query = {
   astroliftHuggingFaceModel: HuggingFaceModelResult;
   astroliftHuggingFaceModels: HuggingFaceModelsPage;
   astroliftIdentityProviders: Array<AstroliftIdentityProvider>;
+  /** The model the install serves on its own GPUs (calliope-installer#446), read-only in the console; null when the platform model is a cloud API or off. */
+  astroliftInstallManagedModel?: Maybe<AstroliftInstallManagedModel>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage. */
   astroliftInvitations: Array<AstroliftInvitation>;
   astroliftInvitationsCsv: AstroliftIdentityCsvExport;
@@ -10974,6 +10987,8 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftWebhookSubscriptionsPage. */
   astroliftWebhookSubscriptions: Array<AstroliftWebhookSubscription>;
   astroliftWebhookSubscriptionsPage: AstroliftWebhookSubscriptionPage;
+  /** What the install withholds from Astrolift (calliope-installer#447): dns, databases, load_balancers, clusters, each with the reason to show. Empty when nothing is withheld. */
+  astroliftWithheldCapabilities: Array<AstroliftWithheldCapability>;
   astroliftWorkflowInstance?: Maybe<AstroliftWorkflowInstance>;
   astroliftWorkflowInstanceDetail?: Maybe<AstroliftWorkflowInstanceDetail>;
   astroliftWorkflowInstances: AstroliftWorkflowInstancePage;
@@ -15405,7 +15420,7 @@ export type ClusterBootstrapPlanQueryVariables = Exact<{
 }>;
 
 
-export type ClusterBootstrapPlanQuery = { astroliftClusterBootstrapPlan?: { clusterId: string, providerPluginSlug: string, components: Array<{ key: string, title: string, defaultEnabled: boolean, installedByRecipe: boolean, runningOutsideRecipe: boolean, rationale: string, helmValues: unknown, requires: Array<string>, options: Array<{ key: string, label: string, default: string, choices: Array<{ value: string, label: string }> }> }> } | null };
+export type ClusterBootstrapPlanQuery = { astroliftClusterBootstrapPlan?: { clusterId: string, providerPluginSlug: string, components: Array<{ key: string, title: string, defaultEnabled: boolean, installedByRecipe: boolean, runningOutsideRecipe: boolean, withheldReason?: string | null, rationale: string, helmValues: unknown, requires: Array<string>, options: Array<{ key: string, label: string, default: string, choices: Array<{ value: string, label: string }> }> }> } | null };
 
 export type InstallClusterPrereqsMutationVariables = Exact<{
   input: InstallClusterPrereqsInputType;
@@ -15994,6 +16009,16 @@ export type MyUiPreferencesQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type MyUiPreferencesQuery = { astroliftMyUiPreferences?: { homeLayout?: string | null, homeLayoutAsked: boolean, fleetView: string, workflowView: string, appView: string, flowParticles: boolean, motion: string, restrictedSettings: string, restrictedSettingsChoice?: string | null, restrictedSettingsOrgDefault: string, appearance: unknown } | null };
+
+export type WithheldCapabilitiesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type WithheldCapabilitiesQuery = { astroliftWithheldCapabilities: Array<{ capability: string, reason: string }> };
+
+export type InstallManagedModelQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type InstallManagedModelQuery = { astroliftInstallManagedModel?: { modelId: string, replicas?: number | null } | null };
 
 export type ListEnvironmentsQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;

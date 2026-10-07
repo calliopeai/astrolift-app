@@ -259,7 +259,9 @@ def _us_east_1_dns_driver():
     ``core.dns_discovery`` pattern."""
     from aws.dns_route53 import Route53Config, Route53Driver
 
-    return Route53Driver(config=Route53Config())
+    from core.install_restrictions import guard_dns_driver
+
+    return guard_dns_driver(Route53Driver(config=Route53Config()), "aws")
 
 
 def _ensure_cloudfront_cert_sync(deployment_id: int) -> dict[str, Any]:

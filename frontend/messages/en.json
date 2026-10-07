@@ -5818,6 +5818,13 @@
         "manifestRevision": "Verified manifest SHA-256",
         "localLicenseReview": "I have reviewed the license and redistribution rights of these local model files."
       }
+    },
+    "installModel": {
+      "title": "Managed by the install",
+      "badge": "read-only",
+      "description": "The install serves this model on its own GPUs. It is read-only here; change it in the installer.",
+      "replicas": "{count, plural, one {# replica} other {# replicas}}, one GPU each",
+      "replicasUnknown": "Replicas not reported by the install"
     }
   },
   "home": {
@@ -6400,6 +6407,7 @@
       "unknown": "unknown",
       "installed": "installed by the recipe",
       "outsideRecipe": "running outside the recipe",
+      "withheld": "withheld by the install",
       "requires": "requires: {requirement}",
       "selected": "{count, number} of {total, number} selected",
       "requesting": "Requesting…",

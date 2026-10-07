@@ -2,6 +2,7 @@
 
 import { ManagedServicesScreen } from "@/components/screens/apps/managed-services/ManagedServicesScreen";
 import { useManagedServices } from "@/components/screens/apps/managed-services/use-managed-services";
+import { useWithheldCapabilities } from "@/hooks/use-install-policy";
 
 import { EmailDetailSheet } from "./email-detail-sheet";
 import { ServiceDetailSheet } from "./service-detail-sheet";
@@ -16,6 +17,7 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
     <ManagedServicesScreen
       {...useManagedServices(slug)}
       slug={slug}
+      databaseRestriction={useWithheldCapabilities().databases}
       renderEmailDetail={(svc, onOpenChange) => (
         <EmailDetailSheet
           managedServiceId={svc.id}

@@ -731,6 +731,19 @@ def _install_cluster_prereqs_sync(
     if additive:
         selected_set |= _edge_controllers_for_additive_run(cluster, components, selected_set)
 
+    # Controllers acting for what the install withholds (calliope-installer#447)
+    # are never installed: their IRSA roles are denied, so a new release would
+    # only sit failing. The cluster owner's own copies, if any, do the work.
+    # Nor are they removed: a release the recipe installed before keeps running
+    # under the role it already has, which the Deny does not take away, and
+    # apps' load balancers and records depend on it.
+    from core.install_restrictions import controller_refusal
+
+    withheld_keys = {c.key for c in components if controller_refusal(c.key, cluster)}
+    if withheld := selected_set & withheld_keys:
+        log.info("install_cluster_prereqs: skipping %s, withheld by the install", sorted(withheld))
+    selected_set -= withheld_keys
+
     # Self-provision the AWS controllers' IRSA roles before their HelmReleases
     # land, so each controller can assume its role as soon as its pods start
     # (#1032 EBS-CSI, #1044 ALB controller + external-dns). No-op for non-AWS
@@ -949,7 +962,7 @@ def _install_cluster_prereqs_sync(
     deselected_releases = [
         f"astrolift-{c.key.replace('_', '-')}"
         for c in components
-        if c.key not in selected_set and c.chart_repo_url
+        if c.key not in selected_set and c.key not in withheld_keys and c.chart_repo_url
     ]
     to_delete_releases = set(deselected_releases) | _LEGACY_HELM_RELEASE_NAMES
     to_delete_repos = _LEGACY_HELM_REPO_NAMES

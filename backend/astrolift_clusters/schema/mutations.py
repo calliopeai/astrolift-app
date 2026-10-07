@@ -1242,6 +1242,13 @@ class ClustersMutation:
 
             if has_cluster_owned_models(cluster.pk):
                 return gql_failure(ErrorCode.PRECONDITION.value, MODEL_CLEANUP_REQUIRED)
+            # Deleting the cloud cluster is cluster lifecycle; retiring the row
+            # (delete_cloud_infra=False) only lifts the platform's RBAC.
+            if input.delete_cloud_infra:
+                from core.install_restrictions import cluster_delete_refusal
+
+                if refusal := cluster_delete_refusal(cluster):
+                    return gql_failure(ErrorCode.PRECONDITION.value, refusal, field="deleteCloudInfra")
             actor = _actor_from_request(info)
             _kick_decommission_cluster(
                 cluster=cluster,
@@ -1298,6 +1305,11 @@ class ClustersMutation:
             from astrolift_clusters.edge_install import edge_support_refusal
 
             if refusal := edge_support_refusal(cluster):
+                return gql_failure(ErrorCode.PRECONDITION.value, refusal, field="selectedComponents")
+        from core.install_restrictions import controller_refusal
+
+        for key in input.selected_components:
+            if refusal := controller_refusal(key, cluster):
                 return gql_failure(ErrorCode.PRECONDITION.value, refusal, field="selectedComponents")
         overrides: dict[str, dict[str, str]] = {}
         for o in input.option_overrides or []:
@@ -1518,6 +1530,13 @@ class ClustersMutation:
                 "Use registerCloudflareDnsZone with a reviewed connection and zone.",
                 field="dnsDriver",
             )
+        # A Route53 zone the platform manages is one it writes records into,
+        # which an install that withholds DNS denies (calliope-installer#447).
+        if input.dns_driver == "route53":
+            from core.install_restrictions import reason
+
+            if refusal := reason("dns"):
+                return gql_failure(ErrorCode.PRECONDITION.value, refusal, field="dnsDriver")
         # One spelling per DNS zone (#1931): the DNS driver resolves a zone by
         # canonical name, so ``Globex.example.`` and ``globex.example`` are one
         # zone. Stored canonical, and unique on that form, so a variant can't

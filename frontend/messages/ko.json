@@ -5738,6 +5738,13 @@
         "manifestRevision": "검증된 매니페스트 SHA-256",
         "localLicenseReview": "이 로컬 모델 파일의 라이선스와 재배포 권한을 검토했습니다."
       }
+    },
+    "installModel": {
+      "title": "설치에서 관리",
+      "badge": "읽기 전용",
+      "description": "설치가 자체 GPU에서 이 모델을 제공합니다. 여기서는 읽기 전용이며, 변경은 설치 프로그램에서 하세요.",
+      "replicas": "{count, plural, other {복제본 #개}}, 각각 GPU 1개",
+      "replicasUnknown": "설치에서 복제본 수를 보고하지 않음"
     }
   },
   "home": {
@@ -6320,6 +6327,7 @@
       "unknown": "알 수 없음",
       "installed": "이 구성으로 설치됨",
       "outsideRecipe": "이 구성 외부에서 실행 중",
+      "withheld": "설치에서 보류됨",
       "requires": "필요: {requirement}",
       "selected": "{total, number}개 중 {count, number}개 선택",
       "requesting": "요청 중…",
