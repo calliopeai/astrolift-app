@@ -17,7 +17,15 @@ from __future__ import annotations
 
 import os
 
-from temporalio.exceptions import ApplicationError
+try:
+    from temporalio.exceptions import ApplicationError
+except ImportError:  # pragma: no cover - the provider test job imports core without the SDK
+
+    class ApplicationError(Exception):  # type: ignore[no-redef]
+        def __init__(self, message: str, *, non_retryable: bool = False) -> None:
+            super().__init__(message)
+            self.non_retryable = non_retryable
+
 
 ENV_VAR = "ASTROLIFT_WITHHELD_CAPABILITIES"
 
