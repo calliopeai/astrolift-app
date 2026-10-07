@@ -16,8 +16,9 @@ Constance flags ``ZENTINELLE_ENABLED`` and ``ZENTINELLE_GATEWAY_ENABLED``
 are turned on.
 
 Idempotent. A live connection to the same Zentinelle is left as it is and
-the run succeeds without reading the code. A connection Zentinelle has
-revoked is disconnected here and connected again with the code. A live
+the run succeeds without reading the code; live means Zentinelle still
+accepts its credential, asked each run. A connection Zentinelle has revoked
+is disconnected here and connected again with the code. A live
 connection to a different Zentinelle is refused: rewiring an organization's
 governance is an org admin's call.
 """
@@ -68,6 +69,13 @@ class Command(BaseCommand):
                     f"organization {organization.slug!r} is connected to {existing.base_url}; "
                     "an org admin disconnects it before it connects elsewhere"
                 )
+            try:
+                live = zentinelle_connect.credential_accepted(existing)
+            except zentinelle_connect.ZentinelleConnectError as exc:
+                raise CommandError(exc.message) from None
+            if not live:
+                existing.refresh_from_db()
+        if existing is not None and existing.status == ZentinelleConnection.Status.CONNECTED:
             self._enable_flags()
             self.stdout.write(f"organization {organization.slug} already connected to {url}; nothing to do")
             return

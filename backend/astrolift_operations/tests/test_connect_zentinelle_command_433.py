@@ -112,7 +112,7 @@ def test_running_again_with_a_live_connection_is_a_no_op_success(org, zentinelle
     output = _run(org.slug, url=BASE + "/")
 
     assert "nothing to do" in output
-    assert len(zentinelle.calls) == 1
+    assert zentinelle.paths() == [("POST", f"{API}/connect"), ("GET", f"{API}/install")]
     assert list(ZentinelleConnection.all_objects.filter(organization=org)) == [first]
     assert config.ZENTINELLE_GATEWAY_ENABLED is True
 
@@ -142,6 +142,44 @@ def test_a_revoked_connection_is_replaced(org, zentinelle, monkeypatch):
     revoked.refresh_from_db()
     assert revoked.deleted_at is not None
     assert [c.url for c in zentinelle.calls] == [f"{BASE}{API}/connect"] * 2
+
+
+@override_config(ZENTINELLE_ENABLED=False, ZENTINELLE_GATEWAY_ENABLED=False)
+def test_a_connection_zentinelle_revoked_but_not_yet_marked_here_is_replaced(org, zentinelle, monkeypatch):
+    monkeypatch.setenv(ENV, CODE)
+    _run(org.slug)
+    stale = ZentinelleConnection.objects.get(organization=org)
+    assert stale.status == ZentinelleConnection.Status.CONNECTED
+    zentinelle.revoked = True
+
+    def connect_again(method, url, **kwargs):
+        if url.endswith(f"{API}/connect"):
+            zentinelle.revoked = False
+        return FakeZentinelle.__call__(zentinelle, method, url, **kwargs)
+
+    monkeypatch.setattr(zentinelle_connect.requests, "request", connect_again)
+
+    output = _run(org.slug)
+
+    assert "nothing to do" not in output
+    live = ZentinelleConnection.objects.get(organization=org)
+    assert live.pk != stale.pk
+    assert live.status == ZentinelleConnection.Status.CONNECTED
+    stale.refresh_from_db()
+    assert stale.status != ZentinelleConnection.Status.CONNECTED
+    assert stale.deleted_at is not None
+    assert ("GET", f"{API}/install") in zentinelle.paths()
+    assert zentinelle.paths()[-1] == ("POST", f"{API}/connect")
+
+
+def test_an_unreachable_zentinelle_fails_the_run_rather_than_reporting_success(org, zentinelle, monkeypatch):
+    monkeypatch.setenv(ENV, CODE)
+    _run(org.slug)
+    zentinelle.overrides[("GET", f"{API}/install")] = zentinelle_connect.requests.ConnectionError("down")
+
+    with pytest.raises(CommandError, match="could not reach Zentinelle"):
+        _run(org.slug)
+    assert ZentinelleConnection.objects.get(organization=org).status == ZentinelleConnection.Status.CONNECTED
 
 
 @override_config(ZENTINELLE_ENABLED=False, ZENTINELLE_GATEWAY_ENABLED=False)
