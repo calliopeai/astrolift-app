@@ -37,6 +37,9 @@ def world(monkeypatch):
     w.cluster = make_cluster(w, "withheld447")
     w.cluster.lifecycle = "managed"
     w.cluster.save()
+    # The installer's Denies reach AWS only; the shared world's plugin is a
+    # generic k8s one, so these clusters are put on the aws slug.
+    _set_provider(w.cluster, "aws")
     bind_role(
         w.user,
         permissions=[Permission.CLUSTER_UNREGISTER, Permission.CLUSTER_MANAGE],
@@ -47,6 +50,14 @@ def world(monkeypatch):
     w.queued = []
     monkeypatch.setattr(mutations, "start_workflow", lambda *args, **kwargs: w.queued.append((args, kwargs)))
     return w
+
+
+def _set_provider(cluster, slug):
+    from astrolift_clusters.models import ProviderPlugin
+
+    ProviderPlugin.objects.filter(pk=cluster.provider_plugin_id).update(slug=slug)
+    cluster.refresh_from_db()
+    cluster.provider_plugin.refresh_from_db()
 
 
 def decommission(w, *, delete_cloud_infra):
@@ -137,3 +148,38 @@ def test_the_recipe_offers_a_withheld_controller_with_its_reason(world, monkeypa
     assert plan["external-dns"] and "DNS is withheld" in plan["external-dns"]
     assert plan["aws-load-balancer-controller"] is None
     assert plan["cert-manager"] is None
+
+
+def test_a_cluster_off_aws_is_not_withheld(world, monkeypatch):
+    """The Denies are AWS IAM statements: an on-prem cluster's external-dns
+    and deleting it never call AWS, so neither is refused there."""
+    _set_provider(world.cluster, "k8s_native")
+    monkeypatch.setenv(ENV_VAR, "dns,databases,load_balancers,clusters")
+    assert install(world, ["external-dns"]).ok
+    assert decommission(world, delete_cloud_infra=True).ok
+    components = [
+        BootstrapComponent(key="external-dns", title="external-dns", default_enabled=True, rationale="")
+    ]
+    assert bootstrap_plan_to_type(world.cluster, components).components[0].withheld_reason is None
+
+
+def test_a_route53_managed_domain_is_refused_when_dns_is_withheld(permission_resolver, monkeypatch):
+    import uuid
+    from types import SimpleNamespace
+
+    from astrolift_clusters.models import ManagedDomain
+    from astrolift_clusters.schema.mutations import CreateManagedDomainInput
+    from astrolift_identity.models import Organization
+
+    monkeypatch.setattr("core.documents.ProfileDocument.index_profile", classmethod(lambda *_: None))
+    permission_resolver.grant(Permission.PROVIDER_PLUGIN_CONFIGURE)
+    monkeypatch.setenv(ENV_VAR, "dns")
+    org = Organization.objects.create(name="D447", slug=f"d447-{uuid.uuid4().hex[:6]}")
+    with tenant_context(TenantContext(organization_id=org.id)):
+        result = ClustersMutation().create_managed_domain(
+            SimpleNamespace(context=SimpleNamespace(user=None, request=None)),
+            CreateManagedDomainInput(zone="apps.d447.example", dns_driver="route53"),
+        )
+    assert not result.ok and result.errors[0].code == "PRECONDITION"
+    assert "DNS is withheld" in result.errors[0].message
+    assert not ManagedDomain.objects.filter(zone="apps.d447.example").exists()

@@ -274,14 +274,14 @@ def list_catalog(
     # that had one obvious answer into one that demands an explicit variant --
     # that would break every existing caller of resolve_variant that omits it.
     # A borrowed variant becomes the default only where the cloud offers none.
+    # Withholding (calliope-installer#447) never moves the default: a withheld
+    # variant still counts here, so a kind whose default it was gets no
+    # default and resolve_variant refuses with the reason, rather than quietly
+    # picking an in-cluster variant the author never chose.
     native_by_kind: dict[str, list[str]] = defaultdict(list)
     for kind, variant in keys:
         meta = metadata.get((kind, variant))
-        if (
-            (kind, variant) in drivers
-            and (meta is None or meta.status in {"ga", "preview"})
-            and not database_refusal(kind, variant)
-        ):
+        if (kind, variant) in drivers and (meta is None or meta.status in {"ga", "preview"}):
             available_by_kind[kind].append(variant)
             if (kind, variant) not in borrowed:
                 native_by_kind[kind].append(variant)

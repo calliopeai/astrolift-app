@@ -1022,12 +1022,7 @@ def _render_app_ingresses_and_tls(
                     )
                 )
             elif computed:
-                from core.install_restrictions import app_ingress_refusal
-
-                if app_ingress_refusal(cluster):
-                    # Load balancers withheld: the same skip core.app_deploy makes.
-                    pass
-                elif cluster.ingress_class == "alb":
+                if cluster.ingress_class == "alb":
                     from core.app_deploy import (
                         cognito_auth_for_cluster,
                         shared_ingress_annotations,

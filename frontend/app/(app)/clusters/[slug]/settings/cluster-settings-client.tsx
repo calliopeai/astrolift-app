@@ -31,15 +31,17 @@ export function ClusterSettingsClient({ slug }: { slug: string }) {
   const settings = useClusterSettings(slug);
   const cluster = settings.cluster;
   const section = useSettingsSection();
-  // Read only while the Danger zone, where cluster deletion is offered, is shown.
-  const withheld = useWithheldCapabilities({ skip: section.active !== "danger-zone" });
+  // Read only while the Danger zone, where cluster deletion is offered, is
+  // shown. The installer's Deny is on AWS, so only an AWS cluster is refused.
+  const onAws = cluster?.providerPluginSlug === "aws";
+  const withheld = useWithheldCapabilities({ skip: !onAws || section.active !== "danger-zone" });
 
   return (
     <ClusterSettingsScreen
       {...settings}
       slug={slug}
       section={section}
-      deleteWithheldReason={withheld.clusters}
+      deleteWithheldReason={onAws ? withheld.clusters : null}
       cards={
         cluster
           ? {

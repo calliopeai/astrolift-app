@@ -13,6 +13,7 @@ from core import install_restrictions as ir
 from core.schema.types.install_policy import InstallPolicyQuery
 
 ALL = "dns,databases,load_balancers,clusters"
+AWS = SimpleNamespace(provider_plugin=SimpleNamespace(slug="aws"))
 MODEL_ENV = (
     "ASTROLIFT_PLATFORM_MODEL_PROVIDER",
     "ASTROLIFT_PLATFORM_MODEL_URL",
@@ -49,8 +50,8 @@ def test_unset_withholds_nothing():
     assert ir.withheld() == frozenset()
     assert ir.reason("databases") == ""
     assert ir.database_refusal("postgres", "rds") == ""
-    assert ir.controller_refusal("external-dns") == ""
-    assert ir.app_ingress_refusal(SimpleNamespace(ingress_class="alb")) == ""
+    assert ir.controller_refusal("external-dns", AWS) == ""
+    assert ir.cluster_delete_refusal(AWS) == ""
 
 
 def test_reads_the_installer_list_and_ignores_unknown_names(monkeypatch):
@@ -77,13 +78,48 @@ def test_databases_refuse_rds_backed_variants_only(monkeypatch):
     assert ir.database_refusal("redis", "elasticache") == ""
 
 
-def test_app_ingress_is_refused_only_where_it_would_make_a_load_balancer(monkeypatch):
-    monkeypatch.setenv(ir.ENV_VAR, "load_balancers")
-    assert "Load balancers are withheld" in ir.app_ingress_refusal(SimpleNamespace(ingress_class="alb"))
-    assert ir.app_ingress_refusal(SimpleNamespace(ingress_class="envoy")) == ""
-    assert ir.app_ingress_refusal(SimpleNamespace(ingress_class="nginx")) == ""
+def test_controllers_and_cluster_deletes_are_refused_only_on_aws(monkeypatch):
+    """The Denies are IAM statements on the AWS task role. A GKE, AKS or
+    on-prem cluster's external-dns, or deleting such a cluster, never calls AWS."""
+    monkeypatch.setenv(ir.ENV_VAR, ALL)
+    assert "DNS is withheld" in ir.controller_refusal("external-dns", AWS)
+    assert "Load balancers are withheld" in ir.controller_refusal("aws-load-balancer-controller", AWS)
+    assert ir.controller_refusal("cert-manager", AWS) == ""
+    assert "Cluster lifecycle is withheld" in ir.cluster_delete_refusal(AWS)
+    for slug in ("gcp", "azure", "k8s_native"):
+        other = SimpleNamespace(provider_plugin=SimpleNamespace(slug=slug))
+        assert ir.controller_refusal("external-dns", other) == ""
+        assert ir.cluster_delete_refusal(other) == ""
+
+
+class _Route53:
+    def ensure_record(self, **kw):
+        return "wrote"
+
+    def list_zones(self):
+        return ["zone"]
+
+
+def test_dns_writes_are_refused_with_the_reason_and_reads_pass(monkeypatch):
+    driver = _Route53()
+    assert ir.guard_dns_driver(driver, "aws") is driver
+
     monkeypatch.setenv(ir.ENV_VAR, "dns")
-    assert ir.app_ingress_refusal(SimpleNamespace(ingress_class="alb")) == ""
+    guarded = ir.guard_dns_driver(driver, "aws")
+    assert guarded.list_zones() == ["zone"]
+    for write in ("ensure_record", "delete_record", "provision_zone", "deprovision_zone"):
+        with pytest.raises(ir.WithheldCapabilityError, match="DNS is withheld"):
+            getattr(guarded, write)(zone="z", name="n", type="A", value="v")
+    assert ir.guard_dns_driver(driver, "gcp") is driver
+
+
+def test_platform_dns_drivers_carry_the_guard(monkeypatch):
+    from astrolift_workflows.activities.static_site import _us_east_1_dns_driver
+
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "us-east-1")
+    monkeypatch.setenv(ir.ENV_VAR, "dns")
+    with pytest.raises(ir.WithheldCapabilityError, match="DNS is withheld"):
+        _us_east_1_dns_driver().ensure_record(zone="z", name="n", type="CNAME", value="v")
 
 
 # ---- databases: the catalogue and the activity -------------------------------
@@ -112,6 +148,21 @@ def test_resolution_refuses_a_withheld_database_with_the_reason(monkeypatch):
     with pytest.raises(CatalogResolutionError, match="Databases are withheld.*cnpg"):
         resolve_variant(plugin_slug="aws", kind="postgres", requested_variant=None)
     assert resolve_variant(plugin_slug="aws", kind="postgres", requested_variant="cnpg").variant == "cnpg"
+
+
+@pytest.mark.parametrize("kind", ["mssql", "document_db", "graph_db"])
+def test_withholding_does_not_promote_an_in_cluster_variant_to_default(monkeypatch, kind):
+    """Kinds with no configured default needed an explicit variant before;
+    withholding the RDS-backed ones must refuse with the reason, not quietly
+    pick the lone in-cluster variant left."""
+    with pytest.raises(CatalogResolutionError, match="explicit variant"):
+        resolve_variant(plugin_slug="aws", kind=kind, requested_variant=None)
+    monkeypatch.setenv(ir.ENV_VAR, "databases")
+    assert not any(
+        row.is_default_for_kind for row in list_catalog("aws", include_extended=True) if row.kind == kind
+    )
+    with pytest.raises(CatalogResolutionError, match="Databases are withheld"):
+        resolve_variant(plugin_slug="aws", kind=kind, requested_variant=None)
 
 
 def test_activity_refuses_an_rds_backed_service_without_retrying(monkeypatch):

@@ -1,4 +1,9 @@
-"""No per-app load balancer Ingress when the install withholds load balancers (calliope-installer#447)."""
+"""App Ingresses are rendered when the install withholds load balancers (calliope-installer#447).
+
+The withholding denies the control plane's own ELB calls and its own AWS Load
+Balancer Controller. An Ingress is a Kubernetes object; a controller the
+cluster's owner runs still makes the app's load balancer from it.
+"""
 
 from __future__ import annotations
 
@@ -52,9 +57,9 @@ def test_unset_renders_the_app_ingress():
     assert _ingresses(_deployment("alb")) == ["web-managed"]
 
 
-def test_withheld_load_balancers_skip_the_alb_app_ingress(monkeypatch):
+def test_withheld_load_balancers_keep_the_alb_app_ingress(monkeypatch):
     monkeypatch.setenv("ASTROLIFT_WITHHELD_CAPABILITIES", "load_balancers")
-    assert _ingresses(_deployment("alb")) == []
+    assert _ingresses(_deployment("alb")) == ["web-managed"]
 
 
 def test_withheld_load_balancers_keep_ingresses_behind_the_cluster_load_balancer(monkeypatch):

@@ -92,22 +92,59 @@ def database_refusal(kind: str, variant: str) -> str:
     return reason("databases")
 
 
-def controller_refusal(component_key: str) -> str:
-    """Why installing a bootstrap component is refused, or ``""``."""
-    capability = CONTROLLERS.get(component_key)
-    return reason(capability) if capability else ""
+def _on_aws(cluster) -> bool:
+    """Whether ``cluster`` runs on AWS, the only cloud the installer's Denies reach.
 
-
-def app_ingress_refusal(cluster) -> str:
-    """Why an app's own Ingress is not rendered on ``cluster``, or ``""``.
-
-    On the ALB class every app Ingress is a load balancer the AWS Load
-    Balancer Controller makes for it, which is what withholding load
-    balancers takes away. Envoy routes and nginx Ingresses sit behind one
-    load balancer the cluster already has, so they are unaffected; that one
-    sign-in for every app is what the installer requires when load balancers
-    are withheld.
+    The Denies are IAM statements on the control plane's AWS task role. A
+    GKE, AKS or on-prem cluster's external-dns, or deleting such a cluster,
+    never calls AWS, so nothing is withheld there.
     """
-    if (getattr(cluster, "ingress_class", "") or "") != "alb":
-        return ""
-    return reason("load_balancers")
+    return getattr(getattr(cluster, "provider_plugin", None), "slug", "") == "aws"
+
+
+def controller_refusal(component_key: str, cluster) -> str:
+    """Why installing a bootstrap component on ``cluster`` is refused, or ``""``."""
+    capability = CONTROLLERS.get(component_key)
+    return reason(capability) if capability and _on_aws(cluster) else ""
+
+
+def cluster_delete_refusal(cluster) -> str:
+    """Why deleting ``cluster``'s cloud infrastructure is refused, or ``""``."""
+    return reason("clusters") if _on_aws(cluster) else ""
+
+
+class WithheldCapabilityError(Exception):
+    """A call the install withholds, refused before it reaches AWS."""
+
+
+#: Route53Driver methods that change DNS: every one the WithheldDns Deny
+#: refuses. Reads (zones, records, certificate status) stay allowed.
+_DNS_WRITES = frozenset({"ensure_record", "delete_record", "provision_zone", "deprovision_zone"})
+
+
+class _DnsWritesRefused:
+    """A DNS driver whose writes raise the withheld reason instead of AccessDenied."""
+
+    def __init__(self, driver, refusal: str) -> None:
+        self._driver = driver
+        self._refusal = refusal
+
+    def __getattr__(self, name: str):
+        if name in _DNS_WRITES:
+
+            def _refused(*_args, **_kwargs):
+                raise WithheldCapabilityError(self._refusal)
+
+            return _refused
+        return getattr(self._driver, name)
+
+
+def guard_dns_driver(driver, plugin_slug: str):
+    """``driver``, with its Route53 writes refused when the install withholds DNS.
+
+    The control plane writes Route53 itself in several workflows (managed
+    domains, custom-domain records, static sites); each gets the reason
+    here rather than AccessDenied partway through.
+    """
+    refusal = reason("dns") if plugin_slug == "aws" else ""
+    return _DnsWritesRefused(driver, refusal) if refusal else driver

@@ -184,3 +184,16 @@ def test_workflow_renderer_emits_no_alb_gate_without_a_config(deployment, cluste
 
     for ingress in _managed_ingresses(deployment):
         assert "alb.ingress.kubernetes.io/auth-type" not in ingress["metadata"]["annotations"]
+
+
+def test_workflow_renderer_keeps_the_alb_ingress_when_load_balancers_are_withheld(
+    deployment, cluster, monkeypatch
+):
+    """calliope-installer#447: withholding load balancers denies the control
+    plane's ELB calls, not the Ingress. A controller the cluster's owner runs
+    still makes the app's load balancer from it, as on the deploy path."""
+    monkeypatch.setenv("ASTROLIFT_WITHHELD_CAPABILITIES", "dns,databases,load_balancers,clusters")
+    cluster.ingress_class = "alb"
+    cluster.save()
+
+    assert _managed_ingresses(deployment), "expected the managed-subdomain Ingress"

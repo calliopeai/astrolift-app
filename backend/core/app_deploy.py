@@ -838,11 +838,16 @@ def driver_for_capability(cluster: TenantCluster, capability: str) -> Any:
         return _k8s_native_registry_driver(cluster)
     cfg = _config_for_capability(plugin_slug, cluster, capability)
     try:
-        return driver_cls(config=cfg)
+        driver = driver_cls(config=cfg)
     except TypeError as exc:
         raise AppDeployError(
             f"cluster {cluster.slug}: {capability} driver constructor rejected config: {exc}",
         ) from exc
+    if capability == "dns":
+        from core.install_restrictions import guard_dns_driver
+
+        return guard_dns_driver(driver, plugin_slug)
+    return driver
 
 
 def driver_for_target_cluster(
@@ -1245,11 +1250,7 @@ def render_resources_for_deployment(
         resources.extend(
             envoy_custom_domain_routes(deployment, manifest, namespace=namespace, cluster=cluster)
         )
-    from core.install_restrictions import app_ingress_refusal
-
-    if managed_domain is not None and cluster is not None and (refusal := app_ingress_refusal(cluster)):
-        log.info("render_resources_for_deployment: no app Ingress for %s: %s", app.slug, refusal)
-    elif managed_domain is not None and cluster is not None:
+    if managed_domain is not None and cluster is not None:
         ingress_resources = (
             _render_managed_subdomain_ingress(deployment, manifest, namespace, managed_domain, cluster) or []
         )

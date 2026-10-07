@@ -1173,3 +1173,21 @@ def test_install_sync_skips_controllers_the_install_withholds(monkeypatch, withh
         assert {"external-dns", "aws-load-balancer-controller"} <= set(result["skipped"])
     else:
         assert releases == {f"astrolift-{k}" for k in keys}
+
+
+def test_install_sync_keeps_a_withheld_controller_the_recipe_installed(monkeypatch):
+    """A re-run with DNS and load balancers withheld leaves external-dns and
+    the ALB controller alone: the releases keep running under the roles they
+    already have, and apps' records and load balancers depend on them. Only a
+    component the operator actually deselected is cleaned up."""
+    monkeypatch.setenv("ASTROLIFT_WITHHELD_CAPABILITIES", "dns,load_balancers")
+    keys = ("external-dns", "aws-load-balancer-controller", "cert-manager", "metrics-server")
+    driver = _FakeDriver()
+
+    _run_install_sync(monkeypatch, [_chart_component(k) for k in keys], driver, {"cert-manager"})
+
+    deleted = {
+        m["metadata"]["name"] for _s, _n, ms in driver.deletes for m in ms if m["kind"] == "HelmRelease"
+    }
+    assert "astrolift-metrics-server" in deleted
+    assert not deleted & {"astrolift-external-dns", "astrolift-aws-load-balancer-controller"}

@@ -352,9 +352,9 @@ def teardown_cluster_dispatch(*, cluster: TenantCluster, delete_cloud_infra: boo
     lifecycle (calliope-installer#447) raises before the driver is built.
     """
     if delete_cloud_infra:
-        from core.install_restrictions import reason
+        from core.install_restrictions import cluster_delete_refusal
 
-        if refusal := reason("clusters"):
+        if refusal := cluster_delete_refusal(cluster):
             raise ClusterManagementError(f"cluster {cluster.slug}: {refusal}")
     driver = _driver_for_cluster(cluster)
     if not hasattr(driver, "teardown_cluster"):
