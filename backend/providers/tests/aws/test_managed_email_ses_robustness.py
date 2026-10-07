@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from _sdk.managed_service import ProvisionSpec
+from _sdk.managed_service import ProvisionSpec, ServiceHandle
 from aws.managed._base import parse_handle
 from aws.managed.email_ses import (
     KIND,
@@ -180,10 +180,11 @@ def _driver(
     sm: FakeSecretsManager | None = None,
     route53: FakeRoute53Driver | None = None,
     base_domain: str = "astrolift.test",
+    dns_withheld_reason: str = "",
 ) -> AmazonSESDriver:
     ses = ses or FakeSes()
     return AmazonSESDriver(
-        config=SESEmailConfig(region="us-east-1", base_domain=base_domain),
+        config=SESEmailConfig(region="us-east-1", base_domain=base_domain, dns_withheld_reason=dns_withheld_reason),
         ses_client=ses,
         sesv2_client=sesv2 or FakeSesV2(ses),
         secrets_client=sm or FakeSecretsManager(),
@@ -303,6 +304,66 @@ def test_reentrant_provision_republishes_dns_for_pending_identity() -> None:
     assert second.ok is True
     assert "already registered" in second.message
     assert any(name == f"_amazonses.{identity}" for _, name, _t, _v in r53.records)
+
+
+# ---- DNS withheld by the install (calliope-installer#447) ---------------
+
+_DNS_WITHHELD = "DNS is withheld from Astrolift on this install."
+
+
+def test_dns_withheld_writes_no_records_and_says_why() -> None:
+    """With DNS withheld the verification records are refused before any
+    Route53 call, the identity still provisions, and the message gives
+    the reason instead of a generic "publish manually"."""
+    r53 = FakeRoute53Driver()
+    d = _driver(route53=r53, dns_withheld_reason=_DNS_WITHHELD)
+    result = d.provision(_spec())
+    assert result.ok is True
+    assert r53.records == []
+    assert f"dns records not published: {_DNS_WITHHELD}" in result.message
+    assert "publish records manually" not in result.message
+
+
+def test_dns_withheld_builds_no_route53_driver() -> None:
+    """The lazily built Route53 driver is the path that bypassed the
+    guard; with DNS withheld it is never constructed."""
+    d = AmazonSESDriver(
+        config=SESEmailConfig(region="us-east-1", base_domain="astrolift.test", dns_withheld_reason=_DNS_WITHHELD),
+        ses_client=(ses := FakeSes()),
+        sesv2_client=FakeSesV2(ses),
+        secrets_client=FakeSecretsManager(),
+    )
+    assert d.provision(_spec()).ok is True
+    assert d._route53 is None
+
+
+def test_dns_withheld_status_says_why_the_identity_is_pending() -> None:
+    d = _driver(dns_withheld_reason=_DNS_WITHHELD)
+    handle = d.provision(_spec()).handle
+    status = d.status(ServiceHandle(handle=handle))
+    assert status.state == "provisioning"
+    assert status.message.endswith(f"dns records not published: {_DNS_WITHHELD}")
+
+
+def test_dns_withheld_reentrant_provision_says_why() -> None:
+    r53 = FakeRoute53Driver()
+    d = _driver(route53=r53, dns_withheld_reason=_DNS_WITHHELD)
+    d.provision(_spec())
+    second = d.provision(_spec())
+    assert "already registered" in second.message
+    assert _DNS_WITHHELD in second.message
+    assert r53.records == []
+
+
+def test_dns_withheld_leaves_identities_it_never_writes_alone() -> None:
+    """An email identity, or a domain outside base_domain, is never
+    published anyway, so no reason is attached to it."""
+    d = _driver(dns_withheld_reason=_DNS_WITHHELD)
+    for identity in ("ops@example.com", "other.example.org"):
+        result = d.provision(_spec(config={"identity": identity}))
+        assert result.ok is True
+        assert _DNS_WITHHELD not in result.message
+        assert _DNS_WITHHELD not in d.status(ServiceHandle(handle=result.handle)).message
 
 
 def test_verify_failure_still_reported_as_not_ok() -> None:

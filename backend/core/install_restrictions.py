@@ -17,6 +17,16 @@ from __future__ import annotations
 
 import os
 
+try:
+    from temporalio.exceptions import ApplicationError
+except ImportError:  # pragma: no cover - the provider test job imports core without the SDK
+
+    class ApplicationError(Exception):  # type: ignore[no-redef]
+        def __init__(self, message: str, *, non_retryable: bool = False) -> None:
+            super().__init__(message)
+            self.non_retryable = non_retryable
+
+
 ENV_VAR = "ASTROLIFT_WITHHELD_CAPABILITIES"
 
 #: In the order the installer writes them.
@@ -113,8 +123,16 @@ def cluster_delete_refusal(cluster) -> str:
     return reason("clusters") if _on_aws(cluster) else ""
 
 
-class WithheldCapabilityError(Exception):
-    """A call the install withholds, refused before it reaches AWS."""
+class WithheldCapabilityError(ApplicationError):
+    """A call the install withholds, refused before it reaches AWS.
+
+    Non-retryable wherever it is raised: inside a Temporal activity it fails
+    the activity at once instead of retrying, because AWS would refuse every
+    attempt the same way. ``str()`` is the reason alone.
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, non_retryable=True)
 
 
 #: Route53Driver methods that change DNS: every one the WithheldDns Deny

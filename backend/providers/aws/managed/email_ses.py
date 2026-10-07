@@ -146,6 +146,14 @@ class SESEmailConfig(CredentialedConfig):
     constructor doesn't need to plumb the ARN through every
     instantiation site."""
 
+    dns_withheld_reason: str = ""
+    """Why the control plane may not write DNS on this install, or empty.
+    Set by the console when the install withholds DNS
+    (``ASTROLIFT_WITHHELD_CAPABILITIES``, calliope-installer#447). When
+    set, the verification records are never written: provision and
+    ``status()`` say why the identity stays pending instead of meeting
+    AccessDenied."""
+
 
 class AmazonSESDriver(ManagedServiceDriver):
     def __init__(
@@ -227,9 +235,13 @@ class AmazonSESDriver(ManagedServiceDriver):
                 spec=spec,
                 identity=identity,
             )
+            dns_refusal = ""
             if is_domain:
                 self._publish_verification_dns(identity=identity)
+                dns_refusal = self._dns_refusal(identity)
             message = f"ses identity {identity} already registered (state={existing_state})"
+            if dns_refusal:
+                message += f"; dns records not published: {dns_refusal}"
             if not smtp_ok:
                 message += "; smtp placeholder secrets not stored"
             return ProvisionResult(
@@ -298,9 +310,14 @@ class AmazonSESDriver(ManagedServiceDriver):
 
         message = f"ses identity {identity} verification requested (configuration set={cset_name})"
         if is_domain:
-            message += (
-                "; dns records published" if dns_published else "; pending dns verification (publish records manually)"
-            )
+            if dns_refusal := self._dns_refusal(identity):
+                message += f"; dns records not published: {dns_refusal}"
+            else:
+                message += (
+                    "; dns records published"
+                    if dns_published
+                    else "; pending dns verification (publish records manually)"
+                )
         if not smtp_ok:
             message += "; smtp placeholder secrets not stored"
 
@@ -425,11 +442,10 @@ class AmazonSESDriver(ManagedServiceDriver):
                 message=f"ses identity {identity} verified",
             )
         if state == "Pending":
-            return ServiceStatus(
-                handle=handle.handle,
-                state="provisioning",
-                message=(f"ses identity {identity} pending DNS / email verification"),
-            )
+            message = f"ses identity {identity} pending DNS / email verification"
+            if dns_refusal := self._dns_refusal(identity):
+                message += f"; dns records not published: {dns_refusal}"
+            return ServiceStatus(handle=handle.handle, state="provisioning", message=message)
         if state == "Failed":
             return ServiceStatus(
                 handle=handle.handle,
@@ -859,6 +875,20 @@ class AmazonSESDriver(ManagedServiceDriver):
             # Already-present is success; any other failure is a soft miss.
             return "ResourceExistsException" in type(exc).__name__
 
+    def _in_base_domain(self, identity: str) -> bool:
+        """Whether ``identity`` lives in the operator's zone, the only place
+        the driver writes verification records."""
+        base_domain = (self._config.base_domain or "").strip().rstrip(".")
+        return bool(base_domain) and (identity == base_domain or identity.endswith("." + base_domain))
+
+    def _dns_refusal(self, identity: str) -> str:
+        """Why the verification records for ``identity`` are not written, or
+        ``""``: set only for a domain identity the driver would otherwise
+        publish, on an install that withholds DNS."""
+        if "@" in identity or not self._in_base_domain(identity):
+            return ""
+        return self._config.dns_withheld_reason
+
     def _dns_driver(self) -> Any | None:
         """Return the Route53 driver used to publish verification records,
         constructing it lazily. Best-effort: returns ``None`` (rather than
@@ -887,13 +917,9 @@ class AmazonSESDriver(ManagedServiceDriver):
         identity simply stays pending verification, which is a normal,
         non-failing state."""
         base_domain = (self._config.base_domain or "").strip().rstrip(".")
-        if not base_domain:
-            return False
         # Only publish when the identity lives inside the operator's zone;
         # otherwise we'd write records into the wrong hosted zone.
-        if identity != base_domain and not identity.endswith(
-            "." + base_domain,
-        ):
+        if not self._in_base_domain(identity):
             return False
 
         try:
@@ -913,6 +939,11 @@ class AmazonSESDriver(ManagedServiceDriver):
         except Exception:
             verification_token = ""
         if not tokens and not verification_token:
+            return False
+        # The install withholds DNS: the SES side above still runs, so the
+        # tokens exist for the operator to publish, but no Route53 driver is
+        # built and nothing is written. The caller reports the reason.
+        if self._config.dns_withheld_reason:
             return False
 
         dns = self._dns_driver()

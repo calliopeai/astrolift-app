@@ -46,6 +46,8 @@ from typing import Any
 
 from temporalio import activity
 
+from core.install_restrictions import WithheldCapabilityError
+
 log = logging.getLogger("astrolift_workflows.activities.provision_managed_domain")
 
 
@@ -192,6 +194,12 @@ def _request_wildcard_cert_sync(cluster_id: int, zone: str, zone_id: str) -> str
                 value=record["value"],
                 ttl=300,
             )
+        except WithheldCapabilityError as exc:
+            # The install withholds DNS (installer #447): the guard refused
+            # before any Route53 call. The cert and its records are still
+            # persisted below for the operator to publish; the poll waits.
+            log.info("request_wildcard_cert_for_zone: validation records left to the operator: %s", exc)
+            break
         except Exception as exc:  # noqa: BLE001
             log.warning(
                 "request_wildcard_cert_for_zone: failed to write validation record %s: %s",
@@ -511,6 +519,11 @@ def _reissue_cert_sync(
                     value=record["value"],
                     ttl=300,
                 )
+            except WithheldCapabilityError as exc:
+                # As in request_wildcard_cert_for_zone: nothing was written,
+                # the new cert and its records are persisted for the operator.
+                log.info("reissue_cert: validation records left to the operator: %s", exc)
+                break
             except Exception as exc:  # noqa: BLE001
                 log.warning(
                     "reissue_cert: failed to write validation record %s: %s",

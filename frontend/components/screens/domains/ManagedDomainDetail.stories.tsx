@@ -1,7 +1,9 @@
 import { NextIntlClientProvider } from "next-intl";
 import en from "@/messages/en.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import {
+  DNS_WITHHELD,
   DOMAIN_DIAGNOSTICS,
   DOMAIN_LONG,
   DOMAIN_UNPROVISIONED,
@@ -41,6 +43,32 @@ export const Unprovisioned: Story = {
 };
 export const LongStrings: Story = {
   args: { ...MANAGED_DOMAIN, domain: DOMAIN_LONG, diagnostics: null },
+};
+/**
+ * calliope-installer#447: DNS withheld on a zone pending verification. Verify
+ * and Revalidate still run (the certificate is requested and its validation
+ * records are left for the operator), so they stay enabled and the page says
+ * why the records are not written. DnsUnset is the same zone without the
+ * restriction: no note.
+ */
+const pendingZone = { ...MANAGED_DOMAIN.domain!, verificationState: "pending" as const };
+const dnsActionsPlay =
+  (withheld: boolean): Story["play"] =>
+  async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    if (withheld) await expect(canvas.getByText(/DNS is withheld/)).toBeVisible();
+    else await expect(canvas.queryByText(/DNS is withheld/)).toBeNull();
+    for (const name of ["Verify TXT ownership", "Revalidate recorded DNS setup", "Remove domain"]) {
+      await expect(canvas.getByRole("button", { name })).toBeEnabled();
+    }
+  };
+export const DnsWithheld: Story = {
+  args: { ...MANAGED_DOMAIN, domain: pendingZone, canVerify: true, dnsRestriction: DNS_WITHHELD },
+  play: dnsActionsPlay(true),
+};
+export const DnsUnset: Story = {
+  args: { ...MANAGED_DOMAIN, domain: pendingZone, canVerify: true, dnsRestriction: null },
+  play: dnsActionsPlay(false),
 };
 export const Records: Story = { args: { ...MANAGED_DOMAIN, initialTab: "records" } };
 export const Routing: Story = { args: { ...MANAGED_DOMAIN, initialTab: "routing" } };

@@ -18,7 +18,17 @@ import { useFormatters } from "@/lib/i18n/formatters";
 import { domainDiagnosticReasonKey } from "./domain-diagnostic-reasons";
 import type { ManagedDomainState } from "./use-managed-domain";
 
-export type ManagedDomainDetailProps = ManagedDomainState & { id: string; initialTab?: Tab };
+export type ManagedDomainDetailProps = ManagedDomainState & {
+  id: string;
+  initialTab?: Tab;
+  /**
+   * Why Astrolift writes no DNS on this install (DNS withheld,
+   * calliope-installer#447). Verify and Revalidate still run: the certificate
+   * is requested and its validation records are left for the operator to
+   * publish, so the page says why instead of disabling them.
+   */
+  dnsRestriction?: string | null;
+};
 type Tab = "overview" | "records" | "routing" | "diagnostics";
 const recordTypes = [
   "A",
@@ -88,6 +98,10 @@ function DetailTabs({
     props.verifying ||
     props.deleting ||
     props.removed;
+  // Provisioning writes through the DNS cluster's driver whatever the row's
+  // dns_driver says; only a read-only Cloudflare zone never reaches it.
+  const dnsWithheld =
+    props.dnsRestriction && d.dnsDriver !== "cloudflare_read_only" ? props.dnsRestriction : null;
   const checkName = (key: string) =>
     ({
       delegation: t("publicDelegation"),
@@ -250,6 +264,7 @@ function DetailTabs({
           {t("delete")}
         </Button>
       </div>
+      {dnsWithheld && <p className="text-warning-fg text-sm">{dnsWithheld}</p>}
       {props.actionMessage && <p role="status">{props.actionMessage}</p>}
       {props.actionError && <p role="alert">{props.actionError}</p>}
       <ConfirmDialog

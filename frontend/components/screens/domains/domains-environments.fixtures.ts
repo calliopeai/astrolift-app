@@ -276,3 +276,7 @@ export const ENV_LONG: AstroliftAppEnvironment = {
     { id: "s-l1", key: `${LONG.toUpperCase().replace(/-/g, "_")}_KEY`, value: `${LONG}-value` },
   ],
 };
+
+/** The reason the install gives when it withholds DNS (calliope-installer#447). */
+export const DNS_WITHHELD =
+  "DNS is withheld from Astrolift on this install: it makes no Route53 changes and runs no external-dns of its own. App records come from an external-dns the cluster's owner runs, or are made another way.";
