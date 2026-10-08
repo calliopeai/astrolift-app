@@ -1,40 +1,13 @@
-"""Activities for Calliope App Builder dev environment provisioning (#767, #768).
+"""Builder provisioning, sync and promotion on the tenant cluster.
 
-Four durable units:
-
-* :func:`provision_dev_environment`: render + apply the K8s objects
-  that make a dev env serve traffic (Namespace + ConfigMap of uploaded
-  files + Deployment + Service + Ingress).
-* :func:`sync_dev_environment_files`: re-apply the rendered objects with
-  a bumped pod-template annotation so the existing Deployment rolls a
-  fresh pod that reads the new file payload.
-* :func:`deploy_promoted_app`: apply the same runtime into the promoted
-  app's own namespace (#1858), with its data volume on a PVC when the
-  cluster can provision one. Flips the dev env back to ``running`` on
-  success (#1875) -- promoting does not touch the dev env's own workload,
-  so its status should say so, and a stuck ``promoting`` blocked both a
-  files sync and a second promote.
-* :func:`record_promoted_app_deployment`: persist the runtime
-  ``deploy_promoted_app`` just applied as a Workload + Deployment (#1875),
-  so the app's own pages, rollback and observability see it.
-* :func:`mark_dev_environment_failed`: terminal-state writer used by
-  the workflows when the provisioning / sync chain raises.
-
-The implementations mirror the ``provision_namespace`` + ``apply_manifests``
-shape used by the app-deploy pipeline (see ``app_lifecycle.py``) so the
-provider-driver call path is identical — App Builder dev envs are
-"normal" workloads on the tenant cluster, not a parallel runtime.
-
-The declared data file (#1858) is too large for the files ConfigMap, so it
-ships as numbered Secrets that a ``seed-data`` init container concatenates
-into the data volume, and only when the file is not already there: an
-emptyDir starts from the shipped copy on every new pod, a PVC keeps what
-the app wrote.
+The control plane snapshots files and the SQLite seed into a private immutable
+artifact. A runtime-neutral init container verifies and installs that artifact;
+Kubernetes holds only runtime configuration and a scoped download credential.
+Promoted apps keep their separate namespace and optional persistent data volume.
 """
 
 from __future__ import annotations
 
-import base64
 import logging
 import math
 import posixpath
@@ -65,14 +38,9 @@ _RUNTIME_IMAGES: dict[str, tuple[str, str]] = {
     "static": ("nginx:alpine", ""),
 }
 
-# Where the data volume mounts, and where the seed Secrets project into the
-# init container that copies the data file onto it.
+# The data volume remains separate from immutable app files.
 _DATA_DIR = "/data"
-_SEED_DIR = "/seed"
 _DATA_PART_PREFIX = "builder-data-part-"
-# A Secret holds at most 1 MiB of data. Parts stay well under that so the
-# server-side apply request, which carries them base64-encoded, fits too.
-_DATA_PART_BYTES = 900 * 1024
 
 
 def _base_domain_for_org(org_slug: str) -> str:
@@ -117,11 +85,6 @@ def _resolve_image(runtime: str, runtime_version: str) -> tuple[str, str]:
         new_tag = runtime_version + ("-" + suffix_parts[1] if len(suffix_parts) > 1 else "")
         base_image = f"{repo}:{new_tag}"
     return base_image, dep_cmd
-
-
-def _data_parts(data: bytes) -> list[bytes]:
-    """Split a data file into Secret-sized parts; an empty file is one empty part."""
-    return [data[i : i + _DATA_PART_BYTES] for i in range(0, len(data), _DATA_PART_BYTES)] or [b""]
 
 
 def _data_volume_size_gib(nbytes: int) -> int:
@@ -171,61 +134,35 @@ def _render_runtime(
     port = dev.port or 8080
     start_cmd = dev.start_command or "echo 'no start_command set; sleeping' && sleep infinity"
 
-    # ConfigMap can't be empty in some k8s versions and an empty data
-    # block makes the deployment fail mount; carry a single placeholder
-    # key when the file tree is empty so subsequent syncs flip in
-    # actual content without re-creating the resource. Binary files
-    # (#1858) go under ``binaryData``, which takes base64 as uploaded.
-    # ConfigMap keys are flat (``[-._a-zA-Z0-9]+``), so a path with a
-    # directory is stored under a generated key and the volume's ``items``
-    # put it back at its path; the kubelet creates the directories (#1873).
-    text_files: dict[str, Any] = {}
-    binary_files: dict[str, str] = {}
-    items: list[dict[str, str]] = []
-    for index, (path, value) in enumerate(sorted((dev.files or {}).items())):
-        key = f"f{index:04d}"
-        items.append({"key": key, "path": path})
-        if isinstance(value, dict):
-            binary_files[key] = value["content"]
-        else:
-            text_files[key] = value
-    cm_manifest: dict[str, Any] = {
-        "apiVersion": "v1",
-        "kind": "ConfigMap",
-        "metadata": {"name": "builder-files", "namespace": namespace},
-        "data": text_files if (text_files or binary_files) else {"__placeholder": ""},
-    }
-    if binary_files:
-        cm_manifest["binaryData"] = binary_files
+    import json
 
+    from astrolift_lifecycle.builder_artifacts import init_script, reference
+
+    artifact = reference(dev)
+    credential = {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "type": "Opaque",
+        "metadata": {"name": "builder-artifact-" + artifact["sha256"][:20], "namespace": namespace},
+        "stringData": {"config": json.dumps(artifact)},
+    }
     env_vars_list = [{"name": str(k), "value": str(v)} for k, v in (dev.env_vars or {}).items()]
     env_vars_list.append({"name": "PORT", "value": str(port)})
-    app_mounts: list[dict[str, Any]] = [{"name": "app-files", "mountPath": "/app"}]
-    volumes: list[dict[str, Any]] = [
-        {"name": "app-files", "configMap": {"name": "builder-files", **({"items": items} if items else {})}},
+    app_mounts = [{"name": "app-files", "mountPath": "/app", "readOnly": True}]
+    volumes = [
+        {"name": "app-files", "emptyDir": {}},
         {"name": "deps-cache", "emptyDir": {}},
+        {"name": "artifact", "secret": {"secretName": "builder-artifact-" + artifact["sha256"][:20]}},
     ]
-
-    init_containers: list[dict[str, Any]] = []
-    data_resources: list[dict[str, Any]] = []
+    seed_mounts = [
+        {"name": "app-files", "mountPath": "/app"},
+        {"name": "artifact", "mountPath": "/artifact", "readOnly": True},
+    ]
+    data_resources = []
     if dev.data_file_path:
         data_file = posixpath.join(_DATA_DIR, dev.data_file_path)
-        data = bytes(dev.data_file or b"")
-        parts = _data_parts(data)
-        part_names = [f"{_DATA_PART_PREFIX}{i:04d}" for i in range(len(parts))]
-        data_resources = [
-            {
-                "apiVersion": "v1",
-                "kind": "Secret",
-                "type": "Opaque",
-                "metadata": {"name": part_name, "namespace": namespace},
-                "data": {"part": base64.b64encode(part).decode("ascii")},
-            }
-            for part_name, part in zip(part_names, parts, strict=True)
-        ]
         if data_storage_class:
             claim = f"{name}-data"
-            size_gib = _data_volume_size_gib(len(data))
             data_resources.append(
                 {
                     "apiVersion": "v1",
@@ -234,42 +171,33 @@ def _render_runtime(
                     "spec": {
                         "accessModes": ["ReadWriteOnce"],
                         "storageClassName": data_storage_class,
-                        "resources": {"requests": {"storage": f"{size_gib}Gi"}},
+                        "resources": {
+                            "requests": {
+                                "storage": f"{_data_volume_size_gib(len(bytes(dev.data_file or b'')))}Gi"
+                            }
+                        },
                     },
                 }
             )
             volumes.append({"name": "data", "persistentVolumeClaim": {"claimName": claim}})
         else:
             volumes.append({"name": "data", "emptyDir": {}})
-        volumes.append(
-            {
-                "name": "data-seed",
-                "projected": {
-                    "sources": [
-                        {"secret": {"name": part_name, "items": [{"key": "part", "path": part_name}]}}
-                        for part_name in part_names
-                    ]
-                },
-            }
+        env_vars_list.extend(
+            [
+                {"name": "ASTROLIFT_DATA_DIR", "value": _DATA_DIR},
+                {"name": "ASTROLIFT_DATA_FILE", "value": data_file},
+            ]
         )
-        data_env = [
-            {"name": "ASTROLIFT_DATA_DIR", "value": _DATA_DIR},
-            {"name": "ASTROLIFT_DATA_FILE", "value": data_file},
-        ]
-        env_vars_list.extend(data_env)
         app_mounts.append({"name": "data", "mountPath": _DATA_DIR})
-        init_containers.append(
-            {
-                "name": "seed-data",
-                "image": base_image,
-                "command": ["sh", "-c", _seed_command(part_names)],
-                "env": data_env,
-                "volumeMounts": [
-                    {"name": "data", "mountPath": _DATA_DIR},
-                    {"name": "data-seed", "mountPath": _SEED_DIR, "readOnly": True},
-                ],
-            }
-        )
+        seed_mounts.append({"name": "data", "mountPath": _DATA_DIR})
+    init_containers = [
+        {
+            "name": "fetch-artifact",
+            "image": "python:3.12-slim",
+            "command": ["python", "-c", init_script()],
+            "volumeMounts": seed_mounts,
+        }
+    ]
 
     if dep_cmd:
         init_containers.append(
@@ -278,7 +206,7 @@ def _render_runtime(
                 "image": base_image,
                 "command": ["sh", "-c", dep_cmd],
                 "volumeMounts": [
-                    {"name": "app-files", "mountPath": "/app"},
+                    {"name": "app-files", "mountPath": "/app", "readOnly": True},
                     {"name": "deps-cache", "mountPath": "/tmp/deps"},
                 ],
                 "workingDir": "/app",
@@ -340,28 +268,12 @@ def _render_runtime(
     }
 
     return [
-        cm_manifest,
+        credential,
         *data_resources,
         deployment_manifest,
         service_manifest,
         _ingress_manifest(namespace, hostname, dev, name),
     ]
-
-
-def _seed_command(part_names: list[str]) -> str:
-    """Shell for the ``seed-data`` init container.
-
-    Writes ``$ASTROLIFT_DATA_FILE`` from the projected parts only when it
-    is absent, through a ``.partial`` rename so a pod killed mid-copy never
-    leaves a truncated file that the next start would take as seeded.
-    """
-    parts = " ".join(f"{_SEED_DIR}/{part_name}" for part_name in part_names)
-    return (
-        'set -e; if [ ! -e "$ASTROLIFT_DATA_FILE" ]; then '
-        'mkdir -p "$(dirname "$ASTROLIFT_DATA_FILE")"; '
-        f'cat {parts} > "$ASTROLIFT_DATA_FILE.partial"; '
-        'mv "$ASTROLIFT_DATA_FILE.partial" "$ASTROLIFT_DATA_FILE"; fi'
-    )
 
 
 def _build_manifests(dev: Any, *, restart_stamp: str = "") -> tuple[str, str, list[dict[str, Any]]]:
@@ -524,7 +436,7 @@ def _sync_dev_environment_files_sync(dev_environment_id: int) -> None:
     ctx = _context_for_cluster(cluster)
     namespace = dev.namespace
     if not namespace:
-        msg = f"dev environment {dev.guid} has no namespace — " "provision step never landed; sync cannot run"
+        msg = f"dev environment {dev.guid} has no namespace — provision step never landed; sync cannot run"
         raise RuntimeError(msg)
 
     _namespace, hostname = _dev_env_names(dev)

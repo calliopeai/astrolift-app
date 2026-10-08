@@ -16,18 +16,23 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import io
+import json
 import os
 import sqlite3
-import subprocess
+import zipfile
+from pathlib import Path
+from threading import Thread
+from wsgiref.simple_server import make_server
 
 import pytest
 from _sdk.cluster import ApplyResult
+from django.core import signing
 
 from astrolift_identity.models import Team
 from astrolift_lifecycle.models import DevEnvironment
 from astrolift_registry.models import RegisteredApp
 from astrolift_workflows.activities.dev_environment import (
-    _DATA_PART_BYTES,
     _build_manifests,
     _deploy_promoted_app_sync,
     _render_runtime,
@@ -97,31 +102,44 @@ def _by_kind(resources, kind):
     return [r for r in resources if r["kind"] == kind]
 
 
-def _seed(resources, data_file: str, tmp_path) -> None:
-    """Do what the kubelet and the seed-data init container would.
+def _archive(resources):
+    from astrolift_lifecycle.builder_artifacts import SALT, storage
 
-    Project every part Secret into a seed directory the way the pod's
-    projected volume lays them out, then run the init container's shell
-    with the pod paths pointed at ``tmp_path``.
-    """
-    deployment = _by_kind(resources, "Deployment")[0]
-    pod = deployment["spec"]["template"]["spec"]
-    secrets = {s["metadata"]["name"]: s for s in _by_kind(resources, "Secret")}
-    seed_dir = tmp_path / "seed"
-    seed_dir.mkdir(exist_ok=True)
-    projected = next(v for v in pod["volumes"] if v["name"] == "data-seed")["projected"]
-    for source in projected["sources"]:
-        secret = secrets[source["secret"]["name"]]
-        for item in source["secret"]["items"]:
-            (seed_dir / item["path"]).write_bytes(base64.b64decode(secret["data"][item["key"]]))
-    init = next(c for c in pod["initContainers"] if c["name"] == "seed-data")
-    assert init["command"][:2] == ["sh", "-c"]
-    script = init["command"][2].replace("/seed/", f"{seed_dir}/")
-    subprocess.run(
-        ["sh", "-c", script],
-        env={**os.environ, "ASTROLIFT_DATA_FILE": data_file},
-        check=True,
+    secret = next(
+        s for s in _by_kind(resources, "Secret") if s["metadata"]["name"].startswith("builder-artifact-")
     )
+    ref = json.loads(secret["stringData"]["config"])
+    claim = signing.loads(ref["token"], salt=SALT)
+    with storage().open(claim["key"], "rb") as source:
+        raw = source.read()
+    return ref, raw
+
+
+def _seed(resources, data_file: str, tmp_path) -> None:
+    from astrolift_lifecycle.builder_unpack import install
+
+    ref, raw = _archive(resources)
+
+    def serve(environ, start_response):
+        assert environ["HTTP_AUTHORIZATION"] == "BuilderArtifact " + ref["token"]
+        start_response("200 OK", [("Content-Length", str(len(raw)))])
+        return [raw]
+
+    server = make_server("127.0.0.1", 0, serve)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        ref["url"] = f"http://127.0.0.1:{server.server_port}/artifact"
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            relative = next(n.removeprefix("data/") for n in archive.namelist() if n.startswith("data/"))
+        root = Path(data_file)
+        for _ in Path(relative).parts:
+            root = root.parent
+        install(ref, tmp_path / "app", root)
+    finally:
+        server.shutdown()
+        thread.join()
+        server.server_close()
 
 
 def _sqlite_bytes(tmp_path, rows: int, row_bytes: int) -> bytes:
@@ -161,7 +179,7 @@ def test_dev_env_renders_from_a_db_row_and_names_use_the_whole_guid(org, cluster
 # ---- files --------------------------------------------------------------
 
 
-def test_binary_files_render_as_configmap_binary_data(org, cluster, actor):
+def test_binary_files_ship_in_a_private_archive(org, cluster, actor):
     png = base64.b64encode(b"\x89PNG\r\n\x1a\n\x00\xff").decode()
     dev = _dev_env(
         org,
@@ -172,15 +190,15 @@ def test_binary_files_render_as_configmap_binary_data(org, cluster, actor):
 
     _, _, resources = _build_manifests(dev)
 
-    config_map = _by_kind(resources, "ConfigMap")[0]
-    assert config_map["data"] == {"f0001": "print('hi')"}
-    assert config_map["binaryData"] == {"f0000": png}
-    assert _by_kind(resources, "Secret") == []
+    assert not _by_kind(resources, "ConfigMap")
+    _, raw = _archive(resources)
+    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        assert archive.read("app/server.py") == b"print('hi')"
+        assert archive.read("app/logo.png") == base64.b64decode(png)
 
 
-def test_a_file_tree_with_directories_maps_generated_keys_back_to_paths(org, cluster, actor):
-    """ConfigMap keys are flat, so ``static/logo.png`` needs ``items`` (#1873)."""
-    import re
+def test_nested_paths_survive_artifact_packaging(org, cluster, actor):
+    """The archive preserves nested paths without Kubernetes key restrictions."""
 
     png = base64.b64encode(b"\x89PNG").decode()
     dev = _dev_env(
@@ -196,41 +214,35 @@ def test_a_file_tree_with_directories_maps_generated_keys_back_to_paths(org, clu
 
     _, _, resources = _build_manifests(dev)
 
-    config_map = _by_kind(resources, "ConfigMap")[0]
-    keys = [*config_map["data"], *config_map.get("binaryData", {})]
-    assert all(re.fullmatch(r"[-._a-zA-Z0-9]+", key) for key in keys)
-    [deployment] = _by_kind(resources, "Deployment")
-    [volume] = [v for v in deployment["spec"]["template"]["spec"]["volumes"] if v["name"] == "app-files"]
-    by_path = {item["path"]: item["key"] for item in volume["configMap"]["items"]}
-    assert set(by_path) == {"server.py", "static/css/site.css", "static/logo.png"}
-    assert config_map["data"][by_path["static/css/site.css"]] == "body{}"
-    assert config_map["binaryData"][by_path["static/logo.png"]] == png
+    assert not _by_kind(resources, "ConfigMap")
+    _, raw = _archive(resources)
+    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        assert set(archive.namelist()) == {"app/server.py", "app/static/css/site.css", "app/static/logo.png"}
+        assert archive.read("app/static/css/site.css") == b"body{}"
+        assert archive.read("app/static/logo.png") == base64.b64decode(png)
 
 
 # ---- data file ------------------------------------------------------------
 
 
-def test_dev_env_data_file_ships_as_secret_parts_seeded_into_an_empty_dir(org, cluster, actor):
+def test_dev_env_data_file_ships_in_an_artifact_seeded_into_an_empty_dir(org, cluster, actor):
     data = os.urandom(10 * 1024 * 1024)
     dev = _dev_env(org, cluster, actor, data_file_path="db/data.sqlite", data_file=data)
 
     namespace, _, resources = _build_manifests(dev)
 
-    parts = _by_kind(resources, "Secret")
-    assert len(parts) == -(-len(data) // _DATA_PART_BYTES) == 12
-    assert [p["metadata"]["name"] for p in parts] == [f"builder-data-part-{i:04d}" for i in range(12)]
-    assert all(p["metadata"]["namespace"] == namespace for p in parts)
-    decoded = [base64.b64decode(p["data"]["part"]) for p in parts]
-    assert all(len(chunk) <= _DATA_PART_BYTES for chunk in decoded)
-    assert b"".join(decoded) == data
+    [credential] = _by_kind(resources, "Secret")
+    assert credential["metadata"]["namespace"] == namespace
+    assert len(json.dumps(credential)) < 4096
+    _, raw = _archive(resources)
+    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        assert archive.read("data/db/data.sqlite") == data
 
     pod = _by_kind(resources, "Deployment")[0]["spec"]["template"]["spec"]
     volumes = {v["name"]: v for v in pod["volumes"]}
     assert volumes["data"] == {"name": "data", "emptyDir": {}}
-    assert [s["secret"]["name"] for s in volumes["data-seed"]["projected"]["sources"]] == [
-        p["metadata"]["name"] for p in parts
-    ]
-    assert [c["name"] for c in pod["initContainers"]] == ["seed-data", "install-deps"]
+    assert "data-seed" not in volumes
+    assert [c["name"] for c in pod["initContainers"]] == ["fetch-artifact", "install-deps"]
     app = pod["containers"][0]
     assert {"name": "data", "mountPath": "/data"} in app["volumeMounts"]
     env = {e["name"]: e["value"] for e in app["env"]}
@@ -246,8 +258,8 @@ def test_without_a_data_file_there_is_no_data_volume(org, cluster, actor):
     _, _, resources = _build_manifests(dev)
 
     pod = _by_kind(resources, "Deployment")[0]["spec"]["template"]["spec"]
-    assert {v["name"] for v in pod["volumes"]} == {"app-files", "deps-cache"}
-    assert [c["name"] for c in pod["initContainers"]] == ["install-deps"]
+    assert {v["name"] for v in pod["volumes"]} == {"app-files", "deps-cache", "artifact"}
+    assert [c["name"] for c in pod["initContainers"]] == ["fetch-artifact", "install-deps"]
     assert "ASTROLIFT_DATA_FILE" not in {e["name"] for e in pod["containers"][0]["env"]}
 
 
@@ -275,7 +287,7 @@ def test_promoted_runtime_claims_a_pvc_when_the_cluster_can_provision_one(org, c
 
 def test_seed_reassembles_the_file_once_and_keeps_what_the_app_wrote(org, cluster, actor, tmp_path):
     data = _sqlite_bytes(tmp_path, rows=40, row_bytes=64 * 1024)
-    assert len(data) > 2 * _DATA_PART_BYTES
+    assert len(data) > 2 * (900 * 1024)
     dev = _dev_env(org, cluster, actor, data_file_path="db/data.sqlite", data_file=data)
     _, _, resources = _build_manifests(dev)
     target = tmp_path / "data" / "db" / "data.sqlite"
@@ -316,7 +328,7 @@ def test_sync_reapplies_the_full_deployment_and_prunes_stale_parts(org, cluster,
     server-side apply reads that as the whole intent of the field
     manager and drops the rest of the spec. It now re-applies the full
     render, and deletes the parts a smaller data file left behind."""
-    dev = _dev_env(org, cluster, actor, data_file_path="data.sqlite", data_file=b"y" * (_DATA_PART_BYTES + 1))
+    dev = _dev_env(org, cluster, actor, data_file_path="data.sqlite", data_file=b"y" * ((900 * 1024) + 1))
     dev.namespace = "builder-dev-existing"
     dev.save(update_fields=["namespace"])
     driver.secrets = [f"builder-data-part-{i:04d}" for i in range(5)] + ["unrelated-secret"]
@@ -329,13 +341,11 @@ def test_sync_reapplies_the_full_deployment_and_prunes_stale_parts(org, cluster,
     assert deployment["spec"]["selector"] == {"matchLabels": {"app": "builder-dev"}}
     assert deployment["spec"]["template"]["spec"]["containers"][0]["name"] == "app"
     assert "builder.astrolift.io/last-sync" in deployment["spec"]["template"]["metadata"]["annotations"]
-    assert [s["metadata"]["name"] for s in _by_kind(resources, "Secret")] == [
-        "builder-data-part-0000",
-        "builder-data-part-0001",
-    ]
+    assert len(_by_kind(resources, "Secret")) == 1
+    assert _by_kind(resources, "Secret")[0]["metadata"]["name"].startswith("builder-artifact-")
     [(deleted_ns, deleted)] = driver.deleted
     assert deleted_ns == "builder-dev-existing"
-    assert [m["metadata"]["name"] for m in deleted] == [f"builder-data-part-{i:04d}" for i in range(2, 5)]
+    assert [m["metadata"]["name"] for m in deleted] == [f"builder-data-part-{i:04d}" for i in range(5)]
     dev.refresh_from_db()
     assert dev.status == DevEnvironment.Status.RUNNING
 

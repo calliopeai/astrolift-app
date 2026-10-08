@@ -86,9 +86,9 @@ finishes.
 
 - **`files`** replaces the whole tree. A value is UTF-8 text, or
   `{"content": <base64>, "encoding": "base64"}` for a binary file. Paths
-  are relative, without `..`. At most 100 files and 512 KiB in total,
-  counted after decoding. Paths must be flat names for now; a path with a
-  directory does not apply (#1873).
+  are relative, without `..`. Nested paths are supported. The operator sets `BUILDER_MAX_FILES`
+  (default 10,000) and `BUILDER_FILES_MAX_BYTES` (default 64 MiB total,
+  counted after decoding).
 - **`data_file`** declares one data file, such as an app's SQLite
   database. It has its own cap, `BUILDER_DATA_FILE_MAX_BYTES` in Constance
   (default 64 MiB, decoded). Omit it to keep the stored data file; send
@@ -176,13 +176,44 @@ an emptyDir starts from the shipped copy each time its pod is replaced.
   ingress in front of the control plane must allow that body size on
   `/api/builder/v1/*` (ingress-nginx defaults to 1 MiB). Other endpoints
   keep Django's 2.5 MiB limit.
-- **Where the data file is stored.** It is stored in Postgres on the dev
-  environment. On the cluster it is split into Secrets named
-  `builder-data-part-NNNN` of at most 900 KiB each (about 73 for a 64 MiB
-  file), once for the dev environment and once for the promoted app.
-  Lower the Constance cap if etcd size matters on your clusters.
+- **Artifact storage.** Immutable ZIP archives live in the private `builder_artifacts`
+  Django storage alias. The default is a scoped `BuilderArtifact` row in Postgres,
+  shared by API and worker replicas. An operator can configure a private shared
+  object-store backend under the same alias. Never point it at public media storage.
+  Existing dev environment source fields remain compatible with older APIs.
+- **Cluster transport.** The `fetch-artifact` init container uses an artifact-specific
+  credential, mounted only into that container, to download the archive. It refuses
+  redirects, checks the compressed length and SHA-256, checks expanded size and
+  paths, then copies assets to `/app` and seeds an absent data file in `/data`.
+  App/SQLite bytes never enter ConfigMaps or Secrets. Each revision has its own
+  small credential Secret, so existing deployments keep their original artifact
+  through later edits and restarts. Removing the preview revokes downloads unless its promoted app remains live;
+  retained promoted apps can restart independently of preview teardown or removal.
+- **API reachability.** Set `BUILDER_ARTIFACT_BASE_URL` to the control-plane API
+  origin reachable from tenant clusters (defaults to `PLATFORM_API_URL`). Use HTTPS
+  across networks; HTTP supports local development. No URL comes from the app.
+  New pod starts need this endpoint and the private artifact store available.
+- **Upgrade.** Apply migration `0046_builder_artifact`, deploy API and worker together,
+  then re-ship existing apps to switch transport. Older clients remain compatible.
+  Rolling back the control plane does not require dropping the additive table, but
+  pods using the new transport still need the artifact endpoint available. Do not
+  delete artifacts or revision credentials while a deployment may restart from them.
 - **Hostnames.** Dev environments serve on `dev-<id without dashes>.<base>`
   and promoted apps on `<org-slug>-<app-slug>.<base>`, the app's namespace
   name (hash-shortened past 63 characters). `<base>` is
   `BUILDER_BASE_DOMAIN`, or `<org-slug>.dev.astrolift.io` when that is
   unset.
+
+## Destination capabilities
+
+`GET /api/builder/v1/capabilities/` requires the linked organization's API bearer
+with `write:apps` and the enabled builder module. It returns `artifact_transport`
+(`private-archive-v1`), `nested_paths`, `max_files`, `max_file_bytes` (total decoded
+assets) and `max_data_bytes`. Studio checks these values before uploading; it does
+not infer deployment capacity from the size of a Kubernetes configuration object.
+
+The initial 512 KiB limit was deliberately for snippets that fit one ConfigMap.
+Artifact transport removes that dependency. Capacity is now an operator resource
+budget; it is not a framework, browser or Brain format limit. Data still travels
+base64 on this compatible upload endpoint, so very large workloads may benefit
+from a future streaming upload API.

@@ -1,5 +1,6 @@
 from astrolift_lifecycle.models.agent_run import AgentRun
 from astrolift_lifecycle.models.app_environment import AppEnvironment
+from astrolift_lifecycle.models.builder_artifact import BuilderArtifact
 from astrolift_lifecycle.models.deploy_token import DeployToken
 from astrolift_lifecycle.models.deployment import Deployment
 from astrolift_lifecycle.models.deployment_approval import DeploymentApproval
@@ -21,6 +22,7 @@ from astrolift_lifecycle.models.preview_environment import PreviewEnvironment
 from astrolift_lifecycle.models.task_run import TaskRun
 
 __all__ = [
+    "BuilderArtifact",
     "DomainSessionHandoff",
     "AgentRun",
     "AppEnvironment",

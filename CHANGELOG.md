@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Builder apps use private immutable artifacts instead of ConfigMaps and data Secrets, with configurable asset capacity and destination capability reporting. Apply lifecycle migration 0046 before deploying the API and worker.
+
 - Managed CI template v10: the notify step reads its deploy token through a single-quoted `secrets['...']` expression (v9 failed every run at parse time), and ci_pushed builds use the manifest's primary-container `dockerfile_path`/`build_context` for fields the app left at its defaults. Existing repos show as template-stale until re-synced (#2300).
 - Resolve GitHub App installations by the repo's owner when an org holds several, and let "Connect GitHub" install the existing App on a further account instead of reporting it already connected (#2297).
 - `applyStagedManifest` bootstraps a repo-backed app that has no workloads and whose repo the platform cannot reach, from the staged manifest or the stored one, with an `app.manifest.apply_unreachable_repo` audit entry (#2296).
