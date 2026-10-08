@@ -4,7 +4,7 @@ Builder (#767, #768).
 
 Files are pushed directly (no Git repo). The environment runs on a real
 tenant cluster; a Temporal workflow provisions the K8s namespace,
-ConfigMap, Deployment, Service, and Ingress. Promote creates a
+artifact-backed Deployment, Service, and Ingress. Promote creates a
 ``RegisteredApp`` (with ``source_kind=direct_upload``) from the uploaded
 files so the app can then go through the standard onboarding pipeline.
 """
@@ -23,11 +23,6 @@ from core.models.base import BaseCoreModel
 # the user is iterating; on cancel/close the platform's preview-GC sweep
 # tears down anything past ``ttl_until``.
 DEV_ENV_TTL_HOURS = 24
-
-# Total payload cap across all files. The builder is for snippets of
-# code, not a full app source dump — the 512 KiB cap fits comfortably in
-# a single k8s ConfigMap (1 MiB limit) with headroom for binding kvs.
-FILE_SIZE_LIMIT_BYTES = 512 * 1024
 
 
 def _default_dev_ttl_until():
@@ -101,13 +96,12 @@ class DevEnvironment(BaseCoreModel):
 
     # File tree: ``{relative_path: content_string}``, or
     # ``{relative_path: {"content": <base64>, "encoding": "base64"}}`` for a
-    # binary file (#1858). Capped at ``FILE_SIZE_LIMIT_BYTES`` of decoded
+    # binary file (#1858). Capped by the operator's builder capacity in decoded
     # content at the API boundary.
     files = models.JSONField(default=dict, blank=True)
 
     # The one declared data file (#1858), e.g. an app's ``data.sqlite``. It is
-    # too large for the files ConfigMap, so it lives here and reaches the pod
-    # as Secret chunks that a seed init container reassembles under the data
+    # included in the private artifact and seeded only into an empty data
     # volume. ``data_file_path`` is relative to that volume; empty means no
     # data file. Queries that do not render manifests defer ``data_file``.
     data_file_path = models.CharField(max_length=255, blank=True, default="")
