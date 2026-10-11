@@ -17,7 +17,7 @@ from aws.managed.mq_amazon import (
     AmazonMQRabbitMQDriver,
 )
 
-BROKER_NAME = "platform-steadymd-triage-prod-broker"
+BROKER_NAME = "platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
 BROKER_ID = "b-123"
 BROKER_ARN = f"arn:aws:mq:us-west-2:123456789012:broker:{BROKER_NAME}:{BROKER_ID}"
 KEY_ARN = "arn:aws:kms:us-west-2:123456789012:key/key-1"
@@ -38,7 +38,7 @@ def _spec(**overrides) -> ProvisionSpec:
         "tags": {"owner": "agents"},
         "isolation": "shared",
         "binding_id": "binding-1",
-        "managed_service_id": "service-1",
+        "managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     }
     values.update(overrides)
     return ProvisionSpec(**values)
@@ -844,3 +844,24 @@ def test_a_broker_replicates_no_other_brokers_data_from_config(replication):
     assert not result.ok
     assert "replicates no other broker's data" in result.message
     client.create_broker.assert_not_called()
+
+
+def test_a_recorded_legacy_name_is_kept():
+    driver = AmazonMQRabbitMQDriver(config=_config(), client=_client(), secrets_client=_secrets())
+    arn = "arn:aws:mq:us-west-2:123456789012:broker:platform-steadymd-triage-prod-broker:b-1234"
+    assert driver._broker_name(_spec(recorded_handle=f"mq/{arn}")) == "platform-steadymd-triage-prod-broker"
+
+
+def test_slug_joins_that_collide_get_distinct_new_names():
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one name before #2032.
+    driver = AmazonMQRabbitMQDriver(config=_config(), client=_client(), secrets_client=_secrets())
+    first = driver._broker_name(_spec(organization_slug="acme", app_slug="web-prod", environment_name="x"))
+    second = driver._broker_name(
+        _spec(
+            organization_slug="acme-web",
+            app_slug="prod",
+            environment_name="x",
+            managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
+        )
+    )
+    assert first != second and len(first) <= 50 and first[0].isalpha()

@@ -24,7 +24,14 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
+from aws.managed._base import (
+    ManagedServiceError,
+    adoption_refusal,
+    handle_for,
+    managed_name_for,
+    parse_handle,
+    tags_for,
+)
 from aws.session import aws_client
 
 KIND = "graph_db"
@@ -108,7 +115,10 @@ class NeptuneDriver(ManagedServiceDriver):
                 "restore from a snapshot Astrolift retained for this app instead",
                 ["invalid_neptune_config"],
             )
-        cluster_id = self._cluster_id(spec)
+        try:
+            cluster_id = self._cluster_id(spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         handle = handle_for(kind=KIND, resource_id=cluster_id)
         cluster = self._describe_cluster(cluster_id)
         if cluster is not None:
@@ -684,13 +694,8 @@ class NeptuneDriver(ManagedServiceDriver):
         return list(self._neptune.list_tags_for_resource(ResourceName=resource_arn).get("TagList", []))
 
     def _cluster_id(self, spec: ProvisionSpec) -> str:
-        return _name(
-            self._config.cluster_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint or "graph",
-        )
+        # Cluster identifiers: <=63 chars, leaving room for the -iN instance suffix (#2032).
+        return managed_name_for(spec, kind=KIND, prefix=self._config.cluster_name_prefix, max_len=58)
 
     def _instance_class(self, size: str, cfg: dict[str, Any]) -> str:
         if self._config.serverless_v2:

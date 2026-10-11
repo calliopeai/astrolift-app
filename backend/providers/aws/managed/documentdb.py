@@ -26,7 +26,14 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
+from aws.managed._base import (
+    ManagedServiceError,
+    adoption_refusal,
+    handle_for,
+    managed_name_for,
+    parse_handle,
+    tags_for,
+)
 from aws.session import aws_client
 
 KIND = "document_db"
@@ -102,7 +109,10 @@ class DocumentDBDriver(ManagedServiceDriver):
                 "restore from a snapshot Astrolift retained for this app instead",
                 ["invalid_documentdb_config"],
             )
-        cluster_id = self._cluster_id(spec)
+        try:
+            cluster_id = self._cluster_id(spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         handle = handle_for(kind=KIND, resource_id=cluster_id)
         cluster = self._describe_cluster(cluster_id)
         if cluster is not None:
@@ -402,7 +412,10 @@ class DocumentDBDriver(ManagedServiceDriver):
     @driver_op(cloud="aws", driver="documentdb")
     def restore(self, snapshot: SnapshotHandle, target: ProvisionSpec) -> ProvisionResult:
         _, source_cluster_id = parse_handle(snapshot.handle)
-        target_cluster_id = self._cluster_id(target)
+        try:
+            target_cluster_id = self._cluster_id(target)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         try:
             self._copy_password_secret(source_cluster_id, target_cluster_id, target)
         except Exception as exc:
@@ -650,13 +663,8 @@ class DocumentDBDriver(ManagedServiceDriver):
                 raise
 
     def _cluster_id(self, spec: ProvisionSpec) -> str:
-        return _name(
-            self._config.cluster_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint or "documents",
-        )
+        # Cluster identifiers: <=63 chars, leaving room for the -iN instance suffix (#2032).
+        return managed_name_for(spec, kind=KIND, prefix=self._config.cluster_name_prefix, max_len=58)
 
     def _password_secret_name(self, cluster_id: str) -> str:
         return f"{self._config.secrets_manager_prefix}/{cluster_id}/password"

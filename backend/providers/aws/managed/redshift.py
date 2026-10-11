@@ -24,7 +24,14 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
+from aws.managed._base import (
+    ManagedServiceError,
+    adoption_refusal,
+    handle_for,
+    managed_name_for,
+    parse_handle,
+    tags_for,
+)
 from aws.session import aws_client
 
 KIND = "warehouse"
@@ -115,7 +122,10 @@ class RedshiftProvisionedDriver(ManagedServiceDriver):
                 "multi_az Redshift clusters require at least two nodes",
                 ["invalid_redshift_config"],
             )
-        cluster_id = self._cluster_id(spec)
+        try:
+            cluster_id = self._cluster_id(spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         handle = handle_for(kind=KIND, resource_id=cluster_id)
         cluster = self._describe_cluster(cluster_id)
         if cluster is not None:
@@ -595,13 +605,8 @@ class RedshiftProvisionedDriver(ManagedServiceDriver):
         return list((cluster or {}).get("Tags") or [])
 
     def _cluster_id(self, spec: ProvisionSpec) -> str:
-        return _name(
-            self._config.cluster_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint or "warehouse",
-        )
+        # Cluster identifiers: <=63 chars, a leading letter (#2032).
+        return managed_name_for(spec, kind=KIND, prefix=self._config.cluster_name_prefix, max_len=63)
 
     def _capacity(
         self,
@@ -676,16 +681,6 @@ class RedshiftProvisionedDriver(ManagedServiceDriver):
             if key in cfg and not isinstance(cfg[key], bool):
                 return f"{key} must be a boolean"
         return ""
-
-
-def _name(*parts: str) -> str:
-    raw = "-".join(str(part).lower() for part in parts if part)
-    clean = "".join(char if char.isalnum() or char == "-" else "-" for char in raw)
-    while "--" in clean:
-        clean = clean.replace("--", "-")
-    if not clean or not clean[0].isalpha():
-        clean = f"a-{clean}"
-    return clean.strip("-")[:63].rstrip("-")
 
 
 def _snapshot_name(cluster_id: str, suffix: str) -> str:

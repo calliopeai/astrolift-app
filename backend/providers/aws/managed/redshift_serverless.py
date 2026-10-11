@@ -24,7 +24,14 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
+from aws.managed._base import (
+    ManagedServiceError,
+    adoption_refusal,
+    handle_for,
+    managed_name_for,
+    parse_handle,
+    tags_for,
+)
 from aws.managed.redshift import _data_api_grants
 from aws.session import aws_client
 
@@ -75,7 +82,10 @@ class RedshiftServerlessDriver(ManagedServiceDriver):
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_redshift_serverless_config"])
-        resource_id = self._resource_id(spec)
+        try:
+            resource_id = self._resource_id(spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         handle = handle_for(kind=KIND, resource_id=resource_id)
         namespace = self._get_namespace(resource_id)
         workgroup = self._get_workgroup(resource_id)
@@ -360,7 +370,10 @@ class RedshiftServerlessDriver(ManagedServiceDriver):
 
     @driver_op(cloud="aws", driver="redshift_serverless")
     def restore(self, snapshot: SnapshotHandle, target: ProvisionSpec) -> ProvisionResult:
-        resource_id = self._resource_id(target)
+        try:
+            resource_id = self._resource_id(target)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         handle = handle_for(kind=KIND, resource_id=resource_id)
         namespace = self._get_namespace(resource_id)
         workgroup = self._get_workgroup(resource_id)
@@ -596,13 +609,8 @@ class RedshiftServerlessDriver(ManagedServiceDriver):
         return list(self._serverless.list_tags_for_resource(resourceArn=arn).get("tags", []))
 
     def _resource_id(self, spec: ProvisionSpec) -> str:
-        return _name(
-            self._config.name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint or "warehouse",
-        )
+        # Namespace and workgroup names: 3-64 lowercase chars (#2032).
+        return managed_name_for(spec, kind=KIND, prefix=self._config.name_prefix, max_len=64)
 
     def _validate_config(self, cfg: dict[str, Any]) -> str:
         # ownerAccount restored a snapshot another AWS account owns; a restore
@@ -688,16 +696,6 @@ def _serverless_tags(spec: ProvisionSpec) -> list[dict[str, str]]:
 
 def _valid_rpu(value: int) -> bool:
     return value == 4 or (8 <= value <= 512 and value % 8 == 0) or (512 < value <= 1024 and value % 32 == 0)
-
-
-def _name(*parts: str) -> str:
-    raw = "-".join(str(part).lower() for part in parts if part)
-    clean = "".join(char if char.isalnum() or char == "-" else "-" for char in raw)
-    while "--" in clean:
-        clean = clean.replace("--", "-")
-    if not clean or not clean[0].isalpha():
-        clean = f"a-{clean}"
-    return clean.strip("-")[:64].rstrip("-")
 
 
 def _snapshot_name(resource_id: str, suffix: str) -> str:
