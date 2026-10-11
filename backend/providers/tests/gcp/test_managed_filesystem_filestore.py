@@ -38,7 +38,7 @@ SPEC = ProvisionSpec(
     service_handle_hint="shared-files",
     size="small",
     binding_id="binding-id",
-    managed_service_id="service-id",
+    managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
 )
 MSID = SPEC.managed_service_id
 
@@ -244,7 +244,7 @@ def test_provision_builds_current_v1_psc_instance_and_binding(
     assert body["fileShares"][0]["nfsExportOptions"][0]["squashMode"] == "ROOT_SQUASH"
     assert body["performanceConfig"] == {"fixedIops": {"maxIops": "3000"}}
     assert body["directoryServices"]["ldap"]["usersOu"] == "users"
-    assert body["labels"]["astrolift-io-managed-service-id"] == "service-id"
+    assert body["labels"]["astrolift-io-managed-service-id"] == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
     assert body["deletionProtectionEnabled"] is True
 
     binding = driver.binding(
@@ -351,7 +351,7 @@ def test_external_collision_is_refused_without_operator_adoption(
     driver: FilestoreDriver,
     client: FakeFilestore,
 ) -> None:
-    instance_id = _resource_id("astrolift-steady-md-triage-production-shared-files")
+    instance_id = "astrolift-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     name = f"projects/project-1/locations/us-central1/instances/{instance_id}"
     client.instances[name] = {
         "name": name,
@@ -576,6 +576,7 @@ def test_portable_snapshot_is_regional_backup_and_restores_new_instance(
         SPEC,
         service_handle_hint="restored",
         config={"deletion_protection": False},
+        managed_service_id=OTHER_SERVICE_ID,
     )
     restored = driver.restore(snapshot, restored_target)
     assert restored.ok and restored.ready
@@ -594,7 +595,9 @@ def test_restore_rejects_native_snapshot_and_undersized_target(driver: Filestore
     backup = driver.snapshot(ServiceHandle(source.handle, managed_service_id=MSID))
     # Simulate a larger source backup than the requested small target.
     driver._filestore.backups[backup.snapshot_id]["capacityGb"] = "2560"  # type: ignore[attr-defined]
-    result = driver.restore(backup, replace(SPEC, service_handle_hint="small-restore"))
+    result = driver.restore(
+        backup, replace(SPEC, service_handle_hint="small-restore", managed_service_id=OTHER_SERVICE_ID)
+    )
     assert not result.ok and "below backup capacity" in result.message
 
 
@@ -818,7 +821,7 @@ def test_tenant_labels_in_the_platform_namespace_are_refused(
     client: FakeFilestore,
     key: str,
 ) -> None:
-    refused = _provision(driver, labels={key: "service-id"})
+    refused = _provision(driver, labels={key: "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"})
     assert not refused.ok and "Astrolift-reserved" in refused.message
     assert client.create_calls == [] and client.instances == {}
 
@@ -858,4 +861,25 @@ def test_an_unmarked_instance_needs_the_exclusive_record_and_is_then_marked(
         UpdateSpec(handle, managed_service_id=MSID, config={"description": "new"}, recorded_handle_exclusive=True),
     )
     assert proven.ok, proven.message
-    assert client.instances[name]["labels"]["astrolift-io-managed-service-id"] == "service-id"
+    assert client.instances[name]["labels"]["astrolift-io-managed-service-id"] == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
+
+
+def test_a_recorded_legacy_name_is_kept(driver) -> None:
+    assert (
+        driver._instance_id(
+            replace(SPEC, config={}, recorded_handle="filesystem/us-central1/astrolift-acme-api-prod-files")
+        )
+        == "astrolift-acme-api-prod-files"
+    )
+
+
+def test_slug_joins_that_collide_get_distinct_new_names(driver) -> None:
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one name before #2032.
+    first = driver._instance_id(replace(SPEC, config={}, organization_slug="acme", app_slug="web-prod"))
+    second = driver._instance_id(
+        replace(SPEC, config={}, organization_slug="acme-web", app_slug="prod", managed_service_id=OTHER_SERVICE_ID)
+    )
+    assert first != second and len(first) <= 63
+
+
+OTHER_SERVICE_ID = "0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4"

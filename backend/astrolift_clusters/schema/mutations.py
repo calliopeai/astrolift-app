@@ -381,6 +381,8 @@ class CreateManagedDomainInput:
 @strawberry.input
 class UpdateManagedDomainInput:
     id: GUID
+    expected_version: int | None = None
+    expected_defaults_fingerprint: str | None = None
     default_for: str | None = None
     is_wildcard_managed: bool | None = None
     dns_config: JSON | None = None
@@ -1644,34 +1646,22 @@ class ClustersMutation:
     def update_managed_domain(
         self, info: Info, input: UpdateManagedDomainInput
     ) -> MutationResultType[ManagedDomainType]:
-        tenant = get_current_tenant()
-        domain = ManagedDomain.objects.filter(
-            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
-            guid=str(input.id),
-        ).first()
-        _require_operator_for_shared(info, domain, Permission.PROVIDER_PLUGIN_CONFIGURE)
+        from astrolift_clusters.managed_domain_defaults import update_domain
+
+        try:
+            domain = update_domain(info, input)
+        except ValueError as exc:
+            reason = str(exc)
+            code = (
+                ErrorCode.VERSION_MISMATCH
+                if reason in ("MANAGED_DOMAIN_VERSION_CHANGED", "MANAGED_DOMAIN_DEFAULTS_CHANGED")
+                else ErrorCode.VALIDATION
+                if reason == "INVALID_DEFAULT_ROLE"
+                else ErrorCode.PRECONDITION
+            )
+            return gql_failure(code.value, reason)
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
-        if domain.dns_driver == "cloudflare_read_only":
-            from astrolift_clusters.dns_provider_connections import admitted
-
-            with admitted(info.context.request, write=True):
-                pass
-        if input.default_for is not None:
-            if (
-                domain.dns_driver == "cloudflare_read_only"
-                and input.default_for != ManagedDomain.DefaultFor.NONE
-            ):
-                return gql_failure(
-                    ErrorCode.PRECONDITION.value,
-                    "Read-only DNS discovery cannot be a managed routing default.",
-                )
-            domain.default_for = input.default_for
-        if input.is_wildcard_managed is not None:
-            domain.is_wildcard_managed = input.is_wildcard_managed
-        if input.dns_config is not None:
-            domain.dns_config = input.dns_config
-        domain.save()
         return gql_success(domain_to_type(domain))
 
     @strawberry.field
@@ -1696,6 +1686,15 @@ class ClustersMutation:
 
             with admitted(info.context.request, write=True):
                 pass
+        from astrolift_lifecycle.domain_app_route import DomainAppRouteError, require_unbound_zone
+
+        try:
+            require_unbound_zone(domain_id=domain.pk)
+        except DomainAppRouteError:
+            return gql_failure(
+                "PROTECTED_DOMAIN_ROUTE_MANAGE_REQUIRED",
+                "Manage the original domain route before changing its native resources.",
+            )
         domain.soft_delete()
 
         # The cloud resources must die with the row: a delete that only
@@ -1886,6 +1885,16 @@ class ClustersMutation:
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "managed domain not found", field="zone")
 
+        from astrolift_lifecycle.domain_app_route import DomainAppRouteError, require_unbound_zone
+
+        try:
+            require_unbound_zone(zone=zone)
+        except DomainAppRouteError:
+            return gql_failure(
+                "PROTECTED_DOMAIN_ROUTE_MANAGE_REQUIRED",
+                "Manage the original domain route before changing its native resources.",
+            )
+
         workflow_id = f"ProvisionManagedDomainWorkflow-{cluster.guid}-{zone.replace('.', '-')}"
         actor = _actor_from_request(info)
         start_workflow(
@@ -1948,6 +1957,16 @@ class ClustersMutation:
         _require_operator_for_shared(info, domain, Permission.CLUSTER_MANAGE)
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "managed domain not found", field="zone")
+
+        from astrolift_lifecycle.domain_app_route import DomainAppRouteError, require_unbound_zone
+
+        try:
+            require_unbound_zone(zone=zone)
+        except DomainAppRouteError:
+            return gql_failure(
+                "PROTECTED_DOMAIN_ROUTE_MANAGE_REQUIRED",
+                "Manage the original domain route before changing its native resources.",
+            )
 
         workflow_id = f"ProvisionManagedDomainWorkflow-{cluster.guid}-{zone.replace('.', '-')}"
         signaled = signal_workflow(workflow_id, "revalidate")
@@ -2022,6 +2041,16 @@ class ClustersMutation:
         _require_operator_for_shared(info, domain, Permission.CLUSTER_MANAGE)
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "managed domain not found", field="zone")
+
+        from astrolift_lifecycle.domain_app_route import DomainAppRouteError, require_unbound_zone
+
+        try:
+            require_unbound_zone(zone=zone)
+        except DomainAppRouteError:
+            return gql_failure(
+                "PROTECTED_DOMAIN_ROUTE_MANAGE_REQUIRED",
+                "Manage the original domain route before changing its native resources.",
+            )
 
         workflow_id = f"ProvisionManagedDomainWorkflow-{cluster.guid}-{zone.replace('.', '-')}"
         signaled = signal_workflow(workflow_id, "reissue")

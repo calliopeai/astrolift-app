@@ -26,6 +26,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.physical_naming import managed_service_identity, physical_name, recorded_resource_name
 from gcp.managed._ownership import label_adoption_refusal
 
 KIND = "warehouse"
@@ -331,7 +332,10 @@ class BigQueryWarehouseDriver(ManagedServiceDriver):
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_bigquery_warehouse_config"])
-        dataset_id = self._dataset_id(spec)
+        try:
+            dataset_id = self._dataset_id(spec)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         try:
             try:
                 current = self._dataset(dataset_id)
@@ -774,18 +778,11 @@ class BigQueryWarehouseDriver(ManagedServiceDriver):
         return self._bq.get_dataset(self._config.project_id, dataset_id)
 
     def _dataset_id(self, spec: ProvisionSpec) -> str:
-        raw = "_".join(
-            part
-            for part in (
-                self._config.dataset_prefix,
-                spec.organization_slug,
-                spec.app_slug,
-                spec.environment_name,
-                spec.service_handle_hint or "warehouse",
-            )
-            if part
+        # Dataset ids: letters, digits and underscores (#2032).
+        managed_service_identity(spec.managed_service_id)
+        return recorded_resource_name(spec.recorded_handle, kind=KIND) or physical_name(
+            spec.managed_service_id, prefix=self._config.dataset_prefix, max_length=1024, separator="_"
         )
-        return _dataset_id(raw)
 
     def _dataset_document(
         self,
@@ -1084,15 +1081,6 @@ def _labels_for(spec: ProvisionSpec | None, cfg: dict[str, Any]) -> dict[str, st
 
 def _label(value: Any) -> str:
     return (re.sub(r"[^a-z0-9_-]+", "_", str(value).lower()).strip("_-") or "value")[:63]
-
-
-def _dataset_id(value: str) -> str:
-    clean = re.sub(r"[^A-Za-z0-9_]+", "_", value).strip("_")
-    if not clean:
-        raise ValueError("BigQuery dataset id cannot be empty after normalization")
-    if not clean[0].isalpha() and clean[0] != "_":
-        clean = f"a_{clean}"
-    return clean[:1024].rstrip("_")
 
 
 def _capacity_id(value: str) -> str:

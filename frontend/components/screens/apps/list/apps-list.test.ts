@@ -23,14 +23,26 @@ describe("APPS_LIST", () => {
     expect(APPS_LIST.views.find((v) => v.key === "mine")?.note).toMatch(/until apps record/);
   });
 
-  it("filters on project, status, last deploy, kind and cluster", () => {
+  it("filters on project, status, last deploy, kind, cluster and app kind", () => {
     expect(APPS_LIST.fields.map((f) => f.key)).toEqual([
       "project",
       "status",
       "deploy",
       "kind",
       "cluster",
+      "appKind",
     ]);
+  });
+
+  it("sends the app kind chip as the appKind filter (#2332)", () => {
+    const vars = appsPageVariables({
+      q: "",
+      filters: { appKind: "mimwell" },
+      sort: [],
+      page: 1,
+      pageSize: 25,
+    });
+    expect(vars.filter).toEqual({ appKind: ["mimwell"] });
   });
 });
 

@@ -57,9 +57,20 @@ def _mark_tearing_down_sync(registered_app_id: int) -> bool:
     so re-applying the full 5-minute window would let back-to-back re-triggers
     reset the timer indefinitely and the stuck rows would never finalize.
     """
+    from django.db import transaction
+
+    from astrolift_lifecycle.domain_app_route import require_unbound_app
     from astrolift_registry.models import RegisteredApp
 
-    app = RegisteredApp.all_objects.get(pk=registered_app_id)
+    with transaction.atomic():
+        app = RegisteredApp.all_objects.select_for_update(nowait=True).get(pk=registered_app_id)
+        require_unbound_app(app.pk)
+        return _mark_unbound_tearing_down(app)
+
+
+def _mark_unbound_tearing_down(app):
+    from astrolift_registry.models import RegisteredApp
+
     # A deregister re-fired to resume a teardown that already reached the
     # terminal DEREGISTERED state (rows soft-deleted on the prior run) must
     # be a clean no-op — DEREGISTERED → TEARING_DOWN is not a legal
@@ -148,6 +159,9 @@ def _delete_app_namespaces_sync(registered_app_id: int) -> list[str]:
     )
 
     app = RegisteredApp.all_objects.get(pk=registered_app_id)
+    from astrolift_lifecycle.domain_app_route import require_unbound_app
+
+    require_unbound_app(app.pk)
     envs = list(
         AppEnvironment.objects.filter(
             registered_app=app,

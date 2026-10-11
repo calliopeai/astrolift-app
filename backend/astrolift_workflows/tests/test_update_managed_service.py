@@ -176,6 +176,7 @@ def test_update_sync_carries_an_unsupported_update_refusal_through_intact():
     ("retryable", "non_retryable"),
     [(True, False), (False, True)],
 )
+@pytest.mark.django_db(transaction=True)
 async def test_update_activity_honours_the_driver_retryable_flag(retryable, non_retryable):
     """A permanent refusal must not burn the workflow's 25-minute retry budget.
 
@@ -183,6 +184,9 @@ async def test_update_activity_honours_the_driver_retryable_flag(retryable, non_
     driver that says "never going to work" has to arrive as a terminal failure
     and one that says "try again" has to stay retryable.
     """
+    from asgiref.sync import sync_to_async
+
+    svc = await sync_to_async(_service)()
     refusal = {
         "ok": False,
         "handle": "postgres/primary",
@@ -198,7 +202,7 @@ async def test_update_activity_honours_the_driver_retryable_flag(retryable, non_
         ),
         pytest.raises(ApplicationError) as caught,
     ):
-        await update_managed_service(1)
+        await update_managed_service(svc.pk)
 
     assert caught.value.non_retryable is non_retryable
     assert "storage shrink is immutable" in str(caught.value)

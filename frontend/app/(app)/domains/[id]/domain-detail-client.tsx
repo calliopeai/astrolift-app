@@ -2,15 +2,19 @@
 
 import { ManagedDomainDetail } from "@/components/screens/domains/ManagedDomainDetail";
 import { useManagedDomain } from "@/components/screens/domains/use-managed-domain";
+import { useDomainDefaultSettings } from "@/components/screens/domains/use-domain-default-settings";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { useMe } from "@/graphql/user/user.hooks";
 import { useWithheldCapabilities } from "@/hooks/use-install-policy";
 
 function DomainContext({ id }: { id: string }) {
+  const state = useManagedDomain(id);
+  const defaults = useDomainDefaultSettings(state);
   return (
     <ManagedDomainDetail
       id={id}
-      {...useManagedDomain(id)}
+      {...state}
+      defaultSettings={defaults}
       dnsRestriction={useWithheldCapabilities().dns}
     />
   );

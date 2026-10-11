@@ -62,6 +62,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.physical_naming import managed_service_identity, physical_name, recorded_resource_name
 from azure.managed.tags import arm_tags_for as tags_for
 from azure.secrets_keyvault import key_vault_secret_ref
 
@@ -195,7 +196,10 @@ class AzureOpenAIDriver(ManagedServiceDriver):
                 message=("azure openai driver requires a Key Vault (set keyvault_url or inject secret_client)"),
                 errors=["no_secret_backend"],
             )
-        deployment_name = self._deployment_name_for(spec=spec)
+        try:
+            deployment_name = self._deployment_name_for(spec=spec)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         cfg = spec.config or {}
 
         existing = self._describe(deployment_name)
@@ -702,21 +706,11 @@ class AzureOpenAIDriver(ManagedServiceDriver):
             return []
 
     def _deployment_name_for(self, *, spec: ProvisionSpec) -> str:
-        parts = [
-            self._config.deployment_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint or "model",
-        ]
-        raw = "-".join(p for p in parts if p).lower()
-        clean = "".join(c if (c.isalnum() or c in "-_") else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        clean = clean.strip("-_")
-        if not clean or not clean[0].isalnum():
-            clean = f"a{clean}"
-        return clean[:64]
+        # Deployment names: <=64 chars (#2032).
+        managed_service_identity(spec.managed_service_id)
+        return recorded_resource_name(spec.recorded_handle, kind=KIND) or physical_name(
+            spec.managed_service_id, prefix=self._config.deployment_name_prefix, max_length=64
+        )
 
     def _handle_for(self, *, deployment_name: str) -> str:
         return f"{KIND}/{deployment_name}"

@@ -20,7 +20,12 @@ from astrolift_clusters.schema.queries import ClustersQuery
 from astrolift_clusters.scopes import cluster_catalog_org_scope, cluster_org_scope, domain_org_scope
 from astrolift_clusters.tests.test_heartbeat import _no_opensearch_profile_index  # noqa: F401
 from astrolift_graphql import GUID
-from astrolift_identity.api_tokens import mint_token, reset_current_api_token, set_current_api_token
+from astrolift_identity.api_tokens import (
+    get_current_api_token,
+    mint_token,
+    reset_current_api_token,
+    set_current_api_token,
+)
 from astrolift_identity.models import ApiToken, Member, Organization
 from core.permissions import Permission, PermissionDenied, PermissionScope, ScopeKind
 from core.tenancy import TenantContext, tenant_context
@@ -250,9 +255,23 @@ def _kwargs(world, name, *, cluster=None, domain=None):
     return {key: value for key, value in values.items() if key in args}
 
 
+def _request_info(user):
+    """What the auth middleware hands a resolver: the API token on the
+    request, or else a real browser session."""
+    info = make_info(user)
+    token = get_current_api_token()
+    if token is not None:
+        info.context.request._api_token = token
+    else:
+        browser = Client()
+        browser.force_login(user)
+        info.context.request.session = browser.session
+    return info
+
+
 def _invoke(world, route, **overrides):
     cls, name, _ = route
-    return getattr(cls(), name)(make_info(world.user), **_kwargs(world, name, **overrides))
+    return getattr(cls(), name)(_request_info(world.user), **_kwargs(world, name, **overrides))
 
 
 def _denied(world, route, **overrides):
@@ -282,6 +301,8 @@ def test_team_project_and_foreign_org_grants_open_no_org_resources(world, route,
 @pytest.mark.parametrize("route", ROUTES, ids=ROUTE_IDS)
 def test_organization_grant_reaches_own_resources_with_selected_sibling_team(world, route):
     _grant(world)
+    # An org-level grantee is an org member; browser writes check membership.
+    Member.objects.get_or_create(user=world.user, scope_kind="ORG", scope_id=world.org.pk)
     with _tenant(world, selected="sibling"):
         result = _invoke(world, route)
     # Unavailable drivers can report a precondition; the scoped gate must
@@ -429,7 +450,9 @@ def test_active_operator_org_admin_token_can_write_shared_resources(world, name)
     world.domain.organization = None
     world.domain.save(update_fields=["organization", "updated_at", "version"])
     with _tenant(world), _token(world):
-        result = getattr(mut.ClustersMutation(), name)(make_info(world.user), **_shared_kwargs(world, name))
+        result = getattr(mut.ClustersMutation(), name)(
+            _request_info(world.user), **_shared_kwargs(world, name)
+        )
     assert result.ok, result
     if name in {"provision_managed_domain", "revalidate_managed_domain", "reissue_managed_domain_cert"}:
         assert len(world.queued) == 1

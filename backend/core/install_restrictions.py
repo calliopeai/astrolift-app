@@ -210,7 +210,18 @@ class WithheldCapabilityError(ApplicationError):
 
 #: Route53Driver methods that change DNS: every one the WithheldDns Deny
 #: refuses. Reads (zones, records, certificate status) stay allowed.
-_DNS_WRITES = frozenset({"ensure_record", "delete_record", "provision_zone", "deprovision_zone"})
+_DNS_WRITES = frozenset(
+    {
+        "ensure_record",
+        "delete_record",
+        "provision_zone",
+        "deprovision_zone",
+        # Reviewed app routes (#2299): the apex/host ALIAS and the ACM
+        # validation record. Requesting the certificate itself is ACM, not DNS.
+        "create_exact_alias_route",
+        "create_reviewed_certificate_validation",
+    }
+)
 
 
 class _DnsWritesRefused:

@@ -345,7 +345,11 @@ def test_failed_test_does_not_claim_observed_feedback_configuration(world):
     assert result["ok"] and not result["data"]["eventTrackingConfigured"]
 
 
-def test_rate_limit_bounds_actual_sends_and_replay_is_free(world):
+def test_rate_limit_bounds_actual_sends_and_replay_is_free(world, monkeypatch):
+    # The limiter counts per calendar minute; pin the clock so the five sends
+    # cannot straddle a minute boundary and land in a fresh bucket.
+    fixed = timezone.now().replace(second=5, microsecond=0)
+    monkeypatch.setattr(email_delivery.timezone, "now", lambda: fixed)
     nonce = uuid4()
     assert send(world, request_id=nonce)["ok"]
     assert send(world, request_id=nonce)["ok"]
@@ -506,6 +510,10 @@ def test_retained_history_blocks_destructive_migration_rollback(world):
     assert send(world)["ok"]
     row = EmailDeliveryTest.objects.get()
     row.soft_delete()
+    # Sibling services branches unapply first and ALTER tables these rows
+    # reference; fire the deferred FK checks so Postgres allows the DDL.
+    with connection.cursor() as cursor:
+        cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
     with pytest.raises(RuntimeError, match="EMAIL_TEST_ROLLBACK_REQUIRES_EMPTY_HISTORY"):
         MigrationExecutor(connection).migrate([("astrolift_services", "0035_merge_model_sources")])
     assert EmailDeliveryTest._base_manager.filter(pk=row.pk).exists()
@@ -518,9 +526,10 @@ def test_empty_mail_history_migration_roundtrip():
 
     assert not EmailDeliveryTest._base_manager.exists()
     previous = [("astrolift_services", "0035_merge_model_sources")]
-    # Restore every leaf: rolling back to 0035 also unapplies sibling branches
-    # joined by a later merge migration, which 0043 alone would not re-apply.
-    current = MigrationExecutor(connection).loader.graph.leaf_nodes("astrolift_services")
+    # Restore every leaf of every app: rolling back to 0035 also unapplies
+    # sibling branches joined by a later merge migration and other apps'
+    # migrations that depend on services, which 0043 alone would not re-apply.
+    current = MigrationExecutor(connection).loader.graph.leaf_nodes()
     try:
         MigrationExecutor(connection).migrate(previous)
         assert "astrolift_services_emaildeliverytest" not in connection.introspection.table_names()

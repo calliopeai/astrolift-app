@@ -58,7 +58,7 @@ def _declaring() -> _Cluster:
     return _Cluster(credential={"mode": "aws_assume_role", "role_arn": ROLE_ARN})
 
 
-@pytest.mark.parametrize("capability", ["registry", "identity", "secrets"])
+@pytest.mark.parametrize("capability", ["registry", "identity", "secrets", "dns"])
 def test_capability_config_carries_the_declared_role(capability):
     cfg = _config_for_capability("aws", _declaring(), capability)
 
@@ -101,17 +101,31 @@ def test_the_migrated_capabilities_are_no_longer_refused(capability):
 
 
 def test_an_unmigrated_capability_is_still_refused():
-    """The guard has not been blanket-disabled.
-
-    ``dns`` on AWS still builds its clients ambiently -- Route53Config is
-    constructed with no cluster in hand at every call site -- so a cluster
-    declaring a role must still be refused there rather than quietly served
-    from the control plane's account.
-    """
-    assert "dns" not in CREDENTIAL_AWARE_CAPABILITIES
+    assert "tls" not in CREDENTIAL_AWARE_CAPABILITIES
     with pytest.raises(ClusterCredentialUnsupported) as exc:
-        assert_credential_supported(_declaring(), capability="dns")
-    assert "dns" in str(exc.value)
+        assert_credential_supported(_declaring(), capability="tls")
+    assert "tls" in str(exc.value)
+
+
+def test_dns_credential_support_is_aws_only():
+    assert_credential_supported(_declaring(), capability="dns")
+    cluster = _declaring()
+    cluster.provider_plugin = type("Plugin", (), {"slug": "gcp"})()
+    from core.cluster_credentials import ClusterCredentialInvalid
+
+    with pytest.raises(ClusterCredentialInvalid):
+        assert_credential_supported(cluster, capability="dns")
+
+
+def test_aws_workload_annotation_remains_irsa_dictionary():
+    from core.app_deploy import _workload_identity_annotations
+
+    assert _workload_identity_annotations(
+        plugin_slug="aws",
+        provider_config={"account_id": "210987654321"},
+        auth_config={},
+        role_name="original",
+    ) == {"eks.amazonaws.com/role-arn": "arn:aws:iam::210987654321:role/original"}
 
 
 def test_the_driver_hands_the_credential_to_the_client_factory():

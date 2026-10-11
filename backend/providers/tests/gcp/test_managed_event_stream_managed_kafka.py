@@ -29,7 +29,7 @@ SPEC = ProvisionSpec(
     service_handle_hint="stream",
     size="small",
     binding_id="binding-id",
-    managed_service_id="managed-id",
+    managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
 )
 MSID = SPEC.managed_service_id
 
@@ -325,7 +325,7 @@ def test_provision_reconciles_cluster_topics_acls_registry_and_connect(
     cluster = client.resources[cluster_name]
     assert cluster["capacityConfig"] == {"vcpuCount": "6", "memoryBytes": str(24 * 1024**3)}
     assert cluster["gcpConfig"]["accessConfig"]["networkConfigs"][0]["subnet"].endswith("/kafka")
-    assert cluster["labels"]["astrolift-io-managed-service-id"] == "managed-id"
+    assert cluster["labels"]["astrolift-io-managed-service-id"] == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
     topic = client.resources[f"{cluster_name}/topics/orders.v1"]
     assert topic["configs"]["cleanup.policy"] == "compact"
     acl = client.resources[f"{cluster_name}/acls/topic/orders.v1"]
@@ -588,7 +588,7 @@ def test_another_services_cluster_and_registry_are_not_reassigned(
     assert driver.provision(replace(SPEC, config=_full_config())).ok
     cluster = "projects/project-1/locations/us-central1/clusters/shared-events"
     registry = "projects/project-1/locations/us-central1/schemaRegistries/events_registry"
-    assert driver._registry_owner(registry) == "managed-id"
+    assert driver._registry_owner(registry) == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
 
     other_spec = replace(SPEC, managed_service_id="other-id")
     for reassign in (False, True):
@@ -599,8 +599,10 @@ def test_another_services_cluster_and_registry_are_not_reassigned(
         refused = driver.provision(replace(other_spec, config=cfg))
         assert not refused.ok
         assert "another managed service" in refused.message
-    assert client.resources[cluster]["labels"]["astrolift-io-managed-service-id"] == "managed-id"
-    assert driver._registry_owner(registry) == "managed-id"
+    assert (
+        client.resources[cluster]["labels"]["astrolift-io-managed-service-id"] == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
+    )
+    assert driver._registry_owner(registry) == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
 
     # The registry refuses on its own marker, not only behind the cluster
     # check: a second cluster naming the same registry is still turned away.
@@ -609,7 +611,7 @@ def test_another_services_cluster_and_registry_are_not_reassigned(
     refused = driver.provision(replace(other_spec, config=other_cluster))
     assert not refused.ok
     assert "schema registry events_registry belongs to another managed service" in refused.message
-    assert driver._registry_owner(registry) == "managed-id"
+    assert driver._registry_owner(registry) == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
 
 
 def test_destructive_child_operations_require_specific_confirmation(driver: ManagedKafkaDriver) -> None:
@@ -1104,3 +1106,24 @@ def test_prune_and_teardown_cannot_follow_foreign_cluster_labels(driver, client,
     assert {key: value for key, value in client.schema_versions.items() if key[0] == foreign_names[-1]} == {
         key: value for key, value in schema_before.items() if key[0] == foreign_names[-1]
     }
+
+
+def test_a_recorded_legacy_name_is_kept(driver) -> None:
+    assert (
+        driver._cluster_id(
+            replace(SPEC, config={}, recorded_handle="event_stream/us-central1/astrolift-billing-prod"), {}
+        )
+        == "astrolift-billing-prod"
+    )
+
+
+def test_slug_joins_that_collide_get_distinct_new_names(driver) -> None:
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one name before #2032.
+    first = driver._cluster_id(replace(SPEC, config={}, organization_slug="acme", app_slug="web-prod"), {})
+    second = driver._cluster_id(
+        replace(SPEC, config={}, organization_slug="acme-web", app_slug="prod", managed_service_id=OTHER_SERVICE_ID), {}
+    )
+    assert first != second and len(first) <= 63
+
+
+OTHER_SERVICE_ID = "0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4"

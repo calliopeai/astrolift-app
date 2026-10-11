@@ -69,6 +69,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.physical_naming import managed_service_identity, physical_name, recorded_resource_name
 from azure.managed.tags import arm_tags_for as tags_for
 
 KIND = "time_series"
@@ -183,7 +184,10 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        workspace_name = self._workspace_name_for(spec=spec)
+        try:
+            workspace_name = self._workspace_name_for(spec=spec)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         cfg = spec.config or {}
 
         existing = self._describe(workspace_name)
@@ -816,22 +820,12 @@ class AzureMonitorPrometheusDriver(ManagedServiceDriver):
         return str(immutable) if immutable else ""
 
     def _workspace_name_for(self, *, spec: ProvisionSpec) -> str:
-        # Azure Monitor workspace names: 4-63 chars, alphanumeric +
-        # hyphen, must start with a letter or digit.
-        parts = [
-            self._config.workspace_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-        ]
-        raw = "-".join(p for p in parts if p).lower()
-        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        clean = clean.strip("-")
-        if not clean or not (clean[0].isalpha() or clean[0].isdigit()):
-            clean = "w" + clean
-        return clean[:63]
+        # Monitor workspace names: 4-63 chars; 39 keeps the -dce endpoint
+        # name (<=43) and the other derived names whole (#2032).
+        managed_service_identity(spec.managed_service_id)
+        return recorded_resource_name(spec.recorded_handle, kind=KIND) or physical_name(
+            spec.managed_service_id, prefix=self._config.workspace_name_prefix, max_length=39
+        )
 
     def _handle_for(self, *, workspace_name: str) -> str:
         return f"{KIND}/{workspace_name}"

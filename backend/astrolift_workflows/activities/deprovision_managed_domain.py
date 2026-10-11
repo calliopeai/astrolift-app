@@ -35,6 +35,9 @@ def _get_cluster_and_dns_driver(cluster_id: int) -> tuple[Any, Any]:
 
 
 def _deprovision_sync(cluster_id: int, zone: str) -> dict[str, Any]:
+    from astrolift_lifecycle.domain_app_route import require_unbound_zone
+
+    require_unbound_zone(zone=zone)
     from astrolift_clusters.models.managed_domain import ManagedDomain
 
     _, dns_driver = _get_cluster_and_dns_driver(cluster_id)

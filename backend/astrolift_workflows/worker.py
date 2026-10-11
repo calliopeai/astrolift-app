@@ -13,6 +13,7 @@ from astrolift_workflows.activities import (
     activate_shared_model_subscriptions,
     aggregate_fan_out,
     apply_manifests,
+    apply_native_model_connection,
     apply_platform_rbac,
     apply_shared_model,
     apply_to_target_cluster,
@@ -60,11 +61,13 @@ from astrolift_workflows.activities import (
     evaluate_alerts_tick,
     evaluate_supply_chain_gate,
     expire_pending_approval_deployments,
+    fail_native_model_connection,
     fail_shared_model_reconcile,
     fetch_app_build_strategy,
     finalize_managed_service_deletion,
     finalize_managed_service_provision,
     finalize_managed_service_update,
+    finish_native_model_connection,
     finish_shared_model_reconcile,
     gc_stale_previews,
     get_workflow_stages,
@@ -85,6 +88,7 @@ from astrolift_workflows.activities import (
     mark_decommissioned,
     mark_decommissioning,
     mark_deploying,
+    mark_deployment_identity_refused,
     mark_dev_environment_failed,
     mark_error,
     mark_failed,
@@ -166,6 +170,7 @@ from astrolift_workflows.activities import (
     update_managed_service,
     update_secrets,
     update_stage_execution,
+    validate_deployment_identity_origin,
     validate_migration_target,
     validate_ns_delegation,
     verify_app_hostnames,
@@ -193,6 +198,7 @@ from astrolift_workflows.activities.configured_workflow_schedule_fire import (
     create_scheduled_workflow_run,
     record_scheduled_workflow_start,
 )
+from astrolift_workflows.activities.domain_app_route import reconcile_domain_app_route
 from astrolift_workflows.activities.install_cluster_agent import install_cluster_agent_attempt
 from astrolift_workflows.activities.install_cluster_log_collector import install_cluster_log_collector_attempt
 from astrolift_workflows.activities.pipeline_schedule_fire import create_scheduled_pipeline_run
@@ -236,6 +242,7 @@ from astrolift_workflows.workflows import (
     InstallClusterPrereqsWorkflow,
     MigrateAppWorkflow,
     NamespaceProvisionWorkflow,
+    NativeModelConnectionReconcileWorkflow,
     ObservabilityRetentionTickWorkflow,
     OnboardAppWorkflow,
     PipelineRunWorkflow,
@@ -268,15 +275,18 @@ from astrolift_workflows.workflows import (
     WorkflowDefinitionRunWorkflow,
     WorkflowRunReconcileTickWorkflow,
 )
+from astrolift_workflows.workflows.domain_app_route import ManagedDomainAppRouteWorkflow
 from astrolift_workflows.workflows.install_cluster_agent import InstallClusterAgentWorkflow
 from astrolift_workflows.workflows.install_cluster_log_collector import InstallClusterLogCollectorWorkflow
 
 WORKFLOWS = (
+    ManagedDomainAppRouteWorkflow,
     InstallClusterAgentWorkflow,
     InstallClusterLogCollectorWorkflow,
     AgentTaskCallbackReconcileWorkflow,
     DeliverAgentTaskCallbackWorkflow,
     SharedModelReconcileWorkflow,
+    NativeModelConnectionReconcileWorkflow,
     AgentBoxReapTickWorkflow,
     AgentCronTickWorkflow,
     AgentLoopTickWorkflow,
@@ -341,6 +351,7 @@ WORKFLOWS = (
 )
 
 ACTIVITIES = (
+    reconcile_domain_app_route,
     install_cluster_agent_attempt,
     install_cluster_log_collector_attempt,
     deliver_agent_task_callback,
@@ -351,6 +362,9 @@ ACTIVITIES = (
     finish_shared_model_reconcile,
     fail_shared_model_reconcile,
     abort_in_flight_deploys,
+    apply_native_model_connection,
+    finish_native_model_connection,
+    fail_native_model_connection,
     assert_no_concurrent,
     apply_observability_retention,
     probe_app_cronjob_runs_activity,
@@ -414,6 +428,8 @@ ACTIVITIES = (
     ensure_static_dns,
     ensure_static_site_services,
     ensure_workload_identity,
+    validate_deployment_identity_origin,
+    mark_deployment_identity_refused,
     evaluate_alerts_tick,
     evaluate_supply_chain_gate,
     execute_agent_stage,

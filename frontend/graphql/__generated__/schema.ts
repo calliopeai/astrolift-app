@@ -1322,6 +1322,12 @@ export type AstroliftAppIdentityBindingResult = {
   reason: AstroliftObservabilityPanelReason;
 };
 
+export type AstroliftAppKind = {
+  description: Scalars['String']['output'];
+  key: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+};
+
 export type AstroliftAppListState =
   | 'ARCHIVED'
   | 'DEREGISTERED'
@@ -1587,6 +1593,8 @@ export type AstroliftApproverUser = {
 };
 
 export type AstroliftAppsListFilter = {
+  /** App kinds from the manifest's [app] kind (#2332); an empty string matches generic apps. */
+  appKind: InputMaybe<Array<Scalars['String']['input']>>;
   /** true: archived apps only. false: active only. null: includeArchived decides. */
   archived: InputMaybe<Scalars['Boolean']['input']>;
   /** Cluster slugs, case-insensitive; any environment on one matches. */
@@ -2612,6 +2620,8 @@ export type AstroliftDiscoveredAgentManifest = {
 
 export type AstroliftDiscoveredAppManifest = {
   alreadyRegistered: Scalars['Boolean']['output'];
+  /** The manifest's [app] kind (#2332); empty when generic. */
+  appKind: Scalars['String']['output'];
   buildContext: Scalars['String']['output'];
   manifestPath: Scalars['String']['output'];
   name: Scalars['String']['output'];
@@ -4459,6 +4469,8 @@ export type AstroliftRegisteredAgent = {
 
 export type AstroliftRegisteredApp = {
   activePreviewCount: Scalars['Int']['output'];
+  /** What the app is for, from the manifest's [app] kind (#2332), e.g. mimwell; empty for a generic app. Separate from workload kinds; see astroliftAppKinds. */
+  appKind: Scalars['String']['output'];
   approverTeamId?: Maybe<Scalars['GUID']['output']>;
   approverUserIds: Array<Scalars['String']['output']>;
   archivedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -6184,6 +6196,55 @@ export type AvailableTransition = {
   toState: Scalars['String']['output'];
 };
 
+export type BedrockModelConnectionAction = {
+  allowed: Scalars['Boolean']['output'];
+  enabled: Scalars['Boolean']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+};
+
+export type BedrockModelPlacementInput = {
+  clusterId: Scalars['GUID']['input'];
+  expectedClusterVersion: Scalars['Int']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  expectedProviderVersion: Scalars['Int']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
+export type BedrockModelSource = {
+  identity: NativeModelConnectionSource;
+  inputModalities: Array<Scalars['String']['output']>;
+  lifecycle?: Maybe<Scalars['String']['output']>;
+  name: Scalars['String']['output'];
+  outputModalities: Array<Scalars['String']['output']>;
+  profileType?: Maybe<Scalars['String']['output']>;
+  provider?: Maybe<Scalars['String']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  registerable: Scalars['Boolean']['output'];
+  streaming?: Maybe<Scalars['Boolean']['output']>;
+};
+
+export type BedrockModelSourceInput = {
+  clusterId: Scalars['GUID']['input'];
+  expectedClusterVersion: Scalars['Int']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  expectedProviderVersion: Scalars['Int']['input'];
+  organizationId: Scalars['GUID']['input'];
+  sourceIdentifier: Scalars['String']['input'];
+  sourceKind: BedrockModelSourceKind;
+};
+
+export type BedrockModelSourceKind =
+  | 'FOUNDATION_MODEL'
+  | 'INFERENCE_PROFILE';
+
+export type BedrockModelSources = {
+  items: Array<BedrockModelSource>;
+  partial: Scalars['Boolean']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+  state: Scalars['String']['output'];
+  truncated: Scalars['Boolean']['output'];
+};
+
 export type BeginCloudflareDnsOAuthInput = {
   name: Scalars['String']['input'];
   organizationId: Scalars['GUID']['input'];
@@ -6457,6 +6518,8 @@ export type ClusterModelDeployment = {
   localManifestSha256?: Maybe<Scalars['String']['output']>;
   modelRepo: Scalars['String']['output'];
   name: Scalars['String']['output'];
+  nativeConnection?: Maybe<NativeModelConnection>;
+  nativeSource?: Maybe<NativeModelConnectionSource>;
   operationCompletedAt?: Maybe<Scalars['DateTime']['output']>;
   operationId?: Maybe<Scalars['String']['output']>;
   operationStartedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -7263,6 +7326,24 @@ export type FormDefinitionUpdateInput = {
   slug: Scalars['String']['input'];
 };
 
+/** Deployment metadata only; application adoption requires an independent gateway credential lifecycle. */
+export type FoundryDeploymentConnectionSource = {
+  accountKind: Scalars['String']['output'];
+  accountResourceId: Scalars['String']['output'];
+  declaredCapacity?: Maybe<Scalars['Int']['output']>;
+  declaredSku?: Maybe<Scalars['String']['output']>;
+  deploymentName: Scalars['String']['output'];
+  deploymentResourceId: Scalars['String']['output'];
+  localAuthDisabled?: Maybe<Scalars['Boolean']['output']>;
+  modelFormat: Scalars['String']['output'];
+  modelName: Scalars['String']['output'];
+  modelVersion?: Maybe<Scalars['String']['output']>;
+  provisioningState?: Maybe<Scalars['String']['output']>;
+  region: Scalars['String']['output'];
+  resourceGroup: Scalars['String']['output'];
+  subscriptionId: Scalars['String']['output'];
+};
+
 export type GenerateInstallEnrollmentQrInput = {
   label: InputMaybe<Scalars['String']['input']>;
   ttlSeconds: InputMaybe<Scalars['Int']['input']>;
@@ -7634,6 +7715,136 @@ export type ManagedDomainActions = {
   canCreate: Scalars['Boolean']['output'];
   canDelete: Scalars['Boolean']['output'];
   canRevalidate: Scalars['Boolean']['output'];
+  canSetDefaults: Scalars['Boolean']['output'];
+  canUpdate: Scalars['Boolean']['output'];
+  defaultUpdateReason: Scalars['String']['output'];
+  defaultsFingerprint?: Maybe<Scalars['String']['output']>;
+};
+
+export type ManagedDomainAppRouteOperation = {
+  allocationState: Scalars['String']['output'];
+  appId: Scalars['GUID']['output'];
+  canReconcile: Scalars['Boolean']['output'];
+  clusterId: Scalars['GUID']['output'];
+  customDomainId?: Maybe<Scalars['GUID']['output']>;
+  dnsState: Scalars['String']['output'];
+  domainId: Scalars['GUID']['output'];
+  environmentId: Scalars['GUID']['output'];
+  hostname: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  ingressState: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  observedAt?: Maybe<Scalars['DateTime']['output']>;
+  purpose: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  records: Array<ManagedDomainAppRouteRecord>;
+  requestId: Scalars['GUID']['output'];
+  status: Scalars['String']['output'];
+  tlsState: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+  workloadId: Scalars['GUID']['output'];
+};
+
+export type ManagedDomainAppRouteOperationInput = {
+  domainId: Scalars['GUID']['input'];
+  requestId: Scalars['GUID']['input'];
+};
+
+export type ManagedDomainAppRouteOperationMutationResult = {
+  data?: Maybe<ManagedDomainAppRouteOperation>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type ManagedDomainAppRouteReconcileInput = {
+  expectedVersion: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  requestId: Scalars['GUID']['input'];
+};
+
+export type ManagedDomainAppRouteRecord = {
+  name: Scalars['String']['output'];
+  target?: Maybe<Scalars['String']['output']>;
+  targetZoneId?: Maybe<Scalars['String']['output']>;
+  type: Scalars['String']['output'];
+};
+
+export type ManagedDomainAppRouteReview = {
+  allocationState: Scalars['String']['output'];
+  apiEndpoint?: Maybe<Scalars['String']['output']>;
+  apiId?: Maybe<Scalars['String']['output']>;
+  appId: Scalars['GUID']['output'];
+  appVersion: Scalars['Int']['output'];
+  canAttach: Scalars['Boolean']['output'];
+  canPrepare: Scalars['Boolean']['output'];
+  certificateStatus: Scalars['String']['output'];
+  clusterId: Scalars['GUID']['output'];
+  clusterVersion: Scalars['Int']['output'];
+  domainId: Scalars['GUID']['output'];
+  domainVersion: Scalars['Int']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentVersion: Scalars['Int']['output'];
+  functionArn?: Maybe<Scalars['String']['output']>;
+  hostname: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  records: Array<ManagedDomainAppRouteRecord>;
+  reviewSha256: Scalars['String']['output'];
+  sourceFingerprint?: Maybe<Scalars['String']['output']>;
+  stage?: Maybe<Scalars['String']['output']>;
+  workloadId: Scalars['GUID']['output'];
+  workloadVersion: Scalars['Int']['output'];
+  writer: Scalars['String']['output'];
+};
+
+export type ManagedDomainAppRouteSupport = {
+  allowed: Scalars['Boolean']['output'];
+  domainId: Scalars['GUID']['output'];
+  reason: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+  writer: Scalars['String']['output'];
+};
+
+export type ManagedDomainAppRouteTarget = {
+  appId: Scalars['GUID']['output'];
+  appName: Scalars['String']['output'];
+  appVersion: Scalars['Int']['output'];
+  clusterId: Scalars['GUID']['output'];
+  clusterName: Scalars['String']['output'];
+  clusterVersion: Scalars['Int']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  environmentVersion: Scalars['Int']['output'];
+  kind: Scalars['String']['output'];
+  workloadId: Scalars['GUID']['output'];
+  workloadName: Scalars['String']['output'];
+  workloadVersion: Scalars['Int']['output'];
+};
+
+export type ManagedDomainAppRouteTargetInput = {
+  domainId: Scalars['GUID']['input'];
+  environmentId: Scalars['GUID']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+  expectedEnvironmentVersion: Scalars['Int']['input'];
+  hostname: Scalars['String']['input'];
+  workloadId: Scalars['GUID']['input'];
+};
+
+export type ManagedDomainAppRouteTargetsPage = {
+  hasNextPage: Scalars['Boolean']['output'];
+  items: Array<ManagedDomainAppRouteTarget>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+};
+
+export type ManagedDomainAppRouteWriteInput = {
+  domainId: Scalars['GUID']['input'];
+  environmentId: Scalars['GUID']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+  expectedEnvironmentVersion: Scalars['Int']['input'];
+  hostname: Scalars['String']['input'];
+  requestId: Scalars['GUID']['input'];
+  reviewSha256: Scalars['String']['input'];
+  workloadId: Scalars['GUID']['input'];
 };
 
 export type ManagedDomainCheckState =
@@ -7660,6 +7871,7 @@ export type ManagedDomainDiagnosticRecord = {
   name: Scalars['String']['output'];
   priority?: Maybe<Scalars['Int']['output']>;
   proxied?: Maybe<Scalars['Boolean']['output']>;
+  routing?: Maybe<ManagedDomainRecordRouting>;
   ttl?: Maybe<Scalars['Int']['output']>;
   type: Scalars['String']['output'];
   values: Array<Scalars['String']['output']>;
@@ -7746,6 +7958,44 @@ export type ManagedDomainProviderZone = {
   zoneName?: Maybe<Scalars['String']['output']>;
 };
 
+export type ManagedDomainRecordCidrRouting = {
+  collectionId: Scalars['String']['output'];
+  locationName: Scalars['String']['output'];
+};
+
+export type ManagedDomainRecordCoordinates = {
+  latitude: Scalars['String']['output'];
+  longitude: Scalars['String']['output'];
+};
+
+export type ManagedDomainRecordGeoLocation = {
+  continentCode?: Maybe<Scalars['String']['output']>;
+  countryCode?: Maybe<Scalars['String']['output']>;
+  subdivisionCode?: Maybe<Scalars['String']['output']>;
+};
+
+export type ManagedDomainRecordGeoProximity = {
+  awsRegion?: Maybe<Scalars['String']['output']>;
+  bias?: Maybe<Scalars['Int']['output']>;
+  coordinates?: Maybe<ManagedDomainRecordCoordinates>;
+  localZoneGroup?: Maybe<Scalars['String']['output']>;
+};
+
+export type ManagedDomainRecordRouting = {
+  cidr?: Maybe<ManagedDomainRecordCidrRouting>;
+  failover?: Maybe<Scalars['String']['output']>;
+  geoLocation?: Maybe<ManagedDomainRecordGeoLocation>;
+  geoProximity?: Maybe<ManagedDomainRecordGeoProximity>;
+  healthCheckId?: Maybe<Scalars['String']['output']>;
+  multiValueAnswer?: Maybe<Scalars['Boolean']['output']>;
+  policy: ManagedDomainRoutingPolicy;
+  reason: Scalars['String']['output'];
+  region?: Maybe<Scalars['String']['output']>;
+  setIdentifier?: Maybe<Scalars['String']['output']>;
+  trafficPolicyInstanceId?: Maybe<Scalars['String']['output']>;
+  weight?: Maybe<Scalars['Int']['output']>;
+};
+
 export type ManagedDomainRecordType =
   | 'A'
   | 'AAAA'
@@ -7771,6 +8021,17 @@ export type ManagedDomainRoute = {
   observedState: ManagedDomainCheckState;
   recordedUrl: Scalars['String']['output'];
 };
+
+export type ManagedDomainRoutingPolicy =
+  | 'CIDR'
+  | 'FAILOVER'
+  | 'GEOLOCATION'
+  | 'GEOPROXIMITY'
+  | 'LATENCY'
+  | 'MULTIVALUE'
+  | 'SIMPLE'
+  | 'UNKNOWN'
+  | 'WEIGHTED';
 
 export type Managedresourceadoptionpayload = {
   acknowledgedPriorOwner: Scalars['String']['output'];
@@ -8085,8 +8346,10 @@ export type ModelPlacementCluster = {
   id: Scalars['GUID']['output'];
   name: Scalars['String']['output'];
   providerId: Scalars['GUID']['output'];
+  providerVersion: Scalars['Int']['output'];
   region?: Maybe<Scalars['String']['output']>;
   slug: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
 };
 
 /** One page of a cursor-paginated or numbered list. */
@@ -8352,6 +8615,7 @@ export type Mutation = {
   connectCloudflareDnsToken: DnsProviderConnectionTypeMutationResult;
   connectExistingGithubApp: AstroliftSourceConnectionMutationResult;
   connectHuggingFace: HuggingFaceConnectionTypeMutationResult;
+  connectManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
   connectSource: AstroliftSourceConnectionMutationResult;
   connectZentinelle: AstroliftZentinelleConnectionMutationResult;
   /** Cancel, terminate, or retry cleanup for an exact owned execution. */
@@ -8510,6 +8774,7 @@ export type Mutation = {
   placeObservabilityRetentionHold: ObservabilityRetentionHoldTypeMutationResult;
   /** Get a pre-signed URL for uploading an image or file. Optionally attach it to an entity via owner_container_property. */
   preSignedUrlImageUpload: PreSignedUrlUploadResult;
+  prepareManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
   /** Process a previously uploaded data import file. */
   processFile: ProcessFileResult;
   /** Update any user's profile via ProfileSerializer. Platform operator only; self-service profile edits go through updateMyProfile. */
@@ -8535,6 +8800,7 @@ export type Mutation = {
   reapCloudOrphan: ReapCloudOrphanPayloadMutationResult;
   recheckDomainValidation: AstroliftAppDomainMutationResult;
   reconcileClusterIngresses: ReconcileClusterIngressesResultMutationResult;
+  reconcileManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
   /** Reconcile the exact reviewed configuration version with its native Temporal schedule. Does not start an immediate run. Active reconciliation requires workflow.trigger; deleted workflow cleanup also requires workflow.delete. */
   reconcileWorkflowSchedule: WorkflowScheduleResult;
   recordClusterBootstrapRun: BootstraprunrecordedpayloadMutationResult;
@@ -8545,6 +8811,7 @@ export type Mutation = {
   registerAgentRepo: AstroliftRegisterAgentRepoResultMutationResult;
   registerApp: AstroliftRegisteredAppMutationResult;
   registerAppRepo: AstroliftRegisterAppRepoResultMutationResult;
+  registerBedrockModelConnection: ClusterModelDeploymentMutationResult;
   registerCloudflareDnsZone: ManagedDomainDnsConnectionBindingMutationResult;
   registerMobileDevice: AstroliftDeviceRegistrationMutationResult;
   registerOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
@@ -8687,6 +8954,7 @@ export type Mutation = {
   triggerPipelineRun: AstroliftPipelineRunMutationResult;
   unbindAgentTrigger: AstroliftAgentTriggerResult;
   unmuteAlertRule: AstroliftAlertRuleMutationResult;
+  unregisterBedrockModelConnection: ClusterModelDeploymentMutationResult;
   unregisterTenantCluster: SoftdeletepayloadMutationResult;
   unregisterZentinelleCluster: AstroliftZentinelleClusterGatewayMutationResult;
   updateAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
@@ -8695,6 +8963,7 @@ export type Mutation = {
   updateAlertRule: AstroliftAlertRuleMutationResult;
   updateApp: AstroliftRegisteredAppMutationResult;
   updateAstroliftSecurityPolicy: AstroliftRegisteredAppMutationResult;
+  updateBedrockModelConnection: ClusterModelDeploymentMutationResult;
   updateClusterModel: ClusterModelDeploymentMutationResult;
   updateClusterModelRuntime: ClusterModelRuntimeSettingsMutationResult;
   updateEmailTemplate: AstroliftEmailTemplateMutationResult;
@@ -9045,6 +9314,11 @@ export type MutationConnectExistingGithubAppArgs = {
 
 export type MutationConnectHuggingFaceArgs = {
   input: ConnectHuggingFaceInput;
+};
+
+
+export type MutationConnectManagedDomainAppRouteArgs = {
+  input: ManagedDomainAppRouteWriteInput;
 };
 
 
@@ -9762,6 +10036,11 @@ export type MutationPreSignedUrlImageUploadArgs = {
 };
 
 
+export type MutationPrepareManagedDomainAppRouteArgs = {
+  input: ManagedDomainAppRouteWriteInput;
+};
+
+
 export type MutationProcessFileArgs = {
   entityType: EntityType;
   processId?: InputMaybe<Scalars['ID']['input']>;
@@ -9869,6 +10148,11 @@ export type MutationReconcileClusterIngressesArgs = {
 };
 
 
+export type MutationReconcileManagedDomainAppRouteArgs = {
+  input: ManagedDomainAppRouteReconcileInput;
+};
+
+
 export type MutationReconcileWorkflowScheduleArgs = {
   expectedActive: Scalars['Boolean']['input'];
   expectedVersion: Scalars['Int']['input'];
@@ -9914,6 +10198,11 @@ export type MutationRegisterAppArgs = {
 
 export type MutationRegisterAppRepoArgs = {
   input: RegisterAppRepoInput;
+};
+
+
+export type MutationRegisterBedrockModelConnectionArgs = {
+  input: RegisterBedrockModelConnectionInput;
 };
 
 
@@ -10605,6 +10894,11 @@ export type MutationUnmuteAlertRuleArgs = {
 };
 
 
+export type MutationUnregisterBedrockModelConnectionArgs = {
+  input: UnregisterBedrockModelConnectionInput;
+};
+
+
 export type MutationUnregisterTenantClusterArgs = {
   input: UnregisterTenantClusterInput;
 };
@@ -10647,6 +10941,11 @@ export type MutationUpdateAppArgs = {
 
 export type MutationUpdateAstroliftSecurityPolicyArgs = {
   input: UpdateSecurityPolicyInput;
+};
+
+
+export type MutationUpdateBedrockModelConnectionArgs = {
+  input: UpdateBedrockModelConnectionInput;
 };
 
 
@@ -10903,6 +11202,59 @@ export type MuteAlertRuleInput = {
   reason: Scalars['String']['input'];
   ruleId: Scalars['GUID']['input'];
 };
+
+export type NativeConnectionSource = FoundryDeploymentConnectionSource | NativeModelConnectionSource | VertexEndpointConnectionSource;
+
+export type NativeModelConfigurationState =
+  | 'CONFIGURED'
+  | 'UNAVAILABLE';
+
+export type NativeModelConnection = {
+  configurationState: NativeModelConfigurationState;
+  family: NativeModelFamily;
+  invokeAccess: NativeModelInvokeAccess;
+  metadataObservedAt?: Maybe<Scalars['DateTime']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  /** Hash of the validated recorded resource tuple; not native incarnation, ownership or invocation proof. */
+  resourceIdentityFingerprint?: Maybe<Scalars['String']['output']>;
+  reviewedSourceFingerprint?: Maybe<Scalars['String']['output']>;
+  source?: Maybe<NativeConnectionSource>;
+  sourceKind: NativeModelConnectionKind;
+};
+
+export type NativeModelConnectionKind =
+  | 'BEDROCK_FOUNDATION_MODEL'
+  | 'BEDROCK_INFERENCE_PROFILE'
+  | 'FOUNDRY_DEPLOYMENT'
+  | 'UNKNOWN'
+  | 'VERTEX_ENDPOINT';
+
+export type NativeModelConnectionSource = {
+  accountId: Scalars['String']['output'];
+  configurationState: Scalars['String']['output'];
+  destinationModelArns: Array<Scalars['String']['output']>;
+  invokeAccess: Scalars['String']['output'];
+  metadataObservedAt?: Maybe<Scalars['DateTime']['output']>;
+  partition: Scalars['String']['output'];
+  protocol: NativeModelProtocol;
+  region: Scalars['String']['output'];
+  sourceArn: Scalars['String']['output'];
+  sourceFingerprint: Scalars['String']['output'];
+  sourceId: Scalars['String']['output'];
+  sourceKind: BedrockModelSourceKind;
+};
+
+export type NativeModelFamily =
+  | 'BEDROCK'
+  | 'FOUNDRY'
+  | 'UNKNOWN'
+  | 'VERTEX';
+
+export type NativeModelInvokeAccess =
+  | 'UNKNOWN';
+
+export type NativeModelProtocol =
+  | 'BEDROCK';
 
 export type NoneTypeMutationResult = {
   data?: Maybe<Scalars['Void']['output']>;
@@ -11312,6 +11664,7 @@ export type Query = {
   astroliftAppGoldenSignals: AstroliftAppGoldenSignalsResult;
   astroliftAppHealthSummary: Array<AstroliftAppHealthSummary>;
   astroliftAppIdentityBinding: AstroliftAppIdentityBindingResult;
+  astroliftAppKinds: Array<AstroliftAppKind>;
   astroliftAppLogs: AstroliftAppLogPage;
   astroliftAppManagedServiceMetrics?: Maybe<AstroliftManagedServiceMetrics>;
   astroliftAppMetricNames: AstroliftAppMetricNames;
@@ -11575,6 +11928,10 @@ export type Query = {
   auditLogs: Array<AuditLogEntry>;
   /** Cursor-paginated mutation audit log. Superuser only. */
   auditLogsPage: AuditLogEntryPage;
+  bedrockModelConnectionAction: BedrockModelConnectionAction;
+  bedrockModelConnectionSupport: BedrockModelConnectionAction;
+  bedrockModelSource?: Maybe<BedrockModelSource>;
+  bedrockModelSources: BedrockModelSources;
   brief?: Maybe<AstroliftBrief>;
   cloudflareDnsRecords: CloudflareDnsRecordsInventory;
   cloudflareDnsZones: CloudflareDnsZonesInventory;
@@ -11607,6 +11964,10 @@ export type Query = {
   humanGateDecision?: Maybe<HumanGateDecisionState>;
   installAlertMailSupport: InstallAlertMailSupport;
   installAlertMailTestsPage: InstallAlertMailTestPage;
+  managedDomainAppRouteOperation?: Maybe<ManagedDomainAppRouteOperation>;
+  managedDomainAppRouteReview: ManagedDomainAppRouteReview;
+  managedDomainAppRouteSupport: ManagedDomainAppRouteSupport;
+  managedDomainAppTargetsPage: ManagedDomainAppRouteTargetsPage;
   me?: Maybe<AstroliftMe>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use membersPage. */
   members: Array<OrganizationMemberType>;
@@ -13511,6 +13872,28 @@ export type QueryAuditLogsPageArgs = {
 };
 
 
+export type QueryBedrockModelConnectionActionArgs = {
+  input: BedrockModelPlacementInput;
+};
+
+
+export type QueryBedrockModelConnectionSupportArgs = {
+  organizationId: Scalars['GUID']['input'];
+};
+
+
+export type QueryBedrockModelSourceArgs = {
+  input: BedrockModelSourceInput;
+};
+
+
+export type QueryBedrockModelSourcesArgs = {
+  input: BedrockModelPlacementInput;
+  limit?: Scalars['Int']['input'];
+  sourceKind: BedrockModelSourceKind;
+};
+
+
 export type QueryBriefArgs = {
   id: Scalars['ID']['input'];
 };
@@ -13681,6 +14064,30 @@ export type QueryInstallAlertMailTestsPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   eventKind?: Scalars['String']['input'];
   limit?: Scalars['Int']['input'];
+};
+
+
+export type QueryManagedDomainAppRouteOperationArgs = {
+  input: ManagedDomainAppRouteOperationInput;
+};
+
+
+export type QueryManagedDomainAppRouteReviewArgs = {
+  input: ManagedDomainAppRouteTargetInput;
+};
+
+
+export type QueryManagedDomainAppRouteSupportArgs = {
+  domainId: Scalars['GUID']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+};
+
+
+export type QueryManagedDomainAppTargetsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  domainId: Scalars['GUID']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+  first?: Scalars['Int']['input'];
 };
 
 
@@ -14112,6 +14519,22 @@ export type RegisterAppRepoInput = {
   sourceKind: Scalars['String']['input'];
   sourceRepo: Scalars['String']['input'];
   sourceUrl: InputMaybe<Scalars['String']['input']>;
+};
+
+export type RegisterBedrockModelConnectionInput = {
+  allowSubscriptions: Scalars['Boolean']['input'];
+  clusterId: Scalars['GUID']['input'];
+  dedicatedAppId: InputMaybe<Scalars['GUID']['input']>;
+  expectedClusterVersion: Scalars['Int']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  expectedProviderVersion: Scalars['Int']['input'];
+  ifMatchDedicatedAppVersion: InputMaybe<Scalars['Int']['input']>;
+  name: Scalars['String']['input'];
+  organizationId: Scalars['GUID']['input'];
+  sharingMode: ModelSharingMode;
+  sourceFingerprint: Scalars['String']['input'];
+  sourceIdentifier: Scalars['String']['input'];
+  sourceKind: BedrockModelSourceKind;
 };
 
 export type RegisterCloudflareDnsZoneInput = {
@@ -14895,6 +15318,14 @@ export type UnmuteAlertRuleInput = {
   ruleId: Scalars['GUID']['input'];
 };
 
+export type UnregisterBedrockModelConnectionInput = {
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  id: Scalars['GUID']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
 export type UnregisterTenantClusterInput = {
   id: Scalars['GUID']['input'];
 };
@@ -14956,6 +15387,19 @@ export type UpdateAppInput = {
   triggerMode: InputMaybe<Scalars['String']['input']>;
 };
 
+export type UpdateBedrockModelConnectionInput = {
+  allowSubscriptions: Scalars['Boolean']['input'];
+  dedicatedAppId: InputMaybe<Scalars['GUID']['input']>;
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  id: Scalars['GUID']['input'];
+  ifMatchDedicatedAppVersion: InputMaybe<Scalars['Int']['input']>;
+  ifMatchVersion: Scalars['Int']['input'];
+  name: Scalars['String']['input'];
+  organizationId: Scalars['GUID']['input'];
+  sharingMode: InputMaybe<ModelSharingMode>;
+};
+
 export type UpdateClusterModelInput = {
   allowSubscriptions: Scalars['Boolean']['input'];
   cpuKvCacheGiB: InputMaybe<Scalars['Int']['input']>;
@@ -15008,6 +15452,8 @@ export type UpdateIdentityProviderInput = {
 export type UpdateManagedDomainInput = {
   defaultFor: InputMaybe<Scalars['String']['input']>;
   dnsConfig: InputMaybe<Scalars['JSON']['input']>;
+  expectedDefaultsFingerprint: InputMaybe<Scalars['String']['input']>;
+  expectedVersion: InputMaybe<Scalars['Int']['input']>;
   id: Scalars['GUID']['input'];
   isWildcardManaged: InputMaybe<Scalars['Boolean']['input']>;
 };
@@ -15246,6 +15692,26 @@ export type VerifyManagedDomainPayloadMutationResult = {
   data?: Maybe<VerifyManagedDomainPayload>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+/** Endpoint routing metadata. IAM covers the whole Endpoint; Predict does not select one deployed model. */
+export type VertexEndpointConnectionSource = {
+  deployedModels: Array<VertexEndpointDeployedModelObservation>;
+  endpointResourceName: Scalars['String']['output'];
+  projectId: Scalars['String']['output'];
+  projectNumber: Scalars['String']['output'];
+  region: Scalars['String']['output'];
+};
+
+export type VertexEndpointDeployedModelObservation = {
+  availableReplicas?: Maybe<Scalars['Int']['output']>;
+  deployedModelId: Scalars['String']['output'];
+  machineType?: Maybe<Scalars['String']['output']>;
+  maxReplicas?: Maybe<Scalars['Int']['output']>;
+  minReplicas?: Maybe<Scalars['Int']['output']>;
+  modelResourceName: Scalars['String']['output'];
+  modelVersionId?: Maybe<Scalars['String']['output']>;
+  trafficPercent: Scalars['Int']['output'];
 };
 
 export type WebhookSecretReveal = {

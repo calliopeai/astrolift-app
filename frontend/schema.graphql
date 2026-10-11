@@ -1361,6 +1361,12 @@ type AstroliftAppIdentityBindingResult {
   binding: AstroliftAppIdentityBinding
 }
 
+type AstroliftAppKind {
+  key: String!
+  label: String!
+  description: String!
+}
+
 enum AstroliftAppListState {
   LIVE
   READY
@@ -1649,6 +1655,11 @@ input AstroliftAppsListFilter {
 
   """Topology kinds, as topologyKind."""
   kind: [String!] = null
+
+  """
+  App kinds from the manifest's [app] kind (#2332); an empty string matches generic apps.
+  """
+  appKind: [String!] = null
 
   """Cluster slugs, case-insensitive; any environment on one matches."""
   cluster: [String!] = null
@@ -2714,6 +2725,9 @@ type AstroliftDiscoveredAppManifest {
   buildContext: String!
   workloadCount: Int!
   alreadyRegistered: Boolean!
+
+  """The manifest's [app] kind (#2332); empty when generic."""
+  appKind: String!
 }
 
 type AstroliftDispatcherInstance {
@@ -4790,6 +4804,11 @@ type AstroliftRegisteredApp {
   clusterSlugs: [String!]!
 
   """
+  What the app is for, from the manifest's [app] kind (#2332), e.g. mimwell; empty for a generic app. Separate from workload kinds; see astroliftAppKinds.
+  """
+  appKind: String!
+
+  """
   Advisory set only on the registerApp result: no organization GitHub connection is visibly recorded on the source repository's owner. Empty everywhere else (#2297).
   """
   sourceConnectionWarning: String!
@@ -6604,6 +6623,56 @@ type AvailableTransition {
   conditionsMet: Boolean!
 }
 
+type BedrockModelConnectionAction {
+  enabled: Boolean!
+  allowed: Boolean!
+  reason: String
+}
+
+input BedrockModelPlacementInput {
+  organizationId: GUID!
+  clusterId: GUID!
+  expectedProviderId: GUID!
+  expectedClusterVersion: Int!
+  expectedProviderVersion: Int!
+}
+
+type BedrockModelSource {
+  identity: NativeModelConnectionSource!
+  name: String!
+  provider: String
+  inputModalities: [String!]!
+  outputModalities: [String!]!
+  streaming: Boolean
+  lifecycle: String
+  profileType: String
+  registerable: Boolean!
+  reason: String
+}
+
+input BedrockModelSourceInput {
+  organizationId: GUID!
+  clusterId: GUID!
+  expectedProviderId: GUID!
+  expectedClusterVersion: Int!
+  expectedProviderVersion: Int!
+  sourceKind: BedrockModelSourceKind!
+  sourceIdentifier: String!
+}
+
+enum BedrockModelSourceKind {
+  FOUNDATION_MODEL
+  INFERENCE_PROFILE
+}
+
+type BedrockModelSources {
+  items: [BedrockModelSource!]!
+  state: String!
+  reason: String
+  truncated: Boolean!
+  partial: Boolean!
+}
+
 input BeginCloudflareDnsOAuthInput {
   organizationId: GUID!
   name: String!
@@ -6890,6 +6959,8 @@ type ClusterModelDeployment {
   operationCompletedAt: DateTime
   desiredResources: ModelResources!
   appliedResources: ModelResources
+  nativeSource: NativeModelConnectionSource
+  nativeConnection: NativeModelConnection
   sourceKind: String!
   localArtifactId: GUID
   localArtifactVersion: Int
@@ -7714,6 +7785,26 @@ input FormDefinitionUpdateInput {
   isPublic: Boolean = null
 }
 
+"""
+Deployment metadata only; application adoption requires an independent gateway credential lifecycle.
+"""
+type FoundryDeploymentConnectionSource {
+  subscriptionId: String!
+  resourceGroup: String!
+  accountResourceId: String!
+  region: String!
+  accountKind: String!
+  localAuthDisabled: Boolean
+  deploymentResourceId: String!
+  deploymentName: String!
+  modelFormat: String!
+  modelName: String!
+  modelVersion: String
+  declaredSku: String
+  declaredCapacity: Int
+  provisioningState: String
+}
+
 """UUID v7 — the platform's external identifier."""
 scalar GUID
 
@@ -8110,6 +8201,136 @@ type ManagedDomainActions {
   canCreate: Boolean!
   canDelete: Boolean!
   canRevalidate: Boolean!
+  canUpdate: Boolean!
+  canSetDefaults: Boolean!
+  defaultUpdateReason: String!
+  defaultsFingerprint: String
+}
+
+type ManagedDomainAppRouteOperation {
+  kind: String!
+  appId: GUID!
+  clusterId: GUID!
+  allocationState: String!
+  records: [ManagedDomainAppRouteRecord!]!
+  observedAt: DateTime
+  id: GUID!
+  version: Int!
+  requestId: GUID!
+  domainId: GUID!
+  environmentId: GUID!
+  workloadId: GUID!
+  customDomainId: GUID
+  hostname: String!
+  purpose: String!
+  status: String!
+  reason: String!
+  dnsState: String!
+  ingressState: String!
+  tlsState: String!
+  canReconcile: Boolean!
+}
+
+input ManagedDomainAppRouteOperationInput {
+  domainId: GUID!
+  requestId: GUID!
+}
+
+type ManagedDomainAppRouteOperationMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ManagedDomainAppRouteOperation
+}
+
+input ManagedDomainAppRouteReconcileInput {
+  operationId: GUID!
+  expectedVersion: Int!
+  requestId: GUID!
+}
+
+type ManagedDomainAppRouteRecord {
+  name: String!
+  type: String!
+  target: String
+  targetZoneId: String
+}
+
+type ManagedDomainAppRouteReview {
+  kind: String!
+  appId: GUID!
+  appVersion: Int!
+  domainId: GUID!
+  domainVersion: Int!
+  environmentId: GUID!
+  environmentVersion: Int!
+  workloadId: GUID!
+  workloadVersion: Int!
+  clusterId: GUID!
+  clusterVersion: Int!
+  hostname: String!
+  reviewSha256: String!
+  writer: String!
+  records: [ManagedDomainAppRouteRecord!]!
+  certificateStatus: String!
+  allocationState: String!
+  apiId: String
+  apiEndpoint: String
+  stage: String
+  functionArn: String
+  sourceFingerprint: String
+  canPrepare: Boolean!
+  canAttach: Boolean!
+  reason: String!
+}
+
+type ManagedDomainAppRouteSupport {
+  domainId: GUID!
+  version: Int!
+  allowed: Boolean!
+  reason: String!
+  writer: String!
+}
+
+type ManagedDomainAppRouteTarget {
+  kind: String!
+  appId: GUID!
+  appName: String!
+  appVersion: Int!
+  environmentId: GUID!
+  environmentName: String!
+  environmentVersion: Int!
+  workloadId: GUID!
+  workloadName: String!
+  workloadVersion: Int!
+  clusterId: GUID!
+  clusterName: String!
+  clusterVersion: Int!
+}
+
+input ManagedDomainAppRouteTargetInput {
+  domainId: GUID!
+  expectedDomainVersion: Int!
+  environmentId: GUID!
+  expectedEnvironmentVersion: Int!
+  workloadId: GUID!
+  hostname: String!
+}
+
+type ManagedDomainAppRouteTargetsPage {
+  items: [ManagedDomainAppRouteTarget!]!
+  nextCursor: String
+  hasNextPage: Boolean!
+}
+
+input ManagedDomainAppRouteWriteInput {
+  domainId: GUID!
+  expectedDomainVersion: Int!
+  environmentId: GUID!
+  expectedEnvironmentVersion: Int!
+  workloadId: GUID!
+  hostname: String!
+  reviewSha256: String!
+  requestId: GUID!
 }
 
 enum ManagedDomainCheckState {
@@ -8140,6 +8361,7 @@ type ManagedDomainDiagnosticRecord {
   evaluateTargetHealth: Boolean
   proxied: Boolean
   priority: Int
+  routing: ManagedDomainRecordRouting
 }
 
 type ManagedDomainDiagnostics {
@@ -8224,6 +8446,44 @@ type ManagedDomainProviderZone {
   bindingSource: String!
 }
 
+type ManagedDomainRecordCidrRouting {
+  collectionId: String!
+  locationName: String!
+}
+
+type ManagedDomainRecordCoordinates {
+  latitude: String!
+  longitude: String!
+}
+
+type ManagedDomainRecordGeoLocation {
+  continentCode: String
+  countryCode: String
+  subdivisionCode: String
+}
+
+type ManagedDomainRecordGeoProximity {
+  awsRegion: String
+  localZoneGroup: String
+  coordinates: ManagedDomainRecordCoordinates
+  bias: Int
+}
+
+type ManagedDomainRecordRouting {
+  policy: ManagedDomainRoutingPolicy!
+  reason: String!
+  setIdentifier: String
+  weight: Int
+  region: String
+  failover: String
+  geoLocation: ManagedDomainRecordGeoLocation
+  geoProximity: ManagedDomainRecordGeoProximity
+  cidr: ManagedDomainRecordCidrRouting
+  multiValueAnswer: Boolean
+  healthCheckId: String
+  trafficPolicyInstanceId: String
+}
+
 enum ManagedDomainRecordType {
   A
   AAAA
@@ -8249,6 +8509,18 @@ type ManagedDomainRoute {
   clusterSlug: String
   ingressClass: String
   observedState: ManagedDomainCheckState!
+}
+
+enum ManagedDomainRoutingPolicy {
+  SIMPLE
+  WEIGHTED
+  LATENCY
+  FAILOVER
+  GEOLOCATION
+  MULTIVALUE
+  GEOPROXIMITY
+  CIDR
+  UNKNOWN
 }
 
 type Managedresourceadoptionpayload {
@@ -8581,7 +8853,9 @@ enum ModelObservationState {
 
 type ModelPlacementCluster {
   id: GUID!
+  version: Int!
   providerId: GUID!
+  providerVersion: Int!
   name: String!
   slug: String!
   region: String
@@ -9070,6 +9344,9 @@ type Mutation {
   deleteClusterAuthUser(input: ClusterAuthUserRefInput!): AstroliftClusterAuthUserChangeMutationResult!
   setClusterAuthUserGroups(input: SetClusterAuthUserGroupsInput!): AstroliftClusterAuthUserChangeMutationResult!
   createClusterAuthGroup(input: CreateClusterAuthGroupInput!): AstroliftClusterAuthUserChangeMutationResult!
+  prepareManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
+  connectManagedDomainAppRoute(input: ManagedDomainAppRouteWriteInput!): ManagedDomainAppRouteOperationMutationResult!
+  reconcileManagedDomainAppRoute(input: ManagedDomainAppRouteReconcileInput!): ManagedDomainAppRouteOperationMutationResult!
   startDeployment(input: StartDeploymentInput!): AstroliftDeploymentMutationResult!
   approveDeployment(input: DeploymentByIdInput!): AstroliftDeploymentMutationResult!
   rejectDeployment(input: AbortDeploymentInput!): AstroliftDeploymentMutationResult!
@@ -9143,6 +9420,9 @@ type Mutation {
   revokeModelSubscription(input: RevokeModelSubscriptionInput!): ModelSubscriptionOperationMutationResult!
   updateClusterModel(input: UpdateClusterModelInput!): ClusterModelDeploymentMutationResult!
   deprovisionClusterModel(input: DeprovisionClusterModelInput!): ClusterModelDeploymentMutationResult!
+  registerBedrockModelConnection(input: RegisterBedrockModelConnectionInput!): ClusterModelDeploymentMutationResult!
+  updateBedrockModelConnection(input: UpdateBedrockModelConnectionInput!): ClusterModelDeploymentMutationResult!
+  unregisterBedrockModelConnection(input: UnregisterBedrockModelConnectionInput!): ClusterModelDeploymentMutationResult!
   updateOrganizationModelConnectionPolicy(input: UpdateOrganizationModelConnectionPolicyInput!): ModelConnectionPolicyMutationResult!
   setModelConnectionRestriction(input: SetModelConnectionRestrictionInput!): ModelConnectionPolicyMutationResult!
   requestModelConnection(input: RequestModelConnectionInput!): ModelConnectionRequestMutationResult!
@@ -9385,6 +9665,67 @@ input MuteAlertRuleInput {
   ruleId: GUID!
   durationSeconds: Int!
   reason: String!
+}
+
+union NativeConnectionSource = NativeModelConnectionSource | VertexEndpointConnectionSource | FoundryDeploymentConnectionSource
+
+enum NativeModelConfigurationState {
+  CONFIGURED
+  UNAVAILABLE
+}
+
+type NativeModelConnection {
+  family: NativeModelFamily!
+  sourceKind: NativeModelConnectionKind!
+  configurationState: NativeModelConfigurationState!
+  invokeAccess: NativeModelInvokeAccess!
+  reason: String
+
+  """
+  Hash of the validated recorded resource tuple; not native incarnation, ownership or invocation proof.
+  """
+  resourceIdentityFingerprint: String
+  reviewedSourceFingerprint: String
+  metadataObservedAt: DateTime
+  source: NativeConnectionSource
+}
+
+enum NativeModelConnectionKind {
+  BEDROCK_FOUNDATION_MODEL
+  BEDROCK_INFERENCE_PROFILE
+  VERTEX_ENDPOINT
+  FOUNDRY_DEPLOYMENT
+  UNKNOWN
+}
+
+type NativeModelConnectionSource {
+  protocol: NativeModelProtocol!
+  sourceKind: BedrockModelSourceKind!
+  accountId: String!
+  region: String!
+  partition: String!
+  sourceId: String!
+  sourceArn: String!
+  destinationModelArns: [String!]!
+  sourceFingerprint: String!
+  metadataObservedAt: DateTime
+  configurationState: String!
+  invokeAccess: String!
+}
+
+enum NativeModelFamily {
+  BEDROCK
+  VERTEX
+  FOUNDRY
+  UNKNOWN
+}
+
+enum NativeModelInvokeAccess {
+  UNKNOWN
+}
+
+enum NativeModelProtocol {
+  BEDROCK
 }
 
 type NoneTypeMutationResult {
@@ -9873,6 +10214,7 @@ type Query {
   astroliftAppMetrics(appSlug: String!, timeRange: String! = "1h"): AstroliftAppMetrics
   astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100, appSlug: String = null): [AstroliftAlertEvent!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftAlertEventsPage.")
   astroliftAlertEventsPage(ruleId: GUID = null, unresolvedOnly: Boolean! = false, search: String = null, limit: Int! = 50, after: String = null, appSlug: String = null): AstroliftAlertEventPage!
+  astroliftAppKinds: [AstroliftAppKind!]!
 
   """
   Read-only APP_READ projection for an exact live app/environment. Expected cluster/provider GUIDs refuse reassignment. Persisted observations do not prove live health, TLS binding or renewal; mutation authority is unchanged.
@@ -9900,6 +10242,10 @@ type Query {
   scanAppManifests(sourceRepo: String!, sourceKind: String! = "github", ref: String! = "main"): AstroliftScanAppManifestsResult!
   astroliftAppAccess(appSlug: String!): AstroliftAppAccess
   astroliftAppAccessPreview(appSlug: String!, groups: [String!]!, users: [String!]!): AstroliftAppAccessPreview
+  managedDomainAppRouteSupport(domainId: GUID!, expectedDomainVersion: Int!): ManagedDomainAppRouteSupport!
+  managedDomainAppTargetsPage(domainId: GUID!, expectedDomainVersion: Int!, first: Int! = 20, after: String = null): ManagedDomainAppRouteTargetsPage!
+  managedDomainAppRouteReview(input: ManagedDomainAppRouteTargetInput!): ManagedDomainAppRouteReview!
+  managedDomainAppRouteOperation(input: ManagedDomainAppRouteOperationInput!): ManagedDomainAppRouteOperation
   scanCloudOrphans: CloudOrphanReportType!
   astroliftEnvironments(appSlug: String = null): [AstroliftAppEnvironment!]!
   astroliftEnvironmentsPage(appSlug: String = null, search: String = null, filter: AstroliftEnvironmentsFilter = null, sort: String = null, page: Int = null, pageSize: Int = null): AstroliftAppEnvironmentPage!
@@ -10007,6 +10353,10 @@ type Query {
   clusterModelRuntimeAdmission(input: ProvisionClusterModelInput!): ModelRuntimeAdmission!
   clusterModelSubscriptionTargetsPage(organizationId: GUID!, modelDeploymentId: GUID!, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionTargetPage!
   clusterModelSubscriptionsPage(organizationId: GUID!, modelDeploymentId: GUID!, appEnvironmentId: GUID = null, search: String = null, page: Int! = 1, pageSize: Int! = 25): ModelSubscriptionPage!
+  bedrockModelConnectionSupport(organizationId: GUID!): BedrockModelConnectionAction!
+  bedrockModelConnectionAction(input: BedrockModelPlacementInput!): BedrockModelConnectionAction!
+  bedrockModelSources(input: BedrockModelPlacementInput!, sourceKind: BedrockModelSourceKind!, limit: Int! = 100): BedrockModelSources!
+  bedrockModelSource(input: BedrockModelSourceInput!): BedrockModelSource
   modelHostingAction(organizationId: GUID!): ModelHostingAction!
   huggingFaceConnectionsPage(organizationId: GUID!, page: Int! = 1, pageSize: Int! = 25): HuggingFaceConnectionTypePage!
   clusterModelSourceAccess(organizationId: GUID!, modelRepo: String!, revisionSha: String!, connectionId: GUID = null, expectedConnectionVersion: Int = null): ModelSourceAccess!
@@ -10334,6 +10684,22 @@ input RegisterAppRepoInput {
   ref: String! = "main"
   defaultBranch: String = null
   deployBranch: String = null
+}
+
+input RegisterBedrockModelConnectionInput {
+  organizationId: GUID!
+  clusterId: GUID!
+  expectedProviderId: GUID!
+  expectedClusterVersion: Int!
+  expectedProviderVersion: Int!
+  sourceKind: BedrockModelSourceKind!
+  sourceIdentifier: String!
+  sourceFingerprint: String!
+  name: String!
+  allowSubscriptions: Boolean!
+  sharingMode: ModelSharingMode! = SHARED
+  dedicatedAppId: GUID = null
+  ifMatchDedicatedAppVersion: Int = null
 }
 
 input RegisterCloudflareDnsZoneInput {
@@ -11086,6 +11452,14 @@ input UnmuteAlertRuleInput {
   ruleId: GUID!
 }
 
+input UnregisterBedrockModelConnectionInput {
+  organizationId: GUID!
+  id: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  ifMatchVersion: Int!
+}
+
 input UnregisterTenantClusterInput {
   id: GUID!
 }
@@ -11147,6 +11521,19 @@ input UpdateAppInput {
   ifMatchVersion: Int = null
 }
 
+input UpdateBedrockModelConnectionInput {
+  organizationId: GUID!
+  id: GUID!
+  expectedClusterId: GUID!
+  expectedProviderId: GUID!
+  ifMatchVersion: Int!
+  name: String!
+  allowSubscriptions: Boolean!
+  sharingMode: ModelSharingMode = null
+  dedicatedAppId: GUID = null
+  ifMatchDedicatedAppVersion: Int = null
+}
+
 input UpdateClusterModelInput {
   organizationId: GUID!
   id: GUID!
@@ -11198,6 +11585,8 @@ input UpdateIdentityProviderInput {
 
 input UpdateManagedDomainInput {
   id: GUID!
+  expectedVersion: Int = null
+  expectedDefaultsFingerprint: String = null
   defaultFor: String = null
   isWildcardManaged: Boolean = null
   dnsConfig: JSON = null
@@ -11436,6 +11825,28 @@ type VerifyManagedDomainPayloadMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: VerifyManagedDomainPayload
+}
+
+"""
+Endpoint routing metadata. IAM covers the whole Endpoint; Predict does not select one deployed model.
+"""
+type VertexEndpointConnectionSource {
+  projectId: String!
+  projectNumber: String!
+  region: String!
+  endpointResourceName: String!
+  deployedModels: [VertexEndpointDeployedModelObservation!]!
+}
+
+type VertexEndpointDeployedModelObservation {
+  deployedModelId: String!
+  modelResourceName: String!
+  modelVersionId: String
+  trafficPercent: Int!
+  machineType: String
+  minReplicas: Int
+  maxReplicas: Int
+  availableReplicas: Int
 }
 
 """Represents NULL values"""

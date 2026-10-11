@@ -1,9 +1,12 @@
+import { ROUTING_EXAMPLES } from "./DomainRecordRouting.stories";
+import { DEFAULT_SETTINGS } from "./DomainDefaultSettings.stories";
 import { NextIntlClientProvider } from "next-intl";
 import en from "@/messages/en.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 import {
   DNS_WITHHELD,
+  DOMAIN_ACTIVE,
   DOMAIN_DIAGNOSTICS,
   DOMAIN_LONG,
   DOMAIN_UNPROVISIONED,
@@ -111,7 +114,12 @@ export const ReadOnly: Story = {
     ...MANAGED_DOMAIN,
     diagnostics: {
       ...DOMAIN_DIAGNOSTICS,
-      actions: { canCreate: false, canDelete: false, canRevalidate: false },
+      actions: {
+        ...DOMAIN_DIAGNOSTICS.actions,
+        canCreate: false,
+        canDelete: false,
+        canRevalidate: false,
+      },
     },
   },
 };
@@ -141,7 +149,12 @@ export const OPERATOR_REQUIRED: ManagedDomainDetailProps = {
   initialTab: "records",
   diagnostics: {
     ...DOMAIN_DIAGNOSTICS,
-    actions: { canCreate: false, canDelete: false, canRevalidate: false },
+    actions: {
+      ...DOMAIN_DIAGNOSTICS.actions,
+      canCreate: false,
+      canDelete: false,
+      canRevalidate: false,
+    },
     providerZone: {
       ...DOMAIN_DIAGNOSTICS.providerZone,
       state: "UNSUPPORTED",
@@ -227,3 +240,28 @@ export const DNS_ANSWER_OBSERVATION: ManagedDomainDetailProps = {
   },
 };
 export const ObservedAnswer: Story = { args: DNS_ANSWER_OBSERVATION };
+
+export const EffectiveDefaultSettings: Story = {
+  args: {
+    ...MANAGED_DOMAIN,
+    defaultSettings: {
+      ...DEFAULT_SETTINGS,
+      zone: DOMAIN_ACTIVE.zone,
+      version: DOMAIN_ACTIVE.version,
+    },
+  },
+};
+
+export const NativeRoutingConfiguration: Story = {
+  args: {
+    ...MANAGED_DOMAIN,
+    initialTab: "records",
+    diagnostics: {
+      ...DOMAIN_DIAGNOSTICS,
+      providerZone: {
+        ...DOMAIN_DIAGNOSTICS.providerZone,
+        records: [{ ...DOMAIN_DIAGNOSTICS.providerZone.records[0], routing: ROUTING_EXAMPLES[1] }],
+      },
+    },
+  },
+};

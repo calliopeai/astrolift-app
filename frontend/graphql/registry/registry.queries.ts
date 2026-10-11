@@ -190,6 +190,7 @@ export const LIST_APPS_PAGE = gql`
         ...AppFreshnessFields
         topologyKind
         clusterSlugs
+        appKind
       }
       nextCursor
       totalCount
@@ -233,6 +234,7 @@ export const LIST_MY_APPS_PAGE = gql`
         ...AppFreshnessFields
         topologyKind
         clusterSlugs
+        appKind
       }
       nextCursor
       totalCount

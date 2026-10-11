@@ -4,6 +4,8 @@ from astrolift_lifecycle.models.builder_artifact import BuilderArtifact
 from astrolift_lifecycle.models.deploy_token import DeployToken
 from astrolift_lifecycle.models.deployment import Deployment
 from astrolift_lifecycle.models.deployment_approval import DeploymentApproval
+from astrolift_lifecycle.models.deployment_execution_receipt import DeploymentExecutionReceipt
+from astrolift_lifecycle.models.deployment_identity_origin import DeploymentIdentityOrigin
 from astrolift_lifecycle.models.deployment_log import DeploymentLog
 from astrolift_lifecycle.models.dev_environment import DevEnvironment
 from astrolift_lifecycle.models.domain_handoff import DomainSessionHandoff
@@ -17,12 +19,14 @@ from astrolift_lifecycle.models.ingress import (
     ProjectIngress,
 )
 from astrolift_lifecycle.models.jobs import CommandRun, ScheduledJobRun
+from astrolift_lifecycle.models.managed_domain_app_binding import ManagedDomainAppBinding
 from astrolift_lifecycle.models.org_secret import OrgSecret
 from astrolift_lifecycle.models.preview_environment import PreviewEnvironment
 from astrolift_lifecycle.models.task_run import TaskRun
 
 __all__ = [
     "BuilderArtifact",
+    "ManagedDomainAppBinding",
     "DomainSessionHandoff",
     "AgentRun",
     "AppEnvironment",
@@ -31,6 +35,8 @@ __all__ = [
     "DeployToken",
     "Deployment",
     "DeploymentApproval",
+    "DeploymentIdentityOrigin",
+    "DeploymentExecutionReceipt",
     "DeploymentLog",
     "DevEnvironment",
     "DomainPathRoute",

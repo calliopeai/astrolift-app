@@ -41,13 +41,14 @@ def live_cluster_models(qs, organization_id: int | None):
         organization__deleted_at__isnull=True,
         deleted_at__isnull=True,
         kind="model_endpoint",
-        variant="vllm",
         registered_app__isnull=True,
         app_environment__isnull=True,
         project__isnull=True,
         tenant_cluster__deleted_at__isnull=True,
         tenant_cluster__provider_plugin__deleted_at__isnull=True,
     ).filter(
+        Q(variant="vllm")
+        | Q(variant="bedrock", config__existing_connection_only=True, config__model_source="bedrock"),
         Q(tenant_cluster__organization_id=organization_id) | Q(tenant_cluster__organization_id__isnull=True),
     )
 

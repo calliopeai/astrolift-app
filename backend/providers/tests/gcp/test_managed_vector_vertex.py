@@ -233,6 +233,7 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         tenant_cluster_id="gcp-prod",
         service_handle_hint="v",
         size="small",
+        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -585,7 +586,7 @@ def test_restore_provisions_target_with_snapshot_uri(
 ) -> None:
     provisioned = driver.provision(_spec())
     snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
-    restore_spec = _spec(service_handle_hint="rt")
+    restore_spec = _spec(service_handle_hint="rt", managed_service_id=OTHER_SERVICE_ID)
     result = driver.restore(snap, restore_spec)
     assert result.ok
     # The target name should differ from the source (different
@@ -660,12 +661,38 @@ def test_binding_schema_lists_all_env_vars(
         assert key in schema.env_vars
 
 
-def test_provision_does_not_adopt_another_services_resource(driver) -> None:
-    """Names are slug-joined, so another service can map to this one's name (#1961)."""
-    import dataclasses
+OTHER_SERVICE_ID = "0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4"
 
-    first = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-a"))
-    second = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-b"))
+
+def test_provision_does_not_adopt_another_services_resource(driver) -> None:
+    """A recorded handle naming another service's resource is refused (#1961)."""
+    first = driver.provision(_spec())
+    second = driver.provision(_spec(managed_service_id=OTHER_SERVICE_ID, recorded_handle=first.handle))
 
     assert first.ok, first.message
     assert not second.ok and "refusing to adopt" in second.message
+
+
+def test_a_recorded_legacy_name_is_kept(driver) -> None:
+    assert (
+        driver._base_name_for(spec=_spec(recorded_handle="vector_index/astrolift-acme-api-prod-v"))
+        == "astrolift-acme-api-prod-v"
+    )
+
+
+def test_slug_joins_that_collide_get_distinct_new_names(driver) -> None:
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one name before #2032.
+    first = driver._base_name_for(spec=_spec(organization_slug="acme", app_slug="web-prod"))
+    second = driver._base_name_for(
+        spec=_spec(organization_slug="acme-web", app_slug="prod", managed_service_id=OTHER_SERVICE_ID)
+    )
+    assert first != second
+    assert all(len(name) <= 40 for name in (first, second) if isinstance(name, str))
+
+
+def test_shard_bucket_keeps_the_whole_identity_and_legacy_buckets_keep_their_cut(driver) -> None:
+    base = driver._base_name_for(spec=_spec())
+    long_project = driver._bucket_name_for(base_name=base)
+    assert long_project.endswith(base) and len(long_project) <= 63
+    legacy = driver._bucket_name_for(base_name="astrolift-acme-api-prod-a-very-long-service-hint")
+    assert len(legacy) <= 63 and legacy.startswith("astrolift-vec-shards-")

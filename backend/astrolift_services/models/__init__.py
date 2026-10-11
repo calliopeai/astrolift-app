@@ -1,5 +1,12 @@
 from astrolift_services.models.email_delivery_test import EmailDeliveryObservation, EmailDeliveryTest
 from astrolift_services.models.email_event import EmailEvent, EmailEventKind
+from astrolift_services.models.gcp_gke_preparation_journal import (
+    GCPGKEPreparationJournal,
+    GCPGKEPreparationOperation,
+)
+from astrolift_services.models.gcp_identity_acknowledgement import GCPIdentityAcknowledgement
+from astrolift_services.models.gcp_identity_source import GCPAppIdentitySource, GCPClusterIdentitySource
+from astrolift_services.models.gcp_workload_identity_journal import GCPWorkloadIdentityJournal
 from astrolift_services.models.hugging_face_connection import HuggingFaceConnection
 from astrolift_services.models.local_model_artifact import LocalModelArtifact
 from astrolift_services.models.managed_resource_adoption import ManagedResourceAdoption
@@ -26,6 +33,12 @@ from astrolift_services.models.workload_identity_grant import (
 )
 
 __all__ = [
+    "GCPIdentityAcknowledgement",
+    "GCPAppIdentitySource",
+    "GCPClusterIdentitySource",
+    "GCPGKEPreparationJournal",
+    "GCPGKEPreparationOperation",
+    "GCPWorkloadIdentityJournal",
     "ModelConnectionApproval",
     "ModelConnectionPolicy",
     "ModelConnectionRequest",
@@ -48,3 +61,4 @@ __all__ = [
     "WorkloadIdentityGrant",
     "grant_state_for",
 ]
+from .gcp_gke_app_apply_journal import GCPGKEAppApplyJournal, GCPGKEAppApplyOperation

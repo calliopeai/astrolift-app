@@ -29,7 +29,7 @@ SPEC = ProvisionSpec(
     service_handle_hint="public-api",
     size="small",
     binding_id="binding-id",
-    managed_service_id="managed-id",
+    managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
 )
 MSID = SPEC.managed_service_id
 
@@ -182,7 +182,10 @@ def test_provision_creates_api_immutable_config_and_gateway(
     assert base64.b64decode(document["contents"]).decode().startswith("openapi: 3.0.0")
     assert client.resources[gateway]["defaultHostname"] == "billing-gateway-hash.uc.gateway.dev"
     for name in (api, config_name, gateway):
-        assert client.resources[name]["labels"]["astrolift-io-managed-service-id"] == "managed-id"
+        assert (
+            client.resources[name]["labels"]["astrolift-io-managed-service-id"]
+            == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
+        )
 
 
 def test_repeated_provision_is_idempotent(
@@ -233,7 +236,9 @@ def test_update_cannot_retarget_the_gateway_at_another_services_api(
     cfg = {**_openapi_config(), "api_id": "victim-api", "allow_api_retarget": True}
     cfg.pop("gateway_id")
 
-    refused = driver.update(UpdateSpec(result.handle, config=cfg, managed_service_id="managed-id"))
+    refused = driver.update(
+        UpdateSpec(result.handle, config=cfg, managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b")
+    )
 
     assert not refused.ok
     assert "another managed service" in refused.message
@@ -751,7 +756,7 @@ def test_tenant_labels_in_the_platform_namespace_are_refused(
     client: FakeGatewayAPI,
     key: str,
 ) -> None:
-    cfg = {**_openapi_config(), "labels": {key: "managed-id"}}
+    cfg = {**_openapi_config(), "labels": {key: "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"}}
     refused = driver.provision(replace(OTHER_ORG, config=cfg))
     assert not refused.ok and "Astrolift-reserved" in refused.message
     assert client.resources == {}
@@ -797,4 +802,33 @@ def test_an_unmarked_gateway_needs_the_exclusive_record_and_is_then_marked(
     )
     assert proven.ok, proven.message
     labels = client.resources[gateway]["labels"]
-    assert labels["astrolift-io-managed-service-id"] == "managed-id"
+    assert labels["astrolift-io-managed-service-id"] == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
+
+
+def test_a_recorded_legacy_name_is_kept(driver) -> None:
+    assert (
+        driver._gateway_id(
+            replace(SPEC, config={}, recorded_handle="api_gateway/us-central1/astrolift-acme-api-prod-gw"), {}
+        )
+        == "astrolift-acme-api-prod-gw"
+    )
+
+
+def test_slug_joins_that_collide_get_distinct_new_names(driver) -> None:
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one name before #2032.
+    first = driver._gateway_id(replace(SPEC, config={}, organization_slug="acme", app_slug="web-prod"), {})
+    second = driver._gateway_id(
+        replace(SPEC, config={}, organization_slug="acme-web", app_slug="prod", managed_service_id=OTHER_SERVICE_ID), {}
+    )
+    assert first != second and len(first) <= 63
+
+
+OTHER_SERVICE_ID = "0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4"
+
+
+def test_a_recorded_service_keeps_its_slug_api_id_and_a_new_one_does_not(driver) -> None:
+    recorded = replace(SPEC, config={}, recorded_handle="api_gateway/us-central1/astrolift-acme-api-prod-gw")
+    fresh = replace(SPEC, config={})
+    legacy = driver._api_id(recorded, {})
+    assert legacy.endswith("-api") and SPEC.app_slug in legacy
+    assert driver._api_id(fresh, {}) != legacy

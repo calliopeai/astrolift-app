@@ -47,7 +47,7 @@ class FakePoller:
         return self.value
 
 
-OWNER = "managed-service-guid"
+OWNER = "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
 BINDING = "binding-guid"
 
 
@@ -739,3 +739,22 @@ def test_binding_schema_lists_all_env_vars(
         "AZURE_AI_SEARCH_ADMIN_KEY",
     ):
         assert key in schema.env_vars
+
+
+def test_a_recorded_legacy_name_is_kept(driver) -> None:
+    assert (
+        driver._service_name_for(spec=_spec(recorded_handle="vector_index/astrolift-acme-api-prod-v"))
+        == "astrolift-acme-api-prod-v"
+    )
+
+
+OTHER_SERVICE_ID = "0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4"
+
+
+def test_slug_joins_that_collide_get_distinct_new_names(driver) -> None:
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one name before #2032.
+    first = driver._service_name_for(spec=_spec(organization_slug="acme", app_slug="web-prod"))
+    second = driver._service_name_for(
+        spec=_spec(organization_slug="acme-web", app_slug="prod", managed_service_id=OTHER_SERVICE_ID)
+    )
+    assert first != second and len(first) <= 60

@@ -38,6 +38,10 @@ from astrolift_lifecycle.models import (
     TaskRun,
 )
 from astrolift_lifecycle.run_log_api import historical_log_operation, historical_log_scope
+from astrolift_lifecycle.schema.domain_app_routes import (
+    ManagedDomainAppRouteOperationQuery,
+    ManagedDomainAppRouteQuery,
+)
 from astrolift_lifecycle.schema.list_contract import (
     COMMAND_RUNS_FILTERS,
     DEPLOYMENTS_DEFAULT_SORT,
@@ -869,7 +873,7 @@ def _agent_runs_qs(
 
 
 @strawberry.type
-class LifecycleQuery:
+class LifecycleQuery(ManagedDomainAppRouteQuery, ManagedDomainAppRouteOperationQuery):
     @strawberry.field
     @require_permission(Permission.APP_DELETE)
     def scan_cloud_orphans(self, info: Info) -> CloudOrphanReportType:

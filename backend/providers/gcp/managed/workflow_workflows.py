@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import contextlib
-import hashlib
 import json
 import re
 import time
@@ -29,6 +28,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.physical_naming import managed_service_identity, physical_name
 from gcp._raw_fields import raw_field_conflicts
 from gcp._service_accounts import unlisted_service_account
 
@@ -301,7 +301,10 @@ class WorkflowsDriver(ManagedServiceDriver):
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_workflows_config"])
-        workflow_id = str(cfg.get("workflow_id") or self._workflow_id(spec))
+        try:
+            workflow_id = str(cfg.get("workflow_id") or self._workflow_id(spec))
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         name = self._workflow_name(workflow_id)
         handle = _handle(name)
         try:
@@ -875,19 +878,11 @@ class WorkflowsDriver(ManagedServiceDriver):
             return None
 
     def _workflow_id(self, spec: ProvisionSpec) -> str:
-        raw = "-".join(
-            filter(
-                None,
-                (
-                    self._config.workflow_name_prefix,
-                    spec.organization_slug,
-                    spec.app_slug,
-                    spec.environment_name,
-                    spec.service_handle_hint or "workflow",
-                ),
-            ),
-        )
-        return _resource_id(raw, maximum=64)
+        # Workflow ids: <=64 chars (#2032). The handle records the full name.
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            return _WORKFLOW_NAME_PATTERN.fullmatch(_parse_handle(spec.recorded_handle)).group(3)
+        return physical_name(spec.managed_service_id, prefix=self._config.workflow_name_prefix, max_length=64)
 
     def _parent(self) -> str:
         return f"projects/{self._config.project_id}/locations/{self._config.region}"
@@ -1016,19 +1011,6 @@ def _parse_snapshot_id(snapshot_id: str) -> tuple[str, str]:
     if not separator or not _WORKFLOW_NAME_PATTERN.fullmatch(name) or not _REVISION_PATTERN.fullmatch(revision_id):
         raise ValueError(f"invalid Google workflow snapshot ID {snapshot_id!r}")
     return name, revision_id
-
-
-def _resource_id(value: str, *, maximum: int) -> str:
-    normalized = re.sub(r"[^a-z0-9_-]+", "-", value.lower()).strip("-_")
-    if not normalized or not normalized[0].isalpha():
-        normalized = f"a-{normalized}"
-    if len(normalized) > maximum:
-        digest = hashlib.sha256(normalized.encode()).hexdigest()[:10]
-        normalized = f"{normalized[: maximum - len(digest) - 1].rstrip('-_')}-{digest}"
-    normalized = normalized.rstrip("-_")
-    if len(normalized) < 2:
-        normalized = f"{normalized or 'a'}0"
-    return normalized
 
 
 def _label_key(value: str) -> str:

@@ -73,6 +73,35 @@ export const MANAGED_DOMAIN_DIAGNOSTICS = gql`
           evaluateTargetHealth
           proxied
           priority
+          routing {
+            policy
+            reason
+            setIdentifier
+            weight
+            region
+            failover
+            geoLocation {
+              continentCode
+              countryCode
+              subdivisionCode
+            }
+            geoProximity {
+              awsRegion
+              localZoneGroup
+              coordinates {
+                latitude
+                longitude
+              }
+              bias
+            }
+            cidr {
+              collectionId
+              locationName
+            }
+            multiValueAnswer
+            healthCheckId
+            trafficPolicyInstanceId
+          }
         }
       }
       routes {
@@ -94,6 +123,30 @@ export const MANAGED_DOMAIN_DIAGNOSTICS = gql`
         canCreate
         canDelete
         canRevalidate
+        canUpdate
+        canSetDefaults
+        defaultUpdateReason
+        defaultsFingerprint
+      }
+    }
+  }
+`;
+
+export const UPDATE_MANAGED_DOMAIN_DEFAULTS = gql`
+  mutation UpdateManagedDomainDefaults($input: UpdateManagedDomainInput!) {
+    updateManagedDomain(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        version
+        zone
+        defaultFor
+        organizationSlug
       }
     }
   }

@@ -285,6 +285,41 @@ export function useManagedDomain(id: string) {
     if (domain && !query.loading) void diagnosticsQuery.refetch().catch(() => {});
     if (ownDomainReadable) void supportQuery.refetch().catch(() => {});
   }
+  const reloadGeneration = React.useRef(0);
+  async function onReloadCurrentDomain() {
+    if (skipped || removed || !mounted.current) return false;
+    const epoch = ++reloadGeneration.current;
+    onResetProbe();
+    try {
+      const result = await query.refetch();
+      const latest = result.data?.astroliftManagedDomain;
+      if (
+        !mounted.current ||
+        epoch !== reloadGeneration.current ||
+        !latest ||
+        latest.id !== id ||
+        !Number.isSafeInteger(latest.version) ||
+        latest.version < 1 ||
+        (latest.organizationSlug && latest.organizationSlug !== org?.slug)
+      )
+        return false;
+      const refreshed = await diagnosticsQuery.refetch({
+        domainId: id,
+        expectedVersion: latest.version,
+      });
+      const facts = refreshed.data?.astroliftManagedDomainDiagnostics;
+      return Boolean(
+        mounted.current &&
+        epoch === reloadGeneration.current &&
+        facts &&
+        facts.id === id &&
+        facts.version === latest.version &&
+        facts.zone === latest.zone
+      );
+    } catch {
+      return false;
+    }
+  }
   return {
     domain,
     loading: orgLoading || (!skipped && query.loading),
@@ -298,6 +333,7 @@ export function useManagedDomain(id: string) {
     diagnosticsError:
       diagnosticsQuery.error?.message ?? (observationMismatch ? t("versionChanged") : null),
     onRefreshDiagnostics,
+    onReloadCurrentDomain,
     probe: probeVersion === domain?.version ? probe : null,
     probeLoading: probeVersion === domain?.version && probeLoading,
     probeError: probeVersion === domain?.version ? probeError : null,

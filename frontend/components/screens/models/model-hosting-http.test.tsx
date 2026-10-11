@@ -21,7 +21,7 @@ vi.mock("@/graphql/user/user.hooks", () => ({
 }));
 type Request = { operationName: string; query: string; variables: Record<string, unknown> };
 let requests: Request[], transport: (r: Request) => Promise<Response>;
-const schema = buildSchema(readFileSync("../backend/schema.graphql", "utf8"));
+const schema = buildSchema(readFileSync("schema.graphql", "utf8"));
 const connection = {
   id: "00000000-0000-4000-8000-000000000002",
   version: 3,

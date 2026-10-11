@@ -201,7 +201,7 @@ def _spec(config: dict[str, Any] | None = None, **overrides: Any) -> ProvisionSp
         "size": "small",
         "config": config or _zip_config(),
         "binding_id": "binding-id",
-        "managed_service_id": "managed-id",
+        "managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     }
     values.update(overrides)
     return ProvisionSpec(**values)
@@ -392,6 +392,9 @@ def test_container_rejects_tagged_or_other_registry_images() -> None:
     assert not other.ok and "allowlisted registry host" in other.message
 
 
+OTHER_SERVICE_ID = "0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4"
+
+
 def test_foreign_resource_and_owner_collision_are_not_adopted() -> None:
     client = _client()
     driver = _driver(client)
@@ -402,8 +405,13 @@ def test_foreign_resource_and_owner_collision_are_not_adopted() -> None:
     foreign = driver.provision(_spec())
     assert not foreign.ok and "carries no Astrolift astrolift-managed-by=platform" in foreign.message
     site["tags"]["astrolift-managed-by"] = "platform"
-    wrong_owner = driver.provision(_spec(managed_service_id="other-managed-id"))
-    assert not wrong_owner.ok and "belongs to managed service managed-id, not other-managed-id" in wrong_owner.message
+    # A recorded handle naming another service's app is refused (#1961).
+    wrong_owner = driver.provision(_spec(managed_service_id=OTHER_SERVICE_ID, recorded_handle=first.handle))
+    assert (
+        not wrong_owner.ok
+        and "belongs to managed service 6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b, not 0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4"
+        in wrong_owner.message
+    )
 
 
 def test_role_assignment_collision_is_rejected() -> None:
@@ -422,7 +430,11 @@ def test_package_update_requires_uri_and_digest_together() -> None:
     driver = _driver(client)
     provisioned = driver.provision(_spec())
     result = driver.update(
-        UpdateSpec(handle=provisioned.handle, config={"package_uri": "https://x"}, managed_service_id="managed-id")
+        UpdateSpec(
+            handle=provisioned.handle,
+            config={"package_uri": "https://x"},
+            managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
+        )
     )
     assert not result.ok
     assert "updated together" in result.message
@@ -440,7 +452,7 @@ def test_package_update_deploys_then_stamps_digest() -> None:
         UpdateSpec(
             handle=provisioned.handle,
             config={"package_uri": uri, "package_sha256": NEXT_DIGEST},
-            managed_service_id="managed-id",
+            managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
         ),
     )
     assert result.ok
@@ -472,7 +484,9 @@ def test_update_resolves_dependencies_allowlisted_in_another_resource_group() ->
     assert provisioned.ok
     updated = driver.update(
         UpdateSpec(
-            handle=provisioned.handle, config={"environment": {"APP_MODE": "batch"}}, managed_service_id="managed-id"
+            handle=provisioned.handle,
+            config={"environment": {"APP_MODE": "batch"}},
+            managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
         )
     )
     assert updated.ok, updated.message
@@ -491,7 +505,9 @@ def test_update_resolves_dependencies_allowlisted_in_another_resource_group() ->
     assert container.ok
     container_updated = container_driver.update(
         UpdateSpec(
-            handle=container.handle, config={"environment": {"APP_MODE": "batch"}}, managed_service_id="managed-id"
+            handle=container.handle,
+            config={"environment": {"APP_MODE": "batch"}},
+            managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
         ),
     )
     assert container_updated.ok, container_updated.message
@@ -510,7 +526,9 @@ def test_update_rejects_unknown_dependency_name_with_an_honest_identifier() -> N
             item["value"] = "rogueaccount"
     result = driver.update(
         UpdateSpec(
-            handle=provisioned.handle, config={"environment": {"APP_MODE": "batch"}}, managed_service_id="managed-id"
+            handle=provisioned.handle,
+            config={"environment": {"APP_MODE": "batch"}},
+            managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
         )
     )
     assert not result.ok
@@ -522,7 +540,11 @@ def test_update_rejects_function_rename() -> None:
     driver = _driver(client)
     provisioned = driver.provision(_spec())
     result = driver.update(
-        UpdateSpec(provisioned.handle, config={"function_name": "different"}, managed_service_id="managed-id")
+        UpdateSpec(
+            provisioned.handle,
+            config={"function_name": "different"},
+            managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
+        )
     )
     assert not result.ok
     assert "immutable" in result.message
@@ -580,10 +602,13 @@ def test_deprovision_protection_and_force_cleanup() -> None:
     cfg = _zip_config()
     driver = _driver(client)
     provisioned = driver.provision(_spec(cfg))
-    protected = driver.deprovision(DeprovisionSpec(provisioned.handle, cfg, managed_service_id="managed-id"))
+    protected = driver.deprovision(
+        DeprovisionSpec(provisioned.handle, cfg, managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b")
+    )
     assert not protected.ok and not protected.retryable
     forced = driver.deprovision(
-        DeprovisionSpec(provisioned.handle, cfg, managed_service_id="managed-id"), force_destroy=True
+        DeprovisionSpec(provisioned.handle, cfg, managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"),
+        force_destroy=True,
     )
     assert forced.ok
     assert not any("/Microsoft.Web/sites/" in key for key in client.resources)
@@ -598,7 +623,9 @@ def test_deprovision_never_removes_roles_before_site_delete_succeeds() -> None:
     driver = _driver(client)
     provisioned = driver.provision(_spec(cfg))
     client.fail_delete_site = True
-    result = driver.deprovision(DeprovisionSpec(provisioned.handle, cfg, managed_service_id="managed-id"))
+    result = driver.deprovision(
+        DeprovisionSpec(provisioned.handle, cfg, managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b")
+    )
     assert not result.ok and "site locked" in result.message
     assert len(_role_ids(client)) == 3
 
@@ -609,14 +636,17 @@ def test_deprovision_missing_site_cleans_roles_from_stored_config() -> None:
     driver = _driver(client)
     provisioned = driver.provision(_spec(cfg))
     del client.resources[_site_id(client)]
-    result = driver.deprovision(DeprovisionSpec(provisioned.handle, cfg, managed_service_id="managed-id"))
+    result = driver.deprovision(
+        DeprovisionSpec(provisioned.handle, cfg, managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b")
+    )
     assert result.ok
     assert not _role_ids(client)
 
 
 def test_missing_site_without_stored_config_fails_closed_on_role_cleanup() -> None:
     result = _driver().deprovision(
-        DeprovisionSpec("faas/rg-functions/missing", managed_service_id="managed-id"), force_destroy=True
+        DeprovisionSpec("faas/rg-functions/missing", managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"),
+        force_destroy=True,
     )
     assert not result.ok
     assert "stored config" in result.message
@@ -721,3 +751,19 @@ def test_rest_client_maps_not_found_conflict_and_provider_error() -> None:
         )
         with pytest.raises(expected, match=r"boom|resource"):
             client.get("/resource", "2024-11-01")
+
+
+def test_a_recorded_legacy_name_is_kept() -> None:
+    assert (
+        _driver()._function_name(_spec(recorded_handle="faas/rg-functions/astrolift-acme-api-prod-fn-0123abcd"), {})
+        == "astrolift-acme-api-prod-fn-0123abcd"
+    )
+
+
+def test_slug_joins_that_collide_get_distinct_new_names() -> None:
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one name before #2032.
+    first = _driver()._function_name(_spec(organization_slug="acme", app_slug="web-prod"), {})
+    second = _driver()._function_name(
+        _spec(organization_slug="acme-web", app_slug="prod", managed_service_id=OTHER_SERVICE_ID), {}
+    )
+    assert first != second and len(first) <= 60

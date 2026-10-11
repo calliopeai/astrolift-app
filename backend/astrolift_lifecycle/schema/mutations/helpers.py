@@ -256,16 +256,40 @@ def _start_deploy_workflow_on_commit(
     itself is written by the caller inside the atomic block; only the start and
     the ``WorkflowRun`` mirror link happen post-commit.
     """
+    from dataclasses import replace
+
     from astrolift_identity.api_tokens import get_current_api_token
+    from astrolift_lifecycle.deployment_identity_origin import deployment_origin, original_actor
+    from astrolift_services.native_identity_authority import current_app_identity_authority
     from core.run_trigger import deployment_run_trigger
 
     # Read while the request is still current: the mirror row is written on
     # commit, and a token-started manual deploy is ``api`` (#2152).
+    origin = deployment_origin(deployment)
+    if origin is not None:
+        with current_app_identity_authority(origin, deployment_guid=deployment.guid):
+            pass
+        actor = original_actor(origin)
+        args = [
+            replace(arg, actor=actor, identity_authority=origin) if isinstance(arg, DeployAppInput) else arg
+            for arg in args
+        ]
+    if origin is not None:
+        from astrolift_lifecycle.deployment_execution_receipt import expect_deployment_execution
+
+        expect_deployment_execution(deployment, workflow_kind, workflow_id, args)
     run_trigger = deployment_run_trigger(
-        deployment.trigger_kind, via_token=get_current_api_token() is not None
+        deployment.trigger_kind,
+        via_token=origin.credential_kind == "api_token" if origin else get_current_api_token() is not None,
     )
 
     def _start() -> None:
+        if origin is not None:
+            current = deployment_origin(deployment)
+            if current != origin:
+                raise ValueError("DEPLOYMENT_ORIGIN_CHANGED")
+            with current_app_identity_authority(origin, deployment_guid=deployment.guid):
+                pass
         handle = start_workflow(workflow_kind, args=args, workflow_id=workflow_id)
         if handle.enqueued:
             run = _record_workflow_run(
@@ -472,6 +496,13 @@ def _record_approval_vote_and_maybe_start(
     # requests before inspecting either the ledger or the rollout state.
     Deployment.objects.select_for_update().get(pk=deployment.pk)
     deployment.refresh_from_db()
+    from astrolift_lifecycle.deployment_identity_origin import deployment_origin
+    from astrolift_services.native_identity_authority import current_app_identity_authority
+
+    origin = deployment_origin(deployment)
+    if origin is not None:
+        with current_app_identity_authority(origin, deployment_guid=deployment.guid):
+            pass
     identity = (
         {"voter_user_id": actor.user_id, "credential_hash": ""}
         if actor.user_id
@@ -498,6 +529,9 @@ def _record_approval_vote_and_maybe_start(
     if deployment.approvals_received < deployment.approvals_required:
         return
 
+    if origin is not None:
+        with current_app_identity_authority(origin, deployment_guid=deployment.guid):
+            pass
     deployment.transition_to(Deployment.Status.PENDING)
     app = deployment.registered_app
     env = deployment.app_environment

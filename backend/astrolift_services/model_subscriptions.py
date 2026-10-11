@@ -33,6 +33,7 @@ def coherent_subscriptions(env, *, applied_only=True):
     from astrolift_services.cluster_models import available_model_clusters, live_cluster_models
     from astrolift_services.model_admission import with_canonical_model_handle
     from astrolift_services.models import ManagedService
+    from astrolift_services.native_model_connections import current
 
     if (
         env.deleted_at is not None
@@ -51,7 +52,10 @@ def coherent_subscriptions(env, *, applied_only=True):
         | Q(config__sharing_mode="dedicated", config__dedicated_app_id=str(env.registered_app.guid))
     )
     if applied_only:
-        models = with_canonical_model_handle(models).filter(backend_ref=F("_canonical_model_handle"))
+        models = with_canonical_model_handle(models).filter(
+            Q(variant="vllm", backend_ref=F("_canonical_model_handle"))
+            | Q(variant="bedrock", config__existing_connection_only=True)
+        )
     rows = ManagedServiceAttachment.objects.filter(
         model_subscription=True, app_environment=env, desired_enabled=True, managed_service__in=models
     ).select_related(
@@ -60,7 +64,8 @@ def coherent_subscriptions(env, *, applied_only=True):
         "app_environment__registered_app__organization",
     )
     if applied_only:
-        rows = rows.filter(
+        vllm_ready = Q(
+            managed_service__variant="vllm",
             managed_service__status__in=("active", "updating", "failed"),
             managed_service__model_ready_provider_guid=F(
                 "managed_service__tenant_cluster__provider_plugin__guid"
@@ -71,10 +76,47 @@ def coherent_subscriptions(env, *, applied_only=True):
             managed_service__model_ready_observed_at__isnull=False,
             managed_service__model_ready_generation__gt=0,
         )
-    return rows.order_by("binding_alias", "guid")
+        native_applied = Q(
+            managed_service__variant="bedrock",
+            applied_revision=F("desired_revision"),
+            subscription_status="active",
+            managed_service__applied_subscription_revision__gte=F("desired_revision"),
+        )
+        rows = rows.filter(vllm_ready | native_applied)
+    # Native declared credential/current source checks are pure page-local facts;
+    # cloud identity is reverified in effect activities, never inferred from runtime fields.
+    native_ids = [
+        row.pk
+        for row in rows
+        if row.managed_service.variant == "bedrock" and not current(row.managed_service)
+    ]
+    return rows.exclude(pk__in=native_ids).order_by("binding_alias", "guid")
 
 
 def binding_values(row, secrets_backend):
+    from astrolift_services.native_model_connections import binding, is_bedrock_connection
+
+    if is_bedrock_connection(row.managed_service):
+        service, env = row.managed_service, row.app_environment
+        subscription_namespace(env)
+        if (
+            row.credential_ref != ""
+            or service.organization_id != env.registered_app.organization_id
+            or service.tenant_cluster_id != env.tenant_cluster_id
+            or not row.desired_enabled
+        ):
+            raise ValueError("Native subscription owner or destination is no longer coherent.")
+        from astrolift_services.model_settings import allows_app
+
+        if not allows_app(service, env.registered_app):
+            raise ValueError("Native subscription app access changed.")
+        prefix = model_binding_prefix(row.binding_alias)
+        values = binding(service).env_vars
+        return {
+            prefix + suffix: values["MODEL_" + suffix].literal
+            for suffix in _BINDING_SUFFIXES
+            if suffix != "API_KEY"
+        }
     from _sdk.k8s_naming import cluster_model_namespace, cluster_model_resource_name
     from _sdk.secrets import resolve_secret_reference
     from k8s_native.managed.model_endpoint_vllm import PORT, _unpack_handle
@@ -198,7 +240,47 @@ def _check_env_from_prefix(refs, prefix, driver, cluster_id, namespace):
             raise ValueError("Subscription binding prefix conflicts with an existing environment source.")
 
 
-def apply_destination_binding(row, cluster_driver, secrets_backend):
+def _native_service_account(row, driver, identity, *, require_existing=False):
+    env = row.app_environment
+    namespace, name = subscription_namespace(env), identity["role"]
+    cid = str(env.tenant_cluster.guid)
+    expected = {
+        "astrolift.io/managed-by": "platform",
+        "astrolift.io/organization-id": str(env.registered_app.organization.guid),
+        "astrolift.io/app-id": str(env.registered_app.guid),
+        "astrolift.io/cluster-id": cid,
+    }
+    prior = driver.get_manifest(cid, namespace, "v1/ServiceAccount", name)
+    if prior is None:
+        if require_existing:
+            raise ValueError("Native ServiceAccount is unavailable.")
+        return {
+            "apiVersion": "v1",
+            "kind": "ServiceAccount",
+            "metadata": {
+                "name": name,
+                "namespace": namespace,
+                "labels": expected,
+                "annotations": identity["annotation"],
+            },
+        }, True
+    meta = prior.get("metadata") or {}
+    if (
+        any((meta.get("labels") or {}).get(key) != value for key, value in expected.items())
+        or any(
+            (meta.get("annotations") or {}).get(key) != value for key, value in identity["annotation"].items()
+        )
+        or not meta.get("uid")
+        or not meta.get("resourceVersion")
+    ):
+        raise ValueError("Native ServiceAccount ownership is unproved; operator resolution is required.")
+    result = deepcopy(prior)
+    result.pop("status", None)
+    result["metadata"].pop("managedFields", None)
+    return result, False
+
+
+def apply_destination_binding(row, cluster_driver, secrets_backend, *, native_identity=None):
     """Conditional full-object apply preserves fixed/HPA replica ownership and refuses replacements."""
     env = row.app_environment
     namespace = subscription_namespace(env)
@@ -212,6 +294,9 @@ def apply_destination_binding(row, cluster_driver, secrets_backend):
     workloads = list(Workload.objects.filter(registered_app=env.registered_app))
     if not workloads or any(workload.kind not in LONG_RUNNING_KINDS for workload in workloads):
         raise ValueError("Subscription destination workloads are unsupported or unavailable.")
+    native_sa = None
+    if native_identity is not None and row.desired_enabled:
+        native_sa = _native_service_account(row, cluster_driver, native_identity)
     prepared = []
     for workload in workloads:
         kind = "apps/v1/StatefulSet" if workload.kind == "statefulset" else "apps/v1/Deployment"
@@ -234,6 +319,11 @@ def apply_destination_binding(row, cluster_driver, secrets_backend):
             manifest["spec"].pop("replicas", None)
         template = _template(manifest)
         spec = template.setdefault("spec", {})
+        if native_sa is not None:
+            prior_sa = spec.get("serviceAccountName", "default")
+            if prior_sa not in ("default", native_identity["role"]):
+                raise ValueError("Native workload identity conflicts with an existing ServiceAccount.")
+            spec["serviceAccountName"] = native_identity["role"]
         containers = spec.get("containers") or []
         if not containers:
             raise ValueError("Subscription destination has no confirmed containers.")
@@ -256,6 +346,10 @@ def apply_destination_binding(row, cluster_driver, secrets_backend):
             f"astrolift.io/model-binding-{row.guid}"
         ] = str(row.desired_revision)
         prepared.append(manifest)
+    if native_sa is not None:
+        manifest, absent = native_sa
+        if not cluster_driver.apply_manifests(cid, namespace, [manifest], create_only=absent).ok:
+            raise ValueError("Native workload ServiceAccount could not be applied.")
     if row.desired_enabled:
         secret = binding_secret(row, secrets_backend)
         if prior is not None:
@@ -288,12 +382,17 @@ def apply_destination_binding(row, cluster_driver, secrets_backend):
             raise ValueError("Subscription binding Secret could not be removed.")
 
 
-def destination_ready(row, cluster_driver):
+def destination_ready(row, cluster_driver, *, native_identity=None):
     env = row.app_environment
     cid, namespace = str(env.tenant_cluster.guid), subscription_namespace(env)
     workloads = list(Workload.objects.filter(registered_app=env.registered_app))
     if not workloads or any(workload.kind not in LONG_RUNNING_KINDS for workload in workloads):
         return False
+    if native_identity is not None and row.desired_enabled:
+        try:
+            _native_service_account(row, cluster_driver, native_identity, require_existing=True)
+        except ValueError:
+            return False
     for workload in workloads:
         kind = "apps/v1/StatefulSet" if workload.kind == "statefulset" else "apps/v1/Deployment"
         resource = cluster_driver.get_manifest(cid, namespace, kind, workload.name)
@@ -307,6 +406,12 @@ def destination_ready(row, cluster_driver):
         if ((template.get("metadata") or {}).get("annotations") or {}).get(
             f"astrolift.io/model-binding-{row.guid}"
         ) != str(row.desired_revision):
+            return False
+        if (
+            native_identity is not None
+            and row.desired_enabled
+            and (template.get("spec") or {}).get("serviceAccountName") != native_identity["role"]
+        ):
             return False
         containers = (template.get("spec") or {}).get("containers") or []
         if not containers or any(
@@ -363,6 +468,12 @@ def destination_ready(row, cluster_driver):
                 return False
             if (pod_meta.get("annotations") or {}).get(f"astrolift.io/model-binding-{row.guid}") != str(
                 row.desired_revision
+            ):
+                return False
+            if (
+                native_identity is not None
+                and row.desired_enabled
+                and (pod.get("spec") or {}).get("serviceAccountName") != native_identity["role"]
             ):
                 return False
             pod_containers = (pod.get("spec") or {}).get("containers") or []
