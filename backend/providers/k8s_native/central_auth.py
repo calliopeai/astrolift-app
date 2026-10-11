@@ -23,6 +23,7 @@ from typing import Any
 
 from _sdk.cluster import BootstrapComponent
 
+from .central_auth_pages import TEMPLATES_CONFIGMAP, TEMPLATES_DIR, templates_configmap
 from .logout import central_logout_snippet
 
 # Name of the Secret the oauth2-proxy release reads its credentials from.
@@ -145,6 +146,9 @@ def central_auth_component(
         "reverse-proxy": "true",
         "set-xauthrequest": "true",
         "skip-provider-button": "true",
+        # The sign-in and error pages a person can land on, in Astrolift's
+        # look rather than oauth2-proxy's (#2285).
+        "custom-templates-dir": TEMPLATES_DIR,
     }
     if issuer_url:
         extra_args["oidc-issuer-url"] = issuer_url
@@ -209,6 +213,9 @@ def central_auth_component(
                 ),
             },
             "replicaCount": 2,
+            "extraObjects": [templates_configmap()],
+            "extraVolumes": [{"name": "astrolift-auth-templates", "configMap": {"name": TEMPLATES_CONFIGMAP}}],
+            "extraVolumeMounts": [{"name": "astrolift-auth-templates", "mountPath": TEMPLATES_DIR, "readOnly": True}],
         },
         requires=[
             "dex or external OIDC provider",
