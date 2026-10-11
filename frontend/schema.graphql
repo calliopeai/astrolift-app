@@ -302,6 +302,25 @@ type AstroliftAccessEntryPage {
   pageSize: Int
 }
 
+type AstroliftAccessPreset {
+  key: String!
+  label: String!
+  summary: String!
+  roles: [AstroliftAccessPresetRole!]!
+}
+
+type AstroliftAccessPresetRole {
+  scopeLevel: String!
+  roleSlug: String!
+  tasks: [AstroliftAccessTask!]!
+}
+
+type AstroliftAccessTask {
+  key: String!
+  label: String!
+  granted: Boolean!
+}
+
 type AstroliftActionPermission {
   allowed: Boolean!
   code: String!
@@ -10169,6 +10188,11 @@ type Query {
   astroliftOrgMembersForApprovalPicker(orgSlug: String!): [AstroliftApproverUser!]!
   astroliftInvitations(status: String = null): [AstroliftInvitation!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage.")
   astroliftInvitationsPage(status: String = null, search: String = null, limit: Int! = 50, after: String = null, filter: AstroliftInvitationsListFilter = null, sort: String = null, page: Int = null, pageSize: Int = null): AstroliftInvitationPage!
+
+  """
+  Easy-mode starting points (#2272): each names the stock role it grants per scope and, from that role's permissions, the tasks it allows and excludes. Never super-admin.
+  """
+  astroliftAccessPresets: [AstroliftAccessPreset!]!
   astroliftRoles: [AstroliftRole!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftRolesPage.")
   astroliftRolesPage(search: String = null, sortBy: AstroliftListSortKey = null, limit: Int! = 50, after: String = null, filter: AstroliftRolesListFilter = null, sort: String = null, page: Int = null, pageSize: Int = null): AstroliftRolePage!
   astroliftSearchableUsers(query: String!): [AstroliftSearchableUser!]!
