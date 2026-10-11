@@ -97,6 +97,10 @@ class AppsListFilterInput:
         default=None, description="The last-deploy health pulse (the row's healthPulse.status)."
     )
     kind: list[str] | None = strawberry.field(default=None, description="Topology kinds, as topologyKind.")
+    app_kind: list[str] | None = strawberry.field(
+        default=None,
+        description="App kinds from the manifest's [app] kind (#2332); an empty string matches generic apps.",
+    )
     cluster: list[str] | None = strawberry.field(
         default=None, description="Cluster slugs, case-insensitive; any environment on one matches."
     )
@@ -691,6 +695,13 @@ class RegisteredAppType:
             "Filled on astroliftAppsPage and astroliftMyAppsPage (#2149)."
         ),
     )
+    app_kind: str = strawberry.field(
+        default="",
+        description=(
+            "What the app is for, from the manifest's [app] kind (#2332), e.g. mimwell; empty for a "
+            "generic app. Separate from workload kinds; see astroliftAppKinds."
+        ),
+    )
     source_connection_warning: str = strawberry.field(
         default="",
         description=(
@@ -1199,6 +1210,7 @@ def app_to_type(
         team_id=GUID(str(app.team.guid)),
         team_name=app.team.name,
         source_kind=app.source_kind,
+        app_kind=app.app_kind or "",
         source_repo=app.source_repo,
         source_url=app.source_url,
         manifest_path=app.manifest_path,

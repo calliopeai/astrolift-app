@@ -313,6 +313,8 @@ class RawManifest:
     # central auth, as ``{"groups": [...], "users": [...]}``. ``None`` when
     # the manifest does not declare it.
     ingress_access: dict[str, list[str]] | None = None
+    # ``[app] kind`` (#2332): a registered app kind, ``""`` for a generic app.
+    app_kind: str = ""
     raw: dict[str, Any] = dataclasses.field(default_factory=dict)
 
 

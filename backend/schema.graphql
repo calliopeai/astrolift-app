@@ -1361,6 +1361,12 @@ type AstroliftAppIdentityBindingResult {
   binding: AstroliftAppIdentityBinding
 }
 
+type AstroliftAppKind {
+  key: String!
+  label: String!
+  description: String!
+}
+
 enum AstroliftAppListState {
   LIVE
   READY
@@ -1649,6 +1655,11 @@ input AstroliftAppsListFilter {
 
   """Topology kinds, as topologyKind."""
   kind: [String!] = null
+
+  """
+  App kinds from the manifest's [app] kind (#2332); an empty string matches generic apps.
+  """
+  appKind: [String!] = null
 
   """Cluster slugs, case-insensitive; any environment on one matches."""
   cluster: [String!] = null
@@ -2714,6 +2725,9 @@ type AstroliftDiscoveredAppManifest {
   buildContext: String!
   workloadCount: Int!
   alreadyRegistered: Boolean!
+
+  """The manifest's [app] kind (#2332); empty when generic."""
+  appKind: String!
 }
 
 type AstroliftDispatcherInstance {
@@ -4788,6 +4802,11 @@ type AstroliftRegisteredApp {
   Clusters the app's environments deploy to, in environment-name order. Filled on astroliftAppsPage and astroliftMyAppsPage (#2149).
   """
   clusterSlugs: [String!]!
+
+  """
+  What the app is for, from the manifest's [app] kind (#2332), e.g. mimwell; empty for a generic app. Separate from workload kinds; see astroliftAppKinds.
+  """
+  appKind: String!
 
   """
   Advisory set only on the registerApp result: no organization GitHub connection is visibly recorded on the source repository's owner. Empty everywhere else (#2297).
@@ -10195,6 +10214,7 @@ type Query {
   astroliftAppMetrics(appSlug: String!, timeRange: String! = "1h"): AstroliftAppMetrics
   astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100, appSlug: String = null): [AstroliftAlertEvent!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftAlertEventsPage.")
   astroliftAlertEventsPage(ruleId: GUID = null, unresolvedOnly: Boolean! = false, search: String = null, limit: Int! = 50, after: String = null, appSlug: String = null): AstroliftAlertEventPage!
+  astroliftAppKinds: [AstroliftAppKind!]!
 
   """
   Read-only APP_READ projection for an exact live app/environment. Expected cluster/provider GUIDs refuse reassignment. Persisted observations do not prove live health, TLS binding or renewal; mutation authority is unchanged.

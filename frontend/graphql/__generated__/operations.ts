@@ -1322,6 +1322,12 @@ export type AstroliftAppIdentityBindingResult = {
   reason: AstroliftObservabilityPanelReason;
 };
 
+export type AstroliftAppKind = {
+  description: Scalars['String']['output'];
+  key: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+};
+
 export type AstroliftAppListState =
   | 'ARCHIVED'
   | 'DEREGISTERED'
@@ -1587,6 +1593,8 @@ export type AstroliftApproverUser = {
 };
 
 export type AstroliftAppsListFilter = {
+  /** App kinds from the manifest's [app] kind (#2332); an empty string matches generic apps. */
+  appKind: InputMaybe<Array<Scalars['String']['input']>>;
   /** true: archived apps only. false: active only. null: includeArchived decides. */
   archived: InputMaybe<Scalars['Boolean']['input']>;
   /** Cluster slugs, case-insensitive; any environment on one matches. */
@@ -2612,6 +2620,8 @@ export type AstroliftDiscoveredAgentManifest = {
 
 export type AstroliftDiscoveredAppManifest = {
   alreadyRegistered: Scalars['Boolean']['output'];
+  /** The manifest's [app] kind (#2332); empty when generic. */
+  appKind: Scalars['String']['output'];
   buildContext: Scalars['String']['output'];
   manifestPath: Scalars['String']['output'];
   name: Scalars['String']['output'];
@@ -4459,6 +4469,8 @@ export type AstroliftRegisteredAgent = {
 
 export type AstroliftRegisteredApp = {
   activePreviewCount: Scalars['Int']['output'];
+  /** What the app is for, from the manifest's [app] kind (#2332), e.g. mimwell; empty for a generic app. Separate from workload kinds; see astroliftAppKinds. */
+  appKind: Scalars['String']['output'];
   approverTeamId?: Maybe<Scalars['GUID']['output']>;
   approverUserIds: Array<Scalars['String']['output']>;
   archivedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -11652,6 +11664,7 @@ export type Query = {
   astroliftAppGoldenSignals: AstroliftAppGoldenSignalsResult;
   astroliftAppHealthSummary: Array<AstroliftAppHealthSummary>;
   astroliftAppIdentityBinding: AstroliftAppIdentityBindingResult;
+  astroliftAppKinds: Array<AstroliftAppKind>;
   astroliftAppLogs: AstroliftAppLogPage;
   astroliftAppManagedServiceMetrics?: Maybe<AstroliftManagedServiceMetrics>;
   astroliftAppMetricNames: AstroliftAppMetricNames;
@@ -18767,7 +18780,7 @@ export type ListAppsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListAppsPageQuery = { astroliftAppsPage: { nextCursor?: string | null, totalCount: number, page?: number | null, pageSize?: number | null, items: Array<{ topologyKind?: string | null, clusterSlugs: Array<string>, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, lastDeployedAt?: string | null, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null }, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null }> } };
+export type ListAppsPageQuery = { astroliftAppsPage: { nextCursor?: string | null, totalCount: number, page?: number | null, pageSize?: number | null, items: Array<{ topologyKind?: string | null, clusterSlugs: Array<string>, appKind: string, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, lastDeployedAt?: string | null, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null }, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null }> } };
 
 export type ListMyAppsPageQueryVariables = Exact<{
   includeFreshness?: InputMaybe<Scalars['Boolean']['input']>;
@@ -18782,7 +18795,7 @@ export type ListMyAppsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListMyAppsPageQuery = { astroliftMyAppsPage: { nextCursor?: string | null, totalCount: number, page?: number | null, pageSize?: number | null, items: Array<{ topologyKind?: string | null, clusterSlugs: Array<string>, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, lastDeployedAt?: string | null, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null }, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null }> } };
+export type ListMyAppsPageQuery = { astroliftMyAppsPage: { nextCursor?: string | null, totalCount: number, page?: number | null, pageSize?: number | null, items: Array<{ topologyKind?: string | null, clusterSlugs: Array<string>, appKind: string, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, lastDeployedAt?: string | null, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null }, healthPulse?: { status: AstroliftAppHealthPulseStatus, ageSeconds?: number | null, message: string } | null, latestDeployment?: { id: string, status: string, startedAt?: string | null, endedAt?: string | null, createdAt: string, environmentName: string, triggeredBy: string, imageTag: string, commitSha: string } | null }> } };
 
 export type GetAppQueryVariables = Exact<{
   slug: Scalars['String']['input'];

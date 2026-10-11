@@ -51,6 +51,9 @@ export const DEPLOY_LABEL: Record<AppHealthPulseStatus, string> = {
   NEVER: "Never deployed",
 };
 
+/** Registered app kinds (backend `astrolift_manifest.app_kinds`). */
+export const APP_KIND_OPTIONS = ["mimwell"] as const;
+
 export const APPS_LIST: ListDefinition = {
   id: "apps",
   fields: [
@@ -83,6 +86,12 @@ export const APPS_LIST: ListDefinition = {
     },
     // Free text: matched on a cluster slug any of the app's environments use.
     { key: "cluster", label: "Cluster" },
+    // What the app is for, from its manifest's [app] kind (#2332).
+    {
+      key: "appKind",
+      label: "App kind",
+      options: APP_KIND_OPTIONS.map((value) => ({ value, label: value })),
+    },
   ],
   // The server matches name, slug, description and repo.
   searchPlaceholder: "Search apps, slugs, repos...",
@@ -120,7 +129,9 @@ export function localizedAppsList(
             ? status(`status.${option.value}`)
             : field.key === "deploy"
               ? t(`freshness.status.${option.value.toUpperCase()}`)
-              : t(`kinds.${option.value}`),
+              : field.key === "appKind"
+                ? t(`appKinds.${option.value}`)
+                : t(`kinds.${option.value}`),
       })),
     })),
     views: APPS_LIST.views.map((view) => ({
@@ -155,6 +166,7 @@ export interface AppsListFilter {
   kind?: string[];
   cluster?: string[];
   project?: string[];
+  appKind?: string[];
 }
 
 export interface AppsPageVariables {
@@ -190,7 +202,7 @@ export function appsPageVariables({
   if (filters.failing) filter.failing = true;
   if (filters.status) filter.status = [filters.status.toUpperCase()];
   if (filters.deploy) filter.deploy = [filters.deploy.toUpperCase()];
-  for (const key of ["kind", "cluster", "project"] as const)
+  for (const key of ["kind", "cluster", "project", "appKind"] as const)
     if (filters[key]) filter[key] = [filters[key]];
   return {
     includeFreshness: true,

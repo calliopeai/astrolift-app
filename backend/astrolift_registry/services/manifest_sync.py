@@ -1717,6 +1717,7 @@ class DiscoveredAppPreview:
     build_context: str
     workload_count: int
     already_registered: bool
+    app_kind: str = ""
 
 
 @dataclasses.dataclass(slots=True)
@@ -1844,6 +1845,7 @@ def discover_app_manifests(
             build_context=d.build_context,
             workload_count=d.workload_count,
             already_registered=d.manifest_path in existing_paths,
+            app_kind=d.app_kind,
         )
         for d in discovered
     ]

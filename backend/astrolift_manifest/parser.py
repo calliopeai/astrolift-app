@@ -272,6 +272,7 @@ def parse_raw(toml_text: str) -> RawManifest:
     skills = _parse_skills(data.get("skills", []), "skills")
     edge = _parse_edge(data.get("edge"), "edge")
     ingress_access = _parse_ingress_access(data.get("ingress"), "ingress")
+    app_kind = _parse_app_kind(data.get("app"))
 
     if workloads:
         public_count = sum(1 for w in workloads if w.is_public)
@@ -290,8 +291,22 @@ def parse_raw(toml_text: str) -> RawManifest:
         skills=skills,
         edge=edge,
         ingress_access=ingress_access,
+        app_kind=app_kind,
         raw=data,
     )
+
+
+def _parse_app_kind(app_table: Any) -> str:
+    if app_table is None:
+        return ""
+    if not isinstance(app_table, dict):
+        raise ManifestError("[app] must be a table", path="app")
+    from astrolift_manifest.app_kinds import resolve_app_kind
+
+    try:
+        return resolve_app_kind(app_table.get("kind"))
+    except ValueError as exc:
+        raise ManifestError(str(exc), path="app.kind") from exc
 
 
 def _parse_ingress_access(value: Any, path: str) -> dict[str, list[str]] | None:

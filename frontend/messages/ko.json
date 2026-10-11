@@ -403,7 +403,8 @@
         "cluster": "클러스터",
         "lastDeploy": "마지막 배포",
         "registered": "등록 일시",
-        "project": "프로젝트"
+        "project": "프로젝트",
+        "appKind": "앱 종류"
       },
       "kinds": {
         "service": "단일 서비스",
@@ -441,7 +442,10 @@
         "submit": "{count, plural, other {앱 #개에 전송}}",
         "description": "지정한 시크릿 번들을 선택한 모든 앱에 적용합니다. 환경을 비워 두면 번들이 연결된 모든 환경에 적용합니다."
       },
-      "previewCount": "{count, plural, other {미리 보기 #개}}"
+      "previewCount": "{count, plural, other {미리 보기 #개}}",
+      "appKinds": {
+        "mimwell": "Mimwell"
+      }
     },
     "tabs": {
       "ariaLabel": "앱 섹션",

@@ -403,7 +403,8 @@
         "cluster": "クラスター",
         "lastDeploy": "最終デプロイ",
         "registered": "登録日時",
-        "project": "プロジェクト"
+        "project": "プロジェクト",
+        "appKind": "アプリの種類"
       },
       "kinds": {
         "service": "単一サービス",
@@ -441,7 +442,10 @@
         "submit": "{count, plural, other {# 件のアプリに送信}}",
         "description": "指定したシークレットバンドルを選択した各アプリに適用します。環境を空欄にすると、バンドルが関連付けられているすべての環境に適用されます。"
       },
-      "previewCount": "{count, plural, other {# 件のプレビュー}}"
+      "previewCount": "{count, plural, other {# 件のプレビュー}}",
+      "appKinds": {
+        "mimwell": "Mimwell"
+      }
     },
     "tabs": {
       "ariaLabel": "アプリのセクション",
