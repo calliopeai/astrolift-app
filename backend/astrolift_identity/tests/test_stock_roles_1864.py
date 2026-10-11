@@ -49,7 +49,7 @@ RESYNC = importlib.import_module("astrolift_identity.migrations.0034_resync_syst
 EVERY_PERMISSION = frozenset(
     (
         "admin.elevate agent.create agent.delete agent.dispatch agent.read agent.update "
-        "agent_box.attach agent_env_spec.create agent_env_spec.delete agent_env_spec.read "
+        "agent_box.attach agent_box.custom_image agent_env_spec.create agent_env_spec.delete agent_env_spec.read "
         "agent_env_spec.update agent_task.send_input agent_task.watch api_token.create "
         "api_token.revoke app.access app.approve_deploy app.create app.delete app.deploy app.exec_pod "
         "app.log_export app.read app.read_logs app.read_metrics app.rollback app.transfer app.update "
@@ -98,7 +98,7 @@ PINNED = {
     ),
     "team_owner": (
         "TEAM",
-        "app.access agent.create agent.delete agent.dispatch agent.read agent.update agent_box.attach "
+        "app.access agent.create agent.delete agent.dispatch agent.read agent.update agent_box.attach agent_box.custom_image "
         "agent_env_spec.create agent_env_spec.delete agent_env_spec.read agent_env_spec.update "
         "app.create app.delete app.deploy app.log_export app.read app.read_logs app.read_metrics "
         "app.rollback app.update project.create project.delete project.read project.update "
@@ -108,7 +108,7 @@ PINNED = {
     ),
     "team_admin": (
         "TEAM",
-        "agent.create agent.delete agent.dispatch agent.read agent.update agent_box.attach "
+        "agent.create agent.delete agent.dispatch agent.read agent.update agent_box.attach agent_box.custom_image "
         "agent_env_spec.create agent_env_spec.read agent_env_spec.update app.create app.deploy "
         "app.log_export app.read app.read_logs app.read_metrics app.rollback app.update "
         "project.create project.read project.update secret.list secret.read secret.write "
@@ -118,7 +118,7 @@ PINNED = {
     ),
     "team_developer": (
         "TEAM",
-        "agent.create agent.dispatch agent.read agent_box.attach agent_env_spec.read app.deploy "
+        "agent.create agent.dispatch agent.read agent_box.attach agent_box.custom_image agent_env_spec.read app.deploy "
         "app.log_export app.read app.read_logs app.read_metrics app.rollback form.read form.submit "
         "project.read secret.list secret.read secret.write skill.import skill.read team.read "
         "workflow.create workflow.read workflow.trigger zentinelle.policy_view "
@@ -126,7 +126,7 @@ PINNED = {
     ),
     "team_operator": (
         "TEAM",
-        "agent.dispatch agent.read agent_box.attach agent_env_spec.read agent_task.watch "
+        "agent.dispatch agent.read agent_box.attach agent_box.custom_image agent_env_spec.read agent_task.watch "
         "app.deploy app.log_export app.read app.read_logs app.read_metrics app.rollback "
         "project.read team.read workflow.read workflow.trigger zentinelle.policy_view "
         "zentinelle.usage_view",
@@ -138,7 +138,7 @@ PINNED = {
     ),
     "project_admin": (
         "PROJECT",
-        "app.access agent.create agent.delete agent.dispatch agent.read agent.update agent_box.attach "
+        "app.access agent.create agent.delete agent.dispatch agent.read agent.update agent_box.attach agent_box.custom_image "
         "agent_env_spec.create agent_env_spec.delete agent_env_spec.read agent_env_spec.update "
         "app.create app.delete app.deploy app.log_export app.read app.read_logs app.read_metrics "
         "app.rollback app.update project.read project.update secret.list secret.read secret.write "
@@ -147,14 +147,14 @@ PINNED = {
     ),
     "project_developer": (
         "PROJECT",
-        "agent.create agent.dispatch agent.read agent_box.attach agent_env_spec.read app.deploy "
+        "agent.create agent.dispatch agent.read agent_box.attach agent_box.custom_image agent_env_spec.read app.deploy "
         "app.log_export app.read app.read_logs app.read_metrics app.rollback project.read "
         "secret.list secret.read secret.write workflow.create workflow.read workflow.trigger "
         "zentinelle.policy_view zentinelle.usage_view",
     ),
     "project_operator": (
         "PROJECT",
-        "agent.dispatch agent.read agent_box.attach agent_env_spec.read agent_task.watch "
+        "agent.dispatch agent.read agent_box.attach agent_box.custom_image agent_env_spec.read agent_task.watch "
         "app.deploy app.log_export app.read app.read_logs app.read_metrics app.rollback "
         "project.read workflow.read workflow.trigger zentinelle.policy_view zentinelle.usage_view",
     ),
@@ -165,7 +165,7 @@ PINNED = {
     ),
     "app_admin": (
         "APP",
-        "app.access agent.create agent.delete agent.dispatch agent.read agent.update agent_box.attach "
+        "app.access agent.create agent.delete agent.dispatch agent.read agent.update agent_box.attach agent_box.custom_image "
         "agent_env_spec.delete agent_env_spec.read agent_env_spec.update app.delete app.deploy "
         "app.log_export app.read app.read_logs app.read_metrics app.rollback app.update "
         "secret.list secret.read secret.write workflow.create workflow.delete workflow.read "
@@ -173,7 +173,7 @@ PINNED = {
     ),
     "app_deployer": (
         "APP",
-        "agent.dispatch agent.read agent_box.attach agent_env_spec.read app.deploy app.read "
+        "agent.dispatch agent.read agent_box.attach agent_box.custom_image agent_env_spec.read app.deploy app.read "
         "app.rollback workflow.read workflow.trigger",
     ),
     "app_developer": (

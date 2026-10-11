@@ -6866,7 +6866,9 @@
       "removed": "{count, plural, one {A reconciliação informou a remoção de anotações Cognito de # Ingress gerenciado. Verifique o acesso real.} other {A reconciliação informou a remoção de anotações Cognito de # Ingress gerenciados. Verifique o acesso real.}}",
       "partial": "{count, plural, one {Foi informada # falha de reconciliação. Revise os eventos do cluster; a implantação está incompleta.} other {Foram informadas # falhas de reconciliação. Revise os eventos do cluster; a implantação está incompleta.}}",
       "skipped": "{count, plural, one {# Ingress foi ignorado. Revise os eventos do cluster e o acesso real.} other {# Ingress foram ignorados. Revise os eventos do cluster e o acesso real.}}",
-      "sourceLimit": "As opções retornadas não comprovam um inventário completo da nuvem. Selecionar ou inserir identificadores não concede acesso."
+      "sourceLimit": "As opções retornadas não comprovam um inventário completo da nuvem. Selecionar ou inserir identificadores não concede acesso.",
+      "brandingMissing": "Este cliente não tem marca de login gerenciado, então o Cognito mostrará “Login pages unavailable”. Crie a marca no Cognito antes de salvar.",
+      "brandingQuotaFull": "Este cliente não tem marca de login gerenciado e o pool já usa as 20 marcas. Libere uma ou use um cliente que tenha marca."
     },
     "authUsers": {
       "title": "Usuários de login",

@@ -147,7 +147,8 @@ _READ_APP_PERMISSIONS = frozenset(
     }
 )
 _WRITE_APP_PREFIXES = ("app.", "agent.", "agent_env_spec.", "skill.", "workflow.")
-_WRITE_APP_PERMISSIONS = frozenset({"secret.write"})
+# agent_box.custom_image rides with agent.dispatch, which "agent." covers (#86).
+_WRITE_APP_PERMISSIONS = frozenset({"secret.write", "agent_box.custom_image"})
 
 
 def set_current_api_token(token) -> contextvars.Token:
@@ -221,6 +222,7 @@ def token_scope_allows_permission(token, permission: str) -> bool:
         "agent.dispatch",
         "agent_task.send_input",
         "agent_box.attach",
+        "agent_box.custom_image",
     }:
         return True
     if SCOPE_MCP_WRITE in scopes and permission in {"agent.create", "agent.update"}:

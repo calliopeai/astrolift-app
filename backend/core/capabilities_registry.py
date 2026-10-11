@@ -56,6 +56,8 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     # Console / cluster exec surfaces.
     "console.exec",
     "console.log_tail",
+    # ensureAgentBox gates free image references on agent_box.custom_image (#86).
+    "boxes.custom_image_permission",
     "observability.exact_environment_logs",
     "observability.scoped_trace_envelopes",
     # Secrets handling surfaces.

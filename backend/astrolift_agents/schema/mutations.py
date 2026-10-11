@@ -2567,6 +2567,14 @@ class AgentsMutation:
             agent = agent_by_slug(org.pk, agent_slug, Permission.AGENT_DISPATCH)
             if agent is None or agent.kind != Workload.Kind.AGENT:
                 return gql_failure(ErrorCode.NOT_FOUND.value, "agent not found", field="agentSlug")
+        if (input.image or "").strip() and spec is None and agent is None:
+            # A free image reference, not one a registered spec or agent names (#86).
+            from astrolift_agents.scopes import agent_box_ensure_scope
+            from core.permissions import check_permission
+
+            check_permission(
+                Permission.AGENT_BOX_CUSTOM_IMAGE, scope=agent_box_ensure_scope("input")({"input": input})
+            )
 
         try:
             box = ensure_agent_box(
