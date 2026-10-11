@@ -543,6 +543,8 @@ def _cluster_zone(domain, current, now):
             )
     except Exception as error:
         return _route53_error(error, candidate, current, now, "CLUSTER_CREDENTIAL")
+
+
 _CERTIFICATE_STATES = {
     "ISSUED": State.OK,
     "PENDING_VALIDATION": State.UNKNOWN,
