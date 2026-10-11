@@ -345,7 +345,11 @@ def test_failed_test_does_not_claim_observed_feedback_configuration(world):
     assert result["ok"] and not result["data"]["eventTrackingConfigured"]
 
 
-def test_rate_limit_bounds_actual_sends_and_replay_is_free(world):
+def test_rate_limit_bounds_actual_sends_and_replay_is_free(world, monkeypatch):
+    # The limiter counts per calendar minute; pin the clock so the five sends
+    # cannot straddle a minute boundary and land in a fresh bucket.
+    fixed = timezone.now().replace(second=5, microsecond=0)
+    monkeypatch.setattr(email_delivery.timezone, "now", lambda: fixed)
     nonce = uuid4()
     assert send(world, request_id=nonce)["ok"]
     assert send(world, request_id=nonce)["ok"]
