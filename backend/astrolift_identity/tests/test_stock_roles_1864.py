@@ -53,7 +53,7 @@ EVERY_PERMISSION = frozenset(
         "agent_env_spec.update agent_task.send_input agent_task.watch api_token.create "
         "api_token.revoke app.access app.approve_deploy app.create app.delete app.deploy app.exec_pod "
         "app.log_export app.read app.read_logs app.read_metrics app.rollback app.transfer app.update "
-        "audit_log.export audit_log.read billing.read billing.update cluster.manage cluster.register cluster.users "
+        "audit_log.export audit_log.read billing.read billing.update cluster.manage cluster.read cluster.register cluster.users "
         "cluster.unregister cluster.update deploy_token.create deploy_token.revoke deploy_token.rotate "
         "form.create form.delete form.moderate form.read form.submit form.update managed_service.adopt "
         "managed_service.create managed_service.destroy managed_service.update org.delete "
@@ -82,18 +82,18 @@ PINNED = {
     "org_auditor": (
         "ORG",
         "agent.read agent_env_spec.read app.log_export app.read app.read_logs app.read_metrics "
-        "audit_log.export audit_log.read form.read org.read project.read secret.list skill.read "
+        "audit_log.export audit_log.read cluster.read form.read org.read project.read secret.list skill.read "
         "team.read workflow.read zentinelle.audit_export zentinelle.audit_view "
         "zentinelle.policy_view zentinelle.status_view",
     ),
     "org_viewer": (
         "ORG",
-        "agent.read agent_env_spec.read app.read app.read_logs app.read_metrics form.read org.read "
+        "agent.read agent_env_spec.read app.read app.read_logs app.read_metrics cluster.read form.read org.read "
         "project.read secret.list skill.read team.read workflow.read zentinelle.status_view",
     ),
     "cluster_owner": (
         "ORG",
-        "cluster.users cluster.manage cluster.register cluster.unregister cluster.update "
+        "cluster.users cluster.manage cluster.read cluster.register cluster.unregister cluster.update "
         "provider_plugin.configure provider_plugin.read",
     ),
     "team_owner": (
