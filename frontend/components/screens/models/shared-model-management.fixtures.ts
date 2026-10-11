@@ -1,6 +1,6 @@
 import type { SharedModelManagementPanelProps } from "./SharedModelManagementPanel";
 import { sharedModelDetailProps } from "./shared-model-detail.fixtures";
-import { sharedModelRequest } from "./shared-model-form";
+import { modelSettingsRequest } from "./shared-model-settings";
 const model = sharedModelDetailProps.model!;
 const draft: SharedModelManagementPanelProps["draft"] = {
   name: model.name,
@@ -24,14 +24,7 @@ export const sharedModelManagementProps: SharedModelManagementPanelProps = {
   admissionError: null,
   onRetryAdmission: () => {},
   admission: {
-    requestKey: JSON.stringify(
-      sharedModelRequest(
-        model.organizationId,
-        { id: model.clusterId, providerId: model.providerId },
-        { repoId: model.modelRepo, revisionSha: model.revisionSha! },
-        draft
-      )
-    ),
+    requestKey: JSON.stringify(modelSettingsRequest(model, draft)),
     eligible: true,
     reason: null,
     runtimeVersion: "0.15.1",

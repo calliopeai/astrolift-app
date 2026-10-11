@@ -77,6 +77,7 @@ class RequestAttributes:
     environment: str | None = None
     region: str | None = None
     approvals: int | None = None
+    approval_request: bool = False
     now: dt.datetime | None = None
     request: Any = None
     authenticated_at: Any = _UNSET
@@ -188,6 +189,7 @@ def attributes_for(actor_user_id: int | None) -> RequestAttributes:
         environment=attrs.environment,
         region=attrs.region,
         approvals=attrs.approvals,
+        approval_request=attrs.approval_request,
         now=attrs.now,
         authenticated_at=None,
         auth_factors=None,
@@ -468,6 +470,17 @@ def _evaluate_policy(policy, subject: Subject) -> PolicyOutcome:
             return outcome(True, True, f"policy {slug} denies {subject.permission}{applies_note}")
         return outcome(
             True, False, f"policy {slug} allows {subject.permission} with no conditions{applies_note}"
+        )
+    if (
+        failed
+        and subject.attrs.approval_request
+        and effect == "ALLOW"
+        and not unknown
+        and not unevaluable
+        and all(c.kind == "approval_required" for c in failed)
+    ):
+        return outcome(
+            True, False, f"policy {slug}: quorum is deferred for a pending approval request", conditions
         )
     if failed:
         detail = "; ".join(f"{c.kind}: {c.detail}" for c in failed)

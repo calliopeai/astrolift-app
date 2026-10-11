@@ -70,7 +70,7 @@ export function teamTabs(slug: string, active: TeamTab): DetailTab[] {
   return tabRow(
     `${TEAMS_HREF}/${encodeURIComponent(slug)}`,
     [
-      ["access", "Access", ""],
+      ["access", "Access", "access"],
       ["members", "Members", "members"],
     ],
     active

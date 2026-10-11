@@ -7,12 +7,11 @@ import {
 import { GroupMappingsPanel } from "@/components/screens/administration/access/GroupMappingsPanel";
 import { MemberDetail } from "@/components/screens/administration/access/MemberDetail";
 import { PersonActivityPanel } from "@/components/screens/administration/access/PersonActivityPanel";
-import { PersonTeamsPanel } from "@/components/screens/administration/access/PersonTeamsPanel";
+import { MembershipRouteClient } from "@/components/screens/administration/access/team-memberships/MembershipRouteClient";
 import { PrincipalAccessPanel } from "@/components/screens/administration/access/PrincipalAccessPanel";
 import { parsePrincipalParam } from "@/components/screens/administration/access/principal-tabs";
 import { useMemberDetail } from "@/components/screens/administration/access/use-member-detail";
 import { usePersonActivity } from "@/components/screens/administration/access/use-person-activity";
-import { usePersonTeams } from "@/components/screens/administration/access/use-person-teams";
 import { usePrincipalAccess } from "@/components/screens/administration/access/use-principal-access";
 import { holderLabel } from "@/components/screens/administration/access/principal-access";
 import { useGroupMappings } from "@/components/screens/administration/access/use-group-mappings";
@@ -52,13 +51,7 @@ function GroupAccessClient({ externalId }: { externalId: string }) {
 }
 
 export function PersonTeamsClient({ memberId }: { memberId: string }) {
-  const detail = useMemberDetail(memberId);
-  const teams = usePersonTeams(detail.member, detail.memberships);
-  return (
-    <MemberDetail {...detail} tab="teams">
-      <PersonTeamsPanel {...teams} />
-    </MemberDetail>
-  );
+  return <MembershipRouteClient direction="person" orgMemberId={memberId} />;
 }
 
 export function PersonActivityClient({ memberId }: { memberId: string }) {

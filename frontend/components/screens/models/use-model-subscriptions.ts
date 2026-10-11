@@ -35,7 +35,8 @@ const statuses: readonly string[] = ["pending", "active", "revoking", "revoked",
 export function useModelSubscriptions(
   model: ClusterModelFieldsFragment,
   blocked: boolean,
-  onRefreshDeployment: () => void
+  onRefreshDeployment: () => void,
+  targetsEnabled = true
 ): ModelSubscriptionsPanelProps {
   const t = useTranslations("models.shared.subscriptions");
   const { org, loading: orgLoading, error: orgError } = useActiveOrg();
@@ -69,7 +70,7 @@ export function useModelSubscriptions(
       page: targetList.state.page,
       pageSize: targetList.state.pageSize,
     },
-    skip: skipped,
+    skip: skipped || !targetsEnabled,
     fetchPolicy: "no-cache",
     context: { queryDeduplication: false },
   });
@@ -89,10 +90,11 @@ export function useModelSubscriptions(
     fetchPolicy: "no-cache",
     context: { queryDeduplication: false },
   });
-  const targetPage = skipped
-    ? null
-    : (targets.data ?? (targets.loading || targets.error ? targets.previousData : undefined))
-        ?.clusterModelSubscriptionTargetsPage;
+  const targetPage =
+    skipped || !targetsEnabled
+      ? null
+      : (targets.data ?? (targets.loading || targets.error ? targets.previousData : undefined))
+          ?.clusterModelSubscriptionTargetsPage;
   const subscriptionPage = skipped
     ? null
     : (
@@ -122,6 +124,7 @@ export function useModelSubscriptions(
     model.providerId,
     skipped,
     blocked,
+    targetsEnabled,
   ]);
   const [scope, setScope] = useState({ key: scopeKey, revision: 0 });
   if (scope.key !== scopeKey) setScope({ key: scopeKey, revision: scope.revision + 1 });
@@ -168,6 +171,7 @@ export function useModelSubscriptions(
     )
       return { accepted: false as const, message: t("changed") };
     if ("environmentId" in request) {
+      if (!targetsEnabled) return { accepted: false as const, message: t("changed") };
       if (
         targetError ||
         targets.loading ||

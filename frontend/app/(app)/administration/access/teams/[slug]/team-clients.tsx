@@ -5,9 +5,8 @@ import { grantHref, TEAMS_HREF } from "@/components/screens/administration/acces
 import { useEntityAccess } from "@/components/screens/administration/access/use-entity-access";
 import { TeamAccessPanel } from "@/components/screens/teams/TeamAccessPanel";
 import { TeamDetailScreen } from "@/components/screens/teams/TeamDetailScreen";
-import { TeamMembersPanel } from "@/components/screens/teams/TeamMembersPanel";
+import { MembershipRouteClient } from "@/components/screens/administration/access/team-memberships/MembershipRouteClient";
 import { useTeamDetail } from "@/components/screens/teams/use-team-detail";
-import { useTeamMembers } from "@/components/screens/teams/use-team-members";
 import { useTeamProjects } from "@/components/screens/teams/use-team-projects";
 
 export function TeamAccessClient({ slug }: { slug: string }) {
@@ -33,11 +32,5 @@ export function TeamAccessClient({ slug }: { slug: string }) {
 }
 
 export function TeamMembersClient({ slug }: { slug: string }) {
-  const detail = useTeamDetail(slug);
-  const members = useTeamMembers(detail.team);
-  return (
-    <TeamDetailScreen {...detail} tab="members">
-      {detail.team && <TeamMembersPanel key={detail.team.id} {...members} team={detail.team} />}
-    </TeamDetailScreen>
-  );
+  return <MembershipRouteClient direction="team" slug={slug} />;
 }

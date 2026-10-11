@@ -257,6 +257,10 @@ def _locked_subscriptions(service):
             or env.tenant_cluster_id != service.tenant_cluster_id
         ):
             raise ValueError("Shared subscription destination is no longer live and coherent.")
+        from astrolift_services.model_settings import allows_app
+
+        if row.desired_enabled and not allows_app(service, env.registered_app):
+            raise ValueError("Shared subscription destination disagrees with the model sharing policy.")
     return rows
 
 

@@ -124,6 +124,7 @@ from astrolift_identity.scopes import (
     project_slug_available_scope,
     team_scope_by_guid,
 )
+from astrolift_identity.team_membership_types import TeamAccessNavigationType
 from core.decorators import tenant_scoped
 from core.naming import PROJECT_SLUG, TEAM_SLUG, NamingViolation
 from core.permissions import (
@@ -171,6 +172,15 @@ class MeType:
     id: str
     profile: UserProfileType | None
 
+    # Self-readable hints use admitted() and per-scope checks in navigation;
+    # no-tenant/no-grant must remain all-false, not a collection refusal.
+    @strawberry.field
+    def team_access_navigation(self, info: Info) -> TeamAccessNavigationType:
+        """Fresh self-readable navigation hints, not exact-target approval."""
+        from astrolift_identity.team_memberships import navigation
+
+        return navigation(info)
+
     @strawberry.field
     def modules(self, info: Info) -> list[ModuleEntitlementType]:
         """Capability manifest for the active tenant (spec 34/36 §0.3).
@@ -207,7 +217,10 @@ class MeType:
 
         Models additionally uses current account/membership and bearer checks:
         view needs ORG_READ at the actual ORG or a live credential-visible app
-        with APP_READ; create/manage/run need CLUSTER_UPDATE at that ORG.
+        with APP_READ; create/manage require fresh installation-superadmin hosting
+        admission, including current bearer/session and ORG_UPDATE/CLUSTER_UPDATE.
+        Run retains CLUSTER_UPDATE for the shared prompt surface; legacy app
+        prompts and subscriptions retain their separate exact app gates.
         Descendant grants and the selected team cannot supply owner authority.
         """
         from astrolift_identity.model_entitlements import models_entitlement
@@ -231,6 +244,9 @@ class MeType:
             is_staff=is_staff,
             org_modules_enabled=enabled_modules(tenant.organization_id),
         )
+        from astrolift_identity.team_memberships import team_access_entitlement
+
+        rows.append(team_access_entitlement(info))
         models = models_entitlement(info)
         rows = [models if row.key == "models" else row for row in rows]
         # The Builder API's create only ever checks ``app.create`` at a TEAM

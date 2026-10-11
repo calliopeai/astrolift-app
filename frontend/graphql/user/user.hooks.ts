@@ -22,7 +22,7 @@ export const useMe = () => {
 // The entitlement-driven module keys the shell knows about (spec 36
 // §1.2). `dashboard` is intentionally absent — it is always rendered
 // and carries no `me.modules` entry.
-export type ModuleKey = "apps" | "agents" | "workflows" | "models" | "admin";
+export type ModuleKey = "apps" | "agents" | "workflows" | "models" | "admin" | "team_access";
 
 // All-false capability for a module the server didn't return (and for
 // anonymous / no-tenant viewers, where `me.modules` is `[]`). Frozen so

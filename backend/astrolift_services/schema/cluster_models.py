@@ -3,6 +3,7 @@
 from uuid import UUID
 
 import strawberry
+from django.db import transaction
 from django.db.models import CharField, Exists, F, Func, OuterRef, Q
 from strawberry.types import Info
 
@@ -22,8 +23,16 @@ from astrolift_services.model_admission import (
     current_org_id,
     in_current_org,
     shared_cluster_operation,
+    shared_model_operation,
     validate_cluster_request,
     with_canonical_model_handle,
+)
+from astrolift_services.model_runtime_settings import ModelDtype
+from astrolift_services.model_settings import (
+    UpdateClusterModelInput,
+    sharing_config,
+    update_placement,
+    validate_updated_source,
 )
 from astrolift_services.models import ManagedService, ManagedServiceAttachment
 from astrolift_services.schema.model_types import (
@@ -32,6 +41,7 @@ from astrolift_services.schema.model_types import (
     ModelSubscriptionTargetType,
     ModelSubscriptionType,
     cluster_model_to_type,
+    cluster_models_to_types,
     model_subscription_to_type,
 )
 from core.decorators import tenant_scoped
@@ -57,6 +67,9 @@ class ProvisionClusterModelInput:
     cpu_kv_cache_gi_b: int | None = None
     connection_id: GUID | None = None
     expected_connection_version: int | None = None
+    dtype: ModelDtype | None = None
+    max_model_len: int | None = None
+    max_num_seqs: int | None = None
 
 
 @strawberry.input
@@ -76,10 +89,10 @@ def _guid(value):
         return None
 
 
-def _page(rows, *, page, page_size, projection):
+def _page(rows, *, page, page_size, projection, batch_projection=None):
     result = numbered_page(rows, order_by=["pk"], page=page, page_size=page_size, max_page_size=50)
     return PageType(
-        items=[projection(row) for row in result.rows],
+        items=batch_projection(result.rows) if batch_projection else [projection(row) for row in result.rows],
         page=result.page,
         page_size=result.page_size,
         total_count=result.total_count,
@@ -95,7 +108,7 @@ def _search(rows, search, fields):
     return rows.filter(predicate)
 
 
-def _environment_rows(permission):
+def _environment_rows(permission, *, approvals=0):
     owners = live_app_owners(
         RegisteredApp.objects.filter(
             organization_id=current_org_id(),
@@ -108,7 +121,113 @@ def _environment_rows(permission):
     ).select_related("registered_app__organization", "tenant_cluster")
     if permission == Permission.APP_UPDATE:
         rows = rows.exclude(registered_app__provisioning_status__in=("tearing_down", "deregistered"))
+    if approvals:
+        from django.db.models import IntegerField, Value
+
+        rows = rows.annotate(_model_connection_approvals=Value(approvals, output_field=IntegerField()))
+        return visible_operation_rows(
+            rows, permission, environment_path="self", approvals_field="_model_connection_approvals"
+        )
     return visible_operation_rows(rows, permission, environment_path="self")
+
+
+def _subscription_targets_page(
+    service, rows, *, search, page, page_size, projection=None, projection_factory=None
+):
+    from astrolift_services.model_subscriptions import LONG_RUNNING_KINDS
+
+    workloads = Workload.objects.filter(registered_app_id=OuterRef("registered_app_id"))
+    rows = rows.annotate(
+        _has_workloads=Exists(workloads),
+        _unsupported_workloads=Exists(workloads.exclude(kind__in=LONG_RUNNING_KINDS)),
+    )
+    if service is None:
+        rows = rows.none()
+    admitted = bool(
+        service
+        and (service.config or {}).get("allow_subscriptions") is True
+        and service.status in ("active", "updating")
+        and service.backend_ref
+        and service.applied_config is not None
+    )
+    if service is not None:
+        admitted = (
+            admitted
+            and available_model_clusters(
+                TenantCluster.objects.filter(
+                    Q(organization_id=current_org_id()) | Q(organization_id__isnull=True),
+                    pk=service.tenant_cluster_id,
+                ),
+                current_org_id(),
+            ).exists()
+        )
+        decision = cluster_model_to_type(service, dedicated=None)
+        admitted = (
+            admitted
+            and decision.runtime_supported is True
+            and decision.ready is True
+            and service.status == "active"
+        )
+
+    from astrolift_services.model_settings import dedicated_app
+
+    dedicated = dedicated_app(service) if service is not None else None
+    sharing = (service.config or {}).get("sharing_mode", "shared") if service else None
+
+    def project(env):
+        from _sdk.k8s_naming import app_namespace
+
+        from core.app_deploy import namespace_for_environment
+
+        canonical_namespace = app_namespace(
+            organization_slug=env.registered_app.organization.slug, app_slug=env.registered_app.slug
+        )
+        supported_namespace = namespace_for_environment(env) == canonical_namespace
+        supported_workloads = env._has_workloads and not env._unsupported_workloads
+        eligible = (
+            admitted
+            and service.tenant_cluster_id == env.tenant_cluster_id
+            and (
+                env.registered_app.organization_id == service.organization_id
+                if sharing == "shared"
+                else dedicated is not None and dedicated.pk == env.registered_app_id
+            )
+            and supported_namespace
+            and supported_workloads
+        )
+        return ModelSubscriptionTargetType(
+            environment_id=GUID(str(env.guid)),
+            environment_version=env.version,
+            app_id=GUID(str(env.registered_app.guid)),
+            app_slug=env.registered_app.slug,
+            app_name=env.registered_app.name,
+            environment_name=env.name,
+            cluster_id=GUID(str(env.tenant_cluster.guid)),
+            eligible=eligible,
+            reason=None
+            if eligible
+            else (
+                "Custom or preview namespaces are not supported for shared model subscriptions."
+                if not supported_namespace
+                else (
+                    "Shared model subscriptions require existing long-running Deployment or StatefulSet workloads."
+                    if not supported_workloads
+                    else "Environment and model placement or subscription admission is unavailable."
+                )
+            ),
+        )
+
+    def batch_project(environments):
+        project_extra = projection_factory(environments) if projection_factory else projection
+        return [project_extra(env, project(env)) if project_extra else project(env) for env in environments]
+
+    return _page(
+        _search(rows, search, ("name", "registered_app__slug", "registered_app__name")),
+        page=page,
+        page_size=page_size,
+        projection=project,
+        batch_projection=batch_project,
+    )
 
 
 @strawberry.type(name="ModelPlacementCluster")
@@ -120,8 +239,109 @@ class ModelPlacementClusterType:
     region: str | None
 
 
+@strawberry.type(name="ModelDedicatedApp")
+class ModelDedicatedAppType:
+    id: GUID
+    version: int
+    name: str
+    slug: str
+
+
 @strawberry.type
 class ClusterModelsQuery:
+    @strawberry.field
+    @require_permission(
+        Permission.ORG_UPDATE,
+        scope=cluster_model_org_scope(Permission.ORG_UPDATE),
+        operation=shared_cluster_operation("cluster_id"),
+    )
+    @tenant_scoped()
+    def cluster_model_dedicated_apps_page(
+        self,
+        info: Info,
+        organization_id: GUID,
+        cluster_id: GUID,
+        expected_provider_id: GUID,
+        search: str | None = None,
+        page: int = 1,
+        page_size: int = 25,
+    ) -> PageType[ModelDedicatedAppType]:
+        from astrolift_services.schema.hf_connections import require_host_admin
+
+        cluster = (
+            available_model_clusters(
+                TenantCluster.objects.filter(
+                    Q(organization_id=current_org_id()) | Q(organization_id__isnull=True),
+                    guid=_guid(cluster_id),
+                    provider_plugin__guid=_guid(expected_provider_id),
+                ),
+                current_org_id(),
+            ).first()
+            if in_current_org(organization_id)
+            else None
+        )
+        rows = live_app_owners(RegisteredApp.objects.filter(organization_id=current_org_id())).exclude(
+            provisioning_status__in=("tearing_down", "deregistered")
+        )
+        if cluster is None:
+            rows = rows.none()
+        else:
+            require_host_admin(info, cluster)
+            from astrolift_registry.visibility import visible_registry_apps
+
+            rows = visible_registry_apps(rows, Permission.APP_READ)
+            rows = rows.filter(
+                environments__tenant_cluster_id=cluster.pk,
+                environments__deleted_at__isnull=True,
+            ).distinct()
+        return _page(
+            _search(rows, search, ("name", "slug")),
+            page=page,
+            page_size=page_size,
+            projection=lambda app: ModelDedicatedAppType(
+                id=GUID(str(app.guid)), version=app.version, name=app.name, slug=app.slug
+            ),
+        )
+
+    @strawberry.field
+    @require_permission(
+        Permission.ORG_UPDATE,
+        scope=cluster_model_org_scope(Permission.ORG_UPDATE),
+        operation=shared_model_operation(),
+    )
+    @require_permission(
+        Permission.CLUSTER_UPDATE,
+        scope=cluster_model_org_scope(Permission.CLUSTER_UPDATE),
+        operation=shared_model_operation(),
+    )
+    @tenant_scoped()
+    def cluster_model_update_admission(
+        self, info: Info, input: UpdateClusterModelInput
+    ) -> ModelRuntimeAdmissionType:
+        from astrolift_services.schema.cluster_model_mutations import _locked_model
+        from astrolift_services.schema.hf_connections import require_host_admin
+
+        try:
+            with transaction.atomic():
+                service = _locked_model(input)
+                if service is None or service.version != input.if_match_version:
+                    raise ValueError("Model deployment changed or is unavailable. Refresh and retry.")
+                require_host_admin(info, service.tenant_cluster)
+                _, runtime = validate_updated_source(service, update_placement(service, input), locked=True)
+                sharing_config(service, input, locked=True)
+                require_host_admin(info, service.tenant_cluster)
+        except (TypeError, ValueError) as exc:
+            return ModelRuntimeAdmissionType(
+                eligible=False, reason=str(exc), runtime_version=None, architecture=None
+            )
+        return ModelRuntimeAdmissionType(
+            eligible=True,
+            reason=None,
+            runtime_version="0.15.1",
+            architecture=runtime.architecture,
+            hardware_admission="operator_declared",
+        )
+
     @strawberry.field
     @require_permission(Permission.ORG_READ, scope=cluster_model_org_scope(Permission.ORG_READ))
     @tenant_scoped()
@@ -217,6 +437,7 @@ class ClusterModelsQuery:
             page=page,
             page_size=page_size,
             projection=cluster_model_to_type,
+            batch_projection=cluster_models_to_types,
         )
 
     @strawberry.field
@@ -262,12 +483,16 @@ class ClusterModelsQuery:
                 runtime_version=None,
                 architecture=None,
             )
+        from astrolift_services.schema.hf_connections import require_host_admin
+
+        require_host_admin(info, cluster)
         try:
             _, runtime = validate_cluster_request(input, cluster)
         except (TypeError, ValueError) as exc:
             return ModelRuntimeAdmissionType(
                 eligible=False, reason=str(exc), runtime_version=None, architecture=None
             )
+        require_host_admin(info, cluster)
         return ModelRuntimeAdmissionType(
             eligible=True,
             reason=None,
@@ -290,84 +515,8 @@ class ClusterModelsQuery:
     ) -> PageType[ModelSubscriptionTargetType]:
         check_permission(Permission.ORG_READ, scope=cluster_model_org_scope(Permission.ORG_READ)({}))
         service = live_cluster_model_by_guid(model_deployment_id) if in_current_org(organization_id) else None
-        from astrolift_services.model_subscriptions import LONG_RUNNING_KINDS
-
-        workloads = Workload.objects.filter(registered_app_id=OuterRef("registered_app_id"))
-        rows = _environment_rows(Permission.APP_UPDATE).annotate(
-            _has_workloads=Exists(workloads),
-            _unsupported_workloads=Exists(workloads.exclude(kind__in=LONG_RUNNING_KINDS)),
-        )
-        if service is None:
-            rows = rows.none()
-        admitted = bool(
-            service
-            and (service.config or {}).get("allow_subscriptions") is True
-            and service.status in ("active", "updating")
-            and service.backend_ref
-            and service.applied_config is not None
-        )
-        if service is not None:
-            admitted = (
-                admitted
-                and available_model_clusters(
-                    TenantCluster.objects.filter(
-                        Q(organization_id=current_org_id()) | Q(organization_id__isnull=True),
-                        pk=service.tenant_cluster_id,
-                    ),
-                    current_org_id(),
-                ).exists()
-            )
-            decision = cluster_model_to_type(service)
-            admitted = (
-                admitted
-                and decision.runtime_supported is True
-                and decision.ready is True
-                and service.status == "active"
-            )
-
-        def project(env):
-            from _sdk.k8s_naming import app_namespace
-
-            from core.app_deploy import namespace_for_environment
-
-            canonical_namespace = app_namespace(
-                organization_slug=env.registered_app.organization.slug, app_slug=env.registered_app.slug
-            )
-            supported_namespace = namespace_for_environment(env) == canonical_namespace
-            supported_workloads = env._has_workloads and not env._unsupported_workloads
-            eligible = (
-                admitted
-                and service.tenant_cluster_id == env.tenant_cluster_id
-                and supported_namespace
-                and supported_workloads
-            )
-            return ModelSubscriptionTargetType(
-                environment_id=GUID(str(env.guid)),
-                environment_version=env.version,
-                app_id=GUID(str(env.registered_app.guid)),
-                app_slug=env.registered_app.slug,
-                app_name=env.registered_app.name,
-                environment_name=env.name,
-                cluster_id=GUID(str(env.tenant_cluster.guid)),
-                eligible=eligible,
-                reason=None
-                if eligible
-                else (
-                    "Custom or preview namespaces are not supported for shared model subscriptions."
-                    if not supported_namespace
-                    else (
-                        "Shared model subscriptions require existing long-running Deployment or StatefulSet workloads."
-                        if not supported_workloads
-                        else "Environment and model placement or subscription admission is unavailable."
-                    )
-                ),
-            )
-
-        return _page(
-            _search(rows, search, ("name", "registered_app__slug", "registered_app__name")),
-            page=page,
-            page_size=page_size,
-            projection=project,
+        return _subscription_targets_page(
+            service, _environment_rows(Permission.APP_UPDATE), search=search, page=page, page_size=page_size
         )
 
     @strawberry.field
