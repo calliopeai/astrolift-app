@@ -29,6 +29,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from _sdk.physical_naming import managed_service_identity, physical_name
 from gcp._raw_fields import raw_field_conflicts
 from gcp._service_accounts import unlisted_service_account
 from gcp.managed._ownership import (
@@ -217,8 +218,11 @@ class APIGatewayDriver(ManagedServiceDriver):
         if not spec.managed_service_id:
             return ProvisionResult(False, "", _MISSING_IDENTITY, ["invalid_api_gateway_config"])
         region = str(cfg.get("region") or self._config.region)
-        api_id = self._api_id(spec, cfg)
-        gateway_id = self._gateway_id(spec, cfg)
+        try:
+            api_id = self._api_id(spec, cfg)
+            gateway_id = self._gateway_id(spec, cfg)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         handle = _handle(region, gateway_id)
         labels = self._labels(spec, cfg)
         api_name = self._api_name(api_id)
@@ -858,10 +862,23 @@ class APIGatewayDriver(ManagedServiceDriver):
         return f"{prefix}-{digest}"[:63].rstrip("-")
 
     def _api_id(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> str:
-        return str(cfg.get("api_id") or _resource_id(self._config.api_id_prefix, spec, "api"))
+        if cfg.get("api_id"):
+            return str(cfg["api_id"])
+        # The handle records only the gateway; a recorded service keeps the API
+        # id it was created with, new services are named from their identity (#2032).
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            _parse_handle(spec.recorded_handle)
+            return _resource_id(self._config.api_id_prefix, spec, "api")
+        return physical_name(spec.managed_service_id, prefix=self._config.api_id_prefix, max_length=63)
 
     def _gateway_id(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> str:
-        return str(cfg.get("gateway_id") or _resource_id(self._config.gateway_id_prefix, spec, "gateway"))
+        if cfg.get("gateway_id"):
+            return str(cfg["gateway_id"])
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            return _parse_handle(spec.recorded_handle)[1]
+        return physical_name(spec.managed_service_id, prefix=self._config.gateway_id_prefix, max_length=63)
 
     def _global_parent(self) -> str:
         return f"projects/{self._config.project_id}/locations/global"

@@ -34,6 +34,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.physical_naming import managed_service_identity, physical_name
 
 KIND = "encryption_key"
 _API_ROOT = "https://cloudkms.googleapis.com/v1"
@@ -683,14 +684,16 @@ class CloudKMSDriver(ManagedServiceDriver):
                 )
 
     def _key_ring_id(self, spec: ProvisionSpec) -> str:
-        return _resource_id(
-            self._config.key_ring_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-        )
+        # Each service gets its own key ring, named from the service identity
+        # (#2032); a recorded key keeps its ring. Key rings are never deleted.
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            return _parts(_parse_handle(spec.recorded_handle))[2]
+        return physical_name(spec.managed_service_id, prefix=self._config.key_ring_name_prefix, max_length=63)
 
     def _key_id(self, spec: ProvisionSpec) -> str:
+        if spec.recorded_handle:
+            return _parts(_parse_handle(spec.recorded_handle))[3]
         return _resource_id(self._config.key_name_prefix, spec.service_handle_hint or "key")
 
 

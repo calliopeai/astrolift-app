@@ -162,7 +162,7 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         "service_handle_hint": "data-key",
         "size": "small",
         "binding_id": "binding-1",
-        "managed_service_id": "service-1",
+        "managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     }
     values.update(overrides)
     return ProvisionSpec(**values)
@@ -869,3 +869,22 @@ def test_rest_client_distinguishes_not_found_and_provider_errors() -> None:
         client.get_crypto_key("gone")
     with pytest.raises(CloudKMSError, match="denied"):
         client.get_crypto_key("forbidden")
+
+
+def test_a_recorded_legacy_key_keeps_its_ring_and_key(driver) -> None:
+    name = "projects/acme-prod/locations/us-central1/keyRings/astrolift-acme-api-prod/cryptoKeys/astrolift-signing"
+    recorded = _spec(recorded_handle=f"encryption_key/{name}")
+    assert driver._key_ring_id(recorded) == "astrolift-acme-api-prod"
+    assert driver._key_id(recorded) == "astrolift-signing"
+
+
+OTHER_SERVICE_ID = "0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4"
+
+
+def test_each_service_gets_its_own_key_ring_even_when_slugs_collide(driver) -> None:
+    # "acme" + "web-prod" and "acme-web" + "prod" shared one key ring before #2032.
+    first = driver._key_ring_id(_spec(organization_slug="acme", app_slug="web-prod"))
+    second = driver._key_ring_id(
+        _spec(organization_slug="acme-web", app_slug="prod", managed_service_id=OTHER_SERVICE_ID)
+    )
+    assert first != second and len(first) <= 63

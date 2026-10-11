@@ -29,6 +29,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.physical_naming import managed_service_identity, physical_name
 from gcp._raw_fields import raw_field_conflicts
 
 KIND = "cdn"
@@ -339,7 +340,10 @@ class CloudCdnDriver(ManagedServiceDriver):
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_cloud_cdn_config"])
-        stack_id = str(cfg.get("cdn_id") or self._stack_id(spec))
+        try:
+            stack_id = str(cfg.get("cdn_id") or self._stack_id(spec))
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         handle = _handle(stack_id)
         marker = _ownership_marker(stack_id, spec=spec)
         try:
@@ -1592,19 +1596,11 @@ class CloudCdnDriver(ManagedServiceDriver):
         return ""
 
     def _stack_id(self, spec: ProvisionSpec) -> str:
-        raw = "-".join(
-            filter(
-                None,
-                (
-                    self._config.name_prefix,
-                    spec.organization_slug,
-                    spec.app_slug,
-                    spec.environment_name,
-                    spec.service_handle_hint or "cdn",
-                ),
-            ),
-        )
-        return _resource_id(raw, maximum=48)
+        # Stack ids leave room for the -<suffix> child resource names (#2032).
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            return _parse_handle(spec.recorded_handle)
+        return physical_name(spec.managed_service_id, prefix=self._config.name_prefix, max_length=48)
 
 
 def _safe_raw(cfg: dict[str, Any], key: str, owned_fields: set[str]) -> dict[str, Any]:

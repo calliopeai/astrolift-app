@@ -53,6 +53,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from _sdk.physical_naming import managed_service_identity, physical_name, recorded_resource_name
 from gcp.managed._ownership import label_adoption_refusal
 
 KIND = "model_endpoint"
@@ -146,7 +147,10 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        base_name = self._base_name_for(spec=spec)
+        try:
+            base_name = self._base_name_for(spec=spec)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         cfg = spec.config or {}
 
         existing = self._describe_endpoint(base_name)
@@ -587,19 +591,11 @@ class VertexAIEndpointDriver(ManagedServiceDriver):
             raise
 
     def _base_name_for(self, *, spec: ProvisionSpec) -> str:
-        raw = (
-            f"{self._config.name_prefix}-"
-            f"{spec.organization_slug}-{spec.app_slug}-"
-            f"{spec.environment_name}-"
-            f"{spec.service_handle_hint or 'm'}"
-        ).lower()
-        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        clean = clean.strip("-")
-        if not clean or not clean[0].isalpha():
-            clean = "m" + clean
-        return clean[:40]
+        # <=40 chars keeps the derived endpoint and model ids valid (#2032).
+        managed_service_identity(spec.managed_service_id)
+        return recorded_resource_name(spec.recorded_handle, kind=KIND) or physical_name(
+            spec.managed_service_id, prefix=self._config.name_prefix, max_length=40
+        )
 
     def _handle_for(self, *, base_name: str) -> str:
         return f"{KIND}/{base_name}"

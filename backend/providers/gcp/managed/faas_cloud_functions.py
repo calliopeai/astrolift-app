@@ -26,6 +26,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from _sdk.physical_naming import managed_service_identity, physical_name
 from gcp._raw_fields import raw_field_conflicts
 from gcp.managed._ownership import is_platform_label_key, label_identity_refusal, reserved_label_keys
 
@@ -227,7 +228,10 @@ class CloudFunctionsDriver(ManagedServiceDriver):
         if not spec.managed_service_id:
             return ProvisionResult(False, "", _MISSING_IDENTITY, ["invalid_cloud_functions_config"])
         region = str(cfg.get("region") or self._config.region)
-        function_id = self._function_id(spec, cfg)
+        try:
+            function_id = self._function_id(spec, cfg)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         handle = _handle(region, function_id)
         name = self._name(region, function_id)
         labels = self._labels(spec, cfg)
@@ -895,21 +899,11 @@ class CloudFunctionsDriver(ManagedServiceDriver):
         explicit = str(cfg.get("function_id") or "")
         if explicit:
             return explicit
-        parts = (
-            self._config.function_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint,
-        )
-        value = re.sub(r"[^a-z0-9-]+", "-", "-".join(parts).lower()).strip("-")
-        value = re.sub(r"-+", "-", value)
-        if not value or not value[0].isalpha():
-            value = f"fn-{value}"
-        value = value[:63].rstrip("-")
-        if len(value) < 4:
-            value = f"{value}-fn"
-        return value
+        # New functions are named from the service identity (#2032).
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            return _parse_handle(spec.recorded_handle)[1]
+        return physical_name(spec.managed_service_id, prefix=self._config.function_name_prefix, max_length=63)
 
     def _parent(self, region: str) -> str:
         return f"projects/{self._config.project_id}/locations/{region}"
