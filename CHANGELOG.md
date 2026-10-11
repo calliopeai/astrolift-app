@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Eight Azure managed drivers name new resources from the managed-service id instead of joined slugs, so services whose slugs join to the same string no longer collide: API Management, Cosmos DB, Azure OpenAI deployments, Blob containers, AI Search, vector search, Azure Monitor workspaces and Function Apps. Recorded resources keep their names and explicit config names still win. Monitor workspace names cap at 39 so the derived `-dce` endpoint name stays whole. A missing or malformed service id is refused as `invalid_resource_identity` (#2032).
+
 - `runTask` dispatches the task's Kubernetes Job: it renders the task from the environment's running deployment (image, env, resources, GPU requests, tolerations and node selector), renames it per run, applies an optional command override, and records the namespace and Job name so the run reconciler follows it to a terminal status. Dispatch failures end the run as `failed` with `failureReason`. A caller `requestId` makes retries return the original run instead of launching more work. Without `environmentName` only a single-environment app is accepted. Apply lifecycle migration `taskrun_dispatch` with the image (#2330).
 
 - The Cognito client picker reports each client's managed login branding, and the ingress-auth form warns before saving a client that has none (Cognito would serve "Login pages unavailable") or whose pool already uses all 20 brandings. Classic hosted UI pools need none; a failed read reports unknown (#1727).

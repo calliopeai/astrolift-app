@@ -61,6 +61,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.physical_naming import managed_service_identity, physical_name, recorded_resource_name
 from azure.managed.tags import arm_tags_for as tags_for
 from azure.secrets_keyvault import key_vault_secret_ref
 
@@ -199,7 +200,10 @@ class AzureCosmosDriver(ManagedServiceDriver):
                 message=("azure cosmos driver requires a Key Vault (set keyvault_url or inject secret_client)"),
                 errors=["no_secret_backend"],
             )
-        account_name = self._account_name_for(spec=spec)
+        try:
+            account_name = self._account_name_for(spec=spec)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         cfg = spec.config or {}
 
         existing = self._describe(account_name)
@@ -629,7 +633,10 @@ class AzureCosmosDriver(ManagedServiceDriver):
         snapshot: SnapshotHandle,
         target: ProvisionSpec,
     ) -> ProvisionResult:
-        target_account = self._account_name_for(spec=target)
+        try:
+            target_account = self._account_name_for(spec=target)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         source_account = self._account_name_from_handle(snapshot.handle)
         existing_target = self._describe(target_account)
         if existing_target is not None:
@@ -745,21 +752,11 @@ class AzureCosmosDriver(ManagedServiceDriver):
             return None
 
     def _account_name_for(self, *, spec: ProvisionSpec) -> str:
-        # Cosmos account names: 3-44 chars, lowercase letters/digits/
-        # hyphens; must start with a letter or digit and cannot end
-        # with a hyphen.
-        parts = [
-            self._config.account_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint or "kv",
-        ]
-        raw = "-".join(p for p in parts if p).lower()
-        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        return clean.strip("-")[:44]
+        # Cosmos account names: 3-44 chars, globally unique (#2032).
+        managed_service_identity(spec.managed_service_id)
+        return recorded_resource_name(spec.recorded_handle, kind=KIND) or physical_name(
+            spec.managed_service_id, prefix=self._config.account_name_prefix, max_length=44
+        )
 
     def _handle_for(self, *, account_name: str) -> str:
         return f"{KIND}/{account_name}"
