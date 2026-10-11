@@ -30,7 +30,9 @@ describe("route TLS observation (#2287)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: copy.checkHttps }));
     expect(onResetProbe).toHaveBeenCalled();
-    expect(onProbe).toHaveBeenCalledWith(expect.objectContaining({ hostname: host, tool: "HTTPS" }));
+    expect(onProbe).toHaveBeenCalledWith(
+      expect.objectContaining({ hostname: host, tool: "HTTPS" })
+    );
 
     rerender(
       view({
