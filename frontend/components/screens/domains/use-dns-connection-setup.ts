@@ -574,7 +574,7 @@ export function useDnsConnectionSetup(domainId?: string) {
     setSelection(null);
     setZone(null);
     void supportQuery.refetch().catch(() => {});
-    if (provider === "cloudflare") {
+    if (provider === "cloudflare" && allowed) {
       const current = recoveryEpoch();
       void connectionsQuery
         .refetch()
@@ -600,7 +600,7 @@ export function useDnsConnectionSetup(domainId?: string) {
     if (provider === "route53") void route53Query.refetch().catch(() => {});
     if (readDomainId) {
       void targetQuery.refetch().catch(() => {});
-      void bindingQuery.refetch().catch(() => {});
+      if (allowed) void bindingQuery.refetch().catch(() => {});
     }
   }
   return {

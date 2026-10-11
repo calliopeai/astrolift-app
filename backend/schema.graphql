@@ -1990,6 +1990,7 @@ type AstroliftClusterBootstrapComponent {
   options: [AstroliftClusterBootstrapOption!]!
   installedByRecipe: Boolean!
   runningOutsideRecipe: Boolean!
+  withheldReason: String
 }
 
 type AstroliftClusterBootstrapOption {
@@ -3227,6 +3228,11 @@ type AstroliftImportSkillsResultMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftImportSkillsResult
+}
+
+type AstroliftInstallManagedModel {
+  modelId: String!
+  replicas: Int
 }
 
 type AstroliftInstallSourceWebhookPayload {
@@ -6068,6 +6074,11 @@ type AstroliftWebhookTestResultMutationResult {
   data: AstroliftWebhookTestResult
 }
 
+type AstroliftWithheldCapability {
+  capability: String!
+  reason: String!
+}
+
 type AstroliftWorkflowHistoryEvent {
   eventType: String!
   timestamp: String!
@@ -7696,6 +7707,55 @@ type ImportWorkflowManifestResult {
   repointedSlugs: [String!]!
 }
 
+type InstallAlertMailSupport {
+  allowed: Boolean!
+  reason: String
+  transport: String
+  sender: String
+  recipient: String
+  tlsMode: String
+  sourceFingerprint: String
+  checkedAt: DateTime!
+}
+
+type InstallAlertMailTest {
+  id: GUID!
+  requestId: GUID!
+  version: Int!
+  eventKind: String!
+  transport: String!
+  sender: String!
+  recipient: String!
+  status: String!
+  reasonCode: String
+  createdAt: DateTime!
+  acceptedAt: DateTime
+  deliveryObserved: Boolean!
+}
+
+type InstallAlertMailTestMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: InstallAlertMailTest
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type InstallAlertMailTestPage {
+  items: [InstallAlertMailTest!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
+}
+
 input InstallClusterAgentInput {
   clusterId: GUID!
   expectedVersion: Int!
@@ -8490,6 +8550,7 @@ type Mutation {
   archiveApp(input: ArchiveAppInput!): AstroliftRegisteredAppMutationResult!
   restoreApp(input: RestoreAppInput!): AstroliftRegisteredAppMutationResult!
   setAppAccess(input: SetAppAccessInput!): AstroliftAppAccessMutationResult!
+  sendInstallAlertMailTest(input: SendInstallAlertMailTestInput!): InstallAlertMailTestMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
   updateWebhookSubscription(input: UpdateWebhookSubscriptionInput!): AstroliftWebhookSubscriptionMutationResult!
   deleteWebhookSubscription(input: DeleteWebhookSubscriptionInput!): SoftdeletepayloadMutationResult!
@@ -9238,6 +9299,16 @@ type Query {
   Multi-install handshake. Returns version, capabilities, feature flags, install identity, and server time so a mobile / CLI / SDK client can decide which UI to render before logging in.
   """
   astroliftServerInfo: AstroliftServerInfo!
+
+  """
+  What the install withholds from Astrolift (calliope-installer#447): dns, databases, load_balancers, clusters, controllers, each with the reason to show. Empty when nothing is withheld.
+  """
+  astroliftWithheldCapabilities: [AstroliftWithheldCapability!]!
+
+  """
+  The model the install serves on its own GPUs (calliope-installer#446), read-only in the console; null when the platform model is a cloud API or off.
+  """
+  astroliftInstallManagedModel: AstroliftInstallManagedModel
   organization(id: ID!): OrganizationType
   organizations(query: String = null): [OrganizationType!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use organizationsPage.")
 
@@ -9293,6 +9364,8 @@ type Query {
   astroliftActiveIdentityProvider: AstroliftIdentityProvider
   astroliftActiveSessions: [AstroliftActiveSession!]!
   astroliftElevationStatus: AstroliftElevationStatus!
+  installAlertMailSupport(eventKind: String! = "deploy.failed"): InstallAlertMailSupport!
+  installAlertMailTestsPage(eventKind: String! = "deploy.failed", after: String = null, limit: Int! = 25): InstallAlertMailTestPage!
   astroliftTopologyTraffic(appSlug: String!, start: DateTime!, end: DateTime!, environmentName: String = null): TopologyTraffic
   astroliftEvent(id: GUID!): AstroliftEvent
   astroliftAlertRule(id: GUID!): AstroliftAlertRule
@@ -10114,6 +10187,12 @@ input SendEmailDeliveryTestInput {
   recipient: String!
   subject: String = null
   body: String = null
+}
+
+input SendInstallAlertMailTestInput {
+  requestId: GUID!
+  expectedSourceFingerprint: String!
+  eventKind: String! = "deploy.failed"
 }
 
 input SendManagedServiceTestEmailInput {

@@ -1,13 +1,15 @@
 import { NextIntlClientProvider } from "next-intl";
 import en from "@/messages/en.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import {
+  DNS_WITHHELD,
   DOMAIN_DIAGNOSTICS,
   DOMAIN_LONG,
   DOMAIN_UNPROVISIONED,
   MANAGED_DOMAIN,
 } from "./domains-environments.fixtures";
-import { ManagedDomainDetail } from "./ManagedDomainDetail";
+import { ManagedDomainDetail, type ManagedDomainDetailProps } from "./ManagedDomainDetail";
 
 const meta: Meta<typeof ManagedDomainDetail> = {
   title: "Screens/Domains/ManagedDomainDetail",
@@ -41,6 +43,32 @@ export const Unprovisioned: Story = {
 };
 export const LongStrings: Story = {
   args: { ...MANAGED_DOMAIN, domain: DOMAIN_LONG, diagnostics: null },
+};
+/**
+ * calliope-installer#447: DNS withheld on a zone pending verification. Verify
+ * and Revalidate still run (the certificate is requested and its validation
+ * records are left for the operator), so they stay enabled and the page says
+ * why the records are not written. DnsUnset is the same zone without the
+ * restriction: no note.
+ */
+const pendingZone = { ...MANAGED_DOMAIN.domain!, verificationState: "pending" as const };
+const dnsActionsPlay =
+  (withheld: boolean): Story["play"] =>
+  async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    if (withheld) await expect(canvas.getByText(/DNS is withheld/)).toBeVisible();
+    else await expect(canvas.queryByText(/DNS is withheld/)).toBeNull();
+    for (const name of ["Verify TXT ownership", "Revalidate recorded DNS setup", "Remove domain"]) {
+      await expect(canvas.getByRole("button", { name })).toBeEnabled();
+    }
+  };
+export const DnsWithheld: Story = {
+  args: { ...MANAGED_DOMAIN, domain: pendingZone, canVerify: true, dnsRestriction: DNS_WITHHELD },
+  play: dnsActionsPlay(true),
+};
+export const DnsUnset: Story = {
+  args: { ...MANAGED_DOMAIN, domain: pendingZone, canVerify: true, dnsRestriction: null },
+  play: dnsActionsPlay(false),
 };
 export const Records: Story = { args: { ...MANAGED_DOMAIN, initialTab: "records" } };
 export const Routing: Story = { args: { ...MANAGED_DOMAIN, initialTab: "routing" } };
@@ -107,3 +135,95 @@ export const ProbeUnavailable: Story = {
     },
   },
 };
+
+export const OPERATOR_REQUIRED: ManagedDomainDetailProps = {
+  ...MANAGED_DOMAIN,
+  initialTab: "records",
+  diagnostics: {
+    ...DOMAIN_DIAGNOSTICS,
+    actions: { canCreate: false, canDelete: false, canRevalidate: false },
+    providerZone: {
+      ...DOMAIN_DIAGNOSTICS.providerZone,
+      state: "UNSUPPORTED",
+      reason: "PLATFORM_OPERATOR_REQUIRED",
+      zoneId: null,
+      zoneName: null,
+      nameservers: [],
+      records: [],
+    },
+  },
+};
+export const DNS_NO_DATA: ManagedDomainDetailProps = {
+  ...MANAGED_DOMAIN,
+  initialTab: "diagnostics",
+  probe: {
+    state: "OK",
+    perspective: "public_dns:1.1.1.1",
+    checkedAt: DOMAIN_DIAGNOSTICS.checkedAt,
+    reason: "DNS_NO_DATA",
+    hostname: DOMAIN_DIAGNOSTICS.zone,
+    tool: "LOOKUP",
+    recordType: "A",
+    values: [],
+    publicAddress: null,
+    httpStatus: null,
+    tlsVerified: null,
+    latencyMs: null,
+  },
+};
+export const ICMP_TIMEOUT: ManagedDomainDetailProps = {
+  ...DNS_NO_DATA,
+  probe: {
+    ...DNS_NO_DATA.probe!,
+    state: "UNKNOWN",
+    tool: "PING",
+    reason: "ICMP_TIMEOUT",
+    perspective: "control_plane_network",
+  },
+};
+export const OperatorRequired: Story = { args: OPERATOR_REQUIRED };
+export const DnsNoData: Story = { args: DNS_NO_DATA };
+export const IcmpTimeout: Story = { args: ICMP_TIMEOUT };
+
+export const DNS_ANSWER_OBSERVATION: ManagedDomainDetailProps = {
+  ...DNS_NO_DATA,
+  diagnostics: {
+    ...DOMAIN_DIAGNOSTICS,
+    checks: [
+      ...["public_dns:1.1.1.1", "public_dns:8.8.8.8"].map((perspective) => ({
+        key: "delegation",
+        state: "OK" as const,
+        perspective,
+        checkedAt: DOMAIN_DIAGNOSTICS.checkedAt,
+        reason: "PUBLIC_DELEGATION_MATCH",
+        expected: ["ns.provider.example"],
+        observed: ["ns.provider.example"],
+      })),
+      {
+        key: "lookup",
+        state: "OK",
+        perspective: "public_dns:1.1.1.1",
+        checkedAt: DOMAIN_DIAGNOSTICS.checkedAt,
+        reason: "DNS_ANSWER",
+        expected: [],
+        observed: ["ns.provider.example"],
+      },
+      {
+        key: "internal_dns",
+        state: "UNSUPPORTED",
+        perspective: "cluster_internal_dns",
+        checkedAt: DOMAIN_DIAGNOSTICS.checkedAt,
+        reason: "INTERNAL_DNS_PROBE_NOT_CONFIGURED",
+        expected: [],
+        observed: [],
+      },
+    ],
+  },
+  probe: {
+    ...DNS_NO_DATA.probe!,
+    reason: "DNS_ANSWER",
+    recordType: "NS",
+    values: ["ns.provider.example"],
+  },
+};
+export const ObservedAnswer: Story = { args: DNS_ANSWER_OBSERVATION };

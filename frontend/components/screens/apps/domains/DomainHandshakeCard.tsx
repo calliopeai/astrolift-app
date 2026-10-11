@@ -154,6 +154,12 @@ export interface DomainHandshakeCardProps {
   onUploadCert: () => void;
   onSaveRedirects: (rules: DomainRedirectRule[]) => Promise<boolean>;
   onSavePathRoutes: (routes: DomainPathRoute[]) => Promise<boolean>;
+  /**
+   * Why Astrolift writes no DNS records on this install (DNS withheld,
+   * calliope-installer#447). A platform-managed zone's records are then not
+   * written for the operator, so the card says so instead.
+   */
+  dnsRestriction?: string | null;
 }
 
 export function DomainHandshakeCard({
@@ -165,6 +171,7 @@ export function DomainHandshakeCard({
   onUploadCert,
   onSaveRedirects,
   onSavePathRoutes,
+  dnsRestriction,
 }: DomainHandshakeCardProps) {
   const t = useTranslations("apps.domains.cert");
   const fmt = useFormatters();
@@ -252,9 +259,15 @@ export function DomainHandshakeCard({
 
         {records.length > 0 ? (
           <div className="min-w-0 space-y-2">
-            <div className="text-muted-foreground text-xs">
+            <div
+              className={
+                domain.isPlatformManagedZone && dnsRestriction
+                  ? "text-warning-fg text-xs"
+                  : "text-muted-foreground text-xs"
+              }
+            >
               {domain.isPlatformManagedZone
-                ? t("platformManagedHelp")
+                ? (dnsRestriction ?? t("platformManagedHelp"))
                 : domain.certState === "validated"
                   ? t("liveHelp")
                   : t("needsHelp")}

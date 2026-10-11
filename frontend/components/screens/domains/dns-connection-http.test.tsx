@@ -396,3 +396,28 @@ describe("DNS connection actual SDL HttpLink journey", () => {
     expect(requests.some((r) => r.operationName === "CloudflareZones")).toBe(false);
   });
 });
+
+it("localizes operator refusal without protected connection inventory or writes", async () => {
+  support = {
+    ...support,
+    allowed: false,
+    reason: "PLATFORM_OPERATOR_REQUIRED",
+    apiTokenSupported: false,
+  };
+  render(<View />);
+  await screen.findByText(en.managedDomains.platformOperatorRequired);
+  expect(screen.queryByText("PLATFORM_OPERATOR_REQUIRED")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Cloudflare" })).toBeDisabled();
+  expect(
+    requests.some((r) =>
+      ["DnsConnectionsPage", "CloudflareZones", "CloudflareRecords", "DnsDomainBinding"].includes(
+        r.operationName
+      )
+    )
+  ).toBe(false);
+  expect(
+    requests.some(
+      (r) => r.operationName.startsWith("Connect") || r.operationName.startsWith("Register")
+    )
+  ).toBe(false);
+});

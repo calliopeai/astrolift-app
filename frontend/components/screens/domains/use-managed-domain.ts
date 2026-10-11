@@ -15,6 +15,7 @@ import type {
   SoftDeleteManagedDomainMutationVariables,
   RevalidateManagedDomainMutation,
   RevalidateManagedDomainMutationVariables,
+  DnsConnectionSupportQuery,
   DnsDomainBindingQuery,
   DnsDomainBindingQueryVariables,
   VerifyDnsDomainMutation,
@@ -24,6 +25,7 @@ import {
   GET_MANAGED_DOMAIN,
   MANAGED_DOMAIN_DIAGNOSTICS,
   MANAGED_DOMAIN_PROBE,
+  DNS_CONNECTION_SUPPORT,
   DNS_DOMAIN_BINDING,
   VERIFY_DNS_DOMAIN,
 } from "@/graphql/domains/domains.queries";
@@ -75,17 +77,33 @@ export function useManagedDomain(id: string) {
     (observed.id !== id || observed.version !== domain?.version || observed.zone !== domain?.zone)
   );
   const diagnostics = observationMismatch ? null : observed;
+  const ownDomainReadable = Boolean(
+    domain && !query.loading && domain.organizationSlug && !skipped
+  );
+  const supportQuery = useQuery<DnsConnectionSupportQuery>(DNS_CONNECTION_SUPPORT, {
+    skip: !ownDomainReadable,
+    fetchPolicy: "no-cache",
+    context: { queryDeduplication: false },
+  });
+  const bindingAllowed =
+    ownDomainReadable &&
+    !supportQuery.loading &&
+    !supportQuery.error &&
+    supportQuery.data?.dnsProviderConnectionSupport.allowed === true &&
+    supportQuery.data.dnsProviderConnectionSupport.dnsWritesSupported === false;
   const bindingQuery = useQuery<DnsDomainBindingQuery, DnsDomainBindingQueryVariables>(
     DNS_DOMAIN_BINDING,
     {
       variables: { domainId: id },
-      skip: !domain || query.loading || !domain.organizationSlug,
+      skip: !bindingAllowed,
       fetchPolicy: "no-cache",
       context: { queryDeduplication: false },
     }
   );
   const binding =
-    bindingQuery.error || bindingQuery.loading ? null : bindingQuery.data?.dnsProviderDomainBinding;
+    !bindingAllowed || bindingQuery.error || bindingQuery.loading
+      ? null
+      : bindingQuery.data?.dnsProviderDomainBinding;
   const [probe, setProbe] = React.useState<
     ManagedDomainProbeQuery["astroliftManagedDomainProbe"] | null
   >(null);
@@ -260,10 +278,12 @@ export function useManagedDomain(id: string) {
   function onRetry() {
     onResetProbe();
     if (!skipped) void query.refetch().catch(() => {});
+    if (ownDomainReadable) void supportQuery.refetch().catch(() => {});
   }
   function onRefreshDiagnostics() {
     onResetProbe();
     if (domain && !query.loading) void diagnosticsQuery.refetch().catch(() => {});
+    if (ownDomainReadable) void supportQuery.refetch().catch(() => {});
   }
   return {
     domain,

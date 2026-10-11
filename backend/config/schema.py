@@ -37,6 +37,7 @@ from astrolift_services.schema.model_reads import ModelReadsQuery
 from astrolift_services.schema.shared_model_prompt import SharedModelPromptMutations, SharedModelPromptQuery
 from config.features import Feature, is_enabled
 from core.schema.types.audit import AuditLogQuery
+from core.schema.types.install_policy import InstallPolicyQuery
 from core.schema.types.permission_analysis import PermissionAnalysisQuery
 from core.schema.types.server_info import AstroliftServerInfoQuery
 from core.schema.types.user import UserType
@@ -47,6 +48,7 @@ _query_bases = [
     PermissionAnalysisQuery,
     AuditLogQuery,
     AstroliftServerInfoQuery,
+    InstallPolicyQuery,
     OrganizationSchema.Query,
     AstroliftIdentitySchema.IdentityQuery,
     AstroliftOperationsSchema.OperationsQuery,

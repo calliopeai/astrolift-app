@@ -12,9 +12,25 @@ import ko from "@/messages/ko.json";
 import zh from "@/messages/zh-Hans.json";
 import pt from "@/messages/pt-BR.json";
 import { ManagedDomainDetail } from "./ManagedDomainDetail";
+import { domainDiagnosticReasonKey } from "./domain-diagnostic-reasons";
+import {
+  DNS_ANSWER_OBSERVATION,
+  DNS_NO_DATA,
+  ICMP_TIMEOUT,
+  OPERATOR_REQUIRED,
+} from "./ManagedDomainDetail.stories";
 import { MANAGED_DOMAIN } from "./domains-environments.fixtures";
 const catalogs = { en, es, fr, de, ja, ko, "zh-Hans": zh, "pt-BR": pt };
 const keys = [
+  "platformOperatorRequired",
+  "dnsNoData",
+  "icmpTimeout",
+  "dnsNoDataStatus",
+  "answerObserved",
+  "dnsAnswerHelp",
+  "delegationMatch",
+  "delegationScopeHelp",
+  "internalDnsUnavailable",
   "mine",
   "status",
   "listSearch",
@@ -206,3 +222,72 @@ describe("managed domain multilingual contract", () => {
     }
   );
 });
+
+it.each(locales)(
+  "%s preserves technical evidence and uncertainty with useful explanations",
+  (locale) => {
+    const errors: Error[] = [];
+    for (const [args, key, code] of [
+      [OPERATOR_REQUIRED, "platformOperatorRequired", "PLATFORM_OPERATOR_REQUIRED"],
+      [DNS_NO_DATA, "dnsNoData", "DNS_NO_DATA"],
+      [ICMP_TIMEOUT, "icmpTimeout", "ICMP_TIMEOUT"],
+    ] as const) {
+      const view = render(
+        <NextIntlClientProvider
+          locale={locale}
+          messages={catalogs[locale]}
+          timeZone="UTC"
+          onError={(e) => errors.push(e)}
+        >
+          <ManagedDomainDetail {...args} />
+        </NextIntlClientProvider>
+      );
+      expect(screen.getByText(catalogs[locale].managedDomains[key])).toBeInTheDocument();
+      expect(screen.getByText(code)).toBeInTheDocument();
+      const expectedState =
+        code === "PLATFORM_OPERATOR_REQUIRED"
+          ? "unsupported"
+          : code === "DNS_NO_DATA"
+            ? "dnsNoDataStatus"
+            : "unknown";
+      expect(
+        screen.getAllByText(catalogs[locale].managedDomains[expectedState]).length
+      ).toBeGreaterThan(0);
+      view.unmount();
+    }
+    expect(errors).toEqual([]);
+  }
+);
+it("unknown evidence reasons cannot become a translated success", () => {
+  expect(domainDiagnosticReasonKey("DNS_NO_DATA")).toBe("dnsNoData");
+  expect(domainDiagnosticReasonKey("constructor")).toBeNull();
+  expect(domainDiagnosticReasonKey("DNS_ANSWER_OBSERVED")).toBeNull();
+  expect(domainDiagnosticReasonKey("DNS_ANSWER")).toBe("dnsAnswerHelp");
+});
+
+it.each(locales)(
+  "%s renders answer observation separately from NS match and internal DNS",
+  (locale) => {
+    const errors: string[] = [];
+    const view = render(
+      <NextIntlClientProvider
+        locale={locale}
+        messages={catalogs[locale]}
+        timeZone="UTC"
+        onError={(error) => errors.push(error.message)}
+      >
+        <ManagedDomainDetail {...DNS_ANSWER_OBSERVATION} />
+      </NextIntlClientProvider>
+    );
+    const copy = catalogs[locale].managedDomains;
+    expect(screen.getAllByText(copy.answerObserved)).toHaveLength(2);
+    expect(screen.getAllByText(copy.dnsAnswerHelp)).toHaveLength(2);
+    expect(screen.getAllByText(copy.delegationMatch)).toHaveLength(2);
+    expect(screen.getAllByText(copy.delegationScopeHelp)).toHaveLength(2);
+    expect(screen.getByText(copy.internalDnsUnavailable)).toBeInTheDocument();
+    expect(screen.getAllByText("DNS_ANSWER")).toHaveLength(2);
+    expect(screen.getByText("INTERNAL_DNS_PROBE_NOT_CONFIGURED")).toBeInTheDocument();
+    expect(errors).toEqual([]);
+    view.unmount();
+  }
+);

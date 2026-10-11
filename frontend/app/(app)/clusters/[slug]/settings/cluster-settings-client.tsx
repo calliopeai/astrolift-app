@@ -16,6 +16,7 @@ import { useClusterAgent } from "@/components/screens/clusters/settings/use-clus
 import { useClusterSettings } from "@/components/screens/clusters/settings/use-cluster-settings";
 import { useIngressAuth } from "@/components/screens/clusters/settings/use-ingress-auth";
 import { useSettingsSection } from "@/components/settings/use-settings-section";
+import { useWithheldCapabilities } from "@/hooks/use-install-policy";
 
 import { AuthUsersCard } from "./auth-users-card";
 import { CentralAuthCard, IngressClassCard } from "./central-auth-card";
@@ -29,12 +30,18 @@ import { CentralAuthCard, IngressClassCard } from "./central-auth-card";
 export function ClusterSettingsClient({ slug }: { slug: string }) {
   const settings = useClusterSettings(slug);
   const cluster = settings.cluster;
+  const section = useSettingsSection();
+  // Read only while the Danger zone, where cluster deletion is offered, is
+  // shown. The installer's Deny is on AWS, so only an AWS cluster is refused.
+  const onAws = cluster?.providerPluginSlug === "aws";
+  const withheld = useWithheldCapabilities({ skip: !onAws || section.active !== "danger-zone" });
 
   return (
     <ClusterSettingsScreen
       {...settings}
       slug={slug}
-      section={useSettingsSection()}
+      section={section}
+      deleteWithheldReason={onAws ? withheld.clusters : null}
       cards={
         cluster
           ? {
@@ -53,7 +60,16 @@ export function ClusterSettingsClient({ slug }: { slug: string }) {
 }
 
 function ClusterAgentCard({ cluster }: { cluster: ClusterWithHeartbeat }) {
-  return <ClusterAgentView {...useClusterAgent(cluster)} />;
+  // The keep-alive agent's ClusterRole is beyond the minimal RBAC contract the
+  // installer holds the control plane to on AWS (calliope-installer#447).
+  const onAws = cluster.providerPluginSlug === "aws";
+  const withheld = useWithheldCapabilities({ skip: !onAws });
+  return (
+    <ClusterAgentView
+      {...useClusterAgent(cluster)}
+      deployWithheldReason={onAws ? withheld.controllers : null}
+    />
+  );
 }
 
 function IngressAuthCard({ cluster }: { cluster: ClusterWithHeartbeat }) {

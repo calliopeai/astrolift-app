@@ -1924,6 +1924,7 @@ export type AstroliftClusterBootstrapComponent = {
   requires: Array<Scalars['String']['output']>;
   runningOutsideRecipe: Scalars['Boolean']['output'];
   title: Scalars['String']['output'];
+  withheldReason?: Maybe<Scalars['String']['output']>;
 };
 
 export type AstroliftClusterBootstrapOption = {
@@ -3108,6 +3109,11 @@ export type AstroliftImportSkillsResultMutationResult = {
   data?: Maybe<AstroliftImportSkillsResult>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftInstallManagedModel = {
+  modelId: Scalars['String']['output'];
+  replicas?: Maybe<Scalars['Int']['output']>;
 };
 
 export type AstroliftInstallSourceWebhookPayload = {
@@ -5697,6 +5703,11 @@ export type AstroliftWebhookTestResultMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftWithheldCapability = {
+  capability: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+};
+
 export type AstroliftWorkflowHistoryEvent = {
   decision: Scalars['String']['output'];
   eventType: Scalars['String']['output'];
@@ -7255,6 +7266,51 @@ export type ImportWorkflowManifestResult = {
   repointedSlugs: Array<Scalars['String']['output']>;
 };
 
+export type InstallAlertMailSupport = {
+  allowed: Scalars['Boolean']['output'];
+  checkedAt: Scalars['DateTime']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+  recipient?: Maybe<Scalars['String']['output']>;
+  sender?: Maybe<Scalars['String']['output']>;
+  sourceFingerprint?: Maybe<Scalars['String']['output']>;
+  tlsMode?: Maybe<Scalars['String']['output']>;
+  transport?: Maybe<Scalars['String']['output']>;
+};
+
+export type InstallAlertMailTest = {
+  acceptedAt?: Maybe<Scalars['DateTime']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  deliveryObserved: Scalars['Boolean']['output'];
+  eventKind: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  reasonCode?: Maybe<Scalars['String']['output']>;
+  recipient: Scalars['String']['output'];
+  requestId: Scalars['GUID']['output'];
+  sender: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  transport: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type InstallAlertMailTestMutationResult = {
+  data?: Maybe<InstallAlertMailTest>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type InstallAlertMailTestPage = {
+  items: Array<InstallAlertMailTest>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type InstallClusterAgentInput = {
   clusterId: Scalars['GUID']['input'];
   expectedSource: Scalars['String']['input'];
@@ -8137,6 +8193,7 @@ export type Mutation = {
   scaleServiceAgent: AstroliftAgentScaleResult;
   sendAgentTaskInput: AstroliftAgentTaskInputMessageMutationResult;
   sendEmailDeliveryTest: EmailDeliveryTestMutationResult;
+  sendInstallAlertMailTest: InstallAlertMailTestMutationResult;
   sendManagedServiceTestEmail: AstroliftManagedServiceTestEmailResultMutationResult;
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
   setAgentBundleSecretValue: AstroliftAgentSecretBundleMutationResult;
@@ -9763,6 +9820,11 @@ export type MutationSendEmailDeliveryTestArgs = {
 };
 
 
+export type MutationSendInstallAlertMailTestArgs = {
+  input: SendInstallAlertMailTestInput;
+};
+
+
 export type MutationSendManagedServiceTestEmailArgs = {
   input: SendManagedServiceTestEmailInput;
 };
@@ -10865,6 +10927,8 @@ export type Query = {
   astroliftHuggingFaceModel: HuggingFaceModelResult;
   astroliftHuggingFaceModels: HuggingFaceModelsPage;
   astroliftIdentityProviders: Array<AstroliftIdentityProvider>;
+  /** The model the install serves on its own GPUs (calliope-installer#446), read-only in the console; null when the platform model is a cloud API or off. */
+  astroliftInstallManagedModel?: Maybe<AstroliftInstallManagedModel>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage. */
   astroliftInvitations: Array<AstroliftInvitation>;
   astroliftInvitationsCsv: AstroliftIdentityCsvExport;
@@ -11003,6 +11067,8 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftWebhookSubscriptionsPage. */
   astroliftWebhookSubscriptions: Array<AstroliftWebhookSubscription>;
   astroliftWebhookSubscriptionsPage: AstroliftWebhookSubscriptionPage;
+  /** What the install withholds from Astrolift (calliope-installer#447): dns, databases, load_balancers, clusters, controllers, each with the reason to show. Empty when nothing is withheld. */
+  astroliftWithheldCapabilities: Array<AstroliftWithheldCapability>;
   astroliftWorkflowInstance?: Maybe<AstroliftWorkflowInstance>;
   astroliftWorkflowInstanceDetail?: Maybe<AstroliftWorkflowInstanceDetail>;
   astroliftWorkflowInstances: AstroliftWorkflowInstancePage;
@@ -11052,6 +11118,8 @@ export type Query = {
   huggingFaceConnectionsPage: HuggingFaceConnectionTypePage;
   /** Recover a human decision by exact execution and stage GUIDs without resubmitting it. */
   humanGateDecision?: Maybe<HumanGateDecisionState>;
+  installAlertMailSupport: InstallAlertMailSupport;
+  installAlertMailTestsPage: InstallAlertMailTestPage;
   me?: Maybe<AstroliftMe>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use membersPage. */
   members: Array<OrganizationMemberType>;
@@ -13009,6 +13077,18 @@ export type QueryHumanGateDecisionArgs = {
 };
 
 
+export type QueryInstallAlertMailSupportArgs = {
+  eventKind?: Scalars['String']['input'];
+};
+
+
+export type QueryInstallAlertMailTestsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  eventKind?: Scalars['String']['input'];
+  limit?: Scalars['Int']['input'];
+};
+
+
 export type QueryMembersPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
@@ -13734,6 +13814,12 @@ export type SendEmailDeliveryTestInput = {
   recipient: Scalars['String']['input'];
   requestId: Scalars['GUID']['input'];
   subject: InputMaybe<Scalars['String']['input']>;
+};
+
+export type SendInstallAlertMailTestInput = {
+  eventKind: Scalars['String']['input'];
+  expectedSourceFingerprint: Scalars['String']['input'];
+  requestId: Scalars['GUID']['input'];
 };
 
 export type SendManagedServiceTestEmailInput = {

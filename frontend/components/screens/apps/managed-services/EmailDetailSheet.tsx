@@ -227,6 +227,13 @@ export interface EmailDetailSheetViewProps {
   panels?: EmailDetailPanels;
   /** The section shown first (stories). */
   defaultSection?: EmailDetailSection;
+  /**
+   * Why Astrolift writes no DNS on this install (DNS withheld,
+   * calliope-installer#447). A pending domain identity's records are the
+   * operator's to publish. The note states that, not a cause: the driver only
+   * ever publishes inside base_domain, which this view does not know.
+   */
+  dnsRestriction?: string | null;
 }
 
 export function EmailDetailSheetView({
@@ -238,6 +245,7 @@ export function EmailDetailSheetView({
   loading,
   panels,
   defaultSection = "health",
+  dnsRestriction,
 }: EmailDetailSheetViewProps) {
   const deliveryText = useTranslations("emailDelivery");
   const [section, setSection] = React.useState<EmailDetailSection>(defaultSection);
@@ -324,7 +332,7 @@ export function EmailDetailSheetView({
               </>
             ) : active === "sending" ? (
               <>
-                <IdentityPanel detail={detail} />
+                <IdentityPanel detail={detail} dnsRestriction={dnsRestriction} />
                 <DnsAuthPanel detail={detail} />
                 {panels?.senderConfig}
                 <SnsEventPublishingPanel serviceConfig={serviceConfig} />
@@ -537,7 +545,13 @@ export function CostPanelView({
 
 // ── Identity verification badge (#634) ─────────────────────────────
 
-function IdentityPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
+function IdentityPanel({
+  detail,
+  dnsRestriction,
+}: {
+  detail: AstroliftEmailServiceDetail;
+  dnsRestriction?: string | null;
+}) {
   const iv = detail.identityVerification;
   if (!iv) {
     return (
@@ -579,6 +593,12 @@ function IdentityPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
         <span className="text-foreground font-mono">{iv.identity}</span> (
         {iv.isDomain ? "domain identity" : "email identity"})
       </p>
+      {iv.isDomain && !verified && !failed && dnsRestriction ? (
+        <p className="text-warning-fg mb-3 text-xs">
+          Astrolift publishes no verification records on this install; publish them in the
+          identity&apos;s DNS zone. {dnsRestriction}
+        </p>
+      ) : null}
       {iv.verificationToken ? (
         <div className="bg-muted/40 text-2xs mb-3 rounded-md border p-2 font-mono">
           <p className="text-muted-foreground">TXT verification challenge:</p>

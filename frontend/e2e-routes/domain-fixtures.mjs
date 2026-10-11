@@ -217,30 +217,50 @@ export function domainFixture(field, args, role, parent) {
           expected: [zone.name],
           observed: ["legacy.example"],
         },
+        {
+          key: "lookup",
+          state: "OK",
+          perspective: "public_dns:1.1.1.1",
+          checkedAt: timestamp,
+          reason: "DNS_ANSWER",
+          expected: [],
+          observed: expected,
+        },
+        {
+          key: "internal_dns",
+          state: "UNSUPPORTED",
+          perspective: "cluster_internal_dns",
+          checkedAt: timestamp,
+          reason: "INTERNAL_DNS_PROBE_NOT_CONFIGURED",
+          expected: [],
+          observed: [],
+        },
       ],
       providerZone: {
         bindingSource: connected ? "PROTECTED_CLOUDFLARE_CONNECTION" : "PLATFORM_WRITTEN",
-        state: "OK",
-        reason: "READ_ONLY_ZONE_OBSERVED",
+        state: owner ? "OK" : "UNSUPPORTED",
+        reason: owner ? "READ_ONLY_ZONE_OBSERVED" : "PLATFORM_OPERATOR_REQUIRED",
         checkedAt: timestamp,
-        zoneId: connected ? zone.id : "CONTROLLED_ROUTE53_ZONE",
-        zoneName: domain.zone,
-        privateZone: false,
-        nameservers: expected,
+        zoneId: !owner ? null : connected ? zone.id : "CONTROLLED_ROUTE53_ZONE",
+        zoneName: owner ? domain.zone : null,
+        privateZone: owner ? false : null,
+        nameservers: owner ? expected : [],
         truncated: false,
-        records: [
-          {
-            name: "www.acme.example",
-            type: "CNAME",
-            ttl: 300,
-            values: ["origin.acme.example"],
-            aliasTarget: null,
-            aliasZoneId: null,
-            evaluateTargetHealth: null,
-            proxied: connected ? true : null,
-            priority: null,
-          },
-        ],
+        records: !owner
+          ? []
+          : [
+              {
+                name: "www.acme.example",
+                type: "CNAME",
+                ttl: 300,
+                values: ["origin.acme.example"],
+                aliasTarget: null,
+                aliasZoneId: null,
+                evaluateTargetHealth: null,
+                proxied: connected ? true : null,
+                priority: null,
+              },
+            ],
       },
       routes: [
         {
@@ -264,14 +284,26 @@ export function domainFixture(field, args, role, parent) {
   }
   if (field === "astroliftManagedDomainProbe")
     return {
-      state: ["PING", "TRACEROUTE"].includes(args.tool) ? "UNSUPPORTED" : "OK",
+      state:
+        role === "reader" && args.tool === "PING"
+          ? "UNKNOWN"
+          : ["PING", "TRACEROUTE"].includes(args.tool)
+            ? "UNSUPPORTED"
+            : "OK",
       perspective: "public_dns:1.1.1.1",
       checkedAt: timestamp,
-      reason: "CONTROLLED_PUBLIC_CHECK",
+      reason:
+        role === "reader"
+          ? args.tool === "PING"
+            ? "ICMP_TIMEOUT"
+            : "DNS_NO_DATA"
+          : ["LOOKUP", "DIG"].includes(args.tool)
+            ? "DNS_ANSWER"
+            : "CONTROLLED_PUBLIC_CHECK",
       hostname: args.hostname,
       tool: args.tool,
       recordType: args.recordType,
-      values: ["controlled-dns-answer"],
+      values: role === "reader" ? [] : ["controlled-dns-answer"],
       publicAddress: null,
       httpStatus: null,
       tlsVerified: null,

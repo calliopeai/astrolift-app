@@ -52,6 +52,13 @@ class CoreConfig(AppConfig):
 
         set_vnc_backend(K8sVncBackend())
 
+        # Hold every Kubernetes request to an EKS apiserver to the minimal
+        # RBAC contract when the install withholds cluster-wide changes
+        # (calliope-installer#447). Inert unless "controllers" is withheld.
+        from core.control_plane_rbac import install_transport_guard
+
+        install_transport_guard()
+
     @staticmethod
     def _register_processors():
         """Register core data processors."""

@@ -152,7 +152,13 @@ def dns_answers(wire, *, match=False):
     ]
 
 
-def test_pending_owned_zone_has_public_mismatch_but_no_provider_inventory(world, client, dns_wire, aws_wire):
+@pytest.mark.parametrize("driver", ["route53", "cloudflare_read_only"])
+def test_pending_owned_zone_has_public_mismatch_but_no_provider_inventory(
+    world, client, dns_wire, aws_wire, driver
+):
+    world.domain.dns_driver = driver
+    world.domain.save(update_fields=["dns_driver"])
+    world.domain.refresh_from_db()
     dns_answers(dns_wire)
     reply = ask(client, world)
     assert not reply.get("errors"), reply.get("errors")
@@ -160,6 +166,8 @@ def test_pending_owned_zone_has_public_mismatch_but_no_provider_inventory(world,
     assert data["zone"] == "example.test"
     assert [row["state"] for row in data["checks"] if row["key"] == "delegation"] == ["MISMATCH", "MISMATCH"]
     assert data["providerZone"]["state"] == "UNSUPPORTED" and not aws_wire["requests"]
+    assert data["providerZone"]["reason"] == "PLATFORM_OPERATOR_REQUIRED"
+    assert data["providerZone"]["zoneId"] is None and data["providerZone"]["records"] == []
     assert data["provisionClusterId"] == str(world.cluster.guid) and not data["actions"]["canRevalidate"]
     world.domain.refresh_from_db()
     assert world.domain.verification_state == "pending"
@@ -457,3 +465,61 @@ def test_private_route53_client_ignores_process_endpoint_override(monkeypatch):
         assert len(gates) >= 2
     finally:
         client.close()
+
+
+def test_operator_unsupported_driver_remains_distinct_without_provider_transport(
+    world, client, dns_wire, aws_wire
+):
+    world.user.is_superuser = True
+    world.user.save(update_fields=["is_superuser"])
+    world.domain.dns_driver = "unsupported_fixture"
+    world.domain.save(update_fields=["dns_driver"])
+    world.domain.refresh_from_db()
+    dns_answers(dns_wire)
+    reply = ask(client, world)
+    assert not reply.get("errors"), reply.get("errors")
+    zone = reply["data"]["astroliftManagedDomainDiagnostics"]["providerZone"]
+    assert zone["state"] == "UNSUPPORTED" and zone["reason"] == "PROVIDER_INVENTORY_UNSUPPORTED"
+    assert zone["zoneId"] is None and zone["records"] == [] and not aws_wire["requests"]
+
+
+def test_empty_lookup_reports_no_data_without_provider_inventory(world, client, dns_wire, aws_wire):
+    dns_wire["answers"] = []
+    reply = ask(client, world, query=PROBE, hostname=world.domain.zone, tool="LOOKUP")
+    assert not reply.get("errors"), reply.get("errors")
+    data = reply["data"]["astroliftManagedDomainProbe"]
+    assert data["state"] == "OK" and data["reason"] == "DNS_NO_DATA" and data["values"] == []
+    assert not aws_wire["requests"]
+
+
+@pytest.mark.parametrize("expected_configured", [True, False])
+def test_ns_answer_is_separate_from_configured_delegation_and_cluster_probe(
+    world, client, dns_wire, aws_wire, expected_configured
+):
+    if not expected_configured:
+        world.domain.provision_nameservers = []
+        world.domain.save(update_fields=["provision_nameservers"])
+        world.domain.refresh_from_db()
+    dns_answers(dns_wire, match=True)
+    before = world.domain.version
+    reply = ask(client, world)
+    assert not reply.get("errors"), reply.get("errors")
+    data = reply["data"]["astroliftManagedDomainDiagnostics"]
+    lookup = next(row for row in data["checks"] if row["key"] == "lookup")
+    assert lookup["state"] == "OK" and lookup["reason"] == "DNS_ANSWER"
+    assert lookup["expected"] == [] and lookup["observed"] == ["ns.provider.test"]
+    delegation = [row for row in data["checks"] if row["key"] == "delegation"]
+    assert len(delegation) == 2
+    for row in delegation:
+        assert row["state"] == ("OK" if expected_configured else "UNKNOWN")
+        assert row["reason"] == ("PUBLIC_DELEGATION_MATCH" if expected_configured else "DNS_ANSWER")
+        assert row["expected"] == (["ns.provider.test"] if expected_configured else [])
+    internal = next(row for row in data["checks"] if row["key"] == "internal_dns")
+    assert internal["state"] == "UNSUPPORTED"
+    assert internal["reason"] == "INTERNAL_DNS_PROBE_NOT_CONFIGURED"
+    assert internal["expected"] == [] and internal["observed"] == []
+    assert data["routes"] == []
+    assert dns_wire["queries"] == [("example.test", 2)] * 3
+    assert not aws_wire["requests"]
+    world.domain.refresh_from_db()
+    assert world.domain.version == before and world.domain.verification_state == "pending"

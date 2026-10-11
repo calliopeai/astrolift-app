@@ -30,6 +30,7 @@ from astrolift_operations.models import (
     default_enabled,
 )
 from astrolift_operations.schema.audit_list import AuditEventsFilterInput, audit_events_qs, audit_sort
+from astrolift_operations.schema.install_alert_mail import InstallAlertMailQuery
 from astrolift_operations.schema.run_audit import RunAuditFilterInput, RunAuditItemType, run_audit_page
 from astrolift_operations.schema.types import (
     ActivityPageType,
@@ -308,7 +309,7 @@ def _alert_events_qs(
 
 
 @strawberry.type
-class OperationsQuery:
+class OperationsQuery(InstallAlertMailQuery):
     @strawberry.field
     @require_permission(
         Permission.APP_READ_METRICS,

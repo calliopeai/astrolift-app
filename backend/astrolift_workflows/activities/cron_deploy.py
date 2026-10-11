@@ -987,6 +987,14 @@ def _reconcile_agent_deployments_sync() -> AgentReconcileSummary:
             if installation_busy(cluster):
                 skipped_count += 1
                 continue
+            from core.install_restrictions import cluster_scope_refusal
+
+            # The agent's ClusterRole is beyond the minimal RBAC contract
+            # (calliope-installer#447): an agent the owner installed is theirs
+            # to keep, not a management error on every tick.
+            if cluster_scope_refusal(cluster):
+                skipped_count += 1
+                continue
             # Re-apply through the SAME idempotent SSA path the mutation uses.
             # Two structured failure shapes are persisted to last_management_error
             # and counted as failed (mirroring the deployClusterAgent mutation):

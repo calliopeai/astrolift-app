@@ -10,7 +10,14 @@ import { useTranslations } from "next-intl";
 
 import type { useClusterAgent } from "./use-cluster-agent";
 
-export type ClusterAgentViewProps = ReturnType<typeof useClusterAgent>;
+export type ClusterAgentViewProps = ReturnType<typeof useClusterAgent> & {
+  /**
+   * Why the control plane may not deploy the agent here: its ClusterRole is
+   * beyond the minimal RBAC contract (calliope-installer#447). Issuing a key
+   * for an agent the cluster's owner installs stays available.
+   */
+  deployWithheldReason?: string | null;
+};
 
 /**
  * Cluster keep-alive agent card (#808). Issues (or rotates) the scoped
@@ -29,6 +36,7 @@ export function ClusterAgentView({
   onIssue,
   onDeploy,
   onDismissIssued,
+  deployWithheldReason,
 }: ClusterAgentViewProps) {
   const t = useTranslations("clusterSettings.agent");
   const issued = receivedIssued?.clusterId === clusterId ? receivedIssued : null;
@@ -91,6 +99,11 @@ export function ClusterAgentView({
       divided
     >
       <div className="flex min-w-0 flex-col gap-3">
+        {deployWithheldReason && (provisioned || issued) && (
+          <p id="agent-deploy-withheld" className="text-warning-fg text-xs">
+            {deployWithheldReason}
+          </p>
+        )}
         {issued ? (
           <>
             <div className="border-warning-border bg-warning/10 rounded-md border p-3">
@@ -136,7 +149,13 @@ export function ClusterAgentView({
               </p>
             )}
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" onClick={onDeploy} disabled={deploying} className="gap-1.5">
+              <Button
+                size="sm"
+                onClick={onDeploy}
+                disabled={deploying || !!deployWithheldReason}
+                aria-describedby={deployWithheldReason ? "agent-deploy-withheld" : undefined}
+                className="gap-1.5"
+              >
                 {deploying ? (
                   <Loader2Icon className="size-3.5 animate-spin" />
                 ) : (
@@ -158,7 +177,13 @@ export function ClusterAgentView({
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-3">
               {provisioned && (
-                <Button size="sm" onClick={onDeploy} disabled={deploying} className="gap-1.5">
+                <Button
+                  size="sm"
+                  onClick={onDeploy}
+                  disabled={deploying || !!deployWithheldReason}
+                  aria-describedby={deployWithheldReason ? "agent-deploy-withheld" : undefined}
+                  className="gap-1.5"
+                >
                   {deploying ? (
                     <Loader2Icon className="size-3.5 animate-spin" />
                   ) : (
