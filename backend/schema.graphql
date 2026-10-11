@@ -5678,6 +5678,9 @@ type AstroliftTaskRun {
   durationSeconds: Int
   k8sJobName: String!
   createdAt: DateTime!
+  namespace: String!
+  failureReason: String!
+  environmentName: String!
 }
 
 """One page of a cursor-paginated or numbered list."""
@@ -5703,6 +5706,9 @@ type AstroliftTaskRunPayload {
   workloadSlug: String!
   status: String!
   createdAt: DateTime!
+  environmentName: String!
+  k8sJobName: String!
+  failureReason: String!
 }
 
 type AstroliftTaskRunPayloadMutationResult {
@@ -10806,6 +10812,11 @@ input RunTaskInput {
   workloadSlug: String!
   environmentName: String = null
   command: [String!]! = []
+
+  """
+  Caller-chosen idempotency key (#2330): a retry with the same key returns the original run instead of starting another Job.
+  """
+  requestId: String = null
 }
 
 type RunWorkflowDefinitionResult {

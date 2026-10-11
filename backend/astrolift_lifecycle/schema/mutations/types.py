@@ -869,6 +869,13 @@ class RunTaskInput:
     workload_slug: str
     environment_name: str | None = None
     command: list[str] = strawberry.field(default_factory=list)
+    request_id: str | None = strawberry.field(
+        default=None,
+        description=(
+            "Caller-chosen idempotency key (#2330): a retry with the same key returns the original "
+            "run instead of starting another Job."
+        ),
+    )
 
 
 @strawberry.input

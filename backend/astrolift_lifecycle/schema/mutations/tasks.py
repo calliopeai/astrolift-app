@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import strawberry
+from django.db import IntegrityError, transaction
 from strawberry.types import Info
 
 from astrolift_graphql import MutationResultType
@@ -51,10 +52,12 @@ class TaskMutations:
     ) -> MutationResultType[TaskRunPayloadType]:
         """Trigger a one-shot execution of a ``kind: task`` workload.
 
-        Creates a ``TaskRun`` record in ``pending`` status and returns it.
-        The actual K8s Job dispatch happens via the task runner service
-        (to be wired in a follow-up); the record is immediately queryable
-        so the Tasks fleet page can show the run in the Recent tab.
+        Records a ``TaskRun`` and applies its Kubernetes Job from the
+        environment's running deployment (#2330); the run reconciler moves
+        it through running to a terminal status. A dispatch failure is
+        recorded on the run as ``failed`` with ``failureReason``. Without
+        ``environmentName`` the app's only environment is used. A repeated
+        ``requestId`` returns the original run instead of starting another.
 
         The ``command`` field overrides the container's default command
         when provided — useful for one-off script variations without
@@ -103,34 +106,92 @@ class TaskMutations:
                 field="workloadSlug",
             )
 
-        env = None
-        if (input.environment_name or "").strip():
-            env = (
-                live_lifecycle_rows(AppEnvironment.objects.all())
-                .filter(
-                    registered_app=app,
-                    name=input.environment_name,
-                    deleted_at__isnull=True,
-                )
-                .first()
-            )
+        environments = live_lifecycle_rows(AppEnvironment.objects.all()).filter(
+            registered_app=app, deleted_at__isnull=True
+        )
+        env_name = (input.environment_name or "").strip()
+        if env_name:
+            env = environments.filter(name=env_name).first()
             if env is None:
                 return gql_failure(
                     ErrorCode.NOT_FOUND.value,
                     f"environment {input.environment_name!r} not found",
                     field="environmentName",
                 )
+        else:
+            # A run needs a cluster; without a name only an unambiguous app qualifies.
+            candidates = list(environments[:2])
+            if len(candidates) != 1:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "environmentName is required when the app has more than one environment",
+                    field="environmentName",
+                )
+            env = candidates[0]
+        if env.tenant_cluster_id is None:
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"environment {env.name!r} has no cluster to run on",
+                field="environmentName",
+            )
+
+        command = input.command or []
+        if len(command) > 64 or any(not isinstance(part, str) or len(part) > 4096 for part in command):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "command must be at most 64 strings of at most 4096 characters",
+                field="command",
+            )
+        request_id = (input.request_id or "").strip()
+        if len(request_id) > 64:
+            return gql_failure(
+                ErrorCode.VALIDATION.value, "requestId is at most 64 characters", field="requestId"
+            )
 
         actor = info.context.request.user
-        run = TaskRun.objects.create(
-            workload=workload,
-            app_environment=env,
-            # A token-authenticated call is an API run, not a manual one (#2152).
-            trigger_kind=(
-                TaskRun.TriggerKind.API if request_trigger() == RunTrigger.API else TaskRun.TriggerKind.MANUAL
-            ),
-            triggered_by_user=actor if actor.is_authenticated else None,
-            command=input.command or [],
-            status=TaskRun.Status.PENDING,
-        )
+        actor_id = actor.pk if actor.is_authenticated else None
+        if request_id:
+            existing = (
+                TaskRun.objects.filter(
+                    workload=workload, triggered_by_user_id=actor_id, request_id=request_id
+                )
+                .select_related("workload__registered_app", "app_environment")
+                .first()
+            )
+            if existing is not None:
+                if existing.app_environment_id != env.pk or list(existing.command or []) != list(command):
+                    return gql_failure(
+                        ErrorCode.CONFLICT.value,
+                        "requestId was already used for a different run",
+                        field="requestId",
+                    )
+                return gql_success(task_run_to_payload(existing))
+        try:
+            with transaction.atomic():
+                run = TaskRun.objects.create(
+                    workload=workload,
+                    app_environment=env,
+                    # A token-authenticated call is an API run, not a manual one (#2152).
+                    trigger_kind=(
+                        TaskRun.TriggerKind.API
+                        if request_trigger() == RunTrigger.API
+                        else TaskRun.TriggerKind.MANUAL
+                    ),
+                    triggered_by_user_id=actor_id,
+                    command=command,
+                    status=TaskRun.Status.PENDING,
+                    request_id=request_id,
+                )
+        except IntegrityError:
+            # A concurrent retry with the same key won the insert; return its run.
+            existing = TaskRun.objects.filter(
+                workload=workload, triggered_by_user_id=actor_id, request_id=request_id
+            ).first()
+            if existing is None:
+                raise
+            return gql_success(task_run_to_payload(existing))
+
+        from astrolift_lifecycle.services.task_runner import dispatch_task_run
+
+        run = dispatch_task_run(run)
         return gql_success(task_run_to_payload(run))
