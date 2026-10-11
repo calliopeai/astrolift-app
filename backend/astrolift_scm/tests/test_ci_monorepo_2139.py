@@ -105,7 +105,7 @@ def test_each_app_references_its_own_deploy_secret_after_a_sibling_is_registered
     for app, name in zip((first, second), names, strict=True):
         document = yaml.safe_load(render_astrolift_ci_workflow(app))
         notify = document["jobs"]["build-and-deploy"]["steps"][-1]
-        assert notify["env"]["TOKEN"] == '${{ secrets["' + name + '"] }}'
+        assert notify["env"]["TOKEN"] == "${{ secrets['" + name + "'] }}"
 
 
 @pytest.mark.parametrize("app_index", [0, 1])
@@ -215,3 +215,60 @@ def test_saved_build_arguments_require_an_actual_string_map(apps, value):
     apps[0].build_args = value
     with pytest.raises(ValueError, match="build arguments"):
         render_astrolift_ci_workflow(apps[0])
+
+
+# --- #2300 ---------------------------------------------------------------
+
+
+def test_deploy_token_lookup_is_a_single_quoted_expression_literal(apps):
+    """Actions expressions only accept single-quoted literals; v9 rendered
+    ``secrets["..."]`` and every run failed at parse time (#2300)."""
+    body = render_astrolift_ci_workflow(apps[0])
+    name = github_ci_secret_name(apps[0], "ASTROLIFT_DEPLOY_TOKEN")
+    assert "TOKEN: ${{ secrets['" + name + "'] }}" in body
+    assert 'secrets["' not in body
+
+
+def test_ci_pushed_build_reads_the_manifest_primary_container_paths(apps):
+    """An app left at the Dockerfile/"." defaults builds what its manifest's
+    primary container declares, as the platform build does (#2300)."""
+    from astrolift_registry.models import Workload
+
+    app = apps[0]
+    app.dockerfile_path, app.build_context = "Dockerfile", "."
+    app.save(update_fields=["dockerfile_path", "build_context"])
+    workload = Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
+    workload.containers.create(
+        name="web", is_primary=True, dockerfile_path="extensions/portal-container/Dockerfile"
+    )
+
+    steps = yaml.safe_load(render_astrolift_ci_workflow(app))["jobs"]["build-and-deploy"]["steps"]
+    build = next(step for step in steps if step["name"] == "Build and push image")
+    assert build["env"]["DOCKERFILE"] == "extensions/portal-container/Dockerfile"
+    assert build["env"]["BUILD_CONTEXT"] == "."
+
+
+def test_ci_pushed_build_keeps_an_explicit_app_level_dockerfile(apps):
+    """An app-level path set on purpose still wins over the manifest."""
+    from astrolift_registry.models import Workload
+
+    app = apps[0]  # dockerfile_path="Dockerfile.portal"
+    workload = Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
+    workload.containers.create(name="web", is_primary=True, dockerfile_path="other/Dockerfile")
+
+    steps = yaml.safe_load(render_astrolift_ci_workflow(app))["jobs"]["build-and-deploy"]["steps"]
+    build = next(step for step in steps if step["name"] == "Build and push image")
+    assert build["env"]["DOCKERFILE"] == "Dockerfile.portal"
+
+
+def test_ci_pushed_build_refuses_a_container_path_outside_the_repo(apps):
+    from astrolift_registry.models import Workload
+
+    app = apps[0]
+    app.dockerfile_path = "Dockerfile"
+    app.save(update_fields=["dockerfile_path"])
+    workload = Workload.objects.create(registered_app=app, name="web", slug="web", kind="deployment")
+    workload.containers.create(name="web", is_primary=True, build_context="../..")
+
+    with pytest.raises(ValueError, match="escapes the repository root"):
+        render_astrolift_ci_workflow(app)

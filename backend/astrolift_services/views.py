@@ -326,6 +326,12 @@ def _handle_notification(sns_body: dict[str, Any]) -> None:
     if not isinstance(ses_message, dict):
         return
 
+    from astrolift_services.email_delivery import observe_test
+
+    if observe_test(sns_body, ses_message):
+        # Diagnostic content has its own safe history; never persist raw mail headers.
+        return
+
     notification_type = ses_message.get("notificationType") or ses_message.get(
         "eventType",
     )

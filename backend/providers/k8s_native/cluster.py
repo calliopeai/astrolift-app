@@ -50,6 +50,7 @@ from _sdk.k8s_dynamic_client import PreconditionFailedError as _PreconditionFail
 from k8s_native.central_auth import central_auth_component
 from k8s_native.management import (
     ManagementBackend,
+    cluster_rbac_withheld,
     default_management_backend,
     probe_cluster_capabilities,
     read_cluster_job_status,
@@ -648,6 +649,7 @@ class K8sNativeClusterDriver(ClusterDriver):
             backend=self._management_backend,
             cluster=cluster,
             run_preflight=run_preflight,
+            cluster_rbac=not cluster_rbac_withheld(cluster.endpoint or ""),
         )
 
     @driver_op(cloud="k8s_native", driver="cluster")

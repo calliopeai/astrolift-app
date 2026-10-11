@@ -102,6 +102,7 @@ from k8s_native.central_auth import central_auth_component
 from k8s_native.edge_gateway import alb_front, edge_component
 from k8s_native.management import (
     ManagementBackend,
+    cluster_rbac_withheld,
     default_management_backend,
     probe_cluster_capabilities,
     read_cluster_job_status,
@@ -985,6 +986,7 @@ class EKSClusterDriver(ClusterDriver):
             backend=self._management_backend,
             cluster=self._resolve_eks_auth_context(cluster),
             run_preflight=run_preflight,
+            cluster_rbac=not cluster_rbac_withheld(),
         )
 
     @driver_op(cloud="aws", driver="cluster")

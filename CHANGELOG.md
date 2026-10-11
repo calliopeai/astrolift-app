@@ -272,6 +272,40 @@
   refusal and actor-bound retry receipts. Preserve inherited/IdP/other-scope
   access and refuse withdrawn sessions after lock waits (#2273).
 
+- Builder apps use private immutable artifacts instead of ConfigMaps and data Secrets, with configurable asset capacity and destination capability reporting. Apply lifecycle migration 0046 before deploying the API and worker.
+
+- Managed CI template v10: the notify step reads its deploy token through a single-quoted `secrets['...']` expression (v9 failed every run at parse time), and ci_pushed builds use the manifest's primary-container `dockerfile_path`/`build_context` for fields the app left at its defaults. Existing repos show as template-stale until re-synced (#2300).
+- Resolve GitHub App installations by the repo's owner when an org holds several, and let "Connect GitHub" install the existing App on a further account instead of reporting it already connected (#2297).
+- `applyStagedManifest` bootstraps a repo-backed app that has no workloads and whose repo the platform cannot reach, from the staged manifest or the stored one, with an `app.manifest.apply_unreachable_repo` audit entry (#2296).
+
+- Certificate registration records the actual provisioning cluster and preserves
+  existing domain configuration, retaining exact cluster links and authorized
+  DNS revalidation after the certificate step.
+
+- Domain diagnostics distinguish observed DNS answers from configured comparisons,
+  explain the limited scope of nameserver matches, and show the unavailable
+  cluster DNS perspective in all eight locales without hiding technical evidence.
+
+- Explain DNS operator admission and no-data/ICMP timeout observations in eight languages; skip protected connection bindings until current support permits the read (#2287).
+
+- Add a current-operator SMTP alert diagnostic in notification settings with explicit own-mailbox/source review, stable request UUIDs, recovery-only uncertain outcomes, cursor history and eight-language copy (#2289).
+- Keep mail review and history usable on narrow screens with accessible navigation drawers, wrapped empty states and an accurate DKIM action label (#2289).
+- Reuse fresh persisted-session and platform-operator admission for DNS connections and email diagnostics; retain current main migration predecessors for the standalone domain/mail release (#2287, #2289).
+- Add operator-only, source-reviewed install SMTP alert-mail diagnostics with verified TLS, durable nonce recovery, content-free history and acceptance distinct from delivery. Preserve default SES configuration and refuse unsupported channels. Refs: #2289.
+
+- Return an editable content refusal for invalid Unicode in email delivery tests before creating send intent or contacting the provider (#2289).
+- Preserve accepted domain creation when refresh fails; require fresh connection inventory and explicit selection after an uncertain Cloudflare token write before further setup writes (#2287, #1787).
+- Read Cloudflare diagnostic inventory through exact protected domain/connection/zone versions with fresh operator checks around every native response; retain tenant public DNS reads and explicit read-only/proxy metadata without provider writes (Refs: #2287, #1787).
+- Add exact managed-domain read-only DNS/delegation/provider/routing diagnostics and bounded public HTTPS/ICMP probes with fresh actor/source admission, explicit unknown states and network throttles (Refs: #2287).
+- Add encrypted org-owned Cloudflare read-only connections, conditional PKCE OAuth, bounded zone/record discovery and versioned domain attachment/registration; preserve current DNS writers, require fresh platform-operator admission and distinguish local disconnect from confirmed or unconfirmed OAuth revocation (#1787, #2287).
+- Refuse SES test sends when the cluster's verified account disagrees with its current credential declaration, recheck verified-account changes around native reads and acknowledgments, and distinguish mailbox/domain configuration-set identities without changing legacy secret-reference names (#2289).
+- Add reviewed, replay-safe SES email delivery tests for the exact app/environment/account/region binding, current caller admission, suppression checks, signed delivery/bounce/complaint/delay/rejection observations and paginated content-free history. Legacy test sends now require a reviewed service version and stable request ID instead of using the install-wide transport (#2289).
+- Bound private AWS email credential refresh and native requests, retain acknowledged message IDs before public readmission, protect retained diagnostic history on rollback and generate valid, collision-resistant SES configuration-set names while preserving secret references (#2289).
+- Add current domain DNS diagnostics and a read-only Cloudflare connection wizard, with separate TXT ownership verification, public delegation and effective-domain checks, exact versioned actions, and eight-language UI copy (#2287, #1787).
+- Review the current SES sender and service version before an explicit recipient test, retain a content-free replay key after uncertain replies, and distinguish provider acceptance from signed delivery observations.
+- Add the domain Email delivery entry with authorized app/service selection and bounded MX, SPF, DMARC and explicit-selector DKIM reads. Existing quick-send and service-sheet entries use the reviewed test API. SMTP, Azure and alert test transports remain unsupported.
+- Reject invalid mailbox, UTF-8 content and malformed Unicode before recording a test request.
+
 - Bind browser SSO step-up to the verified issuer/subject, active actor and current
   persisted authenticated session. Recheck proof freshness after admission locks,
   preserve concurrent logout and suppress stale response-session writes (#2202).

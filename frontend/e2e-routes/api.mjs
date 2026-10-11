@@ -1,3 +1,10 @@
+import {
+  alertMailFixture,
+  alertMailWrites,
+  resetAlertMail,
+} from "./install-alert-mail-fixtures.mjs";
+import { emailFixture, emailWrites, resetEmailFixtures } from "./email-fixtures.mjs";
+import { domainFixture, domainWrites, resetDomainFixtures } from "./domain-fixtures.mjs";
 // Controlled HTTP fixtures for the real Next route walk. These are frontend
 // roles; backend authorization remains covered by its RoleBinding tests.
 import { createServer } from "node:http";
@@ -678,6 +685,9 @@ createServer(async (req, res) => {
     ["/observations/reset", "/observations/reset?model=unsubscribed"].includes(req.url) &&
     req.method === "POST"
   ) {
+    resetDomainFixtures();
+    resetEmailFixtures();
+    resetAlertMail();
     observations.errors.length = 0;
     observations.mutations = 0;
     observations.promptInvocations.length = 0;
@@ -699,6 +709,21 @@ createServer(async (req, res) => {
     res.end(JSON.stringify(observations));
     return;
   }
+  if (req.url === "/observations/alert-mail-writes") {
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify(alertMailWrites));
+    return;
+  }
+  if (req.url === "/observations/email-writes") {
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify(emailWrites));
+    return;
+  }
+  if (req.url === "/observations/domain-writes") {
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify(domainWrites));
+    return;
+  }
   if (req.url === "/observations/model-writes") {
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify(modelWriteRequests));
@@ -716,6 +741,12 @@ createServer(async (req, res) => {
       operationName,
       rootValue: {},
       fieldResolver(source, args, context, info) {
+        const alertMail = alertMailFixture(info.fieldName, args, role, info.parentType.name);
+        if (alertMail !== undefined) return alertMail;
+        const email = emailFixture(info.fieldName, args, role, info.parentType.name, operationName);
+        if (email !== undefined) return email;
+        const dns = domainFixture(info.fieldName, args, role, info.parentType.name);
+        if (dns !== undefined) return dns;
         if (info.parentType.name === "Mutation") {
           const input = args.input;
           if (

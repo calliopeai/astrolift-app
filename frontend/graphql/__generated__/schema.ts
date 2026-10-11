@@ -1924,6 +1924,7 @@ export type AstroliftClusterBootstrapComponent = {
   requires: Array<Scalars['String']['output']>;
   runningOutsideRecipe: Scalars['Boolean']['output'];
   title: Scalars['String']['output'];
+  withheldReason?: Maybe<Scalars['String']['output']>;
 };
 
 export type AstroliftClusterBootstrapOption = {
@@ -3110,6 +3111,11 @@ export type AstroliftImportSkillsResultMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftInstallManagedModel = {
+  modelId: Scalars['String']['output'];
+  replicas?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AstroliftInstallSourceWebhookPayload = {
   hookId: Scalars['String']['output'];
   receiverUrl: Scalars['String']['output'];
@@ -3264,6 +3270,7 @@ export type AstroliftManagedDomain = {
   provisionValidationRecords: Scalars['JSON']['output'];
   verificationState: Scalars['String']['output'];
   verifiedAt?: Maybe<Scalars['DateTime']['output']>;
+  version: Scalars['Int']['output'];
   zone: Scalars['String']['output'];
 };
 
@@ -5827,6 +5834,11 @@ export type AstroliftWebhookTestResultMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftWithheldCapability = {
+  capability: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+};
+
 export type AstroliftWorkflowHistoryEvent = {
   decision: Scalars['String']['output'];
   eventType: Scalars['String']['output'];
@@ -6089,6 +6101,15 @@ export type AstroliftZentinelleDisconnectMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AttachCloudflareDnsZoneInput = {
+  connectionId: Scalars['GUID']['input'];
+  domainId: Scalars['GUID']['input'];
+  expectedConnectionVersion: Scalars['Int']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+  zoneId: Scalars['String']['input'];
+  zoneName: Scalars['String']['input'];
+};
+
 export type AttachProjectManagedServiceInput = {
   agentEnvironmentSpecSlug: InputMaybe<Scalars['String']['input']>;
   appEnvironmentId: InputMaybe<Scalars['GUID']['input']>;
@@ -6200,6 +6221,11 @@ export type BedrockModelSources = {
   reason?: Maybe<Scalars['String']['output']>;
   state: Scalars['String']['output'];
   truncated: Scalars['Boolean']['output'];
+};
+
+export type BeginCloudflareDnsOAuthInput = {
+  name: Scalars['String']['input'];
+  organizationId: Scalars['GUID']['input'];
 };
 
 export type BeginLocalModelArtifactInput = {
@@ -6353,6 +6379,58 @@ export type CloudOrphanType = {
   identifier: Scalars['String']['output'];
   kind: Scalars['String']['output'];
   reapKey: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+};
+
+export type CloudflareDnsConnectionInput = {
+  connectionId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+};
+
+export type CloudflareDnsOAuthStart = {
+  authorizationUrl: Scalars['String']['output'];
+};
+
+export type CloudflareDnsOAuthStartMutationResult = {
+  data?: Maybe<CloudflareDnsOAuthStart>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type CloudflareDnsRecord = {
+  content: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  priority?: Maybe<Scalars['Int']['output']>;
+  proxied: Scalars['Boolean']['output'];
+  ttl: Scalars['Int']['output'];
+  type: Scalars['String']['output'];
+};
+
+export type CloudflareDnsRecordsInput = {
+  connectionId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  zoneId: Scalars['String']['input'];
+  zoneName: Scalars['String']['input'];
+};
+
+export type CloudflareDnsRecordsInventory = {
+  complete: Scalars['Boolean']['output'];
+  items: Array<CloudflareDnsRecord>;
+  reason: Scalars['String']['output'];
+};
+
+export type CloudflareDnsZone = {
+  accountId: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  nameServers: Array<Scalars['String']['output']>;
+  status: Scalars['String']['output'];
+};
+
+export type CloudflareDnsZonesInventory = {
+  complete: Scalars['Boolean']['output'];
+  items: Array<CloudflareDnsZone>;
   reason: Scalars['String']['output'];
 };
 
@@ -6513,6 +6591,7 @@ export type ConfigureProviderPluginInput = {
 
 export type ConfiguredWorkflow = {
   createdAt: Scalars['DateTime']['output'];
+  definitionGuid: Scalars['String']['output'];
   definitionName: Scalars['String']['output'];
   definitionSlug: Scalars['String']['output'];
   description: Scalars['String']['output'];
@@ -6528,6 +6607,7 @@ export type ConfiguredWorkflow = {
   slug: Scalars['String']['output'];
   stageBindings: Scalars['JSON']['output'];
   triggerKind: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
 };
 
 /** One page of a cursor-paginated or numbered list. */
@@ -6545,6 +6625,12 @@ export type ConfiguredWorkflowPage = {
 
 export type ConfirmUploadResult = {
   ack: Scalars['Boolean']['output'];
+};
+
+export type ConnectCloudflareDnsTokenInput = {
+  name: Scalars['String']['input'];
+  organizationId: Scalars['GUID']['input'];
+  token: Scalars['String']['input'];
 };
 
 export type ConnectExistingGithubAppInput = {
@@ -6777,8 +6863,10 @@ export type CreateWebhookSubscriptionInput = {
 };
 
 export type CreateWorkflowResult = {
+  configurationSaved: Scalars['Boolean']['output'];
   errors: Array<ValidationError>;
   ok: Scalars['Boolean']['output'];
+  schedule?: Maybe<WorkflowScheduleState>;
   workflow?: Maybe<ConfiguredWorkflow>;
 };
 
@@ -6954,6 +7042,47 @@ export type DisconnectZentinelleInput = {
   force: Scalars['Boolean']['input'];
 };
 
+export type DnsProviderConnectionSupport = {
+  allowed: Scalars['Boolean']['output'];
+  apiTokenSupported: Scalars['Boolean']['output'];
+  dnsWritesSupported: Scalars['Boolean']['output'];
+  oauthConfigured: Scalars['Boolean']['output'];
+  oauthSetupReason: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+};
+
+export type DnsProviderConnectionType = {
+  authMethod: Scalars['String']['output'];
+  dnsWritesSupported: Scalars['Boolean']['output'];
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  provider: Scalars['String']['output'];
+  revocationState: Scalars['String']['output'];
+  state: Scalars['String']['output'];
+  verifiedAt?: Maybe<Scalars['DateTime']['output']>;
+  version: Scalars['Int']['output'];
+};
+
+export type DnsProviderConnectionTypeMutationResult = {
+  data?: Maybe<DnsProviderConnectionType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type DnsProviderConnectionTypePage = {
+  items: Array<DnsProviderConnectionType>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type DomainPathRouteInput = {
   pathPrefix: Scalars['String']['input'];
   priority: Scalars['Int']['input'];
@@ -6975,6 +7104,56 @@ export type ElevateAdminSessionInput = {
   credential: Scalars['String']['input'];
   method: Scalars['String']['input'];
   ttlSeconds: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type EmailDeliveryTest = {
+  acceptedAt?: Maybe<Scalars['DateTime']['output']>;
+  accountId: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  eventTrackingConfigured: Scalars['Boolean']['output'];
+  id: Scalars['GUID']['output'];
+  identity: Scalars['String']['output'];
+  managedServiceId: Scalars['GUID']['output'];
+  observedAt?: Maybe<Scalars['DateTime']['output']>;
+  providerMessageId?: Maybe<Scalars['String']['output']>;
+  reasonCode?: Maybe<Scalars['String']['output']>;
+  recipient: Scalars['String']['output'];
+  region: Scalars['String']['output'];
+  requestId: Scalars['GUID']['output'];
+  sender: Scalars['String']['output'];
+  simulator: Scalars['Boolean']['output'];
+  status: Scalars['String']['output'];
+  transport: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type EmailDeliveryTestMutationResult = {
+  data?: Maybe<EmailDeliveryTest>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type EmailDeliveryTestPage = {
+  items: Array<EmailDeliveryTest>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type EmailDeliveryTestSupport = {
+  accountId?: Maybe<Scalars['String']['output']>;
+  allowed: Scalars['Boolean']['output'];
+  identity?: Maybe<Scalars['String']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  region?: Maybe<Scalars['String']['output']>;
+  sender?: Maybe<Scalars['String']['output']>;
+  serviceVersion?: Maybe<Scalars['Int']['output']>;
 };
 
 export type Emailsuppressionaddpayload = {
@@ -7281,6 +7460,27 @@ export type HuggingFaceModelsPage = {
   state: CatalogueState;
 };
 
+export type HumanGateDecisionResult = {
+  errors: Array<ValidationError>;
+  gate?: Maybe<HumanGateDecisionState>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type HumanGateDecisionState = {
+  decidedByMe?: Maybe<Scalars['Boolean']['output']>;
+  executionGuid: Scalars['String']['output'];
+  note: Scalars['String']['output'];
+  observationError: Scalars['String']['output'];
+  recordedDecision?: Maybe<Scalars['String']['output']>;
+  requestState: Scalars['String']['output'];
+  requestedDecision?: Maybe<Scalars['String']['output']>;
+  runStatus: Scalars['String']['output'];
+  stageExecutionGuid: Scalars['String']['output'];
+  stageGuid: Scalars['String']['output'];
+  stageStatus: Scalars['String']['output'];
+  temporalExecution?: Maybe<WorkflowStageTemporalExecution>;
+};
+
 export type ImportGapType = {
   code: Scalars['String']['output'];
   message: Scalars['String']['output'];
@@ -7301,11 +7501,57 @@ export type ImportWorkflowFlowResult = {
 
 export type ImportWorkflowManifestResult = {
   createdSlug?: Maybe<Scalars['String']['output']>;
+  definitionId?: Maybe<Scalars['GUID']['output']>;
   errors: Array<ValidationError>;
   manifest?: Maybe<WorkflowManifestPreviewType>;
   mode?: Maybe<Scalars['String']['output']>;
   ok: Scalars['Boolean']['output'];
   repointedSlugs: Array<Scalars['String']['output']>;
+};
+
+export type InstallAlertMailSupport = {
+  allowed: Scalars['Boolean']['output'];
+  checkedAt: Scalars['DateTime']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+  recipient?: Maybe<Scalars['String']['output']>;
+  sender?: Maybe<Scalars['String']['output']>;
+  sourceFingerprint?: Maybe<Scalars['String']['output']>;
+  tlsMode?: Maybe<Scalars['String']['output']>;
+  transport?: Maybe<Scalars['String']['output']>;
+};
+
+export type InstallAlertMailTest = {
+  acceptedAt?: Maybe<Scalars['DateTime']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  deliveryObserved: Scalars['Boolean']['output'];
+  eventKind: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  reasonCode?: Maybe<Scalars['String']['output']>;
+  recipient: Scalars['String']['output'];
+  requestId: Scalars['GUID']['output'];
+  sender: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  transport: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type InstallAlertMailTestMutationResult = {
+  data?: Maybe<InstallAlertMailTest>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type InstallAlertMailTestPage = {
+  items: Array<InstallAlertMailTest>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
 export type InstallClusterAgentInput = {
@@ -7441,6 +7687,148 @@ export type LoginResult = {
 
 export type LogoutAllSessionsInput = {
   keepCurrent: Scalars['Boolean']['input'];
+};
+
+export type ManagedDomainActions = {
+  canCreate: Scalars['Boolean']['output'];
+  canDelete: Scalars['Boolean']['output'];
+  canRevalidate: Scalars['Boolean']['output'];
+};
+
+export type ManagedDomainCheckState =
+  | 'ERROR'
+  | 'MISMATCH'
+  | 'OK'
+  | 'UNKNOWN'
+  | 'UNSUPPORTED';
+
+export type ManagedDomainDiagnosticCheck = {
+  checkedAt: Scalars['DateTime']['output'];
+  expected: Array<Scalars['String']['output']>;
+  key: Scalars['String']['output'];
+  observed: Array<Scalars['String']['output']>;
+  perspective: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  state: ManagedDomainCheckState;
+};
+
+export type ManagedDomainDiagnosticRecord = {
+  aliasTarget?: Maybe<Scalars['String']['output']>;
+  aliasZoneId?: Maybe<Scalars['String']['output']>;
+  evaluateTargetHealth?: Maybe<Scalars['Boolean']['output']>;
+  name: Scalars['String']['output'];
+  priority?: Maybe<Scalars['Int']['output']>;
+  proxied?: Maybe<Scalars['Boolean']['output']>;
+  ttl?: Maybe<Scalars['Int']['output']>;
+  type: Scalars['String']['output'];
+  values: Array<Scalars['String']['output']>;
+};
+
+export type ManagedDomainDiagnostics = {
+  actions: ManagedDomainActions;
+  checkedAt: Scalars['DateTime']['output'];
+  checks: Array<ManagedDomainDiagnosticCheck>;
+  id: Scalars['GUID']['output'];
+  providerZone: ManagedDomainProviderZone;
+  provisionClusterId?: Maybe<Scalars['GUID']['output']>;
+  provisionState: Scalars['String']['output'];
+  routes: Array<ManagedDomainRoute>;
+  routesTruncated: Scalars['Boolean']['output'];
+  verificationState: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+  zone: Scalars['String']['output'];
+};
+
+export type ManagedDomainDnsBindingReference = {
+  canVerify: Scalars['Boolean']['output'];
+  connectionId?: Maybe<Scalars['GUID']['output']>;
+  connectionVersion?: Maybe<Scalars['Int']['output']>;
+  currentConnectionVersion?: Maybe<Scalars['Int']['output']>;
+  dnsWritesSupported: Scalars['Boolean']['output'];
+  domainId: Scalars['GUID']['output'];
+  domainVersion: Scalars['Int']['output'];
+  state: Scalars['String']['output'];
+  zoneId?: Maybe<Scalars['String']['output']>;
+  zoneName: Scalars['String']['output'];
+};
+
+export type ManagedDomainDnsConnectionBinding = {
+  connectionId: Scalars['GUID']['output'];
+  connectionVersion: Scalars['Int']['output'];
+  dnsWritesSupported: Scalars['Boolean']['output'];
+  domainId: Scalars['GUID']['output'];
+  domainVersion: Scalars['Int']['output'];
+  verificationRecordName?: Maybe<Scalars['String']['output']>;
+  verificationRecordValue?: Maybe<Scalars['String']['output']>;
+  verificationState: Scalars['String']['output'];
+  zone: CloudflareDnsZone;
+};
+
+export type ManagedDomainDnsConnectionBindingMutationResult = {
+  data?: Maybe<ManagedDomainDnsConnectionBinding>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type ManagedDomainProbe = {
+  checkedAt: Scalars['DateTime']['output'];
+  hostname: Scalars['String']['output'];
+  httpStatus?: Maybe<Scalars['Int']['output']>;
+  latencyMs?: Maybe<Scalars['Float']['output']>;
+  perspective: Scalars['String']['output'];
+  publicAddress?: Maybe<Scalars['String']['output']>;
+  reason: Scalars['String']['output'];
+  recordType: ManagedDomainRecordType;
+  state: ManagedDomainCheckState;
+  tlsVerified?: Maybe<Scalars['Boolean']['output']>;
+  tool: ManagedDomainProbeTool;
+  values: Array<Scalars['String']['output']>;
+};
+
+export type ManagedDomainProbeTool =
+  | 'DIG'
+  | 'HTTPS'
+  | 'LOOKUP'
+  | 'PING'
+  | 'TRACEROUTE';
+
+export type ManagedDomainProviderZone = {
+  bindingSource: Scalars['String']['output'];
+  checkedAt: Scalars['DateTime']['output'];
+  nameservers: Array<Scalars['String']['output']>;
+  privateZone?: Maybe<Scalars['Boolean']['output']>;
+  reason: Scalars['String']['output'];
+  records: Array<ManagedDomainDiagnosticRecord>;
+  state: ManagedDomainCheckState;
+  truncated: Scalars['Boolean']['output'];
+  zoneId?: Maybe<Scalars['String']['output']>;
+  zoneName?: Maybe<Scalars['String']['output']>;
+};
+
+export type ManagedDomainRecordType =
+  | 'A'
+  | 'AAAA'
+  | 'CAA'
+  | 'CNAME'
+  | 'MX'
+  | 'NS'
+  | 'SOA'
+  | 'SRV'
+  | 'TXT';
+
+export type ManagedDomainRoute = {
+  appId: Scalars['GUID']['output'];
+  appName: Scalars['String']['output'];
+  appSlug: Scalars['String']['output'];
+  clusterId?: Maybe<Scalars['GUID']['output']>;
+  clusterName?: Maybe<Scalars['String']['output']>;
+  clusterSlug?: Maybe<Scalars['String']['output']>;
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  hostname: Scalars['String']['output'];
+  ingressClass?: Maybe<Scalars['String']['output']>;
+  observedState: ManagedDomainCheckState;
+  recordedUrl: Scalars['String']['output'];
 };
 
 export type Managedresourceadoptionpayload = {
@@ -7991,10 +8379,12 @@ export type Mutation = {
   astroliftDisconnectUserSourceProvider: AstroliftDisconnectUserSourceProviderPayloadMutationResult;
   astroliftInstallClusterLogCollector: AstroliftClusterLogCollectorOperationMutationResult;
   attachAgentSecretBundle: AstroliftAgentSecretBundleAttachmentMutationResult;
+  attachCloudflareDnsZone: ManagedDomainDnsConnectionBindingMutationResult;
   attachProjectManagedService: AstroliftManagedServiceAttachmentMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
   attestSession: AstroliftAttestationResultMutationResult;
   authorizeLocalModelUploads: LocalModelUploadAuthorizationMutationResult;
+  beginCloudflareDnsOAuth: CloudflareDnsOAuthStartMutationResult;
   beginLocalModelArtifact: LocalModelArtifactMutationResult;
   bringClusterIntoManagement: AstroliftTenantClusterMutationResult;
   bulkApproveDeployments: AstroliftBulkDeploymentResultDataMutationResult;
@@ -8020,6 +8410,7 @@ export type Mutation = {
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
+  connectCloudflareDnsToken: DnsProviderConnectionTypeMutationResult;
   connectExistingGithubApp: AstroliftSourceConnectionMutationResult;
   connectHuggingFace: HuggingFaceConnectionTypeMutationResult;
   connectSource: AstroliftSourceConnectionMutationResult;
@@ -8052,7 +8443,7 @@ export type Mutation = {
   createToolDef: AstroliftToolDefMutationResult;
   createTrigger: AstroliftTriggerMutationResult;
   createWebhookSubscription: WebhookSecretRevealMutationResult;
-  /** Create a configured Workflow from a visible definition (spec 40 §2.2). */
+  /** Create a configured Workflow from an exact definitionId or legacy definitionSlug. When both are supplied the slug must match the ID. Set isEnabled=false to prepare configuration without activation; the legacy default is true. */
   createWorkflow: CreateWorkflowResult;
   /** Create a new workflow definition (platform operator only). */
   createWorkflowDefinition: MutationResult;
@@ -8060,6 +8451,8 @@ export type Mutation = {
   createWorkflowStage: CreateWorkflowStageResult;
   /** Create an inbound webhook trigger for a workflow definition (platform operator only). */
   createWorkflowTrigger: CreateWorkflowTriggerResult;
+  /** Submit an explicit user decision to one exact human gate. Recover by the same execution and stage IDs after an uncertain response. */
+  decideHumanGate: HumanGateDecisionResult;
   decommissionCluster: AstroliftTenantClusterMutationResult;
   deelevateAdminSession: AstroliftDeelevatePayloadMutationResult;
   /** Delete an object by its global ID (soft-delete via delete_check). */
@@ -8087,8 +8480,8 @@ export type Mutation = {
   deleteSshDeployKey: AstroliftSshDeployKeyMutationResult;
   deleteToolDef: AstroliftToolDefMutationResult;
   deleteWebhookSubscription: SoftdeletepayloadMutationResult;
-  /** Soft-delete a configured Workflow and tear down its schedule. */
-  deleteWorkflow: MutationResult;
+  /** Soft-delete a configured Workflow by exact workflowId or legacy slug and request schedule removal. A supplied slug must match its ID. */
+  deleteWorkflow: WorkflowScheduleResult;
   /** Soft-delete an org-owned workflow definition by slug. */
   deleteWorkflowDefinition: MutationResult;
   /** Soft-delete a stage from a writable definition (spec 40 §6). */
@@ -8102,6 +8495,7 @@ export type Mutation = {
   detachAgentSecretBundle: AstroliftAgentSecretBundleAttachmentMutationResult;
   detachProjectManagedService: AstroliftManagedServiceAttachmentMutationResult;
   detachSecretBundle: AttachmentremovedpayloadMutationResult;
+  disconnectDnsProviderConnection: DnsProviderConnectionTypeMutationResult;
   disconnectHuggingFace: HuggingFaceConnectionTypeMutationResult;
   disconnectSource: AstroliftSourceConnectionMutationResult;
   disconnectZentinelle: AstroliftZentinelleDisconnectMutationResult;
@@ -8125,7 +8519,7 @@ export type Mutation = {
   importSkillsFromRepo: AstroliftImportSkillsResultMutationResult;
   /** Import a popular visual agent/workflow builder export (Langflow, Flowise, …) into an Astrolift WorkflowDefinition. preview=true (default) returns the mapped manifest + gap report without persisting; preview=false creates an org-scoped, disabled definition + stages. */
   importWorkflowFlow: ImportWorkflowFlowResult;
-  /** Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled, org-scoped WorkflowDefinition + stages in the caller's org and returns the (possibly uniquified) slug. replace=true instead upserts the org's own definition sharing the manifest's slug: in place when the stage kinds are unchanged (configured Workflows, bindings and schedules all keep working untouched), otherwise as a new version with every configured Workflow repointed to it, or a clear refusal when a repoint would break one's bindings. */
+  /** Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled WorkflowDefinition + stages in the caller's org, optionally owned by projectId, and returns its exact ID and (possibly uniquified) slug. replace=true instead upserts the org's own definition sharing the manifest's slug: in place when the stage kinds are unchanged (configured Workflows, bindings and schedules all keep working untouched), otherwise as a new version with every configured Workflow repointed to it, or a clear refusal when a repoint would break one's bindings. Replacement preserves ownership; projectId cannot transfer it. */
   importWorkflowManifest: ImportWorkflowManifestResult;
   installAstroliftSourceWebhook: AstroliftInstallSourceWebhookPayloadMutationResult;
   installClusterAgent: AstroliftClusterAgentInstallMutationResult;
@@ -8202,6 +8596,8 @@ export type Mutation = {
   reapCloudOrphan: ReapCloudOrphanPayloadMutationResult;
   recheckDomainValidation: AstroliftAppDomainMutationResult;
   reconcileClusterIngresses: ReconcileClusterIngressesResultMutationResult;
+  /** Reconcile the exact reviewed configuration version with its native Temporal schedule. Does not start an immediate run. Active reconciliation requires workflow.trigger; deleted workflow cleanup also requires workflow.delete. */
+  reconcileWorkflowSchedule: WorkflowScheduleResult;
   recordClusterBootstrapRun: BootstraprunrecordedpayloadMutationResult;
   redeliverAgentTaskCallback: AstroliftAgentTaskMutationResult;
   redeployApp: AstroliftDeploymentMutationResult;
@@ -8211,6 +8607,7 @@ export type Mutation = {
   registerApp: AstroliftRegisteredAppMutationResult;
   registerAppRepo: AstroliftRegisterAppRepoResultMutationResult;
   registerBedrockModelConnection: ClusterModelDeploymentMutationResult;
+  registerCloudflareDnsZone: ManagedDomainDnsConnectionBindingMutationResult;
   registerMobileDevice: AstroliftDeviceRegistrationMutationResult;
   registerOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
   registerTenantCluster: AstroliftTenantClusterMutationResult;
@@ -8245,6 +8642,7 @@ export type Mutation = {
   resyncAllAstroliftCiWorkflows: AstroliftCiWorkflowResyncAllResultMutationResult;
   resyncAstroliftCiWorkflow: AstroliftCiWorkflowSyncStatusMutationResult;
   resyncAstroliftManifestFromRepo: ResyncManifestPayloadMutationResult;
+  retestDnsProviderConnection: DnsProviderConnectionTypeMutationResult;
   retryAgentTask: AstroliftAgentTaskMutationResult;
   retryAstroliftAutowire: AstroliftRetryAutowirePayloadMutationResult;
   revalidateManagedDomain: RevalidateManagedDomainPayloadMutationResult;
@@ -8279,6 +8677,8 @@ export type Mutation = {
   scaleAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
   scaleServiceAgent: AstroliftAgentScaleResult;
   sendAgentTaskInput: AstroliftAgentTaskInputMessageMutationResult;
+  sendEmailDeliveryTest: EmailDeliveryTestMutationResult;
+  sendInstallAlertMailTest: InstallAlertMailTestMutationResult;
   sendManagedServiceTestEmail: AstroliftManagedServiceTestEmailResultMutationResult;
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
   setAgentBundleSecretValue: AstroliftAgentSecretBundleMutationResult;
@@ -8306,6 +8706,8 @@ export type Mutation = {
   setPreviewPinned: AstroliftPreviewEnvironmentMutationResult;
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
+  /** Enable or disable an exact owned workflow definition at its reviewed revision. Does not start a run or confirm schedule state. */
+  setWorkflowDefinitionEnabled: WorkflowDefinitionActivationResult;
   setZentinelleGatewayEnabled: AstroliftZentinelleClusterGatewayMutationResult;
   /** Cancel a sign request. Sign requests are not available: this always refuses. */
   signRequestCancel: Scalars['Boolean']['output'];
@@ -8384,7 +8786,7 @@ export type Mutation = {
   updateTenantCluster: AstroliftTenantClusterMutationResult;
   updateToolDef: AstroliftToolDefMutationResult;
   updateWebhookSubscription: AstroliftWebhookSubscriptionMutationResult;
-  /** Update a configured Workflow (bindings / inputs / trigger / enabled). definitionSlug repoints it at another visible definition: the fallback for a versioned importWorkflowManifest(replace: true) (#1822), or any manual repoint. The existing stage_bindings must still validate against the new definition's stages, or the update is refused. */
+  /** Update a configured Workflow by exact workflowId or legacy slug (bindings / inputs / trigger / enabled). A supplied slug must match its ID. definitionId or definitionSlug repoints it at another visible definition: the fallback for a versioned importWorkflowManifest(replace: true) (#1822), or any manual repoint. The existing stage_bindings must still validate against the new definition's stages, or the update is refused. */
   updateWorkflow: CreateWorkflowResult;
   /** Update an org-owned workflow definition (globals are read-only). */
   updateWorkflowDefinition: MutationResult;
@@ -8540,6 +8942,11 @@ export type MutationAttachAgentSecretBundleArgs = {
 };
 
 
+export type MutationAttachCloudflareDnsZoneArgs = {
+  input: AttachCloudflareDnsZoneInput;
+};
+
+
 export type MutationAttachProjectManagedServiceArgs = {
   input: AttachProjectManagedServiceInput;
 };
@@ -8557,6 +8964,11 @@ export type MutationAttestSessionArgs = {
 
 export type MutationAuthorizeLocalModelUploadsArgs = {
   input: LocalModelArtifactIdentityInput;
+};
+
+
+export type MutationBeginCloudflareDnsOAuthArgs = {
+  input: BeginCloudflareDnsOAuthInput;
 };
 
 
@@ -8682,6 +9094,11 @@ export type MutationConfirmPreSignedUrlImageUploadArgs = {
   metadata?: InputMaybe<Scalars['JSON']['input']>;
   publicUrl?: InputMaybe<Scalars['String']['input']>;
   uploadId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
+export type MutationConnectCloudflareDnsTokenArgs = {
+  input: ConnectCloudflareDnsTokenInput;
 };
 
 
@@ -8854,9 +9271,11 @@ export type MutationCreateWebhookSubscriptionArgs = {
 
 
 export type MutationCreateWorkflowArgs = {
-  definitionSlug: Scalars['String']['input'];
+  definitionId?: InputMaybe<Scalars['GUID']['input']>;
+  definitionSlug?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   inputs?: InputMaybe<Scalars['JSON']['input']>;
+  isEnabled?: Scalars['Boolean']['input'];
   name: Scalars['String']['input'];
   orgId?: InputMaybe<Scalars['ID']['input']>;
   scheduleCron?: InputMaybe<Scalars['String']['input']>;
@@ -8903,6 +9322,16 @@ export type MutationCreateWorkflowStageArgs = {
 
 export type MutationCreateWorkflowTriggerArgs = {
   workflowSlug: Scalars['String']['input'];
+};
+
+
+export type MutationDecideHumanGateArgs = {
+  confirmed: Scalars['Boolean']['input'];
+  decision: Scalars['String']['input'];
+  executionId: Scalars['ID']['input'];
+  note?: Scalars['String']['input'];
+  stageExecutionId: Scalars['ID']['input'];
+  temporalRunId: Scalars['String']['input'];
 };
 
 
@@ -9036,8 +9465,10 @@ export type MutationDeleteWebhookSubscriptionArgs = {
 
 
 export type MutationDeleteWorkflowArgs = {
+  expectedVersion?: InputMaybe<Scalars['Int']['input']>;
   orgId?: InputMaybe<Scalars['ID']['input']>;
-  slug: Scalars['String']['input'];
+  slug?: InputMaybe<Scalars['String']['input']>;
+  workflowId?: InputMaybe<Scalars['GUID']['input']>;
 };
 
 
@@ -9094,6 +9525,11 @@ export type MutationDetachProjectManagedServiceArgs = {
 
 export type MutationDetachSecretBundleArgs = {
   input: DetachSecretBundleInput;
+};
+
+
+export type MutationDisconnectDnsProviderConnectionArgs = {
+  input: CloudflareDnsConnectionInput;
 };
 
 
@@ -9200,6 +9636,7 @@ export type MutationImportWorkflowFlowArgs = {
 export type MutationImportWorkflowManifestArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
   preview?: Scalars['Boolean']['input'];
+  projectId?: InputMaybe<Scalars['GUID']['input']>;
   replace?: Scalars['Boolean']['input'];
   toml: Scalars['String']['input'];
 };
@@ -9496,6 +9933,13 @@ export type MutationReconcileClusterIngressesArgs = {
 };
 
 
+export type MutationReconcileWorkflowScheduleArgs = {
+  expectedActive: Scalars['Boolean']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  workflowId: Scalars['GUID']['input'];
+};
+
+
 export type MutationRecordClusterBootstrapRunArgs = {
   input: RecordClusterBootstrapRunInput;
 };
@@ -9539,6 +9983,11 @@ export type MutationRegisterAppRepoArgs = {
 
 export type MutationRegisterBedrockModelConnectionArgs = {
   input: RegisterBedrockModelConnectionInput;
+};
+
+
+export type MutationRegisterCloudflareDnsZoneArgs = {
+  input: RegisterCloudflareDnsZoneInput;
 };
 
 
@@ -9706,6 +10155,11 @@ export type MutationResyncAstroliftCiWorkflowArgs = {
 
 export type MutationResyncAstroliftManifestFromRepoArgs = {
   input: ResyncManifestFromRepoInput;
+};
+
+
+export type MutationRetestDnsProviderConnectionArgs = {
+  input: CloudflareDnsConnectionInput;
 };
 
 
@@ -9886,6 +10340,16 @@ export type MutationSendAgentTaskInputArgs = {
 };
 
 
+export type MutationSendEmailDeliveryTestArgs = {
+  input: SendEmailDeliveryTestInput;
+};
+
+
+export type MutationSendInstallAlertMailTestArgs = {
+  input: SendInstallAlertMailTestInput;
+};
+
+
 export type MutationSendManagedServiceTestEmailArgs = {
   input: SendManagedServiceTestEmailInput;
 };
@@ -10015,6 +10479,13 @@ export type MutationSetProjectBundleSecretValueArgs = {
 
 export type MutationSetRetentionPolicyArgs = {
   input: SetRetentionPolicyInput;
+};
+
+
+export type MutationSetWorkflowDefinitionEnabledArgs = {
+  definitionId: Scalars['GUID']['input'];
+  expectedRevision: Scalars['String']['input'];
+  isEnabled: Scalars['Boolean']['input'];
 };
 
 
@@ -10398,16 +10869,19 @@ export type MutationUpdateWebhookSubscriptionArgs = {
 
 
 export type MutationUpdateWorkflowArgs = {
+  definitionId?: InputMaybe<Scalars['GUID']['input']>;
   definitionSlug?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
+  expectedVersion?: InputMaybe<Scalars['Int']['input']>;
   inputs?: InputMaybe<Scalars['JSON']['input']>;
   isEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   orgId?: InputMaybe<Scalars['ID']['input']>;
   scheduleCron?: InputMaybe<Scalars['String']['input']>;
-  slug: Scalars['String']['input'];
+  slug?: InputMaybe<Scalars['String']['input']>;
   stageBindings?: InputMaybe<Scalars['JSON']['input']>;
   triggerKind?: InputMaybe<Scalars['String']['input']>;
+  workflowId?: InputMaybe<Scalars['GUID']['input']>;
 };
 
 
@@ -10666,12 +11140,28 @@ export type PauseAppWebhookDeploysInput = {
 export type PendingHumanGate = {
   definitionName: Scalars['String']['output'];
   definitionSlug: Scalars['String']['output'];
+  executionGuid: Scalars['String']['output'];
   executionId: Scalars['String']['output'];
   runGuid: Scalars['String']['output'];
   stageApprovers: Array<Scalars['String']['output']>;
+  stageGuid: Scalars['String']['output'];
   stageRole: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
+  temporalExecution?: Maybe<WorkflowStageTemporalExecution>;
   workflowId: Scalars['String']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type PendingHumanGatePage = {
+  items: Array<PendingHumanGate>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
 export type PermissionComparison = {
@@ -11043,11 +11533,17 @@ export type Query = {
   astroliftHuggingFaceModel: HuggingFaceModelResult;
   astroliftHuggingFaceModels: HuggingFaceModelsPage;
   astroliftIdentityProviders: Array<AstroliftIdentityProvider>;
+  /** The model the install serves on its own GPUs (calliope-installer#446), read-only in the console; null when the platform model is a cloud API or off. */
+  astroliftInstallManagedModel?: Maybe<AstroliftInstallManagedModel>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage. */
   astroliftInvitations: Array<AstroliftInvitation>;
   astroliftInvitationsCsv: AstroliftIdentityCsvExport;
   astroliftInvitationsPage: AstroliftInvitationPage;
   astroliftLocalModelArtifactsPage: LocalModelArtifactPage;
+  astroliftManagedDomain?: Maybe<AstroliftManagedDomain>;
+  astroliftManagedDomainActions: ManagedDomainActions;
+  astroliftManagedDomainDiagnostics?: Maybe<ManagedDomainDiagnostics>;
+  astroliftManagedDomainProbe?: Maybe<ManagedDomainProbe>;
   astroliftManagedDomains: Array<AstroliftManagedDomain>;
   astroliftManagedService?: Maybe<AstroliftManagedServiceContext>;
   astroliftManagedServiceAttachmentsPage?: Maybe<AstroliftManagedServiceAttachmentContextPage>;
@@ -11186,6 +11682,8 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftWebhookSubscriptionsPage. */
   astroliftWebhookSubscriptions: Array<AstroliftWebhookSubscription>;
   astroliftWebhookSubscriptionsPage: AstroliftWebhookSubscriptionPage;
+  /** What the install withholds from Astrolift (calliope-installer#447): dns, databases, load_balancers, clusters, controllers, each with the reason to show. Empty when nothing is withheld. */
+  astroliftWithheldCapabilities: Array<AstroliftWithheldCapability>;
   astroliftWorkflowInstance?: Maybe<AstroliftWorkflowInstance>;
   astroliftWorkflowInstanceDetail?: Maybe<AstroliftWorkflowInstanceDetail>;
   astroliftWorkflowInstances: AstroliftWorkflowInstancePage;
@@ -11213,6 +11711,8 @@ export type Query = {
   bedrockModelSource?: Maybe<BedrockModelSource>;
   bedrockModelSources: BedrockModelSources;
   brief?: Maybe<AstroliftBrief>;
+  cloudflareDnsRecords: CloudflareDnsRecordsInventory;
+  cloudflareDnsZones: CloudflareDnsZonesInventory;
   clusterModelDedicatedAppsPage: ModelDedicatedAppPage;
   clusterModelDeployment?: Maybe<ClusterModelDeployment>;
   clusterModelDeploymentsPage: ClusterModelDeploymentPage;
@@ -11224,14 +11724,24 @@ export type Query = {
   clusterModelSubscriptionsPage: ModelSubscriptionPage;
   clusterModelUpdateAdmission: ModelRuntimeAdmission;
   dispatchers: Array<AstroliftDispatcherInstance>;
+  dnsProviderConnectionSupport: DnsProviderConnectionSupport;
+  dnsProviderConnectionsPage: DnsProviderConnectionTypePage;
+  dnsProviderDomainBinding?: Maybe<ManagedDomainDnsBindingReference>;
   /** List all effective permissions for a user, with the role bindings that grant each one. */
   effectivePermissions: Array<PermissionEntry>;
+  emailDeliveryTestSupport: EmailDeliveryTestSupport;
+  emailDeliveryTests: Array<EmailDeliveryTest>;
+  emailDeliveryTestsPage: EmailDeliveryTestPage;
   exportWorkflowManifest: WorkflowManifestExportType;
   formDefinition?: Maybe<AstroliftFormDefinition>;
   formDefinitions: Array<AstroliftFormDefinition>;
   formFieldTypes: Array<Scalars['String']['output']>;
   formSubmissions: Array<AstroliftFormSubmission>;
   huggingFaceConnectionsPage: HuggingFaceConnectionTypePage;
+  /** Recover a human decision by exact execution and stage GUIDs without resubmitting it. */
+  humanGateDecision?: Maybe<HumanGateDecisionState>;
+  installAlertMailSupport: InstallAlertMailSupport;
+  installAlertMailTestsPage: InstallAlertMailTestPage;
   me?: Maybe<AstroliftMe>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use membersPage. */
   members: Array<OrganizationMemberType>;
@@ -11256,6 +11766,8 @@ export type Query = {
   organizationsPage: OrganizationTypePage;
   /** Open human_gate stage executions across the org's runs that the caller may decide, newest first (#1820). */
   pendingHumanGates: Array<PendingHumanGate>;
+  /** Page through open gates. Named-approver filtering can produce an empty page with a next cursor; continue until nextCursor is null. */
+  pendingHumanGatesPage: PendingHumanGatePage;
   /** Compare effective permissions between two users, anywhere in the active organization or on a target scope (scopeType, scopeId). Superuser or org.manage_members; both users must be members of the active organization. */
   permissionCompare?: Maybe<PermissionComparison>;
   /** Diagnose why a user can or can't perform a specific permission, optionally on a target scope (scopeType ORG, TEAM, PROJECT, APP or AGENT; scopeId its guid). Self, superuser or org.manage_members; the user must be a member of the active organization. */
@@ -11274,7 +11786,7 @@ export type Query = {
   skillsPage: AstroliftSkillPage;
   toolDef?: Maybe<AstroliftToolDef>;
   toolDefs: Array<AstroliftToolDef>;
-  /** One configured Workflow by slug, with its recent runs. */
+  /** One configured Workflow by exact ID or legacy slug, with its recent runs. A supplied slug must match the ID. */
   workflow?: Maybe<ConfiguredWorkflow>;
   /** One visible workflow definition by slug (prefers the org's over a global). */
   workflowDefinition?: Maybe<WorkflowDefinitionSummary>;
@@ -11305,6 +11817,8 @@ export type Query = {
   workflowInstances: Array<WorkflowInstanceType>;
   /** Runs (tier 3) of one configured Workflow, newest first. */
   workflowRuns: Array<WorkflowRun>;
+  /** Observe a configured workflow's exact schedule identity, desired version and engine state, including cleanup after soft deletion. */
+  workflowSchedule?: Maybe<WorkflowScheduleState>;
   /** List stage executions for a WorkflowRun (by workflow_id + run_id). */
   workflowStageExecutions: Array<WorkflowStageExecutionType>;
   /** List stages for a workflow definition by slug. */
@@ -12315,6 +12829,28 @@ export type QueryAstroliftLocalModelArtifactsPageArgs = {
 };
 
 
+export type QueryAstroliftManagedDomainArgs = {
+  domainId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftManagedDomainDiagnosticsArgs = {
+  domainId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  hostname?: InputMaybe<Scalars['String']['input']>;
+  recordType?: ManagedDomainRecordType;
+};
+
+
+export type QueryAstroliftManagedDomainProbeArgs = {
+  domainId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  hostname: Scalars['String']['input'];
+  recordType?: ManagedDomainRecordType;
+  tool: ManagedDomainProbeTool;
+};
+
+
 export type QueryAstroliftManagedServiceArgs = {
   expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
@@ -13128,6 +13664,16 @@ export type QueryBriefArgs = {
 };
 
 
+export type QueryCloudflareDnsRecordsArgs = {
+  input: CloudflareDnsRecordsInput;
+};
+
+
+export type QueryCloudflareDnsZonesArgs = {
+  input: CloudflareDnsConnectionInput;
+};
+
+
 export type QueryClusterModelDedicatedAppsPageArgs = {
   clusterId: Scalars['GUID']['input'];
   expectedProviderId: Scalars['GUID']['input'];
@@ -13206,8 +13752,37 @@ export type QueryClusterModelUpdateAdmissionArgs = {
 };
 
 
+export type QueryDnsProviderConnectionsPageArgs = {
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+};
+
+
+export type QueryDnsProviderDomainBindingArgs = {
+  domainId: Scalars['GUID']['input'];
+};
+
+
 export type QueryEffectivePermissionsArgs = {
   userId: Scalars['ID']['input'];
+};
+
+
+export type QueryEmailDeliveryTestSupportArgs = {
+  managedServiceId: Scalars['GUID']['input'];
+};
+
+
+export type QueryEmailDeliveryTestsArgs = {
+  limit?: Scalars['Int']['input'];
+  managedServiceId: Scalars['GUID']['input'];
+};
+
+
+export type QueryEmailDeliveryTestsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  managedServiceId: Scalars['GUID']['input'];
 };
 
 
@@ -13236,6 +13811,24 @@ export type QueryHuggingFaceConnectionsPageArgs = {
   organizationId: Scalars['GUID']['input'];
   page?: Scalars['Int']['input'];
   pageSize?: Scalars['Int']['input'];
+};
+
+
+export type QueryHumanGateDecisionArgs = {
+  executionId: Scalars['ID']['input'];
+  stageExecutionId: Scalars['ID']['input'];
+};
+
+
+export type QueryInstallAlertMailSupportArgs = {
+  eventKind?: Scalars['String']['input'];
+};
+
+
+export type QueryInstallAlertMailTestsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  eventKind?: Scalars['String']['input'];
+  limit?: Scalars['Int']['input'];
 };
 
 
@@ -13341,6 +13934,12 @@ export type QueryPendingHumanGatesArgs = {
 };
 
 
+export type QueryPendingHumanGatesPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+};
+
+
 export type QueryPermissionCompareArgs = {
   scopeId?: InputMaybe<Scalars['String']['input']>;
   scopeType?: InputMaybe<Scalars['String']['input']>;
@@ -13442,7 +14041,8 @@ export type QueryToolDefsArgs = {
 
 export type QueryWorkflowArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
-  slug: Scalars['String']['input'];
+  slug?: InputMaybe<Scalars['String']['input']>;
+  workflowId?: InputMaybe<Scalars['GUID']['input']>;
 };
 
 
@@ -13527,6 +14127,11 @@ export type QueryWorkflowInstancesArgs = {
 export type QueryWorkflowRunsArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
   workflowId: Scalars['ID']['input'];
+};
+
+
+export type QueryWorkflowScheduleArgs = {
+  workflowId: Scalars['GUID']['input'];
 };
 
 
@@ -13671,6 +14276,13 @@ export type RegisterBedrockModelConnectionInput = {
   sourceFingerprint: Scalars['String']['input'];
   sourceIdentifier: Scalars['String']['input'];
   sourceKind: BedrockModelSourceKind;
+};
+
+export type RegisterCloudflareDnsZoneInput = {
+  connectionId: Scalars['GUID']['input'];
+  expectedConnectionVersion: Scalars['Int']['input'];
+  zoneId: Scalars['String']['input'];
+  zoneName: Scalars['String']['input'];
 };
 
 export type RegisterMobileDeviceInput = {
@@ -14015,10 +14627,27 @@ export type ScaleWorkloadInput = {
   workloadId: Scalars['GUID']['input'];
 };
 
-export type SendManagedServiceTestEmailInput = {
+export type SendEmailDeliveryTestInput = {
   body: InputMaybe<Scalars['String']['input']>;
+  expectedVersion: Scalars['Int']['input'];
   managedServiceId: Scalars['GUID']['input'];
   recipient: Scalars['String']['input'];
+  requestId: Scalars['GUID']['input'];
+  subject: InputMaybe<Scalars['String']['input']>;
+};
+
+export type SendInstallAlertMailTestInput = {
+  eventKind: Scalars['String']['input'];
+  expectedSourceFingerprint: Scalars['String']['input'];
+  requestId: Scalars['GUID']['input'];
+};
+
+export type SendManagedServiceTestEmailInput = {
+  body: InputMaybe<Scalars['String']['input']>;
+  expectedVersion: InputMaybe<Scalars['Int']['input']>;
+  managedServiceId: Scalars['GUID']['input'];
+  recipient: Scalars['String']['input'];
+  requestId: InputMaybe<Scalars['GUID']['input']>;
   subject: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -14837,6 +15466,15 @@ export type WithdrawSecretChangeInput = {
   proposalId: Scalars['GUID']['input'];
 };
 
+export type WorkflowDefinitionActivationResult = {
+  changed: Scalars['Boolean']['output'];
+  definitionId?: Maybe<Scalars['GUID']['output']>;
+  errors: Array<ValidationError>;
+  isEnabled?: Maybe<Scalars['Boolean']['output']>;
+  ok: Scalars['Boolean']['output'];
+  revision?: Maybe<Scalars['String']['output']>;
+};
+
 export type WorkflowDefinitionRun = {
   childRunCount: Scalars['Int']['output'];
   currentStageOrder?: Maybe<Scalars['Int']['output']>;
@@ -15066,6 +15704,29 @@ export type WorkflowRun = {
   temporalWorkflowId?: Maybe<Scalars['String']['output']>;
 };
 
+export type WorkflowScheduleResult = {
+  configurationSaved: Scalars['Boolean']['output'];
+  errors: Array<ValidationError>;
+  ok: Scalars['Boolean']['output'];
+  schedule?: Maybe<WorkflowScheduleState>;
+};
+
+export type WorkflowScheduleState = {
+  actionCount?: Maybe<Scalars['Int']['output']>;
+  configurationVersion: Scalars['Int']['output'];
+  confirmed: Scalars['Boolean']['output'];
+  desiredActive: Scalars['Boolean']['output'];
+  desiredRevision: Scalars['String']['output'];
+  engineCreatedAt?: Maybe<Scalars['DateTime']['output']>;
+  engineUpdatedAt?: Maybe<Scalars['DateTime']['output']>;
+  errorCode: Scalars['String']['output'];
+  message: Scalars['String']['output'];
+  observedAt: Scalars['DateTime']['output'];
+  observedState: Scalars['String']['output'];
+  scheduleId: Scalars['String']['output'];
+  workflowId: Scalars['String']['output'];
+};
+
 export type WorkflowStageExecutionType = {
   agentRunGuid?: Maybe<Scalars['String']['output']>;
   attemptNumber: Scalars['Int']['output'];
@@ -15096,6 +15757,7 @@ export type WorkflowStageExecutionType = {
   stageRole: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
+  temporalExecution?: Maybe<WorkflowStageTemporalExecution>;
 };
 
 /** One page of a cursor-paginated or numbered list. */
@@ -15109,6 +15771,12 @@ export type WorkflowStageExecutionTypePage = {
   pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type WorkflowStageTemporalExecution = {
+  namespace: Scalars['String']['output'];
+  runId: Scalars['String']['output'];
+  workflowId: Scalars['String']['output'];
 };
 
 export type WorkflowStageType = {

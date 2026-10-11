@@ -4,11 +4,18 @@ import { SharedModelsScreen } from "@/components/screens/models/SharedModelsScre
 import { useSharedModels } from "@/components/screens/models/use-shared-models";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import { useMe } from "@/graphql/user/user.hooks";
+import { useInstallManagedModel } from "@/hooks/use-install-policy";
 export function ModelsClient() {
   const { org } = useActiveOrg();
   const { user } = useMe();
   return <InventoryContext key={`${org?.id ?? ""}:${user?.id ?? ""}`} />;
 }
 function InventoryContext() {
-  return <SharedModelsScreen {...useSharedModels()} addChoices={<ModelAddChoiceClient />} />;
+  return (
+    <SharedModelsScreen
+      {...useSharedModels()}
+      addChoices={<ModelAddChoiceClient />}
+      installModel={useInstallManagedModel()}
+    />
+  );
 }

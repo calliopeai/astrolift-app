@@ -1,3 +1,4 @@
+from astrolift_services.models.email_delivery_test import EmailDeliveryObservation, EmailDeliveryTest
 from astrolift_services.models.email_event import EmailEvent, EmailEventKind
 from astrolift_services.models.gcp_gke_preparation_journal import (
     GCPGKEPreparationJournal,
@@ -45,6 +46,8 @@ __all__ = [
     "AppSecretMetadata",
     "EmailEvent",
     "EmailEventKind",
+    "EmailDeliveryObservation",
+    "EmailDeliveryTest",
     "HuggingFaceConnection",
     "LocalModelArtifact",
     "ManagedResourceAdoption",

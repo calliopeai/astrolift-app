@@ -492,6 +492,7 @@ def test_sync_accepts_a_tree_with_directories(org, cluster, user, auth_headers, 
     assert dev.files == files
 
 
+@override_config(BUILDER_FILES_MAX_BYTES=512 * 1024)
 def test_sync_too_large_rejected(org, cluster, user, auth_headers, workflow_starts):
     dev = _running_dev_env(org, cluster, user)
     # 600 KiB single file > 512 KiB cap
@@ -508,6 +509,7 @@ def test_sync_too_large_rejected(org, cluster, user, auth_headers, workflow_star
     assert workflow_starts == []
 
 
+@override_config(BUILDER_MAX_FILES=100)
 def test_sync_too_many_files_rejected(org, cluster, user, auth_headers, workflow_starts):
     dev = _running_dev_env(org, cluster, user)
     files = {f"f{i}.py": "x" for i in range(101)}
@@ -897,6 +899,7 @@ def test_sync_rejects_a_binary_file_without_valid_base64(
     assert workflow_starts == []
 
 
+@override_config(BUILDER_FILES_MAX_BYTES=512 * 1024)
 def test_sync_counts_binary_files_by_decoded_size(org, cluster, user, auth_headers, workflow_starts):
     """400 KiB of binary is 533 KiB of base64; the 512 KiB cap is on the
     decoded bytes, so it fits. 600 KiB decoded does not."""
@@ -995,7 +998,7 @@ def test_sync_rejects_a_malformed_data_file(
     assert workflow_starts == []
 
 
-@override_config(BUILDER_DATA_FILE_MAX_BYTES=1024)
+@override_config(BUILDER_DATA_FILE_MAX_BYTES=1024, BUILDER_FILES_MAX_BYTES=512 * 1024)
 def test_sync_enforces_the_configurable_data_file_limit(org, cluster, user, auth_headers, workflow_starts):
     dev = _running_dev_env(org, cluster, user)
     client = Client()
@@ -1019,7 +1022,7 @@ def test_sync_enforces_the_configurable_data_file_limit(org, cluster, user, auth
     assert "1024 byte limit" in over.json()["detail"]
 
 
-@override_config(BUILDER_DATA_FILE_MAX_BYTES=1024)
+@override_config(BUILDER_DATA_FILE_MAX_BYTES=1024, BUILDER_FILES_MAX_BYTES=512 * 1024)
 def test_sync_refuses_a_body_larger_than_the_limits_allow_before_reading_it(
     org, cluster, user, auth_headers, workflow_starts
 ):

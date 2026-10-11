@@ -40,23 +40,16 @@ def notifications_email_enabled() -> bool:
         return False
 
 
-def send_notice_email(
+def build_notice_email(
     *,
     to: Iterable[str],
     subject: str,
     html_body: str,
     text_body: str,
     tag: str = "",
-) -> int:
-    """Send one multipart/alternative notice to ``to``.
-
-    Returns the ``EmailMessage.send()`` count (0 when there are no
-    recipients or the send fails). Never raises -- a notice email is
-    best-effort and must not break the event fan-out that triggered it.
-    """
+) -> EmailMultiAlternatives:
+    """Shared notice composition for ordinary fan-out and exact-channel tests."""
     recipients = [r for r in to if r]
-    if not recipients:
-        return 0
 
     from_email = getattr(settings, "FROM_EMAIL", None) or "no-reply@astrolift.dev"
     msg = EmailMultiAlternatives(
@@ -77,8 +70,24 @@ def send_notice_email(
     if tag:
         msg.extra_headers["X-SES-MESSAGE-TAGS"] = f"MessageTag={tag}"
 
+    return msg
+
+
+def send_notice_email(
+    *,
+    to: Iterable[str],
+    subject: str,
+    html_body: str,
+    text_body: str,
+    tag: str = "",
+) -> int:
+    """Best-effort ordinary notice transport; a send count is not delivery."""
+    msg = build_notice_email(to=to, subject=subject, html_body=html_body, text_body=text_body, tag=tag)
+    if not msg.recipients():
+        return 0
+
     try:
         return msg.send(fail_silently=False)
     except Exception:  # noqa: BLE001 -- transport failure is audited by the caller
-        log.exception("notice email send failed", extra={"subject": subject, "tag": tag})
+        log.warning("notice email transport failed")
         return 0

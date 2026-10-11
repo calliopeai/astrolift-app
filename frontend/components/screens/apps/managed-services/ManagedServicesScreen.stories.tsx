@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, within } from "storybook/test";
 
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
 import { ManagedServiceMetricsPanel } from "@/components/observability/ManagedServiceMetricsPanel";
@@ -112,6 +113,29 @@ export const Provision: Story = {
       busy={false}
     />
   ),
+};
+
+/** calliope-installer#447: databases withheld; only the in-cluster variant may be provisioned. */
+export const ProvisionDatabasesWithheld: Story = {
+  render: () => (
+    <ProvisionSheet
+      open
+      onOpenChange={() => {}}
+      envs={ENVS}
+      onSubmit={async () => true}
+      busy={false}
+      databaseRestriction="Databases are withheld from Astrolift on this install: it holds no RDS or Aurora grant at all, so managed cloud databases are refused. Run an in-cluster variant or bind a database you bring."
+    />
+  ),
+  play: async () => {
+    const sheet = within(document.body);
+    await expect(sheet.getByText(/Databases are withheld/)).toBeVisible();
+    const submit = sheet.getByRole("button", { name: "Provision" });
+    await expect(submit).toBeDisabled();
+    await expect(submit).toHaveAttribute("aria-describedby", "ms-withheld");
+    await userEvent.type(sheet.getByLabelText("Variant (optional)"), "cnpg");
+    await expect(submit).not.toHaveAttribute("aria-describedby");
+  },
 };
 
 /** No environments yet: nothing to pick, so submit stays disabled. */

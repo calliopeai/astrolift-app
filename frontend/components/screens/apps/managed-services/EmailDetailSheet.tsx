@@ -53,6 +53,7 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
@@ -196,6 +197,7 @@ function emailList(
 
 /** The panels that carry data of their own, rendered by the route's containers. */
 export interface EmailDetailPanels {
+  delivery?: React.ReactNode;
   cost?: React.ReactNode;
   suppression?: React.ReactNode;
   senderConfig?: React.ReactNode;
@@ -207,6 +209,7 @@ export interface EmailDetailPanels {
 
 /** The sheet's sections; one shows at a time. */
 export type EmailDetailSection =
+  | "delivery"
   | "health"
   | "sending"
   | "suppressions"
@@ -224,6 +227,13 @@ export interface EmailDetailSheetViewProps {
   panels?: EmailDetailPanels;
   /** The section shown first (stories). */
   defaultSection?: EmailDetailSection;
+  /**
+   * Why Astrolift writes no DNS on this install (DNS withheld,
+   * calliope-installer#447). A pending domain identity's records are the
+   * operator's to publish. The note states that, not a cause: the driver only
+   * ever publishes inside base_domain, which this view does not know.
+   */
+  dnsRestriction?: string | null;
 }
 
 export function EmailDetailSheetView({
@@ -235,9 +245,12 @@ export function EmailDetailSheetView({
   loading,
   panels,
   defaultSection = "health",
+  dnsRestriction,
 }: EmailDetailSheetViewProps) {
+  const deliveryText = useTranslations("emailDelivery");
   const [section, setSection] = React.useState<EmailDetailSection>(defaultSection);
   const sections: { id: EmailDetailSection; label: string; shown: boolean }[] = [
+    { id: "delivery", label: deliveryText("title"), shown: !!panels?.delivery },
     { id: "health", label: "Health", shown: true },
     { id: "sending", label: "Identity & sending", shown: true },
     { id: "suppressions", label: "Suppressions", shown: Boolean(panels?.suppression) },
@@ -258,7 +271,15 @@ export function EmailDetailSheetView({
           </SheetDescription>
         </SheetHeader>
 
-        {loading && !detail ? (
+        {panels?.delivery ? (
+          <div className="p-1">
+            <Button variant="outline" onClick={() => setSection("delivery")}>
+              {deliveryText("title")}
+            </Button>
+            {active === "delivery" ? panels.delivery : null}
+          </div>
+        ) : null}
+        {active === "delivery" ? null : loading && !detail ? (
           <div className="space-y-4 p-1">
             <Skeleton className="h-24 w-full" />
             <Skeleton className="h-32 w-full" />
@@ -311,7 +332,7 @@ export function EmailDetailSheetView({
               </>
             ) : active === "sending" ? (
               <>
-                <IdentityPanel detail={detail} />
+                <IdentityPanel detail={detail} dnsRestriction={dnsRestriction} />
                 <DnsAuthPanel detail={detail} />
                 {panels?.senderConfig}
                 <SnsEventPublishingPanel serviceConfig={serviceConfig} />
@@ -524,7 +545,13 @@ export function CostPanelView({
 
 // ── Identity verification badge (#634) ─────────────────────────────
 
-function IdentityPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
+function IdentityPanel({
+  detail,
+  dnsRestriction,
+}: {
+  detail: AstroliftEmailServiceDetail;
+  dnsRestriction?: string | null;
+}) {
   const iv = detail.identityVerification;
   if (!iv) {
     return (
@@ -566,6 +593,12 @@ function IdentityPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
         <span className="text-foreground font-mono">{iv.identity}</span> (
         {iv.isDomain ? "domain identity" : "email identity"})
       </p>
+      {iv.isDomain && !verified && !failed && dnsRestriction ? (
+        <p className="text-warning-fg mb-3 text-xs">
+          Astrolift publishes no verification records on this install; publish them in the
+          identity&apos;s DNS zone. {dnsRestriction}
+        </p>
+      ) : null}
       {iv.verificationToken ? (
         <div className="bg-muted/40 text-2xs mb-3 rounded-md border p-2 font-mono">
           <p className="text-muted-foreground">TXT verification challenge:</p>

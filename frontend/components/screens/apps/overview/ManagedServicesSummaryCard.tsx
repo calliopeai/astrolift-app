@@ -27,7 +27,6 @@ import { Can } from "@/components/Can";
 import { StatusDot } from "@/components/StatusDot";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -46,21 +45,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import type {
   SummaryService,
-  TestEmailValues,
   useManagedServiceObjects,
   useQueueDepth,
   useRevealConnection,
-  useSendTestEmail,
 } from "./use-managed-services-summary";
 
 /** Compact human-readable size string. Avoids pulling in a new dep
@@ -489,102 +483,26 @@ export function RevealConnectionDialogView({
 
 // ─── send test email dialog ─────────────────────────────────────────
 
-export type SendTestEmailDialogViewProps = ManagedServiceDialogSlotProps &
-  ReturnType<typeof useSendTestEmail>;
-
+export type SendTestEmailDialogViewProps = ManagedServiceDialogSlotProps & {
+  body: React.ReactNode;
+};
 export function SendTestEmailDialogView({
   svc,
   open,
   onOpenChange,
-  sending: loading,
-  onSend,
+  body,
 }: SendTestEmailDialogViewProps) {
   const t = useTranslations("apps.settings.managedServicesSummary.sendEmailDialog");
-  const [recipient, setRecipient] = React.useState("");
-  const [subject, setSubject] = React.useState("");
-  const [body, setBody] = React.useState("");
-
-  React.useEffect(() => {
-    if (!open) {
-      setRecipient("");
-      setSubject("");
-      setBody("");
-    }
-  }, [open]);
-
-  async function handleSend() {
-    const values: TestEmailValues = { recipient, subject, body };
-    if (await onSend(values)) onOpenChange(false);
-  }
-
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
         <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2">
-            <SendIcon className="size-4" />
-            {t("title", { name: svc.name || svc.kind })}
-          </AlertDialogTitle>
+          <AlertDialogTitle>{t("title", { name: svc.name || svc.kind })}</AlertDialogTitle>
           <AlertDialogDescription>{t("description")}</AlertDialogDescription>
         </AlertDialogHeader>
-        <div className="space-y-3 py-2">
-          <div className="grid gap-1.5">
-            <Label htmlFor="msvc-test-recipient" className="text-xs">
-              {t("recipientLabel")}
-            </Label>
-            <Input
-              id="msvc-test-recipient"
-              type="email"
-              value={recipient}
-              onChange={(e) => setRecipient(e.target.value)}
-              placeholder="qa@example.com"
-              autoComplete="off"
-              spellCheck={false}
-              required
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="msvc-test-subject" className="text-xs">
-              {t("subjectLabel")}
-            </Label>
-            <Input
-              id="msvc-test-subject"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder={t("subjectPlaceholder")}
-              spellCheck={false}
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <Label htmlFor="msvc-test-body" className="text-xs">
-              {t("bodyLabel")}
-            </Label>
-            <Textarea
-              id="msvc-test-body"
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              placeholder={t("bodyPlaceholder")}
-              rows={3}
-            />
-          </div>
-          <p className="text-muted-foreground text-2xs">{t("hint")}</p>
-        </div>
+        {body}
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={loading}>{t("cancel")}</AlertDialogCancel>
-          <AlertDialogAction
-            disabled={loading || !recipient.trim()}
-            onClick={(e) => {
-              e.preventDefault();
-              void handleSend();
-            }}
-          >
-            {loading ? (
-              <Loader2Icon className="size-4 animate-spin" />
-            ) : (
-              <SendIcon className="size-4" />
-            )}
-            {t("send")}
-          </AlertDialogAction>
+          <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

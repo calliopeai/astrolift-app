@@ -11,6 +11,7 @@ import { BrainCircuitIcon, RocketIcon } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 import { ListPage } from "@/components/list/ListPage";
 import { Button } from "@/components/ui/button";
+import { type InstallManagedModel, InstallManagedModelCard } from "./InstallManagedModelCard";
 import type { ModelPage } from "./ModelSubscriptionsPanel";
 import { SHARED_MODEL_STATUSES } from "./shared-models-list";
 
@@ -46,9 +47,11 @@ export type SharedModelListRow = {
 export type SharedModelsScreenProps = {
   page: ModelPage<SharedModelListRow>;
   addChoices?: ReactNode;
+  /** The install's own model (calliope-installer#446), listed read-only above the deployments. */
+  installModel?: InstallManagedModel | null;
 };
 
-export function SharedModelsScreen({ page, addChoices }: SharedModelsScreenProps) {
+export function SharedModelsScreen({ page, addChoices, installModel }: SharedModelsScreenProps) {
   const t = useTranslations("models.shared.deployments");
   const inventory = useTranslations("models.shared.inventory");
   const connections = useTranslations("models.shared.connections");
@@ -80,9 +83,14 @@ export function SharedModelsScreen({ page, addChoices }: SharedModelsScreenProps
         ),
       }}
       notice={
-        addChoices ? (
-          <div id="model-add" className="scroll-mt-20">
-            {addChoices}
+        addChoices || installModel ? (
+          <div className="flex flex-col gap-4">
+            {installModel ? <InstallManagedModelCard model={installModel} /> : null}
+            {addChoices ? (
+              <div id="model-add" className="scroll-mt-20">
+                {addChoices}
+              </div>
+            ) : null}
           </div>
         ) : undefined
       }

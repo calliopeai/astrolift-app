@@ -142,9 +142,9 @@ def resolve_connection(
     """Return the one SourceConnection that authenticates ``purpose`` for
     ``organization``, or raise ``ConnectionResolutionError``.
 
-    ``repo`` is accepted for forward-compatibility (a future per-repo
-    App-installation lookup) and currently unused — org-level resolution
-    is sufficient because a GitHub App installation is org-wide.
+    ``repo`` (``owner/name`` or a clone URL) picks among several GitHub App
+    installations: each covers one GitHub account, so the one recorded on
+    the repo's owner is preferred (#2297). See :func:`covering_repo_owner`.
     """
     if purpose is PLATFORM_REPO_WRITE:
         return _resolve_org_ranked(
@@ -153,6 +153,7 @@ def resolve_connection(
             kinds_map=_PLATFORM_WRITE_KINDS,
             policy="platform-write",
             no_conn_message=_no_platform_conn_message(source_kind),
+            repo=repo,
         )
     if purpose is ORG_REPO_WRITE:
         return _resolve_org_ranked(
@@ -161,6 +162,7 @@ def resolve_connection(
             kinds_map=_ORG_WRITE_KINDS,
             policy="org-write",
             no_conn_message=_no_org_conn_message(source_kind),
+            repo=repo,
         )
     if purpose is USER_REPO_DISCOVERY:
         return _resolve_user_discovery(_org_id(organization), source_kind=source_kind, user_id=user_id)
@@ -174,6 +176,7 @@ def _resolve_org_ranked(
     kinds_map: dict[str, tuple[str, ...]],
     policy: str,
     no_conn_message: str,
+    repo: str | None = None,
 ) -> SourceConnection:
     """Pick the highest-ranked active org connection for ``source_kind``.
 
@@ -201,11 +204,36 @@ def _resolve_org_ranked(
     )
     if not rows:
         raise ConnectionResolutionError("PRECONDITION", no_conn_message)
+    rows = covering_repo_owner(rows, repo)
     # Preference order first (App-install wins on GitHub), then oldest
     # pk so repeated resolutions against the same org are stable.
     rank = {k: i for i, k in enumerate(accepted)}
     rows.sort(key=lambda r: (rank.get(r.kind, len(accepted)), r.pk))
     return rows[0]
+
+
+def _repo_owner(repo: str | None) -> str:
+    """The lower-cased owner of ``owner/name``, a clone URL or an SSH remote;
+    "" when there is no owner segment."""
+    parts = [p for p in (repo or "").strip().replace(":", "/").split("/") if p]
+    return parts[-2].lower() if len(parts) >= 2 else ""
+
+
+def covering_repo_owner(rows: list[SourceConnection], repo: str | None) -> list[SourceConnection]:
+    """Prefer the GitHub App installation on ``repo``'s owner (#2297).
+
+    An installation covers one GitHub account, so when an org holds several
+    and one of them is recorded on the repo's owner, the others are dropped.
+    When none is, every row is kept and ranking picks as before: rows from
+    the manifest flow and older reuse installs record the App's owner rather
+    than the account it was installed on, so a login mismatch proves
+    nothing. Other connection kinds pass through untouched.
+    """
+    owner = _repo_owner(repo)
+    install = SourceConnection.Kind.GITHUB_APP_INSTALL
+    if not owner or not any(r.kind == install and (r.account_login or "").lower() == owner for r in rows):
+        return rows
+    return [r for r in rows if r.kind != install or (r.account_login or "").lower() == owner]
 
 
 def _resolve_user_discovery(org_id, *, source_kind: str, user_id: int | None) -> SourceConnection:

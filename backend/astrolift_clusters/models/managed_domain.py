@@ -31,6 +31,11 @@ class ManagedDomain(BaseCoreModel):
     )
     dns_driver = models.CharField(max_length=64)
     dns_config = models.JSONField(default=dict, blank=True)
+    dns_provider_connection = models.ForeignKey(
+        "astrolift_clusters.DnsProviderConnection", null=True, blank=True, on_delete=models.PROTECT
+    )
+    dns_provider_zone_id = models.CharField(max_length=32, blank=True, default="", editable=False)
+    dns_provider_connection_version = models.PositiveIntegerField(null=True, editable=False)
     provision_state = models.CharField(
         max_length=64,
         blank=True,
@@ -159,6 +164,7 @@ def resolve_managed_domain(
             and getattr(org_default, "deleted_at", None) is None
             and getattr(org_default, "verification_state", ManagedDomain.VerificationState.NOT_REQUIRED)
             != ManagedDomain.VerificationState.PENDING
+            and org_default.dns_driver != "cloudflare_read_only"
         ):
             return org_default  # type: ignore[return-value]
         org_pk = getattr(organization, "pk", None)
@@ -170,6 +176,7 @@ def resolve_managed_domain(
                     deleted_at__isnull=True,
                 )
                 .exclude(verification_state=ManagedDomain.VerificationState.PENDING)
+                .exclude(dns_driver="cloudflare_read_only")
                 .order_by("pk")
                 .first()
             )
@@ -183,6 +190,7 @@ def resolve_managed_domain(
             deleted_at__isnull=True,
         )
         .exclude(verification_state=ManagedDomain.VerificationState.PENDING)
+        .exclude(dns_driver="cloudflare_read_only")
         .order_by("pk")
         .first()
     )
@@ -209,5 +217,6 @@ def managed_domain_for_zone(zone: str, organization_id: int | None) -> ManagedDo
             deleted_at__isnull=True,
         )
         .exclude(verification_state=ManagedDomain.VerificationState.PENDING)
+        .exclude(dns_driver="cloudflare_read_only")
         .first()
     )

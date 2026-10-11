@@ -190,7 +190,12 @@ for (const action of ["inspect", "settings", "subscribe", "remove"] as const) {
         .getByRole("button", { name: en.models.native.details.remove, exact: true })
         .click();
       await expect(settings).toHaveCount(0);
-      await expect(page.getByText(en.models.native.details.removed, { exact: true })).toBeVisible();
+      // The role query stops matching once the region is hidden; wait for the
+      // section to unmount so only the durable page-level notice remains.
+      await expect(page.locator("#model-settings")).toHaveCount(0);
+      const removed = page.getByText(en.models.native.details.removed, { exact: true });
+      await expect(removed).toHaveCount(1);
+      await expect(removed).toBeVisible();
       await expect(page.getByText(sourceArn, { exact: true })).toHaveCount(0);
       const writes = await (await context.request.get(`${api}/observations/model-writes`)).json();
       expect(writes[1]).toEqual({

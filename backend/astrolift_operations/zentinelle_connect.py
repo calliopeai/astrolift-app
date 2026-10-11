@@ -815,6 +815,14 @@ def _unregister_locked(gateway: ZentinelleClusterGateway, actor) -> ZentinelleCl
     return gateway
 
 
+def credential_accepted(connection: ZentinelleConnection) -> bool:
+    """Ask Zentinelle whether it still accepts this install's credential
+    (``GET /install``). A 401 marks the connection revoked and answers False;
+    any other answer is taken as live. Unreachable raises."""
+    reply = _install_call(connection, "GET", "/install", revoked_ok=True)
+    return reply.status != 401
+
+
 def disconnect(*, connection: ZentinelleConnection, actor=None, force: bool = False) -> DisconnectOutcome:
     """Revoke the install in Zentinelle, then remove every gateway it registered.
 

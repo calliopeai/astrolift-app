@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { createTranslator, NextIntlClientProvider, type IntlError } from "next-intl";
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import en from "@/messages/en.json";
 import es from "@/messages/es.json";
@@ -26,7 +26,11 @@ import {
   RevealConnectionDialogView,
   SendTestEmailDialogView,
 } from "./ManagedServicesSummaryCard";
-import type { TestEmailValues } from "./use-managed-services-summary";
+import { EmailDeliveryPanel } from "@/components/screens/email-delivery/EmailDeliveryPanel";
+import {
+  DELIVERY_PANEL,
+  DELIVERY_TEST,
+} from "@/components/screens/email-delivery/EmailDeliveryPanel.stories";
 const catalogs = { en, es, fr, de, ja, ko, "zh-Hans": zh, "pt-BR": pt };
 function Providers({
   children,
@@ -86,52 +90,23 @@ describe("translated managed service dialogs", () => {
     expect(onError).not.toHaveBeenCalled();
   });
   it.each(["fr", "ja"] as const)(
-    "%s retains recipient and content through rejected email send and retries the same request",
-    async (locale) => {
-      const onSend = vi
-        .fn<(values: TestEmailValues) => Promise<boolean>>()
-        .mockResolvedValueOnce(false)
-        .mockResolvedValueOnce(true);
-      const onError = vi.fn();
-      function Dialog() {
-        const [open, setOpen] = useState(true);
-        return (
-          <SendTestEmailDialogView
-            svc={EMAIL}
-            open={open}
-            onOpenChange={setOpen}
-            sending={false}
-            onSend={onSend}
-          />
-        );
-      }
+    "%s keeps reviewed provider acceptance visible in the existing quick-action dialog",
+    (locale) => {
+      const onError = vi.fn(),
+        onClose = vi.fn();
       render(
         <Providers locale={locale} onError={onError}>
-          <Dialog />
+          <SendTestEmailDialogView
+            svc={EMAIL}
+            open
+            onOpenChange={onClose}
+            body={<EmailDeliveryPanel {...DELIVERY_PANEL} current={DELIVERY_TEST} />}
+          />
         </Providers>
       );
-      const copy = catalogs[locale].apps.settings.managedServicesSummary.sendEmailDialog;
-      expect(screen.getByRole("button", { name: copy.send })).toBeDisabled();
-      const values = {
-        recipient: "recipient@example.test",
-        subject: "exact user subject",
-        body: "exact user body",
-      };
-      fireEvent.change(screen.getByLabelText(copy.recipientLabel), {
-        target: { value: values.recipient },
-      });
-      fireEvent.change(screen.getByLabelText(copy.subjectLabel), {
-        target: { value: values.subject },
-      });
-      fireEvent.change(screen.getByLabelText(copy.bodyLabel), { target: { value: values.body } });
-      fireEvent.click(screen.getByRole("button", { name: copy.send }));
-      await waitFor(() => expect(onSend).toHaveBeenCalledExactlyOnceWith(values));
       expect(screen.getByRole("alertdialog")).toBeInTheDocument();
-      expect(screen.getByLabelText(copy.recipientLabel)).toHaveValue(values.recipient);
-      expect(screen.getByLabelText(copy.bodyLabel)).toHaveValue(values.body);
-      fireEvent.click(screen.getByRole("button", { name: copy.send }));
-      await waitFor(() => expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument());
-      expect(onSend).toHaveBeenNthCalledWith(2, values);
+      expect(screen.getByText(catalogs[locale].emailDelivery.acceptedHelp)).toBeInTheDocument();
+      expect(onClose).not.toHaveBeenCalled();
       expect(onError).not.toHaveBeenCalled();
     }
   );

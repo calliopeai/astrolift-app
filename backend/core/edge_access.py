@@ -156,8 +156,14 @@ def reapply_edge(cluster: Any) -> bool:
     """Re-apply the edge so its shared policy carries the current rules.
 
     The same additive recipe run the control plane uses to bring the edge up
-    (#2130): it applies the edge's manifests and deletes nothing.
+    (#2130): it applies the edge's manifests and deletes nothing. On a
+    cluster held to the minimal RBAC contract that run is refused, so only
+    the access policies are written (:func:`_apply_access_policies`).
     """
+    from core.install_restrictions import cluster_scope_refusal
+
+    if cluster_scope_refusal(cluster):
+        return _apply_access_policies(cluster)
     from astrolift_workflows.client import start_workflow
     from astrolift_workflows.inputs import Actor, InstallClusterPrereqsInput
     from providers.k8s_native.edge_gateway import EDGE_COMPONENT_KEY
@@ -179,6 +185,38 @@ def reapply_edge(cluster: Any) -> bool:
         )
     except Exception:
         logger.exception("edge access: re-applying the edge on %s failed", cluster.slug)
+        return False
+    return True
+
+
+def _apply_access_policies(cluster: Any) -> bool:
+    """Write the edge's access policies, and nothing else (calliope-installer#447).
+
+    The recipe run that renders the whole edge writes a GatewayClass, the
+    EnvoyProxy and a HelmRelease, none of which the minimal RBAC contract
+    grants, so it is refused. The SecurityPolicies that carry per-app access
+    live in the edge namespace and are granted; the edge itself is the
+    cluster owner's.
+    """
+    from core.cluster_management import _driver_for_cluster  # type: ignore[attr-defined]
+    from providers.k8s_native.edge_gateway import EDGE_NAMESPACE, edge_access_manifests
+
+    manifests = edge_access_manifests(
+        getattr(cluster, "oidc_auth_config", None), list((cluster.edge_access_rules or {}).values())
+    )
+    if not manifests:
+        return True
+    try:
+        result = _driver_for_cluster(cluster).apply_manifests(cluster.slug, EDGE_NAMESPACE, manifests)
+    except Exception:
+        logger.exception("edge access: writing the access policies on %s failed", cluster.slug)
+        return False
+    if not result.ok:
+        logger.error(
+            "edge access: writing the access policies on %s failed: %s",
+            cluster.slug,
+            "; ".join(str(e) for e in result.errors),
+        )
         return False
     return True
 

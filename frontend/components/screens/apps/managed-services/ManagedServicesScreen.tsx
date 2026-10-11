@@ -152,6 +152,8 @@ function ValidationBadges({ service }: { service: ManagedService }) {
 
 export type ManagedServicesScreenProps = ReturnType<typeof useManagedServices> & {
   slug: string;
+  /** Why managed cloud databases are refused on this install (calliope-installer#447). */
+  databaseRestriction?: string | null;
   /**
    * The email deliverability sheet for one service, mounted only while
    * that service is open so its queries run only then.
@@ -194,6 +196,7 @@ export function ManagedServicesScreen({
   onDeprovision,
   renderEmailDetail,
   renderServiceDetail,
+  databaseRestriction,
 }: ManagedServicesScreenProps) {
   const [open, setOpen] = React.useState(false);
   const [deprovisionTarget, setDeprovisionTarget] = React.useState<ManagedService | null>(null);
@@ -353,6 +356,7 @@ export function ManagedServicesScreen({
           return ok;
         }}
         busy={busy}
+        databaseRestriction={databaseRestriction}
       />
 
       <AlertDialog
@@ -456,14 +460,29 @@ export interface ProvisionSheetProps {
   envs: AstroliftAppEnvironment[];
   onSubmit: (input: ProvisionInput) => Promise<boolean>;
   busy: boolean;
+  /** Why managed cloud databases are refused on this install (calliope-installer#447). */
+  databaseRestriction?: string | null;
 }
 
+// The in-cluster variant of each database kind the sheet offers: the one
+// choice left when the install withholds databases (no RDS or Aurora grant).
+const IN_CLUSTER_DATABASE: Record<string, string> = { postgres: "cnpg", mysql: "operator" };
+
 /** Pick an environment, kind, name and variant for a new managed service. */
-export function ProvisionSheet({ open, onOpenChange, envs, onSubmit, busy }: ProvisionSheetProps) {
+export function ProvisionSheet({
+  open,
+  onOpenChange,
+  envs,
+  onSubmit,
+  busy,
+  databaseRestriction,
+}: ProvisionSheetProps) {
   const [envName, setEnvName] = React.useState("");
   const [kind, setKind] = React.useState("postgres");
   const [name, setName] = React.useState("");
   const [variant, setVariant] = React.useState("");
+  const inCluster = IN_CLUSTER_DATABASE[kind];
+  const withheld = Boolean(databaseRestriction && inCluster && variant.trim() !== inCluster);
 
   React.useEffect(() => {
     if (!open) {
@@ -526,6 +545,12 @@ export function ProvisionSheet({ open, onOpenChange, envs, onSubmit, busy }: Pro
                 ))}
               </SelectContent>
             </Select>
+            {databaseRestriction && inCluster && (
+              <p id="ms-withheld" className="text-warning-fg text-xs">
+                {databaseRestriction} Set the variant to <code>{inCluster}</code> to run it on the
+                cluster.
+              </p>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="ms-name">Name (optional)</Label>
@@ -556,7 +581,11 @@ export function ProvisionSheet({ open, onOpenChange, envs, onSubmit, busy }: Pro
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={busy || !envName || !kind}>
+            <Button
+              type="submit"
+              disabled={busy || !envName || !kind || withheld}
+              aria-describedby={withheld ? "ms-withheld" : undefined}
+            >
               {busy ? "Provisioning…" : "Provision"}
             </Button>
           </SheetFooter>

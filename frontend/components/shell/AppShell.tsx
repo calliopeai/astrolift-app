@@ -1,6 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from "@/components/ui/sheet";
 
 import { cn } from "@/lib/utils";
 
@@ -35,6 +38,8 @@ export function AppShell({
   banner,
   className,
 }: AppShellProps) {
+  const t = useTranslations("responsiveShell");
+  const [mobileRail, setMobileRail] = React.useState<"navigation" | "projects" | null>(null);
   React.useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey || isTyping(e.target)) return;
@@ -58,12 +63,47 @@ export function AppShell({
       )}
     >
       {banner}
+      <div className="flex shrink-0 gap-2 border-b p-2 md:hidden">
+        <Button variant="outline" onClick={() => setMobileRail("navigation")}>
+          {t("navigation")}
+        </Button>
+        <Button variant="outline" onClick={() => setMobileRail("projects")}>
+          {t("projects")}
+        </Button>
+      </div>
+      <Sheet
+        open={mobileRail !== null}
+        onOpenChange={(open) => {
+          if (!open) setMobileRail(null);
+        }}
+      >
+        <SheetContent
+          side={mobileRail === "projects" ? "right" : "left"}
+          showCloseButton={false}
+          className="gap-0"
+        >
+          <SheetHeader className="flex-row items-center justify-between">
+            <SheetTitle>{t(mobileRail ?? "navigation")}</SheetTitle>
+            <SheetClose asChild>
+              <Button variant="outline">{t("close")}</Button>
+            </SheetClose>
+          </SheetHeader>
+          <div
+            className="min-h-0 flex-1 overflow-y-auto"
+            onClick={(event) => {
+              if ((event.target as HTMLElement).closest("a[href]")) setMobileRail(null);
+            }}
+          >
+            {mobileRail === "projects" ? projectsRail : mainRail}
+          </div>
+        </SheetContent>
+      </Sheet>
       <div className="flex min-h-0 flex-1">
-        {mainRail}
-        <main id="main-content" className="min-w-0 flex-1 overflow-y-auto px-6 py-5">
+        <div className="hidden shrink-0 md:block">{mainRail}</div>
+        <main id="main-content" className="min-w-0 flex-1 overflow-y-auto px-3 py-5 md:px-6">
           {children}
         </main>
-        {projectsRail}
+        <div className="hidden shrink-0 md:block">{projectsRail}</div>
       </div>
     </div>
   );
