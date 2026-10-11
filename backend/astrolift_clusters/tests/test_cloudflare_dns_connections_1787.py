@@ -865,9 +865,10 @@ def test_real_migration_retained_secret_history_refuses_then_empty_roundtrip(wor
     try:
         with pytest.raises(RuntimeError, match="Retained DNS connection"):
             executor.migrate([("astrolift_clusters", "0022_reviewed_log_collector")])
-        # Dependents in other apps unapply before the refusing migration runs;
-        # the clusters app itself must be untouched.
-        clusters_applied = {m for m in original_applied if m[0] == "astrolift_clusters"}
+        # Dependents, in other apps and later in this one, unapply before the
+        # refusing migration runs; it and everything before it stay applied.
+        refusing = "0023_dns_provider_connections"
+        clusters_applied = {m for m in original_applied if m[0] == "astrolift_clusters" and m[1] <= refusing}
         after = set(MigrationExecutor(connection).loader.applied_migrations)
         assert {m for m in after if m[0] == "astrolift_clusters"} == clusters_applied
         assert bytes(DnsProviderConnection.all_objects.get(pk=row.pk).secret_ciphertext) == secret.backend_ref

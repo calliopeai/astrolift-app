@@ -8270,7 +8270,20 @@
     "tlsVerifiedHelp": "このホスト名のTLSを検証し、HTTPステータスを観測しました。リダイレクトはたどりません。",
     "httpsDeadline": "HTTPS確認が期限までに完了しませんでした。再試行し、ホスト名が実行中のアプリにルーティングされているか確認してください。",
     "publicAddressRequired": "ホスト名が非公開アドレスに解決されるため、コントロールプレーンからは調査しません。",
-    "checkHttps": "HTTPSを確認"
+    "checkHttps": "HTTPSを確認",
+    "clusterBinding": "クラスターの AWS 認証情報（読み取り専用）",
+    "providerClusterUnavailable": "このゾーンをバインドしたクラスターが利用できないか、別の組織に属しているか、別の AWS アカウントに変わっています。「DNS を接続」からゾーンを再度バインドしてください。",
+    "certificate": "ゾーン証明書",
+    "certificateStatus": "プロバイダーでの状態",
+    "certificateValidationRecords": "検証レコード",
+    "certificateNotRecorded": "このゾーンにはまだ証明書が記録されていません。プロビジョニングで要求されます。",
+    "certificateClusterUnavailable": "このゾーンをプロビジョニングしたクラスターが利用できないか、AWS アカウントが検証されていないため、証明書を読み取れません。",
+    "certificateUnavailable": "プロバイダーから証明書を読み取れませんでした。更新して再試行してください。",
+    "certificateIssued": "証明書は発行済みで、このゾーンを対象にしています。",
+    "certificatePending": "証明書は DNS 検証を待っています。検証レコードがパブリックゾーンで解決される必要があります。",
+    "certificateNotValid": "証明書が有効ではありません（検証失敗、期限切れ、失効、または無効）。再度プロビジョニングして新しい証明書を要求してください。",
+    "certificateHostMismatch": "記録された証明書はこのゾーンを対象にしていません。再度プロビジョニングして対象の証明書を要求してください。",
+    "certificateAccountChanged": "プロバイダーは、このゾーンをプロビジョニングした AWS アカウントとは別のアカウントから応答しています。"
   },
   "domainConnections": {
     "title": "DNS を接続",
@@ -8328,7 +8341,17 @@
     "verifyPending": "所有権は確認されていません。権威プロバイダーで記録された TXT 確認値を確認してください。",
     "callbackSaved": "接続のコールバックは保存済みと報告しました。保存された接続を読み取り、現在の状態を確認してください。",
     "callbackUnconfirmed": "接続のコールバックを確認できませんでした。再試行する前に現在の接続を確認してください。",
-    "callbackDenied": "接続のコールバックが拒否されました。再試行する前に現在の権限と接続設定を確認してください。"
+    "callbackDenied": "接続のコールバックが拒否されました。再試行する前に現在の権限と接続設定を確認してください。",
+    "route53Cluster": "クラスターの認証情報",
+    "route53ClusterHelp": "ホストゾーンは、選択したクラスターの AWS 認証情報(そのクラスターの DNS を書き込む ID)で一覧表示されます。",
+    "route53NoClusters": "検証済みアカウントを持つ AWS クラスターがありません。",
+    "route53Shared": "共有",
+    "route53Private": "プライベート",
+    "route53Bind": "{domain} にバインド",
+    "route53OnlyReviewed": "このドメインにバインドできるのは {domain} という名前のゾーンだけです。",
+    "route53Bound": "ゾーンをバインドしました。レコードはこのクラスターの認証情報で読み取られます。",
+    "route53ZonesTruncated": "最初の 500 件のホストゾーンを表示しています。",
+    "route53NoZones": "この認証情報で見えるホストゾーンはありません。"
   },
   "emailDelivery": {
     "title": "メール配信テスト",

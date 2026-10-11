@@ -27,7 +27,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from k8s_native.managed._handle import ParsedHandle
+from k8s_native.managed._handle import ParsedHandle, service_object_name
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
 
@@ -137,11 +137,7 @@ class KubePrometheusStackDriver(ManagedServiceDriver):
                 organization_slug=spec.organization_slug,
                 app_slug=spec.app_slug,
             )
-            name = dns_label(
-                spec.app_slug,
-                spec.environment_name,
-                spec.service_handle_hint or "monitoring",
-            )
+            name = service_object_name(spec, kind=KIND, prefix="monitoring", max_length=63)
             handle = _pack_handle(
                 kind=KIND,
                 cluster_id=spec.tenant_cluster_id,

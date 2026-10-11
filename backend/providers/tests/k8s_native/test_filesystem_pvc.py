@@ -35,6 +35,7 @@ def _spec(**overrides):
         "service_handle_hint": "workspace",
         "size": "medium",
         "config": {"storage_class_name": "fast-rwx"},
+        "managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     }
     values.update(overrides)
     return ProvisionSpec(**values)
@@ -48,7 +49,7 @@ def test_storage_class_driver_validates_template_without_eager_claim() -> None:
 
     assert result.ok is True
     assert result.ready is True
-    assert result.handle == "filesystem/cluster-1/acme-payments/pvc-payments-shared-workspace"
+    assert result.handle == "filesystem/cluster-1/acme-payments/pvc-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     assert "consumer-local claims" in result.message
 
 
@@ -134,7 +135,7 @@ def test_rook_driver_rejects_storage_class_with_wrong_provisioner() -> None:
 
 def test_dynamic_pvc_binding_rejects_unsafe_capacity_and_access_mode() -> None:
     driver = StorageClassPVCDriver(config=PVCConfig(storage_class_name="standard"))
-    handle = ServiceHandle("filesystem/cluster-1/acme-payments/pvc-payments-shared-workspace")
+    handle = ServiceHandle("filesystem/cluster-1/acme-payments/pvc-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
 
     try:
         driver.binding(handle, {"capacity": "one disk"})
@@ -189,7 +190,7 @@ def test_dynamic_pvc_rejects_overlong_storage_class_dns_label() -> None:
 
 def test_dynamic_pvc_deprovision_is_data_safe_and_rejects_legacy_handle() -> None:
     driver = StorageClassPVCDriver(config=PVCConfig(storage_class_name="standard"))
-    handle = "filesystem/cluster-1/acme-payments/pvc-payments-shared-workspace"
+    handle = "filesystem/cluster-1/acme-payments/pvc-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
 
     retained = driver.deprovision(DeprovisionSpec(handle=handle))
     unconfirmed_delete = driver.deprovision(
@@ -214,7 +215,7 @@ def test_dynamic_pvc_binding_reports_transport_security_conservatively() -> None
     ``"true"`` for an unknown backend would tell a consumer its traffic is
     protected when it may not be.
     """
-    handle = ServiceHandle("filesystem/cluster-1/acme-payments/pvc-payments-shared-workspace")
+    handle = ServiceHandle("filesystem/cluster-1/acme-payments/pvc-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
 
     for driver in (
         StorageClassPVCDriver(config=PVCConfig(storage_class_name="standard")),

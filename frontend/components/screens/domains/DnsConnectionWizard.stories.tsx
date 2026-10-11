@@ -23,6 +23,21 @@ const zone = {
   status: "active",
   nameServers: ["ada.ns.cloudflare.com", "ben.ns.cloudflare.com"],
 };
+const awsCluster = {
+  id: "c0ffee00-0000-4000-8000-000000000001",
+  name: "prod-us-west-2",
+  region: "us-west-2",
+  shared: false,
+};
+const route53Zones = {
+  complete: true,
+  reason: "",
+  truncated: false,
+  items: [
+    { id: "Z0ACME0APPS", name: "apps.acme.example", privateZone: false, recordCount: 14 },
+    { id: "Z0ACME0INTERNAL", name: "internal.acme.example", privateZone: true, recordCount: 6 },
+  ],
+};
 const noop = () => {},
   yes = async () => true;
 export const DNS_SETUP: DnsConnectionWizardProps = {
@@ -74,6 +89,24 @@ export const DNS_SETUP: DnsConnectionWizardProps = {
   route53Domains: [DOMAIN_ACTIVE],
   route53Loading: false,
   route53Error: null,
+  route53Clusters: [
+    awsCluster,
+    {
+      ...awsCluster,
+      id: "c0ffee00-0000-4000-8000-000000000002",
+      name: "shared-edge",
+      shared: true,
+    },
+  ],
+  route53ClustersLoading: false,
+  route53ClustersError: null,
+  route53Cluster: null,
+  onRoute53Cluster: noop,
+  route53Zones: null,
+  route53ZonesLoading: false,
+  route53ZonesError: null,
+  route53Binding: null,
+  onAttachRoute53: yes,
   binding: null,
   currentBinding: null,
   verification: null,
@@ -231,4 +264,56 @@ export const UncertainTokenCreation: Story = {
     connections: null,
     actionError: en.domainConnections.uncertain,
   },
+};
+/** #2287: a reviewed domain lists hosted zones through a cluster's AWS credential. */
+export const Route53Clusters: Story = {
+  args: { provider: "route53", initialStep: "zone", target: DOMAIN_ACTIVE },
+};
+export const Route53Zones: Story = {
+  args: {
+    provider: "route53",
+    initialStep: "zone",
+    target: DOMAIN_ACTIVE,
+    route53Cluster: awsCluster.id,
+    route53Zones,
+  },
+};
+export const Route53NoMatchingZone: Story = {
+  args: {
+    provider: "route53",
+    initialStep: "zone",
+    target: { ...DOMAIN_ACTIVE, zone: "shop.acme.example" },
+    route53Cluster: awsCluster.id,
+    route53Zones,
+  },
+};
+export const Route53AccessDenied: Story = {
+  args: {
+    provider: "route53",
+    initialStep: "zone",
+    target: DOMAIN_ACTIVE,
+    route53Cluster: awsCluster.id,
+    route53ZonesError: "PROVIDER_ACCESS_DENIED",
+  },
+};
+export const Route53Bound: Story = {
+  args: {
+    provider: "route53",
+    initialStep: "zone",
+    target: DOMAIN_ACTIVE,
+    route53Cluster: awsCluster.id,
+    route53Zones,
+    message: "Zone bound. Its records are read with this cluster's credential.",
+    route53Binding: {
+      domainId: DOMAIN_ACTIVE.id,
+      domainVersion: 8,
+      clusterId: awsCluster.id,
+      accountId: "123456789012",
+      zone: route53Zones.items[0],
+      verificationState: "verified",
+    },
+  },
+};
+export const Route53NoClusters: Story = {
+  args: { provider: "route53", initialStep: "zone", target: DOMAIN_ACTIVE, route53Clusters: [] },
 };

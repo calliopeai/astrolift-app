@@ -26,7 +26,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from k8s_native.managed._handle import ParsedHandle
+from k8s_native.managed._handle import ParsedHandle, service_object_name
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
 
@@ -106,11 +106,7 @@ class GatewayAPIDriver(ManagedServiceDriver):
                 organization_slug=spec.organization_slug,
                 app_slug=spec.app_slug,
             )
-            name = dns_label(
-                spec.app_slug,
-                spec.environment_name,
-                spec.service_handle_hint or "gateway",
-            )
+            name = service_object_name(spec, kind=KIND, prefix="gateway", max_length=63)
             cfg = self._normalize(spec.config)
             self._assert_adoptable(
                 cluster_id=spec.tenant_cluster_id,

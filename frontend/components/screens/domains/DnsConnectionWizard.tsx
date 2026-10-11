@@ -146,24 +146,30 @@ export function DnsConnectionWizard(props: DnsConnectionWizardProps) {
         <section className="space-y-3" aria-label={t("zoneStep")}>
           <h2 className="font-semibold">{t("zoneStep")}</h2>
           <p className="text-sm">{t("route53Help")}</p>
-          {props.route53Loading ? (
-            <p role="status">{d("loading")}</p>
-          ) : props.route53Error ? (
-            <p role="alert">{explanation(props.route53Error)}</p>
+          {props.target && props.allowed ? (
+            <Route53ClusterZones {...props} explanation={explanation} />
           ) : (
-            <ul className="divide-y rounded-lg border">
-              {props.route53Domains.map((domain) => (
-                <li key={domain.id} className="space-y-1 p-3">
-                  <Link className="underline" href={`/domains/${domain.id}`}>
-                    {domain.zone}
-                  </Link>
-                  <p className="text-muted-foreground text-sm">{d("provisionHelp")}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-          {!props.route53Loading && !props.route53Error && !props.route53Domains.length && (
-            <p>{t("route53Empty")}</p>
+            <>
+              {props.route53Loading ? (
+                <p role="status">{d("loading")}</p>
+              ) : props.route53Error ? (
+                <p role="alert">{explanation(props.route53Error)}</p>
+              ) : (
+                <ul className="divide-y rounded-lg border">
+                  {props.route53Domains.map((domain) => (
+                    <li key={domain.id} className="space-y-1 p-3">
+                      <Link className="underline" href={`/domains/${domain.id}`}>
+                        {domain.zone}
+                      </Link>
+                      <p className="text-muted-foreground text-sm">{d("provisionHelp")}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {!props.route53Loading && !props.route53Error && !props.route53Domains.length && (
+                <p>{t("route53Empty")}</p>
+              )}
+            </>
           )}
           <Link href="/domains" className="text-sm underline">
             {t("configureRoute53")}
@@ -518,5 +524,81 @@ export function DnsConnectionWizard(props: DnsConnectionWizardProps) {
         onConfirm={() => (disconnect ? props.onDisconnect(disconnect) : false)}
       />
     </PageShell>
+  );
+}
+
+/** #2287: pick a cluster, then bind the hosted zone named exactly like the reviewed domain. */
+function Route53ClusterZones(
+  props: DnsConnectionWizardProps & { explanation: (value: string) => string }
+) {
+  const t = useTranslations("domainConnections"),
+    d = useTranslations("managedDomains");
+  const domain = props.target?.zone ?? "";
+  if (props.route53ClustersLoading) return <p role="status">{d("loading")}</p>;
+  if (props.route53ClustersError)
+    return <p role="alert">{props.explanation(props.route53ClustersError)}</p>;
+  if (!props.route53Clusters?.length) return <p>{t("route53NoClusters")}</p>;
+  return (
+    <div className="space-y-3">
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-medium">{t("route53Cluster")}</legend>
+        <p className="text-muted-foreground text-sm">{t("route53ClusterHelp")}</p>
+        <div className="flex flex-wrap gap-2">
+          {props.route53Clusters.map((cluster) => (
+            <Button
+              key={cluster.id}
+              variant={props.route53Cluster === cluster.id ? "default" : "outline"}
+              aria-pressed={props.route53Cluster === cluster.id}
+              disabled={props.busy || props.uncertain}
+              onClick={() => props.onRoute53Cluster(cluster.id)}
+            >
+              {cluster.name}
+              <span className="text-xs opacity-70">{cluster.region}</span>
+              {cluster.shared && <Badge variant="secondary">{t("route53Shared")}</Badge>}
+            </Button>
+          ))}
+        </div>
+      </fieldset>
+      {props.route53Cluster &&
+        (props.route53ZonesLoading ? (
+          <p role="status">{d("loading")}</p>
+        ) : props.route53ZonesError ? (
+          <p role="alert">{props.explanation(props.route53ZonesError)}</p>
+        ) : !props.route53Zones?.items.length ? (
+          <p>{t("route53NoZones")}</p>
+        ) : (
+          <>
+            <p className="text-muted-foreground text-sm">{t("route53OnlyReviewed", { domain })}</p>
+            <ul className="divide-y rounded-lg border">
+              {props.route53Zones.items.map((zone) => (
+                <li key={zone.id} className="flex flex-wrap items-center gap-2 p-3">
+                  <span className="min-w-0 flex-1 truncate font-mono text-sm" title={zone.name}>
+                    {zone.name}
+                  </span>
+                  <span className="text-muted-foreground font-mono text-xs">{zone.id}</span>
+                  {zone.privateZone && <Badge variant="outline">{t("route53Private")}</Badge>}
+                  {zone.name === domain && (
+                    <Button
+                      size="sm"
+                      disabled={props.busy || props.uncertain || !!props.route53Binding}
+                      onClick={() => void props.onAttachRoute53(zone)}
+                    >
+                      {t("route53Bind", { domain })}
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {props.route53Zones.truncated && (
+              <p className="text-muted-foreground text-sm">{t("route53ZonesTruncated")}</p>
+            )}
+          </>
+        ))}
+      {props.route53Binding && (
+        <Link className="text-sm underline" href={`/domains/${props.route53Binding.domainId}`}>
+          {d("back")}
+        </Link>
+      )}
+    </div>
   );
 }

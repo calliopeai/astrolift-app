@@ -8270,7 +8270,20 @@
     "tlsVerifiedHelp": "已验证此主机名的 TLS 并观测到 HTTP 状态。不会跟随重定向。",
     "httpsDeadline": "HTTPS 检查未在截止时间前完成。请重试，并确认该主机名路由到正在运行的应用。",
     "publicAddressRequired": "该主机名解析为非公共地址，因此不会从控制平面进行探测。",
-    "checkHttps": "检查 HTTPS"
+    "checkHttps": "检查 HTTPS",
+    "clusterBinding": "集群 AWS 凭据（只读）",
+    "providerClusterUnavailable": "绑定此区域所用的集群不可用、属于其他组织，或现在对应另一个 AWS 账户。请在“连接 DNS”中重新绑定该区域。",
+    "certificate": "区域证书",
+    "certificateStatus": "提供商状态",
+    "certificateValidationRecords": "验证记录",
+    "certificateNotRecorded": "此区域尚未记录证书；预配时会申请一个。",
+    "certificateClusterUnavailable": "预配此区域的集群不可用或其 AWS 账户未经验证，因此无法读取其证书。",
+    "certificateUnavailable": "无法从提供商读取证书。请刷新后重试。",
+    "certificateIssued": "证书已签发并覆盖此区域。",
+    "certificatePending": "证书正在等待 DNS 验证。其验证记录必须能在公共区域中解析。",
+    "certificateNotValid": "证书无效：验证失败、已过期、已吊销或未激活。请重新预配以申请新证书。",
+    "certificateHostMismatch": "记录的证书不覆盖此区域。请重新预配以申请覆盖它的证书。",
+    "certificateAccountChanged": "提供商现在从与预配此区域时不同的 AWS 账户返回结果。"
   },
   "domainConnections": {
     "title": "连接 DNS",
@@ -8328,7 +8341,17 @@
     "verifyPending": "尚未确认所有权。请检查权威提供商处已记录的 TXT 验证值。",
     "callbackSaved": "连接回调报告已保存。请读取已保存的连接以确认其当前状态。",
     "callbackUnconfirmed": "连接回调未获确认。请在重试前读取当前连接。",
-    "callbackDenied": "连接回调被拒绝。请在重试前检查当前权限和连接配置。"
+    "callbackDenied": "连接回调被拒绝。请在重试前检查当前权限和连接配置。",
+    "route53Cluster": "集群凭据",
+    "route53ClusterHelp": "托管区域使用所选集群的 AWS 凭据列出,即为该集群写入 DNS 的身份。",
+    "route53NoClusters": "没有可用的已验证账户的 AWS 集群。",
+    "route53Shared": "共享",
+    "route53Private": "私有",
+    "route53Bind": "绑定到 {domain}",
+    "route53OnlyReviewed": "只有名为 {domain} 的区域可以绑定到此域名。",
+    "route53Bound": "区域已绑定。其记录使用此集群的凭据读取。",
+    "route53ZonesTruncated": "显示前 500 个托管区域。",
+    "route53NoZones": "此凭据看不到任何托管区域。"
   },
   "emailDelivery": {
     "title": "邮件投递测试",

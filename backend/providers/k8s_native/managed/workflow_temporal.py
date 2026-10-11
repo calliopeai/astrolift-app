@@ -70,7 +70,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from k8s_native.managed._handle import ParsedHandle
+from k8s_native.managed._handle import ParsedHandle, service_object_name
 from k8s_native.managed._handle import pack as _pack_handle
 from k8s_native.managed._handle import unpack as _unpack_handle
 from k8s_native.managed._temporal_isolation import (
@@ -629,12 +629,7 @@ class TemporalWorkflowEngineDriver(ManagedServiceDriver):
         # The operator suffixes this name per service (``-frontend``,
         # ``-history``) and CNPG suffixes the persistence cluster again, so
         # leave room under the 63-character label limit.
-        return dns_label(
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint or "temporal",
-            max_length=40,
-        )
+        return service_object_name(spec, kind=KIND, prefix="temporal", max_length=40)
 
     @staticmethod
     def _temporal_namespace(spec: ProvisionSpec) -> str:

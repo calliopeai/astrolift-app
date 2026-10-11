@@ -275,3 +275,66 @@ export const NativeRoutingConfiguration: Story = {
     },
   },
 };
+/** #2287: a Route 53 zone bound through a cluster's AWS credential. */
+export const ClusterCredentialZone: Story = {
+  args: {
+    ...MANAGED_DOMAIN,
+    initialTab: "diagnostics",
+    diagnostics: {
+      ...DOMAIN_DIAGNOSTICS,
+      providerZone: { ...DOMAIN_DIAGNOSTICS.providerZone, bindingSource: "CLUSTER_CREDENTIAL" },
+    },
+  },
+};
+export const ClusterCredentialUnavailable: Story = {
+  args: {
+    ...MANAGED_DOMAIN,
+    initialTab: "diagnostics",
+    diagnostics: {
+      ...DOMAIN_DIAGNOSTICS,
+      providerZone: {
+        ...DOMAIN_DIAGNOSTICS.providerZone,
+        state: "ERROR",
+        reason: "PROVIDER_CLUSTER_UNAVAILABLE",
+        bindingSource: "CLUSTER_CREDENTIAL",
+        zoneId: null,
+        zoneName: null,
+        privateZone: null,
+        nameservers: [],
+        records: [],
+      },
+    },
+  },
+};
+/** #2287: the zone certificate waiting on DNS validation, and one that does not cover the zone. */
+export const CertificatePending: Story = {
+  args: {
+    ...MANAGED_DOMAIN,
+    initialTab: "diagnostics",
+    diagnostics: {
+      ...DOMAIN_DIAGNOSTICS,
+      certificate: {
+        ...DOMAIN_DIAGNOSTICS.certificate!,
+        state: "UNKNOWN",
+        reason: "CERTIFICATE_PENDING_VALIDATION",
+        status: "PENDING_VALIDATION",
+      },
+    },
+  },
+};
+export const CertificateHostMismatch: Story = {
+  args: {
+    ...MANAGED_DOMAIN,
+    initialTab: "diagnostics",
+    diagnostics: {
+      ...DOMAIN_DIAGNOSTICS,
+      certificate: {
+        ...DOMAIN_DIAGNOSTICS.certificate!,
+        state: "ERROR",
+        reason: "NATIVE_CERTIFICATE_HOST_MISMATCH",
+        status: null,
+        validationRecords: 0,
+      },
+    },
+  },
+};

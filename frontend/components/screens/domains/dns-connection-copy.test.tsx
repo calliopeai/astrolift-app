@@ -73,15 +73,39 @@ const keys = [
   "registrationAccepted",
   "ownershipVerified",
   "verifyPending",
+  "route53Cluster",
+  "route53ClusterHelp",
+  "route53NoClusters",
+  "route53Shared",
+  "route53Private",
+  "route53Bind",
+  "route53OnlyReviewed",
+  "route53Bound",
+  "route53ZonesTruncated",
+  "route53NoZones",
 ] as const;
+// #2287: the only keys that take an argument, and the only one they take.
+const withDomain = new Set<string>(["route53Bind", "route53OnlyReviewed"]);
 describe("all-eight DNS connection copy", () => {
+  it.each(locales)("%s names the domain in both argument keys", (locale) => {
+    for (const key of withDomain)
+      expect(catalogs[locale].domainConnections[key as (typeof keys)[number]]).toContain(
+        "{domain}"
+      );
+  });
   it.each(locales)("%s preserves exact new keys and zero ICU arguments", (locale) => {
     const copy = catalogs[locale].domainConnections;
     expect(Object.keys(copy).sort()).toEqual([...keys].sort());
     for (const key of keys) {
       expect(copy[key].trim()).not.toBe("");
       if (locale !== "en") expect(copy[key]).not.toBe(en.domainConnections[key]);
-      expect(parse(copy[key]).every((node) => node.type === TYPE.literal)).toBe(true);
+      expect(
+        parse(copy[key]).every(
+          (node) =>
+            node.type === TYPE.literal ||
+            (withDomain.has(key) && node.type === TYPE.argument && node.value === "domain")
+        )
+      ).toBe(true);
       const t = createTranslator({
         locale,
         messages: copy,
@@ -89,7 +113,7 @@ describe("all-eight DNS connection copy", () => {
           throw error;
         },
       });
-      expect(t(key)).not.toContain("domainConnections.");
+      expect(t(key, { domain: "acme.example" })).not.toContain("domainConnections.");
     }
   });
   it.each(locales)(

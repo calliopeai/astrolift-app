@@ -8273,7 +8273,20 @@
     "tlsVerifiedHelp": "Se verificó TLS para este nombre de host y se observó un estado HTTP. No se siguen las redirecciones.",
     "httpsDeadline": "La comprobación HTTPS no terminó antes del plazo. Repítela y verifica que el nombre de host lleve a una aplicación en ejecución.",
     "publicAddressRequired": "El nombre de host se resuelve en una dirección no pública, así que no se sondea desde el plano de control.",
-    "checkHttps": "Comprobar HTTPS"
+    "checkHttps": "Comprobar HTTPS",
+    "clusterBinding": "Credencial de AWS del clúster (solo lectura)",
+    "providerClusterUnavailable": "El clúster con el que se vinculó esta zona no está disponible, pertenece a otra organización o ahora corresponde a otra cuenta de AWS. Vuelva a vincular la zona desde Conectar DNS.",
+    "certificate": "Certificado de la zona",
+    "certificateStatus": "Estado en el proveedor",
+    "certificateValidationRecords": "Registros de validación",
+    "certificateNotRecorded": "Aún no hay un certificado registrado para esta zona; el aprovisionamiento solicita uno.",
+    "certificateClusterUnavailable": "El clúster que aprovisionó esta zona no está disponible o su cuenta de AWS no está verificada, así que no se puede leer su certificado.",
+    "certificateUnavailable": "No se pudo leer el certificado en el proveedor. Actualice para volver a intentarlo.",
+    "certificateIssued": "El certificado está emitido y cubre esta zona.",
+    "certificatePending": "El certificado espera la validación DNS. Sus registros de validación deben resolverse en la zona pública.",
+    "certificateNotValid": "El certificado no es válido: falló la validación, caducó, se revocó o está inactivo. Solicite uno nuevo volviendo a aprovisionar.",
+    "certificateHostMismatch": "El certificado registrado no cubre esta zona. Vuelva a aprovisionar para solicitar uno que sí la cubra.",
+    "certificateAccountChanged": "El proveedor ahora responde desde una cuenta de AWS distinta de aquella en la que se aprovisionó esta zona."
   },
   "domainConnections": {
     "title": "Conectar DNS",
@@ -8331,7 +8344,17 @@
     "verifyPending": "La propiedad no ha sido confirmada. Comprueba la prueba TXT registrada en el proveedor autoritativo.",
     "callbackSaved": "La respuesta de conexión indicó que se guardó. Consulta las conexiones guardadas para confirmar su estado actual.",
     "callbackUnconfirmed": "La respuesta de conexión no se confirmó. Consulta las conexiones actuales antes de volver a intentarlo.",
-    "callbackDenied": "La respuesta de conexión fue rechazada. Revisa los permisos actuales y la configuración antes de volver a intentarlo."
+    "callbackDenied": "La respuesta de conexión fue rechazada. Revisa los permisos actuales y la configuración antes de volver a intentarlo.",
+    "route53Cluster": "Credencial del clúster",
+    "route53ClusterHelp": "Las zonas alojadas se listan con la credencial de AWS del clúster seleccionado, la identidad que escribe el DNS de ese clúster.",
+    "route53NoClusters": "No hay ningún clúster de AWS con una cuenta verificada.",
+    "route53Shared": "compartido",
+    "route53Private": "privada",
+    "route53Bind": "Vincular a {domain}",
+    "route53OnlyReviewed": "Solo la zona llamada {domain} puede vincularse a este dominio.",
+    "route53Bound": "Zona vinculada. Sus registros se leen con la credencial de este clúster.",
+    "route53ZonesTruncated": "Se muestran las primeras 500 zonas alojadas.",
+    "route53NoZones": "Esta credencial no ve ninguna zona alojada."
   },
   "emailDelivery": {
     "title": "Pruebas de entrega de correo",
