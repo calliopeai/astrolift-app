@@ -56,9 +56,11 @@ def test_real_native_owner_migration_preserves_rows_and_replaces_only_reviewed_c
         # isolated test starts with no journals and never removes their rows.
         executor.migrate([_AFTER])
         executor = MigrationExecutor(connection)
-        assert [
-            (migration.name, backwards) for migration, backwards in executor.migration_plan([_BEFORE])
-        ] == [(_AFTER[1], True)]
+        plan = executor.migration_plan([_BEFORE])
+        # Only the reviewed migration does work on the way back; empty merge
+        # nodes joining sibling branches may unapply alongside it.
+        assert all(backwards for _, backwards in plan)
+        assert [migration.name for migration, _ in plan if migration.operations] == [_AFTER[1]]
         executor.migrate([_BEFORE])
         old_apps = MigrationExecutor(connection).loader.project_state([_BEFORE]).apps
         service = old_apps.get_model(_APP, "ManagedService")
