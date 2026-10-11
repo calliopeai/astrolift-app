@@ -1097,6 +1097,7 @@
         "targetPort": "転送先ポート",
         "stripPrefix": "ワークロードに転送する前にプレフィックスを削除",
         "routesHint": "新しいルートは上の「保存」で適用されます。",
+        "noWorkloadsBlocked": "パスルートはワークロードを対象にします。このアプリにワークロードを登録してから、ルートを追加してください。",
         "kinds": {
           "http_to_https": "HTTP → HTTPS",
           "apex_to_www": "ルートドメイン → www",
@@ -1949,6 +1950,7 @@
       },
       "expiry": {
         "expired": "{days, plural, one {#日前} other {#日前}}に期限切れ",
+        "expiredToday": "本日期限切れ",
         "rotateSoon": "ローテーションが必要：{days, plural, one {#日後} other {#日後}}に期限切れ",
         "expires": "{days, plural, one {#日後} other {#日後}}に期限切れ"
       },

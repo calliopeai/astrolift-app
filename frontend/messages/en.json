@@ -1624,6 +1624,7 @@
         "targetPort": "Target port",
         "stripPrefix": "Strip prefix before forwarding to workload",
         "routesHint": "New routes apply after you click Save above.",
+        "noWorkloadsBlocked": "Path routes target a workload. Register a workload on this app, then add the route.",
         "kinds": {
           "http_to_https": "HTTP → HTTPS",
           "apex_to_www": "Apex → www",
@@ -1802,6 +1803,7 @@
       },
       "expiry": {
         "expired": "Expired {days, plural, one {# day ago} other {# days ago}}",
+        "expiredToday": "Expired today",
         "rotateSoon": "Rotate — expires in {days, plural, one {# day} other {# days}}",
         "expires": "Expires in {days, plural, one {# day} other {# days}}"
       },
