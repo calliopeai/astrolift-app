@@ -1,0 +1,203 @@
+{
+  "legacyProducerHead": "5537cc7dd9861c6d8ea976758f47caa09f80c7b6",
+  "producerBase": "1c991a613072df4fccf8d0b92d3dd9709e59c153",
+  "commonProjectionHead": "704c5793eaae83e08186f2f554644f475a7349ef",
+  "producerSources": {
+    "backend/astrolift_services/native_model_projection.py": "8c0ec08cc9f01af9918658ced50a54087dc585f691436b726ed2b8bfcd55463e",
+    "backend/astrolift_services/schema/native_model_types.py": "91099a7475c94911ce3c673d75badfc5322421ebac171bcd7558f62fb18095fb",
+    "backend/schema.graphql": "66fbfabdccd36eb77b86aab1980ef543ccff583b69808ce2f2dacca59b91af67"
+  },
+  "rows": [
+    {
+      "case": "foundation",
+      "provenance": "HTTP_POSTGRES",
+      "serializedQueryData": {
+        "sourceKind": "bedrock_foundation_model",
+        "nativeSource": {
+          "protocol": "BEDROCK",
+          "sourceKind": "FOUNDATION_MODEL"
+        },
+        "nativeConnection": {
+          "family": "BEDROCK",
+          "sourceKind": "BEDROCK_FOUNDATION_MODEL",
+          "configurationState": "CONFIGURED",
+          "invokeAccess": "UNKNOWN",
+          "reason": null,
+          "resourceIdentityFingerprint": "e651c3bb049eddae8057d99a9e1895dec1a81f6a76b0e9d1af2dbab633efc51a",
+          "reviewedSourceFingerprint": "eeaa8f0356478ec789956865bd5209f1158005bc371ac6d5784cc6a2921e33db",
+          "metadataObservedAt": "2026-10-04T00:00:00+00:00",
+          "source": {
+            "__typename": "NativeModelConnectionSource",
+            "protocol": "BEDROCK",
+            "sourceKind": "FOUNDATION_MODEL",
+            "accountId": "123456789012",
+            "region": "us-east-1",
+            "partition": "aws",
+            "sourceId": "anthropic.claude-3-haiku-20240307-v1:0",
+            "sourceArn": "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-haiku-20240307-v1:0",
+            "destinationModelArns": [],
+            "sourceFingerprint": "eeaa8f0356478ec789956865bd5209f1158005bc371ac6d5784cc6a2921e33db",
+            "metadataObservedAt": "2026-10-04T00:00:00+00:00",
+            "configurationState": "configured",
+            "invokeAccess": "unknown"
+          }
+        }
+      },
+      "legacyProjection": {
+        "sourceKind": "bedrock_foundation_model",
+        "nativeSource": {
+          "protocol": "BEDROCK",
+          "sourceKind": "FOUNDATION_MODEL"
+        }
+      }
+    },
+    {
+      "case": "profile",
+      "provenance": "HTTP_POSTGRES",
+      "serializedQueryData": {
+        "sourceKind": "bedrock_inference_profile",
+        "nativeSource": {
+          "protocol": "BEDROCK",
+          "sourceKind": "INFERENCE_PROFILE"
+        },
+        "nativeConnection": {
+          "family": "BEDROCK",
+          "sourceKind": "BEDROCK_INFERENCE_PROFILE",
+          "configurationState": "CONFIGURED",
+          "invokeAccess": "UNKNOWN",
+          "reason": null,
+          "resourceIdentityFingerprint": "9b855b2b02d0f1d2e27631a09575b5e31aef16c607701acccf5d5c2d8de45e21",
+          "reviewedSourceFingerprint": "348fbbada90a22d784ecdc129288fed3544fbbc941bd070b844a5b7a526f2ff2",
+          "metadataObservedAt": "2026-10-04T00:00:00+00:00",
+          "source": {
+            "__typename": "NativeModelConnectionSource",
+            "protocol": "BEDROCK",
+            "sourceKind": "INFERENCE_PROFILE",
+            "accountId": "123456789012",
+            "region": "us-east-1",
+            "partition": "aws",
+            "sourceId": "us.anthropic.claude-3-haiku-20240307-v1:0",
+            "sourceArn": "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-3-haiku-20240307-v1:0",
+            "destinationModelArns": [
+              "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"
+            ],
+            "sourceFingerprint": "348fbbada90a22d784ecdc129288fed3544fbbc941bd070b844a5b7a526f2ff2",
+            "metadataObservedAt": "2026-10-04T00:00:00+00:00",
+            "configurationState": "configured",
+            "invokeAccess": "unknown"
+          }
+        }
+      },
+      "legacyProjection": {
+        "sourceKind": "bedrock_inference_profile",
+        "nativeSource": {
+          "protocol": "BEDROCK",
+          "sourceKind": "INFERENCE_PROFILE"
+        }
+      }
+    },
+    {
+      "case": "withdrawn",
+      "provenance": "HTTP_POSTGRES",
+      "serializedQueryData": {
+        "sourceKind": "bedrock_foundation_model",
+        "nativeSource": null,
+        "nativeConnection": {
+          "family": "BEDROCK",
+          "sourceKind": "BEDROCK_FOUNDATION_MODEL",
+          "configurationState": "UNAVAILABLE",
+          "invokeAccess": "UNKNOWN",
+          "reason": "Native connection configuration is unavailable.",
+          "resourceIdentityFingerprint": null,
+          "reviewedSourceFingerprint": null,
+          "metadataObservedAt": null,
+          "source": null
+        }
+      },
+      "legacyProjection": {
+        "sourceKind": "bedrock_foundation_model",
+        "nativeSource": null
+      }
+    },
+    {
+      "case": "unknown",
+      "provenance": "HTTP_POSTGRES",
+      "serializedQueryData": {
+        "sourceKind": "bedrock_unknown",
+        "nativeSource": null,
+        "nativeConnection": {
+          "family": "BEDROCK",
+          "sourceKind": "UNKNOWN",
+          "configurationState": "UNAVAILABLE",
+          "invokeAccess": "UNKNOWN",
+          "reason": "Native connection configuration is unavailable.",
+          "resourceIdentityFingerprint": null,
+          "reviewedSourceFingerprint": null,
+          "metadataObservedAt": null,
+          "source": null
+        }
+      },
+      "legacyProjection": {
+        "sourceKind": "bedrock_unknown",
+        "nativeSource": null
+      }
+    },
+    {
+      "case": "vertex_unadopted",
+      "provenance": "TRANSIENT_STRAWBERRY_UNADOPTED",
+      "serializedQueryData": {
+        "sourceKind": "vertex_endpoint",
+        "nativeSource": null,
+        "nativeConnection": {
+          "family": "VERTEX",
+          "sourceKind": "VERTEX_ENDPOINT",
+          "configurationState": "UNAVAILABLE",
+          "invokeAccess": "UNKNOWN",
+          "reason": "Native connection adoption is not implemented for this family.",
+          "resourceIdentityFingerprint": null,
+          "reviewedSourceFingerprint": null,
+          "metadataObservedAt": null,
+          "source": null
+        }
+      }
+    },
+    {
+      "case": "foundry_unadopted",
+      "provenance": "TRANSIENT_STRAWBERRY_UNADOPTED",
+      "serializedQueryData": {
+        "sourceKind": "foundry_deployment",
+        "nativeSource": null,
+        "nativeConnection": {
+          "family": "FOUNDRY",
+          "sourceKind": "FOUNDRY_DEPLOYMENT",
+          "configurationState": "UNAVAILABLE",
+          "invokeAccess": "UNKNOWN",
+          "reason": "Native connection adoption is not implemented for this family.",
+          "resourceIdentityFingerprint": null,
+          "reviewedSourceFingerprint": null,
+          "metadataObservedAt": null,
+          "source": null
+        }
+      }
+    },
+    {
+      "case": "unknown_family",
+      "provenance": "TRANSIENT_STRAWBERRY_UNADOPTED",
+      "serializedQueryData": {
+        "sourceKind": "unknown",
+        "nativeSource": null,
+        "nativeConnection": {
+          "family": "UNKNOWN",
+          "sourceKind": "UNKNOWN",
+          "configurationState": "UNAVAILABLE",
+          "invokeAccess": "UNKNOWN",
+          "reason": "Native connection source family is unsupported or inconsistent.",
+          "resourceIdentityFingerprint": null,
+          "reviewedSourceFingerprint": null,
+          "metadataObservedAt": null,
+          "source": null
+        }
+      }
+    }
+  ]
+}

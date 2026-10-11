@@ -287,14 +287,20 @@ def _idle(service):
 
 
 def _enqueue(info, service, *, action="apply", delete_data=False):
+    from astrolift_services.native_model_connections import is_bedrock_connection
     from astrolift_services.schema.mutations.managed_services import _workflow_actor
     from astrolift_workflows.client import start_workflow
     from astrolift_workflows.inputs import SharedModelReconcileInput
 
-    service.operation_kind = "deprovision" if action == "delete" else "reconcile"
-    service.operation_workflow_id = (
-        f"SharedModelReconcileWorkflow-{service.guid}-{service.subscription_revision}"
+    workflow_name = (
+        "NativeModelConnectionReconcileWorkflow"
+        if is_bedrock_connection(service)
+        else "SharedModelReconcileWorkflow"
     )
+    if is_bedrock_connection(service) and action != "apply":
+        raise ModelOperationUnavailable
+    service.operation_kind = "deprovision" if action == "delete" else "reconcile"
+    service.operation_workflow_id = f"{workflow_name}-{service.guid}-{service.subscription_revision}"
     service.model_operation_cluster_guid = service.tenant_cluster.guid
     service.model_operation_provider_guid = service.tenant_cluster.provider_plugin.guid
     service.operation_started_at = timezone.now()
@@ -319,7 +325,7 @@ def _enqueue(info, service, *, action="apply", delete_data=False):
     )
     try:
         handle = start_workflow(
-            "SharedModelReconcileWorkflow",
+            workflow_name,
             args=[
                 SharedModelReconcileInput(
                     service.pk, service.subscription_revision, _workflow_actor(info), action, delete_data
@@ -399,10 +405,16 @@ def _subscribe_model(info, input, *, connection_request=None):
                     requested_version=input.if_match_version,
                     kind="Model deployment",
                 )
+            from astrolift_services.native_model_connections import (
+                is_bedrock_connection,
+                model_connectable,
+                verify_source,
+            )
+
             if (
                 not _idle(service)
                 or service.status != "active"
-                or not cluster_model_to_type(service).ready
+                or not model_connectable(service)
                 or (service.config or {}).get("allow_subscriptions") is not True
             ):
                 return _refusal()
@@ -445,6 +457,8 @@ def _subscribe_model(info, input, *, connection_request=None):
             )
             # This is the last potentially blocking attachment lock. Re-admit source,
             # policy and the current durable human quorum after it, before any effect.
+            if is_bedrock_connection(service):
+                verify_source(service)
             if connection_request is None:
                 _recheck_authority(info, Permission.APP_UPDATE, service.tenant_cluster, environment=env)
                 if not source_current(service) or effective_policy(service).mode != "AUTO":
@@ -474,7 +488,9 @@ def _subscribe_model(info, input, *, connection_request=None):
                 reconcile_started_at=timezone.now(),
             )
             row.credential_ref = (
-                f"services/{service.organization.guid}/{service.guid}/subscriptions/{row.guid}#api_key"
+                ""
+                if is_bedrock_connection(service)
+                else f"services/{service.organization.guid}/{service.guid}/subscriptions/{row.guid}#api_key"
             )
             row.save()
             _enqueue(info, service)
@@ -721,7 +737,7 @@ class ClusterModelMutations:
         try:
             with transaction.atomic():
                 service = _locked_model(input)
-                if service is None or not _idle(service):
+                if service is None or service.variant != "vllm" or not _idle(service):
                     return _refusal()
                 from astrolift_services.schema.hf_connections import require_host_admin
 
@@ -775,7 +791,7 @@ class ClusterModelMutations:
         try:
             with transaction.atomic():
                 service = _locked_model(input)
-                if service is None or not _idle(service):
+                if service is None or service.variant != "vllm" or not _idle(service):
                     return _refusal()
                 from astrolift_services.schema.hf_connections import require_host_admin
 

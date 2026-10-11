@@ -18,7 +18,7 @@ import { ModelRuntimeSetupPanel, type ModelRuntimeSetupProps } from "./ModelRunt
 import { runtimeSetupFixture } from "./ModelRuntimeSetupPanel.stories";
 import { useModelRuntimeSetup } from "./use-model-runtime-setup";
 const locales = { en, es, fr, de, ja, ko, "zh-Hans": zh, "pt-BR": pt };
-const schema = buildSchema(readFileSync("../backend/schema.graphql", "utf8"));
+const schema = buildSchema(readFileSync("schema.graphql", "utf8"));
 type Request = { operationName: string; query: string; variables: Record<string, unknown> };
 let requests: Request[],
   readCount: number,

@@ -298,7 +298,9 @@ class ModelReadsQuery:
                 raise GraphQLError(
                     "Model observation target changed or is unavailable", extensions={"code": "PRECONDITION"}
                 )
-            rows = live_cluster_models(ManagedService.objects.filter(tenant_cluster=cluster), org_id)
+            rows = live_cluster_models(
+                ManagedService.objects.filter(tenant_cluster=cluster, variant="vllm"), org_id
+            )
             return cluster_density(
                 cluster,
                 rows,

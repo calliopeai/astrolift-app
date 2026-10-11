@@ -39,7 +39,6 @@ def locked_targets(
     info, input, *, ready=True, request_only=True, approvals=0, permission=Permission.APP_UPDATE
 ):
     from astrolift_services.schema.cluster_model_mutations import _idle, _locked_model, _ModelIdentity
-    from astrolift_services.schema.model_types import cluster_model_to_type
 
     locked_organization()
     service = _locked_model(
@@ -80,10 +79,12 @@ def locked_targets(
         raise ConnectionUnavailable("Model or destination is unavailable for this app.")
     env.registered_app = app
     env.tenant_cluster = service.tenant_cluster
+    from astrolift_services.native_model_connections import model_connectable
+
     if ready and (
         not _idle(service)
         or service.status != "active"
-        or not cluster_model_to_type(service).ready
+        or not model_connectable(service)
         or (service.config or {}).get("allow_subscriptions") is not True
     ):
         raise ConnectionUnavailable("Model connection target is not ready for subscriptions.")
@@ -108,6 +109,7 @@ def reviewed_versions(service, env):
         "local_manifest_sha256": config.get("model_artifact_manifest_sha256"),
         "connection_id": str(service.model_hf_connection.guid) if service.model_hf_connection_id else None,
         "connection_version": service.model_hf_connection_version,
+        "native_connection": config.get("native_connection"),
     }
     return {
         "source": source,
@@ -123,6 +125,10 @@ def reviewed_versions(service, env):
 
 def source_current(service):
     config = service.config or {}
+    from astrolift_services.native_model_connections import current, is_bedrock_connection
+
+    if is_bedrock_connection(service):
+        return current(service)
     if config.get("model_source") == "local_artifact":
         from _sdk.local_model_artifact import local_source_identity
 

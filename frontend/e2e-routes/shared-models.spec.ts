@@ -250,6 +250,7 @@ for (const computeMode of ["cpu", "gpu"] as const) {
     await page
       .getByRole("link", { name: en.models.shared.inventory.addModel, exact: true })
       .click();
+    await page.getByRole("link", { name: en.models.native.add.hostAction, exact: true }).click();
     await expect(page.getByRole("heading", { name: "Host a model", exact: true })).toBeVisible();
     const journey = page.getByRole("navigation", { name: "Hosting setup", exact: true });
     await expect(journey).toContainText("Choose model");

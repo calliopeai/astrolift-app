@@ -82,6 +82,22 @@ class AstroliftServerInfoTest(TestCase):
         self.assertIsNotNone(result.errors)
         self.assertIsNone(result.data["astroliftWorkloadActionTarget"])
 
+    def test_native_metadata_capability_is_wired_but_does_not_authorize_a_model_read(self) -> None:
+        self.assertIn("models.native_connection_metadata", self._execute()["capabilities"])
+        projection = schema.execute_sync(
+            '{ __type(name: "ClusterModelDeployment") { fields { name } } }',
+            context_value=_anonymous_context(),
+        )
+        self.assertIsNone(projection.errors)
+        self.assertIn("nativeConnection", {field["name"] for field in projection.data["__type"]["fields"]})
+        read = schema.execute_sync(
+            '{ clusterModelDeployment(organizationId: "11111111-1111-4111-8111-111111111111", '
+            'id: "22222222-2222-4222-8222-222222222222") { nativeConnection { family configurationState } } }',
+            context_value=_anonymous_context(),
+        )
+        self.assertIsNotNone(read.errors)
+        self.assertIsNone(read.data["clusterModelDeployment"])
+
     def test_discovery_reports_wired_reviewed_cluster_installers(self) -> None:
         capabilities = self._execute()["capabilities"]
         self.assertIn("clusters.reviewed_agent_install", capabilities)

@@ -20,9 +20,11 @@ binding env-var shape, snapshot + restore.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
+from botocore.exceptions import ClientError
 
 from _sdk.managed_service import (
     DeprovisionSpec,
@@ -66,6 +68,7 @@ class FakeBedrockClient:
     provisioned: dict[str, dict[str, Any]] = field(default_factory=dict)
     create_calls: list[dict[str, Any]] = field(default_factory=list)
     delete_calls: list[str] = field(default_factory=list)
+    tags: dict[str, list[dict[str, str]]] = field(default_factory=dict)
 
     def create_provisioned_model_throughput(
         self,
@@ -74,7 +77,8 @@ class FakeBedrockClient:
         provisionedModelName: str,
         modelId: str,
         commitmentDuration: str,
-        tags: dict[str, str],
+        tags: list[dict[str, str]],
+        clientRequestToken: str,
     ) -> dict[str, Any]:
         self.create_calls.append(
             {
@@ -83,15 +87,22 @@ class FakeBedrockClient:
                 "modelId": modelId,
                 "commitmentDuration": commitmentDuration,
                 "tags": tags,
+                "clientRequestToken": clientRequestToken,
             },
         )
-        arn = f"arn:aws:bedrock:us-east-1:123:provisioned-model/{provisionedModelName}"
+        arn = "arn:aws:bedrock:us-east-1:123456789012:provisioned-model/abcdefgh1234"
         self.provisioned[arn] = {
-            "status": "InService",
-            "modelId": modelId,
+            "status": "Creating",
+            "provisionedModelArn": arn,
+            "provisionedModelName": provisionedModelName,
+            "modelArn": f"arn:aws:bedrock:us-east-1::foundation-model/{modelId}",
+            "desiredModelArn": f"arn:aws:bedrock:us-east-1::foundation-model/{modelId}",
+            "desiredModelUnits": modelUnits,
+            "commitmentExpirationTime": datetime.now(UTC) + timedelta(days=180),
             "commitmentDuration": commitmentDuration,
             "modelUnits": modelUnits,
         }
+        self.tags[arn] = tags
         return {"provisionedModelArn": arn}
 
     def delete_provisioned_model_throughput(
@@ -107,9 +118,15 @@ class FakeBedrockClient:
         *,
         provisionedModelId: str,
     ) -> dict[str, Any]:
-        if provisionedModelId not in self.provisioned:
-            raise RuntimeError(f"ResourceNotFound: {provisionedModelId}")
-        return self.provisioned[provisionedModelId]
+        for arn, row in self.provisioned.items():
+            if provisionedModelId in (arn, row["provisionedModelName"]):
+                return row
+        raise ClientError(
+            {"Error": {"Code": "ResourceNotFoundException", "Message": "missing"}}, "GetProvisionedModelThroughput"
+        )
+
+    def list_tags_for_resource(self, *, resourceARN: str) -> dict[str, Any]:
+        return {"tags": self.tags[resourceARN]}
 
 
 @dataclass
@@ -167,7 +184,8 @@ def driver(
 
 def _spec(**overrides: Any) -> ProvisionSpec:
     base = dict(
-        organization_id="1",
+        organization_id="22222222-2222-4222-8222-222222222222",
+        managed_service_id="11111111-1111-4111-8111-111111111111",
         organization_slug="acme",
         app_id="1",
         app_slug="api",
@@ -282,7 +300,7 @@ def test_provision_attaches_provisioned_throughput(
         ),
     )
     assert result.ok
-    assert "provisioned_throughput=attached" in result.message
+    assert "native readiness pending" in result.message
     assert len(bedrock_client.create_calls) == 1
     call = bedrock_client.create_calls[0]
     assert call["commitmentDuration"] == "OneMonth"
@@ -296,7 +314,7 @@ def test_provision_records_tags_on_provisioned_throughput(
     driver.provision(
         _spec(config={"provisioned_throughput": "OneMonth"}),
     )
-    tags = bedrock_client.create_calls[0]["tags"]
+    tags = {row["key"]: row["value"] for row in bedrock_client.create_calls[0]["tags"]}
     assert tags["astrolift.io/managed-by"] == "platform"
     assert tags["astrolift.io/app"] == "api"
 
@@ -318,7 +336,8 @@ def test_provision_surfaces_throughput_failure(
         _spec(config={"provisioned_throughput": "OneMonth"}),
     )
     assert not result.ok
-    assert "quota exceeded" in result.message
+    assert "quota exceeded" not in result.message
+    assert result.errors == ["throughput_unverified"]
 
 
 # ---- update -----------------------------------------------------
@@ -363,7 +382,7 @@ def test_update_refuses_on_missing(
         UpdateSpec(handle=f"{KIND}/ghost", config={"model_id": "x"}),
     )
     assert not result.ok
-    assert "not found" in result.message
+    assert result.errors == ["not_found"]
 
 
 # ---- deprovision four-corner matrix -----------------------------
@@ -377,7 +396,11 @@ def test_deprovision_default_no_throughput_preserves_logs(
     _, record_id = parse_handle(provisioned.handle)
     log_group = f"/aws/astrolift/bedrock/{record_id}"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
     )
     assert result.ok
     assert "logs=preserved" in result.message
@@ -393,7 +416,11 @@ def test_deprovision_delete_data_drops_logs(
     _, record_id = parse_handle(provisioned.handle)
     log_group = f"/aws/astrolift/bedrock/{record_id}"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
         delete_data=True,
     )
     assert result.ok
@@ -408,13 +435,17 @@ def test_deprovision_default_refuses_with_active_commitment(
         _spec(config={"provisioned_throughput": "SixMonths"}),
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
     )
     assert not result.ok
     assert "commitment" in result.message
 
 
-def test_deprovision_force_destroy_bypasses_commitment(
+def test_deprovision_force_destroy_cannot_bypass_aws_commitment(
     driver: AmazonBedrockDriver,
     bedrock_client: FakeBedrockClient,
 ) -> None:
@@ -422,12 +453,16 @@ def test_deprovision_force_destroy_bypasses_commitment(
         _spec(config={"provisioned_throughput": "SixMonths"}),
     )
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
         force_destroy=True,
     )
-    assert result.ok
-    assert "provisioned_throughput=released" in result.message
-    assert len(bedrock_client.delete_calls) == 1
+    assert not result.ok
+    assert result.errors == ["commitment_active"]
+    assert not bedrock_client.delete_calls
 
 
 def test_deprovision_atomic_both_flags(
@@ -438,10 +473,15 @@ def test_deprovision_atomic_both_flags(
     provisioned = driver.provision(
         _spec(config={"provisioned_throughput": "OneMonth"}),
     )
-    _, record_id = parse_handle(provisioned.handle)
-    log_group = f"/aws/astrolift/bedrock/{record_id}"
+    native = next(iter(bedrock_client.provisioned.values()))
+    native["commitmentExpirationTime"] = datetime.now(UTC) - timedelta(seconds=1)
+    log_group = f"/aws/astrolift/bedrock/{native['provisionedModelName']}"
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
         delete_data=True,
         force_destroy=True,
     )
@@ -472,13 +512,21 @@ def test_deprovision_surfaces_pt_delete_failure(
     def boom(**_kwargs):
         raise RuntimeError("transient API failure")
 
+    next(iter(bedrock_client.provisioned.values()))["commitmentExpirationTime"] = datetime.now(UTC) - timedelta(
+        seconds=1
+    )
     bedrock_client.delete_provisioned_model_throughput = boom  # type: ignore[assignment]
     result = driver.deprovision(
-        DeprovisionSpec(handle=provisioned.handle),
+        DeprovisionSpec(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
         force_destroy=True,
     )
     assert not result.ok
-    assert "transient API failure" in result.message
+    assert "transient API failure" not in result.message
+    assert result.errors == ["throughput_unverified"]
 
 
 # ---- status -----------------------------------------------------
@@ -505,7 +553,13 @@ def test_status_for_on_demand_record_is_available(
     driver: AmazonBedrockDriver,
 ) -> None:
     provisioned = driver.provision(_spec())
-    state = driver.status(ServiceHandle(handle=provisioned.handle))
+    state = driver.status(
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        )
+    )
     assert state.state == "available"
 
 
@@ -519,7 +573,13 @@ def test_status_for_provisioning_throughput(
     # Flip the throughput status into 'Creating'
     arn = next(iter(bedrock_client.provisioned))
     bedrock_client.provisioned[arn]["status"] = "Creating"
-    state = driver.status(ServiceHandle(handle=provisioned.handle))
+    state = driver.status(
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        )
+    )
     assert state.state == "provisioning"
 
 
@@ -532,7 +592,13 @@ def test_status_for_failed_throughput(
     )
     arn = next(iter(bedrock_client.provisioned))
     bedrock_client.provisioned[arn]["status"] = "Failed"
-    state = driver.status(ServiceHandle(handle=provisioned.handle))
+    state = driver.status(
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        )
+    )
     assert state.state == "error"
 
 
@@ -544,7 +610,11 @@ def test_binding_returns_connection_envelope(
 ) -> None:
     provisioned = driver.provision(_spec())
     binding = driver.binding(
-        ServiceHandle(handle=provisioned.handle),
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
     )
     env = binding.env_vars
     for key in (
@@ -567,7 +637,11 @@ def test_binding_iam_grants_cover_invoke_model(
 ) -> None:
     provisioned = driver.provision(_spec())
     binding = driver.binding(
-        ServiceHandle(handle=provisioned.handle),
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
     )
     actions = {a for g in binding.iam_grants for a in g.actions}
     assert "bedrock:InvokeModel" in actions
@@ -601,7 +675,13 @@ def test_binding_without_record_reconstructs_envelope(
         bedrock_client=FakeBedrockClient(),
         logs_client=FakeLogsClient(),
     )
-    binding = fresh.binding(ServiceHandle(handle=provisioned.handle))
+    binding = fresh.binding(
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        )
+    )
     assert binding.env_vars["MODEL_ENDPOINT_PROVIDER"].literal == "bedrock"
     assert binding.env_vars["BEDROCK_REGION"].literal == "us-east-1"
     assert "bedrock-runtime" in binding.env_vars["MODEL_ENDPOINT_URL"].literal
@@ -627,7 +707,11 @@ def test_binding_notes_mention_irsa_tag(
 ) -> None:
     provisioned = driver.provision(_spec())
     binding = driver.binding(
-        ServiceHandle(handle=provisioned.handle),
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        ),
     )
     assert "astrolift.io/irsa-role" in binding.notes
 
@@ -645,7 +729,13 @@ def test_binding_endpoint_honours_override(
         logs_client=logs_client,
     )
     provisioned = d.provision(_spec())
-    binding = d.binding(ServiceHandle(handle=provisioned.handle))
+    binding = d.binding(
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        )
+    )
     assert binding.env_vars["MODEL_ENDPOINT_URL"].literal == "https://bedrock-runtime.acme.local"
 
 
@@ -656,7 +746,13 @@ def test_snapshot_returns_deterministic_id(
     driver: AmazonBedrockDriver,
 ) -> None:
     provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
+    snap = driver.snapshot(
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        )
+    )
     _, record_id = parse_handle(provisioned.handle)
     assert snap.snapshot_id.startswith(record_id)
 
@@ -672,7 +768,13 @@ def test_restore_provisions_target_record(
     driver: AmazonBedrockDriver,
 ) -> None:
     provisioned = driver.provision(_spec())
-    snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
+    snap = driver.snapshot(
+        ServiceHandle(
+            handle=provisioned.handle,
+            managed_service_id=_spec().managed_service_id,
+            organization_id=_spec().organization_id,
+        )
+    )
 
     restore_spec = _spec(service_handle_hint="restored", managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4")
     result = driver.restore(snap, restore_spec)

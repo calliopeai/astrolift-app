@@ -141,6 +141,12 @@ def subscription_metrics(row, start, end, *, transport_available=True):
         step_seconds=step,
         metrics=list(observations.values()),
     )
+    if service.variant != "vllm":
+        for item in observations.values():
+            item.state = ModelObservationState.UNSUPPORTED
+            item.source = "native_connection_unsupported"
+            item.aggregation_window_seconds = 0
+        return result
     available = {key: item for key, item in observations.items() if key not in _UNSUPPORTED}
     if not transport_available:
         fail_observations(available)

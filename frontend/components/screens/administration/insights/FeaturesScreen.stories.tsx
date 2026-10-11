@@ -101,3 +101,23 @@ export const SpanishWidth768: Story = {
     await expect(within(dialog).getByRole("button", { name: "Activar función" })).toBeVisible();
   },
 };
+
+export const AcceptedRefreshFailed: Story = {
+  render: () => (
+    <FeaturesScreen
+      {...FEATURES}
+      controlsDisabled
+      recovery={{ kind: "accepted", key: "admin.cost_enabled", enabled: true }}
+      error={new globalThis.Error("Read unavailable")}
+    />
+  ),
+};
+export const UncertainWrite: Story = {
+  render: () => (
+    <FeaturesScreen
+      {...FEATURES}
+      controlsDisabled
+      recovery={{ kind: "uncertain", key: "admin.cost_enabled", enabled: true }}
+    />
+  ),
+};

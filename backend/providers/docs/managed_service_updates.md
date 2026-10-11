@@ -48,6 +48,13 @@ drivers shipped a courtesy no-op `update()` with a message explaining that the
 change really goes somewhere else, and every one of them was reported as
 success.
 
+Keep completion and pending/refusal results explicit in `update()` with literal
+`ok=True` or `ok=False` constructor branches so the registry-wide source contract
+can verify them. Vertex updates retain their recorded operation checks: pending
+operations return false, failed operations refuse, and success requires completed
+operation evidence and the observed requested serving configuration. An accepted
+native request alone is insufficient.
+
 ## Deriving `editable_fields()`
 
 The list is the subset of your `config_schema()` keys that `update()` can apply

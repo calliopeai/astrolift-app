@@ -258,6 +258,8 @@ def record_session(request: HttpRequest) -> AstroliftSession | None:
     """
     if getattr(request, "_astrolift_session_unavailable", False):
         return None
+    if getattr(request, "_api_token", None) is not None:
+        return None
     user = getattr(request, "user", None)
     if user is None or isinstance(user, AnonymousUser) or not user.is_authenticated:
         return None

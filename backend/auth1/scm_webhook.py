@@ -170,16 +170,13 @@ def _fire_deploy(app: RegisteredApp, branch: str, head_sha: str) -> Deployment |
     if app.deploy_branch and app.deploy_branch != branch:
         return None
 
-    env = (
-        AppEnvironment.objects.filter(
-            registered_app=app, deleted_at__isnull=True
-        )
-        .order_by("name")
-        .first()
-    )
+    env = AppEnvironment.objects.filter(registered_app=app, deleted_at__isnull=True).order_by("name").first()
     if env is None or env.deploys_paused:
         return None
 
+    from astrolift_lifecycle.deployment_identity_origin import refuse_unsupported_origin
+
+    refuse_unsupported_origin(app, env)
     actor = Actor(kind="system", display=f"push:{branch}")
     deployment = Deployment.objects.create(
         registered_app=app,
@@ -277,9 +274,7 @@ def gitlab_webhook(request: HttpRequest, connection_id: str) -> HttpResponse:
     return _handle("gitlab", request, connection_id)
 
 
-def _handle(
-    kind: str, request: HttpRequest, connection_id: str
-) -> HttpResponse:
+def _handle(kind: str, request: HttpRequest, connection_id: str) -> HttpResponse:
     conn = SourceConnection.objects.filter(
         guid=connection_id, is_active=True, deleted_at__isnull=True
     ).first()
@@ -288,9 +283,7 @@ def _handle(
 
     secret = _decrypt_webhook_secret(conn)
     if secret is None:
-        return JsonResponse(
-            {"detail": "no webhook secret configured"}, status=400
-        )
+        return JsonResponse({"detail": "no webhook secret configured"}, status=400)
 
     body = request.body
     if not verify_signature(kind=kind, request=request, body=body, secret=secret):
@@ -340,11 +333,7 @@ def _handle(
     # and the receiver bails with 202 + ignored="duplicate" without
     # firing a second deploy. Records older than 30 days get pruned by
     # the cron task — see WebhookDelivery docstring.
-    delivery_id = (
-        request.headers.get("X-GitHub-Delivery")
-        or request.headers.get("X-Gitlab-Event-UUID")
-        or ""
-    )
+    delivery_id = request.headers.get("X-GitHub-Delivery") or request.headers.get("X-Gitlab-Event-UUID") or ""
     delivery_row: WebhookDelivery | None = None
     if delivery_id:
         try:
@@ -352,11 +341,9 @@ def _handle(
                 delivery_row = WebhookDelivery.objects.create(
                     connection=conn,
                     delivery_id=delivery_id,
-                    host_event=request.headers.get(
-                        "X-GitHub-Event"
-                    ) or request.headers.get(
-                        "X-Gitlab-Event"
-                    ) or "",
+                    host_event=request.headers.get("X-GitHub-Event")
+                    or request.headers.get("X-Gitlab-Event")
+                    or "",
                     repo_full_name=full_name,
                     branch=branch,
                     head_sha=head_sha,
@@ -400,9 +387,16 @@ def _handle(
 
         sync_agent_package = _sync_agent_package_on_push
 
+    refused = []
     for app in apps:
         if app.trigger_mode == RegisteredApp.TriggerMode.AUTO_ON_PUSH.value:
-            deploy = _fire_deploy(app, branch, head_sha)
+            from astrolift_lifecycle.deployment_identity_origin import DeploymentOriginError
+
+            try:
+                deploy = _fire_deploy(app, branch, head_sha)
+            except DeploymentOriginError:
+                refused.append({"app": app.slug, "reason": "NATIVE_HUMAN_ORIGIN_REQUIRED"})
+                deploy = None
             if deploy is not None:
                 fired.append({"app": app.slug, "deployment": str(deploy.guid)})
                 last_deploy = deploy
@@ -439,14 +433,13 @@ def _handle(
         )
         route_scm_push_to_workflow_webhooks(scm_event)
     except Exception:
-        logger.exception(
-            "scm_webhook: WorkflowWebhook routing failed for %s/%s", full_name, branch
-        )
+        logger.exception("scm_webhook: WorkflowWebhook routing failed for %s/%s", full_name, branch)
 
     return JsonResponse(
         {
             "ok": True,
             "fired": fired,
+            **({"refused": refused} if refused else {}),
             "agent_package_sync": agent_package_sync,
             "repo": full_name,
             "branch": branch,

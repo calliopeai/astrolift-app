@@ -43,6 +43,8 @@ export type SubscriptionModel = {
   organizationId: string;
   name: string;
   runtimeAdmission: "configured" | "unsupported" | "unknown";
+  nativeConnection?: boolean;
+  nativeConfigured?: boolean;
   clusterId: string;
   providerId: string;
   subscriptionsEnabled: boolean;
@@ -121,6 +123,8 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
   const targetsError = Boolean(targets.error);
   const t = useTranslations("models.shared.subscriptions");
   const inventory = useTranslations("models.shared.inventory");
+  const native = useTranslations("models.native");
+  const nativeDetails = useTranslations("models.native.details");
   const confirmedPage = !subscriptions.loading && !subscriptions.stale && !subscriptions.error;
   const visibleApps = confirmedPage
     ? [...new Set(subscriptions.rows.map((row) => row.appSlug))]
@@ -236,7 +240,7 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
   }
   const ready =
     deployment.subscriptionsEnabled &&
-    deployment.runtimeAdmission === "configured" &&
+    (deployment.runtimeAdmission === "configured" || deployment.nativeConfigured === true) &&
     !targetsLoading &&
     !targetsError &&
     !targets.stale;
@@ -269,10 +273,11 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
         <p className="text-muted-foreground text-sm">{t("description")}</p>
       </div>
       <p className="border-warning-border bg-warning-bg text-warning-fg rounded-md border p-3 text-sm">
-        {t("restartImpact")}
+        {deployment.nativeConnection ? nativeDetails("restartImpact") : t("restartImpact")}
       </p>
       {!deployment.subscriptionsEnabled && <p role="status">{t("subscriptionsDisabled")}</p>}
-      {deployment.runtimeAdmission !== "configured" && (
+      {deployment.nativeConnection && <p role="status">{native("bindingHelp")}</p>}
+      {!deployment.nativeConnection && deployment.runtimeAdmission !== "configured" && (
         <p role="status">
           {t(
             deployment.runtimeAdmission === "unsupported" ? "unsupportedRuntime" : "unknownRuntime"
@@ -484,7 +489,7 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
                 disabled={
                   !row.canRevoke ||
                   subscriptions.stale ||
-                  deployment.runtimeAdmission !== "configured"
+                  (deployment.runtimeAdmission !== "configured" && !deployment.nativeConnection)
                 }
                 onClick={() => {
                   setFailure(null);
@@ -540,7 +545,9 @@ function SubscriptionPanel(props: ModelSubscriptionsPanelProps) {
                     alias: review.subscription.alias || t("legacyAlias"),
                   })}
             </span>
-            <span className="block">{t("restartImpact")}</span>
+            <span className="block">
+              {deployment.nativeConnection ? nativeDetails("restartImpact") : t("restartImpact")}
+            </span>
             {review && !reviewCurrent && (
               <span role="alert" className="text-destructive block">
                 {t("changed")}
@@ -574,11 +581,13 @@ function reviewIsCurrent(
     current.deployment.version !== candidate.request.modelVersion ||
     current.deployment.clusterId !== candidate.request.expectedClusterId ||
     current.deployment.providerId !== candidate.request.expectedProviderId ||
-    current.deployment.runtimeAdmission !== "configured"
+    (current.deployment.runtimeAdmission !== "configured" && !current.deployment.nativeConnection)
   )
     return false;
   if (candidate.kind === "subscribe")
     return (
+      (current.deployment.runtimeAdmission === "configured" ||
+        current.deployment.nativeConfigured === true) &&
       current.deployment.subscriptionsEnabled &&
       !current.targets.stale &&
       !current.targets.loading &&

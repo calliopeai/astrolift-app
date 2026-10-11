@@ -4,6 +4,8 @@ from astrolift_lifecycle.models.builder_artifact import BuilderArtifact
 from astrolift_lifecycle.models.deploy_token import DeployToken
 from astrolift_lifecycle.models.deployment import Deployment
 from astrolift_lifecycle.models.deployment_approval import DeploymentApproval
+from astrolift_lifecycle.models.deployment_execution_receipt import DeploymentExecutionReceipt
+from astrolift_lifecycle.models.deployment_identity_origin import DeploymentIdentityOrigin
 from astrolift_lifecycle.models.deployment_log import DeploymentLog
 from astrolift_lifecycle.models.dev_environment import DevEnvironment
 from astrolift_lifecycle.models.domain_handoff import DomainSessionHandoff
@@ -31,6 +33,8 @@ __all__ = [
     "DeployToken",
     "Deployment",
     "DeploymentApproval",
+    "DeploymentIdentityOrigin",
+    "DeploymentExecutionReceipt",
     "DeploymentLog",
     "DevEnvironment",
     "DomainPathRoute",
