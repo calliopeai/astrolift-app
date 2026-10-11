@@ -457,6 +457,11 @@ describe("managed-domain app routes over actual draft SDL HttpLink", () => {
     await waitFor(() => expect(reload).toHaveBeenCalledOnce());
     await waitFor(() => expect(sessionStorage.length).toBe(0));
     expect(screen.getByRole("button", { name: en.domainAppRouting.attach })).toBeDisabled();
+    // Back stays disabled until the post-preparation refresh settles; a click
+    // before then is ignored (slow CI runners hit this window).
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: en.managedDomains.back })).toBeEnabled()
+    );
     fireEvent.click(screen.getByRole("button", { name: en.managedDomains.back }));
     await screen.findByLabelText(en.domainAppRouting.targetStep);
     fireEvent.change(screen.getByLabelText(en.domainAppRouting.targetStep), {
