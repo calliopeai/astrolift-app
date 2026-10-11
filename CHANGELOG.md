@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Decommissioning a cluster revokes its Zentinelle gateway credential and removes the gateway before platform RBAC is lifted, best-effort and reported with the other cleanup results. Runs already in flight replay unchanged (#1905).
+
+- `astroliftZentinelleConnection` is gated on `zentinelle.status_view` instead of `zentinelle.connect`, so viewers and auditors can read connection and gateway status; connecting stays admin-only (#1905).
+
 - `registerApp` returns an advisory `sourceConnectionWarning` when no organization GitHub connection is visibly recorded on the source repository's owner, so a later fetch, build or webhook failure on a second GitHub account is explained at registration (#2297).
 
 - Repo skill imports refuse an explicit unknown tool adapter with a `VALIDATION` error naming the tool, instead of storing it as `python_fn`. Omitted adapters keep the default (#2327).

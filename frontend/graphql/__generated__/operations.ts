@@ -10755,6 +10755,7 @@ export type Query = {
   astroliftAppDoctor: AstroliftAppDoctorReport;
   astroliftAppDomains: Array<AstroliftAppDomain>;
   astroliftAppEndpointMetrics: Array<AstroliftAppEndpointMetric>;
+  astroliftAppEventsPage: AstroliftEventPage;
   astroliftAppExecTarget?: Maybe<AstroliftAppExecTarget>;
   astroliftAppGoldenSignals: AstroliftAppGoldenSignalsResult;
   astroliftAppHealthSummary: Array<AstroliftAppHealthSummary>;
@@ -11494,6 +11495,15 @@ export type QueryAstroliftAppEndpointMetricsArgs = {
   environmentName?: InputMaybe<Scalars['String']['input']>;
   rangeSeconds?: InputMaybe<Scalars['Int']['input']>;
   workloadSlug?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftAppEventsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  appSlug: Scalars['String']['input'];
+  eventType?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  severity?: InputMaybe<Scalars['String']['input']>;
 };
 
 

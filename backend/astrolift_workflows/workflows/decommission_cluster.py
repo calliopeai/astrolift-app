@@ -60,6 +60,7 @@ with workflow.unsafe.imports_passed_through():
         mark_decommissioning,
         mark_error,
         remove_platform_rbac,
+        revoke_cluster_zentinelle_gateway,
         teardown_cluster_infra,
     )
 
@@ -137,6 +138,26 @@ class DecommissionClusterWorkflow:
             retry_policy=_STANDARD_RETRY,
         )
 
+        # Step 2b — revoke the cluster's Zentinelle gateway credential (#1905)
+        # while the cluster API still answers. Best-effort like the cloud
+        # cleanup below: a failure is reported, never blocks decommission.
+        cleanup_summary: dict[str, dict[str, object]] = {}
+        any_cleanup_errors = False
+        # Patched so runs started before this step existed replay unchanged.
+        if workflow.patched("decommission-revokes-zentinelle-gateway"):
+            try:
+                report = await workflow.execute_activity(
+                    revoke_cluster_zentinelle_gateway,
+                    cluster_id,
+                    start_to_close_timeout=_QUICK_TIMEOUT,
+                    retry_policy=_STANDARD_RETRY,
+                )
+            except Exception as exc:  # noqa: BLE001 — best-effort
+                report = {"ok": False, "deleted": 0, "errors": [_truncate(str(exc), limit=512)], "skipped": False}
+            cleanup_summary["zentinelle_gateway"] = report if isinstance(report, dict) else {"raw": report}
+            if isinstance(report, dict) and report.get("errors"):
+                any_cleanup_errors = True
+
         # Step 3 — remove platform RBAC. When delete_cloud_infra=True
         # we still try this BEFORE the cloud-side delete: the
         # apiserver is still reachable at this point and clean RBAC
@@ -180,8 +201,6 @@ class DecommissionClusterWorkflow:
         # next so we stop paying for orphans; ECR after to free image
         # storage; IRSA last because (in the rare retry case) workloads
         # may still be authenticating during the namespace drain.
-        cleanup_summary: dict[str, dict[str, object]] = {}
-        any_cleanup_errors = False
         for activity_fn, key in (
             (cleanup_cluster_dns_records, "dns_records"),
             (cleanup_cluster_acm_certs, "acm_certs"),

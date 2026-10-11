@@ -281,6 +281,7 @@ def cluster(plugin, org):
 def admin(permission_resolver):
     permission_resolver.grant(Permission.ZENTINELLE_CONNECT)
     permission_resolver.grant(Permission.ZENTINELLE_GATEWAY_MANAGE)
+    permission_resolver.grant(Permission.ZENTINELLE_STATUS_VIEW)
     return permission_resolver
 
 
@@ -422,13 +423,15 @@ def test_every_zentinelle_mutation_is_listed_as_step_up_gated():
     } <= gated
 
 
-def test_status_query_needs_zentinelle_connect(org, permission_resolver, zentinelle, admin):
+def test_status_query_needs_status_view_not_connect(org, permission_resolver, zentinelle, admin):
+    """Reading status is a viewer's grant; connecting stays admin-only (#1905)."""
     assert _connect(org).ok
-    permission_resolver.deny(Permission.ZENTINELLE_CONNECT)
+    permission_resolver.deny(Permission.ZENTINELLE_STATUS_VIEW)
     with _as(org), pytest.raises(PermissionDenied):
         OperationsQuery().astrolift_zentinelle_connection(_info())
 
-    permission_resolver.grant(Permission.ZENTINELLE_CONNECT)
+    permission_resolver.deny(Permission.ZENTINELLE_CONNECT)
+    permission_resolver.grant(Permission.ZENTINELLE_STATUS_VIEW)
     with _as(org):
         status = OperationsQuery().astrolift_zentinelle_connection(_info())
     assert status is not None and status.status == "connected"

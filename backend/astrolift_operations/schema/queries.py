@@ -1020,11 +1020,12 @@ class OperationsQuery(InstallAlertMailQuery):
         return out
 
     @strawberry.field
-    @require_permission(Permission.ZENTINELLE_CONNECT, scope=org_scope(Permission.ZENTINELLE_CONNECT))
+    @require_permission(Permission.ZENTINELLE_STATUS_VIEW, scope=org_scope(Permission.ZENTINELLE_STATUS_VIEW))
     @tenant_scoped()
     def astrolift_zentinelle_connection(self, info: Info) -> ZentinelleConnectionType | None:
         """This organization's Zentinelle connection and registered clusters (#1887),
-        or null when it is not connected."""
+        or null when it is not connected. Status reading, not connecting: gated on
+        ``zentinelle.status_view`` (#1905); the type carries no credential."""
         org_id = _caller_org_id()
         if org_id is None:
             return None
