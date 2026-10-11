@@ -1159,17 +1159,23 @@ class TaskRunType:
     duration_seconds: int | None
     k8s_job_name: str
     created_at: dt.datetime
+    namespace: str = ""
+    failure_reason: str = ""
 
 
 @strawberry.type(name="AstroliftTaskRunPayload")
 class TaskRunPayloadType:
-    """Mutation payload — the created TaskRun row (#801)."""
+    """Mutation payload — the created TaskRun row (#801). Follow it with
+    ``astroliftTaskRun``/the task-runs list by ``id``."""
 
     id: GUID
     registered_app_slug: str
     workload_slug: str
     status: str
     created_at: dt.datetime
+    environment_name: str = ""
+    k8s_job_name: str = ""
+    failure_reason: str = ""
 
 
 def task_run_to_type(r) -> TaskRunType:
@@ -1187,6 +1193,8 @@ def task_run_to_type(r) -> TaskRunType:
         duration_seconds=r.duration_seconds,
         k8s_job_name=r.k8s_job_name or "",
         created_at=r.created_at,
+        namespace=r.namespace or "",
+        failure_reason=r.failure_reason or "",
     )
 
 
@@ -1197,6 +1205,9 @@ def task_run_to_payload(r) -> TaskRunPayloadType:
         workload_slug=r.workload.slug,
         status=r.status,
         created_at=r.created_at,
+        environment_name=r.app_environment.name if r.app_environment_id else "",
+        k8s_job_name=r.k8s_job_name or "",
+        failure_reason=r.failure_reason or "",
     )
 
 

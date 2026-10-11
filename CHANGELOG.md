@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `runTask` dispatches the task's Kubernetes Job: it renders the task from the environment's running deployment (image, env, resources, GPU requests, tolerations and node selector), renames it per run, applies an optional command override, and records the namespace and Job name so the run reconciler follows it to a terminal status. Dispatch failures end the run as `failed` with `failureReason`. A caller `requestId` makes retries return the original run instead of launching more work. Without `environmentName` only a single-environment app is accepted. Apply lifecycle migration `taskrun_dispatch` with the image (#2330).
+
 - Decommissioning a cluster revokes its Zentinelle gateway credential and removes the gateway before platform RBAC is lifted, best-effort and reported with the other cleanup results. Runs already in flight replay unchanged (#1905).
 
 - `astroliftZentinelleConnection` is gated on `zentinelle.status_view` instead of `zentinelle.connect`, so viewers and auditors can read connection and gateway status; connecting stays admin-only (#1905).

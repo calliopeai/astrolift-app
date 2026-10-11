@@ -5322,8 +5322,10 @@ export type AstroliftTaskRun = {
   durationSeconds?: Maybe<Scalars['Int']['output']>;
   endedAt?: Maybe<Scalars['DateTime']['output']>;
   exitCode?: Maybe<Scalars['Int']['output']>;
+  failureReason: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   k8sJobName: Scalars['String']['output'];
+  namespace: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
@@ -5347,7 +5349,10 @@ export type AstroliftTaskRunPage = {
 
 export type AstroliftTaskRunPayload = {
   createdAt: Scalars['DateTime']['output'];
+  environmentName: Scalars['String']['output'];
+  failureReason: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
+  k8sJobName: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
   status: Scalars['String']['output'];
   workloadSlug: Scalars['String']['output'];
@@ -14423,6 +14428,8 @@ export type RunTaskInput = {
   appSlug: Scalars['String']['input'];
   command: Array<Scalars['String']['input']>;
   environmentName: InputMaybe<Scalars['String']['input']>;
+  /** Caller-chosen idempotency key (#2330): a retry with the same key returns the original run instead of starting another Job. */
+  requestId: InputMaybe<Scalars['String']['input']>;
   workloadSlug: Scalars['String']['input'];
 };
 
