@@ -4519,6 +4519,8 @@ export type AstroliftRegisteredApp = {
   securityPolicy: AstroliftSecurityPolicy;
   settingsLastModified?: Maybe<AstroliftAppSettingsLastModified>;
   slug: Scalars['String']['output'];
+  /** Advisory set only on the registerApp result: no organization GitHub connection is visibly recorded on the source repository's owner. Empty everywhere else (#2297). */
+  sourceConnectionWarning: Scalars['String']['output'];
   sourceKind: Scalars['String']['output'];
   sourceRepo: Scalars['String']['output'];
   sourceUrl: Scalars['String']['output'];

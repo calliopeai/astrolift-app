@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `registerApp` returns an advisory `sourceConnectionWarning` when no organization GitHub connection is visibly recorded on the source repository's owner, so a later fetch, build or webhook failure on a second GitHub account is explained at registration (#2297).
+
+- Repo skill imports refuse an explicit unknown tool adapter with a `VALIDATION` error naming the tool, instead of storing it as `python_fn`. Omitted adapters keep the default (#2327).
+
 - Builder apps use private immutable artifacts instead of ConfigMaps and data Secrets, with configurable asset capacity and destination capability reporting. Apply lifecycle migration 0046 before deploying the API and worker.
 
 - Managed CI template v10: the notify step reads its deploy token through a single-quoted `secrets['...']` expression (v9 failed every run at parse time), and ci_pushed builds use the manifest's primary-container `dockerfile_path`/`build_context` for fields the app left at its defaults. Existing repos show as template-stale until re-synced (#2300).

@@ -4782,6 +4782,11 @@ type AstroliftRegisteredApp {
   Clusters the app's environments deploy to, in environment-name order. Filled on astroliftAppsPage and astroliftMyAppsPage (#2149).
   """
   clusterSlugs: [String!]!
+
+  """
+  Advisory set only on the registerApp result: no organization GitHub connection is visibly recorded on the source repository's owner. Empty everywhere else (#2297).
+  """
+  sourceConnectionWarning: String!
   provisioningProgress: AstroliftProvisioningProgress
 }
 
