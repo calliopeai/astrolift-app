@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The Cognito client picker reports each client's managed login branding, and the ingress-auth form warns before saving a client that has none (Cognito would serve "Login pages unavailable") or whose pool already uses all 20 brandings. Classic hosted UI pools need none; a failed read reports unknown (#1727).
+
 - Starting an agent box on a free image reference (not one a registered spec or agent names) requires the new `agent_box.custom_image` permission, advertised as `boxes.custom_image_permission`. Every stock role and bearer scope that can dispatch keeps it, so nothing changes by default; a custom role can now allow dispatch while limiting boxes to spec images. Apply identity migration 0044 with the image (CLI #86).
 
 - Decommissioning a cluster revokes its Zentinelle gateway credential and removes the gateway before platform RBAC is lifted, best-effort and reported with the other cleanup results. Runs already in flight replay unchanged (#1905).

@@ -293,7 +293,14 @@ def cognito_user_pool_clients_dispatch(
         raise ClusterManagementError(
             f"cluster {cluster.slug}: list_cognito_user_pool_clients raised {exc}",
         ) from exc
-    return [{"client_id": c.client_id, "client_name": c.client_name} for c in clients]
+    return [
+        {
+            "client_id": c.client_id,
+            "client_name": c.client_name,
+            "managed_login_branding": getattr(c, "managed_login_branding", "unknown"),
+        }
+        for c in clients
+    ]
 
 
 def bring_cluster_into_management(

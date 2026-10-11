@@ -250,3 +250,59 @@ def test_list_cognito_user_pool_clients_paginates() -> None:
 
     assert [c.client_id for c in clients] == ["c1", "c2"]
     assert cognito.list_user_pool_clients.call_args_list[1].kwargs.get("NextToken") == "n"
+
+
+# ─── managed login branding per client (#1727) ──────────────────────────
+
+
+def _branding_cognito(*, version, present, clients=("c1", "c2")):
+    from botocore.exceptions import ClientError
+
+    cognito = MagicMock()
+    cognito.list_user_pool_clients.return_value = {
+        "UserPoolClients": [{"ClientId": c, "ClientName": c} for c in clients],
+    }
+    cognito.describe_user_pool.return_value = {"UserPool": {"Domain": "acme-login"}}
+    cognito.describe_user_pool_domain.return_value = {"DomainDescription": {"ManagedLoginVersion": version}}
+
+    def _branding(**kwargs):
+        if kwargs["ClientId"] in present:
+            return {"ManagedLoginBranding": {"ManagedLoginBrandingId": f"b-{kwargs['ClientId']}"}}
+        raise ClientError({"Error": {"Code": "ResourceNotFoundException"}}, "DescribeManagedLoginBrandingByClient")
+
+    cognito.describe_managed_login_branding_by_client.side_effect = _branding
+    return cognito
+
+
+def test_managed_login_clients_report_missing_branding() -> None:
+    driver = _driver(cognito_idp_client=_branding_cognito(version=2, present={"c1"}))
+
+    clients = driver.list_cognito_user_pool_clients("pool")
+
+    assert [(c.client_id, c.managed_login_branding) for c in clients] == [("c1", "present"), ("c2", "missing")]
+
+
+def test_a_full_branding_quota_is_named_on_the_missing_client() -> None:
+    names = [f"c{i}" for i in range(21)]
+    cognito = _branding_cognito(version=2, present=set(names[:20]), clients=names)
+    clients = _driver(cognito_idp_client=cognito).list_cognito_user_pool_clients("pool")
+
+    assert clients[-1].managed_login_branding == "missing_quota_full"
+    assert {c.managed_login_branding for c in clients[:20]} == {"present"}
+
+
+def test_classic_hosted_ui_needs_no_branding_and_skips_per_client_reads() -> None:
+    cognito = _branding_cognito(version=1, present=set())
+    clients = _driver(cognito_idp_client=cognito).list_cognito_user_pool_clients("pool")
+
+    assert {c.managed_login_branding for c in clients} == {"not_required"}
+    cognito.describe_managed_login_branding_by_client.assert_not_called()
+
+
+def test_a_failed_domain_read_reports_unknown_not_missing() -> None:
+    cognito = _branding_cognito(version=2, present=set())
+    cognito.describe_user_pool.side_effect = RuntimeError("AccessDenied")
+    clients = _driver(cognito_idp_client=cognito).list_cognito_user_pool_clients("pool")
+
+    assert [c.client_id for c in clients] == ["c1", "c2"]
+    assert {c.managed_login_branding for c in clients} == {"unknown"}
