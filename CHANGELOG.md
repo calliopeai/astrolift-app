@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- A Graphite theme rebalances the dark UI: neutral graphite carries every surface, the sidebar included, emerald stays the accent and lime stays with state and signal. It is offered beside the existing themes and in Storybook's Ground toolbar so every screen can be reviewed in it before it becomes the default; text and every preset accent clear WCAG AA on it (#2286).
+
 - Hosted brain discovery: apps declared `[app] kind = "mimwell"` are listed as brains by the new `astroliftBrains` query and the `astrolift_list_brains` / `astrolift_get_brain` MCP tools (MCP read plus `read:apps`). The list follows app visibility exactly: organization and team grants, team shares at viewer and up (a revoked share hides the brain again), and the API token's team ceiling. Each brain carries its owning team and project, environment endpoints and the teams it is shared with, and no credentials. **Apps › Semantic layers** (`/brains`) lists them with where each is served, who it is shared with, and a link to the app's Access tab to share it, in every supported language (#2320).
 
 - Domain DNS lookups report NXDOMAIN as a mismatch instead of a healthy result, and a resolver that never answers reports `DNS_TIMEOUT` instead of a generic failure, in both probes and the public-delegation check. The console explains the common diagnostic reason codes (NXDOMAIN, timeouts, malformed or oversized answers, provider access denied, unbound or unreadable zones, missing tools, ICMP and HTTPS outcomes, private zones) with the next step to take, in every supported language. Each app route on the Routing view offers **Check HTTPS**, which runs a live HTTPS/TLS check for that hostname instead of showing TLS as unknown (#2287).
