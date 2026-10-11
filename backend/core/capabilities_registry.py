@@ -47,6 +47,8 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "audit.export",
     "audit.payload_diff",
     "audit.retention_policy",
+    # Per-app event summaries behind app.read, payloads withheld (#2221).
+    "events.app_feed",
     # Approval flows for deploys + bulk operator actions.
     "approvals.bulk",
     "approvals.magic_link",
@@ -101,6 +103,7 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     # SCM integration surfaces.
     "scm.github_app",
     "scm.webhook_secret_rotation",
+    "scm.registration_owner_warning",
     # Identity / auth surfaces clients probe pre-login.
     "identity.session_cookie",
     "identity.invitation_accept",

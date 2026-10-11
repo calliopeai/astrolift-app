@@ -849,6 +849,11 @@ function DomainPathRoutesSection({
               {t("addToList")}
             </Button>
           </div>
+          {workloadOptions.length === 0 && (
+            <p role="status" className="text-muted-foreground text-xs">
+              {t("noWorkloadsBlocked")}
+            </p>
+          )}
           <p className="text-muted-foreground text-2xs">{t("routesHint")}</p>
         </div>
       )}

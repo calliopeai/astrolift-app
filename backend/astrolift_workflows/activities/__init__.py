@@ -78,6 +78,7 @@ from astrolift_workflows.activities.cluster_decommission_cleanup import (
     cleanup_cluster_dns_records,
     cleanup_cluster_ecr_repos,
     cleanup_cluster_irsa_roles,
+    revoke_cluster_zentinelle_gateway,
 )
 from astrolift_workflows.activities.cluster_management import (
     apply_platform_rbac,
@@ -251,6 +252,7 @@ __all__ = [
     "cleanup_cluster_dns_records",
     "cleanup_cluster_ecr_repos",
     "cleanup_cluster_irsa_roles",
+    "revoke_cluster_zentinelle_gateway",
     "create_nested_workflow_run",
     "create_promotion_deployment",
     "create_rollback_deployment",

@@ -50,6 +50,10 @@ class InvalidRepoURLError(ValueError):
     """Raised when ``repo_url`` is not a parseable github.com repo URL."""
 
 
+class InvalidManifestError(ValueError):
+    """Raised when the manifest names a value the catalog cannot store as written."""
+
+
 @dataclass
 class ImportResult:
     imported_skills: list[str] = field(default_factory=list)
@@ -178,9 +182,20 @@ def _upsert_skill(
     return skill
 
 
-def _resolve_adapter(value: Any) -> str:
+def _resolve_adapter(tool_slug: str, value: Any) -> str:
+    """Return the manifest's adapter, the default when omitted, else refuse.
+
+    An explicit unknown adapter is refused rather than replaced: the handler
+    would otherwise run under an execution contract its author did not ask for.
+    """
     token = str(value or "").strip().lower()
-    return token if token in _VALID_ADAPTERS else _DEFAULT_ADAPTER
+    if not token:
+        return _DEFAULT_ADAPTER
+    if token not in _VALID_ADAPTERS:
+        raise InvalidManifestError(
+            f"tools.{tool_slug}: unknown adapter {value!r}; supported: {', '.join(sorted(_VALID_ADAPTERS))}"
+        )
+    return token
 
 
 def _upsert_tooldef(
@@ -193,7 +208,7 @@ def _upsert_tooldef(
 
     tool.name = str(cfg.get("name") or slug)
     tool.description = str(cfg.get("description") or "")
-    tool.adapter = _resolve_adapter(cfg.get("adapter"))
+    tool.adapter = _resolve_adapter(slug, cfg.get("adapter"))
     tool.handler_ref = str(cfg.get("handler_ref") or "")
     tool.input_schema = cfg.get("input_schema") if isinstance(cfg.get("input_schema"), dict) else {}
     tool.output_schema = cfg.get("output_schema") if isinstance(cfg.get("output_schema"), dict) else {}
@@ -235,6 +250,7 @@ def import_skills_from_repo(
 
     Raises:
         InvalidRepoURLError: ``repo_url`` is not a github.com repo URL.
+        InvalidManifestError: a tool names an unknown adapter; nothing is imported.
         requests.HTTPError: GitHub returned a non-2xx response.
     """
     owner_repo = parse_repo_url(repo_url)

@@ -1097,6 +1097,7 @@
         "targetPort": "Porta de destino",
         "stripPrefix": "Remover o prefixo antes de encaminhar para a carga de trabalho",
         "routesHint": "As novas rotas são aplicadas ao clicar em Salvar acima.",
+        "noWorkloadsBlocked": "Rotas de caminho apontam para uma carga de trabalho. Registre uma carga de trabalho neste app e depois adicione a rota.",
         "kinds": {
           "http_to_https": "HTTP → HTTPS",
           "apex_to_www": "Domínio raiz → www",
@@ -1949,6 +1950,7 @@
       },
       "expiry": {
         "expired": "Expirou {days, plural, one {há # dia} other {há # dias}}",
+        "expiredToday": "Expirou hoje",
         "rotateSoon": "Rotacionar: expira em {days, plural, one {# dia} other {# dias}}",
         "expires": "Expira em {days, plural, one {# dia} other {# dias}}"
       },

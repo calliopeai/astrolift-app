@@ -524,3 +524,60 @@ __all__ = [
     "cleanup_cluster_ecr_repos",
     "cleanup_cluster_irsa_roles",
 ]
+
+
+# ---- Zentinelle gateway ----------------------------------------------
+
+
+def _revoke_zentinelle_gateway_sync(cluster_id: int) -> dict[str, Any]:
+    from astrolift_clusters.models import TenantCluster
+    from astrolift_operations import zentinelle_connect
+    from astrolift_operations.models import ZentinelleClusterGateway
+
+    cluster = TenantCluster.all_objects.filter(pk=cluster_id).first()
+    summary: dict[str, Any] = {
+        "ok": True,
+        "deleted": 0,
+        "errors": [],
+        "skipped": False,
+        "cluster_slug": getattr(cluster, "slug", ""),
+    }
+    gateway = (
+        ZentinelleClusterGateway.objects.filter(cluster_id=cluster_id, deleted_at__isnull=True)
+        .select_related("connection", "cluster")
+        .first()
+    )
+    if gateway is None:
+        summary.update(skipped=True, reason="no Zentinelle gateway is registered for this cluster")
+        return summary
+    try:
+        zentinelle_connect.unregister_cluster(gateway=gateway)
+    except zentinelle_connect.ZentinelleConnectError as exc:
+        # Messages are already redacted of the gateway credential.
+        summary["ok"] = False
+        summary["errors"].append(exc.message)
+    else:
+        summary["deleted"] = 1
+    return summary
+
+
+@activity.defn(name="astrolift.cluster.revoke_zentinelle_gateway")
+async def revoke_cluster_zentinelle_gateway(cluster_id: int) -> dict[str, Any]:
+    """Revoke a decommissioning cluster's Zentinelle gateway credential (#1905).
+
+    Runs while the cluster API still answers, so the gateway Deployment and
+    its credential Secret go too; Zentinelle is told first, so the
+    credential is dead even if the in-cluster removal fails.
+    """
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    summary = await sync_to_async(_revoke_zentinelle_gateway_sync)(cluster_id)
+    log.info(
+        "revoke_cluster_zentinelle_gateway cluster=%s revoked=%d errors=%d skipped=%s",
+        summary["cluster_slug"],
+        summary["deleted"],
+        len(summary["errors"]),
+        summary["skipped"],
+    )
+    return summary

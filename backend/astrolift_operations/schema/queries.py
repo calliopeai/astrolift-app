@@ -662,6 +662,59 @@ class OperationsQuery(InstallAlertMailQuery):
         )
 
     @strawberry.field
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug(permission=Permission.APP_READ))
+    @tenant_scoped()
+    def astrolift_app_events_page(
+        self,
+        info: Info,
+        app_slug: str,
+        limit: int = 100,
+        after: str | None = None,
+        event_type: str | None = None,
+        severity: str | None = None,
+    ) -> EventPageType:
+        """One app's event feed for callers who can read that app (#2221).
+
+        ``astroliftEventsPage`` mixes org-level audit with app events, so it
+        needs ``audit_log.read``, which a read-only bearer (``read:apps``,
+        the mobile default) never carries. This feed is gated on
+        ``app.read`` at the named app and returns only events linked to it
+        at emit time. Payloads are withheld (``{}``): they are audit detail,
+        still behind ``audit_log.read`` on the org feed. Same cursor and
+        severity semantics as ``astroliftEventsPage``.
+        """
+        if _caller_org_id() is None:
+            return EventPageType(items=[], next_cursor=None, reason=ObservabilityPanelReason.NO_DATA_YET)
+        from astrolift_registry.models import RegisteredApp
+
+        # The live app the gate admitted, never a deleted same-slug predecessor.
+        app = live_app_owners(
+            RegisteredApp.objects.filter(
+                organization_id=_caller_org_id(), slug=app_slug, deleted_at__isnull=True
+            )
+        )
+        qs = Event.objects.filter(organization_id=_caller_org_id(), registered_app__in=app)
+        if event_type:
+            qs = qs.filter(event_type=event_type)
+        if severity:
+            qs = qs.filter(severity=severity)
+        page = keyset_page(
+            qs,
+            cursor=after,
+            limit=max(1, min(limit, 500)),
+            max_limit=500,
+            sort_field="occurred_at",
+            with_total=False,
+        )
+        items = []
+        for row in page.rows:
+            item = event_to_type(row)
+            item.payload = {}
+            items.append(item)
+        reason = ObservabilityPanelReason.OK if items or after else ObservabilityPanelReason.NO_DATA_YET
+        return EventPageType(items=items, next_cursor=page.next_cursor, reason=reason)
+
+    @strawberry.field
     @require_permission(Permission.AUDIT_LOG_READ, any_scope=True)
     @tenant_scoped()
     def astrolift_recent_activity(
@@ -967,11 +1020,12 @@ class OperationsQuery(InstallAlertMailQuery):
         return out
 
     @strawberry.field
-    @require_permission(Permission.ZENTINELLE_CONNECT, scope=org_scope(Permission.ZENTINELLE_CONNECT))
+    @require_permission(Permission.ZENTINELLE_STATUS_VIEW, scope=org_scope(Permission.ZENTINELLE_STATUS_VIEW))
     @tenant_scoped()
     def astrolift_zentinelle_connection(self, info: Info) -> ZentinelleConnectionType | None:
         """This organization's Zentinelle connection and registered clusters (#1887),
-        or null when it is not connected."""
+        or null when it is not connected. Status reading, not connecting: gated on
+        ``zentinelle.status_view`` (#1905); the type carries no credential."""
         org_id = _caller_org_id()
         if org_id is None:
             return None

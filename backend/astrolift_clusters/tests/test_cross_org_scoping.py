@@ -188,6 +188,7 @@ def test_list_excludes_other_org_includes_own_and_shared(org_a, org_b, permissio
     mine = _cluster(org_a)
     theirs = _cluster(org_b)
     shared = _cluster(None)
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     with _ctx(org_a):
         rows = ClustersQuery().astrolift_clusters(_info())
@@ -208,6 +209,7 @@ def test_cluster_health_other_org_returns_none(org_a, org_b, permission_resolver
         lambda cluster, event_limit: {"pods": [], "events": []},
     )
     theirs = _cluster(org_b)
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     with _ctx(org_a):
         result = ClustersQuery().astrolift_cluster_health(_info(), cluster_id=GUID(str(theirs.guid)))
@@ -220,6 +222,7 @@ def test_cluster_health_shared_cluster_is_reachable(org_a, permission_resolver, 
         lambda cluster, event_limit: {"pods": [], "events": []},
     )
     shared = _cluster(None)
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     with _ctx(org_a):
         result = ClustersQuery().astrolift_cluster_health(_info(), cluster_id=GUID(str(shared.guid)))

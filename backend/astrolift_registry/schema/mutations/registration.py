@@ -419,7 +419,14 @@ class RegistrationMutations:
                 app.slug,
             )
 
-        return gql_success(app_to_type(app, info=info))
+        result = app_to_type(app, info=info)
+        if app.source_repo:
+            from astrolift_scm.services.connection_resolver import repo_owner_connection_warning
+
+            result.source_connection_warning = repo_owner_connection_warning(
+                app.organization, app.source_repo, source_kind=app.source_kind
+            )
+        return gql_success(result)
 
     @strawberry.field
     @mutation_audit(
