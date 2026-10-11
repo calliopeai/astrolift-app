@@ -8273,7 +8273,18 @@
     "tlsVerifiedHelp": "Le TLS a été vérifié pour ce nom d’hôte et un statut HTTP a été observé. Les redirections ne sont pas suivies.",
     "httpsDeadline": "Le contrôle HTTPS ne s’est pas terminé avant l’échéance. Relancez-le et vérifiez que le nom d’hôte mène à une application en cours d’exécution.",
     "publicAddressRequired": "Le nom d’hôte se résout en une adresse non publique ; il n’est donc pas sondé depuis le plan de contrôle.",
-    "checkHttps": "Vérifier HTTPS"
+    "checkHttps": "Vérifier HTTPS",
+    "certificate": "Certificat de la zone",
+    "certificateStatus": "Statut chez le fournisseur",
+    "certificateValidationRecords": "Enregistrements de validation",
+    "certificateNotRecorded": "Aucun certificat n'est encore enregistré pour cette zone ; le provisionnement en demande un.",
+    "certificateClusterUnavailable": "Le cluster qui a provisionné cette zone est indisponible ou son compte AWS n'est pas vérifié ; son certificat ne peut donc pas être lu.",
+    "certificateUnavailable": "Le certificat n'a pas pu être lu chez le fournisseur. Actualisez pour réessayer.",
+    "certificateIssued": "Le certificat est émis et couvre cette zone.",
+    "certificatePending": "Le certificat attend la validation DNS. Ses enregistrements de validation doivent se résoudre dans la zone publique.",
+    "certificateNotValid": "Le certificat n'est pas valide : validation échouée, expiré, révoqué ou inactif. Demandez-en un nouveau en provisionnant à nouveau.",
+    "certificateHostMismatch": "Le certificat enregistré ne couvre pas cette zone. Provisionnez à nouveau pour en demander un qui la couvre.",
+    "certificateAccountChanged": "Le fournisseur répond désormais depuis un autre compte AWS que celui où cette zone a été provisionnée."
   },
   "domainConnections": {
     "title": "Connecter le DNS",

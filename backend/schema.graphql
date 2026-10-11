@@ -8354,6 +8354,14 @@ input ManagedDomainAppRouteWriteInput {
   requestId: GUID!
 }
 
+type ManagedDomainCertificate {
+  state: ManagedDomainCheckState!
+  reason: String!
+  checkedAt: DateTime!
+  status: String
+  validationRecords: Int!
+}
+
 enum ManagedDomainCheckState {
   OK
   MISMATCH
@@ -8398,6 +8406,7 @@ type ManagedDomainDiagnostics {
   routesTruncated: Boolean!
   actions: ManagedDomainActions!
   provisionClusterId: GUID
+  certificate: ManagedDomainCertificate
 }
 
 type ManagedDomainDnsBindingReference {

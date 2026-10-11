@@ -8350,7 +8350,18 @@
     "tlsVerifiedHelp": "TLS was verified for this hostname and an HTTP status was observed. Redirects are not followed.",
     "httpsDeadline": "The HTTPS check did not finish before the deadline. Retry it, and check that the hostname routes to a running app.",
     "publicAddressRequired": "The hostname resolves to a non-public address, so it is not probed from the control plane.",
-    "checkHttps": "Check HTTPS"
+    "checkHttps": "Check HTTPS",
+    "certificate": "Zone certificate",
+    "certificateStatus": "Provider status",
+    "certificateValidationRecords": "Validation records",
+    "certificateNotRecorded": "No certificate is recorded for this zone yet; provisioning requests one.",
+    "certificateClusterUnavailable": "The cluster that provisioned this zone is unavailable or its AWS account is not verified, so its certificate cannot be read.",
+    "certificateUnavailable": "The certificate could not be read from the provider. Refresh to try again.",
+    "certificateIssued": "The certificate is issued and covers this zone.",
+    "certificatePending": "The certificate is waiting for DNS validation. Its validation records must resolve in the public zone.",
+    "certificateNotValid": "The certificate is not valid: it failed validation, timed out, expired, was revoked or is inactive. Request a new one by provisioning again.",
+    "certificateHostMismatch": "The recorded certificate does not cover this zone. Provision again to request one that does.",
+    "certificateAccountChanged": "The provider now answers from a different AWS account than the one this zone was provisioned in."
   },
   "domainConnections": {
     "title": "Connect DNS",

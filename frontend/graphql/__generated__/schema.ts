@@ -7868,6 +7868,14 @@ export type ManagedDomainAppRouteWriteInput = {
   workloadId: Scalars['GUID']['input'];
 };
 
+export type ManagedDomainCertificate = {
+  checkedAt: Scalars['DateTime']['output'];
+  reason: Scalars['String']['output'];
+  state: ManagedDomainCheckState;
+  status?: Maybe<Scalars['String']['output']>;
+  validationRecords: Scalars['Int']['output'];
+};
+
 export type ManagedDomainCheckState =
   | 'ERROR'
   | 'MISMATCH'
@@ -7900,6 +7908,7 @@ export type ManagedDomainDiagnosticRecord = {
 
 export type ManagedDomainDiagnostics = {
   actions: ManagedDomainActions;
+  certificate?: Maybe<ManagedDomainCertificate>;
   checkedAt: Scalars['DateTime']['output'];
   checks: Array<ManagedDomainDiagnosticCheck>;
   id: Scalars['GUID']['output'];

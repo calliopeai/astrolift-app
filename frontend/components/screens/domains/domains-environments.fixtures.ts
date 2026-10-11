@@ -183,6 +183,13 @@ export const DOMAIN_DIAGNOSTICS: NonNullable<ManagedDomainDetailProps["diagnosti
     },
   ],
   routesTruncated: false,
+  certificate: {
+    state: "OK",
+    reason: "CERTIFICATE_ISSUED",
+    checkedAt: "2026-09-27T12:00:00Z",
+    status: "ISSUED",
+    validationRecords: 1,
+  },
   actions: {
     canCreate: true,
     canDelete: true,

@@ -8270,7 +8270,18 @@
     "tlsVerifiedHelp": "O TLS foi verificado para este nome de host e um status HTTP foi observado. Redirecionamentos não são seguidos.",
     "httpsDeadline": "A verificação HTTPS não terminou antes do prazo. Repita e confira se o nome de host leva a um app em execução.",
     "publicAddressRequired": "O nome de host resolve para um endereço não público, então ele não é sondado a partir do plano de controle.",
-    "checkHttps": "Verificar HTTPS"
+    "checkHttps": "Verificar HTTPS",
+    "certificate": "Certificado da zona",
+    "certificateStatus": "Status no provedor",
+    "certificateValidationRecords": "Registros de validação",
+    "certificateNotRecorded": "Ainda não há certificado registrado para esta zona; o provisionamento solicita um.",
+    "certificateClusterUnavailable": "O cluster que provisionou esta zona não está disponível ou sua conta da AWS não está verificada, então o certificado não pode ser lido.",
+    "certificateUnavailable": "Não foi possível ler o certificado no provedor. Atualize para tentar novamente.",
+    "certificateIssued": "O certificado foi emitido e cobre esta zona.",
+    "certificatePending": "O certificado aguarda a validação por DNS. Os registros de validação precisam ser resolvidos na zona pública.",
+    "certificateNotValid": "O certificado não é válido: falhou na validação, expirou, foi revogado ou está inativo. Solicite um novo provisionando novamente.",
+    "certificateHostMismatch": "O certificado registrado não cobre esta zona. Provisione novamente para solicitar um que cubra.",
+    "certificateAccountChanged": "O provedor agora responde de uma conta da AWS diferente daquela em que esta zona foi provisionada."
   },
   "domainConnections": {
     "title": "Conectar DNS",

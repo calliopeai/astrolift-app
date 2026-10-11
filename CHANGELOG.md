@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Domain diagnostics show the zone's recorded certificate: its provider status and validation records, read with the provisioning cluster's reviewed, account-pinned ACM client. An issued certificate, one still waiting for DNS validation, one that failed, expired or does not cover the zone, a changed account and an unreadable one stay distinct, each explained in every supported language. Platform operators only, like the zone inventory (#2287).
+
 - GCP clusters manage their central-auth sign-in users in Google Cloud Identity Platform when central auth signs in through the cluster's own project: list, create (a password creates a verified user, no password sends the set-password email), set password, reset password, enable or disable, and delete, with the same reviewed-target checks as Cognito and Entra ID. Identity Platform has no groups, so group lists are empty and group changes are refused with that reason. The control plane needs `roles/identitytoolkit.admin` on the project (#2135).
 
 - Hosted brain discovery: apps declared `[app] kind = "mimwell"` are listed as brains by the new `astroliftBrains` query and the `astrolift_list_brains` / `astrolift_get_brain` MCP tools (MCP read plus `read:apps`). The list follows app visibility exactly: organization and team grants, team shares at viewer and up (a revoked share hides the brain again), and the API token's team ceiling. Each brain carries its owning team and project, environment endpoints and the teams it is shared with, and no credentials. **Apps › Semantic layers** (`/brains`) lists them with where each is served, who it is shared with, and a link to the app's Access tab to share it, in every supported language (#2320).

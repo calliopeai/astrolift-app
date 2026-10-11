@@ -20,6 +20,7 @@ from astrolift_clusters.models import ManagedDomain, TenantCluster
 from astrolift_clusters.models.managed_domain import resolve_managed_domain
 from astrolift_clusters.schema.domain_diagnostics import (
     ManagedDomainActions,
+    ManagedDomainCertificate,
     ManagedDomainDiagnosticCheck,
     ManagedDomainDiagnosticRecord,
     ManagedDomainDiagnostics,
@@ -480,6 +481,63 @@ def _zone(info, domain, current):
             client.close()
 
 
+_CERTIFICATE_STATES = {
+    "ISSUED": State.OK,
+    "PENDING_VALIDATION": State.UNKNOWN,
+}
+
+
+def _certificate(info, domain, current, cluster):
+    """The zone's recorded certificate, read with the provisioning cluster's
+    reviewed, account-pinned ACM client (#2287). Operator-only, like the zone
+    inventory; never the control plane's ambient identity."""
+    now = timezone.now()
+    result = ManagedDomainCertificate(
+        state=State.UNSUPPORTED, reason="CERTIFICATE_NOT_RECORDED", checked_at=now
+    )
+    with _auth(info) as user:
+        if not _operator(user):
+            result.reason = "PLATFORM_OPERATOR_REQUIRED"
+            return result
+    arn = domain.provision_cert_id or ""
+    if not arn:
+        return result
+    if (
+        cluster is None
+        or cluster.provider_plugin.slug != "aws"
+        or not cluster.cloud_account_id
+        or cluster.cloud_account_verified_at is None
+    ):
+        result.state, result.reason = State.UNKNOWN, "CERTIFICATE_CLUSTER_UNAVAILABLE"
+        return result
+    try:
+        from core.app_deploy import driver_for_capability
+
+        zone = hostname(domain.zone)
+        current()
+        cert = driver_for_capability(cluster, "dns").observe_reviewed_domain_certificate(
+            zone=zone,
+            hostname=zone,
+            arn=arn,
+            expected_account_id=cluster.cloud_account_id,
+            checkpoint=current,
+        )
+    except Exception as error:
+        current()
+        code = str(error)
+        result.state = State.ERROR
+        result.reason = code if re.fullmatch(r"NATIVE_[A-Z_]{1,60}", code) else "CERTIFICATE_UNAVAILABLE"
+        return result
+    current()
+    return ManagedDomainCertificate(
+        state=_CERTIFICATE_STATES.get(cert.status, State.ERROR),
+        reason=f"CERTIFICATE_{cert.status}",
+        checked_at=now,
+        status=cert.status,
+        validation_records=len(cert.validation_records),
+    )
+
+
 def _cloudflare_zone(info, domain, current):
     from astrolift_clusters.cloudflare_dns_transport import DnsConnectionError
     from astrolift_clusters.dns_provider_connections import observe_zone, observe_zone_records
@@ -745,6 +803,7 @@ def diagnostics(info, domain_id, version, requested, record_type):
     routes, truncated = _routes(info, domain)
     current()
     cluster = provision_cluster(domain)
+    certificate = _certificate(info, domain, current, cluster)
     return ManagedDomainDiagnostics(
         id=GUID(str(domain.guid)),
         version=domain.version,
@@ -758,6 +817,7 @@ def diagnostics(info, domain_id, version, requested, record_type):
         routes_truncated=truncated,
         actions=actions(info, domain),
         provision_cluster_id=GUID(str(cluster.guid)) if cluster else None,
+        certificate=certificate,
     )
 
 

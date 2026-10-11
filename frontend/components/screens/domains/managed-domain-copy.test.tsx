@@ -59,6 +59,17 @@ const keys = [
   "cloudflareReadOnly",
 
   "cloudflareBinding",
+  "certificate",
+  "certificateStatus",
+  "certificateValidationRecords",
+  "certificateNotRecorded",
+  "certificateClusterUnavailable",
+  "certificateUnavailable",
+  "certificateIssued",
+  "certificatePending",
+  "certificateNotValid",
+  "certificateHostMismatch",
+  "certificateAccountChanged",
   "priority",
 
   "zoneRoot",

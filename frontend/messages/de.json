@@ -8273,7 +8273,18 @@
     "tlsVerifiedHelp": "TLS wurde für diesen Hostnamen verifiziert und ein HTTP-Status beobachtet. Weiterleitungen werden nicht verfolgt.",
     "httpsDeadline": "Die HTTPS-Prüfung wurde nicht vor Ablauf der Frist beendet. Wiederhole sie und prüfe, ob der Hostname zu einer laufenden App führt.",
     "publicAddressRequired": "Der Hostname wird zu einer nicht öffentlichen Adresse aufgelöst und daher nicht von der Control Plane aus geprüft.",
-    "checkHttps": "HTTPS prüfen"
+    "checkHttps": "HTTPS prüfen",
+    "certificate": "Zonenzertifikat",
+    "certificateStatus": "Anbieterstatus",
+    "certificateValidationRecords": "Validierungseinträge",
+    "certificateNotRecorded": "Für diese Zone ist noch kein Zertifikat hinterlegt; die Bereitstellung fordert eines an.",
+    "certificateClusterUnavailable": "Der Cluster, der diese Zone bereitgestellt hat, ist nicht verfügbar oder sein AWS-Konto ist nicht verifiziert, daher kann das Zertifikat nicht gelesen werden.",
+    "certificateUnavailable": "Das Zertifikat konnte beim Anbieter nicht gelesen werden. Aktualisieren Sie, um es erneut zu versuchen.",
+    "certificateIssued": "Das Zertifikat ist ausgestellt und deckt diese Zone ab.",
+    "certificatePending": "Das Zertifikat wartet auf die DNS-Validierung. Seine Validierungseinträge müssen in der öffentlichen Zone auflösbar sein.",
+    "certificateNotValid": "Das Zertifikat ist nicht gültig: Validierung fehlgeschlagen, abgelaufen, widerrufen oder inaktiv. Fordern Sie durch erneutes Bereitstellen ein neues an.",
+    "certificateHostMismatch": "Das hinterlegte Zertifikat deckt diese Zone nicht ab. Stellen Sie erneut bereit, um ein passendes anzufordern.",
+    "certificateAccountChanged": "Der Anbieter antwortet jetzt aus einem anderen AWS-Konto als dem, in dem diese Zone bereitgestellt wurde."
   },
   "domainConnections": {
     "title": "DNS verbinden",

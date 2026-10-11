@@ -8270,7 +8270,18 @@
     "tlsVerifiedHelp": "このホスト名のTLSを検証し、HTTPステータスを観測しました。リダイレクトはたどりません。",
     "httpsDeadline": "HTTPS確認が期限までに完了しませんでした。再試行し、ホスト名が実行中のアプリにルーティングされているか確認してください。",
     "publicAddressRequired": "ホスト名が非公開アドレスに解決されるため、コントロールプレーンからは調査しません。",
-    "checkHttps": "HTTPSを確認"
+    "checkHttps": "HTTPSを確認",
+    "certificate": "ゾーン証明書",
+    "certificateStatus": "プロバイダーでの状態",
+    "certificateValidationRecords": "検証レコード",
+    "certificateNotRecorded": "このゾーンにはまだ証明書が記録されていません。プロビジョニングで要求されます。",
+    "certificateClusterUnavailable": "このゾーンをプロビジョニングしたクラスターが利用できないか、AWS アカウントが検証されていないため、証明書を読み取れません。",
+    "certificateUnavailable": "プロバイダーから証明書を読み取れませんでした。更新して再試行してください。",
+    "certificateIssued": "証明書は発行済みで、このゾーンを対象にしています。",
+    "certificatePending": "証明書は DNS 検証を待っています。検証レコードがパブリックゾーンで解決される必要があります。",
+    "certificateNotValid": "証明書が有効ではありません（検証失敗、期限切れ、失効、または無効）。再度プロビジョニングして新しい証明書を要求してください。",
+    "certificateHostMismatch": "記録された証明書はこのゾーンを対象にしていません。再度プロビジョニングして対象の証明書を要求してください。",
+    "certificateAccountChanged": "プロバイダーは、このゾーンをプロビジョニングした AWS アカウントとは別のアカウントから応答しています。"
   },
   "domainConnections": {
     "title": "DNS を接続",
