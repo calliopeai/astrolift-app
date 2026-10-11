@@ -518,7 +518,9 @@ def test_empty_mail_history_migration_roundtrip():
 
     assert not EmailDeliveryTest._base_manager.exists()
     previous = [("astrolift_services", "0035_merge_model_sources")]
-    current = [("astrolift_services", "0043_email_delivery_tests")]
+    # Restore every leaf: rolling back to 0035 also unapplies sibling branches
+    # joined by a later merge migration, which 0043 alone would not re-apply.
+    current = MigrationExecutor(connection).loader.graph.leaf_nodes("astrolift_services")
     try:
         MigrationExecutor(connection).migrate(previous)
         assert "astrolift_services_emaildeliverytest" not in connection.introspection.table_names()
