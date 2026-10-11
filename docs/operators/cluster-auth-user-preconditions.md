@@ -91,3 +91,21 @@ application permissions `User.ReadWrite.All`, `Group.ReadWrite.All` and
   created with that user principal name, which must be in a verified domain.
 - Entra has no provider-sent password reset. **Reset password** is refused with
   that reason; set a temporary password instead.
+
+## Google Cloud Identity Platform
+
+A GCP cluster manages sign-in users in Identity Platform only when its central
+auth issuer is `https://securetoken.google.com/<project>` for the cluster's own
+`provider_config.project_id`; any other issuer is reported unsupported with the
+reason. The control plane's Application Default Credentials need
+`roles/identitytoolkit.admin` on that project. The pool is the project ID and
+the user's immutable `localId` is the provider user ID.
+
+- Identity Platform has no groups: the group list is empty, and creating a
+  group or changing membership is refused with that reason.
+- Creating a user without a password sends Identity Platform's set-password
+  email; with a password the user is created verified. Identity Platform cannot
+  force a change at next sign-in, so a temporary and a permanent password behave
+  the same.
+- **Reset password** sends the provider's password-reset email.
+
