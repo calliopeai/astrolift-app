@@ -2720,6 +2720,9 @@ type AstroliftDiscoveredAppManifest {
   buildContext: String!
   workloadCount: Int!
   alreadyRegistered: Boolean!
+
+  """The manifest's [app] kind (#2332); empty when generic."""
+  appKind: String!
 }
 
 type AstroliftDispatcherInstance {

@@ -2618,6 +2618,8 @@ export type AstroliftDiscoveredAgentManifest = {
 
 export type AstroliftDiscoveredAppManifest = {
   alreadyRegistered: Scalars['Boolean']['output'];
+  /** The manifest's [app] kind (#2332); empty when generic. */
+  appKind: Scalars['String']['output'];
   buildContext: Scalars['String']['output'];
   manifestPath: Scalars['String']['output'];
   name: Scalars['String']['output'];
