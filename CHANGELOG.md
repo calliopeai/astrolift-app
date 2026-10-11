@@ -169,6 +169,25 @@
   ready, use supported update masks/traffic etags, preserve unproved Model
   artifacts and document legacy/recovery limits (#2277).
 
+- Stage typed app-domain route adapters against the mounted routing contract, with exact target review, browser-held original request recovery and fresh versioned reconciliation; public activation and native readiness remain separate (#2299).
+
+- Prepare the domain connection view for deployment and app-managed HTTP API targets with generic endpoint/TLS observations, localized hosting labels and retained-review invalidation; routing API activation remains separate (#2299).
+
+- Show typed Route53 policy configuration and health/traffic-policy references per DNS record in the Domains Records tab, retaining unknown and non-Route53 states without claiming measured health or traffic (#2287).
+
+- Connect domain settings to fresh effective-default admission with a reviewed domain version and impact fingerprint, localized refusal reasons and explicit refresh/review after uncertain replies; preserve existing app URLs (#2299).
+
+- Prepare reusable, localized app-domain connection and effective-domain settings
+  views with explicit review, current capability gates and uncertain-outcome
+  recovery. API adapters and product activation remain separate (#2299).
+- Make explicit managed-domain default selection effective for its reviewed use cases, preserve sibling preview/app flags and existing URLs, and reject stale impact, incomplete writers or overriding organization defaults. Refs: #2299.
+- Preserve native Route53 record routing policies, target identifiers, weights,
+  geographic and CIDR configuration and health/traffic-policy references in
+  read-only domain diagnostics; keep incomplete policies explicitly unknown
+  without implying current endpoint health or request distribution (#2287).
+
+- Add source-reviewed public Lambda HTTP API domain Prepare/Connect and original-operation recovery, with retained native ACKs, exact apex Route53 ALIAS creation, fresh caller/credential fences and protected history. Refuse unsupported new EKS and read-only Cloudflare routing, ambiguous resend and legacy mutation of bound routes (Refs: #2299).
+
 - `runTask` dispatches the task's Kubernetes Job: it renders the task from the environment's running deployment (image, env, resources, GPU requests, tolerations and node selector), renames it per run, applies an optional command override, and records the namespace and Job name so the run reconciler follows it to a terminal status. Dispatch failures end the run as `failed` with `failureReason`. A caller `requestId` makes retries return the original run instead of launching more work. Without `environmentName` only a single-environment app is accepted. Apply lifecycle migration `taskrun_dispatch` with the image (#2330).
 
 - The Cognito client picker reports each client's managed login branding, and the ingress-auth form warns before saving a client that has none (Cognito would serve "Login pages unavailable") or whose pool already uses all 20 brandings. Classic hosted UI pools need none; a failed read reports unknown (#1727).

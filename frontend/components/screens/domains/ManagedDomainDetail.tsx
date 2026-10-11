@@ -17,10 +17,13 @@ import type {
 import { useFormatters } from "@/lib/i18n/formatters";
 import { domainDiagnosticReasonKey } from "./domain-diagnostic-reasons";
 import type { ManagedDomainState } from "./use-managed-domain";
+import { DomainRecordRouting } from "./DomainRecordRouting";
+import { DomainDefaultSettings, type DomainDefaultSettingsProps } from "./DomainDefaultSettings";
 
 export type ManagedDomainDetailProps = ManagedDomainState & {
   id: string;
   initialTab?: Tab;
+  defaultSettings?: DomainDefaultSettingsProps | null;
   /**
    * Why Astrolift writes no DNS on this install (DNS withheld,
    * calliope-installer#447). Verify and Revalidate still run: the certificate
@@ -335,6 +338,7 @@ function DetailTabs({
       >
         {tab === "overview" && (
           <>
+            {props.defaultSettings && <DomainDefaultSettings {...props.defaultSettings} />}
             <section className="space-y-3 rounded-lg border p-4">
               <h2 className="font-semibold">{t("configuration")}</h2>
               <div className="flex flex-wrap gap-2">
@@ -505,6 +509,7 @@ function DetailTabs({
                             </p>
                           </div>
                         )}
+                        <DomainRecordRouting routing={r.routing} />
                       </div>
                     </li>
                   ))}

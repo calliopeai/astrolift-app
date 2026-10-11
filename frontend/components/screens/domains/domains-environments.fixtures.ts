@@ -183,7 +183,15 @@ export const DOMAIN_DIAGNOSTICS: NonNullable<ManagedDomainDetailProps["diagnosti
     },
   ],
   routesTruncated: false,
-  actions: { canCreate: true, canDelete: true, canRevalidate: true },
+  actions: {
+    canCreate: true,
+    canDelete: true,
+    canRevalidate: true,
+    canUpdate: false,
+    canSetDefaults: false,
+    defaultUpdateReason: "PERMISSION_DENIED",
+    defaultsFingerprint: null,
+  },
 };
 
 export const MANAGED_DOMAIN: ManagedDomainDetailProps = {
@@ -196,6 +204,7 @@ export const MANAGED_DOMAIN: ManagedDomainDetailProps = {
   diagnosticsLoading: false,
   diagnosticsError: null,
   onRefreshDiagnostics: noop,
+  onReloadCurrentDomain: yes,
   probe: null,
   probeLoading: false,
   probeError: null,

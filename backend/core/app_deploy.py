@@ -548,6 +548,10 @@ def _config_for_capability_uncredentialed(
         )
 
     if plugin_slug == "aws":
+        if capability == "dns":
+            from aws.dns_route53 import Route53Config
+
+            return Route53Config(region=region)
         if capability == "identity_users":
             from aws.identity_users_cognito import CognitoUsersConfig, cognito_pool_from_issuer
 
@@ -1580,7 +1584,9 @@ def envoy_custom_domain_routes(
             is_active=True,
             validation_status=CustomDomain.ValidationStatus.VALIDATED,
             certificate_state__in=[CustomDomain.CertificateState.ACTIVE, CustomDomain.CertificateState.BYO],
-        ).order_by("pk")
+        )
+        .exclude(managed_route_operations__isnull=False)
+        .order_by("pk")
     )
     if not domains:
         return []

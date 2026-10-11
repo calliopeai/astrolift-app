@@ -145,6 +145,11 @@ CREDENTIAL_AWARE_CAPABILITIES: frozenset[str] = frozenset(
     }
 )
 
+# Capabilities whose driver honours a declared credential only on one cloud.
+# The Route53 driver threads it for reviewed app routes (#2299); other clouds'
+# DNS drivers still act as the control plane and keep refusing.
+CLOUD_CREDENTIAL_AWARE_CAPABILITIES: dict[str, frozenset[str]] = {"aws": frozenset({"dns"})}
+
 
 def stamp_credential(cfg: Any, cluster: TenantCluster) -> Any:
     """Return ``cfg`` with the cluster's credential set, if it takes one.
@@ -196,7 +201,11 @@ def assert_credential_supported(cluster: TenantCluster, *, capability: str) -> N
     credential block fails here rather than at some later cloud call.
     """
     credential = credential_for_cluster(cluster)
-    if credential.is_ambient or capability in CREDENTIAL_AWARE_CAPABILITIES:
+    if (
+        credential.is_ambient
+        or capability in CREDENTIAL_AWARE_CAPABILITIES
+        or capability in CLOUD_CREDENTIAL_AWARE_CAPABILITIES.get(_cloud_for(cluster), frozenset())
+    ):
         return
     raise ClusterCredentialUnsupported(
         f"cluster {_slug_for(cluster)}: declares credential mode {credential.mode.value!r}, but the "

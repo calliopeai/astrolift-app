@@ -7703,6 +7703,136 @@ export type ManagedDomainActions = {
   canCreate: Scalars['Boolean']['output'];
   canDelete: Scalars['Boolean']['output'];
   canRevalidate: Scalars['Boolean']['output'];
+  canSetDefaults: Scalars['Boolean']['output'];
+  canUpdate: Scalars['Boolean']['output'];
+  defaultUpdateReason: Scalars['String']['output'];
+  defaultsFingerprint?: Maybe<Scalars['String']['output']>;
+};
+
+export type ManagedDomainAppRouteOperation = {
+  allocationState: Scalars['String']['output'];
+  appId: Scalars['GUID']['output'];
+  canReconcile: Scalars['Boolean']['output'];
+  clusterId: Scalars['GUID']['output'];
+  customDomainId?: Maybe<Scalars['GUID']['output']>;
+  dnsState: Scalars['String']['output'];
+  domainId: Scalars['GUID']['output'];
+  environmentId: Scalars['GUID']['output'];
+  hostname: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  ingressState: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  observedAt?: Maybe<Scalars['DateTime']['output']>;
+  purpose: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  records: Array<ManagedDomainAppRouteRecord>;
+  requestId: Scalars['GUID']['output'];
+  status: Scalars['String']['output'];
+  tlsState: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+  workloadId: Scalars['GUID']['output'];
+};
+
+export type ManagedDomainAppRouteOperationInput = {
+  domainId: Scalars['GUID']['input'];
+  requestId: Scalars['GUID']['input'];
+};
+
+export type ManagedDomainAppRouteOperationMutationResult = {
+  data?: Maybe<ManagedDomainAppRouteOperation>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type ManagedDomainAppRouteReconcileInput = {
+  expectedVersion: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  requestId: Scalars['GUID']['input'];
+};
+
+export type ManagedDomainAppRouteRecord = {
+  name: Scalars['String']['output'];
+  target?: Maybe<Scalars['String']['output']>;
+  targetZoneId?: Maybe<Scalars['String']['output']>;
+  type: Scalars['String']['output'];
+};
+
+export type ManagedDomainAppRouteReview = {
+  allocationState: Scalars['String']['output'];
+  apiEndpoint?: Maybe<Scalars['String']['output']>;
+  apiId?: Maybe<Scalars['String']['output']>;
+  appId: Scalars['GUID']['output'];
+  appVersion: Scalars['Int']['output'];
+  canAttach: Scalars['Boolean']['output'];
+  canPrepare: Scalars['Boolean']['output'];
+  certificateStatus: Scalars['String']['output'];
+  clusterId: Scalars['GUID']['output'];
+  clusterVersion: Scalars['Int']['output'];
+  domainId: Scalars['GUID']['output'];
+  domainVersion: Scalars['Int']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentVersion: Scalars['Int']['output'];
+  functionArn?: Maybe<Scalars['String']['output']>;
+  hostname: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  records: Array<ManagedDomainAppRouteRecord>;
+  reviewSha256: Scalars['String']['output'];
+  sourceFingerprint?: Maybe<Scalars['String']['output']>;
+  stage?: Maybe<Scalars['String']['output']>;
+  workloadId: Scalars['GUID']['output'];
+  workloadVersion: Scalars['Int']['output'];
+  writer: Scalars['String']['output'];
+};
+
+export type ManagedDomainAppRouteSupport = {
+  allowed: Scalars['Boolean']['output'];
+  domainId: Scalars['GUID']['output'];
+  reason: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+  writer: Scalars['String']['output'];
+};
+
+export type ManagedDomainAppRouteTarget = {
+  appId: Scalars['GUID']['output'];
+  appName: Scalars['String']['output'];
+  appVersion: Scalars['Int']['output'];
+  clusterId: Scalars['GUID']['output'];
+  clusterName: Scalars['String']['output'];
+  clusterVersion: Scalars['Int']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  environmentVersion: Scalars['Int']['output'];
+  kind: Scalars['String']['output'];
+  workloadId: Scalars['GUID']['output'];
+  workloadName: Scalars['String']['output'];
+  workloadVersion: Scalars['Int']['output'];
+};
+
+export type ManagedDomainAppRouteTargetInput = {
+  domainId: Scalars['GUID']['input'];
+  environmentId: Scalars['GUID']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+  expectedEnvironmentVersion: Scalars['Int']['input'];
+  hostname: Scalars['String']['input'];
+  workloadId: Scalars['GUID']['input'];
+};
+
+export type ManagedDomainAppRouteTargetsPage = {
+  hasNextPage: Scalars['Boolean']['output'];
+  items: Array<ManagedDomainAppRouteTarget>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+};
+
+export type ManagedDomainAppRouteWriteInput = {
+  domainId: Scalars['GUID']['input'];
+  environmentId: Scalars['GUID']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+  expectedEnvironmentVersion: Scalars['Int']['input'];
+  hostname: Scalars['String']['input'];
+  requestId: Scalars['GUID']['input'];
+  reviewSha256: Scalars['String']['input'];
+  workloadId: Scalars['GUID']['input'];
 };
 
 export type ManagedDomainCheckState =
@@ -7729,6 +7859,7 @@ export type ManagedDomainDiagnosticRecord = {
   name: Scalars['String']['output'];
   priority?: Maybe<Scalars['Int']['output']>;
   proxied?: Maybe<Scalars['Boolean']['output']>;
+  routing?: Maybe<ManagedDomainRecordRouting>;
   ttl?: Maybe<Scalars['Int']['output']>;
   type: Scalars['String']['output'];
   values: Array<Scalars['String']['output']>;
@@ -7815,6 +7946,44 @@ export type ManagedDomainProviderZone = {
   zoneName?: Maybe<Scalars['String']['output']>;
 };
 
+export type ManagedDomainRecordCidrRouting = {
+  collectionId: Scalars['String']['output'];
+  locationName: Scalars['String']['output'];
+};
+
+export type ManagedDomainRecordCoordinates = {
+  latitude: Scalars['String']['output'];
+  longitude: Scalars['String']['output'];
+};
+
+export type ManagedDomainRecordGeoLocation = {
+  continentCode?: Maybe<Scalars['String']['output']>;
+  countryCode?: Maybe<Scalars['String']['output']>;
+  subdivisionCode?: Maybe<Scalars['String']['output']>;
+};
+
+export type ManagedDomainRecordGeoProximity = {
+  awsRegion?: Maybe<Scalars['String']['output']>;
+  bias?: Maybe<Scalars['Int']['output']>;
+  coordinates?: Maybe<ManagedDomainRecordCoordinates>;
+  localZoneGroup?: Maybe<Scalars['String']['output']>;
+};
+
+export type ManagedDomainRecordRouting = {
+  cidr?: Maybe<ManagedDomainRecordCidrRouting>;
+  failover?: Maybe<Scalars['String']['output']>;
+  geoLocation?: Maybe<ManagedDomainRecordGeoLocation>;
+  geoProximity?: Maybe<ManagedDomainRecordGeoProximity>;
+  healthCheckId?: Maybe<Scalars['String']['output']>;
+  multiValueAnswer?: Maybe<Scalars['Boolean']['output']>;
+  policy: ManagedDomainRoutingPolicy;
+  reason: Scalars['String']['output'];
+  region?: Maybe<Scalars['String']['output']>;
+  setIdentifier?: Maybe<Scalars['String']['output']>;
+  trafficPolicyInstanceId?: Maybe<Scalars['String']['output']>;
+  weight?: Maybe<Scalars['Int']['output']>;
+};
+
 export type ManagedDomainRecordType =
   | 'A'
   | 'AAAA'
@@ -7840,6 +8009,17 @@ export type ManagedDomainRoute = {
   observedState: ManagedDomainCheckState;
   recordedUrl: Scalars['String']['output'];
 };
+
+export type ManagedDomainRoutingPolicy =
+  | 'CIDR'
+  | 'FAILOVER'
+  | 'GEOLOCATION'
+  | 'GEOPROXIMITY'
+  | 'LATENCY'
+  | 'MULTIVALUE'
+  | 'SIMPLE'
+  | 'UNKNOWN'
+  | 'WEIGHTED';
 
 export type Managedresourceadoptionpayload = {
   acknowledgedPriorOwner: Scalars['String']['output'];
@@ -8423,6 +8603,7 @@ export type Mutation = {
   connectCloudflareDnsToken: DnsProviderConnectionTypeMutationResult;
   connectExistingGithubApp: AstroliftSourceConnectionMutationResult;
   connectHuggingFace: HuggingFaceConnectionTypeMutationResult;
+  connectManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
   connectSource: AstroliftSourceConnectionMutationResult;
   connectZentinelle: AstroliftZentinelleConnectionMutationResult;
   /** Cancel, terminate, or retry cleanup for an exact owned execution. */
@@ -8581,6 +8762,7 @@ export type Mutation = {
   placeObservabilityRetentionHold: ObservabilityRetentionHoldTypeMutationResult;
   /** Get a pre-signed URL for uploading an image or file. Optionally attach it to an entity via owner_container_property. */
   preSignedUrlImageUpload: PreSignedUrlUploadResult;
+  prepareManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
   /** Process a previously uploaded data import file. */
   processFile: ProcessFileResult;
   /** Update any user's profile via ProfileSerializer. Platform operator only; self-service profile edits go through updateMyProfile. */
@@ -8606,6 +8788,7 @@ export type Mutation = {
   reapCloudOrphan: ReapCloudOrphanPayloadMutationResult;
   recheckDomainValidation: AstroliftAppDomainMutationResult;
   reconcileClusterIngresses: ReconcileClusterIngressesResultMutationResult;
+  reconcileManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
   /** Reconcile the exact reviewed configuration version with its native Temporal schedule. Does not start an immediate run. Active reconciliation requires workflow.trigger; deleted workflow cleanup also requires workflow.delete. */
   reconcileWorkflowSchedule: WorkflowScheduleResult;
   recordClusterBootstrapRun: BootstraprunrecordedpayloadMutationResult;
@@ -9119,6 +9302,11 @@ export type MutationConnectExistingGithubAppArgs = {
 
 export type MutationConnectHuggingFaceArgs = {
   input: ConnectHuggingFaceInput;
+};
+
+
+export type MutationConnectManagedDomainAppRouteArgs = {
+  input: ManagedDomainAppRouteWriteInput;
 };
 
 
@@ -9836,6 +10024,11 @@ export type MutationPreSignedUrlImageUploadArgs = {
 };
 
 
+export type MutationPrepareManagedDomainAppRouteArgs = {
+  input: ManagedDomainAppRouteWriteInput;
+};
+
+
 export type MutationProcessFileArgs = {
   entityType: EntityType;
   processId?: InputMaybe<Scalars['ID']['input']>;
@@ -9940,6 +10133,11 @@ export type MutationRecheckDomainValidationArgs = {
 
 export type MutationReconcileClusterIngressesArgs = {
   input: ReconcileClusterIngressesInput;
+};
+
+
+export type MutationReconcileManagedDomainAppRouteArgs = {
+  input: ManagedDomainAppRouteReconcileInput;
 };
 
 
@@ -11753,6 +11951,10 @@ export type Query = {
   humanGateDecision?: Maybe<HumanGateDecisionState>;
   installAlertMailSupport: InstallAlertMailSupport;
   installAlertMailTestsPage: InstallAlertMailTestPage;
+  managedDomainAppRouteOperation?: Maybe<ManagedDomainAppRouteOperation>;
+  managedDomainAppRouteReview: ManagedDomainAppRouteReview;
+  managedDomainAppRouteSupport: ManagedDomainAppRouteSupport;
+  managedDomainAppTargetsPage: ManagedDomainAppRouteTargetsPage;
   me?: Maybe<AstroliftMe>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use membersPage. */
   members: Array<OrganizationMemberType>;
@@ -13852,6 +14054,30 @@ export type QueryInstallAlertMailTestsPageArgs = {
 };
 
 
+export type QueryManagedDomainAppRouteOperationArgs = {
+  input: ManagedDomainAppRouteOperationInput;
+};
+
+
+export type QueryManagedDomainAppRouteReviewArgs = {
+  input: ManagedDomainAppRouteTargetInput;
+};
+
+
+export type QueryManagedDomainAppRouteSupportArgs = {
+  domainId: Scalars['GUID']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+};
+
+
+export type QueryManagedDomainAppTargetsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  domainId: Scalars['GUID']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+  first?: Scalars['Int']['input'];
+};
+
+
 export type QueryMembersPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
@@ -15213,6 +15439,8 @@ export type UpdateIdentityProviderInput = {
 export type UpdateManagedDomainInput = {
   defaultFor: InputMaybe<Scalars['String']['input']>;
   dnsConfig: InputMaybe<Scalars['JSON']['input']>;
+  expectedDefaultsFingerprint: InputMaybe<Scalars['String']['input']>;
+  expectedVersion: InputMaybe<Scalars['Int']['input']>;
   id: Scalars['GUID']['input'];
   isWildcardManaged: InputMaybe<Scalars['Boolean']['input']>;
 };

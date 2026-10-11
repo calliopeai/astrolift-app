@@ -331,6 +331,15 @@ class AppMutations:
         app = RegisteredApp.objects.filter(guid=str(input.id), organization_id=org_id).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        from astrolift_lifecycle.domain_app_route import DomainAppRouteError, require_unbound_app
+
+        try:
+            require_unbound_app(app.pk)
+        except DomainAppRouteError:
+            return gql_failure(
+                "PROTECTED_DOMAIN_ROUTE_MANAGE_REQUIRED",
+                "Manage the original domain route before retiring this app.",
+            )
         app.soft_delete(by=_actor())
         from astrolift_registry.hostname_claims import release_app_hostname_claims
 
@@ -374,6 +383,16 @@ class AppMutations:
         ).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+
+        from astrolift_lifecycle.domain_app_route import DomainAppRouteError, require_unbound_app
+
+        try:
+            require_unbound_app(app.pk)
+        except DomainAppRouteError:
+            return gql_failure(
+                "PROTECTED_DOMAIN_ROUTE_MANAGE_REQUIRED",
+                "Manage the original domain route before retiring this app.",
+            )
 
         request = info.context.request  # type: ignore[attr-defined]
         user = getattr(request, "user", None)

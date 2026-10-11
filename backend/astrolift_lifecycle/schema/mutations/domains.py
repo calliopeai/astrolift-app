@@ -339,6 +339,13 @@ class DomainMutations:
                 ErrorCode.NOT_FOUND.value,
                 "domain not found",
             )
+        from astrolift_lifecycle.domain_app_route import legacy_custom_domain_allowed
+
+        if not legacy_custom_domain_allowed(domain):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "Protected domain route requires its original managed-route operation.",
+            )
         domain.soft_delete()
         return gql_success(
             _AppDomainRemovedPayload(
@@ -384,6 +391,13 @@ class DomainMutations:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
                 "domain not found",
+            )
+        from astrolift_lifecycle.domain_app_route import legacy_custom_domain_allowed
+
+        if not legacy_custom_domain_allowed(domain):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "Protected domain route requires its original managed-route operation.",
             )
         _kick_validate_custom_domain(domain)
         return gql_success(app_domain_to_type(domain))
@@ -431,6 +445,13 @@ class DomainMutations:
             return gql_failure(
                 ErrorCode.NOT_FOUND.value,
                 "domain not found",
+            )
+        from astrolift_lifecycle.domain_app_route import legacy_custom_domain_allowed
+
+        if not legacy_custom_domain_allowed(domain):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "Protected domain route requires its original managed-route operation.",
             )
         pem = (input.certificate_pem or "").strip()
         key = (input.private_key_pem or "").strip()
@@ -551,6 +572,13 @@ class DomainMutations:
                 "domain not found",
             )
 
+        from astrolift_lifecycle.domain_app_route import legacy_custom_domain_allowed
+
+        if not legacy_custom_domain_allowed(domain):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "Protected domain route requires its original managed-route operation.",
+            )
         now = timezone.now()
         with transaction.atomic():
             DomainRedirectRule.objects.filter(
@@ -640,6 +668,13 @@ class DomainMutations:
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
 
+        from astrolift_lifecycle.domain_app_route import legacy_custom_domain_allowed
+
+        if not legacy_custom_domain_allowed(domain):
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "Protected domain route requires its original managed-route operation.",
+            )
         now = timezone.now()
         with transaction.atomic():
             DomainPathRoute.objects.filter(

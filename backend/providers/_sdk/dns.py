@@ -7,6 +7,33 @@ from typing import Any, Protocol
 
 
 @dataclass(frozen=True)
+class ReviewedDnsHostname:
+    zone_id: str
+    zone_name: str
+    hostname: str
+    expected_account_id: str
+
+
+@dataclass(frozen=True)
+class ExactAliasRoute:
+    zone_id: str
+    zone_name: str
+    hostname: str
+    target_dns_name: str
+    target_zone_id: str
+    expected_account_id: str = ""
+    target_kind: str = "ELB"
+
+
+@dataclass(frozen=True)
+class AliasRouteObservation:
+    present: bool
+    matches: bool
+    change_id: str = ""
+    change_status: str = "UNKNOWN"
+
+
+@dataclass(frozen=True)
 class Record:
     zone: str
     name: str
@@ -38,11 +65,55 @@ class DnsRecord:
 
 
 class DnsDriver(Protocol):
+    def observe_reviewed_dns_change(self, change_id: str, *, expected_account_id: str, checkpoint) -> str:
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError("Reviewed DNS change observation is unsupported")
+
+    def request_reviewed_domain_certificate(
+        self, *, zone, hostname, operation_id, expected_account_id, checkpoint, record_ack
+    ):
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError("Reviewed certificate requests are unsupported.")
+
+    def observe_reviewed_domain_certificate(self, *, zone, hostname, arn, expected_account_id, checkpoint):
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError("Reviewed certificate observations are unsupported.")
+
+    def observe_reviewed_certificate_validation(self, *, zone_id, zone, name, value, expected_account_id, checkpoint):
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError("Reviewed certificate DNS observations are unsupported.")
+
+    def create_reviewed_certificate_validation(
+        self, *, zone_id, zone, name, value, expected_account_id, checkpoint, record_ack
+    ):
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError("Reviewed certificate DNS creation is unsupported.")
+
     """Protocol for managing DNS records.
 
     Implementations: route53, cloud_dns, azure_dns, cloudflare, ns1,
     external_dns_proxy.
     """
+
+    def observe_reviewed_hostname(self, target: ReviewedDnsHostname, *, checkpoint) -> bool:
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError("Reviewed hostname observation is unsupported.")
+
+    def observe_exact_alias_route(self, route: ExactAliasRoute, *, checkpoint) -> AliasRouteObservation:
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError("exact native alias routes are unsupported")
+
+    def create_exact_alias_route(self, route: ExactAliasRoute, *, checkpoint, record_ack) -> AliasRouteObservation:
+        from _sdk import UnsupportedOperationError
+
+        raise UnsupportedOperationError("exact native alias routes are unsupported")
 
     def ensure_record(
         self,

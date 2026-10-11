@@ -298,7 +298,7 @@ describe("actual exported domain schema over HttpLink", () => {
     expect(screen.queryByText(en.managedDomains.notFound)).not.toBeInTheDocument();
     refused = false;
     missing = true;
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    fireEvent.click(screen.getByRole("button", { name: en.managedDomains.refresh }));
     await screen.findByText(en.managedDomains.notFound);
     view.unmount();
   });
@@ -325,6 +325,108 @@ describe("actual exported domain schema over HttpLink", () => {
       "/apps/storefront/domains"
     );
     expect(screen.getByText(en.managedDomains.routeHelp)).toBeInTheDocument();
+  });
+  it("renders actual Route53 policy configuration and inert references without measuring health or traffic", async () => {
+    observation.providerZone.records = [
+      {
+        name: domain.zone,
+        type: "A",
+        ttl: null,
+        values: [],
+        aliasTarget: "native-lb.example",
+        aliasZoneId: "Z-NATIVE",
+        evaluateTargetHealth: false,
+        routing: {
+          policy: "WEIGHTED",
+          reason: "",
+          setIdentifier: "blue",
+          weight: 0,
+          multiValueAnswer: false,
+          healthCheckId: "health-reference",
+          trafficPolicyInstanceId: "traffic-reference",
+        },
+      },
+    ];
+    render(<View />);
+    await ready();
+    fireEvent.click(screen.getByRole("tab", { name: en.managedDomains.records }));
+    const record = screen.getByRole("list", { name: en.managedDomains.records });
+    const summary = within(record).getByText(
+      `${en.domainRecordRouting.title}: ${en.domainRecordRouting.weighted}`
+    );
+    const panel = summary.closest("details")!;
+    expect(panel.open).toBe(false);
+    fireEvent.click(summary);
+    expect(panel.open).toBe(true);
+    expect(within(panel).getByText("0")).toHaveRole("definition");
+    expect(within(panel).getByText(en.domainRecordRouting.no)).toHaveRole("definition");
+    expect(within(panel).getByText("health-reference")).toHaveRole("definition");
+    expect(within(panel).getByText("traffic-reference")).toHaveRole("definition");
+    expect(within(panel).getByText(en.domainRecordRouting.help)).toBeInTheDocument();
+    expect(panel.querySelector("a,button")).toBeNull();
+    expect(
+      requests.every((row) =>
+        [
+          "ManagedDomain",
+          "ManagedDomainDiagnostics",
+          "DnsConnectionSupport",
+          "DnsDomainBinding",
+          // Install policy, not a health or traffic measurement.
+          "WithheldCapabilities",
+        ].includes(row.operationName)
+      )
+    ).toBe(true);
+    expect(within(record).getByText("native-lb.example")).toBeInTheDocument();
+  });
+  it("keeps incomplete native routing explicitly unknown while retaining observed configuration", async () => {
+    observation.providerZone.records = [
+      {
+        name: domain.zone,
+        type: "A",
+        ttl: 60,
+        values: ["192.0.2.1"],
+        routing: {
+          policy: "UNKNOWN",
+          reason: "INCOMPLETE_ROUTING_POLICY",
+          setIdentifier: "retained-id",
+        },
+      },
+    ];
+    render(<View />);
+    await ready();
+    fireEvent.click(screen.getByRole("tab", { name: en.managedDomains.records }));
+    const panel = screen
+      .getByText(`${en.domainRecordRouting.title}: ${en.domainRecordRouting.unknownPolicy}`)
+      .closest("details")!;
+    expect(within(panel).getByRole("note")).toHaveTextContent(en.domainRecordRouting.incomplete);
+    expect(within(panel).getByText("retained-id")).toHaveRole("definition");
+    expect(within(panel).getByText(en.domainRecordRouting.help)).toBeInTheDocument();
+    expect(requests.some((row) => row.operationName === "ManagedDomainProbe")).toBe(false);
+  });
+  it("omits Route53 routing configuration for null Cloudflare metadata without implying SIMPLE", async () => {
+    observation.providerZone.bindingSource = "PROTECTED_CLOUDFLARE_CONNECTION";
+    observation.providerZone.records = [
+      {
+        name: domain.zone,
+        type: "A",
+        ttl: 300,
+        values: ["192.0.2.1"],
+        routing: null,
+        proxied: true,
+      },
+    ];
+    render(<View />);
+    await ready();
+    fireEvent.click(screen.getByRole("tab", { name: en.managedDomains.records }));
+    const record = screen.getByRole("list", { name: en.managedDomains.records });
+    expect(record.querySelector("details")).toBeNull();
+    expect(
+      within(record).queryByText(
+        `${en.domainRecordRouting.title}: ${en.domainRecordRouting.simple}`
+      )
+    ).not.toBeInTheDocument();
+    expect(within(record).getByText("192.0.2.1")).toBeInTheDocument();
+    expect(within(record).getByText(en.domainConnections.proxied)).toBeInTheDocument();
   });
   it("uses actual probe variables for dig/CAA and keeps HTTPS TLS unknown when the server has no proof", async () => {
     render(<View />);
@@ -394,13 +496,24 @@ describe("actual exported domain schema over HttpLink", () => {
     expect(screen.queryByText("observed-current-answer")).not.toBeInTheDocument();
   });
   it("uses only current exact action hints and the safe cluster GUID for revalidation", async () => {
-    observation.actions = { canCreate: false, canDelete: false, canRevalidate: false };
+    observation.actions = {
+      ...DOMAIN_DIAGNOSTICS.actions,
+      canCreate: false,
+      canDelete: false,
+      canRevalidate: false,
+    };
     render(<View />);
     await ready();
     expect(screen.getByRole("button", { name: "Remove domain" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Revalidate recorded DNS setup" })).toBeDisabled();
     observation.actions.canRevalidate = true;
-    fireEvent.click(screen.getByRole("button", { name: "Refresh" }));
+    fireEvent.click(
+      within(
+        screen.getByRole("region", {
+          name: `${en.managedDomains.publicDelegation} · public resolver`,
+        })
+      ).getByRole("button", { name: en.managedDomains.refreshCheck })
+    );
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Revalidate recorded DNS setup" })).toBeEnabled()
     );

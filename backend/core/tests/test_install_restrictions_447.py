@@ -109,7 +109,14 @@ def test_dns_writes_are_refused_with_the_reason_and_reads_pass(monkeypatch):
     monkeypatch.setenv(ir.ENV_VAR, "dns")
     guarded = ir.guard_dns_driver(driver, "aws")
     assert guarded.list_zones() == ["zone"]
-    for write in ("ensure_record", "delete_record", "provision_zone", "deprovision_zone"):
+    for write in (
+        "ensure_record",
+        "delete_record",
+        "provision_zone",
+        "deprovision_zone",
+        "create_exact_alias_route",
+        "create_reviewed_certificate_validation",
+    ):
         with pytest.raises(ir.WithheldCapabilityError, match="DNS is withheld"):
             getattr(guarded, write)(zone="z", name="n", type="A", value="v")
     assert ir.guard_dns_driver(driver, "gcp") is driver

@@ -683,6 +683,9 @@ def _deprovision_sync(
         "app_environment__tenant_cluster__provider_plugin",
         "tenant_cluster__provider_plugin",
     ).get(pk=managed_service_id)
+    from astrolift_lifecycle.domain_app_route import require_unbound_service
+
+    require_unbound_service(svc.pk)
     cluster = _service_cluster(svc)
     if cluster is None:
         # Already orphaned — nothing to call into; mark deleted and

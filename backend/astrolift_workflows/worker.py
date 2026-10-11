@@ -198,6 +198,7 @@ from astrolift_workflows.activities.configured_workflow_schedule_fire import (
     create_scheduled_workflow_run,
     record_scheduled_workflow_start,
 )
+from astrolift_workflows.activities.domain_app_route import reconcile_domain_app_route
 from astrolift_workflows.activities.install_cluster_agent import install_cluster_agent_attempt
 from astrolift_workflows.activities.install_cluster_log_collector import install_cluster_log_collector_attempt
 from astrolift_workflows.activities.pipeline_schedule_fire import create_scheduled_pipeline_run
@@ -274,10 +275,12 @@ from astrolift_workflows.workflows import (
     WorkflowDefinitionRunWorkflow,
     WorkflowRunReconcileTickWorkflow,
 )
+from astrolift_workflows.workflows.domain_app_route import ManagedDomainAppRouteWorkflow
 from astrolift_workflows.workflows.install_cluster_agent import InstallClusterAgentWorkflow
 from astrolift_workflows.workflows.install_cluster_log_collector import InstallClusterLogCollectorWorkflow
 
 WORKFLOWS = (
+    ManagedDomainAppRouteWorkflow,
     InstallClusterAgentWorkflow,
     InstallClusterLogCollectorWorkflow,
     AgentTaskCallbackReconcileWorkflow,
@@ -348,6 +351,7 @@ WORKFLOWS = (
 )
 
 ACTIVITIES = (
+    reconcile_domain_app_route,
     install_cluster_agent_attempt,
     install_cluster_log_collector_attempt,
     deliver_agent_task_callback,

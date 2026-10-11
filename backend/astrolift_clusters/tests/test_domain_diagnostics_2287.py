@@ -73,6 +73,7 @@ def aws_wire(monkeypatch):
         "error": False,
         "before_reply": None,
         "pages": 1,
+        "records_xml": None,
     }
 
     class Handler(BaseHTTPRequestHandler):
@@ -104,6 +105,10 @@ def aws_wire(monkeypatch):
                     )
                     + "<MaxItems>100</MaxItems></ListResourceRecordSetsResponse>"
                 )
+                if state["records_xml"] is not None:
+                    start = body.index("<ResourceRecordSets>") + len("<ResourceRecordSets>")
+                    end = body.index("</ResourceRecordSets>")
+                    body = body[:start] + state["records_xml"] + body[end:]
             else:
                 body = f'<GetHostedZoneResponse xmlns="https://route53.amazonaws.com/doc/2013-04-01/"><HostedZone><Id>/hostedzone/ZEXAMPLE</Id><Name>{state["zone"]}</Name><CallerReference>fixture</CallerReference><Config><PrivateZone>{str(state["private"]).lower()}</PrivateZone></Config><ResourceRecordSetCount>2</ResourceRecordSetCount></HostedZone><DelegationSet><NameServers><NameServer>ns.provider.test</NameServer></NameServers></DelegationSet></GetHostedZoneResponse>'
             self.send_response(200)
@@ -190,6 +195,153 @@ def test_operator_exact_provider_alias_pages_private_zone_is_not_public_failure(
     assert zone["records"][0]["evaluateTargetHealth"] is False
     assert len(aws_wire["requests"]) == 3
     assert all(row["state"] == "UNSUPPORTED" for row in data["checks"] if row["key"] == "delegation")
+
+
+@pytest.mark.parametrize(
+    "metadata,policy,field,expected",
+    [
+        ("", "SIMPLE", "multiValueAnswer", None),
+        ("<Weight>0</Weight>", "WEIGHTED", "weight", 0),
+        ("<Region>us-west-2</Region>", "LATENCY", "region", "us-west-2"),
+        ("<Failover>SECONDARY</Failover>", "FAILOVER", "failover", "SECONDARY"),
+        (
+            "<GeoLocation><CountryCode>US</CountryCode><SubdivisionCode>CA</SubdivisionCode></GeoLocation>",
+            "GEOLOCATION",
+            "geoLocation",
+            {"continentCode": None, "countryCode": "US", "subdivisionCode": "CA"},
+        ),
+        ("<MultiValueAnswer>true</MultiValueAnswer>", "MULTIVALUE", "multiValueAnswer", True),
+        (
+            "<GeoProximityLocation><Coordinates><Latitude>-90</Latitude><Longitude>180.00</Longitude></Coordinates><Bias>-99</Bias></GeoProximityLocation>",
+            "GEOPROXIMITY",
+            "geoProximity",
+            {
+                "awsRegion": None,
+                "localZoneGroup": None,
+                "coordinates": {"latitude": "-90", "longitude": "180.00"},
+                "bias": -99,
+            },
+        ),
+        (
+            "<CidrRoutingConfig><CollectionId>12345678-1234-1234-1234-123456789abc</CollectionId><LocationName>*</LocationName></CidrRoutingConfig>",
+            "CIDR",
+            "cidr",
+            {"collectionId": "12345678-1234-1234-1234-123456789abc", "locationName": "*"},
+        ),
+    ],
+)
+def test_actual_sdk_routing_metadata_preserves_native_policy_and_references(
+    world, client, dns_wire, aws_wire, metadata, policy, field, expected
+):
+    world.user.is_superuser = True
+    world.user.save()
+    identifier = "" if policy == "SIMPLE" else "<SetIdentifier>regional-target</SetIdentifier>"
+    aws_wire["records_xml"] = (
+        "<ResourceRecordSet><Name>www.example.test.</Name><Type>A</Type><TTL>60</TTL>"
+        "<ResourceRecords><ResourceRecord><Value>192.0.2.10</Value></ResourceRecord></ResourceRecords>"
+        + identifier
+        + metadata
+        + "<HealthCheckId>12345678-1234-1234-1234-123456789abc</HealthCheckId>"
+        "<TrafficPolicyInstanceId>12345678-1234-1234-1234-123456789abc</TrafficPolicyInstanceId></ResourceRecordSet>"
+    )
+    query = DIAGNOSTICS.replace(
+        "evaluateTargetHealth",
+        """evaluateTargetHealth routing{policy reason setIdentifier weight region failover multiValueAnswer
+        healthCheckId trafficPolicyInstanceId geoLocation{continentCode countryCode subdivisionCode}
+        geoProximity{awsRegion localZoneGroup coordinates{latitude longitude} bias}
+        cidr{collectionId locationName}}""",
+    )
+    dns_answers(dns_wire)
+    reply = ask(client, world, query)
+    assert not reply.get("errors"), reply.get("errors")
+    zone = reply["data"]["astroliftManagedDomainDiagnostics"]["providerZone"]
+    assert zone["state"] == "OK" and len(zone["records"]) == 1
+    record = zone["records"][0]
+    routing = record["routing"]
+    assert routing["policy"] == policy and routing[field] == expected
+    assert routing["reason"] == "PROVIDER_METADATA_OBSERVED"
+    assert routing["setIdentifier"] == (None if policy == "SIMPLE" else "regional-target")
+    assert (
+        routing["healthCheckId"]
+        == routing["trafficPolicyInstanceId"]
+        == "12345678-1234-1234-1234-123456789abc"
+    )
+    assert record["ttl"] == 60 and record["values"] == ["192.0.2.10"]
+    assert len(aws_wire["requests"]) == 2 and all(
+        "rrset" in path or "hostedzone" in path for path in aws_wire["requests"]
+    )
+    world.domain.refresh_from_db()
+    assert world.domain.verification_state == "pending"
+
+
+@pytest.mark.parametrize(
+    "metadata,reason",
+    [
+        ("<SetIdentifier>unknown-policy</SetIdentifier>", "INCOMPLETE_ROUTING_POLICY"),
+        ("<Weight>5</Weight>", "INCOMPLETE_ROUTING_POLICY"),
+        (
+            "<SetIdentifier>ambiguous</SetIdentifier><Weight>5</Weight><Region>us-west-2</Region>",
+            "AMBIGUOUS_ROUTING_POLICY",
+        ),
+    ],
+)
+def test_incomplete_or_conflicting_native_policy_is_unknown_not_simple(
+    world, client, dns_wire, aws_wire, metadata, reason
+):
+    world.user.is_superuser = True
+    world.user.save()
+    aws_wire["records_xml"] = (
+        "<ResourceRecordSet><Name>www.example.test.</Name><Type>A</Type><TTL>60</TTL>"
+        "<ResourceRecords><ResourceRecord><Value>192.0.2.10</Value></ResourceRecord></ResourceRecords>"
+        + metadata
+        + "</ResourceRecordSet>"
+    )
+    dns_answers(dns_wire)
+    reply = ask(
+        client,
+        world,
+        DIAGNOSTICS.replace("evaluateTargetHealth", "evaluateTargetHealth routing{policy reason}"),
+    )
+    assert not reply.get("errors"), reply.get("errors")
+    routing = reply["data"]["astroliftManagedDomainDiagnostics"]["providerZone"]["records"][0]["routing"]
+    assert routing == {"policy": "UNKNOWN", "reason": reason}
+    assert len(aws_wire["requests"]) == 2
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        "<SetIdentifier>oversized-private-provider-marker-"
+        + "x" * 128
+        + "</SetIdentifier><Weight>1</Weight>",
+        "<SetIdentifier>out-of-range</SetIdentifier><Weight>256</Weight>",
+        "<SetIdentifier>out-of-range</SetIdentifier><GeoProximityLocation><Coordinates><Latitude>91</Latitude><Longitude>0</Longitude></Coordinates></GeoProximityLocation>",
+    ],
+)
+def test_malformed_native_routing_metadata_refuses_inventory_without_body_logging(
+    world, client, dns_wire, aws_wire, caplog, capsys, metadata
+):
+    world.user.is_superuser = True
+    world.user.save()
+    aws_wire["records_xml"] = (
+        "<ResourceRecordSet><Name>www.example.test.</Name><Type>A</Type><TTL>60</TTL>"
+        "<ResourceRecords><ResourceRecord><Value>192.0.2.10</Value></ResourceRecord></ResourceRecords>"
+        + metadata
+        + "</ResourceRecordSet>"
+    )
+    dns_answers(dns_wire)
+    reply = ask(
+        client,
+        world,
+        DIAGNOSTICS.replace("evaluateTargetHealth", "evaluateTargetHealth routing{policy reason}"),
+    )
+    assert not reply.get("errors"), reply.get("errors")
+    zone = reply["data"]["astroliftManagedDomainDiagnostics"]["providerZone"]
+    assert zone["state"] == "ERROR" and zone["records"] == []
+    assert zone["reason"] == "PROVIDER_ZONE_UNAVAILABLE"
+    captured = capsys.readouterr()
+    assert "oversized-private-provider-marker" not in str(reply) + caplog.text + captured.out + captured.err
+    assert len(aws_wire["requests"]) == 2
 
 
 def test_wrong_provider_zone_is_refused_before_records(world, client, dns_wire, aws_wire):

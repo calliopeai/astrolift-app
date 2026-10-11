@@ -19,12 +19,14 @@ from astrolift_lifecycle.models.ingress import (
     ProjectIngress,
 )
 from astrolift_lifecycle.models.jobs import CommandRun, ScheduledJobRun
+from astrolift_lifecycle.models.managed_domain_app_binding import ManagedDomainAppBinding
 from astrolift_lifecycle.models.org_secret import OrgSecret
 from astrolift_lifecycle.models.preview_environment import PreviewEnvironment
 from astrolift_lifecycle.models.task_run import TaskRun
 
 __all__ = [
     "BuilderArtifact",
+    "ManagedDomainAppBinding",
     "DomainSessionHandoff",
     "AgentRun",
     "AppEnvironment",
