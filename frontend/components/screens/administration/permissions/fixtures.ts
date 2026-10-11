@@ -308,3 +308,41 @@ export function holdersProps(
     ...overrides,
   };
 }
+
+const TASKS = [
+  ["browse_apps", "Browse apps and their environments"],
+  ["read_logs_metrics", "Read logs and metrics"],
+  ["deploy_apps", "Deploy and roll back apps"],
+  ["approve_deploys", "Approve deploys that need approval"],
+  ["change_apps", "Change app settings and configuration"],
+] as const;
+const tasks = (granted: string[]) =>
+  TASKS.map(([key, label]) => ({ key, label, granted: granted.includes(key) }));
+
+/** Easy setup (#2272): two presets, the second across three scopes. */
+export const ACCESS_PRESETS_FIXTURE = [
+  {
+    key: "viewer",
+    label: "Viewer",
+    summary: "Sees apps, logs and metrics. Changes nothing.",
+    roles: [
+      {
+        scopeLevel: "APP",
+        roleSlug: "app_viewer",
+        tasks: tasks(["browse_apps", "read_logs_metrics"]),
+      },
+    ],
+  },
+  {
+    key: "deployer",
+    label: "Deployer",
+    summary: "Ships and rolls back releases of existing apps.",
+    roles: ["TEAM", "PROJECT", "APP"].map((scopeLevel) => ({
+      scopeLevel,
+      roleSlug: { TEAM: "team_operator", PROJECT: "project_operator", APP: "app_deployer" }[
+        scopeLevel
+      ]!,
+      tasks: tasks(["browse_apps", "read_logs_metrics", "deploy_apps"]),
+    })),
+  },
+];

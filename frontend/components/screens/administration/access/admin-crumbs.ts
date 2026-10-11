@@ -21,7 +21,7 @@ export function adminCrumb(active: string): Crumb {
   };
 }
 
-export type PermissionsPage = "roles" | "assignments" | "diagnostics";
+export type PermissionsPage = "roles" | "assignments" | "diagnostics" | "presets";
 
 export const PERMISSIONS_PAGES: ReadonlyArray<{
   key: PermissionsPage;
@@ -31,6 +31,7 @@ export const PERMISSIONS_PAGES: ReadonlyArray<{
   { key: "roles", label: "Roles", href: "/administration/permissions" },
   { key: "assignments", label: "Assignments", href: "/administration/permissions/assignments" },
   { key: "diagnostics", label: "Diagnostics", href: "/administration/permissions/diagnostics" },
+  { key: "presets", label: "Easy setup", href: "/administration/permissions/presets" },
 ];
 
 /**
