@@ -8568,5 +8568,21 @@
     "geoproximity": "Geoproximidad",
     "cidrPolicy": "Enrutamiento CIDR",
     "unknownPolicy": "Desconocido"
+  },
+  "brains": {
+    "title": "Capas semánticas",
+    "context": "Capas semánticas alojadas que puedes leer: aplicaciones que sirven una Semantic Context Ontology Layer. Comparte una dando a un equipo acceso a su aplicación.",
+    "columnName": "Capa",
+    "columnOwner": "Equipo / proyecto",
+    "columnEndpoints": "Servida en",
+    "columnShared": "Compartida con",
+    "columnApp": "Acceso",
+    "none": "ninguno",
+    "notServed": "Aún no se sirve",
+    "notShared": "Solo el equipo propietario",
+    "shareTitle": "{team}: {access}",
+    "manageAccess": "Gestionar acceso",
+    "emptyTitle": "No hay capas semánticas",
+    "emptyDescription": "Aquí aparecen las aplicaciones declaradas con [app] kind = \"mimwell\" que puedes leer."
   }
 }

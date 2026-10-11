@@ -1714,6 +1714,27 @@ export type AstroliftAuditRetention = {
   days: Scalars['Int']['output'];
 };
 
+export type AstroliftBrain = {
+  environments: Array<AstroliftBrainEnvironment>;
+  id: Scalars['GUID']['output'];
+  kind: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  project: Scalars['String']['output'];
+  sharedWith: Array<AstroliftBrainShare>;
+  slug: Scalars['String']['output'];
+  team: Scalars['String']['output'];
+};
+
+export type AstroliftBrainEnvironment = {
+  name: Scalars['String']['output'];
+  url: Scalars['String']['output'];
+};
+
+export type AstroliftBrainShare = {
+  access: Scalars['String']['output'];
+  team: Scalars['String']['output'];
+};
+
 export type AstroliftBrief = {
   config: Scalars['JSON']['output'];
   contentHash: Scalars['String']['output'];
@@ -11688,6 +11709,7 @@ export type Query = {
   astroliftAuditEventsPage: AstroliftAuditEventPage;
   astroliftAuditRetention: AstroliftAuditRetention;
   astroliftAvailableRepos: AstroliftRemoteRepoList;
+  astroliftBrains: Array<AstroliftBrain>;
   astroliftBudgets: Array<AstroliftBudget>;
   astroliftCluster?: Maybe<AstroliftTenantCluster>;
   astroliftClusterAgentInstall: AstroliftClusterAgentInstall;
@@ -12657,6 +12679,11 @@ export type QueryAstroliftAuditEventsPageArgs = {
 export type QueryAstroliftAvailableReposArgs = {
   connectionId: Scalars['String']['input'];
   limit?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftBrainsArgs = {
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -18750,6 +18777,13 @@ export type PlaygroundEndpointsPageQueryVariables = Exact<{
 
 
 export type PlaygroundEndpointsPageQuery = { astroliftModelEndpointsPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, name: string, variant: string, registeredAppSlug: string, environmentName: string }> } };
+
+export type ListBrainsQueryVariables = Exact<{
+  search?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ListBrainsQuery = { astroliftBrains: Array<{ id: string, slug: string, name: string, kind: string, team: string, project: string, environments: Array<{ name: string, url: string }>, sharedWith: Array<{ team: string, access: string }> }> };
 
 export type AppFieldsFragment = { id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } };
 

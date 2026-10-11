@@ -383,6 +383,25 @@ MCP_TOOL_META: dict[str, dict[str, Any]] = {
             required=("toml",),
         ),
     },
+    "astrolift_list_brains": {
+        "description": (
+            "List the hosted brains (apps of a brain kind) this identity can read, with their "
+            "environment endpoints and the teams they are shared with (#2320)."
+        ),
+        "scope": SCOPE_MCP_READ,
+        "additional_scopes": (SCOPE_READ_APPS,),
+        "permission": Permission.APP_READ,
+        "inputSchema": _schema(
+            {"search": {"type": "string", "description": "Optional name or slug filter."}}
+        ),
+    },
+    "astrolift_get_brain": {
+        "description": "Describe one hosted brain this identity can read, by app slug (#2320).",
+        "scope": SCOPE_MCP_READ,
+        "additional_scopes": (SCOPE_READ_APPS,),
+        "permission": Permission.APP_READ,
+        "inputSchema": _schema({"slug": {"type": "string"}}, required=("slug",)),
+    },
     "astrolift_list_agents": {
         "description": "List registered agents and their source/package delivery state.",
         "scope": SCOPE_MCP_READ,

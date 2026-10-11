@@ -163,7 +163,7 @@ MATRIX = AvailabilityMatrix(
         ),
         DriverEntry(role="registry", plugin_id="azure", variant="acr"),
         DriverEntry(role="notification", plugin_id="azure", variant="notification_hubs"),
-        DriverEntry(role="identity_users", plugin_id="azure", variant="entra_id", status="planned"),
+        DriverEntry(role="identity_users", plugin_id="azure", variant="entra_id"),
         # k8s_native plugin
         DriverEntry(role="cluster", plugin_id="k8s_native"),
         DriverEntry(role="ingress", plugin_id="k8s_native", variant="nginx_ingress"),

@@ -171,6 +171,13 @@ export const NAV: NavArea[] = [
         functions: [
           { key: "apps", label: "Apps", href: "/apps", icon: PackageIcon, module: "apps" },
           {
+            key: "brains",
+            label: "Semantic layers",
+            href: "/brains",
+            icon: BrainCircuitIcon,
+            module: "apps",
+          },
+          {
             key: "pipelines",
             label: "Pipelines",
             href: "/pipelines",

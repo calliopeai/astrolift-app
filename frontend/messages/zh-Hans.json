@@ -8565,5 +8565,21 @@
     "geoproximity": "地理邻近",
     "cidrPolicy": "CIDR 路由",
     "unknownPolicy": "未知"
+  },
+  "brains": {
+    "title": "语义层",
+    "context": "你可以读取的托管语义层：提供 Semantic Context Ontology Layer 的应用。向团队授予其应用的访问权限即可共享。",
+    "columnName": "语义层",
+    "columnOwner": "团队 / 项目",
+    "columnEndpoints": "服务地址",
+    "columnShared": "共享给",
+    "columnApp": "访问",
+    "none": "无",
+    "notServed": "尚未提供服务",
+    "notShared": "仅所属团队",
+    "shareTitle": "{team}：{access}",
+    "manageAccess": "管理访问",
+    "emptyTitle": "没有语义层",
+    "emptyDescription": "以 [app] kind = \"mimwell\" 声明且你可以读取的应用会显示在这里。"
   }
 }

@@ -8565,5 +8565,21 @@
     "geoproximity": "Geoproximidade",
     "cidrPolicy": "Roteamento CIDR",
     "unknownPolicy": "Desconhecido"
+  },
+  "brains": {
+    "title": "Camadas semânticas",
+    "context": "Camadas semânticas hospedadas que você pode ler: apps que servem uma Semantic Context Ontology Layer. Compartilhe uma dando a uma equipe acesso ao app dela.",
+    "columnName": "Camada",
+    "columnOwner": "Equipe / projeto",
+    "columnEndpoints": "Servida em",
+    "columnShared": "Compartilhada com",
+    "columnApp": "Acesso",
+    "none": "nenhum",
+    "notServed": "Ainda não servida",
+    "notShared": "Somente a equipe proprietária",
+    "shareTitle": "{team}: {access}",
+    "manageAccess": "Gerenciar acesso",
+    "emptyTitle": "Nenhuma camada semântica",
+    "emptyDescription": "Apps declarados com [app] kind = \"mimwell\" que você pode ler aparecem aqui."
   }
 }

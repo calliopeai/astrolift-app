@@ -8645,5 +8645,21 @@
     "geoproximity": "Geoproximity",
     "cidrPolicy": "CIDR routing",
     "unknownPolicy": "Unknown"
+  },
+  "brains": {
+    "title": "Semantic layers",
+    "context": "Hosted semantic layers you can read: apps that serve a Semantic Context Ontology Layer. Share one by giving a team access to its app.",
+    "columnName": "Layer",
+    "columnOwner": "Team / project",
+    "columnEndpoints": "Served at",
+    "columnShared": "Shared with",
+    "columnApp": "Access",
+    "none": "none",
+    "notServed": "Not served yet",
+    "notShared": "Owning team only",
+    "shareTitle": "{team}: {access}",
+    "manageAccess": "Manage access",
+    "emptyTitle": "No semantic layers",
+    "emptyDescription": "Apps declared with [app] kind = \"mimwell\" that you can read appear here."
   }
 }
