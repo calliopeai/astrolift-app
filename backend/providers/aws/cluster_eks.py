@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 import os
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
@@ -40,6 +40,7 @@ from _sdk._kube_health import PLATFORM_NAMESPACE
 from _sdk._telemetry import driver_op, maybe_heartbeat
 from _sdk.cloud_credentials import CredentialedConfig
 from _sdk.cluster import (
+    MANAGED_LOGIN_BRANDING_LIMIT,
     ApplyError,
     ApplyResult,
     BootstrapComponent,
@@ -2236,7 +2237,40 @@ class EKSClusterDriver(ClusterDriver):
             next_token = resp.get("NextToken")
             if not next_token:
                 break
-        return clients
+        branding = self._managed_login_branding(client, pool_id, [c.client_id for c in clients])
+        return [replace(c, managed_login_branding=branding.get(c.client_id, "unknown")) for c in clients]
+
+    def _managed_login_branding(self, client: Any, pool_id: str, client_ids: list[str]) -> dict[str, str]:
+        """Branding status per client (#1727); best-effort, never raises.
+
+        Only a managed-login (version 2) domain needs a branding record. A
+        failed read reports "unknown" rather than guessing either way.
+        """
+        try:
+            domain = client.describe_user_pool(UserPoolId=pool_id).get("UserPool", {}).get("Domain")
+            if not isinstance(domain, str):
+                return {}
+            if not domain:
+                return dict.fromkeys(client_ids, "not_required")
+            version = (
+                client.describe_user_pool_domain(Domain=domain).get("DomainDescription", {}).get("ManagedLoginVersion")
+            )
+        except Exception as exc:
+            log.warning("cognito branding: pool %s domain read failed (%s)", pool_id, exc)
+            return {}
+        if version != 2:
+            return dict.fromkeys(client_ids, "not_required") if isinstance(version, int) else {}
+        status: dict[str, str] = {}
+        for client_id in client_ids:
+            try:
+                client.describe_managed_login_branding_by_client(UserPoolId=pool_id, ClientId=client_id)
+                status[client_id] = "present"
+            except Exception as exc:
+                code = getattr(exc, "response", {}).get("Error", {}).get("Code", "")
+                status[client_id] = "missing" if code == "ResourceNotFoundException" else "unknown"
+        if sum(1 for value in status.values() if value == "present") >= MANAGED_LOGIN_BRANDING_LIMIT:
+            status = {k: ("missing_quota_full" if v == "missing" else v) for k, v in status.items()}
+        return status
 
     def _cognito_pool_domain(self, client: Any, pool_id: str) -> str:
         """Best-effort hosted-domain lookup for ``pool_id`` via

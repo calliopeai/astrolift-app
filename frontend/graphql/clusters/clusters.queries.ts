@@ -686,6 +686,7 @@ export const COGNITO_USER_POOL_CLIENTS = gql`
     astroliftCognitoUserPoolClients(clusterId: $clusterId, poolId: $poolId) {
       clientId
       clientName
+      managedLoginBranding
     }
   }
 `;

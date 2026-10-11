@@ -6775,7 +6775,9 @@
       "removed": "{count, plural, one {Der Abgleich meldet entfernte Cognito-Annotationen an # verwaltetem Ingress. Tatsächlichen Zugriff prüfen.} other {Der Abgleich meldet entfernte Cognito-Annotationen an # verwalteten Ingresses. Tatsächlichen Zugriff prüfen.}}",
       "partial": "{count, plural, one {# Abgleichfehler gemeldet. Cluster-Ereignisse prüfen; Rollout unvollständig.} other {# Abgleichfehler gemeldet. Cluster-Ereignisse prüfen; Rollout unvollständig.}}",
       "skipped": "{count, plural, one {# Ingress wurde übersprungen. Cluster-Ereignisse und tatsächlichen Zugriff prüfen.} other {# Ingresses wurden übersprungen. Cluster-Ereignisse und tatsächlichen Zugriff prüfen.}}",
-      "sourceLimit": "Zurückgegebene Optionen belegen kein vollständiges Cloud-Inventar. Die Auswahl oder Eingabe von Kennungen gewährt keinen Zugriff."
+      "sourceLimit": "Zurückgegebene Optionen belegen kein vollständiges Cloud-Inventar. Die Auswahl oder Eingabe von Kennungen gewährt keinen Zugriff.",
+      "brandingMissing": "Dieser Client hat kein Branding für das verwaltete Login, daher zeigt Cognito „Login pages unavailable“. Lege das Branding in Cognito an, bevor du speicherst.",
+      "brandingQuotaFull": "Dieser Client hat kein Branding für das verwaltete Login, und der Pool nutzt bereits alle 20 Brandings. Gib eines frei oder nutze einen Client mit Branding."
     },
     "authUsers": {
       "title": "Anmeldebenutzer",

@@ -6775,7 +6775,9 @@
       "removed": "{count, plural, one {La reconciliación informó de anotaciones Cognito eliminadas de # Ingress administrado. Verifica el acceso real.} other {La reconciliación informó de anotaciones Cognito eliminadas de # Ingress administrados. Verifica el acceso real.}}",
       "partial": "{count, plural, one {Se informó de # fallo de reconciliación. Revisa los eventos del clúster; el despliegue está incompleto.} other {Se informó de # fallos de reconciliación. Revisa los eventos del clúster; el despliegue está incompleto.}}",
       "skipped": "{count, plural, one {Se omitió # Ingress. Revisa los eventos del clúster y el acceso real.} other {Se omitieron # Ingress. Revisa los eventos del clúster y el acceso real.}}",
-      "sourceLimit": "Las opciones devueltas no demuestran un inventario completo de la nube. Seleccionar o introducir identificadores no concede acceso."
+      "sourceLimit": "Las opciones devueltas no demuestran un inventario completo de la nube. Seleccionar o introducir identificadores no concede acceso.",
+      "brandingMissing": "Este cliente no tiene marca de inicio de sesión administrado, así que Cognito mostrará “Login pages unavailable”. Crea su marca en Cognito antes de guardar.",
+      "brandingQuotaFull": "Este cliente no tiene marca de inicio de sesión administrado y el grupo ya usa las 20 marcas. Libera una o usa un cliente con marca."
     },
     "authUsers": {
       "title": "Usuarios de inicio de sesión",

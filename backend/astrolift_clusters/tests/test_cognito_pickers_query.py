@@ -281,9 +281,11 @@ def test_cognito_clients_dispatch_threads_pool_id(cluster, monkeypatch):
     class _FakeDriver:
         def list_cognito_user_pool_clients(self, pool_id):
             seen["pool_id"] = pool_id
-            return [CognitoUserPoolClientInfo(client_id="c1", client_name="web")]
+            return [
+                CognitoUserPoolClientInfo(client_id="c1", client_name="web", managed_login_branding="missing")
+            ]
 
     monkeypatch.setattr(cluster_management, "_driver_for_cluster", lambda c: _FakeDriver())
     out = cluster_management.cognito_user_pool_clients_dispatch(cluster=cluster, pool_id="pool-xyz")
     assert seen["pool_id"] == "pool-xyz"
-    assert out == [{"client_id": "c1", "client_name": "web"}]
+    assert out == [{"client_id": "c1", "client_name": "web", "managed_login_branding": "missing"}]

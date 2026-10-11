@@ -2241,6 +2241,11 @@ type AstroliftCognitoUserPool {
 type AstroliftCognitoUserPoolClient {
   clientId: String!
   clientName: String!
+
+  """
+  Managed login branding for this client (#1727): present, missing, missing_quota_full (the pool's 20 brandings are used), not_required (classic hosted UI) or unknown. A managed-login client without branding serves 'Login pages unavailable'.
+  """
+  managedLoginBranding: String!
 }
 
 type AstroliftCommandRun {

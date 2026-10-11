@@ -6852,7 +6852,9 @@
       "removed": "{count, plural, one {Reconciliation reported Cognito annotations removed from # managed Ingress. Verify actual access.} other {Reconciliation reported Cognito annotations removed from # managed Ingresses. Verify actual access.}}",
       "partial": "{count, plural, one {# reconciliation failure was reported. Review cluster events; rollout is incomplete.} other {# reconciliation failures were reported. Review cluster events; rollout is incomplete.}}",
       "skipped": "{count, plural, one {# Ingress was skipped. Review cluster events and actual access.} other {# Ingresses were skipped. Review cluster events and actual access.}}",
-      "sourceLimit": "Returned choices do not prove complete cloud inventory. Selecting or entering identifiers does not grant access."
+      "sourceLimit": "Returned choices do not prove complete cloud inventory. Selecting or entering identifiers does not grant access.",
+      "brandingMissing": "This client has no managed login branding, so Cognito will show “Login pages unavailable”. Create its branding in Cognito before saving.",
+      "brandingQuotaFull": "This client has no managed login branding and the pool already uses all 20 brandings. Free one or use a client that has branding."
     },
     "authUsers": {
       "title": "Sign-in users",
