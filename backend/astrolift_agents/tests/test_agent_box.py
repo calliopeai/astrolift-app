@@ -1090,6 +1090,42 @@ def test_ensure_starts_a_box_and_returns_how_to_attach(
     assert cluster.driver.namespaces == [agent_namespace(org.slug)]
 
 
+def test_a_free_image_needs_the_custom_image_permission(
+    permission_resolver, info, org, with_tenant_org, cluster
+):
+    """Dispatch alone starts boxes on images specs name; a free reference
+    also needs agent_box.custom_image (#86), refused before any cluster call."""
+    permission_resolver.grant(Permission.AGENT_DISPATCH)
+    _spec(org)
+
+    refused = _ensure(info, org, with_tenant_org, image="ghcr.io/acme/dev:v1")
+    assert refused.ok is False and refused.errors[0].code == ErrorCode.PERMISSION_DENIED.value
+    assert cluster.driver.applied == []
+    assert not AgentBox.objects.filter(organization=org).exists()
+
+    assert _ensure(info, org, with_tenant_org, environment_spec_slug="claude-dev").ok is True
+
+    permission_resolver.grant(Permission.AGENT_BOX_CUSTOM_IMAGE)
+    allowed = _ensure(info, org, with_tenant_org, image="ghcr.io/acme/dev:v1")
+    assert allowed.ok is True, allowed.errors
+
+
+def test_stock_dispatch_roles_and_bearer_scopes_keep_custom_images():
+    """Nothing changes by default: every stock role and bearer scope that can
+    dispatch can still start a box on a free image (#86)."""
+    from astrolift_identity.api_tokens import token_scope_allows_permission
+    from astrolift_identity.models import ApiToken
+    from astrolift_identity.system_roles import SYSTEM_ROLES
+
+    for slug, _level, _name, _description, perms in SYSTEM_ROLES:
+        if Permission.AGENT_DISPATCH in perms:
+            assert Permission.AGENT_BOX_CUSTOM_IMAGE in perms, slug
+    for scopes in (["write:apps"], ["mcp:dispatch"]):
+        token = ApiToken(scopes=scopes)
+        assert token_scope_allows_permission(token, "agent.dispatch")
+        assert token_scope_allows_permission(token, "agent_box.custom_image"), scopes
+
+
 def test_pressing_the_button_twice_attaches_rather_than_spending_a_second_node(
     permission_resolver, info, org, with_tenant_org, cluster
 ):
