@@ -77,13 +77,17 @@ export function accessCrumbs(
 export function grantHref({
   principal,
   scope,
+  role,
   returnTo,
 }: {
   principal?: { kind: "user" | "group" | "team"; id: string; name: string };
   scope?: { kind: string; id: string; name: string };
+  /** A stock role slug to preselect, from Easy setup (#2272). */
+  role?: string;
   returnTo?: string;
 }): string {
   const q = new URLSearchParams();
+  if (role) q.set("role", role);
   if (principal) {
     q.set("principal", `${principal.kind}:${principal.id}`);
     q.set("principalName", principal.name);
@@ -142,6 +146,7 @@ const PRINCIPAL_KINDS = ["user", "group", "team"] as const;
 export function parseGrantParams(params: URLSearchParams): {
   principal: { kind: "user" | "group" | "team"; id: string; name: string } | null;
   scope: { kind: (typeof SCOPE_KINDS)[number]; id: string; name: string } | null;
+  role: string | null;
   returnTo: string;
 } {
   const rawPrincipal = params.get("principal") ?? "";
@@ -159,5 +164,7 @@ export function parseGrantParams(params: URLSearchParams): {
 
   const ret = params.get("return") ?? "";
   const returnTo = ret.startsWith("/") && !ret.startsWith("//") ? ret : PEOPLE_HREF;
-  return { principal, scope, returnTo };
+  const rawRole = params.get("role") ?? "";
+  const role = /^[a-z][a-z0-9_]{0,63}$/.test(rawRole) ? rawRole : null;
+  return { principal, scope, role, returnTo };
 }

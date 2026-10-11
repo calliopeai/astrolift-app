@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `astroliftAccessPresets` lists the Easy-mode access starting points (Viewer, Deployer, Approver, App owner, Organization administrator). Each names the existing stock role it grants at each scope and, computed from that role's permissions, which plain-language tasks it allows and excludes. Admin › Permissions › Easy setup shows them as a table per preset, with the role it assigns at each scope. A preset is never a role of its own and never installation super-admin (#2272).
+- `astroliftAccessPresets` lists the Easy-mode access starting points (Viewer, Deployer, Approver, App owner, Organization administrator). Each names the existing stock role it grants at each scope and, computed from that role's permissions, which plain-language tasks it allows and excludes. Admin › Permissions › Easy setup shows them as a table per preset, with the role it assigns at each scope and a Grant link that opens Grant access with that role preselected. A preset is never a role of its own and never installation super-admin (#2272).
 
 - GCP clusters manage their central-auth sign-in users in Google Cloud Identity Platform when central auth signs in through the cluster's own project: list, create (a password creates a verified user, no password sends the set-password email), set password, reset password, enable or disable, and delete, with the same reviewed-target checks as Cognito and Entra ID. Identity Platform has no groups, so group lists are empty and group changes are refused with that reason. The control plane needs `roles/identitytoolkit.admin` on the project (#2135).
 

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Button } from "@/components/ui/button";
 
+import { grantHref } from "../access/access-nav";
 import { permissionsCrumbs } from "../access/admin-crumbs";
 import type { useAccessPresets } from "./use-access-presets";
 
@@ -65,6 +66,16 @@ export function AccessPresetsView({ presets, loading, error, onRetry }: AccessPr
                           <span className="text-muted-foreground block font-mono text-xs font-normal">
                             {role.roleSlug}
                           </span>
+                          <Link
+                            className="text-xs font-normal underline underline-offset-2"
+                            href={grantHref({
+                              role: role.roleSlug,
+                              returnTo: "/administration/permissions/presets",
+                            })}
+                            aria-label={`Grant ${preset.label} at ${SCOPE_LABEL[role.scopeLevel] ?? role.scopeLevel} level`}
+                          >
+                            Grant
+                          </Link>
                         </th>
                       ))}
                     </tr>

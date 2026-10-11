@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { parseGrantParams } from "../access/access-nav";
 import { AccessPresetsView } from "./AccessPresetsView";
 import { ACCESS_PRESETS_FIXTURE } from "./fixtures";
 
@@ -29,6 +30,23 @@ describe("Easy setup (#2272)", () => {
     expect(
       screen.getByText(/None of them makes someone an installation super-admin/)
     ).toBeInTheDocument();
+  });
+
+  it("links each scope to Grant access with that preset's role preselected", () => {
+    render(
+      <AccessPresetsView
+        presets={ACCESS_PRESETS_FIXTURE}
+        loading={false}
+        error={null}
+        onRetry={() => {}}
+      />
+    );
+    const link = screen.getByRole("link", { name: "Grant Deployer at App level" });
+    const url = new URL(link.getAttribute("href")!, "http://x");
+    expect(url.pathname).toBe("/administration/access/grant");
+    expect(url.searchParams.get("role")).toBe("app_deployer");
+    expect(parseGrantParams(url.searchParams).role).toBe("app_deployer");
+    expect(parseGrantParams(new URLSearchParams("role=../evil")).role).toBeNull();
   });
 
   it("keeps a failed read distinct from an empty catalogue", () => {
