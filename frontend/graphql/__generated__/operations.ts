@@ -310,6 +310,25 @@ export type AstroliftAccessEntryPage = {
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
+export type AstroliftAccessPreset = {
+  key: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+  roles: Array<AstroliftAccessPresetRole>;
+  summary: Scalars['String']['output'];
+};
+
+export type AstroliftAccessPresetRole = {
+  roleSlug: Scalars['String']['output'];
+  scopeLevel: Scalars['String']['output'];
+  tasks: Array<AstroliftAccessTask>;
+};
+
+export type AstroliftAccessTask = {
+  granted: Scalars['Boolean']['output'];
+  key: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+};
+
 export type AstroliftActionPermission = {
   allowed: Scalars['Boolean']['output'];
   code: Scalars['String']['output'];
@@ -11687,6 +11706,8 @@ export type Query = {
   agentWorkloads: Array<AstroliftAgentListItem>;
   assignableAstroliftProjects: Array<AstroliftProject>;
   astroliftAccessOn: AstroliftAccessEntryPage;
+  /** Easy-mode starting points (#2272): each names the stock role it grants per scope and, from that role's permissions, the tasks it allows and excludes. Never super-admin. */
+  astroliftAccessPresets: Array<AstroliftAccessPreset>;
   astroliftActiveIdentityProvider?: Maybe<AstroliftIdentityProvider>;
   astroliftActiveSessions: Array<AstroliftActiveSession>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftAgentRunsPage. */
@@ -18816,6 +18837,11 @@ export type GetMyPermissionsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type GetMyPermissionsQuery = { astroliftMyPermissions: Array<string> };
+
+export type AccessPresetsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type AccessPresetsQuery = { astroliftAccessPresets: Array<{ key: string, label: string, summary: string, roles: Array<{ scopeLevel: string, roleSlug: string, tasks: Array<{ key: string, label: string, granted: boolean }> }> }> };
 
 export type CreatePipelineMutationVariables = Exact<{
   input: CreatePipelineInput;
