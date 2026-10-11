@@ -21,6 +21,8 @@
 
 - Add source-reviewed public Lambda HTTP API domain Prepare/Connect and original-operation recovery, with retained native ACKs, exact apex Route53 ALIAS creation, fresh caller/credential fences and protected history. Refuse unsupported new EKS and read-only Cloudflare routing, ambiguous resend and legacy mutation of bound routes (Refs: #2299).
 
+- `runTask` dispatches the task's Kubernetes Job: it renders the task from the environment's running deployment (image, env, resources, GPU requests, tolerations and node selector), renames it per run, applies an optional command override, and records the namespace and Job name so the run reconciler follows it to a terminal status. Dispatch failures end the run as `failed` with `failureReason`. A caller `requestId` makes retries return the original run instead of launching more work. Without `environmentName` only a single-environment app is accepted. Apply lifecycle migration `taskrun_dispatch` with the image (#2330).
+
 - The Cognito client picker reports each client's managed login branding, and the ingress-auth form warns before saving a client that has none (Cognito would serve "Login pages unavailable") or whose pool already uses all 20 brandings. Classic hosted UI pools need none; a failed read reports unknown (#1727).
 
 - Starting an agent box on a free image reference (not one a registered spec or agent names) requires the new `agent_box.custom_image` permission, advertised as `boxes.custom_image_permission`. Every stock role and bearer scope that can dispatch keeps it, so nothing changes by default; a custom role can now allow dispatch while limiting boxes to spec images. Apply identity migration 0044 with the image (CLI #86).

@@ -68,12 +68,26 @@ class TaskRun(BaseCoreModel):
     # The batch/v1 Job name in the cluster — used to stream logs and
     # poll completion status.
     k8s_job_name = models.CharField(max_length=255, blank=True, default="")
+    # Where the Job was applied (#2330); the reconciler polls exactly here.
+    namespace = models.CharField(max_length=255, blank=True, default="")
+    # Why dispatch failed before the Job ran, for the operator (#2330).
+    failure_reason = models.TextField(blank=True, default="")
+    # Caller-chosen idempotency key: a retry with the same key returns the
+    # original run instead of launching more (possibly GPU) work (#2330).
+    request_id = models.CharField(max_length=64, blank=True, default="")
 
     class Meta:
         indexes = [
             models.Index(
                 fields=["workload", "-created_at"],
                 name="taskrun_workload_created_idx",
+            ),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workload", "triggered_by_user", "request_id"],
+                condition=models.Q(deleted_at__isnull=True) & ~models.Q(request_id=""),
+                name="taskrun_unique_live_request",
             ),
         ]
 
