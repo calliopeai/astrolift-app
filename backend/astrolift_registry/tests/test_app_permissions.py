@@ -361,3 +361,23 @@ def test_viewer_permissions_field_matches_app_permissions_query():
     # alpha picks up both bindings; gamma sees only the ORG reader.
     assert list_result["alpha-perms"] == single_alpha == ["app.deploy", "app.read"]
     assert list_result["gamma-perms"] == single_gamma == ["app.read"]
+
+
+def test_app_detail_carries_the_same_app_scoped_viewer_permissions():
+    """``astroliftApp`` reports what the viewer holds on that app, not an
+    empty list, so the settings tab can offer only what it allows (#1867).
+    A deployer on alpha alone must not read as a deployer on gamma."""
+    org, _team_eng, _team_ops, _project_demo, _project_tools, apps = _scaffold()
+    user = _user("detail-viewer-perms")
+    org_role = _role("detail-org-role-perms", ["app.read"])
+    app_role = _role("detail-app-role-perms", ["app.deploy"])
+    RoleBinding.objects.create(user=user, role=org_role, scope_kind="ORG", scope_id=org.id)
+    RoleBinding.objects.create(user=user, role=app_role, scope_kind="APP", scope_id=apps["alpha"].id)
+
+    q = RegistryQuery()
+    with tenant_context(TenantContext(organization_id=org.id, actor_user_id=user.id)):
+        alpha = q.astrolift_app(_info(), slug="alpha-perms")
+        gamma = q.astrolift_app(_info(), slug="gamma-perms")
+
+    assert alpha.viewer_permissions == ["app.deploy", "app.read"]
+    assert gamma.viewer_permissions == ["app.read"]

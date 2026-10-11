@@ -250,6 +250,7 @@ export const GET_APP = gql`
     astroliftApp(slug: $slug, includeDrift: $includeDrift) {
       ...AppFields
       stagedEnvChanges
+      viewerPermissions
       configDrift {
         hasDrift
         fields
