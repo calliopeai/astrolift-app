@@ -16,6 +16,7 @@ export const ASTROLIFT_PERMISSIONS = [
   "agent.read",
   "agent.update",
   "agent_box.attach",
+  "agent_box.custom_image",
   "agent_env_spec.create",
   "agent_env_spec.delete",
   "agent_env_spec.read",

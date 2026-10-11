@@ -112,6 +112,7 @@ _DEPLOY_OPS = (
     # may start a box must be able to reach the box it started, or the
     # box is a node it pays for and cannot use.
     Permission.AGENT_BOX_ATTACH,
+    Permission.AGENT_BOX_CUSTOM_IMAGE,
 )
 
 # Agents + Workflows module verbs (spec 34/36 Phase 0). Standalone from
@@ -153,6 +154,7 @@ _AGENT_DEVELOPER = (
     Permission.AGENT_CREATE,
     Permission.AGENT_DISPATCH,
     Permission.AGENT_BOX_ATTACH,
+    Permission.AGENT_BOX_CUSTOM_IMAGE,
 )
 _WORKFLOW_DEVELOPER = (
     Permission.WORKFLOW_READ,
@@ -179,6 +181,7 @@ _OPERATE = (
     Permission.AGENT_READ,
     Permission.AGENT_DISPATCH,
     Permission.AGENT_BOX_ATTACH,
+    Permission.AGENT_BOX_CUSTOM_IMAGE,
     Permission.AGENT_TASK_WATCH,
     Permission.AGENT_ENV_SPEC_READ,
     Permission.WORKFLOW_READ,
@@ -482,6 +485,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
             Permission.AGENT_READ,
             Permission.AGENT_DISPATCH,
             Permission.AGENT_BOX_ATTACH,
+            Permission.AGENT_BOX_CUSTOM_IMAGE,
             Permission.WORKFLOW_READ,
             Permission.WORKFLOW_TRIGGER,
         ),

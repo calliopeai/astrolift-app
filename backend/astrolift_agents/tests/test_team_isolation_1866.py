@@ -487,6 +487,10 @@ def test_an_org_grant_ensures_an_org_level_box(world, started):
     AgentBox.objects.all().delete()
     with member(world):
         assert _ensure(world, environment_spec_slug="shared-env").ok
+        # A free image also needs agent_box.custom_image (#86).
+        assert not _ensure(world, image="example/agent:1").ok
+    grant(world, Permission.AGENT_BOX_CUSTOM_IMAGE, kind="ORG")
+    with member(world):
         assert _ensure(world, image="example/agent:1").ok
     assert all(box.team_id is None and box.project_id is None for box in started)
 

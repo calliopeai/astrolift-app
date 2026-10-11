@@ -967,6 +967,7 @@ class ClustersQuery:
             CognitoUserPoolClientType(
                 client_id=r["client_id"],
                 client_name=r["client_name"],
+                managed_login_branding=r.get("managed_login_branding", "unknown"),
             )
             for r in rows
         ]

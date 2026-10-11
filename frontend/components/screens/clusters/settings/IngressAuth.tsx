@@ -298,6 +298,7 @@ export function IngressAuthView({
                     </div>
                   )}
                   {!poolId && <p className="text-muted-foreground text-xs">{t("poolFirst")}</p>}
+                  <BrandingWarning client={clients.find((c) => c.clientId === clientId)} />
                 </div>
               </>
             ) : (
@@ -479,6 +480,19 @@ function CognitoPoolCombobox({
         </div>
       )}
     </>
+  );
+}
+
+// A managed-login client with no branding record serves "Login pages
+// unavailable", and a pool holds 20 (#1727). Say so before it is saved.
+function BrandingWarning({ client }: { client?: CognitoUserPoolClient }) {
+  const t = useTranslations("clusterSettings.ingressAuth");
+  const status = client?.managedLoginBranding;
+  if (status !== "missing" && status !== "missing_quota_full") return null;
+  return (
+    <p role="alert" className="text-warning-fg text-xs">
+      {t(status === "missing" ? "brandingMissing" : "brandingQuotaFull")}
+    </p>
   );
 }
 

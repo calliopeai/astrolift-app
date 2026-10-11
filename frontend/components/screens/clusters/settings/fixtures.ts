@@ -220,7 +220,13 @@ export const INGRESS_AUTH: IngressAuthViewProps = {
   ],
   poolsLoading: false,
   poolsErrored: false,
-  clients: [{ clientId: "4f8k2m9q1r7t3v5x6z0b", clientName: "astrolift-alb" }],
+  clients: [
+    {
+      clientId: "4f8k2m9q1r7t3v5x6z0b",
+      clientName: "astrolift-alb",
+      managedLoginBranding: "present",
+    },
+  ],
   clientsLoading: false,
   busy: false,
   reconciling: false,

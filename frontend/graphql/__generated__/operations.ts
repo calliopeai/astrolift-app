@@ -2157,6 +2157,8 @@ export type AstroliftCognitoUserPool = {
 export type AstroliftCognitoUserPoolClient = {
   clientId: Scalars['String']['output'];
   clientName: Scalars['String']['output'];
+  /** Managed login branding for this client (#1727): present, missing, missing_quota_full (the pool's 20 brandings are used), not_required (classic hosted UI) or unknown. A managed-login client without branding serves 'Login pages unavailable'. */
+  managedLoginBranding: Scalars['String']['output'];
 };
 
 export type AstroliftCommandRun = {
@@ -16293,7 +16295,7 @@ export type CognitoUserPoolClientsQueryVariables = Exact<{
 }>;
 
 
-export type CognitoUserPoolClientsQuery = { astroliftCognitoUserPoolClients: Array<{ clientId: string, clientName: string }> };
+export type CognitoUserPoolClientsQuery = { astroliftCognitoUserPoolClients: Array<{ clientId: string, clientName: string, managedLoginBranding: string }> };
 
 export type ClusterWorkloadHealthQueryVariables = Exact<{
   clusterId: Scalars['GUID']['input'];
