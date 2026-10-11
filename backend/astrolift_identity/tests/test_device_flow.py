@@ -650,3 +650,16 @@ def test_approval_unknown_session_returns_404():
     client.force_login(user)
     r = client.get("/app/cli/auth/device/nonexistent/")
     assert r.status_code == 404
+
+
+def test_device_pages_render_in_the_astrolift_frame():
+    """#2285: the device-flow pages carry the Astrolift mark and the app's
+    tokens, not the old navy and teal, and load nothing from outside."""
+    user = _make_user(password="pw")
+    client = Client()
+    client.force_login(user)
+    html = client.get("/app/cli/auth/device/nonexistent/").content.decode()
+    assert '<header class="brand">' in html and "<span>Astrolift</span>" in html
+    assert "--action: #2f9e52" in html
+    assert "#0b1623" not in html and "#2cb1bc" not in html
+    assert "https://" not in html
