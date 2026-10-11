@@ -60,7 +60,6 @@ def build_workers(client, queues):
 async def _run() -> None:
     from django.conf import settings
     from temporalio.client import Client
-    from temporalio.worker import Worker
 
     from astrolift_workflows.worker import (
         ACTIVITIES,
