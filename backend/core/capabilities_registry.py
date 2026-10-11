@@ -100,6 +100,7 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     # SCM integration surfaces.
     "scm.github_app",
     "scm.webhook_secret_rotation",
+    "scm.registration_owner_warning",
     # Identity / auth surfaces clients probe pre-login.
     "identity.session_cookie",
     "identity.invitation_accept",
