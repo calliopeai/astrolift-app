@@ -523,6 +523,7 @@ _APPS_FILTERS: dict[str, FilterField] = {
     "cluster": FilterField(q=_apps_on_clusters),
     "project": FilterField(q=lambda v: _iexact_any("project__slug", v) | _iexact_any("project__name", v)),
     "team": FilterField("team__slug"),
+    "app_kind": FilterField("app_kind"),
     # ``archived`` is a tri-state the resolver applies, ``kind`` is Python.
 }
 
@@ -1070,6 +1071,9 @@ class DiscoveredAppManifestType:
     build_context: str
     workload_count: int
     already_registered: bool
+    app_kind: str = strawberry.field(
+        default="", description="The manifest's [app] kind (#2332); empty when generic."
+    )
 
 
 @strawberry.type(name="AstroliftScanAppManifestsResult")
@@ -1160,8 +1164,28 @@ def _workloads_qs(
     return qs
 
 
+@strawberry.type(name="AstroliftAppKind")
+class AppKindType:
+    key: str
+    label: str
+    description: str
+
+
 @strawberry.type
 class RegistryQuery:
+    @strawberry.field
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @tenant_scoped()
+    def astrolift_app_kinds(self, info: Info) -> list[AppKindType]:
+        """The registered app kinds a manifest's ``[app] kind`` accepts (#2332).
+
+        A static catalogue, the same for every organization; an app without a
+        kind is generic. Legacy ``web``/``worker`` values read as generic.
+        """
+        from astrolift_manifest.app_kinds import APP_KINDS
+
+        return [AppKindType(key=k.key, label=k.label, description=k.description) for k in APP_KINDS.values()]
+
     @strawberry.field(
         description="Read-only APP_READ projection for an exact live app/environment. Expected cluster/provider GUIDs refuse reassignment. Persisted observations do not prove live health, TLS binding or renewal; mutation authority is unchanged."
     )
@@ -2465,6 +2489,7 @@ class RegistryQuery:
                     build_context=a.build_context,
                     workload_count=a.workload_count,
                     already_registered=a.already_registered,
+                    app_kind=a.app_kind,
                 )
                 for a in result.apps
             ],

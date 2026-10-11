@@ -319,3 +319,26 @@ def test_rows_carry_topology_kind_and_cluster_slugs(world):
 )
 def test_classify_topology_matches_the_frontend(workloads, services, expected):
     assert classify_topology(workloads, services) == expected
+
+
+# ---------- app kind (#2332) --------------------------------------------
+
+
+def test_app_kind_filters_and_shows_on_rows(world):
+    RegisteredApp.objects.filter(pk=world.apps["ok-a"].pk).update(app_kind="mimwell")
+
+    kinded = _page(world, world.user, filter=AppsListFilterInput(app_kind=["mimwell"]))
+    generic = _page(world, world.user, filter=AppsListFilterInput(app_kind=[""]))
+
+    assert [(row.name, row.app_kind) for row in kinded.items] == [("Alpha", "mimwell")]
+    assert "Alpha" not in _names(generic)
+    assert all(row.app_kind == "" for row in generic.items)
+
+
+def test_app_kinds_catalogue_lists_mimwell(world):
+    kinds = _run_in_tenant(
+        {"organization_id": world.org.id, "actor_user_id": world.user.id},
+        lambda: RegistryQuery().astrolift_app_kinds(_info()),
+    )
+    assert [kind.key for kind in kinds] == ["mimwell"]
+    assert kinds[0].label == "Mimwell"

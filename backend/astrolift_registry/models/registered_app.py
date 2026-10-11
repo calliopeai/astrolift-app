@@ -99,6 +99,9 @@ class RegisteredApp(NamedBaseCoreModel):
     )
 
     source_kind = models.CharField(max_length=32, choices=SourceKind.choices, default=SourceKind.GITHUB)
+    # What the app is for, from the manifest's ``[app] kind`` (#2332); empty
+    # for a generic app. Registry: ``astrolift_manifest.app_kinds``.
+    app_kind = models.CharField(max_length=40, blank=True, default="", db_index=True)
     source_repo = models.CharField(max_length=255, blank=True, default="")
     source_url = models.URLField(blank=True, default="")
     manifest_path = models.CharField(max_length=255, default="astrolift.toml")

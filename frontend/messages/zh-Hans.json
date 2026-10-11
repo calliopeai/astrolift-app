@@ -403,7 +403,8 @@
         "cluster": "集群",
         "lastDeploy": "上次部署",
         "registered": "注册时间",
-        "project": "项目"
+        "project": "项目",
+        "appKind": "应用类型"
       },
       "kinds": {
         "service": "单个服务",
@@ -441,7 +442,10 @@
         "submit": "{count, plural, other {推送到 # 个应用}}",
         "description": "将指定的密钥包应用到每个选中的应用。环境留空时，会应用到该密钥包绑定的所有环境。"
       },
-      "previewCount": "{count, plural, other {# 个预览}}"
+      "previewCount": "{count, plural, other {# 个预览}}",
+      "appKinds": {
+        "mimwell": "Mimwell"
+      }
     },
     "tabs": {
       "ariaLabel": "应用分区",

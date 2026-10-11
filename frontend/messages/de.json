@@ -403,7 +403,8 @@
         "cluster": "Cluster",
         "lastDeploy": "Letzte Bereitstellung",
         "registered": "Registriert",
-        "project": "Projekt"
+        "project": "Projekt",
+        "appKind": "App-Art"
       },
       "kinds": {
         "service": "Einzelner Dienst",
@@ -441,7 +442,10 @@
         "submit": "{count, plural, one {An # App übertragen} other {An # Apps übertragen}}",
         "description": "Das angegebene Secret-Bundle auf alle ausgewählten Apps anwenden. Umgebung leer lassen, um alle Umgebungen einzubeziehen, an die das Bundle gebunden ist."
       },
-      "previewCount": "{count, plural, one {# Vorschau} other {# Vorschauen}}"
+      "previewCount": "{count, plural, one {# Vorschau} other {# Vorschauen}}",
+      "appKinds": {
+        "mimwell": "Mimwell"
+      }
     },
     "tabs": {
       "ariaLabel": "Anwendungsabschnitte",

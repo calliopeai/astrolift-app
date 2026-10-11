@@ -157,6 +157,7 @@ function AppCard({
             >
               {app.name}
             </Link>
+            <AppKindBadge kind={app.appKind} className="ml-1.5 align-middle" />
           </div>
           <div
             className="text-muted-foreground truncate font-mono text-xs"
@@ -262,8 +263,11 @@ export function AppsListScreen({
         <span className="flex min-w-0 items-center gap-2">
           <AppKindGlyph topology={app.topology} className="size-7" />
           <span className="block min-w-0">
-            <span className="block truncate font-medium" title={app.name}>
-              {app.name}
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="block truncate font-medium" title={app.name}>
+                {app.name}
+              </span>
+              <AppKindBadge kind={app.appKind} />
             </span>
             <span
               className="text-muted-foreground block truncate font-mono text-xs"
@@ -521,5 +525,16 @@ function PushSecretsForm({
         </Button>
       </DialogFooter>
     </form>
+  );
+}
+
+/** A purpose-built app's kind (#2332); nothing for a generic app. */
+function AppKindBadge({ kind, className }: { kind?: string | null; className?: string }) {
+  const t = useTranslations("apps.list");
+  if (!kind) return null;
+  return (
+    <Badge variant="secondary" className={className}>
+      {t(`appKinds.${kind}`)}
+    </Badge>
   );
 }

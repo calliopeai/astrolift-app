@@ -1322,6 +1322,12 @@ export type AstroliftAppIdentityBindingResult = {
   reason: AstroliftObservabilityPanelReason;
 };
 
+export type AstroliftAppKind = {
+  description: Scalars['String']['output'];
+  key: Scalars['String']['output'];
+  label: Scalars['String']['output'];
+};
+
 export type AstroliftAppListState =
   | 'ARCHIVED'
   | 'DEREGISTERED'
@@ -1587,6 +1593,8 @@ export type AstroliftApproverUser = {
 };
 
 export type AstroliftAppsListFilter = {
+  /** App kinds from the manifest's [app] kind (#2332); an empty string matches generic apps. */
+  appKind: InputMaybe<Array<Scalars['String']['input']>>;
   /** true: archived apps only. false: active only. null: includeArchived decides. */
   archived: InputMaybe<Scalars['Boolean']['input']>;
   /** Cluster slugs, case-insensitive; any environment on one matches. */
@@ -4457,6 +4465,8 @@ export type AstroliftRegisteredAgent = {
 
 export type AstroliftRegisteredApp = {
   activePreviewCount: Scalars['Int']['output'];
+  /** What the app is for, from the manifest's [app] kind (#2332), e.g. mimwell; empty for a generic app. Separate from workload kinds; see astroliftAppKinds. */
+  appKind: Scalars['String']['output'];
   approverTeamId?: Maybe<Scalars['GUID']['output']>;
   approverUserIds: Array<Scalars['String']['output']>;
   archivedAt?: Maybe<Scalars['DateTime']['output']>;
@@ -11304,6 +11314,7 @@ export type Query = {
   astroliftAppGoldenSignals: AstroliftAppGoldenSignalsResult;
   astroliftAppHealthSummary: Array<AstroliftAppHealthSummary>;
   astroliftAppIdentityBinding: AstroliftAppIdentityBindingResult;
+  astroliftAppKinds: Array<AstroliftAppKind>;
   astroliftAppLogs: AstroliftAppLogPage;
   astroliftAppManagedServiceMetrics?: Maybe<AstroliftManagedServiceMetrics>;
   astroliftAppMetricNames: AstroliftAppMetricNames;

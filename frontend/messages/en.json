@@ -405,7 +405,8 @@
         "cluster": "Cluster",
         "lastDeploy": "Last deploy",
         "registered": "Registered",
-        "project": "Project"
+        "project": "Project",
+        "appKind": "App kind"
       },
       "kinds": {
         "service": "Single service",
@@ -443,7 +444,10 @@
         "submit": "{count, plural, one {Push to # app} other {Push to # apps}}",
         "description": "Project the named secret bundle onto every selected app. Leave environment blank to fan out to every environment the bundle is bound to."
       },
-      "previewCount": "{count, plural, one {# preview} other {# previews}}"
+      "previewCount": "{count, plural, one {# preview} other {# previews}}",
+      "appKinds": {
+        "mimwell": "Mimwell"
+      }
     },
     "tabs": {
       "ariaLabel": "App sections",

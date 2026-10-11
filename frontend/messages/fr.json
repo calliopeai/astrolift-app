@@ -403,7 +403,8 @@
         "cluster": "Cluster",
         "lastDeploy": "Dernier déploiement",
         "registered": "Enregistrement",
-        "project": "Projet"
+        "project": "Projet",
+        "appKind": "Type d’app"
       },
       "kinds": {
         "service": "Service unique",
@@ -441,7 +442,10 @@
         "submit": "{count, plural, one {Envoyer à # application} other {Envoyer à # applications}}",
         "description": "Appliquez le paquet de secrets indiqué à chaque application sélectionnée. Laissez l’environnement vide pour l’appliquer à tous les environnements auxquels le paquet est lié."
       },
-      "previewCount": "{count, plural, one {# aperçu} other {# aperçus}}"
+      "previewCount": "{count, plural, one {# aperçu} other {# aperçus}}",
+      "appKinds": {
+        "mimwell": "Mimwell"
+      }
     },
     "tabs": {
       "ariaLabel": "Sections de l’application",

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Manifests can declare what an app is for with `[app] kind`, validated against a registry (`astroliftAppKinds`; `mimwell` first) and kept separate from workload kinds. Omitted means a generic app, and the legacy spec values `web`/`worker` read as generic, so existing manifests and their hashes are unchanged. The kind is persisted on registration and sync, shown in scan previews and app reads (`appKind`), filterable on the Apps list and shown as a badge. Apply registry migration 0043 with the image (#2332).
+
 - Decommissioning a cluster revokes its Zentinelle gateway credential and removes the gateway before platform RBAC is lifted, best-effort and reported with the other cleanup results. Runs already in flight replay unchanged (#1905).
 
 - `astroliftZentinelleConnection` is gated on `zentinelle.status_view` instead of `zentinelle.connect`, so viewers and auditors can read connection and gateway status; connecting stays admin-only (#1905).

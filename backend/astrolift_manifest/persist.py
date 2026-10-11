@@ -163,6 +163,10 @@ def persist_manifest(app, manifest: NormalizedManifest, *, raw_text: str = "") -
     if raw_text and app.manifest_raw != raw_text:
         app.manifest_raw = raw_text
         fields_to_update.append("manifest_raw")
+    app_kind = manifest.serialized.get("app_kind", "")
+    if app.app_kind != app_kind:
+        app.app_kind = app_kind
+        fields_to_update.append("app_kind")
     if fields_to_update:
         fields_to_update += ["updated_at", "version"]
         app.save(update_fields=fields_to_update)

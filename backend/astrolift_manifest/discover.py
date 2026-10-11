@@ -660,6 +660,7 @@ class DiscoveredAppManifest:
     build_context: str
     workload_count: int
     raw_text: str
+    app_kind: str = ""
 
 
 def _candidate_app_manifest_paths(files: Mapping[str, Any]) -> list[str]:
@@ -687,8 +688,8 @@ def _candidate_app_manifest_paths(files: Mapping[str, Any]) -> list[str]:
     return sorted(set(out))
 
 
-def _parse_app_manifest(text: str | None) -> tuple[str, int] | None:
-    """Parse one manifest body and return ``(name, workload_count)`` when it is
+def _parse_app_manifest(text: str | None) -> tuple[str, int, str] | None:
+    """Parse one manifest body and return ``(name, workload_count, app_kind)`` when it is
     an app manifest, else ``None``.
 
     A manifest qualifies as an app when it declares at least one *non-agent*
@@ -712,7 +713,7 @@ def _parse_app_manifest(text: str | None) -> tuple[str, int] | None:
         return None
     if not any(w.kind != "agent" for w in manifest.workloads):
         return None
-    return manifest.name, len(manifest.workloads)
+    return manifest.name, len(manifest.workloads), manifest.app_kind
 
 
 def scan_app_manifests(files: Mapping[str, Any]) -> list[DiscoveredAppManifest]:
@@ -732,7 +733,7 @@ def scan_app_manifests(files: Mapping[str, Any]) -> list[DiscoveredAppManifest]:
         parsed = _parse_app_manifest(files.get(path) if isinstance(files.get(path), str) else None)
         if parsed is None:
             continue
-        name, workload_count = parsed
+        name, workload_count, app_kind = parsed
         build_context = path.rsplit("/", 1)[0] if "/" in path else "."
         found.append(
             DiscoveredAppManifest(
@@ -741,6 +742,7 @@ def scan_app_manifests(files: Mapping[str, Any]) -> list[DiscoveredAppManifest]:
                 build_context=build_context,
                 workload_count=workload_count,
                 raw_text=files[path],
+                app_kind=app_kind,
             )
         )
     return found
