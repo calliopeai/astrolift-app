@@ -26,6 +26,8 @@ vi.mock("./ModelSubscriptionsClient", () => ({ ModelSubscriptionsClient: () => n
 vi.mock("./ModelObservationsClient", () => ({ ModelObservationsClient: () => null }));
 vi.mock("./SharedModelPromptClient", () => ({ SharedModelPromptClient: () => null }));
 vi.mock("./SharedModelManagementClient", () => ({ SharedModelManagementClient: () => null }));
+// The install-wide served model is an unscoped cache-first read with its own coverage.
+vi.mock("@/hooks/use-install-policy", () => ({ useInstallManagedModel: () => null }));
 type Request = {
   operationName: string;
   query: string;
