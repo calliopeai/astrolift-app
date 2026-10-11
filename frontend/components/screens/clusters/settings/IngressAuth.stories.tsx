@@ -17,6 +17,16 @@ export const Empty: Story = {
 
 export const Editing: Story = { render: () => <IngressAuthView {...INGRESS_AUTH} editing /> };
 
+export const EditingClientWithoutBranding: Story = {
+  render: () => (
+    <IngressAuthView
+      {...INGRESS_AUTH}
+      editing
+      clients={INGRESS_AUTH.clients.map((c) => ({ ...c, managedLoginBranding: "missing" }))}
+    />
+  ),
+};
+
 export const PoolsLoading: Story = {
   render: () => (
     <IngressAuthView {...INGRESS_AUTH} existing={null} editing poolId="" pools={[]} poolsLoading />

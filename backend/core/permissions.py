@@ -187,6 +187,10 @@ class Permission(enum.StrEnum):
     # granted alongside the deploy ops on the same roles for now (see
     # ``astrolift_identity.system_roles._DEPLOY_OPS``).
     AGENT_DISPATCH = "agent.dispatch"
+    # Starting a box on a free image reference instead of a registered spec
+    # or agent (#86). Rides with dispatch on the stock roles, so a custom role
+    # can allow dispatch while limiting boxes to the images specs name.
+    AGENT_BOX_CUSTOM_IMAGE = "agent_box.custom_image"
 
     # --- Agents module (spec 34/36 Phase 0) -----------------------
     # Standalone CRUD verbs for the Agents entity module so an org can

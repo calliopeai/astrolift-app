@@ -6768,7 +6768,9 @@
       "removed": "{count, plural, one {协调报告已从 # 个受管 Ingress 移除 Cognito 注解。请验证实际访问。} other {协调报告已从 # 个受管 Ingress 移除 Cognito 注解。请验证实际访问。}}",
       "partial": "{count, plural, one {报告了 # 个协调失败。请检查集群事件；部署尚未完成。} other {报告了 # 个协调失败。请检查集群事件；部署尚未完成。}}",
       "skipped": "{count, plural, one {跳过了 # 个 Ingress。请检查集群事件和实际访问。} other {跳过了 # 个 Ingress。请检查集群事件和实际访问。}}",
-      "sourceLimit": "返回的选项不能证明云资源清单完整。选择或输入标识符不会授予访问权限。"
+      "sourceLimit": "返回的选项不能证明云资源清单完整。选择或输入标识符不会授予访问权限。",
+      "brandingMissing": "此客户端没有托管登录品牌，因此 Cognito 会显示“Login pages unavailable”。请先在 Cognito 中创建品牌再保存。",
+      "brandingQuotaFull": "此客户端没有托管登录品牌，且该用户池已用完全部 20 个品牌。请释放一个，或改用已有品牌的客户端。"
     },
     "authUsers": {
       "title": "登录用户",

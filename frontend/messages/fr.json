@@ -6771,7 +6771,9 @@
       "removed": "{count, plural, one {La réconciliation signale le retrait des annotations Cognito de # Ingress géré. Vérifiez l’accès réel.} other {La réconciliation signale le retrait des annotations Cognito de # Ingress gérés. Vérifiez l’accès réel.}}",
       "partial": "{count, plural, one {# échec de réconciliation est signalé. Consultez les événements du cluster ; le déploiement est incomplet.} other {# échecs de réconciliation sont signalés. Consultez les événements du cluster ; le déploiement est incomplet.}}",
       "skipped": "{count, plural, one {# Ingress a été ignoré. Consultez les événements du cluster et l’accès réel.} other {# Ingress ont été ignorés. Consultez les événements du cluster et l’accès réel.}}",
-      "sourceLimit": "Les choix retournés ne prouvent pas un inventaire cloud complet. Sélectionner ou saisir des identifiants n’accorde aucun accès."
+      "sourceLimit": "Les choix retournés ne prouvent pas un inventaire cloud complet. Sélectionner ou saisir des identifiants n’accorde aucun accès.",
+      "brandingMissing": "Ce client n’a pas d’habillage de connexion gérée : Cognito affichera « Login pages unavailable ». Créez son habillage dans Cognito avant d’enregistrer.",
+      "brandingQuotaFull": "Ce client n’a pas d’habillage de connexion gérée et le pool utilise déjà les 20 habillages. Libérez-en un ou utilisez un client qui en a un."
     },
     "authUsers": {
       "title": "Utilisateurs de connexion",

@@ -867,6 +867,14 @@ class CognitoUserPoolClientInfo:
 
     client_id: str
     client_name: str
+    # Managed login serves "Login pages unavailable" to a client without a
+    # branding record, and a pool holds at most 20 (#1727): "present",
+    # "missing", "missing_quota_full", "not_required" (classic hosted UI or
+    # no domain) or "unknown" when the read failed.
+    managed_login_branding: str = "unknown"
+
+
+MANAGED_LOGIN_BRANDING_LIMIT = 20
 
 
 @dataclass(frozen=True)
