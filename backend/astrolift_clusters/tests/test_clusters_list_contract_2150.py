@@ -104,6 +104,7 @@ def _slugs(page) -> list[str]:
 
 def test_the_201st_cluster_resolves_on_its_own_detail_page(permission_resolver):
     """The bug: detail found the cluster in a list that stops at 200."""
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     org = _org("fleet")
     plugin = _plugin("fleet")
@@ -128,6 +129,7 @@ def test_the_201st_cluster_resolves_on_its_own_detail_page(permission_resolver):
 
 
 def test_detail_read_keeps_the_list_visibility(permission_resolver):
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     org = _org("vis")
     other = _org("other")
@@ -149,6 +151,8 @@ def test_detail_read_keeps_the_list_visibility(permission_resolver):
 def test_detail_read_refuses_without_a_tenant(permission_resolver):
     from core.decorators import TenantRequired
 
+    permission_resolver.grant(Permission.CLUSTER_READ)
+
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     _cluster(None, _plugin("nt"), "nt-shared")
     with tenant_context(TenantContext(organization_id=None)):
@@ -162,6 +166,7 @@ def test_detail_read_refuses_without_a_tenant(permission_resolver):
 
 
 def test_filters_provider_status_and_registered_by(permission_resolver):
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     org = _org("flt")
     aws = _plugin("aws")
@@ -194,6 +199,7 @@ def test_filters_provider_status_and_registered_by(permission_resolver):
 
 def test_live_filter_matches_the_heartbeat_status_the_row_shows(permission_resolver):
     """The Offline view counts exactly the rows the Live column paints red."""
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     org = _org("live")
     plugin = _plugin("live")
@@ -230,6 +236,7 @@ def test_live_filter_matches_the_heartbeat_status_the_row_shows(permission_resol
 
 def test_filter_applies_on_the_cursor_walk_too(permission_resolver):
     """No sort, page or pageSize: the old cursor walk, filtered first."""
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     org = _org("cur")
     plugin = _plugin("cur")
@@ -257,6 +264,7 @@ def test_filter_applies_on_the_cursor_walk_too(permission_resolver):
 
 
 def test_sorts(permission_resolver):
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     org = _org("srt")
     plugin = _plugin("srt")
@@ -286,6 +294,7 @@ def test_sorts(permission_resolver):
 
 
 def test_numbered_page_defaults_and_past_the_end(permission_resolver):
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     org = _org("num")
     plugin = _plugin("num")
@@ -307,6 +316,7 @@ def test_numbered_page_defaults_and_past_the_end(permission_resolver):
 
 
 def test_register_records_who_and_the_row_reports_it(permission_resolver):
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     org = _org("reg")
     plugin = _plugin("reg")
@@ -331,6 +341,7 @@ def test_register_records_who_and_the_row_reports_it(permission_resolver):
 
 
 def test_a_shared_cluster_does_not_report_its_registrant(permission_resolver):
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     org = _org("shr")
     operator = User.objects.create(username=f"op-{uuid.uuid4().hex[:6]}")

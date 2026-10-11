@@ -623,6 +623,7 @@ def test_workflow_schedules_cleanup_activities_before_teardown(
         mark_decommissioned,
         mark_decommissioning,
         remove_platform_rbac,
+        revoke_cluster_zentinelle_gateway,
         teardown_cluster_infra,
     )
     from astrolift_workflows.inputs import Actor, DecommissionClusterInput
@@ -652,6 +653,7 @@ def test_workflow_schedules_cleanup_activities_before_teardown(
     # Patch the temporalio.workflow attributes the workflow body uses
     # so we can drive ``run`` outside a real Temporal worker.
     monkeypatch.setattr(temporalio_workflow, "execute_activity", _fake_execute_activity)
+    monkeypatch.setattr(temporalio_workflow, "patched", lambda patch_id: True)
 
     class _NullLogger:
         def warning(self, *args, **kwargs):
@@ -679,6 +681,7 @@ def test_workflow_schedules_cleanup_activities_before_teardown(
     expected = [
         ensure_cluster_drained.__name__,
         mark_decommissioning.__name__,
+        revoke_cluster_zentinelle_gateway.__name__,
         remove_platform_rbac.__name__,
         cleanup_cluster_dns_records.__name__,
         cleanup_cluster_acm_certs.__name__,
@@ -691,6 +694,7 @@ def test_workflow_schedules_cleanup_activities_before_teardown(
     # Cleanup summary surfaces in the workflow result data.
     assert result.data is not None
     assert set(result.data["cleanup"].keys()) == {
+        "zentinelle_gateway",
         "dns_records",
         "acm_certs",
         "ecr_repos",
@@ -745,6 +749,7 @@ def test_workflow_continues_when_cleanup_activity_raises(
             pass
 
     monkeypatch.setattr(temporalio_workflow, "execute_activity", _fake_execute_activity)
+    monkeypatch.setattr(temporalio_workflow, "patched", lambda patch_id: True)
     monkeypatch.setattr(temporalio_workflow, "logger", _NullLogger())
 
     workflow_instance = DecommissionClusterWorkflow()
@@ -767,3 +772,54 @@ def test_workflow_continues_when_cleanup_activity_raises(
     # And the per-capability detail surfaces in data.
     assert result.data["cleanup"]["ecr_repos"]["ok"] is False
     assert any("ecr api down" in e for e in result.data["cleanup"]["ecr_repos"]["errors"])
+
+
+# ---- Zentinelle gateway revocation (#1905) ---------------------------
+
+
+def _gateway(org, cluster):
+    from astrolift_operations.models import ZentinelleClusterGateway, ZentinelleConnection
+
+    connection = ZentinelleConnection.objects.create(
+        organization=org, base_url="https://zentinelle.test", status=ZentinelleConnection.Status.CONNECTED
+    )
+    return ZentinelleClusterGateway.objects.create(
+        connection=connection, cluster=cluster, zentinelle_cluster_id=str(cluster.guid)
+    )
+
+
+@pytest.mark.django_db
+def test_revoke_gateway_skips_a_cluster_without_one(cluster):
+    from astrolift_workflows.activities.cluster_decommission_cleanup import _revoke_zentinelle_gateway_sync
+
+    summary = _revoke_zentinelle_gateway_sync(cluster.pk)
+    assert summary["skipped"] is True and summary["deleted"] == 0 and summary["errors"] == []
+
+
+@pytest.mark.django_db
+def test_revoke_gateway_unregisters_the_live_gateway(org, cluster, monkeypatch):
+    from astrolift_operations import zentinelle_connect
+    from astrolift_workflows.activities.cluster_decommission_cleanup import _revoke_zentinelle_gateway_sync
+
+    gateway = _gateway(org, cluster)
+    calls = []
+    monkeypatch.setattr(zentinelle_connect, "unregister_cluster", lambda *, gateway: calls.append(gateway.pk))
+    summary = _revoke_zentinelle_gateway_sync(cluster.pk)
+    assert calls == [gateway.pk]
+    assert summary["deleted"] == 1 and summary["ok"] is True and summary["skipped"] is False
+
+
+@pytest.mark.django_db
+def test_revoke_gateway_failure_is_reported_not_raised(org, cluster, monkeypatch):
+    from astrolift_operations import zentinelle_connect
+    from astrolift_workflows.activities.cluster_decommission_cleanup import _revoke_zentinelle_gateway_sync
+    from core.mutations import ErrorCode
+
+    _gateway(org, cluster)
+
+    def refuse(*, gateway):
+        raise zentinelle_connect.ZentinelleConnectError(ErrorCode.INTERNAL, "Zentinelle is unreachable")
+
+    monkeypatch.setattr(zentinelle_connect, "unregister_cluster", refuse)
+    summary = _revoke_zentinelle_gateway_sync(cluster.pk)
+    assert summary["ok"] is False and summary["errors"] == ["Zentinelle is unreachable"]

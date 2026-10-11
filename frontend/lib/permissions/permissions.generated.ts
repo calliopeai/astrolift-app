@@ -42,6 +42,7 @@ export const ASTROLIFT_PERMISSIONS = [
   "billing.read",
   "billing.update",
   "cluster.manage",
+  "cluster.read",
   "cluster.register",
   "cluster.unregister",
   "cluster.update",

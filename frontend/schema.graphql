@@ -4783,6 +4783,11 @@ type AstroliftRegisteredApp {
   Clusters the app's environments deploy to, in environment-name order. Filled on astroliftAppsPage and astroliftMyAppsPage (#2149).
   """
   clusterSlugs: [String!]!
+
+  """
+  Advisory set only on the registerApp result: no organization GitHub connection is visibly recorded on the source repository's owner. Empty everywhere else (#2297).
+  """
+  sourceConnectionWarning: String!
   provisioningProgress: AstroliftProvisioningProgress
 }
 
@@ -9968,6 +9973,7 @@ type Query {
   astroliftEventsAggregated(limit: Int! = 100, eventType: String = null, severity: String = null, appSlug: String = null, aggregateWindowSeconds: Int! = 300): [AstroliftAggregatedEvent!]! @deprecated(reason: "Caps at 500 buckets folded from a bounded 10k-row scan, so activity older than the scan window is unreachable. Use astroliftEventsAggregatedPage.")
   astroliftEventsAggregatedPage(limit: Int! = 50, after: String = null, eventType: String = null, severity: String = null, appSlug: String = null, search: String = null, aggregateWindowSeconds: Int! = 300): AstroliftAggregatedEventPage!
   astroliftEventsPage(limit: Int! = 100, after: String = null, eventType: String = null, severity: String = null, appSlug: String = null, search: String = null): AstroliftEventPage!
+  astroliftAppEventsPage(appSlug: String!, limit: Int! = 100, after: String = null, eventType: String = null, severity: String = null): AstroliftEventPage!
   astroliftRecentActivity(limit: Int! = 20, cursor: String = null): AstroliftActivityPage!
   astroliftAuditEvents(limit: Int! = 100, action: String = null, decision: String = null, actorId: String = null, createdAtGte: DateTime = null, createdAtLte: DateTime = null): [AstroliftAuditEvent!]!
   astroliftAuditEventsPage(limit: Int! = 100, after: String = null, action: String = null, decision: String = null, actorId: String = null, createdAtGte: DateTime = null, createdAtLte: DateTime = null, includeTotal: Boolean! = false, search: String = null, targetKind: String = null, targetId: String = null, subjectUserId: String = null, filter: AstroliftAuditEventsFilter = null, sort: String = null): AstroliftAuditEventPage!

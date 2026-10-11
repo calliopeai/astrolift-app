@@ -24,6 +24,7 @@ from astrolift_scm.services.connection_resolver import (
     PLATFORM_REPO_WRITE,
     USER_REPO_DISCOVERY,
     ConnectionResolutionError,
+    repo_owner_connection_warning,
     resolve_connection,
 )
 from core.secrets import encrypt_at_rest
@@ -313,3 +314,47 @@ def test_a_single_installation_still_resolves_for_any_owner(org):
         org, purpose=PLATFORM_REPO_WRITE, source_kind="github", repo="ragelink/leo-brain"
     )
     assert got.pk == only.pk
+
+
+# ---------------------------------------------------------------------------
+# registration advisory — nothing visibly covers the repo's owner (#2297)
+# ---------------------------------------------------------------------------
+
+
+def test_owner_warning_empty_when_an_installation_is_on_the_owner(org):
+    _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ")
+    _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="2", account_login="ragelink")
+    assert repo_owner_connection_warning(org, "https://github.com/RageLink/leo-brain.git") == ""
+
+
+@pytest.mark.parametrize("kind", [SourceConnection.Kind.GITHUB_OAUTH_USER, SourceConnection.Kind.GITHUB_PAT])
+def test_owner_warning_empty_when_an_account_token_can_reach_it(org, user, kind):
+    _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ")
+    _mk(org, kind, user=user if kind == SourceConnection.Kind.GITHUB_OAUTH_USER else None, account_login="x")
+    assert repo_owner_connection_warning(org, "ragelink/leo-brain") == ""
+
+
+def test_owner_warning_names_the_owner_when_installations_cover_other_accounts(org):
+    _mk(org, SourceConnection.Kind.GITHUB_APP_INSTALL, installation_id="1", account_login="ConflictHQ")
+    warning = repo_owner_connection_warning(org, "ragelink/leo-brain")
+    assert "recorded on ragelink" in warning
+    assert "Settings → Connections" in warning
+
+
+def test_owner_warning_when_the_org_has_no_github_connection(org):
+    _mk(
+        org,
+        SourceConnection.Kind.GITHUB_APP_INSTALL,
+        installation_id="1",
+        account_login="ragelink",
+        is_active=False,
+    )
+    warning = repo_owner_connection_warning(org, "ragelink/leo-brain")
+    assert warning.startswith("This organization has no GitHub connection")
+
+
+@pytest.mark.parametrize(
+    "source_kind,repo", [("gitlab", "group/app"), ("github", ""), ("github", "no-owner")]
+)
+def test_owner_warning_only_applies_to_github_repos_with_an_owner(org, source_kind, repo):
+    assert repo_owner_connection_warning(org, repo, source_kind=source_kind) == ""

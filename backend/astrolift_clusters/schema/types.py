@@ -74,6 +74,10 @@ class TenantClusterType:
     cluster: that row belongs to the platform, not to anyone in the
     viewer's org."""
 
+    # False for a caller holding ``cluster.read`` without ``cluster.register``:
+    # operator-only fields were withheld and bootstrap history stays hidden.
+    operator_view: strawberry.Private[bool] = True
+
     @strawberry.field
     def last_bootstrap_run(self) -> ClusterBootstrapRunType | None:
         """Most recent ``astro cluster bootstrap`` invocation for this
@@ -98,7 +102,7 @@ class TenantClusterType:
         # otherwise both match.
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        if org_id is None:
+        if org_id is None or not self.operator_view:
             return None
         cluster = TenantCluster.objects.filter(
             Q(organization_id=org_id) | Q(organization_id__isnull=True),
@@ -133,7 +137,7 @@ class TenantClusterType:
         # Re-scope by caller org (#1183, #1955) — see last_bootstrap_run.
         tenant = get_current_tenant()
         org_id = tenant.organization_id if tenant else None
-        if org_id is None:
+        if org_id is None or not self.operator_view:
             return []
         cluster = TenantCluster.objects.filter(
             Q(organization_id=org_id) | Q(organization_id__isnull=True),
@@ -316,7 +320,10 @@ def redact_oidc_auth_config(config: dict | None) -> dict | None:
     return view
 
 
-def cluster_to_type(cluster) -> TenantClusterType:
+def cluster_to_type(cluster, *, operator_view: bool = True) -> TenantClusterType:
+    """Serialize one cluster. ``operator_view=False`` withholds the API
+    endpoint, edge-auth configuration, management error and bootstrap
+    history from inventory-only readers (#2295)."""
     from django.utils import timezone
 
     from astrolift_clusters.heartbeat_status import (
@@ -339,18 +346,18 @@ def cluster_to_type(cluster) -> TenantClusterType:
         organization_slug=cluster.organization.slug if cluster.organization_id else None,
         provider_plugin_slug=cluster.provider_plugin.slug,
         region=cluster.region or "",
-        endpoint=cluster.endpoint or "",
+        endpoint=(cluster.endpoint or "") if operator_view else "",
         auth_method=cluster.auth_method,
         ingress_class=cluster.ingress_class,
         ingress_mode=cluster.ingress_mode,
-        oidc_auth_config=redact_oidc_auth_config(cluster.oidc_auth_config),
-        alb_auth_config=cluster.alb_auth_config,
+        oidc_auth_config=redact_oidc_auth_config(cluster.oidc_auth_config) if operator_view else None,
+        alb_auth_config=cluster.alb_auth_config if operator_view else None,
         is_active=cluster.is_active,
         capabilities=cluster.capabilities or {},
         capabilities_probed_at=cluster.capabilities_probed_at,
         created_at=cluster.created_at,
         lifecycle=cluster.lifecycle,
-        last_management_error=cluster.last_management_error or "",
+        last_management_error=(cluster.last_management_error or "") if operator_view else "",
         managed_at=cluster.managed_at,
         secrets_backend_provisioned_at=cluster.secrets_backend_provisioned_at,
         last_heartbeat_at=cluster.last_heartbeat_at,
@@ -366,6 +373,7 @@ def cluster_to_type(cluster) -> TenantClusterType:
             if cluster.organization_id is not None and cluster.created_by_id is not None
             else None
         ),
+        operator_view=operator_view,
     )
 
 

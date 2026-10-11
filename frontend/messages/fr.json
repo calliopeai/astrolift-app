@@ -1097,6 +1097,7 @@
         "targetPort": "Port cible",
         "stripPrefix": "Retirer le préfixe avant de transmettre à la charge de travail",
         "routesHint": "Les nouvelles routes s'appliquent après Enregistrer ci-dessus.",
+        "noWorkloadsBlocked": "Les routes de chemin ciblent une charge de travail. Enregistrez une charge de travail pour cette application, puis ajoutez la route.",
         "kinds": {
           "http_to_https": "HTTP → HTTPS",
           "apex_to_www": "Domaine racine → www",
@@ -1949,6 +1950,7 @@
       },
       "expiry": {
         "expired": "Expiré {days, plural, one {depuis # jour} other {depuis # jours}}",
+        "expiredToday": "Expiré aujourd'hui",
         "rotateSoon": "Renouveler : expire dans {days, plural, one {# jour} other {# jours}}",
         "expires": "Expire dans {days, plural, one {# jour} other {# jours}}"
       },

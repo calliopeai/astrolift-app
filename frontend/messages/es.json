@@ -1097,6 +1097,7 @@
         "targetPort": "Puerto de destino",
         "stripPrefix": "Quitar el prefijo antes de reenviar a la carga de trabajo",
         "routesHint": "Las nuevas rutas se aplican al pulsar Guardar arriba.",
+        "noWorkloadsBlocked": "Las rutas de ruta apuntan a una carga de trabajo. Registra una carga de trabajo en esta app y luego añade la ruta.",
         "kinds": {
           "http_to_https": "HTTP → HTTPS",
           "apex_to_www": "Dominio raíz → www",
@@ -1949,6 +1950,7 @@
       },
       "expiry": {
         "expired": "Caducó {days, plural, one {hace # día} other {hace # días}}",
+        "expiredToday": "Caducó hoy",
         "rotateSoon": "Rotar: caduca en {days, plural, one {# día} other {# días}}",
         "expires": "Caduca en {days, plural, one {# día} other {# días}}"
       },

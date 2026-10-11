@@ -63,6 +63,8 @@ _READ_ALL = (
     # role grant (see ``team_viewer`` / ``team_developer`` below) so
     # auditors don't accidentally submit on a published form.
     Permission.FORM_READ,
+    # Cluster inventory metadata (#2295); operator fields stay withheld.
+    Permission.CLUSTER_READ,
     # Skill registry: readers see the org's Skill + ToolDef catalog
     # (plus the platform-global skills). Write/import live on the
     # admin/developer roles below so auditors can't mutate the catalog.
@@ -254,6 +256,7 @@ SYSTEM_ROLES: tuple[tuple[str, str, str, str, tuple[Permission, ...]], ...] = (
         "Cluster Owner",
         "Register, update, unregister, and bring tenant clusters into management.",
         (
+            Permission.CLUSTER_READ,
             Permission.CLUSTER_REGISTER,
             Permission.CLUSTER_UPDATE,
             Permission.CLUSTER_UNREGISTER,

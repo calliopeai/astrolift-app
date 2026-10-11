@@ -236,6 +236,43 @@ def covering_repo_owner(rows: list[SourceConnection], repo: str | None) -> list[
     return [r for r in rows if r.kind != install or (r.account_login or "").lower() == owner]
 
 
+def repo_owner_connection_warning(organization, repo: str | None, *, source_kind: str = "github") -> str:
+    """Explain at registration when nothing visibly covers ``repo``'s owner (#2297).
+
+    Returns "" when an org-level GitHub connection could reach the repo: an
+    App installation recorded on its owner, or an OAuth-user/PAT connection
+    (those reach whatever their account can). Otherwise names the owner so
+    a later fetch, build or webhook failure is not a surprise. Advisory
+    only: older installation rows record the App's owner rather than the
+    account it was installed on, so a mismatch does not prove a failure.
+    """
+    owner = _repo_owner(repo)
+    if source_kind != "github" or not owner:
+        return ""
+    rows = list(
+        SourceConnection.objects.filter(
+            organization_id=_org_id(organization),
+            kind__in=_ORG_WRITE_KINDS["github"],
+            is_active=True,
+            is_orphaned=False,
+            deleted_at__isnull=True,
+        ).only("kind", "account_login")
+    )
+    install = SourceConnection.Kind.GITHUB_APP_INSTALL
+    if any(r.kind != install or (r.account_login or "").lower() == owner for r in rows):
+        return ""
+    if not rows:
+        return (
+            f"This organization has no GitHub connection, so Astrolift cannot fetch, build or "
+            f"receive webhooks for {owner}'s repositories. Connect GitHub under Settings → Connections."
+        )
+    return (
+        f"No GitHub App installation in this organization is recorded on {owner}. If fetches, "
+        f"builds or webhooks for this repository fail, install the App on {owner} under "
+        f"Settings → Connections."
+    )
+
+
 def _resolve_user_discovery(org_id, *, source_kind: str, user_id: int | None) -> SourceConnection:
     if source_kind != "github":
         raise ConnectionResolutionError(

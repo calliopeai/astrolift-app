@@ -105,6 +105,7 @@ def test_register_with_connection_completes_autowire(monkeypatch, permission_res
     assert app.autowire_state["webhook"] == "ok"
     assert app.autowire_state["secrets"] == "ok"
     assert "errors" not in app.autowire_state
+    assert result.data.source_connection_warning == ""
 
 
 def test_register_without_connection_lands_unwired(monkeypatch, permission_resolver, seed_cluster):
@@ -136,6 +137,7 @@ def test_register_without_connection_lands_unwired(monkeypatch, permission_resol
     app = RegisteredApp.objects.get(slug="unwired-app")
     assert app.autowire_state["connected"] is False
     assert "ci_workflow" not in app.autowire_state
+    assert result.data.source_connection_warning.startswith("This organization has no GitHub connection")
 
 
 def test_register_autowire_failure_does_not_fail_registration(monkeypatch, permission_resolver, seed_cluster):

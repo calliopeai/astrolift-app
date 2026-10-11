@@ -1097,6 +1097,7 @@
         "targetPort": "대상 포트",
         "stripPrefix": "워크로드로 전달하기 전에 접두사 제거",
         "routesHint": "새 경로는 위의 저장을 클릭한 후 적용됩니다.",
+        "noWorkloadsBlocked": "경로 라우트는 워크로드를 대상으로 합니다. 이 앱에 워크로드를 등록한 다음 라우트를 추가하세요.",
         "kinds": {
           "http_to_https": "HTTP → HTTPS",
           "apex_to_www": "루트 도메인 → www",
@@ -1949,6 +1950,7 @@
       },
       "expiry": {
         "expired": "{days, plural, one {#일 전} other {#일 전}} 만료",
+        "expiredToday": "오늘 만료됨",
         "rotateSoon": "교체 필요: {days, plural, one {#일 후} other {#일 후}} 만료",
         "expires": "{days, plural, one {#일 후} other {#일 후}} 만료"
       },
