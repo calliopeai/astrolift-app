@@ -1687,6 +1687,9 @@ class RegistryQuery:
             autowire=autowire,
             ci_workflow_sync_status=ci_workflow_sync,
             settings_last_modified=settings_last_modified,
+            # App-scoped, not account-wide: the settings tab gates its
+            # actions on these so it offers only what this app allows (#1867).
+            viewer_permissions=_viewer_permissions_for_apps([app]).get(app.pk, set()),
             include_retention_policies=True,
         )
 

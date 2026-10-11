@@ -128,10 +128,10 @@ def _spec(**overrides) -> ProvisionSpec:
         "service_handle_hint": "ledger",
         "size": "small",
         "config": {},
-        "managed_service_id": "service-1",
+        "managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     }
     values.update(overrides)
-    return ProvisionSpec(**values)
+    return ProvisionSpec(**{"managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b", **values})
 
 
 def _driver(
@@ -161,7 +161,7 @@ def _object(cluster: _Cluster, kind: str, namespace: str, name: str) -> dict:
     return cluster.objects[(kind, namespace, name)]
 
 
-def _container(cluster: _Cluster, name: str = "mssql-payments-prod-ledger") -> dict:
+def _container(cluster: _Cluster, name: str = "mssql-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b") -> dict:
     statefulset = _object(cluster, "apps/v1/StatefulSet", "acme-payments", name)
     return statefulset["spec"]["template"]["spec"]["containers"][0]
 
@@ -173,7 +173,7 @@ def test_provision_emits_secure_durable_statefulset_and_external_credentials() -
 
     assert result.ok is True
     assert result.ready is False
-    assert result.handle == "mssql/cluster-1/acme-payments/mssql-payments-prod-ledger"
+    assert result.handle == "mssql/cluster-1/acme-payments/mssql-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     assert cluster.namespaces[0][1] == "acme-payments"
     assert {row["kind"] for row in cluster.applied[-1]} == {
         "ConfigMap",
@@ -187,7 +187,7 @@ def test_provision_emits_secure_durable_statefulset_and_external_credentials() -
         cluster,
         "apps/v1/StatefulSet",
         "acme-payments",
-        "mssql-payments-prod-ledger",
+        "mssql-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
     )["spec"]["template"]["spec"]
     container = pod["containers"][0]
     assert container["image"] == DEFAULT_IMAGE
@@ -208,11 +208,11 @@ def test_provision_emits_secure_durable_statefulset_and_external_credentials() -
         cluster,
         "v1/PersistentVolumeClaim",
         "acme-payments",
-        "mssql-payments-prod-ledger-data",
+        "mssql-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-data",
     )
     assert pvc["spec"]["resources"]["requests"]["storage"] == "20Gi"
     assert pvc["spec"]["storageClassName"] == "fast-rwo"
-    path = "managed/mssql/cluster-1/acme-payments/mssql-payments-prod-ledger/credentials"
+    path = "managed/mssql/cluster-1/acme-payments/mssql-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b/credentials"
     assert set(backend.values[path]) == {
         "sa_password",
         "username",
@@ -248,7 +248,7 @@ def test_provision_is_idempotent_and_repairs_external_bundle_from_retained_secre
         cluster,
         "v1/PersistentVolumeClaim",
         "acme-payments",
-        "mssql-payments-prod-ledger-data",
+        "mssql-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-data",
     )
 
 
@@ -321,7 +321,7 @@ def test_load_balancer_requires_install_opt_in_and_source_ranges() -> None:
     assert invalid.ok is False
     assert "CIDR" in invalid.message
     assert allowed.ok is True
-    service = _object(cluster, "v1/Service", "acme-payments", "mssql-payments-prod-ledger")
+    service = _object(cluster, "v1/Service", "acme-payments", "mssql-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
     assert service["spec"]["type"] == "LoadBalancer"
     assert service["spec"]["loadBalancerSourceRanges"] == ["10.20.0.0/16"]
 
@@ -345,7 +345,7 @@ def test_network_policy_allows_only_same_tenant_managed_and_agent_namespaces() -
         cluster,
         "networking.k8s.io/v1/NetworkPolicy",
         "acme-payments",
-        "mssql-payments-prod-ledger-ingress",
+        "mssql-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-ingress",
     )
     peers = policy["spec"]["ingress"][0]["from"]
     assert {"podSelector": {}} in peers
@@ -366,10 +366,10 @@ def test_network_policy_allows_only_same_tenant_managed_and_agent_namespaces() -
 
 def test_foreign_statefulset_is_never_adopted() -> None:
     driver, cluster, backend = _driver()
-    cluster.objects[("apps/v1/StatefulSet", "acme-payments", "mssql-payments-prod-ledger")] = {
+    cluster.objects[("apps/v1/StatefulSet", "acme-payments", "mssql-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")] = {
         "apiVersion": "apps/v1",
         "kind": "StatefulSet",
-        "metadata": {"name": "mssql-payments-prod-ledger", "namespace": "acme-payments"},
+        "metadata": {"name": "mssql-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b", "namespace": "acme-payments"},
     }
 
     result = driver.provision(_spec())
@@ -382,7 +382,7 @@ def test_foreign_statefulset_is_never_adopted() -> None:
 def test_status_reports_starting_ready_failure_and_retained_data() -> None:
     driver, cluster, _ = _driver()
     result = driver.provision(_spec())
-    key = ("apps/v1/StatefulSet", "acme-payments", "mssql-payments-prod-ledger")
+    key = ("apps/v1/StatefulSet", "acme-payments", "mssql-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
 
     assert driver.status(ServiceHandle(result.handle)).state == "provisioning"
     cluster.objects[key]["status"] = {"readyReplicas": 1, "currentReplicas": 1}
@@ -432,7 +432,7 @@ def test_partial_update_preserves_current_size_and_applies_runtime_controls() ->
         cluster,
         "apps/v1/StatefulSet",
         "acme-payments",
-        "mssql-payments-prod-ledger",
+        "mssql-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
     )
     pod = statefulset["spec"]["template"]
     assert pod["metadata"]["annotations"] == {"after": "true"}
@@ -444,14 +444,14 @@ def test_partial_update_preserves_current_size_and_applies_runtime_controls() ->
         cluster,
         "v1/PersistentVolumeClaim",
         "acme-payments",
-        "mssql-payments-prod-ledger-data",
+        "mssql-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-data",
     )
     assert pvc["spec"]["resources"]["requests"]["storage"] == "30Gi"
     config_map = _object(
         cluster,
         "v1/ConfigMap",
         "acme-payments",
-        "mssql-payments-prod-ledger-config",
+        "mssql-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-config",
     )
     assert "defaultdatadir = /var/opt/mssql/data" in config_map["data"]["mssql.conf"]
 
@@ -485,7 +485,11 @@ def test_deprovision_retains_data_by_default_and_requires_force_for_delete() -> 
     assert retained.ok is True
     assert "retained" in retained.message
     assert path in backend.values
-    assert ("v1/PersistentVolumeClaim", "acme-payments", "mssql-payments-prod-ledger-data") in cluster.objects
+    assert (
+        "v1/PersistentVolumeClaim",
+        "acme-payments",
+        "mssql-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-data",
+    ) in cluster.objects
 
     protected = driver.deprovision(
         DeprovisionSpec(result.handle, config={"deletion_protection": True}),
@@ -521,17 +525,17 @@ def test_snapshot_is_guarded_and_restore_is_same_cluster_namespace_only() -> Non
     snapshot = driver.snapshot(ServiceHandle(source.handle))
     restored = driver.restore(
         snapshot,
-        _spec(service_handle_hint="ledger-copy", managed_service_id="service-2"),
+        _spec(service_handle_hint="ledger-copy", managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4"),
     )
 
     assert snapshot.snapshot_id.startswith("cluster-1/acme-payments/")
     assert restored.ok is True
-    assert restored.handle.endswith("mssql-payments-prod-ledger-copy")
+    assert restored.handle.endswith("mssql-0b8e7c1d2f3a4b5c9d6e7f8091a2b3c4")
     restored_pvc = _object(
         cluster,
         "v1/PersistentVolumeClaim",
         "acme-payments",
-        "mssql-payments-prod-ledger-copy-data",
+        "mssql-0b8e7c1d2f3a4b5c9d6e7f8091a2b3c4-data",
     )
     assert restored_pvc["spec"]["dataSource"]["name"] == snapshot.snapshot_id.rsplit("/", 1)[-1]
     assert len(backend.values) == 2
@@ -564,7 +568,7 @@ def test_binding_rejects_tampered_endpoint_or_extra_secret_fields() -> None:
         driver.binding(ServiceHandle(result.handle))
 
     backend.values[path]["database_url"] = driver._database_url(
-        "mssql-payments-prod-ledger.acme-payments.svc.cluster.local",
+        "mssql-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b.acme-payments.svc.cluster.local",
         backend.values[path]["database"],
         backend.values[path]["username"],
         backend.values[path]["password"],

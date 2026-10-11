@@ -32,6 +32,11 @@ import type {
   ListManagedDomainsQuery,
   DnsDomainBindingQuery,
   DnsDomainBindingQueryVariables,
+  Route53DnsClustersQuery,
+  Route53DnsZonesQuery,
+  Route53DnsZonesQueryVariables,
+  AttachRoute53ZoneMutation,
+  AttachRoute53ZoneMutationVariables,
 } from "@/graphql/__generated__/operations";
 import { LIST_MANAGED_DOMAINS } from "@/graphql/clusters/clusters.queries";
 import {
@@ -48,10 +53,16 @@ import {
   VERIFY_DNS_DOMAIN,
   GET_MANAGED_DOMAIN,
   DNS_DOMAIN_BINDING,
+  ROUTE53_DNS_CLUSTERS,
+  ROUTE53_DNS_ZONES,
+  ATTACH_ROUTE53_ZONE,
 } from "@/graphql/domains/domains.queries";
 
 export type DnsConnection = DnsConnectionsPageQuery["dnsProviderConnectionsPage"]["items"][number];
 export type DnsZone = CloudflareZonesQuery["cloudflareDnsZones"]["items"][number];
+export type Route53Cluster = Route53DnsClustersQuery["route53DnsClusters"]["items"][number];
+export type Route53Zone = Route53DnsZonesQuery["route53DnsZones"]["items"][number];
+type Route53Binding = NonNullable<AttachRoute53ZoneMutation["attachRoute53DnsZone"]["data"]>;
 const isGuid = (value: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const version = (value: number) => Number.isSafeInteger(value) && value > 0;
@@ -101,6 +112,8 @@ export function useDnsConnectionSetup(domainId?: string) {
   const [binding, setBinding] = React.useState<
     RegisterCloudflareZoneMutation["registerCloudflareDnsZone"]["data"] | null
   >(null);
+  const [route53Cluster, setRoute53Cluster] = React.useState<string | null>(null);
+  const [route53Binding, setRoute53Binding] = React.useState<Route53Binding | null>(null);
   const [busy, setBusy] = React.useState(false);
   const inFlight = React.useRef(false);
   const [message, setMessage] = React.useState<string | null>(null);
@@ -247,6 +260,34 @@ export function useDnsConnectionSetup(domainId?: string) {
         (d) => d.dnsDriver === "route53" && isGuid(d.id)
       )
     : [];
+  // #2287: a reviewed domain binds a Route 53 zone seen through a cluster's
+  // AWS credential, the identity that writes DNS for that cluster.
+  const route53ClustersQuery = useQuery<Route53DnsClustersQuery>(ROUTE53_DNS_CLUSTERS, {
+    skip: unavailable || provider !== "route53" || !allowed || !domainId,
+    fetchPolicy: "no-cache",
+    context,
+  });
+  const route53ClustersRaw = route53ClustersQuery.error
+    ? null
+    : (route53ClustersQuery.data?.route53DnsClusters ?? null);
+  const route53Clusters =
+    route53ClustersRaw?.complete === true && route53ClustersRaw.items.every((c) => isGuid(c.id))
+      ? route53ClustersRaw.items
+      : null;
+  const route53ClusterSelected = route53Clusters?.find((c) => c.id === route53Cluster)?.id ?? null;
+  const route53ZonesQuery = useQuery<Route53DnsZonesQuery, Route53DnsZonesQueryVariables>(
+    ROUTE53_DNS_ZONES,
+    {
+      variables: { input: { clusterId: route53ClusterSelected ?? "" } },
+      skip: !allowed || !domainId || !route53ClusterSelected,
+      fetchPolicy: "no-cache",
+      context,
+    }
+  );
+  const route53Zones =
+    route53ClusterSelected && !route53ZonesQuery.error
+      ? (route53ZonesQuery.data?.route53DnsZones ?? null)
+      : null;
   const epoch = useSetupEpoch([
     org?.id,
     user?.id,
@@ -260,6 +301,7 @@ export function useDnsConnectionSetup(domainId?: string) {
     selectedZone?.id,
     selectedZone?.name,
     selectedZone?.accountId,
+    route53ClusterSelected,
   ]);
   const recoveryEpoch = useSetupEpoch([
     org?.id,
@@ -277,8 +319,15 @@ export function useDnsConnectionSetup(domainId?: string) {
     setSelection(null);
     setZone(null);
     setBinding(null);
+    setRoute53Cluster(null);
+    setRoute53Binding(null);
     setActionError(null);
     setMessage(null);
+  }
+  function onRoute53Cluster(id: string) {
+    if (busy || uncertain || !route53Clusters?.some((c) => c.id === id)) return;
+    setRoute53Cluster(id);
+    setRoute53Binding(null);
   }
   function onConnection(value: DnsConnection) {
     if (
@@ -530,6 +579,60 @@ export function useDnsConnectionSetup(domainId?: string) {
       return true;
     }, true);
   }
+  async function onAttachRoute53(zone: Route53Zone) {
+    return write(async (current) => {
+      if (
+        !target ||
+        targetQuery.loading ||
+        !route53ClusterSelected ||
+        route53ZonesQuery.loading ||
+        route53Zones?.complete !== true ||
+        zone.name !== target.zone ||
+        !route53Zones.items.some((z) => z.id === zone.id && z.name === zone.name)
+      )
+        return false;
+      const result = await client.mutate<
+        AttachRoute53ZoneMutation,
+        AttachRoute53ZoneMutationVariables
+      >({
+        mutation: ATTACH_ROUTE53_ZONE,
+        variables: {
+          input: {
+            domainId: target.id,
+            expectedDomainVersion: target.version,
+            clusterId: route53ClusterSelected,
+            zoneId: zone.id,
+            zoneName: zone.name,
+          },
+        },
+        context,
+      });
+      if (!current()) return false;
+      const payload = result.data?.attachRoute53DnsZone;
+      if (payload?.ok === false) {
+        setActionError(payload.errors[0]?.code ?? t("refused"));
+        return false;
+      }
+      if (payload?.ok !== true) throw new Error(t("uncertain"));
+      const value = payload.data;
+      if (
+        !value ||
+        value.domainId !== target.id ||
+        !version(value.domainVersion) ||
+        value.clusterId !== route53ClusterSelected ||
+        value.zone.id !== zone.id ||
+        value.zone.name !== zone.name
+      ) {
+        setMessage(t("acceptedUnverified"));
+        setUncertain(true);
+        return false;
+      }
+      setRoute53Binding(value);
+      setMessage(t("route53Bound"));
+      await targetQuery.refetch().catch(() => setActionError(t("refreshFailed")));
+      return true;
+    }, true);
+  }
   const canVerify =
     allowed &&
     !targetQuery.loading &&
@@ -597,7 +700,10 @@ export function useDnsConnectionSetup(domainId?: string) {
         })
         .catch(() => {});
     }
-    if (provider === "route53") void route53Query.refetch().catch(() => {});
+    if (provider === "route53") {
+      void route53Query.refetch().catch(() => {});
+      if (route53ClusterSelected) void route53ZonesQuery.refetch().catch(() => {});
+    }
     if (readDomainId) {
       void targetQuery.refetch().catch(() => {});
       if (allowed) void bindingQuery.refetch().catch(() => {});
@@ -639,6 +745,20 @@ export function useDnsConnectionSetup(domainId?: string) {
     route53Domains,
     route53Loading: route53Query.loading,
     route53Error: route53Query.error?.message ?? null,
+    route53Clusters,
+    route53ClustersLoading: route53ClustersQuery.loading,
+    route53ClustersError:
+      route53ClustersQuery.error?.message ??
+      (route53ClustersRaw?.complete === false ? route53ClustersRaw.reason : null),
+    route53Cluster: route53ClusterSelected,
+    onRoute53Cluster,
+    route53Zones,
+    route53ZonesLoading: route53ZonesQuery.loading,
+    route53ZonesError:
+      route53ZonesQuery.error?.message ??
+      (route53Zones?.complete === false ? route53Zones.reason : null),
+    route53Binding,
+    onAttachRoute53,
     binding,
     currentBinding,
     verification,

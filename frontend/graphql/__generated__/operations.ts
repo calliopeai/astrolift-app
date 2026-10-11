@@ -6179,6 +6179,14 @@ export type AttachProjectManagedServiceInput = {
   managedServiceId: Scalars['GUID']['input'];
 };
 
+export type AttachRoute53DnsZoneInput = {
+  clusterId: Scalars['GUID']['input'];
+  domainId: Scalars['GUID']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+  zoneId: Scalars['String']['input'];
+  zoneName: Scalars['String']['input'];
+};
+
 export type AttachSecretBundleInput = {
   appSlug: Scalars['String']['input'];
   bundleSlug: Scalars['String']['input'];
@@ -7887,6 +7895,14 @@ export type ManagedDomainAppRouteWriteInput = {
   workloadId: Scalars['GUID']['input'];
 };
 
+export type ManagedDomainCertificate = {
+  checkedAt: Scalars['DateTime']['output'];
+  reason: Scalars['String']['output'];
+  state: ManagedDomainCheckState;
+  status?: Maybe<Scalars['String']['output']>;
+  validationRecords: Scalars['Int']['output'];
+};
+
 export type ManagedDomainCheckState =
   | 'ERROR'
   | 'MISMATCH'
@@ -7919,6 +7935,7 @@ export type ManagedDomainDiagnosticRecord = {
 
 export type ManagedDomainDiagnostics = {
   actions: ManagedDomainActions;
+  certificate?: Maybe<ManagedDomainCertificate>;
   checkedAt: Scalars['DateTime']['output'];
   checks: Array<ManagedDomainDiagnosticCheck>;
   id: Scalars['GUID']['output'];
@@ -8060,6 +8077,23 @@ export type ManagedDomainRoute = {
   ingressClass?: Maybe<Scalars['String']['output']>;
   observedState: ManagedDomainCheckState;
   recordedUrl: Scalars['String']['output'];
+};
+
+export type ManagedDomainRoute53Binding = {
+  accountId: Scalars['String']['output'];
+  clusterId: Scalars['GUID']['output'];
+  domainId: Scalars['GUID']['output'];
+  domainVersion: Scalars['Int']['output'];
+  verificationRecordName?: Maybe<Scalars['String']['output']>;
+  verificationRecordValue?: Maybe<Scalars['String']['output']>;
+  verificationState: Scalars['String']['output'];
+  zone: Route53DnsZone;
+};
+
+export type ManagedDomainRoute53BindingMutationResult = {
+  data?: Maybe<ManagedDomainRoute53Binding>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type ManagedDomainRoutingPolicy =
@@ -8623,6 +8657,7 @@ export type Mutation = {
   attachAgentSecretBundle: AstroliftAgentSecretBundleAttachmentMutationResult;
   attachCloudflareDnsZone: ManagedDomainDnsConnectionBindingMutationResult;
   attachProjectManagedService: AstroliftManagedServiceAttachmentMutationResult;
+  attachRoute53DnsZone: ManagedDomainRoute53BindingMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
   attestSession: AstroliftAttestationResultMutationResult;
   authorizeLocalModelUploads: LocalModelUploadAuthorizationMutationResult;
@@ -9194,6 +9229,11 @@ export type MutationAttachCloudflareDnsZoneArgs = {
 
 export type MutationAttachProjectManagedServiceArgs = {
   input: AttachProjectManagedServiceInput;
+};
+
+
+export type MutationAttachRoute53DnsZoneArgs = {
+  input: AttachRoute53DnsZoneInput;
 };
 
 
@@ -12047,6 +12087,8 @@ export type Query = {
   previewAstroliftDeregister?: Maybe<AstroliftDeregisterPreview>;
   previewAstroliftForceRedeploy?: Maybe<AstroliftForceRedeployPreview>;
   previewWorkflowManifest: WorkflowManifestPreviewType;
+  route53DnsClusters: Route53DnsClustersInventory;
+  route53DnsZones: Route53DnsZonesInventory;
   scanAgentManifests: AstroliftScanAgentManifestsResult;
   scanAppManifests: AstroliftScanAppManifestsResult;
   scanCloudOrphans: CloudOrphanReportType;
@@ -14300,6 +14342,11 @@ export type QueryPreviewWorkflowManifestArgs = {
 };
 
 
+export type QueryRoute53DnsZonesArgs = {
+  input: Route53DnsZonesInput;
+};
+
+
 export type QueryScanAgentManifestsArgs = {
   orgId: Scalars['ID']['input'];
   ref?: Scalars['String']['input'];
@@ -14856,6 +14903,37 @@ export type RotateWebhookSecretInput = {
 export type RotateZentinelleGatewayCredentialInput = {
   clusterId: Scalars['GUID']['input'];
   overlapSeconds: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type Route53DnsCluster = {
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  region: Scalars['String']['output'];
+  shared: Scalars['Boolean']['output'];
+};
+
+export type Route53DnsClustersInventory = {
+  complete: Scalars['Boolean']['output'];
+  items: Array<Route53DnsCluster>;
+  reason: Scalars['String']['output'];
+};
+
+export type Route53DnsZone = {
+  id: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  privateZone: Scalars['Boolean']['output'];
+  recordCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type Route53DnsZonesInput = {
+  clusterId: Scalars['GUID']['input'];
+};
+
+export type Route53DnsZonesInventory = {
+  complete: Scalars['Boolean']['output'];
+  items: Array<Route53DnsZone>;
+  reason: Scalars['String']['output'];
+  truncated: Scalars['Boolean']['output'];
 };
 
 export type RunAstroliftAgentInput = {
@@ -17010,7 +17088,7 @@ export type ManagedDomainDiagnosticsQueryVariables = Exact<{
 }>;
 
 
-export type ManagedDomainDiagnosticsQuery = { astroliftManagedDomainDiagnostics?: { id: string, version: number, zone: string, verificationState: string, provisionState: string, provisionClusterId?: string | null, checkedAt: string, routesTruncated: boolean, checks: Array<{ key: string, state: ManagedDomainCheckState, perspective: string, checkedAt: string, reason: string, expected: Array<string>, observed: Array<string> }>, providerZone: { bindingSource: string, state: ManagedDomainCheckState, reason: string, checkedAt: string, zoneId?: string | null, zoneName?: string | null, privateZone?: boolean | null, nameservers: Array<string>, truncated: boolean, records: Array<{ name: string, type: string, ttl?: number | null, values: Array<string>, aliasTarget?: string | null, aliasZoneId?: string | null, evaluateTargetHealth?: boolean | null, proxied?: boolean | null, priority?: number | null, routing?: { policy: ManagedDomainRoutingPolicy, reason: string, setIdentifier?: string | null, weight?: number | null, region?: string | null, failover?: string | null, multiValueAnswer?: boolean | null, healthCheckId?: string | null, trafficPolicyInstanceId?: string | null, geoLocation?: { continentCode?: string | null, countryCode?: string | null, subdivisionCode?: string | null } | null, geoProximity?: { awsRegion?: string | null, localZoneGroup?: string | null, bias?: number | null, coordinates?: { latitude: string, longitude: string } | null } | null, cidr?: { collectionId: string, locationName: string } | null } | null }> }, routes: Array<{ appId: string, appName: string, appSlug: string, environmentId: string, environmentName: string, recordedUrl: string, hostname: string, clusterId?: string | null, clusterName?: string | null, clusterSlug?: string | null, ingressClass?: string | null, observedState: ManagedDomainCheckState }>, actions: { canCreate: boolean, canDelete: boolean, canRevalidate: boolean, canUpdate: boolean, canSetDefaults: boolean, defaultUpdateReason: string, defaultsFingerprint?: string | null } } | null };
+export type ManagedDomainDiagnosticsQuery = { astroliftManagedDomainDiagnostics?: { id: string, version: number, zone: string, verificationState: string, provisionState: string, provisionClusterId?: string | null, checkedAt: string, routesTruncated: boolean, checks: Array<{ key: string, state: ManagedDomainCheckState, perspective: string, checkedAt: string, reason: string, expected: Array<string>, observed: Array<string> }>, providerZone: { bindingSource: string, state: ManagedDomainCheckState, reason: string, checkedAt: string, zoneId?: string | null, zoneName?: string | null, privateZone?: boolean | null, nameservers: Array<string>, truncated: boolean, records: Array<{ name: string, type: string, ttl?: number | null, values: Array<string>, aliasTarget?: string | null, aliasZoneId?: string | null, evaluateTargetHealth?: boolean | null, proxied?: boolean | null, priority?: number | null, routing?: { policy: ManagedDomainRoutingPolicy, reason: string, setIdentifier?: string | null, weight?: number | null, region?: string | null, failover?: string | null, multiValueAnswer?: boolean | null, healthCheckId?: string | null, trafficPolicyInstanceId?: string | null, geoLocation?: { continentCode?: string | null, countryCode?: string | null, subdivisionCode?: string | null } | null, geoProximity?: { awsRegion?: string | null, localZoneGroup?: string | null, bias?: number | null, coordinates?: { latitude: string, longitude: string } | null } | null, cidr?: { collectionId: string, locationName: string } | null } | null }> }, routes: Array<{ appId: string, appName: string, appSlug: string, environmentId: string, environmentName: string, recordedUrl: string, hostname: string, clusterId?: string | null, clusterName?: string | null, clusterSlug?: string | null, ingressClass?: string | null, observedState: ManagedDomainCheckState }>, certificate?: { state: ManagedDomainCheckState, reason: string, checkedAt: string, status?: string | null, validationRecords: number } | null, actions: { canCreate: boolean, canDelete: boolean, canRevalidate: boolean, canUpdate: boolean, canSetDefaults: boolean, defaultUpdateReason: string, defaultsFingerprint?: string | null } } | null };
 
 export type UpdateManagedDomainDefaultsMutationVariables = Exact<{
   input: UpdateManagedDomainInput;
@@ -17098,6 +17176,25 @@ export type AttachCloudflareZoneMutationVariables = Exact<{
 
 
 export type AttachCloudflareZoneMutation = { attachCloudflareDnsZone: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { domainId: string, domainVersion: number, connectionId: string, connectionVersion: number, dnsWritesSupported: boolean, verificationState: string, verificationRecordName?: string | null, verificationRecordValue?: string | null, zone: { id: string, name: string, accountId: string, status: string, nameServers: Array<string> } } | null } };
+
+export type Route53DnsClustersQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type Route53DnsClustersQuery = { route53DnsClusters: { complete: boolean, reason: string, items: Array<{ id: string, name: string, region: string, shared: boolean }> } };
+
+export type Route53DnsZonesQueryVariables = Exact<{
+  input: Route53DnsZonesInput;
+}>;
+
+
+export type Route53DnsZonesQuery = { route53DnsZones: { complete: boolean, reason: string, truncated: boolean, items: Array<{ id: string, name: string, privateZone: boolean, recordCount?: number | null }> } };
+
+export type AttachRoute53ZoneMutationVariables = Exact<{
+  input: AttachRoute53DnsZoneInput;
+}>;
+
+
+export type AttachRoute53ZoneMutation = { attachRoute53DnsZone: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { domainId: string, domainVersion: number, clusterId: string, accountId: string, verificationState: string, zone: { id: string, name: string, privateZone: boolean, recordCount?: number | null } } | null } };
 
 export type VerifyDnsDomainMutationVariables = Exact<{
   input: VerifyManagedDomainInput;
@@ -18863,7 +18960,7 @@ export type GetAppQueryVariables = Exact<{
 }>;
 
 
-export type GetAppQuery = { astroliftApp?: { stagedEnvChanges: Array<string>, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, configDrift?: { hasDrift: boolean, fields: Array<string>, environmentName: string, lastChecked: string } | null, autowire?: { connected: boolean, ciWorkflow: string, webhook: string, secrets: string, checkedAt?: string | null, detail: string } | null, ciWorkflowSyncStatus?: { state: string, syncedTemplateVersion?: number | null, currentTemplateVersion: number, syncedAt?: string | null, checkedAt?: string | null, path: string, prUrl: string, detail: string, repoText: string, renderedText: string, repoTextPulledAt?: string | null } | null, settingsLastModified?: { deployStrategy?: string | null, deployTokens?: string | null, secrets?: string | null, managedServices?: string | null, domains?: string | null, webhooks?: string | null, members?: string | null, observability?: string | null } | null, retentionPolicies: Array<{ id: string, signal: string, retentionDays: number }>, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } } | null };
+export type GetAppQuery = { astroliftApp?: { stagedEnvChanges: Array<string>, viewerPermissions: Array<string>, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, configDrift?: { hasDrift: boolean, fields: Array<string>, environmentName: string, lastChecked: string } | null, autowire?: { connected: boolean, ciWorkflow: string, webhook: string, secrets: string, checkedAt?: string | null, detail: string } | null, ciWorkflowSyncStatus?: { state: string, syncedTemplateVersion?: number | null, currentTemplateVersion: number, syncedAt?: string | null, checkedAt?: string | null, path: string, prUrl: string, detail: string, repoText: string, renderedText: string, repoTextPulledAt?: string | null } | null, settingsLastModified?: { deployStrategy?: string | null, deployTokens?: string | null, secrets?: string | null, managedServices?: string | null, domains?: string | null, webhooks?: string | null, members?: string | null, observability?: string | null } | null, retentionPolicies: Array<{ id: string, signal: string, retentionDays: number }>, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } } | null };
 
 export type ListWorkloadsQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;

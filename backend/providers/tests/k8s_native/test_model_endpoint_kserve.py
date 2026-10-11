@@ -104,7 +104,7 @@ def _spec(**config: Any) -> ProvisionSpec:
         service_handle_hint="fraud-model",
         size="custom",
         config={"inference_spec": _inference_spec(), **config},
-        managed_service_id="service-1",
+        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
 
 
@@ -113,7 +113,7 @@ def _driver(cluster: _Cluster | None = None, **policy: Any) -> tuple[KServeDrive
     return KServeDriver(config=KServeConfig(cluster_driver=live, **policy)), live
 
 
-def _resource(cluster: _Cluster, name: str = "triage-prod-fraud-model") -> dict[str, Any]:
+def _resource(cluster: _Cluster, name: str = "model-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b") -> dict[str, Any]:
     return cluster.objects[(f"{API_VERSION}/InferenceService", "steady-md-triage", name)]
 
 
@@ -124,7 +124,7 @@ def test_provision_preserves_native_spec_and_applies_safe_defaults() -> None:
 
     assert result.ok is True
     assert result.ready is False
-    assert result.handle == "model_endpoint/cluster-1/steady-md-triage/triage-prod-fraud-model"
+    assert result.handle == "model_endpoint/cluster-1/steady-md-triage/model-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     account, service = cluster.applied[-1][2]
     assert account["kind"] == "ServiceAccount"
     assert account["metadata"]["name"] == "kserve-model"
@@ -133,11 +133,11 @@ def test_provision_preserves_native_spec_and_applies_safe_defaults() -> None:
     assert service["metadata"]["labels"] == {
         "team": "ml",
         "app.kubernetes.io/managed-by": "astrolift",
-        "astrolift.io/managed-service-id": "service-1",
+        "astrolift.io/managed-service-id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
         "astrolift.io/organization": "steady-md",
         "astrolift.io/app": "triage",
         "astrolift.io/environment": "prod",
-        "app.kubernetes.io/name": "triage-prod-fraud-model",
+        "app.kubernetes.io/name": "model-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
         "networking.kserve.io/visibility": "cluster-local",
         "networking.knative.dev/visibility": "cluster-local",
     }
@@ -634,11 +634,11 @@ def test_baseline_service_account_cannot_adopt_foreign_or_ambient_identity() -> 
 
 def test_existing_service_is_refused_even_with_its_exact_uid_and_other_owner_is_never_adoptable() -> None:
     cluster = _Cluster()
-    key = (f"{API_VERSION}/InferenceService", "steady-md-triage", "triage-prod-fraud-model")
+    key = (f"{API_VERSION}/InferenceService", "steady-md-triage", "model-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
     cluster.objects[key] = {
         "apiVersion": API_VERSION,
         "kind": "InferenceService",
-        "metadata": {"name": "triage-prod-fraud-model", "uid": "uid-1"},
+        "metadata": {"name": "model-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b", "uid": "uid-1"},
         "spec": _inference_spec(),
     }
     driver, _ = _driver(cluster)
@@ -673,7 +673,7 @@ def test_update_preserves_owner_and_reconciles_native_spec() -> None:
 
     assert result.ok is True
     resource = _resource(cluster)
-    assert resource["metadata"]["labels"]["astrolift.io/managed-service-id"] == "service-1"
+    assert resource["metadata"]["labels"]["astrolift.io/managed-service-id"] == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
     assert resource["spec"]["predictor"]["maxReplicas"] == 7
 
 
@@ -682,8 +682,8 @@ def test_status_and_binding_report_runtime_protocol_and_endpoints() -> None:
     provisioned = driver.provision(_spec())
     resource = _resource(cluster)
     resource["status"] = {
-        "url": "http://triage-prod-fraud-model.steady-md-triage.svc",
-        "grpcUrl": "grpc://triage-prod-fraud-model.steady-md-triage.svc:8081",
+        "url": "http://model-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b.steady-md-triage.svc",
+        "grpcUrl": "grpc://model-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b.steady-md-triage.svc:8081",
         "servingRuntimeName": "sklearn-runtime",
         "conditions": [{"type": "Ready", "status": "True"}],
         "modelStatus": {
@@ -699,14 +699,14 @@ def test_status_and_binding_report_runtime_protocol_and_endpoints() -> None:
     assert "sklearn-runtime" in status.message
     literals = {key: value.literal for key, value in binding.env_vars.items()}
     assert literals == {
-        "MODEL_ENDPOINT_URL": "http://triage-prod-fraud-model.steady-md-triage.svc",
-        "MODEL_DEPLOYMENT_NAME": "triage-prod-fraud-model",
+        "MODEL_ENDPOINT_URL": "http://model-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b.steady-md-triage.svc",
+        "MODEL_DEPLOYMENT_NAME": "model-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
         "MODEL_REGION": "kubernetes",
         "MODEL_API_STYLE": "kserve",
         "MODEL_AUTH_MODE": "none",
-        "KSERVE_INFERENCE_SERVICE": "triage-prod-fraud-model",
+        "KSERVE_INFERENCE_SERVICE": "model-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
         "KSERVE_NAMESPACE": "steady-md-triage",
-        "MODEL_ENDPOINT_GRPC_URL": "grpc://triage-prod-fraud-model.steady-md-triage.svc:8081",
+        "MODEL_ENDPOINT_GRPC_URL": "grpc://model-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b.steady-md-triage.svc:8081",
         "MODEL_PROTOCOL_VERSION": "v2",
         "MODEL_SERVING_RUNTIME": "sklearn-runtime",
         "MODEL_FORMAT": "sklearn",

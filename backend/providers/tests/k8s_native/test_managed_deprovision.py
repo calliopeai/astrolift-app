@@ -143,10 +143,17 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         size="medium",
     )
     base.update(overrides)
-    return ProvisionSpec(**base)
+    return ProvisionSpec(**{"managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b", **base})
 
 
 # ---- CNPG Postgres ------------------------------------------------
+
+
+def _new_name(prefix: str, max_length: int) -> str:
+    """The id-derived object name a fresh provision of _spec() gets (#2032)."""
+    from _sdk.physical_naming import physical_name
+
+    return physical_name(_spec().managed_service_id, prefix=prefix, max_length=max_length)
 
 
 def test_cnpg_deprovision_deletes_cluster_cr_at_correct_ns() -> None:
@@ -217,7 +224,7 @@ def test_redis_deprovision_emits_both_cr_kinds() -> None:
     assert kinds == {"Redis", "RedisReplication"}
     for stub in call.manifests:
         assert stub["apiVersion"] == "redis.redis.opstreelabs.in/v1beta2"
-        assert stub["metadata"]["name"] == "api-prod"
+        assert stub["metadata"]["name"] == _new_name("redis", 60)
         assert stub["metadata"]["namespace"] == "acme-api"
 
 
@@ -262,7 +269,7 @@ def test_mysql_deprovision_targets_namespace_not_blank() -> None:
     cr = call.manifests[0]
     assert cr["apiVersion"] == "pxc.percona.com/v1"
     assert cr["kind"] == "PerconaXtraDBCluster"
-    assert cr["metadata"]["name"] == "api-prod"
+    assert cr["metadata"]["name"] == _new_name("mysql", 50)
     assert cr["metadata"]["namespace"] == "acme-api"
 
 
@@ -322,7 +329,7 @@ def test_mongodb_deprovision_deletes_psmdb_cr() -> None:
     cr = call.manifests[0]
     assert cr["apiVersion"] == "psmdb.percona.com/v1"
     assert cr["kind"] == "PerconaServerMongoDB"
-    assert cr["metadata"]["name"] == "api-prod"
+    assert cr["metadata"]["name"] == _new_name("mongodb", 50)
 
 
 def test_mongodb_deprovision_error_propagates() -> None:
@@ -358,11 +365,11 @@ def test_strimzi_deprovision_emits_all_four_crs() -> None:
     by_kind: dict[str, list[dict[str, Any]]] = {}
     for stub in call.manifests:
         by_kind.setdefault(stub["kind"], []).append(stub)
-    assert {m["metadata"]["name"] for m in by_kind["Kafka"]} == {"api-prod"}
+    assert {m["metadata"]["name"] for m in by_kind["Kafka"]} == {_new_name("event", 50)}
     nodepool_names = {m["metadata"]["name"] for m in by_kind["KafkaNodePool"]}
     assert nodepool_names == {"controllers", "brokers"}
     assert {m["metadata"]["name"] for m in by_kind["KafkaUser"]} == {
-        "api-prod-app-user",
+        _new_name("event", 50) + "-app-user",
     }
     for stub in call.manifests:
         assert stub["apiVersion"] == "kafka.strimzi.io/v1beta2"
@@ -396,7 +403,7 @@ def test_nats_deprovision_deletes_statefulset() -> None:
     cr = call.manifests[0]
     assert cr["apiVersion"] == "apps/v1"
     assert cr["kind"] == "StatefulSet"
-    assert cr["metadata"]["name"] == "api-prod"
+    assert cr["metadata"]["name"] == _new_name("event", 50)
     assert cr["metadata"]["namespace"] == "acme-api"
 
 
@@ -427,7 +434,7 @@ def test_rabbitmq_deprovision_deletes_cluster_cr() -> None:
     cr = call.manifests[0]
     assert cr["apiVersion"] == "rabbitmq.com/v1beta1"
     assert cr["kind"] == "RabbitmqCluster"
-    assert cr["metadata"]["name"] == "api-prod"
+    assert cr["metadata"]["name"] == _new_name("queue", 50)
     assert cr["metadata"]["namespace"] == "acme-api"
 
 
@@ -463,7 +470,7 @@ def test_nfs_deprovision_deletes_pvc() -> None:
     cr = call.manifests[0]
     assert cr["apiVersion"] == "v1"
     assert cr["kind"] == "PersistentVolumeClaim"
-    assert cr["metadata"]["name"] == "nfs-api-prod"
+    assert cr["metadata"]["name"] == _new_name("nfs", 63)
     assert cr["metadata"]["namespace"] == "acme-api"
 
 

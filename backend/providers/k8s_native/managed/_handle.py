@@ -104,3 +104,22 @@ def unpack(handle: str) -> ParsedHandle:
         f"(<kind>/<cluster>/<ns>/<name>); got {handle!r}"
     )
     raise ValueError(msg)
+
+
+def service_object_name(spec, *, kind: str, prefix: str, max_length: int = 63) -> str:
+    """The object name for a k8s_native managed service (#2032).
+
+    A recorded handle keeps the name it was created with, so existing services
+    are never renamed. A new service's name comes from its managed-service id,
+    never from joined slugs: ``app`` + ``env`` + ``hint`` joins could collide
+    inside one app's namespace (``prod`` + ``cache-a`` and ``prod-cache`` + ``a``).
+    """
+    from _sdk.physical_naming import managed_service_identity, physical_name
+
+    managed_service_identity(spec.managed_service_id)
+    if spec.recorded_handle:
+        parsed = unpack(spec.recorded_handle)
+        if parsed.kind != kind or not parsed.name:
+            raise ValueError("recorded handle belongs to a different driver kind")
+        return parsed.name
+    return physical_name(spec.managed_service_id, prefix=prefix, max_length=max_length)

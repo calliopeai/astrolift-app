@@ -37,7 +37,7 @@ from k8s_native.managed.cache_memcached import (
 ORGANIZATION = "acme"
 APP = "api"
 NAMESPACE = app_namespace(organization_slug=ORGANIZATION, app_slug=APP)
-CACHE_NAME = "api-prod-sessions"
+CACHE_NAME = "cache-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
 HANDLE = f"cache/local-k8s/{NAMESPACE}/{CACHE_NAME}"
 
 
@@ -109,7 +109,7 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         "size": "small",
     }
     base.update(overrides)
-    return ProvisionSpec(**base)
+    return ProvisionSpec(**{"managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b", **base})
 
 
 def _statefulset(*, replicas: int, ready: int = 0) -> dict[str, Any]:
@@ -229,14 +229,14 @@ def test_names_and_namespace_survive_slugs_too_long_for_a_dns_label() -> None:
 def test_apply_failure_returns_no_handle() -> None:
     """A handle for objects that were never created would make deprovision
     chase a resource that does not exist."""
-    cluster_driver = FakeClusterDriver(apply_errors=["StatefulSet/api-prod-sessions: forbidden"])
+    cluster_driver = FakeClusterDriver(apply_errors=["StatefulSet/cache-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b: forbidden"])
     driver = MemcachedDriver(config=MemcachedConfig(cluster_driver=cluster_driver))
 
     result = driver.provision(_spec())
 
     assert result.ok is False
     assert result.handle == ""
-    assert result.errors == ["StatefulSet/api-prod-sessions: forbidden"]
+    assert result.errors == ["StatefulSet/cache-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b: forbidden"]
 
 
 # ---- isolation ------------------------------------------------------------
@@ -385,13 +385,13 @@ def test_deprovision_deletes_everything_provision_applied() -> None:
 
 
 def test_deprovision_reports_delete_failures() -> None:
-    cluster_driver = FakeClusterDriver(delete_errors=["StatefulSet/api-prod-sessions: forbidden"])
+    cluster_driver = FakeClusterDriver(delete_errors=["StatefulSet/cache-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b: forbidden"])
     driver = MemcachedDriver(config=MemcachedConfig(cluster_driver=cluster_driver))
 
     result = driver.deprovision(DeprovisionSpec(handle=HANDLE))
 
     assert result.ok is False
-    assert result.errors == ["StatefulSet/api-prod-sessions: forbidden"]
+    assert result.errors == ["StatefulSet/cache-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b: forbidden"]
 
 
 def test_deprovision_refuses_a_legacy_handle_instead_of_guessing_a_namespace() -> None:

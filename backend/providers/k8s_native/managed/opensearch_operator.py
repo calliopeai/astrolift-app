@@ -25,7 +25,7 @@ from typing import Any
 
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op, maybe_heartbeat
-from _sdk.k8s_naming import agent_namespace, app_namespace, dns_label
+from _sdk.k8s_naming import agent_namespace, app_namespace
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -42,6 +42,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from k8s_native.managed._handle import pack as _pack_handle
+from k8s_native.managed._handle import service_object_name
 from k8s_native.managed._handle import unpack as _unpack_handle
 from k8s_native.managed._secret_refs import refuse_shared_namespace_secrets
 
@@ -1704,13 +1705,7 @@ os_curl --header 'Content-Type: application/json' --request PUT \\
         return values
 
     def _name(self, spec: ProvisionSpec) -> str:
-        return dns_label(
-            "os",
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint,
-            max_length=48,
-        )
+        return service_object_name(spec, kind=self.kind, prefix="os", max_length=48)
 
     def _namespace(self, spec: ProvisionSpec) -> str:
         if self._config.namespace:

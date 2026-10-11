@@ -119,6 +119,13 @@ export const MANAGED_DOMAIN_DIAGNOSTICS = gql`
         observedState
       }
       routesTruncated
+      certificate {
+        state
+        reason
+        checkedAt
+        status
+        validationRecords
+      }
       actions {
         canCreate
         canDelete
@@ -390,6 +397,60 @@ export const ATTACH_CLOUDFLARE_ZONE = gql`
         verificationState
         verificationRecordName
         verificationRecordValue
+      }
+    }
+  }
+`;
+export const ROUTE53_DNS_CLUSTERS = gql`
+  query Route53DnsClusters {
+    route53DnsClusters {
+      complete
+      reason
+      items {
+        id
+        name
+        region
+        shared
+      }
+    }
+  }
+`;
+export const ROUTE53_DNS_ZONES = gql`
+  query Route53DnsZones($input: Route53DnsZonesInput!) {
+    route53DnsZones(input: $input) {
+      complete
+      reason
+      truncated
+      items {
+        id
+        name
+        privateZone
+        recordCount
+      }
+    }
+  }
+`;
+export const ATTACH_ROUTE53_ZONE = gql`
+  mutation AttachRoute53Zone($input: AttachRoute53DnsZoneInput!) {
+    attachRoute53DnsZone(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        domainId
+        domainVersion
+        clusterId
+        accountId
+        zone {
+          id
+          name
+          privateZone
+          recordCount
+        }
+        verificationState
       }
     }
   }

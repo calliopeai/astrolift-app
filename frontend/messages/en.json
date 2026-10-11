@@ -8350,7 +8350,20 @@
     "tlsVerifiedHelp": "TLS was verified for this hostname and an HTTP status was observed. Redirects are not followed.",
     "httpsDeadline": "The HTTPS check did not finish before the deadline. Retry it, and check that the hostname routes to a running app.",
     "publicAddressRequired": "The hostname resolves to a non-public address, so it is not probed from the control plane.",
-    "checkHttps": "Check HTTPS"
+    "checkHttps": "Check HTTPS",
+    "clusterBinding": "Cluster AWS credential (read-only)",
+    "providerClusterUnavailable": "The cluster this zone was bound through is unavailable, belongs to another organization, or now resolves to a different AWS account. Bind the zone again from Connect DNS.",
+    "certificate": "Zone certificate",
+    "certificateStatus": "Provider status",
+    "certificateValidationRecords": "Validation records",
+    "certificateNotRecorded": "No certificate is recorded for this zone yet; provisioning requests one.",
+    "certificateClusterUnavailable": "The cluster that provisioned this zone is unavailable or its AWS account is not verified, so its certificate cannot be read.",
+    "certificateUnavailable": "The certificate could not be read from the provider. Refresh to try again.",
+    "certificateIssued": "The certificate is issued and covers this zone.",
+    "certificatePending": "The certificate is waiting for DNS validation. Its validation records must resolve in the public zone.",
+    "certificateNotValid": "The certificate is not valid: it failed validation, timed out, expired, was revoked or is inactive. Request a new one by provisioning again.",
+    "certificateHostMismatch": "The recorded certificate does not cover this zone. Provision again to request one that does.",
+    "certificateAccountChanged": "The provider now answers from a different AWS account than the one this zone was provisioned in."
   },
   "domainConnections": {
     "title": "Connect DNS",
@@ -8408,7 +8421,17 @@
     "verifyPending": "Ownership has not been confirmed. Check the recorded TXT challenge at the authoritative provider.",
     "callbackSaved": "The connection callback reported a saved result. Read saved connections to confirm their current state.",
     "callbackUnconfirmed": "The connection callback was not confirmed. Read current connections before trying again.",
-    "callbackDenied": "The connection callback was refused. Review current permissions and connection setup before trying again."
+    "callbackDenied": "The connection callback was refused. Review current permissions and connection setup before trying again.",
+    "route53Cluster": "Cluster credential",
+    "route53ClusterHelp": "Hosted zones are listed with the selected cluster's AWS credential, the identity that writes DNS for that cluster.",
+    "route53NoClusters": "No AWS cluster with a verified account is available.",
+    "route53Shared": "shared",
+    "route53Private": "private",
+    "route53Bind": "Bind to {domain}",
+    "route53OnlyReviewed": "Only the zone named {domain} can be bound to this domain.",
+    "route53Bound": "Zone bound. Its records are read with this cluster's credential.",
+    "route53ZonesTruncated": "Showing the first 500 hosted zones.",
+    "route53NoZones": "This credential sees no hosted zones."
   },
   "emailDelivery": {
     "title": "Email delivery tests",

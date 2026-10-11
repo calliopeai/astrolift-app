@@ -34,6 +34,8 @@ export function domainDiagnosticReasonKey(reason: string) {
       return "providerZoneUnavailable";
     case "PROVIDER_ZONE_NOT_BOUND":
       return "providerZoneNotBound";
+    case "PROVIDER_CLUSTER_UNAVAILABLE":
+      return "providerClusterUnavailable";
     case "TOOL_NOT_INSTALLED":
       return "toolNotInstalled";
     case "ICMP_REPLY":
@@ -46,6 +48,27 @@ export function domainDiagnosticReasonKey(reason: string) {
       return "httpsDeadline";
     case "PUBLIC_ADDRESS_REQUIRED":
       return "publicAddressRequired";
+    case "CERTIFICATE_NOT_RECORDED":
+      return "certificateNotRecorded";
+    case "CERTIFICATE_CLUSTER_UNAVAILABLE":
+      return "certificateClusterUnavailable";
+    case "CERTIFICATE_UNAVAILABLE":
+      return "certificateUnavailable";
+    case "CERTIFICATE_ISSUED":
+      return "certificateIssued";
+    case "CERTIFICATE_PENDING_VALIDATION":
+      return "certificatePending";
+    case "CERTIFICATE_FAILED":
+    case "CERTIFICATE_VALIDATION_TIMED_OUT":
+    case "CERTIFICATE_EXPIRED":
+    case "CERTIFICATE_REVOKED":
+    case "CERTIFICATE_INACTIVE":
+    case "NATIVE_CERTIFICATE_EXPIRED":
+      return "certificateNotValid";
+    case "NATIVE_CERTIFICATE_HOST_MISMATCH":
+      return "certificateHostMismatch";
+    case "NATIVE_ACCOUNT_CHANGED":
+      return "certificateAccountChanged";
     default:
       return null;
   }

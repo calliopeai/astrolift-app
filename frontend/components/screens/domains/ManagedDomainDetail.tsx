@@ -460,11 +460,52 @@ function DetailTabs({
                           : observation.providerZone.bindingSource ===
                               "PROTECTED_CLOUDFLARE_CONNECTION"
                             ? t("cloudflareBinding")
-                            : t("unknown")}
+                            : observation.providerZone.bindingSource === "CLUSTER_CREDENTIAL"
+                              ? t("clusterBinding")
+                              : t("unknown")}
                     </dd>
                   </div>
                 </dl>
                 {observation.providerZone.truncated && <p role="status">{t("recordsTruncated")}</p>}
+                {observation.certificate && (
+                  <section
+                    className="space-y-2 rounded-lg border p-3"
+                    aria-label={t("certificate")}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-sm font-semibold">{t("certificate")}</h3>
+                      {state(observation.certificate.state)}
+                    </div>
+                    {reason(observation.certificate.reason)}
+                    <dl className="grid gap-2 text-sm sm:grid-cols-3">
+                      <div>
+                        <dt className="text-muted-foreground">{t("certificateStatus")}</dt>
+                        <dd className="font-mono text-xs">
+                          {observation.certificate.status ?? t("unknown")}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">
+                          {t("certificateValidationRecords")}
+                        </dt>
+                        <dd className="font-mono text-xs">
+                          {observation.certificate.validationRecords}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-muted-foreground">{t("checkedAt")}</dt>
+                        <dd>
+                          <time
+                            dateTime={observation.certificate.checkedAt}
+                            title={observation.certificate.checkedAt}
+                          >
+                            {fmt.formatDateTime(observation.certificate.checkedAt)}
+                          </time>
+                        </dd>
+                      </div>
+                    </dl>
+                  </section>
+                )}
                 <p className="text-muted-foreground text-xs">
                   {t("recordCount", { count: records.length })}
                 </p>

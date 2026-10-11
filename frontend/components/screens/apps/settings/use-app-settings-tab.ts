@@ -1,6 +1,7 @@
 "use client";
 
 import { useSettingsSection } from "@/components/settings/use-settings-section";
+import { permissionMatches } from "@/lib/permissions/astrolift-permissions";
 import { type PermissionCheck, useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import type { AppSettingsTabAccess } from "./AppSettingsTab";
@@ -15,7 +16,14 @@ export function useAppSettingsTab(slug: string) {
   const settings = useAppSettings(slug);
   const section = useSettingsSection();
   const perms = useMyPermissions();
-  const allow = (p: PermissionCheck) => (perms.loading && perms.granted.size === 0) || perms.can(p);
+  // The app's own effective permissions once it has loaded (#1867): an
+  // account-wide grant held on some other project must not offer an action
+  // this app will refuse. Account grants only bridge the first load.
+  const scoped = settings.app?.viewerPermissions;
+  const allow = (p: PermissionCheck) =>
+    scoped
+      ? permissionMatches(new Set(scoped), p)
+      : (perms.loading && perms.granted.size === 0) || perms.can(p);
   const access: AppSettingsTabAccess = {
     update: allow("app.update"),
     deploy: allow("app.deploy"),
