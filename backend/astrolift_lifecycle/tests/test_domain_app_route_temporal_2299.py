@@ -70,7 +70,13 @@ async def test_real_authenticated_start_worker_sdk_complete_and_original_replay(
         ):
             row, payload = await sync_to_async(accept_real)(client, w)
             handle = temporal_env.client.get_workflow_handle(row.workflow_id)
-            result = await asyncio.wait_for(handle.result(), 100)
+            # Wait on the run's status rather than result()'s history long
+            # poll, which can return without a close event on a slow runner.
+            for _ in range(200):
+                if (await handle.describe()).status.name != "RUNNING":
+                    break
+                await asyncio.sleep(0.5)
+            result = await asyncio.wait_for(handle.result(), 30)
             assert result["status"] == "ready", result
             repeated = await sync_to_async(graphql_http)(client, w.headers, CONNECT, {"input": payload})
             assert repeated["data"]["connectManagedDomainAppRoute"]["data"]["id"] == str(row.guid)

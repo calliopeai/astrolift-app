@@ -59,9 +59,14 @@ def test_an_unmigrated_capability_refuses_a_declared_credential():
     test by itself, and the day nothing is left unmigrated it skips rather
     than passes vacuously.
     """
-    from core.cluster_credentials import CREDENTIAL_AWARE_CAPABILITIES
+    from core.cluster_credentials import CLOUD_CREDENTIAL_AWARE_CAPABILITIES, CREDENTIAL_AWARE_CAPABILITIES
 
-    unmigrated = sorted({"dns", "tls", "ingress", "notification"} - CREDENTIAL_AWARE_CAPABILITIES)
+    # These clusters declare an AWS credential, so AWS-only migrations count too.
+    unmigrated = sorted(
+        {"dns", "tls", "ingress", "notification"}
+        - CREDENTIAL_AWARE_CAPABILITIES
+        - CLOUD_CREDENTIAL_AWARE_CAPABILITIES["aws"]
+    )
     if not unmigrated:
         pytest.skip("every capability is migrated; this test has nothing left to guard")
     capability = unmigrated[0]

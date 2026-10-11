@@ -157,12 +157,18 @@ def test_an_unmigrated_capability_still_refuses():
     name turns into a vacuous assertion the moment the frontier moves.
     """
     from core.cluster_credentials import (
+        CLOUD_CREDENTIAL_AWARE_CAPABILITIES,
         CREDENTIAL_AWARE_CAPABILITIES,
         ClusterCredentialUnsupported,
         assert_credential_supported,
     )
 
-    unmigrated = sorted({"dns", "tls", "ingress", "notification"} - CREDENTIAL_AWARE_CAPABILITIES)
+    # These clusters declare an AWS credential, so AWS-only migrations count too.
+    unmigrated = sorted(
+        {"dns", "tls", "ingress", "notification"}
+        - CREDENTIAL_AWARE_CAPABILITIES
+        - CLOUD_CREDENTIAL_AWARE_CAPABILITIES["aws"]
+    )
     if not unmigrated:
         pytest.skip("every capability is migrated; this test has nothing left to guard")
 
