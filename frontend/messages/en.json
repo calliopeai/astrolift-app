@@ -8350,7 +8350,9 @@
     "tlsVerifiedHelp": "TLS was verified for this hostname and an HTTP status was observed. Redirects are not followed.",
     "httpsDeadline": "The HTTPS check did not finish before the deadline. Retry it, and check that the hostname routes to a running app.",
     "publicAddressRequired": "The hostname resolves to a non-public address, so it is not probed from the control plane.",
-    "checkHttps": "Check HTTPS"
+    "checkHttps": "Check HTTPS",
+    "clusterBinding": "Cluster AWS credential (read-only)",
+    "providerClusterUnavailable": "The cluster this zone was bound through is unavailable, belongs to another organization, or now resolves to a different AWS account. Bind the zone again from Connect DNS."
   },
   "domainConnections": {
     "title": "Connect DNS",

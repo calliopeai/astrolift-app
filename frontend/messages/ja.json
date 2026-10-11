@@ -8270,7 +8270,9 @@
     "tlsVerifiedHelp": "このホスト名のTLSを検証し、HTTPステータスを観測しました。リダイレクトはたどりません。",
     "httpsDeadline": "HTTPS確認が期限までに完了しませんでした。再試行し、ホスト名が実行中のアプリにルーティングされているか確認してください。",
     "publicAddressRequired": "ホスト名が非公開アドレスに解決されるため、コントロールプレーンからは調査しません。",
-    "checkHttps": "HTTPSを確認"
+    "checkHttps": "HTTPSを確認",
+    "clusterBinding": "クラスターの AWS 認証情報（読み取り専用）",
+    "providerClusterUnavailable": "このゾーンをバインドしたクラスターが利用できないか、別の組織に属しているか、別の AWS アカウントに変わっています。「DNS を接続」からゾーンを再度バインドしてください。"
   },
   "domainConnections": {
     "title": "DNS を接続",

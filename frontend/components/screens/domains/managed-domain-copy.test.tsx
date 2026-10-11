@@ -59,6 +59,8 @@ const keys = [
   "cloudflareReadOnly",
 
   "cloudflareBinding",
+  "clusterBinding",
+  "providerClusterUnavailable",
   "priority",
 
   "zoneRoot",

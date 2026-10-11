@@ -8270,7 +8270,9 @@
     "tlsVerifiedHelp": "O TLS foi verificado para este nome de host e um status HTTP foi observado. Redirecionamentos não são seguidos.",
     "httpsDeadline": "A verificação HTTPS não terminou antes do prazo. Repita e confira se o nome de host leva a um app em execução.",
     "publicAddressRequired": "O nome de host resolve para um endereço não público, então ele não é sondado a partir do plano de controle.",
-    "checkHttps": "Verificar HTTPS"
+    "checkHttps": "Verificar HTTPS",
+    "clusterBinding": "Credencial da AWS do cluster (somente leitura)",
+    "providerClusterUnavailable": "O cluster pelo qual esta zona foi vinculada não está disponível, pertence a outra organização ou agora corresponde a outra conta da AWS. Vincule a zona novamente em Conectar DNS."
   },
   "domainConnections": {
     "title": "Conectar DNS",

@@ -8270,7 +8270,9 @@
     "tlsVerifiedHelp": "已验证此主机名的 TLS 并观测到 HTTP 状态。不会跟随重定向。",
     "httpsDeadline": "HTTPS 检查未在截止时间前完成。请重试，并确认该主机名路由到正在运行的应用。",
     "publicAddressRequired": "该主机名解析为非公共地址，因此不会从控制平面进行探测。",
-    "checkHttps": "检查 HTTPS"
+    "checkHttps": "检查 HTTPS",
+    "clusterBinding": "集群 AWS 凭据（只读）",
+    "providerClusterUnavailable": "绑定此区域所用的集群不可用、属于其他组织，或现在对应另一个 AWS 账户。请在“连接 DNS”中重新绑定该区域。"
   },
   "domainConnections": {
     "title": "连接 DNS",

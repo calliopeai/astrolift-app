@@ -8273,7 +8273,9 @@
     "tlsVerifiedHelp": "Le TLS a été vérifié pour ce nom d’hôte et un statut HTTP a été observé. Les redirections ne sont pas suivies.",
     "httpsDeadline": "Le contrôle HTTPS ne s’est pas terminé avant l’échéance. Relancez-le et vérifiez que le nom d’hôte mène à une application en cours d’exécution.",
     "publicAddressRequired": "Le nom d’hôte se résout en une adresse non publique ; il n’est donc pas sondé depuis le plan de contrôle.",
-    "checkHttps": "Vérifier HTTPS"
+    "checkHttps": "Vérifier HTTPS",
+    "clusterBinding": "Identifiant AWS du cluster (lecture seule)",
+    "providerClusterUnavailable": "Le cluster par lequel cette zone a été liée est indisponible, appartient à une autre organisation ou correspond désormais à un autre compte AWS. Liez à nouveau la zone depuis Connecter le DNS."
   },
   "domainConnections": {
     "title": "Connecter le DNS",

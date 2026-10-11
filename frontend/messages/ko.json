@@ -8270,7 +8270,9 @@
     "tlsVerifiedHelp": "이 호스트 이름의 TLS를 검증하고 HTTP 상태를 관측했습니다. 리디렉션은 따라가지 않습니다.",
     "httpsDeadline": "HTTPS 검사가 기한 내에 끝나지 않았습니다. 다시 시도하고 호스트 이름이 실행 중인 앱으로 라우팅되는지 확인하세요.",
     "publicAddressRequired": "호스트 이름이 비공개 주소로 확인되므로 컨트롤 플레인에서 검사하지 않습니다.",
-    "checkHttps": "HTTPS 확인"
+    "checkHttps": "HTTPS 확인",
+    "clusterBinding": "클러스터 AWS 자격 증명(읽기 전용)",
+    "providerClusterUnavailable": "이 영역을 바인딩한 클러스터를 사용할 수 없거나, 다른 조직에 속하거나, 이제 다른 AWS 계정을 가리킵니다. DNS 연결에서 영역을 다시 바인딩하세요."
   },
   "domainConnections": {
     "title": "DNS 연결",

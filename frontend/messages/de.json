@@ -8273,7 +8273,9 @@
     "tlsVerifiedHelp": "TLS wurde für diesen Hostnamen verifiziert und ein HTTP-Status beobachtet. Weiterleitungen werden nicht verfolgt.",
     "httpsDeadline": "Die HTTPS-Prüfung wurde nicht vor Ablauf der Frist beendet. Wiederhole sie und prüfe, ob der Hostname zu einer laufenden App führt.",
     "publicAddressRequired": "Der Hostname wird zu einer nicht öffentlichen Adresse aufgelöst und daher nicht von der Control Plane aus geprüft.",
-    "checkHttps": "HTTPS prüfen"
+    "checkHttps": "HTTPS prüfen",
+    "clusterBinding": "AWS-Anmeldedaten des Clusters (nur Lesen)",
+    "providerClusterUnavailable": "Der Cluster, über den diese Zone gebunden wurde, ist nicht verfügbar, gehört zu einer anderen Organisation oder gehört jetzt zu einem anderen AWS-Konto. Binden Sie die Zone erneut unter „DNS verbinden“."
   },
   "domainConnections": {
     "title": "DNS verbinden",

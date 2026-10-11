@@ -460,7 +460,9 @@ function DetailTabs({
                           : observation.providerZone.bindingSource ===
                               "PROTECTED_CLOUDFLARE_CONNECTION"
                             ? t("cloudflareBinding")
-                            : t("unknown")}
+                            : observation.providerZone.bindingSource === "CLUSTER_CREDENTIAL"
+                              ? t("clusterBinding")
+                              : t("unknown")}
                     </dd>
                   </div>
                 </dl>
