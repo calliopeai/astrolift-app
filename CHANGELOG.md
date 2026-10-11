@@ -19,6 +19,8 @@
   read-only domain diagnostics; keep incomplete policies explicitly unknown
   without implying current endpoint health or request distribution (#2287).
 
+- Add source-reviewed public Lambda HTTP API domain Prepare/Connect and original-operation recovery, with retained native ACKs, exact apex Route53 ALIAS creation, fresh caller/credential fences and protected history. Refuse unsupported new EKS and read-only Cloudflare routing, ambiguous resend and legacy mutation of bound routes (Refs: #2299).
+
 - Certificate registration records the actual provisioning cluster and preserves
   existing domain configuration, retaining exact cluster links and authorized
   DNS revalidation after the certificate step.

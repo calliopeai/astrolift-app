@@ -224,13 +224,20 @@ def sync_workload_hostname_claims(app, manifest=None) -> list[str]:
     conflicts: list[str] = []
     now = timezone.now()
 
+    from astrolift_lifecycle.domain_app_route import protected_hostname_pairs
+
+    protected = protected_hostname_pairs(app.pk)
     with transaction.atomic():
         mine = {
             (row.environment_id, row.workload_id): row
             for row in HostnameClaim.objects.filter(registered_app_id=app.pk, deleted_at__isnull=True)
+            if (row.managed_domain_id, row.hostname) not in protected
         }
         keep: set[int] = set()
         for env, workload_slug, hostname in desired:
+            if (env.managed_domain_id, hostname) in protected:
+                conflicts.append("Protected domain route requires its original manage operation")
+                continue
             workload = app.workloads.filter(slug=workload_slug, deleted_at__isnull=True).only("pk").first()
             if workload is None:
                 # Between the manifest snapshot and this call the workload
@@ -307,11 +314,15 @@ def release_app_hostname_claims(app) -> int:
     """
     from django.utils import timezone
 
+    from astrolift_lifecycle.domain_app_route import protected_hostname_pairs
     from astrolift_registry.models import HostnameClaim
 
+    protected = protected_hostname_pairs(app.pk)
     now = timezone.now()
     released = 0
     for row in HostnameClaim.objects.filter(registered_app_id=app.pk, deleted_at__isnull=True):
+        if (row.managed_domain_id, row.hostname) in protected:
+            continue
         row.deleted_at = now
         row.save(update_fields=["deleted_at", "updated_at", "version"])
         released += 1

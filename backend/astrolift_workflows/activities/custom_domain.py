@@ -83,7 +83,7 @@ def _resolve_authoritative_records(
         except Exception:  # noqa: BLE001
             continue
     if not nameservers:
-        return [], (f"could not resolve any IP for {apex!r}'s authoritative " f"nameservers")
+        return [], (f"could not resolve any IP for {apex!r}'s authoritative nameservers")
 
     # Step 2: query each authoritative server directly for the record.
     resolver = dns.resolver.Resolver(configure=False)
@@ -96,7 +96,7 @@ def _resolve_authoritative_records(
             lifetime=5.0,
         )
     except dns.resolver.NXDOMAIN:
-        return [], (f"record {name!r} not found at the authoritative NS " f"(NXDOMAIN — still propagating?)")
+        return [], (f"record {name!r} not found at the authoritative NS (NXDOMAIN — still propagating?)")
     except dns.resolver.NoAnswer:
         return [], (f"no {record_type} record at {name!r} at the authoritative NS")
     except Exception as exc:  # noqa: BLE001
@@ -166,6 +166,9 @@ def _ensure_records_sync(custom_domain_id: int) -> dict[str, Any]:
     d = CustomDomain.all_objects.select_related("registered_app").get(
         pk=custom_domain_id,
     )
+    from astrolift_lifecycle.domain_app_route import require_legacy_custom_domain
+
+    require_legacy_custom_domain(d)
     if not d.is_platform_managed_zone:
         return {
             "ensured": [],
@@ -250,6 +253,9 @@ def _probe_sync(custom_domain_id: int) -> dict[str, Any]:
     from astrolift_lifecycle.models import CustomDomain
 
     d = CustomDomain.all_objects.get(pk=custom_domain_id)
+    from astrolift_lifecycle.domain_app_route import require_legacy_custom_domain
+
+    require_legacy_custom_domain(d)
     apex = hostname_parent_zone(d.hostname)
     new_rows: list[dict[str, Any]] = []
     all_propagated = True
@@ -300,6 +306,9 @@ def _transition_sync(
     from astrolift_lifecycle.models import CustomDomain
 
     d = CustomDomain.all_objects.get(pk=custom_domain_id)
+    from astrolift_lifecycle.domain_app_route import require_legacy_custom_domain
+
+    require_legacy_custom_domain(d)
     if success:
         d.validation_status = CustomDomain.ValidationStatus.VALIDATED
         d.last_validation_error = ""
@@ -374,6 +383,9 @@ def _issue_cert_sync(custom_domain_id: int) -> dict[str, Any]:
     d = CustomDomain.all_objects.select_related("registered_app").get(
         pk=custom_domain_id,
     )
+    from astrolift_lifecycle.domain_app_route import require_legacy_custom_domain
+
+    require_legacy_custom_domain(d)
     if d.certificate_state == CustomDomain.CertificateState.BYO:
         # Operator opted into BYO via uploadCustomDomainCertificate —
         # don't auto-issue or overwrite. Renderer reads the uploaded

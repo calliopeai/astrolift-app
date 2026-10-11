@@ -1655,6 +1655,15 @@ class ClustersMutation:
 
             with admitted(info.context.request, write=True):
                 pass
+        from astrolift_lifecycle.domain_app_route import DomainAppRouteError, require_unbound_zone
+
+        try:
+            require_unbound_zone(domain_id=domain.pk)
+        except DomainAppRouteError:
+            return gql_failure(
+                "PROTECTED_DOMAIN_ROUTE_MANAGE_REQUIRED",
+                "Manage the original domain route before changing its native resources.",
+            )
         domain.soft_delete()
 
         # The cloud resources must die with the row: a delete that only
@@ -1845,6 +1854,16 @@ class ClustersMutation:
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "managed domain not found", field="zone")
 
+        from astrolift_lifecycle.domain_app_route import DomainAppRouteError, require_unbound_zone
+
+        try:
+            require_unbound_zone(zone=zone)
+        except DomainAppRouteError:
+            return gql_failure(
+                "PROTECTED_DOMAIN_ROUTE_MANAGE_REQUIRED",
+                "Manage the original domain route before changing its native resources.",
+            )
+
         workflow_id = f"ProvisionManagedDomainWorkflow-{cluster.guid}-{zone.replace('.', '-')}"
         actor = _actor_from_request(info)
         start_workflow(
@@ -1907,6 +1926,16 @@ class ClustersMutation:
         _require_operator_for_shared(info, domain, Permission.CLUSTER_MANAGE)
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "managed domain not found", field="zone")
+
+        from astrolift_lifecycle.domain_app_route import DomainAppRouteError, require_unbound_zone
+
+        try:
+            require_unbound_zone(zone=zone)
+        except DomainAppRouteError:
+            return gql_failure(
+                "PROTECTED_DOMAIN_ROUTE_MANAGE_REQUIRED",
+                "Manage the original domain route before changing its native resources.",
+            )
 
         workflow_id = f"ProvisionManagedDomainWorkflow-{cluster.guid}-{zone.replace('.', '-')}"
         signaled = signal_workflow(workflow_id, "revalidate")
@@ -1981,6 +2010,16 @@ class ClustersMutation:
         _require_operator_for_shared(info, domain, Permission.CLUSTER_MANAGE)
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "managed domain not found", field="zone")
+
+        from astrolift_lifecycle.domain_app_route import DomainAppRouteError, require_unbound_zone
+
+        try:
+            require_unbound_zone(zone=zone)
+        except DomainAppRouteError:
+            return gql_failure(
+                "PROTECTED_DOMAIN_ROUTE_MANAGE_REQUIRED",
+                "Manage the original domain route before changing its native resources.",
+            )
 
         workflow_id = f"ProvisionManagedDomainWorkflow-{cluster.guid}-{zone.replace('.', '-')}"
         signaled = signal_workflow(workflow_id, "reissue")

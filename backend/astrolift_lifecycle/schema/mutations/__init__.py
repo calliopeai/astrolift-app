@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import strawberry
 
+from astrolift_lifecycle.schema.domain_app_routes import ManagedDomainAppRouteMutation
 from astrolift_lifecycle.schema.mutations.app_ops import AppOpsMutations
 from astrolift_lifecycle.schema.mutations.deploy_tokens import DeployTokenMutations
 from astrolift_lifecycle.schema.mutations.deployments import DeploymentMutations
@@ -123,6 +124,7 @@ from astrolift_lifecycle.schema.mutations.types import (  # noqa: F401
 
 @strawberry.type
 class LifecycleMutation(
+    ManagedDomainAppRouteMutation,
     DeploymentMutations,
     EnvironmentMutations,
     PreviewMutations,
