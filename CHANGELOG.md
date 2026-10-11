@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `manage.py report_shared_environment_namespaces` lists apps whose live environments on one cluster still render into the same namespace because they predate per-environment namespaces (#1922), so their deploys overwrite each other. It reads only and exits 1 when it finds any (#2094).
+
 - Fifteen more AWS managed drivers name new resources from the managed-service id instead of joined slugs, so two services whose slugs join to the same string (`acme` + `web-prod`, `acme-web` + `prod`) no longer collide: Redshift, Redshift Serverless, DocumentDB, Neptune, MemoryDB, Amazon MQ, RDS Proxy, Bedrock provisioned models, Keyspaces, Timestream, FSx, CloudWatch bundles and the REST, HTTP and WebSocket API Gateways. Existing resources keep their recorded names; API Gateway, Amazon MQ and FSx find a recorded resource by its id or tag. Keyspaces and Timestream give each service its own keyspace or database, so deprovision with data deletion no longer drops a sibling service's tables. A missing or malformed service id is refused as `invalid_resource_identity` before any AWS call (#2032).
 
 - Retry startup connection resets within the existing bounded CPU runtime health poll; retain container-exit and readiness-deadline failures before inference (#2284).
