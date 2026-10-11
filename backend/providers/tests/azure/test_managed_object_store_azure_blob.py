@@ -50,7 +50,7 @@ class FakeImmutabilityPolicy:
     policy_mode: str = "Unlocked"
 
 
-OWNER = "managed-service-guid"
+OWNER = "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
 BINDING = "binding-guid"
 
 

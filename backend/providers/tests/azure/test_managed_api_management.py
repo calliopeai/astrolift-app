@@ -22,7 +22,7 @@ from azure.plugin import PLUGIN
 SUBSCRIPTION_ID = "00000000-1111-2222-3333-444444444444"
 SERVICE_PATH = (
     f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/rg-platform/"
-    "providers/Microsoft.ApiManagement/service/astrolift-acme-api-prod-gateway"
+    "providers/Microsoft.ApiManagement/service/astrolift-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
 )
 
 SPEC = ProvisionSpec(
@@ -36,7 +36,7 @@ SPEC = ProvisionSpec(
     service_handle_hint="gateway",
     size="small",
     binding_id="binding-id",
-    managed_service_id="managed-id",
+    managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
 )
 
 
@@ -212,7 +212,7 @@ def test_provision_reconciles_typed_service_children_and_generated_policy(
 ) -> None:
     result = driver.provision(replace(SPEC, config=_declaration()))
     assert result.ok and result.ready
-    assert result.handle == "api_gateway/astrolift-acme-api-prod-gateway"
+    assert result.handle == "api_gateway/astrolift-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     service = client.resources[SERVICE_PATH]
     assert service["sku"] == {"name": "Developer", "capacity": 1}
     assert service["identity"] == {"type": "SystemAssigned"}
@@ -226,7 +226,7 @@ def test_provision_reconciles_typed_service_children_and_generated_policy(
             "defaultSslBinding": True,
         },
     ]
-    assert service["tags"]["astrolift-managed-service-id"] == "managed-id"
+    assert service["tags"]["astrolift-managed-service-id"] == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
     policy_path = f"{SERVICE_PATH}/apis/astrolift-public/policies/policy"
     policy = client.resources[policy_path]["properties"]["value"]
     assert '<set-backend-service backend-id="astrolift-billing"' in policy
@@ -384,7 +384,7 @@ def test_update_reconciles_and_prunes_only_owned_prefix_children(
                 "subscriptions": _declaration()["subscriptions"],
                 "prune_children": True,
             },
-            managed_service_id="managed-id",
+            managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
         ),
     )
     assert update.ok
@@ -436,7 +436,10 @@ def test_foreign_owned_collision_is_never_reassigned(
         },
     }
     result = driver.provision(replace(SPEC, config=_declaration()))
-    assert not result.ok and "belongs to managed service someone-else, not managed-id" in result.message
+    assert (
+        not result.ok
+        and "belongs to managed service someone-else, not 6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b" in result.message
+    )
 
 
 def test_teardown_is_protected_and_adoption_aware(
@@ -444,14 +447,24 @@ def test_teardown_is_protected_and_adoption_aware(
     client: FakeAPIMClient,
 ) -> None:
     result = driver.provision(replace(SPEC, config=_declaration()))
-    protected = driver.deprovision(DeprovisionSpec(result.handle, _declaration(), managed_service_id="managed-id"))
+    protected = driver.deprovision(
+        DeprovisionSpec(result.handle, _declaration(), managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b")
+    )
     assert not protected.ok and protected.errors == ["deletion_protection_enabled"]
     no_force = driver.deprovision(
-        DeprovisionSpec(result.handle, _declaration(deletion_protection=False), managed_service_id="managed-id"),
+        DeprovisionSpec(
+            result.handle,
+            _declaration(deletion_protection=False),
+            managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
+        ),
     )
     assert not no_force.ok and no_force.errors == ["force_destroy_required"]
     deleted = driver.deprovision(
-        DeprovisionSpec(result.handle, _declaration(deletion_protection=False), managed_service_id="managed-id"),
+        DeprovisionSpec(
+            result.handle,
+            _declaration(deletion_protection=False),
+            managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
+        ),
         force_destroy=True,
     )
     assert deleted.ok and SERVICE_PATH not in client.resources
@@ -474,7 +487,7 @@ def test_adopted_teardown_requires_delete_adopted(
         "properties": {"provisioningState": "Succeeded"},
         "tags": {
             "astrolift-managed-by": "platform",
-            "astrolift-managed-service-id": "managed-id",
+            "astrolift-managed-service-id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
             "astrolift-adopted": "true",
             "astrolift-adopted-at": "2026-08-18T00:00:00+00:00",
         },
@@ -484,13 +497,19 @@ def test_adopted_teardown_requires_delete_adopted(
     # A reconcile must not strip the adoption marker off the resource.
     assert client.resources[SERVICE_PATH]["tags"]["astrolift-adopted"] == "true"
     blocked = driver.deprovision(
-        DeprovisionSpec(result.handle, _declaration(deletion_protection=False), managed_service_id="managed-id"),
+        DeprovisionSpec(
+            result.handle,
+            _declaration(deletion_protection=False),
+            managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
+        ),
         force_destroy=True,
     )
     assert not blocked.ok and blocked.errors == ["delete_adopted_required"]
     deleted = driver.deprovision(
         DeprovisionSpec(
-            result.handle, _declaration(deletion_protection=False, delete_adopted=True), managed_service_id="managed-id"
+            result.handle,
+            _declaration(deletion_protection=False, delete_adopted=True),
+            managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
         ),
         force_destroy=True,
     )
@@ -504,7 +523,9 @@ def test_status_and_binding_never_expose_admin_or_subscription_keys(
     result = driver.provision(replace(SPEC, config=_declaration()))
     assert driver.status(ServiceHandle(result.handle)).state == "available"
     binding = driver.binding(ServiceHandle(result.handle))
-    assert binding.env_vars["API_GATEWAY_URL"].literal == ("https://astrolift-acme-api-prod-gateway.azure-api.net")
+    assert binding.env_vars["API_GATEWAY_URL"].literal == (
+        "https://astrolift-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b.azure-api.net"
+    )
     assert all(value.secret_ref is None for value in binding.env_vars.values())
     assert not any("key" in name.lower() for name in binding.env_vars)
     client.resources[SERVICE_PATH]["properties"]["provisioningState"] = "Failed"
@@ -592,3 +613,22 @@ def test_schema_catalog_and_plugin_registration_are_current(driver: AzureAPIMDri
     assert entry.status == "experimental"
     assert entry.issue_url.endswith("/1471")
     assert "API_GATEWAY_URL" in entry.binding_envs
+
+
+def test_a_recorded_legacy_name_is_kept(driver) -> None:
+    assert (
+        driver._service_name(replace(SPEC, recorded_handle="api_gateway/astrolift-acme-api-prod-gateway"), {})
+        == "astrolift-acme-api-prod-gateway"
+    )
+
+
+OTHER_SERVICE_ID = "0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4"
+
+
+def test_slug_joins_that_collide_get_distinct_new_names(driver) -> None:
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one name before #2032.
+    first = driver._service_name(replace(SPEC, organization_slug="acme", app_slug="web-prod"), {})
+    second = driver._service_name(
+        replace(SPEC, organization_slug="acme-web", app_slug="prod", managed_service_id=OTHER_SERVICE_ID), {}
+    )
+    assert first != second and len(first) <= 50

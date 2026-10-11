@@ -67,6 +67,7 @@ from _sdk.managed_service import (
     ValueRef,
     unsupported_update,
 )
+from _sdk.physical_naming import managed_service_identity, physical_name, recorded_resource_name
 
 KIND = "object_store"
 
@@ -110,7 +111,10 @@ class BlobStorageDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        container_name = self._container_name_for(spec=spec)
+        try:
+            container_name = self._container_name_for(spec=spec)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         try:
             container_client = self._client.get_container_client(
                 container_name,
@@ -327,21 +331,11 @@ class BlobStorageDriver(ManagedServiceDriver):
         return []
 
     def _container_name_for(self, *, spec: ProvisionSpec) -> str:
-        # Container names: 3-63 chars, lowercase alphanumeric +
-        # dashes, no consecutive dashes, no leading/trailing dash.
-        parts = [
-            self._config.container_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-        ]
-        if spec.service_handle_hint:
-            parts.append(spec.service_handle_hint)
-        raw = "-".join(p for p in parts if p).lower()
-        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        return clean.strip("-")[:63]
+        # Container names: 3-63 chars (#2032).
+        managed_service_identity(spec.managed_service_id)
+        return recorded_resource_name(spec.recorded_handle, kind=KIND) or physical_name(
+            spec.managed_service_id, prefix=self._config.container_name_prefix, max_length=63
+        )
 
 
 # ---- #364 cross-cloud-symmetry driver --------------------------------
@@ -439,7 +433,10 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        container_name = self._container_name_for(spec=spec)
+        try:
+            container_name = self._container_name_for(spec=spec)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         try:
             container_client = self._client.get_container_client(
                 container_name,
@@ -696,21 +693,11 @@ class AzureBlobStorageDriver(ManagedServiceDriver):
     # ---- internals ----------------------------------------------------
 
     def _container_name_for(self, *, spec: ProvisionSpec) -> str:
-        # Container names: 3-63 chars, lowercase alphanumeric +
-        # dashes, no consecutive dashes, no leading/trailing dash.
-        parts = [
-            self._config.container_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-        ]
-        if spec.service_handle_hint:
-            parts.append(spec.service_handle_hint)
-        raw = "-".join(p for p in parts if p).lower()
-        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        return clean.strip("-")[:63]
+        # Container names: 3-63 chars (#2032).
+        managed_service_identity(spec.managed_service_id)
+        return recorded_resource_name(spec.recorded_handle, kind=KIND) or physical_name(
+            spec.managed_service_id, prefix=self._config.container_name_prefix, max_length=63
+        )
 
     def _handle_for(self, *, container_name: str) -> str:
         return f"{KIND}/{container_name}"

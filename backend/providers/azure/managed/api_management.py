@@ -10,7 +10,6 @@ credential-exfiltration primitive.
 
 from __future__ import annotations
 
-import hashlib
 import ipaddress
 import json
 import re
@@ -47,6 +46,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import ownership_key
+from _sdk.physical_naming import managed_service_identity, physical_name, recorded_resource_name
 from azure.managed.tags import arm_tags_for
 
 KIND = "api_gateway"
@@ -320,7 +320,10 @@ class AzureAPIMDriver(ManagedServiceDriver):
         error = self._validate(cfg, update=False)
         if error:
             return ProvisionResult(False, "", error, ["invalid_api_management_config"])
-        service_name = self._service_name(spec, cfg)
+        try:
+            service_name = self._service_name(spec, cfg)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         path = self._service_path(service_name)
         existing = self._get(path)
         try:
@@ -1236,24 +1239,11 @@ class AzureAPIMDriver(ManagedServiceDriver):
         explicit = str(cfg.get("service_name") or "")
         if explicit:
             return explicit
-        raw = "-".join(
-            filter(
-                None,
-                (
-                    self._config.service_name_prefix,
-                    spec.organization_slug,
-                    spec.app_slug,
-                    spec.environment_name,
-                    spec.service_handle_hint,
-                ),
-            ),
-        ).lower()
-        safe = re.sub(r"[^a-z0-9-]+", "-", raw).strip("-")
-        if not safe or not safe[0].isalpha():
-            safe = f"a-{safe}"
-        if len(safe) > 50:
-            suffix = hashlib.sha256(raw.encode()).hexdigest()[:10]
-            safe = f"{safe[:39].rstrip('-')}-{suffix}"
+        # Service names: <=50 chars, globally unique (#2032).
+        managed_service_identity(spec.managed_service_id)
+        safe = recorded_resource_name(spec.recorded_handle, kind=KIND) or physical_name(
+            spec.managed_service_id, prefix=self._config.service_name_prefix, max_length=50
+        )
         if not _SERVICE_RE.fullmatch(safe):
             raise AzureAPIMError("derived API Management service name is invalid")
         return safe

@@ -9,7 +9,6 @@ plain secret application settings.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 import time
@@ -45,6 +44,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.physical_naming import managed_service_identity, physical_name
 from azure.managed.tags import arm_tags_for
 
 KIND = "faas"
@@ -275,7 +275,10 @@ class AzureFunctionsDriver(ManagedServiceDriver):
         error = self._validate(cfg, update=False)
         if error:
             return ProvisionResult(False, "", error, ["invalid_azure_functions_config"])
-        name = self._function_name(spec, cfg)
+        try:
+            name = self._function_name(spec, cfg)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         handle = _handle(self._config.resource_group, name)
         resource_id = self._site_resource_id(self._config.resource_group, name)
         try:
@@ -1098,20 +1101,11 @@ class AzureFunctionsDriver(ManagedServiceDriver):
         explicit = str(cfg.get("function_name") or "")
         if explicit:
             return explicit
-        seed = "-".join(
-            (
-                self._config.function_name_prefix,
-                spec.organization_slug,
-                spec.app_slug,
-                spec.environment_name,
-                spec.service_handle_hint,
-            ),
-        ).lower()
-        normalized = re.sub(r"[^a-z0-9-]+", "-", seed).strip("-")
-        normalized = re.sub(r"-+", "-", normalized)
-        digest = hashlib.sha256(seed.encode()).hexdigest()[:8]
-        prefix = (normalized or "function")[:51].rstrip("-")
-        return f"{prefix}-{digest}"
+        # Function app names: <=60 chars, globally unique (#2032).
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            return _parse_handle(spec.recorded_handle)[1]
+        return physical_name(spec.managed_service_id, prefix=self._config.function_name_prefix, max_length=60)
 
     def _site_resource_id(self, resource_group: str, name: str) -> str:
         return (

@@ -54,6 +54,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from _sdk.physical_naming import managed_service_identity, physical_name, recorded_resource_name
 from azure.managed.tags import arm_tags_for as tags_for
 from azure.secrets_keyvault import key_vault_secret_ref
 
@@ -163,7 +164,10 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
                 message=("azure ai search driver requires a Key Vault (set keyvault_url or inject secret_client)"),
                 errors=["no_secret_backend"],
             )
-        service_name = self._service_name_for(spec=spec)
+        try:
+            service_name = self._service_name_for(spec=spec)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         cfg = spec.config or {}
 
         existing = self._describe(service_name)
@@ -585,25 +589,11 @@ class AzureAISearchFullTextDriver(ManagedServiceDriver):
             raise
 
     def _service_name_for(self, *, spec: ProvisionSpec) -> str:
-        # Azure AI Search service names: 2-60 chars, lowercase, must
-        # start with a letter, only letters/digits/hyphens, can't
-        # contain two consecutive hyphens, can't start/end with
-        # hyphen, globally unique under search.windows.net.
-        parts = [
-            self._config.service_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint or "search",
-        ]
-        raw = "-".join(p for p in parts if p).lower()
-        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        clean = clean.strip("-")
-        if not clean or not clean[0].isalpha():
-            clean = f"a{clean}"
-        return clean[:60]
+        # AI Search service names: 2-60 chars, globally unique (#2032).
+        managed_service_identity(spec.managed_service_id)
+        return recorded_resource_name(spec.recorded_handle, kind=KIND) or physical_name(
+            spec.managed_service_id, prefix=self._config.service_name_prefix, max_length=60
+        )
 
     def _handle_for(self, *, service_name: str) -> str:
         return f"{KIND}/{service_name}"

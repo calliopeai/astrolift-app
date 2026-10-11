@@ -80,6 +80,10 @@ def test_deprovision_deletes_the_deployment(driver, mgmt) -> None:
 
 
 def test_another_services_deployment_is_not_adopted(driver) -> None:
-    assert driver.provision(_foundry_spec()).ok
-    refused = driver.provision(_spec(config=MODEL, managed_service_id="someone-else"))
+    first = driver.provision(_foundry_spec())
+    assert first.ok
+    # A recorded handle naming another service's deployment is refused (#1961).
+    refused = driver.provision(
+        _spec(config=MODEL, managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4", recorded_handle=first.handle)
+    )
     assert not refused.ok and refused.errors == [OWNERSHIP_ERROR_CODE]
