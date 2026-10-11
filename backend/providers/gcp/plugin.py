@@ -47,6 +47,7 @@ explicit capability error; the lifecycle config factory refuses it.
 from _sdk.base import ProviderPlugin
 from gcp.cluster_gke import GKEClusterDriver
 from gcp.dns_clouddns import CloudDNSDriver
+from gcp.identity_users_platform import IdentityPlatformUsersDriver
 from gcp.identity_wi import GCPWorkloadIdentityDriver
 from gcp.ingress import GCPIngressDriver
 from gcp.managed.api_gateway import APIGatewayDriver
@@ -94,6 +95,8 @@ PLUGIN = ProviderPlugin(
         "cluster": GKEClusterDriver,
         "ingress": GCPIngressDriver,
         "notification": FCMNotificationDriver,
+        # The edge identity provider's users (#2135).
+        "identity_users": IdentityPlatformUsersDriver,
     },
     managed_service_drivers={
         ("object_store", "gcs"): GCSDriver,
