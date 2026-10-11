@@ -394,6 +394,60 @@ export const ATTACH_CLOUDFLARE_ZONE = gql`
     }
   }
 `;
+export const ROUTE53_DNS_CLUSTERS = gql`
+  query Route53DnsClusters {
+    route53DnsClusters {
+      complete
+      reason
+      items {
+        id
+        name
+        region
+        shared
+      }
+    }
+  }
+`;
+export const ROUTE53_DNS_ZONES = gql`
+  query Route53DnsZones($input: Route53DnsZonesInput!) {
+    route53DnsZones(input: $input) {
+      complete
+      reason
+      truncated
+      items {
+        id
+        name
+        privateZone
+        recordCount
+      }
+    }
+  }
+`;
+export const ATTACH_ROUTE53_ZONE = gql`
+  mutation AttachRoute53Zone($input: AttachRoute53DnsZoneInput!) {
+    attachRoute53DnsZone(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        domainId
+        domainVersion
+        clusterId
+        accountId
+        zone {
+          id
+          name
+          privateZone
+          recordCount
+        }
+        verificationState
+      }
+    }
+  }
+`;
 export const VERIFY_DNS_DOMAIN = gql`
   mutation VerifyDnsDomain($input: VerifyManagedDomainInput!) {
     verifyManagedDomain(input: $input) {

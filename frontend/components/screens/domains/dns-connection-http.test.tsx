@@ -28,6 +28,7 @@ const schema = buildSchema(
   )
 );
 const c = en.domainConnections;
+const CLUSTER = "c0ffee00-0000-4000-8000-000000000001";
 type Request = { operationName: string; variables: Record<string, unknown> };
 let view: ReturnType<typeof render>;
 let server: Server,
@@ -44,6 +45,7 @@ let incompleteZones: boolean,
   malformed: boolean,
   explicitRefusal: boolean,
   canVerify: boolean,
+  route53Denied: boolean,
   hold: string | null,
   release: (() => void) | null;
 beforeEach(async () => {
@@ -60,6 +62,7 @@ beforeEach(async () => {
   loseRegistration = false;
   incompleteZones = incompleteRecords = refusedConnections = malformed = explicitRefusal = false;
   canVerify = true;
+  route53Denied = false;
   hold = null;
   release = null;
   requests = [];
@@ -118,6 +121,35 @@ beforeEach(async () => {
         verificationRecordName: domain.challengeRecordName,
         verificationRecordValue: domain.challengeRecordValue,
         dnsWritesSupported: false,
+      },
+    }),
+    route53DnsClusters: () => ({
+      complete: true,
+      reason: "",
+      items: [{ id: CLUSTER, name: "prod-us-west-2", region: "us-west-2", shared: false }],
+    }),
+    route53DnsZones: () =>
+      route53Denied
+        ? { complete: false, reason: "PROVIDER_ACCESS_DENIED", truncated: false, items: [] }
+        : {
+            complete: true,
+            reason: "",
+            truncated: false,
+            items: [
+              { id: "ZACME1", name: domain.zone, privateZone: false, recordCount: 9 },
+              { id: "ZOTHER2", name: "other.example", privateZone: true, recordCount: 2 },
+            ],
+          },
+    attachRoute53DnsZone: ({ input }: { input: { domainId: string; zoneId: string } }) => ({
+      ok: true,
+      errors: [],
+      data: {
+        domainId: input.domainId,
+        domainVersion: domain.version + 1,
+        clusterId: CLUSTER,
+        accountId: "123456789012",
+        zone: { id: input.zoneId, name: domain.zone, privateZone: false, recordCount: 9 },
+        verificationState: "pending",
       },
     }),
     astroliftManagedDomain: () => domain,
@@ -394,6 +426,45 @@ describe("DNS connection actual SDL HttpLink journey", () => {
     expect(link).toHaveAttribute("href", `/domains/${domain.id}`);
     expect(screen.queryByLabelText(c.token)).not.toBeInTheDocument();
     expect(requests.some((r) => r.operationName === "CloudflareZones")).toBe(false);
+  });
+  it("binds only the exactly named hosted zone seen through the chosen cluster (#2287)", async () => {
+    render(<View domainId={domain.id} />);
+    const aws = await screen.findByRole("button", { name: "AWS Route53" });
+    await waitFor(() => expect(aws).toBeEnabled());
+    fireEvent.click(aws);
+    fireEvent.click(await screen.findByRole("button", { name: /prod-us-west-2/ }));
+    const bind = await screen.findByRole("button", {
+      name: c.route53Bind.replace("{domain}", domain.zone),
+    });
+    expect(screen.getByText("other.example")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^Bind to/ })).toHaveLength(1);
+    expect(requests.find((r) => r.operationName === "Route53DnsZones")?.variables).toEqual({
+      input: { clusterId: CLUSTER },
+    });
+    fireEvent.click(bind);
+    await screen.findByText(c.route53Bound);
+    expect(requests.find((r) => r.operationName === "AttachRoute53Zone")?.variables).toEqual({
+      input: {
+        domainId: domain.id,
+        expectedDomainVersion: domain.version,
+        clusterId: CLUSTER,
+        zoneId: "ZACME1",
+        zoneName: domain.zone,
+      },
+    });
+    expect(screen.queryByLabelText(c.token)).not.toBeInTheDocument();
+  });
+  it("keeps a refused Route 53 inventory distinct from an empty one (#2287)", async () => {
+    route53Denied = true;
+    render(<View domainId={domain.id} />);
+    const aws = await screen.findByRole("button", { name: "AWS Route53" });
+    await waitFor(() => expect(aws).toBeEnabled());
+    fireEvent.click(aws);
+    fireEvent.click(await screen.findByRole("button", { name: /prod-us-west-2/ }));
+    await screen.findByRole("alert");
+    expect(screen.queryByText(c.route53NoZones)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Bind to/ })).not.toBeInTheDocument();
+    expect(requests.some((r) => r.operationName === "AttachRoute53Zone")).toBe(false);
   });
 });
 

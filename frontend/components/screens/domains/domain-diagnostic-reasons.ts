@@ -34,6 +34,8 @@ export function domainDiagnosticReasonKey(reason: string) {
       return "providerZoneUnavailable";
     case "PROVIDER_ZONE_NOT_BOUND":
       return "providerZoneNotBound";
+    case "PROVIDER_CLUSTER_UNAVAILABLE":
+      return "providerClusterUnavailable";
     case "TOOL_NOT_INSTALLED":
       return "toolNotInstalled";
     case "ICMP_REPLY":

@@ -275,3 +275,34 @@ export const NativeRoutingConfiguration: Story = {
     },
   },
 };
+/** #2287: a Route 53 zone bound through a cluster's AWS credential. */
+export const ClusterCredentialZone: Story = {
+  args: {
+    ...MANAGED_DOMAIN,
+    initialTab: "diagnostics",
+    diagnostics: {
+      ...DOMAIN_DIAGNOSTICS,
+      providerZone: { ...DOMAIN_DIAGNOSTICS.providerZone, bindingSource: "CLUSTER_CREDENTIAL" },
+    },
+  },
+};
+export const ClusterCredentialUnavailable: Story = {
+  args: {
+    ...MANAGED_DOMAIN,
+    initialTab: "diagnostics",
+    diagnostics: {
+      ...DOMAIN_DIAGNOSTICS,
+      providerZone: {
+        ...DOMAIN_DIAGNOSTICS.providerZone,
+        state: "ERROR",
+        reason: "PROVIDER_CLUSTER_UNAVAILABLE",
+        bindingSource: "CLUSTER_CREDENTIAL",
+        zoneId: null,
+        zoneName: null,
+        privateZone: null,
+        nameservers: [],
+        records: [],
+      },
+    },
+  },
+};
