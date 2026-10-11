@@ -24,7 +24,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws._naming import iam_role_name
+from aws._naming import managed_service_name
 from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
@@ -71,10 +71,14 @@ class ApiGatewayRestDriver(ManagedServiceDriver):
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_rest_api_config"])
-        name = self._api_name(spec)
+        try:
+            name = self._api_name(spec)
+            recorded_id = self._recorded_api_id(spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         api_id = ""
         try:
-            api = self._find_owned_api(name, spec)
+            api = self._find_owned_api(name, spec, recorded_id)
             if api is None:
                 request = dict(cfg.get("rest_api") or {})
                 request.update(
@@ -308,16 +312,20 @@ class ApiGatewayRestDriver(ManagedServiceDriver):
         return ""
 
     def _api_name(self, spec: ProvisionSpec) -> str:
-        return iam_role_name(
-            "astrolift",
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint,
-            max_len=128,
-        )
+        # API names are not unique in AWS: new APIs are named from the service
+        # identity (#2032); a recorded API is found by its id instead.
+        return managed_service_name(spec.managed_service_id, prefix="astrolift", max_len=128)
 
-    def _find_owned_api(self, name: str, spec: ProvisionSpec) -> dict[str, Any] | None:
+    @staticmethod
+    def _recorded_api_id(spec: ProvisionSpec) -> str:
+        if not spec.recorded_handle:
+            return ""
+        recorded_kind, api_id = parse_handle(spec.recorded_handle)
+        if recorded_kind != KIND:
+            raise ManagedServiceError("recorded AWS handle belongs to a different driver kind")
+        return api_id
+
+    def _find_owned_api(self, name: str, spec: ProvisionSpec, recorded_id: str = "") -> dict[str, Any] | None:
         position = ""
         while True:
             request: dict[str, Any] = {"limit": 500}
@@ -327,7 +335,7 @@ class ApiGatewayRestDriver(ManagedServiceDriver):
             for api in response.get("items", []) or []:
                 tags = api.get("tags") or {}
                 if (
-                    api.get("name") == name
+                    (api.get("id") == recorded_id if recorded_id else api.get("name") == name)
                     and tags.get("astrolift.io/managed-by") == "platform"
                     and tags.get("astrolift.io/organization") == spec.organization_slug
                     and tags.get("astrolift.io/app") == spec.app_slug

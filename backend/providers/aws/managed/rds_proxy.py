@@ -24,7 +24,14 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
+from aws.managed._base import (
+    ManagedServiceError,
+    adoption_refusal,
+    handle_for,
+    managed_name_for,
+    parse_handle,
+    tags_for,
+)
 from aws.session import aws_client
 
 KIND = "database_proxy"
@@ -82,7 +89,10 @@ class RDSProxyDriver(ManagedServiceDriver):
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_proxy_config"])
-        proxy_name = self._proxy_name(spec)
+        try:
+            proxy_name = self._proxy_name(spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         existing = self._describe(proxy_name)
         try:
             refusal = self._target_refusal(cfg, spec.organization_slug)
@@ -695,23 +705,8 @@ class RDSProxyDriver(ManagedServiceDriver):
                 raise
 
     def _proxy_name(self, spec: ProvisionSpec) -> str:
-        raw = "-".join(
-            part
-            for part in (
-                self._config.proxy_name_prefix,
-                spec.organization_slug,
-                spec.app_slug,
-                spec.environment_name,
-                spec.service_handle_hint or "proxy",
-            )
-            if part
-        )
-        clean = "".join(char if char.isalnum() or char == "-" else "-" for char in raw.lower())
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        if not clean or not clean[0].isalpha():
-            clean = f"p-{clean}"
-        return clean.strip("-")[:63]
+        # Proxy names: <=63 chars; 44 keeps the astrolift-rds-proxy- IAM role (<=64) whole (#2032).
+        return managed_name_for(spec, kind=KIND, prefix=self._config.proxy_name_prefix, max_len=44)
 
     @staticmethod
     def _role_name(proxy_name: str) -> str:

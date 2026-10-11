@@ -61,6 +61,7 @@ from _sdk.managed_service import (
 from aws.managed._base import (
     ManagedServiceError,
     handle_for,
+    managed_name_for,
     parse_handle,
     tags_for,
 )
@@ -164,7 +165,10 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        record_id = self._record_id_for(spec=spec)
+        try:
+            record_id = self._record_id_for(spec=spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         cfg = spec.config or {}
 
         existing = self._describe(record_id)
@@ -578,21 +582,8 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         return bool(record.get("CommitmentDuration"))
 
     def _record_id_for(self, *, spec: ProvisionSpec) -> str:
-        # Bedrock provisioned-model names: 1-63 chars, alphanumeric +
-        # hyphens. We add the same canonicalisation as the
-        # OpenSearch driver to keep slugs predictable.
-        raw = (
-            f"astrolift-{spec.organization_slug}-{spec.app_slug}-"
-            f"{spec.environment_name}-"
-            f"{spec.service_handle_hint or 'model'}"
-        ).lower()
-        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        clean = clean.strip("-")
-        if not clean or not clean[0].isalpha():
-            clean = f"a{clean}"
-        return clean[:63]
+        # Bedrock provisioned-model names: 1-63 chars, alphanumeric + hyphens (#2032).
+        return managed_name_for(spec, kind=KIND, prefix="astrolift", max_len=63)
 
     def _log_group_for(self, *, record_id: str) -> str:
         return f"{self._config.invocation_log_group_prefix}/{record_id}"

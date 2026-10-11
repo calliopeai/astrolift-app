@@ -212,6 +212,7 @@ def _spec(config: dict | None = None) -> ProvisionSpec:
         service_handle_hint="api-prod-api",
         size="small",
         config=config if config is not None else {"lambda_function_arn": _LAMBDA_ARN},
+        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
 
 
@@ -287,7 +288,7 @@ def test_provision_is_idempotent_reuses_api_integration_route_stage():
 
 def test_provision_repoints_route_when_integration_target_drifts():
     api = FakeApiGateway()
-    api_id = api.seed_api(name="astrolift-acme-api-prod-api-prod-api")
+    api_id = api.seed_api(name="astrolift-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
     # A stale route pointing at a different integration.
     api._routes[api_id] = [{"RouteId": "route-old", "RouteKey": "$default", "Target": "integrations/stale"}]
     api._integrations[api_id] = []
@@ -412,3 +413,33 @@ def test_provision_does_not_rewire_another_orgs_api():
 
     assert not result.ok and "refusing to adopt" in result.message
     assert "create_integration" not in api.names() and "create_route" not in api.names()
+
+
+def test_a_recorded_legacy_api_is_found_by_id_not_recreated():
+    import dataclasses
+
+    api = FakeApiGateway()
+    api_id = api.seed_api(name="astrolift-acme-api-prod-api-prod-api")
+    drv, api, _ = _driver(api=api)
+
+    result = drv.provision(dataclasses.replace(_spec(), recorded_handle=f"api_gateway/{api_id}"))
+
+    assert result.ok and result.handle == f"api_gateway/{api_id}"
+    assert "create_api" not in api.names() and len(api._apis) == 1
+
+
+def test_slug_joins_that_collide_get_distinct_new_names():
+    import dataclasses
+
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one name before #2032.
+    drv = _driver()[0]
+    first = drv._api_name(dataclasses.replace(_spec(), organization_slug="acme", app_slug="web-prod"))
+    second = drv._api_name(
+        dataclasses.replace(
+            _spec(),
+            organization_slug="acme-web",
+            app_slug="prod",
+            managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
+        )
+    )
+    assert first != second and len(first) <= 128

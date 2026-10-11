@@ -48,7 +48,7 @@ def _spec(**overrides) -> ProvisionSpec:
         "tags": {"owner": "agents"},
         "isolation": "shared",
         "binding_id": "binding-1",
-        "managed_service_id": "service-1",
+        "managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     }
     values.update(overrides)
     return ProvisionSpec(**values)
@@ -95,15 +95,10 @@ def _file_system(file_system_type: str, *, managed: bool = True, lifecycle: str 
         "OPENZFS": "OpenZFSConfiguration",
         "WINDOWS": "WindowsConfiguration",
     }[file_system_type]
-    variant = {
-        "LUSTRE": "fsx_lustre",
-        "OPENZFS": "fsx_openzfs",
-        "WINDOWS": "fsx_windows",
-    }[file_system_type]
     tags = [
         {
             "Key": "astrolift.io/resource-token",
-            "Value": f"platform-steadymd-triage-prod-shared-{variant}",
+            "Value": "platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
         },
     ]
     if managed:
@@ -615,7 +610,7 @@ def test_restore_does_not_adopt_the_ordinary_provisioned_filesystem():
     result = driver.restore(snapshot, _spec())
     assert result.ok and result.handle == f"filesystem/{RESTORED_FS_ID}"
     restore_request = client.create_file_system_from_backup.call_args.kwargs
-    assert restore_request["ClientRequestToken"] != "platform-steadymd-triage-prod-shared-fsx_openzfs"
+    assert restore_request["ClientRequestToken"] != "platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
 
 
 def test_lustre_scratch_refuses_backup_and_safe_delete():
@@ -817,3 +812,23 @@ def test_a_lustre_file_system_names_no_s3_data_repository(fragment, repository):
     assert "S3 data repository fields" in result.message
     client.create_file_system.assert_not_called()
     client.create_file_system_from_backup.assert_not_called()
+
+
+def test_a_recorded_legacy_filesystem_keeps_its_tagged_token():
+    client = _client("LUSTRE", existing=True)
+    for tag in client.store["fs"]["Tags"]:
+        if tag["Key"] == "astrolift.io/resource-token":
+            tag["Value"] = "platform-steadymd-triage-prod-shared-fsx_lustre"
+    driver = FSxLustreDriver(config=_config(), client=client)
+    token = driver._client_token(_spec(recorded_handle=f"filesystem/{FS_ID}"))
+    assert token == "platform-steadymd-triage-prod-shared-fsx_lustre"
+
+
+def test_slug_joins_that_collide_get_distinct_new_tokens():
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one token before #2032.
+    driver = FSxLustreDriver(config=_config(), client=_client("LUSTRE"))
+    first = driver._client_token(_spec(organization_slug="acme", app_slug="web-prod"))
+    second = driver._client_token(
+        _spec(organization_slug="acme-web", app_slug="prod", managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4")
+    )
+    assert first != second and len(first) <= 63

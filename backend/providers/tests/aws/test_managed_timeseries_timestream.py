@@ -68,6 +68,7 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         tenant_cluster_id="aws-prod",
         service_handle_hint="metrics",
         size="small",
+        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -452,21 +453,18 @@ def test_restore_provisions_target(
 # ---- naming + helpers ------------------------------------------
 
 
-def test_database_name_canonicalization(
-    driver: TimestreamDriver,
-) -> None:
-    name = driver._database_name_for(  # type: ignore[attr-defined]
-        spec=_spec(
-            organization_slug="ACME!",
-            app_slug="My API",
-            environment_name="Prod",
-        ),
+def test_a_recorded_legacy_database_keeps_its_names(driver: TimestreamDriver) -> None:
+    recorded = _spec(recorded_handle="time_series/astrolift-acme-api-prod/metrics")
+    assert driver._coordinates(recorded) == ("astrolift-acme-api-prod", "metrics")  # type: ignore[attr-defined]
+
+
+def test_each_service_gets_its_own_database_even_when_slugs_collide(driver: TimestreamDriver) -> None:
+    # "acme" + "web-prod" and "acme-web" + "prod" shared one database before #2032.
+    first, table = driver._coordinates(_spec(organization_slug="acme", app_slug="web-prod"))  # type: ignore[attr-defined]
+    second, _ = driver._coordinates(  # type: ignore[attr-defined]
+        _spec(organization_slug="acme-web", app_slug="prod", managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4")
     )
-    assert "--" not in name
-    assert not name.startswith("-") and not name.endswith("-")
-    for c in name:
-        assert c.isalnum() or c in "-_."
-    assert len(name) <= 64
+    assert first != second and len(first) <= 64 and table == "metrics"
 
 
 def test_handle_rejects_malformed(driver: TimestreamDriver) -> None:
@@ -523,9 +521,10 @@ def test_binding_schema_lists_all_env_vars(
 
 
 def test_provision_does_not_adopt_another_services_table(driver: TimestreamDriver) -> None:
-    """Names are slug-joined, so another service can map to this one's name (#1961)."""
-    first = driver.provision(_spec(managed_service_id="svc-a"))
-    second = driver.provision(_spec(managed_service_id="svc-b"))
+    """A recorded handle naming another service's table is refused (#1961)."""
+    first = driver.provision(_spec())
+    other = "0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4"
+    second = driver.provision(_spec(managed_service_id=other, recorded_handle=first.handle))
 
     assert first.ok, first.message
     assert not second.ok and second.handle == "" and "refusing to adopt" in second.message

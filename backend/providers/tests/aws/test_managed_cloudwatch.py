@@ -346,7 +346,7 @@ def _spec(config: dict | None = None) -> ProvisionSpec:
         size="small",
         config=config if config is not None else {},
         binding_id="binding-id",
-        managed_service_id="service-id",
+        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
 
 
@@ -917,3 +917,30 @@ def test_registration_catalogue_cost_and_runtime_config() -> None:
     assert config.log_group_prefix == "/company/apps"
     assert config.retention_days_default == 90
     assert config.dashboard_enabled_default is False
+
+
+def test_a_recorded_legacy_bundle_keeps_its_id():
+    import dataclasses
+
+    from aws.managed.observability_cloudwatch import _bundle_id
+
+    legacy = "acme-api-prod-observability-0123456789"
+    assert _bundle_id(dataclasses.replace(_spec(), recorded_handle=f"observability/{legacy}")) == legacy
+
+
+def test_slug_joins_that_collide_get_distinct_new_bundle_ids():
+    import dataclasses
+
+    from aws.managed.observability_cloudwatch import _bundle_id
+
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one bundle before #2032.
+    first = _bundle_id(dataclasses.replace(_spec(), organization_slug="acme", app_slug="web-prod"))
+    second = _bundle_id(
+        dataclasses.replace(
+            _spec(),
+            organization_slug="acme-web",
+            app_slug="prod",
+            managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
+        )
+    )
+    assert first != second and len(first) <= 96

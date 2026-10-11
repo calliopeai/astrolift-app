@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 from dataclasses import dataclass
@@ -27,7 +26,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, handle_for, parse_handle, tags_for
+from aws.managed._base import ManagedServiceError, handle_for, managed_name_for, parse_handle, tags_for
 from aws.session import aws_client
 
 KIND = "observability"
@@ -117,7 +116,10 @@ class CloudWatchDriver(ManagedServiceDriver):
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_cloudwatch_config"])
-        bundle_id = _bundle_id(spec)
+        try:
+            bundle_id = _bundle_id(spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         handle = handle_for(kind=KIND, resource_id=bundle_id)
         try:
             self._reconcile(bundle_id, cfg, spec=spec)
@@ -940,20 +942,8 @@ def _validate_declarations(collection: str, value: Any) -> str:
 
 
 def _bundle_id(spec: ProvisionSpec) -> str:
-    raw = "-".join(
-        (
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint,
-        ),
-    )
-    return _name(raw, hashlib.sha256(raw.encode()).hexdigest()[:10], max_length=96)
-
-
-def _name(*parts: str, max_length: int) -> str:
-    value = re.sub(r"[^A-Za-z0-9_.#/-]+", "-", "-".join(str(part) for part in parts if part)).strip("-./")
-    return (value or "astrolift")[:max_length]
+    # Bundle ids name the alarms, dashboard and log groups: <=96 chars (#2032).
+    return managed_name_for(spec, kind=KIND, prefix="cw", max_len=96)
 
 
 def _dashboard_name(bundle_id: str) -> str:
