@@ -24,7 +24,10 @@ from django.utils import timezone
 
 from astrolift_operations.models import WorkflowRun
 from astrolift_workflows.inputs import Actor
+from astrolift_workflows.tests.schedule_server import schedule_server as schedule_server_fixture
 from workflows.models import Workflow, WorkflowDefinition, WorkflowStage, WorkflowStageExecution
+
+schedule_server = schedule_server_fixture
 
 pytestmark = pytest.mark.django_db
 
@@ -75,45 +78,6 @@ def _action(wf):
     return {"workflow_guid": str(wf.guid), "organization_id": wf.organization_id}
 
 
-class _FakeScheduleHandle:
-    def __init__(self, calls, schedule_id):
-        self._calls = calls
-        self._id = schedule_id
-
-    async def delete(self):
-        self._calls.append(("delete", self._id))
-
-
-class _FakeTemporalClient:
-    """Records schedule writes; `fail_create` names schedule ids to refuse."""
-
-    def __init__(self, fail_create=()):
-        self.calls = []
-        self.schedules = {}
-        self.fail_create = set(fail_create)
-
-    def get_schedule_handle(self, schedule_id):
-        return _FakeScheduleHandle(self.calls, schedule_id)
-
-    async def create_schedule(self, schedule_id, schedule):
-        if schedule_id in self.fail_create:
-            raise RuntimeError("temporal refused the schedule")
-        self.calls.append(("create", schedule_id))
-        self.schedules[schedule_id] = schedule
-
-
-@pytest.fixture
-def temporal_client(monkeypatch):
-    client = _FakeTemporalClient()
-
-    async def _client():
-        return client
-
-    monkeypatch.setattr("astrolift_workflows.client._temporal_enabled", lambda: True)
-    monkeypatch.setattr("astrolift_workflows.client._get_client_async", _client)
-    return client
-
-
 # ---- registration ----------------------------------------------------------
 
 
@@ -134,7 +98,7 @@ def test_the_wrapper_and_its_activities_are_registered():
 # ---- the schedule writer ---------------------------------------------------
 
 
-def test_the_schedule_action_names_the_workflow_not_a_run(scheduled, temporal_client):
+def test_the_schedule_action_names_the_workflow_not_a_run(scheduled, schedule_server):
     """The defect itself: the action carried a run input, so it named one
     WorkflowRun that every fire reused. Saving a schedule now creates no run
     at all; a fire does."""
@@ -142,12 +106,18 @@ def test_the_schedule_action_names_the_workflow_not_a_run(scheduled, temporal_cl
 
     runs_before = WorkflowRun.objects.count()
 
-    sync_workflow_schedule(scheduled)
+    schedule_server.track(scheduled)
+    assert sync_workflow_schedule(scheduled).confirmed
 
     schedule_id = f"workflow-{scheduled.guid}"
-    action = temporal_client.schedules[schedule_id].action
+    action = schedule_server.describe(scheduled).schedule.action
     assert action.workflow == "ConfiguredWorkflowScheduleWorkflow"
-    assert action.args == [_action(scheduled)]
+    from workflows.schedule_sync import desired_revision
+
+    assert schedule_server.action_input(scheduled) == {
+        **_action(scheduled),
+        "schedule_revision": desired_revision(scheduled),
+    }
     assert action.id == f"{schedule_id}-run"
     assert WorkflowRun.objects.count() == runs_before
 
@@ -363,43 +333,44 @@ def population(org):
     return {"live": live, "others": [disabled, deleted, manual]}
 
 
-def test_resync_reports_by_default_and_rewrites_on_apply(population, temporal_client):
+def test_resync_reports_by_default_and_rewrites_on_apply(population, schedule_server):
     live = population["live"]
     live_id = f"workflow-{live.guid}"
 
     out = StringIO()
     call_command("resync_workflow_schedules", stdout=out)
 
-    assert temporal_client.calls == []
+    assert schedule_server.describe(live) is None
     assert live_id in out.getvalue()
     assert "1 schedule(s) to rewrite" in out.getvalue()
 
     out = StringIO()
     call_command("resync_workflow_schedules", "--apply", stdout=out)
 
-    assert temporal_client.schedules[live_id].action.workflow == "ConfiguredWorkflowScheduleWorkflow"
-    assert temporal_client.schedules[live_id].action.args == [_action(live)]
-    assert set(temporal_client.schedules) == {live_id}
-    # Everything else gets the delete its own save would have issued, so a
-    # schedule that outlived its Workflow stops firing the old action.
-    deleted_ids = {schedule_id for kind, schedule_id in temporal_client.calls if kind == "delete"}
-    assert {f"workflow-{wf.guid}" for wf in population["others"]} <= deleted_ids
+    assert schedule_server.describe(live).schedule.action.workflow == "ConfiguredWorkflowScheduleWorkflow"
+    assert schedule_server.action_input(live)["workflow_guid"] == str(live.guid)
+    for row in population["others"]:
+        assert schedule_server.describe(row) is None
+    assert "absence confirmed for 3 workflow(s)" in out.getvalue()
     assert "1 rewritten, 0 failed" in out.getvalue()
     assert not WorkflowRun.objects.exists()
 
 
-def test_resync_fails_loudly_when_a_rewrite_fails(org, temporal_client):
+def test_resync_fails_loudly_when_a_rewrite_fails(org, schedule_server):
     broken = _scheduled_workflow(org, slug="broken")
     healthy = _scheduled_workflow(org, slug="healthy")
-    temporal_client.fail_create.add(f"workflow-{broken.guid}")
+    broken.schedule_cron = "invalid cron"
+    broken.save()
+    schedule_server.track(broken)
+    schedule_server.track(healthy)
 
     out = StringIO()
     with pytest.raises(CommandError, match="1 schedule"):
         call_command("resync_workflow_schedules", "--apply", stdout=out)
 
-    assert f"workflow-{healthy.guid}" in temporal_client.schedules
+    assert schedule_server.describe(healthy) is not None
     assert f"workflow-{broken.guid}" in out.getvalue()
-    assert "temporal refused the schedule" in out.getvalue()
+    assert "schedule_not_confirmed" in out.getvalue()
 
 
 def test_resync_refuses_to_apply_while_temporal_is_off(population, monkeypatch):

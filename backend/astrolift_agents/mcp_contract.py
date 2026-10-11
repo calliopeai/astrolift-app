@@ -11,6 +11,8 @@ from astrolift_identity.api_tokens import (
     SCOPE_MCP_WRITE,
     SCOPE_PROJECT_WRITE,
     SCOPE_READ_APPS,
+    SCOPE_WORKFLOW_TRIGGER,
+    SCOPE_WORKFLOW_WRITE,
 )
 from core.permissions import Permission
 
@@ -30,7 +32,357 @@ def _schema(properties: dict[str, Any], *, required: tuple[str, ...] = ()) -> di
     }
 
 
+WORKFLOW_TOOL_NAMES = frozenset(
+    {
+        "astrolift_list_workflow_definitions",
+        "astrolift_get_workflow_definition",
+        "astrolift_set_workflow_definition_enabled",
+        "astrolift_list_workflows",
+        "astrolift_get_workflow",
+        "astrolift_create_workflow",
+        "astrolift_update_workflow",
+        "astrolift_delete_workflow",
+        "astrolift_preview_workflow_manifest",
+        "astrolift_export_workflow_manifest",
+        "astrolift_import_workflow_manifest",
+        "astrolift_start_workflow_definition",
+        "astrolift_get_workflow_start",
+        "astrolift_list_workflow_runs",
+        "astrolift_get_workflow_execution",
+        "astrolift_list_workflow_execution_stages",
+        "astrolift_control_workflow_execution",
+        "astrolift_list_human_gates",
+        "astrolift_get_human_gate_decision",
+        "astrolift_decide_human_gate",
+        "astrolift_get_workflow_schedule",
+        "astrolift_reconcile_workflow_schedule",
+    }
+)
+
+_WORKFLOW_PAGE_PROPERTIES = {
+    "search": {"type": "string", "maxLength": 1024},
+    "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+    "cursor": {
+        "type": "string",
+        "maxLength": 4096,
+        "description": "Native next_cursor from the preceding page; malformed cursors restart the page.",
+    },
+}
+_DEFINITION_ID = {"type": "string", "format": "uuid"}
+_CONFIGURATION_VERSION = {"type": "integer", "minimum": 1, "maximum": 2147483647}
+_WORKFLOW_CONFIGURATION = {
+    "name": {"type": "string", "minLength": 1, "maxLength": 255},
+    "description": {"type": "string", "maxLength": 65536},
+    "stage_bindings": {
+        "type": "object",
+        "description": "Native stage-order keys mapped to binding objects, including agent_workload_id; validated by the workflow model.",
+    },
+    "inputs": {"type": "object"},
+    "trigger_kind": {"type": "string", "enum": ["manual", "schedule"]},
+    "schedule_cron": {
+        "type": "string",
+        "maxLength": 1024,
+        "description": "Native cron expression; empty string clears it.",
+    },
+    "is_enabled": {"type": "boolean"},
+}
+_EXECUTION_ID = {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 64,
+    "description": "Exact WorkflowRun record ID or GUID returned by the native start or run list.",
+}
+_START_REQUEST_ID = {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 128,
+    "description": "Persist a unique request ID before starting. Recovery is scoped to the original organization and actor.",
+}
+
+
 MCP_TOOL_META: dict[str, dict[str, Any]] = {
+    "astrolift_set_workflow_definition_enabled": {
+        "description": (
+            "Enable or disable an exact owned definition at its reviewed revision. "
+            "Enabling also requires mcp:dispatch, workflow:trigger and current trigger permission. "
+            "Source-managed and nested-parent restrictions still apply. Returns the resulting revision; "
+            "review it before starting. This does not start a run or confirm schedule state."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WORKFLOW_WRITE,),
+        "permission": Permission.WORKFLOW_UPDATE,
+        "inputSchema": _schema(
+            {
+                "definition_id": _DEFINITION_ID,
+                "expected_revision": {"type": "string", "minLength": 64, "maxLength": 64},
+                "is_enabled": {"type": "boolean"},
+            },
+            required=("definition_id", "expected_revision", "is_enabled"),
+        ),
+    },
+    "astrolift_get_workflow": {
+        "description": "Read one exact configured workflow ID, including its configuration version, bindings, inputs and recent runs.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema({"workflow_id": _DEFINITION_ID}, required=("workflow_id",)),
+    },
+    "astrolift_create_workflow": {
+        "description": (
+            "Configure an exact visible definition ID. Defaults to disabled; does not start a run. "
+            "Active schedules additionally require mcp:dispatch and workflow:trigger. "
+            "Retain configuration_saved and schedule results even on failure; do not blindly retry creation."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WORKFLOW_WRITE,),
+        "permission": Permission.WORKFLOW_CREATE,
+        "inputSchema": _schema(
+            {
+                **_WORKFLOW_CONFIGURATION,
+                "definition_id": _DEFINITION_ID,
+                "slug": {"type": "string", "maxLength": 255},
+                "is_enabled": {"type": "boolean", "default": False},
+            },
+            required=("definition_id", "name"),
+        ),
+    },
+    "astrolift_update_workflow": {
+        "description": (
+            "Edit an exact configured workflow at its reviewed version. Omitted fields remain unchanged. "
+            "Repointing a definition also requires create permission at the new owner. "
+            "Any resulting active schedule requires mcp:dispatch and workflow:trigger, including edits to inputs. "
+            "A saved configuration is separate from confirmed engine state; inspect and reconcile uncertain results."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WORKFLOW_WRITE,),
+        "permission": Permission.WORKFLOW_UPDATE,
+        "inputSchema": _schema(
+            {
+                **_WORKFLOW_CONFIGURATION,
+                "workflow_id": _DEFINITION_ID,
+                "definition_id": _DEFINITION_ID,
+                "expected_version": _CONFIGURATION_VERSION,
+            },
+            required=("workflow_id", "expected_version"),
+        ),
+    },
+    "astrolift_delete_workflow": {
+        "description": "Soft-delete an exact configured workflow at its reviewed version and request schedule cleanup. Preserve the returned schedule identity even when cleanup is unconfirmed.",
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WORKFLOW_WRITE,),
+        "permission": Permission.WORKFLOW_DELETE,
+        "inputSchema": _schema(
+            {"workflow_id": _DEFINITION_ID, "expected_version": _CONFIGURATION_VERSION},
+            required=("workflow_id", "expected_version"),
+        ),
+    },
+    "astrolift_get_workflow_schedule": {
+        "description": "Inspect engine-confirmed schedule state for an exact configured workflow ID, including pending cleanup after deletion.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema({"workflow_id": _DEFINITION_ID}, required=("workflow_id",)),
+    },
+    "astrolift_reconcile_workflow_schedule": {
+        "description": (
+            "Reconcile the reviewed configuration version against Temporal and report observed state. "
+            "Active schedules additionally require mcp:dispatch and workflow:trigger scopes and trigger permission; "
+            "cleanup of deleted workflows requires delete permission. Inspect again after stale or uncertain results."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WORKFLOW_WRITE,),
+        "permission": Permission.WORKFLOW_UPDATE,
+        "inputSchema": _schema(
+            {
+                "workflow_id": _DEFINITION_ID,
+                "expected_version": {"type": "integer", "minimum": 1},
+                "expected_active": {"type": "boolean"},
+            },
+            required=("workflow_id", "expected_version", "expected_active"),
+        ),
+    },
+    "astrolift_start_workflow_definition": {
+        "description": (
+            "Start an explicitly reviewed native workflow. Requires the exact definition ID, revision "
+            "and input-schema digest, a persisted request ID, and confirmation. Retry the same request "
+            "after an uncertain response; never generate a replacement ID. Tool errors preserve the "
+            "native result including reserved execution IDs when available."
+        ),
+        "scope": SCOPE_MCP_DISPATCH,
+        "additional_scopes": (SCOPE_WORKFLOW_TRIGGER,),
+        "permission": Permission.WORKFLOW_TRIGGER,
+        "inputSchema": _schema(
+            {
+                "definition_id": _DEFINITION_ID,
+                "expected_revision": {"type": "string", "minLength": 64, "maxLength": 64},
+                "expected_input_schema_digest": {"type": "string", "minLength": 64, "maxLength": 64},
+                "request_id": _START_REQUEST_ID,
+                "inputs": {"type": "object"},
+                "confirmed": {"type": "boolean"},
+            },
+            required=(
+                "definition_id",
+                "expected_revision",
+                "expected_input_schema_digest",
+                "request_id",
+                "confirmed",
+            ),
+        ),
+    },
+    "astrolift_get_workflow_start": {
+        "description": (
+            "Recover the authenticated actor's original workflow start request. Reconciles recorded "
+            "state against Temporal without starting a new execution. Returns start: null for no visible request."
+        ),
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema({"request_id": _START_REQUEST_ID}, required=("request_id",)),
+    },
+    "astrolift_list_workflow_runs": {
+        "description": "Discover permitted native definition runs with pagination, search and status/definition/project filters.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema(
+            {
+                **_WORKFLOW_PAGE_PROPERTIES,
+                "statuses": {"type": "array", "items": {"type": "string"}, "maxItems": 32},
+                "definition_slugs": {"type": "array", "items": {"type": "string"}, "maxItems": 100},
+                "project_slugs": {"type": "array", "items": {"type": "string"}, "maxItems": 100},
+                "started_by_me": {"type": "boolean"},
+            }
+        ),
+    },
+    "astrolift_get_workflow_execution": {
+        "description": "Observe one exact permitted native execution, including terminal state, cleanup state and engine observation errors.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema({"execution_id": _EXECUTION_ID}, required=("execution_id",)),
+    },
+    "astrolift_list_workflow_execution_stages": {
+        "description": "Page through the stage history of one exact permitted execution, including child runs and pending human gates.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema(
+            {
+                "execution_id": _EXECUTION_ID,
+                "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+                "cursor": {
+                    "type": "string",
+                    "maxLength": 4096,
+                    "description": "Execution-bound next_cursor from the preceding stage page.",
+                },
+            },
+            required=("execution_id",),
+        ),
+    },
+    "astrolift_control_workflow_execution": {
+        "description": (
+            "Request native cancel, terminate or cleanup for an exact execution/workflow/run triple. "
+            "A delivered request is not proof of closure: inspect the execution again. "
+            "Termination requires a reason; cleanup requires an already-terminal execution."
+        ),
+        "scope": SCOPE_MCP_DISPATCH,
+        "additional_scopes": (SCOPE_WORKFLOW_TRIGGER,),
+        "permission": Permission.WORKFLOW_TRIGGER,
+        "inputSchema": _schema(
+            {
+                "execution_id": _EXECUTION_ID,
+                "workflow_id": {"type": "string", "minLength": 1, "maxLength": 255},
+                "run_id": {"type": "string", "minLength": 1, "maxLength": 255},
+                "action": {"type": "string", "enum": ["cancel", "terminate", "cleanup"]},
+                "reason": {"type": "string", "maxLength": 2048},
+            },
+            required=("execution_id", "workflow_id", "run_id", "action"),
+        ),
+    },
+    "astrolift_list_human_gates": {
+        "description": "Page through open gates the authenticated caller may decide. Continue next_cursor even on an empty filtered page. Returns public stage/run GUIDs and captured Temporal identities. Named addresses restrict approvers; role/team references defer to workflow.trigger authority.",
+        "scope": SCOPE_MCP_READ,
+        "additional_scopes": (SCOPE_WORKFLOW_TRIGGER,),
+        "permission": Permission.WORKFLOW_TRIGGER,
+        "inputSchema": _schema(
+            {
+                "limit": {"type": "integer", "minimum": 1, "maximum": 200},
+                "cursor": {"type": "string", "maxLength": 4096},
+            }
+        ),
+    },
+    "astrolift_get_human_gate_decision": {
+        "description": "Recover a decision for an exact gate without sending another request. Distinguishes requested, recorded, closed, unbound and unknown states. Requested does not prove the workflow advanced.",
+        "scope": SCOPE_MCP_READ,
+        "additional_scopes": (SCOPE_WORKFLOW_TRIGGER,),
+        "permission": Permission.WORKFLOW_TRIGGER,
+        "inputSchema": _schema(
+            {"execution_id": _DEFINITION_ID, "stage_execution_id": _DEFINITION_ID},
+            required=("execution_id", "stage_execution_id"),
+        ),
+    },
+    "astrolift_decide_human_gate": {
+        "description": "Submit the user's explicit approved/rejected decision to an exact reviewed human gate. Requires confirmed=true; never infer approval from the agent's assessment. The server attributes the authenticated caller, not an impersonated user. Recover uncertain responses with get_human_gate_decision. A conflicting retry cannot replace the accepted decision. Requires workers supporting durable gate updates.",
+        "scope": SCOPE_MCP_DISPATCH,
+        "additional_scopes": (SCOPE_WORKFLOW_TRIGGER,),
+        "permission": Permission.WORKFLOW_TRIGGER,
+        "inputSchema": _schema(
+            {
+                "execution_id": _DEFINITION_ID,
+                "stage_execution_id": _DEFINITION_ID,
+                "temporal_run_id": _DEFINITION_ID,
+                "decision": {"type": "string", "enum": ["approved", "rejected"]},
+                "confirmed": {"type": "boolean", "const": True},
+                "note": {"type": "string", "maxLength": 4096},
+            },
+            required=("execution_id", "stage_execution_id", "temporal_run_id", "decision", "confirmed"),
+        ),
+    },
+    "astrolift_list_workflow_definitions": {
+        "description": "Discover permitted native workflow definitions and stage topology, with search and pagination.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema({**_WORKFLOW_PAGE_PROPERTIES, "project_id": _DEFINITION_ID}),
+    },
+    "astrolift_get_workflow_definition": {
+        "description": "Review an exact workflow definition ID with its native revision and input-schema contract. Does not start a run.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema({"definition_id": _DEFINITION_ID}, required=("definition_id",)),
+    },
+    "astrolift_list_workflows": {
+        "description": "Discover permitted configured native workflows, inputs, bindings and trigger settings, with search and pagination.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema(_WORKFLOW_PAGE_PROPERTIES),
+    },
+    "astrolift_preview_workflow_manifest": {
+        "description": "Validate native Workflow TOML and preview its stages or structured parse errors. Does not save, enable or dispatch anything.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema({"toml": {"type": "string", "maxLength": 262144}}, required=("toml",)),
+    },
+    "astrolift_export_workflow_manifest": {
+        "description": "Export canonical native Workflow TOML for an exact permitted definition ID. Read-only; no slug substitution.",
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.WORKFLOW_READ,
+        "inputSchema": _schema({"definition_id": _DEFINITION_ID}, required=("definition_id",)),
+    },
+    "astrolift_import_workflow_manifest": {
+        "description": (
+            "Import native Workflow TOML into the organization or an explicit project. Defaults to "
+            "preview only; set preview=false to persist a disabled new definition and receive its exact ID. "
+            "replace=true updates the same-slug definition or versions it and repoints compatible configured "
+            "workflows, retaining owner and enabled state. Replacement can affect future scheduled runs. "
+            "Never transfers ownership or starts a run. A new import may uniquify its slug; do not blindly retry writes."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WORKFLOW_WRITE,),
+        "permission": Permission.WORKFLOW_CREATE,
+        "inputSchema": _schema(
+            {
+                "toml": {"type": "string", "maxLength": 262144},
+                "preview": {"type": "boolean", "default": True},
+                "replace": {"type": "boolean", "default": False},
+                "project_id": {"type": "string", "format": "uuid"},
+            },
+            required=("toml",),
+        ),
+    },
     "astrolift_list_agents": {
         "description": "List registered agents and their source/package delivery state.",
         "scope": SCOPE_MCP_READ,

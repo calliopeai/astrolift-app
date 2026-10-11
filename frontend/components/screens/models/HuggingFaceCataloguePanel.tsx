@@ -20,6 +20,7 @@ export interface HuggingFaceCataloguePanelProps {
   selectedRepoId: string | null;
   revision: string;
   onSelect: (repoId: string) => void;
+  onSelectSmallModel?: () => void;
   onRevisionChange: (revision: string) => void;
   resolving: boolean;
   resolvedModel: HuggingFaceModel | null;
@@ -51,6 +52,7 @@ export function HuggingFaceCataloguePanel(props: HuggingFaceCataloguePanelProps)
   } = props;
   const t = useTranslations("models.shared.catalogue");
   const hosting = useTranslations("models.shared.hosting");
+  const usability = useTranslations("models.shared.usability");
   const fmt = useFormatter();
   const id = useId();
   const selection = useRef<HTMLDivElement>(null);
@@ -99,6 +101,21 @@ export function HuggingFaceCataloguePanel(props: HuggingFaceCataloguePanelProps)
           {t("title")}
         </h2>
         <p className="text-muted-foreground text-sm">{t("description")}</p>
+        <div className="space-y-2">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={props.hostingAllowed !== true}
+            onClick={() =>
+              props.onSelectSmallModel
+                ? props.onSelectSmallModel()
+                : onSelect("Qwen/Qwen2.5-0.5B-Instruct")
+            }
+          >
+            {usability("smallModel")}
+          </Button>
+          <p className="text-muted-foreground text-sm">{usability("smallModelHelp")}</p>
+        </div>
         <details className="text-sm">
           <summary className="text-muted-foreground cursor-pointer">
             {hosting("reviewStep")}

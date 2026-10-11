@@ -695,6 +695,9 @@ class Workflow(BaseCoreModel):
         default=TriggerKind.MANUAL,
     )
     schedule_cron = models.CharField(max_length=128, null=True, blank=True)
+    schedule_managed = models.BooleanField(default=False, editable=False)
+    schedule_revision = models.CharField(max_length=64, blank=True, default="", editable=False)
+    schedule_spec_hash = models.CharField(max_length=64, blank=True, default="", editable=False)
     trigger_ref = models.CharField(max_length=200, null=True, blank=True)
     is_enabled = models.BooleanField(default=True)
 
@@ -914,6 +917,11 @@ class WorkflowStageExecution(BaseCoreModel):
     )
     collection_index = models.PositiveSmallIntegerField(null=True, blank=True)
     collection_workflow_id = models.CharField(max_length=512, blank=True, default="")
+    temporal_namespace = models.CharField(max_length=200, blank=True, default="", editable=False)
+    temporal_workflow_id = models.CharField(max_length=512, blank=True, default="", editable=False)
+    temporal_run_id = models.CharField(max_length=200, blank=True, default="", editable=False)
+    temporal_activity_id = models.CharField(max_length=200, blank=True, default="", editable=False)
+    temporal_activity_key = models.CharField(max_length=64, blank=True, default="", editable=False)
     attempt_number = models.IntegerField(
         default=1,
         help_text="1-based retry count — incremented each time the stage is retried.",
@@ -934,6 +942,13 @@ class WorkflowStageExecution(BaseCoreModel):
     error_message = models.TextField(blank=True, default="")
 
     class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["temporal_activity_key"],
+                condition=~models.Q(temporal_activity_key=""),
+                name="wfstageexec_temporal_activity_uq",
+            ),
+        ]
         indexes = [
             models.Index(
                 fields=["workflow_run", "stage"],

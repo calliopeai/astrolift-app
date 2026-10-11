@@ -15,6 +15,7 @@ from astrolift_services.schema.cluster_models import (
     ClusterModelsQuery,
     ProvisionClusterModelInput,
 )
+from astrolift_services.tests.model_hosting_helpers import promote_host_operator
 from astrolift_services.tests.test_cluster_model_foundation_2213 import subject
 from astrolift_services.tests.test_cluster_model_foundation_2213 import world as foundation_world
 from core.permissions import Permission, PermissionDenied
@@ -77,7 +78,9 @@ def test_runtime_review_requires_actual_owner_permission_and_current_provider(wo
     query = ClusterModelsQuery()
     with subject(world), pytest.raises(PermissionDenied):
         query.cluster_model_runtime_admission(make_info(world.user), input=request(world))
-    binding = grant(world, Permission.CLUSTER_UPDATE)
+    grant(world, Permission.CLUSTER_UPDATE)
+    grant(world, Permission.ORG_UPDATE)
+    promote_host_operator(world)
     with subject(world):
         assert query.cluster_model_runtime_admission(make_info(world.user), input=request(world)).eligible
         assert not query.cluster_model_runtime_admission(
@@ -86,7 +89,7 @@ def test_runtime_review_requires_actual_owner_permission_and_current_provider(wo
         assert not query.cluster_model_runtime_admission(
             make_info(world.user), input=request(world, organization_id=GUID(str(world.other_org.guid)))
         ).eligible
-    binding.soft_delete()
+    type(world.user).objects.filter(pk=world.user.pk).update(is_superuser=False)
     with subject(world), pytest.raises(PermissionDenied):
         query.cluster_model_runtime_admission(make_info(world.user), input=request(world))
 

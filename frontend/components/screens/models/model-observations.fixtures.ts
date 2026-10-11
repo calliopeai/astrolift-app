@@ -11,7 +11,7 @@ export const observation = (
   unit,
   value,
   state,
-  source: "prometheus_vllm",
+  source: "vllm",
   observedAt: state === "AVAILABLE" ? observedAt : null,
   aggregationWindowSeconds: key.endsWith("per_second") || key.endsWith("p95") ? 300 : 0,
   samples:

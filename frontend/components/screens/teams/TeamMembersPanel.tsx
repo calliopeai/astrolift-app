@@ -39,6 +39,8 @@ import type { useTeamMembers } from "./use-team-members";
 
 export type TeamMembersPanelProps = ReturnType<typeof useTeamMembers> & {
   team: Pick<AstroliftTeam, "id" | "slug" | "name">;
+  /** A direct TEAM Member is not an ORG Member identity for newer person tabs. */
+  memberHref?: ((member: AstroliftMember) => string) | null;
 };
 
 const TONE: Record<string, Dot> = { active: "ok", invited: "warn", suspended: "warn" };
@@ -63,6 +65,7 @@ export function TeamMembersPanel({
   canManageTeamMembers,
   assigning,
   onAssign,
+  memberHref,
 }: TeamMembersPanelProps) {
   const t = useTranslations("lists.teamMembersBulk");
   const mt = useTranslations("teams.members");
@@ -138,7 +141,9 @@ export function TeamMembersPanel({
         columns={columns}
         rows={rows}
         getRowId={(m) => m.id}
-        rowHref={(m) => `${PEOPLE_HREF}/${m.id}`}
+        rowHref={
+          memberHref === null ? undefined : (memberHref ?? ((m) => `${PEOPLE_HREF}/${m.id}`))
+        }
         loading={loading}
         error={error}
         onRetry={onRetry}

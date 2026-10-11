@@ -9,11 +9,24 @@ export const sharedModelDraftSchema = z
     gpuCount: z.string().regex(/^\d+$/),
     cpuKvCacheGiB: z.string().regex(/^$|^[1-9]\d*$/),
     allowSubscriptions: z.boolean(),
+    dtype: z.enum(["", "AUTO", "FLOAT16", "BFLOAT16", "FLOAT32"]).optional(),
+    maxModelLen: z
+      .string()
+      .regex(/^$|^[1-9]\d*$/)
+      .optional(),
+    maxNumSeqs: z
+      .string()
+      .regex(/^$|^[1-9]\d*$/)
+      .optional(),
   })
   .refine(
     (draft) =>
       draft.computeMode !== "" &&
-      (draft.computeMode === "cpu" ? Number(draft.gpuCount) === 0 : Number(draft.gpuCount) > 0)
+      (draft.computeMode === "cpu"
+        ? Number(draft.gpuCount) === 0 &&
+          /^[1-9]\d*$/.test(draft.cpuKvCacheGiB) &&
+          Number(draft.cpuKvCacheGiB) <= 1024
+        : Number(draft.gpuCount) > 0)
   );
 export type SharedModelDraft = {
   name: string;
@@ -23,6 +36,9 @@ export type SharedModelDraft = {
   gpuCount: string;
   cpuKvCacheGiB: string;
   allowSubscriptions: boolean;
+  dtype?: "" | "AUTO" | "FLOAT16" | "BFLOAT16" | "FLOAT32";
+  maxModelLen?: string;
+  maxNumSeqs?: string;
 };
 export type SharedModelSource =
   | { repoId: string; revisionSha: string }
@@ -49,6 +65,9 @@ export type SharedModelRequest = {
   allowSubscriptions: boolean;
   connectionId: string | null;
   expectedConnectionVersion: number | null;
+  dtype: "AUTO" | "FLOAT16" | "BFLOAT16" | "FLOAT32" | null;
+  maxModelLen: number | null;
+  maxNumSeqs: number | null;
 };
 export function sharedModelRequest(
   organizationId: string,
@@ -82,6 +101,13 @@ export function sharedModelRequest(
     (cpuKvCacheGiB !== null && !Number.isSafeInteger(cpuKvCacheGiB))
   )
     return null;
+  for (const [raw, low, high] of [
+    [value.maxModelLen, 256, 131072],
+    [value.maxNumSeqs, 1, 4096],
+  ] as const) {
+    if (raw && (!Number.isSafeInteger(Number(raw)) || Number(raw) < low || Number(raw) > high))
+      return null;
+  }
   return {
     organizationId,
     clusterId: cluster.id,
@@ -97,6 +123,9 @@ export function sharedModelRequest(
     gpuCount,
     cpuKvCacheGiB: value.computeMode === "cpu" ? cpuKvCacheGiB : null,
     allowSubscriptions: value.allowSubscriptions,
+    dtype: value.dtype || null,
+    maxModelLen: value.maxModelLen ? Number(value.maxModelLen) : null,
+    maxNumSeqs: value.maxNumSeqs ? Number(value.maxNumSeqs) : null,
     ...(connection ?? { connectionId: null, expectedConnectionVersion: null }),
   };
 }

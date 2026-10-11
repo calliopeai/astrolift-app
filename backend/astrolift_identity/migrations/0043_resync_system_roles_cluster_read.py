@@ -34,7 +34,7 @@ def upsert_system_roles(apps, schema_editor):
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("astrolift_identity", "0041_merge_agent_enforcement_scim_groups"),
+        ("astrolift_identity", "0042_team_membership_actions"),
     ]
 
     operations = [

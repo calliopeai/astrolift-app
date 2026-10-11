@@ -523,9 +523,9 @@ def _unique_definition_slug(base_slug: str, organization) -> str:
 
 
 def create_definition_from_manifest(
-    parsed: ParsedWorkflowManifest, *, organization, created_by=None, is_enabled: bool = False
+    parsed: ParsedWorkflowManifest, *, organization, created_by=None, is_enabled: bool = False, project=None
 ):
-    """Persist a structured manifest as an org-scoped ``WorkflowDefinition`` +
+    """Persist a structured manifest as an org/project-owned ``WorkflowDefinition`` +
     its ordered stages. The single create path shared by the visual-flow
     importers (#984) and any future native-TOML create surface — it consumes
     the same ``ParsedWorkflowManifest`` the parser and importers emit, so the
@@ -537,21 +537,30 @@ def create_definition_from_manifest(
     matching org workload already exists; otherwise they remain late-bound
     and can resolve after that agent is registered. An explicit GUID never selects
     a sibling or a same-slug replacement. The definition slug is made unique
-    within the org on collision.
+    within the org on collision. An explicit project must be live in that org.
 
     ``is_enabled`` defaults to ``False`` for a brand-new import; the
     ``replace``-versioning path (#1822) passes the superseded definition's
-    own ``is_enabled`` so a version created to replace an already-enabled,
+    own ``is_enabled`` and project owner so a version created to replace an already-enabled,
     in-use definition does not land disabled under configured Workflows that
     keep firing on a schedule.
     """
     from workflows.back_edges import SUPPORTED_EXECUTOR_PATTERNS
 
+    if project is not None and (
+        organization is None
+        or project.organization_id != organization.pk
+        or project.deleted_at is not None
+        or project.team.organization_id != organization.pk
+        or project.team.deleted_at is not None
+    ):
+        raise ManifestError("Import requires a live project in the destination organization", path="project")
     if parsed.definition.pattern not in SUPPORTED_EXECUTOR_PATTERNS:
         raise ManifestError("This workflow pattern has no supported executor", path="workflow.pattern")
     slug = _unique_definition_slug(parsed.definition.slug, organization)
     definition = WorkflowDefinition.objects.create(
         organization=organization,
+        project=project,
         name=parsed.definition.name,
         slug=slug,
         description=parsed.definition.description or "",
@@ -794,7 +803,11 @@ def replace_definition_from_manifest(
             return ReplaceOutcome(definition=existing, mode="updated_in_place")
 
         new_definition = create_definition_from_manifest(
-            parsed, organization=organization, created_by=created_by, is_enabled=existing.is_enabled
+            parsed,
+            organization=organization,
+            created_by=created_by,
+            is_enabled=existing.is_enabled,
+            project=existing.project,
         )
 
         configured = list(

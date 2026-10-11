@@ -15,13 +15,14 @@ from astrolift_identity.schema.types import (
     ProjectType,
     TeamType,
 )
+from astrolift_identity.team_membership_schema import TeamMembershipMutation, TeamMembershipQuery
 
 
 # Compose the per-user connected-accounts surface into the identity
 # Query / Mutation roots so ``config.schema`` doesn't need to learn
 # about the new domain — it already merges ``IdentityQuery`` and
 # ``IdentityMutation`` into the root schema.
-class IdentityQuery(_BaseIdentityQuery, MyConnectedAccountsQuery):
+class IdentityQuery(_BaseIdentityQuery, MyConnectedAccountsQuery, TeamMembershipQuery):
     pass
 
 
@@ -29,6 +30,7 @@ class IdentityMutation(
     _BaseIdentityMutation,
     MyConnectedAccountsMutation,
     IdentityAnonymizeUserMutation,
+    TeamMembershipMutation,
 ):
     pass
 

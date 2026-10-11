@@ -118,3 +118,11 @@ export const NewSubscriptionsDisabled: Story = {
     deployment: { ...subscriptionProps.deployment, subscriptionsEnabled: false },
   },
 };
+
+/** Multiple subscriptions to one app are not multiple connected apps. */
+export const VisibleAppSummary: Story = {
+  args: {
+    ...subscriptionProps,
+    subscriptions: { ...subscriptionProps.subscriptions, totalCount: 12 },
+  },
+};

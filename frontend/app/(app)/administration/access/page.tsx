@@ -1,10 +1,8 @@
-import { redirect } from "next/navigation";
-
-import { PEOPLE_HREF } from "@/components/screens/administration/access/access-nav";
+import { AccessLandingClient } from "@/components/screens/administration/access/team-memberships/AccessLandingClient";
 
 export const metadata = { title: "Access · Astrolift" };
 
-/** Admin › Access lands on People (access UX design 3.1). */
+/** Current credential decides People versus Teams; broad module visibility does not. */
 export default function AccessPage() {
-  redirect(PEOPLE_HREF);
+  return <AccessLandingClient />;
 }

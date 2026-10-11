@@ -1,3 +1,4 @@
+import en from "../messages/en.json";
 import { expect, test } from "@playwright/test";
 
 const modelId = "22222222-2222-4222-8222-222222222222";
@@ -19,7 +20,10 @@ for (const action of ["update", "deprovision", "refuse-deprovision"] as const) {
     page.setDefaultTimeout(15_000);
     await page.goto("/models");
     await page.getByRole("link", { name: /Controlled shared CPU model/ }).click();
-    const section = page.getByRole("region", { name: "Deployment management", exact: true });
+    const section = page.getByRole("region", {
+      name: en.models.shared.inventory.settings,
+      exact: true,
+    });
     await page
       .getByLabel("Prompt", { exact: true })
       .fill("Inspect admission without running a prompt.");
@@ -53,11 +57,18 @@ for (const action of ["update", "deprovision", "refuse-deprovision"] as const) {
       ifMatchVersion: 5,
       ...(action === "update"
         ? {
+            name: "Controlled shared CPU model",
             cpuRequest: "3",
             memoryRequest: "8Gi",
             gpuCount: 0,
             cpuKvCacheGiB: 2,
             allowSubscriptions: true,
+            dtype: "FLOAT32",
+            maxModelLen: 512,
+            maxNumSeqs: 1,
+            sharingMode: "SHARED",
+            dedicatedAppId: null,
+            ifMatchDedicatedAppVersion: null,
           }
         : { deleteData: false }),
     };
@@ -116,13 +127,27 @@ for (const action of ["subscribe", "revoke"] as const) {
     page.setDefaultTimeout(15_000);
     await page.goto("/models");
     await page.getByRole("link", { name: /Controlled shared CPU model/ }).click();
-    const section = page.getByRole("region", { name: "App subscriptions", exact: true });
+    if (action === "subscribe")
+      await page
+        .getByRole("button", { name: en.models.shared.connections.add, exact: true })
+        .click();
+    const section = page.getByRole("region", {
+      name:
+        action === "subscribe"
+          ? en.models.shared.connections.add
+          : en.models.shared.inventory.connections,
+      exact: true,
+    });
     if (action === "subscribe") {
       await section
         .getByRole("button", { name: "controlled-app / production", exact: true })
         .click();
-      await section.getByLabel("Subscription alias", { exact: true }).fill("assistant");
-      await section.getByRole("button", { name: "Review subscription", exact: true }).click();
+      await section
+        .getByLabel(en.models.shared.connections.alias, { exact: true })
+        .fill("assistant");
+      await section
+        .getByRole("button", { name: en.models.shared.connections.review, exact: true })
+        .click();
     } else {
       await section
         .getByRole("row")
@@ -131,24 +156,38 @@ for (const action of ["subscribe", "revoke"] as const) {
         .click();
     }
     const confirmation = page.getByRole("alertdialog");
-    await expect(confirmation).toContainText("All consumers may temporarily lose access.");
+    await expect(confirmation).toContainText(
+      action === "subscribe"
+        ? en.models.shared.connections.restartNotice
+        : "All consumers may temporarily lose access."
+    );
     expect(await (await context.request.get(`${api}/observations/model-writes`)).json()).toEqual(
       []
     );
     await confirmation
       .getByRole("button", {
-        name: action === "subscribe" ? "Request subscription" : "Request revocation",
+        name: action === "subscribe" ? en.models.shared.connections.connect : "Request revocation",
         exact: true,
       })
       .click();
     await expect(
       section.getByText(
-        "Request accepted. Waiting for restart and readiness; the requested access change is not yet confirmed.",
+        action === "subscribe"
+          ? en.models.shared.connections.connectionQueued
+          : "Request accepted. Waiting for restart and readiness; the requested access change is not yet confirmed.",
         { exact: true }
       )
     ).toBeVisible();
+    if (action === "subscribe")
+      await page
+        .getByRole("button", { name: en.models.shared.connections.connections, exact: true })
+        .click();
+    const currentConnections = page.getByRole("region", {
+      name: en.models.shared.inventory.connections,
+      exact: true,
+    });
     await expect(
-      section
+      currentConnections
         .getByRole("row")
         .filter({ hasText: action === "subscribe" ? "MODEL_ASSISTANT_" : "MODEL_CHAT_" })
     ).toContainText(
@@ -156,9 +195,9 @@ for (const action of ["subscribe", "revoke"] as const) {
         ? "Pending restart and readiness"
         : "Revocation pending restart and readiness"
     );
-    await expect(section.getByRole("row").filter({ hasText: "MODEL_SEARCH_" })).toContainText(
-      "Active"
-    );
+    await expect(
+      currentConnections.getByRole("row").filter({ hasText: "MODEL_SEARCH_" })
+    ).toContainText("Active");
     const input =
       action === "subscribe"
         ? {
@@ -208,7 +247,9 @@ for (const computeMode of ["cpu", "gpu"] as const) {
     ]);
     page.setDefaultTimeout(15_000);
     await page.goto("/models");
-    await page.getByRole("link", { name: "Host a model", exact: true }).click();
+    await page
+      .getByRole("link", { name: en.models.shared.inventory.addModel, exact: true })
+      .click();
     await expect(page.getByRole("heading", { name: "Host a model", exact: true })).toBeVisible();
     const journey = page.getByRole("navigation", { name: "Hosting setup", exact: true });
     await expect(journey).toContainText("Choose model");
@@ -225,7 +266,7 @@ for (const computeMode of ["cpu", "gpu"] as const) {
     await expect(modelChoice).toBeVisible();
     if (computeMode === "cpu")
       await page.screenshot({
-        path: "/tmp/astrolift-hosting-ux-source.png",
+        path: testInfo.outputPath("hosting-source.png"),
         animations: "disabled",
       });
     await modelChoice.click();
@@ -235,11 +276,17 @@ for (const computeMode of ["cpu", "gpu"] as const) {
     await page
       .getByRole("button", { name: "Controlled shared cluster · shared-fixture", exact: true })
       .click();
+    await expect(page.getByLabel("Deployment name", { exact: true })).toHaveValue("Qwen3-0.6B");
     await page.getByLabel("Deployment name", { exact: true }).fill(deploymentName);
     await page.getByLabel(computeMode.toUpperCase(), { exact: true }).check();
     if (computeMode === "gpu")
       await page.getByLabel("Requested GPU devices", { exact: true }).fill("1");
     await page.getByLabel("Enable named app subscriptions", { exact: true }).check();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
+    await expect(page.getByRole("radio", { name: "CPU", exact: true })).toHaveCount(0);
+    await expect(
+      page.getByRole("button", { name: "Controlled shared cluster · shared-fixture", exact: true })
+    ).toHaveCount(0);
     const review = page.getByRole("button", { name: "Review deployment", exact: true });
     await expect(
       page.getByText("Read access confirmed for this repository and revision.", { exact: true })
@@ -261,12 +308,12 @@ for (const computeMode of ["cpu", "gpu"] as const) {
         .getByRole("heading", { name: "3. Review hosting checks", exact: true })
         .scrollIntoViewIfNeeded();
       await page.screenshot({
-        path: "/tmp/astrolift-hosting-ux-checks.png",
+        path: testInfo.outputPath("hosting-checks.png"),
         animations: "disabled",
       });
       await page.setViewportSize({ width: 768, height: 1024 });
       await page.screenshot({
-        path: "/tmp/astrolift-hosting-ux-checks-768.png",
+        path: testInfo.outputPath("hosting-checks-768.png"),
         animations: "disabled",
       });
       await page.setViewportSize({ width: 1440, height: 1000 });
@@ -308,8 +355,11 @@ for (const computeMode of ["cpu", "gpu"] as const) {
           cpuRequest: "2",
           memoryRequest: "8Gi",
           gpuCount: computeMode === "cpu" ? 0 : 1,
-          cpuKvCacheGiB: null,
+          cpuKvCacheGiB: computeMode === "cpu" ? 2 : null,
           allowSubscriptions: true,
+          dtype: null,
+          maxModelLen: null,
+          maxNumSeqs: null,
         },
       },
     ]);
@@ -368,7 +418,9 @@ test("shared catalogue reaches app-free CPU deployment, honest density and an ex
   page.on("pageerror", (error) => errors.push(error.message));
   page.setDefaultTimeout(15_000);
   await page.goto("/models");
-  await expect(page.getByRole("heading", { name: "Shared models", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: en.models.shared.inventory.title, exact: true })
+  ).toBeVisible();
   await page.getByRole("link", { name: /Controlled shared CPU model/ }).click();
   await expect(page).toHaveURL(new RegExp(`/models/shared/${modelId}$`));
   await expect(
@@ -376,7 +428,7 @@ test("shared catalogue reaches app-free CPU deployment, honest density and an ex
   ).toBeVisible();
   await expect(page.getByText("Qwen/Qwen3-0.6B", { exact: true })).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Observed model metrics", exact: true })
+    page.getByRole("heading", { name: en.models.shared.inventory.metrics, exact: true })
   ).toBeVisible();
   await expect(page.getByText("Showing 1 of 1 shared models; snapshot limit 20.")).toBeVisible();
   await expect(
@@ -414,6 +466,72 @@ test("shared catalogue reaches app-free CPU deployment, honest density and an ex
     ],
   });
   await page.getByRole("link", { name: "Open full cluster catalogue", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Shared models", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: en.models.shared.inventory.title, exact: true })
+  ).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test("small model wizard preserves steps and submits only its reviewed immutable CPU request", async ({
+  page,
+  context,
+}, testInfo) => {
+  const api = `http://127.0.0.1:${process.env.ROUTE_API_PORT ?? 6172}`;
+  expect((await context.request.post(`${api}/observations/reset`)).status()).toBe(204);
+  await context.addCookies([
+    { name: "sessionid", value: "owner", url: testInfo.project.use.baseURL! },
+    { name: "backend_jwt", value: "route-fixture-token", url: testInfo.project.use.baseURL! },
+  ]);
+  await page.goto("/models/deploy");
+  await page.getByRole("button", { name: "Choose a small test model", exact: true }).click();
+  await page.getByRole("button", { name: "Choose cluster and check access", exact: true }).click();
+  const name = page.getByLabel("Deployment name", { exact: true });
+  await expect(name).toHaveValue("Qwen2.5-0.5B-Instruct");
+  await expect(page.getByRole("button", { name: "Review deployment", exact: true })).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Controlled shared cluster · shared-fixture", exact: true })
+    .click();
+  await page.getByRole("radio", { name: "CPU", exact: true }).check();
+  await expect(page.getByLabel("CPU KV-cache request (GiB)", { exact: true })).toHaveValue("1");
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(page.getByRole("radio", { name: "CPU", exact: true })).toHaveCount(0);
+  const license = page.getByRole("checkbox", {
+    name: "I reviewed the model license and permitted use for this deployment.",
+    exact: true,
+  });
+  await license.check();
+  await page
+    .getByRole("link", { name: "Review CPU, memory and GPU requests", exact: true })
+    .click();
+  await expect(page.getByLabel("CPU request", { exact: true })).toBeFocused();
+  await expect(name).toHaveValue("Qwen2.5-0.5B-Instruct");
+  await page.getByRole("button", { name: "Next", exact: true }).click();
+  await expect(license).toBeChecked();
+  await expect(
+    page.getByRole("link", { name: "Review cluster runtime configuration", exact: true })
+  ).toHaveAttribute("target", "_blank");
+  expect(await (await context.request.get(`${api}/observations/model-writes`)).json()).toEqual([]);
+  await page.getByRole("button", { name: "Review deployment", exact: true }).click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Request deployment", exact: true })
+    .click();
+  await expect(page.getByRole("link", { name: "Open deployment", exact: true })).toBeVisible();
+  const writes = await (await context.request.get(`${api}/observations/model-writes`)).json();
+  expect(writes).toHaveLength(1);
+  expect(writes[0].input).toMatchObject({
+    name: "Qwen2.5-0.5B-Instruct",
+    modelRepo: "Qwen/Qwen2.5-0.5B-Instruct",
+    cpuRequest: "1",
+    memoryRequest: "4Gi",
+    revisionSha: "a".repeat(40),
+    clusterId,
+    expectedProviderId: providerId,
+    computeMode: "cpu",
+    gpuCount: 0,
+    cpuKvCacheGiB: 1,
+    dtype: "FLOAT32",
+    maxModelLen: 256,
+    maxNumSeqs: 1,
+  });
 });

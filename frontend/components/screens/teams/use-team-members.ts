@@ -29,7 +29,10 @@ interface TeamMembersResp {
  * role-assign mutation (#416 scope B). `team` null (the page is still
  * finding the team) runs nothing.
  */
-export function useTeamMembers(team: Pick<AstroliftTeam, "id"> | null) {
+export function useTeamMembers(
+  team: Pick<AstroliftTeam, "id"> | null,
+  options: { fresh?: boolean } = {}
+) {
   const t = useTranslations("lists.teamMembersBulk");
   const mt = useTranslations("teams.members");
   const perms = useMyPermissions();
@@ -40,11 +43,13 @@ export function useTeamMembers(team: Pick<AstroliftTeam, "id"> | null) {
   const { data, loading, error, refetch } = useQuery<TeamMembersResp>(LIST_TEAM_MEMBERS, {
     variables: { teamId: team?.id },
     skip: !team,
-    fetchPolicy: "cache-and-network",
+    fetchPolicy: options.fresh ? "no-cache" : "cache-and-network",
+    context: options.fresh ? { queryDeduplication: false } : undefined,
   });
   const roles = useQuery<{ astroliftRoles: AstroliftRole[] }>(LIST_ROLES, {
     skip: !team || !canManageTeamMembers,
-    fetchPolicy: "cache-first",
+    fetchPolicy: options.fresh ? "no-cache" : "cache-first",
+    context: options.fresh ? { queryDeduplication: false } : undefined,
   });
   // Team-grantable levels only, so the assign dialog never offers a
   // PROJECT or APP role the backend would reject.

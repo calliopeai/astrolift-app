@@ -13,6 +13,11 @@ from datetime import datetime
 
 import strawberry
 
+from astrolift_workflows.schema.stage_temporal_types import (
+    WorkflowStageTemporalExecution,
+    stage_temporal_execution,
+)
+
 JSON = strawberry.scalars.JSON
 
 
@@ -139,6 +144,9 @@ class PendingHumanGateType:
     """
 
     execution_id: str
+    execution_guid: str
+    stage_guid: str
+    temporal_execution: WorkflowStageTemporalExecution | None
     run_guid: str
     workflow_id: str
     definition_slug: str
@@ -155,6 +163,7 @@ class ConfiguredWorkflowType:
     entitlement gates."""
 
     guid: str
+    version: int
     name: str
     slug: str
     description: str
@@ -164,6 +173,7 @@ class ConfiguredWorkflowType:
     inputs: JSON
     stage_bindings: JSON
     organization_guid: str | None
+    definition_guid: str
     definition_slug: str
     definition_name: str
     pattern_kind: str
@@ -331,6 +341,9 @@ def pending_gate_to_type(execution) -> PendingHumanGateType:
     approvers = stage.approvers if isinstance(stage.approvers, list) else []
     return PendingHumanGateType(
         execution_id=str(execution.pk),
+        execution_guid=str(execution.guid),
+        stage_guid=str(stage.guid),
+        temporal_execution=stage_temporal_execution(execution),
         run_guid=str(run.guid),
         workflow_id=run.workflow_id,
         definition_slug=definition.slug or "",
@@ -349,6 +362,7 @@ def workflow_to_type(workflow, *, with_runs: bool = False) -> ConfiguredWorkflow
         ]
     return ConfiguredWorkflowType(
         guid=str(workflow.guid),
+        version=workflow.version,
         name=workflow.name,
         slug=workflow.slug or "",
         description=workflow.description or "",
@@ -358,6 +372,7 @@ def workflow_to_type(workflow, *, with_runs: bool = False) -> ConfiguredWorkflow
         inputs=workflow.inputs or {},
         stage_bindings=workflow.stage_bindings or {},
         organization_guid=(None if workflow.organization_id is None else str(workflow.organization.guid)),
+        definition_guid=str(workflow.definition.guid),
         definition_slug=workflow.definition.slug or "",
         definition_name=workflow.definition.name,
         pattern_kind=workflow.definition.pattern_kind,

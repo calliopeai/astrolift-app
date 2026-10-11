@@ -77,20 +77,27 @@ export function useNumberedListQuery<TRow, F extends object>(
     toFilter,
     variables = {},
     skip = false,
+    freshOnly = false,
   }: {
     toFilter: (filters: Record<string, string>) => F;
     variables?: Record<string, unknown>;
     skip?: boolean;
+    /** Scope-keyed callers require a fresh response instead of shared cache data. */
+    freshOnly?: boolean;
   }
 ): ListPageData<TRow> {
   const { state } = list;
   const result = useQuery(query, {
     variables: { ...variables, ...numberedVariables(state, toFilter(list.filters)) },
     skip,
-    fetchPolicy: "cache-and-network",
+    fetchPolicy: freshOnly ? "no-cache" : "cache-and-network",
+    context: freshOnly ? { queryDeduplication: false } : undefined,
   });
   const fresh = extract(result.data);
-  const page = fresh ?? extract(result.previousData);
+  const page =
+    freshOnly && (skip || result.loading || result.error)
+      ? null
+      : (fresh ?? (!freshOnly ? extract(result.previousData) : null));
   return {
     rows: page?.items ?? [],
     totalCount: page?.totalCount ?? null,

@@ -9,7 +9,11 @@ import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
-import { accessCrumbs, TEAMS_HREF } from "@/components/screens/administration/access/access-nav";
+import {
+  accessCrumbs,
+  TEAMS_HREF,
+  type AccessFunction,
+} from "@/components/screens/administration/access/access-nav";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { AstroliftTeam } from "@/graphql/identity/identity.types";
@@ -18,6 +22,7 @@ import { useFormatters } from "@/lib/i18n/formatters";
 import type { useTeams } from "./use-teams";
 
 export type TeamsScreenProps = ReturnType<typeof useTeams> & {
+  accessFunctions?: readonly AccessFunction[];
   /** The create-team sheet; it runs its own mutation, so the route supplies it. */
   renderCreateDialog: (props: {
     open: boolean;
@@ -50,6 +55,7 @@ export function TeamsScreen({
   onDelete,
   renderCreateDialog,
   renderEditDialog,
+  accessFunctions,
 }: TeamsScreenProps) {
   const copy = useTranslations("teams");
   const fmt = useFormatters();
@@ -94,7 +100,7 @@ export function TeamsScreen({
     <div className="flex min-w-0 flex-1 flex-col p-6">
       <ListPage<AstroliftTeam>
         header={{
-          crumbs: accessCrumbs("teams"),
+          crumbs: accessCrumbs("teams", undefined, accessFunctions),
           title: copy("title"),
           context: copy("context"),
           primaryAction: (
@@ -111,7 +117,7 @@ export function TeamsScreen({
         columns={columns}
         rows={rows}
         getRowId={(team) => team.id}
-        rowHref={(team) => `${TEAMS_HREF}/${encodeURIComponent(team.slug)}`}
+        rowHref={(team) => `${TEAMS_HREF}/${encodeURIComponent(team.slug)}/members`}
         rowActions={
           canUpdate || canDelete
             ? (team) => (
