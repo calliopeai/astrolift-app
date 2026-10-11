@@ -29,7 +29,7 @@ SPEC = ProvisionSpec(
     service_handle_hint="webhook",
     size="small",
     binding_id="binding-id",
-    managed_service_id="managed-id",
+    managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
 )
 MSID = SPEC.managed_service_id
 
@@ -194,7 +194,7 @@ def test_provision_reconciles_full_gen2_function(
     assert function["serviceConfig"]["vpcConnectorEgressSettings"] == "ALL_TRAFFIC"
     assert function["eventTrigger"]["eventFilters"][0]["attribute"] == "type"
     assert function["kmsKeyName"].endswith("/functions")
-    assert function["labels"]["astrolift-io-managed-service-id"] == "managed-id"
+    assert function["labels"]["astrolift-io-managed-service-id"] == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
 
 
 def test_repeated_provision_is_idempotent(
@@ -850,7 +850,7 @@ def test_tenant_labels_in_the_platform_namespace_are_refused(
     client: FakeFunctions,
     key: str,
 ) -> None:
-    cfg = {**_full_config(), "labels": {key: "managed-id"}}
+    cfg = {**_full_config(), "labels": {key: "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"}}
     refused = driver.provision(replace(SPEC, managed_service_id="managed-b", config=cfg))
     assert not refused.ok and "Astrolift-reserved" in refused.message
     assert not [call for call in client.calls if call[0] in {"create", "patch", "delete"}]
@@ -896,4 +896,28 @@ def test_an_unmarked_function_needs_the_exclusive_record_and_is_then_marked(
         ),
     )
     assert proven.ok, proven.message
-    assert client.resources[FUNCTION]["labels"]["astrolift-io-managed-service-id"] == "managed-id"
+    assert (
+        client.resources[FUNCTION]["labels"]["astrolift-io-managed-service-id"]
+        == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
+    )
+
+
+def test_a_recorded_legacy_name_is_kept(driver) -> None:
+    assert (
+        driver._function_id(
+            replace(SPEC, config={}, recorded_handle="faas/us-central1/astrolift-acme-billing-prod-fn"), {}
+        )
+        == "astrolift-acme-billing-prod-fn"
+    )
+
+
+def test_slug_joins_that_collide_get_distinct_new_names(driver) -> None:
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one name before #2032.
+    first = driver._function_id(replace(SPEC, config={}, organization_slug="acme", app_slug="web-prod"), {})
+    second = driver._function_id(
+        replace(SPEC, config={}, organization_slug="acme-web", app_slug="prod", managed_service_id=OTHER_SERVICE_ID), {}
+    )
+    assert first != second and len(first) <= 63
+
+
+OTHER_SERVICE_ID = "0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4"

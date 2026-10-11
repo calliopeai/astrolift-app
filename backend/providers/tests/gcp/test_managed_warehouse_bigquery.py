@@ -197,7 +197,7 @@ def _spec(config: dict[str, Any] | None = None) -> ProvisionSpec:
         config=config or {},
         tags={"Data Class": "Internal"},
         binding_id="binding-1",
-        managed_service_id="service-1",
+        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
 
 
@@ -264,7 +264,7 @@ def _full_config() -> dict[str, Any]:
 
 def test_provision_reconciles_dataset_capacity_reservation_and_assignment(harness: Harness) -> None:
     result = _provision(harness, _full_config())
-    assert result.handle == "warehouse/astrolift_acme_analytics_prod_events"
+    assert result.handle == "warehouse/astrolift_6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     assert not result.ready
     dataset = next(iter(harness.state.datasets.values()))
     assert dataset["location"] == "US"
@@ -747,12 +747,35 @@ def test_rest_client_maps_not_found_and_provider_errors() -> None:
         denied.get_dataset("acme", "events")
 
 
+OTHER_SERVICE_ID = "0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4"
+
+
 def test_provision_does_not_adopt_another_services_resource(harness) -> None:
-    """Names are slug-joined, so another service can map to this one's name (#1961)."""
+    """A recorded handle naming another service's dataset is refused (#1961)."""
     import dataclasses
 
-    first = harness.driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-a"))
-    second = harness.driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-b"))
+    first = harness.driver.provision(_spec())
+    second = harness.driver.provision(
+        dataclasses.replace(_spec(), managed_service_id=OTHER_SERVICE_ID, recorded_handle=first.handle)
+    )
 
     assert first.ok, first.message
     assert not second.ok and "refusing to adopt" in second.message
+
+
+def test_a_recorded_legacy_dataset_keeps_its_id(harness) -> None:
+    import dataclasses
+
+    recorded = dataclasses.replace(_spec(), recorded_handle="warehouse/astrolift_acme_analytics_prod_events")
+    assert harness.driver._dataset_id(recorded) == "astrolift_acme_analytics_prod_events"
+
+
+def test_slug_joins_that_collide_get_distinct_new_dataset_ids(harness) -> None:
+    import dataclasses
+
+    # "acme" + "web_prod" and "acme_web" + "prod" joined to one dataset before #2032.
+    first = harness.driver._dataset_id(dataclasses.replace(_spec(), organization_slug="acme", app_slug="web-prod"))
+    second = harness.driver._dataset_id(
+        dataclasses.replace(_spec(), organization_slug="acme-web", app_slug="prod", managed_service_id=OTHER_SERVICE_ID)
+    )
+    assert first != second and "-" not in first

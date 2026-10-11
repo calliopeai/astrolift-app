@@ -175,12 +175,15 @@ def spec(**config: Any) -> ProvisionSpec:
             "domains": ["portal.example.com"],
             **config,
         },
-        managed_service_id="service-id",
+        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
 
 
 def marker(*, adopted: bool = False) -> str:
-    value = "Astrolift managed CDN; stack=portal-cdn; boundary=acme/portal/prod/cluster-id; resource=service-id"
+    value = (
+        "Astrolift managed CDN; stack=portal-cdn; boundary=acme/portal/prod/cluster-id; "
+        "resource=6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
+    )
     return f"{value}; adopted=true" if adopted else value
 
 
@@ -432,7 +435,7 @@ def test_another_services_stack_resource_is_not_taken_over(
     driver: CloudCdnDriver,
     fake: FakeCompute,
 ) -> None:
-    other = marker().replace("resource=service-id", "resource=other-service")
+    other = marker().replace("resource=6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b", "resource=other-service")
     fake.resources["backendBuckets"]["portal-cdn-bucket"] = {
         "name": "portal-cdn-bucket",
         "description": other,
@@ -778,3 +781,29 @@ def test_a_resource_adopted_before_2074_keeps_its_marker_through_reprovision_and
     assert fake.resources["urlMaps"]["portal-cdn-map"]["description"] == marker(adopted=True)
     blocked = driver.deprovision(DeprovisionSpec("cdn/portal-cdn", {"deletion_protection": False}))
     assert not blocked.ok and "delete_adopted_resources=true" in blocked.message
+
+
+def test_a_recorded_legacy_stack_keeps_its_id(driver) -> None:
+    import dataclasses
+
+    recorded = dataclasses.replace(spec(), recorded_handle="cdn/astrolift-acme-portal-prod-cdn")
+    assert driver._stack_id(recorded) == "astrolift-acme-portal-prod-cdn"
+
+
+OTHER_SERVICE_ID = "0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4"
+
+
+def test_slug_joins_that_collide_get_distinct_new_stack_ids(driver) -> None:
+    import dataclasses
+
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one stack before #2032.
+    first = driver._stack_id(dataclasses.replace(spec(), organization_slug="acme", app_slug="web-prod"))
+    second = driver._stack_id(
+        dataclasses.replace(
+            spec(),
+            organization_slug="acme-web",
+            app_slug="prod",
+            managed_service_id=OTHER_SERVICE_ID,
+        )
+    )
+    assert first != second and len(first) <= 48

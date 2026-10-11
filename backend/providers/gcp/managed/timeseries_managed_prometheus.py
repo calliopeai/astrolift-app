@@ -72,6 +72,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from _sdk.physical_naming import managed_service_identity, physical_name, recorded_resource_name
 from gcp.managed._ownership import label_adoption_refusal
 
 KIND = "time_series"
@@ -157,7 +158,10 @@ class GCPManagedPrometheusDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        workspace_name = self._workspace_name_for(spec=spec)
+        try:
+            workspace_name = self._workspace_name_for(spec=spec)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         cfg = spec.config or {}
 
         existing = self._describe(workspace_name)
@@ -580,18 +584,11 @@ class GCPManagedPrometheusDriver(ManagedServiceDriver):
         return list(resp)
 
     def _workspace_name_for(self, *, spec: ProvisionSpec) -> str:
-        # GMP workspace ids: 1-63 chars, [a-z0-9-], must start with
-        # a letter.
-        raw = (
-            f"{self._config.workspace_name_prefix}-{spec.organization_slug}-{spec.app_slug}-{spec.environment_name}"
-        ).lower()
-        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        clean = clean.strip("-")
-        if not clean or not clean[0].isalpha():
-            clean = "w" + clean
-        return clean[:63]
+        # GMP workspace ids: 1-63 chars, a leading letter (#2032).
+        managed_service_identity(spec.managed_service_id)
+        return recorded_resource_name(spec.recorded_handle, kind=KIND) or physical_name(
+            spec.managed_service_id, prefix=self._config.workspace_name_prefix, max_length=63
+        )
 
     def _handle_for(self, *, workspace_name: str) -> str:
         return f"{KIND}/{workspace_name}"

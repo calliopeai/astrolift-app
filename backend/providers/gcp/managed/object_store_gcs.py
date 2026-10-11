@@ -55,6 +55,7 @@ from _sdk.managed_service import (
     unsupported_update,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from _sdk.physical_naming import managed_service_identity, physical_name, recorded_resource_name
 from gcp.managed._ownership import label_adoption_refusal
 
 KIND = "object_store"
@@ -91,7 +92,10 @@ class GCSDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        bucket_name = self._bucket_name_for(spec=spec)
+        try:
+            bucket_name = self._bucket_name_for(spec=spec)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         try:
             bucket = self._client.bucket(bucket_name)
             bucket.location = self._config.location
@@ -374,19 +378,8 @@ class GCSDriver(ManagedServiceDriver):
         return []
 
     def _bucket_name_for(self, *, spec: ProvisionSpec) -> str:
-        # GCS bucket names: 3-63 chars, lowercase letters / digits /
-        # dashes / underscores / dots; must be globally unique
-        # (project-scoped naming via prefix).
-        parts = [
-            self._config.bucket_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-        ]
-        if spec.service_handle_hint:
-            parts.append(spec.service_handle_hint)
-        raw = "-".join(p for p in parts if p).lower()
-        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        return clean.strip("-")[:63]
+        # GCS bucket names: 3-63 chars, globally unique (#2032).
+        managed_service_identity(spec.managed_service_id)
+        return recorded_resource_name(spec.recorded_handle, kind=KIND) or physical_name(
+            spec.managed_service_id, prefix=self._config.bucket_name_prefix, max_length=63
+        )

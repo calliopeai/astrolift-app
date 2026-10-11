@@ -41,6 +41,7 @@ from _sdk.managed_service import (
     VolumeSourceKind,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from _sdk.physical_naming import managed_service_identity, physical_name
 from gcp.managed._ownership import is_platform_label_key, label_identity_refusal, reserved_label_keys
 
 KIND = "filesystem"
@@ -281,7 +282,10 @@ class FilestoreDriver(ManagedServiceDriver):
         if not spec.managed_service_id:
             return ProvisionResult(False, "", _MISSING_IDENTITY, ["invalid_filestore_config"])
         location = str(cfg.get("location") or self._config.location)
-        instance_id = self._instance_id(spec)
+        try:
+            instance_id = self._instance_id(spec)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         name = self._instance_name(location, instance_id)
         handle = _handle(location, instance_id)
         record_proves = spec.recorded_handle_exclusive and spec.recorded_handle == handle
@@ -602,7 +606,10 @@ class FilestoreDriver(ManagedServiceDriver):
                 ["invalid_snapshot"],
             )
         location = str(cfg.get("location") or self._config.location)
-        instance_id = self._instance_id(target)
+        try:
+            instance_id = self._instance_id(target)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         name = self._instance_name(location, instance_id)
         handle = _handle(location, instance_id)
         try:
@@ -1296,14 +1303,11 @@ class FilestoreDriver(ManagedServiceDriver):
         explicit = str((spec.config or {}).get("instance_id") or "")
         if explicit:
             return explicit
-        parts = [
-            self._config.instance_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint,
-        ]
-        return _resource_id("-".join(part for part in parts if part))
+        # New instances are named from the service identity (#2032).
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            return _parse_handle(spec.recorded_handle)[1]
+        return physical_name(spec.managed_service_id, prefix=self._config.instance_name_prefix, max_length=63)
 
     def _instance_name(self, location: str, instance_id: str) -> str:
         return f"{self._location_parent(location)}/instances/{instance_id}"

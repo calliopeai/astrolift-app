@@ -36,6 +36,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from _sdk.managed_service_tags import MANAGED_SERVICE_ID_LABEL
+from _sdk.physical_naming import managed_service_identity, physical_name
 from gcp._raw_fields import raw_field_conflicts
 from gcp.managed._ownership import (
     is_marked_for,
@@ -347,7 +348,10 @@ class ManagedKafkaDriver(ManagedServiceDriver):
         if not spec.managed_service_id:
             return ProvisionResult(False, "", _MISSING_IDENTITY, ["invalid_managed_kafka_config"])
         location = str(cfg.get("location") or self._config.location)
-        cluster_id = self._cluster_id(spec, cfg)
+        try:
+            cluster_id = self._cluster_id(spec, cfg)
+        except ValueError as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         handle = _handle(location, cluster_id)
         name = self._cluster_name(location, cluster_id)
         labels = self._labels(spec, cfg)
@@ -1649,8 +1653,11 @@ class ManagedKafkaDriver(ManagedServiceDriver):
     def _cluster_id(self, spec: ProvisionSpec, cfg: dict[str, Any]) -> str:
         if cfg.get("cluster_id"):
             return str(cfg["cluster_id"])
-        suffix = f"{spec.app_slug}-{spec.environment_name}"
-        return _dns_id(f"{self._config.cluster_id_prefix}-{suffix}")
+        # New clusters are named from the service identity (#2032).
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            return _parse_handle(spec.recorded_handle)[1]
+        return physical_name(spec.managed_service_id, prefix=self._config.cluster_id_prefix, max_length=63)
 
     def _parent(self, location: str) -> str:
         return f"projects/{self._config.project_id}/locations/{location}"

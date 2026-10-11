@@ -114,6 +114,8 @@ def _spec(
     app_slug: str = "api",
     environment_name: str = "prod",
     service_handle_hint: str = "",
+    managed_service_id: str = "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
+    recorded_handle: str = "",
 ) -> ProvisionSpec:
     return ProvisionSpec(
         organization_id="org-1",
@@ -125,6 +127,8 @@ def _spec(
         tenant_cluster_id="cluster-1",
         service_handle_hint=service_handle_hint,
         size="small",
+        managed_service_id=managed_service_id,
+        recorded_handle=recorded_handle,
     )
 
 
@@ -380,12 +384,27 @@ def test_deprovision_idempotent_already_gone(
     assert "already gone" in deprov.message
 
 
-def test_provision_does_not_adopt_another_services_resource(driver) -> None:
-    """Names are slug-joined, so another service can map to this one's name (#1961)."""
-    import dataclasses
+OTHER_SERVICE_ID = "0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4"
 
-    first = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-a"))
-    second = driver.provision(dataclasses.replace(_spec(), managed_service_id="svc-b"))
+
+def test_provision_does_not_adopt_another_services_resource(driver) -> None:
+    """A recorded handle naming another service's bucket is refused (#1961)."""
+    first = driver.provision(_spec())
+    second = driver.provision(_spec(managed_service_id=OTHER_SERVICE_ID, recorded_handle=first.handle))
 
     assert first.ok, first.message
     assert not second.ok and "refusing to adopt" in second.message
+
+
+def test_a_recorded_legacy_bucket_keeps_its_name(driver) -> None:
+    recorded = _spec(recorded_handle="object_store/astrolift-acme-api-prod")
+    assert driver._bucket_name_for(spec=recorded) == "astrolift-acme-api-prod"
+
+
+def test_slug_joins_that_collide_get_distinct_new_bucket_names(driver) -> None:
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one bucket before #2032.
+    first = driver._bucket_name_for(spec=_spec(organization_slug="acme", app_slug="web-prod"))
+    second = driver._bucket_name_for(
+        spec=_spec(organization_slug="acme-web", app_slug="prod", managed_service_id=OTHER_SERVICE_ID)
+    )
+    assert first != second and len(first) <= 63
