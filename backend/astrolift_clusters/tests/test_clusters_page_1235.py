@@ -93,6 +93,7 @@ def test_page_reaches_past_the_old_two_hundred_row_cap(permission_resolver):
     201st cluster did not exist as far as /clusters was concerned."""
     org = Organization.objects.create(name="Acme", slug="acme-cap")
     plugin = _plugin("cap")
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     for n in range(205):
         _cluster(org, plugin, f"c{n:03d}")
@@ -113,6 +114,7 @@ def test_walk_is_alphabetical_and_loses_nothing(permission_resolver):
     the deprecated list field serves."""
     org = Organization.objects.create(name="Acme", slug="acme-order")
     plugin = _plugin("order")
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     for slug in ("zulu", "alpha", "mike", "bravo", "yankee", "charlie", "delta"):
         _cluster(org, plugin, slug)
@@ -128,6 +130,7 @@ def test_page_and_deprecated_list_field_agree(permission_resolver):
     cluster" cannot drift; this pins that they really do."""
     org = Organization.objects.create(name="Acme", slug="acme-agree")
     plugin = _plugin("agree")
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     for slug in ("one", "two", "three", "four"):
         _cluster(org, plugin, slug)
@@ -142,6 +145,7 @@ def test_page_and_deprecated_list_field_agree(permission_resolver):
 def test_total_count_is_the_whole_result_set(permission_resolver):
     org = Organization.objects.create(name="Acme", slug="acme-total")
     plugin = _plugin("total")
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     for n in range(12):
         _cluster(org, plugin, f"t{n:02d}")
@@ -158,6 +162,7 @@ def test_platform_clusters_stay_visible_to_every_org(permission_resolver):
     applies has to survive the conversion or shared clusters vanish."""
     org = Organization.objects.create(name="Acme", slug="acme-platform")
     plugin = _plugin("platform")
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     _cluster(org, plugin, "org-owned")
     _cluster(None, plugin, "install-wide")
@@ -174,6 +179,7 @@ def test_other_orgs_clusters_are_invisible(permission_resolver):
     org = Organization.objects.create(name="Acme", slug="acme-iso")
     other = Organization.objects.create(name="Other", slug="other-iso")
     plugin = _plugin("iso")
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     _cluster(org, plugin, "ours")
     _cluster(other, plugin, "theirs")
@@ -192,6 +198,7 @@ def test_search_matches_name_endpoint_region_and_provider_slug(permission_resolv
     org = Organization.objects.create(name="Acme", slug="acme-search")
     aws = _plugin("aws")
     k8s = _plugin("k8s-native")
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     _cluster(org, aws, "prod-east", name="Production East", region="us-east-1")
     _cluster(org, k8s, "lab-metal", name="Lab", region="rack-7", endpoint="https://metal.lan")
@@ -217,6 +224,7 @@ def test_search_narrows_total_count_not_just_the_page(permission_resolver):
     one-row table."""
     org = Organization.objects.create(name="Acme", slug="acme-narrow")
     plugin = _plugin("narrow")
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     _cluster(org, plugin, "keep-me")
     for n in range(8):
@@ -242,6 +250,7 @@ def test_soft_deleted_clusters_are_absent(permission_resolver):
     rows) — so this is a correctness precondition, not just a filter."""
     org = Organization.objects.create(name="Acme", slug="acme-deleted")
     plugin = _plugin("deleted")
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     _cluster(org, plugin, "alive")
     doomed = _cluster(org, plugin, "gone")
@@ -260,6 +269,7 @@ def test_limit_is_clamped_to_the_shared_ceiling(permission_resolver):
 
     org = Organization.objects.create(name="Acme", slug="acme-clamp")
     plugin = _plugin("clamp")
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     for n in range(MAX_PAGE_LIMIT + 5):
         _cluster(org, plugin, f"k{n:04d}")
@@ -283,6 +293,7 @@ def test_no_tenant_context_is_refused_outright(permission_resolver):
 
     org = Organization.objects.create(name="Acme", slug="acme-notenant")
     plugin = _plugin("notenant")
+    permission_resolver.grant(Permission.CLUSTER_READ)
     permission_resolver.grant(Permission.CLUSTER_REGISTER)
     _cluster(org, plugin, "org-owned")
     _cluster(None, plugin, "install-wide")

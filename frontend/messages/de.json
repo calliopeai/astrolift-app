@@ -1097,6 +1097,7 @@
         "targetPort": "Zielport",
         "stripPrefix": "Präfix vor der Weiterleitung zum Workload entfernen",
         "routesHint": "Neue Routen werden angewendet, wenn du oben auf Speichern klickst.",
+        "noWorkloadsBlocked": "Pfadrouten zielen auf eine Workload. Registriere eine Workload für diese App und füge dann die Route hinzu.",
         "kinds": {
           "http_to_https": "HTTP → HTTPS",
           "apex_to_www": "Root-Domain → www",
@@ -1949,6 +1950,7 @@
       },
       "expiry": {
         "expired": "Vor {days, plural, one {# Tag} other {# Tagen}} abgelaufen",
+        "expiredToday": "Heute abgelaufen",
         "rotateSoon": "Rotieren: läuft in {days, plural, one {# Tag} other {# Tagen}} ab",
         "expires": "Läuft in {days, plural, one {# Tag} other {# Tagen}} ab"
       },

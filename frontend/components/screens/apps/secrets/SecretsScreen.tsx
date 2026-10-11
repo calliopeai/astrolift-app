@@ -54,6 +54,7 @@ import type { AstroliftSecretChangeProposal } from "@/graphql/services/services.
 import { SECRETS_SECTIONS, type SecretsSection } from "./secrets-list";
 import type { AppSecret, AppSecretBundleAttachment } from "./secrets.types";
 import { ALL_ENVS, useSecretScopeLabel, type useAppSecrets } from "./use-app-secrets";
+import { secretExpiry } from "./secret-expiry";
 
 export type SecretsScreenProps = ReturnType<typeof useAppSecrets> & {
   /** The app tab bar. */
@@ -107,16 +108,16 @@ function SecretExpiryBadge({ expiresAt }: { expiresAt: string | null | undefined
   const t = useTranslations("apps.secrets.expiry");
   const [now] = React.useState(() => Date.now());
   if (!expiresAt) return null;
-  const ms = new Date(expiresAt).getTime() - now;
-  const days = Math.floor(ms / (1000 * 60 * 60 * 24));
-  if (!Number.isFinite(days)) return null;
-  if (days < 0) {
+  const expiry = secretExpiry(expiresAt, now);
+  if (!expiry) return null;
+  if (expiry.kind !== "remaining") {
     return (
       <Badge variant="destructive" className="text-2xs ml-2">
-        {t("expired", { days: Math.abs(days) })}
+        {expiry.kind === "expiredToday" ? t("expiredToday") : t("expired", { days: expiry.days })}
       </Badge>
     );
   }
+  const { days } = expiry;
   if (days <= 7) {
     return (
       <Badge variant="destructive" className="text-2xs ml-2">

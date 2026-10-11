@@ -1097,6 +1097,7 @@
         "targetPort": "目标端口",
         "stripPrefix": "转发到工作负载前移除前缀",
         "routesHint": "新路由会在点击上方保存后应用。",
+        "noWorkloadsBlocked": "路径路由以工作负载为目标。请先为此应用注册工作负载，然后再添加路由。",
         "kinds": {
           "http_to_https": "HTTP → HTTPS",
           "apex_to_www": "根域名 → www",
@@ -1949,6 +1950,7 @@
       },
       "expiry": {
         "expired": "已于 {days, plural, one {# 天前} other {# 天前}}过期",
+        "expiredToday": "今天已过期",
         "rotateSoon": "请轮换：将在 {days, plural, one {# 天后} other {# 天后}}过期",
         "expires": "将在 {days, plural, one {# 天后} other {# 天后}}过期"
       },

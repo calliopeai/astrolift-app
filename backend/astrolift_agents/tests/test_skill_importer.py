@@ -16,6 +16,7 @@ import requests
 from astrolift_agents.models import Skill, ToolDef
 from astrolift_agents.services import brief_assembler, skill_importer
 from astrolift_agents.services.skill_importer import (
+    InvalidManifestError,
     InvalidRepoURLError,
     import_skills_from_repo,
     parse_repo_url,
@@ -275,6 +276,43 @@ commands = ["true"]
     assert sorted(result.imported_skills) == ["a", "b"]
     assert result.imported_tools == []
     assert ToolDef.objects.filter(skill__organization=org).count() == 0
+
+
+_TYPO_ADAPTER_TOML = b"""
+[skills.audit]
+content = "Audit the site."
+
+[tools.measure]
+skill = "audit"
+adapter = "http_endpont"
+handler_ref = "https://metrics.example/api"
+"""
+
+
+def test_unknown_explicit_adapter_is_refused_and_leaves_catalog_unchanged(monkeypatch, org):
+    _patch_get(monkeypatch, _FakeResponse(_make_zipball(_TOML)))
+    import_skills_from_repo(organization=org, repo_url="https://github.com/acme/cfg")
+    before = sorted(ToolDef.objects.filter(skill__organization=org).values_list("slug", "adapter"))
+
+    _patch_get(monkeypatch, _FakeResponse(_make_zipball(_TYPO_ADAPTER_TOML)))
+    with pytest.raises(InvalidManifestError) as exc_info:
+        import_skills_from_repo(organization=org, repo_url="https://github.com/acme/cfg")
+
+    message = str(exc_info.value)
+    assert "tools.measure" in message
+    assert "'http_endpont'" in message
+    assert "http_endpoint" in message
+    assert not Skill.objects.filter(organization=org, slug="audit").exists()
+    assert sorted(ToolDef.objects.filter(skill__organization=org).values_list("slug", "adapter")) == before
+
+
+@pytest.mark.parametrize("adapter_line", [b"", b'adapter = ""\n'])
+def test_missing_or_empty_adapter_keeps_the_default(monkeypatch, org, adapter_line):
+    toml = b'[skills.audit]\ncontent = "Audit."\n\n[tools.measure]\nskill = "audit"\n' + adapter_line
+    _patch_get(monkeypatch, _FakeResponse(_make_zipball(toml)))
+    import_skills_from_repo(organization=org, repo_url="https://github.com/acme/cfg")
+
+    assert ToolDef.objects.get(skill__organization=org, slug="measure").adapter == ToolDef.Adapter.PYTHON_FN
 
 
 def test_repo_without_manifest_imports_nothing(monkeypatch, org):

@@ -29,10 +29,9 @@ from core.tests.utils.scope_world import ScopeWorld, bind_role, make_cluster, ma
 pytestmark = pytest.mark.django_db
 
 QUERY_PERMISSIONS = {
+    # Inventory reads are separate from registration (#2295).
+    Permission.CLUSTER_READ: ("astrolift_clusters", "astrolift_clusters_page", "astrolift_cluster"),
     Permission.CLUSTER_REGISTER: (
-        "astrolift_clusters",
-        "astrolift_clusters_page",
-        "astrolift_cluster",
         "astrolift_provider_regions",
         "astrolift_cluster_lifecycle_audit",
         "astrolift_recent_cluster_workflows",

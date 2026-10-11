@@ -21,6 +21,14 @@
 
 - Add source-reviewed public Lambda HTTP API domain Prepare/Connect and original-operation recovery, with retained native ACKs, exact apex Route53 ALIAS creation, fresh caller/credential fences and protected history. Refuse unsupported new EKS and read-only Cloudflare routing, ambiguous resend and legacy mutation of bound routes (Refs: #2299).
 
+- Decommissioning a cluster revokes its Zentinelle gateway credential and removes the gateway before platform RBAC is lifted, best-effort and reported with the other cleanup results. Runs already in flight replay unchanged (#1905).
+
+- `astroliftZentinelleConnection` is gated on `zentinelle.status_view` instead of `zentinelle.connect`, so viewers and auditors can read connection and gateway status; connecting stays admin-only (#1905).
+
+- `registerApp` returns an advisory `sourceConnectionWarning` when no organization GitHub connection is visibly recorded on the source repository's owner, so a later fetch, build or webhook failure on a second GitHub account is explained at registration (#2297).
+
+- Repo skill imports refuse an explicit unknown tool adapter with a `VALIDATION` error naming the tool, instead of storing it as `python_fn`. Omitted adapters keep the default (#2327).
+
 - Bind model subscription finalization and traffic lookups explicitly to current
   service/app owners. Preserve admitted installation-shared cluster placement
   while keeping dedicated-app selectors tenant-bound (#2269, #2270).

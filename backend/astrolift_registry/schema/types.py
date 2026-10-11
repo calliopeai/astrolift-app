@@ -691,6 +691,13 @@ class RegisteredAppType:
             "Filled on astroliftAppsPage and astroliftMyAppsPage (#2149)."
         ),
     )
+    source_connection_warning: str = strawberry.field(
+        default="",
+        description=(
+            "Advisory set only on the registerApp result: no organization GitHub connection "
+            "is visibly recorded on the source repository's owner. Empty everywhere else (#2297)."
+        ),
+    )
 
     @strawberry.field
     def provisioning_progress(self) -> ProvisioningProgressType | None:
