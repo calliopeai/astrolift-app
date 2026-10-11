@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Domain DNS lookups report NXDOMAIN as a mismatch instead of a healthy result, and a resolver that never answers reports `DNS_TIMEOUT` instead of a generic failure, in both probes and the public-delegation check. The console explains the common diagnostic reason codes (NXDOMAIN, timeouts, malformed or oversized answers, provider access denied, unbound or unreadable zones, missing tools, ICMP and HTTPS outcomes, private zones) with the next step to take, in every supported language. Each app route on the Routing view offers **Check HTTPS**, which runs a live HTTPS/TLS check for that hostname instead of showing TLS as unknown (#2287).
+
 - Fifteen more AWS managed drivers name new resources from the managed-service id instead of joined slugs, so two services whose slugs join to the same string (`acme` + `web-prod`, `acme-web` + `prod`) no longer collide: Redshift, Redshift Serverless, DocumentDB, Neptune, MemoryDB, Amazon MQ, RDS Proxy, Bedrock provisioned models, Keyspaces, Timestream, FSx, CloudWatch bundles and the REST, HTTP and WebSocket API Gateways. Existing resources keep their recorded names; API Gateway, Amazon MQ and FSx find a recorded resource by its id or tag. Keyspaces and Timestream give each service its own keyspace or database, so deprovision with data deletion no longer drops a sibling service's tables. A missing or malformed service id is refused as `invalid_resource_identity` before any AWS call (#2032).
 
 - Retry startup connection resets within the existing bounded CPU runtime health poll; retain container-exit and readiness-deadline failures before inference (#2284).

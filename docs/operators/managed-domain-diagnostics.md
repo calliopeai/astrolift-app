@@ -29,6 +29,14 @@ claim raw command flags/output. Record types are A, AAAA, CNAME, NS, SOA, TXT,
 MX, SRV and CAA; underscore labels are allowed for DNS record lookups only.
 Packets must match the request, peer, question and answer/CNAME ownership chain.
 NXDOMAIN and no-data reasons remain distinct; truncated packets are refused.
+A lookup that returns NXDOMAIN is reported as `MISMATCH`, never `OK`. A
+resolver that does not answer within two seconds reports `DNS_TIMEOUT`, which
+is neither an empty answer nor a generic `DIAGNOSTIC_PROBE_UNAVAILABLE`; other
+transport refusals keep their own codes (`DNS_RESPONSE_INVALID`,
+`DNS_RESPONSE_BOUND_EXCEEDED`). The console explains each code with the next
+step to take. The Routing view never reports TLS for an app route from
+configuration alone; **Check HTTPS** runs the HTTPS probe for that route's
+hostname and shows the observed outcome on the route.
 
 HTTPS first resolves through the fixed public resolver and rejects every mixed
 public/private answer. It pins a public IP, verifies the registered hostname

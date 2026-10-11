@@ -16,12 +16,32 @@ import { domainDiagnosticReasonKey } from "./domain-diagnostic-reasons";
 import {
   DNS_ANSWER_OBSERVATION,
   DNS_NO_DATA,
+  DNS_NXDOMAIN,
+  DNS_TIMEOUT,
   ICMP_TIMEOUT,
   OPERATOR_REQUIRED,
 } from "./ManagedDomainDetail.stories";
 import { MANAGED_DOMAIN } from "./domains-environments.fixtures";
 const catalogs = { en, es, fr, de, ja, ko, "zh-Hans": zh, "pt-BR": pt };
 const keys = [
+  "checkHttps",
+  "dnsNxdomainStatus",
+  "dnsNxdomain",
+  "dnsTimeout",
+  "dnsLookupUnavailable",
+  "dnsResponseInvalid",
+  "dnsResponseBoundExceeded",
+  "probeUnavailable",
+  "privateZoneDelegation",
+  "providerAccessDenied",
+  "providerZoneUnavailable",
+  "providerZoneNotBound",
+  "toolNotInstalled",
+  "icmpReply",
+  "icmpUnconfirmed",
+  "tlsVerifiedHelp",
+  "httpsDeadline",
+  "publicAddressRequired",
   "platformOperatorRequired",
   "dnsNoData",
   "icmpTimeout",
@@ -231,6 +251,8 @@ it.each(locales)(
       [OPERATOR_REQUIRED, "platformOperatorRequired", "PLATFORM_OPERATOR_REQUIRED"],
       [DNS_NO_DATA, "dnsNoData", "DNS_NO_DATA"],
       [ICMP_TIMEOUT, "icmpTimeout", "ICMP_TIMEOUT"],
+      [DNS_NXDOMAIN, "dnsNxdomain", "DNS_NXDOMAIN"],
+      [DNS_TIMEOUT, "dnsTimeout", "DNS_TIMEOUT"],
     ] as const) {
       const view = render(
         <NextIntlClientProvider
@@ -249,7 +271,11 @@ it.each(locales)(
           ? "unsupported"
           : code === "DNS_NO_DATA"
             ? "dnsNoDataStatus"
-            : "unknown";
+            : code === "DNS_NXDOMAIN"
+              ? "dnsNxdomainStatus"
+              : code === "DNS_TIMEOUT"
+                ? "unavailable"
+                : "unknown";
       expect(
         screen.getAllByText(catalogs[locale].managedDomains[expectedState]).length
       ).toBeGreaterThan(0);
@@ -263,6 +289,10 @@ it("unknown evidence reasons cannot become a translated success", () => {
   expect(domainDiagnosticReasonKey("constructor")).toBeNull();
   expect(domainDiagnosticReasonKey("DNS_ANSWER_OBSERVED")).toBeNull();
   expect(domainDiagnosticReasonKey("DNS_ANSWER")).toBe("dnsAnswerHelp");
+  // Failures map to explanations with a next step, never to a success label.
+  expect(domainDiagnosticReasonKey("DNS_NXDOMAIN")).toBe("dnsNxdomain");
+  expect(domainDiagnosticReasonKey("DNS_TIMEOUT")).toBe("dnsTimeout");
+  expect(domainDiagnosticReasonKey("PROVIDER_ACCESS_DENIED")).toBe("providerAccessDenied");
 });
 
 it.each(locales)(

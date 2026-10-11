@@ -675,3 +675,28 @@ def test_ns_answer_is_separate_from_configured_delegation_and_cluster_probe(
     assert not aws_wire["requests"]
     world.domain.refresh_from_db()
     assert world.domain.version == before and world.domain.verification_state == "pending"
+
+
+def test_nxdomain_lookup_is_never_reported_healthy(world, client, dns_wire, aws_wire):
+    dns_wire["flags"] = 0x8183
+    reply = ask(client, world, query=PROBE, hostname=world.domain.zone, tool="LOOKUP")
+    assert not reply.get("errors"), reply.get("errors")
+    data = reply["data"]["astroliftManagedDomainProbe"]
+    assert data["state"] == "MISMATCH" and data["reason"] == "DNS_NXDOMAIN" and data["values"] == []
+
+
+def test_resolver_timeout_is_distinct_from_no_answer_and_generic_failure(world, client, monkeypatch):
+    def silent(*_args, **_kwargs):
+        raise service.network.DiagnosticTransportError("DNS_TIMEOUT")
+
+    monkeypatch.setattr(service.network, "dns_lookup", silent)
+    reply = ask(client, world, query=PROBE, hostname=world.domain.zone, tool="LOOKUP")
+    assert not reply.get("errors"), reply.get("errors")
+    data = reply["data"]["astroliftManagedDomainProbe"]
+    assert data["state"] == "ERROR" and data["reason"] == "DNS_TIMEOUT"
+    delegation = [
+        check
+        for check in ask(client, world)["data"]["astroliftManagedDomainDiagnostics"]["checks"]
+        if check["key"] == "delegation"
+    ]
+    assert delegation and all(check["reason"] == "DNS_TIMEOUT" for check in delegation)

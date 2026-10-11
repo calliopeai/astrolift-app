@@ -194,9 +194,19 @@ export const ICMP_TIMEOUT: ManagedDomainDetailProps = {
     perspective: "control_plane_network",
   },
 };
+export const DNS_NXDOMAIN: ManagedDomainDetailProps = {
+  ...DNS_NO_DATA,
+  probe: { ...DNS_NO_DATA.probe!, state: "MISMATCH", reason: "DNS_NXDOMAIN" },
+};
+export const DNS_TIMEOUT: ManagedDomainDetailProps = {
+  ...DNS_NO_DATA,
+  probe: { ...DNS_NO_DATA.probe!, state: "ERROR", reason: "DNS_TIMEOUT" },
+};
 export const OperatorRequired: Story = { args: OPERATOR_REQUIRED };
 export const DnsNoData: Story = { args: DNS_NO_DATA };
 export const IcmpTimeout: Story = { args: ICMP_TIMEOUT };
+export const DnsNxdomain: Story = { args: DNS_NXDOMAIN };
+export const DnsTimeout: Story = { args: DNS_TIMEOUT };
 
 export const DNS_ANSWER_OBSERVATION: ManagedDomainDetailProps = {
   ...DNS_NO_DATA,
