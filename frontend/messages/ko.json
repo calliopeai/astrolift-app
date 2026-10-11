@@ -8328,7 +8328,17 @@
     "verifyPending": "소유권이 확인되지 않았습니다. 권한 있는 공급자에 기록된 TXT 확인 값을 확인하세요.",
     "callbackSaved": "연결 콜백에서 저장 결과를 보고했습니다. 저장된 연결을 조회하여 현재 상태를 확인하세요.",
     "callbackUnconfirmed": "연결 콜백이 확인되지 않았습니다. 다시 시도하기 전에 현재 연결을 조회하세요.",
-    "callbackDenied": "연결 콜백이 거부되었습니다. 다시 시도하기 전에 현재 권한과 연결 설정을 검토하세요."
+    "callbackDenied": "연결 콜백이 거부되었습니다. 다시 시도하기 전에 현재 권한과 연결 설정을 검토하세요.",
+    "route53Cluster": "클러스터 자격 증명",
+    "route53ClusterHelp": "호스팅 영역은 선택한 클러스터의 AWS 자격 증명, 즉 해당 클러스터의 DNS를 쓰는 ID로 나열됩니다.",
+    "route53NoClusters": "검증된 계정이 있는 AWS 클러스터가 없습니다.",
+    "route53Shared": "공유",
+    "route53Private": "비공개",
+    "route53Bind": "{domain}에 바인딩",
+    "route53OnlyReviewed": "이 도메인에는 {domain} 이름의 영역만 바인딩할 수 있습니다.",
+    "route53Bound": "영역이 바인딩되었습니다. 레코드는 이 클러스터의 자격 증명으로 읽습니다.",
+    "route53ZonesTruncated": "처음 500개의 호스팅 영역을 표시합니다.",
+    "route53NoZones": "이 자격 증명으로 보이는 호스팅 영역이 없습니다."
   },
   "emailDelivery": {
     "title": "이메일 전달 테스트",

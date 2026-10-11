@@ -8328,7 +8328,17 @@
     "verifyPending": "A propriedade não foi confirmada. Confira o valor TXT registrado no provedor autoritativo.",
     "callbackSaved": "O retorno da conexão informou um resultado salvo. Consulte as conexões salvas para confirmar o estado atual.",
     "callbackUnconfirmed": "O retorno da conexão não foi confirmado. Consulte as conexões atuais antes de tentar novamente.",
-    "callbackDenied": "O retorno da conexão foi recusado. Revise as permissões atuais e a configuração antes de tentar novamente."
+    "callbackDenied": "O retorno da conexão foi recusado. Revise as permissões atuais e a configuração antes de tentar novamente.",
+    "route53Cluster": "Credencial do cluster",
+    "route53ClusterHelp": "As zonas hospedadas são listadas com a credencial da AWS do cluster selecionado, a identidade que grava o DNS desse cluster.",
+    "route53NoClusters": "Nenhum cluster da AWS com conta verificada está disponível.",
+    "route53Shared": "compartilhado",
+    "route53Private": "privada",
+    "route53Bind": "Vincular a {domain}",
+    "route53OnlyReviewed": "Somente a zona chamada {domain} pode ser vinculada a este domínio.",
+    "route53Bound": "Zona vinculada. Os registros são lidos com a credencial deste cluster.",
+    "route53ZonesTruncated": "Mostrando as primeiras 500 zonas hospedadas.",
+    "route53NoZones": "Esta credencial não vê nenhuma zona hospedada."
   },
   "emailDelivery": {
     "title": "Testes de entrega de e-mail",

@@ -296,6 +296,9 @@ def _snapshot(domain):
             domain.dns_provider_connection_id,
             domain.dns_provider_zone_id,
             domain.dns_provider_connection_version,
+            domain.dns_cluster_id,
+            domain.dns_cluster_zone_id,
+            domain.dns_cluster_account_id,
         ),
         sort_keys=True,
         allow_nan=False,
@@ -352,6 +355,10 @@ def _zone(info, domain, current):
         if not _operator(user):
             unsupported.reason = "PLATFORM_OPERATOR_REQUIRED"
             return unsupported
+    # A zone bound through a cluster's credential (#2287) is read with that
+    # credential only, never the control plane's own.
+    if domain.dns_cluster_id is not None or domain.dns_cluster_zone_id or domain.dns_cluster_account_id:
+        return _cluster_zone(domain, current, now)
     # A protected attachment is authoritative for discovery even when an
     # older Route53 writer remains configured. Invalid or withdrawn binding
     # metadata must never fall back to ambient AWS credentials.
@@ -372,112 +379,169 @@ def _zone(info, domain, current):
     client = None
     try:
         client = _route53(current)
-        current()
-        result = client.get_hosted_zone(Id=candidate)
-        current()
-        zone = result["HostedZone"]
-        if (
-            zone["Id"].removeprefix("/hostedzone/") != candidate
-            or hostname(zone["Name"]) != hostname(domain.zone)
-            or type(zone["Config"]["PrivateZone"]) is not bool
-        ):
-            raise ValueError("PROVIDER_ZONE_IDENTITY_MISMATCH")
-        nameservers = sorted(
-            hostname(value) for value in result.get("DelegationSet", {}).get("NameServers", [])
-        )
-        records, continuation, seen = [], {}, set()
-        truncated = False
-        for _ in range(MAX_PAGES):
-            current()
-            page = client.list_resource_record_sets(
-                HostedZoneId=candidate, MaxItems=str(MAX_RECORDS - len(records) + 1), **continuation
-            )
-            current()
-            for raw in page["ResourceRecordSets"]:
-                name = raw["Name"].lower().rstrip(".")
-                scoped_record_name(name.removeprefix("*."), domain.zone)
-                values = [row["Value"] for row in raw.get("ResourceRecords", [])]
-                if len(values) > 64 or any(
-                    not isinstance(value, str) or len(value) > 4096 for value in values
-                ):
-                    raise ValueError("PROVIDER_RECORD_BOUND_EXCEEDED")
-                alias = raw.get("AliasTarget", {})
-                if raw.get("TTL") is not None and (
-                    type(raw["TTL"]) is not int or not 0 <= raw["TTL"] <= 2147483647
-                ):
-                    raise ValueError("PROVIDER_RECORD_INVALID")
-                if alias and (
-                    not isinstance(alias.get("DNSName"), str)
-                    or len(alias["DNSName"]) > 253
-                    or not isinstance(alias.get("HostedZoneId"), str)
-                    or not re.fullmatch(r"Z[A-Z0-9]{1,63}", alias["HostedZoneId"])
-                    or type(alias.get("EvaluateTargetHealth")) is not bool
-                ):
-                    raise ValueError("PROVIDER_RECORD_INVALID")
-                records.append(
-                    ManagedDomainDiagnosticRecord(
-                        name=name,
-                        type=raw["Type"],
-                        ttl=raw.get("TTL"),
-                        values=values,
-                        alias_target=alias.get("DNSName"),
-                        alias_zone_id=alias.get("HostedZoneId"),
-                        evaluate_target_health=alias.get("EvaluateTargetHealth"),
-                        routing=route53_routing(raw),
-                    )
-                )
-            if len(records) > MAX_RECORDS:
-                truncated = True
-                records = records[:MAX_RECORDS]
-                break
-            truncated = bool(page["IsTruncated"])
-            if not truncated:
-                break
-            continuation = {
-                "StartRecordName": page["NextRecordName"],
-                "StartRecordType": page["NextRecordType"],
-            }
-            if page.get("NextRecordIdentifier"):
-                continuation["StartRecordIdentifier"] = page["NextRecordIdentifier"]
-            key = json.dumps(continuation, sort_keys=True)
-            if key in seen:
-                raise ValueError("PROVIDER_CURSOR_INVALID")
-            seen.add(key)
-            truncated = True
-        return ManagedDomainProviderZone(
-            state=State.OK,
-            reason="PROVIDER_ZONE_OBSERVED",
-            checked_at=now,
-            zone_id=candidate,
-            zone_name=hostname(zone["Name"]),
-            private_zone=zone["Config"]["PrivateZone"],
-            nameservers=nameservers,
-            records=records,
-            truncated=truncated,
-            binding_source="PLATFORM_WRITTEN" if domain.provision_zone_id else "OPERATOR_CONFIGURATION",
+        return _read_route53_zone(
+            client,
+            candidate,
+            domain,
+            current,
+            now,
+            "PLATFORM_WRITTEN" if domain.provision_zone_id else "OPERATOR_CONFIGURATION",
         )
     except Exception as error:
-        current()
-        code = getattr(error, "response", {}).get("Error", {}).get("Code")
-        reason = (
-            "PROVIDER_ACCESS_DENIED"
-            if code in ("AccessDenied", "AccessDeniedException", "UnauthorizedOperation")
-            else "PROVIDER_ZONE_UNAVAILABLE"
-        )
-        return ManagedDomainProviderZone(
-            state=State.ERROR,
-            reason=reason,
-            checked_at=now,
-            zone_id=candidate,
-            zone_name=None,
-            private_zone=None,
-            nameservers=[],
-            records=[],
-            truncated=False,
-        )
+        return _route53_error(error, candidate, current, now, "NONE")
     finally:
         if client is not None:
             client.close()
+
+
+def _read_route53_zone(client, candidate, domain, current, now, binding_source):
+    """Bounded hosted-zone identity and record read through ``client``."""
+    current()
+    result = client.get_hosted_zone(Id=candidate)
+    current()
+    zone = result["HostedZone"]
+    if (
+        zone["Id"].removeprefix("/hostedzone/") != candidate
+        or hostname(zone["Name"]) != hostname(domain.zone)
+        or type(zone["Config"]["PrivateZone"]) is not bool
+    ):
+        raise ValueError("PROVIDER_ZONE_IDENTITY_MISMATCH")
+    nameservers = sorted(hostname(value) for value in result.get("DelegationSet", {}).get("NameServers", []))
+    records, continuation, seen = [], {}, set()
+    truncated = False
+    for _ in range(MAX_PAGES):
+        current()
+        page = client.list_resource_record_sets(
+            HostedZoneId=candidate, MaxItems=str(MAX_RECORDS - len(records) + 1), **continuation
+        )
+        current()
+        for raw in page["ResourceRecordSets"]:
+            name = raw["Name"].lower().rstrip(".")
+            scoped_record_name(name.removeprefix("*."), domain.zone)
+            values = [row["Value"] for row in raw.get("ResourceRecords", [])]
+            if len(values) > 64 or any(not isinstance(value, str) or len(value) > 4096 for value in values):
+                raise ValueError("PROVIDER_RECORD_BOUND_EXCEEDED")
+            alias = raw.get("AliasTarget", {})
+            if raw.get("TTL") is not None and (
+                type(raw["TTL"]) is not int or not 0 <= raw["TTL"] <= 2147483647
+            ):
+                raise ValueError("PROVIDER_RECORD_INVALID")
+            if alias and (
+                not isinstance(alias.get("DNSName"), str)
+                or len(alias["DNSName"]) > 253
+                or not isinstance(alias.get("HostedZoneId"), str)
+                or not re.fullmatch(r"Z[A-Z0-9]{1,63}", alias["HostedZoneId"])
+                or type(alias.get("EvaluateTargetHealth")) is not bool
+            ):
+                raise ValueError("PROVIDER_RECORD_INVALID")
+            records.append(
+                ManagedDomainDiagnosticRecord(
+                    name=name,
+                    type=raw["Type"],
+                    ttl=raw.get("TTL"),
+                    values=values,
+                    alias_target=alias.get("DNSName"),
+                    alias_zone_id=alias.get("HostedZoneId"),
+                    evaluate_target_health=alias.get("EvaluateTargetHealth"),
+                    routing=route53_routing(raw),
+                )
+            )
+        if len(records) > MAX_RECORDS:
+            truncated = True
+            records = records[:MAX_RECORDS]
+            break
+        truncated = bool(page["IsTruncated"])
+        if not truncated:
+            break
+        continuation = {
+            "StartRecordName": page["NextRecordName"],
+            "StartRecordType": page["NextRecordType"],
+        }
+        if page.get("NextRecordIdentifier"):
+            continuation["StartRecordIdentifier"] = page["NextRecordIdentifier"]
+        key = json.dumps(continuation, sort_keys=True)
+        if key in seen:
+            raise ValueError("PROVIDER_CURSOR_INVALID")
+        seen.add(key)
+        truncated = True
+    return ManagedDomainProviderZone(
+        state=State.OK,
+        reason="PROVIDER_ZONE_OBSERVED",
+        checked_at=now,
+        zone_id=candidate,
+        zone_name=hostname(zone["Name"]),
+        private_zone=zone["Config"]["PrivateZone"],
+        nameservers=nameservers,
+        records=records,
+        truncated=truncated,
+        binding_source=binding_source,
+    )
+
+
+def _route53_error(error, candidate, current, now, binding_source):
+    current()
+    code = getattr(error, "response", {}).get("Error", {}).get("Code")
+    reason = (
+        "PROVIDER_ACCESS_DENIED"
+        if code in ("AccessDenied", "AccessDeniedException", "UnauthorizedOperation")
+        else "PROVIDER_ZONE_UNAVAILABLE"
+    )
+    return ManagedDomainProviderZone(
+        state=State.ERROR,
+        reason=reason,
+        checked_at=now,
+        zone_id=candidate,
+        zone_name=None,
+        private_zone=None,
+        nameservers=[],
+        records=[],
+        truncated=False,
+        binding_source=binding_source,
+    )
+
+
+def _cluster_zone(domain, current, now):
+    from aws.domain_route_clients import clients
+
+    from core.cluster_credentials import credential_for_cluster
+
+    candidate = domain.dns_cluster_zone_id
+    unbound = ManagedDomainProviderZone(
+        state=State.ERROR,
+        reason="PROVIDER_CLUSTER_UNAVAILABLE",
+        checked_at=now,
+        zone_id=None,
+        zone_name=None,
+        private_zone=None,
+        nameservers=[],
+        records=[],
+        truncated=False,
+        binding_source="CLUSTER_CREDENTIAL",
+    )
+    cluster = TenantCluster.objects.filter(
+        pk=domain.dns_cluster_id, is_active=True, provider_plugin__slug="aws"
+    ).first()
+    if (
+        cluster is None
+        or cluster.organization_id not in (None, domain.organization_id)
+        or not re.fullmatch(r"Z[A-Z0-9]{1,31}", candidate or "")
+        or not domain.dns_cluster_account_id
+        or cluster.cloud_account_id != domain.dns_cluster_account_id
+    ):
+        return unbound
+    try:
+        with clients(
+            region=cluster.region or "us-east-1",
+            credential=credential_for_cluster(cluster),
+            checkpoint=current,
+            expected_account_id=domain.dns_cluster_account_id,
+            services=("sts", "route53"),
+        ) as (native, _account):
+            return _read_route53_zone(
+                native["route53"], candidate, domain, current, now, "CLUSTER_CREDENTIAL"
+            )
+    except Exception as error:
+        return _route53_error(error, candidate, current, now, "CLUSTER_CREDENTIAL")
 
 
 def _cloudflare_zone(info, domain, current):

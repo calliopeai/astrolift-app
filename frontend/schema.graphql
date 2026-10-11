@@ -6583,6 +6583,14 @@ input AttachProjectManagedServiceInput {
   appEnvironmentId: GUID = null
 }
 
+input AttachRoute53DnsZoneInput {
+  domainId: GUID!
+  expectedDomainVersion: Int!
+  clusterId: GUID!
+  zoneId: String!
+  zoneName: String!
+}
+
 input AttachSecretBundleInput {
   appSlug: String!
   environmentName: String!
@@ -8532,6 +8540,23 @@ type ManagedDomainRoute {
   observedState: ManagedDomainCheckState!
 }
 
+type ManagedDomainRoute53Binding {
+  domainId: GUID!
+  domainVersion: Int!
+  clusterId: GUID!
+  accountId: String!
+  zone: Route53DnsZone!
+  verificationState: String!
+  verificationRecordName: String
+  verificationRecordValue: String
+}
+
+type ManagedDomainRoute53BindingMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: ManagedDomainRoute53Binding
+}
+
 enum ManagedDomainRoutingPolicy {
   SIMPLE
   WEIGHTED
@@ -9105,6 +9130,7 @@ type Mutation {
   beginCloudflareDnsOAuth(input: BeginCloudflareDnsOAuthInput!): CloudflareDnsOAuthStartMutationResult!
   attachCloudflareDnsZone(input: AttachCloudflareDnsZoneInput!): ManagedDomainDnsConnectionBindingMutationResult!
   registerCloudflareDnsZone(input: RegisterCloudflareDnsZoneInput!): ManagedDomainDnsConnectionBindingMutationResult!
+  attachRoute53DnsZone(input: AttachRoute53DnsZoneInput!): ManagedDomainRoute53BindingMutationResult!
 
   """Authenticate a user with username and password."""
   login(username: String!, password: String!): LoginResult!
@@ -10105,6 +10131,8 @@ type Query {
   dnsProviderConnectionsPage(page: Int! = 1, pageSize: Int! = 20): DnsProviderConnectionTypePage!
   cloudflareDnsZones(input: CloudflareDnsConnectionInput!): CloudflareDnsZonesInventory!
   cloudflareDnsRecords(input: CloudflareDnsRecordsInput!): CloudflareDnsRecordsInventory!
+  route53DnsClusters: Route53DnsClustersInventory!
+  route53DnsZones(input: Route53DnsZonesInput!): Route53DnsZonesInventory!
 
   """
   List all effective permissions for a user, with the role bindings that grant each one.
@@ -10995,6 +11023,37 @@ input RotateWebhookSecretInput {
 input RotateZentinelleGatewayCredentialInput {
   clusterId: GUID!
   overlapSeconds: Int = null
+}
+
+type Route53DnsCluster {
+  id: GUID!
+  name: String!
+  region: String!
+  shared: Boolean!
+}
+
+type Route53DnsClustersInventory {
+  complete: Boolean!
+  reason: String!
+  items: [Route53DnsCluster!]!
+}
+
+type Route53DnsZone {
+  id: String!
+  name: String!
+  privateZone: Boolean!
+  recordCount: Int
+}
+
+input Route53DnsZonesInput {
+  clusterId: GUID!
+}
+
+type Route53DnsZonesInventory {
+  complete: Boolean!
+  reason: String!
+  truncated: Boolean!
+  items: [Route53DnsZone!]!
 }
 
 input RunAstroliftAgentInput {

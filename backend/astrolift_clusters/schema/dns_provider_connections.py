@@ -8,6 +8,7 @@ from strawberry.types import Info
 
 from astrolift_clusters import cloudflare_dns_oauth as oauth
 from astrolift_clusters import dns_provider_connections as service
+from astrolift_clusters import route53_cluster_zones as route53
 from astrolift_clusters.cloudflare_dns_transport import DnsConnectionError
 from astrolift_clusters.models import DnsProviderConnection, ManagedDomain
 from astrolift_clusters.scopes import cluster_catalog_org_scope
@@ -200,6 +201,63 @@ class ManagedDomainDnsBindingReference:
     dns_writes_supported: bool = False
 
 
+@strawberry.type
+class Route53DnsCluster:
+    id: GUID
+    name: str
+    region: str
+    shared: bool
+
+
+@strawberry.type
+class Route53DnsClustersInventory:
+    complete: bool
+    reason: str
+    items: list[Route53DnsCluster]
+
+
+@strawberry.type
+class Route53DnsZone:
+    id: str
+    name: str
+    private_zone: bool
+    record_count: int | None
+
+
+@strawberry.type
+class Route53DnsZonesInventory:
+    complete: bool
+    reason: str
+    truncated: bool
+    items: list[Route53DnsZone]
+
+
+@strawberry.input
+class Route53DnsZonesInput:
+    cluster_id: GUID
+
+
+@strawberry.input
+class AttachRoute53DnsZoneInput:
+    domain_id: GUID
+    expected_domain_version: int
+    cluster_id: GUID
+    zone_id: str
+    zone_name: str
+
+
+@strawberry.type
+class ManagedDomainRoute53Binding:
+    domain_id: GUID
+    domain_version: int
+    cluster_id: GUID
+    account_id: str
+    zone: Route53DnsZone
+    verification_state: str
+    verification_record_name: str | None
+    verification_record_value: str | None
+
+
 def binding_type(domain, zone):
     return ManagedDomainDnsConnectionBinding(
         domain_id=GUID(str(domain.guid)),
@@ -365,6 +423,45 @@ class DnsProviderConnectionsQuery:
         except Exception as exc:
             return CloudflareDnsRecordsInventory(complete=False, reason=safe_reason(exc), items=[])
 
+    @strawberry.field
+    @require_permission(
+        Permission.PROVIDER_PLUGIN_READ, scope=cluster_catalog_org_scope(Permission.PROVIDER_PLUGIN_READ)
+    )
+    @tenant_scoped()
+    def route53_dns_clusters(self, info: Info) -> Route53DnsClustersInventory:
+        """AWS clusters whose declared credential may list hosted zones (#2287)."""
+        try:
+            rows = route53.bindable_clusters(info.context.request)
+            return Route53DnsClustersInventory(
+                complete=True,
+                reason="",
+                items=[
+                    Route53DnsCluster(
+                        id=GUID(str(c.guid)), name=c.name, region=c.region, shared=c.organization_id is None
+                    )
+                    for c in rows
+                ],
+            )
+        except Exception as exc:
+            return Route53DnsClustersInventory(complete=False, reason=safe_reason(exc), items=[])
+
+    @strawberry.field
+    @require_permission(
+        Permission.PROVIDER_PLUGIN_READ, scope=cluster_catalog_org_scope(Permission.PROVIDER_PLUGIN_READ)
+    )
+    @tenant_scoped()
+    def route53_dns_zones(self, info: Info, input: Route53DnsZonesInput) -> Route53DnsZonesInventory:
+        """Hosted zones seen through the cluster's declared AWS credential (#2287)."""
+        try:
+            rows, truncated = route53.list_cluster_zones(info.context.request, input.cluster_id)
+            return Route53DnsZonesInventory(
+                complete=True, reason="", truncated=truncated, items=[Route53DnsZone(**x) for x in rows]
+            )
+        except Exception as exc:
+            return Route53DnsZonesInventory(
+                complete=False, reason=safe_reason(exc), truncated=False, items=[]
+            )
+
 
 @strawberry.type
 class DnsProviderConnectionsMutation:
@@ -469,3 +566,36 @@ class DnsProviderConnectionsMutation:
             input.zone_name,
         )
         return success(binding_type(domain, zone))
+
+    @strawberry.mutation
+    @dns_mutation("dns.route53.zone.attach")
+    @require_permission(
+        Permission.PROVIDER_PLUGIN_CONFIGURE,
+        scope=cluster_catalog_org_scope(Permission.PROVIDER_PLUGIN_CONFIGURE),
+    )
+    @tenant_scoped()
+    def attach_route53_dns_zone(
+        self, info: Info, input: AttachRoute53DnsZoneInput
+    ) -> MutationResultType[ManagedDomainRoute53Binding]:
+        domain, cluster, zone = route53.attach_cluster_zone(
+            info.context.request,
+            input.domain_id,
+            input.expected_domain_version,
+            input.cluster_id,
+            input.zone_id,
+            input.zone_name,
+        )
+        return success(
+            ManagedDomainRoute53Binding(
+                domain_id=GUID(str(domain.guid)),
+                domain_version=domain.version,
+                cluster_id=GUID(str(cluster.guid)),
+                account_id=domain.dns_cluster_account_id,
+                zone=Route53DnsZone(**zone),
+                verification_state=domain.verification_state,
+                verification_record_name="_astrolift-challenge." + domain.zone
+                if domain.verification_token
+                else None,
+                verification_record_value=domain.verification_token or None,
+            )
+        )

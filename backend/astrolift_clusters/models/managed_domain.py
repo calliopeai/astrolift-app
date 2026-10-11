@@ -36,6 +36,19 @@ class ManagedDomain(BaseCoreModel):
     )
     dns_provider_zone_id = models.CharField(max_length=32, blank=True, default="", editable=False)
     dns_provider_connection_version = models.PositiveIntegerField(null=True, editable=False)
+    # A Route 53 zone seen through a cluster's declared AWS credential (#2287).
+    # Platform-written by the guided connection, never from dns_config, and
+    # pinned to the account the zone was observed in.
+    dns_cluster = models.ForeignKey(
+        "astrolift_clusters.TenantCluster",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="+",
+        editable=False,
+    )
+    dns_cluster_zone_id = models.CharField(max_length=32, blank=True, default="", editable=False)
+    dns_cluster_account_id = models.CharField(max_length=12, blank=True, default="", editable=False)
     provision_state = models.CharField(
         max_length=64,
         blank=True,

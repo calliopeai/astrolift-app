@@ -6160,6 +6160,14 @@ export type AttachProjectManagedServiceInput = {
   managedServiceId: Scalars['GUID']['input'];
 };
 
+export type AttachRoute53DnsZoneInput = {
+  clusterId: Scalars['GUID']['input'];
+  domainId: Scalars['GUID']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+  zoneId: Scalars['String']['input'];
+  zoneName: Scalars['String']['input'];
+};
+
 export type AttachSecretBundleInput = {
   appSlug: Scalars['String']['input'];
   bundleSlug: Scalars['String']['input'];
@@ -8043,6 +8051,23 @@ export type ManagedDomainRoute = {
   recordedUrl: Scalars['String']['output'];
 };
 
+export type ManagedDomainRoute53Binding = {
+  accountId: Scalars['String']['output'];
+  clusterId: Scalars['GUID']['output'];
+  domainId: Scalars['GUID']['output'];
+  domainVersion: Scalars['Int']['output'];
+  verificationRecordName?: Maybe<Scalars['String']['output']>;
+  verificationRecordValue?: Maybe<Scalars['String']['output']>;
+  verificationState: Scalars['String']['output'];
+  zone: Route53DnsZone;
+};
+
+export type ManagedDomainRoute53BindingMutationResult = {
+  data?: Maybe<ManagedDomainRoute53Binding>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type ManagedDomainRoutingPolicy =
   | 'CIDR'
   | 'FAILOVER'
@@ -8604,6 +8629,7 @@ export type Mutation = {
   attachAgentSecretBundle: AstroliftAgentSecretBundleAttachmentMutationResult;
   attachCloudflareDnsZone: ManagedDomainDnsConnectionBindingMutationResult;
   attachProjectManagedService: AstroliftManagedServiceAttachmentMutationResult;
+  attachRoute53DnsZone: ManagedDomainRoute53BindingMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
   attestSession: AstroliftAttestationResultMutationResult;
   authorizeLocalModelUploads: LocalModelUploadAuthorizationMutationResult;
@@ -9175,6 +9201,11 @@ export type MutationAttachCloudflareDnsZoneArgs = {
 
 export type MutationAttachProjectManagedServiceArgs = {
   input: AttachProjectManagedServiceInput;
+};
+
+
+export type MutationAttachRoute53DnsZoneArgs = {
+  input: AttachRoute53DnsZoneInput;
 };
 
 
@@ -12026,6 +12057,8 @@ export type Query = {
   previewAstroliftDeregister?: Maybe<AstroliftDeregisterPreview>;
   previewAstroliftForceRedeploy?: Maybe<AstroliftForceRedeployPreview>;
   previewWorkflowManifest: WorkflowManifestPreviewType;
+  route53DnsClusters: Route53DnsClustersInventory;
+  route53DnsZones: Route53DnsZonesInventory;
   scanAgentManifests: AstroliftScanAgentManifestsResult;
   scanAppManifests: AstroliftScanAppManifestsResult;
   scanCloudOrphans: CloudOrphanReportType;
@@ -14279,6 +14312,11 @@ export type QueryPreviewWorkflowManifestArgs = {
 };
 
 
+export type QueryRoute53DnsZonesArgs = {
+  input: Route53DnsZonesInput;
+};
+
+
 export type QueryScanAgentManifestsArgs = {
   orgId: Scalars['ID']['input'];
   ref?: Scalars['String']['input'];
@@ -14835,6 +14873,37 @@ export type RotateWebhookSecretInput = {
 export type RotateZentinelleGatewayCredentialInput = {
   clusterId: Scalars['GUID']['input'];
   overlapSeconds: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type Route53DnsCluster = {
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  region: Scalars['String']['output'];
+  shared: Scalars['Boolean']['output'];
+};
+
+export type Route53DnsClustersInventory = {
+  complete: Scalars['Boolean']['output'];
+  items: Array<Route53DnsCluster>;
+  reason: Scalars['String']['output'];
+};
+
+export type Route53DnsZone = {
+  id: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  privateZone: Scalars['Boolean']['output'];
+  recordCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type Route53DnsZonesInput = {
+  clusterId: Scalars['GUID']['input'];
+};
+
+export type Route53DnsZonesInventory = {
+  complete: Scalars['Boolean']['output'];
+  items: Array<Route53DnsZone>;
+  reason: Scalars['String']['output'];
+  truncated: Scalars['Boolean']['output'];
 };
 
 export type RunAstroliftAgentInput = {

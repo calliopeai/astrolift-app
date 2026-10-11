@@ -8328,7 +8328,17 @@
     "verifyPending": "尚未确认所有权。请检查权威提供商处已记录的 TXT 验证值。",
     "callbackSaved": "连接回调报告已保存。请读取已保存的连接以确认其当前状态。",
     "callbackUnconfirmed": "连接回调未获确认。请在重试前读取当前连接。",
-    "callbackDenied": "连接回调被拒绝。请在重试前检查当前权限和连接配置。"
+    "callbackDenied": "连接回调被拒绝。请在重试前检查当前权限和连接配置。",
+    "route53Cluster": "集群凭据",
+    "route53ClusterHelp": "托管区域使用所选集群的 AWS 凭据列出,即为该集群写入 DNS 的身份。",
+    "route53NoClusters": "没有可用的已验证账户的 AWS 集群。",
+    "route53Shared": "共享",
+    "route53Private": "私有",
+    "route53Bind": "绑定到 {domain}",
+    "route53OnlyReviewed": "只有名为 {domain} 的区域可以绑定到此域名。",
+    "route53Bound": "区域已绑定。其记录使用此集群的凭据读取。",
+    "route53ZonesTruncated": "显示前 500 个托管区域。",
+    "route53NoZones": "此凭据看不到任何托管区域。"
   },
   "emailDelivery": {
     "title": "邮件投递测试",

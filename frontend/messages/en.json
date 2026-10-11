@@ -8408,7 +8408,17 @@
     "verifyPending": "Ownership has not been confirmed. Check the recorded TXT challenge at the authoritative provider.",
     "callbackSaved": "The connection callback reported a saved result. Read saved connections to confirm their current state.",
     "callbackUnconfirmed": "The connection callback was not confirmed. Read current connections before trying again.",
-    "callbackDenied": "The connection callback was refused. Review current permissions and connection setup before trying again."
+    "callbackDenied": "The connection callback was refused. Review current permissions and connection setup before trying again.",
+    "route53Cluster": "Cluster credential",
+    "route53ClusterHelp": "Hosted zones are listed with the selected cluster's AWS credential, the identity that writes DNS for that cluster.",
+    "route53NoClusters": "No AWS cluster with a verified account is available.",
+    "route53Shared": "shared",
+    "route53Private": "private",
+    "route53Bind": "Bind to {domain}",
+    "route53OnlyReviewed": "Only the zone named {domain} can be bound to this domain.",
+    "route53Bound": "Zone bound. Its records are read with this cluster's credential.",
+    "route53ZonesTruncated": "Showing the first 500 hosted zones.",
+    "route53NoZones": "This credential sees no hosted zones."
   },
   "emailDelivery": {
     "title": "Email delivery tests",
