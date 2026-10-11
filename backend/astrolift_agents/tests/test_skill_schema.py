@@ -271,6 +271,39 @@ def test_import_mutation_rejects_non_github_url(permission_resolver, info, org, 
     assert Skill.objects.filter(organization=org).count() == 0
 
 
+def test_import_mutation_refuses_unknown_adapter_as_validation(
+    permission_resolver, info, org, with_tenant_org, monkeypatch
+):
+    _grant_all(permission_resolver)
+    typo = _TOML.replace(b'capability_group = "dev"', b'capability_group = "dev"\nadapter = "http_endpont"')
+    _patch_get(monkeypatch, _FakeResponse(_zipball(typo)))
+
+    with with_tenant_org(org):
+        result = AgentsMutation().import_skills_from_repo(
+            info(), repo_url="https://github.com/acme/agent-config"
+        )
+
+    assert result.ok is False
+    assert result.errors[0].code == "VALIDATION"
+    assert "tools.read_file" in result.errors[0].message
+    assert Skill.objects.filter(organization=org).count() == 0
+
+
+def test_import_mutation_accepts_missing_adapter(
+    permission_resolver, info, org, with_tenant_org, monkeypatch
+):
+    _grant_all(permission_resolver)
+    _patch_get(monkeypatch, _FakeResponse(_zipball(_TOML)))
+
+    with with_tenant_org(org):
+        result = AgentsMutation().import_skills_from_repo(
+            info(), repo_url="https://github.com/acme/agent-config"
+        )
+
+    assert result.ok is True
+    assert ToolDef.objects.get(skill__organization=org, slug="read_file").adapter == ToolDef.Adapter.PYTHON_FN
+
+
 def test_import_mutation_surfaces_github_error_as_precondition(
     permission_resolver, info, org, with_tenant_org, monkeypatch
 ):

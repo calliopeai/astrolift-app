@@ -3051,6 +3051,7 @@ class AgentsMutation:
         import requests
 
         from astrolift_agents.services.skill_importer import (
+            InvalidManifestError,
             InvalidRepoURLError,
             import_skills_from_repo,
         )
@@ -3076,6 +3077,8 @@ class AgentsMutation:
             )
         except InvalidRepoURLError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="repoUrl")
+        except InvalidManifestError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc))
         except requests.RequestException as exc:
             # Upstream fetch failed (repo/branch missing, network, non-2xx).
             # That's a client-fixable precondition, not a server INTERNAL.
