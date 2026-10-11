@@ -68,7 +68,7 @@ from astrolift_graphql import (
     search_q,
 )
 from core.decorators import tenant_scoped
-from core.permissions import Permission, require_permission
+from core.permissions import Permission, PermissionDenied, check_permission, require_permission
 from core.tenancy import get_current_tenant
 
 log = logging.getLogger(__name__)
@@ -332,23 +332,33 @@ def _variables_name_cluster(variables, *, guid: uuid.UUID, slug: str | None) -> 
     return False
 
 
+def _cluster_operator_view(scope_factory, args) -> bool:
+    """True when the caller also holds ``cluster.register`` at the read's scope.
+
+    Inventory reads need only ``cluster.read`` (#2295); registration authority
+    is what reveals the endpoint, edge-auth config and bootstrap history.
+    """
+    try:
+        check_permission(Permission.CLUSTER_REGISTER, scope=scope_factory(args))
+    except PermissionDenied:
+        return False
+    return True
+
+
 @strawberry.type
 class ClustersQuery:
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftClustersPage."
     )
-    @require_permission(
-        Permission.CLUSTER_REGISTER, scope=cluster_catalog_org_scope(Permission.CLUSTER_REGISTER)
-    )
+    @require_permission(Permission.CLUSTER_READ, scope=cluster_catalog_org_scope(Permission.CLUSTER_READ))
     @tenant_scoped()
     def astrolift_clusters(self, info: Info) -> list[TenantClusterType]:
         qs = _clusters_qs().order_by("slug")[:200]
-        return [cluster_to_type(c) for c in qs]
+        operator = _cluster_operator_view(cluster_catalog_org_scope(Permission.CLUSTER_REGISTER), {})
+        return [cluster_to_type(c, operator_view=operator) for c in qs]
 
     @strawberry.field
-    @require_permission(
-        Permission.CLUSTER_REGISTER, scope=cluster_catalog_org_scope(Permission.CLUSTER_REGISTER)
-    )
+    @require_permission(Permission.CLUSTER_READ, scope=cluster_catalog_org_scope(Permission.CLUSTER_READ))
     @tenant_scoped()
     def astrolift_clusters_page(
         self,
@@ -389,6 +399,11 @@ class ClustersQuery:
         order ``name``. Otherwise the cursor walk runs unchanged, with
         ``filter`` applied first. An undeclared sort key is an error.
         """
+        operator = _cluster_operator_view(cluster_catalog_org_scope(Permission.CLUSTER_REGISTER), {})
+
+        def to_type(cluster):
+            return cluster_to_type(cluster, operator_view=operator)
+
         qs = _clusters_qs(search=search)
         if filter is not None:
             qs = _annotate_clusters_list(qs).filter(
@@ -398,7 +413,7 @@ class ClustersQuery:
             order_by = resolve_list_sort(sort, _CLUSTERS_SORT_KEYS, default=_CLUSTERS_DEFAULT_SORT)
             if filter is None:
                 qs = _annotate_clusters_list(qs)
-            return numbered_page(qs, order_by=order_by, page=page, page_size=page_size).map(cluster_to_type)
+            return numbered_page(qs, order_by=order_by, page=page, page_size=page_size).map(to_type)
         result = keyset_page(
             qs,
             cursor=after,
@@ -407,12 +422,12 @@ class ClustersQuery:
             tiebreak_field="guid",
             descending=False,
         )
-        return result.map(cluster_to_type)
+        return result.map(to_type)
 
     @strawberry.field
     @require_permission(
-        Permission.CLUSTER_REGISTER,
-        scope=cluster_org_scope(Permission.CLUSTER_REGISTER, "slug", by_slug=True),
+        Permission.CLUSTER_READ,
+        scope=cluster_org_scope(Permission.CLUSTER_READ, "slug", by_slug=True),
     )
     @tenant_scoped()
     def astrolift_cluster(self, info: Info, slug: str) -> TenantClusterType | None:
@@ -425,7 +440,12 @@ class ClustersQuery:
         clusters, never another org's.
         """
         cluster = _clusters_qs().filter(slug=slug).first()
-        return cluster_to_type(cluster) if cluster is not None else None
+        if cluster is None:
+            return None
+        operator = _cluster_operator_view(
+            cluster_org_scope(Permission.CLUSTER_REGISTER, "slug", by_slug=True), {"slug": slug}
+        )
+        return cluster_to_type(cluster, operator_view=operator)
 
     @strawberry.field
     @require_permission(Permission.APP_CREATE, scope=cluster_catalog_org_scope(Permission.APP_CREATE))

@@ -110,6 +110,10 @@ class Permission(enum.StrEnum):
     BILLING_UPDATE = "billing.update"
 
     # --- Cluster / plugin -----------------------------------------
+    # Inventory and exact-cluster metadata, separate from registration so a
+    # read-only client can list clusters (#2295). Edge-auth config, the API
+    # endpoint and bootstrap history stay with ``cluster.register``.
+    CLUSTER_READ = "cluster.read"
     CLUSTER_REGISTER = "cluster.register"
     CLUSTER_UPDATE = "cluster.update"
     CLUSTER_UNREGISTER = "cluster.unregister"

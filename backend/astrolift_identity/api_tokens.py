@@ -183,7 +183,7 @@ def token_scope_allows_permission(token, permission: str) -> bool:
         permission.startswith(_WRITE_APP_PREFIXES) or permission in _WRITE_APP_PERMISSIONS
     ):
         return True
-    if SCOPE_READ_CLUSTERS in scopes and permission == "provider_plugin.read":
+    if SCOPE_READ_CLUSTERS in scopes and permission in {"provider_plugin.read", "cluster.read"}:
         return True
     if SCOPE_WRITE_CLUSTERS in scopes and permission == "cluster.update":
         return True
