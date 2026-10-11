@@ -147,7 +147,7 @@ MATRIX = AvailabilityMatrix(
         DriverEntry(role="identity", plugin_id="gcp", variant="workload_identity"),
         DriverEntry(role="registry", plugin_id="gcp", variant="artifact_registry"),
         DriverEntry(role="notification", plugin_id="gcp", variant="fcm"),
-        DriverEntry(role="identity_users", plugin_id="gcp", variant="identity_platform", status="planned"),
+        DriverEntry(role="identity_users", plugin_id="gcp", variant="identity_platform"),
         # Azure plugin
         DriverEntry(role="cluster", plugin_id="azure"),
         DriverEntry(role="ingress", plugin_id="azure", variant="agic"),
