@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Azure clusters manage their central-auth sign-in users in Microsoft Entra ID through Microsoft Graph, when central auth signs in through the cluster's own tenant: list, create (a password creates a member, no password sends a B2B invitation), set password, enable or disable, delete, and group membership, with the same reviewed-target checks as Cognito. Entra has no provider-sent password reset, so that action is refused with the reason. The control plane needs Graph `User.ReadWrite.All`, `Group.ReadWrite.All` and `User.Invite.All` in the tenant (#2134).
+
 - Fifteen more AWS managed drivers name new resources from the managed-service id instead of joined slugs, so two services whose slugs join to the same string (`acme` + `web-prod`, `acme-web` + `prod`) no longer collide: Redshift, Redshift Serverless, DocumentDB, Neptune, MemoryDB, Amazon MQ, RDS Proxy, Bedrock provisioned models, Keyspaces, Timestream, FSx, CloudWatch bundles and the REST, HTTP and WebSocket API Gateways. Existing resources keep their recorded names; API Gateway, Amazon MQ and FSx find a recorded resource by its id or tag. Keyspaces and Timestream give each service its own keyspace or database, so deprovision with data deletion no longer drops a sibling service's tables. A missing or malformed service id is refused as `invalid_resource_identity` before any AWS call (#2032).
 
 - Retry startup connection resets within the existing bounded CPU runtime health poll; retain container-exit and readiness-deadline failures before inference (#2284).

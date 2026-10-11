@@ -4,7 +4,8 @@ The authenticated `astroliftClusterAuthUsers` inventory exposes optional
 `source { providerPluginId, providerPoolId, sourceVersion }` and each user's
 optional `providerUserId`. These are target observations, not authorization.
 Cognito uses its literal user-pool ID and immutable `sub`, never email or a
-username inferred from a display label. Passwords and cloud credential values
+username inferred from a display label. Microsoft Entra ID (Azure clusters)
+uses the tenant ID as the pool and the user's immutable object ID. Passwords and cloud credential values
 are absent from these reads and from the source-token payload.
 
 Pass the observed `source` as `expectedSource` to all seven existing mutations:
@@ -75,3 +76,18 @@ No database migration is required. Rolling back removes these guards; legacy
 current-target behavior resumes. Clients sending the new fields require a
 matching schema, so roll back connected web/backend together. No production pool
 changes, cloud provisioning or live user writes are part of local verification.
+
+## Microsoft Entra ID
+
+An Azure cluster manages sign-in users in Entra ID only when its central auth
+issuer is that cluster's own tenant (`provider_config.tenant_id`); any other
+issuer, including the multi-tenant `common` endpoint, is reported unsupported
+with the reason. The control plane's Azure identity needs the Microsoft Graph
+application permissions `User.ReadWrite.All`, `Group.ReadWrite.All` and
+`User.Invite.All` in that tenant. Two behaviors differ from Cognito:
+
+- Creating a user without a password sends an Entra B2B invitation; the user
+  appears as a guest pending acceptance. With a password, a member user is
+  created with that user principal name, which must be in a verified domain.
+- Entra has no provider-sent password reset. **Reset password** is refused with
+  that reason; set a temporary password instead.
