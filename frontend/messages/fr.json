@@ -8568,5 +8568,21 @@
     "geoproximity": "Géoproximité",
     "cidrPolicy": "Routage CIDR",
     "unknownPolicy": "Inconnu"
+  },
+  "brains": {
+    "title": "Couches sémantiques",
+    "context": "Couches sémantiques hébergées que vous pouvez lire : des applications qui servent une Semantic Context Ontology Layer. Partagez-en une en donnant à une équipe l’accès à son application.",
+    "columnName": "Couche",
+    "columnOwner": "Équipe / projet",
+    "columnEndpoints": "Servie à",
+    "columnShared": "Partagée avec",
+    "columnApp": "Accès",
+    "none": "aucun",
+    "notServed": "Pas encore servie",
+    "notShared": "Équipe propriétaire uniquement",
+    "shareTitle": "{team} : {access}",
+    "manageAccess": "Gérer l’accès",
+    "emptyTitle": "Aucune couche sémantique",
+    "emptyDescription": "Les applications déclarées avec [app] kind = \"mimwell\" que vous pouvez lire apparaissent ici."
   }
 }

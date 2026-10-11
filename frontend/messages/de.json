@@ -8568,5 +8568,21 @@
     "geoproximity": "Geografische Nähe",
     "cidrPolicy": "CIDR-Routing",
     "unknownPolicy": "Unbekannt"
+  },
+  "brains": {
+    "title": "Semantische Schichten",
+    "context": "Gehostete semantische Schichten, die du lesen kannst: Apps, die eine Semantic Context Ontology Layer bereitstellen. Teile eine, indem du einem Team Zugriff auf ihre App gibst.",
+    "columnName": "Schicht",
+    "columnOwner": "Team / Projekt",
+    "columnEndpoints": "Bereitgestellt unter",
+    "columnShared": "Geteilt mit",
+    "columnApp": "Zugriff",
+    "none": "keins",
+    "notServed": "Noch nicht bereitgestellt",
+    "notShared": "Nur das besitzende Team",
+    "shareTitle": "{team}: {access}",
+    "manageAccess": "Zugriff verwalten",
+    "emptyTitle": "Keine semantischen Schichten",
+    "emptyDescription": "Apps mit [app] kind = \"mimwell\", die du lesen kannst, erscheinen hier."
   }
 }

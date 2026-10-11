@@ -8565,5 +8565,21 @@
     "geoproximity": "地理的近接性",
     "cidrPolicy": "CIDR ルーティング",
     "unknownPolicy": "不明"
+  },
+  "brains": {
+    "title": "セマンティックレイヤー",
+    "context": "閲覧できるホスト型セマンティックレイヤーです。Semantic Context Ontology Layer を提供するアプリが対象です。チームにアプリへのアクセス権を付与すると共有できます。",
+    "columnName": "レイヤー",
+    "columnOwner": "チーム / プロジェクト",
+    "columnEndpoints": "提供先",
+    "columnShared": "共有先",
+    "columnApp": "アクセス",
+    "none": "なし",
+    "notServed": "未提供",
+    "notShared": "所有チームのみ",
+    "shareTitle": "{team}: {access}",
+    "manageAccess": "アクセスを管理",
+    "emptyTitle": "セマンティックレイヤーはありません",
+    "emptyDescription": "[app] kind = \"mimwell\" で宣言され、閲覧できるアプリがここに表示されます。"
   }
 }
