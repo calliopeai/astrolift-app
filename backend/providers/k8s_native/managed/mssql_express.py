@@ -26,7 +26,7 @@ from uuid import uuid4
 
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op, maybe_heartbeat
-from _sdk.k8s_naming import agent_namespace, app_namespace, dns_label
+from _sdk.k8s_naming import agent_namespace, app_namespace
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -43,6 +43,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from k8s_native.managed._handle import pack as _pack_handle
+from k8s_native.managed._handle import service_object_name
 from k8s_native.managed._handle import unpack as _unpack_handle
 from k8s_native.managed._secret_refs import refuse_shared_namespace_secrets
 
@@ -1480,13 +1481,7 @@ class SQLServerExpressDriver(ManagedServiceDriver):
             time.sleep(max(self._config.deletion_poll_seconds, 0))
 
     def _name(self, spec: ProvisionSpec) -> str:
-        return dns_label(
-            "mssql",
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint,
-            max_length=50,
-        )
+        return service_object_name(spec, kind=KIND, prefix="mssql", max_length=50)
 
     def _namespace(self, spec: ProvisionSpec) -> str:
         if self._config.namespace:

@@ -107,7 +107,7 @@ def _spec(**config: Any) -> ProvisionSpec:
         service_handle_hint="intake-function",
         size="small",
         config={"image": IMAGE, **config},
-        managed_service_id="service-1",
+        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
 
 
@@ -127,12 +127,12 @@ def test_provision_renders_owned_private_scale_to_zero_service() -> None:
 
     assert result.ok is True
     assert result.ready is False
-    assert result.handle == "faas/cluster-1/steady-md-triage/triage-prod-intake-function"
+    assert result.handle == "faas/cluster-1/steady-md-triage/function-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     manifest = _manifest(cluster)
     assert manifest["apiVersion"] == API_VERSION
     assert manifest["kind"] == "Service"
     assert manifest["metadata"]["labels"]["app.kubernetes.io/managed-by"] == "astrolift"
-    assert manifest["metadata"]["labels"]["astrolift.io/managed-service-id"] == "service-1"
+    assert manifest["metadata"]["labels"]["astrolift.io/managed-service-id"] == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
     assert manifest["metadata"]["labels"]["networking.knative.dev/visibility"] == "cluster-local"
     template = manifest["spec"]["template"]
     assert template["metadata"]["annotations"]["autoscaling.knative.dev/min-scale"] == "0"
@@ -251,7 +251,7 @@ def test_existing_resource_is_refused_even_with_its_exact_uid() -> None:
     key = (
         f"{API_VERSION}/Service",
         "steady-md-triage",
-        "triage-prod-intake-function",
+        "function-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
     )
     foreign = {"metadata": {"uid": "uid-1", "labels": {"app.kubernetes.io/managed-by": "someone-else"}}}
     cluster.objects[key] = foreign
@@ -285,9 +285,14 @@ def test_reprovision_reconciles_resource_owned_by_same_managed_service() -> None
 
 def test_reprovision_never_adopts_another_astrolift_managed_resource() -> None:
     driver, _ = _driver()
-    assert driver.provision(_spec()).ok is True
+    first = driver.provision(_spec())
+    assert first.ok is True
 
-    result = driver.provision(replace(_spec(), managed_service_id="service-2"))
+    # Names derive from the id (#2032); only a recorded handle can point a
+    # second binding at the first one's object.
+    result = driver.provision(
+        replace(_spec(), managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4", recorded_handle=first.handle)
+    )
 
     assert result.ok is False
     assert "another Astrolift managed resource" in result.message
@@ -325,7 +330,9 @@ def test_update_missing_resource_is_permanent_failure() -> None:
 def test_update_requires_nonempty_astrolift_resource_identity() -> None:
     driver, cluster = _driver()
     provisioned = driver.provision(_spec())
-    current = cluster.objects[(f"{API_VERSION}/Service", "steady-md-triage", "triage-prod-intake-function")]
+    current = cluster.objects[
+        (f"{API_VERSION}/Service", "steady-md-triage", "function-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
+    ]
     current["metadata"]["labels"].pop("astrolift.io/managed-service-id")
 
     result = driver.update(UpdateSpec(handle=provisioned.handle, size="small", config={"image": IMAGE_V2}))
@@ -344,7 +351,9 @@ def test_deprovision_honors_protection_and_ownership() -> None:
     assert protected.ok is False
     assert protected.retryable is False
 
-    current = cluster.objects[(f"{API_VERSION}/Service", "steady-md-triage", "triage-prod-intake-function")]
+    current = cluster.objects[
+        (f"{API_VERSION}/Service", "steady-md-triage", "function-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
+    ]
     current["metadata"]["labels"]["app.kubernetes.io/managed-by"] = "foreign"
     foreign = driver.deprovision(DeprovisionSpec(handle=provisioned.handle))
     forced_foreign = driver.deprovision(
@@ -414,14 +423,16 @@ def test_binding_exposes_knative_route_and_portable_locator() -> None:
 
     binding = driver.binding(ServiceHandle(provisioned.handle))
 
-    assert binding.env_vars["FUNCTION_NAME"].literal == "triage-prod-intake-function"
+    assert binding.env_vars["FUNCTION_NAME"].literal == "function-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     assert binding.env_vars["FUNCTION_URL"].literal == "https://function.example.test"
-    assert binding.env_vars["FUNCTION_ARN"].literal == ("k8s://cluster-1/steady-md-triage/triage-prod-intake-function")
+    assert binding.env_vars["FUNCTION_ARN"].literal == (
+        "k8s://cluster-1/steady-md-triage/function-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
+    )
 
 
 def test_binding_fails_when_service_or_ready_route_is_missing() -> None:
     driver, _ = _driver()
-    handle = "faas/cluster-1/steady-md-triage/triage-prod-intake-function"
+    handle = "faas/cluster-1/steady-md-triage/function-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     with pytest.raises(ValueError, match="does not exist"):
         driver.binding(ServiceHandle(handle))
 

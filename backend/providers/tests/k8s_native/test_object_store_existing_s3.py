@@ -114,7 +114,7 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         "service_handle_hint": "uploads",
         "size": "custom",
         "config": _config(),
-        "managed_service_id": "service-1",
+        "managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     }
     values.update(overrides)
     return ProvisionSpec(**values)
@@ -139,7 +139,7 @@ def _driver(
 
 
 def _record(cluster: _Cluster) -> dict[str, Any]:
-    return cluster.objects[("v1/ConfigMap", "acme-payments", "payments-prod-uploads-s3")]
+    return cluster.objects[("v1/ConfigMap", "acme-payments", "s3-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")]
 
 
 def _document(cluster: _Cluster) -> dict[str, Any]:
@@ -153,12 +153,12 @@ def test_provision_registers_nonsecret_connection_record_and_is_immediately_read
 
     assert result.ok is True
     assert result.ready is True
-    assert result.handle == "object_store/cluster-1/acme-payments/payments-prod-uploads-s3"
+    assert result.handle == "object_store/cluster-1/acme-payments/s3-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     assert "reachability was not probed" in result.message
     record = _record(cluster)
     assert record["metadata"]["labels"] == {
         "app.kubernetes.io/managed-by": "astrolift",
-        "astrolift.io/managed-service-id": "service-1",
+        "astrolift.io/managed-service-id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
         "astrolift.io/component": "s3-compatible-registration",
         "astrolift.io/organization": "acme",
         "astrolift.io/app": "payments",
@@ -365,7 +365,10 @@ def test_update_reconciles_connection_without_changing_owner() -> None:
     assert updated.ok is True
     assert _document(cluster)["bucket_name"] == "acme-archive"
     assert _document(cluster)["prefix"] == "archive"
-    assert _record(cluster)["metadata"]["labels"]["astrolift.io/managed-service-id"] == "service-1"
+    assert (
+        _record(cluster)["metadata"]["labels"]["astrolift.io/managed-service-id"]
+        == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
+    )
 
 
 def test_status_fails_closed_for_record_tampering_and_rotated_credential_removal() -> None:
@@ -429,7 +432,7 @@ def test_policy_tightening_does_not_trap_an_owned_registration() -> None:
     assert status.state == "error"
     assert "outside the cluster allowlist" in status.message
     assert unlinked.ok is True
-    assert ("v1/ConfigMap", "acme-payments", "payments-prod-uploads-s3") not in cluster.objects
+    assert ("v1/ConfigMap", "acme-payments", "s3-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b") not in cluster.objects
 
 
 def test_apply_and_delete_failures_are_reported() -> None:

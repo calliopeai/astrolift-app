@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from _sdk._telemetry import driver_op
-from _sdk.k8s_naming import app_namespace, dns_label
+from _sdk.k8s_naming import app_namespace
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -40,6 +40,7 @@ from _sdk.managed_service import (
     unsupported_update,
 )
 from k8s_native.managed._handle import pack as _pack_handle
+from k8s_native.managed._handle import service_object_name
 from k8s_native.managed._handle import unpack as _unpack_handle
 from k8s_native.managed._secret_refs import shared_namespace_owner_refusal
 
@@ -325,12 +326,7 @@ class NFSDriver(ManagedServiceDriver):
         }
 
     def _pvc_name(self, *, spec: ProvisionSpec) -> str:
-        return dns_label(
-            "nfs",
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint,
-        )
+        return service_object_name(spec, kind=KIND, prefix="nfs", max_length=63)
 
     def _namespace_for(self, *, spec: ProvisionSpec) -> str:
         if self._config.namespace:

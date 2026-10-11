@@ -8,7 +8,7 @@ from typing import Any
 
 from _sdk import UnsupportedOperationError
 from _sdk._telemetry import driver_op
-from _sdk.k8s_naming import app_namespace, dns_label
+from _sdk.k8s_naming import app_namespace
 from _sdk.managed_service import (
     Binding,
     BindingSchema,
@@ -26,6 +26,7 @@ from _sdk.managed_service import (
     VolumeSourceKind,
 )
 from k8s_native.managed._handle import pack as _pack_handle
+from k8s_native.managed._handle import service_object_name
 from k8s_native.managed._handle import unpack as _unpack_handle
 
 KIND = "filesystem"
@@ -357,12 +358,7 @@ class _DynamicPVCDriver(ManagedServiceDriver):
 
     def _volume_name(self, spec: ProvisionSpec) -> str:
         prefix = "cephfs" if self.protocol == "cephfs" else "pvc"
-        return dns_label(
-            prefix,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint,
-        )
+        return service_object_name(spec, kind=KIND, prefix=prefix)
 
     def _namespace_for(self, spec: ProvisionSpec) -> str:
         return app_namespace(

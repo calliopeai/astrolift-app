@@ -100,7 +100,7 @@ def _spec(**config: Any) -> ProvisionSpec:
         service_handle_hint="events",
         size="custom",
         config={"triggers": [_trigger()], **config},
-        managed_service_id="service-1",
+        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
 
 
@@ -118,7 +118,7 @@ def _driver(
 
 
 def _broker(cluster: _Cluster) -> dict[str, Any]:
-    return cluster.objects[(f"{API_VERSION}/Broker", "steady-md-triage", "triage-prod-events")]
+    return cluster.objects[(f"{API_VERSION}/Broker", "steady-md-triage", "events-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")]
 
 
 def _stored_trigger(cluster: _Cluster, name: str = "triage") -> dict[str, Any]:
@@ -126,7 +126,7 @@ def _stored_trigger(cluster: _Cluster, name: str = "triage") -> dict[str, Any]:
         (
             f"{API_VERSION}/Trigger",
             "steady-md-triage",
-            f"triage-prod-events-{name}",
+            f"events-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-{name}",
         )
     ]
 
@@ -175,13 +175,13 @@ def test_provision_renders_owned_broker_delivery_and_trigger() -> None:
 
     assert result.ok is True
     assert result.ready is False
-    assert result.handle == "event_bus/cluster-1/steady-md-triage/triage-prod-events"
+    assert result.handle == "event_bus/cluster-1/steady-md-triage/events-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     broker = _broker(cluster)
     assert broker["metadata"]["annotations"]["eventing.knative.dev/broker.class"] == ("MTChannelBasedBroker")
-    assert broker["metadata"]["labels"]["astrolift.io/managed-service-id"] == "service-1"
+    assert broker["metadata"]["labels"]["astrolift.io/managed-service-id"] == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
     assert broker["spec"]["delivery"]["retry"] == 5
     trigger = _stored_trigger(cluster)
-    assert trigger["spec"]["broker"] == "triage-prod-events"
+    assert trigger["spec"]["broker"] == "events-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     assert trigger["spec"]["subscriber"]["ref"]["name"] == "triage-worker"
     assert trigger["spec"]["filter"]["attributes"]["type"] == "dev.astrolift.finding"
 
@@ -346,7 +346,7 @@ def test_trigger_resource_names_are_scoped_to_their_broker() -> None:
     second = replace(
         first,
         service_handle_hint="audit-events",
-        managed_service_id="service-2",
+        managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
     )
 
     assert driver.provision(first).ok is True
@@ -358,14 +358,14 @@ def test_trigger_resource_names_are_scoped_to_their_broker() -> None:
         if kind == f"{API_VERSION}/Trigger" and namespace == "steady-md-triage"
     }
     assert trigger_names == {
-        "triage-prod-events-triage",
-        "triage-prod-audit-events-triage",
+        "events-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-triage",
+        "events-0b8e7c1d2f3a4b5c9d6e7f8091a2b3c4-triage",
     }
 
 
 def test_existing_broker_is_refused_even_with_its_exact_uid() -> None:
     driver, cluster = _driver()
-    key = (f"{API_VERSION}/Broker", "steady-md-triage", "triage-prod-events")
+    key = (f"{API_VERSION}/Broker", "steady-md-triage", "events-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
     foreign = {
         "metadata": {
             "uid": "uid-1",
@@ -389,7 +389,7 @@ def test_existing_broker_is_refused_even_with_its_exact_uid() -> None:
 
 def test_existing_trigger_is_refused_even_with_its_exact_uid() -> None:
     driver, cluster = _driver()
-    key = (f"{API_VERSION}/Trigger", "steady-md-triage", "triage-prod-events-triage")
+    key = (f"{API_VERSION}/Trigger", "steady-md-triage", "events-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-triage")
     foreign = {
         "metadata": {
             "uid": "trigger-uid",
@@ -416,7 +416,7 @@ def test_update_prunes_removed_owned_trigger_and_reconciles_remaining_set() -> N
     assert driver.provision(
         _spec(triggers=[_trigger("first"), _trigger("second")]),
     ).ok
-    handle = "event_bus/cluster-1/steady-md-triage/triage-prod-events"
+    handle = "event_bus/cluster-1/steady-md-triage/events-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
 
     result = driver.update(
         UpdateSpec(handle=handle, config={"triggers": [_trigger("second")]}),
@@ -424,14 +424,14 @@ def test_update_prunes_removed_owned_trigger_and_reconciles_remaining_set() -> N
 
     assert result.ok is True
     assert [row["metadata"]["name"] for row in cluster.deleted[-1][2]] == [
-        "triage-prod-events-first",
+        "events-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-first",
     ]
     assert (
         f"{API_VERSION}/Trigger",
         "steady-md-triage",
-        "triage-prod-events-first",
+        "events-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-first",
     ) not in cluster.objects
-    assert _stored_trigger(cluster, "second")["spec"]["broker"] == "triage-prod-events"
+    assert _stored_trigger(cluster, "second")["spec"]["broker"] == "events-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
 
 
 def test_update_refuses_immutable_broker_class_change() -> None:
@@ -476,19 +476,21 @@ def test_status_and_binding_require_ready_broker_and_triggers() -> None:
 
     _mark_ready(
         _broker(cluster),
-        address="http://triage-prod-events-kn-channel.steady-md-triage.svc.cluster.local",
+        address="http://events-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-kn-channel.steady-md-triage.svc.cluster.local",
     )
     assert driver.status(handle).state == "provisioning"
     _mark_ready(_stored_trigger(cluster))
 
     assert driver.status(handle).state == "available"
     binding = driver.binding(handle)
-    assert binding.env_vars["EVENT_BUS_NAME"].literal == "triage-prod-events"
+    assert binding.env_vars["EVENT_BUS_NAME"].literal == "events-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     assert binding.env_vars["EVENT_BUS_REGION"].literal == "kubernetes"
     assert binding.env_vars["EVENT_BUS_ENDPOINT"].literal == (
-        "http://triage-prod-events-kn-channel.steady-md-triage.svc.cluster.local"
+        "http://events-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-kn-channel.steady-md-triage.svc.cluster.local"
     )
-    assert binding.env_vars["EVENT_BUS_ARN"].literal == ("k8s://cluster-1/steady-md-triage/broker/triage-prod-events")
+    assert binding.env_vars["EVENT_BUS_ARN"].literal == (
+        "k8s://cluster-1/steady-md-triage/broker/events-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
+    )
 
 
 def test_terminal_broker_and_trigger_conditions_report_errors() -> None:
