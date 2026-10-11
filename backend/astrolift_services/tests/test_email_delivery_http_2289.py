@@ -510,6 +510,10 @@ def test_retained_history_blocks_destructive_migration_rollback(world):
     assert send(world)["ok"]
     row = EmailDeliveryTest.objects.get()
     row.soft_delete()
+    # Sibling services branches unapply first and ALTER tables these rows
+    # reference; fire the deferred FK checks so Postgres allows the DDL.
+    with connection.cursor() as cursor:
+        cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
     with pytest.raises(RuntimeError, match="EMAIL_TEST_ROLLBACK_REQUIRES_EMPTY_HISTORY"):
         MigrationExecutor(connection).migrate([("astrolift_services", "0035_merge_model_sources")])
     assert EmailDeliveryTest._base_manager.filter(pk=row.pk).exists()
