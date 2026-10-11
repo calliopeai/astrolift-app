@@ -33,6 +33,7 @@ from _sdk.managed_service import (
     VolumeMount,
     VolumeSourceKind,
 )
+from aws._naming import managed_service_identity, managed_service_name
 from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
 from aws.session import aws_client
 
@@ -102,7 +103,10 @@ class FSxDriver(ManagedServiceDriver):
         error = self._validate_config(cfg, size=spec.size)
         if error:
             return ProvisionResult(False, "", error, ["invalid_fsx_config"])
-        token = self._client_token(spec)
+        try:
+            token = self._client_token(spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         existing = self._find_by_token(token)
         file_system_id = str(existing.get("FileSystemId") or "")
         created = False
@@ -362,7 +366,10 @@ class FSxDriver(ManagedServiceDriver):
         error = self._validate_config(cfg, size=target.size, restoring=True)
         if error:
             return ProvisionResult(False, "", error, ["invalid_fsx_restore_config"])
-        token = _token(f"{self._client_token(target)}-restore-{snapshot.snapshot_id}")
+        try:
+            token = _token(f"{self._client_token(target)}-restore-{snapshot.snapshot_id}")
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         existing = self._find_by_token(token)
         file_system_id = str(existing.get("FileSystemId") or "")
         try:
@@ -1005,19 +1012,23 @@ class FSxDriver(ManagedServiceDriver):
         ]
 
     def _client_token(self, spec: ProvisionSpec) -> str:
-        raw = "-".join(
-            part
-            for part in (
-                self._config.client_token_prefix,
-                spec.organization_slug,
-                spec.app_slug,
-                spec.environment_name,
-                spec.service_handle_hint or self.variant,
-                self.variant,
-            )
-            if part
-        )
-        return _token(raw)
+        """New filesystems take a token from the service identity (#2032); a
+        recorded filesystem keeps the token it is tagged with."""
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            recorded_kind, file_system_id = parse_handle(spec.recorded_handle)
+            if recorded_kind != KIND:
+                raise ManagedServiceError("recorded AWS handle belongs to a different driver kind")
+            try:
+                rows = self._fsx.describe_file_systems(FileSystemIds=[file_system_id]).get("FileSystems") or []
+            except Exception as exc:  # the recorded filesystem must be readable to keep its token
+                raise ManagedServiceError(f"recorded FSx filesystem {file_system_id} is unreadable: {exc}") from exc
+            token = _tag_map((rows[0] if rows else {}).get("Tags") or []).get(_RESOURCE_TOKEN_TAG, "")
+            if not token:
+                raise ManagedServiceError(f"recorded FSx filesystem {file_system_id} has no Astrolift resource token")
+            return token
+        # Client request tokens: <=63 chars of [A-Za-z0-9_.-].
+        return managed_service_name(spec.managed_service_id, prefix=self._config.client_token_prefix, max_len=63)
 
     def _capacity(self, size: str) -> int:
         if size == "custom":

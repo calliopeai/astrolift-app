@@ -50,7 +50,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from aws._errors import map_client_error
-from aws._naming import iam_role_name
+from aws._naming import managed_service_name
 from aws.managed._base import (
     ManagedServiceError,
     adoption_refusal,
@@ -120,9 +120,13 @@ class ApiGatewayHttpDriver:
             msg = "api_gateway provision requires config.lambda_function_arn"
             return ProvisionResult(ok=False, handle="", message=msg, errors=[msg])
 
-        api_name = self._api_name(spec)
         try:
-            api = self._find_api(api_name)
+            api_name = self._api_name(spec)
+            recorded_id = self._recorded_api_id(spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
+        try:
+            api = self._find_api(api_name, recorded_id)
             if api is not None:
                 # Routes, integration and invoke permission would be rewired
                 # onto another service's API otherwise (#1961).
@@ -282,20 +286,20 @@ class ApiGatewayHttpDriver:
     # ---- internals ------------------------------------------------
 
     def _api_name(self, spec: ProvisionSpec) -> str:
-        # Deterministic + astrolift-* prefixed (matches the control-plane
-        # name-prefix grant) and scoped by the per-workload service_handle_hint
-        # so two faas workloads in one app/env get distinct APIs -- same shape
-        # as faas_lambda._function_name.
-        return iam_role_name(
-            "astrolift",
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint,
-            max_len=128,
-        )
+        # API names are not unique in AWS: new APIs are named from the service
+        # identity (#2032); a recorded API is found by its id instead.
+        return managed_service_name(spec.managed_service_id, prefix="astrolift", max_len=128)
 
-    def _find_api(self, api_name: str) -> dict[str, Any] | None:
+    @staticmethod
+    def _recorded_api_id(spec: ProvisionSpec) -> str:
+        if not spec.recorded_handle:
+            return ""
+        recorded_kind, api_id = parse_handle(spec.recorded_handle)
+        if recorded_kind != KIND:
+            raise ManagedServiceError("recorded AWS handle belongs to a different driver kind")
+        return api_id
+
+    def _find_api(self, api_name: str, recorded_id: str = "") -> dict[str, Any] | None:
         # Idempotent probe: HTTP APIs aren't name-unique, so we match the
         # deterministic name to recover a prior provision's api (paginated).
         try:
@@ -306,7 +310,7 @@ class ApiGatewayHttpDriver:
                     kwargs["NextToken"] = token
                 resp = self._api.get_apis(**kwargs)
                 for item in resp.get("Items", []) or []:
-                    if item.get("Name") == api_name:
+                    if (item.get("ApiId") == recorded_id) if recorded_id else (item.get("Name") == api_name):
                         return item
                 token = resp.get("NextToken", "")
                 if not token:

@@ -176,6 +176,7 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         tenant_cluster_id="aws-prod",
         service_handle_hint="model",
         size="small",
+        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
     base.update(overrides)
     return ProvisionSpec(**base)
@@ -673,7 +674,7 @@ def test_restore_provisions_target_record(
     provisioned = driver.provision(_spec())
     snap = driver.snapshot(ServiceHandle(handle=provisioned.handle))
 
-    restore_spec = _spec(service_handle_hint="restored")
+    restore_spec = _spec(service_handle_hint="restored", managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4")
     result = driver.restore(snap, restore_spec)
     assert result.ok
     _, restored_id = parse_handle(result.handle)
@@ -700,6 +701,24 @@ def test_record_name_canonicalization(
         assert c.islower() or c.isdigit() or c == "-"
     assert "--" not in name
     assert not name.startswith("-") and not name.endswith("-")
+
+
+def test_a_recorded_legacy_record_keeps_its_name(driver: AmazonBedrockDriver) -> None:
+    legacy = "astrolift-acme-api-prod-model"
+    assert driver._record_id_for(spec=_spec(recorded_handle=f"model_endpoint/{legacy}")) == legacy
+
+
+def test_slug_joins_that_collide_get_distinct_new_names(driver: AmazonBedrockDriver) -> None:
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one name before #2032.
+    first = driver._record_id_for(spec=_spec(organization_slug="acme", app_slug="web-prod"))
+    second = driver._record_id_for(
+        spec=_spec(
+            organization_slug="acme-web",
+            app_slug="prod",
+            managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
+        )
+    )
+    assert first != second
 
 
 # ---- config + binding schemas -----------------------------------

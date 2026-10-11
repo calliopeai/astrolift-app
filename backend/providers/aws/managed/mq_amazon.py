@@ -109,7 +109,10 @@ class AmazonMQDriver(ManagedServiceDriver):
         error = self._validate_config(cfg, size=spec.size)
         if error:
             return ProvisionResult(False, "", error, ["invalid_amazon_mq_config"])
-        name = self._broker_name(spec)
+        try:
+            name = self._broker_name(spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         existing = self._find_broker(name)
         created = False
         broker_id = str(existing.get("BrokerId") or "")
@@ -961,19 +964,23 @@ class AmazonMQDriver(ManagedServiceDriver):
         return "CLUSTER_MULTI_AZ" if self.engine_type == "RABBITMQ" else "ACTIVE_STANDBY_MULTI_AZ"
 
     def _broker_name(self, spec: ProvisionSpec) -> str:
-        return _name(
-            "-".join(
-                part
-                for part in (
-                    self._config.broker_name_prefix,
-                    spec.organization_slug,
-                    spec.app_slug,
-                    spec.environment_name,
-                    spec.service_handle_hint or self.engine_type.lower(),
-                )
-                if part
-            ),
-        )
+        """New brokers are named from the service identity (#2032); a recorded
+        broker keeps its name, read from the ARN or the live broker."""
+        from aws._naming import managed_service_identity, managed_service_name
+
+        managed_service_identity(spec.managed_service_id)
+        if spec.recorded_handle:
+            recorded_kind, resource_id = parse_handle(spec.recorded_handle)
+            if recorded_kind != KIND:
+                raise ManagedServiceError("recorded AWS handle belongs to a different driver kind")
+            if resource_id.startswith("arn:"):
+                return _broker_name_from_resource(resource_id)
+            try:
+                return str(self._description(resource_id)["BrokerName"])
+            except Exception as exc:  # the recorded broker must be readable to keep its name
+                raise ManagedServiceError(f"recorded Amazon MQ broker {resource_id} is unreadable: {exc}") from exc
+        # Broker names: <=50 chars of [A-Za-z0-9_-].
+        return managed_service_name(spec.managed_service_id, prefix=self._config.broker_name_prefix, max_len=50)
 
     def _generated_secret_name(self, description: dict[str, Any], username: str) -> str:
         broker_name = str(description.get("BrokerName") or description.get("BrokerId") or "broker")

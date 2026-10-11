@@ -138,6 +138,7 @@ def spec(**config: Any) -> ProvisionSpec:
         size="medium",
         config=config,
         isolation="dedicated",
+        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
 
 
@@ -174,7 +175,7 @@ def test_provisioned_cluster_binding_and_idempotence():
     )
 
     assert result.ok and again.ok
-    assert result.handle == "document_db/astrolift-acme-api-prod-documents"
+    assert result.handle == "document_db/astrolift-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     assert len([call for call in docdb.calls if call[0] == "CreateDBCluster"]) == 1
     assert len([call for call in docdb.calls if call[0] == "CreateDBInstance"]) == 2
     create = next(payload for operation, payload in docdb.calls if operation == "CreateDBCluster")
@@ -285,7 +286,12 @@ def test_snapshot_restore_copies_credentials_and_preserves_snapshot_username():
     subject, docdb, secrets = driver()
     source = subject.provision(spec())
     snapshot = subject.snapshot(ServiceHandle(source.handle))
-    target = replace(spec(), app_slug="restored", service_handle_hint="copy")
+    target = replace(
+        spec(),
+        app_slug="restored",
+        service_handle_hint="copy",
+        managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
+    )
 
     restored = subject.restore(snapshot, target)
     target_id = restored.handle.split("/", 1)[1]
@@ -340,15 +346,40 @@ def test_current_botocore_accepts_all_documentdb_request_shapes():
 
 
 def test_provision_does_not_adopt_another_services_resource():
-    """Names are slug-joined, so another service can map to this one's name (#1961)."""
+    """A recorded handle naming another service's cluster is refused (#1961)."""
     import dataclasses
 
     subject, client = driver()[:2]
-    first = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-a"))
+    first = subject.provision(spec())
     calls = len(client.calls)
 
-    second = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-b"))
+    second = subject.provision(
+        dataclasses.replace(
+            spec(), managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4", recorded_handle=first.handle
+        )
+    )
 
     assert first.ok, first.message
     assert not second.ok and second.handle == "" and "refusing to adopt" in second.message
     assert not any(name.startswith(("Create", "Update", "Modify")) for name, _ in client.calls[calls:])
+
+
+def test_a_recorded_legacy_name_is_kept():
+    subject = driver()[0]
+    legacy = "astrolift-acme-api-prod-documents"
+    assert subject._cluster_id(replace(spec(), recorded_handle=f"document_db/{legacy}")) == legacy
+
+
+def test_slug_joins_that_collide_get_distinct_new_names():
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one name before #2032.
+    subject = driver()[0]
+    first = subject._cluster_id(replace(spec(), organization_slug="acme", app_slug="web-prod"))
+    second = subject._cluster_id(
+        replace(
+            spec(),
+            organization_slug="acme-web",
+            app_slug="prod",
+            managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
+        )
+    )
+    assert first != second and len(first) <= 58 and first[0].isalpha()

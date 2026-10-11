@@ -26,7 +26,14 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
-from aws.managed._base import ManagedServiceError, adoption_refusal, handle_for, parse_handle, tags_for
+from aws.managed._base import (
+    ManagedServiceError,
+    adoption_refusal,
+    handle_for,
+    managed_name_for,
+    parse_handle,
+    tags_for,
+)
 from aws.session import aws_client
 
 KIND = "redis"
@@ -105,7 +112,10 @@ class MemoryDBDriver(ManagedServiceDriver):
                 "restore from a snapshot Astrolift retained for this app instead",
                 ["invalid_memorydb_config"],
             )
-        name = self._cluster_name(spec)
+        try:
+            name = self._cluster_name(spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         handle = handle_for(kind=KIND, resource_id=name)
         # Ownership before the access resources, which are keyed by name (#1961).
         existing = self._describe_cluster(name)
@@ -555,14 +565,8 @@ class MemoryDBDriver(ManagedServiceDriver):
                 raise
 
     def _cluster_name(self, spec: ProvisionSpec) -> str:
-        return _name(
-            "m",
-            self._config.cluster_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint or "cache",
-        )
+        # Cluster names: <=40 chars; 38 keeps the u-/a- user and ACL names whole (#2032).
+        return managed_name_for(spec, kind=KIND, prefix=self._config.cluster_name_prefix, max_len=38)
 
     @staticmethod
     def _user_name(name: str) -> str:

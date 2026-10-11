@@ -147,6 +147,7 @@ def spec(**config: Any) -> ProvisionSpec:
         size="small",
         config=config,
         isolation="dedicated",
+        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
 
 
@@ -258,6 +259,7 @@ def test_snapshot_restore_and_async_delete_cleanup():
             spec(),
             environment_name="restore",
             service_handle_hint="restored",
+            managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
         ),
     )
 
@@ -295,14 +297,18 @@ def test_current_botocore_accepts_memorydb_request_shapes():
 
 
 def test_provision_does_not_adopt_another_services_resource():
-    """Names are slug-joined, so another service can map to this one's name (#1961)."""
+    """A recorded handle naming another service's resource is refused (#1961)."""
     import dataclasses
 
     subject, client = driver()[:2]
-    first = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-a"))
+    first = subject.provision(spec())
     calls = len(client.calls)
 
-    second = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-b"))
+    second = subject.provision(
+        dataclasses.replace(
+            spec(), managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4", recorded_handle=first.handle
+        )
+    )
 
     assert first.ok, first.message
     assert not second.ok and second.handle == "" and "refusing to adopt" in second.message
@@ -331,3 +337,24 @@ def test_config_cannot_name_a_snapshot_to_copy_data_from(source):
     assert not provisioned.ok and "cannot name a snapshot to copy data from" in provisioned.message
     assert not restored.ok and "cannot name a snapshot to copy data from" in restored.message
     assert not [operation for operation, _ in memorydb.calls if operation == "CreateCluster"]
+
+
+def test_a_recorded_legacy_name_is_kept():
+    subject = driver()[0]
+    legacy = "m-astrolift-acme-api-prod-durable"
+    assert subject._cluster_name(replace(spec(), recorded_handle=f"redis/{legacy}")) == legacy
+
+
+def test_slug_joins_that_collide_get_distinct_new_names():
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one name before #2032.
+    subject = driver()[0]
+    first = subject._cluster_name(replace(spec(), organization_slug="acme", app_slug="web-prod"))
+    second = subject._cluster_name(
+        replace(
+            spec(),
+            organization_slug="acme-web",
+            app_slug="prod",
+            managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
+        )
+    )
+    assert first != second and len(first) <= 38 and first[0].isalpha()

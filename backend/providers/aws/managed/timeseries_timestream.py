@@ -68,6 +68,7 @@ from _sdk.managed_service import (
     UpdateSpec,
     ValueRef,
 )
+from aws._naming import managed_service_name
 from aws.managed._base import (
     ManagedServiceError,
     adoption_refusal,
@@ -165,8 +166,10 @@ class TimestreamDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        database_name = self._database_name_for(spec=spec)
-        table_name = self._table_name_for(spec=spec)
+        try:
+            database_name, table_name = self._coordinates(spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         cfg = spec.config or {}
 
         existing_db = self._describe_database(database_name)
@@ -748,19 +751,19 @@ class TimestreamDriver(ManagedServiceDriver):
             return ""
         return str((resp.get("Database") or {}).get("Arn") or "")
 
-    def _database_name_for(self, *, spec: ProvisionSpec) -> str:
+    def _coordinates(self, spec: ProvisionSpec) -> tuple[str, str]:
+        """Each service gets its own database, named from the service identity
+        (#2032); a recorded database/table keeps its names."""
+        if spec.recorded_handle:
+            recorded_kind, _ = parse_handle(spec.recorded_handle)
+            if recorded_kind != KIND:
+                raise ManagedServiceError("recorded AWS handle belongs to a different driver kind")
+            return self._split_handle(spec.recorded_handle)
         # Timestream database names: 3-64 chars, [a-zA-Z0-9_.-].
-        parts = [
-            self._config.database_name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
-        ]
-        raw = "-".join(p for p in parts if p)
-        clean = "".join(c if (c.isalnum() or c in "-_.") else "-" for c in raw)
-        while "--" in clean:
-            clean = clean.replace("--", "-")
-        return clean.strip("-.")[:64]
+        database_name = managed_service_name(
+            spec.managed_service_id, prefix=self._config.database_name_prefix, max_len=64
+        )
+        return database_name, self._table_name_for(spec=spec)
 
     def _table_name_for(self, *, spec: ProvisionSpec) -> str:
         # Timestream table names: 3-256 chars, [a-zA-Z0-9_.-].

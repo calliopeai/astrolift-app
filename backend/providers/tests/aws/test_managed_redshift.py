@@ -26,7 +26,7 @@ def _spec(**overrides) -> ProvisionSpec:
         "tags": {"owner": "agents"},
         "isolation": "shared",
         "binding_id": "binding-1",
-        "managed_service_id": "service-1",
+        "managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     }
     values.update(overrides)
     return ProvisionSpec(**values)
@@ -50,7 +50,7 @@ def _client(cluster=None) -> MagicMock:
 
 def _cluster(**overrides):
     values = {
-        "ClusterIdentifier": "platform-steadymd-triage-prod-analytics",
+        "ClusterIdentifier": "platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
         "ClusterNamespaceArn": "arn:aws:redshift:us-west-2:123456789012:namespace:namespace-id",
         "ClusterStatus": "available",
         "DBName": "analytics",
@@ -99,7 +99,7 @@ def test_create_cluster_is_private_encrypted_managed_secret_and_ra3():
     )
 
     assert result.ok
-    assert result.handle == "warehouse/platform-steadymd-triage-prod-analytics"
+    assert result.handle == "warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     request = client.create_cluster.call_args.kwargs
     assert request["ClusterType"] == "multi-node"
     assert request["NodeType"] == "ra3.4xlarge"
@@ -146,7 +146,7 @@ def test_update_resizes_changes_network_and_reconciles_iam_roles():
 
     result = driver.update(
         UpdateSpec(
-            handle="warehouse/platform-steadymd-triage-prod-analytics",
+            handle="warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
             size="large",
             config={
                 "number_of_nodes": 4,
@@ -177,7 +177,7 @@ def test_binding_defaults_to_iam_temporary_credentials_and_scoped_data_api():
     driver = RedshiftProvisionedDriver(config=_config(), redshift_client=client)
 
     binding = driver.binding(
-        ServiceHandle("warehouse/platform-steadymd-triage-prod-analytics"),
+        ServiceHandle("warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"),
         {"data_api_access": True},
     )
 
@@ -189,12 +189,12 @@ def test_binding_defaults_to_iam_temporary_credentials_and_scoped_data_api():
     assert binding.env_vars["WAREHOUSE_TLS"].literal == "1"
     assert "WAREHOUSE_PASSWORD" not in binding.env_vars
     assert binding.iam_grants[0].resource == (
-        "arn:aws:redshift:us-west-2:123456789012:dbname:platform-steadymd-triage-prod-analytics/analytics"
+        "arn:aws:redshift:us-west-2:123456789012:dbname:platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b/analytics"
     )
     assert binding.iam_grants[0].actions == ["redshift:GetClusterCredentialsWithIAM"]
     assert any(
         "redshift-data:ExecuteStatement" in grant.actions
-        and grant.resource.endswith(":cluster:platform-steadymd-triage-prod-analytics")
+        and grant.resource.endswith(":cluster:platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
         for grant in binding.iam_grants
     )
 
@@ -204,7 +204,7 @@ def test_binding_can_explicitly_expose_managed_admin_secret_reference():
     driver = RedshiftProvisionedDriver(config=_config(), redshift_client=client)
 
     binding = driver.binding(
-        ServiceHandle("warehouse/platform-steadymd-triage-prod-analytics"),
+        ServiceHandle("warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"),
         {"auth_mode": "admin_secret"},
     )
 
@@ -224,13 +224,13 @@ def test_admin_secret_binding_refuses_cluster_without_managed_secret():
 
     with pytest.raises(ManagedServiceError, match="managed admin secret"):
         driver.binding(
-            ServiceHandle("warehouse/platform-steadymd-triage-prod-analytics"),
+            ServiceHandle("warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"),
             {"auth_mode": "admin_secret"},
         )
 
 
 def test_status_maps_cluster_lifecycle():
-    handle = ServiceHandle("warehouse/platform-steadymd-triage-prod-analytics")
+    handle = ServiceHandle("warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
     driver = RedshiftProvisionedDriver(
         config=_config(),
         redshift_client=_client(_cluster(ClusterStatus="resizing")),
@@ -245,7 +245,7 @@ def test_status_maps_cluster_lifecycle():
 def test_deprovision_requires_force_when_astrolift_protection_is_enabled():
     client = _client(_cluster())
     driver = RedshiftProvisionedDriver(config=_config(), redshift_client=client)
-    handle = "warehouse/platform-steadymd-triage-prod-analytics"
+    handle = "warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
 
     refused = driver.deprovision(DeprovisionSpec(handle))
 
@@ -272,7 +272,7 @@ def test_destructive_deprovision_skips_final_snapshot():
 
     result = driver.deprovision(
         DeprovisionSpec(
-            "warehouse/platform-steadymd-triage-prod-analytics",
+            "warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
             config={"deletion_protection": False},
         ),
         delete_data=True,
@@ -280,7 +280,7 @@ def test_destructive_deprovision_skips_final_snapshot():
 
     assert not result.ok
     assert client.delete_cluster.call_args.kwargs == {
-        "ClusterIdentifier": "platform-steadymd-triage-prod-analytics",
+        "ClusterIdentifier": "platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
         "SkipFinalClusterSnapshot": True,
     }
 
@@ -293,7 +293,7 @@ def test_snapshot_copies_tags_and_restore_retags_target():
         },
     }
     driver = RedshiftProvisionedDriver(config=_config(), redshift_client=client)
-    handle = ServiceHandle("warehouse/platform-steadymd-triage-prod-analytics")
+    handle = ServiceHandle("warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
 
     snapshot = driver.snapshot(handle)
 
@@ -398,11 +398,11 @@ def test_restore_uses_only_the_retained_snapshot_even_beside_a_typed_one():
     retained = "arn:aws:redshift:us-west-2:123456789012:snapshot:cluster/retained"
 
     widened = driver.restore(
-        SnapshotHandle("warehouse/platform-steadymd-triage-prod-analytics", retained, ""),
+        SnapshotHandle("warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b", retained, ""),
         _spec(config={"snapshot_arn": "arn:aws:redshift:us-west-2:123456789012:snapshot:other/final"}),
     )
     restored = driver.restore(
-        SnapshotHandle("warehouse/platform-steadymd-triage-prod-analytics", retained, ""),
+        SnapshotHandle("warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b", retained, ""),
         _spec(service_handle_hint="restored"),
     )
 
@@ -412,3 +412,24 @@ def test_restore_uses_only_the_retained_snapshot_even_beside_a_typed_one():
     assert request["SnapshotArn"] == retained
     assert "OwnerAccount" not in request and "SnapshotClusterIdentifier" not in request
     assert client.restore_from_cluster_snapshot.call_count == 1
+
+
+def test_a_recorded_legacy_cluster_keeps_its_slug_name():
+    driver = RedshiftProvisionedDriver(config=_config(), redshift_client=_client())
+    legacy = "warehouse/platform-steadymd-triage-prod-analytics"
+    assert driver._cluster_id(_spec(recorded_handle=legacy)) == "platform-steadymd-triage-prod-analytics"
+
+
+def test_slug_joins_that_collide_get_distinct_new_names():
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one name before #2032.
+    driver = RedshiftProvisionedDriver(config=_config(), redshift_client=_client())
+    first = driver._cluster_id(_spec(organization_slug="acme", app_slug="web-prod", environment_name="x"))
+    second = driver._cluster_id(
+        _spec(
+            organization_slug="acme-web",
+            app_slug="prod",
+            environment_name="x",
+            managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
+        )
+    )
+    assert first != second and len(first) <= 63 and first[0].isalpha()

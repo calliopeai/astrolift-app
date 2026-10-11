@@ -30,7 +30,7 @@ def _spec(**overrides) -> ProvisionSpec:
         "tags": {"owner": "agents"},
         "isolation": "shared",
         "binding_id": "binding-1",
-        "managed_service_id": "service-1",
+        "managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     }
     values.update(overrides)
     return ProvisionSpec(**values)
@@ -59,8 +59,8 @@ def _client(*, cluster=None, instances=None) -> MagicMock:
 
 def _cluster(**overrides):
     values = {
-        "DBClusterIdentifier": "platform-steadymd-triage-prod-knowledge-graph",
-        "DBClusterArn": ("arn:aws:rds:us-west-2:123456789012:cluster:platform-steadymd-triage-prod-knowledge-graph"),
+        "DBClusterIdentifier": "platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
+        "DBClusterArn": ("arn:aws:rds:us-west-2:123456789012:cluster:platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"),
         "DbClusterResourceId": "cluster-ABCDEFGHIJKL",
         "Status": "available",
         "Endpoint": "writer.cluster-xyz.us-west-2.neptune.amazonaws.com",
@@ -76,8 +76,8 @@ def _cluster(**overrides):
 
 def _instance(index: int = 1, **overrides):
     values = {
-        "DBInstanceIdentifier": f"platform-steadymd-triage-prod-knowledge-graph-i{index}",
-        "DBClusterIdentifier": "platform-steadymd-triage-prod-knowledge-graph",
+        "DBInstanceIdentifier": f"platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-i{index}",
+        "DBClusterIdentifier": "platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
         "DBInstanceClass": "db.r6g.large",
         "DBInstanceStatus": "available",
     }
@@ -112,7 +112,7 @@ def test_provisioned_cluster_request_is_private_encrypted_and_iam_authenticated(
     )
 
     assert result.ok
-    assert result.handle == "graph_db/platform-steadymd-triage-prod-knowledge-graph"
+    assert result.handle == "graph_db/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     create_cluster = client.create_db_cluster.call_args.kwargs
     assert create_cluster["Engine"] == "neptune"
     assert create_cluster["DBSubnetGroupName"] == "neptune-private"
@@ -210,7 +210,7 @@ def test_partial_serverless_capacity_update_uses_current_other_bound():
 
     result = driver.update(
         UpdateSpec(
-            handle="graph_db/platform-steadymd-triage-prod-knowledge-graph",
+            handle="graph_db/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
             config={"min_capacity": 32.0},
         ),
     )
@@ -228,7 +228,7 @@ def test_update_reconciles_cluster_logs_instances_and_scale_down():
 
     result = driver.update(
         UpdateSpec(
-            handle="graph_db/platform-steadymd-triage-prod-knowledge-graph",
+            handle="graph_db/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
             size="large",
             config={
                 "num_instances": 1,
@@ -253,7 +253,7 @@ def test_update_reconciles_cluster_logs_instances_and_scale_down():
     assert instance_request["ApplyImmediately"] is True
     _validate("ModifyDBInstance", instance_request)
     assert client.delete_db_instance.call_args.kwargs == {
-        "DBInstanceIdentifier": "platform-steadymd-triage-prod-knowledge-graph-i2",
+        "DBInstanceIdentifier": "platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-i2",
         "SkipFinalSnapshot": True,
     }
 
@@ -264,7 +264,7 @@ def test_non_instance_update_does_not_remove_existing_readers():
 
     result = driver.update(
         UpdateSpec(
-            handle="graph_db/platform-steadymd-triage-prod-knowledge-graph",
+            handle="graph_db/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
             config={"backup_retention_days": 10},
         ),
     )
@@ -279,7 +279,7 @@ def test_binding_emits_protocol_urls_and_least_privilege_database_grant():
     driver = NeptuneProvisionedDriver(config=_config(), neptune_client=client)
 
     binding = driver.binding(
-        ServiceHandle("graph_db/platform-steadymd-triage-prod-knowledge-graph"),
+        ServiceHandle("graph_db/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"),
         {"protocol": "opencypher"},
     )
 
@@ -300,7 +300,7 @@ def test_binding_without_iam_is_explicitly_network_only():
     client = _client(cluster=_cluster(IAMDatabaseAuthenticationEnabled=False))
     driver = NeptuneProvisionedDriver(config=_config(), neptune_client=client)
 
-    binding = driver.binding(ServiceHandle("graph_db/platform-steadymd-triage-prod-knowledge-graph"))
+    binding = driver.binding(ServiceHandle("graph_db/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"))
 
     assert binding.env_vars["GRAPH_DB_AUTH_MODE"].literal == "network_only"
     assert binding.iam_grants == []
@@ -311,7 +311,7 @@ def test_binding_rejects_unknown_protocol():
 
     with pytest.raises(ManagedServiceError, match="protocol"):
         driver.binding(
-            ServiceHandle("graph_db/platform-steadymd-triage-prod-knowledge-graph"),
+            ServiceHandle("graph_db/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"),
             {"protocol": "bolt"},
         )
 
@@ -321,7 +321,7 @@ def test_status_requires_both_cluster_and_instance_readiness():
         config=_config(),
         neptune_client=_client(cluster=_cluster(), instances=[]),
     )
-    handle = ServiceHandle("graph_db/platform-steadymd-triage-prod-knowledge-graph")
+    handle = ServiceHandle("graph_db/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
 
     assert driver.status(handle).state == "provisioning"
 
@@ -337,7 +337,7 @@ def test_deprovision_refuses_deletion_protection_without_force():
     driver = NeptuneProvisionedDriver(config=_config(), neptune_client=client)
 
     result = driver.deprovision(
-        DeprovisionSpec("graph_db/platform-steadymd-triage-prod-knowledge-graph"),
+        DeprovisionSpec("graph_db/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"),
     )
 
     assert not result.ok
@@ -351,14 +351,14 @@ def test_force_deprovision_disables_protection_before_any_delete():
     driver = NeptuneProvisionedDriver(config=_config(), neptune_client=client)
 
     result = driver.deprovision(
-        DeprovisionSpec("graph_db/platform-steadymd-triage-prod-knowledge-graph"),
+        DeprovisionSpec("graph_db/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"),
         force_destroy=True,
     )
 
     assert not result.ok
     assert result.retryable
     assert client.modify_db_cluster.call_args.kwargs == {
-        "DBClusterIdentifier": "platform-steadymd-triage-prod-knowledge-graph",
+        "DBClusterIdentifier": "platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
         "DeletionProtection": False,
         "ApplyImmediately": True,
     }
@@ -366,7 +366,7 @@ def test_force_deprovision_disables_protection_before_any_delete():
 
 
 def test_deprovision_deletes_instances_before_safe_final_snapshot():
-    handle = "graph_db/platform-steadymd-triage-prod-knowledge-graph"
+    handle = "graph_db/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     client = _client(cluster=_cluster(), instances=[_instance()])
     driver = NeptuneProvisionedDriver(config=_config(), neptune_client=client)
 
@@ -383,7 +383,7 @@ def test_deprovision_deletes_instances_before_safe_final_snapshot():
     assert not second.ok
     delete = client.delete_db_cluster.call_args.kwargs
     assert delete["SkipFinalSnapshot"] is False
-    assert delete["FinalDBSnapshotIdentifier"].startswith("platform-steadymd-triage")
+    assert delete["FinalDBSnapshotIdentifier"].startswith("platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
     _validate("DeleteDBCluster", delete)
 
 
@@ -392,13 +392,13 @@ def test_destructive_deprovision_skips_final_snapshot():
     driver = NeptuneProvisionedDriver(config=_config(), neptune_client=client)
 
     result = driver.deprovision(
-        DeprovisionSpec("graph_db/platform-steadymd-triage-prod-knowledge-graph"),
+        DeprovisionSpec("graph_db/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"),
         delete_data=True,
     )
 
     assert not result.ok
     assert client.delete_db_cluster.call_args.kwargs == {
-        "DBClusterIdentifier": "platform-steadymd-triage-prod-knowledge-graph",
+        "DBClusterIdentifier": "platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
         "SkipFinalSnapshot": True,
     }
 
@@ -411,7 +411,7 @@ def test_snapshot_and_restore_use_cluster_snapshot_lifecycle():
         },
     }
     driver = NeptuneProvisionedDriver(config=_config(), neptune_client=client)
-    handle = ServiceHandle("graph_db/platform-steadymd-triage-prod-knowledge-graph")
+    handle = ServiceHandle("graph_db/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
 
     snapshot = driver.snapshot(handle)
 
@@ -495,3 +495,26 @@ def test_an_existing_cluster_of_another_org_is_not_adopted():
     assert not result.ok and "refusing to adopt" in result.message
     client.modify_db_cluster.assert_not_called()
     client.create_db_instance.assert_not_called()
+
+
+def test_a_recorded_legacy_name_is_kept():
+    driver = NeptuneProvisionedDriver(config=_config(), neptune_client=_client())
+    assert (
+        driver._cluster_id(_spec(recorded_handle="graph_db/platform-steadymd-triage-prod-knowledge-graph"))
+        == "platform-steadymd-triage-prod-knowledge-graph"
+    )
+
+
+def test_slug_joins_that_collide_get_distinct_new_names():
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one name before #2032.
+    driver = NeptuneProvisionedDriver(config=_config(), neptune_client=_client())
+    first = driver._cluster_id(_spec(organization_slug="acme", app_slug="web-prod", environment_name="x"))
+    second = driver._cluster_id(
+        _spec(
+            organization_slug="acme-web",
+            app_slug="prod",
+            environment_name="x",
+            managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
+        )
+    )
+    assert first != second and len(first) <= 58 and first[0].isalpha()

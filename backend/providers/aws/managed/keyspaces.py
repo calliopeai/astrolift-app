@@ -78,7 +78,10 @@ class KeyspacesDriver(ManagedServiceDriver):
         error = self._validate_config(cfg)
         if error:
             return ProvisionResult(False, "", error, ["invalid_keyspaces_config"])
-        keyspace_name, table_name = self._coordinates(spec)
+        try:
+            keyspace_name, table_name = self._coordinates(spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         handle = self._handle(keyspace_name, table_name)
         try:
             keyspace = self._get_keyspace(keyspace_name)
@@ -344,7 +347,10 @@ class KeyspacesDriver(ManagedServiceDriver):
     @driver_op(cloud="aws", driver="keyspaces")
     def restore(self, snapshot: SnapshotHandle, target: ProvisionSpec) -> ProvisionResult:
         source_keyspace, source_table = self._parse_handle(snapshot.handle)
-        target_keyspace, target_table = self._coordinates(target)
+        try:
+            target_keyspace, target_table = self._coordinates(target)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         cfg = target.config or {}
         try:
             if self._get_keyspace(target_keyspace) is None:
@@ -573,14 +579,20 @@ class KeyspacesDriver(ManagedServiceDriver):
             raise
 
     def _coordinates(self, spec: ProvisionSpec) -> tuple[str, str]:
-        keyspace_name = _identifier(
-            self._config.name_prefix,
-            spec.organization_slug,
-            spec.app_slug,
-            spec.environment_name,
+        """Each service gets its own keyspace, named from the service identity
+        (#2032); a recorded keyspace/table keeps its names."""
+        from _sdk.physical_naming import physical_name
+
+        if spec.recorded_handle:
+            recorded_kind, _ = parse_handle(spec.recorded_handle)
+            if recorded_kind != KIND:
+                raise ManagedServiceError("recorded AWS handle belongs to a different driver kind")
+            return self._parse_handle(spec.recorded_handle)
+        # Keyspace names: <=48 chars of [a-z0-9_], a leading letter.
+        keyspace_name = physical_name(
+            spec.managed_service_id, prefix=self._config.name_prefix, max_length=48, separator="_"
         )
-        table_name = _identifier(spec.service_handle_hint or "data")
-        return keyspace_name, table_name
+        return keyspace_name, _identifier(spec.service_handle_hint or "data")
 
     @staticmethod
     def _handle(keyspace_name: str, table_name: str) -> str:

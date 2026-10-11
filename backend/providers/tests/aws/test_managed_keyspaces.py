@@ -109,6 +109,7 @@ def spec(**config: Any) -> ProvisionSpec:
         service_handle_hint="events",
         size="medium",
         config=config,
+        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
 
 
@@ -259,7 +260,12 @@ def test_snapshot_restore_uses_pitr_timestamp_and_target_coordinates():
     subject, client = driver()
     source = subject.provision(spec())
     snapshot = subject.snapshot(ServiceHandle(source.handle))
-    target = replace(spec(), app_slug="restored", service_handle_hint="copy")
+    target = replace(
+        spec(),
+        app_slug="restored",
+        service_handle_hint="copy",
+        managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
+    )
 
     restored = subject.restore(snapshot, target)
     request = next(payload for operation, payload in client.calls if operation == "RestoreTable")
@@ -318,15 +324,41 @@ def test_current_botocore_accepts_all_keyspaces_request_shapes():
 
 
 def test_provision_does_not_adopt_another_services_resource():
-    """Names are slug-joined, so another service can map to this one's name (#1961)."""
+    """A recorded handle naming another service's resource is refused (#1961)."""
     import dataclasses
 
     subject, client = driver()[:2]
-    first = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-a"))
+    first = subject.provision(spec())
     calls = len(client.calls)
 
-    second = subject.provision(dataclasses.replace(spec(), managed_service_id="svc-b"))
+    second = subject.provision(
+        dataclasses.replace(
+            spec(), managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4", recorded_handle=first.handle
+        )
+    )
 
     assert first.ok, first.message
     assert not second.ok and second.handle == "" and "refusing to adopt" in second.message
     assert not any(name.startswith(("Create", "Update", "Modify")) for name, _ in client.calls[calls:])
+
+
+def test_a_recorded_legacy_keyspace_keeps_its_names():
+    subject = driver()[0]
+    recorded = replace(spec(), recorded_handle="wide_column/astrolift_acme_api_prod/events")
+    assert subject._coordinates(recorded) == ("astrolift_acme_api_prod", "events")
+
+
+def test_each_service_gets_its_own_keyspace_even_when_slugs_collide():
+    # "acme" + "web-prod" and "acme-web" + "prod" shared one keyspace before #2032.
+    subject = driver()[0]
+    first, table = subject._coordinates(replace(spec(), organization_slug="acme", app_slug="web-prod"))
+    second, _ = subject._coordinates(
+        replace(
+            spec(),
+            organization_slug="acme-web",
+            app_slug="prod",
+            managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
+        )
+    )
+    assert first != second and len(first) <= 48 and first[0].isalpha() and "-" not in first
+    assert table == "events"

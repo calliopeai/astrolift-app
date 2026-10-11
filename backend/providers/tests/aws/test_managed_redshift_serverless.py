@@ -27,7 +27,7 @@ def _spec(**overrides) -> ProvisionSpec:
         "tags": {"owner": "agents"},
         "isolation": "shared",
         "binding_id": "binding-1",
-        "managed_service_id": "service-1",
+        "managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     }
     values.update(overrides)
     return ProvisionSpec(**values)
@@ -71,7 +71,7 @@ def _client(*, namespace=None, workgroup=None) -> MagicMock:
 
 def _namespace(**overrides):
     values = {
-        "namespaceName": "platform-steadymd-triage-prod-analytics",
+        "namespaceName": "platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
         "namespaceId": "namespace-id",
         "namespaceArn": "arn:aws:redshift-serverless:us-west-2:123456789012:namespace/namespace-id",
         "status": "AVAILABLE",
@@ -85,10 +85,10 @@ def _namespace(**overrides):
 
 def _workgroup(**overrides):
     values = {
-        "workgroupName": "platform-steadymd-triage-prod-analytics",
+        "workgroupName": "platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
         "workgroupId": "workgroup-id",
         "workgroupArn": "arn:aws:redshift-serverless:us-west-2:123456789012:workgroup/workgroup-id",
-        "namespaceName": "platform-steadymd-triage-prod-analytics",
+        "namespaceName": "platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
         "status": "AVAILABLE",
         "baseCapacity": 32,
         "maxCapacity": 128,
@@ -133,7 +133,7 @@ def test_create_namespace_and_private_workgroup_with_full_controls():
     )
 
     assert result.ok
-    assert result.handle == "warehouse/platform-steadymd-triage-prod-analytics"
+    assert result.handle == "warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     namespace = client.create_namespace.call_args.kwargs
     assert namespace["manageAdminPassword"] is True
     assert namespace["kmsKeyId"].endswith("key/key-1")
@@ -185,7 +185,7 @@ def test_update_validates_partial_capacity_against_current_and_updates_both_halv
 
     bad = driver.update(
         UpdateSpec(
-            handle="warehouse/platform-steadymd-triage-prod-analytics",
+            handle="warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
             config={"base_capacity": 256},
         ),
     )
@@ -195,7 +195,7 @@ def test_update_validates_partial_capacity_against_current_and_updates_both_halv
 
     result = driver.update(
         UpdateSpec(
-            handle="warehouse/platform-steadymd-triage-prod-analytics",
+            handle="warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
             config={
                 "base_capacity": 64,
                 "max_capacity": 256,
@@ -225,7 +225,7 @@ def test_size_update_maps_to_base_capacity_without_dropping_max():
 
     result = driver.update(
         UpdateSpec(
-            handle="warehouse/platform-steadymd-triage-prod-analytics",
+            handle="warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
             size="large",
         ),
     )
@@ -239,7 +239,7 @@ def test_binding_uses_workgroup_scoped_iam_and_optional_data_api():
     driver = RedshiftServerlessDriver(config=_config(), serverless_client=client)
 
     binding = driver.binding(
-        ServiceHandle("warehouse/platform-steadymd-triage-prod-analytics"),
+        ServiceHandle("warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"),
         {"data_api_access": True},
     )
 
@@ -248,7 +248,7 @@ def test_binding_uses_workgroup_scoped_iam_and_optional_data_api():
         "postgresql://analytics.123.us-west-2.redshift-serverless.amazonaws.com:5439/analytics"
     )
     assert binding.env_vars["WAREHOUSE_AUTH_MODE"].literal == "iam"
-    assert binding.env_vars["WAREHOUSE_WORKGROUP"].literal == ("platform-steadymd-triage-prod-analytics")
+    assert binding.env_vars["WAREHOUSE_WORKGROUP"].literal == ("platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
     assert binding.iam_grants[0].resource == workgroup_arn
     assert binding.iam_grants[0].actions == ["redshift-serverless:GetCredentials"]
     assert any(
@@ -262,7 +262,7 @@ def test_binding_can_expose_managed_admin_secret_but_never_plaintext_password():
     driver = RedshiftServerlessDriver(config=_config(), serverless_client=client)
 
     binding = driver.binding(
-        ServiceHandle("warehouse/platform-steadymd-triage-prod-analytics"),
+        ServiceHandle("warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"),
         {"auth_mode": "admin_secret"},
     )
 
@@ -284,13 +284,13 @@ def test_admin_secret_binding_refuses_namespace_without_managed_secret():
 
     with pytest.raises(ManagedServiceError, match="no managed admin secret"):
         driver.binding(
-            ServiceHandle("warehouse/platform-steadymd-triage-prod-analytics"),
+            ServiceHandle("warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"),
             {"auth_mode": "admin_secret"},
         )
 
 
 def test_status_requires_namespace_and_workgroup_available():
-    handle = ServiceHandle("warehouse/platform-steadymd-triage-prod-analytics")
+    handle = ServiceHandle("warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
     driver = RedshiftServerlessDriver(
         config=_config(),
         serverless_client=_client(namespace=_namespace(), workgroup=_workgroup()),
@@ -308,7 +308,7 @@ def test_status_requires_namespace_and_workgroup_available():
 
 
 def test_deprovision_refuses_protection_then_deletes_workgroup_before_namespace():
-    handle = "warehouse/platform-steadymd-triage-prod-analytics"
+    handle = "warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     client = _client(namespace=_namespace(), workgroup=_workgroup())
     driver = RedshiftServerlessDriver(config=_config(), serverless_client=client)
 
@@ -320,14 +320,14 @@ def test_deprovision_refuses_protection_then_deletes_workgroup_before_namespace(
     first = driver.deprovision(DeprovisionSpec(handle), force_destroy=True)
     assert not first.ok
     assert client.delete_workgroup.call_args.kwargs == {
-        "workgroupName": "platform-steadymd-triage-prod-analytics",
+        "workgroupName": "platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
     }
     _validate("DeleteWorkgroup", client.delete_workgroup.call_args.kwargs)
     client.delete_namespace.assert_not_called()
 
 
 def test_safe_namespace_delete_retains_final_snapshot_and_destructive_skips_it():
-    handle = "warehouse/platform-steadymd-triage-prod-analytics"
+    handle = "warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     client = _client(namespace=_namespace(), workgroup=None)
     driver = RedshiftServerlessDriver(config=_config(), serverless_client=client)
 
@@ -341,7 +341,7 @@ def test_safe_namespace_delete_retains_final_snapshot_and_destructive_skips_it()
     assert not safe.ok
     request = client.delete_namespace.call_args.kwargs
     assert request["finalSnapshotRetentionPeriod"] == 60
-    assert request["finalSnapshotName"].startswith("platform-steadymd")
+    assert request["finalSnapshotName"].startswith("platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
     _validate("DeleteNamespace", request)
 
     client.reset_mock()
@@ -351,7 +351,7 @@ def test_safe_namespace_delete_retains_final_snapshot_and_destructive_skips_it()
     )
     assert not destructive.ok
     assert client.delete_namespace.call_args.kwargs == {
-        "namespaceName": "platform-steadymd-triage-prod-analytics",
+        "namespaceName": "platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
     }
 
 
@@ -363,7 +363,7 @@ def test_snapshot_preserves_tags_and_restore_targets_available_pair():
         },
     }
     driver = RedshiftServerlessDriver(config=_config(), serverless_client=client)
-    handle = ServiceHandle("warehouse/platform-steadymd-triage-prod-analytics")
+    handle = ServiceHandle("warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
 
     snapshot = driver.snapshot(handle)
 
@@ -453,7 +453,7 @@ def test_owner_account_no_longer_restores_another_accounts_snapshot():
 
     refused = driver.provision(_spec(config={"owner_account": "210987654321"}))
     restored = driver.restore(
-        SnapshotHandle("warehouse/platform-steadymd-triage-prod-analytics", retained, ""),
+        SnapshotHandle("warehouse/platform-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b", retained, ""),
         _spec(config={"owner_account": "210987654321"}),
     )
 
@@ -463,3 +463,26 @@ def test_owner_account_no_longer_restores_another_accounts_snapshot():
     assert request["snapshotArn"] == retained
     assert "ownerAccount" not in request
     assert "owner_account" not in driver.config_schema()["properties"]
+
+
+def test_a_recorded_legacy_name_is_kept():
+    driver = RedshiftServerlessDriver(config=_config(), serverless_client=_client())
+    assert (
+        driver._resource_id(_spec(recorded_handle="warehouse/platform-steadymd-triage-prod-analytics"))
+        == "platform-steadymd-triage-prod-analytics"
+    )
+
+
+def test_slug_joins_that_collide_get_distinct_new_names():
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one name before #2032.
+    driver = RedshiftServerlessDriver(config=_config(), serverless_client=_client())
+    first = driver._resource_id(_spec(organization_slug="acme", app_slug="web-prod", environment_name="x"))
+    second = driver._resource_id(
+        _spec(
+            organization_slug="acme-web",
+            app_slug="prod",
+            environment_name="x",
+            managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
+        )
+    )
+    assert first != second and len(first) <= 64 and first[0].isalpha()

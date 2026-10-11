@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import ClassVar
 
 from _sdk.managed_service import DeprovisionSpec, ProvisionSpec, ServiceHandle, UpdateSpec
@@ -136,6 +137,7 @@ def spec(**overrides):
         service_handle_hint="pool",
         size="small",
         config=config,
+        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
 
 
@@ -162,7 +164,7 @@ def test_provision_creates_least_privilege_role_proxy_and_target_idempotently():
     again = subject.provision(spec(kms_key_arn="arn:aws:kms:us-west-2:123:key/one"))
 
     assert result.ok and again.ok
-    assert result.handle == "database_proxy/astrolift-acme-api-prod-pool"
+    assert result.handle == "database_proxy/astrolift-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     assert len(rds.creates) == 1
     assert len(rds.targets) == 2
     create = rds.creates[0]
@@ -495,3 +497,26 @@ def test_an_existing_proxy_of_another_org_is_not_adopted():
     again = subject.provision(spec())
 
     assert not again.ok and "refusing to adopt" in again.message
+
+
+def test_a_recorded_legacy_name_is_kept():
+    subject = driver()[0]
+    legacy = "astrolift-acme-api-prod-pool"
+    assert subject._proxy_name(replace(spec(), recorded_handle=f"database_proxy/{legacy}")) == legacy
+
+
+def test_slug_joins_that_collide_get_distinct_new_names_and_whole_role_names():
+    # "acme" + "web-prod" and "acme-web" + "prod" joined to one name before #2032.
+    subject = driver()[0]
+    first = subject._proxy_name(replace(spec(), organization_slug="acme", app_slug="web-prod"))
+    second = subject._proxy_name(
+        replace(
+            spec(),
+            organization_slug="acme-web",
+            app_slug="prod",
+            managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
+        )
+    )
+    assert first != second and first[0].isalpha()
+    assert subject._role_name(first) != subject._role_name(second)
+    assert subject._role_name(first).endswith(first)

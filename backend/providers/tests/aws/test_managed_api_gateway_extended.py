@@ -265,7 +265,7 @@ def _spec(config: dict) -> ProvisionSpec:
         size="small",
         config=config,
         binding_id="binding-1",
-        managed_service_id="service-1",
+        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
 
 
@@ -619,3 +619,19 @@ def test_registration_catalog_cost_and_runtime_config_are_wired() -> None:
     config = managed_config_for("aws", cluster, kind="api_gateway", variant="rest_api")
     assert config.account_id == "123456789012"
     assert config.deletion_protection_default is True
+
+
+@pytest.mark.parametrize("make", [_rest, _websocket])
+def test_reprovision_follows_the_recorded_api_id_and_new_services_get_their_own_api(make) -> None:
+    import dataclasses
+
+    other = "0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4"
+    driver, _, _, spec = make()
+    first = driver.provision(spec)
+    # A recorded API is found by id whatever name the current scheme gives (#2032).
+    followed = driver.provision(dataclasses.replace(spec, managed_service_id=other, recorded_handle=first.handle))
+    # A different service with the same slugs no longer lands on the first API.
+    fresh = driver.provision(dataclasses.replace(spec, managed_service_id=other))
+
+    assert first.ok and followed.ok and fresh.ok
+    assert followed.handle == first.handle and fresh.handle != first.handle

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fifteen more AWS managed drivers name new resources from the managed-service id instead of joined slugs, so two services whose slugs join to the same string (`acme` + `web-prod`, `acme-web` + `prod`) no longer collide: Redshift, Redshift Serverless, DocumentDB, Neptune, MemoryDB, Amazon MQ, RDS Proxy, Bedrock provisioned models, Keyspaces, Timestream, FSx, CloudWatch bundles and the REST, HTTP and WebSocket API Gateways. Existing resources keep their recorded names; API Gateway, Amazon MQ and FSx find a recorded resource by its id or tag. Keyspaces and Timestream give each service its own keyspace or database, so deprovision with data deletion no longer drops a sibling service's tables. A missing or malformed service id is refused as `invalid_resource_identity` before any AWS call (#2032).
+
 - `runTask` dispatches the task's Kubernetes Job: it renders the task from the environment's running deployment (image, env, resources, GPU requests, tolerations and node selector), renames it per run, applies an optional command override, and records the namespace and Job name so the run reconciler follows it to a terminal status. Dispatch failures end the run as `failed` with `failureReason`. A caller `requestId` makes retries return the original run instead of launching more work. Without `environmentName` only a single-environment app is accepted. Apply lifecycle migration `taskrun_dispatch` with the image (#2330).
 
 - The Cognito client picker reports each client's managed login branding, and the ingress-auth form warns before saving a client that has none (Cognito would serve "Login pages unavailable") or whose pool already uses all 20 brandings. Classic hosted UI pools need none; a failed read reports unknown (#1727).
