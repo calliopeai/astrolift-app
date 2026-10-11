@@ -288,3 +288,19 @@ def test_withdrawn_process_admission_kills_and_joins_owned_child(monkeypatch):
     with pytest.raises(ValueError, match="CURRENT_AUTHORITY_WITHDRAWN"):
         net.icmp_probe("PING", "8.8.4.4", current=current)
     assert len(children) == 1 and children[0].poll() is not None
+
+
+def test_resolver_that_never_answers_is_a_timeout_not_an_empty_answer(monkeypatch):
+    class Silent(socket.socket):
+        def connect(self, address):
+            return None
+
+        def send(self, data):
+            return len(data)
+
+        def recv(self, size):
+            raise TimeoutError
+
+    monkeypatch.setattr(socket, "socket", Silent)
+    with pytest.raises(net.DiagnosticTransportError, match="DNS_TIMEOUT"):
+        net.dns_lookup("example.test", "A", "1.1.1.1", current=lambda: None)

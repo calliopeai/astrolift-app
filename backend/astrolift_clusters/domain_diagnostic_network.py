@@ -38,8 +38,12 @@ def dns_lookup(hostname, record_type, resolver, *, current):
         sock.settimeout(2)
         sock.connect((resolver, 53))
         current()
-        sock.send(packet)
-        data = sock.recv(8193)
+        try:
+            sock.send(packet)
+            data = sock.recv(8193)
+        except TimeoutError:
+            # A resolver that never answers is not an empty answer (#2287).
+            raise DiagnosticTransportError("DNS_TIMEOUT") from None
     current()
     if len(data) < 12 or len(data) > 8192:
         raise DiagnosticTransportError("DNS_RESPONSE_INVALID")

@@ -119,7 +119,9 @@ function DetailTabs({
         ? t("dnsNoDataStatus")
         : reason === "DNS_ANSWER" && value === "OK"
           ? t("answerObserved")
-          : t(stateKeys[value])}
+          : reason === "DNS_NXDOMAIN"
+            ? t("dnsNxdomainStatus")
+            : t(stateKeys[value])}
     </Badge>
   );
   async function copy(value: string) {

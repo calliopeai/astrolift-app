@@ -12,6 +12,40 @@ export function domainDiagnosticReasonKey(reason: string) {
       return "delegationMatch";
     case "INTERNAL_DNS_PROBE_NOT_CONFIGURED":
       return "internalDnsUnavailable";
+    case "PUBLIC_DELEGATION_MISMATCH":
+      return "mismatchHelp";
+    case "DNS_NXDOMAIN":
+      return "dnsNxdomain";
+    case "DNS_TIMEOUT":
+      return "dnsTimeout";
+    case "DNS_LOOKUP_UNAVAILABLE":
+      return "dnsLookupUnavailable";
+    case "DNS_RESPONSE_INVALID":
+      return "dnsResponseInvalid";
+    case "DNS_RESPONSE_BOUND_EXCEEDED":
+      return "dnsResponseBoundExceeded";
+    case "DIAGNOSTIC_PROBE_UNAVAILABLE":
+      return "probeUnavailable";
+    case "PRIVATE_ZONE_PUBLIC_DELEGATION_NOT_APPLICABLE":
+      return "privateZoneDelegation";
+    case "PROVIDER_ACCESS_DENIED":
+      return "providerAccessDenied";
+    case "PROVIDER_ZONE_UNAVAILABLE":
+      return "providerZoneUnavailable";
+    case "PROVIDER_ZONE_NOT_BOUND":
+      return "providerZoneNotBound";
+    case "TOOL_NOT_INSTALLED":
+      return "toolNotInstalled";
+    case "ICMP_REPLY":
+      return "icmpReply";
+    case "ICMP_UNCONFIRMED":
+      return "icmpUnconfirmed";
+    case "TLS_VERIFIED_HTTP_STATUS_OBSERVED":
+      return "tlsVerifiedHelp";
+    case "HTTPS_DEADLINE_EXCEEDED":
+      return "httpsDeadline";
+    case "PUBLIC_ADDRESS_REQUIRED":
+      return "publicAddressRequired";
     default:
       return null;
   }

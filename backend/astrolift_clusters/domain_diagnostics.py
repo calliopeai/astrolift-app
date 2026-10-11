@@ -680,15 +680,16 @@ def diagnostics(info, domain_id, version, requested, record_type):
                     observed=observed,
                 )
             )
-        except Exception:
+        except Exception as exc:
             current()
+            timed_out = isinstance(exc, network.DiagnosticTransportError) and str(exc) == "DNS_TIMEOUT"
             checks.append(
                 ManagedDomainDiagnosticCheck(
                     key="delegation",
                     state=State.UNKNOWN,
                     perspective="public_dns:" + resolver,
                     checked_at=now,
-                    reason="DNS_LOOKUP_UNAVAILABLE",
+                    reason="DNS_TIMEOUT" if timed_out else "DNS_LOOKUP_UNAVAILABLE",
                     expected=expected,
                     observed=[],
                 )
@@ -790,7 +791,9 @@ def _probe(domain, current, name, tool, record_type):
         values, reason = network.dns_lookup(name, lookup_type, network.RESOLVERS[0], current=current)
         result.values, result.reason = values, reason
         if tool.value in ("LOOKUP", "DIG"):
-            result.state = State.OK
+            # An answer or an empty answer is an observation; a name that does
+            # not exist is never shown as healthy (#2287).
+            result.state = State.MISMATCH if reason == "DNS_NXDOMAIN" else State.OK
         elif values:
             # Reject a mixed public/private answer; never choose the public
             # half of a rebinding response and silently discard the rest.
@@ -812,6 +815,11 @@ def _probe(domain, current, name, tool, record_type):
                     tool.value, addresses[0], current=current
                 )
                 result.state = State(state)
+    except network.DiagnosticTransportError as exc:
+        # Fixed transport codes (DNS_TIMEOUT, DNS_RESPONSE_INVALID, ...) stay
+        # distinct from a generic failure (#2287).
+        current()
+        result.state, result.reason, result.values = State.ERROR, str(exc), []
     except Exception:
         current()
         result.state, result.reason, result.values = State.ERROR, "DIAGNOSTIC_PROBE_UNAVAILABLE", []
