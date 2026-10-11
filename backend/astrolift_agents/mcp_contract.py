@@ -51,6 +51,18 @@ MCP_TOOL_META: dict[str, dict[str, Any]] = {
         "permission": Permission.AGENT_READ,
         "inputSchema": _schema({"task_id": {"type": "string"}}, required=("task_id",)),
     },
+    "astrolift_get_task_by_client_request_id": {
+        "description": (
+            "Recover the caller's visible task by dispatch request UUID without dispatching. "
+            "Returns task: null when no accessible task matches."
+        ),
+        "scope": SCOPE_MCP_READ,
+        "permission": Permission.AGENT_READ,
+        "inputSchema": _schema(
+            {"client_request_id": {"type": "string", "format": "uuid"}},
+            required=("client_request_id",),
+        ),
+    },
     "astrolift_list_tasks": {
         "description": "Discover agent runs, lifecycle and runtime placement, newest first, with pagination.",
         "scope": SCOPE_MCP_READ,
@@ -81,6 +93,14 @@ MCP_TOOL_META: dict[str, dict[str, Any]] = {
                 "environment_spec_id": {"type": "string"},
                 "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 604800},
                 "trigger_payload": {"type": "object"},
+                "client_request_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": (
+                        "Persist a UUID before dispatch. Reusing it with the same request returns "
+                        "the same task for this organization and requester; changed inputs conflict."
+                    ),
+                },
             },
             required=("agent_slug",),
         ),

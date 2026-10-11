@@ -67,8 +67,6 @@ log = logging.getLogger("astrolift_lifecycle.builder_views")
 
 _VALID_RUNTIMES = {"python", "node", "ruby", "go", "static"}
 _VALID_PROFILES = {"small", "medium", "large"}
-_MAX_FILES = 100
-_FILE_SIZE_LIMIT = 512 * 1024  # 512 KiB total, decoded
 
 # DNS-label shape for slugs (k8s names + ingress hostnames must match).
 _SLUG_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$")
@@ -305,10 +303,24 @@ def _load_json(request: HttpRequest, *, max_bytes: int | None = None):
         if length > max_bytes:
             return None, JsonResponse({"detail": f"request body exceeds {max_bytes} bytes"}, status=413)
         raw = request.read(max_bytes + 1)
+        if len(raw) > max_bytes:
+            return None, JsonResponse({"detail": f"request body exceeds {max_bytes} bytes"}, status=413)
     try:
         return json.loads(raw or "{}"), None
     except (ValueError, UnicodeDecodeError):
         return None, JsonResponse({"detail": "invalid JSON body"}, status=400)
+
+
+def _file_size_limit():
+    from constance import config
+
+    return max(1, int(config.BUILDER_FILES_MAX_BYTES))
+
+
+def _max_files():
+    from constance import config
+
+    return max(1, int(config.BUILDER_MAX_FILES))
 
 
 def _data_file_limit() -> int:
@@ -324,13 +336,13 @@ def _max_sync_body_bytes(data_file_limit: int) -> int:
     can grow text files up to 6x (``\\u00XX``); 1 MiB covers paths and
     structure.
     """
-    return 4 * -(-data_file_limit // 3) + 6 * _FILE_SIZE_LIMIT + 1024 * 1024
+    return 4 * -(-data_file_limit // 3) + 6 * _file_size_limit() + 1024 * 1024
 
 
 def _path_error(path) -> str:
     if not isinstance(path, str) or not path:
         return "file paths must be non-empty strings"
-    if path.startswith("/") or ".." in path:
+    if path.startswith("/") or ".." in path or "\\" in path or any(ord(c) < 32 for c in path):
         return f"path {path!r} must be relative and must not contain .."
     if any(part in ("", ".") for part in path.split("/")):
         return f"path {path!r} must not have empty or '.' segments"
@@ -352,8 +364,8 @@ def _tree_error(paths) -> str:
 def _decode_base64(entry) -> bytes | None:
     """Decoded bytes of a ``{"content", "encoding": "base64"}`` entry, or None.
 
-    Strict standard alphabet with padding, no line breaks: the content goes
-    to Kubernetes as-is, which decodes it the same way.
+    Strict standard alphabet with padding and no line breaks preserves binary
+    assets exactly through the upload and artifact paths.
     """
     if not isinstance(entry, dict) or entry.get("encoding") != "base64":
         return None
@@ -635,9 +647,9 @@ def sync_dev_environment_files(request: HttpRequest, guid: str) -> JsonResponse:
             {"detail": "files must be an object mapping path to content"},
             status=400,
         )
-    if len(files) > _MAX_FILES:
+    if len(files) > _max_files():
         return JsonResponse(
-            {"detail": f"too many files (max {_MAX_FILES})"},
+            {"detail": f"too many files (max {_max_files()})"},
             status=400,
         )
     total_bytes = 0
@@ -651,8 +663,7 @@ def sync_dev_environment_files(request: HttpRequest, guid: str) -> JsonResponse:
                 return JsonResponse(
                     {
                         "detail": (
-                            f"file {path_key!r} must be text or "
-                            '{"content": <base64>, "encoding": "base64"}'
+                            f'file {path_key!r} must be text or {{"content": <base64>, "encoding": "base64"}}'
                         )
                     },
                     status=400,
@@ -665,9 +676,9 @@ def sync_dev_environment_files(request: HttpRequest, guid: str) -> JsonResponse:
     tree_err = _tree_error(files)
     if tree_err:
         return JsonResponse({"detail": tree_err}, status=400)
-    if total_bytes > _FILE_SIZE_LIMIT:
+    if total_bytes > _file_size_limit():
         return JsonResponse(
-            {"detail": f"total file size exceeds {_FILE_SIZE_LIMIT // 1024}KiB limit"},
+            {"detail": f"total file size exceeds {_file_size_limit() // 1024}KiB limit"},
             status=400,
         )
 
@@ -716,7 +727,7 @@ def sync_dev_environment_files(request: HttpRequest, guid: str) -> JsonResponse:
         start_workflow(
             "SyncDevEnvironmentFilesWorkflow",
             [SyncDevEnvironmentFilesInput(dev_environment_id=dev.pk)],
-            workflow_id=(f"SyncDevEnvironmentFilesWorkflow-{dev.guid}-" f"{int(timezone.now().timestamp())}"),
+            workflow_id=(f"SyncDevEnvironmentFilesWorkflow-{dev.guid}-{int(timezone.now().timestamp())}"),
             task_queue=_TASK_QUEUE,
         )
     except Exception:  # noqa: BLE001
@@ -828,7 +839,7 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
     app_slug = explicit_slug or re.sub(r"[^a-z0-9-]", "-", app_name.lower()).strip("-")
     if not _SLUG_PATTERN.match(app_slug):
         return JsonResponse(
-            {"detail": ("app_slug must be a valid DNS label " "(lowercase alphanumeric + hyphens)")},
+            {"detail": ("app_slug must be a valid DNS label (lowercase alphanumeric + hyphens)")},
             status=400,
         )
 
@@ -866,7 +877,7 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
         return JsonResponse(
             {
                 "detail": (
-                    "dev environment is not bound to a cluster; cannot " "promote without a runtime target"
+                    "dev environment is not bound to a cluster; cannot promote without a runtime target"
                 ),
             },
             status=409,
@@ -1049,4 +1060,30 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
             "data_persistent": bool(storage_class) if dev.data_file_path else None,
         },
         status=202,
+    )
+
+
+@require_http_methods(["GET"])
+@route_auth(credential="api-token", scope="bearer write:apps and enabled organization builder module")
+def capabilities(request):
+    token = getattr(request, "_api_token", None)
+    if token is None:
+        return _token_required()
+    org, error = _resolve_org(token)
+    if error:
+        return error
+    error = _module_gate(org)
+    if error:
+        return error
+    denied = enforce_scopes(token, (SCOPE_WRITE_APPS,))
+    if denied:
+        return JsonResponse({"detail": denied}, status=403)
+    return JsonResponse(
+        {
+            "artifact_transport": "private-archive-v1",
+            "nested_paths": True,
+            "max_files": _max_files(),
+            "max_file_bytes": _file_size_limit(),
+            "max_data_bytes": _data_file_limit(),
+        }
     )

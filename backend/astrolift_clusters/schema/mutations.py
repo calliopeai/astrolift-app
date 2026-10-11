@@ -1242,6 +1242,13 @@ class ClustersMutation:
 
             if has_cluster_owned_models(cluster.pk):
                 return gql_failure(ErrorCode.PRECONDITION.value, MODEL_CLEANUP_REQUIRED)
+            # Deleting the cloud cluster is cluster lifecycle; retiring the row
+            # (delete_cloud_infra=False) only lifts the platform's RBAC.
+            if input.delete_cloud_infra:
+                from core.install_restrictions import cluster_delete_refusal
+
+                if refusal := cluster_delete_refusal(cluster):
+                    return gql_failure(ErrorCode.PRECONDITION.value, refusal, field="deleteCloudInfra")
             actor = _actor_from_request(info)
             _kick_decommission_cluster(
                 cluster=cluster,
@@ -1298,6 +1305,11 @@ class ClustersMutation:
             from astrolift_clusters.edge_install import edge_support_refusal
 
             if refusal := edge_support_refusal(cluster):
+                return gql_failure(ErrorCode.PRECONDITION.value, refusal, field="selectedComponents")
+        from core.install_restrictions import controller_refusal
+
+        for key in input.selected_components:
+            if refusal := controller_refusal(key, cluster):
                 return gql_failure(ErrorCode.PRECONDITION.value, refusal, field="selectedComponents")
         overrides: dict[str, dict[str, str]] = {}
         for o in input.option_overrides or []:
@@ -1512,6 +1524,12 @@ class ClustersMutation:
     def create_managed_domain(
         self, info: Info, input: CreateManagedDomainInput
     ) -> MutationResultType[ManagedDomainType]:
+        if input.dns_driver == "cloudflare_read_only":
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                "Use registerCloudflareDnsZone with a reviewed connection and zone.",
+                field="dnsDriver",
+            )
         # One spelling per DNS zone (#1931): the DNS driver resolves a zone by
         # canonical name, so ``Globex.example.`` and ``globex.example`` are one
         # zone. Stored canonical, and unique on that form, so a variant can't
@@ -1557,6 +1575,25 @@ class ClustersMutation:
         # until verifyManagedDomain confirms the caller published the TXT
         # challenge this returns.
         requires_verification = bool(dns_config.get("zone_id")) or _zone_exists_in_provider(cluster, zone)
+        # A zone the platform would create is a hosted zone it writes, which
+        # an install that withholds DNS denies (calliope-installer#447). The
+        # provisioning workflow writes through the DNS cluster's driver
+        # whatever the row's dns_driver says, so every driver is refused. A
+        # zone that already exists is registered pending verification; its
+        # certificate records are then left to the operator to publish.
+        if (
+            not requires_verification
+            and getattr(getattr(cluster, "provider_plugin", None), "slug", "") == "aws"
+        ):
+            from core.install_restrictions import reason
+
+            if refusal := reason("dns"):
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    f"{refusal} Astrolift cannot create this hosted zone; register a zone that "
+                    "already exists in the account and verify it.",
+                    field="dnsDriver",
+                )
         verification_token = secrets.token_hex(16) if requires_verification else ""
 
         domain = ManagedDomain.objects.create(
@@ -1615,7 +1652,20 @@ class ClustersMutation:
         _require_operator_for_shared(info, domain, Permission.PROVIDER_PLUGIN_CONFIGURE)
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
+        if domain.dns_driver == "cloudflare_read_only":
+            from astrolift_clusters.dns_provider_connections import admitted
+
+            with admitted(info.context.request, write=True):
+                pass
         if input.default_for is not None:
+            if (
+                domain.dns_driver == "cloudflare_read_only"
+                and input.default_for != ManagedDomain.DefaultFor.NONE
+            ):
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    "Read-only DNS discovery cannot be a managed routing default.",
+                )
             domain.default_for = input.default_for
         if input.is_wildcard_managed is not None:
             domain.is_wildcard_managed = input.is_wildcard_managed
@@ -1641,13 +1691,18 @@ class ClustersMutation:
         _require_operator_for_shared(info, domain, Permission.PROVIDER_PLUGIN_CONFIGURE)
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found")
+        if domain.dns_driver == "cloudflare_read_only":
+            from astrolift_clusters.dns_provider_connections import admitted
+
+            with admitted(info.context.request, write=True):
+                pass
         domain.soft_delete()
 
         # The cloud resources must die with the row: a delete that only
         # soft-deletes leaves the hosted zone billing monthly and the
         # wildcard cert orphaned (found live: myastrolift.net survived
         # its own deletion). Fire-and-forget; the activity is idempotent.
-        cluster = _first_dns_cluster()
+        cluster = None if domain.dns_driver == "cloudflare_read_only" else _first_dns_cluster()
         if cluster is not None:
             start_workflow(
                 "DeprovisionManagedDomainWorkflow",
@@ -1704,6 +1759,20 @@ class ClustersMutation:
         if domain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "domain not found", field="zone")
 
+        if domain.dns_driver == "cloudflare_read_only":
+            from astrolift_clusters.dns_provider_connections import verify_read_only_domain
+
+            verified = verify_read_only_domain(info.context.request, domain)
+            return gql_success(
+                VerifyManagedDomainPayload(
+                    zone=zone,
+                    verified=verified,
+                    message="TXT challenge verified; DNS writes remain unavailable."
+                    if verified
+                    else "TXT challenge has not been confirmed; publish it and retry verification.",
+                )
+            )
+
         if domain.verification_state != ManagedDomain.VerificationState.PENDING:
             return gql_success(
                 VerifyManagedDomainPayload(
@@ -1748,7 +1817,8 @@ class ClustersMutation:
         domain.save(update_fields=["verification_state", "verified_at", "updated_at", "version"])
 
         message = "verified"
-        cluster = _first_dns_cluster()
+        # A read-only Cloudflare binding grants no DNS/certificate write port.
+        cluster = None if domain.dns_driver == "cloudflare_read_only" else _first_dns_cluster()
         if cluster is not None:
             start_workflow(
                 "ProvisionManagedDomainWorkflow",

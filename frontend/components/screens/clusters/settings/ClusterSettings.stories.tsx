@@ -58,6 +58,22 @@ export const Loading: Story = {
   render: () => <ClusterSettingsScreen {...SETTINGS} cluster={null} loading />,
 };
 
+/** calliope-installer#447: deleting the cloud cluster is refused with the reason; retiring stays. */
+export const ClusterLifecycleWithheld: Story = {
+  render: () => (
+    <ClusterSettingsScreen
+      {...SETTINGS}
+      cards={cards}
+      bootstrapHistory={history}
+      deleteWithheldReason="Cluster lifecycle is withheld from Astrolift on this install: it runs on clusters it is handed and may not create or delete one."
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText(/Cluster lifecycle is withheld/)).toBeVisible();
+  },
+};
+
 /** No cluster with this slug, or no permission to see it. */
 export const NotFound: Story = {
   render: () => <ClusterSettingsScreen {...SETTINGS} slug="no-such-cluster" cluster={null} />,

@@ -185,7 +185,8 @@ no role change or administrator token is needed to repair the CLI scope mapping.
 | `astrolift_list_runtimes` | Discover the configured runtime names and container images. |
 | `astrolift_list_tasks` | List runs by `status`, `agent_slug`, and/or `project_slug`. |
 | `astrolift_get_task` | Read one run's lifecycle, placement, result and failure. |
-| `astrolift_run_agent` | Launch a registered task agent with `trigger_payload`. |
+| `astrolift_get_task_by_client_request_id` | Recover the caller's visible task after an interrupted dispatch response. |
+| `astrolift_run_agent` | Launch a registered task agent with `trigger_payload` and an optional idempotency UUID. |
 | `astrolift_cancel_task` | Stop a run through the existing cancellation path. |
 
 For example, call `astrolift_list_tasks` with:
@@ -229,6 +230,23 @@ ordinary scoped operations; hosting a chat UI does not grant additional
 permissions or create a second scheduler. The current MCP launch tool supports
 Task-family agents. Service-family agents retain their existing deployment
 controls.
+
+Before dispatch, persist a fresh UUID with the intended request. Supply it as
+`client_request_id` to `astrolift_run_agent`. Repeating the same request with
+that UUID returns the existing task through the shared dispatch service. Changing
+the agent, environment, effective timeout or payload returns `precondition`;
+omitting the UUID preserves independent launches.
+
+After a lost response, call `astrolift_get_task_by_client_request_id` with the
+persisted UUID. It returns `{"task": ...}` with the normal task details or
+`{"task": null}` when no accessible task matches. Recovery requires `mcp:read`
+and `agent.read`, and is restricted to the active organization, token owner,
+current task visibility and token team ceiling. A renewed token for the same
+user can recover their task. This lookup never dispatches work. A null result
+can also mean deleted work or lost access; it does not authorize launching with
+a new UUID. Retry the original request with the original UUID when dispatch is
+still intended and authorized. Native dispatch retains deleted keys and rejects
+conflicting reuse. Persist the returned task ID for subsequent status/cancel calls.
 
 ## Startup diagnostics
 

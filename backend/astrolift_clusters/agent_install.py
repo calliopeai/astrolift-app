@@ -199,7 +199,16 @@ def review_install(cluster_id):
         )
         if plugin is None:
             raise AgentInstallError("PRECONDITION", "Cluster provider is unavailable")
+        _refuse_cluster_scope(cluster)
         return cluster, _review_source(cluster, plugin)
+
+
+def _refuse_cluster_scope(cluster):
+    """The agent's ClusterRole is beyond the minimal RBAC contract (calliope-installer#447)."""
+    from core.install_restrictions import cluster_scope_refusal
+
+    if refusal := cluster_scope_refusal(cluster):
+        raise AgentInstallError("WITHHELD", refusal)
 
 
 def installation_busy(cluster):
@@ -217,6 +226,7 @@ def reserve_install(*, cluster_id, expected_version, expected_source, request_id
     with transaction.atomic(), current_dispatch_credential(Permission.CLUSTER_MANAGE):
         cluster, user = _visible_cluster(cluster_id, lock=True)
         assert tenant is not None and user is not None
+        _refuse_cluster_scope(cluster)
         token = get_current_api_token()
         requested = [
             str(cluster.guid),

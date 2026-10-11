@@ -208,7 +208,9 @@ export function DataTable<TRow>({
         return (
           <TableRow className="hover:bg-transparent">
             <TableCell colSpan={columnCount} className="p-0">
-              <EmptyState {...empty} />
+              <div className="sticky left-0 w-[100cqw] max-w-full">
+                <EmptyState {...empty} />
+              </div>
             </TableCell>
           </TableRow>
         );

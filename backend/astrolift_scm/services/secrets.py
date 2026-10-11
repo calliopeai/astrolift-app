@@ -527,6 +527,7 @@ def validate_astrolift_ci_secrets(
             app.organization_id,
             purpose=PLATFORM_REPO_WRITE,
             source_kind="github",
+            repo=app.source_repo,
         )
     except ConnectionResolutionError as exc:
         return ValidateCiSecretsResult(
@@ -731,6 +732,7 @@ def push_astrolift_ci_secrets(
             app.organization_id,
             purpose=PLATFORM_REPO_WRITE,
             source_kind="github",
+            repo=app.source_repo,
         )
     except ConnectionResolutionError as exc:
         raise PushSecretsError(exc.code, exc.message) from exc

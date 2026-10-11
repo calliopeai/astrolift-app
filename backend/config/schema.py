@@ -28,18 +28,27 @@ import astrolift_workflows.schema as AstroliftTemporalWorkflowsSchema  # noqa: E
 # ---------------------------------------------------------------------------
 import core.schema.mutations as CoreMutations
 import organization.schema as OrganizationSchema
+from astrolift_clusters.schema.domain_diagnostics import ManagedDomainDiagnosticQuery
+from astrolift_clusters.schema.dns_provider_connections import (
+    DnsProviderConnectionsMutation,
+    DnsProviderConnectionsQuery,
+)
 from astrolift_services.schema.model_reads import ModelReadsQuery
 from astrolift_services.schema.shared_model_prompt import SharedModelPromptMutations, SharedModelPromptQuery
 from config.features import Feature, is_enabled
 from core.schema.types.audit import AuditLogQuery
+from core.schema.types.install_policy import InstallPolicyQuery
 from core.schema.types.permission_analysis import PermissionAnalysisQuery
 from core.schema.types.server_info import AstroliftServerInfoQuery
 from core.schema.types.user import UserType
 
 _query_bases = [
+    ManagedDomainDiagnosticQuery,
+    DnsProviderConnectionsQuery,
     PermissionAnalysisQuery,
     AuditLogQuery,
     AstroliftServerInfoQuery,
+    InstallPolicyQuery,
     OrganizationSchema.Query,
     AstroliftIdentitySchema.IdentityQuery,
     AstroliftOperationsSchema.OperationsQuery,
@@ -63,6 +72,7 @@ _query_bases = [
     AstroliftPipelinesSchema.PipelinesQuery,
 ]
 _mutation_bases = [
+    DnsProviderConnectionsMutation,
     CoreMutations.Mutation,
     OrganizationSchema.Mutation,
     AstroliftIdentitySchema.IdentityMutation,

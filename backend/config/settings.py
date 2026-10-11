@@ -222,6 +222,14 @@ AWS_SES_REGION_ENDPOINT = os.environ.get("AWS_SES_REGION_ENDPOINT", "email.us-we
 EMAIL_BACKEND = env_str("DJANGO_EMAIL_BACKEND", "django_ses.SESBackend")
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "localhost")
 EMAIL_PORT = int(os.environ.get("EMAIL_PORT", 25))
+# Standard Django SMTP settings are explicit install configuration. Defaults
+# preserve the existing SES path; the diagnostic refuses unverified SMTP.
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", False)
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", False)
+EMAIL_HOST_USER = env_str("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = env_str("EMAIL_HOST_PASSWORD", "")
+EMAIL_SSL_KEYFILE = env_str("EMAIL_SSL_KEYFILE") or None
+EMAIL_SSL_CERTFILE = env_str("EMAIL_SSL_CERTFILE") or None
 FROM_EMAIL = os.environ.get("FROM_EMAIL", "no-reply@example.com")
 
 # SES → SNS event publishing (#756). When set, the AmazonSES driver
@@ -244,6 +252,11 @@ SES_EVENTS_SNS_TOPIC_ARN = env_str("ASTROLIFT_SES_EVENTS_SNS_TOPIC_ARN", "")
 # "Hook url is not supported because it isn't reachable over the
 # public Internet (localhost)".
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "").rstrip("/")
+# Operator-provisioned Cloudflare OAuth client; never returned via GraphQL.
+# Use exact read scope IDs from Cloudflare's OAuth scopes catalogue.
+ASTROLIFT_CLOUDFLARE_OAUTH_CLIENT_ID = env_str("ASTROLIFT_CLOUDFLARE_OAUTH_CLIENT_ID", "")
+ASTROLIFT_CLOUDFLARE_OAUTH_CLIENT_SECRET = env_str("ASTROLIFT_CLOUDFLARE_OAUTH_CLIENT_SECRET", "")
+ASTROLIFT_CLOUDFLARE_OAUTH_READ_SCOPES = tuple(env_str("ASTROLIFT_CLOUDFLARE_OAUTH_READ_SCOPES", "").split())
 
 # GitHub-App connection reuse scope. Controls whether the "Connect
 # GitHub" manifest flow mints a brand-new GitHub App on every connect
@@ -645,12 +658,14 @@ CONSTANCE_CONFIG = {
         "still want the deploy-approval audit trail without blocking on a second approver. "
         "Per-deployment auditability is unchanged either way.",
     ),
+    "BUILDER_FILES_MAX_BYTES": (64 * 1024 * 1024, "Decoded app asset budget per builder sync."),
+    "BUILDER_MAX_FILES": (10000, "Maximum assets per builder sync."),
     "BUILDER_DATA_FILE_MAX_BYTES": (
         64 * 1024 * 1024,
         "Largest data file (e.g. an app's data.sqlite) the App Builder accepts in one "
         "files sync, in decoded bytes. It travels base64 in the request, so the request "
         "can be a third larger; an ingress in front of the control plane must allow that "
-        "body size. The file is stored in Postgres and shipped to the cluster as Secrets.",
+        "body size. The file is shipped in a private artifact and seeded into the data volume.",
     ),
     # ---- Admin console surfaces (feature flipper) ----
     # Runtime gates for the platform-admin cost / quotas / permissions
@@ -874,7 +889,10 @@ CONSTANCE_CONFIG_FIELDSETS = {
         ),
         "collapse": False,
     },
-    "App Builder": {"fields": ("BUILDER_DATA_FILE_MAX_BYTES",), "collapse": False},
+    "App Builder": {
+        "fields": ("BUILDER_FILES_MAX_BYTES", "BUILDER_MAX_FILES", "BUILDER_DATA_FILE_MAX_BYTES"),
+        "collapse": False,
+    },
     "Webhooks": {"fields": ("WEBHOOK_SECRET_ROTATION_GRACE_SECONDS",), "collapse": False},
     "Deploy tokens": {
         "fields": (
@@ -1335,3 +1353,17 @@ TWILIO_SID = os.getenv("TWILIO_SID", "")
 TWILIO_SECRET = os.getenv("TWILIO_SECRET", "")
 TWILIO_FROM_NUMBER = os.getenv("TWILIO_FROM_NUMBER", "")
 TWILIO_CALLBACK = os.getenv("TWILIO_CALLBACK", "")
+
+# The default archive store is shared across API/worker replicas without a new
+# service. Operators can replace this alias with a private object-store backend.
+BUILDER_ARTIFACT_BASE_URL = env_str("BUILDER_ARTIFACT_BASE_URL", PLATFORM_API_URL)
+STORAGES = globals().get(
+    "STORAGES",
+    {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    },
+)
+STORAGES.setdefault(
+    "builder_artifacts", {"BACKEND": "astrolift_lifecycle.artifact_storage.BuilderArtifactStorage"}
+)

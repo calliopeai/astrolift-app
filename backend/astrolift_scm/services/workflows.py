@@ -128,6 +128,7 @@ def _pick_source_connection(app: RegisteredApp) -> SourceConnection | None:
             app.organization_id,
             purpose=ORG_REPO_WRITE,
             source_kind=app.source_kind,
+            repo=app.source_repo,
         )
     except ConnectionResolutionError:
         return None

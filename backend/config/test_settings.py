@@ -25,6 +25,7 @@ from config.settings import *  # noqa: F401, F403
 # Plain in-memory defaults — no whitenoise, no s3boto3. Tests that
 # need to exercise either should override this fixture-scoped.
 STORAGES = {  # noqa: F811
+    "builder_artifacts": {"BACKEND": "astrolift_lifecycle.artifact_storage.BuilderArtifactStorage"},
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },

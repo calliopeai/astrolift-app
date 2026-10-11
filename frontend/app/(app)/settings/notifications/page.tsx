@@ -15,7 +15,7 @@ export default async function NotificationsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { section } = await searchParams;
-  if (section === "alerts") return <NotificationsClient />;
+  if (section === "alerts" || section === "install-email") return <NotificationsClient />;
   return (
     <PreloadQuery query={LIST_MY_NOTIFICATIONS} variables={{ unreadOnly: false, limit: 100 }}>
       <NotificationsClient />

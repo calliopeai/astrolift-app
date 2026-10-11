@@ -13,7 +13,6 @@ from astrolift_graphql import GUID
 from astrolift_identity.models import Organization, Project, Team
 from astrolift_lifecycle.models import AppEnvironment
 from astrolift_operations.email_infra import (
-    EmailKind,
     TransportKind,
     clear_transport,
     set_transport,
@@ -328,7 +327,7 @@ def stub_email_transport():
     clear_transport()
 
 
-def test_send_test_email_routes_through_transport(permission_resolver, stub_email_transport):
+def test_unreviewed_legacy_send_never_uses_global_transport(permission_resolver, stub_email_transport):
     org, app, env = _scaffold()
     permission_resolver.grant(Permission.APP_UPDATE)
     permission_resolver.grant(Permission.MANAGED_SERVICE_UPDATE)
@@ -351,22 +350,15 @@ def test_send_test_email_routes_through_transport(permission_resolver, stub_emai
                 body="Hello there",
             ),
         )
-    assert result.ok, result.errors
-    payload = result.data
-    assert payload is not None
-    assert payload.recipient == "qa@acme.test"
-    assert payload.subject == "Custom subject"
-    assert payload.transport == TransportKind.AWS_SES.value
-    assert len(stub_email_transport) == 1
-    sent = stub_email_transport[0]
-    assert sent.to_address == "qa@acme.test"
-    assert sent.from_address == "noreply@acme.test"
-    assert sent.kind == EmailKind.MANAGED_SERVICE_TEST
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
+    assert "expectedVersion" in result.errors[0].message
+    assert stub_email_transport == []
     svc.refresh_from_db()
-    assert svc.last_action_kind == "test_email.send"
+    assert svc.last_action_kind != "test_email.send"
 
 
-def test_send_test_email_defaults_subject_and_body(permission_resolver, stub_email_transport):
+def test_unconfigured_applied_binding_never_synthesizes_a_sender(permission_resolver, stub_email_transport):
     org, app, env = _scaffold()
     permission_resolver.grant(Permission.APP_UPDATE)
     permission_resolver.grant(Permission.MANAGED_SERVICE_UPDATE)
@@ -385,10 +377,9 @@ def test_send_test_email_defaults_subject_and_body(permission_resolver, stub_ema
                 recipient="qa@acme.test",
             ),
         )
-    assert result.ok, result.errors
-    sent = stub_email_transport[0]
-    assert sent.subject.startswith("[Astrolift]")
-    assert "msvc-app" in sent.plain_body or "ses-default" in sent.plain_body
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
+    assert stub_email_transport == []
 
 
 def test_send_test_email_non_email_kind_rejected(permission_resolver, stub_email_transport):

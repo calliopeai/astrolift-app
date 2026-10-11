@@ -44,6 +44,8 @@ export interface BootstrapComponent {
   defaultEnabled: boolean;
   installedByRecipe: boolean;
   runningOutsideRecipe: boolean;
+  /** Why the install refuses it (calliope-installer#447); offered disabled. */
+  withheldReason?: string | null;
   rationale: string;
   requires: string[];
   options: BootstrapOption[];
@@ -68,7 +70,9 @@ export function preselected(c: {
   defaultEnabled: boolean;
   installedByRecipe: boolean;
   runningOutsideRecipe: boolean;
+  withheldReason?: string | null;
 }): boolean {
+  if (c.withheldReason) return false;
   if (c.installedByRecipe) return true;
   return c.defaultEnabled && !c.runningOutsideRecipe;
 }

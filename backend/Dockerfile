@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     ca-certificates \
     openssh-client \
+    iputils-ping \
+    traceroute \
     && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --upgrade pip pipenv wheel

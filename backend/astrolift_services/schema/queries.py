@@ -46,6 +46,7 @@ from astrolift_services.models import (
     WorkloadIdentityGrant,
 )
 from astrolift_services.schema.cluster_models import ClusterModelsQuery
+from astrolift_services.schema.email_delivery import EmailDeliveryQuery
 from astrolift_services.schema.hf_connections import HuggingFaceConnectionsQuery
 from astrolift_services.schema.local_model_artifacts import ModelArtifactsQuery
 from astrolift_services.schema.model_connections import ModelConnectionsQuery
@@ -683,6 +684,7 @@ def _managed_services_qs(
 
 @strawberry.type
 class ServicesQuery(
+    EmailDeliveryQuery,
     ModelConnectionsQuery,
     ClusterModelsQuery,
     HuggingFaceConnectionsQuery,

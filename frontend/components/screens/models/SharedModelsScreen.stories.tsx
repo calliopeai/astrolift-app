@@ -26,6 +26,23 @@ export const Full: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Filter by cluster Production" }));
   },
 };
+export const WithInstallManagedModel: Story = {
+  args: {
+    ...sharedModelsProps,
+    installModel: { modelId: "Qwen/Qwen2.5-7B-Instruct", replicas: 1 },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("region", { name: "Managed by the install" })).toBeVisible();
+    await expect(canvas.getByText("Qwen/Qwen2.5-7B-Instruct")).toBeVisible();
+  },
+};
+export const InstallManagedModelOnly: Story = {
+  args: {
+    page: { ...sharedModelsProps.page, rows: [], totalCount: 0 },
+    installModel: { modelId: "Qwen/Qwen2.5-7B-Instruct", replicas: null },
+  },
+};
 export const Loading: Story = {
   args: { page: { ...sharedModelsProps.page, rows: [], loading: true } },
 };

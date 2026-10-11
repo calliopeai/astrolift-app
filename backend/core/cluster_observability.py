@@ -3288,6 +3288,8 @@ def _managed_config_uncredentialed(
     if kind == "email":
         from aws.managed.email_ses import SESEmailConfig
 
+        from core.install_restrictions import reason as withheld_reason
+
         return SESEmailConfig(
             region=region,
             identity_prefix=str(pc.get("ses_identity_prefix", "astrolift")),
@@ -3295,6 +3297,10 @@ def _managed_config_uncredentialed(
             deletion_protection_default=bool(
                 pc.get("deletion_protection_default", True),
             ),
+            # The SES driver writes its verification records into Route53
+            # itself; on an install that withholds DNS it writes none and
+            # says why the identity stays pending (calliope-installer#447).
+            dns_withheld_reason=withheld_reason("dns"),
         )
 
     if kind == "model_endpoint":

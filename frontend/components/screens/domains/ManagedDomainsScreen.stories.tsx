@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, userEvent, within } from "storybook/test";
 
 import { selectRows } from "@/components/list/select-rows";
 import { type ListState, useLocalListState } from "@/components/list/use-list-state";
@@ -7,6 +8,7 @@ import {
   DOMAIN_ACTIVE,
   DOMAIN_LONG,
   DOMAIN_PROVISIONING,
+  DNS_WITHHELD,
   DOMAIN_UNPROVISIONED,
   MANAGED_DOMAINS,
   type ManagedDomainsFixture,
@@ -91,4 +93,33 @@ export const Width768: Story = {
       <Screen {...MANAGED_DOMAINS} domains={[DOMAIN_LONG, DOMAIN_ACTIVE]} />
     </div>
   ),
+};
+
+/**
+ * calliope-installer#447: DNS withheld. The note shows whichever driver is
+ * picked, because provisioning writes through the DNS cluster's driver; submit
+ * stays enabled for a zone that already exists. AddZoneDnsUnset opens the
+ * same sheet without the restriction: no note.
+ */
+const addZonePlay =
+  (withheld: boolean): Story["play"] =>
+  async ({ canvasElement }) => {
+    await userEvent.click(within(canvasElement).getByRole("button", { name: "Add zone" }));
+    const sheet = within(document.body);
+    await userEvent.type(sheet.getByLabelText(/^Zone \(fully qualified/), "apps.acme.example");
+    for (const driver of ["route53", "external_dns"]) {
+      await userEvent.click(sheet.getByRole("combobox", { name: "DNS driver" }));
+      await userEvent.click(sheet.getByRole("option", { name: driver }));
+      if (withheld) await expect(sheet.getByText(/DNS is withheld/)).toBeVisible();
+      else await expect(sheet.queryByText(/DNS is withheld/)).toBeNull();
+      await expect(sheet.getAllByRole("button", { name: "Add zone" }).at(-1)!).toBeEnabled();
+    }
+  };
+export const AddZoneDnsWithheld: Story = {
+  render: () => <Screen {...MANAGED_DOMAINS} dnsRestriction={DNS_WITHHELD} />,
+  play: addZonePlay(true),
+};
+export const AddZoneDnsUnset: Story = {
+  render: () => <Screen {...MANAGED_DOMAINS} />,
+  play: addZonePlay(false),
 };

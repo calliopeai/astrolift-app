@@ -10,6 +10,7 @@ import urllib.request  # noqa: F401
 
 import strawberry
 
+from astrolift_operations.schema.install_alert_mail import InstallAlertMailMutation
 from astrolift_operations.schema.mutations.alert_subscriptions import AlertSubscriptionMutations
 from astrolift_operations.schema.mutations.alerts import AlertMutations
 from astrolift_operations.schema.mutations.bulk_ops import BulkOpsMutations
@@ -74,6 +75,7 @@ from astrolift_operations.schema.mutations.zentinelle import ZentinelleMutations
 
 @strawberry.type
 class OperationsMutation(
+    InstallAlertMailMutation,
     WebhookMutations,
     NotificationMutations,
     AlertMutations,

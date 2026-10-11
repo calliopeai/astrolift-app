@@ -16,11 +16,17 @@ from __future__ import annotations
 from django.urls import path
 from django.views.decorators.csrf import csrf_exempt
 
-from astrolift_lifecycle import builder_views, cli_views, domain_handoff_views
+from astrolift_lifecycle import builder_artifacts, builder_views, cli_views, domain_handoff_views
 
 app_name = "astrolift_lifecycle"
 
 urlpatterns = [
+    path("api/builder/v1/capabilities/", builder_views.capabilities, name="builder-capabilities"),
+    path(
+        "api/builder/v1/dev-environments/<str:guid>/artifact/",
+        builder_artifacts.download,
+        name="builder-artifact",
+    ),
     # ── Calliope App Builder (/api/builder/v1/) ──────────────────────────
     path(
         "api/builder/v1/dev-environments/",

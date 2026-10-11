@@ -1924,6 +1924,7 @@ export type AstroliftClusterBootstrapComponent = {
   requires: Array<Scalars['String']['output']>;
   runningOutsideRecipe: Scalars['Boolean']['output'];
   title: Scalars['String']['output'];
+  withheldReason?: Maybe<Scalars['String']['output']>;
 };
 
 export type AstroliftClusterBootstrapOption = {
@@ -3110,6 +3111,11 @@ export type AstroliftImportSkillsResultMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftInstallManagedModel = {
+  modelId: Scalars['String']['output'];
+  replicas?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AstroliftInstallSourceWebhookPayload = {
   hookId: Scalars['String']['output'];
   receiverUrl: Scalars['String']['output'];
@@ -3264,6 +3270,7 @@ export type AstroliftManagedDomain = {
   provisionValidationRecords: Scalars['JSON']['output'];
   verificationState: Scalars['String']['output'];
   verifiedAt?: Maybe<Scalars['DateTime']['output']>;
+  version: Scalars['Int']['output'];
   zone: Scalars['String']['output'];
 };
 
@@ -5827,6 +5834,11 @@ export type AstroliftWebhookTestResultMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftWithheldCapability = {
+  capability: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+};
+
 export type AstroliftWorkflowHistoryEvent = {
   decision: Scalars['String']['output'];
   eventType: Scalars['String']['output'];
@@ -6089,6 +6101,15 @@ export type AstroliftZentinelleDisconnectMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AttachCloudflareDnsZoneInput = {
+  connectionId: Scalars['GUID']['input'];
+  domainId: Scalars['GUID']['input'];
+  expectedConnectionVersion: Scalars['Int']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+  zoneId: Scalars['String']['input'];
+  zoneName: Scalars['String']['input'];
+};
+
 export type AttachProjectManagedServiceInput = {
   agentEnvironmentSpecSlug: InputMaybe<Scalars['String']['input']>;
   appEnvironmentId: InputMaybe<Scalars['GUID']['input']>;
@@ -6151,6 +6172,11 @@ export type AvailableTransition = {
   fromState: Scalars['String']['output'];
   label: Scalars['String']['output'];
   toState: Scalars['String']['output'];
+};
+
+export type BeginCloudflareDnsOAuthInput = {
+  name: Scalars['String']['input'];
+  organizationId: Scalars['GUID']['input'];
 };
 
 export type BeginLocalModelArtifactInput = {
@@ -6304,6 +6330,58 @@ export type CloudOrphanType = {
   identifier: Scalars['String']['output'];
   kind: Scalars['String']['output'];
   reapKey: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+};
+
+export type CloudflareDnsConnectionInput = {
+  connectionId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+};
+
+export type CloudflareDnsOAuthStart = {
+  authorizationUrl: Scalars['String']['output'];
+};
+
+export type CloudflareDnsOAuthStartMutationResult = {
+  data?: Maybe<CloudflareDnsOAuthStart>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type CloudflareDnsRecord = {
+  content: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  priority?: Maybe<Scalars['Int']['output']>;
+  proxied: Scalars['Boolean']['output'];
+  ttl: Scalars['Int']['output'];
+  type: Scalars['String']['output'];
+};
+
+export type CloudflareDnsRecordsInput = {
+  connectionId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  zoneId: Scalars['String']['input'];
+  zoneName: Scalars['String']['input'];
+};
+
+export type CloudflareDnsRecordsInventory = {
+  complete: Scalars['Boolean']['output'];
+  items: Array<CloudflareDnsRecord>;
+  reason: Scalars['String']['output'];
+};
+
+export type CloudflareDnsZone = {
+  accountId: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  nameServers: Array<Scalars['String']['output']>;
+  status: Scalars['String']['output'];
+};
+
+export type CloudflareDnsZonesInventory = {
+  complete: Scalars['Boolean']['output'];
+  items: Array<CloudflareDnsZone>;
   reason: Scalars['String']['output'];
 };
 
@@ -6494,6 +6572,12 @@ export type ConfiguredWorkflowPage = {
 
 export type ConfirmUploadResult = {
   ack: Scalars['Boolean']['output'];
+};
+
+export type ConnectCloudflareDnsTokenInput = {
+  name: Scalars['String']['input'];
+  organizationId: Scalars['GUID']['input'];
+  token: Scalars['String']['input'];
 };
 
 export type ConnectExistingGithubAppInput = {
@@ -6903,6 +6987,47 @@ export type DisconnectZentinelleInput = {
   force: Scalars['Boolean']['input'];
 };
 
+export type DnsProviderConnectionSupport = {
+  allowed: Scalars['Boolean']['output'];
+  apiTokenSupported: Scalars['Boolean']['output'];
+  dnsWritesSupported: Scalars['Boolean']['output'];
+  oauthConfigured: Scalars['Boolean']['output'];
+  oauthSetupReason: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+};
+
+export type DnsProviderConnectionType = {
+  authMethod: Scalars['String']['output'];
+  dnsWritesSupported: Scalars['Boolean']['output'];
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  provider: Scalars['String']['output'];
+  revocationState: Scalars['String']['output'];
+  state: Scalars['String']['output'];
+  verifiedAt?: Maybe<Scalars['DateTime']['output']>;
+  version: Scalars['Int']['output'];
+};
+
+export type DnsProviderConnectionTypeMutationResult = {
+  data?: Maybe<DnsProviderConnectionType>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type DnsProviderConnectionTypePage = {
+  items: Array<DnsProviderConnectionType>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type DomainPathRouteInput = {
   pathPrefix: Scalars['String']['input'];
   priority: Scalars['Int']['input'];
@@ -6924,6 +7049,56 @@ export type ElevateAdminSessionInput = {
   credential: Scalars['String']['input'];
   method: Scalars['String']['input'];
   ttlSeconds: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type EmailDeliveryTest = {
+  acceptedAt?: Maybe<Scalars['DateTime']['output']>;
+  accountId: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  eventTrackingConfigured: Scalars['Boolean']['output'];
+  id: Scalars['GUID']['output'];
+  identity: Scalars['String']['output'];
+  managedServiceId: Scalars['GUID']['output'];
+  observedAt?: Maybe<Scalars['DateTime']['output']>;
+  providerMessageId?: Maybe<Scalars['String']['output']>;
+  reasonCode?: Maybe<Scalars['String']['output']>;
+  recipient: Scalars['String']['output'];
+  region: Scalars['String']['output'];
+  requestId: Scalars['GUID']['output'];
+  sender: Scalars['String']['output'];
+  simulator: Scalars['Boolean']['output'];
+  status: Scalars['String']['output'];
+  transport: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type EmailDeliveryTestMutationResult = {
+  data?: Maybe<EmailDeliveryTest>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type EmailDeliveryTestPage = {
+  items: Array<EmailDeliveryTest>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type EmailDeliveryTestSupport = {
+  accountId?: Maybe<Scalars['String']['output']>;
+  allowed: Scalars['Boolean']['output'];
+  identity?: Maybe<Scalars['String']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  region?: Maybe<Scalars['String']['output']>;
+  sender?: Maybe<Scalars['String']['output']>;
+  serviceVersion?: Maybe<Scalars['Int']['output']>;
 };
 
 export type Emailsuppressionaddpayload = {
@@ -7239,6 +7414,51 @@ export type ImportWorkflowManifestResult = {
   repointedSlugs: Array<Scalars['String']['output']>;
 };
 
+export type InstallAlertMailSupport = {
+  allowed: Scalars['Boolean']['output'];
+  checkedAt: Scalars['DateTime']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+  recipient?: Maybe<Scalars['String']['output']>;
+  sender?: Maybe<Scalars['String']['output']>;
+  sourceFingerprint?: Maybe<Scalars['String']['output']>;
+  tlsMode?: Maybe<Scalars['String']['output']>;
+  transport?: Maybe<Scalars['String']['output']>;
+};
+
+export type InstallAlertMailTest = {
+  acceptedAt?: Maybe<Scalars['DateTime']['output']>;
+  createdAt: Scalars['DateTime']['output'];
+  deliveryObserved: Scalars['Boolean']['output'];
+  eventKind: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  reasonCode?: Maybe<Scalars['String']['output']>;
+  recipient: Scalars['String']['output'];
+  requestId: Scalars['GUID']['output'];
+  sender: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  transport: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type InstallAlertMailTestMutationResult = {
+  data?: Maybe<InstallAlertMailTest>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type InstallAlertMailTestPage = {
+  items: Array<InstallAlertMailTest>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type InstallClusterAgentInput = {
   clusterId: Scalars['GUID']['input'];
   expectedSource: Scalars['String']['input'];
@@ -7372,6 +7592,148 @@ export type LoginResult = {
 
 export type LogoutAllSessionsInput = {
   keepCurrent: Scalars['Boolean']['input'];
+};
+
+export type ManagedDomainActions = {
+  canCreate: Scalars['Boolean']['output'];
+  canDelete: Scalars['Boolean']['output'];
+  canRevalidate: Scalars['Boolean']['output'];
+};
+
+export type ManagedDomainCheckState =
+  | 'ERROR'
+  | 'MISMATCH'
+  | 'OK'
+  | 'UNKNOWN'
+  | 'UNSUPPORTED';
+
+export type ManagedDomainDiagnosticCheck = {
+  checkedAt: Scalars['DateTime']['output'];
+  expected: Array<Scalars['String']['output']>;
+  key: Scalars['String']['output'];
+  observed: Array<Scalars['String']['output']>;
+  perspective: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  state: ManagedDomainCheckState;
+};
+
+export type ManagedDomainDiagnosticRecord = {
+  aliasTarget?: Maybe<Scalars['String']['output']>;
+  aliasZoneId?: Maybe<Scalars['String']['output']>;
+  evaluateTargetHealth?: Maybe<Scalars['Boolean']['output']>;
+  name: Scalars['String']['output'];
+  priority?: Maybe<Scalars['Int']['output']>;
+  proxied?: Maybe<Scalars['Boolean']['output']>;
+  ttl?: Maybe<Scalars['Int']['output']>;
+  type: Scalars['String']['output'];
+  values: Array<Scalars['String']['output']>;
+};
+
+export type ManagedDomainDiagnostics = {
+  actions: ManagedDomainActions;
+  checkedAt: Scalars['DateTime']['output'];
+  checks: Array<ManagedDomainDiagnosticCheck>;
+  id: Scalars['GUID']['output'];
+  providerZone: ManagedDomainProviderZone;
+  provisionClusterId?: Maybe<Scalars['GUID']['output']>;
+  provisionState: Scalars['String']['output'];
+  routes: Array<ManagedDomainRoute>;
+  routesTruncated: Scalars['Boolean']['output'];
+  verificationState: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+  zone: Scalars['String']['output'];
+};
+
+export type ManagedDomainDnsBindingReference = {
+  canVerify: Scalars['Boolean']['output'];
+  connectionId?: Maybe<Scalars['GUID']['output']>;
+  connectionVersion?: Maybe<Scalars['Int']['output']>;
+  currentConnectionVersion?: Maybe<Scalars['Int']['output']>;
+  dnsWritesSupported: Scalars['Boolean']['output'];
+  domainId: Scalars['GUID']['output'];
+  domainVersion: Scalars['Int']['output'];
+  state: Scalars['String']['output'];
+  zoneId?: Maybe<Scalars['String']['output']>;
+  zoneName: Scalars['String']['output'];
+};
+
+export type ManagedDomainDnsConnectionBinding = {
+  connectionId: Scalars['GUID']['output'];
+  connectionVersion: Scalars['Int']['output'];
+  dnsWritesSupported: Scalars['Boolean']['output'];
+  domainId: Scalars['GUID']['output'];
+  domainVersion: Scalars['Int']['output'];
+  verificationRecordName?: Maybe<Scalars['String']['output']>;
+  verificationRecordValue?: Maybe<Scalars['String']['output']>;
+  verificationState: Scalars['String']['output'];
+  zone: CloudflareDnsZone;
+};
+
+export type ManagedDomainDnsConnectionBindingMutationResult = {
+  data?: Maybe<ManagedDomainDnsConnectionBinding>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type ManagedDomainProbe = {
+  checkedAt: Scalars['DateTime']['output'];
+  hostname: Scalars['String']['output'];
+  httpStatus?: Maybe<Scalars['Int']['output']>;
+  latencyMs?: Maybe<Scalars['Float']['output']>;
+  perspective: Scalars['String']['output'];
+  publicAddress?: Maybe<Scalars['String']['output']>;
+  reason: Scalars['String']['output'];
+  recordType: ManagedDomainRecordType;
+  state: ManagedDomainCheckState;
+  tlsVerified?: Maybe<Scalars['Boolean']['output']>;
+  tool: ManagedDomainProbeTool;
+  values: Array<Scalars['String']['output']>;
+};
+
+export type ManagedDomainProbeTool =
+  | 'DIG'
+  | 'HTTPS'
+  | 'LOOKUP'
+  | 'PING'
+  | 'TRACEROUTE';
+
+export type ManagedDomainProviderZone = {
+  bindingSource: Scalars['String']['output'];
+  checkedAt: Scalars['DateTime']['output'];
+  nameservers: Array<Scalars['String']['output']>;
+  privateZone?: Maybe<Scalars['Boolean']['output']>;
+  reason: Scalars['String']['output'];
+  records: Array<ManagedDomainDiagnosticRecord>;
+  state: ManagedDomainCheckState;
+  truncated: Scalars['Boolean']['output'];
+  zoneId?: Maybe<Scalars['String']['output']>;
+  zoneName?: Maybe<Scalars['String']['output']>;
+};
+
+export type ManagedDomainRecordType =
+  | 'A'
+  | 'AAAA'
+  | 'CAA'
+  | 'CNAME'
+  | 'MX'
+  | 'NS'
+  | 'SOA'
+  | 'SRV'
+  | 'TXT';
+
+export type ManagedDomainRoute = {
+  appId: Scalars['GUID']['output'];
+  appName: Scalars['String']['output'];
+  appSlug: Scalars['String']['output'];
+  clusterId?: Maybe<Scalars['GUID']['output']>;
+  clusterName?: Maybe<Scalars['String']['output']>;
+  clusterSlug?: Maybe<Scalars['String']['output']>;
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  hostname: Scalars['String']['output'];
+  ingressClass?: Maybe<Scalars['String']['output']>;
+  observedState: ManagedDomainCheckState;
+  recordedUrl: Scalars['String']['output'];
 };
 
 export type Managedresourceadoptionpayload = {
@@ -7920,10 +8282,12 @@ export type Mutation = {
   astroliftDisconnectUserSourceProvider: AstroliftDisconnectUserSourceProviderPayloadMutationResult;
   astroliftInstallClusterLogCollector: AstroliftClusterLogCollectorOperationMutationResult;
   attachAgentSecretBundle: AstroliftAgentSecretBundleAttachmentMutationResult;
+  attachCloudflareDnsZone: ManagedDomainDnsConnectionBindingMutationResult;
   attachProjectManagedService: AstroliftManagedServiceAttachmentMutationResult;
   attachSecretBundle: AstroliftAppSecretBundleAttachmentMutationResult;
   attestSession: AstroliftAttestationResultMutationResult;
   authorizeLocalModelUploads: LocalModelUploadAuthorizationMutationResult;
+  beginCloudflareDnsOAuth: CloudflareDnsOAuthStartMutationResult;
   beginLocalModelArtifact: LocalModelArtifactMutationResult;
   bringClusterIntoManagement: AstroliftTenantClusterMutationResult;
   bulkApproveDeployments: AstroliftBulkDeploymentResultDataMutationResult;
@@ -7949,6 +8313,7 @@ export type Mutation = {
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
   confirmPreSignedUrlImageUpload: ConfirmUploadResult;
+  connectCloudflareDnsToken: DnsProviderConnectionTypeMutationResult;
   connectExistingGithubApp: AstroliftSourceConnectionMutationResult;
   connectHuggingFace: HuggingFaceConnectionTypeMutationResult;
   connectSource: AstroliftSourceConnectionMutationResult;
@@ -8031,6 +8396,7 @@ export type Mutation = {
   detachAgentSecretBundle: AstroliftAgentSecretBundleAttachmentMutationResult;
   detachProjectManagedService: AstroliftManagedServiceAttachmentMutationResult;
   detachSecretBundle: AttachmentremovedpayloadMutationResult;
+  disconnectDnsProviderConnection: DnsProviderConnectionTypeMutationResult;
   disconnectHuggingFace: HuggingFaceConnectionTypeMutationResult;
   disconnectSource: AstroliftSourceConnectionMutationResult;
   disconnectZentinelle: AstroliftZentinelleDisconnectMutationResult;
@@ -8139,6 +8505,7 @@ export type Mutation = {
   registerAgentRepo: AstroliftRegisterAgentRepoResultMutationResult;
   registerApp: AstroliftRegisteredAppMutationResult;
   registerAppRepo: AstroliftRegisterAppRepoResultMutationResult;
+  registerCloudflareDnsZone: ManagedDomainDnsConnectionBindingMutationResult;
   registerMobileDevice: AstroliftDeviceRegistrationMutationResult;
   registerOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
   registerTenantCluster: AstroliftTenantClusterMutationResult;
@@ -8173,6 +8540,7 @@ export type Mutation = {
   resyncAllAstroliftCiWorkflows: AstroliftCiWorkflowResyncAllResultMutationResult;
   resyncAstroliftCiWorkflow: AstroliftCiWorkflowSyncStatusMutationResult;
   resyncAstroliftManifestFromRepo: ResyncManifestPayloadMutationResult;
+  retestDnsProviderConnection: DnsProviderConnectionTypeMutationResult;
   retryAgentTask: AstroliftAgentTaskMutationResult;
   retryAstroliftAutowire: AstroliftRetryAutowirePayloadMutationResult;
   revalidateManagedDomain: RevalidateManagedDomainPayloadMutationResult;
@@ -8207,6 +8575,8 @@ export type Mutation = {
   scaleAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
   scaleServiceAgent: AstroliftAgentScaleResult;
   sendAgentTaskInput: AstroliftAgentTaskInputMessageMutationResult;
+  sendEmailDeliveryTest: EmailDeliveryTestMutationResult;
+  sendInstallAlertMailTest: InstallAlertMailTestMutationResult;
   sendManagedServiceTestEmail: AstroliftManagedServiceTestEmailResultMutationResult;
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
   setAgentBundleSecretValue: AstroliftAgentSecretBundleMutationResult;
@@ -8466,6 +8836,11 @@ export type MutationAttachAgentSecretBundleArgs = {
 };
 
 
+export type MutationAttachCloudflareDnsZoneArgs = {
+  input: AttachCloudflareDnsZoneInput;
+};
+
+
 export type MutationAttachProjectManagedServiceArgs = {
   input: AttachProjectManagedServiceInput;
 };
@@ -8483,6 +8858,11 @@ export type MutationAttestSessionArgs = {
 
 export type MutationAuthorizeLocalModelUploadsArgs = {
   input: LocalModelArtifactIdentityInput;
+};
+
+
+export type MutationBeginCloudflareDnsOAuthArgs = {
+  input: BeginCloudflareDnsOAuthInput;
 };
 
 
@@ -8608,6 +8988,11 @@ export type MutationConfirmPreSignedUrlImageUploadArgs = {
   metadata?: InputMaybe<Scalars['JSON']['input']>;
   publicUrl?: InputMaybe<Scalars['String']['input']>;
   uploadId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
+export type MutationConnectCloudflareDnsTokenArgs = {
+  input: ConnectCloudflareDnsTokenInput;
 };
 
 
@@ -9020,6 +9405,11 @@ export type MutationDetachProjectManagedServiceArgs = {
 
 export type MutationDetachSecretBundleArgs = {
   input: DetachSecretBundleInput;
+};
+
+
+export type MutationDisconnectDnsProviderConnectionArgs = {
+  input: CloudflareDnsConnectionInput;
 };
 
 
@@ -9463,6 +9853,11 @@ export type MutationRegisterAppRepoArgs = {
 };
 
 
+export type MutationRegisterCloudflareDnsZoneArgs = {
+  input: RegisterCloudflareDnsZoneInput;
+};
+
+
 export type MutationRegisterMobileDeviceArgs = {
   input: RegisterMobileDeviceInput;
 };
@@ -9627,6 +10022,11 @@ export type MutationResyncAstroliftCiWorkflowArgs = {
 
 export type MutationResyncAstroliftManifestFromRepoArgs = {
   input: ResyncManifestFromRepoInput;
+};
+
+
+export type MutationRetestDnsProviderConnectionArgs = {
+  input: CloudflareDnsConnectionInput;
 };
 
 
@@ -9804,6 +10204,16 @@ export type MutationSendAgentTaskInputArgs = {
   clientRequestId?: InputMaybe<Scalars['String']['input']>;
   message: Scalars['String']['input'];
   taskId: Scalars['ID']['input'];
+};
+
+
+export type MutationSendEmailDeliveryTestArgs = {
+  input: SendEmailDeliveryTestInput;
+};
+
+
+export type MutationSendInstallAlertMailTestArgs = {
+  input: SendInstallAlertMailTestInput;
 };
 
 
@@ -10901,11 +11311,17 @@ export type Query = {
   astroliftHuggingFaceModel: HuggingFaceModelResult;
   astroliftHuggingFaceModels: HuggingFaceModelsPage;
   astroliftIdentityProviders: Array<AstroliftIdentityProvider>;
+  /** The model the install serves on its own GPUs (calliope-installer#446), read-only in the console; null when the platform model is a cloud API or off. */
+  astroliftInstallManagedModel?: Maybe<AstroliftInstallManagedModel>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage. */
   astroliftInvitations: Array<AstroliftInvitation>;
   astroliftInvitationsCsv: AstroliftIdentityCsvExport;
   astroliftInvitationsPage: AstroliftInvitationPage;
   astroliftLocalModelArtifactsPage: LocalModelArtifactPage;
+  astroliftManagedDomain?: Maybe<AstroliftManagedDomain>;
+  astroliftManagedDomainActions: ManagedDomainActions;
+  astroliftManagedDomainDiagnostics?: Maybe<ManagedDomainDiagnostics>;
+  astroliftManagedDomainProbe?: Maybe<ManagedDomainProbe>;
   astroliftManagedDomains: Array<AstroliftManagedDomain>;
   astroliftManagedService?: Maybe<AstroliftManagedServiceContext>;
   astroliftManagedServiceAttachmentsPage?: Maybe<AstroliftManagedServiceAttachmentContextPage>;
@@ -11044,6 +11460,8 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftWebhookSubscriptionsPage. */
   astroliftWebhookSubscriptions: Array<AstroliftWebhookSubscription>;
   astroliftWebhookSubscriptionsPage: AstroliftWebhookSubscriptionPage;
+  /** What the install withholds from Astrolift (calliope-installer#447): dns, databases, load_balancers, clusters, controllers, each with the reason to show. Empty when nothing is withheld. */
+  astroliftWithheldCapabilities: Array<AstroliftWithheldCapability>;
   astroliftWorkflowInstance?: Maybe<AstroliftWorkflowInstance>;
   astroliftWorkflowInstanceDetail?: Maybe<AstroliftWorkflowInstanceDetail>;
   astroliftWorkflowInstances: AstroliftWorkflowInstancePage;
@@ -11067,6 +11485,8 @@ export type Query = {
   /** Cursor-paginated mutation audit log. Superuser only. */
   auditLogsPage: AuditLogEntryPage;
   brief?: Maybe<AstroliftBrief>;
+  cloudflareDnsRecords: CloudflareDnsRecordsInventory;
+  cloudflareDnsZones: CloudflareDnsZonesInventory;
   clusterModelDedicatedAppsPage: ModelDedicatedAppPage;
   clusterModelDeployment?: Maybe<ClusterModelDeployment>;
   clusterModelDeploymentsPage: ClusterModelDeploymentPage;
@@ -11078,14 +11498,22 @@ export type Query = {
   clusterModelSubscriptionsPage: ModelSubscriptionPage;
   clusterModelUpdateAdmission: ModelRuntimeAdmission;
   dispatchers: Array<AstroliftDispatcherInstance>;
+  dnsProviderConnectionSupport: DnsProviderConnectionSupport;
+  dnsProviderConnectionsPage: DnsProviderConnectionTypePage;
+  dnsProviderDomainBinding?: Maybe<ManagedDomainDnsBindingReference>;
   /** List all effective permissions for a user, with the role bindings that grant each one. */
   effectivePermissions: Array<PermissionEntry>;
+  emailDeliveryTestSupport: EmailDeliveryTestSupport;
+  emailDeliveryTests: Array<EmailDeliveryTest>;
+  emailDeliveryTestsPage: EmailDeliveryTestPage;
   exportWorkflowManifest: WorkflowManifestExportType;
   formDefinition?: Maybe<AstroliftFormDefinition>;
   formDefinitions: Array<AstroliftFormDefinition>;
   formFieldTypes: Array<Scalars['String']['output']>;
   formSubmissions: Array<AstroliftFormSubmission>;
   huggingFaceConnectionsPage: HuggingFaceConnectionTypePage;
+  installAlertMailSupport: InstallAlertMailSupport;
+  installAlertMailTestsPage: InstallAlertMailTestPage;
   me?: Maybe<AstroliftMe>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use membersPage. */
   members: Array<OrganizationMemberType>;
@@ -12169,6 +12597,28 @@ export type QueryAstroliftLocalModelArtifactsPageArgs = {
 };
 
 
+export type QueryAstroliftManagedDomainArgs = {
+  domainId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftManagedDomainDiagnosticsArgs = {
+  domainId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  hostname?: InputMaybe<Scalars['String']['input']>;
+  recordType?: ManagedDomainRecordType;
+};
+
+
+export type QueryAstroliftManagedDomainProbeArgs = {
+  domainId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  hostname: Scalars['String']['input'];
+  recordType?: ManagedDomainRecordType;
+  tool: ManagedDomainProbeTool;
+};
+
+
 export type QueryAstroliftManagedServiceArgs = {
   expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
   id: Scalars['GUID']['input'];
@@ -12960,6 +13410,16 @@ export type QueryBriefArgs = {
 };
 
 
+export type QueryCloudflareDnsRecordsArgs = {
+  input: CloudflareDnsRecordsInput;
+};
+
+
+export type QueryCloudflareDnsZonesArgs = {
+  input: CloudflareDnsConnectionInput;
+};
+
+
 export type QueryClusterModelDedicatedAppsPageArgs = {
   clusterId: Scalars['GUID']['input'];
   expectedProviderId: Scalars['GUID']['input'];
@@ -13038,8 +13498,37 @@ export type QueryClusterModelUpdateAdmissionArgs = {
 };
 
 
+export type QueryDnsProviderConnectionsPageArgs = {
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+};
+
+
+export type QueryDnsProviderDomainBindingArgs = {
+  domainId: Scalars['GUID']['input'];
+};
+
+
 export type QueryEffectivePermissionsArgs = {
   userId: Scalars['ID']['input'];
+};
+
+
+export type QueryEmailDeliveryTestSupportArgs = {
+  managedServiceId: Scalars['GUID']['input'];
+};
+
+
+export type QueryEmailDeliveryTestsArgs = {
+  limit?: Scalars['Int']['input'];
+  managedServiceId: Scalars['GUID']['input'];
+};
+
+
+export type QueryEmailDeliveryTestsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  managedServiceId: Scalars['GUID']['input'];
 };
 
 
@@ -13068,6 +13557,18 @@ export type QueryHuggingFaceConnectionsPageArgs = {
   organizationId: Scalars['GUID']['input'];
   page?: Scalars['Int']['input'];
   pageSize?: Scalars['Int']['input'];
+};
+
+
+export type QueryInstallAlertMailSupportArgs = {
+  eventKind?: Scalars['String']['input'];
+};
+
+
+export type QueryInstallAlertMailTestsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  eventKind?: Scalars['String']['input'];
+  limit?: Scalars['Int']['input'];
 };
 
 
@@ -13489,6 +13990,13 @@ export type RegisterAppRepoInput = {
   sourceUrl: InputMaybe<Scalars['String']['input']>;
 };
 
+export type RegisterCloudflareDnsZoneInput = {
+  connectionId: Scalars['GUID']['input'];
+  expectedConnectionVersion: Scalars['Int']['input'];
+  zoneId: Scalars['String']['input'];
+  zoneName: Scalars['String']['input'];
+};
+
 export type RegisterMobileDeviceInput = {
   deviceToken: Scalars['String']['input'];
   label: InputMaybe<Scalars['String']['input']>;
@@ -13831,10 +14339,27 @@ export type ScaleWorkloadInput = {
   workloadId: Scalars['GUID']['input'];
 };
 
-export type SendManagedServiceTestEmailInput = {
+export type SendEmailDeliveryTestInput = {
   body: InputMaybe<Scalars['String']['input']>;
+  expectedVersion: Scalars['Int']['input'];
   managedServiceId: Scalars['GUID']['input'];
   recipient: Scalars['String']['input'];
+  requestId: Scalars['GUID']['input'];
+  subject: InputMaybe<Scalars['String']['input']>;
+};
+
+export type SendInstallAlertMailTestInput = {
+  eventKind: Scalars['String']['input'];
+  expectedSourceFingerprint: Scalars['String']['input'];
+  requestId: Scalars['GUID']['input'];
+};
+
+export type SendManagedServiceTestEmailInput = {
+  body: InputMaybe<Scalars['String']['input']>;
+  expectedVersion: InputMaybe<Scalars['Int']['input']>;
+  managedServiceId: Scalars['GUID']['input'];
+  recipient: Scalars['String']['input'];
+  requestId: InputMaybe<Scalars['GUID']['input']>;
   subject: InputMaybe<Scalars['String']['input']>;
 };
 
