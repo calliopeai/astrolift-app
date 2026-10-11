@@ -194,7 +194,6 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         tenant_cluster_id="aws-prod",
         service_handle_hint="model",
         size="small",
-        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
     base.update(overrides)
     return ProvisionSpec(**base)

@@ -128,10 +128,6 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         sensitive_kind="managed_service_provision",
     )
     def provision(self, spec: ProvisionSpec) -> ProvisionResult:
-        try:
-            record_id = self._record_id_for(spec=spec)
-        except (ValueError, ManagedServiceError) as exc:
-            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         cfg = spec.config or {}
 
         if cfg.get("provisioned_throughput") or (spec.recorded_handle and PaidHandle.parse(spec.recorded_handle)):
@@ -155,6 +151,10 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                     message="Recorded Bedrock identity could not be verified",
                     errors=["throughput_unverified"],
                 )
+        try:
+            record_id = self._record_id_for(spec=spec)
+        except (ValueError, ManagedServiceError) as exc:
+            return ProvisionResult(False, "", str(exc), ["invalid_resource_identity"])
         existing = self._describe(record_id)
         if existing is not None:
             return ProvisionResult(
@@ -612,7 +612,7 @@ class AmazonBedrockDriver(ManagedServiceDriver):
                 if spec.recorded_handle
                 else [
                     handle_for(kind=KIND, resource_id=name),
-                    handle_for(kind=KIND, resource_id=self._record_id_for(spec=spec)),
+                    handle_for(kind=KIND, resource_id=self._legacy_record_id_for(spec=spec)),
                 ]
             )
             for candidate in dict.fromkeys(candidates):
@@ -713,8 +713,25 @@ class AmazonBedrockDriver(ManagedServiceDriver):
         }
 
     def _record_id_for(self, *, spec: ProvisionSpec) -> str:
-        # Bedrock provisioned-model names: 1-63 chars, alphanumeric + hyphens (#2032).
+        # On-demand record names: 1-63 chars, alphanumeric + hyphens (#2032).
         return managed_name_for(spec, kind=KIND, prefix="astrolift", max_len=63)
+
+    @staticmethod
+    def _legacy_record_id_for(*, spec: ProvisionSpec) -> str:
+        """The pre-#2032 slug-joined name, probed only to recover a paid
+        throughput created before identity-derived names."""
+        raw = (
+            f"astrolift-{spec.organization_slug}-{spec.app_slug}-"
+            f"{spec.environment_name}-"
+            f"{spec.service_handle_hint or 'model'}"
+        ).lower()
+        clean = "".join(c if (c.isalnum() or c == "-") else "-" for c in raw)
+        while "--" in clean:
+            clean = clean.replace("--", "-")
+        clean = clean.strip("-")
+        if not clean or not clean[0].isalpha():
+            clean = f"a{clean}"
+        return clean[:63]
 
     def _log_group_for(self, *, record_id: str) -> str:
         return f"{self._config.invocation_log_group_prefix}/{record_id}"
