@@ -68,7 +68,7 @@ const preview: Preview = {
   decorators: [withAppProviders],
   globalTypes: {
     mode: toolbar("Mode", ["dark", "light"]),
-    ground: toolbar("Ground", ["black", "charcoal", "emerald", "paper", "mist"]),
+    ground: toolbar("Ground", ["black", "charcoal", "graphite", "emerald", "paper", "mist"]),
     accent: toolbar("Accent", ["green", "copper", "ice", "periwinkle", "amber"]),
     density: toolbar("Density", ["compact", "cards"]),
     permissions: toolbar("Permissions", ["all", "none"]),

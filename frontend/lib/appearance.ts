@@ -6,7 +6,8 @@
  * resolves into the existing design tokens, so no component needs to know a
  * theme system exists:
  *
- *   data-ground   surface ramp      black | charcoal | emerald | paper | mist
+ *   data-ground   surface ramp      black | charcoal | graphite | emerald | paper
+ *                                   | mist
  *   data-accent   action + charts   green | copper | ice | periwinkle | amber
  *                                   | custom (a `#rrggbb` the person picked)
  *   data-density  layout scale      compact | cards
@@ -23,6 +24,7 @@
 export const GROUNDS = {
   black: { label: "Black", mode: "dark" },
   charcoal: { label: "Charcoal", mode: "dark" },
+  graphite: { label: "Graphite", mode: "dark" },
   emerald: { label: "Emerald", mode: "dark" },
   paper: { label: "Paper", mode: "light" },
   mist: { label: "Mist", mode: "light" },
@@ -77,6 +79,14 @@ export const THEMES = [
     hint: "Charcoal · periwinkle",
     ground: "charcoal",
     accent: "periwinkle",
+  },
+  // #2286: neutral surfaces with a neutral sidebar; emerald as accent only.
+  {
+    id: "graphite",
+    name: "Graphite",
+    hint: "Graphite · green",
+    ground: "graphite",
+    accent: "green",
   },
   { id: "field", name: "Field", hint: "Emerald · green", ground: "emerald", accent: "green" },
   { id: "daylight", name: "Daylight", hint: "Mist · green", ground: "mist", accent: "green" },
@@ -162,6 +172,7 @@ export function parseCustomAccent(raw: string): CustomAccent | null {
 export const GROUND_BACKGROUND: Record<Ground, string> = {
   black: "#000000",
   charcoal: "#0e0f10",
+  graphite: "#111214",
   emerald: "#050b08",
   paper: "#faf6ee",
   mist: "#f2f7f9",

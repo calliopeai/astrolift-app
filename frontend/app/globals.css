@@ -279,6 +279,22 @@
   --accent: #232628;
   --muted-foreground: #8b9194;
 }
+/* #2286: the rebalanced ground. Neutral graphite carries every surface,
+ * the sidebar included, so emerald is the accent rather than the ground and
+ * lime stays with state and signal. Opt-in until it is chosen as default. */
+.dark[data-ground="graphite"] {
+  --background: #111214;
+  --card: #18191b;
+  --popover: #202124;
+  --secondary: #222326;
+  --muted: #1b1c1e;
+  --accent: #26272a;
+  --muted-foreground: #8e9296;
+  --border: rgba(255, 255, 255, 0.09);
+  --sidebar: #161719;
+  --sidebar-accent: color-mix(in oklab, var(--primary) 14%, transparent);
+  --sidebar-border: rgba(255, 255, 255, 0.07);
+}
 .dark[data-ground="emerald"] {
   --background: #050b08;
   --card: #0a1310;

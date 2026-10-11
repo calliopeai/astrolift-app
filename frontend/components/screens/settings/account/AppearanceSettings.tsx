@@ -38,12 +38,14 @@ function ThemePreview({ ground, accent }: { ground: string; accent: string }) {
   const grounds: Record<string, [string, string]> = {
     black: ["#000000", "#0a0a0a"],
     charcoal: ["#0e0f10", "#161819"],
+    graphite: ["#111214", "#18191b"],
     emerald: ["#050b08", "#0a1310"],
     paper: ["#f7f3ea", "#fffdf8"],
     mist: ["#f2f4f7", "#ffffff"],
   };
   const [bg, panel] = grounds[ground] ?? grounds.black;
-  const side = dark && ground !== "charcoal" ? "#04231a" : panel;
+  const side =
+    ground === "graphite" ? "#161719" : dark && ground !== "charcoal" ? "#04231a" : panel;
   return (
     <span
       aria-hidden

@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import {
+  ACCENTS,
+  GROUNDS,
+  GROUND_BACKGROUND,
+  THEMES,
   DEFAULT_APPEARANCE,
   MIN_ACCENT_CONTRAST,
   STORAGE_KEY,
@@ -216,5 +220,20 @@ describe("appearanceFromServer", () => {
         orgDefault: { ground: "paper", accent: "copper" },
       }).value
     ).toEqual({ ...DEFAULT_APPEARANCE, ground: "paper", accent: "ice" });
+  });
+});
+
+describe("graphite ground (#2286)", () => {
+  it("is a dark neutral ground every preset accent and the muted text clear", () => {
+    expect(GROUNDS.graphite.mode).toBe("dark");
+    for (const accent of Object.values(ACCENTS))
+      expect(contrastRatio(accent.swatch, GROUND_BACKGROUND.graphite)).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio("#8e9296", GROUND_BACKGROUND.graphite)).toBeGreaterThanOrEqual(4.5);
+  });
+  it("is offered as a theme with the green accent", () => {
+    expect(THEMES.find((theme) => theme.id === "graphite")).toMatchObject({
+      ground: "graphite",
+      accent: "green",
+    });
   });
 });
