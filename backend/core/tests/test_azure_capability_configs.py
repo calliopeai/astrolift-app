@@ -35,6 +35,10 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         slug="azure-prod",
         region="westus2",
         provider_config=provider_config,
+        # Central auth in the cluster's own Entra tenant (#2134).
+        oidc_auth_config={
+            "discovery_url": f"https://login.microsoftonline.com/{provider_config['tenant_id']}/v2.0",
+        },
         auth_config={
             "notification_hubs_shared_access_key_name": "DefaultFullSharedAccessSignature",
             "notification_hubs_shared_access_key": "test-only-not-a-real-key",
