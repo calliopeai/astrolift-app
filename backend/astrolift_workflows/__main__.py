@@ -30,6 +30,33 @@ def _bootstrap_django() -> None:
     django.setup()
 
 
+def build_workers(client, queues):
+    """One Worker per queue, every workflow and activity on each.
+
+    A synchronous activity needs a thread executor or Worker refuses to start
+    (``validate_deployment_identity_origin`` is one, since #2278), so all of
+    them share one. Tests build workers through here, so a missing executor
+    fails a test instead of crash-looping the worker on deploy.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    from temporalio.worker import Worker
+
+    from astrolift_workflows.worker import ACTIVITIES, WORKFLOWS
+
+    executor = ThreadPoolExecutor(max_workers=int(os.environ.get("ASTROLIFT_SYNC_ACTIVITY_THREADS", "16")))
+    return [
+        Worker(
+            client,
+            task_queue=q,
+            workflows=list(WORKFLOWS),
+            activities=list(ACTIVITIES),
+            activity_executor=executor,
+        )
+        for q in queues
+    ]
+
+
 async def _run() -> None:
     from django.conf import settings
     from temporalio.client import Client
@@ -73,15 +100,7 @@ async def _run() -> None:
         TASK_QUEUE_OBSERVABILITY,
         default_queue,
     )
-    workers = [
-        Worker(
-            client,
-            task_queue=q,
-            workflows=list(WORKFLOWS),
-            activities=list(ACTIVITIES),
-        )
-        for q in queues
-    ]
+    workers = build_workers(client, queues)
 
     log.info(
         "starting %d workers queues=%s workflows=%d activities=%d",
