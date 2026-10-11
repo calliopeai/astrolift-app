@@ -46,6 +46,7 @@ from _sdk.base import ProviderPlugin
 from azure.cluster_aks import AKSClusterDriver
 from azure.dns_azuredns import AzureDNSDriver
 from azure.identity_federated import AzureFederatedIdentityDriver
+from azure.identity_users_entra import EntraIdentityUsersDriver
 from azure.ingress_appgw import AzureAppGatewayIngressDriver
 from azure.managed.api_management import AzureAPIMDriver
 from azure.managed.cache_redis import AzureCacheRedisDriver
@@ -599,6 +600,8 @@ PLUGIN = ProviderPlugin(
         "cluster": AKSClusterDriver,
         "ingress": AzureAppGatewayIngressDriver,
         "notification": AzureNotificationHubsDriver,
+        # The edge identity provider's users (#2134).
+        "identity_users": EntraIdentityUsersDriver,
     },
     managed_service_drivers={
         ("object_store", "blob"): BlobStorageDriver,

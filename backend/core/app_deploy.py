@@ -609,6 +609,25 @@ def _config_for_capability_uncredentialed(
         resource_group = str(pc.get("resource_group") or ac.get("resource_group") or "")
         tenant_id = str(pc.get("tenant_id") or ac.get("tenant_id") or "")
         vault_url = str(pc.get("vault_url") or pc.get("keyvault_url") or "")
+        if capability == "identity_users":
+            from azure.identity_users_entra import EntraUsersConfig, entra_tenant_from_issuer
+
+            # The tenant the edge signs in against, from the cluster's central
+            # auth config (#2134). Only the install's own tenant is managed
+            # here; any other IdP is managed in that provider.
+            oidc = cluster.oidc_auth_config or {}
+            issuer_tenant = entra_tenant_from_issuer(str(oidc.get("discovery_url") or ""))
+            if issuer_tenant is None:
+                raise AppDeployError(
+                    f"cluster {cluster.slug}: central auth does not sign in through Microsoft Entra ID, "
+                    "so its users are managed in that provider",
+                )
+            if not tenant_id or issuer_tenant != tenant_id.lower():
+                raise AppDeployError(
+                    f"cluster {cluster.slug}: central auth signs in through Entra ID tenant {issuer_tenant}, "
+                    "which is not the tenant this cluster runs in, so its users are managed there",
+                )
+            return EntraUsersConfig(tenant_id=issuer_tenant)
         if capability == "registry":
             from azure.registry_acr import ACRConfig
 
