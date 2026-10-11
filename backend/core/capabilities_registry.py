@@ -46,6 +46,8 @@ SHIPPED_CAPABILITIES: Final[tuple[str, ...]] = (
     "audit.export",
     "audit.payload_diff",
     "audit.retention_policy",
+    # Per-app event summaries behind app.read, payloads withheld (#2221).
+    "events.app_feed",
     # Approval flows for deploys + bulk operator actions.
     "approvals.bulk",
     "approvals.magic_link",
