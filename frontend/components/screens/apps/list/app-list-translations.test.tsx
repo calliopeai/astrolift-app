@@ -162,3 +162,33 @@ describe("translated app registry", () => {
     }
   );
 });
+
+describe("app kind badge", () => {
+  it("labels known kinds and shows an unknown kind from a newer server as-is (#2332)", () => {
+    const onError = vi.fn();
+    const rows = [
+      { ...APPS[0], appKind: "mimwell" },
+      { ...APPS[1], appKind: "brainz" },
+    ];
+    function KindApps() {
+      const t = useTranslations("apps.list");
+      const status = useTranslations("apps.frame");
+      const list = useLocalListState(localizedAppsList(t, status));
+      return <AppsListScreen {...listProps({ rows, totalCount: 2 })} list={list} />;
+    }
+    render(
+      <MockedProvider>
+        <PermissionsProvider value={{ granted: new Set(), loading: false }}>
+          <NextIntlClientProvider locale="en" messages={en} timeZone="UTC" onError={onError}>
+            <TooltipProvider>
+              <KindApps />
+            </TooltipProvider>
+          </NextIntlClientProvider>
+        </PermissionsProvider>
+      </MockedProvider>
+    );
+    expect(screen.getAllByText(en.apps.list.appKinds.mimwell).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("brainz").length).toBeGreaterThan(0);
+    expect(onError).not.toHaveBeenCalled();
+  });
+});

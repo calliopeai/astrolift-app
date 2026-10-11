@@ -534,7 +534,7 @@ function AppKindBadge({ kind, className }: { kind?: string | null; className?: s
   if (!kind) return null;
   return (
     <Badge variant="secondary" className={className}>
-      {t(`appKinds.${kind}`)}
+      {t.has(`appKinds.${kind}`) ? t(`appKinds.${kind}`) : kind}
     </Badge>
   );
 }
