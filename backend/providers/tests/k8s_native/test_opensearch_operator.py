@@ -98,10 +98,10 @@ def _spec(**overrides) -> ProvisionSpec:
         "service_handle_hint": "catalog",
         "size": "small",
         "config": {},
-        "managed_service_id": "service-1",
+        "managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     }
     values.update(overrides)
-    return ProvisionSpec(**values)
+    return ProvisionSpec(**{"managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b", **values})
 
 
 def _driver(
@@ -146,7 +146,7 @@ def test_search_provision_emits_secure_operator_resources_and_external_credentia
 
     assert result.ok is True
     assert result.ready is False
-    assert result.handle == "search/cluster-1/acme-payments/os-payments-prod-catalog"
+    assert result.handle == "search/cluster-1/acme-payments/os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     assert cluster.namespaces[0][1] == "acme-payments"
     assert {row["kind"] for row in cluster.applied[-1]} == {
         "NetworkPolicy",
@@ -160,20 +160,22 @@ def test_search_provision_emits_secure_operator_resources_and_external_credentia
         cluster,
         f"{CURRENT_API_VERSION}/OpenSearchCluster",
         "acme-payments",
-        "os-payments-prod-catalog",
+        "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
     )
     assert search["spec"]["general"]["image"] == DEFAULT_IMAGE
     assert search["spec"]["general"]["setVMMaxMapCount"] is False
     assert search["spec"]["general"]["podSecurityContext"]["runAsNonRoot"] is True
     assert search["spec"]["dashboards"] == {"enable": False}
-    assert search["spec"]["security"]["config"]["adminCredentialsSecret"] == {"name": "os-payments-prod-catalog-admin"}
+    assert search["spec"]["security"]["config"]["adminCredentialsSecret"] == {
+        "name": "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-admin"
+    }
     assert search["spec"]["security"]["tls"]["http"]["rotateDaysBeforeExpiry"] == 30
     assert search["spec"]["security"]["tls"]["transport"]["rotateDaysBeforeExpiry"] == 30
     role = _object(
         cluster,
         f"{CURRENT_API_VERSION}/OpensearchRole",
         "acme-payments",
-        "os-payments-prod-catalog-client",
+        "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-client",
     )
     assert role["spec"]["indexPermissions"][0]["indexPatterns"] == ["payments-prod-catalog-*"]
     assert "indices:admin/exists" in role["spec"]["indexPermissions"][0]["allowedActions"]
@@ -188,21 +190,21 @@ def test_search_provision_emits_secure_operator_resources_and_external_credentia
         cluster,
         f"{CURRENT_API_VERSION}/OpensearchUser",
         "acme-payments",
-        "os-payments-prod-catalog-app",
+        "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-app",
     )
     assert user["spec"]["passwordFrom"] == {
-        "name": "os-payments-prod-catalog-app-user",
-        "key": "os-payments-prod-catalog-app",
+        "name": "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-app-user",
+        "key": "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-app",
     }
     non_secret_rows = [row for row in cluster.applied[-1] if row["kind"] != "Secret"]
-    path = "managed/opensearch/cluster-1/acme-payments/os-payments-prod-catalog/credentials"
+    path = "managed/opensearch/cluster-1/acme-payments/os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b/credentials"
     assert backend.values[path]["password"] not in repr(non_secret_rows)
     assert backend.values[path]["admin_password"] not in repr(non_secret_rows)
 
     binding = driver.binding(ServiceHandle(result.handle))
     assert binding.env_vars["SEARCH_PASSWORD"].secret_ref == f"{path}#password"
     assert binding.env_vars["SEARCH_ENDPOINT"].literal == (
-        "https://os-payments-prod-catalog.acme-payments.svc.cluster.local:9200"
+        "https://os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b.acme-payments.svc.cluster.local:9200"
     )
     assert binding.env_vars["SEARCH_TLS_VERIFY"].literal == "false"
 
@@ -232,7 +234,7 @@ def test_vector_provision_creates_real_index_with_explicit_hnsw_mapping() -> Non
         cluster,
         "batch/v1/Job",
         "acme-payments",
-        "os-payments-prod-catalog-create-index",
+        "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-create-index",
     )
     container = job["spec"]["template"]["spec"]["containers"][0]
     assert container["image"] == DEFAULT_BOOTSTRAP_IMAGE
@@ -259,15 +261,15 @@ def test_vector_provision_creates_real_index_with_explicit_hnsw_mapping() -> Non
         cluster,
         f"{CURRENT_API_VERSION}/OpensearchRole",
         "acme-payments",
-        "os-payments-prod-catalog-client",
+        "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-client",
     )
     assert role["spec"]["indexPermissions"][0]["indexPatterns"] == ["payments-prod-catalog"]
-    assert env["OS_PASSWORD"]["valueFrom"]["secretKeyRef"]["key"] == ("os-payments-prod-catalog-app")
+    assert env["OS_PASSWORD"]["valueFrom"]["secretKeyRef"]["key"] == ("os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-app")
     assert backend.values[next(iter(backend.values))]["password"] not in repr(job)
 
     binding = driver.binding(ServiceHandle(result.handle))
     assert "VECTOR_API_KEY" not in binding.env_vars
-    assert binding.env_vars["VECTOR_USERNAME"].literal == "os-payments-prod-catalog-app"
+    assert binding.env_vars["VECTOR_USERNAME"].literal == "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-app"
     assert binding.env_vars["VECTOR_PASSWORD"].secret_ref.endswith("#password")
     assert binding.env_vars["VECTOR_INDEX_NAME"].literal == "payments-prod-catalog"
 
@@ -343,7 +345,7 @@ def test_single_node_custom_plugins_and_network_disable_require_install_opt_in()
         cluster,
         f"{CURRENT_API_VERSION}/OpenSearchCluster",
         "acme-payments",
-        "os-payments-prod-catalog",
+        "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
     )
     assert search["spec"]["general"]["pluginsList"] == ["repository-s3"]
     assert "NetworkPolicy" not in {row["kind"] for row in cluster.applied[-1]}
@@ -358,7 +360,7 @@ def test_network_policy_is_tenant_scoped_and_keeps_transport_cluster_local() -> 
         cluster,
         "networking.k8s.io/v1/NetworkPolicy",
         "acme-payments",
-        "os-payments-prod-catalog-ingress",
+        "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-ingress",
     )
     http_rule, transport_rule = policy["spec"]["ingress"]
     peers = http_rule["from"]
@@ -374,7 +376,13 @@ def test_network_policy_is_tenant_scoped_and_keeps_transport_cluster_local() -> 
     assert {"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "astrolift-agents-acme"}}} in peers
     assert http_rule["ports"] == [{"protocol": "TCP", "port": 9200}]
     assert transport_rule == {
-        "from": [{"podSelector": {"matchLabels": {"opensearch.org/opensearch-cluster": "os-payments-prod-catalog"}}}],
+        "from": [
+            {
+                "podSelector": {
+                    "matchLabels": {"opensearch.org/opensearch-cluster": "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"}
+                }
+            }
+        ],
         "ports": [{"protocol": "TCP", "port": 9300}],
     }
 
@@ -396,7 +404,7 @@ def test_verified_custom_tls_mounts_ca_and_removes_insecure_bootstrap_flag() -> 
         cluster,
         f"{CURRENT_API_VERSION}/OpenSearchCluster",
         "acme-payments",
-        "os-payments-prod-catalog",
+        "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
     )
     assert search["spec"]["security"]["tls"]["http"] == {
         "generate": False,
@@ -409,7 +417,7 @@ def test_verified_custom_tls_mounts_ca_and_removes_insecure_bootstrap_flag() -> 
         cluster,
         "batch/v1/Job",
         "acme-payments",
-        "os-payments-prod-catalog-create-index",
+        "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-create-index",
     )
     container = job["spec"]["template"]["spec"]["containers"][0]
     env = {row["name"]: row for row in container["env"]}
@@ -452,10 +460,12 @@ def test_custom_tls_requires_admin_certificate_and_dn(config) -> None:
 
 def test_foreign_cluster_is_never_adopted() -> None:
     driver, cluster, backend = _driver()
-    cluster.objects[(f"{CURRENT_API_VERSION}/OpenSearchCluster", "acme-payments", "os-payments-prod-catalog")] = {
+    cluster.objects[
+        (f"{CURRENT_API_VERSION}/OpenSearchCluster", "acme-payments", "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
+    ] = {
         "apiVersion": CURRENT_API_VERSION,
         "kind": "OpenSearchCluster",
-        "metadata": {"name": "os-payments-prod-catalog", "namespace": "acme-payments"},
+        "metadata": {"name": "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b", "namespace": "acme-payments"},
     }
 
     result = driver.provision(_spec())
@@ -471,9 +481,9 @@ def test_status_includes_operator_health_and_vector_bootstrap_state() -> None:
     cluster_key = (
         f"{CURRENT_API_VERSION}/OpenSearchCluster",
         "acme-payments",
-        "os-payments-prod-catalog",
+        "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
     )
-    job_key = ("batch/v1/Job", "acme-payments", "os-payments-prod-catalog-create-index")
+    job_key = ("batch/v1/Job", "acme-payments", "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-create-index")
 
     assert driver.status(ServiceHandle(result.handle)).state == "provisioning"
     cluster.objects[cluster_key]["status"] = {
@@ -483,9 +493,9 @@ def test_status_includes_operator_health_and_vector_bootstrap_state() -> None:
     }
     assert "application access is pending" in driver.status(ServiceHandle(result.handle)).message
     for kind, name in (
-        ("OpensearchRole", "os-payments-prod-catalog-client"),
-        ("OpensearchUser", "os-payments-prod-catalog-app"),
-        ("OpensearchUserRoleBinding", "os-payments-prod-catalog-client-binding"),
+        ("OpensearchRole", "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-client"),
+        ("OpensearchUser", "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-app"),
+        ("OpensearchUserRoleBinding", "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-client-binding"),
     ):
         cluster.objects[(f"{CURRENT_API_VERSION}/{kind}", "acme-payments", name)]["status"] = {"state": "CREATED"}
     assert driver.status(ServiceHandle(result.handle)).message == "vector index bootstrap is pending"
@@ -500,14 +510,14 @@ def test_status_includes_operator_health_and_vector_bootstrap_state() -> None:
 def test_status_fails_closed_when_application_access_reconciliation_fails() -> None:
     driver, cluster, _ = _driver()
     result = driver.provision(_spec())
-    cluster.objects[(f"{CURRENT_API_VERSION}/OpenSearchCluster", "acme-payments", "os-payments-prod-catalog")][
-        "status"
-    ] = {"phase": "RUNNING", "health": "green", "initialized": True}
+    cluster.objects[
+        (f"{CURRENT_API_VERSION}/OpenSearchCluster", "acme-payments", "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
+    ]["status"] = {"phase": "RUNNING", "health": "green", "initialized": True}
     cluster.objects[
         (
             f"{CURRENT_API_VERSION}/OpensearchUserRoleBinding",
             "acme-payments",
-            "os-payments-prod-catalog-client-binding",
+            "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-client-binding",
         )
     ]["status"] = {"state": "ERROR", "reason": "  role\nwas rejected  "}
 
@@ -521,7 +531,7 @@ def test_reprovision_replaces_failed_bootstrap_job_and_existing_index_is_idempot
     driver, cluster, _ = _driver(vector=True)
     spec = _vector_spec()
     first = driver.provision(spec)
-    key = ("batch/v1/Job", "acme-payments", "os-payments-prod-catalog-create-index")
+    key = ("batch/v1/Job", "acme-payments", "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-create-index")
     cluster.objects[key]["status"] = {"failed": 1}
 
     second = driver.provision(spec)
@@ -566,7 +576,7 @@ def test_partial_update_preserves_shape_and_rejects_immutable_or_unsafe_changes(
         cluster,
         f"{CURRENT_API_VERSION}/OpenSearchCluster",
         "acme-payments",
-        "os-payments-prod-catalog",
+        "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
     )
     pool = search["spec"]["nodePools"][0]
     assert pool["resources"]["requests"]["cpu"] == "750m"
@@ -605,8 +615,8 @@ def test_default_teardown_retains_data_and_credentials_and_repairs_external_bund
     assert retained.ok is True
     assert "retained" in retained.message
     assert path in backend.values
-    assert ("v1/Secret", "acme-payments", "os-payments-prod-catalog-admin") in cluster.objects
-    assert ("batch/v1/Job", "acme-payments", "os-payments-prod-catalog-create-index") not in cluster.objects
+    assert ("v1/Secret", "acme-payments", "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-admin") in cluster.objects
+    assert ("batch/v1/Job", "acme-payments", "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-create-index") not in cluster.objects
 
     backend.values.clear()
     reprovisioned = driver.provision(spec)
@@ -631,7 +641,7 @@ def test_destructive_teardown_requires_force_and_deletes_secret_bundle() -> None
     assert destroyed.ok is True
     assert path not in backend.values
     assert backend.deletes == [path]
-    assert ("v1/Secret", "acme-payments", "os-payments-prod-catalog-admin") not in cluster.objects
+    assert ("v1/Secret", "acme-payments", "os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-admin") not in cluster.objects
 
 
 def test_snapshots_and_restore_fail_honestly_until_repository_support_lands() -> None:
@@ -656,7 +666,9 @@ def test_binding_rejects_tampered_endpoint_and_extra_secret_fields() -> None:
     with pytest.raises(ValueError, match="owned Service"):
         driver.binding(ServiceHandle(result.handle))
 
-    backend.values[path]["endpoint"] = "https://os-payments-prod-catalog.acme-payments.svc.cluster.local:9200"
+    backend.values[path]["endpoint"] = (
+        "https://os-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b.acme-payments.svc.cluster.local:9200"
+    )
     backend.values[path]["unexpected"] = "not-projected"
     with pytest.raises(ValueError, match="unsupported keys"):
         driver.binding(ServiceHandle(result.handle))

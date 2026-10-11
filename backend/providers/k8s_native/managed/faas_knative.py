@@ -26,6 +26,7 @@ from _sdk.managed_service import (
     ValueRef,
 )
 from k8s_native.managed._handle import pack as _pack_handle
+from k8s_native.managed._handle import service_object_name
 from k8s_native.managed._handle import unpack as _unpack_handle
 from k8s_native.managed._secret_refs import refuse_shared_namespace_secrets
 
@@ -454,12 +455,7 @@ class KnativeServiceDriver(ManagedServiceDriver):
 
     @staticmethod
     def _name(spec: ProvisionSpec) -> str:
-        return dns_label(
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint or "function",
-            max_length=63,
-        )
+        return service_object_name(spec, kind=KIND, prefix="function", max_length=63)
 
     def _normalized_config(self, size: str, raw: dict[str, Any], *, update: bool) -> dict[str, Any]:
         cfg = copy.deepcopy(_SIZE_DEFAULTS.get(size, {}))

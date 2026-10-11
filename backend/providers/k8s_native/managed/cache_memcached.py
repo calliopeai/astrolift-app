@@ -41,6 +41,7 @@ from _sdk.managed_service import (
     unsupported_update,
 )
 from k8s_native.managed._handle import pack as _pack_handle
+from k8s_native.managed._handle import service_object_name
 from k8s_native.managed._handle import unpack as _unpack_handle
 
 if TYPE_CHECKING:
@@ -330,12 +331,7 @@ class MemcachedDriver(ManagedServiceDriver):
     def _cache_name(self, *, spec: ProvisionSpec) -> str:
         # Pods take an ordinal suffix and are DNS labels themselves, so the
         # StatefulSet name has to leave room for it.
-        return dns_label(
-            spec.app_slug,
-            spec.environment_name,
-            spec.service_handle_hint,
-            max_length=50,
-        )
+        return service_object_name(spec, kind=KIND, prefix="cache", max_length=50)
 
     def _render(self, *, spec: ProvisionSpec, name: str, namespace: str) -> list[dict[str, Any]]:
         cfg = spec.config or {}

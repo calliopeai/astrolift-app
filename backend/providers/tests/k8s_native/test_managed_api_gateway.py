@@ -88,7 +88,7 @@ def _spec(**config: Any) -> ProvisionSpec:
         service_handle_hint="edge",
         size="custom",
         config={"listeners": [_listener()], **config},
-        managed_service_id="service-1",
+        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
 
 
@@ -104,7 +104,7 @@ def _driver(cluster: _Cluster | None = None, **policy: Any) -> tuple[GatewayAPID
 
 
 def _gateway(cluster: _Cluster) -> dict[str, Any]:
-    return cluster.objects[(f"{API_VERSION}/Gateway", "steady-md-triage", "triage-prod-edge")]
+    return cluster.objects[(f"{API_VERSION}/Gateway", "steady-md-triage", "gateway-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")]
 
 
 def _http_route(cluster: _Cluster) -> dict[str, Any]:
@@ -138,13 +138,13 @@ def test_provision_renders_owned_gateway_and_attached_http_route() -> None:
 
     assert result.ok is True
     assert result.ready is False
-    assert result.handle == "api_gateway/cluster-1/steady-md-triage/triage-prod-edge"
+    assert result.handle == "api_gateway/cluster-1/steady-md-triage/gateway-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     gateway = _gateway(cluster)
     assert gateway["spec"]["gatewayClassName"] == "envoy-gateway"
-    assert gateway["metadata"]["labels"]["astrolift.io/managed-service-id"] == "service-1"
+    assert gateway["metadata"]["labels"]["astrolift.io/managed-service-id"] == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
     assert "HTTPRoute" in gateway["metadata"]["annotations"]["astrolift.io/managed-children"]
     route = _http_route(cluster)
-    assert route["spec"]["parentRefs"] == [{"name": "triage-prod-edge"}]
+    assert route["spec"]["parentRefs"] == [{"name": "gateway-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"}]
     assert route["spec"]["rules"][0]["backendRefs"][0]["name"] == "api"
 
 
@@ -225,7 +225,7 @@ def test_gateway_exposes_addresses_infrastructure_tls_and_listener_sets() -> Non
                     "kind": "ListenerSet",
                     "name": "unsafe-listeners",
                     "spec": {
-                        "parentRef": {"name": "triage-prod-edge"},
+                        "parentRef": {"name": "gateway-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"},
                         "listeners": [
                             _listener(
                                 name="shared",
@@ -309,7 +309,7 @@ def test_listener_set_cannot_bypass_cross_namespace_route_policy() -> None:
         "kind": "ListenerSet",
         "name": "unsafe-listeners",
         "spec": {
-            "parentRef": {"name": "triage-prod-edge"},
+            "parentRef": {"name": "gateway-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"},
             "listeners": [
                 _listener(
                     name="shared",
@@ -340,7 +340,7 @@ def test_auxiliary_gateway_resources_are_owned_and_pruned() -> None:
             "kind": "ListenerSet",
             "name": "extra-listeners",
             "spec": {
-                "parentRef": {"name": "triage-prod-edge"},
+                "parentRef": {"name": "gateway-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"},
                 "listeners": [_listener(name="metrics", port=9090)],
             },
         },
@@ -373,7 +373,7 @@ def test_gateway_class_override_requires_install_policy() -> None:
 
 def test_existing_gateway_and_routes_are_refused_even_with_their_exact_uids() -> None:
     driver, cluster = _driver()
-    gateway_key = (f"{API_VERSION}/Gateway", "steady-md-triage", "triage-prod-edge")
+    gateway_key = (f"{API_VERSION}/Gateway", "steady-md-triage", "gateway-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
     route_key = (f"{API_VERSION}/HTTPRoute", "steady-md-triage", "api")
     foreign_gateway = {"metadata": {"uid": "gw-uid", "labels": {}}}
     cluster.objects[gateway_key] = foreign_gateway
@@ -405,9 +405,14 @@ def test_existing_gateway_and_routes_are_refused_even_with_their_exact_uids() ->
 
 def test_reprovision_never_hijacks_another_astrolift_gateway() -> None:
     driver, _ = _driver()
-    assert driver.provision(_spec()).ok is True
+    first = driver.provision(_spec())
+    assert first.ok is True
 
-    result = driver.provision(replace(_spec(), managed_service_id="service-2"))
+    # Names derive from the id (#2032); only a recorded handle can point a
+    # second binding at the first one's object.
+    result = driver.provision(
+        replace(_spec(), managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4", recorded_handle=first.handle)
+    )
 
     assert result.ok is False
     assert "another Astrolift" in result.message

@@ -1,13 +1,16 @@
 """Operator objects in a shared namespace are not overwritten across orgs (#1959).
 
-Their names carry no org (``<app>-<env>-<hint>``), so two orgs' apps with one
-slug render the same object; the second apply took over the first's
-database and credentials.
+Their names used to carry no org (``<app>-<env>-<hint>``), so two orgs' apps
+with one slug rendered the same object; the second apply took over the
+first's database and credentials. Names now derive from the managed-service
+id (#2032), so the two orgs render distinct objects and neither touches the
+other's.
 """
 
 from __future__ import annotations
 
 import copy
+import uuid
 from typing import Any
 
 import pytest
@@ -58,7 +61,7 @@ def _spec(org: str) -> ProvisionSpec:
         service_handle_hint="data",
         size="small",
         config={},
-        managed_service_id=f"svc-{org}",
+        managed_service_id=str(uuid.uuid5(uuid.NAMESPACE_URL, org)),
     )
 
 
@@ -80,13 +83,16 @@ def test_a_second_org_cannot_overwrite_the_first_orgs_object_in_a_shared_namespa
     driver = DRIVERS[name](cluster, "shared-data")
 
     first = driver.provision(_spec("acme"))
-    applies = cluster.applies
-    again = driver.provision(_spec("acme"))
+    acme = copy.deepcopy(cluster.objects)
     other = driver.provision(_spec("globex"))
 
-    assert first.ok and again.ok, (first.message, again.message)
-    assert not other.ok and "refusing to overwrite" in other.message
-    assert cluster.applies == applies + 1  # only acme's re-provision applied
+    assert first.ok, first.message
+    if name == "strimzi":
+        # Node pools keep fixed names, so a shared namespace holds one Kafka.
+        assert not other.ok and "KafkaNodePool" in other.message
+    else:
+        assert other.ok and first.handle != other.handle, other.message
+    assert all(cluster.objects[key] == value for key, value in acme.items())
 
 
 @pytest.mark.parametrize("name", sorted(DRIVERS))
@@ -106,6 +112,10 @@ def test_a_second_kafka_cannot_rebind_the_first_ones_fixed_name_node_pools():
     driver = DRIVERS["strimzi"](cluster, "shared-data")
     assert driver.provision(_spec("acme")).ok
 
-    other = driver.provision(dataclasses.replace(_spec("acme"), app_slug="api"))
+    other = driver.provision(
+        dataclasses.replace(
+            _spec("acme"), app_slug="api", managed_service_id=str(uuid.uuid5(uuid.NAMESPACE_URL, "api"))
+        )
+    )
 
     assert not other.ok and "KafkaNodePool" in other.message

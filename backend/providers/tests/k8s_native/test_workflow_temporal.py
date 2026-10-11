@@ -40,12 +40,12 @@ CONTROL_PLANE = ControlPlaneTemporal(
 
 CLUSTER_ID = "tenant-cluster-1"
 NAMESPACE = "acme-web"
-NAME = "web-prod-engine"
-PERSISTENCE = "web-prod-engine-persistence"
-CLIENT = "web-prod-engine-client"
-POLICY = "web-prod-engine-temporal"
+NAME = "tempora-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
+PERSISTENCE = f"{NAME}-persistence"
+CLIENT = f"{NAME}-client"
+POLICY = f"{NAME}-temporal"
 TENANT_NAMESPACE = "acme-web-prod"
-OWNER = "ms-0001"
+OWNER = "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
 HANDLE = f"workflow_engine/{CLUSTER_ID}/{NAMESPACE}/{NAME}"
 
 
@@ -124,7 +124,7 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         "managed_service_id": OWNER,
     }
     values.update(overrides)
-    return ProvisionSpec(**values)
+    return ProvisionSpec(**{"managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b", **values})
 
 
 def _labels(component: str, owner: str = OWNER, cluster_name: str = NAME) -> dict[str, str]:
@@ -314,7 +314,7 @@ def test_provision_requires_an_owner_and_a_cluster() -> None:
 
 def test_provision_refuses_to_adopt_another_bindings_cluster() -> None:
     cluster = _Cluster()
-    _seed_provisioned(cluster, owner="ms-other")
+    _seed_provisioned(cluster, owner="9e9e9e9e-1d1d-4e4e-8f8f-0a0a0a0a0a09")
 
     result = _driver(cluster).provision(_spec())
 
@@ -521,7 +521,9 @@ def test_deprovision_leaves_another_bindings_temporal_alone() -> None:
     cluster = _Cluster()
     _seed_provisioned(cluster)
 
-    result = _driver(cluster).deprovision(DeprovisionSpec(handle=HANDLE, managed_service_id="ms-other"))
+    result = _driver(cluster).deprovision(
+        DeprovisionSpec(handle=HANDLE, managed_service_id="9e9e9e9e-1d1d-4e4e-8f8f-0a0a0a0a0a09")
+    )
 
     assert result.ok is False
     assert result.retryable is False
@@ -531,7 +533,7 @@ def test_deprovision_leaves_another_bindings_temporal_alone() -> None:
 def test_deprovision_with_delete_data_removes_the_history_volumes_by_owner() -> None:
     cluster = _Cluster()
     _seed_provisioned(cluster)
-    for ordinal, owner in ((1, OWNER), (2, OWNER), (1, "ms-other")):
+    for ordinal, owner in ((1, OWNER), (2, OWNER), (1, "9e9e9e9e-1d1d-4e4e-8f8f-0a0a0a0a0a09")):
         cluster.seed(
             {
                 "apiVersion": "v1",

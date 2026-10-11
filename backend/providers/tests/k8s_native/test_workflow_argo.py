@@ -143,7 +143,7 @@ def _spec(**config: Any) -> ProvisionSpec:
         service_handle_hint="pipeline",
         size="custom",
         config={"workflow_spec": _workflow_spec(), **config},
-        managed_service_id="service-1",
+        managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     )
 
 
@@ -175,7 +175,7 @@ def _resource(cluster: _Cluster, kind: str, name: str) -> dict[str, Any]:
     return cluster.objects[(f"{API_VERSION}/{kind}", "steady-md-triage", name)]
 
 
-def _template(cluster: _Cluster, name: str = "triage-prod-pipeline") -> dict[str, Any]:
+def _template(cluster: _Cluster, name: str = "workflow-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b") -> dict[str, Any]:
     return _resource(cluster, "WorkflowTemplate", name)
 
 
@@ -183,7 +183,7 @@ def _child(
     cluster: _Cluster,
     kind: str,
     name: str,
-    parent: str = "triage-prod-pipeline",
+    parent: str = "workflow-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
 ) -> dict[str, Any]:
     return _resource(cluster, kind, f"{parent}-{name}")
 
@@ -220,25 +220,28 @@ def test_provision_renders_owned_template_schedule_and_event_binding() -> None:
 
     assert result.ok is True
     assert result.ready is True
-    assert result.handle == ("workflow_engine/cluster-1/steady-md-triage/triage-prod-pipeline")
+    assert result.handle == ("workflow_engine/cluster-1/steady-md-triage/workflow-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
     template = _template(cluster)
-    assert template["metadata"]["labels"]["astrolift.io/managed-service-id"] == ("service-1")
+    assert template["metadata"]["labels"]["astrolift.io/managed-service-id"] == ("6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b")
     assert template["spec"]["serviceAccountName"] == "argo-workflow"
     assert template["spec"]["parallelism"] == 10
     assert template["spec"]["activeDeadlineSeconds"] == 3600
     assert template["spec"]["ttlStrategy"]["secondsAfterCompletion"] == 86400
     assert template["spec"]["podGC"]["strategy"] == "OnWorkflowCompletion"
-    assert template["spec"]["workflowMetadata"]["labels"]["astrolift.io/managed-service-id"] == "service-1"
+    assert (
+        template["spec"]["workflowMetadata"]["labels"]["astrolift.io/managed-service-id"]
+        == "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
+    )
 
     cron = _child(cluster, "CronWorkflow", "hourly")
     assert cron["spec"]["concurrencyPolicy"] == "Forbid"
     assert cron["spec"]["workflowSpec"]["workflowTemplateRef"] == {
-        "name": "triage-prod-pipeline",
+        "name": "workflow-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
     }
     assert cron["spec"]["workflowSpec"]["activeDeadlineSeconds"] == 3600
     event = _child(cluster, "WorkflowEventBinding", "webhook")
     assert event["spec"]["submit"]["workflowTemplateRef"] == {
-        "name": "triage-prod-pipeline",
+        "name": "workflow-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b",
     }
 
 
@@ -572,7 +575,7 @@ def test_image_allowlist_matches_repository_boundaries() -> None:
                     ],
                 ),
             ),
-            managed_service_id="service-2",
+            managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
             service_handle_hint="other",
         ),
     )
@@ -731,7 +734,7 @@ def test_child_resource_names_are_scoped_to_their_template() -> None:
     second = replace(
         first,
         service_handle_hint="audit-pipeline",
-        managed_service_id="service-2",
+        managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
     )
 
     assert driver.provision(first).ok is True
@@ -743,8 +746,8 @@ def test_child_resource_names_are_scoped_to_their_template() -> None:
         if kind == f"{API_VERSION}/CronWorkflow" and namespace == "steady-md-triage"
     }
     assert cron_names == {
-        "triage-prod-pipeline-hourly",
-        "triage-prod-audit-pipeline-hourly",
+        "workflow-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-hourly",
+        "workflow-0b8e7c1d2f3a4b5c9d6e7f8091a2b3c4-hourly",
     }
 
 
@@ -756,7 +759,7 @@ def test_existing_template_is_refused_even_with_its_exact_uid() -> None:
             "labels": {"app.kubernetes.io/managed-by": "another-controller"},
         },
     }
-    key = (f"{API_VERSION}/WorkflowTemplate", "steady-md-triage", "triage-prod-pipeline")
+    key = (f"{API_VERSION}/WorkflowTemplate", "steady-md-triage", "workflow-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")
     cluster.objects[key] = foreign
 
     refused = driver.provision(_spec())
@@ -780,7 +783,7 @@ def test_existing_child_is_refused_even_with_its_exact_uid() -> None:
             "labels": {"app.kubernetes.io/managed-by": "another-controller"},
         },
     }
-    key = (f"{API_VERSION}/CronWorkflow", "steady-md-triage", "triage-prod-pipeline-hourly")
+    key = (f"{API_VERSION}/CronWorkflow", "steady-md-triage", "workflow-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-hourly")
     cluster.objects[key] = foreign
 
     refused = driver.provision(_spec(cron_workflows=[_cron()]))
@@ -826,13 +829,13 @@ def test_update_prunes_removed_owned_children() -> None:
     assert result.ok is True
     deleted = {(row["kind"], row["metadata"]["name"]) for row in cluster.deleted[-1][2]}
     assert deleted == {
-        ("CronWorkflow", "triage-prod-pipeline-first"),
-        ("WorkflowEventBinding", "triage-prod-pipeline-webhook"),
+        ("CronWorkflow", "workflow-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-first"),
+        ("WorkflowEventBinding", "workflow-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-webhook"),
     }
     assert cluster.deleted[-1][3] == "Orphan"
     assert (
         _child(cluster, "CronWorkflow", "second")["spec"]["workflowSpec"]["workflowTemplateRef"]["name"]
-        == "triage-prod-pipeline"
+        == "workflow-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     )
 
 
@@ -883,7 +886,7 @@ def test_status_surfaces_missing_children_and_cron_submission_errors() -> None:
         (
             f"{API_VERSION}/CronWorkflow",
             "steady-md-triage",
-            "triage-prod-pipeline-hourly",
+            "workflow-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-hourly",
         ),
     )
     assert driver.status(handle).state == "error"
@@ -895,10 +898,10 @@ def test_binding_exposes_portable_and_authenticated_server_coordinates() -> None
 
     binding = driver.binding(ServiceHandle(provisioned.handle))
 
-    assert binding.env_vars["WORKFLOW_ENGINE_ID"].literal == "triage-prod-pipeline"
+    assert binding.env_vars["WORKFLOW_ENGINE_ID"].literal == "workflow-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     assert binding.env_vars["WORKFLOW_ENGINE_TYPE"].literal == "ARGO_WORKFLOWS"
     assert binding.env_vars["WORKFLOW_ENGINE_ARN"].literal == (
-        "k8s://cluster-1/steady-md-triage/workflowtemplate/triage-prod-pipeline"
+        "k8s://cluster-1/steady-md-triage/workflowtemplate/workflow-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     )
     assert binding.env_vars["ARGO_SERVER_URL"].literal == "https://argo.example.test"
     assert binding.env_vars["ARGO_EVENT_ENDPOINT"].literal == (
@@ -941,7 +944,7 @@ def test_active_cron_runs_block_pruning_and_guard_destructive_teardown() -> None
     driver, cluster = _driver()
     provisioned = driver.provision(_spec(cron_workflows=[_cron()]))
     _child(cluster, "CronWorkflow", "hourly")["status"] = {
-        "active": [{"name": "triage-prod-pipeline-hourly-abc"}],
+        "active": [{"name": "workflow-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-hourly-abc"}],
     }
 
     pruned = driver.update(
@@ -980,7 +983,7 @@ def test_manual_and_event_runs_are_retained_unless_data_deletion_is_requested() 
             "namespace": "steady-md-triage",
             "labels": {
                 "app.kubernetes.io/managed-by": "astrolift",
-                "astrolift.io/managed-service-id": "service-1",
+                "astrolift.io/managed-service-id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
             },
         },
         "status": {"phase": "Running"},
@@ -1036,22 +1039,22 @@ def test_declarative_snapshot_restore_and_legacy_handles_fail_closed() -> None:
         replace(
             _spec(workflow_spec=_workflow_spec(entrypoint="wrong")),
             service_handle_hint="restored",
-            managed_service_id="service-2",
+            managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
         ),
     )
 
     assert snapshot.snapshot_id.startswith("workflow_engine/cluster-1/steady-md-triage/")
     assert restored.ok is True
-    restored_template = _template(cluster, "triage-prod-restored")
+    restored_template = _template(cluster, "workflow-0b8e7c1d2f3a4b5c9d6e7f8091a2b3c4")
     assert restored_template["spec"]["entrypoint"] == "main"
     assert restored_template["metadata"]["labels"]["example.test/service"] == "triage"
     assert restored_template["metadata"]["annotations"]["example.test/team"] == "engineering"
     assert restored_template["metadata"]["annotations"]["astrolift.io/deletion-protection"] == "true"
-    restored_cron = _child(cluster, "CronWorkflow", "hourly", "triage-prod-restored")
+    restored_cron = _child(cluster, "CronWorkflow", "hourly", "workflow-0b8e7c1d2f3a4b5c9d6e7f8091a2b3c4")
     assert restored_cron["spec"]["schedules"] == ["0 * * * *"]
     assert restored_cron["metadata"]["labels"]["example.test/schedule"] == "hourly"
     assert restored_cron["metadata"]["annotations"]["example.test/source"] == "snapshot"
-    assert _child(cluster, "WorkflowEventBinding", "webhook", "triage-prod-restored")
+    assert _child(cluster, "WorkflowEventBinding", "webhook", "workflow-0b8e7c1d2f3a4b5c9d6e7f8091a2b3c4")
 
     snapshot_resource = cluster.objects[
         (
@@ -1070,7 +1073,7 @@ def test_declarative_snapshot_restore_and_legacy_handles_fail_closed() -> None:
         replace(
             _spec(),
             service_handle_hint="invalid",
-            managed_service_id="service-3",
+            managed_service_id="3c3c3c3c-1d1d-4e4e-8f8f-0a0a0a0a0a03",
         ),
     )
     assert invalid.ok is False
@@ -1083,7 +1086,7 @@ def test_declarative_snapshot_restore_and_legacy_handles_fail_closed() -> None:
         replace(
             _spec(),
             service_handle_hint="tampered",
-            managed_service_id="service-4",
+            managed_service_id="4d4d4d4d-1d1d-4e4e-8f8f-0a0a0a0a0a04",
         ),
     )
     assert tampered.ok is False
@@ -1096,8 +1099,10 @@ def test_declarative_snapshot_restore_and_legacy_handles_fail_closed() -> None:
 
 def test_snapshot_integrity_name_survives_max_length_parent_name() -> None:
     driver, _cluster = _driver()
+    # New names are id-derived and short; a recorded legacy handle can still
+    # carry a full 63-character name.
     provisioned = driver.provision(
-        replace(_spec(), service_handle_hint="x" * 63),
+        replace(_spec(), recorded_handle=f"workflow_engine/cluster-1/steady-md-triage/{'x' * 63}"),
     )
 
     assert len(provisioned.handle.rsplit("/", 1)[-1]) == 63
@@ -1108,7 +1113,7 @@ def test_snapshot_integrity_name_survives_max_length_parent_name() -> None:
         replace(
             _spec(),
             service_handle_hint="restored-long",
-            managed_service_id="service-2",
+            managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
         ),
     )
 

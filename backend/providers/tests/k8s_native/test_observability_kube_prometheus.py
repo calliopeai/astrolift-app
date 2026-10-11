@@ -229,10 +229,10 @@ def _spec(**overrides: Any) -> ProvisionSpec:
         "service_handle_hint": "monitoring",
         "size": "custom",
         "config": {},
-        "managed_service_id": "service-1",
+        "managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
     }
     values.update(overrides)
-    return ProvisionSpec(**values)
+    return ProvisionSpec(**{"managed_service_id": "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b", **values})
 
 
 def _driver(
@@ -244,7 +244,7 @@ def _driver(
 
 
 def _root(cluster: _Cluster) -> dict[str, Any]:
-    return cluster.objects[("v1/ConfigMap", "acme-payments", "payments-prod-monitoring")]
+    return cluster.objects[("v1/ConfigMap", "acme-payments", "monitoring-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b")]
 
 
 def _children(cluster: _Cluster) -> list[dict[str, Any]]:
@@ -269,7 +269,7 @@ def test_default_bundle_creates_safe_rules_dashboard_and_portable_binding() -> N
 
     assert result.ok is True
     assert result.ready is True
-    assert result.handle == "observability/cluster-1/acme-payments/payments-prod-monitoring"
+    assert result.handle == "observability/cluster-1/acme-payments/monitoring-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
     root = _root(cluster)
     assert root["metadata"]["labels"]["astrolift.io/component"] == "kube-prometheus-bundle"
     children = _children(cluster)
@@ -280,7 +280,7 @@ def test_default_bundle_creates_safe_rules_dashboard_and_portable_binding() -> N
     dashboard = json.loads(children[1]["data"][dashboard_key])
     assert dashboard_key == f"{dashboard['uid']}.json"
     assert len(dashboard["uid"]) <= 40
-    assert dashboard["uid"].startswith("astrolift-acme-service-1-overview")
+    assert dashboard["uid"].startswith("astrolift-acme-6f1c2b3a-4d5e-")
     assert all('namespace="acme-payments"' in panel["targets"][0]["expr"] for panel in dashboard["panels"])
 
     binding = driver.binding(ServiceHandle(result.handle))
@@ -427,7 +427,7 @@ def test_cross_namespace_custom_rules_dashboards_and_honor_labels_require_operat
     assert len(dashboards) == 2
     keys = {next(iter(dashboard["data"])) for dashboard in dashboards}
     assert len(keys) == 2
-    assert all(key.startswith("astrolift-acme-service-1-") and key.endswith(".json") for key in keys)
+    assert all(key.startswith("astrolift-acme-6f1c2b3a-") and key.endswith(".json") for key in keys)
 
 
 def test_empty_custom_collections_do_not_require_policy_opt_in() -> None:
@@ -658,18 +658,18 @@ def test_teardown_is_protected_non_destructive_and_ownership_safe() -> None:
     assert refused.ok is False
     assert "ownership changed" in refused.message
 
-    child["metadata"]["labels"]["astrolift.io/managed-service-id"] = "service-1"
+    child["metadata"]["labels"]["astrolift.io/managed-service-id"] = "6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b"
     cluster.objects[(f"{child['apiVersion']}/{child['kind']}", "acme-payments", child["metadata"]["name"])] = child
     removed = driver.deprovision(DeprovisionSpec(result.handle), force_destroy=True)
     repeated = driver.deprovision(DeprovisionSpec(result.handle), force_destroy=True)
     assert removed.ok is True
     assert "shared metrics data and stack retained" in removed.message
-    assert all(row["metadata"]["name"] != "payments-prod-monitoring" for row in cluster.deleted[-2])
+    assert all(row["metadata"]["name"] != "monitoring-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b" for row in cluster.deleted[-2])
     assert cluster.deleted[-1] == [
         {
             "apiVersion": "v1",
             "kind": "ConfigMap",
-            "metadata": {"name": "payments-prod-monitoring", "namespace": "acme-payments"},
+            "metadata": {"name": "monitoring-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b", "namespace": "acme-payments"},
         },
     ]
     assert repeated.ok is True
@@ -697,8 +697,8 @@ def test_apply_delete_and_prune_failures_are_reported() -> None:
     cluster.delete_result = _Result(False, ["apiserver unavailable"])
     failed_delete = driver.deprovision(DeprovisionSpec(provisioned.handle))
     assert failed_delete.ok is False and failed_delete.errors == ["apiserver unavailable"]
-    assert _root(cluster)["metadata"]["name"] == "payments-prod-monitoring"
-    assert all(row["metadata"]["name"] != "payments-prod-monitoring" for row in cluster.deleted[-1])
+    assert _root(cluster)["metadata"]["name"] == "monitoring-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b"
+    assert all(row["metadata"]["name"] != "monitoring-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b" for row in cluster.deleted[-1])
 
 
 @pytest.mark.parametrize("failed_apply_index", [1, 2])
@@ -731,7 +731,7 @@ def test_dashboard_uids_and_file_keys_are_unique_across_organizations_and_servic
     beta = driver.provision(
         _spec(
             organization_slug="beta",
-            managed_service_id="service-2",
+            managed_service_id="0b8e7c1d-2f3a-4b5c-9d6e-7f8091a2b3c4",
         ),
     )
     assert acme.ok and beta.ok
@@ -756,7 +756,7 @@ def test_dashboard_uids_and_file_keys_are_unique_across_organizations_and_servic
     unusual = driver.provision(
         _spec(
             organization_slug="This Organization Has A Long Unsafe Name That Must Be Normalized Before Persistence",
-            managed_service_id="service-3",
+            managed_service_id="3c3c3c3c-1d1d-4e4e-8f8f-0a0a0a0a0a03",
         ),
     )
     assert unusual.ok is True
