@@ -141,7 +141,10 @@ class HealthPollingTests(unittest.TestCase):
             self.assertEqual(data["failure_type"], "TimeoutError")
             self.assertNotIn("completion_received", data)
             self.assertEqual(observed, {"health": 1, "completion": 0})
-            remove.assert_called_once()
+            self.assertEqual(
+                [call.args[0][:2] for call in remove.call_args_list],
+                [["docker", "logs"], ["docker", "rm"]],
+            )
 
     def test_container_death_after_native_reset_is_not_treated_as_readiness(self):
         with startup_server(always_reset=True) as (
@@ -163,7 +166,10 @@ class HealthPollingTests(unittest.TestCase):
             self.assertFalse(data["oom_killed"])
             self.assertNotIn("completion_received", data)
             self.assertEqual(observed, {"health": 1, "completion": 0})
-            remove.assert_called_once()
+            self.assertEqual(
+                [call.args[0][:2] for call in remove.call_args_list],
+                [["docker", "logs"], ["docker", "rm"]],
+            )
 
 
 if __name__ == "__main__":

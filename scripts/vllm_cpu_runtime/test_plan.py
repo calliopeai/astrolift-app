@@ -134,6 +134,10 @@ class SmokeControlTests(unittest.TestCase):
                 remove.call_args.args[0],
                 ["docker", "rm", "--force", "owned-fixture-id"],
             )
+            self.assertEqual(
+                remove.call_args_list[0].args[0],
+                ["docker", "logs", "--tail", "200", "owned-fixture-id"],
+            )
 
 
 if __name__ == "__main__":

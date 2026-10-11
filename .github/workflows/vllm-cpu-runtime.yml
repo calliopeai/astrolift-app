@@ -76,6 +76,7 @@ jobs:
           path: |
             ${{ runner.temp }}/build.log
             ${{ runner.temp }}/runtime-proof.json
+            ${{ runner.temp }}/runtime-container.log
             ${{ runner.temp }}/registry-manifest.json
             ${{ runner.temp }}/registry-manifest.sha256
           retention-days: 7

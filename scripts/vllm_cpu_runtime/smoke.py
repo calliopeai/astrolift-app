@@ -61,6 +61,27 @@ def post_prompt(port, model):
     return {"completion_received": True, "usage": result.get("usage")}
 
 
+LOG_TAIL_LINES = 200
+
+
+def keep_container_log(container, path):
+    """Keep a bounded tail of a failed candidate's own startup output.
+
+    The server runs a public model with no credentials, so its log carries no
+    secrets; the tail is what distinguishes a slow load from a stuck engine.
+    """
+    result = subprocess.run(
+        ["docker", "logs", "--tail", str(LOG_TAIL_LINES), container],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        timeout=30,
+        check=False,
+    )
+    if isinstance(result.stdout, bytes):
+        path.write_bytes(result.stdout)
+        path.chmod(0o600)
+
+
 def smoke(image, proof):
     spec = json.loads(Path(__file__).with_name("source.json").read_text())
     receipt = {
@@ -169,6 +190,8 @@ def smoke(image, proof):
             "CPU runtime candidate smoke failed; see sanitized proof"
         ) from None
     finally:
+        if container and not receipt["passed"]:
+            keep_container_log(container, proof.with_name("runtime-container.log"))
         if container:
             subprocess.run(
                 ["docker", "rm", "--force", container],
