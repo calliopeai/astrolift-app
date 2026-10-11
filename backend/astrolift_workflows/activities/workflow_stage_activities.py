@@ -42,6 +42,8 @@ import uuid
 
 from temporalio import activity
 
+from workflows.stage_incarnations import StageIncarnation
+
 log = logging.getLogger("astrolift_workflows.activities.workflow_stage")
 
 
@@ -528,6 +530,8 @@ def _create_stage_execution_sync(
     stage_id: str,
     attempt_number: int,
     context: dict | None = None,
+    *,
+    temporal_identity: StageIncarnation | None = None,
 ) -> str:
     """Create a RUNNING ``WorkflowStageExecution`` and point the run's
     ``current_stage_execution`` at it. Returns the execution pk as str."""
@@ -539,6 +543,20 @@ def _create_stage_execution_sync(
 
     with transaction.atomic():
         run = WorkflowRun.objects.select_for_update().get(pk=_parent_run_pk(workflow_run_id))
+        identity_fields = temporal_identity.fields() if temporal_identity is not None else {}
+        if identity_fields:
+            existing = WorkflowStageExecution.objects.filter(
+                temporal_activity_key=identity_fields["temporal_activity_key"]
+            ).first()
+            if existing is not None:
+                if (
+                    existing.workflow_run_id != run.pk
+                    or existing.stage_id != int(stage_id)
+                    or existing.attempt_number != max(1, int(attempt_number))
+                    or any(getattr(existing, key) != value for key, value in identity_fields.items())
+                ):
+                    raise RuntimeError("Stage activity identity conflicts with its recorded execution")
+                return str(existing.pk)
         if run.status != "running" or run.ended_at is not None:
             raise RuntimeError("Cannot open a stage on a closed workflow")
         stage = WorkflowStage.objects.get(pk=int(stage_id))
@@ -557,6 +575,7 @@ def _create_stage_execution_sync(
             attempt_number=attempt,
             started_at=timezone.now(),
             **metadata,
+            **identity_fields,
         )
         if context is None:
             execution = WorkflowStageExecution.objects.create(**execution_fields)
@@ -573,6 +592,12 @@ def _create_stage_execution_sync(
                 slug=key, defaults=execution_fields
             )
             if not created:
+                if (
+                    identity_fields
+                    and execution.temporal_activity_key
+                    and any(getattr(execution, key) != value for key, value in identity_fields.items())
+                ):
+                    raise RuntimeError("Stage execution belongs to a different Temporal activity")
                 return str(execution.pk)
 
         run.current_stage_execution = execution
@@ -1221,6 +1246,9 @@ def _record_human_gate_decision_sync(
     decision: str,
     decided_by_user_id: int | None,
     note: str,
+    request: dict | None = None,
+    *,
+    temporal_identity: StageIncarnation | None = None,
 ) -> None:
     """Persist a human-gate outcome onto the gate's execution row.
 
@@ -1237,6 +1265,25 @@ def _record_human_gate_decision_sync(
         raise ValueError(f"invalid human-gate decision {decision!r}")
 
     execution = WorkflowStageExecution.objects.get(pk=int(execution_id))
+    if request is not None:
+        from workflows.human_gate_protocol import validate_gate_request
+
+        validate_gate_request(request)
+        if (
+            temporal_identity is None
+            or not execution.temporal_activity_key
+            or (execution.temporal_namespace, execution.temporal_workflow_id, execution.temporal_run_id)
+            != (temporal_identity.namespace, temporal_identity.workflow_id, temporal_identity.run_id)
+            or request
+            != {
+                "execution_id": execution_id,
+                "execution_guid": str(execution.guid),
+                "decision": decision,
+                "decided_by_user_id": decided_by_user_id,
+                "note": note,
+            }
+        ):
+            raise ValueError("Human gate request does not match its exact stage execution")
     if execution.is_terminal:
         log.info(
             "record_human_gate_decision: %s already terminal (%s); ignoring",
@@ -1250,6 +1297,7 @@ def _record_human_gate_decision_sync(
             "decision": decision,
             "decided_by_user_id": decided_by_user_id,
             "note": note or "",
+            **({"request_id": request["execution_guid"]} if request is not None else {}),
         }
     }
     if decision == "approved":
@@ -1523,8 +1571,17 @@ async def create_stage_execution(
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
+    source = activity.info()
+    if source.workflow_namespace is None or source.workflow_id is None or source.workflow_run_id is None:
+        raise ValueError("Stage creation requires a workflow activity identity")
     return await sync_to_async(_create_stage_execution_sync)(
-        workflow_run_id, stage_id, attempt_number, context
+        workflow_run_id,
+        stage_id,
+        attempt_number,
+        context,
+        temporal_identity=StageIncarnation(
+            source.workflow_namespace, source.workflow_id, source.workflow_run_id, source.activity_id
+        ),
     )
 
 
@@ -1614,12 +1671,23 @@ async def record_human_gate_decision(
     decision: str,
     decided_by_user_id: int | None = None,
     note: str = "",
+    request: dict | None = None,
 ) -> None:
     """Persist a human-gate ``approved``/``rejected`` outcome on the row."""
     from asgiref.sync import sync_to_async
 
     activity.heartbeat()
-    await sync_to_async(_record_human_gate_decision_sync)(execution_id, decision, decided_by_user_id, note)
+    identity = None
+    if request is not None:
+        source = activity.info()
+        if source.workflow_namespace is None or source.workflow_id is None or source.workflow_run_id is None:
+            raise ValueError("Human gate decision requires a workflow activity identity")
+        identity = StageIncarnation(
+            source.workflow_namespace, source.workflow_id, source.workflow_run_id, source.activity_id
+        )
+    await sync_to_async(_record_human_gate_decision_sync)(
+        execution_id, decision, decided_by_user_id, note, request, temporal_identity=identity
+    )
 
 
 @activity.defn(name="astrolift.workflow_stage.snapshot_checkpoint")

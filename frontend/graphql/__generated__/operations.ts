@@ -6540,6 +6540,7 @@ export type ConfigureProviderPluginInput = {
 
 export type ConfiguredWorkflow = {
   createdAt: Scalars['DateTime']['output'];
+  definitionGuid: Scalars['String']['output'];
   definitionName: Scalars['String']['output'];
   definitionSlug: Scalars['String']['output'];
   description: Scalars['String']['output'];
@@ -6555,6 +6556,7 @@ export type ConfiguredWorkflow = {
   slug: Scalars['String']['output'];
   stageBindings: Scalars['JSON']['output'];
   triggerKind: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
 };
 
 /** One page of a cursor-paginated or numbered list. */
@@ -6810,8 +6812,10 @@ export type CreateWebhookSubscriptionInput = {
 };
 
 export type CreateWorkflowResult = {
+  configurationSaved: Scalars['Boolean']['output'];
   errors: Array<ValidationError>;
   ok: Scalars['Boolean']['output'];
+  schedule?: Maybe<WorkflowScheduleState>;
   workflow?: Maybe<ConfiguredWorkflow>;
 };
 
@@ -7387,6 +7391,27 @@ export type HuggingFaceModelsPage = {
   state: CatalogueState;
 };
 
+export type HumanGateDecisionResult = {
+  errors: Array<ValidationError>;
+  gate?: Maybe<HumanGateDecisionState>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type HumanGateDecisionState = {
+  decidedByMe?: Maybe<Scalars['Boolean']['output']>;
+  executionGuid: Scalars['String']['output'];
+  note: Scalars['String']['output'];
+  observationError: Scalars['String']['output'];
+  recordedDecision?: Maybe<Scalars['String']['output']>;
+  requestState: Scalars['String']['output'];
+  requestedDecision?: Maybe<Scalars['String']['output']>;
+  runStatus: Scalars['String']['output'];
+  stageExecutionGuid: Scalars['String']['output'];
+  stageGuid: Scalars['String']['output'];
+  stageStatus: Scalars['String']['output'];
+  temporalExecution?: Maybe<WorkflowStageTemporalExecution>;
+};
+
 export type ImportGapType = {
   code: Scalars['String']['output'];
   message: Scalars['String']['output'];
@@ -7407,6 +7432,7 @@ export type ImportWorkflowFlowResult = {
 
 export type ImportWorkflowManifestResult = {
   createdSlug?: Maybe<Scalars['String']['output']>;
+  definitionId?: Maybe<Scalars['GUID']['output']>;
   errors: Array<ValidationError>;
   manifest?: Maybe<WorkflowManifestPreviewType>;
   mode?: Maybe<Scalars['String']['output']>;
@@ -8346,7 +8372,7 @@ export type Mutation = {
   createToolDef: AstroliftToolDefMutationResult;
   createTrigger: AstroliftTriggerMutationResult;
   createWebhookSubscription: WebhookSecretRevealMutationResult;
-  /** Create a configured Workflow from a visible definition (spec 40 §2.2). */
+  /** Create a configured Workflow from an exact definitionId or legacy definitionSlug. When both are supplied the slug must match the ID. Set isEnabled=false to prepare configuration without activation; the legacy default is true. */
   createWorkflow: CreateWorkflowResult;
   /** Create a new workflow definition (platform operator only). */
   createWorkflowDefinition: MutationResult;
@@ -8354,6 +8380,8 @@ export type Mutation = {
   createWorkflowStage: CreateWorkflowStageResult;
   /** Create an inbound webhook trigger for a workflow definition (platform operator only). */
   createWorkflowTrigger: CreateWorkflowTriggerResult;
+  /** Submit an explicit user decision to one exact human gate. Recover by the same execution and stage IDs after an uncertain response. */
+  decideHumanGate: HumanGateDecisionResult;
   decommissionCluster: AstroliftTenantClusterMutationResult;
   deelevateAdminSession: AstroliftDeelevatePayloadMutationResult;
   /** Delete an object by its global ID (soft-delete via delete_check). */
@@ -8381,8 +8409,8 @@ export type Mutation = {
   deleteSshDeployKey: AstroliftSshDeployKeyMutationResult;
   deleteToolDef: AstroliftToolDefMutationResult;
   deleteWebhookSubscription: SoftdeletepayloadMutationResult;
-  /** Soft-delete a configured Workflow and tear down its schedule. */
-  deleteWorkflow: MutationResult;
+  /** Soft-delete a configured Workflow by exact workflowId or legacy slug and request schedule removal. A supplied slug must match its ID. */
+  deleteWorkflow: WorkflowScheduleResult;
   /** Soft-delete an org-owned workflow definition by slug. */
   deleteWorkflowDefinition: MutationResult;
   /** Soft-delete a stage from a writable definition (spec 40 §6). */
@@ -8420,7 +8448,7 @@ export type Mutation = {
   importSkillsFromRepo: AstroliftImportSkillsResultMutationResult;
   /** Import a popular visual agent/workflow builder export (Langflow, Flowise, …) into an Astrolift WorkflowDefinition. preview=true (default) returns the mapped manifest + gap report without persisting; preview=false creates an org-scoped, disabled definition + stages. */
   importWorkflowFlow: ImportWorkflowFlowResult;
-  /** Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled, org-scoped WorkflowDefinition + stages in the caller's org and returns the (possibly uniquified) slug. replace=true instead upserts the org's own definition sharing the manifest's slug: in place when the stage kinds are unchanged (configured Workflows, bindings and schedules all keep working untouched), otherwise as a new version with every configured Workflow repointed to it, or a clear refusal when a repoint would break one's bindings. */
+  /** Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled WorkflowDefinition + stages in the caller's org, optionally owned by projectId, and returns its exact ID and (possibly uniquified) slug. replace=true instead upserts the org's own definition sharing the manifest's slug: in place when the stage kinds are unchanged (configured Workflows, bindings and schedules all keep working untouched), otherwise as a new version with every configured Workflow repointed to it, or a clear refusal when a repoint would break one's bindings. Replacement preserves ownership; projectId cannot transfer it. */
   importWorkflowManifest: ImportWorkflowManifestResult;
   installAstroliftSourceWebhook: AstroliftInstallSourceWebhookPayloadMutationResult;
   installClusterAgent: AstroliftClusterAgentInstallMutationResult;
@@ -8497,6 +8525,8 @@ export type Mutation = {
   reapCloudOrphan: ReapCloudOrphanPayloadMutationResult;
   recheckDomainValidation: AstroliftAppDomainMutationResult;
   reconcileClusterIngresses: ReconcileClusterIngressesResultMutationResult;
+  /** Reconcile the exact reviewed configuration version with its native Temporal schedule. Does not start an immediate run. Active reconciliation requires workflow.trigger; deleted workflow cleanup also requires workflow.delete. */
+  reconcileWorkflowSchedule: WorkflowScheduleResult;
   recordClusterBootstrapRun: BootstraprunrecordedpayloadMutationResult;
   redeliverAgentTaskCallback: AstroliftAgentTaskMutationResult;
   redeployApp: AstroliftDeploymentMutationResult;
@@ -8604,6 +8634,8 @@ export type Mutation = {
   setPreviewPinned: AstroliftPreviewEnvironmentMutationResult;
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
+  /** Enable or disable an exact owned workflow definition at its reviewed revision. Does not start a run or confirm schedule state. */
+  setWorkflowDefinitionEnabled: WorkflowDefinitionActivationResult;
   setZentinelleGatewayEnabled: AstroliftZentinelleClusterGatewayMutationResult;
   /** Cancel a sign request. Sign requests are not available: this always refuses. */
   signRequestCancel: Scalars['Boolean']['output'];
@@ -8680,7 +8712,7 @@ export type Mutation = {
   updateTenantCluster: AstroliftTenantClusterMutationResult;
   updateToolDef: AstroliftToolDefMutationResult;
   updateWebhookSubscription: AstroliftWebhookSubscriptionMutationResult;
-  /** Update a configured Workflow (bindings / inputs / trigger / enabled). definitionSlug repoints it at another visible definition: the fallback for a versioned importWorkflowManifest(replace: true) (#1822), or any manual repoint. The existing stage_bindings must still validate against the new definition's stages, or the update is refused. */
+  /** Update a configured Workflow by exact workflowId or legacy slug (bindings / inputs / trigger / enabled). A supplied slug must match its ID. definitionId or definitionSlug repoints it at another visible definition: the fallback for a versioned importWorkflowManifest(replace: true) (#1822), or any manual repoint. The existing stage_bindings must still validate against the new definition's stages, or the update is refused. */
   updateWorkflow: CreateWorkflowResult;
   /** Update an org-owned workflow definition (globals are read-only). */
   updateWorkflowDefinition: MutationResult;
@@ -9165,9 +9197,11 @@ export type MutationCreateWebhookSubscriptionArgs = {
 
 
 export type MutationCreateWorkflowArgs = {
-  definitionSlug: Scalars['String']['input'];
+  definitionId?: InputMaybe<Scalars['GUID']['input']>;
+  definitionSlug?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   inputs?: InputMaybe<Scalars['JSON']['input']>;
+  isEnabled?: Scalars['Boolean']['input'];
   name: Scalars['String']['input'];
   orgId?: InputMaybe<Scalars['ID']['input']>;
   scheduleCron?: InputMaybe<Scalars['String']['input']>;
@@ -9214,6 +9248,16 @@ export type MutationCreateWorkflowStageArgs = {
 
 export type MutationCreateWorkflowTriggerArgs = {
   workflowSlug: Scalars['String']['input'];
+};
+
+
+export type MutationDecideHumanGateArgs = {
+  confirmed: Scalars['Boolean']['input'];
+  decision: Scalars['String']['input'];
+  executionId: Scalars['ID']['input'];
+  note?: Scalars['String']['input'];
+  stageExecutionId: Scalars['ID']['input'];
+  temporalRunId: Scalars['String']['input'];
 };
 
 
@@ -9347,8 +9391,10 @@ export type MutationDeleteWebhookSubscriptionArgs = {
 
 
 export type MutationDeleteWorkflowArgs = {
+  expectedVersion?: InputMaybe<Scalars['Int']['input']>;
   orgId?: InputMaybe<Scalars['ID']['input']>;
-  slug: Scalars['String']['input'];
+  slug?: InputMaybe<Scalars['String']['input']>;
+  workflowId?: InputMaybe<Scalars['GUID']['input']>;
 };
 
 
@@ -9516,6 +9562,7 @@ export type MutationImportWorkflowFlowArgs = {
 export type MutationImportWorkflowManifestArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
   preview?: Scalars['Boolean']['input'];
+  projectId?: InputMaybe<Scalars['GUID']['input']>;
   replace?: Scalars['Boolean']['input'];
   toml: Scalars['String']['input'];
 };
@@ -9809,6 +9856,13 @@ export type MutationRecheckDomainValidationArgs = {
 
 export type MutationReconcileClusterIngressesArgs = {
   input: ReconcileClusterIngressesInput;
+};
+
+
+export type MutationReconcileWorkflowScheduleArgs = {
+  expectedActive: Scalars['Boolean']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  workflowId: Scalars['GUID']['input'];
 };
 
 
@@ -10349,6 +10403,13 @@ export type MutationSetRetentionPolicyArgs = {
 };
 
 
+export type MutationSetWorkflowDefinitionEnabledArgs = {
+  definitionId: Scalars['GUID']['input'];
+  expectedRevision: Scalars['String']['input'];
+  isEnabled: Scalars['Boolean']['input'];
+};
+
+
 export type MutationSetZentinelleGatewayEnabledArgs = {
   input: SetZentinelleGatewayEnabledInput;
 };
@@ -10719,16 +10780,19 @@ export type MutationUpdateWebhookSubscriptionArgs = {
 
 
 export type MutationUpdateWorkflowArgs = {
+  definitionId?: InputMaybe<Scalars['GUID']['input']>;
   definitionSlug?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
+  expectedVersion?: InputMaybe<Scalars['Int']['input']>;
   inputs?: InputMaybe<Scalars['JSON']['input']>;
   isEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   orgId?: InputMaybe<Scalars['ID']['input']>;
   scheduleCron?: InputMaybe<Scalars['String']['input']>;
-  slug: Scalars['String']['input'];
+  slug?: InputMaybe<Scalars['String']['input']>;
   stageBindings?: InputMaybe<Scalars['JSON']['input']>;
   triggerKind?: InputMaybe<Scalars['String']['input']>;
+  workflowId?: InputMaybe<Scalars['GUID']['input']>;
 };
 
 
@@ -10934,12 +10998,28 @@ export type PauseAppWebhookDeploysInput = {
 export type PendingHumanGate = {
   definitionName: Scalars['String']['output'];
   definitionSlug: Scalars['String']['output'];
+  executionGuid: Scalars['String']['output'];
   executionId: Scalars['String']['output'];
   runGuid: Scalars['String']['output'];
   stageApprovers: Array<Scalars['String']['output']>;
+  stageGuid: Scalars['String']['output'];
   stageRole: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
+  temporalExecution?: Maybe<WorkflowStageTemporalExecution>;
   workflowId: Scalars['String']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type PendingHumanGatePage = {
+  items: Array<PendingHumanGate>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
 export type PermissionComparison = {
@@ -11512,6 +11592,8 @@ export type Query = {
   formFieldTypes: Array<Scalars['String']['output']>;
   formSubmissions: Array<AstroliftFormSubmission>;
   huggingFaceConnectionsPage: HuggingFaceConnectionTypePage;
+  /** Recover a human decision by exact execution and stage GUIDs without resubmitting it. */
+  humanGateDecision?: Maybe<HumanGateDecisionState>;
   installAlertMailSupport: InstallAlertMailSupport;
   installAlertMailTestsPage: InstallAlertMailTestPage;
   me?: Maybe<AstroliftMe>;
@@ -11538,6 +11620,8 @@ export type Query = {
   organizationsPage: OrganizationTypePage;
   /** Open human_gate stage executions across the org's runs that the caller may decide, newest first (#1820). */
   pendingHumanGates: Array<PendingHumanGate>;
+  /** Page through open gates. Named-approver filtering can produce an empty page with a next cursor; continue until nextCursor is null. */
+  pendingHumanGatesPage: PendingHumanGatePage;
   /** Compare effective permissions between two users, anywhere in the active organization or on a target scope (scopeType, scopeId). Superuser or org.manage_members; both users must be members of the active organization. */
   permissionCompare?: Maybe<PermissionComparison>;
   /** Diagnose why a user can or can't perform a specific permission, optionally on a target scope (scopeType ORG, TEAM, PROJECT, APP or AGENT; scopeId its guid). Self, superuser or org.manage_members; the user must be a member of the active organization. */
@@ -11556,7 +11640,7 @@ export type Query = {
   skillsPage: AstroliftSkillPage;
   toolDef?: Maybe<AstroliftToolDef>;
   toolDefs: Array<AstroliftToolDef>;
-  /** One configured Workflow by slug, with its recent runs. */
+  /** One configured Workflow by exact ID or legacy slug, with its recent runs. A supplied slug must match the ID. */
   workflow?: Maybe<ConfiguredWorkflow>;
   /** One visible workflow definition by slug (prefers the org's over a global). */
   workflowDefinition?: Maybe<WorkflowDefinitionSummary>;
@@ -11587,6 +11671,8 @@ export type Query = {
   workflowInstances: Array<WorkflowInstanceType>;
   /** Runs (tier 3) of one configured Workflow, newest first. */
   workflowRuns: Array<WorkflowRun>;
+  /** Observe a configured workflow's exact schedule identity, desired version and engine state, including cleanup after soft deletion. */
+  workflowSchedule?: Maybe<WorkflowScheduleState>;
   /** List stage executions for a WorkflowRun (by workflow_id + run_id). */
   workflowStageExecutions: Array<WorkflowStageExecutionType>;
   /** List stages for a workflow definition by slug. */
@@ -13560,6 +13646,12 @@ export type QueryHuggingFaceConnectionsPageArgs = {
 };
 
 
+export type QueryHumanGateDecisionArgs = {
+  executionId: Scalars['ID']['input'];
+  stageExecutionId: Scalars['ID']['input'];
+};
+
+
 export type QueryInstallAlertMailSupportArgs = {
   eventKind?: Scalars['String']['input'];
 };
@@ -13674,6 +13766,12 @@ export type QueryPendingHumanGatesArgs = {
 };
 
 
+export type QueryPendingHumanGatesPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+};
+
+
 export type QueryPermissionCompareArgs = {
   scopeId?: InputMaybe<Scalars['String']['input']>;
   scopeType?: InputMaybe<Scalars['String']['input']>;
@@ -13775,7 +13873,8 @@ export type QueryToolDefsArgs = {
 
 export type QueryWorkflowArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
-  slug: Scalars['String']['input'];
+  slug?: InputMaybe<Scalars['String']['input']>;
+  workflowId?: InputMaybe<Scalars['GUID']['input']>;
 };
 
 
@@ -13860,6 +13959,11 @@ export type QueryWorkflowInstancesArgs = {
 export type QueryWorkflowRunsArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
   workflowId: Scalars['ID']['input'];
+};
+
+
+export type QueryWorkflowScheduleArgs = {
+  workflowId: Scalars['GUID']['input'];
 };
 
 
@@ -15137,6 +15241,15 @@ export type WithdrawSecretChangeInput = {
   proposalId: Scalars['GUID']['input'];
 };
 
+export type WorkflowDefinitionActivationResult = {
+  changed: Scalars['Boolean']['output'];
+  definitionId?: Maybe<Scalars['GUID']['output']>;
+  errors: Array<ValidationError>;
+  isEnabled?: Maybe<Scalars['Boolean']['output']>;
+  ok: Scalars['Boolean']['output'];
+  revision?: Maybe<Scalars['String']['output']>;
+};
+
 export type WorkflowDefinitionRun = {
   childRunCount: Scalars['Int']['output'];
   currentStageOrder?: Maybe<Scalars['Int']['output']>;
@@ -15366,6 +15479,29 @@ export type WorkflowRun = {
   temporalWorkflowId?: Maybe<Scalars['String']['output']>;
 };
 
+export type WorkflowScheduleResult = {
+  configurationSaved: Scalars['Boolean']['output'];
+  errors: Array<ValidationError>;
+  ok: Scalars['Boolean']['output'];
+  schedule?: Maybe<WorkflowScheduleState>;
+};
+
+export type WorkflowScheduleState = {
+  actionCount?: Maybe<Scalars['Int']['output']>;
+  configurationVersion: Scalars['Int']['output'];
+  confirmed: Scalars['Boolean']['output'];
+  desiredActive: Scalars['Boolean']['output'];
+  desiredRevision: Scalars['String']['output'];
+  engineCreatedAt?: Maybe<Scalars['DateTime']['output']>;
+  engineUpdatedAt?: Maybe<Scalars['DateTime']['output']>;
+  errorCode: Scalars['String']['output'];
+  message: Scalars['String']['output'];
+  observedAt: Scalars['DateTime']['output'];
+  observedState: Scalars['String']['output'];
+  scheduleId: Scalars['String']['output'];
+  workflowId: Scalars['String']['output'];
+};
+
 export type WorkflowStageExecutionType = {
   agentRunGuid?: Maybe<Scalars['String']['output']>;
   attemptNumber: Scalars['Int']['output'];
@@ -15396,6 +15532,7 @@ export type WorkflowStageExecutionType = {
   stageRole: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
+  temporalExecution?: Maybe<WorkflowStageTemporalExecution>;
 };
 
 /** One page of a cursor-paginated or numbered list. */
@@ -15409,6 +15546,12 @@ export type WorkflowStageExecutionTypePage = {
   pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type WorkflowStageTemporalExecution = {
+  namespace: Scalars['String']['output'];
+  runId: Scalars['String']['output'];
+  workflowId: Scalars['String']['output'];
 };
 
 export type WorkflowStageType = {

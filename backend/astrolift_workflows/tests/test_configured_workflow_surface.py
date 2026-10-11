@@ -19,12 +19,15 @@ from django.contrib.auth import get_user_model
 from astrolift_workflows.inputs import WorkflowDefinitionRunInput
 from astrolift_workflows.schema.mutations import WorkflowsMutation
 from astrolift_workflows.schema.queries import WorkflowsQuery
+from astrolift_workflows.tests.schedule_server import schedule_server as schedule_server_fixture
 from core.permissions import Permission
 from core.tenancy import TenantContext
 from core.tenancy import tenant_context as _tenant_ctx
 from workflows.models import Workflow, WorkflowDefinition, WorkflowInstance, WorkflowStage
 
 User = get_user_model()
+schedule_server = schedule_server_fixture
+
 pytestmark = pytest.mark.django_db
 
 
@@ -109,39 +112,6 @@ def patched_start(monkeypatch):
         return SimpleNamespace(enqueued=True, run_id="test-run-id")
 
     monkeypatch.setattr("astrolift_workflows.client.start_workflow", _fake)
-    return calls
-
-
-class _FakeScheduleHandle:
-    def __init__(self, calls):
-        self._calls = calls
-
-    async def delete(self):
-        self._calls.append(("delete",))
-
-
-class _FakeTemporalClient:
-    def __init__(self, calls):
-        self._calls = calls
-
-    def get_schedule_handle(self, schedule_id):
-        self._calls.append(("get_handle", schedule_id))
-        return _FakeScheduleHandle(self._calls)
-
-    async def create_schedule(self, schedule_id, schedule):
-        self._calls.append(("create_schedule", schedule_id))
-
-
-@pytest.fixture
-def patched_schedule(monkeypatch):
-    """Patch the Temporal client boundary the schedule sync uses locally."""
-    calls = []
-
-    async def _fake_client():
-        return _FakeTemporalClient(calls)
-
-    monkeypatch.setattr("astrolift_workflows.client._temporal_enabled", lambda: True)
-    monkeypatch.setattr("astrolift_workflows.client._get_client_async", _fake_client)
     return calls
 
 
@@ -504,9 +474,10 @@ def test_workflow_runs_back_compat_null_run_id(member, org, permission_resolver)
 
 
 def test_schedule_created_on_scheduled_workflow(
-    member, org, agent_workload, permission_resolver, patched_schedule
+    member, org, agent_workload, permission_resolver, schedule_server
 ):
     permission_resolver.grant(Permission.WORKFLOW_CREATE)
+    permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
     _make_def("cw-sched", organization=org)
     m = WorkflowsMutation()
     with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
@@ -521,14 +492,15 @@ def test_schedule_created_on_scheduled_workflow(
         )
     assert res.ok, res.errors
     wf = Workflow.objects.get(slug="sched-wf")
-    sched_id = f"workflow-{wf.guid}"
-    assert ("create_schedule", sched_id) in patched_schedule
+    assert res.configuration_saved and res.schedule.confirmed
+    assert schedule_server.describe(wf).schedule.action.workflow == "ConfiguredWorkflowScheduleWorkflow"
 
 
-def test_schedule_deleted_when_disabled(member, org, agent_workload, permission_resolver, patched_schedule):
+def test_schedule_deleted_when_disabled(member, org, agent_workload, permission_resolver, schedule_server):
     permission_resolver.grant(Permission.WORKFLOW_CREATE)
     permission_resolver.grant(Permission.WORKFLOW_UPDATE)
     permission_resolver.grant(Permission.WORKFLOW_DELETE)
+    permission_resolver.grant(Permission.WORKFLOW_TRIGGER)
     _make_def("cw-sched2", organization=org)
     m = WorkflowsMutation()
     with _tenant_ctx(TenantContext(organization_id=org.id, actor_user_id=member.id)):
@@ -542,19 +514,13 @@ def test_schedule_deleted_when_disabled(member, org, agent_workload, permission_
             schedule_cron="*/5 * * * *",
         )
         wf = Workflow.objects.get(slug="sched2")
-        sched_id = f"workflow-{wf.guid}"
-
-        patched_schedule.clear()
-        # Disabling tears the schedule down (get the handle, then delete it).
-        m.update_workflow(_info(member), slug="sched2", is_enabled=False)
-        assert ("get_handle", sched_id) in patched_schedule
-        assert ("delete",) in patched_schedule
-
-        patched_schedule.clear()
-        # Deleting the workflow also deletes the schedule.
-        m.delete_workflow(_info(member), slug="sched2")
-        assert ("get_handle", sched_id) in patched_schedule
-        assert ("delete",) in patched_schedule
+        assert schedule_server.describe(wf) is not None
+        disabled = m.update_workflow(_info(member), slug="sched2", is_enabled=False)
+        assert disabled.ok and disabled.schedule.confirmed
+        assert schedule_server.describe(wf) is None
+        deleted = m.delete_workflow(_info(member), slug="sched2")
+        assert deleted.ok and deleted.configuration_saved
+        assert schedule_server.describe(wf) is None
 
 
 # ---------------------------------------------------------------------------

@@ -23,14 +23,23 @@ from astrolift_graphql import (
     parse_sort_spec,
     search_q,
 )
-from astrolift_identity.operation_context import execution_operation, workflow_id_operation
+from astrolift_identity.operation_context import (
+    agent_region_operation,
+    execution_operation,
+    workflow_id_operation,
+)
 from astrolift_operations.models import WorkflowRun
 from astrolift_workflows.client import (
     describe_workflow_instance,
     list_workflow_instances,
     workflow_history,
 )
+from astrolift_workflows.configuration_targets import configured_workflow_scope, find_configured_workflow
+from astrolift_workflows.import_scopes import import_definition_owner_scope
+from astrolift_workflows.schedule_operations import schedule_workflow, workflow_schedule_scope
 from astrolift_workflows.schema.execution_types import WorkflowExecutionStages, WorkflowExecutionType
+from astrolift_workflows.schema.human_gate_types import HumanGateDecisionState
+from astrolift_workflows.schema.schedule_types import WorkflowScheduleState, schedule_to_type
 from astrolift_workflows.schema.types import (
     WorkflowInstanceDetailType,
     WorkflowInstancePageType,
@@ -73,12 +82,12 @@ from workflows.scopes import (
     definition_start_scope,
     execution_scope_by_id,
     may_decide_human_gate,
+    reviewed_definition_scope,
     visible_project_owned,
     visible_runs,
     workflow_run_scope,
     workflow_run_scope_by_id,
     workflow_scope_by_guid,
-    workflow_scope_by_slug,
 )
 
 
@@ -524,6 +533,95 @@ def _workflow_definitions_qs(
 
 @strawberry.type
 class WorkflowsQuery:
+    @strawberry.field(
+        description="Page through open gates. Named-approver filtering can produce an empty page with a next cursor; continue until nextCursor is null."
+    )
+    @require_permission(Permission.WORKFLOW_TRIGGER, any_scope=True)
+    @tenant_scoped()
+    def pending_human_gates_page(
+        self,
+        info: Info,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[PendingHumanGateType]:
+        from workflows.models import WorkflowStageExecution
+
+        caller = _caller_org_pk()
+        runs = visible_runs(
+            WorkflowRun.objects.filter(organization_id=caller), caller, Permission.WORKFLOW_TRIGGER
+        )
+        page: KeysetPage[WorkflowStageExecution] = keyset_page(
+            WorkflowStageExecution.objects.filter(
+                workflow_run_id__in=runs.values("pk"),
+                workflow_run__status="running",
+                workflow_run__ended_at__isnull=True,
+                workflow_run__deleted_at__isnull=True,
+                stage__kind="human_gate",
+                stage__deleted_at__isnull=True,
+                deleted_at__isnull=True,
+                status="running",
+            ).select_related("stage__definition", "workflow_run"),
+            cursor=after,
+            limit=limit,
+            with_total=False,
+            cursor_scope=f"pending-gates:{caller}:{info.context.user.pk}",
+        )
+        return PageType(
+            items=[
+                pending_gate_to_type(row)
+                for row in page.rows
+                if may_decide_human_gate(info.context.user, row.stage.approvers)
+            ],
+            next_cursor=page.next_cursor,
+        )
+
+    @strawberry.field(
+        description="Recover a human decision by exact execution and stage GUIDs without resubmitting it."
+    )
+    @require_permission(
+        Permission.WORKFLOW_TRIGGER,
+        scope=execution_scope_by_id(permission=Permission.WORKFLOW_TRIGGER),
+        operation=execution_operation,
+    )
+    @tenant_scoped()
+    def human_gate_decision(
+        self,
+        info: Info,
+        execution_id: strawberry.ID,
+        stage_execution_id: strawberry.ID,
+    ) -> HumanGateDecisionState | None:
+        from astrolift_workflows.human_gates import find_gate, gate_state
+
+        row = find_gate(info.context.user, execution_id, stage_execution_id)
+        return gate_state(row, info.context.user)[0] if row is not None else None
+
+    @strawberry.field(
+        description="Observe a configured workflow's exact schedule identity, desired version and engine state, including cleanup after soft deletion."
+    )
+    @require_permission(Permission.WORKFLOW_READ, scope=workflow_schedule_scope(Permission.WORKFLOW_READ))
+    @tenant_scoped()
+    def workflow_schedule(self, info: Info, workflow_id: GUID) -> WorkflowScheduleState | None:  # type: ignore[valid-type]
+        from workflows.schedule_sync import observe_workflow_schedule
+
+        workflow = schedule_workflow(workflow_id)
+        if workflow is None:
+            return None
+        check_permission(
+            Permission.WORKFLOW_READ,
+            scope=import_definition_owner_scope(workflow.definition, permission=Permission.WORKFLOW_READ),
+        )
+        return schedule_to_type(
+            observe_workflow_schedule(
+                workflow,
+                authorize=lambda current: check_permission(
+                    Permission.WORKFLOW_READ,
+                    scope=import_definition_owner_scope(
+                        current.definition, permission=Permission.WORKFLOW_READ
+                    ),
+                ),
+            )
+        )
+
     """Configured-Workflow read surface (spec 40 §6). Every resolver is
     ``WORKFLOW_READ``-gated + ``@tenant_scoped`` and applies the caller's
     org filter in the body (#1042 — the decorator only asserts a context
@@ -603,24 +701,28 @@ class WorkflowsQuery:
         )
         return page.map(workflow_to_type)
 
-    @strawberry.field(description="One configured Workflow by slug, with its recent runs.")
-    @require_permission(Permission.WORKFLOW_READ, scope=workflow_scope_by_slug("slug"))
+    @strawberry.field(
+        description="One configured Workflow by exact ID or legacy slug, with its recent runs. A supplied slug must match the ID."
+    )
+    @require_permission(Permission.WORKFLOW_READ, scope=configured_workflow_scope(Permission.WORKFLOW_READ))
     @tenant_scoped()
     def workflow(
-        self, info: Info, slug: str, org_id: strawberry.ID | None = None
+        self,
+        info: Info,
+        slug: str | None = None,
+        org_id: strawberry.ID | None = None,
+        workflow_id: GUID | None = None,  # type: ignore[valid-type]
     ) -> ConfiguredWorkflowType | None:
         caller, ok = _org_pk_matches(org_id)
         if not ok:
             return None
-        from workflows.models import Workflow
-
-        wf = (
-            Workflow.objects.filter(organization_id=caller, slug=slug, deleted_at__isnull=True)
-            .select_related("definition", "organization")
-            .first()
-        )
+        wf = find_configured_workflow(caller, workflow_id=workflow_id, slug=slug)
         if wf is None:
             return None
+        check_permission(
+            Permission.WORKFLOW_READ,
+            scope=reviewed_definition_scope(wf.definition, caller, permission=Permission.WORKFLOW_READ),
+        )
         return workflow_to_type(wf, with_runs=True)
 
     @strawberry.field(
@@ -752,7 +854,9 @@ class WorkflowsQuery:
     @strawberry.field(
         description="Reconcile the authenticated actor's original reviewed start request without dispatching another run."
     )
-    @require_permission(Permission.WORKFLOW_READ, scope=definition_start_scope("request_id"))
+    @require_permission(
+        Permission.WORKFLOW_READ, scope=definition_start_scope("request_id"), operation=agent_region_operation
+    )
     @tenant_scoped()
     def workflow_definition_start_request(
         self, info: Info, request_id: str
@@ -949,6 +1053,12 @@ class WorkflowsQuery:
         rows = (
             WorkflowStageExecution.objects.filter(
                 stage__kind=WorkflowStage.StageKind.HUMAN_GATE,
+                stage__deleted_at__isnull=True,
+                deleted_at__isnull=True,
+                status="running",
+                workflow_run__status="running",
+                workflow_run__ended_at__isnull=True,
+                workflow_run__deleted_at__isnull=True,
                 workflow_run_id__in=runs.values("pk"),
             )
             .exclude(status__in=WorkflowStageExecution.TERMINAL_STATUSES)

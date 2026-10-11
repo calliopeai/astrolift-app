@@ -513,6 +513,15 @@ def test_mcp_scopes_do_not_grant_project_permissions_by_themselves():
     write_token = SimpleNamespace(scopes=[SCOPE_MCP_WRITE])
 
     assert token_scope_allows_permission(read_token, Permission.AGENT_READ)
+    assert token_scope_allows_permission(read_token, Permission.WORKFLOW_READ)
+    for permission in (
+        Permission.WORKFLOW_CREATE,
+        Permission.WORKFLOW_UPDATE,
+        Permission.WORKFLOW_DELETE,
+        Permission.WORKFLOW_TRIGGER,
+        Permission.SECRET_READ,
+    ):
+        assert not token_scope_allows_permission(read_token, permission)
     assert not token_scope_allows_permission(read_token, Permission.PROJECT_READ)
     assert not token_scope_allows_permission(read_token, Permission.PROJECT_UPDATE)
     assert not token_scope_allows_permission(read_token, Permission.APP_READ)

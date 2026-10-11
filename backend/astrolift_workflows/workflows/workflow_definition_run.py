@@ -58,6 +58,7 @@ from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, is_cancelled_exception
 
 from astrolift_workflows.inputs import WorkflowDefinitionRunInput, WorkflowResult
+from workflows.human_gate_protocol import GATE_UPDATE, decision_update_id, validate_gate_request
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities import (
@@ -280,6 +281,8 @@ class WorkflowDefinitionRunWorkflow:
         # Latest human-gate decision, keyed by stage execution id. Set by
         # the ``human_gate_decision`` signal; consumed by the gate wait.
         self._gate_decisions: dict[str, dict[str, Any]] = {}
+        self._gate_requests: dict[str, dict[str, Any]] = {}
+        self._pending_gate_execution_id: str | None = None
         # Escalation clears, keyed by stage execution id.
         self._escalation_cleared: dict[str, dict[str, Any]] = {}
         self._abort_requested: bool = False
@@ -299,12 +302,32 @@ class WorkflowDefinitionRunWorkflow:
         """Operator decision for a pending human gate.
 
         Payload: ``{"execution_id": str, "decision": "approved"|"rejected",
-        "decided_by_user_id": int|None, "note": str}``. The newest decision
-        for an execution id wins.
+        "decided_by_user_id": int|None, "note": str}``. The newest signal
+        wins until a durable update admits an immutable decision.
         """
         execution_id = str(payload.get("execution_id", ""))
-        if execution_id:
+        if execution_id and execution_id not in self._gate_requests:
             self._gate_decisions[execution_id] = payload
+
+    @workflow.update(name=GATE_UPDATE)
+    def decide_human_gate(self, payload: dict) -> dict:
+        """Durably accept one immutable decision; persistence follows in the gate activity."""
+        execution_id = payload["execution_id"]
+        self._gate_requests[execution_id] = dict(payload)
+        self._gate_decisions[execution_id] = dict(payload)
+        return {"state": "requested", **payload}
+
+    @decide_human_gate.validator
+    def validate_human_gate_decision(self, payload: dict) -> None:
+        validate_gate_request(payload)
+        update = workflow.current_update_info()
+        if update is None or update.id != decision_update_id(payload["execution_guid"]):
+            raise ValueError("Human gate update ID does not match the stage")
+        execution_id = payload["execution_id"]
+        if self._pending_gate_execution_id != execution_id or self._abort_requested:
+            raise ValueError("This human gate is not pending")
+        if execution_id in self._gate_requests or execution_id in self._gate_decisions:
+            raise ValueError("This human gate already has a decision")
 
     @workflow.signal(name="escalation_cleared")
     def escalation_cleared(self, payload: dict) -> None:
@@ -1587,13 +1610,17 @@ class WorkflowDefinitionRunWorkflow:
     async def _run_human_gate(self, stage: dict) -> dict:
         """Open a gate execution and block on the decision signal."""
         execution_id = await self._open_execution(stage, 1)
+        self._pending_gate_execution_id = execution_id
 
         # Gate timeout: respect an explicit per-stage override above the
         # 300s stage default; otherwise grant a full day.
         configured = int(stage["timeout_seconds"])
         timeout_seconds = configured if configured > 300 else DEFAULT_GATE_TIMEOUT_SECONDS
 
-        decision_payload = await self._wait_gate_decision(execution_id, timeout_seconds)
+        try:
+            decision_payload = await self._wait_gate_decision(execution_id, timeout_seconds)
+        finally:
+            self._pending_gate_execution_id = None
 
         if decision_payload is None:
             await workflow.execute_activity(
@@ -1608,14 +1635,17 @@ class WorkflowDefinitionRunWorkflow:
             )
 
         decision = str(decision_payload.get("decision", "rejected"))
+        decision_args = [
+            execution_id,
+            decision,
+            decision_payload.get("decided_by_user_id"),
+            str(decision_payload.get("note", "")),
+        ]
+        if execution_id in self._gate_requests:
+            decision_args.append(self._gate_requests[execution_id])
         await workflow.execute_activity(
             record_human_gate_decision,
-            args=[
-                execution_id,
-                decision,
-                decision_payload.get("decided_by_user_id"),
-                str(decision_payload.get("note", "")),
-            ],
+            args=decision_args,
             start_to_close_timeout=_DB_TIMEOUT,
             retry_policy=_DB_RETRY,
         )

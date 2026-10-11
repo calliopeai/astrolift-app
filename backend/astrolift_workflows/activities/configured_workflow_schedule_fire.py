@@ -35,24 +35,29 @@ def _create_sync(action: dict[str, Any]) -> ScheduledWorkflowFire:
     from core.run_trigger import RunTrigger
     from workflows.models import Workflow, WorkflowInstance
     from workflows.run_service import build_workflow_definition_run_input
-    from workflows.schedule_sync import schedule_inactive_reason
+    from workflows.schedule_sync import desired_revision, schedule_inactive_reason
 
     workflow_guid = str(action.get("workflow_guid") or "")
     organization_id = action.get("organization_id")
-    wf = (
-        Workflow.objects.filter(guid=workflow_guid, organization_id=organization_id)
-        .select_related("definition")
-        .first()
-        if workflow_guid and organization_id is not None
-        else None
-    )
-    reason = "workflow no longer exists" if wf is None else schedule_inactive_reason(wf)
-    if reason:
-        # Temporal keeps firing until something deletes the schedule.
-        log.info("configured workflow schedule: %s (%s); skipping fire", reason, workflow_guid)
-        return ScheduledWorkflowFire(skipped=reason)
-
     with transaction.atomic():
+        wf = (
+            Workflow.objects.filter(guid=workflow_guid, organization_id=organization_id)
+            .select_related("definition__project__team")
+            .select_for_update(of=("self",))
+            .first()
+            if workflow_guid and organization_id is not None
+            else None
+        )
+        reason = "workflow no longer exists" if wf is None else schedule_inactive_reason(wf)
+        if reason:
+            # Temporal keeps firing until something deletes the schedule.
+            log.info("configured workflow schedule: %s (%s); skipping fire", reason, workflow_guid)
+            return ScheduledWorkflowFire(skipped=reason)
+        if action.get("schedule_revision") is not None and action["schedule_revision"] != desired_revision(
+            wf
+        ):
+            return ScheduledWorkflowFire(skipped="schedule configuration changed")
+
         run, run_input, workflow_id = build_workflow_definition_run_input(
             wf.definition,
             trigger_payload=dict(wf.inputs or {}),
