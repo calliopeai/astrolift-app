@@ -246,13 +246,16 @@ def test_run_task_creates_record(app, task_workload, env, user, org, permission_
     assert result.data is not None
     assert result.data.workload_slug == "db-migrate"
     assert result.data.registered_app_slug == "task-app"
-    assert result.data.status == "pending"
+    # No running deployment yet: the run is recorded as a failed dispatch (#2330).
+    assert result.data.status == "failed"
+    assert "no running deployment" in result.data.failure_reason
 
     # Verify the DB row
     run = TaskRun.objects.get(guid=str(result.data.id))
     assert run.command == ["python", "manage.py", "migrate"]
     assert run.trigger_kind == "manual"
     assert run.triggered_by_user == user
+    assert run.k8s_job_name == "" and run.ended_at is not None
 
 
 def test_run_task_unknown_app(task_workload, user, org, permission_resolver):

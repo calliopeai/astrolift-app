@@ -226,7 +226,8 @@ def _reconcile_task_run(run: TaskRun) -> str:
     if cluster is None:
         log.info("run reconciler: TaskRun %s has no environment/cluster; skipping", run.pk)
         return "skipped"
-    namespace = namespace_for_environment(env)
+    # The namespace runTask applied the Job in (#2330); older rows fall back.
+    namespace = run.namespace or namespace_for_environment(env)
     if not namespace:
         return "skipped"
 
