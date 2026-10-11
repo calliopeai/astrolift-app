@@ -8272,7 +8272,18 @@
     "publicAddressRequired": "O nome de host resolve para um endereço não público, então ele não é sondado a partir do plano de controle.",
     "checkHttps": "Verificar HTTPS",
     "clusterBinding": "Credencial da AWS do cluster (somente leitura)",
-    "providerClusterUnavailable": "O cluster pelo qual esta zona foi vinculada não está disponível, pertence a outra organização ou agora corresponde a outra conta da AWS. Vincule a zona novamente em Conectar DNS."
+    "providerClusterUnavailable": "O cluster pelo qual esta zona foi vinculada não está disponível, pertence a outra organização ou agora corresponde a outra conta da AWS. Vincule a zona novamente em Conectar DNS.",
+    "certificate": "Certificado da zona",
+    "certificateStatus": "Status no provedor",
+    "certificateValidationRecords": "Registros de validação",
+    "certificateNotRecorded": "Ainda não há certificado registrado para esta zona; o provisionamento solicita um.",
+    "certificateClusterUnavailable": "O cluster que provisionou esta zona não está disponível ou sua conta da AWS não está verificada, então o certificado não pode ser lido.",
+    "certificateUnavailable": "Não foi possível ler o certificado no provedor. Atualize para tentar novamente.",
+    "certificateIssued": "O certificado foi emitido e cobre esta zona.",
+    "certificatePending": "O certificado aguarda a validação por DNS. Os registros de validação precisam ser resolvidos na zona pública.",
+    "certificateNotValid": "O certificado não é válido: falhou na validação, expirou, foi revogado ou está inativo. Solicite um novo provisionando novamente.",
+    "certificateHostMismatch": "O certificado registrado não cobre esta zona. Provisione novamente para solicitar um que cubra.",
+    "certificateAccountChanged": "O provedor agora responde de uma conta da AWS diferente daquela em que esta zona foi provisionada."
   },
   "domainConnections": {
     "title": "Conectar DNS",

@@ -150,6 +150,17 @@ class ManagedDomainProviderZone:
 
 
 @strawberry.type
+class ManagedDomainCertificate:
+    """The zone's recorded wildcard certificate as the provider reports it (#2287)."""
+
+    state: ManagedDomainCheckState
+    reason: str
+    checked_at: dt.datetime
+    status: str | None = None
+    validation_records: int = 0
+
+
+@strawberry.type
 class ManagedDomainRoute:
     app_id: GUID
     app_name: str
@@ -179,6 +190,7 @@ class ManagedDomainDiagnostics:
     routes_truncated: bool
     actions: ManagedDomainActions
     provision_cluster_id: GUID | None = None
+    certificate: ManagedDomainCertificate | None = None
 
 
 @strawberry.type

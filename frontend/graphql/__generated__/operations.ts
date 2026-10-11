@@ -7876,6 +7876,14 @@ export type ManagedDomainAppRouteWriteInput = {
   workloadId: Scalars['GUID']['input'];
 };
 
+export type ManagedDomainCertificate = {
+  checkedAt: Scalars['DateTime']['output'];
+  reason: Scalars['String']['output'];
+  state: ManagedDomainCheckState;
+  status?: Maybe<Scalars['String']['output']>;
+  validationRecords: Scalars['Int']['output'];
+};
+
 export type ManagedDomainCheckState =
   | 'ERROR'
   | 'MISMATCH'
@@ -7908,6 +7916,7 @@ export type ManagedDomainDiagnosticRecord = {
 
 export type ManagedDomainDiagnostics = {
   actions: ManagedDomainActions;
+  certificate?: Maybe<ManagedDomainCertificate>;
   checkedAt: Scalars['DateTime']['output'];
   checks: Array<ManagedDomainDiagnosticCheck>;
   id: Scalars['GUID']['output'];
@@ -17058,7 +17067,7 @@ export type ManagedDomainDiagnosticsQueryVariables = Exact<{
 }>;
 
 
-export type ManagedDomainDiagnosticsQuery = { astroliftManagedDomainDiagnostics?: { id: string, version: number, zone: string, verificationState: string, provisionState: string, provisionClusterId?: string | null, checkedAt: string, routesTruncated: boolean, checks: Array<{ key: string, state: ManagedDomainCheckState, perspective: string, checkedAt: string, reason: string, expected: Array<string>, observed: Array<string> }>, providerZone: { bindingSource: string, state: ManagedDomainCheckState, reason: string, checkedAt: string, zoneId?: string | null, zoneName?: string | null, privateZone?: boolean | null, nameservers: Array<string>, truncated: boolean, records: Array<{ name: string, type: string, ttl?: number | null, values: Array<string>, aliasTarget?: string | null, aliasZoneId?: string | null, evaluateTargetHealth?: boolean | null, proxied?: boolean | null, priority?: number | null, routing?: { policy: ManagedDomainRoutingPolicy, reason: string, setIdentifier?: string | null, weight?: number | null, region?: string | null, failover?: string | null, multiValueAnswer?: boolean | null, healthCheckId?: string | null, trafficPolicyInstanceId?: string | null, geoLocation?: { continentCode?: string | null, countryCode?: string | null, subdivisionCode?: string | null } | null, geoProximity?: { awsRegion?: string | null, localZoneGroup?: string | null, bias?: number | null, coordinates?: { latitude: string, longitude: string } | null } | null, cidr?: { collectionId: string, locationName: string } | null } | null }> }, routes: Array<{ appId: string, appName: string, appSlug: string, environmentId: string, environmentName: string, recordedUrl: string, hostname: string, clusterId?: string | null, clusterName?: string | null, clusterSlug?: string | null, ingressClass?: string | null, observedState: ManagedDomainCheckState }>, actions: { canCreate: boolean, canDelete: boolean, canRevalidate: boolean, canUpdate: boolean, canSetDefaults: boolean, defaultUpdateReason: string, defaultsFingerprint?: string | null } } | null };
+export type ManagedDomainDiagnosticsQuery = { astroliftManagedDomainDiagnostics?: { id: string, version: number, zone: string, verificationState: string, provisionState: string, provisionClusterId?: string | null, checkedAt: string, routesTruncated: boolean, checks: Array<{ key: string, state: ManagedDomainCheckState, perspective: string, checkedAt: string, reason: string, expected: Array<string>, observed: Array<string> }>, providerZone: { bindingSource: string, state: ManagedDomainCheckState, reason: string, checkedAt: string, zoneId?: string | null, zoneName?: string | null, privateZone?: boolean | null, nameservers: Array<string>, truncated: boolean, records: Array<{ name: string, type: string, ttl?: number | null, values: Array<string>, aliasTarget?: string | null, aliasZoneId?: string | null, evaluateTargetHealth?: boolean | null, proxied?: boolean | null, priority?: number | null, routing?: { policy: ManagedDomainRoutingPolicy, reason: string, setIdentifier?: string | null, weight?: number | null, region?: string | null, failover?: string | null, multiValueAnswer?: boolean | null, healthCheckId?: string | null, trafficPolicyInstanceId?: string | null, geoLocation?: { continentCode?: string | null, countryCode?: string | null, subdivisionCode?: string | null } | null, geoProximity?: { awsRegion?: string | null, localZoneGroup?: string | null, bias?: number | null, coordinates?: { latitude: string, longitude: string } | null } | null, cidr?: { collectionId: string, locationName: string } | null } | null }> }, routes: Array<{ appId: string, appName: string, appSlug: string, environmentId: string, environmentName: string, recordedUrl: string, hostname: string, clusterId?: string | null, clusterName?: string | null, clusterSlug?: string | null, ingressClass?: string | null, observedState: ManagedDomainCheckState }>, certificate?: { state: ManagedDomainCheckState, reason: string, checkedAt: string, status?: string | null, validationRecords: number } | null, actions: { canCreate: boolean, canDelete: boolean, canRevalidate: boolean, canUpdate: boolean, canSetDefaults: boolean, defaultUpdateReason: string, defaultsFingerprint?: string | null } } | null };
 
 export type UpdateManagedDomainDefaultsMutationVariables = Exact<{
   input: UpdateManagedDomainInput;

@@ -8272,7 +8272,18 @@
     "publicAddressRequired": "호스트 이름이 비공개 주소로 확인되므로 컨트롤 플레인에서 검사하지 않습니다.",
     "checkHttps": "HTTPS 확인",
     "clusterBinding": "클러스터 AWS 자격 증명(읽기 전용)",
-    "providerClusterUnavailable": "이 영역을 바인딩한 클러스터를 사용할 수 없거나, 다른 조직에 속하거나, 이제 다른 AWS 계정을 가리킵니다. DNS 연결에서 영역을 다시 바인딩하세요."
+    "providerClusterUnavailable": "이 영역을 바인딩한 클러스터를 사용할 수 없거나, 다른 조직에 속하거나, 이제 다른 AWS 계정을 가리킵니다. DNS 연결에서 영역을 다시 바인딩하세요.",
+    "certificate": "영역 인증서",
+    "certificateStatus": "공급자 상태",
+    "certificateValidationRecords": "검증 레코드",
+    "certificateNotRecorded": "이 영역에 기록된 인증서가 아직 없습니다. 프로비저닝 시 요청됩니다.",
+    "certificateClusterUnavailable": "이 영역을 프로비저닝한 클러스터를 사용할 수 없거나 AWS 계정이 검증되지 않아 인증서를 읽을 수 없습니다.",
+    "certificateUnavailable": "공급자에서 인증서를 읽지 못했습니다. 새로 고쳐 다시 시도하세요.",
+    "certificateIssued": "인증서가 발급되었으며 이 영역을 포함합니다.",
+    "certificatePending": "인증서가 DNS 검증을 기다리고 있습니다. 검증 레코드가 공개 영역에서 확인되어야 합니다.",
+    "certificateNotValid": "인증서가 유효하지 않습니다(검증 실패, 만료, 해지 또는 비활성). 다시 프로비저닝하여 새 인증서를 요청하세요.",
+    "certificateHostMismatch": "기록된 인증서가 이 영역을 포함하지 않습니다. 다시 프로비저닝하여 포함하는 인증서를 요청하세요.",
+    "certificateAccountChanged": "공급자가 이 영역을 프로비저닝한 계정과 다른 AWS 계정에서 응답합니다."
   },
   "domainConnections": {
     "title": "DNS 연결",

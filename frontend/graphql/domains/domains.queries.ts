@@ -119,6 +119,13 @@ export const MANAGED_DOMAIN_DIAGNOSTICS = gql`
         observedState
       }
       routesTruncated
+      certificate {
+        state
+        reason
+        checkedAt
+        status
+        validationRecords
+      }
       actions {
         canCreate
         canDelete

@@ -8272,7 +8272,18 @@
     "publicAddressRequired": "该主机名解析为非公共地址，因此不会从控制平面进行探测。",
     "checkHttps": "检查 HTTPS",
     "clusterBinding": "集群 AWS 凭据（只读）",
-    "providerClusterUnavailable": "绑定此区域所用的集群不可用、属于其他组织，或现在对应另一个 AWS 账户。请在“连接 DNS”中重新绑定该区域。"
+    "providerClusterUnavailable": "绑定此区域所用的集群不可用、属于其他组织，或现在对应另一个 AWS 账户。请在“连接 DNS”中重新绑定该区域。",
+    "certificate": "区域证书",
+    "certificateStatus": "提供商状态",
+    "certificateValidationRecords": "验证记录",
+    "certificateNotRecorded": "此区域尚未记录证书；预配时会申请一个。",
+    "certificateClusterUnavailable": "预配此区域的集群不可用或其 AWS 账户未经验证，因此无法读取其证书。",
+    "certificateUnavailable": "无法从提供商读取证书。请刷新后重试。",
+    "certificateIssued": "证书已签发并覆盖此区域。",
+    "certificatePending": "证书正在等待 DNS 验证。其验证记录必须能在公共区域中解析。",
+    "certificateNotValid": "证书无效：验证失败、已过期、已吊销或未激活。请重新预配以申请新证书。",
+    "certificateHostMismatch": "记录的证书不覆盖此区域。请重新预配以申请覆盖它的证书。",
+    "certificateAccountChanged": "提供商现在从与预配此区域时不同的 AWS 账户返回结果。"
   },
   "domainConnections": {
     "title": "连接 DNS",
