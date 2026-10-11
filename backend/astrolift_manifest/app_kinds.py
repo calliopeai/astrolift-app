@@ -26,6 +26,9 @@ APP_KINDS: dict[str, AppKind] = {
     ),
 }
 
+# Kinds whose app serves a brain other apps, agents and workflows can read (#2320).
+BRAIN_KINDS = frozenset({"mimwell"})
+
 # Spec 05 once documented ``[app] kind = "web" | "worker"``; no parser read
 # it. Those values stay accepted and mean a generic app, so no manifest that
 # followed the old spec stops validating.

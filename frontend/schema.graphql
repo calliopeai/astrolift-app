@@ -1783,6 +1783,27 @@ type AstroliftAuditRetention {
   days: Int!
 }
 
+type AstroliftBrain {
+  id: GUID!
+  slug: String!
+  name: String!
+  kind: String!
+  team: String!
+  project: String!
+  environments: [AstroliftBrainEnvironment!]!
+  sharedWith: [AstroliftBrainShare!]!
+}
+
+type AstroliftBrainEnvironment {
+  name: String!
+  url: String!
+}
+
+type AstroliftBrainShare {
+  team: String!
+  access: String!
+}
+
 type AstroliftBrief {
   id: GUID!
   contentHash: String!
@@ -10215,6 +10236,7 @@ type Query {
   astroliftAlertEvents(ruleId: GUID = null, unresolvedOnly: Boolean! = false, limit: Int! = 100, appSlug: String = null): [AstroliftAlertEvent!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftAlertEventsPage.")
   astroliftAlertEventsPage(ruleId: GUID = null, unresolvedOnly: Boolean! = false, search: String = null, limit: Int! = 50, after: String = null, appSlug: String = null): AstroliftAlertEventPage!
   astroliftAppKinds: [AstroliftAppKind!]!
+  astroliftBrains(search: String = null): [AstroliftBrain!]!
 
   """
   Read-only APP_READ projection for an exact live app/environment. Expected cluster/provider GUIDs refuse reassignment. Persisted observations do not prove live health, TLS binding or renewal; mutation authority is unchanged.
