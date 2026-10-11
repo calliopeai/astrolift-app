@@ -25,12 +25,14 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django_ratelimit.decorators import ratelimit
 
+from astrolift_agents import workflow_mcp
 from astrolift_agents.mcp_contract import (
     MCP_TOOL_META,
     PROTOCOL_VERSION,
     SERVER_NAME,
     SERVER_VERSION,
     SUPPORTED_PROTOCOL_VERSIONS,
+    WORKFLOW_TOOL_NAMES,
 )
 from astrolift_agents.scopes import agent_project_scope, agent_task_scope, agent_workload_app_scope
 from astrolift_identity.api_tokens import (
@@ -44,6 +46,13 @@ from astrolift_services.scopes import (
     managed_service_scope_by_guid,
     services_project_scope_by_guid,
 )
+from astrolift_workflows.configuration_targets import (
+    configuration_definition_scope,
+    configured_workflow_scope,
+)
+from astrolift_workflows.import_scopes import workflow_manifest_import_scope
+from astrolift_workflows.schedule_operations import workflow_schedule_scope
+from config.features import Feature, is_enabled
 from core.permissions import (
     Permission,
     PermissionDenied,
@@ -54,6 +63,7 @@ from core.permissions import (
 )
 from core.run_trigger import RunTrigger
 from core.tenancy import get_current_tenant
+from workflows.scopes import definition_scope_by_guid, definition_start_scope, execution_scope_by_id
 
 log = logging.getLogger(__name__)
 
@@ -61,8 +71,11 @@ _SESSION_SALT = "astrolift.mcp.session.v1"
 
 
 class McpCallError(RuntimeError):
-    def __init__(self, message: str, *, code: str = "tool_error") -> None:
+    def __init__(
+        self, message: str, *, code: str = "tool_error", result: dict[str, Any] | None = None
+    ) -> None:
         self.code = code
+        self.result = result
         super().__init__(message)
 
 
@@ -85,6 +98,30 @@ ANY_SCOPE = "any_scope"
 #: stands in for the target; the surface guardrail allows that only for the
 #: tools on its allowlist.
 TOOL_SCOPES: dict[str, Any] = {
+    "astrolift_set_workflow_definition_enabled": definition_scope_by_guid(
+        permission=Permission.WORKFLOW_UPDATE
+    ),
+    "astrolift_get_workflow": configured_workflow_scope(Permission.WORKFLOW_READ),
+    "astrolift_create_workflow": configuration_definition_scope,
+    "astrolift_update_workflow": configured_workflow_scope(Permission.WORKFLOW_UPDATE),
+    "astrolift_delete_workflow": configured_workflow_scope(Permission.WORKFLOW_DELETE),
+    "astrolift_get_workflow_schedule": workflow_schedule_scope(Permission.WORKFLOW_READ),
+    "astrolift_reconcile_workflow_schedule": workflow_schedule_scope(Permission.WORKFLOW_UPDATE),
+    "astrolift_start_workflow_definition": definition_scope_by_guid(),
+    "astrolift_get_workflow_start": definition_start_scope(),
+    "astrolift_list_workflow_runs": ANY_SCOPE,
+    "astrolift_get_workflow_execution": execution_scope_by_id(),
+    "astrolift_list_workflow_execution_stages": execution_scope_by_id(),
+    "astrolift_control_workflow_execution": execution_scope_by_id(permission=Permission.WORKFLOW_TRIGGER),
+    "astrolift_list_human_gates": ANY_SCOPE,
+    "astrolift_get_human_gate_decision": execution_scope_by_id(permission=Permission.WORKFLOW_TRIGGER),
+    "astrolift_decide_human_gate": execution_scope_by_id(permission=Permission.WORKFLOW_TRIGGER),
+    "astrolift_list_workflow_definitions": ANY_SCOPE,
+    "astrolift_get_workflow_definition": definition_scope_by_guid(permission=Permission.WORKFLOW_READ),
+    "astrolift_list_workflows": ANY_SCOPE,
+    "astrolift_preview_workflow_manifest": ANY_SCOPE,
+    "astrolift_export_workflow_manifest": definition_scope_by_guid(permission=Permission.WORKFLOW_READ),
+    "astrolift_import_workflow_manifest": workflow_manifest_import_scope,
     "astrolift_list_agents": ANY_SCOPE,
     "astrolift_list_tasks": ANY_SCOPE,
     "astrolift_get_task_by_client_request_id": ANY_SCOPE,
@@ -131,6 +168,22 @@ TOOL_SCOPES: dict[str, Any] = {
 def _operation_for_tool(name: str, args: dict[str, Any]):
     from astrolift_identity.operation_context import agent_region_operation, agent_task_operation
 
+    if name in {
+        "astrolift_start_workflow_definition",
+        "astrolift_get_workflow_start",
+        "astrolift_set_workflow_definition_enabled",
+    }:
+        return agent_region_operation(args)[0]
+    if name in {
+        "astrolift_get_workflow_execution",
+        "astrolift_list_workflow_execution_stages",
+        "astrolift_control_workflow_execution",
+        "astrolift_get_human_gate_decision",
+        "astrolift_decide_human_gate",
+    }:
+        from astrolift_identity.operation_context import execution_operation
+
+        return execution_operation(args)[0]
     if name in {"astrolift_get_task", "astrolift_cancel_task"}:
         return agent_task_operation("task_id")(args)[0]
     if name in {"astrolift_get_agent", "astrolift_run_agent"}:
@@ -977,6 +1030,28 @@ def _deprovision_project_resource(request: HttpRequest, args: dict[str, Any]) ->
 
 
 _HANDLERS: dict[str, ToolHandler] = {
+    "astrolift_set_workflow_definition_enabled": workflow_mcp.set_definition_enabled,
+    "astrolift_get_workflow": workflow_mcp.get_workflow,
+    "astrolift_create_workflow": workflow_mcp.create_workflow,
+    "astrolift_update_workflow": workflow_mcp.update_workflow,
+    "astrolift_delete_workflow": workflow_mcp.delete_workflow,
+    "astrolift_start_workflow_definition": workflow_mcp.start_definition,
+    "astrolift_get_workflow_start": workflow_mcp.get_start,
+    "astrolift_list_workflow_runs": workflow_mcp.list_runs,
+    "astrolift_get_workflow_execution": workflow_mcp.get_execution,
+    "astrolift_list_workflow_execution_stages": workflow_mcp.list_execution_stages,
+    "astrolift_control_workflow_execution": workflow_mcp.control_execution,
+    "astrolift_list_human_gates": workflow_mcp.list_human_gates,
+    "astrolift_get_human_gate_decision": workflow_mcp.get_human_gate_decision,
+    "astrolift_decide_human_gate": workflow_mcp.decide_human_gate,
+    "astrolift_list_workflow_definitions": workflow_mcp.list_definitions,
+    "astrolift_get_workflow_definition": workflow_mcp.get_definition,
+    "astrolift_list_workflows": workflow_mcp.list_workflows,
+    "astrolift_preview_workflow_manifest": workflow_mcp.preview_manifest,
+    "astrolift_export_workflow_manifest": workflow_mcp.export_manifest,
+    "astrolift_import_workflow_manifest": workflow_mcp.import_manifest,
+    "astrolift_get_workflow_schedule": workflow_mcp.get_schedule,
+    "astrolift_reconcile_workflow_schedule": workflow_mcp.reconcile_schedule,
     "astrolift_list_agents": _list_agents,
     "astrolift_get_agent": _get_agent,
     "astrolift_get_task": _get_task,
@@ -1048,6 +1123,8 @@ def _has_project_resource_target(request: HttpRequest, meta: dict[str, Any]) -> 
 def _tool_list(request: HttpRequest) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
     for name, meta in _TOOL_META.items():
+        if name in WORKFLOW_TOOL_NAMES and not is_enabled(Feature.WORKFLOWS):
+            continue
         # Listing has no target: a scoped tool is offered where its grant is
         # held anywhere; the call itself checks the target.
         if not _may(request, meta, any_scope=name in TOOL_SCOPES):
@@ -1107,12 +1184,21 @@ def _validate_tool_arguments(meta: dict[str, Any], args: dict[str, Any]) -> None
             raise McpCallError(f"{name} must be a {expected}", code="invalid_arguments")
         if "enum" in rule and value not in rule["enum"]:
             raise McpCallError(f"{name} must be one of {rule['enum']}", code="invalid_arguments")
+        if expected == "string":
+            if "minLength" in rule and len(value) < rule["minLength"]:
+                raise McpCallError(f"{name} is below its minimum length", code="invalid_arguments")
+            if "maxLength" in rule and len(value) > rule["maxLength"]:
+                raise McpCallError(f"{name} exceeds its maximum length", code="invalid_arguments")
+            if rule.get("format") == "uuid":
+                _public_id(value, name)
         if expected == "integer":
             if "minimum" in rule and value < rule["minimum"]:
                 raise McpCallError(f"{name} is below its minimum", code="invalid_arguments")
             if "maximum" in rule and value > rule["maximum"]:
                 raise McpCallError(f"{name} exceeds its maximum", code="invalid_arguments")
         if expected == "array" and (rule.get("items") or {}).get("type") == "string":
+            if "maxItems" in rule and len(value) > rule["maxItems"]:
+                raise McpCallError(f"{name} exceeds its maximum size", code="invalid_arguments")
             if any(not isinstance(item, str) for item in value):
                 raise McpCallError(f"{name} items must be strings", code="invalid_arguments")
 
@@ -1128,6 +1214,8 @@ def _tool_call(request: HttpRequest, params: dict[str, Any]) -> dict[str, Any]:
         handler = _HANDLERS.get(name)
         if meta is None or handler is None:
             raise McpCallError(f"unknown tool {name!r}", code="not_found")
+        if name in WORKFLOW_TOOL_NAMES and not is_enabled(Feature.WORKFLOWS):
+            raise McpCallError("workflow tools are disabled", code="not_found")
         _validate_tool_arguments(meta, args)
         permissions = tuple(meta.get("permissions") or (meta.get("permission"),))
         scopes = (meta["scope"], *meta.get("additional_scopes", ()))
@@ -1147,7 +1235,10 @@ def _tool_call(request: HttpRequest, params: dict[str, Any]) -> dict[str, Any]:
                 permission_scope=permission_scope,
                 any_scope=declared == ANY_SCOPE,
             )
-            payload = handler(request, args)
+            try:
+                payload = handler(request, args)
+            except PermissionDenied as exc:
+                raise McpCallError(exc.reason, code="permission_denied") from exc
     except Exception as exc:
         decision = "DENY" if isinstance(exc, McpCallError) else "UNKNOWN"
         _audit(
@@ -1339,7 +1430,8 @@ def mcp_gateway(request: HttpRequest) -> HttpResponse:
                 "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
                 "instructions": (
                     "Use Astrolift tools to inspect immutable agent packages, dispatch/kill runs, "
-                    "sync source repos, and manage shared project resources. Secret values are "
+                    "sync source repos, inspect native workflows and preview manifests, and "
+                    "manage shared project resources. Secret values are "
                     "intentionally unavailable over MCP."
                 ),
             },
@@ -1367,8 +1459,17 @@ def mcp_gateway(request: HttpRequest) -> HttpResponse:
             return _rpc_result(
                 request_id,
                 {
-                    "content": [{"type": "text", "text": str(exc)}],
-                    "structuredContent": {"code": exc.code, "message": str(exc)},
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": json.dumps(exc.result, sort_keys=True, default=str)
+                            if exc.result is not None
+                            else str(exc),
+                        }
+                    ],
+                    "structuredContent": exc.result
+                    if exc.result is not None
+                    else {"code": exc.code, "message": str(exc)},
                     "isError": True,
                 },
                 protocol=protocol,

@@ -18,13 +18,32 @@ import strawberry
 from django.db import transaction
 from strawberry.types import Info
 
+from astrolift_graphql import GUID
 from astrolift_identity.operation_context import agent_region_operation, execution_operation
 from astrolift_workflows.client import (
     cancel_workflow,
     signal_workflow,
     terminate_workflow,
 )
+from astrolift_workflows.configuration_targets import (
+    configuration_definition_scope,
+    configured_workflow_scope,
+    find_configuration_definition,
+    find_configured_workflow,
+)
+from astrolift_workflows.schedule_operations import (
+    authorize_schedule,
+    schedule_workflow,
+    validate_schedule_configuration,
+    workflow_schedule_scope,
+)
 from astrolift_workflows.schema.execution_types import WorkflowExecutionControlResult, WorkflowExecutionType
+from astrolift_workflows.schema.human_gate_types import HumanGateDecisionResult
+from astrolift_workflows.schema.schedule_types import (
+    WorkflowScheduleResult,
+    WorkflowScheduleState,
+    schedule_to_type,
+)
 from astrolift_workflows.schema.workflow_config_types import (
     ConfiguredWorkflowType,
     workflow_to_type,
@@ -40,13 +59,12 @@ from core.permissions import (
 from core.schema.common import MutationResult, ValidationError
 from core.tenancy import get_current_tenant
 from workflows.scopes import (
-    definition_scope,
     definition_scope_by_slug,
     definition_scope_by_stage_guid,
     execution_scope_by_id,
+    reviewed_definition_scope,
     workflow_run_scope,
     workflow_scope_by_guid,
-    workflow_scope_by_slug,
 )
 
 JSON = strawberry.scalars.JSON
@@ -160,6 +178,8 @@ def _gate_instance_op(user, workflow_id: str) -> MutationResult | None:
 @strawberry.type
 class CreateWorkflowResult(MutationResult):
     workflow: ConfiguredWorkflowType | None = None
+    configuration_saved: bool = False
+    schedule: WorkflowScheduleState | None = None
 
 
 @strawberry.type
@@ -376,6 +396,56 @@ def _resolve_execution_id(raw: object, workflow_id: str) -> str | None:
 
 @strawberry.type
 class WorkflowsMutation:
+    @strawberry.mutation(
+        description="Submit an explicit user decision to one exact human gate. Recover by the same execution and stage IDs after an uncertain response."
+    )
+    @require_permission(
+        Permission.WORKFLOW_TRIGGER,
+        scope=execution_scope_by_id(permission=Permission.WORKFLOW_TRIGGER),
+        operation=execution_operation,
+    )
+    @tenant_scoped()
+    def decide_human_gate(
+        self,
+        info: Info,
+        execution_id: strawberry.ID,
+        stage_execution_id: strawberry.ID,
+        temporal_run_id: str,
+        decision: str,
+        confirmed: bool,
+        note: str = "",
+    ) -> HumanGateDecisionResult:
+        from astrolift_workflows.human_gates import decide_gate, find_gate
+
+        row = find_gate(info.context.user, execution_id, stage_execution_id)
+        if row is None:
+            return HumanGateDecisionResult(
+                ok=False,
+                errors=[
+                    ValidationError(
+                        field="stageExecutionId", messages=["Human gate not found or not permitted"]
+                    )
+                ],
+            )
+        try:
+            state, error = decide_gate(
+                row,
+                info.context.user,
+                decision=decision,
+                note=note,
+                confirmed=confirmed,
+                temporal_run_id=temporal_run_id,
+            )
+        except (ValueError, TypeError) as exc:
+            return HumanGateDecisionResult(
+                ok=False, errors=[ValidationError(field="decision", messages=[str(exc)])]
+            )
+        return HumanGateDecisionResult(
+            ok=not error,
+            gate=state,
+            errors=[ValidationError(field="decision", messages=[error])] if error else [],
+        )
+
     """Configured-Workflow write surface (spec 40 §3/§6). Every resolver is
     ``WORKFLOW_*``-gated + ``@tenant_scoped`` and applies a real caller-org
     filter in the body (#1042). Definition + stage CREATE / clone + the
@@ -385,7 +455,9 @@ class WorkflowsMutation:
 
     @strawberry.mutation(description="Cancel, terminate, or retry cleanup for an exact owned execution.")
     @require_permission(
-        Permission.WORKFLOW_TRIGGER, scope=execution_scope_by_id(), operation=execution_operation
+        Permission.WORKFLOW_TRIGGER,
+        scope=execution_scope_by_id(permission=Permission.WORKFLOW_TRIGGER),
+        operation=execution_operation,
     )
     @tenant_scoped()
     def control_workflow_execution(
@@ -416,16 +488,60 @@ class WorkflowsMutation:
             ok=True, requested=True, execution=WorkflowExecutionType(**state)
         )
 
+    @strawberry.mutation(
+        description="Reconcile the exact reviewed configuration version with its native Temporal schedule. Does not start an immediate run. Active reconciliation requires workflow.trigger; deleted workflow cleanup also requires workflow.delete."
+    )
+    @require_permission(Permission.WORKFLOW_UPDATE, scope=workflow_schedule_scope(Permission.WORKFLOW_UPDATE))
+    @tenant_scoped()
+    def reconcile_workflow_schedule(
+        self,
+        info: Info,
+        workflow_id: GUID,  # type: ignore[valid-type]
+        expected_version: int,
+        expected_active: bool,
+    ) -> WorkflowScheduleResult:
+        from workflows.schedule_sync import reconcile_workflow_schedule
+
+        workflow = schedule_workflow(workflow_id)
+        if workflow is None:
+            return WorkflowScheduleResult(
+                ok=False, errors=[ValidationError(field="workflow_id", messages=["Workflow not found"])]
+            )
+        result = reconcile_workflow_schedule(
+            workflow,
+            expected_version=expected_version,
+            expected_active=expected_active,
+            authorize=authorize_schedule,
+        )
+        return WorkflowScheduleResult(
+            ok=result.confirmed,
+            schedule=schedule_to_type(result),
+            errors=[]
+            if result.confirmed
+            else [
+                ValidationError(
+                    field="schedule",
+                    messages=[result.message or "Schedule does not match the reviewed configuration."],
+                )
+            ],
+        )
+
     # ── tier-2 Workflow CRUD ────────────────────────────────────────────
 
-    @strawberry.mutation(description="Create a configured Workflow from a visible definition (spec 40 §2.2).")
-    @require_permission(Permission.WORKFLOW_CREATE, scope=definition_scope_by_slug("definition_slug"))
+    @strawberry.mutation(
+        description=(
+            "Create a configured Workflow from an exact definitionId or legacy definitionSlug. "
+            "When both are supplied the slug must match the ID. Set isEnabled=false to prepare "
+            "configuration without activation; the legacy default is true."
+        )
+    )
+    @require_permission(Permission.WORKFLOW_CREATE, scope=configuration_definition_scope)
     @tenant_scoped()
     def create_workflow(
         self,
         info: Info,
         name: str,
-        definition_slug: str,
+        definition_slug: str | None = None,
         slug: str | None = None,
         description: str | None = None,
         stage_bindings: JSON | None = None,
@@ -433,10 +549,12 @@ class WorkflowsMutation:
         trigger_kind: str = "manual",
         schedule_cron: str | None = None,
         org_id: strawberry.ID | None = None,
+        definition_id: GUID | None = None,  # type: ignore[valid-type]
+        is_enabled: bool = True,
     ) -> CreateWorkflowResult:
         from django.core.exceptions import ValidationError as DjangoValidationError
 
-        from workflows.models import Workflow, WorkflowDefinition
+        from workflows.models import Workflow
 
         org, err = _resolve_caller_org(org_id)
         if err is not None:
@@ -451,79 +569,97 @@ class WorkflowsMutation:
                 ],
             )
 
-        # Definition must be visible to the org (its own UNION global) — §2.1.
-        # The org's own wins a slug it shares with a template: that is the
-        # row the permission scope was checked against.
-        visible = WorkflowDefinition.visible_to_org(org.pk).filter(
-            slug=definition_slug, deleted_at__isnull=True
-        )
-        definition = visible.filter(organization_id=org.pk).first() or visible.first()
-        if definition is None:
-            return CreateWorkflowResult(
-                ok=False,
-                errors=[
-                    ValidationError(
-                        field="definition_slug",
-                        messages=[f'Workflow definition "{definition_slug}" not visible'],
-                    )
-                ],
+        with transaction.atomic():
+            definition = find_configuration_definition(
+                org.pk,
+                definition_id=definition_id,
+                definition_slug=definition_slug,
+                lock=True,
+            )
+            if definition is None:
+                return CreateWorkflowResult(
+                    ok=False,
+                    errors=[
+                        ValidationError(
+                            field="definition_id" if definition_id is not None else "definition_slug",
+                            messages=["Workflow definition not visible or identity assertion does not match"],
+                        )
+                    ],
+                )
+
+            check_permission(
+                Permission.WORKFLOW_CREATE,
+                scope=reviewed_definition_scope(definition, org.pk, permission=Permission.WORKFLOW_CREATE),
             )
 
-        from workflows.back_edges import SUPPORTED_EXECUTOR_PATTERNS
+            from workflows.back_edges import SUPPORTED_EXECUTOR_PATTERNS
 
-        if definition.pattern_kind not in SUPPORTED_EXECUTOR_PATTERNS:
-            return CreateWorkflowResult(
-                ok=False,
-                errors=[
-                    ValidationError(
-                        field="definition_slug", messages=["This workflow pattern has no supported executor"]
-                    )
-                ],
+            if definition.pattern_kind not in SUPPORTED_EXECUTOR_PATTERNS:
+                return CreateWorkflowResult(
+                    ok=False,
+                    errors=[
+                        ValidationError(
+                            field="definition_slug",
+                            messages=["This workflow pattern has no supported executor"],
+                        )
+                    ],
+                )
+
+            user = info.context.user
+            wf = Workflow(
+                organization=org,
+                definition=definition,
+                name=name,
+                slug=slug or "",
+                description=description or "",
+                stage_bindings=stage_bindings or {},
+                inputs=inputs or {},
+                trigger_kind=trigger_kind,
+                is_enabled=is_enabled,
+                schedule_cron=(schedule_cron or None),
+                created_by=user,
+                updated_by=user,
             )
+            schedule_error = validate_schedule_configuration(wf)
+            if schedule_error is not None:
+                return CreateWorkflowResult(ok=False, errors=[schedule_error])
+            from workflows.schedule_sync import schedule_inactive_reason
 
-        user = info.context.user
-        wf = Workflow(
-            organization=org,
-            definition=definition,
-            name=name,
-            slug=slug or "",
-            description=description or "",
-            stage_bindings=stage_bindings or {},
-            inputs=inputs or {},
-            trigger_kind=trigger_kind,
-            schedule_cron=(schedule_cron or None),
-            created_by=user,
-            updated_by=user,
-        )
-        try:
-            # Model.save validates bindings (every agent_dispatch stage resolves).
-            wf.save()
-        except DjangoValidationError as e:
-            return CreateWorkflowResult(
-                ok=False,
-                errors=[ValidationError(field="stage_bindings", messages=list(e.messages))],
-            )
-        except Exception as e:  # noqa: BLE001 — IntegrityError on (org, slug), etc.
-            return CreateWorkflowResult(ok=False, errors=[ValidationError(field="slug", messages=[str(e)])])
+            wf.schedule_managed = schedule_inactive_reason(wf) is None
+            if wf.schedule_managed:
+                _configuration_authorizer(info, Permission.WORKFLOW_CREATE)(wf)
+            try:
+                # Model.save validates bindings (every agent_dispatch stage resolves).
+                wf.save()
+            except DjangoValidationError as e:
+                return CreateWorkflowResult(
+                    ok=False,
+                    errors=[ValidationError(field="stage_bindings", messages=list(e.messages))],
+                )
+            except Exception as e:  # noqa: BLE001 — IntegrityError on (org, slug), etc.
+                return CreateWorkflowResult(
+                    ok=False, errors=[ValidationError(field="slug", messages=[str(e)])]
+                )
 
-        _sync_schedule(wf)
-        return CreateWorkflowResult(ok=True, workflow=workflow_to_type(wf, with_runs=True))
+        return _configured_schedule_result(wf, Permission.WORKFLOW_CREATE, info)
 
     @strawberry.mutation(
         description=(
-            "Update a configured Workflow (bindings / inputs / trigger / enabled). "
-            "definitionSlug repoints it at another visible definition: the fallback "
+            "Update a configured Workflow by exact workflowId or legacy slug (bindings / inputs / trigger / enabled). "
+            "A supplied slug must match its ID. definitionId or definitionSlug repoints it at another visible definition: the fallback "
             "for a versioned importWorkflowManifest(replace: true) (#1822), or any "
             "manual repoint. The existing stage_bindings must still validate against "
             "the new definition's stages, or the update is refused."
         )
     )
-    @require_permission(Permission.WORKFLOW_UPDATE, scope=workflow_scope_by_slug("slug"))
+    @require_permission(
+        Permission.WORKFLOW_UPDATE, scope=configured_workflow_scope(Permission.WORKFLOW_UPDATE)
+    )
     @tenant_scoped()
     def update_workflow(
         self,
         info: Info,
-        slug: str,
+        slug: str | None = None,
         name: str | None = None,
         description: str | None = None,
         stage_bindings: JSON | None = None,
@@ -533,106 +669,191 @@ class WorkflowsMutation:
         is_enabled: bool | None = None,
         definition_slug: str | None = None,
         org_id: strawberry.ID | None = None,
+        workflow_id: GUID | None = None,  # type: ignore[valid-type]
+        definition_id: GUID | None = None,  # type: ignore[valid-type]
+        expected_version: int | None = None,
     ) -> CreateWorkflowResult:
         from django.core.exceptions import ValidationError as DjangoValidationError
-
-        from workflows.models import Workflow, WorkflowDefinition
-
-        org, err = _resolve_caller_org(org_id)
-        if err is not None:
-            return CreateWorkflowResult(ok=err.ok, errors=err.errors)
-
-        wf = (
-            Workflow.objects.filter(organization=org, slug=slug, deleted_at__isnull=True)
-            .select_related("definition")
-            .first()
-        )
-        if wf is None:
-            return CreateWorkflowResult(
-                ok=False, errors=[ValidationError(field="slug", messages=[f'Workflow "{slug}" not found'])]
-            )
-
-        if definition_slug is not None:
-            # Same visibility rule createWorkflow resolves a definition_slug
-            # with: the org's own wins a slug it shares with a template.
-            visible = WorkflowDefinition.visible_to_org(org.pk).filter(
-                slug=definition_slug, deleted_at__isnull=True
-            )
-            new_definition = visible.filter(organization_id=org.pk).first() or visible.first()
-            if new_definition is None:
-                return CreateWorkflowResult(
-                    ok=False,
-                    errors=[
-                        ValidationError(
-                            field="definition_slug",
-                            messages=[f'Workflow definition "{definition_slug}" not visible'],
-                        )
-                    ],
-                )
-            # Same permission createWorkflow requires to bind a Workflow to
-            # this definition in the first place.
-            check_permission(Permission.WORKFLOW_CREATE, scope=definition_scope(new_definition, org.pk))
-            wf.definition = new_definition
-
-        if trigger_kind is not None:
-            valid_triggers = {c[0] for c in Workflow.TriggerKind.choices}
-            if trigger_kind not in valid_triggers:
-                return CreateWorkflowResult(
-                    ok=False,
-                    errors=[
-                        ValidationError(
-                            field="trigger_kind", messages=[f'Invalid trigger_kind "{trigger_kind}"']
-                        )
-                    ],
-                )
-            wf.trigger_kind = trigger_kind
-        if name is not None:
-            wf.name = name
-        if description is not None:
-            wf.description = description
-        if stage_bindings is not None:
-            wf.stage_bindings = stage_bindings
-        if inputs is not None:
-            wf.inputs = inputs
-        if schedule_cron is not None:
-            wf.schedule_cron = schedule_cron or None
-        if is_enabled is not None:
-            wf.is_enabled = is_enabled
-        wf.updated_by = info.context.user
-
-        try:
-            wf.save()
-        except DjangoValidationError as e:
-            return CreateWorkflowResult(
-                ok=False, errors=[ValidationError(field="stage_bindings", messages=list(e.messages))]
-            )
-
-        _sync_schedule(wf)
-        return CreateWorkflowResult(ok=True, workflow=workflow_to_type(wf, with_runs=True))
-
-    @strawberry.mutation(description="Soft-delete a configured Workflow and tear down its schedule.")
-    @require_permission(Permission.WORKFLOW_DELETE, scope=workflow_scope_by_slug("slug"))
-    @tenant_scoped()
-    def delete_workflow(self, info: Info, slug: str, org_id: strawberry.ID | None = None) -> MutationResult:
-        from django.utils import timezone
 
         from workflows.models import Workflow
 
         org, err = _resolve_caller_org(org_id)
         if err is not None:
-            return err
+            return CreateWorkflowResult(ok=err.ok, errors=err.errors)
 
-        wf = Workflow.objects.filter(organization=org, slug=slug, deleted_at__isnull=True).first()
-        if wf is None:
-            return _failure("slug", f'Workflow "{slug}" not found')
+        with transaction.atomic():
+            # Manifest replacement locks the definition before configured rows.
+            # Keep that order when repointing to avoid a lock inversion.
+            new_definition = None
+            if definition_slug is not None or definition_id is not None:
+                new_definition = find_configuration_definition(
+                    org.pk,
+                    definition_id=definition_id,
+                    definition_slug=definition_slug,
+                    lock=True,
+                )
+                if new_definition is None:
+                    return CreateWorkflowResult(
+                        ok=False,
+                        errors=[
+                            ValidationError(
+                                field="definition_id" if definition_id is not None else "definition_slug",
+                                messages=[
+                                    "Workflow definition not visible or identity assertion does not match"
+                                ],
+                            )
+                        ],
+                    )
+                # Same permission createWorkflow requires to bind a Workflow to
+                # this definition in the first place.
+                check_permission(
+                    Permission.WORKFLOW_CREATE,
+                    scope=reviewed_definition_scope(
+                        new_definition, org.pk, permission=Permission.WORKFLOW_CREATE
+                    ),
+                )
 
-        wf.deleted_at = timezone.now()
-        wf.deleted_by = info.context.user
-        wf.save(
-            update_fields=["deleted_at", "deleted_by", "updated_at", "version"], skip_binding_validation=True
+            wf = find_configured_workflow(org.pk, workflow_id=workflow_id, slug=slug, lock=True)
+            if wf is None:
+                return CreateWorkflowResult(
+                    ok=False,
+                    errors=[
+                        ValidationError(
+                            field="workflow_id" if workflow_id is not None else "slug",
+                            messages=["Workflow not found or identity assertion does not match"],
+                        )
+                    ],
+                )
+
+            check_permission(
+                Permission.WORKFLOW_UPDATE,
+                scope=reviewed_definition_scope(wf.definition, org.pk, permission=Permission.WORKFLOW_UPDATE),
+            )
+            if expected_version is not None and (
+                isinstance(expected_version, bool) or expected_version < 1 or wf.version != expected_version
+            ):
+                return CreateWorkflowResult(
+                    ok=False,
+                    errors=[
+                        ValidationError(
+                            field="expected_version",
+                            messages=["Workflow configuration changed; inspect it again before editing."],
+                        )
+                    ],
+                )
+
+            from workflows.schedule_sync import schedule_inactive_reason
+
+            previously_active = schedule_inactive_reason(wf) is None
+            if new_definition is not None:
+                wf.definition = new_definition
+
+            if trigger_kind is not None:
+                valid_triggers = {c[0] for c in Workflow.TriggerKind.choices}
+                if trigger_kind not in valid_triggers:
+                    return CreateWorkflowResult(
+                        ok=False,
+                        errors=[
+                            ValidationError(
+                                field="trigger_kind", messages=[f'Invalid trigger_kind "{trigger_kind}"']
+                            )
+                        ],
+                    )
+                wf.trigger_kind = trigger_kind
+            if name is not None:
+                wf.name = name
+            if description is not None:
+                wf.description = description
+            if stage_bindings is not None:
+                wf.stage_bindings = stage_bindings
+            if inputs is not None:
+                wf.inputs = inputs
+            if schedule_cron is not None:
+                wf.schedule_cron = schedule_cron or None
+            if is_enabled is not None:
+                wf.is_enabled = is_enabled
+            wf.updated_by = info.context.user
+
+            schedule_error = validate_schedule_configuration(wf)
+            if schedule_error is not None:
+                return CreateWorkflowResult(ok=False, errors=[schedule_error])
+            active = schedule_inactive_reason(wf) is None
+            wf.schedule_managed = wf.schedule_managed or previously_active or active
+            if active:
+                _configuration_authorizer(info, Permission.WORKFLOW_UPDATE)(wf)
+            try:
+                wf.save()
+            except DjangoValidationError as e:
+                return CreateWorkflowResult(
+                    ok=False, errors=[ValidationError(field="stage_bindings", messages=list(e.messages))]
+                )
+
+        return _configured_schedule_result(wf, Permission.WORKFLOW_UPDATE, info)
+
+    @strawberry.mutation(
+        description="Soft-delete a configured Workflow by exact workflowId or legacy slug and request schedule removal. A supplied slug must match its ID."
+    )
+    @require_permission(
+        Permission.WORKFLOW_DELETE, scope=configured_workflow_scope(Permission.WORKFLOW_DELETE)
+    )
+    @tenant_scoped()
+    def delete_workflow(
+        self,
+        info: Info,
+        slug: str | None = None,
+        org_id: strawberry.ID | None = None,
+        workflow_id: GUID | None = None,  # type: ignore[valid-type]
+        expected_version: int | None = None,
+    ) -> WorkflowScheduleResult:
+        from django.utils import timezone
+
+        org, err = _resolve_caller_org(org_id)
+        if err is not None:
+            return WorkflowScheduleResult(ok=err.ok, errors=err.errors)
+
+        with transaction.atomic():
+            wf = find_configured_workflow(org.pk, workflow_id=workflow_id, slug=slug, lock=True)
+            if wf is None:
+                return WorkflowScheduleResult(
+                    ok=False,
+                    errors=[
+                        ValidationError(
+                            field="workflow_id",
+                            messages=["Workflow not found or identity assertion does not match"],
+                        )
+                    ],
+                )
+
+            check_permission(
+                Permission.WORKFLOW_DELETE,
+                scope=reviewed_definition_scope(wf.definition, org.pk, permission=Permission.WORKFLOW_DELETE),
+            )
+            if expected_version is not None and (
+                isinstance(expected_version, bool) or expected_version < 1 or wf.version != expected_version
+            ):
+                return WorkflowScheduleResult(
+                    ok=False,
+                    errors=[
+                        ValidationError(
+                            field="expected_version",
+                            messages=["Workflow configuration changed; inspect it again before editing."],
+                        )
+                    ],
+                )
+
+            from workflows.schedule_sync import schedule_inactive_reason
+
+            wf.schedule_managed = wf.schedule_managed or schedule_inactive_reason(wf) is None
+            wf.deleted_at = timezone.now()
+            wf.deleted_by = info.context.user
+            wf.save(
+                update_fields=["deleted_at", "deleted_by", "updated_at", "version", "schedule_managed"],
+                skip_binding_validation=True,
+            )
+        result = _configured_schedule_result(wf, Permission.WORKFLOW_DELETE, info)
+        return WorkflowScheduleResult(
+            ok=result.ok, errors=result.errors, configuration_saved=True, schedule=result.schedule
         )
-        _delete_schedule(wf)
-        return MutationResult.success()
 
     # ── run mapping (spec 40 §3) ────────────────────────────────────────
 
@@ -948,28 +1169,39 @@ class WorkflowsMutation:
         return MutationResult.success()
 
 
-def _sync_schedule(workflow) -> None:
-    """Best-effort Temporal schedule sync for a saved Workflow (spec 40 §3)."""
-    try:
-        from workflows.schedule_sync import sync_workflow_schedule
+def _configuration_authorizer(info, permission):
+    def authorize(current):
+        from workflows.schedule_sync import schedule_inactive_reason
 
-        sync_workflow_schedule(workflow)
-    except Exception:  # noqa: BLE001 — schedule sync never blocks the save
-        import logging
+        authorize_schedule(current, permission)
+        activation_check = getattr(info.context, "workflow_activation_check", None)
+        if schedule_inactive_reason(current) is None and activation_check is not None:
+            activation_check()
 
-        logging.getLogger(__name__).exception(
-            "create/update_workflow: schedule sync failed for workflow %s", workflow.pk
-        )
+    return authorize
 
 
-def _delete_schedule(workflow) -> None:
-    try:
-        from workflows.schedule_sync import delete_workflow_schedule
+def _configured_schedule_result(workflow, permission, info):
+    from workflows.schedule_sync import sync_workflow_schedule, unrequested_schedule
 
-        delete_workflow_schedule(workflow)
-    except Exception:  # noqa: BLE001
-        import logging
-
-        logging.getLogger(__name__).exception(
-            "delete_workflow: schedule delete failed for workflow %s", workflow.pk
-        )
+    if workflow.schedule_managed:
+        observed = sync_workflow_schedule(workflow, authorize=_configuration_authorizer(info, permission))
+    else:
+        observed = unrequested_schedule(workflow)
+    ok = observed.confirmed or observed.observed_state == "not_requested"
+    return CreateWorkflowResult(
+        ok=ok,
+        configuration_saved=True,
+        workflow=workflow_to_type(workflow, with_runs=True),
+        schedule=schedule_to_type(observed),
+        errors=[]
+        if ok
+        else [
+            ValidationError(
+                field="schedule",
+                messages=[
+                    "Configuration was saved, but schedule state is unconfirmed. Inspect and reconcile this workflow ID."
+                ],
+            )
+        ],
+    )
