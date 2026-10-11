@@ -805,6 +805,51 @@
       ]
     },
     {
+      "description": "List the hosted brains (apps of a brain kind) this identity can read, with their environment endpoints and the teams they are shared with (#2320).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "search": {
+            "description": "Optional name or slug filter.",
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "name": "astrolift_list_brains",
+      "required_permissions": [
+        "app.read"
+      ],
+      "required_scopes": [
+        "mcp:read",
+        "read:apps"
+      ]
+    },
+    {
+      "description": "Describe one hosted brain this identity can read, by app slug (#2320).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_get_brain",
+      "required_permissions": [
+        "app.read"
+      ],
+      "required_scopes": [
+        "mcp:read",
+        "read:apps"
+      ]
+    },
+    {
       "description": "List registered agents and their source/package delivery state.",
       "inputSchema": {
         "additionalProperties": false,

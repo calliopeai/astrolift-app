@@ -1714,6 +1714,27 @@ export type AstroliftAuditRetention = {
   days: Scalars['Int']['output'];
 };
 
+export type AstroliftBrain = {
+  environments: Array<AstroliftBrainEnvironment>;
+  id: Scalars['GUID']['output'];
+  kind: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  project: Scalars['String']['output'];
+  sharedWith: Array<AstroliftBrainShare>;
+  slug: Scalars['String']['output'];
+  team: Scalars['String']['output'];
+};
+
+export type AstroliftBrainEnvironment = {
+  name: Scalars['String']['output'];
+  url: Scalars['String']['output'];
+};
+
+export type AstroliftBrainShare = {
+  access: Scalars['String']['output'];
+  team: Scalars['String']['output'];
+};
+
 export type AstroliftBrief = {
   config: Scalars['JSON']['output'];
   contentHash: Scalars['String']['output'];
@@ -11688,6 +11709,7 @@ export type Query = {
   astroliftAuditEventsPage: AstroliftAuditEventPage;
   astroliftAuditRetention: AstroliftAuditRetention;
   astroliftAvailableRepos: AstroliftRemoteRepoList;
+  astroliftBrains: Array<AstroliftBrain>;
   astroliftBudgets: Array<AstroliftBudget>;
   astroliftCluster?: Maybe<AstroliftTenantCluster>;
   astroliftClusterAgentInstall: AstroliftClusterAgentInstall;
@@ -12657,6 +12679,11 @@ export type QueryAstroliftAuditEventsPageArgs = {
 export type QueryAstroliftAvailableReposArgs = {
   connectionId: Scalars['String']['input'];
   limit?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftBrainsArgs = {
   search?: InputMaybe<Scalars['String']['input']>;
 };
 

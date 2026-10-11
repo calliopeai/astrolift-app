@@ -1171,6 +1171,32 @@ class AppKindType:
     description: str
 
 
+@strawberry.type(name="AstroliftBrainEnvironment")
+class BrainEnvironmentType:
+    name: str
+    url: str
+
+
+@strawberry.type(name="AstroliftBrainShare")
+class BrainShareType:
+    team: str
+    access: str
+
+
+@strawberry.type(name="AstroliftBrain")
+class BrainType:
+    """A hosted brain the caller can read (#2320): an app of a brain kind."""
+
+    id: GUID
+    slug: str
+    name: str
+    kind: str
+    team: str
+    project: str
+    environments: list[BrainEnvironmentType]
+    shared_with: list[BrainShareType]
+
+
 @strawberry.type
 class RegistryQuery:
     @strawberry.field
@@ -1185,6 +1211,31 @@ class RegistryQuery:
         from astrolift_manifest.app_kinds import APP_KINDS
 
         return [AppKindType(key=k.key, label=k.label, description=k.description) for k in APP_KINDS.values()]
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @tenant_scoped()
+    def astrolift_brains(self, info: Info, search: str | None = None) -> list[BrainType]:
+        """Hosted brains the caller can read (#2320), with the same tenancy,
+        team shares and token ceiling as apps. Sharing a brain is sharing its app."""
+        from astrolift_registry.brains import describe_brain, visible_brains
+
+        out = []
+        for app in visible_brains(search=search or "")[:200]:
+            row = describe_brain(app)
+            out.append(
+                BrainType(
+                    id=GUID(row["id"]),
+                    slug=row["slug"],
+                    name=row["name"],
+                    kind=row["kind"],
+                    team=row["team"],
+                    project=row["project"],
+                    environments=[BrainEnvironmentType(**e) for e in row["environments"]],
+                    shared_with=[BrainShareType(**x) for x in row["shared_with"]],
+                )
+            )
+        return out
 
     @strawberry.field(
         description="Read-only APP_READ projection for an exact live app/environment. Expected cluster/provider GUIDs refuse reassignment. Persisted observations do not prove live health, TLS binding or renewal; mutation authority is unchanged."

@@ -122,6 +122,8 @@ TOOL_SCOPES: dict[str, Any] = {
     "astrolift_preview_workflow_manifest": ANY_SCOPE,
     "astrolift_export_workflow_manifest": definition_scope_by_guid(permission=Permission.WORKFLOW_READ),
     "astrolift_import_workflow_manifest": workflow_manifest_import_scope,
+    "astrolift_list_brains": ANY_SCOPE,
+    "astrolift_get_brain": ANY_SCOPE,
     "astrolift_list_agents": ANY_SCOPE,
     "astrolift_list_tasks": ANY_SCOPE,
     "astrolift_get_task_by_client_request_id": ANY_SCOPE,
@@ -338,6 +340,24 @@ def _serialize_agent(workload, *, include_package: bool) -> dict[str, Any]:
     if include_package:
         data["package"]["definition"] = snapshot.get("agent_package") or {}
     return data
+
+
+def _list_brains(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_registry.brains import describe_brain, visible_brains
+
+    rows = visible_brains(search=str(args.get("search") or ""))[:200]
+    return {"brains": [describe_brain(app) for app in rows]}
+
+
+def _get_brain(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_registry.brains import describe_brain, visible_brains
+
+    slug = str(args.get("slug") or "").strip()
+    # Not visible and not a brain read the same, so existence never leaks.
+    app = visible_brains().filter(slug=slug).first() if slug else None
+    if app is None:
+        raise McpCallError("brain not found", code="not_found")
+    return describe_brain(app)
 
 
 def _list_agents(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
@@ -1052,6 +1072,8 @@ _HANDLERS: dict[str, ToolHandler] = {
     "astrolift_import_workflow_manifest": workflow_mcp.import_manifest,
     "astrolift_get_workflow_schedule": workflow_mcp.get_schedule,
     "astrolift_reconcile_workflow_schedule": workflow_mcp.reconcile_schedule,
+    "astrolift_list_brains": _list_brains,
+    "astrolift_get_brain": _get_brain,
     "astrolift_list_agents": _list_agents,
     "astrolift_get_agent": _get_agent,
     "astrolift_get_task": _get_task,
