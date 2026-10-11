@@ -869,7 +869,7 @@ def test_tenant_temporal_refuses_to_provision_against_the_control_plane_it_was_g
     monkeypatch.setattr("core.cluster_observability._driver_for_cluster", lambda _cluster: object())
     # The frontend the tenant cluster would publish, written the short way an
     # operator would: the comparison has to see through the spelling.
-    settings.TEMPORAL_ADDRESS = "web-prod-temporal-frontend.acme-web:7233"
+    settings.TEMPORAL_ADDRESS = "tempora-6f1c2b3a4d5e4f608a7b9c0d1e2f3a4b-frontend.acme-web:7233"
     settings.TEMPORAL_NAMESPACE = "default"
 
     config = managed_config_for(
@@ -890,7 +890,7 @@ def test_tenant_temporal_refuses_to_provision_against_the_control_plane_it_was_g
             tenant_cluster_id="cluster-1",
             service_handle_hint="",
             size="small",
-            managed_service_id="ms-1",
+            managed_service_id="6f1c2b3a-4d5e-4f60-8a7b-9c0d1e2f3a4b",
         )
     )
 
