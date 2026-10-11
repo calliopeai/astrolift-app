@@ -1000,6 +1000,10 @@ class K8sNativeClusterDriver(ClusterDriver):
                         "issuer": "https://dex.example.com/dex",
                         "storage": {"type": "kubernetes", "config": {"inCluster": True}},
                         "oauth2": {"skipApprovalScreen": True},
+                        # Dex's own login page, when a person lands on it,
+                        # names Astrolift on the dark theme (#2285). An inline
+                        # logo would not survive Dex's html/template escaping.
+                        "frontend": {"issuer": "Astrolift", "theme": "dark"},
                         "staticClients": [],
                         "connectors": [],
                     },

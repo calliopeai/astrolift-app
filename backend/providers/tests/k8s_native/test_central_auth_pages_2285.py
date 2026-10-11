@@ -58,3 +58,14 @@ def test_templates_use_only_fields_the_proxy_provides_and_load_nothing_external(
 def test_the_sign_in_form_still_starts_the_flow_with_the_return_address():
     assert 'action="{{ .ProxyPrefix }}/start"' in SIGN_IN_HTML
     assert 'name="rd" value="{{ .Redirect }}"' in SIGN_IN_HTML
+
+
+def test_dex_names_astrolift_on_its_dark_theme():
+    from _sdk.cluster import ClusterContext
+    from k8s_native.cluster import K8sNativeClusterDriver, K8sNativeConfig
+
+    driver = K8sNativeClusterDriver(config=K8sNativeConfig())
+    [dex] = [
+        c for c in driver.bootstrap_components(ClusterContext(slug="t", auth_method="kubeconfig")) if c.key == "dex"
+    ]
+    assert dex.helm_values["config"]["frontend"] == {"issuer": "Astrolift", "theme": "dark"}
