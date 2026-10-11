@@ -5321,6 +5321,7 @@ export type AstroliftTaskRun = {
   createdAt: Scalars['DateTime']['output'];
   durationSeconds?: Maybe<Scalars['Int']['output']>;
   endedAt?: Maybe<Scalars['DateTime']['output']>;
+  environmentName: Scalars['String']['output'];
   exitCode?: Maybe<Scalars['Int']['output']>;
   failureReason: Scalars['String']['output'];
   id: Scalars['GUID']['output'];

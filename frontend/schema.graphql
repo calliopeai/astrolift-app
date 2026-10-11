@@ -5675,6 +5675,7 @@ type AstroliftTaskRun {
   createdAt: DateTime!
   namespace: String!
   failureReason: String!
+  environmentName: String!
 }
 
 """One page of a cursor-paginated or numbered list."""

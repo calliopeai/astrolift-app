@@ -10,6 +10,7 @@ import pytest
 
 from astrolift_lifecycle.models import AppEnvironment, Deployment, TaskRun
 from astrolift_lifecycle.schema.mutations import LifecycleMutation, RunTaskInput
+from astrolift_lifecycle.schema.types import task_run_to_type
 from astrolift_lifecycle.services import task_runner
 from astrolift_lifecycle.tests.test_task_run import (  # noqa: F401
     _admin_info,
@@ -103,6 +104,7 @@ def test_run_applies_the_rendered_task_job_with_gpu_scheduling(
     assert job["spec"]["backoffLimit"] == 0
     assert RENDERED["metadata"]["name"] == "db-migrate"  # the rendered template is untouched
     assert run.status == TaskRun.Status.PENDING and result.data.environment_name == "staging"
+    assert task_run_to_type(run).environment_name == "staging"
 
 
 def test_the_declared_command_runs_when_none_is_given(

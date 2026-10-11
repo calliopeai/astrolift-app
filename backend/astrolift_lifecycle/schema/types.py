@@ -1161,6 +1161,7 @@ class TaskRunType:
     created_at: dt.datetime
     namespace: str = ""
     failure_reason: str = ""
+    environment_name: str = ""
 
 
 @strawberry.type(name="AstroliftTaskRunPayload")
@@ -1195,6 +1196,7 @@ def task_run_to_type(r) -> TaskRunType:
         created_at=r.created_at,
         namespace=r.namespace or "",
         failure_reason=r.failure_reason or "",
+        environment_name=r.app_environment.name if r.app_environment_id else "",
     )
 
 
