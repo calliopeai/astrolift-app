@@ -33,7 +33,16 @@ import { useFormatters } from "@/lib/i18n/formatters";
 
 import type { ManagedDomainsState } from "./use-managed-domains";
 
-export type ManagedDomainsScreenProps = ManagedDomainsState;
+export type ManagedDomainsScreenProps = ManagedDomainsState & {
+  /**
+   * Why Astrolift writes no DNS on this install (DNS withheld,
+   * calliope-installer#447). Provisioning writes through the DNS cluster's
+   * driver whichever driver is picked, so the note shows for every one. Submit
+   * stays enabled: a zone that already exists in the account registers pending
+   * verification, and the console refuses, with the reason, one it would create.
+   */
+  dnsRestriction?: string | null;
+};
 
 const defaultForBadge: Record<string, string> = {
   tenant_apps: "bg-info/15 text-info-fg",
@@ -70,6 +79,7 @@ export function ManagedDomainsScreen({
   canCreate,
   onCreate,
   onCopyNameservers,
+  dnsRestriction,
 }: ManagedDomainsScreenProps) {
   const t = useTranslations("managedDomains");
   const connectionText = useTranslations("domainConnections");
@@ -255,6 +265,7 @@ export function ManagedDomainsScreen({
                     <SelectItem value="external_dns">external_dns</SelectItem>
                   </SelectContent>
                 </Select>
+                {dnsRestriction && <p className="text-warning-fg text-xs">{dnsRestriction}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="default-for">{t("defaultFor")}</Label>

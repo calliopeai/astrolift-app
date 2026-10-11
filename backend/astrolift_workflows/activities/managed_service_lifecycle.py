@@ -235,6 +235,10 @@ def _cluster_model_placement(svc: Any, *, cluster: Any) -> Any:
             ).values_list("pk", flat=True)
         )
     consumers = []
+    from astrolift_services.model_settings import allows_app, dedicated_app
+
+    if (svc.config or {}).get("sharing_mode") == "dedicated" and dedicated_app(svc) is None:
+        raise ValueError("Dedicated model app is no longer live and coherent.")
     for row in desired.order_by("guid"):
         env = row.app_environment
         app = env.registered_app if env else None
@@ -247,6 +251,8 @@ def _cluster_model_placement(svc: Any, *, cluster: Any) -> Any:
         ):
             raise ValueError("Shared model subscription destination is no longer live and coherent.")
         expected = f"services/{svc.organization.guid}/{svc.guid}/subscriptions/{row.guid}#api_key"
+        if not allows_app(svc, app):
+            raise ValueError("Shared model subscription disagrees with the model sharing policy.")
         if row.credential_ref != expected:
             raise ValueError("Shared model subscription credential identity is invalid.")
         consumers.append(
@@ -464,6 +470,25 @@ def _recorded_restore_source(svc: Any, restore: dict[str, Any]) -> dict[str, str
 def _signals_already_gone(*parts: object) -> bool:
     blob = " ".join(str(p) for p in parts if p).lower()
     return any(marker in blob for marker in _ALREADY_GONE_MARKERS)
+
+
+def _assert_not_withheld(svc: Any, cluster: Any) -> None:
+    """Refuse a service the install withholds before its cloud resource exists.
+
+    An RDS-backed service when databases are withheld; a CSI-mounted one
+    (EFS, FSx, NFS, S3 with a mount path) on a cluster held to the minimal
+    RBAC contract, where every workload mounting it would be refused.
+    Every path that books one (the mutation, a manifest, a project resource)
+    reaches this activity, so this is the one place that cannot be missed.
+    Non-retryable: the restriction is fixed at install.
+    """
+    from core.install_restrictions import database_refusal, filesystem_refusal
+
+    kind, variant = str(svc.kind), str(getattr(svc, "variant", "") or "")
+    if refusal := database_refusal(kind, variant) or filesystem_refusal(
+        kind, variant, getattr(svc, "config", None) or {}, cluster
+    ):
+        raise ManagedServicePreflightError(refusal)
 
 
 def _run_managed_service_preflight(svc: Any, cluster: Any) -> None:
@@ -928,6 +953,7 @@ def _provision_sync(managed_service_id: int) -> dict[str, Any]:
     plugin_slug = cluster.provider_plugin.slug
     variant = getattr(svc, "variant", "") or ""
     _assert_config_secret_refs_scoped(svc, cluster)
+    _assert_not_withheld(svc, cluster)
     restore = dict((getattr(svc, "lifecycle_policy", None) or {}).get("restore") or {})
     source = _recorded_restore_source(svc, restore) if restore and not svc.backend_ref else None
     _run_managed_service_preflight(svc, cluster)
@@ -998,6 +1024,7 @@ def _update_sync(managed_service_id: int) -> dict[str, Any]:
     plugin_slug = cluster.provider_plugin.slug
     variant = getattr(svc, "variant", "") or ""
     _assert_config_secret_refs_scoped(svc, cluster)
+    _assert_not_withheld(svc, cluster)
     _run_managed_service_preflight(svc, cluster)
     try:
         resolved = resolve_managed_driver(

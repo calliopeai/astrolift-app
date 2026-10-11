@@ -1,6 +1,7 @@
 import { NextIntlClientProvider } from "next-intl";
 import localizedMessages from "@/messages/de.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 
 import {
   DOMAIN_BYO,
@@ -12,6 +13,7 @@ import {
   HANDSHAKE_CARD,
 } from "./app-domains.fixtures";
 import { DomainHandshakeCard } from "./DomainHandshakeCard";
+import { DNS_WITHHELD } from "../../domains/domains-environments.fixtures";
 
 const meta: Meta = { title: "Screens/Apps/Domains/DomainHandshakeCard" };
 export default meta;
@@ -53,6 +55,38 @@ export const BringYourOwnCert: Story = {
 
 export const WildcardIssuing: Story = {
   render: () => <DomainHandshakeCard {...HANDSHAKE_CARD} domain={DOMAIN_WILDCARD} />,
+};
+
+/**
+ * calliope-installer#447: DNS withheld on a platform-managed zone. The records
+ * are not written for the operator, so the card gives the reason instead of
+ * "no operator action needed". Recheck, a probe, stays. PlatformZoneDnsUnset
+ * is the same domain without the restriction.
+ */
+const platformHelp = /No operator action needed/;
+export const PlatformZoneDnsWithheld: Story = {
+  render: () => (
+    <DomainHandshakeCard
+      {...HANDSHAKE_CARD}
+      domain={DOMAIN_WILDCARD}
+      dnsRestriction={DNS_WITHHELD}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText(/DNS is withheld/)).toBeVisible();
+    await expect(canvas.queryByText(platformHelp)).toBeNull();
+  },
+};
+export const PlatformZoneDnsUnset: Story = {
+  render: () => (
+    <DomainHandshakeCard {...HANDSHAKE_CARD} domain={DOMAIN_WILDCARD} dnsRestriction={null} />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText(platformHelp)).toBeVisible();
+    await expect(canvas.queryByText(/DNS is withheld/)).toBeNull();
+  },
 };
 
 export const Busy: Story = { render: () => <DomainHandshakeCard {...HANDSHAKE_CARD} busy /> };

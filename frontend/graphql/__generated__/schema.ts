@@ -1924,6 +1924,7 @@ export type AstroliftClusterBootstrapComponent = {
   requires: Array<Scalars['String']['output']>;
   runningOutsideRecipe: Scalars['Boolean']['output'];
   title: Scalars['String']['output'];
+  withheldReason?: Maybe<Scalars['String']['output']>;
 };
 
 export type AstroliftClusterBootstrapOption = {
@@ -3110,6 +3111,11 @@ export type AstroliftImportSkillsResultMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftInstallManagedModel = {
+  modelId: Scalars['String']['output'];
+  replicas?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AstroliftInstallSourceWebhookPayload = {
   hookId: Scalars['String']['output'];
   receiverUrl: Scalars['String']['output'];
@@ -3558,6 +3564,7 @@ export type AstroliftMe = {
   id: Scalars['String']['output'];
   modules: Array<AstroliftModuleEntitlement>;
   profile?: Maybe<AstroliftUserProfile>;
+  teamAccessNavigation: AstroliftTeamAccessNavigation;
 };
 
 export type AstroliftMember = {
@@ -5360,6 +5367,136 @@ export type AstroliftTeam = {
   updatedAt: Scalars['DateTime']['output'];
 };
 
+export type AstroliftTeamAccessNavigation = {
+  canCheckAccess: Scalars['Boolean']['output'];
+  canManageTeamMembers: Scalars['Boolean']['output'];
+  canViewPeople: Scalars['Boolean']['output'];
+  canViewPolicies: Scalars['Boolean']['output'];
+  canViewRoles: Scalars['Boolean']['output'];
+  canViewTeams: Scalars['Boolean']['output'];
+};
+
+export type AstroliftTeamAccessSource = {
+  expired: Scalars['Boolean']['output'];
+  expiresAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['GUID']['output'];
+  removable: Scalars['Boolean']['output'];
+  roleId: Scalars['GUID']['output'];
+  roleName: Scalars['String']['output'];
+  scopeKind: Scalars['String']['output'];
+  source: Scalars['String']['output'];
+  sourceHref?: Maybe<Scalars['String']['output']>;
+};
+
+export type AstroliftTeamMembership = {
+  canRemove: Scalars['Boolean']['output'];
+  lifecycle?: Maybe<Scalars['String']['output']>;
+  person: AstroliftTeamMembershipPerson;
+  sources: Array<AstroliftTeamAccessSource>;
+  team: AstroliftTeamMembershipTeam;
+  teamMemberId?: Maybe<Scalars['GUID']['output']>;
+};
+
+export type AstroliftTeamMembershipChange = {
+  changeId: Scalars['GUID']['output'];
+  committed: Scalars['Boolean']['output'];
+  orgMemberId: Scalars['GUID']['output'];
+  remainingSources: Array<AstroliftTeamAccessSource>;
+  removedBindingIds: Array<Scalars['GUID']['output']>;
+  replayed: Scalars['Boolean']['output'];
+  requestId: Scalars['GUID']['output'];
+  teamId: Scalars['GUID']['output'];
+  teamMemberId?: Maybe<Scalars['GUID']['output']>;
+};
+
+export type AstroliftTeamMembershipChangeMutationResult = {
+  data?: Maybe<AstroliftTeamMembershipChange>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftTeamMembershipPage = {
+  items: Array<AstroliftTeamMembership>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftTeamMembershipPerson = {
+  active: Scalars['Boolean']['output'];
+  email: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  orgMemberId: Scalars['GUID']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftTeamMembershipPersonPage = {
+  items: Array<AstroliftTeamMembershipPerson>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftTeamMembershipReview = {
+  expectedSource: Scalars['String']['output'];
+  kind: TeamMembershipChangeKind;
+  membership: AstroliftTeamMembership;
+  remainingSources: Array<AstroliftTeamAccessSource>;
+  roles: Array<AstroliftTeamMembershipRole>;
+};
+
+export type AstroliftTeamMembershipRole = {
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  permissions: Array<Scalars['String']['output']>;
+  version: Scalars['Int']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftTeamMembershipRolePage = {
+  items: Array<AstroliftTeamMembershipRole>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftTeamMembershipTeam = {
+  canManageMembers: Scalars['Boolean']['output'];
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftTeamMembershipTeamPage = {
+  items: Array<AstroliftTeamMembershipTeam>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type AstroliftTeamMutationResult = {
   data?: Maybe<AstroliftTeam>;
   errors: Array<MutationError>;
@@ -5695,6 +5832,11 @@ export type AstroliftWebhookTestResultMutationResult = {
   data?: Maybe<AstroliftWebhookTestResult>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftWithheldCapability = {
+  capability: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
 };
 
 export type AstroliftWorkflowHistoryEvent = {
@@ -6146,6 +6288,15 @@ export type CatalogueState =
   | 'RATE_LIMITED'
   | 'UNAVAILABLE';
 
+export type ChangeAstroliftTeamMembershipInput = {
+  expectedSource: Scalars['String']['input'];
+  kind: TeamMembershipChangeKind;
+  orgMemberId: Scalars['GUID']['input'];
+  requestId: Scalars['GUID']['input'];
+  roleId: InputMaybe<Scalars['GUID']['input']>;
+  teamId: Scalars['GUID']['input'];
+};
+
 export type CiWorkflowSyncActionInput = {
   appId: Scalars['GUID']['input'];
 };
@@ -6284,6 +6435,10 @@ export type ClusterModelDeployment = {
   clusterName: Scalars['String']['output'];
   clusterSlug: Scalars['String']['output'];
   computeMode?: Maybe<Scalars['String']['output']>;
+  dedicatedAppId?: Maybe<Scalars['GUID']['output']>;
+  dedicatedAppName?: Maybe<Scalars['String']['output']>;
+  dedicatedAppSlug?: Maybe<Scalars['String']['output']>;
+  dedicatedAppVersion?: Maybe<Scalars['Int']['output']>;
   desiredResources: ModelResources;
   desiredSubscriptionRevision: Scalars['Int']['output'];
   id: Scalars['GUID']['output'];
@@ -6304,6 +6459,7 @@ export type ClusterModelDeployment = {
   revisionSha?: Maybe<Scalars['String']['output']>;
   runtimeReason?: Maybe<Scalars['String']['output']>;
   runtimeSupported?: Maybe<Scalars['Boolean']['output']>;
+  sharingMode: ModelSharingMode;
   sourceKind: Scalars['String']['output'];
   status: Scalars['String']['output'];
   subscriptionsEnabled: Scalars['Boolean']['output'];
@@ -6327,6 +6483,30 @@ export type ClusterModelDeploymentPage = {
   pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ClusterModelRuntimeModeSettings = {
+  computeMode: ModelRuntimeMode;
+  configured: Scalars['Boolean']['output'];
+  declaration?: Maybe<ModelRuntimeDeclaration>;
+  hardwareAdmission: Scalars['String']['output'];
+  reason?: Maybe<Scalars['String']['output']>;
+};
+
+export type ClusterModelRuntimeSettings = {
+  clusterId: Scalars['GUID']['output'];
+  clusterVersion: Scalars['Int']['output'];
+  modes: Array<ClusterModelRuntimeModeSettings>;
+  observedAt: Scalars['DateTime']['output'];
+  organizationId: Scalars['GUID']['output'];
+  providerId: Scalars['GUID']['output'];
+  providerVersion: Scalars['Int']['output'];
+};
+
+export type ClusterModelRuntimeSettingsMutationResult = {
+  data?: Maybe<ClusterModelRuntimeSettings>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type ClusterModelsFilterInput = {
@@ -6360,6 +6540,7 @@ export type ConfigureProviderPluginInput = {
 
 export type ConfiguredWorkflow = {
   createdAt: Scalars['DateTime']['output'];
+  definitionGuid: Scalars['String']['output'];
   definitionName: Scalars['String']['output'];
   definitionSlug: Scalars['String']['output'];
   description: Scalars['String']['output'];
@@ -6375,6 +6556,7 @@ export type ConfiguredWorkflow = {
   slug: Scalars['String']['output'];
   stageBindings: Scalars['JSON']['output'];
   triggerKind: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
 };
 
 /** One page of a cursor-paginated or numbered list. */
@@ -6630,8 +6812,10 @@ export type CreateWebhookSubscriptionInput = {
 };
 
 export type CreateWorkflowResult = {
+  configurationSaved: Scalars['Boolean']['output'];
   errors: Array<ValidationError>;
   ok: Scalars['Boolean']['output'];
+  schedule?: Maybe<WorkflowScheduleState>;
   workflow?: Maybe<ConfiguredWorkflow>;
 };
 
@@ -6653,6 +6837,11 @@ export type DataImportUploadResult = {
   id?: Maybe<Scalars['ID']['output']>;
   preSignedUrl?: Maybe<Scalars['String']['output']>;
   publicUrl?: Maybe<Scalars['String']['output']>;
+};
+
+export type DecideModelConnectionRequestInput = {
+  id: Scalars['GUID']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
 };
 
 export type DecommissionClusterInputType = {
@@ -7202,6 +7391,27 @@ export type HuggingFaceModelsPage = {
   state: CatalogueState;
 };
 
+export type HumanGateDecisionResult = {
+  errors: Array<ValidationError>;
+  gate?: Maybe<HumanGateDecisionState>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type HumanGateDecisionState = {
+  decidedByMe?: Maybe<Scalars['Boolean']['output']>;
+  executionGuid: Scalars['String']['output'];
+  note: Scalars['String']['output'];
+  observationError: Scalars['String']['output'];
+  recordedDecision?: Maybe<Scalars['String']['output']>;
+  requestState: Scalars['String']['output'];
+  requestedDecision?: Maybe<Scalars['String']['output']>;
+  runStatus: Scalars['String']['output'];
+  stageExecutionGuid: Scalars['String']['output'];
+  stageGuid: Scalars['String']['output'];
+  stageStatus: Scalars['String']['output'];
+  temporalExecution?: Maybe<WorkflowStageTemporalExecution>;
+};
+
 export type ImportGapType = {
   code: Scalars['String']['output'];
   message: Scalars['String']['output'];
@@ -7222,6 +7432,7 @@ export type ImportWorkflowFlowResult = {
 
 export type ImportWorkflowManifestResult = {
   createdSlug?: Maybe<Scalars['String']['output']>;
+  definitionId?: Maybe<Scalars['GUID']['output']>;
   errors: Array<ValidationError>;
   manifest?: Maybe<WorkflowManifestPreviewType>;
   mode?: Maybe<Scalars['String']['output']>;
@@ -7417,6 +7628,132 @@ export type ManagedDomainActions = {
   canUpdate: Scalars['Boolean']['output'];
   defaultUpdateReason: Scalars['String']['output'];
   defaultsFingerprint?: Maybe<Scalars['String']['output']>;
+};
+
+export type ManagedDomainAppRouteOperation = {
+  allocationState: Scalars['String']['output'];
+  appId: Scalars['GUID']['output'];
+  canReconcile: Scalars['Boolean']['output'];
+  clusterId: Scalars['GUID']['output'];
+  customDomainId?: Maybe<Scalars['GUID']['output']>;
+  dnsState: Scalars['String']['output'];
+  domainId: Scalars['GUID']['output'];
+  environmentId: Scalars['GUID']['output'];
+  hostname: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  ingressState: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  observedAt?: Maybe<Scalars['DateTime']['output']>;
+  purpose: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  records: Array<ManagedDomainAppRouteRecord>;
+  requestId: Scalars['GUID']['output'];
+  status: Scalars['String']['output'];
+  tlsState: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+  workloadId: Scalars['GUID']['output'];
+};
+
+export type ManagedDomainAppRouteOperationInput = {
+  domainId: Scalars['GUID']['input'];
+  requestId: Scalars['GUID']['input'];
+};
+
+export type ManagedDomainAppRouteOperationMutationResult = {
+  data?: Maybe<ManagedDomainAppRouteOperation>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type ManagedDomainAppRouteReconcileInput = {
+  expectedVersion: Scalars['Int']['input'];
+  operationId: Scalars['GUID']['input'];
+  requestId: Scalars['GUID']['input'];
+};
+
+export type ManagedDomainAppRouteRecord = {
+  name: Scalars['String']['output'];
+  target?: Maybe<Scalars['String']['output']>;
+  targetZoneId?: Maybe<Scalars['String']['output']>;
+  type: Scalars['String']['output'];
+};
+
+export type ManagedDomainAppRouteReview = {
+  allocationState: Scalars['String']['output'];
+  apiEndpoint?: Maybe<Scalars['String']['output']>;
+  apiId?: Maybe<Scalars['String']['output']>;
+  appId: Scalars['GUID']['output'];
+  appVersion: Scalars['Int']['output'];
+  canAttach: Scalars['Boolean']['output'];
+  canPrepare: Scalars['Boolean']['output'];
+  certificateStatus: Scalars['String']['output'];
+  clusterId: Scalars['GUID']['output'];
+  clusterVersion: Scalars['Int']['output'];
+  domainId: Scalars['GUID']['output'];
+  domainVersion: Scalars['Int']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentVersion: Scalars['Int']['output'];
+  functionArn?: Maybe<Scalars['String']['output']>;
+  hostname: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  reason: Scalars['String']['output'];
+  records: Array<ManagedDomainAppRouteRecord>;
+  reviewSha256: Scalars['String']['output'];
+  sourceFingerprint?: Maybe<Scalars['String']['output']>;
+  stage?: Maybe<Scalars['String']['output']>;
+  workloadId: Scalars['GUID']['output'];
+  workloadVersion: Scalars['Int']['output'];
+  writer: Scalars['String']['output'];
+};
+
+export type ManagedDomainAppRouteSupport = {
+  allowed: Scalars['Boolean']['output'];
+  domainId: Scalars['GUID']['output'];
+  reason: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+  writer: Scalars['String']['output'];
+};
+
+export type ManagedDomainAppRouteTarget = {
+  appId: Scalars['GUID']['output'];
+  appName: Scalars['String']['output'];
+  appVersion: Scalars['Int']['output'];
+  clusterId: Scalars['GUID']['output'];
+  clusterName: Scalars['String']['output'];
+  clusterVersion: Scalars['Int']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  environmentVersion: Scalars['Int']['output'];
+  kind: Scalars['String']['output'];
+  workloadId: Scalars['GUID']['output'];
+  workloadName: Scalars['String']['output'];
+  workloadVersion: Scalars['Int']['output'];
+};
+
+export type ManagedDomainAppRouteTargetInput = {
+  domainId: Scalars['GUID']['input'];
+  environmentId: Scalars['GUID']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+  expectedEnvironmentVersion: Scalars['Int']['input'];
+  hostname: Scalars['String']['input'];
+  workloadId: Scalars['GUID']['input'];
+};
+
+export type ManagedDomainAppRouteTargetsPage = {
+  hasNextPage: Scalars['Boolean']['output'];
+  items: Array<ManagedDomainAppRouteTarget>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+};
+
+export type ManagedDomainAppRouteWriteInput = {
+  domainId: Scalars['GUID']['input'];
+  environmentId: Scalars['GUID']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+  expectedEnvironmentVersion: Scalars['Int']['input'];
+  hostname: Scalars['String']['input'];
+  requestId: Scalars['GUID']['input'];
+  reviewSha256: Scalars['String']['input'];
+  workloadId: Scalars['GUID']['input'];
 };
 
 export type ManagedDomainCheckState =
@@ -7705,6 +8042,157 @@ export type ModelClusterCapacity = {
 export type ModelCompatibility =
   | 'UNKNOWN';
 
+export type ModelConnectionAction =
+  | 'AUTO'
+  | 'DENY'
+  | 'REQUEST';
+
+export type ModelConnectionDestination = {
+  action: ModelConnectionAction;
+  allowSelfApproval?: Maybe<Scalars['Boolean']['output']>;
+  appId: Scalars['GUID']['output'];
+  appName: Scalars['String']['output'];
+  appSlug: Scalars['String']['output'];
+  appVersion: Scalars['Int']['output'];
+  clusterId: Scalars['GUID']['output'];
+  eligible: Scalars['Boolean']['output'];
+  environmentId: Scalars['GUID']['output'];
+  environmentName: Scalars['String']['output'];
+  environmentVersion: Scalars['Int']['output'];
+  policyVersion?: Maybe<Scalars['String']['output']>;
+  reason?: Maybe<Scalars['String']['output']>;
+  requiredApprovals?: Maybe<Scalars['Int']['output']>;
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type ModelConnectionDestinationPage = {
+  items: Array<ModelConnectionDestination>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ModelConnectionEligibility = {
+  action: ModelConnectionAction;
+  allowSelfApproval?: Maybe<Scalars['Boolean']['output']>;
+  policyVersion?: Maybe<Scalars['String']['output']>;
+  reason: Scalars['String']['output'];
+  requiredApprovals?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ModelConnectionMode =
+  | 'AUTO'
+  | 'DENY'
+  | 'REQUIRE_APPROVAL';
+
+export type ModelConnectionPlacementInput = {
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
+export type ModelConnectionPolicy = {
+  allowSelfApproval: Scalars['Boolean']['output'];
+  id?: Maybe<Scalars['GUID']['output']>;
+  mode: ModelConnectionMode;
+  requiredApprovals: Scalars['Int']['output'];
+  version: Scalars['Int']['output'];
+};
+
+export type ModelConnectionPolicyMutationResult = {
+  data?: Maybe<ModelConnectionPolicy>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type ModelConnectionRequest = {
+  alias: Scalars['String']['output'];
+  appEnvironmentId: Scalars['GUID']['output'];
+  appId: Scalars['GUID']['output'];
+  appName?: Maybe<Scalars['String']['output']>;
+  approvalCount: Scalars['Int']['output'];
+  canApprove: Scalars['Boolean']['output'];
+  canCancel: Scalars['Boolean']['output'];
+  canFinalize: Scalars['Boolean']['output'];
+  canReject: Scalars['Boolean']['output'];
+  clusterId: Scalars['GUID']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  decidedAt?: Maybe<Scalars['DateTime']['output']>;
+  environmentName?: Maybe<Scalars['String']['output']>;
+  finalizedAt?: Maybe<Scalars['DateTime']['output']>;
+  id: Scalars['GUID']['output'];
+  modelDeploymentId: Scalars['GUID']['output'];
+  modelName?: Maybe<Scalars['String']['output']>;
+  organizationId: Scalars['GUID']['output'];
+  policyVersion: Scalars['String']['output'];
+  providerId: Scalars['GUID']['output'];
+  requesterUsername?: Maybe<Scalars['String']['output']>;
+  requiredApprovals: Scalars['Int']['output'];
+  status: ModelConnectionRequestStatus;
+  subscriptionId?: Maybe<Scalars['GUID']['output']>;
+  version: Scalars['Int']['output'];
+};
+
+export type ModelConnectionRequestMutationResult = {
+  data?: Maybe<ModelConnectionRequest>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type ModelConnectionRequestPage = {
+  items: Array<ModelConnectionRequest>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type ModelConnectionRequestStatus =
+  | 'APPROVED'
+  | 'CANCELLED'
+  | 'PENDING'
+  | 'REJECTED'
+  | 'STALE';
+
+export type ModelConnectionTargetInput = {
+  appEnvironmentId: Scalars['GUID']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
+export type ModelDedicatedApp = {
+  id: Scalars['GUID']['output'];
+  name: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+  version: Scalars['Int']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type ModelDedicatedAppPage = {
+  items: Array<ModelDedicatedApp>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
 export type ModelDeploymentMetrics = {
   clusterId: Scalars['GUID']['output'];
   end: Scalars['DateTime']['output'];
@@ -7716,6 +8204,12 @@ export type ModelDeploymentMetrics = {
   start: Scalars['DateTime']['output'];
   stepSeconds: Scalars['Int']['output'];
 };
+
+export type ModelDtype =
+  | 'AUTO'
+  | 'BFLOAT16'
+  | 'FLOAT16'
+  | 'FLOAT32';
 
 export type ModelGating =
   | 'AUTO'
@@ -7794,7 +8288,10 @@ export type ModelResourceRequests = {
 export type ModelResources = {
   cpuKvCacheGiB?: Maybe<Scalars['Int']['output']>;
   cpuRequest?: Maybe<Scalars['String']['output']>;
+  dtype?: Maybe<Scalars['String']['output']>;
   gpuCount?: Maybe<Scalars['Int']['output']>;
+  maxModelLen?: Maybe<Scalars['Int']['output']>;
+  maxNumSeqs?: Maybe<Scalars['Int']['output']>;
   memoryRequest?: Maybe<Scalars['String']['output']>;
   replicas?: Maybe<Scalars['Int']['output']>;
 };
@@ -7806,6 +8303,67 @@ export type ModelRuntimeAdmission = {
   reason?: Maybe<Scalars['String']['output']>;
   runtimeVersion?: Maybe<Scalars['String']['output']>;
 };
+
+export type ModelRuntimeArchitecture =
+  | 'AMD64'
+  | 'ARM64';
+
+export type ModelRuntimeDeclaration = {
+  architecture: ModelRuntimeArchitecture;
+  cpuRequestCeiling: Scalars['String']['output'];
+  defaultDtype: ModelDtype;
+  defaultMaxModelLen: Scalars['Int']['output'];
+  defaultMaxNumSeqs: Scalars['Int']['output'];
+  gpuCountCeiling: Scalars['Int']['output'];
+  hardwareCertified: Scalars['Boolean']['output'];
+  hardwareEvidence?: Maybe<Scalars['String']['output']>;
+  image: Scalars['String']['output'];
+  maxModelLenCeiling: Scalars['Int']['output'];
+  maxNumSeqsCeiling: Scalars['Int']['output'];
+  memoryRequestCeiling: Scalars['String']['output'];
+  nodeSelector: Array<ModelRuntimeSelector>;
+  packageVersion: Scalars['String']['output'];
+  supportedDtypes: Array<ModelDtype>;
+  version: Scalars['String']['output'];
+};
+
+export type ModelRuntimeDeclarationInput = {
+  architecture: ModelRuntimeArchitecture;
+  cpuRequestCeiling: Scalars['String']['input'];
+  defaultDtype: ModelDtype;
+  defaultMaxModelLen: Scalars['Int']['input'];
+  defaultMaxNumSeqs: Scalars['Int']['input'];
+  gpuCountCeiling: Scalars['Int']['input'];
+  hardwareAttested: Scalars['Boolean']['input'];
+  hardwareCertified: Scalars['Boolean']['input'];
+  hardwareEvidence: InputMaybe<Scalars['String']['input']>;
+  image: Scalars['String']['input'];
+  maxModelLenCeiling: Scalars['Int']['input'];
+  maxNumSeqsCeiling: Scalars['Int']['input'];
+  memoryRequestCeiling: Scalars['String']['input'];
+  nodeSelector: Array<ModelRuntimeSelectorInput>;
+  packageVersion: Scalars['String']['input'];
+  supportedDtypes: Array<ModelDtype>;
+  version: Scalars['String']['input'];
+};
+
+export type ModelRuntimeMode =
+  | 'CPU'
+  | 'GPU';
+
+export type ModelRuntimeSelector = {
+  key: Scalars['String']['output'];
+  value: Scalars['String']['output'];
+};
+
+export type ModelRuntimeSelectorInput = {
+  key: Scalars['String']['input'];
+  value: Scalars['String']['input'];
+};
+
+export type ModelSharingMode =
+  | 'DEDICATED'
+  | 'SHARED';
 
 export type ModelSourceAccess = {
   accessible: Scalars['Boolean']['output'];
@@ -7833,6 +8391,18 @@ export type ModelSubscription = {
   reconciledAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
   version: Scalars['Int']['output'];
+};
+
+export type ModelSubscriptionMetrics = {
+  clusterId: Scalars['GUID']['output'];
+  end: Scalars['DateTime']['output'];
+  metrics: Array<ModelMetricObservation>;
+  retrievedAt: Scalars['DateTime']['output'];
+  scope: Scalars['String']['output'];
+  serviceId: Scalars['GUID']['output'];
+  start: Scalars['DateTime']['output'];
+  stepSeconds: Scalars['Int']['output'];
+  subscriptionId: Scalars['GUID']['output'];
 };
 
 export type ModelSubscriptionOperation = {
@@ -7905,6 +8475,7 @@ export type Mutation = {
   applyStagedManifest: ManifeststagepayloadMutationResult;
   approveDeployment: AstroliftDeploymentMutationResult;
   approveDeploymentByToken: AstroliftDeploymentMutationResult;
+  approveModelConnectionRequest: ModelConnectionRequestMutationResult;
   approveSecretChange: AstroliftSecretChangeProposalMutationResult;
   archiveApp: AstroliftRegisteredAppMutationResult;
   archiveAppRegistryRepo: AstroliftCapabilityDeprovisionPayloadMutationResult;
@@ -7934,9 +8505,11 @@ export type Mutation = {
   bulkRevokeAstroliftRoleBindings: AstroliftBulkRevokeRoleBindingsPayloadMutationResult;
   bulkRollingRestart: BulkOperationResult;
   cancelAstroliftDeregister: AstroliftCancelDeregisterPayloadMutationResult;
+  cancelModelConnectionRequest: ModelConnectionRequestMutationResult;
   cancelPipelineRun: AstroliftPipelineRunMutationResult;
   cancelTask: NoneTypeMutationResult;
   cancelWorkflowInstance: MutationResult;
+  changeAstroliftTeamMembership: AstroliftTeamMembershipChangeMutationResult;
   clearAgentQuarantine: NoneTypeMutationResult;
   clearAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
   clearEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
@@ -7949,6 +8522,7 @@ export type Mutation = {
   connectCloudflareDnsToken: DnsProviderConnectionTypeMutationResult;
   connectExistingGithubApp: AstroliftSourceConnectionMutationResult;
   connectHuggingFace: HuggingFaceConnectionTypeMutationResult;
+  connectManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
   connectSource: AstroliftSourceConnectionMutationResult;
   connectZentinelle: AstroliftZentinelleConnectionMutationResult;
   /** Cancel, terminate, or retry cleanup for an exact owned execution. */
@@ -7979,7 +8553,7 @@ export type Mutation = {
   createToolDef: AstroliftToolDefMutationResult;
   createTrigger: AstroliftTriggerMutationResult;
   createWebhookSubscription: WebhookSecretRevealMutationResult;
-  /** Create a configured Workflow from a visible definition (spec 40 §2.2). */
+  /** Create a configured Workflow from an exact definitionId or legacy definitionSlug. When both are supplied the slug must match the ID. Set isEnabled=false to prepare configuration without activation; the legacy default is true. */
   createWorkflow: CreateWorkflowResult;
   /** Create a new workflow definition (platform operator only). */
   createWorkflowDefinition: MutationResult;
@@ -7987,6 +8561,8 @@ export type Mutation = {
   createWorkflowStage: CreateWorkflowStageResult;
   /** Create an inbound webhook trigger for a workflow definition (platform operator only). */
   createWorkflowTrigger: CreateWorkflowTriggerResult;
+  /** Submit an explicit user decision to one exact human gate. Recover by the same execution and stage IDs after an uncertain response. */
+  decideHumanGate: HumanGateDecisionResult;
   decommissionCluster: AstroliftTenantClusterMutationResult;
   deelevateAdminSession: AstroliftDeelevatePayloadMutationResult;
   /** Delete an object by its global ID (soft-delete via delete_check). */
@@ -8014,8 +8590,8 @@ export type Mutation = {
   deleteSshDeployKey: AstroliftSshDeployKeyMutationResult;
   deleteToolDef: AstroliftToolDefMutationResult;
   deleteWebhookSubscription: SoftdeletepayloadMutationResult;
-  /** Soft-delete a configured Workflow and tear down its schedule. */
-  deleteWorkflow: MutationResult;
+  /** Soft-delete a configured Workflow by exact workflowId or legacy slug and request schedule removal. A supplied slug must match its ID. */
+  deleteWorkflow: WorkflowScheduleResult;
   /** Soft-delete an org-owned workflow definition by slug. */
   deleteWorkflowDefinition: MutationResult;
   /** Soft-delete a stage from a writable definition (spec 40 §6). */
@@ -8041,6 +8617,7 @@ export type Mutation = {
   /** Upload a file and get a pre-signed URL. Creates a FileUpload wrapper around the Upload. */
   fileUpload: FileUploadResult;
   finalizeLocalModelArtifact: LocalModelArtifactMutationResult;
+  finalizeModelConnectionRequest: ModelConnectionRequestMutationResult;
   forceAstroliftRedeploy: AstroliftForceRedeployPayloadMutationResult;
   generateInstallEnrollmentQr: AstroliftEnrollmentQrPayloadMutationResult;
   /** Generate a temporary authentication token for Rocket.Chat. TTL is configured on the Rocket.Chat server. */
@@ -8052,7 +8629,7 @@ export type Mutation = {
   importSkillsFromRepo: AstroliftImportSkillsResultMutationResult;
   /** Import a popular visual agent/workflow builder export (Langflow, Flowise, …) into an Astrolift WorkflowDefinition. preview=true (default) returns the mapped manifest + gap report without persisting; preview=false creates an org-scoped, disabled definition + stages. */
   importWorkflowFlow: ImportWorkflowFlowResult;
-  /** Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled, org-scoped WorkflowDefinition + stages in the caller's org and returns the (possibly uniquified) slug. replace=true instead upserts the org's own definition sharing the manifest's slug: in place when the stage kinds are unchanged (configured Workflows, bindings and schedules all keep working untouched), otherwise as a new version with every configured Workflow repointed to it, or a clear refusal when a repoint would break one's bindings. */
+  /** Import a workflow manifest TOML. preview=true (default) returns the parsed shape without persisting; preview=false creates a disabled WorkflowDefinition + stages in the caller's org, optionally owned by projectId, and returns its exact ID and (possibly uniquified) slug. replace=true instead upserts the org's own definition sharing the manifest's slug: in place when the stage kinds are unchanged (configured Workflows, bindings and schedules all keep working untouched), otherwise as a new version with every configured Workflow repointed to it, or a clear refusal when a repoint would break one's bindings. Replacement preserves ownership; projectId cannot transfer it. */
   importWorkflowManifest: ImportWorkflowManifestResult;
   installAstroliftSourceWebhook: AstroliftInstallSourceWebhookPayloadMutationResult;
   installClusterAgent: AstroliftClusterAgentInstallMutationResult;
@@ -8104,6 +8681,7 @@ export type Mutation = {
   placeObservabilityRetentionHold: ObservabilityRetentionHoldTypeMutationResult;
   /** Get a pre-signed URL for uploading an image or file. Optionally attach it to an entity via owner_container_property. */
   preSignedUrlImageUpload: PreSignedUrlUploadResult;
+  prepareManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
   /** Process a previously uploaded data import file. */
   processFile: ProcessFileResult;
   /** Update any user's profile via ProfileSerializer. Platform operator only; self-service profile edits go through updateMyProfile. */
@@ -8129,6 +8707,9 @@ export type Mutation = {
   reapCloudOrphan: ReapCloudOrphanPayloadMutationResult;
   recheckDomainValidation: AstroliftAppDomainMutationResult;
   reconcileClusterIngresses: ReconcileClusterIngressesResultMutationResult;
+  reconcileManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
+  /** Reconcile the exact reviewed configuration version with its native Temporal schedule. Does not start an immediate run. Active reconciliation requires workflow.trigger; deleted workflow cleanup also requires workflow.delete. */
+  reconcileWorkflowSchedule: WorkflowScheduleResult;
   recordClusterBootstrapRun: BootstraprunrecordedpayloadMutationResult;
   redeliverAgentTaskCallback: AstroliftAgentTaskMutationResult;
   redeployApp: AstroliftDeploymentMutationResult;
@@ -8145,6 +8726,7 @@ export type Mutation = {
   reissueManagedDomainCert: ReissueManagedDomainCertPayloadMutationResult;
   rejectDeployment: AstroliftDeploymentMutationResult;
   rejectDeploymentByToken: AstroliftDeploymentMutationResult;
+  rejectModelConnectionRequest: ModelConnectionRequestMutationResult;
   rejectSecretChange: AstroliftSecretChangeProposalMutationResult;
   releaseObservabilityRetentionHold: ObservabilityRetentionHoldTypeMutationResult;
   removeAgentSecretRef: AstroliftAgentSecretStatusMutationResult;
@@ -8158,6 +8740,7 @@ export type Mutation = {
   reprovisionManagedService: AstroliftManagedServiceMutationResult;
   reprovisionProjectManagedService: AstroliftManagedServiceMutationResult;
   requestAttestationChallenge: AstroliftAttestationChallengePayloadMutationResult;
+  requestModelConnection: ModelConnectionRequestMutationResult;
   requestQuotaIncrease: AstroliftQuotaIncreaseRequestMutationResult;
   rerunAstroliftOnboarding: AstroliftRerunOnboardingPayloadMutationResult;
   resendInvitation: AstroliftInvitationCreatedMutationResult;
@@ -8225,6 +8808,7 @@ export type Mutation = {
   setEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
   /** Toggle a public runtime feature flag (the admin 'feature flipper'). Platform-admin only. ``key`` is the public dotted key from ``astroliftServerInfo.featureFlags`` (e.g. ``zentinelle.enabled``); the backing Constance value is set and the updated flag is returned. Unknown / non-public keys are rejected with a VALIDATION error. Install-time features (``astroliftServerInfo.buildTimeFeatures``) are NOT settable here — they require a redeploy. */
   setFeatureFlag: FeatureFlagInfoMutationResult;
+  setModelConnectionRestriction: ModelConnectionPolicyMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
   setNotificationProfile: AstroliftNotificationProfileMutationResult;
   /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with PRECONDITION; turning one off always succeeds. */
@@ -8233,6 +8817,8 @@ export type Mutation = {
   setPreviewPinned: AstroliftPreviewEnvironmentMutationResult;
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
+  /** Enable or disable an exact owned workflow definition at its reviewed revision. Does not start a run or confirm schedule state. */
+  setWorkflowDefinitionEnabled: WorkflowDefinitionActivationResult;
   setZentinelleGatewayEnabled: AstroliftZentinelleClusterGatewayMutationResult;
   /** Cancel a sign request. Sign requests are not available: this always refuses. */
   signRequestCancel: Scalars['Boolean']['output'];
@@ -8283,6 +8869,7 @@ export type Mutation = {
   updateApp: AstroliftRegisteredAppMutationResult;
   updateAstroliftSecurityPolicy: AstroliftRegisteredAppMutationResult;
   updateClusterModel: ClusterModelDeploymentMutationResult;
+  updateClusterModelRuntime: ClusterModelRuntimeSettingsMutationResult;
   updateEmailTemplate: AstroliftEmailTemplateMutationResult;
   updateFormDefinition: AstroliftFormDefinitionMutationResult;
   updateIdentityProvider: AstroliftIdentityProviderMutationResult;
@@ -8293,6 +8880,7 @@ export type Mutation = {
   updateMyUiPreferences: AstroliftUiPreferencesMutationResult;
   updateOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
   updateOrganization: AstroliftOrganizationMutationResult;
+  updateOrganizationModelConnectionPolicy: ModelConnectionPolicyMutationResult;
   updatePipeline: AstroliftPipelineMutationResult;
   updatePolicy: AstroliftPolicyMutationResult;
   updateProject: AstroliftProjectMutationResult;
@@ -8307,7 +8895,7 @@ export type Mutation = {
   updateTenantCluster: AstroliftTenantClusterMutationResult;
   updateToolDef: AstroliftToolDefMutationResult;
   updateWebhookSubscription: AstroliftWebhookSubscriptionMutationResult;
-  /** Update a configured Workflow (bindings / inputs / trigger / enabled). definitionSlug repoints it at another visible definition: the fallback for a versioned importWorkflowManifest(replace: true) (#1822), or any manual repoint. The existing stage_bindings must still validate against the new definition's stages, or the update is refused. */
+  /** Update a configured Workflow by exact workflowId or legacy slug (bindings / inputs / trigger / enabled). A supplied slug must match its ID. definitionId or definitionSlug repoints it at another visible definition: the fallback for a versioned importWorkflowManifest(replace: true) (#1822), or any manual repoint. The existing stage_bindings must still validate against the new definition's stages, or the update is refused. */
   updateWorkflow: CreateWorkflowResult;
   /** Update an org-owned workflow definition (globals are read-only). */
   updateWorkflowDefinition: MutationResult;
@@ -8389,6 +8977,11 @@ export type MutationApproveDeploymentArgs = {
 
 export type MutationApproveDeploymentByTokenArgs = {
   input: ApproveByTokenInput;
+};
+
+
+export type MutationApproveModelConnectionRequestArgs = {
+  input: DecideModelConnectionRequestInput;
 };
 
 
@@ -8543,6 +9136,11 @@ export type MutationCancelAstroliftDeregisterArgs = {
 };
 
 
+export type MutationCancelModelConnectionRequestArgs = {
+  input: DecideModelConnectionRequestInput;
+};
+
+
 export type MutationCancelPipelineRunArgs = {
   confirmed?: Scalars['Boolean']['input'];
   expectedVersion?: InputMaybe<Scalars['Int']['input']>;
@@ -8560,6 +9158,11 @@ export type MutationCancelTaskArgs = {
 export type MutationCancelWorkflowInstanceArgs = {
   runId?: InputMaybe<Scalars['String']['input']>;
   workflowId: Scalars['String']['input'];
+};
+
+
+export type MutationChangeAstroliftTeamMembershipArgs = {
+  input: ChangeAstroliftTeamMembershipInput;
 };
 
 
@@ -8615,6 +9218,11 @@ export type MutationConnectExistingGithubAppArgs = {
 
 export type MutationConnectHuggingFaceArgs = {
   input: ConnectHuggingFaceInput;
+};
+
+
+export type MutationConnectManagedDomainAppRouteArgs = {
+  input: ManagedDomainAppRouteWriteInput;
 };
 
 
@@ -8777,9 +9385,11 @@ export type MutationCreateWebhookSubscriptionArgs = {
 
 
 export type MutationCreateWorkflowArgs = {
-  definitionSlug: Scalars['String']['input'];
+  definitionId?: InputMaybe<Scalars['GUID']['input']>;
+  definitionSlug?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
   inputs?: InputMaybe<Scalars['JSON']['input']>;
+  isEnabled?: Scalars['Boolean']['input'];
   name: Scalars['String']['input'];
   orgId?: InputMaybe<Scalars['ID']['input']>;
   scheduleCron?: InputMaybe<Scalars['String']['input']>;
@@ -8826,6 +9436,16 @@ export type MutationCreateWorkflowStageArgs = {
 
 export type MutationCreateWorkflowTriggerArgs = {
   workflowSlug: Scalars['String']['input'];
+};
+
+
+export type MutationDecideHumanGateArgs = {
+  confirmed: Scalars['Boolean']['input'];
+  decision: Scalars['String']['input'];
+  executionId: Scalars['ID']['input'];
+  note?: Scalars['String']['input'];
+  stageExecutionId: Scalars['ID']['input'];
+  temporalRunId: Scalars['String']['input'];
 };
 
 
@@ -8959,8 +9579,10 @@ export type MutationDeleteWebhookSubscriptionArgs = {
 
 
 export type MutationDeleteWorkflowArgs = {
+  expectedVersion?: InputMaybe<Scalars['Int']['input']>;
   orgId?: InputMaybe<Scalars['ID']['input']>;
-  slug: Scalars['String']['input'];
+  slug?: InputMaybe<Scalars['String']['input']>;
+  workflowId?: InputMaybe<Scalars['GUID']['input']>;
 };
 
 
@@ -9081,6 +9703,11 @@ export type MutationFinalizeLocalModelArtifactArgs = {
 };
 
 
+export type MutationFinalizeModelConnectionRequestArgs = {
+  input: DecideModelConnectionRequestInput;
+};
+
+
 export type MutationForceAstroliftRedeployArgs = {
   input: ForceRedeployInput;
 };
@@ -9123,6 +9750,7 @@ export type MutationImportWorkflowFlowArgs = {
 export type MutationImportWorkflowManifestArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
   preview?: Scalars['Boolean']['input'];
+  projectId?: InputMaybe<Scalars['GUID']['input']>;
   replace?: Scalars['Boolean']['input'];
   toml: Scalars['String']['input'];
 };
@@ -9312,6 +9940,11 @@ export type MutationPreSignedUrlImageUploadArgs = {
 };
 
 
+export type MutationPrepareManagedDomainAppRouteArgs = {
+  input: ManagedDomainAppRouteWriteInput;
+};
+
+
 export type MutationProcessFileArgs = {
   entityType: EntityType;
   processId?: InputMaybe<Scalars['ID']['input']>;
@@ -9419,6 +10052,18 @@ export type MutationReconcileClusterIngressesArgs = {
 };
 
 
+export type MutationReconcileManagedDomainAppRouteArgs = {
+  input: ManagedDomainAppRouteReconcileInput;
+};
+
+
+export type MutationReconcileWorkflowScheduleArgs = {
+  expectedActive: Scalars['Boolean']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  workflowId: Scalars['GUID']['input'];
+};
+
+
 export type MutationRecordClusterBootstrapRunArgs = {
   input: RecordClusterBootstrapRunInput;
 };
@@ -9502,6 +10147,11 @@ export type MutationRejectDeploymentByTokenArgs = {
 };
 
 
+export type MutationRejectModelConnectionRequestArgs = {
+  input: DecideModelConnectionRequestInput;
+};
+
+
 export type MutationRejectSecretChangeArgs = {
   input: RejectSecretChangeInput;
 };
@@ -9563,6 +10213,11 @@ export type MutationReprovisionProjectManagedServiceArgs = {
 
 export type MutationRequestAttestationChallengeArgs = {
   input: RequestAttestationChallengeInput;
+};
+
+
+export type MutationRequestModelConnectionArgs = {
+  input: RequestModelConnectionInput;
 };
 
 
@@ -9906,6 +10561,11 @@ export type MutationSetFeatureFlagArgs = {
 };
 
 
+export type MutationSetModelConnectionRestrictionArgs = {
+  input: SetModelConnectionRestrictionInput;
+};
+
+
 export type MutationSetNotificationPreferenceArgs = {
   input: SetNotificationPreferenceInput;
 };
@@ -9938,6 +10598,13 @@ export type MutationSetProjectBundleSecretValueArgs = {
 
 export type MutationSetRetentionPolicyArgs = {
   input: SetRetentionPolicyInput;
+};
+
+
+export type MutationSetWorkflowDefinitionEnabledArgs = {
+  definitionId: Scalars['GUID']['input'];
+  expectedRevision: Scalars['String']['input'];
+  isEnabled: Scalars['Boolean']['input'];
 };
 
 
@@ -10176,6 +10843,11 @@ export type MutationUpdateClusterModelArgs = {
 };
 
 
+export type MutationUpdateClusterModelRuntimeArgs = {
+  input: UpdateClusterModelRuntimeInput;
+};
+
+
 export type MutationUpdateEmailTemplateArgs = {
   input: UpdateEmailTemplateInput;
 };
@@ -10223,6 +10895,11 @@ export type MutationUpdateOrgSkillRepoArgs = {
 
 export type MutationUpdateOrganizationArgs = {
   input: UpdateOrganizationInput;
+};
+
+
+export type MutationUpdateOrganizationModelConnectionPolicyArgs = {
+  input: UpdateOrganizationModelConnectionPolicyInput;
 };
 
 
@@ -10301,16 +10978,19 @@ export type MutationUpdateWebhookSubscriptionArgs = {
 
 
 export type MutationUpdateWorkflowArgs = {
+  definitionId?: InputMaybe<Scalars['GUID']['input']>;
   definitionSlug?: InputMaybe<Scalars['String']['input']>;
   description?: InputMaybe<Scalars['String']['input']>;
+  expectedVersion?: InputMaybe<Scalars['Int']['input']>;
   inputs?: InputMaybe<Scalars['JSON']['input']>;
   isEnabled?: InputMaybe<Scalars['Boolean']['input']>;
   name?: InputMaybe<Scalars['String']['input']>;
   orgId?: InputMaybe<Scalars['ID']['input']>;
   scheduleCron?: InputMaybe<Scalars['String']['input']>;
-  slug: Scalars['String']['input'];
+  slug?: InputMaybe<Scalars['String']['input']>;
   stageBindings?: InputMaybe<Scalars['JSON']['input']>;
   triggerKind?: InputMaybe<Scalars['String']['input']>;
+  workflowId?: InputMaybe<Scalars['GUID']['input']>;
 };
 
 
@@ -10516,12 +11196,28 @@ export type PauseAppWebhookDeploysInput = {
 export type PendingHumanGate = {
   definitionName: Scalars['String']['output'];
   definitionSlug: Scalars['String']['output'];
+  executionGuid: Scalars['String']['output'];
   executionId: Scalars['String']['output'];
   runGuid: Scalars['String']['output'];
   stageApprovers: Array<Scalars['String']['output']>;
+  stageGuid: Scalars['String']['output'];
   stageRole: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
+  temporalExecution?: Maybe<WorkflowStageTemporalExecution>;
   workflowId: Scalars['String']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type PendingHumanGatePage = {
+  items: Array<PendingHumanGate>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
 export type PermissionComparison = {
@@ -10655,11 +11351,14 @@ export type ProvisionClusterModelInput = {
   connectionId: InputMaybe<Scalars['GUID']['input']>;
   cpuKvCacheGiB: InputMaybe<Scalars['Int']['input']>;
   cpuRequest: Scalars['String']['input'];
+  dtype: InputMaybe<ModelDtype>;
   expectedArtifactVersion: InputMaybe<Scalars['Int']['input']>;
   expectedConnectionVersion: InputMaybe<Scalars['Int']['input']>;
   expectedProviderId: Scalars['GUID']['input'];
   gpuCount: Scalars['Int']['input'];
   localArtifactId: InputMaybe<Scalars['GUID']['input']>;
+  maxModelLen: InputMaybe<Scalars['Int']['input']>;
+  maxNumSeqs: InputMaybe<Scalars['Int']['input']>;
   memoryRequest: Scalars['String']['input'];
   modelRepo: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
@@ -10890,6 +11589,8 @@ export type Query = {
   astroliftHuggingFaceModel: HuggingFaceModelResult;
   astroliftHuggingFaceModels: HuggingFaceModelsPage;
   astroliftIdentityProviders: Array<AstroliftIdentityProvider>;
+  /** The model the install serves on its own GPUs (calliope-installer#446), read-only in the console; null when the platform model is a cloud API or off. */
+  astroliftInstallManagedModel?: Maybe<AstroliftInstallManagedModel>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage. */
   astroliftInvitations: Array<AstroliftInvitation>;
   astroliftInvitationsCsv: AstroliftIdentityCsvExport;
@@ -10912,11 +11613,13 @@ export type Query = {
   astroliftMembers: Array<AstroliftMember>;
   astroliftMembersCsv: AstroliftIdentityCsvExport;
   astroliftMembersPage: AstroliftMemberPage;
+  astroliftMembershipTeamsPage: AstroliftTeamMembershipTeamPage;
   astroliftModelDeploymentMetrics?: Maybe<ModelDeploymentMetrics>;
   astroliftModelEndpoint?: Maybe<AstroliftManagedService>;
   astroliftModelEndpoints: Array<AstroliftManagedService>;
   astroliftModelEndpointsPage: AstroliftManagedServicePage;
   astroliftModelPromptReadiness?: Maybe<AstroliftModelPromptReadiness>;
+  astroliftModelSubscriptionMetrics?: Maybe<ModelSubscriptionMetrics>;
   astroliftMyAlertSubscriptions: Array<AstroliftUserAlertSubscription>;
   astroliftMyApps: Array<AstroliftRegisteredApp>;
   astroliftMyAppsPage: AstroliftRegisteredAppPage;
@@ -10934,6 +11637,7 @@ export type Query = {
   astroliftOrganization?: Maybe<AstroliftOrganization>;
   astroliftOrganizationAllowlistDomains: Array<AstroliftOrganizationAllowlistedDomain>;
   astroliftOrganizations: Array<AstroliftOrganization>;
+  astroliftPersonTeamMembershipsPage: AstroliftTeamMembershipPage;
   astroliftPipeline?: Maybe<AstroliftPipeline>;
   astroliftPipelineRun?: Maybe<AstroliftPipelineRun>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftPipelineRunsPage. */
@@ -11014,7 +11718,13 @@ export type Query = {
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftTaskRunsPage. */
   astroliftTaskRuns: Array<AstroliftTaskRun>;
   astroliftTaskRunsPage: AstroliftTaskRunPage;
+  astroliftTeamMemberCandidatesPage: AstroliftTeamMembershipPersonPage;
   astroliftTeamMembers: Array<AstroliftMember>;
+  astroliftTeamMembershipPerson?: Maybe<AstroliftTeamMembershipPerson>;
+  astroliftTeamMembershipReview?: Maybe<AstroliftTeamMembershipReview>;
+  astroliftTeamMembershipRolesPage: AstroliftTeamMembershipRolePage;
+  astroliftTeamMembershipTeam?: Maybe<AstroliftTeamMembershipTeam>;
+  astroliftTeamMembershipsPage: AstroliftTeamMembershipPage;
   astroliftTeamSlugAvailable: Scalars['Boolean']['output'];
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftTeamsPage. */
   astroliftTeams: Array<AstroliftTeam>;
@@ -11028,6 +11738,8 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftWebhookSubscriptionsPage. */
   astroliftWebhookSubscriptions: Array<AstroliftWebhookSubscription>;
   astroliftWebhookSubscriptionsPage: AstroliftWebhookSubscriptionPage;
+  /** What the install withholds from Astrolift (calliope-installer#447): dns, databases, load_balancers, clusters, controllers, each with the reason to show. Empty when nothing is withheld. */
+  astroliftWithheldCapabilities: Array<AstroliftWithheldCapability>;
   astroliftWorkflowInstance?: Maybe<AstroliftWorkflowInstance>;
   astroliftWorkflowInstanceDetail?: Maybe<AstroliftWorkflowInstanceDetail>;
   astroliftWorkflowInstances: AstroliftWorkflowInstancePage;
@@ -11053,13 +11765,16 @@ export type Query = {
   brief?: Maybe<AstroliftBrief>;
   cloudflareDnsRecords: CloudflareDnsRecordsInventory;
   cloudflareDnsZones: CloudflareDnsZonesInventory;
+  clusterModelDedicatedAppsPage: ModelDedicatedAppPage;
   clusterModelDeployment?: Maybe<ClusterModelDeployment>;
   clusterModelDeploymentsPage: ClusterModelDeploymentPage;
   clusterModelPlacementClustersPage: ModelPlacementClusterPage;
   clusterModelRuntimeAdmission: ModelRuntimeAdmission;
+  clusterModelRuntimeSettings?: Maybe<ClusterModelRuntimeSettings>;
   clusterModelSourceAccess: ModelSourceAccess;
   clusterModelSubscriptionTargetsPage: ModelSubscriptionTargetPage;
   clusterModelSubscriptionsPage: ModelSubscriptionPage;
+  clusterModelUpdateAdmission: ModelRuntimeAdmission;
   dispatchers: Array<AstroliftDispatcherInstance>;
   dnsProviderConnectionSupport: DnsProviderConnectionSupport;
   dnsProviderConnectionsPage: DnsProviderConnectionTypePage;
@@ -11075,24 +11790,40 @@ export type Query = {
   formFieldTypes: Array<Scalars['String']['output']>;
   formSubmissions: Array<AstroliftFormSubmission>;
   huggingFaceConnectionsPage: HuggingFaceConnectionTypePage;
+  /** Recover a human decision by exact execution and stage GUIDs without resubmitting it. */
+  humanGateDecision?: Maybe<HumanGateDecisionState>;
   installAlertMailSupport: InstallAlertMailSupport;
   installAlertMailTestsPage: InstallAlertMailTestPage;
+  managedDomainAppRouteOperation?: Maybe<ManagedDomainAppRouteOperation>;
+  managedDomainAppRouteReview: ManagedDomainAppRouteReview;
+  managedDomainAppRouteSupport: ManagedDomainAppRouteSupport;
+  managedDomainAppTargetsPage: ManagedDomainAppRouteTargetsPage;
   me?: Maybe<AstroliftMe>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use membersPage. */
   members: Array<OrganizationMemberType>;
   /** Cursor-paginated list of members in the caller's organizations. */
   membersPage: OrganizationMemberTypePage;
+  modelConnectionAction: ModelConnectionEligibility;
+  modelConnectionApprovalRequestsPage: ModelConnectionRequestPage;
+  modelConnectionRequest?: Maybe<ModelConnectionRequest>;
+  modelConnectionRequestsPage: ModelConnectionRequestPage;
+  modelConnectionRestriction: ModelConnectionPolicy;
+  modelConnectionReviewRequest?: Maybe<ModelConnectionRequest>;
+  modelConnectionTargetsPage: ModelConnectionDestinationPage;
   modelHostingAction: ModelHostingAction;
   orgSkillRepos: Array<AstroliftOrgSkillRepo>;
   orgToolDefs: Array<AstroliftToolDef>;
   orgToolDefsPage: AstroliftToolDefPage;
   organization?: Maybe<OrganizationType>;
+  organizationModelConnectionPolicy: ModelConnectionPolicy;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use organizationsPage. */
   organizations: Array<OrganizationType>;
   /** Cursor-paginated list of the caller's organizations. */
   organizationsPage: OrganizationTypePage;
   /** Open human_gate stage executions across the org's runs that the caller may decide, newest first (#1820). */
   pendingHumanGates: Array<PendingHumanGate>;
+  /** Page through open gates. Named-approver filtering can produce an empty page with a next cursor; continue until nextCursor is null. */
+  pendingHumanGatesPage: PendingHumanGatePage;
   /** Compare effective permissions between two users, anywhere in the active organization or on a target scope (scopeType, scopeId). Superuser or org.manage_members; both users must be members of the active organization. */
   permissionCompare?: Maybe<PermissionComparison>;
   /** Diagnose why a user can or can't perform a specific permission, optionally on a target scope (scopeType ORG, TEAM, PROJECT, APP or AGENT; scopeId its guid). Self, superuser or org.manage_members; the user must be a member of the active organization. */
@@ -11111,7 +11842,7 @@ export type Query = {
   skillsPage: AstroliftSkillPage;
   toolDef?: Maybe<AstroliftToolDef>;
   toolDefs: Array<AstroliftToolDef>;
-  /** One configured Workflow by slug, with its recent runs. */
+  /** One configured Workflow by exact ID or legacy slug, with its recent runs. A supplied slug must match the ID. */
   workflow?: Maybe<ConfiguredWorkflow>;
   /** One visible workflow definition by slug (prefers the org's over a global). */
   workflowDefinition?: Maybe<WorkflowDefinitionSummary>;
@@ -11142,6 +11873,8 @@ export type Query = {
   workflowInstances: Array<WorkflowInstanceType>;
   /** Runs (tier 3) of one configured Workflow, newest first. */
   workflowRuns: Array<WorkflowRun>;
+  /** Observe a configured workflow's exact schedule identity, desired version and engine state, including cleanup after soft deletion. */
+  workflowSchedule?: Maybe<WorkflowScheduleState>;
   /** List stage executions for a WorkflowRun (by workflow_id + run_id). */
   workflowStageExecutions: Array<WorkflowStageExecutionType>;
   /** List stages for a workflow definition by slug. */
@@ -12243,6 +12976,13 @@ export type QueryAstroliftMembersPageArgs = {
 };
 
 
+export type QueryAstroliftMembershipTeamsPageArgs = {
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryAstroliftModelDeploymentMetricsArgs = {
   end: Scalars['DateTime']['input'];
   expectedClusterId: Scalars['GUID']['input'];
@@ -12268,6 +13008,17 @@ export type QueryAstroliftModelEndpointsPageArgs = {
 
 export type QueryAstroliftModelPromptReadinessArgs = {
   id: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftModelSubscriptionMetricsArgs = {
+  end: Scalars['DateTime']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+  serviceId: Scalars['GUID']['input'];
+  start: Scalars['DateTime']['input'];
+  subscriptionId: Scalars['GUID']['input'];
 };
 
 
@@ -12322,6 +13073,14 @@ export type QueryAstroliftOrgMembersForApprovalPickerArgs = {
 
 export type QueryAstroliftOrganizationArgs = {
   slug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftPersonTeamMembershipsPageArgs = {
+  orgMemberId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -12710,7 +13469,50 @@ export type QueryAstroliftTaskRunsPageArgs = {
 };
 
 
+export type QueryAstroliftTeamMemberCandidatesPageArgs = {
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftTeamMembersArgs = {
+  teamId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftTeamMembershipPersonArgs = {
+  orgMemberId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftTeamMembershipReviewArgs = {
+  kind: TeamMembershipChangeKind;
+  orgMemberId: Scalars['GUID']['input'];
+  roleId?: InputMaybe<Scalars['GUID']['input']>;
+  teamId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftTeamMembershipRolesPageArgs = {
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+  teamId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftTeamMembershipTeamArgs = {
+  slug?: InputMaybe<Scalars['String']['input']>;
+  teamId?: InputMaybe<Scalars['GUID']['input']>;
+};
+
+
+export type QueryAstroliftTeamMembershipsPageArgs = {
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
   teamId: Scalars['GUID']['input'];
 };
 
@@ -12906,6 +13708,16 @@ export type QueryCloudflareDnsZonesArgs = {
 };
 
 
+export type QueryClusterModelDedicatedAppsPageArgs = {
+  clusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type QueryClusterModelDeploymentArgs = {
   id: Scalars['GUID']['input'];
   organizationId: Scalars['GUID']['input'];
@@ -12934,6 +13746,13 @@ export type QueryClusterModelRuntimeAdmissionArgs = {
 };
 
 
+export type QueryClusterModelRuntimeSettingsArgs = {
+  clusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+};
+
+
 export type QueryClusterModelSourceAccessArgs = {
   connectionId?: InputMaybe<Scalars['GUID']['input']>;
   expectedConnectionVersion?: InputMaybe<Scalars['Int']['input']>;
@@ -12959,6 +13778,11 @@ export type QueryClusterModelSubscriptionsPageArgs = {
   page?: Scalars['Int']['input'];
   pageSize?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryClusterModelUpdateAdmissionArgs = {
+  input: UpdateClusterModelInput;
 };
 
 
@@ -13024,6 +13848,12 @@ export type QueryHuggingFaceConnectionsPageArgs = {
 };
 
 
+export type QueryHumanGateDecisionArgs = {
+  executionId: Scalars['ID']['input'];
+  stageExecutionId: Scalars['ID']['input'];
+};
+
+
 export type QueryInstallAlertMailSupportArgs = {
   eventKind?: Scalars['String']['input'];
 };
@@ -13036,9 +13866,75 @@ export type QueryInstallAlertMailTestsPageArgs = {
 };
 
 
+export type QueryManagedDomainAppRouteOperationArgs = {
+  input: ManagedDomainAppRouteOperationInput;
+};
+
+
+export type QueryManagedDomainAppRouteReviewArgs = {
+  input: ManagedDomainAppRouteTargetInput;
+};
+
+
+export type QueryManagedDomainAppRouteSupportArgs = {
+  domainId: Scalars['GUID']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+};
+
+
+export type QueryManagedDomainAppTargetsPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  domainId: Scalars['GUID']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+  first?: Scalars['Int']['input'];
+};
+
+
 export type QueryMembersPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryModelConnectionActionArgs = {
+  input: ModelConnectionTargetInput;
+};
+
+
+export type QueryModelConnectionApprovalRequestsPageArgs = {
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+};
+
+
+export type QueryModelConnectionRequestArgs = {
+  input: DecideModelConnectionRequestInput;
+};
+
+
+export type QueryModelConnectionRequestsPageArgs = {
+  organizationId: Scalars['GUID']['input'];
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
+};
+
+
+export type QueryModelConnectionRestrictionArgs = {
+  input: ModelConnectionPlacementInput;
+};
+
+
+export type QueryModelConnectionReviewRequestArgs = {
+  input: DecideModelConnectionRequestInput;
+};
+
+
+export type QueryModelConnectionTargetsPageArgs = {
+  input: ModelConnectionPlacementInput;
+  page?: Scalars['Int']['input'];
+  pageSize?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
 };
 
@@ -13073,6 +13969,11 @@ export type QueryOrganizationArgs = {
 };
 
 
+export type QueryOrganizationModelConnectionPolicyArgs = {
+  organizationId: Scalars['GUID']['input'];
+};
+
+
 export type QueryOrganizationsArgs = {
   query?: InputMaybe<Scalars['String']['input']>;
 };
@@ -13088,6 +13989,12 @@ export type QueryOrganizationsPageArgs = {
 export type QueryPendingHumanGatesArgs = {
   limit?: Scalars['Int']['input'];
   orgId?: InputMaybe<Scalars['ID']['input']>;
+};
+
+
+export type QueryPendingHumanGatesPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
 };
 
 
@@ -13192,7 +14099,8 @@ export type QueryToolDefsArgs = {
 
 export type QueryWorkflowArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
-  slug: Scalars['String']['input'];
+  slug?: InputMaybe<Scalars['String']['input']>;
+  workflowId?: InputMaybe<Scalars['GUID']['input']>;
 };
 
 
@@ -13277,6 +14185,11 @@ export type QueryWorkflowInstancesArgs = {
 export type QueryWorkflowRunsArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
   workflowId: Scalars['ID']['input'];
+};
+
+
+export type QueryWorkflowScheduleArgs = {
+  workflowId: Scalars['GUID']['input'];
 };
 
 
@@ -13493,6 +14406,20 @@ export type ReprovisionManagedServiceInput = {
 
 export type RequestAttestationChallengeInput = {
   kind: Scalars['String']['input'];
+};
+
+export type RequestModelConnectionInput = {
+  alias: Scalars['String']['input'];
+  appEnvironmentId: Scalars['GUID']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  idempotencyKey: Scalars['GUID']['input'];
+  ifMatchAppVersion: Scalars['Int']['input'];
+  ifMatchEnvironmentVersion: Scalars['Int']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+  policyVersion: Scalars['String']['input'];
 };
 
 export type RequestQuotaIncreaseInput = {
@@ -13849,6 +14776,18 @@ export type SetEnvironmentSettingInput = {
   value: Scalars['String']['input'];
 };
 
+export type SetModelConnectionRestrictionInput = {
+  allowSelfApproval: Scalars['Boolean']['input'];
+  expectedClusterId: Scalars['GUID']['input'];
+  expectedProviderId: Scalars['GUID']['input'];
+  ifMatchDeploymentVersion: Scalars['Int']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  mode: ModelConnectionMode;
+  modelDeploymentId: Scalars['GUID']['input'];
+  organizationId: Scalars['GUID']['input'];
+  requiredApprovals: Scalars['Int']['input'];
+};
+
 export type SetNotificationPreferenceInput = {
   channel: Scalars['String']['input'];
   enabled: Scalars['Boolean']['input'];
@@ -14042,6 +14981,10 @@ export type SyncManifestFromRepoInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type TeamMembershipChangeKind =
+  | 'ADD'
+  | 'REMOVE';
+
 export type TearDownAppInput = {
   deleteData: Scalars['Boolean']['input'];
   forceDestroy: Scalars['Boolean']['input'];
@@ -14221,12 +15164,29 @@ export type UpdateClusterModelInput = {
   allowSubscriptions: Scalars['Boolean']['input'];
   cpuKvCacheGiB: InputMaybe<Scalars['Int']['input']>;
   cpuRequest: Scalars['String']['input'];
+  dedicatedAppId: InputMaybe<Scalars['GUID']['input']>;
+  dtype: InputMaybe<ModelDtype>;
   expectedClusterId: Scalars['GUID']['input'];
   expectedProviderId: Scalars['GUID']['input'];
   gpuCount: Scalars['Int']['input'];
   id: Scalars['GUID']['input'];
+  ifMatchDedicatedAppVersion: InputMaybe<Scalars['Int']['input']>;
   ifMatchVersion: Scalars['Int']['input'];
+  maxModelLen: InputMaybe<Scalars['Int']['input']>;
+  maxNumSeqs: InputMaybe<Scalars['Int']['input']>;
   memoryRequest: Scalars['String']['input'];
+  name: InputMaybe<Scalars['String']['input']>;
+  organizationId: Scalars['GUID']['input'];
+  sharingMode: InputMaybe<ModelSharingMode>;
+};
+
+export type UpdateClusterModelRuntimeInput = {
+  clusterId: Scalars['GUID']['input'];
+  computeMode: ModelRuntimeMode;
+  declaration: ModelRuntimeDeclarationInput;
+  expectedProviderId: Scalars['GUID']['input'];
+  expectedProviderVersion: Scalars['Int']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
   organizationId: Scalars['GUID']['input'];
 };
 
@@ -14315,6 +15275,14 @@ export type UpdateOrganizationInput = {
   restrictedSettingsDefault: InputMaybe<Scalars['String']['input']>;
   traceRetentionDaysDefault: InputMaybe<Scalars['Int']['input']>;
   website: InputMaybe<Scalars['String']['input']>;
+};
+
+export type UpdateOrganizationModelConnectionPolicyInput = {
+  allowSelfApproval: Scalars['Boolean']['input'];
+  ifMatchVersion: Scalars['Int']['input'];
+  mode: ModelConnectionMode;
+  organizationId: Scalars['GUID']['input'];
+  requiredApprovals: Scalars['Int']['input'];
 };
 
 export type UpdatePipelineInput = {
@@ -14499,6 +15467,15 @@ export type WebhookSecretRevealMutationResult = {
 
 export type WithdrawSecretChangeInput = {
   proposalId: Scalars['GUID']['input'];
+};
+
+export type WorkflowDefinitionActivationResult = {
+  changed: Scalars['Boolean']['output'];
+  definitionId?: Maybe<Scalars['GUID']['output']>;
+  errors: Array<ValidationError>;
+  isEnabled?: Maybe<Scalars['Boolean']['output']>;
+  ok: Scalars['Boolean']['output'];
+  revision?: Maybe<Scalars['String']['output']>;
 };
 
 export type WorkflowDefinitionRun = {
@@ -14730,6 +15707,29 @@ export type WorkflowRun = {
   temporalWorkflowId?: Maybe<Scalars['String']['output']>;
 };
 
+export type WorkflowScheduleResult = {
+  configurationSaved: Scalars['Boolean']['output'];
+  errors: Array<ValidationError>;
+  ok: Scalars['Boolean']['output'];
+  schedule?: Maybe<WorkflowScheduleState>;
+};
+
+export type WorkflowScheduleState = {
+  actionCount?: Maybe<Scalars['Int']['output']>;
+  configurationVersion: Scalars['Int']['output'];
+  confirmed: Scalars['Boolean']['output'];
+  desiredActive: Scalars['Boolean']['output'];
+  desiredRevision: Scalars['String']['output'];
+  engineCreatedAt?: Maybe<Scalars['DateTime']['output']>;
+  engineUpdatedAt?: Maybe<Scalars['DateTime']['output']>;
+  errorCode: Scalars['String']['output'];
+  message: Scalars['String']['output'];
+  observedAt: Scalars['DateTime']['output'];
+  observedState: Scalars['String']['output'];
+  scheduleId: Scalars['String']['output'];
+  workflowId: Scalars['String']['output'];
+};
+
 export type WorkflowStageExecutionType = {
   agentRunGuid?: Maybe<Scalars['String']['output']>;
   attemptNumber: Scalars['Int']['output'];
@@ -14760,6 +15760,7 @@ export type WorkflowStageExecutionType = {
   stageRole: Scalars['String']['output'];
   startedAt?: Maybe<Scalars['DateTime']['output']>;
   status: Scalars['String']['output'];
+  temporalExecution?: Maybe<WorkflowStageTemporalExecution>;
 };
 
 /** One page of a cursor-paginated or numbered list. */
@@ -14773,6 +15774,12 @@ export type WorkflowStageExecutionTypePage = {
   pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type WorkflowStageTemporalExecution = {
+  namespace: Scalars['String']['output'];
+  runId: Scalars['String']['output'];
+  workflowId: Scalars['String']['output'];
 };
 
 export type WorkflowStageType = {

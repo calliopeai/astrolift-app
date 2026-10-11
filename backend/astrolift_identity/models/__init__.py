@@ -29,6 +29,7 @@ from astrolift_identity.models.session import (
     RevocationReason,
 )
 from astrolift_identity.models.team import Team
+from astrolift_identity.models.team_membership_action import TeamMembershipAction
 
 __all__ = [
     "DEFAULT_MAX_SESSIONS_PER_CLIENT_KIND",
@@ -57,5 +58,6 @@ __all__ = [
     "RoleBinding",
     "ScimGroup",
     "Team",
+    "TeamMembershipAction",
     "UserPreferences",
 ]

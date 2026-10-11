@@ -199,7 +199,7 @@ def test_db_immutable_original_owner_and_history_and_reverse_refusal(admitted):
         ManagedDomainAppBinding.all_objects.filter(pk=row.pk).delete()
     row.soft_delete()
     assert ManagedDomainAppBinding.all_objects.get(pk=row.pk).deleted_at is not None
-    module = import_module("astrolift_lifecycle.migrations.0046_managed_domain_app_binding")
+    module = import_module("astrolift_lifecycle.migrations.0047_managed_domain_app_binding")
     executor = MigrationExecutor(connection)
     with connection.schema_editor(atomic=True) as editor:
         with pytest.raises(RuntimeError, match="empty retained"):

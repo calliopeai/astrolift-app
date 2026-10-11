@@ -60,7 +60,8 @@ export function useSharedModels(): SharedModelsScreenProps {
     {
       variables: variables ?? { organizationId, page: 1, pageSize: 25 },
       skip: skipped,
-      fetchPolicy: "cache-and-network",
+      fetchPolicy: "no-cache",
+      context: { queryDeduplication: false },
     }
   );
   const page = skipped ? undefined : query.data?.clusterModelDeploymentsPage;
@@ -72,6 +73,11 @@ export function useSharedModels(): SharedModelsScreenProps {
         ? []
         : (page?.items ?? []).map((row) => ({
             ...row,
+            desiredResources: {
+              cpuRequest: row.desiredResources.cpuRequest ?? null,
+              memoryRequest: row.desiredResources.memoryRequest ?? null,
+              gpuCount: row.desiredResources.gpuCount ?? null,
+            },
             revisionSha: row.revisionSha ?? null,
             computeMode: row.computeMode ?? null,
             reason: row.reason ?? null,

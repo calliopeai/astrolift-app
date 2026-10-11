@@ -639,6 +639,18 @@ CONSTANCE_CONFIG = {
         "presenting the legacy shape — at that point any straggler legacy token will fail "
         "auth with a 401 and operators can re-issue.",
     ),
+    "MODEL_CONNECTION_DEFAULT_MODE": (
+        "AUTO",
+        "Default app-to-model connection mode: AUTO, REQUIRE_APPROVAL or DENY. Organization policies may override this default; model restrictions cannot loosen organization policy.",
+    ),
+    "MODEL_CONNECTION_DEFAULT_QUORUM": (
+        1,
+        "Default distinct human approvals required for app-to-model connections (1 through 16).",
+    ),
+    "MODEL_CONNECTION_ALLOW_SELF_APPROVAL": (
+        False,
+        "Whether an app-to-model requester may count as an approver by default. Organization and model rules may require separation of duties.",
+    ),
     "ALLOW_SELF_APPROVE_DEPLOYS": (
         False,
         "When False (default), the user who triggered a deployment cannot also approve it — "
@@ -646,12 +658,14 @@ CONSTANCE_CONFIG = {
         "still want the deploy-approval audit trail without blocking on a second approver. "
         "Per-deployment auditability is unchanged either way.",
     ),
+    "BUILDER_FILES_MAX_BYTES": (64 * 1024 * 1024, "Decoded app asset budget per builder sync."),
+    "BUILDER_MAX_FILES": (10000, "Maximum assets per builder sync."),
     "BUILDER_DATA_FILE_MAX_BYTES": (
         64 * 1024 * 1024,
         "Largest data file (e.g. an app's data.sqlite) the App Builder accepts in one "
         "files sync, in decoded bytes. It travels base64 in the request, so the request "
         "can be a third larger; an ingress in front of the control plane must allow that "
-        "body size. The file is stored in Postgres and shipped to the cluster as Secrets.",
+        "body size. The file is shipped in a private artifact and seeded into the data volume.",
     ),
     # ---- Admin console surfaces (feature flipper) ----
     # Runtime gates for the platform-admin cost / quotas / permissions
@@ -865,10 +879,20 @@ CONSTANCE_CONFIG_FIELDSETS = {
         "collapse": False,
     },
     "Workflows": {
-        "fields": ("TEMPORAL_ENABLED", "DEPLOY_PIPELINE_ENABLED", "ALLOW_SELF_APPROVE_DEPLOYS"),
+        "fields": (
+            "TEMPORAL_ENABLED",
+            "DEPLOY_PIPELINE_ENABLED",
+            "ALLOW_SELF_APPROVE_DEPLOYS",
+            "MODEL_CONNECTION_DEFAULT_MODE",
+            "MODEL_CONNECTION_DEFAULT_QUORUM",
+            "MODEL_CONNECTION_ALLOW_SELF_APPROVAL",
+        ),
         "collapse": False,
     },
-    "App Builder": {"fields": ("BUILDER_DATA_FILE_MAX_BYTES",), "collapse": False},
+    "App Builder": {
+        "fields": ("BUILDER_FILES_MAX_BYTES", "BUILDER_MAX_FILES", "BUILDER_DATA_FILE_MAX_BYTES"),
+        "collapse": False,
+    },
     "Webhooks": {"fields": ("WEBHOOK_SECRET_ROTATION_GRACE_SECONDS",), "collapse": False},
     "Deploy tokens": {
         "fields": (
@@ -1329,3 +1353,17 @@ TWILIO_SID = os.getenv("TWILIO_SID", "")
 TWILIO_SECRET = os.getenv("TWILIO_SECRET", "")
 TWILIO_FROM_NUMBER = os.getenv("TWILIO_FROM_NUMBER", "")
 TWILIO_CALLBACK = os.getenv("TWILIO_CALLBACK", "")
+
+# The default archive store is shared across API/worker replicas without a new
+# service. Operators can replace this alias with a private object-store backend.
+BUILDER_ARTIFACT_BASE_URL = env_str("BUILDER_ARTIFACT_BASE_URL", PLATFORM_API_URL)
+STORAGES = globals().get(
+    "STORAGES",
+    {
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+    },
+)
+STORAGES.setdefault(
+    "builder_artifacts", {"BACKEND": "astrolift_lifecycle.artifact_storage.BuilderArtifactStorage"}
+)

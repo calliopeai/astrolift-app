@@ -24,6 +24,7 @@ import {
 } from "@/components/screens/apps/managed-services/use-email-detail";
 import { EmailDeliveryClient } from "@/components/screens/email-delivery/EmailDeliveryClient";
 import type { AstroliftEmailServiceDetail } from "@/graphql/services/services.types";
+import { useWithheldCapabilities } from "@/hooks/use-install-policy";
 
 interface EmailDetailSheetProps {
   managedServiceId: string;
@@ -48,6 +49,9 @@ export function EmailDetailSheet({
   onOpenChange,
 }: EmailDetailSheetProps) {
   const { detail, loading, onRefetch } = useEmailDetail(managedServiceId, open);
+  // SES is the only backend that writes its own verification records, on AWS.
+  const onAws = detail?.pluginSlug === "aws";
+  const dns = useWithheldCapabilities({ skip: !onAws }).dns;
 
   return (
     <EmailDetailSheetView
@@ -57,6 +61,7 @@ export function EmailDetailSheet({
       onOpenChange={onOpenChange}
       detail={detail}
       loading={loading}
+      dnsRestriction={onAws ? dns : null}
       panels={
         detail
           ? {

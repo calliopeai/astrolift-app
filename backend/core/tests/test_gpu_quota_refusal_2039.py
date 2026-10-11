@@ -116,3 +116,20 @@ def test_an_autoscaled_workload_counts_at_its_ceiling(world):
     raw = _toml(gpu=1).replace("replicas = 1\n", "replicas = 1\nhpa_min = 1\nhpa_max = 5\n")
     # prod holds 4; this one can scale to 5.
     assert "needs 5 GPU(s)" in gpu_quota_refusal(world.deploy, _manifest(raw))
+
+
+def test_the_install_shared_model_counts_its_replicas(world, monkeypatch):
+    # calliope-installer#446: one GPU per replica of the install's own vLLM.
+    _quota(world.org, 6)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("ASTROLIFT_PLATFORM_MODEL_PROVIDER", "openai_compatible")
+    monkeypatch.setenv("ASTROLIFT_PLATFORM_MODEL_URL", "http://internal-acme-al-model.elb.amazonaws.com/v1")
+    monkeypatch.setenv("ASTROLIFT_PLATFORM_MODEL_ID", "Qwen/Qwen2.5-7B-Instruct")
+    monkeypatch.setenv("ASTROLIFT_PLATFORM_MODEL_REPLICAS", "1")
+    # prod holds 4, the shared model 1: one more fits, two do not.
+    assert gpu_quota_refusal(world.deploy, _manifest(_toml(gpu=1))) is None
+    refusal = gpu_quota_refusal(world.deploy, _manifest(_toml(gpu=2)))
+    assert (
+        refusal
+        and "already runs 5 (including 1 for the install's shared model) of its 6-GPU quota" in refusal
+    )

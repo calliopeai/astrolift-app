@@ -52,9 +52,11 @@ export function BootstrapPlanView({
   const selected: Record<string, boolean> = {};
   const optionValues: Record<string, Record<string, string>> = {};
   for (const component of plan?.components ?? []) {
-    selected[component.key] = sameCluster
-      ? (draft.selected[component.key] ?? preselected(component))
-      : preselected(component);
+    selected[component.key] = component.withheldReason
+      ? false
+      : sameCluster
+        ? (draft.selected[component.key] ?? preselected(component))
+        : preselected(component);
     optionValues[component.key] = {};
     for (const option of component.options) {
       const picked = sameCluster ? draft.options[component.key]?.[option.key] : undefined;
@@ -141,7 +143,8 @@ export function BootstrapPlanView({
               <input
                 type="checkbox"
                 checked={!!selected[c.key]}
-                disabled={readOnly || installing}
+                disabled={readOnly || installing || !!c.withheldReason}
+                aria-describedby={c.withheldReason ? `withheld-${c.key}` : undefined}
                 onChange={(e) =>
                   setDraft((s) => ({
                     ...s,
@@ -163,8 +166,18 @@ export function BootstrapPlanView({
                       {t("outsideRecipe")}
                     </Badge>
                   )}
+                  {c.withheldReason && (
+                    <Badge variant="outline" className="text-2xs">
+                      {t("withheld")}
+                    </Badge>
+                  )}
                 </div>
                 <div className="text-muted-foreground mt-0.5 text-xs">{c.rationale}</div>
+                {c.withheldReason && (
+                  <p id={`withheld-${c.key}`} className="text-warning-fg mt-1 text-xs">
+                    {c.withheldReason}
+                  </p>
+                )}
                 {c.requires.length > 0 && (
                   <div className="mt-1 flex flex-wrap gap-1">
                     {c.requires.map((r) => (

@@ -52,6 +52,11 @@ function row(
     name: page === 1 ? "First shared model" : "Later shared model",
     organizationId,
     version: 4,
+    sharingMode: "SHARED",
+    dedicatedAppId: null,
+    dedicatedAppVersion: null,
+    dedicatedAppName: null,
+    dedicatedAppSlug: null,
     runtimeSupported: true,
     runtimeReason: null,
     readinessGeneration: 8,
@@ -141,7 +146,7 @@ describe("actual shared model reads", () => {
       "href",
       "/models/endpoints"
     );
-    expect(screen.getByRole("link", { name: "Host a model" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "Add model" })).toHaveAttribute(
       "href",
       "/models/deploy"
     );

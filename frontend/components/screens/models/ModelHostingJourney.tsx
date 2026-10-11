@@ -11,11 +11,13 @@ export interface ModelHostingJourneyProps {
   clusterSelected: boolean;
   readyForReview: boolean;
   accepted: boolean;
+  activeStep?: 0 | 1 | 2;
+  onNavigate?: (step: 0 | 1 | 2) => void;
 }
 
 export function ModelHostingJourney(props: ModelHostingJourneyProps) {
   const t = useTranslations("models.shared.hosting");
-  const current = !props.modelSelected ? 0 : !props.clusterSelected ? 1 : 2;
+  const current = props.activeStep ?? (!props.modelSelected ? 0 : !props.clusterSelected ? 1 : 2);
   const steps = [
     {
       title: "modelStep",
@@ -71,7 +73,16 @@ export function ModelHostingJourney(props: ModelHostingJourneyProps) {
           return (
             <li key={step.title} aria-current={selected ? "step" : undefined}>
               {step.enabled ? (
-                <a href={`#${step.anchor}`} className={style}>
+                <a
+                  href={`#${step.anchor}`}
+                  className={style}
+                  onClick={(event) => {
+                    if (props.onNavigate) {
+                      event.preventDefault();
+                      props.onNavigate(index as 0 | 1 | 2);
+                    }
+                  }}
+                >
                   {content}
                 </a>
               ) : (

@@ -38,9 +38,12 @@ Python model code or remote-code loader is admitted.
 
 ## Product/API sequence
 
-Every source operation requires current `org.update` authority in the selected
-organization, an active user/member and the original bearer permission ceiling.
-Import administration does not bypass `cluster.update` or model-hosting admission.
+Every source operation requires a fresh active installation platform operator
+(Django superuser), current `org.update` and `cluster.update` authority in the
+selected organization, and the existing bearer ceiling. A bearer must retain its
+`admin` scope and live selected-org membership. Ordinary organization owner grants
+do not authorize imports. A waited-on artifact lock rechecks this admission before
+verification writes; source storage observations remain separate from model health.
 
 1. `beginLocalModelArtifact` accepts the organization GUID, display name and an
    immutable file manifest. Each entry has a flat filename, SHA-256 and decimal

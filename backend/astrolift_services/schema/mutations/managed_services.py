@@ -145,6 +145,14 @@ def _creator_id() -> int | None:
     return tenant.actor_user_id if tenant else None
 
 
+def _require_model_host_operator(info, kind, cluster):
+    """Legacy app/project models retain their owner contract and require hosting admission."""
+    if kind == ManagedService.Kind.MODEL_ENDPOINT:
+        from astrolift_services.schema.hf_connections import require_host_admin
+
+        require_host_admin(info, cluster)
+
+
 def _requested_isolation(value: str | None) -> str:
     """The isolation mode to store on the row, or ``""`` for unspecified.
 
@@ -457,6 +465,7 @@ class ManagedServiceMutations:
         ).first()
         if cluster is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+        _require_model_host_operator(info, input.kind, cluster)
         from astrolift_services.managed_service_catalog import (
             CatalogResolutionError,
             resolve_variant,
@@ -570,6 +579,7 @@ class ManagedServiceMutations:
         for env in app_envs:
             _authorize_app_consumer(str(env.guid))
 
+        _require_model_host_operator(info, input.kind, cluster)
         svc = ManagedService.objects.create(
             project=project,
             tenant_cluster=cluster,
@@ -739,6 +749,7 @@ class ManagedServiceMutations:
             svc = _project_service_rows_for_caller(input.id).select_for_update(of=("self",)).first()
             if svc is None:
                 return gql_failure(ErrorCode.NOT_FOUND.value, "project managed service not found")
+            _require_model_host_operator(info, svc.kind, svc.effective_cluster)
             incoming = dict(input.config) if input.config is not None else None
             if incoming is not None and incoming != (svc.config or {}):
                 from astrolift_services.schema.types import _editable_fields_for
@@ -790,6 +801,7 @@ class ManagedServiceMutations:
                 svc.name = input.name.strip()
                 changed_fields.append("name")
             if changed_fields:
+                _require_model_host_operator(info, svc.kind, svc.effective_cluster)
                 svc.save(update_fields=[*changed_fields, "updated_at", "version"])
         if config_changed:
             try:
@@ -829,6 +841,7 @@ class ManagedServiceMutations:
                 ErrorCode.PRECONDITION.value,
                 f"managed service is {svc.status}",
             )
+        _require_model_host_operator(info, svc.kind, svc.effective_cluster)
         svc.status = ManagedService.Status.PENDING
         svc.save(update_fields=["status", "updated_at", "version"])
         _start_project_service_provision(info, svc)
@@ -852,6 +865,7 @@ class ManagedServiceMutations:
         svc = _project_service_for_caller(input.id)
         if svc is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project managed service not found")
+        _require_model_host_operator(info, svc.kind, svc.effective_cluster)
         svc.status = ManagedService.Status.DEPROVISIONING
         svc.save(update_fields=["status", "updated_at", "version"])
         _start_project_service_deprovision(
@@ -897,6 +911,7 @@ class ManagedServiceMutations:
                 field="environmentName",
             )
         assert_provider_cluster(env.tenant_cluster, permission=Permission.APP_UPDATE)
+        _require_model_host_operator(info, input.kind, env.tenant_cluster)
         from astrolift_services.managed_service_catalog import (
             CatalogResolutionError,
             resolve_variant,
@@ -942,6 +957,7 @@ class ManagedServiceMutations:
                 f"managed service ({input.kind}, {name!r}) already exists for this app environment",
                 field="name",
             )
+        _require_model_host_operator(info, input.kind, env.tenant_cluster)
         svc = ManagedService.objects.create(
             registered_app=app,
             app_environment=env,
@@ -1021,6 +1037,7 @@ class ManagedServiceMutations:
                     ErrorCode.NOT_FOUND.value,
                     "managed service not found",
                 )
+            _require_model_host_operator(info, svc.kind, svc.effective_cluster)
             incoming = dict(input.config) if input.config is not None else None
             if incoming is not None and incoming != (svc.config or {}):
                 from astrolift_services.schema.types import _editable_fields_for
@@ -1073,6 +1090,7 @@ class ManagedServiceMutations:
                 svc.name = input.name.strip()
                 changed_fields.append("name")
             if changed_fields:
+                _require_model_host_operator(info, svc.kind, svc.effective_cluster)
                 svc.save(update_fields=[*changed_fields, "updated_at", "version"])
         if config_changed:
             try:
@@ -1134,6 +1152,7 @@ class ManagedServiceMutations:
                 "triggered for services that are active, pending, updating, or failed",
                 field="managedServiceId",
             )
+        _require_model_host_operator(info, svc.kind, svc.effective_cluster)
         svc.status = ManagedService.Status.PENDING
         svc.save(update_fields=["status", "updated_at", "version"])
 
@@ -1207,6 +1226,7 @@ class ManagedServiceMutations:
         # immediately. The workflow re-asserts on entry; the platform
         # row is only soft-deleted by the workflow's finalize activity
         # AFTER the driver confirms the backend resource is gone.
+        _require_model_host_operator(info, svc.kind, svc.effective_cluster)
         svc.status = ManagedService.Status.DEPROVISIONING
         svc.save(
             update_fields=[
@@ -1291,6 +1311,7 @@ class ManagedServiceMutations:
         svc = _managed_service_for_caller(input.id)
         if svc is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "managed service not found")
+        _require_model_host_operator(info, svc.kind, svc.effective_cluster)
         # Adoption builds the provision spec from the stored config and binds
         # the adopted resource to it, so a config stored before #1921 carrying
         # a secret ref outside its owner's namespace is fixed first, not adopted.
@@ -1307,6 +1328,7 @@ class ManagedServiceMutations:
 
         request = info.context.request  # type: ignore[attr-defined]
         user = getattr(request, "user", None)
+        _require_model_host_operator(info, svc.kind, svc.effective_cluster)
         try:
             outcome = adopt_managed_resource(
                 svc=svc,

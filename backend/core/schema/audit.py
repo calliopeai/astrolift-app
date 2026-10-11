@@ -81,6 +81,7 @@ SENSITIVE_INPUT_FIELDS = frozenset(
         "SendEmailDeliveryTestInput.body",
         "SendManagedServiceTestEmailInput.subject",
         "SendManagedServiceTestEmailInput.body",
+        "UpdateClusterModelRuntimeInput.declaration",
         "BeginLocalModelArtifactInput.files",
         "BeginLocalModelArtifactInput.name",
         "CreateIdentityProviderInput.config",

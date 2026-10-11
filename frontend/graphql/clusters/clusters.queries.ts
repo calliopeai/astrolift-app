@@ -568,6 +568,7 @@ export const CLUSTER_BOOTSTRAP_PLAN = gql`
         defaultEnabled
         installedByRecipe
         runningOutsideRecipe
+        withheldReason
         rationale
         helmValues
         requires

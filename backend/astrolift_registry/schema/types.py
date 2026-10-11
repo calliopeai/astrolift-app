@@ -1507,7 +1507,9 @@ def _autowire_org_connection_available(app) -> bool:
     )
 
     try:
-        resolve_connection(app.organization_id, purpose=ORG_REPO_WRITE, source_kind=app.source_kind)
+        resolve_connection(
+            app.organization_id, purpose=ORG_REPO_WRITE, source_kind=app.source_kind, repo=app.source_repo
+        )
         return True
     except ConnectionResolutionError:
         return False

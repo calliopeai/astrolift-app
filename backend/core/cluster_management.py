@@ -347,7 +347,15 @@ def teardown_cluster_dispatch(*, cluster: TenantCluster, delete_cloud_infra: boo
     layer flips the row to error lifecycle and surfaces the message.
     Drivers handle "already gone" idempotently; the activity does NOT
     treat that as failure.
+
+    Deleting the cloud cluster on an install that withholds cluster
+    lifecycle (calliope-installer#447) raises before the driver is built.
     """
+    if delete_cloud_infra:
+        from core.install_restrictions import WithheldCapabilityError, cluster_delete_refusal
+
+        if refusal := cluster_delete_refusal(cluster):
+            raise WithheldCapabilityError(f"cluster {cluster.slug}: {refusal}")
     driver = _driver_for_cluster(cluster)
     if not hasattr(driver, "teardown_cluster"):
         raise ClusterManagementError(
@@ -568,6 +576,12 @@ def deploy_agent_dispatch(*, cluster: TenantCluster) -> Any:
     with transaction.atomic():
         cluster = TenantCluster.objects.select_for_update().get(pk=cluster.pk)
         from astrolift_clusters.agent_install import installation_busy, reconcile_installed_agent
+        from core.install_restrictions import cluster_scope_refusal
+
+        # The agent's ClusterRole is cluster-scoped RBAC, which the minimal
+        # contract leaves to the cluster's owner (calliope-installer#447).
+        if refusal := cluster_scope_refusal(cluster):
+            raise ClusterManagementError(refusal)
 
         if installation_busy(cluster):
             raise ClusterManagementError("A server-owned agent installation is pending")

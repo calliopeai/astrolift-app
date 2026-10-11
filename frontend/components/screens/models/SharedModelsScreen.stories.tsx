@@ -16,7 +16,7 @@ export const Full: Story = {
   args: sharedModelsProps,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByRole("link", { name: "Host a model" })).toHaveAttribute(
+    await expect(canvas.getByRole("link", { name: "Add model" })).toHaveAttribute(
       "href",
       "/models/deploy"
     );
@@ -24,6 +24,23 @@ export const Full: Story = {
       canvas.getByRole("link", { name: "App, project and cloud endpoints" })
     ).toHaveAttribute("href", "/models/endpoints");
     await userEvent.click(canvas.getByRole("button", { name: "Filter by cluster Production" }));
+  },
+};
+export const WithInstallManagedModel: Story = {
+  args: {
+    ...sharedModelsProps,
+    installModel: { modelId: "Qwen/Qwen2.5-7B-Instruct", replicas: 1 },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("region", { name: "Managed by the install" })).toBeVisible();
+    await expect(canvas.getByText("Qwen/Qwen2.5-7B-Instruct")).toBeVisible();
+  },
+};
+export const InstallManagedModelOnly: Story = {
+  args: {
+    page: { ...sharedModelsProps.page, rows: [], totalCount: 0 },
+    installModel: { modelId: "Qwen/Qwen2.5-7B-Instruct", replicas: null },
   },
 };
 export const Loading: Story = {
@@ -95,4 +112,22 @@ export const Width768: Story = {
       <SharedModelsScreen {...args} />
     </div>
   ),
+};
+
+/** A verified local source is hosted independently of any app subscription. */
+export const LocalSource: Story = {
+  args: {
+    page: {
+      ...sharedModelsProps.page,
+      rows: [
+        {
+          ...sharedModelsProps.page.rows[1],
+          sourceKind: "local_artifact",
+          localManifestSha256: "c".repeat(64),
+          revisionSha: null,
+          desiredResources: { cpuRequest: "2", memoryRequest: "8Gi", gpuCount: 0 },
+        },
+      ],
+    },
+  },
 };

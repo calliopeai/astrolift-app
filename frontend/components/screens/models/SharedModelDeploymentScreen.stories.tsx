@@ -1,3 +1,5 @@
+import { useState } from "react";
+import en from "@/messages/en.json";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 import { NextIntlClientProvider } from "next-intl";
@@ -10,6 +12,7 @@ const meta = {
   title: "Screens/Models/SharedModelDeploymentScreen",
   component: SharedModelDeploymentScreen,
   parameters: { layout: "padded" },
+  args: { initialStep: 2 },
 } satisfies Meta<typeof SharedModelDeploymentScreen>;
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -130,5 +133,59 @@ export const LocalSourceReview: Story = {
     const dialog = within(canvasElement.ownerDocument.body).getByRole("alertdialog");
     await expect(dialog).toHaveTextContent("b".repeat(64));
     await expect(dialog).toHaveTextContent("Hardware capacity and model fit remain unverified");
+  },
+};
+
+export const Wizard: Story = {
+  args: { ...sharedDeploymentProps, initialStep: 1 },
+  render: function WizardRender(args) {
+    const [draft, setDraft] = useState({
+      ...args.draft,
+      name: "Qwen2.5-0.5B-Instruct",
+      computeMode: "cpu" as const,
+      gpuCount: "0",
+      cpuKvCacheGiB: "2",
+    });
+    const [licenseReviewed, setLicenseReviewed] = useState(false);
+    const request = sharedModelRequest(
+      args.organizationId,
+      args.clusters.rows[0],
+      args.model,
+      draft
+    );
+    return (
+      <SharedModelDeploymentScreen
+        {...args}
+        draft={draft}
+        licenseReviewed={licenseReviewed}
+        onLicenseReviewed={setLicenseReviewed}
+        onDraftChange={(field, value) => setDraft((current) => ({ ...current, [field]: value }))}
+        admission={{ ...args.admission!, requestKey: JSON.stringify(request) }}
+      />
+    );
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("radio", { name: "CPU" })).toBeVisible();
+    await expect(
+      canvas.queryByRole("button", { name: "Review deployment" })
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      canvas.getByRole("button", { name: en.models.shared.usability.continueStep })
+    );
+    await expect(canvas.queryByRole("radio", { name: "CPU" })).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByLabelText(en.models.shared.hosting.licenseReview));
+    await expect(canvas.getByRole("button", { name: "Review deployment" })).toBeEnabled();
+    await userEvent.click(
+      canvas.getByRole("link", { name: en.models.shared.hosting.reviewResourceRequests })
+    );
+    await expect(canvas.getByLabelText(en.models.shared.placement.cpuRequest)).toHaveFocus();
+    await expect(canvas.getByLabelText(en.models.shared.placement.name)).toHaveValue(
+      "Qwen2.5-0.5B-Instruct"
+    );
+    await userEvent.click(
+      canvas.getByRole("button", { name: en.models.shared.usability.continueStep })
+    );
+    await expect(canvas.getByLabelText(en.models.shared.hosting.licenseReview)).toBeChecked();
   },
 };

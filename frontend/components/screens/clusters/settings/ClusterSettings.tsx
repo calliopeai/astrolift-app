@@ -82,6 +82,11 @@ export type ClusterSettingsScreenProps = Omit<
   /** Overrides the person's "settings you can't change" preference (stories). */
   restrictedMode?: "show" | "hide";
   /**
+   * Why deleting the cloud cluster is refused on this install (cluster
+   * lifecycle withheld, calliope-installer#447). Retiring the row stays.
+   */
+  deleteWithheldReason?: string | null;
+  /**
    * Which section is shown (`?section=`). Set by the route, so only the
    * active section's cards mount and fetch (list rules 1 and 2); without it
    * every section renders, as in the catalog's overview story.
@@ -118,6 +123,7 @@ export function ClusterSettingsScreen({
   cards = {},
   bootstrapHistory,
   restrictedMode,
+  deleteWithheldReason,
   section,
 }: ClusterSettingsScreenProps) {
   const sourceT = useTranslations("clusterSettings.source");
@@ -394,6 +400,7 @@ export function ClusterSettingsScreen({
                     cluster: () => <span className="font-mono">{cluster.slug}</span>,
                   })}
                   confirmDescription={lifecycleT("deleteConfirmHelp")}
+                  disabledReason={deleteWithheldReason}
                   onConfirm={() => onDecommission(true)}
                 />
               </fieldset>

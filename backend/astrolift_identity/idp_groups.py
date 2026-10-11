@@ -81,36 +81,41 @@ def sync_member_groups(user, claims: Mapping[str, Any] | None) -> int:
 
 def member_groups(user_id: int, organization_id: int) -> frozenset[str]:
     """The groups on ``user_id``'s active ORG membership of one org."""
+    return member_groups_for_users([user_id], organization_id).get(user_id, frozenset())
 
+
+def member_groups_for_users(user_ids, organization_id: int) -> dict[int, frozenset[str]]:
+    """Batch the same SSO/SCIM authority boundary for a request-local projection."""
     from astrolift_identity.models import Member, ScimGroup
 
-    member = (
+    members = {}
+    for member in (
         Member.objects.filter(
-            user_id=user_id,
+            user_id__in=user_ids,
             scope_kind=Member.ScopeKind.ORG,
             scope_id=organization_id,
             is_active=True,
         )
-        .values("pk", "idp_groups")
-        .first()
-    )
-    if member is None:
-        return frozenset()
-    raw = member["idp_groups"]
-    snapshot = {g for g in raw if isinstance(g, str) and g} if isinstance(raw, list) else set()
-    # Deleted groups remain authorities for their identifier. Keeping the
-    # tombstone prevents a stale SSO claim from reviving their memberships.
+        .order_by("pk")
+        .values("pk", "user_id", "idp_groups")
+    ):
+        members.setdefault(member["user_id"], member)
     managed = set()
     for group in ScimGroup.all_objects.filter(organization_id=organization_id):
         managed.add(group.group_external_id)
         managed.update(group.retired_external_ids)
-    provisioned = {
-        external or str(guid)
-        for external, guid in ScimGroup.objects.filter(
-            organization_id=organization_id, members__pk=member["pk"]
-        ).values_list("external_id", "guid")
-    }
-    return frozenset((snapshot - managed) | provisioned)
+    provisioned = {}
+    for member_id, external, guid in ScimGroup.objects.filter(
+        organization_id=organization_id,
+        members__pk__in=[m["pk"] for m in members.values()],
+    ).values_list("members__pk", "external_id", "guid"):
+        provisioned.setdefault(member_id, set()).add(external or str(guid))
+    result = {}
+    for user_id, member in members.items():
+        raw = member["idp_groups"]
+        snapshot = {g for g in raw if isinstance(g, str) and g} if isinstance(raw, list) else set()
+        result[user_id] = frozenset((snapshot - managed) | provisioned.get(member["pk"], set()))
+    return result
 
 
 def group_member_counts(organization_id: int, groups: list[str]) -> dict[str, int]:

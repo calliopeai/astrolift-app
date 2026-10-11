@@ -88,8 +88,19 @@ def models_entitlement(info) -> ModuleEntitlement:
                 ).exists()
             except PermissionDenied:
                 pass
-        owner_write = owner_allowed(Permission.CLUSTER_UPDATE)
-        return ModuleEntitlement("models", can_view, owner_write, owner_write, owner_write, True)
+        # Shared model prompt execution retains its ordinary owner permission.
+        # Creating or configuring a hosted source/model has the stricter current
+        # installation-operator + org/cluster gate; a flat cluster grant cannot
+        # establish it. These remain advisory until an exact target is checked.
+        can_run = owner_allowed(Permission.CLUSTER_UPDATE)
+        try:
+            from astrolift_services.schema.hf_connections import require_host_admin
+
+            require_host_admin(info)
+            host_write = True
+        except PermissionDenied:
+            host_write = False
+        return ModuleEntitlement("models", can_view, host_write, host_write, can_run, True)
     finally:
         if marker is not None:
             reset_current_api_token(marker)

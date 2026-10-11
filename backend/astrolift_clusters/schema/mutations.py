@@ -1244,6 +1244,13 @@ class ClustersMutation:
 
             if has_cluster_owned_models(cluster.pk):
                 return gql_failure(ErrorCode.PRECONDITION.value, MODEL_CLEANUP_REQUIRED)
+            # Deleting the cloud cluster is cluster lifecycle; retiring the row
+            # (delete_cloud_infra=False) only lifts the platform's RBAC.
+            if input.delete_cloud_infra:
+                from core.install_restrictions import cluster_delete_refusal
+
+                if refusal := cluster_delete_refusal(cluster):
+                    return gql_failure(ErrorCode.PRECONDITION.value, refusal, field="deleteCloudInfra")
             actor = _actor_from_request(info)
             _kick_decommission_cluster(
                 cluster=cluster,
@@ -1300,6 +1307,11 @@ class ClustersMutation:
             from astrolift_clusters.edge_install import edge_support_refusal
 
             if refusal := edge_support_refusal(cluster):
+                return gql_failure(ErrorCode.PRECONDITION.value, refusal, field="selectedComponents")
+        from core.install_restrictions import controller_refusal
+
+        for key in input.selected_components:
+            if refusal := controller_refusal(key, cluster):
                 return gql_failure(ErrorCode.PRECONDITION.value, refusal, field="selectedComponents")
         overrides: dict[str, dict[str, str]] = {}
         for o in input.option_overrides or []:
@@ -1565,6 +1577,25 @@ class ClustersMutation:
         # until verifyManagedDomain confirms the caller published the TXT
         # challenge this returns.
         requires_verification = bool(dns_config.get("zone_id")) or _zone_exists_in_provider(cluster, zone)
+        # A zone the platform would create is a hosted zone it writes, which
+        # an install that withholds DNS denies (calliope-installer#447). The
+        # provisioning workflow writes through the DNS cluster's driver
+        # whatever the row's dns_driver says, so every driver is refused. A
+        # zone that already exists is registered pending verification; its
+        # certificate records are then left to the operator to publish.
+        if (
+            not requires_verification
+            and getattr(getattr(cluster, "provider_plugin", None), "slug", "") == "aws"
+        ):
+            from core.install_restrictions import reason
+
+            if refusal := reason("dns"):
+                return gql_failure(
+                    ErrorCode.PRECONDITION.value,
+                    f"{refusal} Astrolift cannot create this hosted zone; register a zone that "
+                    "already exists in the account and verify it.",
+                    field="dnsDriver",
+                )
         verification_token = secrets.token_hex(16) if requires_verification else ""
 
         domain = ManagedDomain.objects.create(

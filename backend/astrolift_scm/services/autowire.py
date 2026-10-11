@@ -86,7 +86,9 @@ def _has_connection(app: RegisteredApp, purpose: ConnectionPurpose) -> bool:
     so it's safe to call on the read path as well as before each write.
     """
     try:
-        resolve_connection(app.organization_id, purpose=purpose, source_kind=app.source_kind)
+        resolve_connection(
+            app.organization_id, purpose=purpose, source_kind=app.source_kind, repo=app.source_repo
+        )
         return True
     except ConnectionResolutionError:
         return False

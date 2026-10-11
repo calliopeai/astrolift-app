@@ -48,6 +48,8 @@ beforeEach(async () => {
   hold = refuseRead = false;
   release = null;
   const roots = {
+    // This install withholds nothing (calliope-installer#447).
+    astroliftWithheldCapabilities: () => [],
     astroliftManagedDomain: () => {
       if (refuseRead) throw new Error("Current admission refused");
       return domain;

@@ -1,5 +1,6 @@
 "use client";
 
+import { ModelConnectionPolicyClient } from "@/components/screens/models/ModelConnectionPolicyClient";
 import { OrganizationSettings } from "@/components/screens/administration/organization/OrganizationSettings";
 import { useOrganizationSettings } from "@/components/screens/administration/organization/use-organization-settings";
 import { useSettingsSection } from "@/components/settings/use-settings-section";
@@ -18,6 +19,7 @@ export function OrganizationSettingsClient() {
       houseTheme={settings.org ? <HouseThemeCard org={settings.org} /> : null}
       trustedDomains={<TrustedDomainsCard />}
       modules={<ModulesCard />}
+      modelConnections={<ModelConnectionPolicyClient />}
     />
   );
 }

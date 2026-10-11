@@ -50,7 +50,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ("astrolift_clusters", "0023_dns_provider_connections"),
         ("astrolift_identity", "0041_merge_agent_enforcement_scim_groups"),
-        ("astrolift_lifecycle", "0045_deployment_run_history"),
+        ("astrolift_lifecycle", "0046_builder_artifact"),
         ("astrolift_registry", "0042_registeredapp_edge_access"),
         ("astrolift_services", "0043_email_delivery_tests"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),

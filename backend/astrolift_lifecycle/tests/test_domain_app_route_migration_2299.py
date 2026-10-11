@@ -16,8 +16,8 @@ from .test_domain_app_route_store_2299 import (
 admitted = admitted_fixture
 
 pytestmark = pytest.mark.django_db(transaction=True)
-LEAF = ("astrolift_lifecycle", "0046_managed_domain_app_binding")
-PREVIOUS = ("astrolift_lifecycle", "0045_deployment_run_history")
+LEAF = ("astrolift_lifecycle", "0047_managed_domain_app_binding")
+PREVIOUS = ("astrolift_lifecycle", "0046_builder_artifact")
 
 
 def test_empty_journal_actual_reverse_forward_restores_whole_graph():
