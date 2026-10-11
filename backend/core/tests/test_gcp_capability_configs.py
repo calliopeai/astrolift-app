@@ -30,6 +30,8 @@ def _cluster(**provider_overrides: object) -> SimpleNamespace:
         region="us-west1",
         provider_config=provider_config,
         auth_config={"fcm_access_token": "test-only-token"},
+        # Central auth in the cluster's own Identity Platform project (#2135).
+        oidc_auth_config={"discovery_url": f"https://securetoken.google.com/{provider_config['project_id']}"},
     )
 
 
@@ -548,3 +550,18 @@ def test_memorystore_valkey_runtime_config_preserves_operator_controls() -> None
     assert config.api_endpoint.endswith("/v1beta")
     assert config.operation_timeout_seconds == 900
     assert config.poll_interval_seconds == 1
+
+
+@pytest.mark.parametrize(
+    "discovery,reason",
+    [
+        ("https://login.example.net/oidc", "does not sign in through Google Cloud Identity Platform"),
+        ("https://securetoken.google.com/someone-elses-project", "not the project this cluster runs in"),
+    ],
+)
+def test_identity_users_is_only_the_clusters_own_identity_platform_project(discovery, reason) -> None:
+    cluster = _cluster()
+    assert _config_for_capability("gcp", cluster, "identity_users").project_id == "acme-prod"
+    cluster.oidc_auth_config = {"discovery_url": discovery}
+    with pytest.raises(AppDeployError, match=reason):
+        _config_for_capability("gcp", cluster, "identity_users")

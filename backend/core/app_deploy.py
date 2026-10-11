@@ -486,6 +486,29 @@ def _config_for_capability_uncredentialed(
             raise AppDeployError(
                 f"cluster {cluster.slug}: GCP capability {capability!r} requires provider_config.project_id",
             )
+        if capability == "identity_users":
+            from gcp.identity_users_platform import (
+                IdentityPlatformUsersConfig,
+                identity_platform_project_from_issuer,
+            )
+
+            # The project the edge signs in against, from the cluster's central
+            # auth config (#2135). Only the install's own project is managed
+            # here; any other IdP is managed in that provider.
+            oidc = getattr(cluster, "oidc_auth_config", None) or {}
+            issuer_project = identity_platform_project_from_issuer(str(oidc.get("discovery_url") or ""))
+            if issuer_project is None:
+                raise AppDeployError(
+                    f"cluster {cluster.slug}: central auth does not sign in through Google Cloud Identity "
+                    "Platform, so its users are managed in that provider",
+                )
+            if issuer_project != project_id:
+                raise AppDeployError(
+                    f"cluster {cluster.slug}: central auth signs in through Identity Platform project "
+                    f"{issuer_project}, which is not the project this cluster runs in, so its users are "
+                    "managed there",
+                )
+            return IdentityPlatformUsersConfig(project_id=project_id)
         if capability == "registry":
             from gcp.registry_artifact import ArtifactRegistryConfig
 
