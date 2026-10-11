@@ -89,3 +89,21 @@ def test_custom_accent_must_clear_contrast_on_a_pinned_ground():
 def test_custom_accent_without_a_ground_is_checked_by_the_client():
     """No ground pinned: each person's ground varies, so the client re-checks."""
     assert validate_appearance({"accent": "#111111"}) == {"accent": "#111111"}
+
+
+def test_the_server_knows_every_ground_and_ground_colour_the_client_offers():
+    """#2286 added Graphite to the client only, so saving it was refused here.
+    The client's GROUNDS and GROUND_BACKGROUND are the source; this pins parity."""
+    import re
+    from pathlib import Path
+
+    from core.appearance import GROUND_BACKGROUND, GROUNDS, validate_appearance
+
+    client = (Path(__file__).resolve().parents[3] / "frontend" / "lib" / "appearance.ts").read_text()
+    grounds_block = re.search(r"export const GROUNDS = \{(.*?)\n\} as const;", client, re.S).group(1)
+    colours_block = re.search(
+        r"GROUND_BACKGROUND: Record<Ground, string> = \{(.*?)\n\};", client, re.S
+    ).group(1)
+    assert set(re.findall(r"^\s+(\w+): \{", grounds_block, re.M)) == set(GROUNDS)
+    assert dict(re.findall(r'^\s+(\w+): "(#[0-9a-f]{6})"', colours_block, re.M)) == GROUND_BACKGROUND
+    assert validate_appearance({"ground": "graphite"}) == {"ground": "graphite"}

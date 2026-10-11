@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Graphite is the default theme: neutral graphite surfaces and sidebar, emerald as the accent, lime for state and signal. Anyone who picked a theme keeps it. The server now accepts `graphite` as a ground when a person's or an organization's appearance is saved (it refused it before), and a test keeps the server's grounds and colours in step with the client's (#2286).
+
 - The Temporal worker starts again: its Workers get a thread executor, which the synchronous `validate_deployment_identity_origin` activity (#2278) needs, so Temporal no longer refuses to construct them. The worker had crash-looped on start with the 68ca1869 build. A test now builds the entrypoint's real worker set.
 
 - The guided domain connection binds a Route 53 hosted zone to a reviewed domain through a cluster's AWS credential, the identity that writes DNS for that cluster: pick one of the organization's AWS clusters (or a shared one) with a verified account, see the hosted zones that credential can read (private zones marked, capped at 500), and bind only the zone named exactly like the domain. The binding is platform-written and pins the account the zone was seen in; domain diagnostics then read the zone's records with that credential only, and an unavailable cluster, a foreign cluster or a changed account reports `PROVIDER_CLUSTER_UNAVAILABLE` instead of falling back to the control plane's identity. Platform operators only, like the Cloudflare connection; every supported language (#2287).

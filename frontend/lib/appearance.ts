@@ -58,7 +58,7 @@ export interface Appearance {
 }
 
 export const DEFAULT_APPEARANCE: Appearance = {
-  ground: "black",
+  ground: "graphite",
   accent: "green",
   density: "compact",
   corners: 2,

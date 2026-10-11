@@ -20,7 +20,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-GROUNDS = frozenset({"black", "charcoal", "emerald", "paper", "mist"})
+GROUNDS = frozenset({"black", "charcoal", "graphite", "emerald", "paper", "mist"})
 ACCENTS = frozenset({"green", "copper", "ice", "periwinkle", "amber"})
 DENSITIES = frozenset({"compact", "cards"})
 CORNERS = frozenset({0, 2, 4, 10})
@@ -35,6 +35,7 @@ MIN_ACCENT_CONTRAST = 3.0
 GROUND_BACKGROUND = {
     "black": "#000000",
     "charcoal": "#0e0f10",
+    "graphite": "#111214",
     "emerald": "#050b08",
     "paper": "#faf6ee",
     "mist": "#f2f7f9",
