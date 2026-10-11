@@ -8272,7 +8272,8 @@
     "icmpUnconfirmed": "L’outil s’est terminé sans réponse ICMP confirmée. L’ICMP peut être filtré ; utilisez le contrôle HTTPS pour l’état du service.",
     "tlsVerifiedHelp": "Le TLS a été vérifié pour ce nom d’hôte et un statut HTTP a été observé. Les redirections ne sont pas suivies.",
     "httpsDeadline": "Le contrôle HTTPS ne s’est pas terminé avant l’échéance. Relancez-le et vérifiez que le nom d’hôte mène à une application en cours d’exécution.",
-    "publicAddressRequired": "Le nom d’hôte se résout en une adresse non publique ; il n’est donc pas sondé depuis le plan de contrôle."
+    "publicAddressRequired": "Le nom d’hôte se résout en une adresse non publique ; il n’est donc pas sondé depuis le plan de contrôle.",
+    "checkHttps": "Vérifier HTTPS"
   },
   "domainConnections": {
     "title": "Connecter le DNS",

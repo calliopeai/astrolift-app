@@ -24,6 +24,7 @@ import {
 import { MANAGED_DOMAIN } from "./domains-environments.fixtures";
 const catalogs = { en, es, fr, de, ja, ko, "zh-Hans": zh, "pt-BR": pt };
 const keys = [
+  "checkHttps",
   "dnsNxdomainStatus",
   "dnsNxdomain",
   "dnsTimeout",

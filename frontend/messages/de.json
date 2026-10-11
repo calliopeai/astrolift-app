@@ -8272,7 +8272,8 @@
     "icmpUnconfirmed": "Das Werkzeug wurde ohne bestätigte ICMP-Antwort beendet. ICMP kann gefiltert sein; nutze die HTTPS-Prüfung für den Dienstzustand.",
     "tlsVerifiedHelp": "TLS wurde für diesen Hostnamen verifiziert und ein HTTP-Status beobachtet. Weiterleitungen werden nicht verfolgt.",
     "httpsDeadline": "Die HTTPS-Prüfung wurde nicht vor Ablauf der Frist beendet. Wiederhole sie und prüfe, ob der Hostname zu einer laufenden App führt.",
-    "publicAddressRequired": "Der Hostname wird zu einer nicht öffentlichen Adresse aufgelöst und daher nicht von der Control Plane aus geprüft."
+    "publicAddressRequired": "Der Hostname wird zu einer nicht öffentlichen Adresse aufgelöst und daher nicht von der Control Plane aus geprüft.",
+    "checkHttps": "HTTPS prüfen"
   },
   "domainConnections": {
     "title": "DNS verbinden",

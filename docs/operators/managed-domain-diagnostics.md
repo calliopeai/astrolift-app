@@ -34,7 +34,9 @@ resolver that does not answer within two seconds reports `DNS_TIMEOUT`, which
 is neither an empty answer nor a generic `DIAGNOSTIC_PROBE_UNAVAILABLE`; other
 transport refusals keep their own codes (`DNS_RESPONSE_INVALID`,
 `DNS_RESPONSE_BOUND_EXCEEDED`). The console explains each code with the next
-step to take.
+step to take. The Routing view never reports TLS for an app route from
+configuration alone; **Check HTTPS** runs the HTTPS probe for that route's
+hostname and shows the observed outcome on the route.
 
 HTTPS first resolves through the fixed public resolver and rejects every mixed
 public/private answer. It pins a public IP, verifies the registered hostname

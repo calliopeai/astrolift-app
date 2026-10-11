@@ -8269,7 +8269,8 @@
     "icmpUnconfirmed": "工具结束时未确认收到 ICMP 应答。ICMP 可能被过滤；请使用 HTTPS 检查判断服务状态。",
     "tlsVerifiedHelp": "已验证此主机名的 TLS 并观测到 HTTP 状态。不会跟随重定向。",
     "httpsDeadline": "HTTPS 检查未在截止时间前完成。请重试，并确认该主机名路由到正在运行的应用。",
-    "publicAddressRequired": "该主机名解析为非公共地址，因此不会从控制平面进行探测。"
+    "publicAddressRequired": "该主机名解析为非公共地址，因此不会从控制平面进行探测。",
+    "checkHttps": "检查 HTTPS"
   },
   "domainConnections": {
     "title": "连接 DNS",

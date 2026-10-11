@@ -175,6 +175,14 @@ function DetailTabs({
     props.onResetProbe();
     change();
   }
+  // A route's TLS is only known from a live HTTPS check of its hostname (#2287).
+  function checkHttps(routeHostname: string) {
+    changeProbe(() => {
+      setHostname(routeHostname);
+      setTool("HTTPS");
+    });
+    void props.onProbe({ hostname: routeHostname, tool: "HTTPS", recordType });
+  }
   function reason(value: string) {
     const key = domainDiagnosticReasonKey(value);
     return (
@@ -573,7 +581,20 @@ function DetailTabs({
                   </div>
                   <div>
                     <dt>{t("tls")}</dt>
-                    <dd>{t("unknown")}</dd>
+                    <dd>
+                      {props.probe?.tool === "HTTPS" && props.probe.hostname === route.hostname ? (
+                        state(props.probe.state, props.probe.reason)
+                      ) : (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={busy || props.probeLoading}
+                          onClick={() => checkHttps(route.hostname)}
+                        >
+                          {t("checkHttps")}
+                        </Button>
+                      )}
+                    </dd>
                   </div>
                 </dl>
               </section>

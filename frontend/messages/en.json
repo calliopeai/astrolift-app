@@ -8349,7 +8349,8 @@
     "icmpUnconfirmed": "The tool finished without a confirmed ICMP reply. ICMP may be filtered; use the HTTPS check for service health.",
     "tlsVerifiedHelp": "TLS was verified for this hostname and an HTTP status was observed. Redirects are not followed.",
     "httpsDeadline": "The HTTPS check did not finish before the deadline. Retry it, and check that the hostname routes to a running app.",
-    "publicAddressRequired": "The hostname resolves to a non-public address, so it is not probed from the control plane."
+    "publicAddressRequired": "The hostname resolves to a non-public address, so it is not probed from the control plane.",
+    "checkHttps": "Check HTTPS"
   },
   "domainConnections": {
     "title": "Connect DNS",

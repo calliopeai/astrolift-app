@@ -8269,7 +8269,8 @@
     "icmpUnconfirmed": "A ferramenta terminou sem uma resposta ICMP confirmada. O ICMP pode estar filtrado; use a verificação HTTPS para a saúde do serviço.",
     "tlsVerifiedHelp": "O TLS foi verificado para este nome de host e um status HTTP foi observado. Redirecionamentos não são seguidos.",
     "httpsDeadline": "A verificação HTTPS não terminou antes do prazo. Repita e confira se o nome de host leva a um app em execução.",
-    "publicAddressRequired": "O nome de host resolve para um endereço não público, então ele não é sondado a partir do plano de controle."
+    "publicAddressRequired": "O nome de host resolve para um endereço não público, então ele não é sondado a partir do plano de controle.",
+    "checkHttps": "Verificar HTTPS"
   },
   "domainConnections": {
     "title": "Conectar DNS",

@@ -8269,7 +8269,8 @@
     "icmpUnconfirmed": "ツールはICMP応答を確認できずに終了しました。ICMPがフィルタリングされている可能性があります。サービスの正常性にはHTTPS確認を使用してください。",
     "tlsVerifiedHelp": "このホスト名のTLSを検証し、HTTPステータスを観測しました。リダイレクトはたどりません。",
     "httpsDeadline": "HTTPS確認が期限までに完了しませんでした。再試行し、ホスト名が実行中のアプリにルーティングされているか確認してください。",
-    "publicAddressRequired": "ホスト名が非公開アドレスに解決されるため、コントロールプレーンからは調査しません。"
+    "publicAddressRequired": "ホスト名が非公開アドレスに解決されるため、コントロールプレーンからは調査しません。",
+    "checkHttps": "HTTPSを確認"
   },
   "domainConnections": {
     "title": "DNS を接続",
