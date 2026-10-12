@@ -529,3 +529,28 @@ def _get_client_ip(request) -> str | None:
     if xff:
         return xff.split(",")[0].strip()
     return request.META.get("REMOTE_ADDR")
+
+
+class PermissionDeniedExtension(SchemaExtension):
+    """Give a refused permission the same code on every surface (#1867).
+
+    A resolver's ``PermissionDenied`` reaches the client as a top-level error
+    whose message is ``<reason>: <permission>`` and nothing else, so the CLI
+    and the web could not tell a refusal from any other failure. Mark it
+    ``PERMISSION_DENIED`` (the envelope code mutations already use) and carry
+    the reason and permission apart; the message is unchanged."""
+
+    def on_execute(self):
+        yield
+        from core.permissions import PermissionDenied
+
+        result = getattr(self.execution_context, "result", None)
+        for error in getattr(result, "errors", None) or ():
+            original = getattr(error, "original_error", None)
+            if isinstance(original, PermissionDenied):
+                error.extensions = {
+                    **(error.extensions or {}),
+                    "code": "PERMISSION_DENIED",
+                    "reason": original.reason,
+                    "permission": original.permission.value,
+                }
