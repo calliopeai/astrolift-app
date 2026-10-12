@@ -4213,6 +4213,12 @@
       "network": "Server nicht erreichbar. Verbindung prüfen und erneut versuchen."
     }
   },
+  "pageShell": {
+    "collapseHeader": "Kopfbereich einklappen",
+    "expandHeader": "Kopfbereich ausklappen",
+    "collapse": "Einklappen",
+    "details": "Details"
+  },
   "a11y": {
     "skipToContent": "Skip to main content"
   },

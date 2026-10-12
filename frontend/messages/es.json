@@ -4213,6 +4213,12 @@
       "network": "No se pudo contactar al servidor. Revisa tu conexión e inténtalo de nuevo."
     }
   },
+  "pageShell": {
+    "collapseHeader": "Contraer encabezado",
+    "expandHeader": "Expandir encabezado",
+    "collapse": "Contraer",
+    "details": "Detalles"
+  },
   "a11y": {
     "skipToContent": "Skip to main content"
   },

@@ -36,6 +36,12 @@
     "zh-Hans": "Chinese (Simplified)",
     "pt-BR": "Portuguese (Brazil)"
   },
+  "pageShell": {
+    "collapseHeader": "收起标题区",
+    "expandHeader": "展开标题区",
+    "collapse": "收起",
+    "details": "详情"
+  },
   "a11y": {
     "skipToContent": "Skip to main content"
   },

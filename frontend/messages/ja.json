@@ -36,6 +36,12 @@
     "zh-Hans": "Chinese (Simplified)",
     "pt-BR": "Portuguese (Brazil)"
   },
+  "pageShell": {
+    "collapseHeader": "ヘッダーを折りたたむ",
+    "expandHeader": "ヘッダーを展開",
+    "collapse": "折りたたむ",
+    "details": "詳細"
+  },
   "a11y": {
     "skipToContent": "Skip to main content"
   },
