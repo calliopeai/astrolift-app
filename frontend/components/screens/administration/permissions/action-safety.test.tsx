@@ -16,6 +16,8 @@ vi.mock("@/components/shell/ShellHeader", () => ({
 
 const base = {
   rows: ACTION_SAFETY_FIXTURE,
+  inspecting: null,
+  onInspect: () => {},
   loading: false,
   error: null,
   onRetry: () => {},
@@ -95,5 +97,20 @@ describe("Action safety (#2203)", () => {
     rerender(<ActionSafetyView {...base} rows={null} error="Network error" requests={[]} />);
     expect(screen.getByRole("alert")).toHaveTextContent("Network error");
     expect(screen.getByText("No open requests.")).toBeInTheDocument();
+  });
+
+  it("shows what applies on one app read-only, and goes back to the organization", async () => {
+    const onInspect = vi.fn();
+    const { rerender } = render(<ActionSafetyView {...base} onInspect={onInspect} />);
+    fireEvent.click(screen.getByRole("combobox", { name: "Show what applies on" }));
+    fireEvent.click(await screen.findByRole("option", { name: "billing-api" }));
+    expect(onInspect).toHaveBeenLastCalledWith("billing-api");
+
+    rerender(<ActionSafetyView {...base} inspecting="billing-api" onInspect={onInspect} />);
+    expect(screen.getByText(/Read-only: what applies on this app/)).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Ask before: Deregister an app" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("combobox", { name: "Show what applies on" }));
+    fireEvent.click(await screen.findByRole("option", { name: "The whole organization" }));
+    expect(onInspect).toHaveBeenLastCalledWith(null);
   });
 });

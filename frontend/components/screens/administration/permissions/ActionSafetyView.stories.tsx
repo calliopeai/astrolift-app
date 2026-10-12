@@ -13,6 +13,8 @@ const meta: Meta<typeof ActionSafetyView> = {
   parameters: { layout: "fullscreen" },
   args: {
     rows: ACTION_SAFETY_FIXTURE,
+    inspecting: null,
+    onInspect: () => {},
     loading: false,
     error: null,
     onRetry: () => {},
@@ -31,6 +33,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Gates: Story = {};
+export const InspectingAnApp: Story = { args: { inspecting: "billing-api" } };
 export const Saving: Story = { args: { saving: "secret.change" } };
 export const SaveRefused: Story = {
   args: {

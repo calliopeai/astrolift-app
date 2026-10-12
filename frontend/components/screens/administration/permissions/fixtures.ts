@@ -493,6 +493,7 @@ export const SCOPED_SAFETY_FIXTURE = {
                 kind: "APP" as const,
                 id: "0192a3b4-0000-7000-8000-0000000000a1",
                 name: "billing-api",
+                slug: "billing-api",
               },
             ],
           },

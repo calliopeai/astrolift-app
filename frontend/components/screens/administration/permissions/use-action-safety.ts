@@ -70,7 +70,13 @@ const OPEN = new Set(["pending", "approved"]);
  * prompt handles with a retry.
  */
 export function useActionSafety() {
-  const query = useQuery<ActionSafetyQuery>(ACTION_SAFETY, { fetchPolicy: "cache-and-network" });
+  // Null shows the organization's switches; an app slug shows, read-only, what
+  // applies there after team, app and person rules.
+  const [inspecting, setInspecting] = React.useState<string | null>(null);
+  const query = useQuery<ActionSafetyQuery>(ACTION_SAFETY, {
+    variables: { appSlug: inspecting },
+    fetchPolicy: "cache-and-network",
+  });
   const requests = useQuery<ActionApprovalRequestsQuery>(ACTION_APPROVAL_REQUESTS, {
     fetchPolicy: "cache-and-network",
   });
@@ -126,6 +132,8 @@ export function useActionSafety() {
 
   return {
     rows: query.data?.astroliftActionSafety ?? null,
+    inspecting,
+    onInspect: setInspecting,
     loading: query.loading && !query.data,
     error: query.error?.message ?? null,
     onRetry: (): void => {

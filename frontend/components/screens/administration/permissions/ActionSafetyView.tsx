@@ -11,6 +11,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+import type { ScopeNode } from "@/components/access/access-model";
+
 import { permissionsCrumbs } from "../access/admin-crumbs";
 import { ScopedSafetyRules } from "./ScopedSafetyRules";
 import type { ActionApprovalRequestRow, useActionSafety } from "./use-action-safety";
@@ -18,6 +20,14 @@ import type { ActionApprovalRequestRow, useActionSafety } from "./use-action-saf
 export type ActionSafetyViewProps = ReturnType<typeof useActionSafety>;
 
 const QUORUMS = [1, 2, 3, 4, 5];
+const WHOLE_ORG = "__org__";
+
+function appsIn(nodes: ScopeNode[]): ScopeNode[] {
+  return nodes.flatMap((n) => [
+    ...(n.kind === "APP" && n.slug ? [n] : []),
+    ...appsIn(n.children ?? []),
+  ]);
+}
 
 /**
  * Admin › Permissions › Action safety (#2203). Each sensitive action asks for
@@ -28,6 +38,8 @@ const QUORUMS = [1, 2, 3, 4, 5];
  */
 export function ActionSafetyView({
   rows,
+  inspecting,
+  onInspect,
   loading,
   error,
   onRetry,
@@ -55,6 +67,32 @@ export function ActionSafetyView({
           {saveError}
         </p>
       )}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-muted-foreground text-xs">Show what applies on</span>
+        <Select
+          value={inspecting ?? WHOLE_ORG}
+          onValueChange={(value) => onInspect(value === WHOLE_ORG ? null : value)}
+        >
+          <SelectTrigger size="sm" className="w-auto" aria-label="Show what applies on">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={WHOLE_ORG}>The whole organization</SelectItem>
+            {[...new Map(appsIn(scoped.scopeTree.roots).map((a) => [a.slug!, a])).values()].map(
+              (app) => (
+                <SelectItem key={app.slug} value={app.slug!}>
+                  {app.name}
+                </SelectItem>
+              )
+            )}
+          </SelectContent>
+        </Select>
+        {inspecting && (
+          <span className="text-muted-foreground text-xs">
+            Read-only: what applies on this app for you, after team, app and person rules.
+          </span>
+        )}
+      </div>
       {loading ? (
         <p role="status" className="text-muted-foreground text-sm">
           Loading…
@@ -87,7 +125,7 @@ export function ActionSafetyView({
             </thead>
             <tbody>
               {(rows ?? []).map((row) => {
-                const busy = saving === row.action;
+                const busy = saving === row.action || inspecting !== null;
                 const narrower = row.sources.some((s) => s !== "ORG");
                 return (
                   <tr key={row.action} className="border-b last:border-0">
