@@ -145,7 +145,11 @@ export function DnsRecordsCard({
       cell: (r) => (
         <span className="inline-flex items-center gap-2 text-xs">
           <StatusDot status={PROPAGATION_DOT[r.propagationStatus]} />
-          <span>{t(`propagation.${r.propagationStatus}`)}</span>
+          <span>
+            {t.has(`propagation.${r.propagationStatus}`)
+              ? t(`propagation.${r.propagationStatus}`)
+              : r.propagationStatus}
+          </span>
         </span>
       ),
     },

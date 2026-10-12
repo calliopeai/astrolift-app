@@ -11831,7 +11831,9 @@
       "auto": "Automatische Verlängerung",
       "manual": "Manuell",
       "failed": "Verlängerung fehlgeschlagen",
-      "unknown": "Unbekannt"
+      "unknown": "Unbekannt",
+      "pending": "Ausstehend",
+      "eligible": "Berechtigt"
     },
     "title": "TLS-Zertifikate",
     "description": "Zertifikate, die der TLS-Treiber des Clusters kennt, gefiltert nach dem Slug dieser App. Die Tage bis zum Ablauf sind farbcodiert: rot < 30, gelb < 90.",

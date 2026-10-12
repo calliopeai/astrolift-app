@@ -11831,7 +11831,9 @@
       "auto": "Renovación automática",
       "manual": "Manual",
       "failed": "Renovación fallida",
-      "unknown": "Desconocida"
+      "unknown": "Desconocida",
+      "pending": "Pendiente",
+      "eligible": "Apto"
     },
     "title": "Certificados TLS",
     "description": "Certificados que conoce el driver TLS del clúster, filtrados por el slug de esta app. Los días hasta el vencimiento tienen código de color: rojo < 30, ámbar < 90.",

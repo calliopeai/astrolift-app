@@ -133,7 +133,8 @@ export function RolesView({ list, page }: RolesViewProps) {
         }}
         list={list}
         label={t("title")}
-        columns={columns(t, scopes)}
+        // A scope level the catalog does not name reads as itself.
+        columns={columns(t, (key) => (scopes.has(key) ? scopes(key) : key))}
         rows={page.rows}
         getRowId={(role) => role.id}
         rowHref={(role) => roleHref(role.id)}

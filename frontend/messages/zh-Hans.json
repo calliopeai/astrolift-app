@@ -11828,7 +11828,9 @@
       "auto": "自动续期",
       "manual": "手动",
       "failed": "续期失败",
-      "unknown": "未知"
+      "unknown": "未知",
+      "pending": "待处理",
+      "eligible": "符合条件"
     },
     "title": "TLS 证书",
     "description": "集群 TLS 驱动已知的证书，按此应用的 slug 筛选。距过期天数以颜色标示：红色 < 30，琥珀色 < 90。",

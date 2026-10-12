@@ -11831,7 +11831,9 @@
       "auto": "Renouvellement auto",
       "manual": "Manuel",
       "failed": "Échec du renouvellement",
-      "unknown": "Inconnu"
+      "unknown": "Inconnu",
+      "pending": "En attente",
+      "eligible": "Éligible"
     },
     "title": "Certificats TLS",
     "description": "Certificats connus du driver TLS du cluster, filtrés par le slug de cette app. Les jours avant expiration sont codés par couleur : rouge < 30, orange < 90.",

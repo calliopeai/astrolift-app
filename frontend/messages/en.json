@@ -6871,7 +6871,9 @@
       "passwordRequired": "Password is required.",
       "generic": "Verification failed. Try again.",
       "network": "Couldn't reach the server. Try again."
-    }
+    },
+    "indicator": "Admin elevated for {minutes, plural, one {# more minute} other {# more minutes}}",
+    "deelevateLabel": "End admin elevation now"
   },
   "elevation": {
     "active": "Admin elevated",
@@ -11826,7 +11828,9 @@
       "auto": "Auto-renew",
       "manual": "Manual",
       "failed": "Renewal failed",
-      "unknown": "Unknown"
+      "unknown": "Unknown",
+      "pending": "Pending",
+      "eligible": "Eligible"
     },
     "title": "TLS certificates",
     "description": "Certs the cluster's TLS driver knows about, filtered by this app's slug. Days-until-expiry are colour-coded: red < 30, amber < 90.",

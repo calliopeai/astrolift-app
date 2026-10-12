@@ -164,7 +164,7 @@ export function TlsCertificatesCard({
       header: t("columns.renewal"),
       cell: (c) => (
         <Badge variant={RENEWAL_TONE[c.renewalStatus]} className="font-mono text-xs">
-          {t(`renewal.${c.renewalStatus}`)}
+          {t.has(`renewal.${c.renewalStatus}`) ? t(`renewal.${c.renewalStatus}`) : c.renewalStatus}
         </Badge>
       ),
     },

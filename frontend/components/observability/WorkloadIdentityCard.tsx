@@ -151,7 +151,7 @@ export function WorkloadIdentityCard({
               <dt className="text-muted-foreground text-xs tracking-wide uppercase">{t("kind")}</dt>
               <dd className="mt-1">
                 <Badge variant="secondary" className="font-mono text-xs">
-                  {t(`kinds.${binding.kind}`)}
+                  {t.has(`kinds.${binding.kind}`) ? t(`kinds.${binding.kind}`) : binding.kind}
                 </Badge>
               </dd>
             </div>

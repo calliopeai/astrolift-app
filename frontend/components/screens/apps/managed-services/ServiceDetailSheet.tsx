@@ -61,7 +61,7 @@ export function ServiceDetailSheet({
   onRetry,
 }: ServiceDetailSheetProps) {
   const copy = useTranslations("projectResources.reads");
-  const common = useTranslations("common");
+  const common = useTranslations("apps.common");
   const displayed = current === undefined ? service : current;
   const open = service !== null;
   return (

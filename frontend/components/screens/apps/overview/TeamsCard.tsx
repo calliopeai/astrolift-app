@@ -110,7 +110,7 @@ export function TeamsCardView({
             permission="app.update"
             fallback={
               <Badge variant="outline" className={LEVEL_BADGE[a.accessLevel]}>
-                {t(`levels.${a.accessLevel}`)}
+                {t.has(`levels.${a.accessLevel}`) ? t(`levels.${a.accessLevel}`) : a.accessLevel}
               </Badge>
             }
           >
@@ -133,7 +133,9 @@ export function TeamsCardView({
             </Select>
           </Can>
           <p className="text-muted-foreground text-2xs mt-1">
-            {t(`levelDescriptions.${a.accessLevel}`)}
+            {t.has(`levelDescriptions.${a.accessLevel}`)
+              ? t(`levelDescriptions.${a.accessLevel}`)
+              : ""}
           </p>
         </>
       ),
@@ -344,7 +346,9 @@ export function AddTeamSheetView({
                 <SelectItem value="owner">{copy("levels.owner")}</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-muted-foreground text-xs">{copy(`levelDescriptions.${level}`)}</p>
+            <p className="text-muted-foreground text-xs">
+              {copy.has(`levelDescriptions.${level}`) ? copy(`levelDescriptions.${level}`) : ""}
+            </p>
           </div>
 
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">

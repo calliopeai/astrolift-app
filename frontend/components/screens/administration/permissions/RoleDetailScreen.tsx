@@ -101,7 +101,7 @@ export function RoleDetailScreen({
         status={
           <span className="flex min-w-0 items-center gap-1.5">
             <Badge variant="outline" className="font-mono uppercase">
-              {scopes(role.scopeLevel)}
+              {scopes.has(role.scopeLevel) ? scopes(role.scopeLevel) : role.scopeLevel}
             </Badge>
             {role.isSystem ? (
               <Badge variant="secondary" className="gap-1">
