@@ -262,6 +262,43 @@ def start_workflow_once(
     return WorkflowHandle(workflow_id=workflow_id, run_id=run_id, enqueued=True)
 
 
+@dataclass(frozen=True)
+class WorkflowRunState:
+    """The latest run of a workflow id: whether it is still running, and its run id
+    (empty when the id has never run)."""
+
+    running: bool
+    run_id: str
+
+
+@async_to_sync
+async def _run_state_async(workflow_id: str) -> WorkflowRunState:
+    from temporalio.client import WorkflowExecutionStatus
+    from temporalio.service import RPCError, RPCStatusCode
+
+    client = await asyncio.wait_for(_get_client_async(), timeout=5)
+    try:
+        description = await client.get_workflow_handle(workflow_id).describe(rpc_timeout=timedelta(seconds=3))
+    except RPCError as exc:
+        if exc.status == RPCStatusCode.NOT_FOUND:
+            return WorkflowRunState(running=False, run_id="")
+        raise
+    return WorkflowRunState(
+        running=description.status == WorkflowExecutionStatus.RUNNING, run_id=description.run_id or ""
+    )
+
+
+def workflow_run_state(workflow_id: str) -> WorkflowRunState | None:
+    """The latest run of ``workflow_id``; None when the engine is off or did not answer."""
+    if not _temporal_enabled():
+        return None
+    try:
+        return _run_state_async(workflow_id)
+    except Exception:  # noqa: BLE001
+        logger.warning("temporal run state read failed for %s", workflow_id, exc_info=True)
+        return None
+
+
 def signal_workflow(workflow_id: str, signal_name: str, *args: Any) -> bool:
     """Best-effort signal. Returns False when disabled or not found."""
     if not _temporal_enabled():
