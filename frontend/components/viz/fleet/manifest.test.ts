@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import messages from "@/messages/en.json";
+
+import { vizTranslator } from "../core/viz-t";
+
 import { makeFleet, type FleetRun } from "../core/fleet-model";
 import { mulberry32 } from "../core/semantics";
 
@@ -15,6 +19,7 @@ import {
   summarizeRuns,
 } from "./manifest";
 
+const t = vizTranslator(messages);
 const NOW = Date.UTC(2026, 8, 28, 14, 0, 0);
 const run = (over: Partial<FleetRun>): FleetRun => ({
   id: "r0",
@@ -45,8 +50,8 @@ describe("clock and detail", () => {
   });
 
   it("summarizes the board", () => {
-    expect(summarizeRuns([])).toBe("0 runs on the board");
-    expect(summarizeRuns([run({}), run({ id: "r1", state: "failed" }), run({ id: "r2" })])).toBe(
+    expect(summarizeRuns([], t)).toBe("0 runs on the board");
+    expect(summarizeRuns([run({}), run({ id: "r1", state: "failed" }), run({ id: "r2" })], t)).toBe(
       "3 runs: 2 queued, 1 failed"
     );
   });

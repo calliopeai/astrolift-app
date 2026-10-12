@@ -7190,6 +7190,963 @@
       }
     }
   },
+  "vizRender": {
+    "health": {
+      "ok": "Saudável",
+      "degraded": "Degradado",
+      "failing": "Falhando",
+      "idle": "Ocioso"
+    },
+    "healthInline": {
+      "ok": "saudável",
+      "degraded": "degradado",
+      "failing": "falhando",
+      "idle": "ocioso"
+    },
+    "frame": {
+      "legend": "Legenda",
+      "reducedMotion": "Movimento reduzido: exibindo quadros estáticos",
+      "viewStyle": "Estilo de visualização",
+      "fleetTitle": "Frota de agentes",
+      "fleetDescription": "{agents, plural, one {# agente} other {# agentes}} em {clusters, plural, one {# cluster} other {# clusters}}",
+      "workflowsTitle": "Workflows",
+      "workflowsDescription": "{workflows, plural, one {# workflow} other {# workflows}}, {runs, plural, one {# execução} other {# execuções}}"
+    },
+    "styles": {
+      "fleet": {
+        "orbit": {
+          "label": "Órbita",
+          "blurb": "Clusters como planetas, agentes como satélites"
+        },
+        "heartbeat": {
+          "label": "Batimento",
+          "blurb": "Um ponto fosforescente que esmaece por evento"
+        },
+        "hive": {
+          "label": "Colmeia",
+          "blurb": "Um bloco por agente, para frotas grandes"
+        },
+        "manifest": {
+          "label": "Painel de partidas",
+          "blurb": "A fila de execuções como um painel de partidas"
+        },
+        "isometric": {
+          "label": "Isométrica",
+          "blurb": "Clusters como plataformas, carga como altura"
+        },
+        "graph": {
+          "label": "Grafo",
+          "blurb": "Um grafo de forças ao vivo com pulsos de despacho"
+        },
+        "swarm": {
+          "label": "Enxame",
+          "blurb": "Agentes rodeando seus clusters em gavinhas"
+        },
+        "list": {
+          "label": "Lista",
+          "blurb": "Uma tabela simples"
+        }
+      },
+      "workflow": {
+        "transit": {
+          "label": "Metrô",
+          "blurb": "Workflows como linhas, execuções como trens"
+        },
+        "isometric": {
+          "label": "Isométrica",
+          "blurb": "Etapas como uma linha de montagem"
+        },
+        "graph": {
+          "label": "Grafo",
+          "blurb": "Um grafo de etapas animado"
+        },
+        "list": {
+          "label": "Lista",
+          "blurb": "Uma tabela simples"
+        }
+      },
+      "app": {
+        "auto": {
+          "label": "Automática",
+          "blurb": "Organizada conforme a topologia do app"
+        },
+        "isometric": {
+          "label": "Isométrica",
+          "blurb": "Cargas de trabalho como blocos em uma plataforma"
+        },
+        "graph": {
+          "label": "Grafo",
+          "blurb": "Cargas de trabalho e tráfego como um grafo ao vivo"
+        },
+        "classic": {
+          "label": "Clássica",
+          "blurb": "Somente cartões, sem diagrama"
+        }
+      }
+    },
+    "topology": {
+      "service": "Serviço único",
+      "service-data": "Serviço e dados",
+      "service-worker": "Web e worker",
+      "microservices": "Microsserviços",
+      "service-agent": "App e agente",
+      "agent": "Agente",
+      "functions": "Funções",
+      "scheduled": "Agendado",
+      "task": "Tarefa",
+      "workflow": "Workflow",
+      "mixed": "Mista"
+    },
+    "legend": {
+      "shape": {
+        "returnTrack": "Via de retorno: trabalho enviado de volta a uma etapa anterior, com seu limite de rodadas",
+        "roundBadge": "Selo de rodada: em qual rodada uma execução está",
+        "roundNearBound": "Selo de rodada âmbar: a uma rodada do limite; depois dele a execução falha",
+        "siding": "Desvio: uma nova tentativa da mesma etapa, com seu limite de tentativas",
+        "join": "Junção: ramos paralelos se unem quando todos terminam",
+        "supervisorSwarm": "Enxame supervisor: seus workers, acesos enquanto ocupados com uma subtarefa",
+        "nestedStack": "Pilha aninhada: uma etapa que executa um workflow filho inteiro"
+      },
+      "healthy": "Saudável",
+      "degradedLoad85": "Degradado: acima de 85% de carga",
+      "flickerFailing": "Piscando: falhando",
+      "idle": "Ocioso",
+      "fleetListLoadBar": "Barra: carga, na cor de saúde do agente",
+      "manifestQueued": "Na fila, contagem regressiva para a decolagem",
+      "manifestHolding": "Em espera (pulsa enquanto aguarda)",
+      "manifestLiftedOff": "Decolou / em voo",
+      "manifestLanded": "Pousou",
+      "failed": "Falhou",
+      "manifestFlip": "O status vira uma vez quando uma execução muda de estado",
+      "graphHealthy": "Saudável; o tamanho indica as execuções ativas",
+      "degradedLoadOver85": "Degradado (carga acima de 85%)",
+      "failing": "Falhando",
+      "idleDarkShort": "Ocioso, apagado",
+      "graphRunsFlow": "Execuções em andamento; mais rápido e largo é mais ocupado",
+      "graphDispatch": "O despacho percorre hub, cluster e agente (estático: agente com anel)",
+      "graphQueued": "Execuções na fila",
+      "graphPinned": "Fixado; clique duas vezes para soltar",
+      "orbitHealthy": "Saudável; a velocidade da órbita indica a carga",
+      "orbitDegraded": "Degradado, acima de 85% de carga",
+      "orbitFailing": "Falhando, caiu para uma órbita baixa",
+      "orbitIdle": "Ocioso, estacionado",
+      "orbitLaunch": "Execução iniciada (lançamento)",
+      "clusterDegraded": "Cluster degradado",
+      "clusterOffline": "Cluster offline",
+      "heartbeatRun": "Execução iniciada ou concluída",
+      "heartbeatRunFailed": "Execução falhou",
+      "heartbeatDispatched": "Execução despachada",
+      "heartbeatDrift": "Os pontos deslizam para a esquerda e esmaecem em 12s",
+      "heartbeatBusy": "Agente ocupado: a linha brilha conforme a carga",
+      "heartbeatDegraded": "Degradado (sobrecarregado)",
+      "heartbeatFailing": "Agente falhando",
+      "heartbeatIdle": "Ocioso: a linha fica apagada",
+      "hiveBrightness": "Brilho: carga",
+      "hiveBorder": "Borda: saudável",
+      "degraded": "Degradado",
+      "hiveDark": "Apagado: ocioso",
+      "hiveRing": "Anel: despacho a partir do hub do cluster",
+      "hiveStillDot": "Ponto fixo: recebeu trabalho nos últimos 12s",
+      "swarmSpeed": "Velocidade do enxame: quão ocupado está o agente",
+      "swarmIdle": "Assentado e parado: ocioso",
+      "swarmTendril": "Espessura da gavinha: execuções ativas",
+      "swarmFailing": "Afastando-se, gavinha desfiada: falhando",
+      "swarmPulse": "Pulso pelas gavinhas: um despacho",
+      "isoHealthy": "Saudável (a altura indica a carga)",
+      "isoIdle": "Ocioso (baixo, apagado)",
+      "isoRunStarted": "Execução iniciada (um ponto fixo com movimento reduzido)",
+      "isoClusterDegraded": "Cluster degradado (borda da plataforma)",
+      "jobsRunning": "Em execução: brilha",
+      "jobsFailing": "Job ou etapa falhando",
+      "jobsPastOk": "Execução anterior bem-sucedida",
+      "jobsPastFailed": "Execução anterior falhou",
+      "jobsNoRecord": "Horário agendado sem registro de execução",
+      "jobsStepTraffic": "Tráfego da etapa: mais rápido é mais ocupado",
+      "jobsInvoked": "Invocado ou agiu agora (misto)",
+      "idleStaysDark": "Ocioso: fica apagado",
+      "idleStaysDarkComma": "Ocioso, fica apagado",
+      "saAction": "Ação do agente, esmaece em 12s",
+      "saActionFailing": "Ação do agente em uma chamada com falha",
+      "saJustCalled": "Chamado agora pelo agente",
+      "saCallTraffic": "Tráfego de chamadas do agente: mais rápido é mais ocupado",
+      "saCallFailing": "Chamada falhando (acima de 5% de erros)",
+      "load": "Carga",
+      "failingWorkload": "Carga de trabalho falhando",
+      "swDegraded": "Degradado: acumulando, acima de 1% de erros ou réplicas faltando",
+      "darkNoTraffic": "Apagado: sem tráfego",
+      "swTank": "Tanque: profundidade da fila; pulsa enquanto acumula",
+      "swDash": "Traço em movimento: mensagens entrando e saindo, mais rápido quando ocupado",
+      "swGauge": "Medidor: CPU",
+      "degradedErrorsReplicas": "Degradado: acima de 1% de erros ou réplicas faltando",
+      "flickerFailingErrors": "Piscando: falhando, acima de 5% de erros",
+      "squaresReplicas": "Quadrados: réplicas prontas; um contorno pulsando é uma ainda não pronta",
+      "sdDash": "Traço em movimento: chamadas ao armazenamento, mais rápido quando ocupado",
+      "sdGauge": "Medidor: CPU para o serviço, conexões para um armazenamento",
+      "degradedErrors": "Degradado: acima de 1% de erros",
+      "msHotSpot": "Barra de ponto crítico: parcela de chamadas com falha",
+      "msDash": "Traço em movimento: chamadas em um caminho, mais rápido quando ocupado",
+      "agentTick": "Ação do agente (marca), esmaece em 12s",
+      "agentTickFailing": "Ação em uma chamada com falha",
+      "agentToolTraffic": "Tráfego de chamadas de ferramentas: mais rápido e grosso é mais ocupado",
+      "agentToolFailing": "Chamada de ferramenta falhando (acima de 5% de erros)",
+      "agentToolJustCalled": "Ferramenta chamada agora",
+      "agentFailing": "Agente ou ferramenta falhando",
+      "fnInvoked": "Invocada agora",
+      "fnTileLight": "Luz do bloco: invocação recente, esmaece em 12s",
+      "fnConcurrency": "Concorrência em uso",
+      "fnCold": "Partida a frio: invocada após 5s de inatividade",
+      "fnTraffic": "Tráfego de invocações: mais rápido e grosso é mais ocupado",
+      "fnFailingPath": "Caminho falhando (acima de 5% de erros)",
+      "fnFailing": "Função falhando",
+      "trafficBusier": "Tráfego, mais rápido e brilhante quando ocupado",
+      "callsFailing": "Mais de 5% das chamadas falhando",
+      "graphDegradedShort": "Degradado ou réplicas insuficientes",
+      "graphFunctionInvoked": "Função invocada, esmaece em 12 s",
+      "agentActed": "O agente agiu, o sinalizador esmaece em 12 s",
+      "isoBlockHeight": "A altura do bloco indica a carga",
+      "isoSlab": "Uma placa por réplica pronta",
+      "isoReplicaMissing": "Réplica ausente ou degradada",
+      "isoFunctionInvoked": "Função invocada, o topo esmaece em 12 s",
+      "replaySegment": "A largura do segmento é a duração real",
+      "replayPlayhead": "Cursor em movimento: reproduzindo",
+      "replayActive": "Etapa sob o cursor",
+      "succeeded": "Concluído",
+      "replayGate": "Portão aguardando (pulsa)",
+      "replaySkipped": "Não alcançada ou ignorada",
+      "replayLoopMark": "Marca de loop: onde um loop devolveu trabalho e a próxima rodada começou",
+      "replayRoundBand": "Faixa de rodada: a qual rodada cada trecho pertence",
+      "replayParallel": "Barras paralelas: os ramos de um fan-out, cada um com seus tempos",
+      "listMoving": "Em movimento",
+      "listBreathing": "Pulsando: retido em um portão",
+      "listFlicker": "Piscando: falhou",
+      "listDone": "Concluído",
+      "listLoopRow": "Linha de loop: para onde o trabalho volta e seu limite, âmbar enquanto uma execução é devolvida",
+      "listRoundAmber": "Rodada em âmbar: a uma rodada do limite; depois dele a execução falha",
+      "trMoving": "Execução em movimento (um trem)",
+      "trHeld": "Execução retida em um portão, pulsando",
+      "trFailed": "Execução falhou, parada",
+      "trDone": "Execução concluída, esmaece no terminal",
+      "trGateHolding": "Portão retendo uma execução",
+      "trGateClear": "Portão livre",
+      "trThroughput": "Vazão: densidade e velocidade das partículas, espessura da linha",
+      "trBacklog": "Acúmulo acima de 3 execuções",
+      "trReturnTrack": "Via de retorno sobre a linha: um loop de volta, com gatilho e limite; acesa enquanto uma execução a percorre",
+      "trSmallLoop": "Pequeno loop sobre uma estação: uma nova tentativa, com seu limite",
+      "trRoundBadge": "Selo de rodada: rodada atual sobre o limite",
+      "trSiding": "Desvio: um ramo paralelo; seu vagão acende durante a execução e fica na junção ao terminar",
+      "trBranchFailed": "Ramo falhou (concluído, em vermelho)",
+      "trJoin": "Junção: brilha quando todos os ramos chegam",
+      "trSwarm": "Enxame supervisor: workers ocupados acesos em gavinhas, girando conforme a carga",
+      "trStacked": "Estação empilhada: um workflow filho; abra para ver sua linha",
+      "grFlowing": "Execuções fluindo, mais rápido quando ocupado",
+      "grBackedUp": "Acumulado (mais de 3 na fila)",
+      "grGateWaiting": "Portão aguardando aprovação",
+      "grGateApproved": "Portão aprovado",
+      "grGateDenied": "Portão negado ou rejeitado",
+      "grRunsAtStage": "Execuções em uma etapa",
+      "grFailedRun": "Execução com falha",
+      "grIdle": "Ocioso ou concluído",
+      "grReturnTrack": "Via de retorno: um loop para uma etapa anterior, com limite de rodadas; flui enquanto uma execução é devolvida",
+      "grFanoutBox": "Caixa de fan-out: uma linha por ramo; um ramo em execução flui, um concluído pisca uma vez",
+      "grSatellites": "Satélites do supervisor: seus workers, acesos e girando quando ocupados, mais rápido com mais carga",
+      "grNestedGroup": "Grupo aninhado: uma etapa que executa um workflow filho; recolha em uma pilha",
+      "isoWfMoving": "Execução em movimento (caixa) / etapa trabalhando",
+      "isoWfHeld": "Retida em um portão: cabine fechada, pulsando",
+      "isoWfFailed": "Execução falhou naquela máquina",
+      "isoWfBacklog": "Acúmulo aguardando em uma entrada",
+      "isoWfBelt": "Velocidade da esteira = vazão",
+      "isoWfIdle": "Ocioso / concluído",
+      "isoWfRamp": "Rampa de retorno: o trabalho devolvido sobe um nível até a etapa anterior; o limite fica na rampa",
+      "isoWfDeck": "Um deck por rodada sobre as etapas em loop: a rodada atual acesa, as anteriores esmaecidas",
+      "isoWfHoop": "Arco sobre uma etapa: uma nova tentativa dessa etapa, com seu limite",
+      "isoWfRails": "Trilhos elevados: ramos do fan-out, acesos durante a execução; cada um rola até o bloco de junção ao terminar",
+      "isoWfSupervisor": "Bloco supervisor: workers ocupados orbitam o hub, mais rápido com mais carga; ociosos ficam parados",
+      "isoWfStacked": "Bloco empilhado: um workflow filho; abra para ver suas etapas em uma subplataforma",
+      "airlockWaiting": "Aguardando aprovação: o medidor pulsa e enche com o tempo retido",
+      "airlockApproved": "Aprovado: portas abertas",
+      "airlockDenied": "Negado: lacrado, treme uma vez"
+    },
+    "listSeparator": ", ",
+    "unknown": "desconhecido",
+    "offline": "Offline",
+    "selectedAgent": ", agente selecionado",
+    "agentSummary": "{name}: {health}, {load}% de carga, {running} em execução, {queued} na fila",
+    "counts": {
+      "failing": "{count} falhando",
+      "degraded": "{count} degradados",
+      "busy": "{count} ocupados",
+      "idle": "{count} ociosos",
+      "queued": "{count} na fila",
+      "clustersNotHealthy": "{count, plural, one {# cluster não saudável} other {# clusters não saudáveis}}"
+    },
+    "fleetList": {
+      "summary": "{agents} agentes, {failing} falhando, {busy} ocupados",
+      "searchPlaceholder": "Pesquisar agentes, clusters…",
+      "health": "Saúde",
+      "views": {
+        "all": "Todos",
+        "mine": "Meus"
+      },
+      "mineNote": "Os agentes pertencem à frota, não a uma pessoa, então Meus fica vazio.",
+      "columns": {
+        "agent": "Agente",
+        "health": "Saúde",
+        "load": "Carga",
+        "runs": "Execuções ativas",
+        "queued": "Na fila",
+        "cluster": "Cluster"
+      },
+      "agentLabel": "{name}, {health}",
+      "label": "Agentes",
+      "empty": "Nenhum agente nesta frota"
+    },
+    "manifest": {
+      "count": {
+        "queued": "{count} na fila",
+        "holding": "{count} em espera",
+        "lifted_off": "{count} decolaram",
+        "in_flight": "{count} em voo",
+        "landed": "{count} pousaram",
+        "failed": "{count} falharam"
+      },
+      "state": {
+        "queued": "Na fila",
+        "holding": "Em espera",
+        "lifted_off": "Decolou",
+        "in_flight": "Em voo",
+        "landed": "Pousou",
+        "failed": "Falhou"
+      },
+      "summary": "{count, plural, one {# execução} other {# execuções}}: {parts}",
+      "summaryEmpty": "{count, plural, one {# execução} other {# execuções}} no painel",
+      "label": "Manifesto de lançamento. {summary}",
+      "queue": "Fila de execuções",
+      "columns": {
+        "clock": "T- / UTC",
+        "run": "Execução",
+        "agent": "Agente",
+        "cluster": "Cluster",
+        "status": "Status"
+      },
+      "empty": "Nenhuma execução no painel"
+    },
+    "fleetGraph": {
+      "summary": "{agents} agentes em {clusters} clusters, {failing} falhando, {busy} ocupados, {queued} execuções na fila",
+      "hub": "Hub da organização",
+      "org": "org",
+      "agentLabel": "{name}: {health}, {active} ativas, {queued} na fila",
+      "agentTitle": "{name}: {health}, {active} ativas, {queued} na fila, carga {load}%",
+      "clusterTitle": "{name}: {health}",
+      "clusterRegionTitle": "{name} ({region}): {health}"
+    },
+    "orbit": {
+      "planet": "{agents} agentes · {busy} ocupados"
+    },
+    "heartbeat": {
+      "summary": "Batimento: {agents} agentes, {failing} falhando, {busy} ocupados, {recent} eventos nos últimos {seconds}s",
+      "agent": "agente",
+      "now": "agora"
+    },
+    "hive": {
+      "summary": "{agents} agentes em {clusters} clusters, {failing} falhando, {degraded} degradados, {busy} ocupados",
+      "group": "{name}, {count} agentes",
+      "groupRegion": "{name} ({region}), {count} agentes",
+      "dispatcher": "Despachante de {name}, cluster {health}",
+      "agent": "{name}, {cluster}, {health}, carga {load}%, {running} em execução, {queued} na fila"
+    },
+    "swarm": {
+      "summary": "{agents} agentes em enxame: {busy} ocupados, {idle} ociosos, {failing} falhando"
+    },
+    "isoFleet": {
+      "summary": "Frota isométrica: {fleet}, {failing} falhando, {degraded} degradados, {busy} ocupados, {idle} ociosos",
+      "agent": "{name}: {health}, carga {load}%, {count, plural, one {# execução ativa} other {# execuções ativas}}",
+      "cluster": "{name}: {count} agentes",
+      "clusterRegion": "{name} ({region}): {count} agentes",
+      "peek": "{health} · carga {load}% · {running} em execução · {queued} na fila"
+    },
+    "feed": {
+      "queried": "<a>{agent}</a> consultou <b>{target}</b>",
+      "publishedTo": "<a>{agent}</a> publicou em <b>{target}</b>",
+      "invoked": "<a>{agent}</a> invocou <b>{target}</b>",
+      "called": "<a>{agent}</a> chamou <b>{target}</b>",
+      "workedOn": "<a>{agent}</a> trabalhou em <b>{target}</b>"
+    },
+    "tick": {
+      "queried": "consultou {target}, há {seconds}s",
+      "publishedTo": "publicou em {target}, há {seconds}s",
+      "invoked": "invocou {target}, há {seconds}s",
+      "called": "chamou {target}, há {seconds}s",
+      "workedOn": "trabalhou em {target}, há {seconds}s"
+    },
+    "work": "trabalho",
+    "nodeTitle": "{name} ({kind}): {health}",
+    "loadBar": "{label} {pct}%",
+    "load": "carga",
+    "loadPct": "carga {pct}%",
+    "loadOf": "Carga de {name}",
+    "connectionsOf": "Conexões de {name}",
+    "cpuOf": "CPU de {name}",
+    "appSummary": "{app}: {summary}",
+    "nouns": {
+      "workloads": "{count, plural, one {# carga de trabalho} other {# cargas de trabalho}}",
+      "nodes": "{count, plural, one {# nó} other {# nós}}",
+      "appWorkloads": "{count, plural, one {# carga de trabalho do app} other {# cargas de trabalho do app}}",
+      "agents": "{count, plural, one {# agente} other {# agentes}}",
+      "tools": "{count, plural, one {# ferramenta} other {# ferramentas}}",
+      "functions": "{count, plural, one {# função} other {# funções}}"
+    },
+    "sections": {
+      "traffic": "Tráfego",
+      "services": "Serviços",
+      "functions": "Funções",
+      "jobs": "Jobs",
+      "agents": "Agentes",
+      "queues": "Filas",
+      "data": "Dados",
+      "external": "Externo"
+    },
+    "roles": {
+      "ingress": "ingress",
+      "service": "serviço",
+      "worker": "worker",
+      "data": "dados",
+      "queue": "fila",
+      "function": "função",
+      "trigger": "gatilho",
+      "agent": "agente",
+      "schedule": "agendamento",
+      "external": "externo"
+    },
+    "utc": "{time} UTC",
+    "notApplicable": "n/d",
+    "nodeLoadLabel": "{name}, {kind}, {health}, carga {load}%",
+    "nodeRoleLabel": "{name}, {role}, {health}",
+    "nameHealth": "{name}, {health}",
+    "readyReplicas": "{ready}/{desired} prontas",
+    "reqPerSec": "req/s",
+    "jobsPerSec": "jobs/s",
+    "errors": "erros",
+    "distribution": "Distribuição",
+    "trend": "Tendência",
+    "topologyGraph": "Grafo de topologia",
+    "trafficSummary": "{app}, {topology}: {health}, {rps} requisições por segundo, {errors} de erros",
+    "jobs": {
+      "scheduleLabel": "{name}: {next}, {health}",
+      "nextRunIn": "próxima execução em {countdown}",
+      "notParsed": "agendamento não interpretado",
+      "nextRun": "Próxima execução em",
+      "running": "em execução",
+      "notRunning": "parado",
+      "lastSlots": "Últimos {count} horários",
+      "history": "Histórico de execuções",
+      "slot": "{time} UTC: {outcome}",
+      "succeeded": "bem-sucedida",
+      "failed": "falhou",
+      "noRecord": "sem registro",
+      "noSchedules": "Nenhum agendamento vinculado a um job.",
+      "noTask": "Nenhuma tarefa neste app.",
+      "stateFailed": "Falhou",
+      "stateRunning": "Em execução",
+      "stateNotRunning": "Parado",
+      "runLabel": "Execução de {name}: {state}",
+      "run": "Execução",
+      "kind": "tipo",
+      "pods": "pods",
+      "writes": "grava",
+      "errPct": "{pct}% erro",
+      "steps": "Etapas do workflow",
+      "stepsTitle": "Etapas",
+      "stepLabel": "Etapa {n}, {name}: {state}",
+      "runningPct": "em execução {pct}%"
+    },
+    "serviceAgent": {
+      "summary": "{app}: {workloads}; {agents}; {actions} ações de agentes nos últimos 12s",
+      "app": "App",
+      "doing": "O que o agente está fazendo",
+      "quiet": "Tranquilo: nenhuma ação de agente nos últimos 12s",
+      "agent": "Agente",
+      "calls": "Chamadas do agente",
+      "callLabel": "O agente chama {name}: {rps}/s, {errors}% de erros",
+      "calledLabel": "{label}, chamado pelo agente",
+      "agentTag": "agente"
+    },
+    "serviceWorker": {
+      "behind": "+{rps}/s atrasado",
+      "keepingUp": "acompanhando",
+      "empty": "vazia",
+      "in": "entrada",
+      "out": "saída",
+      "depth": "profundidade",
+      "lag": "atraso",
+      "depthTrend": "Tendência de profundidade",
+      "enqueued": "enfileirados/s",
+      "consumed": "consumidos/s",
+      "summary": "{head}, fila {queue} com {fill} ocupado e {health}, {inRps} de entrada e {outRps} de saída por segundo",
+      "fallingBehind": ", atrasando {rps} por segundo",
+      "summaryNoQueue": "{head}, sem fila",
+      "web": "Web",
+      "webHeading": "Web · {rps} req/s · {errors} de erros",
+      "queue": "Fila",
+      "noQueue": "Nenhuma fila neste app.",
+      "workers": "Workers",
+      "workersHeading": "Workers · {rps} jobs/s"
+    },
+    "service": {
+      "summary": "{app}, {topology}: {health}, {rps} requisições por segundo, p50 {p50}, {errors} de erros, {ready} de {desired} réplicas prontas"
+    },
+    "kpi": {
+      "requests": "Requisições/s",
+      "p50": "Latência p50",
+      "errorRate": "Taxa de erros",
+      "replicas": "Réplicas prontas"
+    },
+    "serviceData": {
+      "connections": "conexões",
+      "callErrors": "erros de chamada",
+      "summary": "{head}, {count, plural, one {# armazenamento de dados} other {# armazenamentos de dados}}",
+      "worstStore": ", {name} {health}",
+      "storeAt": ", {name} em {load}"
+    },
+    "micro": {
+      "summary": "{app}, {topology}: {services} serviços, {failing} falhando, {paths} caminhos de chamada falhando, {rps} requisições por segundo",
+      "hottest": ", o mais crítico {name} com {errors} de erros",
+      "services": "serviços",
+      "replicas": "réplicas",
+      "failingPaths": "caminhos falhando",
+      "hotSpots": "Pontos críticos",
+      "callPaths": "Caminhos de chamada",
+      "callPathsHeading": "Caminhos de chamada por requisições/s",
+      "fromTo": "De → para",
+      "traffic": "Tráfego",
+      "quieter": "e {count} caminhos menos movimentados"
+    },
+    "agentLayout": {
+      "summary": "{app}: {agents}; {actions} ações nos últimos 12s; {tools}",
+      "runs": "Execuções",
+      "actions": "Ações, últimos 12s",
+      "toolCalls": "Chamadas de ferramentas",
+      "diagram": "Diagrama",
+      "stripLabel": "{name}: {count} ações nos últimos 12s, {health}",
+      "noActions": "nenhuma ação"
+    },
+    "functions": {
+      "summary": "{app}: {functions}; {invoked} invocadas nos últimos 12s",
+      "coldStarts": ", {count, plural, one {# partida a frio} other {# partidas a frio}}",
+      "tile": "{name}: {rps} invocações, concorrência {pct}%, {recent} nos últimos 12s, {health}",
+      "tileCold": "{name}: {rps} invocações, concorrência {pct}%, {recent} nos últimos 12s, partida a frio, {health}",
+      "cold": "frio",
+      "in12s": "{count} em 12s"
+    },
+    "graph": {
+      "nodeName": "{name} ({role})",
+      "replicas": "{ready} de {desired} réplicas",
+      "perSecond": "{rps} por segundo",
+      "invocations": "{count} invocações em 12 s",
+      "actions": "{count} ações em 12 s",
+      "erroring": "{erroring} de {total} conexões com erros",
+      "connectionsHealthy": "{count} conexões saudáveis",
+      "acts": "{count} ações",
+      "retrying": "tentando {stage} de novo, tentativa {n} de {max}",
+      "sentBack": "devolvida de {from} para {to} na rodada {n} de {max}",
+      "state": {
+        "failed": "falhou",
+        "rejected": "rejeitada, devolvendo o trabalho",
+        "sendingBack": "devolvendo o trabalho",
+        "waitingApproval": "aguardando aprovação",
+        "runningWaiting": "em execução, {held} aguardando",
+        "held": "retida",
+        "backedUp": "acumulada, {backlog} na fila",
+        "running": "em execução",
+        "finished": "concluída"
+      },
+      "kind": {
+        "gate": "portão",
+        "fanout": "fan-out",
+        "join": "junção",
+        "supervisor": "supervisor",
+        "workflow": "workflow aninhado"
+      },
+      "group": {
+        "moving": "{count} em execução: {runs}",
+        "held": "{count} retidas: {runs}",
+        "failed": "{count} falharam: {runs}",
+        "done": "{count} concluídas: {runs}"
+      },
+      "branches": "{count, plural, one {# ramo} other {# ramos}}, {settled} de {count} concluídos",
+      "branchesDynamic": "{count, plural, one {# ramo definido} other {# ramos definidos}} por execução, {settled} de {count} concluídos",
+      "branchesFailed": ", {count} falharam",
+      "noBranches": "ainda sem ramos",
+      "waitsOn": "aguarda {count, plural, one {# ramo} other {# ramos}}, {settled} concluídos",
+      "waitsOnFanout": "aguarda seu fan-out",
+      "subtasksShort": "{done}/{total} subtarefas",
+      "subtasksDone": "{done} de {total} subtarefas concluídas",
+      "workerBusy": "{label}: ocupado, {load}% de carga",
+      "workerIdle": "{label}: ocioso, {load}% de carga",
+      "firstStage": "sua primeira etapa",
+      "loopRun": "{label}, {text}",
+      "trackShort": {
+        "failed": "{stage} falhou, máx. {max} rodadas",
+        "rejected": "{stage} rejeitada, máx. {max} rodadas",
+        "condition": "{stage} condição atendida, máx. {max} rodadas"
+      },
+      "maxAttempts": "máx. {max} tentativas",
+      "workflows": "{count, plural, one {# workflow} other {# workflows}}",
+      "backedUpStages": "{count, plural, one {# etapa acumulada} other {# etapas acumuladas}}"
+    },
+    "loop": {
+      "attemptOf": "tentativa {n} de {max}",
+      "roundOf": "rodada {n} de {max}",
+      "stage": "etapa",
+      "retry": {
+        "failed": "Tentar {stage} de novo quando falhar, no máximo {max} tentativas",
+        "rejected": "Tentar {stage} de novo quando for rejeitada, no máximo {max} tentativas",
+        "condition": "Tentar {stage} de novo quando atender à condição, no máximo {max} tentativas"
+      },
+      "when": {
+        "failed": "{stage} falha",
+        "rejected": "{stage} é rejeitada",
+        "condition": "{stage} atende à condição"
+      },
+      "back": "Voltar para {to} quando {when}, no máximo {max} rodadas"
+    },
+    "station": {
+      "gateFailed": "uma execução falhou aqui",
+      "holding": "retendo execuções",
+      "open": "aberta",
+      "runsWaiting": "{count, plural, one {, # execução aguardando} other {, # execuções aguardando}}",
+      "idleLastRun": "{count, plural, one {ociosa, a última execução teve # ramo} other {ociosa, a última execução teve # ramos}}",
+      "branches": "{count, plural, one {# ramo} other {# ramos}}, {settled} concluídos, {running} em execução",
+      "branchesFailed": ", {count} falharam",
+      "waitingOn": "aguardando {pending} de {count, plural, one {# ramo} other {# ramos}}",
+      "workersBusy": "{busy} de {count, plural, one {# worker} other {# workers}} ocupados",
+      "childFailed": "uma execução filha falhou",
+      "childFinished": "execução filha concluída",
+      "childAt": "execução filha em {stage}, etapa {n} de {total}",
+      "aStage": "uma etapa",
+      "name": "{line}, {station}: {state}{loops}",
+      "kind": {
+        "stage": "{name}",
+        "gate": "portão {name}",
+        "fanout": "fan-out {name}",
+        "join": "junção {name}",
+        "supervisor": "supervisor {name}",
+        "workflow": "workflow filho {name}"
+      }
+    },
+    "run": {
+      "retrying": "tentando {stage} de novo",
+      "theStage": "a etapa",
+      "sentBackTo": "devolvida para {stage}",
+      "anEarlierStage": "uma etapa anterior",
+      "waitingFanout": "aguardando o fan-out liberar",
+      "held": "retida",
+      "failed": "falhou",
+      "finished": "concluída",
+      "waitingBranches": "aguardando ramos, {settled} de {total} concluídos",
+      "subtasks": "subtarefas {done} de {total} concluídas",
+      "childAt": "execução filha em {stage}",
+      "moving": "em movimento",
+      "round": "rodada {n}",
+      "childRun": "execução filha",
+      "name": "Execução {label}: {parts}"
+    },
+    "trains": {
+      "moving": "{count} em movimento",
+      "heldAtGates": "{count} retidas em portões",
+      "failed": "{count} falharam",
+      "sentBackOnLoop": "{count} devolvidas em um loop",
+      "backedUp": "{count} acumuladas",
+      "running": "{count} em execução",
+      "sentBackAlongLoop": "{count} devolvidas ao longo de um loop"
+    },
+    "list": {
+      "trigger": {
+        "failed": "{stage} falhou",
+        "rejected": "{stage} rejeitada",
+        "condition": "{stage} atendeu à condição",
+        "custom": "{stage}: {condition}"
+      },
+      "retrying": "{what}, tentando {stage} de novo, tentativa {n} de {max}",
+      "goesBack": "{what} volta para {to}, rodada {n} de {max}",
+      "inside": "{base}; {label} está na rodada {n} de {max}",
+      "branchesPerRun": "Ramos definidos por execução",
+      "noBranches": "Ainda sem ramos",
+      "done": "{settled} / {total} concluídos",
+      "waitsAllSettled": "Aguarda {count, plural, one {# ramo} other {# ramos}}, todos concluídos",
+      "waitsToGo": "Aguarda {count, plural, one {# ramo} other {# ramos}}, faltam {pending}",
+      "waitsOn": "Aguarda {name}",
+      "subtasks": "{done} / {total} subtarefas, {workers}",
+      "runsChild": "Executa {name}",
+      "childAt": "Execução filha em {stage}, {n} / {total}",
+      "start": "início",
+      "stages": {
+        "search": "Pesquisar etapas, workflows, loops…"
+      },
+      "runs": {
+        "search": "Pesquisar execuções, workflows, estações…"
+      },
+      "fields": {
+        "state": "Estado",
+        "kind": "Tipo"
+      },
+      "kind": {
+        "stage": "Etapa",
+        "gate": "Portão",
+        "fanout": "Fan-out",
+        "join": "Junção",
+        "supervisor": "Supervisor",
+        "workflow": "Workflow aninhado",
+        "loop": "Loop",
+        "retry": "Nova tentativa"
+      },
+      "kindInline": {
+        "stage": "etapa",
+        "gate": "portão",
+        "fanout": "fan-out",
+        "join": "junção",
+        "supervisor": "supervisor",
+        "workflow": "workflow aninhado",
+        "loop": "loop",
+        "retry": "nova tentativa"
+      },
+      "stageState": {
+        "failed": "Falhou",
+        "sendingBack": "Devolvendo",
+        "held": "Retida",
+        "waitingApproval": "Aguardando aprovação",
+        "backedUp": "Acumulada",
+        "running": "Em execução",
+        "finished": "Concluída",
+        "idle": "Ociosa"
+      },
+      "stageStateInline": {
+        "failed": "falhou",
+        "sendingBack": "devolvendo",
+        "held": "retida",
+        "waitingApproval": "aguardando aprovação",
+        "backedUp": "acumulada",
+        "running": "em execução",
+        "finished": "concluída",
+        "idle": "ociosa"
+      },
+      "trainState": {
+        "moving": "Em movimento",
+        "held": "Retida",
+        "failed": "Falhou",
+        "done": "Concluída",
+        "sent": "Devolvida"
+      },
+      "trainStateInline": {
+        "moving": "em movimento",
+        "held": "retida",
+        "failed": "falhou",
+        "done": "concluída",
+        "sent": "devolvida"
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Meus"
+      },
+      "mineNote": "As etapas e execuções pertencem ao workflow, não a uma pessoa, então Meus fica vazio.",
+      "agoSeconds": "há {s}s",
+      "agoMinutes": "há {m}min",
+      "agoHours": "há {h}h {m}min",
+      "summary": "{head}: {moving} em movimento, {held} retidas em portões, {failed} falharam, {done} concluídas",
+      "summarySent": ", {count} devolvidas ao longo de um loop",
+      "none": "nenhum",
+      "nearBound": ", a uma rodada do limite",
+      "where": {
+        "retrying": "Tentando {stage} de novo",
+        "sentBack": "Devolvida para {stage}"
+      },
+      "whereInline": {
+        "retrying": "tentando {stage} de novo",
+        "sentBack": "devolvida para {stage}"
+      },
+      "loopLabel": "{workflow}: {words}, {state}",
+      "stageLabel": "{name}, {kind} em {workflow}",
+      "attempt": "tentativa {n}",
+      "columns": {
+        "stage": "Etapa",
+        "workflow": "Workflow",
+        "kind": "Tipo",
+        "state": "Estado",
+        "round": "Rodada",
+        "attempts": "Tentativas",
+        "progress": "Progresso",
+        "runs": "Execuções",
+        "run": "Execução",
+        "station": "Estação",
+        "started": "Iniciada"
+      },
+      "show": "Mostrar",
+      "stagesCount": "Etapas ({count})",
+      "runsCount": "Execuções ({count})",
+      "stagesLabel": "Etapas",
+      "runsLabel": "Execuções",
+      "noWorkflows": "Nenhum workflow",
+      "noRuns": "Nenhuma execução em nenhum workflow"
+    },
+    "replay": {
+      "round": "Rodada {n}",
+      "roundShort": "R{n}",
+      "roundLower": "rodada {n}",
+      "running": "em execução",
+      "queued": "Na fila",
+      "noCanvas": "Este navegador não consegue desenhar a exportação (sem canvas 2D).",
+      "noVideo": "Este navegador não consegue gravar vídeo.",
+      "waitingApproval": "aguardando aprovação",
+      "deniedBy": "negada por {who}",
+      "approvedBy": "aprovada por {who}",
+      "runningFor": "em execução há {duration}",
+      "took": "levou {duration}",
+      "stages": "{count, plural, one {# etapa} other {# etapas}}",
+      "rounds": "{count, plural, one {# rodada} other {# rodadas}}",
+      "sentBack": "{count, plural, one {devolvida # vez} other {devolvida # vezes}}",
+      "parallel": "{count, plural, one {# ramo paralelo} other {# ramos paralelos}}",
+      "waitingAtGate": "{count} aguardando em um portão",
+      "describe": "Execução {label}: {parts}, {span}",
+      "outcome": {
+        "rejected": "rejeitada",
+        "failed": "falhou",
+        "waiting": "aguardando",
+        "running": "em execução",
+        "skipped": "ignorada"
+      },
+      "elapsedAt": "{clock} decorrido, {stage}",
+      "elapsed": "{clock} decorrido",
+      "exportFailed": "Não foi possível exportar a reprodução: {error}",
+      "status": {
+        "succeeded": "concluída",
+        "failed": "falhou",
+        "skipped": "ignorada",
+        "running": "em execução",
+        "waiting": "aguardando"
+      },
+      "kind": {
+        "stage": "etapa",
+        "gate": "portão",
+        "fanout": "fan-out",
+        "join": "junção",
+        "supervisor": "supervisor",
+        "workflow": "workflow filho"
+      },
+      "roundsOnTrack": "Rodadas na trilha",
+      "markLabel": "Rodada {n}: {reason}, devolvida para {to}. Ir para cá",
+      "markTitle": "{reason}, de volta para {to} (rodada {n})",
+      "segment": "{name} ({kind}): {status}, {duration}",
+      "segmentRound": "{name} ({kind}, rodada {n}): {status}, {duration}",
+      "decidedBy": "decidida por {who}",
+      "sentBackReason": "devolvida: {reason}",
+      "branch": "{name} (ramo): {status}, {duration}",
+      "position": "Posição da reprodução",
+      "slowest": "<label>Etapa mais lenta: </label><strong>{name}</strong> levou <mono>{duration}</mono>, <mono>{share}%</mono> da execução",
+      "roundsList": "Rodadas",
+      "cause": "(devolvida: <em>{reason}</em>)",
+      "reducedHint": "Movimento reduzido: arraste o cursor ou use as setas",
+      "pauseLabel": "Pausar reprodução",
+      "playLabel": "Reproduzir",
+      "pause": "Pausar",
+      "play": "Reproduzir",
+      "speed": "Velocidade da reprodução",
+      "recording": "Gravando…",
+      "encoding": "Codificando…",
+      "export": "Exportar",
+      "exportGif": "GIF (time-lapse de 6s)",
+      "exportVideo": "Vídeo, WebM (time-lapse de 6s)"
+    },
+    "transit": {
+      "trigger": {
+        "failed": "{stage} falhou",
+        "rejected": "{stage} rejeitada",
+        "condition": "{stage}"
+      },
+      "maxRounds": "{trigger} · máx. {max} rodadas",
+      "maxAttempts": "{trigger} · máx. {max} tentativas",
+      "retryingNext": "tentando {stage} de novo, próxima tentativa {n} de {max}",
+      "sentBackNext": {
+        "failed": "devolvida para {to} porque {from} falhou, próxima rodada {n} de {max}",
+        "rejected": "devolvida para {to} porque {from} foi rejeitada, próxima rodada {n} de {max}",
+        "condition": "devolvida para {to} porque {from} atendeu à condição, próxima rodada {n} de {max}"
+      },
+      "roundOverall": "rodada {n} no total",
+      "summary": "{head}: {moving} em movimento, {held} retidas, {failed} falharam, {done} concluídas",
+      "sentBackOnLoop": ", {count} devolvidas em um loop",
+      "segmentsBackedUp": ", {count, plural, one {# trecho acumulado} other {# trechos acumulados}}",
+      "done": "{count} concluídas",
+      "trainLabel": {
+        "moving": "Execução {label} em {line}, em movimento em {station}",
+        "held": "Execução {label} em {line}, retida em {station}",
+        "failed": "Execução {label} em {line}, falhou em {station}",
+        "done": "Execução {label} em {line}, concluída em {station}"
+      },
+      "backClose": "Voltar para {parent}: fechar {child}",
+      "backTo": "Voltar para {parent}",
+      "backToInline": "voltar para {parent}",
+      "stationName": "{line}: {station}",
+      "nearBound": ", perto do limite",
+      "gateHolding": "portão retendo uma execução",
+      "gateClear": "portão livre",
+      "parallelPerRun": "ramos paralelos, quantidade definida por execução, ociosa",
+      "parallelIdle": "ramos paralelos, ociosa",
+      "branchesSettled": "{settled} de {total} ramos concluídos",
+      "waitingOn": ", aguardando {names}",
+      "and": " e ",
+      "joinReady": "junção pronta",
+      "joinWaiting": "junção aguardando {pending} de {total} ramos",
+      "merging": "unindo",
+      "supervisor": "supervisor, {busy} de {count, plural, one {# worker} other {# workers}} ocupados",
+      "childWorkflow": "workflow filho {name}",
+      "childWorkflowBare": "workflow filho",
+      "closed": "fechada",
+      "branchTitle": "{label}: {state}",
+      "branchState": {
+        "queued": "na fila",
+        "running": "em execução",
+        "succeeded": "concluído",
+        "failed": "falhou"
+      },
+      "moreRunning": ", {count} em execução",
+      "waiting": "{count} aguardando"
+    },
+    "graphView": {
+      "more": "+{count} a mais",
+      "branchesPerRun": "ramos por execução",
+      "noBranches": "sem ramos",
+      "childWorkflow": "{name}, workflow filho",
+      "collapseLabel": "Recolher o workflow filho {name}",
+      "expandLabel": "Expandir o workflow filho {name}",
+      "collapse": "Recolher {name}",
+      "expand": "Expandir {name}"
+    },
+    "isoWf": {
+      "closeChild": "Fechar {child}, o workflow filho executado por {station}",
+      "openChild": "Abrir {child}, o workflow filho executado por {station}",
+      "childStages": "{name}: as etapas do workflow filho",
+      "deckLit": "Rodada {n}: uma execução está nesta rodada agora",
+      "deckEarlier": "Rodada {n}: uma rodada anterior",
+      "branchesPerRun": "{name}: ramos definidos por execução",
+      "branchLastRun": "{label}: {state} (última execução)"
+    },
+    "airlock": {
+      "wait": "ESPERA {time}",
+      "waiting": "AGUARDANDO",
+      "open": "ABERTA",
+      "denied": "NEGADA",
+      "labelHeld": "Portão aguardando aprovação, retido há {time}",
+      "labelWaiting": "Portão aguardando aprovação",
+      "labelBy": {
+        "approved": "Portão aprovado por {who}",
+        "denied": "Portão negado por {who}"
+      },
+      "label": {
+        "approved": "Portão aprovado",
+        "denied": "Portão negado"
+      },
+      "approve": "Aprovar",
+      "deny": "Negar"
+    }
+  },
   "clusterConnection": {
     "title": "Conexão do cluster",
     "help": "Sinal de presença relatado pelo agente no cluster. Consulta a cada 30 segundos.",

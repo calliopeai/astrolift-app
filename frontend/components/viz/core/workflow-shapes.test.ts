@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import messages from "@/messages/en.json";
+
+import { vizTranslator } from "./viz-t";
+
 import { makeFeatureTimeline, makeWorkflows, type WorkflowTrain } from "./workflow-model";
 import {
   groupTimelineByRound,
@@ -26,6 +30,8 @@ const train = (over: Partial<WorkflowTrain> = {}): WorkflowTrain => ({
   ...over,
 });
 
+const vt = vizTranslator(messages);
+
 describe("workflow shapes", () => {
   it("finds the loops leaving a station, a retry included", () => {
     expect(loopsAt(feature, 2)).toEqual([testLoop]);
@@ -43,8 +49,8 @@ describe("workflow shapes", () => {
     expect(loopRound(t, reviewLoop)).toBe(1);
     expect(loopRound(t, deployRetry)).toBe(2);
     expect(roundsLeft(train({ loopRounds: { [testLoop.id]: 9 } }), testLoop)).toBe(0);
-    expect(roundLabel(t, testLoop)).toBe("round 3 of 5");
-    expect(roundLabel(t, deployRetry)).toBe("attempt 2 of 3");
+    expect(roundLabel(t, testLoop, vt)).toBe("round 3 of 5");
+    expect(roundLabel(t, deployRetry, vt)).toBe("attempt 2 of 3");
   });
 
   it("warns one round from the bound", () => {
@@ -55,13 +61,15 @@ describe("workflow shapes", () => {
   });
 
   it("says every loop with its bound", () => {
-    expect(loopLabel(feature, testLoop)).toBe("Back to Code when Test fails, at most 5 rounds");
-    expect(loopLabel(feature, reviewLoop)).toBe(
+    expect(loopLabel(feature, testLoop, vt)).toBe("Back to Code when Test fails, at most 5 rounds");
+    expect(loopLabel(feature, reviewLoop, vt)).toBe(
       "Back to Code when Review is rejected, at most 3 rounds"
     );
-    expect(loopLabel(feature, deployRetry)).toBe("Retry Deploy when it fails, at most 3 attempts");
+    expect(loopLabel(feature, deployRetry, vt)).toBe(
+      "Retry Deploy when it fails, at most 3 attempts"
+    );
     const cond = { ...testLoop, trigger: "condition" as const, condition: "coverage drops" };
-    expect(loopLabel(feature, cond)).toBe("Back to Code when coverage drops, at most 5 rounds");
+    expect(loopLabel(feature, cond, vt)).toBe("Back to Code when coverage drops, at most 5 rounds");
   });
 
   it("groups a timeline by round", () => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -42,17 +43,13 @@ import { fmtRps, healthLabel, selectProps } from "./layouts-b-parts";
  */
 
 export const AGENT_LAYOUT_LEGEND: LegendItem[] = [
-  { glyph: "bar", color: HEALTH_COLOR.ok, label: "Agent action (tick), dims over 12s" },
-  { glyph: "bar", color: HEALTH_COLOR.failing, label: "Action on a failing call" },
-  {
-    glyph: "flow",
-    color: HEALTH_COLOR.ok,
-    label: "Tool call traffic: faster and thicker is busier",
-  },
-  { glyph: "flow", color: HEALTH_COLOR.failing, label: "Tool call failing (over 5% errors)" },
-  { glyph: "ring", color: "var(--brand-primary)", label: "Tool just called" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Failing agent or tool" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Idle: stays dark" },
+  { glyph: "bar", color: HEALTH_COLOR.ok, labelKey: "agentTick" },
+  { glyph: "bar", color: HEALTH_COLOR.failing, labelKey: "agentTickFailing" },
+  { glyph: "flow", color: HEALTH_COLOR.ok, labelKey: "agentToolTraffic" },
+  { glyph: "flow", color: HEALTH_COLOR.failing, labelKey: "agentToolFailing" },
+  { glyph: "ring", color: "var(--brand-primary)", labelKey: "agentToolJustCalled" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "agentFailing" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "idleStaysDark" },
 ];
 
 const W = 600;
@@ -73,6 +70,7 @@ export function AgentLayout({
   className,
   diagram,
 }: AgentLayoutProps) {
+  const vt = useTranslations("vizRender");
   const agents = snapshot.nodes.filter((n) => n.role === "agent");
   const agentIds = new Set(agents.map((a) => a.id));
   const byId = new Map(snapshot.nodes.map((n) => [n.id, n]));
@@ -91,7 +89,12 @@ export function AgentLayout({
   const agentY = new Map(agents.map((a, i) => [a.id, yOf(i, agents.length)]));
   const toolY = new Map(tools.map((t, i) => [t.id, yOf(i, tools.length)]));
 
-  const label = `${snapshot.app.name}: ${summarize(agents, agents.length === 1 ? "agent" : "agents")}; ${feed.length} actions in the last 12s; ${summarize(tools, "tools")}`;
+  const label = vt("agentLayout.summary", {
+    app: snapshot.app.name,
+    agents: summarize(agents, "agents", vt),
+    actions: feed.length,
+    tools: summarize(tools, "tools", vt),
+  });
 
   return (
     <div
@@ -100,10 +103,10 @@ export function AgentLayout({
       data-motion={motion}
       className={cn("flex min-w-0 flex-col gap-3 p-3", className)}
     >
-      <section aria-label="Runs" className="min-w-0 space-y-1.5">
+      <section aria-label={vt("agentLayout.runs")} className="min-w-0 space-y-1.5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="text-muted-foreground text-2xs font-mono tracking-wide uppercase">
-            Actions, last 12s
+            {vt("agentLayout.actions")}
           </h3>
           <div className="text-muted-foreground flex flex-wrap gap-3 font-mono text-xs">
             {schedules.map((s) => {
@@ -112,7 +115,9 @@ export function AgentLayout({
               return (
                 <span key={s.id} className="truncate" title={s.name}>
                   {truncate(s.name, 28)}
-                  {next ? ` · next run in ${formatCountdown(next - snapshot.now)}` : ""}
+                  {next
+                    ? ` · ${vt("jobs.nextRunIn", { countdown: formatCountdown(next - snapshot.now) })}`
+                    : ""}
                 </span>
               );
             })}
@@ -135,9 +140,9 @@ export function AgentLayout({
           diagram != null && "sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]"
         )}
       >
-        <section aria-label="Tool calls" className="min-w-0">
+        <section aria-label={vt("agentLayout.toolCalls")} className="min-w-0">
           <h3 className="text-muted-foreground text-2xs mb-1.5 font-mono tracking-wide uppercase">
-            Tool calls
+            {vt("agentLayout.toolCalls")}
           </h3>
           <svg viewBox={`0 0 ${W} ${H}`} className="block h-auto w-full">
             {callEdges.map((e) => {
@@ -179,7 +184,9 @@ export function AgentLayout({
                     fill={failing ? HEALTH_COLOR.failing : "var(--muted-foreground)"}
                   >
                     {fmtRps(e.rps)}
-                    {failing ? ` · ${(e.errorRate * 100).toFixed(0)}% err` : ""}
+                    {failing
+                      ? ` · ${vt("jobs.errPct", { pct: (e.errorRate * 100).toFixed(0) })}`
+                      : ""}
                   </text>
                 </g>
               );
@@ -191,7 +198,7 @@ export function AgentLayout({
                 x={AGENT_X}
                 y={agentY.get(a.id) ?? 0}
                 w={AGENT_W}
-                sub={`load ${Math.round(a.load * 100)}%`}
+                sub={vt("loadPct", { pct: Math.round(a.load * 100) })}
                 onSelect={onSelectNode}
               />
             ))}
@@ -237,9 +244,9 @@ export function AgentLayout({
           </svg>
         </section>
         {diagram != null && (
-          <section aria-label="Diagram" className="min-w-0">
+          <section aria-label={vt("agentLayout.diagram")} className="min-w-0">
             <h3 className="text-muted-foreground text-2xs mb-1.5 font-mono tracking-wide uppercase">
-              Diagram
+              {vt("agentLayout.diagram")}
             </h3>
             <div className="h-64 overflow-hidden rounded-sm border">{diagram}</div>
           </section>
@@ -260,11 +267,16 @@ function RunStrip({
   motion: "full" | "reduced";
   onSelect?: (id: string) => void;
 }) {
+  const vt = useTranslations("vizRender");
   const failing = agent.health === "failing";
   return (
     <div
       {...selectProps(agent.id, onSelect)}
-      aria-label={`${agent.name}: ${ticks.length} actions in the last 12s, ${healthLabel(agent)}`}
+      aria-label={vt("agentLayout.stripLabel", {
+        name: agent.name,
+        count: ticks.length,
+        health: healthLabel(agent, vt),
+      })}
       className="focus-visible:ring-ring grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)] items-center gap-2 rounded-sm outline-none focus-visible:ring-2"
     >
       <span className="flex min-w-0 items-center gap-1.5 text-xs" title={agent.name}>
@@ -283,7 +295,10 @@ function RunStrip({
           <span
             key={t.id}
             aria-hidden
-            title={`${t.verb} ${t.target?.name ?? "work"}, ${Math.round(t.age / 1000)}s ago`}
+            title={vt(`tick.${t.verb}`, {
+              target: t.target?.name ?? vt("work"),
+              seconds: Math.round(t.age / 1000),
+            })}
             className="absolute inset-y-1 w-0.5 -translate-x-1/2 rounded-sm"
             style={{
               left: `${Math.max(0, 100 - (t.age / EVENT_WINDOW_MS) * 100)}%`,
@@ -295,7 +310,7 @@ function RunStrip({
         ))}
         {ticks.length === 0 && (
           <span className="text-muted-foreground absolute inset-0 flex items-center justify-center text-xs">
-            no actions
+            {vt("agentLayout.noActions")}
           </span>
         )}
       </span>
@@ -318,12 +333,13 @@ function Tile({
   sub: string;
   onSelect?: (id: string) => void;
 }) {
+  const vt = useTranslations("vizRender");
   const color = HEALTH_COLOR[node.health];
   const failing = node.health === "failing";
   return (
     <g
       {...selectProps(node.id, onSelect)}
-      aria-label={`${node.name}, ${healthLabel(node)}`}
+      aria-label={vt("nameHealth", { name: node.name, health: healthLabel(node, vt) })}
       className="group cursor-pointer outline-none"
     >
       <title>{node.name}</title>

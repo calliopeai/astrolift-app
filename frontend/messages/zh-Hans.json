@@ -7190,6 +7190,963 @@
       }
     }
   },
+  "vizRender": {
+    "health": {
+      "ok": "健康",
+      "degraded": "降级",
+      "failing": "故障",
+      "idle": "空闲"
+    },
+    "healthInline": {
+      "ok": "健康",
+      "degraded": "降级",
+      "failing": "故障",
+      "idle": "空闲"
+    },
+    "frame": {
+      "legend": "图例",
+      "reducedMotion": "减少动态效果：显示静态画面",
+      "viewStyle": "视图样式",
+      "fleetTitle": "代理集群",
+      "fleetDescription": "{clusters, plural, other {# 个集群}}中的{agents, plural, other {# 个代理}}",
+      "workflowsTitle": "工作流",
+      "workflowsDescription": "{workflows, plural, other {# 个工作流}}，{runs, plural, other {# 次运行}}"
+    },
+    "styles": {
+      "fleet": {
+        "orbit": {
+          "label": "轨道",
+          "blurb": "集群为行星，代理为卫星"
+        },
+        "heartbeat": {
+          "label": "心跳",
+          "blurb": "每个事件一个渐隐的荧光点"
+        },
+        "hive": {
+          "label": "蜂巢",
+          "blurb": "每个代理一个磁贴，适合大型集群"
+        },
+        "manifest": {
+          "label": "发车牌",
+          "blurb": "以发车牌形式展示运行队列"
+        },
+        "isometric": {
+          "label": "等距视图",
+          "blurb": "集群为平台，负载为高度"
+        },
+        "graph": {
+          "label": "图",
+          "blurb": "带分派脉冲的实时力导向图"
+        },
+        "swarm": {
+          "label": "蜂群",
+          "blurb": "代理沿触须环绕其集群"
+        },
+        "list": {
+          "label": "列表",
+          "blurb": "普通表格"
+        }
+      },
+      "workflow": {
+        "transit": {
+          "label": "线路图",
+          "blurb": "工作流为线路，运行为列车"
+        },
+        "isometric": {
+          "label": "等距视图",
+          "blurb": "阶段为装配线"
+        },
+        "graph": {
+          "label": "图",
+          "blurb": "动画阶段图"
+        },
+        "list": {
+          "label": "列表",
+          "blurb": "普通表格"
+        }
+      },
+      "app": {
+        "auto": {
+          "label": "自动",
+          "blurb": "按应用拓扑布局"
+        },
+        "isometric": {
+          "label": "等距视图",
+          "blurb": "工作负载为平台上的方块"
+        },
+        "graph": {
+          "label": "图",
+          "blurb": "以实时图展示工作负载和流量"
+        },
+        "classic": {
+          "label": "经典",
+          "blurb": "仅卡片，无图示"
+        }
+      }
+    },
+    "topology": {
+      "service": "单一服务",
+      "service-data": "服务与数据",
+      "service-worker": "Web 与 Worker",
+      "microservices": "微服务",
+      "service-agent": "应用与代理",
+      "agent": "代理",
+      "functions": "函数",
+      "scheduled": "定时",
+      "task": "任务",
+      "workflow": "工作流",
+      "mixed": "混合"
+    },
+    "legend": {
+      "shape": {
+        "returnTrack": "回退轨道：被退回到前一阶段的工作，标注轮次上限",
+        "roundBadge": "轮次徽章：运行当前所在的轮次",
+        "roundNearBound": "琥珀色轮次徽章：距上限还剩一轮，超过即运行失败",
+        "siding": "侧线：同一阶段的重试，标注尝试上限",
+        "join": "汇合：所有分支完成后并行分支合并",
+        "supervisorSwarm": "监督者蜂群：其工作者处理子任务时点亮",
+        "nestedStack": "嵌套堆栈：运行整个子工作流的阶段"
+      },
+      "healthy": "健康",
+      "degradedLoad85": "降级：负载超过 85%",
+      "flickerFailing": "闪烁：故障",
+      "idle": "空闲",
+      "fleetListLoadBar": "条形：负载，以代理的健康颜色显示",
+      "manifestQueued": "排队中，起飞倒计时",
+      "manifestHolding": "暂停中（等待时呼吸闪烁）",
+      "manifestLiftedOff": "已起飞 / 飞行中",
+      "manifestLanded": "已着陆",
+      "failed": "失败",
+      "manifestFlip": "运行状态变化时状态牌翻转一次",
+      "graphHealthy": "健康；大小表示活动运行数",
+      "degradedLoadOver85": "降级（负载超过 85%）",
+      "failing": "故障",
+      "idleDarkShort": "空闲，暗色",
+      "graphRunsFlow": "进行中的运行；越快越宽表示越繁忙",
+      "graphDispatch": "分派从中心到集群再到代理（静态：带环的代理）",
+      "graphQueued": "排队的运行",
+      "graphPinned": "已固定；双击释放",
+      "orbitHealthy": "健康；轨道速度表示负载",
+      "orbitDegraded": "降级，负载超过 85%",
+      "orbitFailing": "故障，降至低轨道",
+      "orbitIdle": "空闲，停泊",
+      "orbitLaunch": "运行已开始（发射）",
+      "clusterDegraded": "集群降级",
+      "clusterOffline": "集群离线",
+      "heartbeatRun": "运行开始或结束",
+      "heartbeatRunFailed": "运行失败",
+      "heartbeatDispatched": "运行已分派",
+      "heartbeatDrift": "圆点在 12 秒内向左漂移并淡出",
+      "heartbeatBusy": "繁忙代理：行随负载发光",
+      "heartbeatDegraded": "降级（过载）",
+      "heartbeatFailing": "故障代理",
+      "heartbeatIdle": "空闲：行保持暗色",
+      "hiveBrightness": "亮度：负载",
+      "hiveBorder": "边框：健康",
+      "degraded": "降级",
+      "hiveDark": "暗色：空闲",
+      "hiveRing": "环：来自集群中心的分派",
+      "hiveStillDot": "静止圆点：最近 12 秒内收到工作",
+      "swarmSpeed": "蜂群速度：代理的繁忙程度",
+      "swarmIdle": "停稳不动：空闲",
+      "swarmTendril": "触须粗细：活动运行数",
+      "swarmFailing": "向外漂移、触须散乱：故障",
+      "swarmPulse": "沿触须传递的脉冲：一次分派",
+      "isoHealthy": "健康（高度表示负载）",
+      "isoIdle": "空闲（低且暗）",
+      "isoRunStarted": "运行已开始（减少动态效果时为静止圆点）",
+      "isoClusterDegraded": "集群降级（平台边缘）",
+      "jobsRunning": "运行中：发光",
+      "jobsFailing": "故障的作业或步骤",
+      "jobsPastOk": "过去的运行成功",
+      "jobsPastFailed": "过去的运行失败",
+      "jobsNoRecord": "没有运行记录的计划时段",
+      "jobsStepTraffic": "步骤流量：越快越繁忙",
+      "jobsInvoked": "刚刚被调用或执行（混合）",
+      "idleStaysDark": "空闲：保持暗色",
+      "idleStaysDarkComma": "空闲，保持暗色",
+      "saAction": "代理操作，12 秒内淡出",
+      "saActionFailing": "代理对失败调用的操作",
+      "saJustCalled": "刚被代理调用",
+      "saCallTraffic": "代理调用流量：越快越繁忙",
+      "saCallFailing": "调用失败（错误超过 5%）",
+      "load": "负载",
+      "failingWorkload": "故障的工作负载",
+      "swDegraded": "降级：积压、错误超过 1% 或副本缺失",
+      "darkNoTraffic": "暗色：无流量",
+      "swTank": "水箱：队列深度；积压时呼吸闪烁",
+      "swDash": "移动虚线：消息进出，越繁忙越快",
+      "swGauge": "仪表：CPU",
+      "degradedErrorsReplicas": "降级：错误超过 1% 或副本缺失",
+      "flickerFailingErrors": "闪烁：故障，错误超过 5%",
+      "squaresReplicas": "方块：就绪副本；呼吸闪烁的轮廓表示尚未就绪的副本",
+      "sdDash": "移动虚线：对存储的调用，越繁忙越快",
+      "sdGauge": "仪表：服务显示 CPU，存储显示连接数",
+      "degradedErrors": "降级：错误超过 1%",
+      "msHotSpot": "热点条：失败调用的占比",
+      "msDash": "移动虚线：路径上的调用，越繁忙越快",
+      "agentTick": "代理操作（刻度），12 秒内变暗",
+      "agentTickFailing": "对失败调用的操作",
+      "agentToolTraffic": "工具调用流量：越快越粗越繁忙",
+      "agentToolFailing": "工具调用失败（错误超过 5%）",
+      "agentToolJustCalled": "刚被调用的工具",
+      "agentFailing": "故障的代理或工具",
+      "fnInvoked": "刚被调用",
+      "fnTileLight": "磁贴亮光：最近调用，12 秒内淡出",
+      "fnConcurrency": "已用并发",
+      "fnCold": "冷启动：静默 5 秒后被调用",
+      "fnTraffic": "调用流量：越快越粗越繁忙",
+      "fnFailingPath": "失败路径（错误超过 5%）",
+      "fnFailing": "故障函数",
+      "trafficBusier": "流量，越繁忙越快越亮",
+      "callsFailing": "超过 5% 的调用失败",
+      "graphDegradedShort": "降级或副本不足",
+      "graphFunctionInvoked": "函数被调用，12 秒内淡出",
+      "agentActed": "代理已执行，信标 12 秒内淡出",
+      "isoBlockHeight": "方块高度表示负载",
+      "isoSlab": "每个就绪副本一块板",
+      "isoReplicaMissing": "副本缺失或降级",
+      "isoFunctionInvoked": "函数被调用，顶部 12 秒内淡出",
+      "replaySegment": "段宽即实际时长",
+      "replayPlayhead": "播放头移动：正在回放",
+      "replayActive": "播放头所在阶段",
+      "succeeded": "成功",
+      "replayGate": "关卡等待中（呼吸闪烁）",
+      "replaySkipped": "未到达或已跳过",
+      "replayLoopMark": "循环标记：循环退回工作并开始下一轮的位置",
+      "replayRoundBand": "轮次带：每段所属的轮次",
+      "replayParallel": "并行条：扇出的各分支，各自计时",
+      "listMoving": "移动中",
+      "listBreathing": "呼吸闪烁：在关卡处暂停",
+      "listFlicker": "闪烁：失败",
+      "listDone": "完成",
+      "listLoopRow": "循环行：工作退回的位置及上限，有运行被退回时显示琥珀色",
+      "listRoundAmber": "琥珀色轮次：距上限还剩一轮，超过即运行失败",
+      "trMoving": "移动中的运行（列车）",
+      "trHeld": "在关卡处暂停的运行，呼吸闪烁",
+      "trFailed": "运行失败，已停止",
+      "trDone": "运行完成，在终点淡出",
+      "trGateHolding": "关卡暂停了一个运行",
+      "trGateClear": "关卡畅通",
+      "trThroughput": "吞吐量：粒子密度与速度、线条粗细",
+      "trBacklog": "积压超过 3 个运行",
+      "trReturnTrack": "线路上方的回退轨道：带触发条件和上限的回环，有运行经过时点亮",
+      "trSmallLoop": "单站上方的小环：重试，带尝试上限",
+      "trRoundBadge": "轮次徽章：运行当前轮次 / 上限",
+      "trSiding": "侧线：一个并行分支；运行时车厢点亮，完成后停在汇合点",
+      "trBranchFailed": "分支失败（已完成，红色）",
+      "trJoin": "汇合：所有分支到达后发光",
+      "trSwarm": "监督者蜂群：繁忙的工作者在触须上点亮，按负载速度环绕",
+      "trStacked": "堆叠站点：子工作流；展开可查看其线路",
+      "grFlowing": "运行流动，越繁忙越快",
+      "grBackedUp": "积压（排队超过 3 个）",
+      "grGateWaiting": "关卡等待批准",
+      "grGateApproved": "关卡已批准",
+      "grGateDenied": "关卡被拒绝或驳回",
+      "grRunsAtStage": "阶段中的运行",
+      "grFailedRun": "失败的运行",
+      "grIdle": "空闲或已完成",
+      "grReturnTrack": "回退轨道：返回前一阶段的循环，带轮次上限；有运行被退回时流动",
+      "grFanoutBox": "扇出框：每个分支一行；运行中的分支流动，完成时闪烁一次",
+      "grSatellites": "监督者卫星：其工作者繁忙时点亮并环绕，负载越高越快",
+      "grNestedGroup": "嵌套组：运行子工作流的阶段；可折叠为堆栈",
+      "isoWfMoving": "移动中的运行（货箱）/工作中的阶段",
+      "isoWfHeld": "在关卡暂停：亭子关闭，呼吸闪烁",
+      "isoWfFailed": "运行在该机器处失败",
+      "isoWfBacklog": "入口处等待的积压",
+      "isoWfBelt": "传送带速度 = 吞吐量",
+      "isoWfIdle": "空闲 / 已完成",
+      "isoWfRamp": "回退坡道：退回的工作上升一层到前一阶段；上限标在坡道上",
+      "isoWfDeck": "循环阶段上方每轮一层平台：当前轮点亮，之前的轮次变淡",
+      "isoWfHoop": "阶段上方的环：该阶段的重试，标注尝试上限",
+      "isoWfRails": "高架轨道：扇出分支，运行时点亮；完成后滚向汇合块",
+      "isoWfSupervisor": "监督者磁贴：繁忙工作者绕中心旋转，负载越高越快；空闲工作者静止",
+      "isoWfStacked": "堆叠方块：子工作流；展开可在子平台上查看其阶段",
+      "airlockWaiting": "等待批准：仪表呼吸闪烁，随暂停时间充满",
+      "airlockApproved": "已批准：门打开",
+      "airlockDenied": "已拒绝：封闭，抖动一次"
+    },
+    "listSeparator": "，",
+    "unknown": "未知",
+    "offline": "离线",
+    "selectedAgent": "，已选代理",
+    "agentSummary": "{name}:{health}，负载 {load}%，运行中 {running}，排队 {queued}",
+    "counts": {
+      "failing": "{count} 个故障",
+      "degraded": "{count} 个降级",
+      "busy": "{count} 个繁忙",
+      "idle": "{count} 个空闲",
+      "queued": "{count} 个排队",
+      "clustersNotHealthy": "{count, plural, other {# 个集群不健康}}"
+    },
+    "fleetList": {
+      "summary": "{agents} 个代理，{failing} 个故障，{busy} 个繁忙",
+      "searchPlaceholder": "搜索代理、集群…",
+      "health": "健康状况",
+      "views": {
+        "all": "全部",
+        "mine": "我的"
+      },
+      "mineNote": "代理属于集群而非个人，因此“我的”为空。",
+      "columns": {
+        "agent": "代理",
+        "health": "健康状况",
+        "load": "负载",
+        "runs": "活动运行",
+        "queued": "排队",
+        "cluster": "集群"
+      },
+      "agentLabel": "{name}，{health}",
+      "label": "代理",
+      "empty": "此集群中没有代理"
+    },
+    "manifest": {
+      "count": {
+        "queued": "{count} 排队",
+        "holding": "{count} 暂停",
+        "lifted_off": "{count} 已起飞",
+        "in_flight": "{count} 飞行中",
+        "landed": "{count} 已着陆",
+        "failed": "{count} 失败"
+      },
+      "state": {
+        "queued": "排队",
+        "holding": "暂停",
+        "lifted_off": "已起飞",
+        "in_flight": "飞行中",
+        "landed": "已着陆",
+        "failed": "失败"
+      },
+      "summary": "{count, plural, other {# 次运行}}:{parts}",
+      "summaryEmpty": "{count, plural, other {看板上有 # 次运行}}",
+      "label": "发射清单。{summary}",
+      "queue": "运行队列",
+      "columns": {
+        "clock": "T- / UTC",
+        "run": "运行",
+        "agent": "代理",
+        "cluster": "集群",
+        "status": "状态"
+      },
+      "empty": "看板上没有运行"
+    },
+    "fleetGraph": {
+      "summary": "{clusters} 个集群中有 {agents} 个代理，{failing} 个故障，{busy} 个繁忙，{queued} 次运行排队",
+      "hub": "组织中心",
+      "org": "组织",
+      "agentLabel": "{name}:{health}，活动 {active}，排队 {queued}",
+      "agentTitle": "{name}:{health}，活动 {active}，排队 {queued}，负载 {load}%",
+      "clusterTitle": "{name}:{health}",
+      "clusterRegionTitle": "{name}({region}):{health}"
+    },
+    "orbit": {
+      "planet": "{agents} 个代理 · {busy} 个繁忙"
+    },
+    "heartbeat": {
+      "summary": "心跳：{agents} 个代理，{failing} 个故障，{busy} 个繁忙，最近 {seconds} 秒内 {recent} 个事件",
+      "agent": "代理",
+      "now": "现在"
+    },
+    "hive": {
+      "summary": "{clusters} 个集群中有 {agents} 个代理，{failing} 个故障，{degraded} 个降级，{busy} 个繁忙",
+      "group": "{name}，{count} 个代理",
+      "groupRegion": "{name}({region})，{count} 个代理",
+      "dispatcher": "{name} 分派器，集群{health}",
+      "agent": "{name}，{cluster}，{health}，负载 {load}%，运行中 {running}，排队 {queued}"
+    },
+    "swarm": {
+      "summary": "{agents} 个代理在集群中：{busy} 个繁忙，{idle} 个空闲，{failing} 个故障"
+    },
+    "isoFleet": {
+      "summary": "等距集群：{fleet}，{failing} 个故障，{degraded} 个降级，{busy} 个繁忙，{idle} 个空闲",
+      "agent": "{name}:{health}，负载 {load}%，{count, plural, other {# 个活动运行}}",
+      "cluster": "{name}:{count} 个代理",
+      "clusterRegion": "{name}({region}):{count} 个代理",
+      "peek": "{health} · 负载 {load}% · 运行中 {running} · 排队 {queued}"
+    },
+    "feed": {
+      "queried": "<a>{agent}</a> 查询了 <b>{target}</b>",
+      "publishedTo": "<a>{agent}</a> 发布到 <b>{target}</b>",
+      "invoked": "<a>{agent}</a> 调用了 <b>{target}</b>",
+      "called": "<a>{agent}</a> 调用了 <b>{target}</b>",
+      "workedOn": "<a>{agent}</a> 处理了 <b>{target}</b>"
+    },
+    "tick": {
+      "queried": "{seconds} 秒前查询了 {target}",
+      "publishedTo": "{seconds} 秒前发布到 {target}",
+      "invoked": "{seconds} 秒前调用了 {target}",
+      "called": "{seconds} 秒前调用了 {target}",
+      "workedOn": "{seconds} 秒前处理了 {target}"
+    },
+    "work": "工作",
+    "nodeTitle": "{name}({kind}):{health}",
+    "loadBar": "{label} {pct}%",
+    "load": "负载",
+    "loadPct": "负载 {pct}%",
+    "loadOf": "{name} 负载",
+    "connectionsOf": "{name} 连接",
+    "cpuOf": "{name} CPU",
+    "appSummary": "{app}:{summary}",
+    "nouns": {
+      "workloads": "{count, plural, other {# 个工作负载}}",
+      "nodes": "{count, plural, other {# 个节点}}",
+      "appWorkloads": "{count, plural, other {# 个应用工作负载}}",
+      "agents": "{count, plural, other {# 个代理}}",
+      "tools": "{count, plural, other {# 个工具}}",
+      "functions": "{count, plural, other {# 个函数}}"
+    },
+    "sections": {
+      "traffic": "流量",
+      "services": "服务",
+      "functions": "函数",
+      "jobs": "作业",
+      "agents": "代理",
+      "queues": "队列",
+      "data": "数据",
+      "external": "外部"
+    },
+    "roles": {
+      "ingress": "入口",
+      "service": "服务",
+      "worker": "Worker",
+      "data": "数据",
+      "queue": "队列",
+      "function": "函数",
+      "trigger": "触发器",
+      "agent": "代理",
+      "schedule": "计划",
+      "external": "外部"
+    },
+    "utc": "{time} UTC",
+    "notApplicable": "不适用",
+    "nodeLoadLabel": "{name}，{kind}，{health}，负载 {load}%",
+    "nodeRoleLabel": "{name}，{role}，{health}",
+    "nameHealth": "{name}，{health}",
+    "readyReplicas": "{ready}/{desired} 就绪",
+    "reqPerSec": "请求/秒",
+    "jobsPerSec": "作业/秒",
+    "errors": "错误",
+    "distribution": "分布",
+    "trend": "趋势",
+    "topologyGraph": "拓扑图",
+    "trafficSummary": "{app}，{topology}:{health}，每秒 {rps} 个请求，错误率 {errors}",
+    "jobs": {
+      "scheduleLabel": "{name}:{next}，{health}",
+      "nextRunIn": "{countdown} 后下次运行",
+      "notParsed": "无法解析计划",
+      "nextRun": "距下次运行",
+      "running": "运行中",
+      "notRunning": "未运行",
+      "lastSlots": "最近 {count} 个时段",
+      "history": "运行历史",
+      "slot": "{time} UTC:{outcome}",
+      "succeeded": "成功",
+      "failed": "失败",
+      "noRecord": "无记录",
+      "noSchedules": "没有关联到作业的计划。",
+      "noTask": "此应用中没有任务。",
+      "stateFailed": "失败",
+      "stateRunning": "运行中",
+      "stateNotRunning": "未运行",
+      "runLabel": "{name} 运行：{state}",
+      "run": "运行",
+      "kind": "类型",
+      "pods": "Pod",
+      "writes": "写入",
+      "errPct": "错误 {pct}%",
+      "steps": "工作流步骤",
+      "stepsTitle": "步骤",
+      "stepLabel": "第 {n} 步，{name}:{state}",
+      "runningPct": "运行中 {pct}%"
+    },
+    "serviceAgent": {
+      "summary": "{app}:{workloads}；{agents}；最近 12 秒内 {actions} 个代理操作",
+      "app": "应用",
+      "doing": "代理正在做什么",
+      "quiet": "安静：最近 12 秒内没有代理操作",
+      "agent": "代理",
+      "calls": "代理调用",
+      "callLabel": "代理调用 {name}:{rps}/秒，错误 {errors}%",
+      "calledLabel": "{label}，由代理调用",
+      "agentTag": "代理"
+    },
+    "serviceWorker": {
+      "behind": "落后 +{rps}/秒",
+      "keepingUp": "跟得上",
+      "empty": "空",
+      "in": "入",
+      "out": "出",
+      "depth": "深度",
+      "lag": "延迟",
+      "depthTrend": "深度趋势",
+      "enqueued": "入队/秒",
+      "consumed": "消费/秒",
+      "summary": "{head}，队列 {queue} 已用 {fill}，{health}，每秒入 {inRps}、出 {outRps}",
+      "fallingBehind": "，每秒落后 {rps}",
+      "summaryNoQueue": "{head}，无队列",
+      "web": "Web",
+      "webHeading": "Web · {rps} 请求/秒 · 错误 {errors}",
+      "queue": "队列",
+      "noQueue": "此应用中没有队列。",
+      "workers": "Worker",
+      "workersHeading": "Worker · {rps} 作业/秒"
+    },
+    "service": {
+      "summary": "{app}，{topology}:{health}，每秒 {rps} 个请求，p50 {p50}，错误率 {errors}，{desired} 个副本中 {ready} 个就绪"
+    },
+    "kpi": {
+      "requests": "请求/秒",
+      "p50": "p50 延迟",
+      "errorRate": "错误率",
+      "replicas": "就绪副本"
+    },
+    "serviceData": {
+      "connections": "连接",
+      "callErrors": "调用错误",
+      "summary": "{head}，{count, plural, other {# 个数据存储}}",
+      "worstStore": "，{name}{health}",
+      "storeAt": "，{name} 为 {load}"
+    },
+    "micro": {
+      "summary": "{app}，{topology}:{services} 个服务，{failing} 个故障，{paths} 条调用路径失败，每秒 {rps} 个请求",
+      "hottest": "，最严重的是 {name}，错误率 {errors}",
+      "services": "服务",
+      "replicas": "副本",
+      "failingPaths": "失败路径",
+      "hotSpots": "热点",
+      "callPaths": "调用路径",
+      "callPathsHeading": "按请求/秒排序的调用路径",
+      "fromTo": "从 → 到",
+      "traffic": "流量",
+      "quieter": "另有 {count} 条较空闲的路径"
+    },
+    "agentLayout": {
+      "summary": "{app}:{agents}；最近 12 秒内 {actions} 个操作；{tools}",
+      "runs": "运行",
+      "actions": "操作（最近 12 秒）",
+      "toolCalls": "工具调用",
+      "diagram": "图示",
+      "stripLabel": "{name}:最近 12 秒内 {count} 个操作，{health}",
+      "noActions": "无操作"
+    },
+    "functions": {
+      "summary": "{app}:{functions}；最近 12 秒内调用了 {invoked} 个",
+      "coldStarts": "，{count, plural, other {# 次冷启动}}",
+      "tile": "{name}:调用 {rps}，并发 {pct}%，最近 12 秒内 {recent} 次，{health}",
+      "tileCold": "{name}:调用 {rps}，并发 {pct}%，最近 12 秒内 {recent} 次，冷启动，{health}",
+      "cold": "冷",
+      "in12s": "12 秒内 {count}"
+    },
+    "graph": {
+      "nodeName": "{name}({role})",
+      "replicas": "{desired} 个副本中的 {ready} 个",
+      "perSecond": "每秒 {rps}",
+      "invocations": "12 秒内调用 {count} 次",
+      "actions": "12 秒内 {count} 个操作",
+      "erroring": "{total} 个连接中有 {erroring} 个出错",
+      "connectionsHealthy": "{count} 个连接正常",
+      "acts": "{count} 次操作",
+      "retrying": "正在重试 {stage}，第 {n}/{max} 次尝试",
+      "sentBack": "从 {from} 退回到 {to}，进入第 {n}/{max} 轮",
+      "state": {
+        "failed": "失败",
+        "rejected": "已驳回，正在退回工作",
+        "sendingBack": "正在退回工作",
+        "waitingApproval": "等待批准",
+        "runningWaiting": "运行中，{held} 个等待",
+        "held": "已暂停",
+        "backedUp": "积压，{backlog} 个排队",
+        "running": "运行中",
+        "finished": "已完成"
+      },
+      "kind": {
+        "gate": "关卡",
+        "fanout": "扇出",
+        "join": "汇合",
+        "supervisor": "监督者",
+        "workflow": "嵌套工作流"
+      },
+      "group": {
+        "moving": "{count} 个运行中：{runs}",
+        "held": "{count} 个暂停：{runs}",
+        "failed": "{count} 个失败：{runs}",
+        "done": "{count} 个完成：{runs}"
+      },
+      "branches": "{count, plural, other {# 个分支}}，{count} 个中 {settled} 个完成",
+      "branchesDynamic": "每次运行决定的 {count, plural, other {# 个分支}}，{count} 个中 {settled} 个完成",
+      "branchesFailed": "，{count} 个失败",
+      "noBranches": "尚无分支",
+      "waitsOn": "等待 {count, plural, other {# 个分支}}，{settled} 个已完成",
+      "waitsOnFanout": "等待其扇出",
+      "subtasksShort": "子任务 {done}/{total}",
+      "subtasksDone": "{total} 个子任务中完成 {done} 个",
+      "workerBusy": "{label}:繁忙，负载 {load}%",
+      "workerIdle": "{label}:空闲，负载 {load}%",
+      "firstStage": "其第一阶段",
+      "loopRun": "{label}，{text}",
+      "trackShort": {
+        "failed": "{stage} 失败，最多 {max} 轮",
+        "rejected": "{stage} 被驳回，最多 {max} 轮",
+        "condition": "{stage} 满足条件，最多 {max} 轮"
+      },
+      "maxAttempts": "最多 {max} 次",
+      "workflows": "{count, plural, other {# 个工作流}}",
+      "backedUpStages": "{count, plural, other {# 个积压阶段}}"
+    },
+    "loop": {
+      "attemptOf": "第 {n}/{max} 次尝试",
+      "roundOf": "第 {n}/{max} 轮",
+      "stage": "阶段",
+      "retry": {
+        "failed": "{stage} 失败时重试，最多 {max} 次",
+        "rejected": "{stage} 被驳回时重试，最多 {max} 次",
+        "condition": "{stage} 满足条件时重试，最多 {max} 次"
+      },
+      "when": {
+        "failed": "{stage} 失败",
+        "rejected": "{stage} 被驳回",
+        "condition": "{stage} 满足条件"
+      },
+      "back": "当{when}时返回 {to}，最多 {max} 轮"
+    },
+    "station": {
+      "gateFailed": "有运行在此失败",
+      "holding": "正在暂停运行",
+      "open": "已打开",
+      "runsWaiting": "{count, plural, other {，# 个运行等待中}}",
+      "idleLastRun": "{count, plural, other {空闲，上次运行有 # 个分支}}",
+      "branches": "{count, plural, other {# 个分支}}，{settled} 个完成，{running} 个运行中",
+      "branchesFailed": "，{count} 个失败",
+      "waitingOn": "等待 {count, plural, other {# 个分支}}中的 {pending} 个",
+      "workersBusy": "{count, plural, other {# 个工作者}}中 {busy} 个繁忙",
+      "childFailed": "有子运行失败",
+      "childFinished": "子运行已完成",
+      "childAt": "子运行在 {stage}，第 {n}/{total} 阶段",
+      "aStage": "某个阶段",
+      "name": "{line}，{station}:{state}{loops}",
+      "kind": {
+        "stage": "{name}",
+        "gate": "{name} 关卡",
+        "fanout": "{name} 扇出",
+        "join": "{name} 汇合",
+        "supervisor": "{name} 监督者",
+        "workflow": "{name} 子工作流"
+      }
+    },
+    "run": {
+      "retrying": "正在重试 {stage}",
+      "theStage": "该阶段",
+      "sentBackTo": "已退回到 {stage}",
+      "anEarlierStage": "前一阶段",
+      "waitingFanout": "等待扇出空闲",
+      "held": "已暂停",
+      "failed": "失败",
+      "finished": "已完成",
+      "waitingBranches": "等待分支，{total} 个中 {settled} 个已完成",
+      "subtasks": "子任务 {total} 个中完成 {done} 个",
+      "childAt": "子运行在 {stage}",
+      "moving": "移动中",
+      "round": "第 {n} 轮",
+      "childRun": "子运行",
+      "name": "运行 {label}:{parts}"
+    },
+    "trains": {
+      "moving": "{count} 个移动中",
+      "heldAtGates": "{count} 个在关卡暂停",
+      "failed": "{count} 个失败",
+      "sentBackOnLoop": "{count} 个经循环退回",
+      "backedUp": "{count} 个积压",
+      "running": "{count} 个运行中",
+      "sentBackAlongLoop": "{count} 个沿循环退回"
+    },
+    "list": {
+      "trigger": {
+        "failed": "{stage} 失败",
+        "rejected": "{stage} 被驳回",
+        "condition": "{stage} 满足条件",
+        "custom": "{stage}:{condition}"
+      },
+      "retrying": "{what}，正在重试 {stage}，第 {n}/{max} 次尝试",
+      "goesBack": "{what}，返回 {to}，第 {n}/{max} 轮",
+      "inside": "{base}；{label} 处于第 {n}/{max} 轮",
+      "branchesPerRun": "分支数每次运行决定",
+      "noBranches": "尚无分支",
+      "done": "{settled} / {total} 完成",
+      "waitsAllSettled": "等待 {count, plural, other {# 个分支}}，全部完成",
+      "waitsToGo": "等待 {count, plural, other {# 个分支}}，还剩 {pending} 个",
+      "waitsOn": "等待 {name}",
+      "subtasks": "子任务 {done} / {total}，{workers}",
+      "runsChild": "运行 {name}",
+      "childAt": "子运行在 {stage}，{n} / {total}",
+      "start": "起点",
+      "stages": {
+        "search": "搜索阶段、工作流、循环…"
+      },
+      "runs": {
+        "search": "搜索运行、工作流、站点…"
+      },
+      "fields": {
+        "state": "状态",
+        "kind": "类型"
+      },
+      "kind": {
+        "stage": "阶段",
+        "gate": "关卡",
+        "fanout": "扇出",
+        "join": "汇合",
+        "supervisor": "监督者",
+        "workflow": "嵌套工作流",
+        "loop": "循环",
+        "retry": "重试"
+      },
+      "kindInline": {
+        "stage": "阶段",
+        "gate": "关卡",
+        "fanout": "扇出",
+        "join": "汇合",
+        "supervisor": "监督者",
+        "workflow": "嵌套工作流",
+        "loop": "循环",
+        "retry": "重试"
+      },
+      "stageState": {
+        "failed": "失败",
+        "sendingBack": "正在退回",
+        "held": "已暂停",
+        "waitingApproval": "等待批准",
+        "backedUp": "积压",
+        "running": "运行中",
+        "finished": "已完成",
+        "idle": "空闲"
+      },
+      "stageStateInline": {
+        "failed": "失败",
+        "sendingBack": "正在退回",
+        "held": "已暂停",
+        "waitingApproval": "等待批准",
+        "backedUp": "积压",
+        "running": "运行中",
+        "finished": "已完成",
+        "idle": "空闲"
+      },
+      "trainState": {
+        "moving": "移动中",
+        "held": "已暂停",
+        "failed": "失败",
+        "done": "完成",
+        "sent": "已退回"
+      },
+      "trainStateInline": {
+        "moving": "移动中",
+        "held": "已暂停",
+        "failed": "失败",
+        "done": "完成",
+        "sent": "已退回"
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的"
+      },
+      "mineNote": "工作流阶段和运行属于工作流而非个人，因此“我的”为空。",
+      "agoSeconds": "{s} 秒前",
+      "agoMinutes": "{m} 分钟前",
+      "agoHours": "{h} 小时 {m} 分钟前",
+      "summary": "{head}:{moving} 个移动中，{held} 个在关卡暂停，{failed} 个失败，{done} 个完成",
+      "summarySent": "，{count} 个沿循环退回",
+      "none": "无",
+      "nearBound": "，距上限还剩一轮",
+      "where": {
+        "retrying": "正在重试 {stage}",
+        "sentBack": "已退回到 {stage}"
+      },
+      "whereInline": {
+        "retrying": "正在重试 {stage}",
+        "sentBack": "已退回到 {stage}"
+      },
+      "loopLabel": "{workflow}:{words}，{state}",
+      "stageLabel": "{name}，{workflow} 中的{kind}",
+      "attempt": "第 {n} 次尝试",
+      "columns": {
+        "stage": "阶段",
+        "workflow": "工作流",
+        "kind": "类型",
+        "state": "状态",
+        "round": "轮次",
+        "attempts": "尝试",
+        "progress": "进度",
+        "runs": "运行",
+        "run": "运行",
+        "station": "站点",
+        "started": "开始时间"
+      },
+      "show": "显示",
+      "stagesCount": "阶段({count})",
+      "runsCount": "运行({count})",
+      "stagesLabel": "阶段",
+      "runsLabel": "运行",
+      "noWorkflows": "没有工作流",
+      "noRuns": "所有工作流都没有运行"
+    },
+    "replay": {
+      "round": "第 {n} 轮",
+      "roundShort": "R{n}",
+      "roundLower": "第 {n} 轮",
+      "running": "运行中",
+      "queued": "排队中",
+      "noCanvas": "此浏览器无法绘制导出内容（不支持 2D Canvas）。",
+      "noVideo": "此浏览器无法录制视频。",
+      "waitingApproval": "等待批准",
+      "deniedBy": "被 {who} 拒绝",
+      "approvedBy": "由 {who} 批准",
+      "runningFor": "已运行 {duration}",
+      "took": "耗时 {duration}",
+      "stages": "{count, plural, other {# 个阶段}}",
+      "rounds": "{count, plural, other {# 轮}}",
+      "sentBack": "{count, plural, other {退回 # 次}}",
+      "parallel": "{count, plural, other {# 个并行分支}}",
+      "waitingAtGate": "{count} 个在关卡等待",
+      "describe": "运行 {label}:{parts}，{span}",
+      "outcome": {
+        "rejected": "被驳回",
+        "failed": "失败",
+        "waiting": "等待中",
+        "running": "运行中",
+        "skipped": "已跳过"
+      },
+      "elapsedAt": "已用 {clock}，{stage}",
+      "elapsed": "已用 {clock}",
+      "exportFailed": "无法导出回放：{error}",
+      "status": {
+        "succeeded": "成功",
+        "failed": "失败",
+        "skipped": "已跳过",
+        "running": "运行中",
+        "waiting": "等待中"
+      },
+      "kind": {
+        "stage": "阶段",
+        "gate": "关卡",
+        "fanout": "扇出",
+        "join": "汇合",
+        "supervisor": "监督者",
+        "workflow": "子工作流"
+      },
+      "roundsOnTrack": "轨道上的轮次",
+      "markLabel": "第 {n} 轮：{reason}，退回到 {to}。跳转到此处",
+      "markTitle": "{reason}，返回 {to}(第 {n} 轮)",
+      "segment": "{name}({kind}):{status}，{duration}",
+      "segmentRound": "{name}({kind}，第 {n} 轮):{status}，{duration}",
+      "decidedBy": "由 {who} 决定",
+      "sentBackReason": "已退回：{reason}",
+      "branch": "{name}（分支）:{status}，{duration}",
+      "position": "回放位置",
+      "slowest": "<label>最慢阶段：</label><strong>{name}</strong> 耗时 <mono>{duration}</mono>，占运行的 <mono>{share}%</mono>",
+      "roundsList": "轮次",
+      "cause": "(已退回：<em>{reason}</em>)",
+      "reducedHint": "减少动态效果：拖动播放头或使用方向键",
+      "pauseLabel": "暂停回放",
+      "playLabel": "播放回放",
+      "pause": "暂停",
+      "play": "播放",
+      "speed": "回放速度",
+      "recording": "录制中…",
+      "encoding": "编码中…",
+      "export": "导出",
+      "exportGif": "GIF（6 秒延时）",
+      "exportVideo": "视频，WebM（6 秒延时）"
+    },
+    "transit": {
+      "trigger": {
+        "failed": "{stage} 失败",
+        "rejected": "{stage} 被驳回",
+        "condition": "{stage}"
+      },
+      "maxRounds": "{trigger} · 最多 {max} 轮",
+      "maxAttempts": "{trigger} · 最多 {max} 次",
+      "retryingNext": "正在重试 {stage}，下一次为第 {n}/{max} 次",
+      "sentBackNext": {
+        "failed": "因 {from} 失败退回到 {to}，下一轮为第 {n}/{max} 轮",
+        "rejected": "因 {from} 被驳回退回到 {to}，下一轮为第 {n}/{max} 轮",
+        "condition": "因 {from} 满足条件退回到 {to}，下一轮为第 {n}/{max} 轮"
+      },
+      "roundOverall": "总第 {n} 轮",
+      "summary": "{head}:{moving} 个移动中，{held} 个暂停，{failed} 个失败，{done} 个完成",
+      "sentBackOnLoop": "，{count} 个经循环退回",
+      "segmentsBackedUp": "，{count, plural, other {# 个区段积压}}",
+      "done": "{count} 个完成",
+      "trainLabel": {
+        "moving": "{line} 上的运行 {label}，在 {station} 移动中",
+        "held": "{line} 上的运行 {label}，在 {station} 暂停",
+        "failed": "{line} 上的运行 {label}，在 {station} 失败",
+        "done": "{line} 上的运行 {label}，在 {station} 完成"
+      },
+      "backClose": "返回 {parent}:关闭 {child}",
+      "backTo": "返回 {parent}",
+      "backToInline": "返回 {parent}",
+      "stationName": "{line}:{station}",
+      "nearBound": "，接近上限",
+      "gateHolding": "关卡暂停了一个运行",
+      "gateClear": "关卡畅通",
+      "parallelPerRun": "并行分支，数量每次运行决定，空闲",
+      "parallelIdle": "并行分支，空闲",
+      "branchesSettled": "{total} 个分支中 {settled} 个完成",
+      "waitingOn": "，等待 {names}",
+      "and": "和",
+      "joinReady": "汇合就绪",
+      "joinWaiting": "汇合等待 {total} 个分支中的 {pending} 个",
+      "merging": "正在汇合",
+      "supervisor": "监督者，{count, plural, other {# 个工作者}}中 {busy} 个繁忙",
+      "childWorkflow": "子工作流 {name}",
+      "childWorkflowBare": "子工作流",
+      "closed": "已关闭",
+      "branchTitle": "{label}:{state}",
+      "branchState": {
+        "queued": "排队中",
+        "running": "运行中",
+        "succeeded": "成功",
+        "failed": "失败"
+      },
+      "moreRunning": "，{count} 个运行中",
+      "waiting": "{count} 个等待"
+    },
+    "graphView": {
+      "more": "另 {count} 个",
+      "branchesPerRun": "每次运行的分支",
+      "noBranches": "无分支",
+      "childWorkflow": "{name}，子工作流",
+      "collapseLabel": "折叠子工作流 {name}",
+      "expandLabel": "展开子工作流 {name}",
+      "collapse": "折叠 {name}",
+      "expand": "展开 {name}"
+    },
+    "isoWf": {
+      "closeChild": "关闭由 {station} 运行的子工作流 {child}",
+      "openChild": "打开由 {station} 运行的子工作流 {child}",
+      "childStages": "{name}:子工作流的阶段",
+      "deckLit": "第 {n} 轮：当前有运行在此轮",
+      "deckEarlier": "第 {n} 轮：较早的轮次",
+      "branchesPerRun": "{name}:分支数每次运行决定",
+      "branchLastRun": "{label}:{state}（上次运行）"
+    },
+    "airlock": {
+      "wait": "等待 {time}",
+      "waiting": "等待中",
+      "open": "开启",
+      "denied": "已拒绝",
+      "labelHeld": "关卡等待批准，已暂停 {time}",
+      "labelWaiting": "关卡等待批准",
+      "labelBy": {
+        "approved": "关卡已由 {who} 批准",
+        "denied": "关卡已被 {who} 拒绝"
+      },
+      "label": {
+        "approved": "关卡已批准",
+        "denied": "关卡已拒绝"
+      },
+      "approve": "批准",
+      "deny": "拒绝"
+    }
+  },
   "clusterConnection": {
     "title": "集群连接",
     "help": "集群内代理报告的心跳。每 30 秒查询一次。",

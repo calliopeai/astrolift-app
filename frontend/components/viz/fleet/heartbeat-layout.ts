@@ -5,6 +5,7 @@ import {
   type FleetEvent,
   type FleetSnapshot,
 } from "../core/fleet-model";
+import type { VizT } from "../core/viz-t";
 
 /**
  * Pure layout for the heartbeat wall: which events are still on screen, where
@@ -77,12 +78,22 @@ export function layoutHeartbeat(
 }
 
 /** The sentence a screen reader hears for the whole wall. */
-export function summarizeHeartbeat(snapshot: FleetSnapshot, windowMs = EVENT_WINDOW_MS): string {
+export function summarizeHeartbeat(
+  snapshot: FleetSnapshot,
+  t: VizT,
+  windowMs = EVENT_WINDOW_MS
+): string {
   const agents = snapshot.agents.length;
   const failing = snapshot.agents.filter((a) => a.health === "failing").length;
   const busy = snapshot.agents.filter(isBusy).length;
   const recent = snapshot.events.filter((e) => placeEvent(e, snapshot.now, windowMs)).length;
-  return `Heartbeat: ${agents} agents, ${failing} failing, ${busy} busy, ${recent} events in the last ${Math.round(windowMs / 1000)}s`;
+  return t("heartbeat.summary", {
+    agents,
+    failing,
+    busy,
+    recent,
+    seconds: Math.round(windowMs / 1000),
+  });
 }
 
 /** Row tint strength: busier rows glow brighter, capped so text stays legible. */

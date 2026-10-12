@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import messages from "@/messages/en.json";
+
+import { vizTranslator } from "../core/viz-t";
+
 import { EVENT_WINDOW_MS, makeFleet, stepFleet } from "../core/fleet-model";
 import { mulberry32 } from "../core/semantics";
 
@@ -68,7 +72,8 @@ describe("busy and glow", () => {
 
   it("summarizes the fleet for screen readers", () => {
     const quiet = makeFleet({ idle: true, clusters: 2, agentsPerCluster: 3 });
-    expect(summarizeHeartbeat(quiet)).toBe(
+    const t = vizTranslator(messages);
+    expect(summarizeHeartbeat(quiet, t)).toBe(
       "Heartbeat: 6 agents, 0 failing, 0 busy, 0 events in the last 12s"
     );
   });

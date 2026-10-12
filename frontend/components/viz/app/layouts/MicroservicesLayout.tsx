@@ -1,12 +1,12 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { TOPOLOGY_META } from "@/lib/topology";
 import { cn } from "@/lib/utils";
 
 import type { AppViewProps } from "../../core/app-model";
-import { HEALTH_COLOR, HEALTH_LABEL } from "../../core/semantics";
+import { HEALTH_COLOR } from "../../core/semantics";
 import type { LegendItem } from "../../core/VizLegend";
 
 import { DiagramSlot, FlowLine, FOCUS_RING, StatusDot, tint } from "./layout-parts";
@@ -30,16 +30,12 @@ import {
  */
 
 export const MICROSERVICES_LAYOUT_LEGEND: LegendItem[] = [
-  { glyph: "dot", color: HEALTH_COLOR.ok, label: "Healthy" },
-  { glyph: "dot", color: HEALTH_COLOR.degraded, label: "Degraded: over 1% errors" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Flicker: failing, over 5% errors" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Dark: no traffic" },
-  { glyph: "bar", color: HEALTH_COLOR.failing, label: "Hot spot bar: share of calls failing" },
-  {
-    glyph: "flow",
-    color: HEALTH_COLOR.ok,
-    label: "Moving dash: calls on a path, faster when busier",
-  },
+  { glyph: "dot", color: HEALTH_COLOR.ok, labelKey: "healthy" },
+  { glyph: "dot", color: HEALTH_COLOR.degraded, labelKey: "degradedErrors" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "flickerFailingErrors" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "darkNoTraffic" },
+  { glyph: "bar", color: HEALTH_COLOR.failing, labelKey: "msHotSpot" },
+  { glyph: "flow", color: HEALTH_COLOR.ok, labelKey: "msDash" },
 ];
 
 /** Call paths shown before the table folds the rest into a count. */
@@ -55,6 +51,7 @@ export function MicroservicesLayout({
   className,
   diagram,
 }: MicroservicesLayoutProps) {
+  const t = useTranslations("vizRender");
   const totals = appTotals(snapshot);
   const services = nodesWithRole(snapshot, "service");
   const hot = hotSpots(snapshot, 5);
@@ -65,11 +62,16 @@ export function MicroservicesLayout({
   const worst = hot[0];
 
   const label =
-    `${snapshot.app.name}, ${TOPOLOGY_META[snapshot.topology].label.toLowerCase()}: ` +
-    `${services.length} services, ${failingNodes} failing, ${failingPaths} failing call paths, ` +
-    `${fmtRps(totals.rps)} requests per second` +
+    t("micro.summary", {
+      app: snapshot.app.name,
+      topology: t(`topology.${snapshot.topology}`),
+      services: services.length,
+      failing: failingNodes,
+      paths: failingPaths,
+      rps: fmtRps(totals.rps),
+    }) +
     (worst && worst.health !== "ok" && worst.health !== "idle"
-      ? `, hottest ${worst.node.name} at ${fmtPct(worst.errorRate)} errors`
+      ? t("micro.hottest", { name: worst.node.name, errors: fmtPct(worst.errorRate) })
       : "");
 
   return (
@@ -81,12 +83,12 @@ export function MicroservicesLayout({
     >
       <dl className="text-muted-foreground flex flex-wrap gap-x-5 gap-y-1 font-mono text-xs">
         {[
-          ["services", `${services.length}`],
-          ["req/s", fmtRps(totals.rps)],
+          [t("micro.services"), `${services.length}`],
+          [t("reqPerSec"), fmtRps(totals.rps)],
           ["p50", fmtMs(totals.p50)],
-          ["errors", fmtPct(totals.errorRate)],
-          ["replicas", `${totals.replicas.ready}/${totals.replicas.desired}`],
-          ["failing paths", `${failingPaths}`],
+          [t("errors"), fmtPct(totals.errorRate)],
+          [t("micro.replicas"), `${totals.replicas.ready}/${totals.replicas.desired}`],
+          [t("micro.failingPaths"), `${failingPaths}`],
         ].map(([k, v]) => (
           <div key={k} className="flex gap-1.5">
             <dt>{k}</dt>
@@ -96,9 +98,9 @@ export function MicroservicesLayout({
       </dl>
       <div className="grid gap-3 @4xl:grid-cols-[minmax(0,3fr)_minmax(0,1fr)]">
         <DiagramSlot className="h-80 @2xl:h-96">{diagram}</DiagramSlot>
-        <section className="min-w-0" aria-label="Hot spots">
+        <section className="min-w-0" aria-label={t("micro.hotSpots")}>
           <h3 className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
-            Hot spots
+            {t("micro.hotSpots")}
           </h3>
           <ol className="grid gap-1.5 @2xl:@max-4xl:grid-cols-2">
             {hot.map((h, i) => {
@@ -108,7 +110,11 @@ export function MicroservicesLayout({
                   <button
                     type="button"
                     tabIndex={0}
-                    title={`${h.node.name} (${h.node.kind}): ${HEALTH_LABEL[h.health]}`}
+                    title={t("nodeTitle", {
+                      name: h.node.name,
+                      kind: h.node.kind,
+                      health: t(`health.${h.health}`),
+                    })}
                     onClick={() => onSelectNode?.(h.node.id)}
                     className={cn(
                       "bg-card flex w-full min-w-0 flex-col gap-1.5 rounded-sm border px-2.5 py-2 text-left",
@@ -147,17 +153,17 @@ export function MicroservicesLayout({
           </ol>
         </section>
       </div>
-      <section className="min-w-0 overflow-x-auto" aria-label="Call paths">
+      <section className="min-w-0 overflow-x-auto" aria-label={t("micro.callPaths")}>
         <h3 className="text-muted-foreground mb-2 text-xs font-medium tracking-wide uppercase">
-          Call paths by requests/s
+          {t("micro.callPathsHeading")}
         </h3>
         <table className="w-full table-fixed border-collapse text-sm">
           <thead>
             <tr className="text-muted-foreground border-b text-left text-xs">
-              <th className="w-1/3 py-1.5 pr-2 font-medium">From → to</th>
-              <th className="py-1.5 pr-2 font-medium">Traffic</th>
-              <th className="w-20 py-1.5 pr-2 text-right font-medium">req/s</th>
-              <th className="w-20 py-1.5 text-right font-medium">errors</th>
+              <th className="w-1/3 py-1.5 pr-2 font-medium">{t("micro.fromTo")}</th>
+              <th className="py-1.5 pr-2 font-medium">{t("micro.traffic")}</th>
+              <th className="w-20 py-1.5 pr-2 text-right font-medium">{t("reqPerSec")}</th>
+              <th className="w-20 py-1.5 text-right font-medium">{t("errors")}</th>
             </tr>
           </thead>
           <tbody>
@@ -202,7 +208,7 @@ export function MicroservicesLayout({
         </table>
         {rows.length > shown.length && (
           <p className="text-muted-foreground mt-1.5 text-xs">
-            and {rows.length - shown.length} quieter paths
+            {t("micro.quieter", { count: rows.length - shown.length })}
           </p>
         )}
       </section>

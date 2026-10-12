@@ -6,6 +6,7 @@ import type {
   WorkflowLoop,
   WorkflowTrain,
 } from "./workflow-model";
+import type { VizT } from "./viz-t";
 
 /**
  * Pure questions the workflow views ask about loops, rounds and fanouts, so
@@ -39,25 +40,25 @@ export function isNearBound(train: WorkflowTrain, loop: WorkflowLoop): boolean {
 }
 
 /** "round 3 of 5" or "attempt 2 of 3", for labels and accessible names. */
-export function roundLabel(train: WorkflowTrain, loop: WorkflowLoop): string {
-  const word = loop.kind === "retry" ? "attempt" : "round";
-  return `${word} ${loopRound(train, loop)} of ${loop.maxRounds}`;
+export function roundLabel(train: WorkflowTrain, loop: WorkflowLoop, vt: VizT): string {
+  return vt(loop.kind === "retry" ? "loop.attemptOf" : "loop.roundOf", {
+    n: loopRound(train, loop),
+    max: loop.maxRounds,
+  });
 }
 
-const TRIGGER_WORD: Record<WorkflowLoop["trigger"], string> = {
-  failed: "fails",
-  rejected: "is rejected",
-  condition: "meets its condition",
-};
-
-/** A loop in words, always with its bound: "Back to Code when Test fails, at most 5 rounds". */
-export function loopLabel(line: WorkflowLine, loop: WorkflowLoop): string {
-  const from = line.stations[loop.from]?.name ?? "stage";
-  const when = loop.condition ?? `${from} ${TRIGGER_WORD[loop.trigger]}`;
+/**
+ * A loop in words, always with its bound: "Back to Code when Test fails, at
+ * most 5 rounds". The trigger words live under `vizRender.loop.when` and
+ * `vizRender.loop.retry`; a loop's own condition is its data.
+ */
+export function loopLabel(line: WorkflowLine, loop: WorkflowLoop, vt: VizT): string {
+  const from = line.stations[loop.from]?.name ?? vt("loop.stage");
   if (loop.kind === "retry")
-    return `Retry ${from} when it ${TRIGGER_WORD[loop.trigger]}, at most ${loop.maxRounds} attempts`;
-  const to = line.stations[loop.to]?.name ?? "stage";
-  return `Back to ${to} when ${when}, at most ${loop.maxRounds} rounds`;
+    return vt(`loop.retry.${loop.trigger}`, { stage: from, max: loop.maxRounds });
+  const when = loop.condition ?? vt(`loop.when.${loop.trigger}`, { stage: from });
+  const to = line.stations[loop.to]?.name ?? vt("loop.stage");
+  return vt("loop.back", { to, when, max: loop.maxRounds });
 }
 
 export type TimelineStage = RunTimeline["stages"][number];

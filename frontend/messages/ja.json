@@ -7190,6 +7190,963 @@
       }
     }
   },
+  "vizRender": {
+    "health": {
+      "ok": "正常",
+      "degraded": "低下",
+      "failing": "障害",
+      "idle": "アイドル"
+    },
+    "healthInline": {
+      "ok": "正常",
+      "degraded": "低下",
+      "failing": "障害",
+      "idle": "アイドル"
+    },
+    "frame": {
+      "legend": "凡例",
+      "reducedMotion": "視覚効果を減らす：静止画を表示しています",
+      "viewStyle": "表示スタイル",
+      "fleetTitle": "エージェントフリート",
+      "fleetDescription": "{clusters, plural, other {# クラスター}}にまたがる{agents, plural, other {# エージェント}}",
+      "workflowsTitle": "ワークフロー",
+      "workflowsDescription": "{workflows, plural, other {ワークフロー # 件}}、{runs, plural, other {実行 # 件}}"
+    },
+    "styles": {
+      "fleet": {
+        "orbit": {
+          "label": "軌道",
+          "blurb": "クラスターを惑星、エージェントを衛星として表示"
+        },
+        "heartbeat": {
+          "label": "ハートビート",
+          "blurb": "イベントごとに消えていく残光ドット"
+        },
+        "hive": {
+          "label": "ハイブ",
+          "blurb": "エージェントごとに 1 タイル、大規模フリート向け"
+        },
+        "manifest": {
+          "label": "発車案内",
+          "blurb": "実行キューを発車案内板として表示"
+        },
+        "isometric": {
+          "label": "アイソメトリック",
+          "blurb": "クラスターを台座、負荷を高さとして表示"
+        },
+        "graph": {
+          "label": "グラフ",
+          "blurb": "ディスパッチのパルスが流れるライブのフォースグラフ"
+        },
+        "swarm": {
+          "label": "スウォーム",
+          "blurb": "エージェントが触手でクラスターの周りに群がる表示"
+        },
+        "list": {
+          "label": "リスト",
+          "blurb": "シンプルな表"
+        }
+      },
+      "workflow": {
+        "transit": {
+          "label": "路線図",
+          "blurb": "ワークフローを路線、実行を列車として表示"
+        },
+        "isometric": {
+          "label": "アイソメトリック",
+          "blurb": "ステージを組み立てラインとして表示"
+        },
+        "graph": {
+          "label": "グラフ",
+          "blurb": "アニメーション付きのステージグラフ"
+        },
+        "list": {
+          "label": "リスト",
+          "blurb": "シンプルな表"
+        }
+      },
+      "app": {
+        "auto": {
+          "label": "自動",
+          "blurb": "アプリのトポロジーに合わせて配置"
+        },
+        "isometric": {
+          "label": "アイソメトリック",
+          "blurb": "ワークロードを台座上のブロックとして表示"
+        },
+        "graph": {
+          "label": "グラフ",
+          "blurb": "ワークロードとトラフィックをライブグラフで表示"
+        },
+        "classic": {
+          "label": "クラシック",
+          "blurb": "カードのみ、図なし"
+        }
+      }
+    },
+    "topology": {
+      "service": "単一サービス",
+      "service-data": "サービスとデータ",
+      "service-worker": "Web とワーカー",
+      "microservices": "マイクロサービス",
+      "service-agent": "アプリとエージェント",
+      "agent": "エージェント",
+      "functions": "関数",
+      "scheduled": "スケジュール",
+      "task": "タスク",
+      "workflow": "ワークフロー",
+      "mixed": "混在"
+    },
+    "legend": {
+      "shape": {
+        "returnTrack": "戻り線：前のステージに戻される作業。ラウンド上限を表示",
+        "roundBadge": "ラウンドバッジ：実行が何ラウンド目か",
+        "roundNearBound": "黄色のラウンドバッジ：上限まであと 1 ラウンド。超えると実行は失敗します",
+        "siding": "側線：同じステージの再試行。試行上限を表示",
+        "join": "結合：すべての分岐が完了すると並列分岐が合流します",
+        "supervisorSwarm": "スーパーバイザーの群れ：サブタスク処理中のワーカーが点灯",
+        "nestedStack": "入れ子スタック：子ワークフロー全体を実行するステージ"
+      },
+      "healthy": "正常",
+      "degradedLoad85": "低下：負荷 85% 超",
+      "flickerFailing": "点滅：障害",
+      "idle": "アイドル",
+      "fleetListLoadBar": "バー：負荷（エージェントの状態色）",
+      "manifestQueued": "キュー待ち、発射までのカウントダウン",
+      "manifestHolding": "保留中（待機中は明滅）",
+      "manifestLiftedOff": "発射 / 飛行中",
+      "manifestLanded": "着陸",
+      "failed": "失敗",
+      "manifestFlip": "実行の状態が変わると表示が 1 回めくれます",
+      "graphHealthy": "正常。サイズは実行中の数",
+      "degradedLoadOver85": "低下（負荷 85% 超）",
+      "failing": "障害",
+      "idleDarkShort": "アイドル、消灯",
+      "graphRunsFlow": "実行中のラン。速く太いほど混雑",
+      "graphDispatch": "ディスパッチはハブ、クラスター、エージェントの順に移動（静止時：リング付きエージェント）",
+      "graphQueued": "キュー内の実行",
+      "graphPinned": "固定中。ダブルクリックで解除",
+      "orbitHealthy": "正常。軌道速度は負荷",
+      "orbitDegraded": "低下、負荷 85% 超",
+      "orbitFailing": "障害、低軌道に沈下",
+      "orbitIdle": "アイドル、停泊中",
+      "orbitLaunch": "実行開始（発射）",
+      "clusterDegraded": "クラスター低下",
+      "clusterOffline": "クラスターオフライン",
+      "heartbeatRun": "実行の開始または終了",
+      "heartbeatRunFailed": "実行失敗",
+      "heartbeatDispatched": "実行をディスパッチ",
+      "heartbeatDrift": "ドットは 12 秒かけて左へ流れ、消えていきます",
+      "heartbeatBusy": "ビジーなエージェント：行が負荷に応じて光る",
+      "heartbeatDegraded": "低下（過負荷）",
+      "heartbeatFailing": "障害のあるエージェント",
+      "heartbeatIdle": "アイドル：行は暗いまま",
+      "hiveBrightness": "明るさ：負荷",
+      "hiveBorder": "枠線：正常",
+      "degraded": "低下",
+      "hiveDark": "暗い：アイドル",
+      "hiveRing": "リング：クラスターハブからのディスパッチ",
+      "hiveStillDot": "静止ドット：直近 12 秒で作業を受信",
+      "swarmSpeed": "群れの速さ：エージェントの忙しさ",
+      "swarmIdle": "落ち着いて静止：アイドル",
+      "swarmTendril": "触手の太さ：実行中の数",
+      "swarmFailing": "離れていき触手がほつれる：障害",
+      "swarmPulse": "触手を伝うパルス：ディスパッチ",
+      "isoHealthy": "正常（高さは負荷）",
+      "isoIdle": "アイドル（低く暗い）",
+      "isoRunStarted": "実行開始（視覚効果を減らすと静止ドット）",
+      "isoClusterDegraded": "クラスター低下（台座の縁）",
+      "jobsRunning": "実行中：光る",
+      "jobsFailing": "障害のあるジョブまたはステップ",
+      "jobsPastOk": "過去の実行は成功",
+      "jobsPastFailed": "過去の実行は失敗",
+      "jobsNoRecord": "実行記録のない予定枠",
+      "jobsStepTraffic": "ステップのトラフィック：速いほど混雑",
+      "jobsInvoked": "直前に呼び出し / 動作（混在）",
+      "idleStaysDark": "アイドル：暗いまま",
+      "idleStaysDarkComma": "アイドル、暗いまま",
+      "saAction": "エージェントの操作、12 秒で消える",
+      "saActionFailing": "失敗した呼び出しへのエージェントの操作",
+      "saJustCalled": "エージェントが直前に呼び出し",
+      "saCallTraffic": "エージェントの呼び出しトラフィック：速いほど混雑",
+      "saCallFailing": "呼び出し失敗（エラー 5% 超）",
+      "load": "負荷",
+      "failingWorkload": "障害のあるワークロード",
+      "swDegraded": "低下：滞留中、エラー 1% 超、またはレプリカ不足",
+      "darkNoTraffic": "暗い：トラフィックなし",
+      "swTank": "タンク：キューの深さ。滞留中は明滅",
+      "swDash": "動く破線：メッセージの出入り、混雑時ほど速い",
+      "swGauge": "ゲージ：CPU",
+      "degradedErrorsReplicas": "低下：エラー 1% 超、またはレプリカ不足",
+      "flickerFailingErrors": "点滅：障害、エラー 5% 超",
+      "squaresReplicas": "四角：準備完了のレプリカ。明滅する枠はまだ準備中",
+      "sdDash": "動く破線：ストアへの呼び出し、混雑時ほど速い",
+      "sdGauge": "ゲージ：サービスは CPU、ストアは接続数",
+      "degradedErrors": "低下：エラー 1% 超",
+      "msHotSpot": "ホットスポットバー：失敗した呼び出しの割合",
+      "msDash": "動く破線：経路上の呼び出し、混雑時ほど速い",
+      "agentTick": "エージェントの操作（目盛り）、12 秒で薄れる",
+      "agentTickFailing": "失敗した呼び出しへの操作",
+      "agentToolTraffic": "ツール呼び出しのトラフィック：速く太いほど混雑",
+      "agentToolFailing": "ツール呼び出し失敗（エラー 5% 超）",
+      "agentToolJustCalled": "直前に呼び出されたツール",
+      "agentFailing": "障害のあるエージェントまたはツール",
+      "fnInvoked": "直前に呼び出し",
+      "fnTileLight": "タイルの点灯：最近の呼び出し、12 秒で消える",
+      "fnConcurrency": "使用中の同時実行数",
+      "fnCold": "コールドスタート：5 秒間の静止後に呼び出し",
+      "fnTraffic": "呼び出しトラフィック：速く太いほど混雑",
+      "fnFailingPath": "失敗している経路（エラー 5% 超）",
+      "fnFailing": "障害のある関数",
+      "trafficBusier": "トラフィック、混雑時ほど速く明るい",
+      "callsFailing": "呼び出しの 5% 超が失敗",
+      "graphDegradedShort": "低下またはレプリカ不足",
+      "graphFunctionInvoked": "関数の呼び出し、12 秒で消える",
+      "agentActed": "エージェントが動作、ビーコンは 12 秒で消える",
+      "isoBlockHeight": "ブロックの高さは負荷",
+      "isoSlab": "準備完了レプリカごとに 1 枚の板",
+      "isoReplicaMissing": "レプリカ不足または低下",
+      "isoFunctionInvoked": "関数の呼び出し、上面が 12 秒で消える",
+      "replaySegment": "区間の幅は実際の所要時間",
+      "replayPlayhead": "再生ヘッドが移動中：再生中",
+      "replayActive": "再生ヘッド位置のステージ",
+      "succeeded": "成功",
+      "replayGate": "ゲート待機中（明滅）",
+      "replaySkipped": "未到達またはスキップ",
+      "replayLoopMark": "ループマーク：ループが作業を戻し、次のラウンドが始まった位置",
+      "replayRoundBand": "ラウンド帯：各区間がどのラウンドか",
+      "replayParallel": "並列バー：ファンアウトの各分岐とその時間",
+      "listMoving": "移動中",
+      "listBreathing": "明滅：ゲートで保留",
+      "listFlicker": "点滅：失敗",
+      "listDone": "完了",
+      "listLoopRow": "ループ行：作業の戻り先と上限。実行が戻されている間は黄色",
+      "listRoundAmber": "黄色のラウンド：上限まであと 1 ラウンド。超えると実行は失敗",
+      "trMoving": "移動中の実行（列車）",
+      "trHeld": "ゲートで保留中の実行（明滅）",
+      "trFailed": "失敗して停止した実行",
+      "trDone": "完了した実行、終点で消える",
+      "trGateHolding": "実行を保留中のゲート",
+      "trGateClear": "ゲート通過可",
+      "trThroughput": "スループット：粒子の密度と速さ、線の太さ",
+      "trBacklog": "3 件を超える滞留",
+      "trReturnTrack": "路線上の戻り線：トリガーと上限付きのループ。実行が通過中は点灯",
+      "trSmallLoop": "1 駅の上の小さなループ：試行上限付きの再試行",
+      "trRoundBadge": "ラウンドバッジ：実行の現在ラウンド / 上限",
+      "trSiding": "側線：並列分岐 1 本。実行中は車両が点灯し、完了後は結合点へ",
+      "trBranchFailed": "失敗した分岐（完了、赤）",
+      "trJoin": "結合：すべての分岐が到着すると光る",
+      "trSwarm": "スーパーバイザーの群れ：ビジーなワーカーが触手上で点灯し、負荷に応じた速さで回る",
+      "trStacked": "積み重ねた駅：子ワークフロー。開くと路線を表示",
+      "grFlowing": "流れる実行、混雑時ほど速い",
+      "grBackedUp": "滞留（3 件超が待機）",
+      "grGateWaiting": "承認待ちのゲート",
+      "grGateApproved": "承認されたゲート",
+      "grGateDenied": "拒否または差し戻されたゲート",
+      "grRunsAtStage": "ステージ上の実行",
+      "grFailedRun": "失敗した実行",
+      "grIdle": "アイドルまたは完了",
+      "grReturnTrack": "戻り線：前のステージへのループ（ラウンド上限付き）。実行が戻されている間は流れる",
+      "grFanoutBox": "ファンアウト枠：分岐ごとに 1 行。実行中の分岐は流れ、完了すると 1 回点滅",
+      "grSatellites": "スーパーバイザーの衛星：ビジーなワーカーは点灯して回り、負荷が高いほど速い",
+      "grNestedGroup": "入れ子グループ：子ワークフローを実行するステージ。折りたたむとスタックになる",
+      "isoWfMoving": "移動中の実行（木箱）/ 稼働中のステージ",
+      "isoWfHeld": "ゲートで保留：ブースが閉じて明滅",
+      "isoWfFailed": "その機械で実行が失敗",
+      "isoWfBacklog": "投入口で待機中の滞留",
+      "isoWfBelt": "ベルトの速さ = スループット",
+      "isoWfIdle": "アイドル / 完了",
+      "isoWfRamp": "戻りランプ：戻された作業が 1 段上がって前のステージへ。上限はランプに表示",
+      "isoWfDeck": "ループ区間の上にラウンドごとのデッキ。現在のラウンドは点灯、以前は淡色",
+      "isoWfHoop": "ステージ上のフープ：そのステージの再試行。試行上限を表示",
+      "isoWfRails": "高架レール：ファンアウトの分岐。実行中は点灯し、完了すると結合ブロックへ転がる",
+      "isoWfSupervisor": "スーパーバイザータイル：ビジーなワーカーはハブを周回し負荷が高いほど速い。アイドルは静止",
+      "isoWfStacked": "積み重ねたブロック：子ワークフロー。開くとサブ台座にステージを表示",
+      "airlockWaiting": "承認待ち：ゲージは明滅し、保留時間に応じて満ちる",
+      "airlockApproved": "承認：扉が開く",
+      "airlockDenied": "拒否：封鎖され 1 回揺れる"
+    },
+    "listSeparator": "、",
+    "unknown": "不明",
+    "offline": "オフライン",
+    "selectedAgent": "、選択中のエージェント",
+    "agentSummary": "{name}: {health}、負荷 {load}%、実行中 {running}、待機 {queued}",
+    "counts": {
+      "failing": "障害 {count}",
+      "degraded": "低下 {count}",
+      "busy": "ビジー {count}",
+      "idle": "アイドル {count}",
+      "queued": "待機 {count}",
+      "clustersNotHealthy": "{count, plural, other {正常でないクラスター #}}"
+    },
+    "fleetList": {
+      "summary": "エージェント {agents}、障害 {failing}、ビジー {busy}",
+      "searchPlaceholder": "エージェント、クラスターを検索…",
+      "health": "状態",
+      "views": {
+        "all": "すべて",
+        "mine": "自分"
+      },
+      "mineNote": "エージェントは個人ではなくフリートに属するため、「自分」は空です。",
+      "columns": {
+        "agent": "エージェント",
+        "health": "状態",
+        "load": "負荷",
+        "runs": "実行中",
+        "queued": "待機",
+        "cluster": "クラスター"
+      },
+      "agentLabel": "{name}、{health}",
+      "label": "エージェント",
+      "empty": "このフリートにエージェントはいません"
+    },
+    "manifest": {
+      "count": {
+        "queued": "待機 {count}",
+        "holding": "保留 {count}",
+        "lifted_off": "発射 {count}",
+        "in_flight": "飛行中 {count}",
+        "landed": "着陸 {count}",
+        "failed": "失敗 {count}"
+      },
+      "state": {
+        "queued": "待機",
+        "holding": "保留",
+        "lifted_off": "発射",
+        "in_flight": "飛行中",
+        "landed": "着陸",
+        "failed": "失敗"
+      },
+      "summary": "{count, plural, other {実行 # 件}}: {parts}",
+      "summaryEmpty": "{count, plural, other {ボード上の実行 # 件}}",
+      "label": "発射マニフェスト。{summary}",
+      "queue": "実行キュー",
+      "columns": {
+        "clock": "T- / UTC",
+        "run": "実行",
+        "agent": "エージェント",
+        "cluster": "クラスター",
+        "status": "ステータス"
+      },
+      "empty": "ボードに実行はありません"
+    },
+    "fleetGraph": {
+      "summary": "{clusters} クラスターにエージェント {agents}、障害 {failing}、ビジー {busy}、待機中の実行 {queued}",
+      "hub": "組織ハブ",
+      "org": "組織",
+      "agentLabel": "{name}: {health}、実行中 {active}、待機 {queued}",
+      "agentTitle": "{name}: {health}、実行中 {active}、待機 {queued}、負荷 {load}%",
+      "clusterTitle": "{name}: {health}",
+      "clusterRegionTitle": "{name} ({region}): {health}"
+    },
+    "orbit": {
+      "planet": "エージェント {agents} · ビジー {busy}"
+    },
+    "heartbeat": {
+      "summary": "ハートビート：エージェント {agents}、障害 {failing}、ビジー {busy}、直近 {seconds} 秒のイベント {recent}",
+      "agent": "エージェント",
+      "now": "現在"
+    },
+    "hive": {
+      "summary": "{clusters} クラスターにエージェント {agents}、障害 {failing}、低下 {degraded}、ビジー {busy}",
+      "group": "{name}、エージェント {count}",
+      "groupRegion": "{name} ({region})、エージェント {count}",
+      "dispatcher": "{name} のディスパッチャー、クラスター{health}",
+      "agent": "{name}、{cluster}、{health}、負荷 {load}%、実行中 {running}、待機 {queued}"
+    },
+    "swarm": {
+      "summary": "群れているエージェント {agents}: ビジー {busy}、アイドル {idle}、障害 {failing}"
+    },
+    "isoFleet": {
+      "summary": "アイソメトリックフリート：{fleet}、障害 {failing}、低下 {degraded}、ビジー {busy}、アイドル {idle}",
+      "agent": "{name}: {health}、負荷 {load}%、{count, plural, other {実行中 # 件}}",
+      "cluster": "{name}: エージェント {count}",
+      "clusterRegion": "{name} ({region}): エージェント {count}",
+      "peek": "{health} · 負荷 {load}% · 実行中 {running} · 待機 {queued}"
+    },
+    "feed": {
+      "queried": "<a>{agent}</a> が <b>{target}</b> にクエリ",
+      "publishedTo": "<a>{agent}</a> が <b>{target}</b> に発行",
+      "invoked": "<a>{agent}</a> が <b>{target}</b> を呼び出し",
+      "called": "<a>{agent}</a> が <b>{target}</b> を呼び出し",
+      "workedOn": "<a>{agent}</a> が <b>{target}</b> を処理"
+    },
+    "tick": {
+      "queried": "{seconds} 秒前に {target} にクエリ",
+      "publishedTo": "{seconds} 秒前に {target} に発行",
+      "invoked": "{seconds} 秒前に {target} を呼び出し",
+      "called": "{seconds} 秒前に {target} を呼び出し",
+      "workedOn": "{seconds} 秒前に {target} を処理"
+    },
+    "work": "作業",
+    "nodeTitle": "{name} ({kind}): {health}",
+    "loadBar": "{label} {pct}%",
+    "load": "負荷",
+    "loadPct": "負荷 {pct}%",
+    "loadOf": "{name} の負荷",
+    "connectionsOf": "{name} の接続",
+    "cpuOf": "{name} の CPU",
+    "appSummary": "{app}: {summary}",
+    "nouns": {
+      "workloads": "{count, plural, other {ワークロード #}}",
+      "nodes": "{count, plural, other {ノード #}}",
+      "appWorkloads": "{count, plural, other {アプリのワークロード #}}",
+      "agents": "{count, plural, other {エージェント #}}",
+      "tools": "{count, plural, other {ツール #}}",
+      "functions": "{count, plural, other {関数 #}}"
+    },
+    "sections": {
+      "traffic": "トラフィック",
+      "services": "サービス",
+      "functions": "関数",
+      "jobs": "ジョブ",
+      "agents": "エージェント",
+      "queues": "キュー",
+      "data": "データ",
+      "external": "外部"
+    },
+    "roles": {
+      "ingress": "Ingress",
+      "service": "サービス",
+      "worker": "ワーカー",
+      "data": "データ",
+      "queue": "キュー",
+      "function": "関数",
+      "trigger": "トリガー",
+      "agent": "エージェント",
+      "schedule": "スケジュール",
+      "external": "外部"
+    },
+    "utc": "{time} UTC",
+    "notApplicable": "該当なし",
+    "nodeLoadLabel": "{name}、{kind}、{health}、負荷 {load}%",
+    "nodeRoleLabel": "{name}、{role}、{health}",
+    "nameHealth": "{name}、{health}",
+    "readyReplicas": "{ready}/{desired} 準備完了",
+    "reqPerSec": "req/s",
+    "jobsPerSec": "ジョブ/秒",
+    "errors": "エラー",
+    "distribution": "分布",
+    "trend": "推移",
+    "topologyGraph": "トポロジーグラフ",
+    "trafficSummary": "{app}、{topology}: {health}、毎秒 {rps} リクエスト、エラー {errors}",
+    "jobs": {
+      "scheduleLabel": "{name}: {next}、{health}",
+      "nextRunIn": "次の実行まで {countdown}",
+      "notParsed": "スケジュールを解析できません",
+      "nextRun": "次の実行まで",
+      "running": "実行中",
+      "notRunning": "停止中",
+      "lastSlots": "直近 {count} 枠",
+      "history": "実行履歴",
+      "slot": "{time} UTC: {outcome}",
+      "succeeded": "成功",
+      "failed": "失敗",
+      "noRecord": "記録なし",
+      "noSchedules": "ジョブに紐づくスケジュールはありません。",
+      "noTask": "このアプリにタスクはありません。",
+      "stateFailed": "失敗",
+      "stateRunning": "実行中",
+      "stateNotRunning": "停止中",
+      "runLabel": "{name} の実行：{state}",
+      "run": "実行",
+      "kind": "種類",
+      "pods": "Pod",
+      "writes": "書き込み",
+      "errPct": "エラー {pct}%",
+      "steps": "ワークフローのステップ",
+      "stepsTitle": "ステップ",
+      "stepLabel": "ステップ {n}、{name}: {state}",
+      "runningPct": "実行中 {pct}%"
+    },
+    "serviceAgent": {
+      "summary": "{app}: {workloads}; {agents}; 直近 12 秒のエージェント操作 {actions}",
+      "app": "アプリ",
+      "doing": "エージェントの動作",
+      "quiet": "静か：直近 12 秒にエージェントの操作はありません",
+      "agent": "エージェント",
+      "calls": "エージェントの呼び出し",
+      "callLabel": "エージェントが {name} を呼び出し：{rps}/秒、エラー {errors}%",
+      "calledLabel": "{label}、エージェントが呼び出し",
+      "agentTag": "エージェント"
+    },
+    "serviceWorker": {
+      "behind": "+{rps}/秒 遅延",
+      "keepingUp": "追いついている",
+      "empty": "空",
+      "in": "入力",
+      "out": "出力",
+      "depth": "深さ",
+      "lag": "遅延",
+      "depthTrend": "深さの推移",
+      "enqueued": "投入/秒",
+      "consumed": "消費/秒",
+      "summary": "{head}、キュー {queue} は {fill} 使用で{health}、毎秒入力 {inRps}、出力 {outRps}",
+      "fallingBehind": "、毎秒 {rps} ずつ遅延",
+      "summaryNoQueue": "{head}、キューなし",
+      "web": "Web",
+      "webHeading": "Web · {rps} req/s · エラー {errors}",
+      "queue": "キュー",
+      "noQueue": "このアプリにキューはありません。",
+      "workers": "ワーカー",
+      "workersHeading": "ワーカー · {rps} ジョブ/秒"
+    },
+    "service": {
+      "summary": "{app}、{topology}: {health}、毎秒 {rps} リクエスト、p50 {p50}、エラー {errors}、レプリカ {desired} 中 {ready} が準備完了"
+    },
+    "kpi": {
+      "requests": "リクエスト/秒",
+      "p50": "p50 レイテンシー",
+      "errorRate": "エラー率",
+      "replicas": "準備完了のレプリカ"
+    },
+    "serviceData": {
+      "connections": "接続",
+      "callErrors": "呼び出しエラー",
+      "summary": "{head}、{count, plural, other {データストア #}}",
+      "worstStore": "、{name} {health}",
+      "storeAt": "、{name} は {load}"
+    },
+    "micro": {
+      "summary": "{app}、{topology}: サービス {services}、障害 {failing}、失敗している呼び出し経路 {paths}、毎秒 {rps} リクエスト",
+      "hottest": "、最も深刻なのは {name} (エラー {errors})",
+      "services": "サービス",
+      "replicas": "レプリカ",
+      "failingPaths": "失敗経路",
+      "hotSpots": "ホットスポット",
+      "callPaths": "呼び出し経路",
+      "callPathsHeading": "リクエスト/秒順の呼び出し経路",
+      "fromTo": "送信元 → 送信先",
+      "traffic": "トラフィック",
+      "quieter": "ほか {count} 件の静かな経路"
+    },
+    "agentLayout": {
+      "summary": "{app}: {agents}; 直近 12 秒の操作 {actions}; {tools}",
+      "runs": "実行",
+      "actions": "操作（直近 12 秒）",
+      "toolCalls": "ツール呼び出し",
+      "diagram": "図",
+      "stripLabel": "{name}: 直近 12 秒の操作 {count}、{health}",
+      "noActions": "操作なし"
+    },
+    "functions": {
+      "summary": "{app}: {functions}; 直近 12 秒に {invoked} 件呼び出し",
+      "coldStarts": "、{count, plural, other {コールドスタート #}}",
+      "tile": "{name}: 呼び出し {rps}、同時実行 {pct}%、直近 12 秒に {recent}、{health}",
+      "tileCold": "{name}: 呼び出し {rps}、同時実行 {pct}%、直近 12 秒に {recent}、コールドスタート、{health}",
+      "cold": "コールド",
+      "in12s": "12 秒で {count}"
+    },
+    "graph": {
+      "nodeName": "{name} ({role})",
+      "replicas": "レプリカ {desired} 中 {ready}",
+      "perSecond": "毎秒 {rps}",
+      "invocations": "12 秒で呼び出し {count}",
+      "actions": "12 秒で操作 {count}",
+      "erroring": "接続 {total} 件中 {erroring} 件でエラー",
+      "connectionsHealthy": "接続 {count} 件は正常",
+      "acts": "操作 {count}",
+      "retrying": "{stage} を再試行中、試行 {n}/{max}",
+      "sentBack": "{from} から {to} に戻され、ラウンド {n}/{max} へ",
+      "state": {
+        "failed": "失敗",
+        "rejected": "差し戻し、作業を戻しています",
+        "sendingBack": "作業を戻しています",
+        "waitingApproval": "承認待ち",
+        "runningWaiting": "実行中、待機 {held}",
+        "held": "保留中",
+        "backedUp": "滞留、待機 {backlog}",
+        "running": "実行中",
+        "finished": "完了"
+      },
+      "kind": {
+        "gate": "ゲート",
+        "fanout": "ファンアウト",
+        "join": "結合",
+        "supervisor": "スーパーバイザー",
+        "workflow": "入れ子のワークフロー"
+      },
+      "group": {
+        "moving": "実行中 {count}: {runs}",
+        "held": "保留中 {count}: {runs}",
+        "failed": "失敗 {count}: {runs}",
+        "done": "完了 {count}: {runs}"
+      },
+      "branches": "{count, plural, other {# 分岐}}、{count} 中 {settled} 完了",
+      "branchesDynamic": "実行ごとに決まる{count, plural, other {# 分岐}}、{count} 中 {settled} 完了",
+      "branchesFailed": "、失敗 {count}",
+      "noBranches": "分岐はまだありません",
+      "waitsOn": "{count, plural, other {# 分岐}}を待機、完了 {settled}",
+      "waitsOnFanout": "ファンアウトを待機",
+      "subtasksShort": "サブタスク {done}/{total}",
+      "subtasksDone": "サブタスク {total} 中 {done} 完了",
+      "workerBusy": "{label}: ビジー、負荷 {load}%",
+      "workerIdle": "{label}: アイドル、負荷 {load}%",
+      "firstStage": "最初のステージ",
+      "loopRun": "{label}、{text}",
+      "trackShort": {
+        "failed": "{stage} 失敗、最大 {max} ラウンド",
+        "rejected": "{stage} 差し戻し、最大 {max} ラウンド",
+        "condition": "{stage} 条件成立、最大 {max} ラウンド"
+      },
+      "maxAttempts": "最大 {max} 回",
+      "workflows": "{count, plural, other {ワークフロー #}}",
+      "backedUpStages": "{count, plural, other {滞留中のステージ #}}"
+    },
+    "loop": {
+      "attemptOf": "試行 {n}/{max}",
+      "roundOf": "ラウンド {n}/{max}",
+      "stage": "ステージ",
+      "retry": {
+        "failed": "{stage} が失敗したら再試行 (最大 {max} 回)",
+        "rejected": "{stage} が差し戻されたら再試行 (最大 {max} 回)",
+        "condition": "{stage} が条件を満たしたら再試行 (最大 {max} 回)"
+      },
+      "when": {
+        "failed": "{stage} が失敗した",
+        "rejected": "{stage} が差し戻された",
+        "condition": "{stage} が条件を満たした"
+      },
+      "back": "{when}とき {to} に戻る (最大 {max} ラウンド)"
+    },
+    "station": {
+      "gateFailed": "ここで実行が失敗",
+      "holding": "実行を保留中",
+      "open": "開いている",
+      "runsWaiting": "{count, plural, other {、待機中の実行 #}}",
+      "idleLastRun": "{count, plural, other {アイドル、前回の実行は # 分岐}}",
+      "branches": "{count, plural, other {# 分岐}}、完了 {settled}、実行中 {running}",
+      "branchesFailed": "、失敗 {count}",
+      "waitingOn": "{count, plural, other {# 分岐}}中 {pending} を待機中",
+      "workersBusy": "{count, plural, other {ワーカー #}}中 {busy} がビジー",
+      "childFailed": "子の実行が失敗",
+      "childFinished": "子の実行が完了",
+      "childAt": "子の実行は {stage} (ステージ {n}/{total})",
+      "aStage": "いずれかのステージ",
+      "name": "{line}、{station}: {state}{loops}",
+      "kind": {
+        "stage": "{name}",
+        "gate": "{name} ゲート",
+        "fanout": "{name} ファンアウト",
+        "join": "{name} 結合",
+        "supervisor": "{name} スーパーバイザー",
+        "workflow": "{name} 子ワークフロー"
+      }
+    },
+    "run": {
+      "retrying": "{stage} を再試行中",
+      "theStage": "そのステージ",
+      "sentBackTo": "{stage} に戻された",
+      "anEarlierStage": "前のステージ",
+      "waitingFanout": "ファンアウトの空きを待機中",
+      "held": "保留中",
+      "failed": "失敗",
+      "finished": "完了",
+      "waitingBranches": "分岐を待機中 ({total} 中 {settled} 完了)",
+      "subtasks": "サブタスク {total} 中 {done} 完了",
+      "childAt": "子の実行は {stage}",
+      "moving": "移動中",
+      "round": "ラウンド {n}",
+      "childRun": "子の実行",
+      "name": "実行 {label}: {parts}"
+    },
+    "trains": {
+      "moving": "移動中 {count}",
+      "heldAtGates": "ゲートで保留 {count}",
+      "failed": "失敗 {count}",
+      "sentBackOnLoop": "ループで戻された {count}",
+      "backedUp": "滞留 {count}",
+      "running": "実行中 {count}",
+      "sentBackAlongLoop": "ループに沿って戻された {count}"
+    },
+    "list": {
+      "trigger": {
+        "failed": "{stage} が失敗",
+        "rejected": "{stage} が差し戻し",
+        "condition": "{stage} が条件を満たした",
+        "custom": "{stage}: {condition}"
+      },
+      "retrying": "{what}、{stage} を再試行中 (試行 {n}/{max})",
+      "goesBack": "{what} ため {to} に戻る (ラウンド {n}/{max})",
+      "inside": "{base}。{label} はラウンド {n}/{max}",
+      "branchesPerRun": "分岐数は実行ごとに決定",
+      "noBranches": "分岐はまだありません",
+      "done": "{settled} / {total} 完了",
+      "waitsAllSettled": "{count, plural, other {# 分岐}}を待機、すべて完了",
+      "waitsToGo": "{count, plural, other {# 分岐}}を待機、残り {pending}",
+      "waitsOn": "{name} を待機",
+      "subtasks": "サブタスク {done} / {total}、{workers}",
+      "runsChild": "{name} を実行",
+      "childAt": "子の実行は {stage}、{n} / {total}",
+      "start": "開始",
+      "stages": {
+        "search": "ステージ、ワークフロー、ループを検索…"
+      },
+      "runs": {
+        "search": "実行、ワークフロー、駅を検索…"
+      },
+      "fields": {
+        "state": "状態",
+        "kind": "種類"
+      },
+      "kind": {
+        "stage": "ステージ",
+        "gate": "ゲート",
+        "fanout": "ファンアウト",
+        "join": "結合",
+        "supervisor": "スーパーバイザー",
+        "workflow": "入れ子のワークフロー",
+        "loop": "ループ",
+        "retry": "再試行"
+      },
+      "kindInline": {
+        "stage": "ステージ",
+        "gate": "ゲート",
+        "fanout": "ファンアウト",
+        "join": "結合",
+        "supervisor": "スーパーバイザー",
+        "workflow": "入れ子のワークフロー",
+        "loop": "ループ",
+        "retry": "再試行"
+      },
+      "stageState": {
+        "failed": "失敗",
+        "sendingBack": "差し戻し中",
+        "held": "保留中",
+        "waitingApproval": "承認待ち",
+        "backedUp": "滞留",
+        "running": "実行中",
+        "finished": "完了",
+        "idle": "アイドル"
+      },
+      "stageStateInline": {
+        "failed": "失敗",
+        "sendingBack": "差し戻し中",
+        "held": "保留中",
+        "waitingApproval": "承認待ち",
+        "backedUp": "滞留",
+        "running": "実行中",
+        "finished": "完了",
+        "idle": "アイドル"
+      },
+      "trainState": {
+        "moving": "移動中",
+        "held": "保留中",
+        "failed": "失敗",
+        "done": "完了",
+        "sent": "差し戻し"
+      },
+      "trainStateInline": {
+        "moving": "移動中",
+        "held": "保留中",
+        "failed": "失敗",
+        "done": "完了",
+        "sent": "差し戻し"
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分"
+      },
+      "mineNote": "ワークフローのステージと実行は個人ではなくワークフローのものなので、「自分」は空です。",
+      "agoSeconds": "{s} 秒前",
+      "agoMinutes": "{m} 分前",
+      "agoHours": "{h} 時間 {m} 分前",
+      "summary": "{head}: 移動中 {moving}、ゲートで保留 {held}、失敗 {failed}、完了 {done}",
+      "summarySent": "、ループに沿って戻された {count}",
+      "none": "なし",
+      "nearBound": "、上限まであと 1 ラウンド",
+      "where": {
+        "retrying": "{stage} を再試行中",
+        "sentBack": "{stage} に差し戻し"
+      },
+      "whereInline": {
+        "retrying": "{stage} を再試行中",
+        "sentBack": "{stage} に差し戻し"
+      },
+      "loopLabel": "{workflow}: {words}、{state}",
+      "stageLabel": "{name}、{workflow} の{kind}",
+      "attempt": "試行 {n}",
+      "columns": {
+        "stage": "ステージ",
+        "workflow": "ワークフロー",
+        "kind": "種類",
+        "state": "状態",
+        "round": "ラウンド",
+        "attempts": "試行",
+        "progress": "進捗",
+        "runs": "実行",
+        "run": "実行",
+        "station": "駅",
+        "started": "開始"
+      },
+      "show": "表示",
+      "stagesCount": "ステージ ({count})",
+      "runsCount": "実行 ({count})",
+      "stagesLabel": "ステージ",
+      "runsLabel": "実行",
+      "noWorkflows": "ワークフローはありません",
+      "noRuns": "どのワークフローにも実行はありません"
+    },
+    "replay": {
+      "round": "ラウンド {n}",
+      "roundShort": "R{n}",
+      "roundLower": "ラウンド {n}",
+      "running": "実行中",
+      "queued": "待機中",
+      "noCanvas": "このブラウザーではエクスポートを描画できません（2D Canvas がありません）。",
+      "noVideo": "このブラウザーでは動画を録画できません。",
+      "waitingApproval": "承認待ち",
+      "deniedBy": "{who} が拒否",
+      "approvedBy": "{who} が承認",
+      "runningFor": "{duration} 実行中",
+      "took": "所要時間 {duration}",
+      "stages": "{count, plural, other {ステージ #}}",
+      "rounds": "{count, plural, other {ラウンド #}}",
+      "sentBack": "{count, plural, other {差し戻し # 回}}",
+      "parallel": "{count, plural, other {並列分岐 #}}",
+      "waitingAtGate": "ゲートで待機 {count}",
+      "describe": "実行 {label}: {parts}、{span}",
+      "outcome": {
+        "rejected": "差し戻し",
+        "failed": "失敗",
+        "waiting": "待機中",
+        "running": "実行中",
+        "skipped": "スキップ"
+      },
+      "elapsedAt": "{clock} 経過、{stage}",
+      "elapsed": "{clock} 経過",
+      "exportFailed": "リプレイをエクスポートできませんでした：{error}",
+      "status": {
+        "succeeded": "成功",
+        "failed": "失敗",
+        "skipped": "スキップ",
+        "running": "実行中",
+        "waiting": "待機中"
+      },
+      "kind": {
+        "stage": "ステージ",
+        "gate": "ゲート",
+        "fanout": "ファンアウト",
+        "join": "結合",
+        "supervisor": "スーパーバイザー",
+        "workflow": "子ワークフロー"
+      },
+      "roundsOnTrack": "トラック上のラウンド",
+      "markLabel": "ラウンド {n}: {reason}、{to} に差し戻し。ここへ移動",
+      "markTitle": "{reason}、{to} に戻る (ラウンド {n})",
+      "segment": "{name} ({kind}): {status}、{duration}",
+      "segmentRound": "{name} ({kind}、ラウンド {n}): {status}、{duration}",
+      "decidedBy": "{who} が判断",
+      "sentBackReason": "差し戻し：{reason}",
+      "branch": "{name}（分岐）: {status}、{duration}",
+      "position": "再生位置",
+      "slowest": "<label>最も遅いステージ：</label><strong>{name}</strong> は <mono>{duration}</mono> かかり、実行全体の <mono>{share}%</mono>",
+      "roundsList": "ラウンド",
+      "cause": "(差し戻し：<em>{reason}</em>)",
+      "reducedHint": "視覚効果を減らす：再生ヘッドをドラッグするか矢印キーを使用",
+      "pauseLabel": "再生を一時停止",
+      "playLabel": "再生",
+      "pause": "一時停止",
+      "play": "再生",
+      "speed": "再生速度",
+      "recording": "録画中…",
+      "encoding": "エンコード中…",
+      "export": "エクスポート",
+      "exportGif": "GIF（6 秒のタイムラプス）",
+      "exportVideo": "動画、WebM（6 秒のタイムラプス）"
+    },
+    "transit": {
+      "trigger": {
+        "failed": "{stage} 失敗",
+        "rejected": "{stage} 差し戻し",
+        "condition": "{stage}"
+      },
+      "maxRounds": "{trigger} · 最大 {max} ラウンド",
+      "maxAttempts": "{trigger} · 最大 {max} 回",
+      "retryingNext": "{stage} を再試行中、次は試行 {n}/{max}",
+      "sentBackNext": {
+        "failed": "{from} が失敗したため {to} に差し戻し、次はラウンド {n}/{max}",
+        "rejected": "{from} が差し戻されたため {to} に戻る、次はラウンド {n}/{max}",
+        "condition": "{from} が条件を満たしたため {to} に戻る、次はラウンド {n}/{max}"
+      },
+      "roundOverall": "全体でラウンド {n}",
+      "summary": "{head}: 移動中 {moving}、保留 {held}、失敗 {failed}、完了 {done}",
+      "sentBackOnLoop": "、ループで戻された {count}",
+      "segmentsBackedUp": "、滞留区間 {count, plural, other {#}}",
+      "done": "完了 {count}",
+      "trainLabel": {
+        "moving": "{line} の実行 {label}、{station} で移動中",
+        "held": "{line} の実行 {label}、{station} で保留中",
+        "failed": "{line} の実行 {label}、{station} で失敗",
+        "done": "{line} の実行 {label}、{station} で完了"
+      },
+      "backClose": "{parent} に戻る：{child} を閉じる",
+      "backTo": "{parent} に戻る",
+      "backToInline": "{parent} に戻る",
+      "stationName": "{line}: {station}",
+      "nearBound": "、上限間近",
+      "gateHolding": "実行を保留中のゲート",
+      "gateClear": "ゲート通過可",
+      "parallelPerRun": "並列分岐、数は実行ごとに決定、アイドル",
+      "parallelIdle": "並列分岐、アイドル",
+      "branchesSettled": "{total} 分岐中 {settled} 完了",
+      "waitingOn": "、{names} を待機中",
+      "and": "と",
+      "joinReady": "結合準備完了",
+      "joinWaiting": "結合は {total} 分岐中 {pending} を待機",
+      "merging": "結合中",
+      "supervisor": "スーパーバイザー、{count, plural, other {ワーカー #}}中 {busy} がビジー",
+      "childWorkflow": "子ワークフロー {name}",
+      "childWorkflowBare": "子ワークフロー",
+      "closed": "閉じている",
+      "branchTitle": "{label}: {state}",
+      "branchState": {
+        "queued": "待機中",
+        "running": "実行中",
+        "succeeded": "成功",
+        "failed": "失敗"
+      },
+      "moreRunning": "、実行中 {count}",
+      "waiting": "待機 {count}"
+    },
+    "graphView": {
+      "more": "ほか {count}",
+      "branchesPerRun": "実行ごとの分岐",
+      "noBranches": "分岐なし",
+      "childWorkflow": "{name}、子ワークフロー",
+      "collapseLabel": "子ワークフロー {name} を折りたたむ",
+      "expandLabel": "子ワークフロー {name} を展開",
+      "collapse": "{name} を折りたたむ",
+      "expand": "{name} を展開"
+    },
+    "isoWf": {
+      "closeChild": "{station} が実行する子ワークフロー {child} を閉じる",
+      "openChild": "{station} が実行する子ワークフロー {child} を開く",
+      "childStages": "{name}: 子ワークフローのステージ",
+      "deckLit": "ラウンド {n}: 現在このラウンドに実行がある",
+      "deckEarlier": "ラウンド {n}: 以前のラウンド",
+      "branchesPerRun": "{name}: 分岐数は実行ごとに決定",
+      "branchLastRun": "{label}: {state}（前回の実行）"
+    },
+    "airlock": {
+      "wait": "待機 {time}",
+      "waiting": "待機中",
+      "open": "開放",
+      "denied": "拒否",
+      "labelHeld": "承認待ちのゲート、保留 {time}",
+      "labelWaiting": "承認待ちのゲート",
+      "labelBy": {
+        "approved": "{who} が承認したゲート",
+        "denied": "{who} が拒否したゲート"
+      },
+      "label": {
+        "approved": "承認されたゲート",
+        "denied": "拒否されたゲート"
+      },
+      "approve": "承認",
+      "deny": "拒否"
+    }
+  },
   "clusterConnection": {
     "title": "クラスター接続",
     "help": "クラスター内のエージェントが報告するハートビート。30 秒ごとに確認します。",

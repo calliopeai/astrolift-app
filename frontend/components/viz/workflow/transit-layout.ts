@@ -5,6 +5,7 @@ import type {
   WorkflowLoop,
   WorkflowTrain,
 } from "../core/workflow-model";
+import type { VizT } from "../core/viz-t";
 import { isNearBound, loopRound } from "../core/workflow-shapes";
 
 /**
@@ -148,18 +149,17 @@ function cubicGeom(p0: Pt, c1: Pt, c2: Pt, p1: Pt) {
   };
 }
 
-const TRIGGER_SHORT: Record<WorkflowLoop["trigger"], string> = {
-  failed: "failed",
-  rejected: "rejected",
-  condition: "",
-};
-
 /** A loop's label on the map: its trigger and its bound (the full sentence goes in a <title>). */
-export function loopShortLabel(line: WorkflowLine, loop: WorkflowLoop): string {
-  const from = truncate((line.stations[loop.from]?.name ?? "stage").toLowerCase(), 12);
-  const trigger = truncate(loop.condition ?? `${from} ${TRIGGER_SHORT[loop.trigger]}`.trim(), 22);
-  const unit = loop.kind === "retry" ? "attempts" : "rounds";
-  return `${trigger} · max ${loop.maxRounds} ${unit}`;
+export function loopShortLabel(line: WorkflowLine, loop: WorkflowLoop, vt: VizT): string {
+  const from = truncate((line.stations[loop.from]?.name ?? vt("loop.stage")).toLowerCase(), 12);
+  const trigger = truncate(
+    loop.condition ?? vt(`transit.trigger.${loop.trigger}`, { stage: from }).trim(),
+    22
+  );
+  return vt(loop.kind === "retry" ? "transit.maxAttempts" : "transit.maxRounds", {
+    trigger,
+    max: loop.maxRounds,
+  });
 }
 
 /** How high a back-edge arcs: taller than every back-edge it spans over. */
@@ -181,11 +181,16 @@ const loopHeight = (rank: number) => 36 + 22 * rank;
 /** The apex of a back-edge, above its stations: the cubic's midpoint. */
 const apexDepth = (h: number) => 0.25 * 5 + 0.75 * h;
 
-function layoutLoop(line: WorkflowLine, loop: WorkflowLoop, stations: Pt[]): LoopGeom | null {
+function layoutLoop(
+  line: WorkflowLine,
+  loop: WorkflowLoop,
+  stations: Pt[],
+  vt: VizT
+): LoopGeom | null {
   const a = stations[loop.from];
   const b = stations[loop.to];
   if (!a || !b) return null;
-  const label = loopShortLabel(line, loop);
+  const label = loopShortLabel(line, loop, vt);
   if (loop.from === loop.to) {
     const g = cubicGeom(
       { x: a.x + 7, y: a.y - 6 },
@@ -336,6 +341,7 @@ export function workerSpeed(busy: boolean, load: number): number {
  */
 export function layoutTransit(
   lines: WorkflowLine[],
+  vt: VizT,
   expanded: ReadonlySet<string> = new Set()
 ): TransitLayout {
   const byId = new Map(lines.map((l) => [l.id, l]));
@@ -376,7 +382,7 @@ export function layoutTransit(
       Array.from({ length: s.join - s.fanout }, (_, k) => s.fanout + k)
     );
     const loops = (line.loops ?? [])
-      .map((l) => layoutLoop(line, l, stations))
+      .map((l) => layoutLoop(line, l, stations, vt))
       .filter((l): l is LoopGeom => l !== null);
     return {
       id: line.id,

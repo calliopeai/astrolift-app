@@ -1,8 +1,9 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
-import { TOPOLOGY_META, type TopologyKind } from "@/lib/topology";
+import { type TopologyKind } from "@/lib/topology";
 import { APP_VIEWS, useMotion, useVizPrefs, type AppView as AppStyle } from "@/lib/viz-prefs";
 
 import { APP_GRAPH_LEGEND, AppGraph } from "./app/AppGraph";
@@ -22,8 +23,8 @@ import {
   ServiceWorkerLayout,
 } from "./app/layouts/ServiceWorkerLayout";
 import type { AppSnapshot, AppViewProps } from "./core/app-model";
-import { VizFrame } from "./core/VizFrame";
-import type { LegendItem } from "./core/VizLegend";
+import { VizFrame, useStyleCopy } from "./core/VizFrame";
+import { legendItemId, type LegendItem } from "./core/VizLegend";
 
 type LayoutProps = AppViewProps & { diagram: React.ReactNode; runs?: JobRun[] };
 
@@ -45,10 +46,12 @@ export const APP_LAYOUTS: Record<
   mixed: { Component: JobsLayout, legend: JOBS_LAYOUT_LEGEND },
 };
 
-/** One legend from several; the frame keys items by label, so repeats drop. */
+/** One legend from several; the frame keys items by their copy, so repeats drop. */
 function mergeLegends(...lists: LegendItem[][]): LegendItem[] {
   const seen = new Set<string>();
-  return lists.flat().filter((item) => !seen.has(item.label) && seen.add(item.label));
+  return lists
+    .flat()
+    .filter((item) => !seen.has(legendItemId(item)) && seen.add(legendItemId(item)));
 }
 
 /** What an app style draws, and its legend. */
@@ -104,6 +107,8 @@ export function AppView({
   motion,
   className,
 }: AppViewFrameProps) {
+  const t = useTranslations("vizRender");
+  const styles = useStyleCopy(APP_VIEWS, "app");
   const [prefs, update] = useVizPrefs();
   const resolved = useMotion();
   const style = value ?? prefs.appView;
@@ -118,8 +123,8 @@ export function AppView({
   return (
     <VizFrame
       title={title ?? snapshot.app.name}
-      description={description ?? TOPOLOGY_META[snapshot.topology].label}
-      styles={APP_VIEWS}
+      description={description ?? t(`topology.${snapshot.topology}`)}
+      styles={styles}
       value={style}
       onChange={onChange ?? ((appView) => update({ appView }))}
       motion={m}

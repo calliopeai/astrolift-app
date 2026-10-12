@@ -1,20 +1,12 @@
 import type { FleetRun, FleetRunState, FleetSnapshot } from "../core/fleet-model";
 import { mulberry32, type Health } from "../core/semantics";
+import type { VizT } from "../core/viz-t";
 
 /**
  * Pure logic behind the launch manifest: how a run's status reads, how its
  * clock reads, and (for stories) how the run queue moves. `stepFleet` leaves
  * runs alone, so the Live story composes it with `stepRuns`.
  */
-
-export const RUN_STATE_LABEL: Record<FleetRunState, string> = {
-  queued: "Queued",
-  holding: "Holding",
-  lifted_off: "Lifted off",
-  in_flight: "In flight",
-  landed: "Landed",
-  failed: "Failed",
-};
 
 /** Which status colour a run state carries. Queued is waiting, so it stays dark. */
 export const RUN_STATE_HEALTH: Record<FleetRunState, Health> = {
@@ -89,7 +81,7 @@ export function boardOrder(runs: FleetRun[]): FleetRun[] {
 }
 
 /** "12 runs: 2 queued, 1 holding, 3 in flight, 4 landed, 2 failed". */
-export function summarizeRuns(runs: FleetRun[]): string {
+export function summarizeRuns(runs: FleetRun[], t: VizT): string {
   const counts: Record<FleetRunState, number> = {
     queued: 0,
     holding: 0,
@@ -101,9 +93,10 @@ export function summarizeRuns(runs: FleetRun[]): string {
   for (const r of runs) counts[r.state] += 1;
   const parts = (Object.keys(counts) as FleetRunState[])
     .filter((s) => counts[s] > 0)
-    .map((s) => `${counts[s]} ${RUN_STATE_LABEL[s].toLowerCase()}`);
-  const head = `${runs.length} run${runs.length === 1 ? "" : "s"}`;
-  return parts.length ? `${head}: ${parts.join(", ")}` : `${head} on the board`;
+    .map((s) => t(`manifest.count.${s}`, { count: counts[s] }));
+  return parts.length
+    ? t("manifest.summary", { count: runs.length, parts: parts.join(t("listSeparator")) })
+    : t("manifest.summaryEmpty", { count: runs.length });
 }
 
 const LABELS = [

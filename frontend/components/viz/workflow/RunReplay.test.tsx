@@ -1,5 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
+import { renderWithIntl } from "@/test/render-with-intl";
 
 import { makeFeatureTimeline, makeTimeline } from "../core/workflow-model";
 
@@ -9,7 +11,7 @@ import { RunReplay } from "./RunReplay";
 
 describe("RunReplay", () => {
   it("opens settled at the end under reduced motion, with the slowest-stage callout", () => {
-    render(<RunReplay timeline={makeTimeline()} motion="reduced" />);
+    renderWithIntl(<RunReplay timeline={makeTimeline()} motion="reduced" />);
     const slider = screen.getByRole("slider");
     expect(slider.getAttribute("aria-valuenow")).toBe("913");
     expect(screen.getByRole("button", { name: /play replay/i })).toBeDisabled();
@@ -22,7 +24,7 @@ describe("RunReplay", () => {
   });
 
   it("steps between stage boundaries with the arrow keys", () => {
-    render(<RunReplay timeline={makeTimeline()} motion="reduced" />);
+    renderWithIntl(<RunReplay timeline={makeTimeline()} motion="reduced" />);
     const slider = screen.getByRole("slider");
     fireEvent.keyDown(slider, { key: "Home" });
     expect(slider.getAttribute("aria-valuenow")).toBe("0");
@@ -36,20 +38,22 @@ describe("RunReplay", () => {
   });
 
   it("shows who decided a gate once the playhead leaves it", () => {
-    render(<RunReplay timeline={makeTimeline()} motion="reduced" />);
+    renderWithIntl(<RunReplay timeline={makeTimeline()} motion="reduced" />);
     expect(screen.getAllByText(/approved by reviewer@example.com/).length).toBeGreaterThan(0);
   });
 
   it("selects a stage with Enter and jumps to its start", () => {
     const onSelectStage = vi.fn();
-    render(<RunReplay timeline={makeTimeline()} motion="reduced" onSelectStage={onSelectStage} />);
+    renderWithIntl(
+      <RunReplay timeline={makeTimeline()} motion="reduced" onSelectStage={onSelectStage} />
+    );
     fireEvent.keyDown(screen.getByRole("button", { name: /^Scan/ }), { key: "Enter" });
     expect(onSelectStage).toHaveBeenCalledWith("st2");
     expect(screen.getByRole("slider").getAttribute("aria-valuenow")).toBe("306");
   });
 
   it("groups a looping run by round and jumps to where a loop sent work back", () => {
-    render(<RunReplay timeline={makeFeatureTimeline()} motion="reduced" />);
+    renderWithIntl(<RunReplay timeline={makeFeatureTimeline()} motion="reduced" />);
     const rounds = screen.getByRole("list", { name: "Rounds" }).querySelectorAll("li");
     expect(rounds).toHaveLength(4);
     expect(rounds[0].textContent).toBe("Round 1: Plan, Code, Test failed");
@@ -68,7 +72,7 @@ describe("RunReplay", () => {
   });
 
   it("draws a fan-out's branches as parallel bars", () => {
-    render(<RunReplay timeline={makeFanoutTimeline()} motion="reduced" />);
+    renderWithIntl(<RunReplay timeline={makeFanoutTimeline()} motion="reduced" />);
     const bars = screen.getAllByRole("button", { name: /\(branch\)/ });
     expect(bars).toHaveLength(6);
     expect(bars[4].getAttribute("aria-label")).toBe("Source 5 (branch): failed, 1m 30s");

@@ -1,6 +1,7 @@
 import type { AppEdge, AppEvent, AppNode, AppNodeRole, AppSnapshot } from "../core/app-model";
 import { iso, type Point } from "../core/iso";
 import type { Health } from "../core/semantics";
+import type { VizT } from "../core/viz-t";
 
 /**
  * Where things sit in the two generic app renderers (AppIsometric, AppGraph),
@@ -34,26 +35,24 @@ export const LAYER: Record<AppNodeRole, 0 | 1 | 2> = {
   external: 2,
 };
 
-export const ROLE_TAG: Record<AppNodeRole, string> = {
-  ingress: "ingress",
-  trigger: "trigger",
-  schedule: "schedule",
-  service: "service",
-  worker: "worker",
-  function: "function",
-  agent: "agent",
-  data: "data",
-  queue: "queue",
-  external: "external",
-};
-
-export function nodeLabel(node: AppNode, h: Health, invokes: number, actions: number): string {
-  const parts = [`${node.name} (${node.role})`, h, `load ${Math.round(node.load * 100)}%`];
-  if (node.replicas) parts.push(`${node.replicas.ready} of ${node.replicas.desired} replicas`);
-  if (node.rps !== undefined) parts.push(`${Math.round(node.rps)} per second`);
-  if (invokes) parts.push(`${invokes} invocations in 12 s`);
-  if (actions) parts.push(`${actions} actions in 12 s`);
-  return parts.join(", ");
+export function nodeLabel(
+  node: AppNode,
+  h: Health,
+  invokes: number,
+  actions: number,
+  t: VizT
+): string {
+  const parts = [
+    t("graph.nodeName", { name: node.name, role: t(`roles.${node.role}`) }),
+    t(`healthInline.${h}`),
+    t("loadPct", { pct: Math.round(node.load * 100) }),
+  ];
+  if (node.replicas)
+    parts.push(t("graph.replicas", { ready: node.replicas.ready, desired: node.replicas.desired }));
+  if (node.rps !== undefined) parts.push(t("graph.perSecond", { rps: Math.round(node.rps) }));
+  if (invokes) parts.push(t("graph.invocations", { count: invokes }));
+  if (actions) parts.push(t("graph.actions", { count: actions }));
+  return parts.join(t("listSeparator"));
 }
 
 export function truncate(s: string, n: number): string {
@@ -106,21 +105,26 @@ export function recency(snapshot: AppSnapshot, e: AppEvent | undefined): number 
 }
 
 /** "9 workloads, 1 failing, 3 busy, 2 edges erroring" for the aria-label. */
-export function describeApp(snapshot: AppSnapshot): string {
+export function describeApp(snapshot: AppSnapshot, t: VizT): string {
   const count = (h: Health) => snapshot.nodes.filter((n) => n.health === h).length;
   const busy = snapshot.nodes.filter((n) => n.health !== "failing" && n.load >= BUSY_LOAD).length;
   const erroring = snapshot.edges.filter((e) => e.errorRate > ERROR_EDGE).length;
-  const parts = [`${snapshot.app.name}: ${snapshot.nodes.length} nodes`];
-  if (count("failing")) parts.push(`${count("failing")} failing`);
-  if (count("degraded")) parts.push(`${count("degraded")} degraded`);
-  if (busy) parts.push(`${busy} busy`);
-  if (count("idle")) parts.push(`${count("idle")} idle`);
+  const parts = [
+    t("appSummary", {
+      app: snapshot.app.name,
+      summary: t("nouns.nodes", { count: snapshot.nodes.length }),
+    }),
+  ];
+  if (count("failing")) parts.push(t("counts.failing", { count: count("failing") }));
+  if (count("degraded")) parts.push(t("counts.degraded", { count: count("degraded") }));
+  if (busy) parts.push(t("counts.busy", { count: busy }));
+  if (count("idle")) parts.push(t("counts.idle", { count: count("idle") }));
   parts.push(
     erroring
-      ? `${erroring} of ${snapshot.edges.length} connections erroring`
-      : `${snapshot.edges.length} connections healthy`
+      ? t("graph.erroring", { erroring, total: snapshot.edges.length })
+      : t("graph.connectionsHealthy", { count: snapshot.edges.length })
   );
-  return parts.join(", ");
+  return parts.join(t("listSeparator"));
 }
 
 /**
