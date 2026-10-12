@@ -139,14 +139,14 @@ Mutation = strawberry.type(
 # Schema instance
 # ---------------------------------------------------------------------------
 
-from core.schema.audit import MutationAuditExtension, SecretSafeSchema
+from core.schema.audit import MutationAuditExtension, PermissionDeniedExtension, SecretSafeSchema
 from core.schema.subscriptions import Subscription
 
 schema = SecretSafeSchema(
     query=Query,
     mutation=Mutation,
     subscription=Subscription,
-    extensions=[DjangoOptimizerExtension, MutationAuditExtension],
+    extensions=[DjangoOptimizerExtension, MutationAuditExtension, PermissionDeniedExtension],
 )
 
 

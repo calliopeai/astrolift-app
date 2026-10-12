@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- A refused permission reads the same on every client: GraphQL errors raised by a permission check now carry `extensions.code = "PERMISSION_DENIED"` (the code mutation envelopes already use) with `extensions.reason` and `extensions.permission`; the message is unchanged. The CLI and web can tell a refusal from any other failure and show why (#1867).
+
 - Every tab inside an app or agent offers actions from that app's own permissions, not the account's: the header (deploy, archive, delete), Settings sections (resync, retention, environments, managed services, archive, the danger zone) and Access (tokens, security, edge). A grant held on another project no longer offers an action this app refuses. Account grants only bridge the first load (`useAppCan`, fed by the frame) (#1867).
 
 - A cluster says what the viewer may do to it (`viewerPermissions`, from the checker the cluster mutations use, at the owning organization). A shared cluster's writes are the platform operator's, so a tenant sees read only. Cluster settings now offer manage, update, users and unregister only where the cluster and the account's current grants both allow them; before, an org admin was offered actions on a shared cluster that the server refuses (#1867).
