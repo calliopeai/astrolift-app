@@ -791,8 +791,9 @@ class ClusterModelMutations:
         # Action-safety gate (#2202): fresh verification, on by default.
         from astrolift_identity.action_safety import gate as _safety_gate
 
+        target = live_cluster_model_by_guid(input.id) if in_current_org(input.organization_id) else None
         deny = _safety_gate(
-            info, "managed_service.deprovision", app=None, resolver_name="deprovision_cluster_model"
+            info, "managed_service.deprovision", target=target, resolver_name="deprovision_cluster_model"
         )
         if deny is not None:
             return deny

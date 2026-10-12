@@ -60,7 +60,12 @@ from astrolift_identity.schema.access_ux import (
     PrincipalType,
     condition_catalog,
 )
-from astrolift_identity.schema.action_safety import ActionSafetyRequirementType, requirements_for_viewer
+from astrolift_identity.schema.action_safety import (
+    ActionApprovalRequestType,
+    ActionSafetyRequirementType,
+    requests_for_viewer,
+    requirements_for_viewer,
+)
 from astrolift_identity.schema.identity_csv import (
     IdentityCsvExport,
     bindings_csv,
@@ -1320,6 +1325,19 @@ class IdentityQuery:
         self, info: Info, app_slug: str | None = None
     ) -> list[ActionSafetyRequirementType]:
         return requirements_for_viewer(app_slug)
+
+    @strawberry.field(
+        description=(
+            "Approval requests for gated actions in this organization (#2202), newest first; "
+            "pass a status (pending, approved, rejected, cancelled, expired, consumed) to filter."
+        )
+    )
+    @require_permission(Permission.ORG_READ, scope=identity_organization_scope(Permission.ORG_READ))
+    @tenant_scoped()
+    def astrolift_action_approval_requests(
+        self, info: Info, status: str | None = None
+    ) -> list[ActionApprovalRequestType]:
+        return requests_for_viewer(status)
 
     @strawberry.field(
         description=(

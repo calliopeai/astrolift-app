@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- A destructive delete can wait for approval: an organization, team, app or person rule can add approval to deregistering or tearing down an app, decommissioning or unregistering a cluster, or deprovisioning a managed service, with a quorum of up to five (the largest asked for wins). The mutation then records a request and refuses with `APPROVAL_REQUIRED` (carrying `approvalRequestId`); other admins with the authority the action needs approve or reject it under Admin › Permissions › Action safety, and the requester runs it again, which spends the approved request once. Requests bind to the action, target and requester, expire after 24 hours, and an API token does not skip them. An admin may approve their own only where every applicable rule allows it, with organization-admin authority, and that is audited as a self-approval. Secret changes keep the app's own secret-approval setting. A rule write now changes only the switches it sends (#2202).
+
+- The action-safety gates cover every mutation in the first cut: `tearDownApp`, `unregisterTenantCluster` and `deprovisionProjectManagedService` join the deletes; revealing an agent, agent-bundle or project-bundle secret joins secret reveal; rotating or bulk-importing app secrets, and setting or deleting agent, agent-bundle, project-bundle and pipeline secret values, join secret change (#2202).
+
 - Opening a console in a workload is an action-safety gate too, on by default: a browser session that has not freshly stepped up is closed with 4428 before the relay accepts, and the console's terminal opens the step-up prompt and attaches again once it succeeds. API bearers (`astro exec`) pass, as for step-up; an organization can turn the gate off like the others (#2202).
 
 - Admin › Permissions › Action safety lists every gated action with what it asks (confirmation and a fresh sign-in) and two organization switches: ask before it, and let admins approve their own. A row a team, app or person has also set says so, since narrower rules can only add. Changing a switch asks for a fresh sign-in, through the existing prompt (#2203).

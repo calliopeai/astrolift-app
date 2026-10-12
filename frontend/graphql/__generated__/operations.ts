@@ -329,6 +329,29 @@ export type AstroliftAccessTask = {
   label: Scalars['String']['output'];
 };
 
+export type AstroliftActionApprovalRequest = {
+  action: Scalars['String']['output'];
+  allowSelfApproval: Scalars['Boolean']['output'];
+  appSlug?: Maybe<Scalars['String']['output']>;
+  approvals: Scalars['Int']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  expiresAt: Scalars['DateTime']['output'];
+  id: Scalars['GUID']['output'];
+  label: Scalars['String']['output'];
+  requesterEmail?: Maybe<Scalars['String']['output']>;
+  requiredApprovals: Scalars['Int']['output'];
+  status: Scalars['String']['output'];
+  targetKind: Scalars['String']['output'];
+  targetLabel: Scalars['String']['output'];
+  viewerIsRequester: Scalars['Boolean']['output'];
+};
+
+export type AstroliftActionApprovalRequestMutationResult = {
+  data?: Maybe<AstroliftActionApprovalRequest>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftActionPermission = {
   allowed: Scalars['Boolean']['output'];
   code: Scalars['String']['output'];
@@ -338,9 +361,12 @@ export type AstroliftActionPermission = {
 export type AstroliftActionSafetyRequirement = {
   action: Scalars['String']['output'];
   allowSelfApproval: Scalars['Boolean']['output'];
+  approvable: Scalars['Boolean']['output'];
+  approval: Scalars['Boolean']['output'];
   confirmation: Scalars['Boolean']['output'];
   enabled: Scalars['Boolean']['output'];
   label: Scalars['String']['output'];
+  minimumApprovals: Scalars['Int']['output'];
   sources: Array<Scalars['String']['output']>;
   verification: Scalars['Boolean']['output'];
 };
@@ -349,6 +375,8 @@ export type AstroliftActionSafetyRule = {
   action: Scalars['String']['output'];
   allowSelfApproval?: Maybe<Scalars['Boolean']['output']>;
   enabled?: Maybe<Scalars['Boolean']['output']>;
+  minimumApprovals?: Maybe<Scalars['Int']['output']>;
+  requireApproval?: Maybe<Scalars['Boolean']['output']>;
   scopeId?: Maybe<Scalars['GUID']['output']>;
   scopeKind: Scalars['String']['output'];
 };
@@ -6984,6 +7012,11 @@ export type DataImportUploadResult = {
   publicUrl?: Maybe<Scalars['String']['output']>;
 };
 
+export type DecideActionApprovalInput = {
+  id: Scalars['GUID']['input'];
+  reason: InputMaybe<Scalars['String']['input']>;
+};
+
 export type DecideModelConnectionRequestInput = {
   id: Scalars['GUID']['input'];
   ifMatchVersion: Scalars['Int']['input'];
@@ -8664,6 +8697,7 @@ export type Mutation = {
   adoptManagedResource: ManagedresourceadoptionpayloadMutationResult;
   adoptRepoCiWorkflow: AstroliftCiWorkflowSyncStatusMutationResult;
   applyStagedManifest: ManifeststagepayloadMutationResult;
+  approveActionRequest: AstroliftActionApprovalRequestMutationResult;
   approveDeployment: AstroliftDeploymentMutationResult;
   approveDeploymentByToken: AstroliftDeploymentMutationResult;
   approveModelConnectionRequest: ModelConnectionRequestMutationResult;
@@ -8696,6 +8730,7 @@ export type Mutation = {
   bulkResyncManifest: BulkOperationResult;
   bulkRevokeAstroliftRoleBindings: AstroliftBulkRevokeRoleBindingsPayloadMutationResult;
   bulkRollingRestart: BulkOperationResult;
+  cancelActionRequest: AstroliftActionApprovalRequestMutationResult;
   cancelAstroliftDeregister: AstroliftCancelDeregisterPayloadMutationResult;
   cancelModelConnectionRequest: ModelConnectionRequestMutationResult;
   cancelPipelineRun: AstroliftPipelineRunMutationResult;
@@ -8917,6 +8952,7 @@ export type Mutation = {
   registerTenantCluster: AstroliftTenantClusterMutationResult;
   registerZentinelleCluster: AstroliftZentinelleClusterGatewayMutationResult;
   reissueManagedDomainCert: ReissueManagedDomainCertPayloadMutationResult;
+  rejectActionRequest: AstroliftActionApprovalRequestMutationResult;
   rejectDeployment: AstroliftDeploymentMutationResult;
   rejectDeploymentByToken: AstroliftDeploymentMutationResult;
   rejectModelConnectionRequest: ModelConnectionRequestMutationResult;
@@ -9166,6 +9202,11 @@ export type MutationApplyStagedManifestArgs = {
 };
 
 
+export type MutationApproveActionRequestArgs = {
+  input: DecideActionApprovalInput;
+};
+
+
 export type MutationApproveDeploymentArgs = {
   input: DeploymentByIdInput;
 };
@@ -9329,6 +9370,11 @@ export type MutationBulkRevokeAstroliftRoleBindingsArgs = {
 
 export type MutationBulkRollingRestartArgs = {
   input: BulkRollingRestartInput;
+};
+
+
+export type MutationCancelActionRequestArgs = {
+  input: DecideActionApprovalInput;
 };
 
 
@@ -10343,6 +10389,11 @@ export type MutationReissueManagedDomainCertArgs = {
 };
 
 
+export type MutationRejectActionRequestArgs = {
+  input: DecideActionApprovalInput;
+};
+
+
 export type MutationRejectDeploymentArgs = {
   input: AbortDeploymentInput;
 };
@@ -11292,6 +11343,7 @@ export type MutationWithdrawSecretChangeArgs = {
 };
 
 export type MutationError = {
+  approvalRequestId?: Maybe<Scalars['String']['output']>;
   code: Scalars['String']['output'];
   currentVersion?: Maybe<Scalars['Int']['output']>;
   field?: Maybe<Scalars['String']['output']>;
@@ -11738,6 +11790,8 @@ export type Query = {
   astroliftAccessOn: AstroliftAccessEntryPage;
   /** Easy-mode starting points (#2272): each names the stock role it grants per scope and, from that role's permissions, the tasks it allows and excludes. Never super-admin. */
   astroliftAccessPresets: Array<AstroliftAccessPreset>;
+  /** Approval requests for gated actions in this organization (#2202), newest first; pass a status (pending, approved, rejected, cancelled, expired, consumed) to filter. */
+  astroliftActionApprovalRequests: Array<AstroliftActionApprovalRequest>;
   /** What each gated action asks of the viewer (#2202), optionally on one app: confirmation, fresh verification and whether an admin may approve their own. */
   astroliftActionSafety: Array<AstroliftActionSafetyRequirement>;
   astroliftActiveIdentityProvider?: Maybe<AstroliftIdentityProvider>;
@@ -12391,6 +12445,11 @@ export type QueryAstroliftAccessOnArgs = {
   scopeId: Scalars['String']['input'];
   scopeKind: Scalars['String']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftActionApprovalRequestsArgs = {
+  status?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -15079,6 +15138,8 @@ export type SetActionSafetyRuleInput = {
   action: Scalars['String']['input'];
   allowSelfApproval: InputMaybe<Scalars['Boolean']['input']>;
   enabled: InputMaybe<Scalars['Boolean']['input']>;
+  minimumApprovals: InputMaybe<Scalars['Int']['input']>;
+  requireApproval: InputMaybe<Scalars['Boolean']['input']>;
   scopeId: InputMaybe<Scalars['GUID']['input']>;
   scopeKind: Scalars['String']['input'];
 };
@@ -18883,7 +18944,28 @@ export type SetActionSafetyRuleMutationVariables = Exact<{
 }>;
 
 
-export type SetActionSafetyRuleMutation = { setActionSafetyRule: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { action: string, scopeKind: string, enabled?: boolean | null, allowSelfApproval?: boolean | null } | null } };
+export type SetActionSafetyRuleMutation = { setActionSafetyRule: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { action: string, scopeKind: string, enabled?: boolean | null, allowSelfApproval?: boolean | null, requireApproval?: boolean | null, minimumApprovals?: number | null } | null } };
+
+export type ApproveActionRequestMutationVariables = Exact<{
+  input: DecideActionApprovalInput;
+}>;
+
+
+export type ApproveActionRequestMutation = { approveActionRequest: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, action: string, label: string, targetKind: string, targetLabel: string, appSlug?: string | null, requesterEmail?: string | null, viewerIsRequester: boolean, status: string, requiredApprovals: number, approvals: number, allowSelfApproval: boolean, createdAt: string, expiresAt: string } | null } };
+
+export type RejectActionRequestMutationVariables = Exact<{
+  input: DecideActionApprovalInput;
+}>;
+
+
+export type RejectActionRequestMutation = { rejectActionRequest: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, action: string, label: string, targetKind: string, targetLabel: string, appSlug?: string | null, requesterEmail?: string | null, viewerIsRequester: boolean, status: string, requiredApprovals: number, approvals: number, allowSelfApproval: boolean, createdAt: string, expiresAt: string } | null } };
+
+export type CancelActionRequestMutationVariables = Exact<{
+  input: DecideActionApprovalInput;
+}>;
+
+
+export type CancelActionRequestMutation = { cancelActionRequest: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, action: string, label: string, targetKind: string, targetLabel: string, appSlug?: string | null, requesterEmail?: string | null, viewerIsRequester: boolean, status: string, requiredApprovals: number, approvals: number, allowSelfApproval: boolean, createdAt: string, expiresAt: string } | null } };
 
 export type GetMyPermissionsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -18900,7 +18982,14 @@ export type ActionSafetyQueryVariables = Exact<{
 }>;
 
 
-export type ActionSafetyQuery = { astroliftActionSafety: Array<{ action: string, label: string, enabled: boolean, confirmation: boolean, verification: boolean, allowSelfApproval: boolean, sources: Array<string> }> };
+export type ActionSafetyQuery = { astroliftActionSafety: Array<{ action: string, label: string, enabled: boolean, confirmation: boolean, verification: boolean, allowSelfApproval: boolean, approvable: boolean, approval: boolean, minimumApprovals: number, sources: Array<string> }> };
+
+export type ActionApprovalRequestsQueryVariables = Exact<{
+  status?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ActionApprovalRequestsQuery = { astroliftActionApprovalRequests: Array<{ id: string, action: string, label: string, targetKind: string, targetLabel: string, appSlug?: string | null, requesterEmail?: string | null, viewerIsRequester: boolean, status: string, requiredApprovals: number, approvals: number, allowSelfApproval: boolean, createdAt: string, expiresAt: string }> };
 
 export type CreatePipelineMutationVariables = Exact<{
   input: CreatePipelineInput;

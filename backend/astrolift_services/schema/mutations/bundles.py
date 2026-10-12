@@ -272,6 +272,12 @@ class SecretBundleMutations:
         bundle = _project_bundle_for_caller(input.bundle_id)
         if bundle is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project secret bundle not found")
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
+
+        deny = _safety_gate(info, "secret.change", resolver_name="set_project_bundle_secret_value")
+        if deny is not None:
+            return deny
         key = (input.key or "").strip()
         if not valid_agent_env_var(key) or len(key) > 255:
             return gql_failure(ErrorCode.VALIDATION.value, "key must be env-var safe", field="key")
@@ -318,6 +324,12 @@ class SecretBundleMutations:
         bundle = _project_bundle_for_caller(input.bundle_id)
         if bundle is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project secret bundle not found")
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
+
+        deny = _safety_gate(info, "secret.change", resolver_name="delete_project_bundle_secret_value")
+        if deny is not None:
+            return deny
         backend, _caps, err = _project_bundle_backend(bundle)
         if err is not None:
             return err
@@ -359,6 +371,12 @@ class SecretBundleMutations:
         bundle = _project_bundle_for_caller(input.bundle_id)
         if bundle is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project secret bundle not found")
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
+
+        deny = _safety_gate(info, "secret.reveal", resolver_name="reveal_project_bundle_secret_value")
+        if deny is not None:
+            return deny
         backend, capabilities, err = _project_bundle_backend(bundle)
         if err is not None:
             return err

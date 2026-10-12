@@ -321,6 +321,29 @@ type AstroliftAccessTask {
   granted: Boolean!
 }
 
+type AstroliftActionApprovalRequest {
+  id: GUID!
+  action: String!
+  label: String!
+  targetKind: String!
+  targetLabel: String!
+  appSlug: String
+  requesterEmail: String
+  viewerIsRequester: Boolean!
+  status: String!
+  requiredApprovals: Int!
+  approvals: Int!
+  allowSelfApproval: Boolean!
+  createdAt: DateTime!
+  expiresAt: DateTime!
+}
+
+type AstroliftActionApprovalRequestMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftActionApprovalRequest
+}
+
 type AstroliftActionPermission {
   allowed: Boolean!
   code: String!
@@ -334,6 +357,9 @@ type AstroliftActionSafetyRequirement {
   confirmation: Boolean!
   verification: Boolean!
   allowSelfApproval: Boolean!
+  approvable: Boolean!
+  approval: Boolean!
+  minimumApprovals: Int!
   sources: [String!]!
 }
 
@@ -343,6 +369,8 @@ type AstroliftActionSafetyRule {
   scopeId: GUID
   enabled: Boolean
   allowSelfApproval: Boolean
+  requireApproval: Boolean
+  minimumApprovals: Int
 }
 
 type AstroliftActionSafetyRuleMutationResult {
@@ -7432,6 +7460,11 @@ scalar Date
 """Date with time (isoformat)"""
 scalar DateTime
 
+input DecideActionApprovalInput {
+  id: GUID!
+  reason: String = null
+}
+
 input DecideModelConnectionRequestInput {
   id: GUID!
   ifMatchVersion: Int!
@@ -9358,6 +9391,9 @@ type Mutation {
   attestSession(input: AttestSessionInput!): AstroliftAttestationResultMutationResult!
   assertSession(input: AssertSessionInput!): AstroliftAttestationResultMutationResult!
   setActionSafetyRule(input: SetActionSafetyRuleInput!): AstroliftActionSafetyRuleMutationResult!
+  approveActionRequest(input: DecideActionApprovalInput!): AstroliftActionApprovalRequestMutationResult!
+  rejectActionRequest(input: DecideActionApprovalInput!): AstroliftActionApprovalRequestMutationResult!
+  cancelActionRequest(input: DecideActionApprovalInput!): AstroliftActionApprovalRequestMutationResult!
   registerApp(input: RegisterAppInput!): AstroliftRegisteredAppMutationResult!
   registerAgentRepo(input: RegisterAgentRepoInput!): AstroliftRegisterAgentRepoResultMutationResult!
   registerAppRepo(input: RegisterAppRepoInput!): AstroliftRegisterAppRepoResultMutationResult!
@@ -9753,6 +9789,7 @@ type MutationError {
   currentVersion: Int
   requestedVersion: Int
   supportedMethods: [String!]
+  approvalRequestId: String
 }
 
 """Standard mutation result with ok flag and validation errors."""
@@ -10255,6 +10292,11 @@ type Query {
   What each gated action asks of the viewer (#2202), optionally on one app: confirmation, fresh verification and whether an admin may approve their own.
   """
   astroliftActionSafety(appSlug: String = null): [AstroliftActionSafetyRequirement!]!
+
+  """
+  Approval requests for gated actions in this organization (#2202), newest first; pass a status (pending, approved, rejected, cancelled, expired, consumed) to filter.
+  """
+  astroliftActionApprovalRequests(status: String = null): [AstroliftActionApprovalRequest!]!
 
   """
   Easy-mode starting points (#2272): each names the stock role it grants per scope and, from that role's permissions, the tasks it allows and excludes. Never super-admin.
@@ -11230,6 +11272,8 @@ input SetActionSafetyRuleInput {
   scopeId: GUID = null
   enabled: Boolean = null
   allowSelfApproval: Boolean = null
+  requireApproval: Boolean = null
+  minimumApprovals: Int = null
 }
 
 input SetActiveIdentityProviderInput {

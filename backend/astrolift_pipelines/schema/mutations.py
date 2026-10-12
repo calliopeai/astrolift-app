@@ -113,6 +113,17 @@ def _change_secret(info, input, *, delete=False):
             )
             if pipeline is None:
                 return gql_failure(ErrorCode.NOT_FOUND.value, "Pipeline is unavailable")
+            # Action-safety gate (#2202): fresh verification, on by default.
+            from astrolift_identity.action_safety import gate as _safety_gate
+
+            deny = _safety_gate(
+                info,
+                "secret.change",
+                app=pipeline.registered_app,
+                resolver_name="delete_pipeline_secret" if delete else "set_pipeline_secret",
+            )
+            if deny is not None:
+                return deny
             # The entry gate ran before acquiring the row lock. Recheck the
             # current owner so an intervening app association cannot widen it.
             require_permission(*_SECRET_WRITE_PERMISSIONS, scope=_SECRET_WRITE_SCOPE)(

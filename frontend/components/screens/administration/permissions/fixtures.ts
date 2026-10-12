@@ -347,7 +347,8 @@ export const ACCESS_PRESETS_FIXTURE = [
   },
 ];
 
-/** Action safety (#2203): one gate off for the org, one re-enabled for an app. */
+/** Action safety (#2203): one gate off for the org, one re-enabled for an app,
+ * approval added to deregistering apps with a two-person quorum. */
 export const ACTION_SAFETY_FIXTURE = [
   {
     action: "app.deregister",
@@ -355,7 +356,22 @@ export const ACTION_SAFETY_FIXTURE = [
     enabled: true,
     confirmation: true,
     verification: true,
+    allowSelfApproval: false,
+    approvable: true,
+    approval: true,
+    minimumApprovals: 2,
+    sources: ["ORG"],
+  },
+  {
+    action: "cluster.decommission",
+    label: "Decommission a cluster",
+    enabled: true,
+    confirmation: true,
+    verification: true,
     allowSelfApproval: true,
+    approvable: true,
+    approval: false,
+    minimumApprovals: 1,
     sources: [],
   },
   {
@@ -365,6 +381,9 @@ export const ACTION_SAFETY_FIXTURE = [
     confirmation: true,
     verification: true,
     allowSelfApproval: true,
+    approvable: false,
+    approval: false,
+    minimumApprovals: 1,
     sources: [],
   },
   {
@@ -374,6 +393,9 @@ export const ACTION_SAFETY_FIXTURE = [
     confirmation: false,
     verification: false,
     allowSelfApproval: true,
+    approvable: false,
+    approval: false,
+    minimumApprovals: 1,
     sources: ["ORG"],
   },
   {
@@ -383,6 +405,45 @@ export const ACTION_SAFETY_FIXTURE = [
     confirmation: true,
     verification: true,
     allowSelfApproval: false,
+    approvable: false,
+    approval: false,
+    minimumApprovals: 1,
     sources: ["ORG", "APP:12"],
+  },
+];
+
+/** Open approval requests (#2202): one waiting on the viewer, one of theirs approved. */
+export const ACTION_APPROVAL_REQUESTS_FIXTURE = [
+  {
+    id: "0192a3b4-0000-7000-8000-000000000001",
+    action: "app.deregister",
+    label: "Deregister an app",
+    targetKind: "app",
+    targetLabel: "billing-api",
+    appSlug: "billing-api",
+    requesterEmail: "dana@example.com",
+    viewerIsRequester: false,
+    status: "pending",
+    requiredApprovals: 2,
+    approvals: 1,
+    allowSelfApproval: false,
+    createdAt: "2026-10-11T18:02:00Z",
+    expiresAt: "2026-10-12T18:02:00Z",
+  },
+  {
+    id: "0192a3b4-0000-7000-8000-000000000002",
+    action: "cluster.decommission",
+    label: "Decommission a cluster",
+    targetKind: "cluster",
+    targetLabel: "staging-east",
+    appSlug: null,
+    requesterEmail: "you@example.com",
+    viewerIsRequester: true,
+    status: "approved",
+    requiredApprovals: 1,
+    approvals: 1,
+    allowSelfApproval: true,
+    createdAt: "2026-10-11T17:40:00Z",
+    expiresAt: "2026-10-12T17:40:00Z",
   },
 ];

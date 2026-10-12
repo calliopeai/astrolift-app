@@ -33,6 +33,10 @@ class ActionSafetyRule(BaseCoreModel):
     action = models.CharField(max_length=64)
     enabled = models.BooleanField(null=True, blank=True)
     allow_self_approval = models.BooleanField(null=True, blank=True)
+    # Approval is off by default; any applicable scope can add it, and the
+    # largest quorum asked for wins.
+    require_approval = models.BooleanField(null=True, blank=True)
+    minimum_approvals = models.PositiveSmallIntegerField(null=True, blank=True)
 
     class Meta:
         constraints = [

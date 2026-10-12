@@ -37,3 +37,6 @@ class MutationErrorType:
     # password form for SSO users who can't satisfy it (unusable
     # password hash). Null on every other envelope.
     supported_methods: list[str] | None = None
+    # #2202 — the approval request an ``APPROVAL_REQUIRED`` envelope is
+    # waiting on. Null on every other envelope.
+    approval_request_id: str | None = None

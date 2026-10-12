@@ -42,6 +42,7 @@ def captured():
         ("PERMISSION_DENIED", "DENY"),
         ("STEP_UP_REQUIRED", "DENY"),
         ("SECRET_APPROVAL_REQUIRED", "DENY"),
+        ("APPROVAL_REQUIRED", "DENY"),
         ("VALIDATION", "ALLOW"),
     ],
 )

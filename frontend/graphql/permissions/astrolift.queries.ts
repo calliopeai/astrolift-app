@@ -36,7 +36,31 @@ export const ACTION_SAFETY = gql`
       confirmation
       verification
       allowSelfApproval
+      approvable
+      approval
+      minimumApprovals
       sources
+    }
+  }
+`;
+
+export const ACTION_APPROVAL_REQUESTS = gql`
+  query ActionApprovalRequests($status: String) {
+    astroliftActionApprovalRequests(status: $status) {
+      id
+      action
+      label
+      targetKind
+      targetLabel
+      appSlug
+      requesterEmail
+      viewerIsRequester
+      status
+      requiredApprovals
+      approvals
+      allowSelfApproval
+      createdAt
+      expiresAt
     }
   }
 `;
