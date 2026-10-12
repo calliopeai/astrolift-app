@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -35,6 +36,7 @@ export interface StartBoxInput {
  * mutations. The data half of BoxesTabView.
  */
 export function useAgentBoxes(orgId: string) {
+  const t = useTranslations("agentBoxes");
   const [includeEnded, setIncludeEnded] = React.useState(false);
   const list = useListState(AGENT_BOXES_LIST);
 
@@ -85,14 +87,14 @@ export function useAgentBoxes(orgId: string) {
       });
       const result = resp?.ensureAgentBox;
       if (!result?.ok) {
-        throw new Error(result?.errors?.[0]?.message ?? "Could not start the box");
+        throw new Error(result?.errors?.[0]?.message ?? t("toasts.startFailed"));
       }
-      toast.success(`Box ${result.data?.slug ?? ""} is starting`);
+      toast.success(t("toasts.starting", { slug: result.data?.slug ?? "" }));
       refetch();
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      toast.error("Couldn't start the box", { description: message });
+      toast.error(t("toasts.startFailed"), { description: message });
       return false;
     }
   }
@@ -102,19 +104,19 @@ export function useAgentBoxes(orgId: string) {
       const { data: resp } = await destroyBox({ variables: { slug: box.slug } });
       const result = resp?.destroyAgentBox;
       if (!result?.ok) {
-        throw new Error(result?.errors?.[0]?.message ?? "Could not destroy the box");
+        throw new Error(result?.errors?.[0]?.message ?? t("toasts.destroyFailed"));
       }
-      toast.success(`Destroyed ${box.slug}`);
+      toast.success(t("toasts.destroyed", { slug: box.slug }));
       refetch();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      toast.error("Couldn't destroy the box", { description: message });
+      toast.error(t("toasts.destroyFailed"), { description: message });
     }
   }
 
   function copyAttach(line: string) {
     void navigator.clipboard.writeText(line);
-    toast.success("Attach command copied");
+    toast.success(t("toasts.copied"));
   }
 
   return {

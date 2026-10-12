@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 export interface FlowStep {
@@ -17,8 +18,9 @@ export interface FlowStepsProps {
  * context slot (spec 44 §5.4), as the Register cluster page shows them. Pure.
  */
 export function FlowSteps({ steps, current }: FlowStepsProps) {
+  const tr = useTranslations("agentSkills.common");
   return (
-    <ol aria-label="Steps" className="inline-flex min-w-0 flex-wrap items-center gap-2">
+    <ol aria-label={tr("steps")} className="inline-flex min-w-0 flex-wrap items-center gap-2">
       {steps.map((s, i) => {
         const n = i + 1;
         return (

@@ -1,6 +1,7 @@
 "use client";
 
 import { BookOpenIcon, WrenchIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
@@ -22,10 +23,12 @@ interface ListProps<T> {
 export type AgentSkillsListProps = ListProps<AstroliftAgentSkill>;
 export type AgentToolsListProps = ListProps<AgentToolRow>;
 
-const SKILL_COLUMNS: Column<AstroliftAgentSkill>[] = [
+type Translate = ReturnType<typeof useTranslations<"agentSkillsTab">>;
+
+const skillColumns = (t: Translate): Column<AstroliftAgentSkill>[] => [
   {
     id: "name",
-    header: "Skill",
+    header: t("skill"),
     sortKey: "name",
     cell: (b) => (
       <span className="flex min-w-0 flex-col gap-0.5">
@@ -38,20 +41,20 @@ const SKILL_COLUMNS: Column<AstroliftAgentSkill>[] = [
   },
   {
     id: "slug",
-    header: "Slug",
+    header: t("slug"),
     cellClassName: "text-muted-foreground font-mono text-xs",
     cell: (b) => <span className="block max-w-64 truncate">{b.skill.slug}</span>,
   },
   {
     id: "version",
-    header: "Version",
+    header: t("version"),
     width: "w-24",
     cellClassName: "text-muted-foreground font-mono text-xs",
     cell: (b) => `v${b.skill.skillVersion}`,
   },
   {
     id: "tools",
-    header: "Tools",
+    header: t("tools"),
     sortKey: "tools",
     width: "w-20",
     align: "right",
@@ -60,24 +63,24 @@ const SKILL_COLUMNS: Column<AstroliftAgentSkill>[] = [
   },
   {
     id: "status",
-    header: "Status",
+    header: t("status"),
     width: "w-36",
     cell: (b) => (
       <span className="flex flex-wrap gap-1">
         {b.skill.isGlobal && (
           <Badge variant="outline" className="text-xs">
-            Global
+            {t("global")}
           </Badge>
         )}
         <Badge variant={b.skill.isActive ? "secondary" : "outline"} className="text-xs">
-          {b.skill.isActive ? "Active" : "Inactive"}
+          {b.skill.isActive ? t("active") : t("inactive")}
         </Badge>
       </span>
     ),
   },
   {
     id: "position",
-    header: "Order",
+    header: t("order"),
     sortKey: "position",
     width: "w-20",
     align: "right",
@@ -86,10 +89,13 @@ const SKILL_COLUMNS: Column<AstroliftAgentSkill>[] = [
   },
 ];
 
-const TOOL_COLUMNS: Column<AgentToolRow>[] = [
+const toolColumns = (
+  t: Translate,
+  adapters: ReturnType<typeof useTranslations<"agentToolRegistry">>
+): Column<AgentToolRow>[] => [
   {
     id: "name",
-    header: "Tool",
+    header: t("tool"),
     sortKey: "name",
     cell: (r) => (
       <span className="flex min-w-0 flex-col gap-0.5">
@@ -102,24 +108,24 @@ const TOOL_COLUMNS: Column<AgentToolRow>[] = [
   },
   {
     id: "skill",
-    header: "Skill",
+    header: t("skill"),
     sortKey: "skill",
     cell: (r) => <span className="block max-w-48 truncate">{r.skill.name}</span>,
   },
   {
     id: "adapter",
-    header: "Adapter",
+    header: t("adapter"),
     sortKey: "adapter",
     width: "w-36",
     cell: (r) => (
       <Badge variant="secondary" className="text-xs">
-        {ADAPTER_LABELS[r.tool.adapter] ?? r.tool.adapter}
+        {ADAPTER_LABELS[r.tool.adapter] ? adapters(r.tool.adapter) : r.tool.adapter}
       </Badge>
     ),
   },
   {
     id: "handler",
-    header: "Handler",
+    header: t("handler"),
     cellClassName: "text-muted-foreground font-mono text-xs",
     cell: (r) =>
       r.tool.handlerRef ? (
@@ -127,7 +133,7 @@ const TOOL_COLUMNS: Column<AgentToolRow>[] = [
           {r.tool.handlerRef}
         </span>
       ) : (
-        "Not set"
+        t("notSet")
       ),
   },
 ];
@@ -145,12 +151,13 @@ export function AgentSkillsList({
   error,
   onRetry,
 }: AgentSkillsListProps) {
+  const t = useTranslations("agentSkillsTab");
   return (
     <ListPage<AstroliftAgentSkill>
       embedded
       list={list}
-      label="Skills"
-      columns={SKILL_COLUMNS}
+      label={t("skills")}
+      columns={skillColumns(t)}
       rows={rows}
       getRowId={(b) => b.skill.id}
       rowHref={(b) => `/agents/skills/${b.skill.id}`}
@@ -160,11 +167,10 @@ export function AgentSkillsList({
       totalCount={totalCount}
       empty={{
         icon: <BookOpenIcon className="size-5" />,
-        title: "No skills attached",
-        description:
-          "This agent has no skills bound to it yet. Skills and their tool definitions are managed in the org-wide registry.",
+        title: t("noSkills"),
+        description: t("noSkillsDescription"),
         actionHref: "/agents/skills",
-        actionLabel: "Skill registry",
+        actionLabel: t("skillRegistry"),
       }}
     />
   );
@@ -183,12 +189,14 @@ export function AgentToolsList({
   error,
   onRetry,
 }: AgentToolsListProps) {
+  const t = useTranslations("agentSkillsTab");
+  const adapters = useTranslations("agentToolRegistry");
   return (
     <ListPage<AgentToolRow>
       embedded
       list={list}
-      label="Tools"
-      columns={TOOL_COLUMNS}
+      label={t("tools")}
+      columns={toolColumns(t, adapters)}
       rows={rows}
       getRowId={(r) => `${r.skill.id}:${r.tool.id}`}
       rowHref={(r) => `/agents/tools/${r.tool.id}`}
@@ -198,11 +206,10 @@ export function AgentToolsList({
       totalCount={totalCount}
       empty={{
         icon: <WrenchIcon className="size-5" />,
-        title: "No tools",
-        description:
-          "None of this agent's skills carry a tool. Tools are defined on skills in the tool registry.",
+        title: t("noTools"),
+        description: t("noToolsDescription"),
         actionHref: "/agents/tools",
-        actionLabel: "Tool registry",
+        actionLabel: t("toolRegistry"),
       }}
     />
   );

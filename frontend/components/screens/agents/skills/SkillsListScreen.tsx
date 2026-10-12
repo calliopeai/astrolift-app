@@ -2,6 +2,7 @@
 
 import { BookOpenIcon, GitBranchIcon, MoreHorizontalIcon, PlusIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import type { Column, EmptyStateSpec } from "@/components/data-table";
@@ -56,19 +57,21 @@ export function SkillsListScreen({
   importSheet,
 }: SkillsListScreenProps) {
   const fmt = useFormatters();
+  const tr = useTranslations("agentSkills.list");
+  const common = useTranslations("agentSkills.common");
 
   const empty: EmptyStateSpec = {
     icon: <BookOpenIcon className="size-5" />,
-    title: "No skills defined",
-    description: "Skills package instructions and tools that agents draw on when running tasks.",
+    title: tr("emptyTitle"),
+    description: tr("emptyDescription"),
     actionHref: "/agents/skills/new",
-    actionLabel: "New skill",
+    actionLabel: tr("newSkill"),
   };
 
   const columns: Column<SkillListItem>[] = [
     {
       id: "skill",
-      header: "Skill",
+      header: common("skill"),
       sortKey: "name",
       cellClassName: "max-w-96",
       cell: (s) => (
@@ -84,7 +87,7 @@ export function SkillsListScreen({
     },
     {
       id: "description",
-      header: "Description",
+      header: common("description"),
       cellClassName: "max-w-80",
       cell: (s) =>
         s.description ? (
@@ -92,42 +95,42 @@ export function SkillsListScreen({
             {s.description}
           </span>
         ) : (
-          <span className="text-muted-foreground text-sm italic">No description</span>
+          <span className="text-muted-foreground text-sm italic">{common("noDescription")}</span>
         ),
     },
     {
       id: "status",
-      header: "Status",
+      header: tr("status"),
       cell: (s) => (
         <span className="inline-flex items-center gap-1.5 text-sm">
           <StatusDot status={s.isActive ? "ok" : "muted"} />
-          {s.isActive ? "Active" : "Inactive"}
+          {s.isActive ? common("active") : common("inactive")}
         </span>
       ),
     },
     {
       id: "scope",
-      header: "Scope",
+      header: tr("scope"),
       cell: (s) =>
         s.isGlobal ? (
-          <Badge variant="outline">Global</Badge>
+          <Badge variant="outline">{common("global")}</Badge>
         ) : (
-          <span className="text-muted-foreground text-sm">Organization</span>
+          <span className="text-muted-foreground text-sm">{common("organization")}</span>
         ),
     },
     {
       id: "version",
-      header: "Version",
+      header: tr("version"),
       sortKey: "version",
       cell: (s) => <span className="font-mono text-xs">v{s.skillVersion}</span>,
     },
     {
       id: "updated",
-      header: "Updated",
+      header: tr("updated"),
       sortKey: "updated",
       cell: (s) => (
         <span className="text-muted-foreground font-mono text-xs">
-          {s.updatedAt ? fmt.formatDateTime(s.updatedAt) : "unknown"}
+          {s.updatedAt ? fmt.formatDateTime(s.updatedAt) : common("unknown")}
         </span>
       ),
     },
@@ -138,34 +141,39 @@ export function SkillsListScreen({
       <ListPage<SkillListItem>
         header={{
           crumbs: agentsCrumbs("skills"),
-          title: "Skills",
-          context: "Versioned instructions and tool bindings your agents draw on at dispatch time.",
+          title: common("skills"),
+          context: tr("context"),
           primaryAction: (
             <Button size="sm" asChild>
               <Link href="/agents/skills/new">
                 <PlusIcon className="size-4" />
-                New skill
+                {tr("newSkill")}
               </Link>
             </Button>
           ),
           menu: (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="icon" variant="ghost" className="size-8" aria-label="More actions">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="size-8"
+                  aria-label={common("moreActions")}
+                >
                   <MoreHorizontalIcon className="size-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-48">
                 <DropdownMenuItem onSelect={() => onImportOpenChange(true)}>
                   <GitBranchIcon className="size-4" />
-                  Import from repo
+                  {tr("importFromRepo")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ),
         }}
         list={list}
-        label="Skills"
+        label={common("skills")}
         columns={columns}
         rows={rows}
         getRowId={(s) => s.id}

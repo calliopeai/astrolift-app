@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -22,6 +24,7 @@ export function WizardClient() {
 }
 
 function ScopedWizardClient() {
+  const t = useTranslations("agentWizard");
   const flow = useNewAgent();
   const { state, setState, setValid, errors } = flow;
 
@@ -37,7 +40,7 @@ function ScopedWizardClient() {
     >
       {state.step === 1 && (
         <>
-          <NewAgentSection title="Repository" error={errors.repo}>
+          <NewAgentSection title={t("sections.repository")} error={errors.repo}>
             <RepoPickerStep
               state={state}
               setState={setState}
@@ -46,8 +49,8 @@ function ScopedWizardClient() {
           </NewAgentSection>
           {flow.hasRepo && (
             <NewAgentSection
-              title="Agents found"
-              description="Each agent manifest in the repo becomes an agent."
+              title={t("sections.agentsFound")}
+              description={t("sections.agentsFoundDescription")}
               error={errors.discover}
             >
               <DiscoveryStep
@@ -60,7 +63,7 @@ function ScopedWizardClient() {
         </>
       )}
       {state.step === 2 && (
-        <NewAgentSection title="Project" error={errors.project}>
+        <NewAgentSection title={t("sections.project")} error={errors.project}>
           <ProjectStep state={state} setState={setState} setValid={(v) => setValid("project", v)} />
         </NewAgentSection>
       )}
@@ -78,9 +81,9 @@ function ScopedWizardClient() {
       <ConfirmDialog
         open={flow.confirmCancel}
         onOpenChange={flow.setConfirmCancel}
-        title="Discard this new agent?"
-        description="The repository and the agents found so far are not saved anywhere. Leaving now means starting over."
-        confirmLabel="Discard and exit"
+        title={t("discard.title")}
+        description={t("discard.description")}
+        confirmLabel={t("discard.confirm")}
         destructive
         onConfirm={flow.onDiscard}
       />

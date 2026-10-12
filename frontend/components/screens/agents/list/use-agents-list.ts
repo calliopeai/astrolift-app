@@ -2,6 +2,7 @@
 
 import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { useListState } from "@/components/list/use-list-state";
@@ -51,6 +52,7 @@ const POLL_MS = 15_000;
  * opens the agent's Runs tab. The data half of AgentsListScreen.
  */
 export function useAgentsList() {
+  const t = useTranslations("agentDispatch");
   const list = useListState(AGENTS_LIST);
   const { state } = list;
   const router = useRouter();
@@ -96,8 +98,8 @@ export function useAgentsList() {
     try {
       const { data } = await runAgent({ variables: { input: { agentSlug: agent.slug } } });
       const result = data?.runAstroliftAgent;
-      if (!result?.ok) throw new Error(result?.errors?.[0]?.message ?? "Dispatch failed");
-      toast.success(`Dispatched ${agent.name}`);
+      if (!result?.ok) throw new Error(result?.errors?.[0]?.message ?? t("toasts.dispatchFailed"));
+      toast.success(t("toasts.dispatched", { name: agent.name }));
       await client.refetchQueries({
         include: [LIST_AGENT_TASKS, AGENT_FLEET_LIST_PAGE],
       });
@@ -105,7 +107,7 @@ export function useAgentsList() {
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      toast.error(`Couldn't dispatch ${agent.name}`, { description: message });
+      toast.error(t("toasts.dispatchFailedFor", { name: agent.name }), { description: message });
       return false;
     }
   }

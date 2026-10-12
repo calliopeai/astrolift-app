@@ -1,6 +1,7 @@
 "use client";
 
 import { BoxesIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
@@ -8,7 +9,7 @@ import type { ListStateController } from "@/components/list/list-state";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import { agentsCrumbs } from "../skills/catalog";
-import { type EnvironmentSpec, specOwner } from "./environment-specs";
+import type { EnvironmentSpec } from "./environment-specs";
 
 export interface EnvironmentSpecsScreenProps {
   list: ListStateController;
@@ -22,10 +23,11 @@ export interface EnvironmentSpecsScreenProps {
 
 export function EnvironmentSpecsScreen(props: EnvironmentSpecsScreenProps) {
   const fmt = useFormatters();
+  const t = useTranslations("agentEnvSpecs");
   const columns: Column<EnvironmentSpec>[] = [
     {
       id: "name",
-      header: "Environment spec",
+      header: t("envSpec"),
       sortKey: "name",
       cellClassName: "max-w-80",
       cell: (s) => (
@@ -41,20 +43,24 @@ export function EnvironmentSpecsScreen(props: EnvironmentSpecsScreenProps) {
     },
     {
       id: "runtime",
-      header: "Runtime / image",
+      header: t("runtimeImage"),
       sortKey: "runtime",
       cellClassName: "max-w-96",
       cell: (s) => (
         <span className="block truncate font-mono text-xs" title={s.imageTag || s.runtime}>
-          {s.imageTag || s.runtime || "Workload default"}
+          {s.imageTag || s.runtime || t("workloadDefault")}
         </span>
       ),
     },
-    { id: "agentType", header: "Agent type", cell: (s) => s.agentType },
-    { id: "owner", header: "Owner", cell: specOwner },
+    { id: "agentType", header: t("agentType"), cell: (s) => s.agentType },
+    {
+      id: "owner",
+      header: t("owner"),
+      cell: (s) => t(`owners.${s.projectId ? "project" : s.teamId ? "team" : "org"}`),
+    },
     {
       id: "updated",
-      header: "Updated",
+      header: t("updated"),
       sortKey: "updated",
       cell: (s) => (
         <span className="text-muted-foreground font-mono text-xs">
@@ -68,17 +74,17 @@ export function EnvironmentSpecsScreen(props: EnvironmentSpecsScreenProps) {
       {...props}
       header={{
         crumbs: agentsCrumbs("environment-specs"),
-        title: "Environment specs",
-        context: "Reusable container recipes available to your agents in this organization.",
+        title: t("title"),
+        context: t("context"),
       }}
-      label="Environment specs"
+      label={t("title")}
       columns={columns}
       getRowId={(s) => s.id}
       rowHref={(s) => `/agents/environment-specs/${encodeURIComponent(s.slug)}`}
       empty={{
         icon: <BoxesIcon className="size-5" />,
-        title: "No environment specs",
-        description: "Recipes appear here when agents are registered with a container environment.",
+        title: t("emptyTitle"),
+        description: t("emptyDescription"),
       }}
     />
   );

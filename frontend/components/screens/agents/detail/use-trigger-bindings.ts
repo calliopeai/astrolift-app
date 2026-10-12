@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { CREATE_AGENT_TRIGGER, UNBIND_AGENT_TRIGGER } from "@/graphql/agents/agents.mutations";
@@ -41,6 +42,7 @@ export function useTriggerBindings({
   agentName: string;
   orgId: string;
 }) {
+  const t = useTranslations("agentTriggers");
   const { data, loading, error, refetch } = useQuery<AgentTriggersData, AgentTriggersVars>(
     AGENT_TRIGGERS,
     {
@@ -66,14 +68,16 @@ export function useTriggerBindings({
       const { data: res } = await createTrigger({ variables: { agentSlug, ...input } });
       const result = res?.createAgentTrigger;
       if (result?.ok) {
-        toast.success(`Trigger bound for ${agentName}`);
+        toast.success(t("toasts.bound", { name: agentName }));
         return result;
       }
-      toast.error("Couldn't bind trigger", { description: result?.message ?? "Unknown error" });
+      toast.error(t("toasts.bindFailed"), {
+        description: result?.message ?? t("toasts.unknownError"),
+      });
       return null;
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      toast.error("Couldn't bind trigger", { description: message });
+      toast.error(t("toasts.bindFailed"), { description: message });
       return null;
     }
   }
@@ -83,9 +87,9 @@ export function useTriggerBindings({
     const { data: res } = await unbindTrigger({ variables: { slug } });
     const result = res?.unbindAgentTrigger;
     if (!result?.ok) {
-      throw new Error(result?.message ?? "Couldn't remove trigger");
+      throw new Error(result?.message ?? t("toasts.removeFailed"));
     }
-    toast.success("Trigger removed");
+    toast.success(t("toasts.removed"));
   }
 
   return {
