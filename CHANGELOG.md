@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Admin › Permissions › Action safety lists every gated action with what it asks (confirmation and a fresh sign-in) and two organization switches: ask before it, and let admins approve their own. A row a team, app or person has also set says so, since narrower rules can only add. Changing a switch asks for a fresh sign-in, through the existing prompt (#2203).
+
 - Action-safety gates, server-enforced and on by default: deregistering or soft-deleting an app, decommissioning a cluster, deprovisioning a managed service or a cluster model, and setting, deleting or revealing an app secret now ask for a fresh step-up re-authentication, even where the install-wide step-up switch is off. The web console's existing re-auth prompt handles the refusal with a retry; API tokens pass, as they do for step-up. An organization can turn a gate off, or admin self-approval off, with `setActionSafetyRule` (org admin, itself behind a fresh re-auth); team, app and user rules can only add, because the strictest requirement from any applicable scope wins. `astroliftActionSafety(appSlug)` reports what each gated action asks of the viewer and which rules decided it. Exec/console attach and approval routing follow (#2202).
 
 - Graphite is the default theme: neutral graphite surfaces and sidebar, emerald as the accent, lime for state and signal. Anyone who picked a theme keeps it. The server now accepts `graphite` as a ground when a person's or an organization's appearance is saved (it refused it before), and a test keeps the server's grounds and colours in step with the client's (#2286).
