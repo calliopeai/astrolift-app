@@ -526,6 +526,15 @@ CONSTANCE_CONFIG = {
         "write its HOME and every non-root pod fails. Change only with matching images.",
         "posix_id",
     ),
+    "AGENT_SECRET_OWNER_ENFORCEMENT": (
+        False,
+        "Hold every typed agent secret ref to its spec owner's namespace (#2102): "
+        "agents/<org>/projects/<project>/, agents/<org>/teams/<team>/ or agents/<org>/shared/. "
+        "Checked on every write and at dispatch. Turn on only after migrate_agent_secret_owners "
+        "has run and audit_agent_secret_owner_cutover --require-ready passes; an agent still on "
+        "a legacy location stops spawning.",
+        bool,
+    ),
     "AGENT_NETWORK_FENCE": (
         False,
         "Apply a NetworkPolicy to agent task and box pods: no inbound pod traffic; outbound "
@@ -845,6 +854,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
             "AGENT_POD_GID",
             "AGENT_NETWORK_FENCE",
             "AGENT_EGRESS_ALLOW_CIDRS",
+            "AGENT_SECRET_OWNER_ENFORCEMENT",
         ),
         "collapse": False,
     },

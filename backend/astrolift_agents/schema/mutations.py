@@ -1152,8 +1152,10 @@ class AgentsMutation:
         try:
             secret_refs = normalize_secret_references(input.secret_refs, field="secretRefs")
             env_vars = normalize_environment_values(input.env_vars, field="envVars")
+            # Not saved yet: judged against the owner it is about to have (#2102).
+            owner = AgentEnvironmentSpec(organization=org, team=team, project=project)
             for ref in secret_refs:
-                assert_org_scoped_secret_ref(ref["uri"], organization=org)
+                assert_org_scoped_secret_ref(ref["uri"], organization=org, spec=owner)
         except AgentPackageError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc))
         except SecretRefNamespaceError as exc:
@@ -1247,7 +1249,7 @@ class AgentsMutation:
             )
             if secret_refs is not None:
                 for ref in secret_refs:
-                    assert_org_scoped_secret_ref(ref["uri"], organization=spec.organization)
+                    assert_org_scoped_secret_ref(ref["uri"], organization=spec.organization, spec=spec)
         except AgentPackageError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc))
         except SecretRefNamespaceError as exc:
@@ -1467,7 +1469,7 @@ class AgentsMutation:
                 field="uri",
             )
         try:
-            assert_org_scoped_secret_ref(uri, organization=spec.organization)
+            assert_org_scoped_secret_ref(uri, organization=spec.organization, spec=spec)
         except SecretRefNamespaceError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="uri")
         with transaction.atomic():
