@@ -330,7 +330,7 @@ describe.each(locales)("Cluster chrome in %s", (locale) => {
     const english = flat(catalogs.en.clusters.chrome),
       copy = flat(catalogs[locale].clusters.chrome);
     expect(Object.keys(copy)).toEqual(Object.keys(english));
-    expect(Object.keys(copy)).toHaveLength(32);
+    expect(Object.keys(copy)).toHaveLength(33);
     for (const [key, message] of Object.entries(copy)) {
       expect(parseMessage(message).every((node) => node.type === 0)).toBe(true);
       expect(tFor(locale)(key)).toBe(message);

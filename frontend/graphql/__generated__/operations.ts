@@ -4077,6 +4077,31 @@ export type AstroliftPipelineSecretChangeMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftPlatformSetting = {
+  changed: Scalars['Boolean']['output'];
+  choices: Array<Scalars['String']['output']>;
+  default: Scalars['String']['output'];
+  editable: Scalars['Boolean']['output'];
+  group: Scalars['String']['output'];
+  helpText: Scalars['String']['output'];
+  key: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  readOnlyReason: Scalars['String']['output'];
+  value: Scalars['String']['output'];
+  warning: Scalars['String']['output'];
+};
+
+export type AstroliftPlatformSettingChange = {
+  previousValue: Scalars['String']['output'];
+  setting: AstroliftPlatformSetting;
+};
+
+export type AstroliftPlatformSettingChangeMutationResult = {
+  data?: Maybe<AstroliftPlatformSettingChange>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftPodResourceUsage = {
   lastRestartAt?: Maybe<Scalars['DateTime']['output']>;
   podName: Scalars['String']['output'];
@@ -8984,6 +9009,8 @@ export type Mutation = {
   rerunAstroliftOnboarding: AstroliftRerunOnboardingPayloadMutationResult;
   resendInvitation: AstroliftInvitationCreatedMutationResult;
   resetClusterAuthUserPassword: AstroliftClusterAuthUserChangeMutationResult;
+  /** Put an install setting back to its default (#1861). */
+  resetPlatformSetting: AstroliftPlatformSettingChangeMutationResult;
   restartAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
   restoreApp: AstroliftRegisteredAppMutationResult;
   resumeAppIngress: AstroliftAppEnvironmentMutationResult;
@@ -9054,6 +9081,8 @@ export type Mutation = {
   /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with PRECONDITION; turning one off always succeeds. */
   setOrganizationModule: AstroliftOrganizationModuleMutationResult;
   setPipelineSecret: AstroliftPipelineSecretChangeMutationResult;
+  /** Set an install setting (#1861). ``value`` is text, ``true``/``false`` for a yes/no setting, validated as the Django admin validates it. A setting with a ``warning`` needs ``confirmed``. Platform operator only, with a fresh sign-in. */
+  setPlatformSetting: AstroliftPlatformSettingChangeMutationResult;
   setPreviewPinned: AstroliftPreviewEnvironmentMutationResult;
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
@@ -10513,6 +10542,12 @@ export type MutationResetClusterAuthUserPasswordArgs = {
 };
 
 
+export type MutationResetPlatformSettingArgs = {
+  confirmed?: Scalars['Boolean']['input'];
+  key: Scalars['String']['input'];
+};
+
+
 export type MutationRestartAstroliftWorkloadArgs = {
   ifMatchVersion?: InputMaybe<Scalars['Int']['input']>;
   input: RestartWorkloadInput;
@@ -10860,6 +10895,13 @@ export type MutationSetOrganizationModuleArgs = {
 
 export type MutationSetPipelineSecretArgs = {
   input: SetPipelineSecretInput;
+};
+
+
+export type MutationSetPlatformSettingArgs = {
+  confirmed?: Scalars['Boolean']['input'];
+  key: Scalars['String']['input'];
+  value: Scalars['String']['input'];
 };
 
 
@@ -12000,6 +12042,8 @@ export type Query = {
   astroliftPipelines: Array<AstroliftPipeline>;
   astroliftPipelinesPage: AstroliftPipelinePage;
   astroliftPlatformApiUrl: Scalars['String']['output'];
+  /** Every install setting, grouped, for the platform operator (#1861). */
+  astroliftPlatformSettings: Array<AstroliftPlatformSetting>;
   astroliftPodResourceUsage?: Maybe<AstroliftPodResourceUsage>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftPoliciesPage. */
   astroliftPolicies: Array<AstroliftPolicy>;
@@ -19448,6 +19492,23 @@ export type SetFeatureFlagMutationVariables = Exact<{
 
 export type SetFeatureFlagMutation = { setFeatureFlag: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { key: string, enabled: boolean, description?: string | null } | null } };
 
+export type SetPlatformSettingMutationVariables = Exact<{
+  key: Scalars['String']['input'];
+  value: Scalars['String']['input'];
+  confirmed: Scalars['Boolean']['input'];
+}>;
+
+
+export type SetPlatformSettingMutation = { setPlatformSetting: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { previousValue: string, setting: { key: string, group: string, kind: string, helpText: string, value: string, default: string, changed: boolean, choices: Array<string>, editable: boolean, readOnlyReason: string, warning: string } } | null } };
+
+export type ResetPlatformSettingMutationVariables = Exact<{
+  key: Scalars['String']['input'];
+  confirmed: Scalars['Boolean']['input'];
+}>;
+
+
+export type ResetPlatformSettingMutation = { resetPlatformSetting: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { previousValue: string, setting: { key: string, group: string, kind: string, helpText: string, value: string, default: string, changed: boolean, choices: Array<string>, editable: boolean, readOnlyReason: string, warning: string } } | null } };
+
 export type AstroliftServerInfoQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -19457,6 +19518,13 @@ export type AdminFeatureInventoryQueryVariables = Exact<{ [key: string]: never; 
 
 
 export type AdminFeatureInventoryQuery = { astroliftServerInfo: { featureFlags: Array<{ key: string, enabled: boolean, description?: string | null }>, buildTimeFeatures: Array<{ key: string, enabled: boolean, envVar: string, description?: string | null }> } };
+
+export type PlatformSettingFieldsFragment = { key: string, group: string, kind: string, helpText: string, value: string, default: string, changed: boolean, choices: Array<string>, editable: boolean, readOnlyReason: string, warning: string };
+
+export type PlatformSettingsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type PlatformSettingsQuery = { astroliftPlatformSettings: Array<{ key: string, group: string, kind: string, helpText: string, value: string, default: string, changed: boolean, choices: Array<string>, editable: boolean, readOnlyReason: string, warning: string }> };
 
 export type EmailDeliveryTestFieldsFragment = { id: string, managedServiceId: string, version: number, requestId: string, sender: string, recipient: string, status: string, accountId: string, region: string, identity: string, transport: string, providerMessageId?: string | null, eventTrackingConfigured: boolean, simulator: boolean, createdAt: string, acceptedAt?: string | null, observedAt?: string | null, reasonCode?: string | null };
 
