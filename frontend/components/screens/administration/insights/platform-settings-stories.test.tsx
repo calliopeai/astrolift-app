@@ -7,7 +7,7 @@ import * as preview from "../../../../.storybook/preview";
 import * as stories from "./PlatformSettingsScreen.stories";
 
 setProjectAnnotations(preview);
-const { Full, ConfirmsSensitive, QueryError, Saving } = composeStories(stories);
+const { Full, ConfirmsSensitive, QueryError, Saving, SecretStores } = composeStories(stories);
 
 async function render(Story: Parameters<typeof runStory>[0]) {
   const canvas = document.createElement("div");
@@ -51,6 +51,20 @@ describe("platform settings stories (#1861)", () => {
       expect(failed.page.getByText("only the platform operator may do this")).toBeVisible();
     } finally {
       failed.done();
+    }
+  });
+
+  it("lists secret stores and one organization's refs by presence", async () => {
+    const { page, done } = await render(SecretStores);
+    try {
+      expect(page.getByText("conflict-astrolift")).toBeVisible();
+      expect(page.getByText("Has a value")).toBeVisible();
+      expect(page.getByText("No value set")).toBeVisible();
+      expect(page.getByText("outside this spec's owner namespace")).toBeVisible();
+      const checks = page.getAllByRole("button", { name: "Check secrets" });
+      expect(checks[1]).toBeDisabled();
+    } finally {
+      done();
     }
   });
 });

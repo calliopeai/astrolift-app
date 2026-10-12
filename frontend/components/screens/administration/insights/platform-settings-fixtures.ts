@@ -83,3 +83,55 @@ export const PLATFORM_SETTINGS: PlatformSettingsScreenProps = {
   save: async () => {},
   reset: async () => {},
 };
+
+export const PLATFORM_SECRETS: NonNullable<PlatformSettingsScreenProps["secrets"]> = {
+  stores: [
+    {
+      organizationSlug: "conflict",
+      organizationName: "CONFLICT",
+      clusterSlug: "conflict-astrolift",
+      sharedCluster: false,
+      specCount: 3,
+    },
+    {
+      organizationSlug: "empty-org",
+      organizationName: "Empty Org",
+      clusterSlug: "",
+      sharedCluster: false,
+      specCount: 0,
+    },
+  ],
+  storesLoading: false,
+  storesError: null,
+  inventory: {
+    provider: "aws-secrets-manager",
+    canReveal: true,
+    store: { organizationSlug: "conflict" },
+    refs: [
+      {
+        specSlug: "claude-dev",
+        envVar: "GITHUB_TOKEN",
+        uri: "sm:agents/01a05978/gh",
+        exists: true,
+        error: "",
+      },
+      {
+        specSlug: "claude-dev",
+        envVar: "SLACK_TOKEN",
+        uri: "sm:agents/01a05978/slack",
+        exists: false,
+        error: "",
+      },
+      {
+        specSlug: "reviewer",
+        envVar: "OTHER_TEAM_TOKEN",
+        uri: "sm:agents/01a05978/teams/other/token",
+        exists: false,
+        error: "outside this spec's owner namespace",
+      },
+    ],
+  },
+  inventoryLoading: false,
+  inventoryError: null,
+  inspect: () => {},
+};

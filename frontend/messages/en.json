@@ -4501,7 +4501,20 @@
       "confirmTitle": "Change {key}?",
       "confirm": "Change setting",
       "saveError": "The setting was not saved.",
-      "saved": "{key} saved"
+      "saved": "{key} saved",
+      "secrets": {
+        "title": "Agent secret stores",
+        "description": "Where each organization's agent secrets are stored, and whether each secret its agents reference has a value. Values are never shown; set them in the organization's agent secrets.",
+        "empty": "No organizations on this install.",
+        "noCluster": "No managed cluster for agents",
+        "shared": "Shared cluster",
+        "specs": "{count, plural, one {# agent environment} other {# agent environments}}",
+        "check": "Check secrets",
+        "noRefs": "This organization's agents reference no secrets.",
+        "provider": "Store: {provider}",
+        "present": "Has a value",
+        "missing": "No value set"
+      }
     },
     "metrics": {
       "title": "Platform metrics",

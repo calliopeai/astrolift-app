@@ -4421,7 +4421,20 @@
       "confirmTitle": "Alterar {key}?",
       "confirm": "Alterar configuração",
       "saveError": "A configuração não foi salva.",
-      "saved": "{key} salvo"
+      "saved": "{key} salvo",
+      "secrets": {
+        "title": "Cofres de segredos dos agentes",
+        "description": "Onde ficam os segredos dos agentes de cada organização e se cada segredo usado pelos agentes tem valor. Os valores nunca são exibidos; defina-os nos segredos de agentes da organização.",
+        "empty": "Nenhuma organização nesta instalação.",
+        "noCluster": "Sem cluster gerenciado para agentes",
+        "shared": "Cluster compartilhado",
+        "specs": "{count, plural, one {# ambiente de agente} other {# ambientes de agente}}",
+        "check": "Verificar segredos",
+        "noRefs": "Os agentes desta organização não usam segredos.",
+        "provider": "Cofre: {provider}",
+        "present": "Tem valor",
+        "missing": "Sem valor"
+      }
     },
     "metrics": {
       "title": "Métricas da plataforma",

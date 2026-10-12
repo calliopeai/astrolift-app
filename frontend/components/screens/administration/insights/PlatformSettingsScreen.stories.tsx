@@ -1,7 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, userEvent, within } from "storybook/test";
 
-import { PLATFORM_SETTINGS, PLATFORM_SETTINGS_ROWS } from "./platform-settings-fixtures";
+import {
+  PLATFORM_SECRETS,
+  PLATFORM_SETTINGS,
+  PLATFORM_SETTINGS_ROWS,
+} from "./platform-settings-fixtures";
 import { PlatformSettingsScreen } from "./PlatformSettingsScreen";
 
 const meta: Meta = {
@@ -60,4 +64,9 @@ export const LongStrings: Story = {
       }))}
     />
   ),
+};
+
+/** Agent secret stores: one organization checked, values never shown. */
+export const SecretStores: Story = {
+  render: () => <PlatformSettingsScreen {...PLATFORM_SETTINGS} secrets={PLATFORM_SECRETS} />,
 };

@@ -4424,7 +4424,20 @@
       "confirmTitle": "Modifier {key} ?",
       "confirm": "Modifier le paramètre",
       "saveError": "Le paramètre n'a pas été enregistré.",
-      "saved": "{key} enregistré"
+      "saved": "{key} enregistré",
+      "secrets": {
+        "title": "Coffres de secrets des agents",
+        "description": "Où sont stockés les secrets d'agents de chaque organisation, et si chaque secret utilisé par ses agents a une valeur. Les valeurs ne sont jamais affichées ; elles se définissent dans les secrets d'agents de l'organisation.",
+        "empty": "Aucune organisation sur cette installation.",
+        "noCluster": "Aucun cluster géré pour les agents",
+        "shared": "Cluster partagé",
+        "specs": "{count, plural, one {# environnement d'agent} other {# environnements d'agent}}",
+        "check": "Vérifier les secrets",
+        "noRefs": "Les agents de cette organisation n'utilisent aucun secret.",
+        "provider": "Coffre : {provider}",
+        "present": "A une valeur",
+        "missing": "Aucune valeur"
+      }
     },
     "metrics": {
       "title": "Métriques de la plateforme",

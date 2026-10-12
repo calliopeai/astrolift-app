@@ -4424,7 +4424,20 @@
       "confirmTitle": "{key} ändern?",
       "confirm": "Einstellung ändern",
       "saveError": "Die Einstellung wurde nicht gespeichert.",
-      "saved": "{key} gespeichert"
+      "saved": "{key} gespeichert",
+      "secrets": {
+        "title": "Secret-Speicher der Agenten",
+        "description": "Wo die Agenten-Secrets jeder Organisation liegen und ob jedes Secret, das ihre Agenten verwenden, einen Wert hat. Werte werden nie angezeigt; sie werden in den Agenten-Secrets der Organisation gesetzt.",
+        "empty": "Keine Organisationen in dieser Installation.",
+        "noCluster": "Kein verwalteter Cluster für Agenten",
+        "shared": "Gemeinsamer Cluster",
+        "specs": "{count, plural, one {# Agentenumgebung} other {# Agentenumgebungen}}",
+        "check": "Secrets prüfen",
+        "noRefs": "Die Agenten dieser Organisation verwenden keine Secrets.",
+        "provider": "Speicher: {provider}",
+        "present": "Hat einen Wert",
+        "missing": "Kein Wert gesetzt"
+      }
     },
     "metrics": {
       "title": "Plattformmetriken",

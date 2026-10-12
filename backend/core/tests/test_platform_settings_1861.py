@@ -197,3 +197,74 @@ def test_both_writes_are_step_up_gated():
 
     gated = {probe.resolver.rsplit(".", 1)[1] for probe in list_gated_resolvers()}
     assert {"set_platform_setting", "reset_platform_setting"} <= gated
+
+
+# ---- agent secret stores (read-only) ---------------------------------
+
+
+class _FakeSecrets:
+    def __init__(self, store):
+        self.store = store
+
+    def get(self, path):
+        return self.store.get(path)
+
+
+def _secrets_world(monkeypatch, store):
+    import astrolift_agents.services.agent_cluster as agent_cluster
+    import core.app_deploy as app_deploy
+    from astrolift_agents.models import AgentEnvironmentSpec
+    from astrolift_identity.models import Organization
+
+    org = Organization.objects.create(name="Vault Org", slug="vault-org")
+    cluster = SimpleNamespace(slug="vault-eks", organization_id=org.pk)
+    monkeypatch.setattr(agent_cluster, "resolve_agent_cluster", lambda _org: cluster)
+    backend = _FakeSecrets({k.format(org=org.guid): v for k, v in store.items()})
+    monkeypatch.setattr(app_deploy, "driver_for_capability", lambda _c, _cap: backend)
+    AgentEnvironmentSpec.objects.create(
+        organization=org,
+        name="Claude Dev",
+        slug="claude-dev",
+        agent_type=AgentEnvironmentSpec.AgentType.CLAUDE,
+        secret_refs=[
+            {"uri": f"sm:agents/{org.guid}/gh", "env_var": "GITHUB_TOKEN"},
+            {"uri": f"sm:agents/{org.guid}/slack", "env_var": "SLACK_TOKEN"},
+        ],
+    )
+    return org
+
+
+def test_the_secret_inventory_reports_presence_never_values(monkeypatch, permission_resolver):
+    from core import platform_secrets
+
+    _secrets_world(monkeypatch, {"sm:agents/{org}/gh": {"value": "private-token-canary"}})
+    permission_resolver.grant(Permission.ADMIN_ELEVATE)
+
+    stores = {row.organization_slug: row for row in platform_secrets.list_stores()}
+    assert stores["vault-org"].cluster_slug == "vault-eks" and stores["vault-org"].spec_count == 1
+    assert stores["vault-org"].shared_cluster is False
+
+    found = PlatformSettingsQuery().astrolift_platform_secret_inventory(
+        _info(_operator()), organization_slug="vault-org"
+    )
+    by_var = {ref.env_var: ref for ref in found.refs}
+    assert by_var["GITHUB_TOKEN"].exists is True and by_var["SLACK_TOKEN"].exists is False
+    assert {ref.spec_slug for ref in found.refs} == {"claude-dev"}
+    assert "private-token-canary" not in repr(found)
+    assert (
+        PlatformSettingsQuery().astrolift_platform_secret_inventory(
+            _info(_operator()), organization_slug="nobody"
+        )
+        is None
+    )
+
+
+def test_the_secret_stores_are_the_platform_operators_alone(permission_resolver):
+    permission_resolver.grant(Permission.ADMIN_ELEVATE)
+
+    with pytest.raises(PermissionDenied):
+        PlatformSettingsQuery().astrolift_platform_secret_stores(_info(_org_admin()))
+    with pytest.raises(PermissionDenied):
+        PlatformSettingsQuery().astrolift_platform_secret_inventory(
+            _info(_org_admin()), organization_slug="vault-org"
+        )
