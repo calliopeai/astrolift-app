@@ -84,10 +84,78 @@ function textOf(chunk) {
   );
 }
 
+// The prose of a translated page lives in the English catalog, not in the
+// TSX (#2145): `{t("key")}` / `{t.rich("key", ...)}` resolve against the
+// namespace each translator was made for. A key built at runtime
+// (`t(\`kinds.${k}\`)`) has no single text and stays dropped, as before.
+const CATALOG = JSON.parse(readFileSync(join(FRONTEND, "messages", "en.json"), "utf8"));
+
+function message(path) {
+  let node = CATALOG;
+  for (const part of path.split(".")) {
+    if (node == null || typeof node !== "object") return null;
+    node = node[part];
+  }
+  return typeof node === "string" ? node : null;
+}
+
+function translators(src) {
+  const names = new Map();
+  for (const m of src.matchAll(
+    /(?:const|let)\s+(\w+)\s*=\s*(?:await\s+)?(?:useTranslations|getTranslations)\(\s*["']([^"']+)["']/g
+  )) {
+    names.set(m[1], m[2]);
+  }
+  return names;
+}
+
+// Replace each `{name("key"...)}`, `{name.rich("key"...)}` or
+// `{name.markup("key"...)}` with the catalog text, its tags and arguments
+// left for textOf to strip like any other markup.
+function resolveTranslations(body, names) {
+  if (names.size === 0) return body;
+  const call = new RegExp(
+    "\\{\\s*(" +
+      [...names.keys()].join("|") +
+      ")(?:\\.(?:rich|markup))?\\(\\s*([\"'`])([^\"'`$]+)\\2",
+    "g"
+  );
+  let out = "";
+  let last = 0;
+  let m;
+  while ((m = call.exec(body)) !== null) {
+    // Find the `}` that closes this JSX expression, past nested braces.
+    let depth = 0;
+    let end = -1;
+    for (let i = m.index; i < body.length; i++) {
+      if (body[i] === "{") depth++;
+      else if (body[i] === "}" && --depth === 0) {
+        end = i;
+        break;
+      }
+    }
+    if (end < 0) break;
+    let text = message(`${names.get(m[1])}.${m[3]}`);
+    if (text) {
+      // Fill `{name}` from literal string arguments (`name: "..."`); a slot
+      // filled by JSX or a variable has no text to show and drops.
+      const args = body.slice(m.index, end);
+      const literals = new Map(
+        [...args.matchAll(/(\w+):\s*(["'`])([^"'`$]*)\2/g)].map((a) => [a[1], a[3]])
+      );
+      text = text.replace(/\{(\w+)\}/g, (slot, name) => literals.get(name) ?? slot);
+    }
+    out += body.slice(last, m.index) + (text ?? " ");
+    last = end + 1;
+    call.lastIndex = end + 1;
+  }
+  return out + body.slice(last);
+}
+
 function extract(src) {
   const out = [];
   // Only the returned JSX. Anything above it is imports and metadata.
-  const body = src.slice(src.indexOf("return ("));
+  const body = resolveTranslations(src.slice(src.indexOf("return (")), translators(src));
 
   const tag = /<(h1|h2|h3|h4|p|li)\b[^>]*>([\s\S]*?)<\/\1>/g;
   let match;
