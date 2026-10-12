@@ -1008,6 +1008,58 @@ def revoke_agent_key(*, connection: ZentinelleConnection, agent_id: str) -> Revo
     raise _refused(reply, "the agent key revocation")
 
 
+@dataclasses.dataclass(frozen=True)
+class GatewayReconcile:
+    """What reconciling one registered cluster's gateway did."""
+
+    cluster_slug: str
+    outcome: str  # "deployed", "removed", "unchanged" or "failed: <reason>"
+
+
+def reconcile_gateways() -> list[GatewayReconcile]:
+    """Bring every registered gateway in line with ``ZENTINELLE_GATEWAY_ENABLED`` (#1905).
+
+    On: deploy each gateway that is still wanted (``gateway_enabled``) on a
+    connected organization and is not running, including clusters registered
+    while the switch was off. Off: remove each running gateway's Deployment
+    and Service; the registration, its credential Secret and the per-cluster
+    intent stay, so turning the switch back on brings them back. Idempotent;
+    one cluster's failure is reported and does not stop the others.
+    """
+    on = gateway_feature_enabled()
+    results: list[GatewayReconcile] = []
+    rows = ZentinelleClusterGateway.objects.filter(
+        deleted_at__isnull=True, gateway_enabled=True
+    ).select_related("cluster", "connection")
+    for gateway in rows:
+        if bool(gateway.gateway_deployed) == on:
+            results.append(GatewayReconcile(gateway.cluster.slug, "unchanged"))
+            continue
+        try:
+            outcome = _run_locked(gateway.cluster, _reconcile_locked, gateway, on)
+        except ZentinelleConnectError as exc:
+            outcome = f"failed: {exc.message}"
+            log.warning("zentinelle: reconcile of cluster %s failed: %s", gateway.cluster.slug, exc.message)
+        results.append(GatewayReconcile(gateway.cluster.slug, outcome))
+    return results
+
+
+def _reconcile_locked(gateway: ZentinelleClusterGateway, on: bool) -> str:
+    gateway = _live(gateway)
+    if on:
+        _require_connected(gateway.connection)
+        _deploy(gateway)
+        return "deployed"
+    try:
+        _delete(gateway.cluster, _workload_refs(with_secret=False))
+    except ZentinelleConnectError as exc:
+        raise _fail(gateway, exc, f"the gateway could not be removed: {exc.message}") from None
+    gateway.gateway_deployed = False
+    gateway.last_error = ""
+    gateway.save()
+    return "removed"
+
+
 def fenced_agents_reach_gateway(cluster) -> bool:
     """Whether the agent network fence on ``cluster`` opens egress to its gateway (#1850)."""
     cluster_pk = getattr(cluster, "pk", None)
