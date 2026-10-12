@@ -1,8 +1,14 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { renderWithIntl as render } from "@/test/render-with-intl";
+
 import { ActionSafetyView } from "./ActionSafetyView";
-import { ACTION_APPROVAL_REQUESTS_FIXTURE, ACTION_SAFETY_FIXTURE } from "./fixtures";
+import {
+  ACTION_APPROVAL_REQUESTS_FIXTURE,
+  ACTION_SAFETY_FIXTURE,
+  SCOPED_SAFETY_FIXTURE,
+} from "./fixtures";
 
 vi.mock("@/components/shell/ShellHeader", () => ({
   ShellHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
@@ -21,6 +27,7 @@ const base = {
   deciding: null,
   decideError: null,
   onDecide: async () => {},
+  scoped: SCOPED_SAFETY_FIXTURE,
 };
 
 describe("Action safety (#2203)", () => {

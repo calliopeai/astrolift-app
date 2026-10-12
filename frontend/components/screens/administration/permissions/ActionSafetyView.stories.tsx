@@ -1,7 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
 import { ActionSafetyView } from "./ActionSafetyView";
-import { ACTION_APPROVAL_REQUESTS_FIXTURE, ACTION_SAFETY_FIXTURE } from "./fixtures";
+import {
+  ACTION_APPROVAL_REQUESTS_FIXTURE,
+  ACTION_SAFETY_FIXTURE,
+  SCOPED_SAFETY_FIXTURE,
+} from "./fixtures";
 
 const meta: Meta<typeof ActionSafetyView> = {
   title: "Screens/Administration/Permissions/ActionSafety",
@@ -20,6 +24,7 @@ const meta: Meta<typeof ActionSafetyView> = {
     deciding: null,
     decideError: null,
     onDecide: async () => {},
+    scoped: SCOPED_SAFETY_FIXTURE,
   },
 };
 export default meta;

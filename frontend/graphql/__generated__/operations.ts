@@ -377,8 +377,9 @@ export type AstroliftActionSafetyRule = {
   enabled?: Maybe<Scalars['Boolean']['output']>;
   minimumApprovals?: Maybe<Scalars['Int']['output']>;
   requireApproval?: Maybe<Scalars['Boolean']['output']>;
-  scopeId?: Maybe<Scalars['GUID']['output']>;
+  scopeId?: Maybe<Scalars['String']['output']>;
   scopeKind: Scalars['String']['output'];
+  scopeLabel: Scalars['String']['output'];
 };
 
 export type AstroliftActionSafetyRuleMutationResult = {
@@ -6472,6 +6473,12 @@ export type CiWorkflowSyncActionInput = {
   appId: Scalars['GUID']['input'];
 };
 
+export type ClearActionSafetyRuleInput = {
+  action: Scalars['String']['input'];
+  scopeId: InputMaybe<Scalars['String']['input']>;
+  scopeKind: Scalars['String']['input'];
+};
+
 export type ClearAlertSubscriptionInput = {
   id: Scalars['GUID']['input'];
 };
@@ -8737,6 +8744,7 @@ export type Mutation = {
   cancelTask: NoneTypeMutationResult;
   cancelWorkflowInstance: MutationResult;
   changeAstroliftTeamMembership: AstroliftTeamMembershipChangeMutationResult;
+  clearActionSafetyRule: AstroliftActionSafetyRuleMutationResult;
   clearAgentQuarantine: NoneTypeMutationResult;
   clearAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
   clearEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
@@ -9410,6 +9418,11 @@ export type MutationCancelWorkflowInstanceArgs = {
 
 export type MutationChangeAstroliftTeamMembershipArgs = {
   input: ChangeAstroliftTeamMembershipInput;
+};
+
+
+export type MutationClearActionSafetyRuleArgs = {
+  input: ClearActionSafetyRuleInput;
 };
 
 
@@ -11794,6 +11807,8 @@ export type Query = {
   astroliftActionApprovalRequests: Array<AstroliftActionApprovalRequest>;
   /** What each gated action asks of the viewer (#2202), optionally on one app: confirmation, fresh verification and whether an admin may approve their own. */
   astroliftActionSafety: Array<AstroliftActionSafetyRequirement>;
+  /** Every action-safety rule set in this organization (#2203): the organization's own and each team, app or person's, with the scope named. */
+  astroliftActionSafetyRules: Array<AstroliftActionSafetyRule>;
   astroliftActiveIdentityProvider?: Maybe<AstroliftIdentityProvider>;
   astroliftActiveSessions: Array<AstroliftActiveSession>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftAgentRunsPage. */
@@ -15140,7 +15155,7 @@ export type SetActionSafetyRuleInput = {
   enabled: InputMaybe<Scalars['Boolean']['input']>;
   minimumApprovals: InputMaybe<Scalars['Int']['input']>;
   requireApproval: InputMaybe<Scalars['Boolean']['input']>;
-  scopeId: InputMaybe<Scalars['GUID']['input']>;
+  scopeId: InputMaybe<Scalars['String']['input']>;
   scopeKind: Scalars['String']['input'];
 };
 
@@ -18967,6 +18982,13 @@ export type CancelActionRequestMutationVariables = Exact<{
 
 export type CancelActionRequestMutation = { cancelActionRequest: { ok: boolean, errors: Array<{ code: string, message: string }>, data?: { id: string, action: string, label: string, targetKind: string, targetLabel: string, appSlug?: string | null, requesterEmail?: string | null, viewerIsRequester: boolean, status: string, requiredApprovals: number, approvals: number, allowSelfApproval: boolean, createdAt: string, expiresAt: string } | null } };
 
+export type ClearActionSafetyRuleMutationVariables = Exact<{
+  input: ClearActionSafetyRuleInput;
+}>;
+
+
+export type ClearActionSafetyRuleMutation = { clearActionSafetyRule: { ok: boolean, errors: Array<{ code: string, message: string }> } };
+
 export type GetMyPermissionsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -18990,6 +19012,11 @@ export type ActionApprovalRequestsQueryVariables = Exact<{
 
 
 export type ActionApprovalRequestsQuery = { astroliftActionApprovalRequests: Array<{ id: string, action: string, label: string, targetKind: string, targetLabel: string, appSlug?: string | null, requesterEmail?: string | null, viewerIsRequester: boolean, status: string, requiredApprovals: number, approvals: number, allowSelfApproval: boolean, createdAt: string, expiresAt: string }> };
+
+export type ActionSafetyRulesQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ActionSafetyRulesQuery = { astroliftActionSafetyRules: Array<{ action: string, scopeKind: string, scopeId?: string | null, scopeLabel: string, enabled?: boolean | null, allowSelfApproval?: boolean | null, requireApproval?: boolean | null, minimumApprovals?: number | null }> };
 
 export type CreatePipelineMutationVariables = Exact<{
   input: CreatePipelineInput;

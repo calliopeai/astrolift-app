@@ -64,3 +64,18 @@ export const ACTION_APPROVAL_REQUESTS = gql`
     }
   }
 `;
+
+export const ACTION_SAFETY_RULES = gql`
+  query ActionSafetyRules {
+    astroliftActionSafetyRules {
+      action
+      scopeKind
+      scopeId
+      scopeLabel
+      enabled
+      allowSelfApproval
+      requireApproval
+      minimumApprovals
+    }
+  }
+`;

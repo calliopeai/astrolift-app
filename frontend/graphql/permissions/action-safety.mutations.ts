@@ -106,3 +106,16 @@ export const CANCEL_ACTION_REQUEST = gql`
     }
   }
 `;
+
+/** Remove one team, app or person's rule, so that scope inherits again (#2203). */
+export const CLEAR_ACTION_SAFETY_RULE = gql`
+  mutation ClearActionSafetyRule($input: ClearActionSafetyRuleInput!) {
+    clearActionSafetyRule(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+    }
+  }
+`;

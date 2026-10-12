@@ -314,3 +314,68 @@ def test_a_rule_write_changes_only_the_switches_it_sends(client):
         2,
         False,
     )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_rules_list_names_each_scope_and_clearing_a_narrower_rule_inherits_again(client):
+    world = ScopeWorld("rules-" + uuid4().hex[:8])
+    _alice, alice_h = _admin(world, "alice")
+    app_guid = str(world.medops_app.guid)
+    setter = "mutation($i:SetActionSafetyRuleInput!){setActionSafetyRule(input:$i){ok}}"
+    graphql_http(
+        client, alice_h, setter, {"i": {"action": "secret.change", "scopeKind": "ORG", "enabled": False}}
+    )
+    graphql_http(
+        client,
+        alice_h,
+        setter,
+        {"i": {"action": "secret.change", "scopeKind": "APP", "scopeId": app_guid, "enabled": True}},
+    )
+    listed = graphql_http(
+        client, alice_h, "{astroliftActionSafetyRules{action scopeKind scopeId scopeLabel enabled}}", {}
+    )["data"]["astroliftActionSafetyRules"]
+    by_kind = {row["scopeKind"]: row for row in listed}
+    assert by_kind["APP"] == {
+        "action": "secret.change",
+        "scopeKind": "APP",
+        "scopeId": app_guid,
+        "scopeLabel": world.medops_app.name or world.medops_app.slug,
+        "enabled": True,
+    }
+    assert by_kind["ORG"]["scopeId"] is None and by_kind["ORG"]["enabled"] is False
+
+    cleared = graphql_http(
+        client,
+        alice_h,
+        "mutation($i:ClearActionSafetyRuleInput!){clearActionSafetyRule(input:$i){ok}}",
+        {"i": {"action": "secret.change", "scopeKind": "APP", "scopeId": app_guid}},
+    )["data"]["clearActionSafetyRule"]
+    assert cleared["ok"] is True
+    assert effective(world.org.pk, "secret.change", app_id=world.medops_app.pk).enabled is False
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_person_rule_is_addressed_by_user_id_and_a_malformed_scope_is_not_found(client):
+    world = ScopeWorld("person-" + uuid4().hex[:8])
+    alice, alice_h = _admin(world, "alice")
+    setter = "mutation($i:SetActionSafetyRuleInput!){setActionSafetyRule(input:$i){ok errors{code field}}}"
+
+    def put(scope_id):
+        variables = {
+            "i": {
+                "action": "app.deregister",
+                "scopeKind": "USER",
+                "scopeId": scope_id,
+                "requireApproval": True,
+            }
+        }
+        return graphql_http(client, alice_h, setter, variables)["data"]["setActionSafetyRule"]
+
+    assert put(str(alice.pk))["ok"] is True
+    assert effective(world.org.pk, "app.deregister", user_id=alice.pk).approval is True
+    for bad in ("not-a-guid", "99999999", ""):
+        assert put(bad)["errors"][0]["code"] in {"NOT_FOUND", "VALIDATION"}
+    listed = graphql_http(client, alice_h, "{astroliftActionSafetyRules{scopeKind scopeId scopeLabel}}", {})
+    assert {"scopeKind": "USER", "scopeId": str(alice.pk), "scopeLabel": alice.email} in listed["data"][
+        "astroliftActionSafetyRules"
+    ]

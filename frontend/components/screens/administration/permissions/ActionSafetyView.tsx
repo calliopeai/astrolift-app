@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/select";
 
 import { permissionsCrumbs } from "../access/admin-crumbs";
+import { ScopedSafetyRules } from "./ScopedSafetyRules";
 import type { ActionApprovalRequestRow, useActionSafety } from "./use-action-safety";
 
 export type ActionSafetyViewProps = ReturnType<typeof useActionSafety>;
@@ -38,6 +39,7 @@ export function ActionSafetyView({
   deciding,
   decideError,
   onDecide,
+  scoped,
 }: ActionSafetyViewProps) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
@@ -193,6 +195,7 @@ export function ActionSafetyView({
         decideError={decideError}
         onDecide={onDecide}
       />
+      {rows && <ScopedSafetyRules {...scoped} />}
     </div>
   );
 }

@@ -447,3 +447,70 @@ export const ACTION_APPROVAL_REQUESTS_FIXTURE = [
     expiresAt: "2026-10-12T17:40:00Z",
   },
 ];
+
+/** Team, app and person rules (#2203), with the pickers they draw on. */
+export const SCOPED_SAFETY_FIXTURE = {
+  actions: ACTION_SAFETY_FIXTURE.map(({ action, label, approvable }) => ({
+    action,
+    label,
+    approvable,
+  })),
+  rules: [
+    {
+      action: "secret.change",
+      scopeKind: "APP",
+      scopeId: "0192a3b4-0000-7000-8000-0000000000a1",
+      scopeLabel: "billing-api",
+      enabled: true,
+      allowSelfApproval: null,
+      requireApproval: null,
+      minimumApprovals: null,
+    },
+    {
+      action: "app.deregister",
+      scopeKind: "TEAM",
+      scopeId: "0192a3b4-0000-7000-8000-0000000000b1",
+      scopeLabel: "Payments",
+      enabled: null,
+      allowSelfApproval: false,
+      requireApproval: true,
+      minimumApprovals: 2,
+    },
+  ],
+  scopeTree: {
+    roots: [
+      {
+        kind: "ORG" as const,
+        id: "org-1",
+        name: "Acme",
+        children: [
+          {
+            kind: "TEAM" as const,
+            id: "0192a3b4-0000-7000-8000-0000000000b1",
+            name: "Payments",
+            children: [
+              {
+                kind: "APP" as const,
+                id: "0192a3b4-0000-7000-8000-0000000000a1",
+                name: "billing-api",
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    loading: false,
+    error: null,
+    onRetry: () => {},
+  },
+  people: {
+    query: "",
+    onQuery: () => {},
+    results: [{ id: "42", name: "Dana Ortiz", secondary: "dana@example.com" }],
+    loading: false,
+  },
+  saving: false,
+  error: null,
+  onAdd: async () => true,
+  onClear: () => {},
+};

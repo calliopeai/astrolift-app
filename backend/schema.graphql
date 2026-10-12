@@ -366,7 +366,8 @@ type AstroliftActionSafetyRequirement {
 type AstroliftActionSafetyRule {
   action: String!
   scopeKind: String!
-  scopeId: GUID
+  scopeId: String
+  scopeLabel: String!
   enabled: Boolean
   allowSelfApproval: Boolean
   requireApproval: Boolean
@@ -6903,6 +6904,12 @@ input CiWorkflowSyncActionInput {
   appId: GUID!
 }
 
+input ClearActionSafetyRuleInput {
+  action: String!
+  scopeKind: String!
+  scopeId: String = null
+}
+
 input ClearAlertSubscriptionInput {
   id: GUID!
 }
@@ -9391,6 +9398,7 @@ type Mutation {
   attestSession(input: AttestSessionInput!): AstroliftAttestationResultMutationResult!
   assertSession(input: AssertSessionInput!): AstroliftAttestationResultMutationResult!
   setActionSafetyRule(input: SetActionSafetyRuleInput!): AstroliftActionSafetyRuleMutationResult!
+  clearActionSafetyRule(input: ClearActionSafetyRuleInput!): AstroliftActionSafetyRuleMutationResult!
   approveActionRequest(input: DecideActionApprovalInput!): AstroliftActionApprovalRequestMutationResult!
   rejectActionRequest(input: DecideActionApprovalInput!): AstroliftActionApprovalRequestMutationResult!
   cancelActionRequest(input: DecideActionApprovalInput!): AstroliftActionApprovalRequestMutationResult!
@@ -10297,6 +10305,11 @@ type Query {
   Approval requests for gated actions in this organization (#2202), newest first; pass a status (pending, approved, rejected, cancelled, expired, consumed) to filter.
   """
   astroliftActionApprovalRequests(status: String = null): [AstroliftActionApprovalRequest!]!
+
+  """
+  Every action-safety rule set in this organization (#2203): the organization's own and each team, app or person's, with the scope named.
+  """
+  astroliftActionSafetyRules: [AstroliftActionSafetyRule!]!
 
   """
   Easy-mode starting points (#2272): each names the stock role it grants per scope and, from that role's permissions, the tasks it allows and excludes. Never super-admin.
@@ -11269,7 +11282,7 @@ input SendManagedServiceTestEmailInput {
 input SetActionSafetyRuleInput {
   action: String!
   scopeKind: String!
-  scopeId: GUID = null
+  scopeId: String = null
   enabled: Boolean = null
   allowSelfApproval: Boolean = null
   requireApproval: Boolean = null

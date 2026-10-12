@@ -47,7 +47,8 @@ class ActionSafetyRequirementType:
 class SetActionSafetyRuleInput:
     action: str
     scope_kind: str
-    scope_id: GUID | None = None
+    #: A team or app guid, or a person's user id; null for the organization.
+    scope_id: str | None = None
     enabled: bool | None = None
     allow_self_approval: bool | None = None
     require_approval: bool | None = None
@@ -58,7 +59,10 @@ class SetActionSafetyRuleInput:
 class ActionSafetyRuleType:
     action: str
     scope_kind: str
-    scope_id: GUID | None
+    #: A team or app guid, or a person's user id; null for the organization.
+    scope_id: str | None
+    #: The team, app or person's display name; empty for the organization.
+    scope_label: str = ""
     enabled: bool | None
     allow_self_approval: bool | None
     require_approval: bool | None
@@ -81,6 +85,13 @@ class ActionApprovalRequestType:
     allow_self_approval: bool
     created_at: datetime
     expires_at: datetime
+
+
+@strawberry.input(name="ClearActionSafetyRuleInput")
+class ClearActionSafetyRuleInput:
+    action: str
+    scope_kind: str
+    scope_id: str | None = None
 
 
 @strawberry.input(name="DecideActionApprovalInput")
@@ -130,25 +141,70 @@ def requirements_for_viewer(app_slug: str | None) -> list[ActionSafetyRequiremen
     return out
 
 
+def rules_for_org() -> list[ActionSafetyRuleType]:
+    """Every rule row in the organization, with its scope named."""
+    from django.contrib.auth import get_user_model
+
+    from astrolift_identity.models import ActionSafetyRule, Team
+    from astrolift_registry.models import RegisteredApp
+
+    tenant = get_current_tenant()
+    if tenant is None or tenant.organization_id is None:
+        return []
+    rows = list(
+        ActionSafetyRule.objects.filter(organization_id=tenant.organization_id).order_by(
+            "scope_kind", "action"
+        )
+    )
+    ids = {kind: {r.scope_id for r in rows if r.scope_kind == kind} for kind in ("TEAM", "APP", "USER")}
+    names = {
+        "TEAM": {t.pk: (str(t.guid), t.name) for t in Team.objects.filter(pk__in=ids["TEAM"])},
+        "APP": {
+            a.pk: (str(a.guid), a.name or a.slug) for a in RegisteredApp.objects.filter(pk__in=ids["APP"])
+        },
+        "USER": {u.pk: (str(u.pk), u.email) for u in get_user_model().objects.filter(pk__in=ids["USER"])},
+    }
+    out = []
+    for r in rows:
+        guid, label = names.get(r.scope_kind, {}).get(r.scope_id, (None, ""))
+        if r.scope_kind != "ORG" and guid is None:
+            continue  # its team, app or person is gone
+        out.append(
+            ActionSafetyRuleType(
+                action=r.action,
+                scope_kind=r.scope_kind,
+                scope_id=guid,
+                scope_label=label,
+                enabled=r.enabled,
+                allow_self_approval=r.allow_self_approval,
+                require_approval=r.require_approval,
+                minimum_approvals=r.minimum_approvals,
+            )
+        )
+    return out
+
+
 def _scope_pk(organization_id: int, kind: str, scope_id) -> int | None:
-    """The org-confined primary key for a TEAM, APP or USER guid, else None."""
+    """The org-confined primary key for a TEAM or APP guid, or a USER id
+    (users are addressed by id across this API), else None."""
+    from uuid import UUID
+
     from astrolift_identity.models import Member, Team
     from astrolift_registry.models import RegisteredApp
 
-    if kind == "TEAM":
-        row = Team.objects.filter(organization_id=organization_id, guid=str(scope_id)).first()
-        return row.pk if row else None
-    if kind == "APP":
-        row = RegisteredApp.objects.filter(organization_id=organization_id, guid=str(scope_id)).first()
-        return row.pk if row else None
+    raw = str(scope_id or "").strip()
     if kind == "USER":
-        member = (
-            Member.objects.filter(scope_kind="ORG", scope_id=organization_id, user__guid=str(scope_id))
-            .select_related("user")
-            .first()
-        )
+        if not raw.isdigit():
+            return None
+        member = Member.objects.filter(scope_kind="ORG", scope_id=organization_id, user_id=int(raw)).first()
         return member.user_id if member else None
-    return None
+    try:
+        guid = str(UUID(raw))
+    except ValueError:
+        return None
+    model = {"TEAM": Team, "APP": RegisteredApp}.get(kind)
+    row = model.objects.filter(organization_id=organization_id, guid=guid).first() if model else None
+    return row.pk if row else None
 
 
 @strawberry.type
@@ -246,6 +302,50 @@ class ActionSafetyMutations:
                 allow_self_approval=row.allow_self_approval,
                 require_approval=row.require_approval,
                 minimum_approvals=row.minimum_approvals,
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(action="org.action_safety.clear")
+    @require_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE))
+    @tenant_scoped()
+    def clear_action_safety_rule(
+        self, info: Info, input: ClearActionSafetyRuleInput
+    ) -> MutationResultType[ActionSafetyRuleType]:
+        """Remove one scope's rule, so what applies there is inherited again."""
+        from astrolift_identity.models import ActionSafetyRule
+        from astrolift_identity.step_up import check_elevation
+
+        deny = check_elevation(
+            info,
+            action_label="Change action-safety rules",
+            resolver_name="clear_action_safety_rule",
+            required=True,
+        )
+        if deny is not None:
+            return deny
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
+        kind = (input.scope_kind or "").upper()
+        if org_id is None or kind not in ActionSafetyRule.ScopeKind.values:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "rule not found")
+        scope_pk = None if kind == "ORG" else _scope_pk(org_id, kind, input.scope_id)
+        row = ActionSafetyRule.objects.filter(
+            organization_id=org_id, scope_kind=kind, scope_id=scope_pk, action=input.action
+        ).first()
+        if row is None or (kind != "ORG" and scope_pk is None):
+            return gql_failure(ErrorCode.NOT_FOUND.value, "rule not found")
+        row.deleted_by_id = tenant.actor_user_id
+        row.soft_delete()
+        return gql_success(
+            ActionSafetyRuleType(
+                action=row.action,
+                scope_kind=row.scope_kind,
+                scope_id=input.scope_id if kind != "ORG" else None,
+                enabled=None,
+                allow_self_approval=None,
+                require_approval=None,
+                minimum_approvals=None,
             )
         )
 

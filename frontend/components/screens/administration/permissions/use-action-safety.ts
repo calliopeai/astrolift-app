@@ -3,9 +3,14 @@
 import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
 
+import type { SearchedPrincipal } from "@/components/access/use-grant-access";
+import { useScopeTree } from "@/components/access/use-scope-tree";
+import { PRINCIPAL_SEARCH } from "@/graphql/access/access.queries";
 import type {
   ActionApprovalRequestsQuery,
   ActionSafetyQuery,
+  ActionSafetyRulesQuery,
+  ClearActionSafetyRuleMutation,
   ApproveActionRequestMutation,
   CancelActionRequestMutation,
   RejectActionRequestMutation,
@@ -16,10 +21,23 @@ import type {
 import {
   APPROVE_ACTION_REQUEST,
   CANCEL_ACTION_REQUEST,
+  CLEAR_ACTION_SAFETY_RULE,
   REJECT_ACTION_REQUEST,
   SET_ACTION_SAFETY_RULE,
 } from "@/graphql/permissions/action-safety.mutations";
-import { ACTION_APPROVAL_REQUESTS, ACTION_SAFETY } from "@/graphql/permissions/astrolift.queries";
+import {
+  ACTION_APPROVAL_REQUESTS,
+  ACTION_SAFETY,
+  ACTION_SAFETY_RULES,
+} from "@/graphql/permissions/astrolift.queries";
+import { useDebounce } from "@/hooks/use-debounce";
+
+import type {
+  ScopedKind,
+  ScopedRule,
+  ScopedRulePatch,
+  ScopedSafetyRulesProps,
+} from "./ScopedSafetyRules";
 
 export type ActionSafetyRow = ActionSafetyQuery["astroliftActionSafety"][number];
 export type ActionApprovalRequestRow =
@@ -123,5 +141,93 @@ export function useActionSafety() {
     deciding,
     decideError,
     onDecide: decide,
+    scoped: useScopedSafetyRules(query.data?.astroliftActionSafety ?? []),
+  };
+}
+
+/** Team, app and person rules (#2203): the list, the pickers, add and remove. */
+function useScopedSafetyRules(rows: ActionSafetyRow[]): ScopedSafetyRulesProps {
+  const rules = useQuery<ActionSafetyRulesQuery>(ACTION_SAFETY_RULES, {
+    fetchPolicy: "cache-and-network",
+  });
+  const [write] = useMutation<SetActionSafetyRuleMutation, SetActionSafetyRuleMutationVariables>(
+    SET_ACTION_SAFETY_RULE
+  );
+  const [clear] = useMutation<ClearActionSafetyRuleMutation>(CLEAR_ACTION_SAFETY_RULE);
+  const scopeTree = useScopeTree();
+  const [query, setQuery] = React.useState("");
+  const term = useDebounce(query.trim(), 250);
+  const search = useQuery<{ astroliftPrincipalSearch: { items: SearchedPrincipal[] } }>(
+    PRINCIPAL_SEARCH,
+    {
+      variables: { search: term, filter: { kind: ["USER"] }, page: 1, pageSize: 8 },
+      skip: !term,
+      fetchPolicy: "cache-first",
+    }
+  );
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  async function run(step: () => Promise<{ ok: boolean; message?: string } | undefined>) {
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await step();
+      if (result && !result.ok) {
+        setError(result.message ?? "The rule was not saved.");
+        return false;
+      }
+      await rules.refetch();
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "The rule was not saved.");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return {
+    actions: rows.map(({ action, label, approvable }) => ({ action, label, approvable })),
+    rules: (rules.data?.astroliftActionSafetyRules ?? []).filter((r) => r.scopeKind !== "ORG"),
+    scopeTree,
+    people: {
+      query,
+      onQuery: setQuery,
+      results: (search.data?.astroliftPrincipalSearch.items ?? []).flatMap((p) =>
+        p.kind === "USER" && p.userId
+          ? [{ id: p.userId, name: p.name, secondary: p.secondary }]
+          : []
+      ),
+      loading: search.loading,
+    },
+    saving,
+    error: error ?? rules.error?.message ?? null,
+    onAdd: (target: { kind: ScopedKind; id: string }, action: string, patch: ScopedRulePatch) =>
+      run(async () => {
+        const payload = (
+          await write({
+            variables: {
+              input: { action, scopeKind: target.kind, scopeId: target.id, ...UNCHANGED, ...patch },
+            },
+          })
+        ).data?.setActionSafetyRule;
+        return payload && { ok: payload.ok, message: payload.errors[0]?.message };
+      }),
+    onClear: (rule: ScopedRule) =>
+      void run(async () => {
+        const payload = (
+          await clear({
+            variables: {
+              input: {
+                action: rule.action,
+                scopeKind: rule.scopeKind,
+                scopeId: rule.scopeId ?? null,
+              },
+            },
+          })
+        ).data?.clearActionSafetyRule;
+        return payload && { ok: payload.ok, message: payload.errors[0]?.message };
+      }),
   };
 }

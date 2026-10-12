@@ -63,8 +63,10 @@ from astrolift_identity.schema.access_ux import (
 from astrolift_identity.schema.action_safety import (
     ActionApprovalRequestType,
     ActionSafetyRequirementType,
+    ActionSafetyRuleType,
     requests_for_viewer,
     requirements_for_viewer,
+    rules_for_org,
 )
 from astrolift_identity.schema.identity_csv import (
     IdentityCsvExport,
@@ -1338,6 +1340,17 @@ class IdentityQuery:
         self, info: Info, status: str | None = None
     ) -> list[ActionApprovalRequestType]:
         return requests_for_viewer(status)
+
+    @strawberry.field(
+        description=(
+            "Every action-safety rule set in this organization (#2203): the organization's "
+            "own and each team, app or person's, with the scope named."
+        )
+    )
+    @require_permission(Permission.ORG_READ, scope=identity_organization_scope(Permission.ORG_READ))
+    @tenant_scoped()
+    def astrolift_action_safety_rules(self, info: Info) -> list[ActionSafetyRuleType]:
+        return rules_for_org()
 
     @strawberry.field(
         description=(
