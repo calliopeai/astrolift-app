@@ -18,8 +18,8 @@ pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture(autouse=True)
-def _default_on(settings):
-    settings.ASTROLIFT_ACTION_SAFETY_DEFAULT_ON = True
+def _default_on(monkeypatch):
+    monkeypatch.setattr("astrolift_identity.action_safety.DEFAULT_ON", True)
 
 
 @pytest.fixture

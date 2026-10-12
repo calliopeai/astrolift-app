@@ -23,6 +23,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+#: The built-in default: on (Leo, 2026-10-11). A module attribute rather than a
+#: setting so the wider test suite can drive these mutations without stepping
+#: up (see the root conftest) without going through Django's settings wrapper.
+DEFAULT_ON = True
+
 #: The gated actions and how the prompt names them.
 ACTIONS: dict[str, str] = {
     "app.deregister": "Deregister an app",
@@ -70,13 +75,8 @@ def effective(
     scopes += [("TEAM", team_id)] if team_id else []
     scopes += [("APP", app_id)] if app_id else []
     scopes += [("USER", user_id)] if user_id else []
-    from django.conf import settings
-
     rows = _rows(organization_id, action, scopes)
-    # The built-in default: on (Leo, 2026-10-11). The setting exists so the
-    # wider test suite can drive these mutations without stepping up.
-    default_on = bool(getattr(settings, "ASTROLIFT_ACTION_SAFETY_DEFAULT_ON", True))
-    enabled, self_approval, sources = default_on, True, []
+    enabled, self_approval, sources = DEFAULT_ON, True, []
     org = next((r for r in rows if r.scope_kind == "ORG"), None)
     if org is not None:
         sources.append("ORG")

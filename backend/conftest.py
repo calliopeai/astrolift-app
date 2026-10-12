@@ -123,13 +123,13 @@ def _reset_request_identity():
 
 
 @pytest.fixture(autouse=True)
-def _action_safety_defaults_off(settings):
+def _action_safety_defaults_off(monkeypatch):
     """The action-safety gates (#2202) are on by default in production, so a
     session that never stepped up is refused a delete or a secret change.
     Most tests drive those mutations through such a session to test something
-    else; they run with the built-in default off. Tests of the gates set
-    ``settings.ASTROLIFT_ACTION_SAFETY_DEFAULT_ON = True`` themselves."""
-    settings.ASTROLIFT_ACTION_SAFETY_DEFAULT_ON = False
+    else; they run with the built-in default off. Tests of the gates turn it
+    back on themselves."""
+    monkeypatch.setattr("astrolift_identity.action_safety.DEFAULT_ON", False)
 
 
 @pytest.fixture(autouse=True)
