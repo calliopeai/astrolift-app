@@ -35,3 +35,30 @@ export const ADMIN_FEATURE_INVENTORY = gql`
     }
   }
 `;
+
+export const PLATFORM_SETTING_FIELDS = gql`
+  fragment PlatformSettingFields on AstroliftPlatformSetting {
+    key
+    group
+    kind
+    helpText
+    value
+    default
+    changed
+    choices
+    editable
+    readOnlyReason
+    warning
+  }
+`;
+
+// Every install setting for Administration › Platform settings (#1861).
+// Platform operator only; a credential's value is never returned.
+export const PLATFORM_SETTINGS = gql`
+  query PlatformSettings {
+    astroliftPlatformSettings {
+      ...PlatformSettingFields
+    }
+  }
+  ${PLATFORM_SETTING_FIELDS}
+`;
