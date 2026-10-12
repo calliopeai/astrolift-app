@@ -2,9 +2,10 @@
 
 import { LockIcon, SearchXIcon, UserPlusIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
-import { SCOPE_NOUN, summarizePermissions } from "@/components/access/access-model";
+import { summarizePermissions } from "@/components/access/access-model";
 import { EmptyState } from "@/components/EmptyState";
 import { Panel } from "@/components/panel/Panel";
 import { ShellHeader } from "@/components/shell/ShellHeader";
@@ -55,24 +56,26 @@ export function RoleDetailScreen({
   tab,
   holders,
 }: RoleDetailScreenProps) {
+  const t = useTranslations("adminRoleDetail");
+  const scopes = useTranslations("shared.access.scope");
   if (!role) {
     return (
       <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
         <ShellHeader
-          crumbs={roleCrumbs(loading ? "Role" : "Not found")}
-          title={loading ? <Skeleton className="h-6 w-48" /> : "Role not found"}
+          crumbs={roleCrumbs(loading ? t("role") : t("notFoundCrumb"))}
+          title={loading ? <Skeleton className="h-6 w-48" /> : t("notFoundTitle")}
         />
         {loading ? (
-          <Panel title="Permissions" loading />
+          <Panel title={t("permissions")} loading />
         ) : error ? (
-          <Panel title="Role" error={error} onRetry={onRetry} />
+          <Panel title={t("role")} error={error} onRetry={onRetry} />
         ) : (
           <EmptyState
             icon={<SearchXIcon className="size-5" />}
-            title="No role with this id"
-            description={`Nothing in this organization has the id ${id}. It may have been removed.`}
+            title={t("missingTitle")}
+            description={t("missingDescription", { id })}
             actionHref={ROLES_HREF}
-            actionLabel="All roles"
+            actionLabel={t("allRoles")}
           />
         )}
       </div>
@@ -85,7 +88,7 @@ export function RoleDetailScreen({
     <Button size="sm" asChild>
       <Link href={grantRoleHref(role.id)}>
         <UserPlusIcon className="size-4" />
-        Grant access
+        {t("grantAccess")}
       </Link>
     </Button>
   ) : undefined;
@@ -98,15 +101,15 @@ export function RoleDetailScreen({
         status={
           <span className="flex min-w-0 items-center gap-1.5">
             <Badge variant="outline" className="font-mono uppercase">
-              {SCOPE_NOUN[role.scopeLevel]}
+              {scopes(role.scopeLevel)}
             </Badge>
             {role.isSystem ? (
               <Badge variant="secondary" className="gap-1">
                 <LockIcon aria-hidden className="size-3" />
-                built-in
+                {t("builtIn")}
               </Badge>
             ) : (
-              <Badge variant="secondary">custom</Badge>
+              <Badge variant="secondary">{t("custom")}</Badge>
             )}
           </span>
         }
@@ -116,8 +119,8 @@ export function RoleDetailScreen({
           </span>
         }
         primaryAction={primaryAction}
-        tabs={roleTabs(role.id, tab)}
-        tabsAriaLabel="Role"
+        tabs={roleTabs(role.id, tab, (key) => t(`tabs.${key}`))}
+        tabsAriaLabel={t("role")}
       />
 
       {tab === "permissions" && (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
@@ -21,6 +22,7 @@ export interface OrganizationSettingsDraft {
 
 /** The server half of the Organization settings screen. */
 export function useOrganizationSettings() {
+  const t = useTranslations("adminOrganization");
   const { org, loading } = useActiveOrg();
 
   const [updateOrg, { loading: saving }] = useMutation<{
@@ -47,10 +49,10 @@ export function useOrganizationSettings() {
       },
     });
     if (data?.updateOrganization.ok) {
-      toast.success("Organization updated");
+      toast.success(t("updated"));
       return true;
     }
-    toast.error(data?.updateOrganization.errors?.[0]?.message ?? "Save failed");
+    toast.error(data?.updateOrganization.errors?.[0]?.message ?? t("saveFailed"));
     return false;
   }
 

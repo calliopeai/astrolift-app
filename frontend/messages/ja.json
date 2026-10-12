@@ -4032,6 +4032,584 @@
       "truncated": "200行表示 — コンソールで全ログを確認できます。"
     }
   },
+  "adminOrganization": {
+    "title": "組織",
+    "description": "プラットフォームの組織レベルの ID と保持期間の既定値を編集します。",
+    "general": {
+      "title": "一般",
+      "description": "サイドバーとメールに表示される表示名とホームページ URL。",
+      "slug": "スラッグ",
+      "slugHint": "スラッグは変更できません。URL と名前空間のプレフィックスに使われます。",
+      "displayName": "表示名",
+      "website": "ウェブサイト"
+    },
+    "retention": {
+      "title": "保持期間の既定値",
+      "description": "新しいアプリが引き継ぐ既定値です。既存のアプリは明示的に編集するまで独自の値を保持します。",
+      "auditDays": "監査ログの保持日数",
+      "default": "既定値: <mono>{value}</mono>",
+      "previewCap": "プレビュー環境の上限",
+      "appLogDays": "アプリログの保持日数",
+      "pending": "アプリレジストリ画面の提供後に編集できるようになります。"
+    },
+    "policies": {
+      "title": "ユーザーポリシー",
+      "description": "セルフサービスのプロフィール編集を含め、すべてのメンバーに適用される組織全体のルール。",
+      "allowProfileEdit": "ユーザーに自分のプロフィールの編集を許可する",
+      "allowProfileEditHint": "ユーザーが <code>{path}</code> で名、姓、メールアドレスを更新できます。ID プロバイダーが管理するフィールドは、オンでもロックされたままです。IdP が管理するフィールドをローカルで編集しても次回サインイン時に上書きされるためです。IdP を信頼できる唯一の情報源とする SSO 専用環境ではオフにしてください。",
+      "restrictedTitle": "メンバーが変更できない設定",
+      "restrictedHint": "設定 › 外観で選択していないメンバーに適用される既定値です。自分で選んだメンバーはその設定が維持されます。",
+      "restricted": {
+        "show": {
+          "label": "読み取り専用で表示",
+          "blurb": "変更できない設定を無効状態で、必要な権限とともに表示します"
+        },
+        "hide": {
+          "label": "非表示",
+          "blurb": "変更できる設定のみ表示します"
+        }
+      }
+    },
+    "sections": {
+      "houseTheme": "ハウステーマ",
+      "trustedDomains": "信頼済みドメイン",
+      "modules": "モジュール"
+    },
+    "idp": {
+      "title": "ID プロバイダー",
+      "description": "この組織の OIDC、SAML、SCIM サインイン設定。",
+      "comingSoon": "アプリ内設定は近日対応",
+      "activeByEnvironment": "現在有効な設定 (環境別):",
+      "development": "開発",
+      "devBypass": "auth1 dev-login によるバイパス",
+      "stagingProduction": "ステージングと本番",
+      "roadmap": "アプリ内のプロバイダー選択が接続されると、専用の設定ページで OIDC ディスカバリー、SAML メタデータ、SCIM トークンのローテーションが追加されます。"
+    },
+    "updated": "組織を更新しました",
+    "saveFailed": "保存に失敗しました"
+  },
+  "adminTrustedDomains": {
+    "title": "信頼済みメールドメイン",
+    "description": "メールアドレスがこれらのドメインに属する SSO ユーザーは、明示的な招待なしでこの組織に参加できます。<em>管理者の承認を必須にする</em>を選ぶと、アクセスが有効になる前に承認待ちのメンバーとして追加されます。",
+    "domain": "ドメイン",
+    "defaultRole": "既定のロール",
+    "none": "なし",
+    "noneOption": "なし",
+    "mode": "モード",
+    "reviewRequired": "承認が必要",
+    "autoJoin": "自動参加",
+    "loadingRoles": "ロールを読み込み中…",
+    "rolesError": "既定のロールを読み込めませんでした",
+    "onSignIn": "サインイン時",
+    "autoJoinNow": "すぐに自動参加",
+    "requireReview": "管理者の承認を必須にする",
+    "addDomain": "ドメインを追加",
+    "listLabel": "信頼済みドメイン",
+    "removeDomain": "{domain} を削除",
+    "emptyTitle": "信頼済みドメインはまだありません",
+    "emptyDescription": "ドメインが一致しない SSO ユーザーが参加するには、引き続き明示的な招待が必要です。",
+    "confirmTitle": "{domain} を削除しますか?",
+    "confirmTitleFallback": "ドメインを削除しますか?",
+    "confirmDescription": "このドメインからの新しいサインインは組織に自動参加しなくなり、明示的な招待が必要になります。既存のメンバーのアクセスとロールの割り当ては維持されます。変更は今後にのみ適用されます。",
+    "confirmLabel": "ドメインを削除",
+    "added": "{domain} を追加しました",
+    "addFailed": "追加に失敗しました",
+    "removed": "{domain} を削除しました",
+    "removeFailed": "削除に失敗しました",
+    "list": {
+      "search": "ドメイン、ロールを検索…",
+      "fields": {
+        "mode": "モード",
+        "role": "既定のロール"
+      },
+      "options": {
+        "mode": {
+          "auto": "自動参加",
+          "review": "承認が必要"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目"
+      },
+      "notes": {
+        "mine": "信頼済みドメインには追加者がまだ記録されないため、「自分の項目」は空です。"
+      }
+    }
+  },
+  "adminHouseTheme": {
+    "title": "ハウステーマ",
+    "description": "設定 › 外観で独自に選択していないすべてのユーザーに適用されます。各自に選ばせたい項目は<strong>未設定</strong>のままにしてください。テーマがロックされていない限り、アクセントカラーは各自で選べます。",
+    "save": "ハウステーマを保存",
+    "ground": "背景",
+    "accent": "アクセント",
+    "notSet": "未設定",
+    "lock": "このテーマをロック",
+    "lockHint": "全員にハウステーマが適用され、個人の選択は読み取り専用になります。既定ではオフです。既定値を公開することと強制することは別の判断です。",
+    "grounds": {
+      "black": "ブラック",
+      "charcoal": "チャコール",
+      "graphite": "グラファイト",
+      "emerald": "エメラルド",
+      "paper": "ペーパー",
+      "mist": "ミスト"
+    },
+    "modes": {
+      "dark": "ダーク",
+      "light": "ライト"
+    },
+    "accents": {
+      "green": "グリーン",
+      "copper": "カッパー",
+      "ice": "アイス",
+      "periwinkle": "ペリウィンクル",
+      "amber": "アンバー"
+    },
+    "saved": "ハウステーマを保存しました",
+    "savedLocked": "ハウステーマを保存してロックしました",
+    "saveFailed": "保存に失敗しました"
+  },
+  "adminModules": {
+    "title": "モジュール",
+    "description": "この組織向けのオプション連携です。インストール管理者は、すべての組織で強制的にオフにできます。",
+    "loadError": "モジュールを読み込めませんでした",
+    "installOff": "このインストールではオフです",
+    "enable": "{module} を有効にする",
+    "disable": "{module} を無効にする",
+    "enabledToast": "{module} を有効にしました",
+    "disabledToast": "{module} を無効にしました",
+    "updateError": "モジュールを更新できませんでした。",
+    "items": {
+      "chat_studio_integration": {
+        "label": "Chat Studio 連携",
+        "description": "Chat Studio が builder API 経由でこの組織のアプリにアクセスできるようにします。"
+      },
+      "agent_live_attach": {
+        "label": "エージェントへのライブ接続",
+        "description": "メンバーが実行中のエージェントセッションにライブで接続できるようにします。"
+      },
+      "chat_studio_agent_runs": {
+        "label": "Chat Studio からのエージェント実行",
+        "description": "Chat Studio がこの組織の登録済みエージェントを起動できるようにします。"
+      },
+      "agent_policy_enforcement": {
+        "label": "エージェントポリシーの適用",
+        "description": "Zentinelle がこの組織のエージェントとボックスにポリシーアクションを適用できるようにします。"
+      }
+    }
+  },
+  "actionSafety": {
+    "title": "操作の安全性",
+    "intro": "機密性の高い操作は、実行前に確認と再サインインを求めます。既定でオンです。破壊的な削除は、他の管理者の承認を待つようにもできます。ここでの変更は組織全体に適用されます。チーム、アプリ、個人にはより厳しい条件を追加できますが、緩めることはできません。変更するには再度サインインが必要です。",
+    "inspect": "適用内容を表示する対象",
+    "wholeOrg": "組織全体",
+    "inspectingNote": "読み取り専用: チーム、アプリ、個人のルールを反映した、このアプリであなたに適用される内容です。",
+    "loading": "読み込み中…",
+    "loadError": "ゲートを読み込めませんでした: {error}",
+    "retry": "再試行",
+    "columns": {
+      "action": "操作",
+      "confirm": "確認して再サインイン",
+      "approval": "承認",
+      "selfApproval": "管理者による自己承認"
+    },
+    "askBefore": "実行前に確認: {action}",
+    "on": "オン",
+    "off": "オフ",
+    "narrower": "チーム、アプリ、個人にも設定あり",
+    "requireApproval": "承認を必須にする: {action}",
+    "required": "必須",
+    "approversNeeded": "必要な承認者数: {action}",
+    "approvers": "{count, plural, other {承認者 # 人}}",
+    "perApp": "アプリごとにシークレット承認で設定",
+    "notAvailable": "利用不可",
+    "selfApprovalFor": "管理者による自己承認: {action}",
+    "allowed": "許可",
+    "notAllowed": "不許可",
+    "ruleNotSaved": "ルールは保存されませんでした。",
+    "decisionNotSaved": "判断は保存されませんでした。",
+    "requests": {
+      "title": "承認リクエスト",
+      "loadError": "リクエストを読み込めませんでした: {error}",
+      "empty": "未処理のリクエストはありません。",
+      "byYou": "あなたがリクエスト",
+      "byEmail": "{email} がリクエスト",
+      "bySomeone": "他のユーザーがリクエスト",
+      "progress": "<mono>{approvals}/{required}</mono> 承認済み · 有効期限 <expiry></expiry>",
+      "approvedMine": "承認済み: 続行するにはもう一度実行してください",
+      "approved": "承認済み",
+      "approve": "承認",
+      "reject": "却下",
+      "withdraw": "取り下げ"
+    },
+    "scoped": {
+      "title": "チーム、アプリ、個人のルール",
+      "description": "組織のゲートに追加されるだけで、削除されることはありません。",
+      "empty": "チーム、アプリ、個人のルールはありません。",
+      "forKind": "対象: {kind}",
+      "kinds": {
+        "TEAM": "チーム",
+        "APP": "アプリ",
+        "USER": "個人"
+      },
+      "remove": "削除",
+      "addLegend": "ルールを追加",
+      "appliesTo": "適用先",
+      "action": "操作",
+      "searchPeoplePlaceholder": "名前またはメールでユーザーを検索",
+      "searchPeople": "ユーザーを検索",
+      "searching": "検索中…",
+      "people": "ユーザー",
+      "pickTeam": "チームを選択",
+      "pickApp": "アプリを選択",
+      "teams": "チーム",
+      "apps": "アプリ",
+      "askBefore": "実行前に確認 (確認して再サインイン)",
+      "requireApproval": "承認を必須にする",
+      "approversNeeded": "必要な承認者数",
+      "approvers": "{count, plural, other {承認者 # 人}}",
+      "noSelf": "自己承認を禁止",
+      "add": "ルールを追加",
+      "adds": {
+        "asksBefore": "実行前に確認",
+        "needsApprovers": "{count, plural, other {承認者 # 人が必要}}",
+        "noSelfApproval": "自己承認なし",
+        "nothing": "追加なし"
+      }
+    }
+  },
+  "adminCheckAccess": {
+    "checkTitle": "アクセスを確認",
+    "compareTitle": "アクセスを比較",
+    "checkOne": "1 つの権限を確認",
+    "compareTwo": "2 人を比較",
+    "me": "自分",
+    "question": "<who></who> は <scope></scope> で <permission></permission> を実行できますか?",
+    "someone": "誰か",
+    "doSomething": "何かの操作",
+    "theOrganization": "組織",
+    "who": "誰が",
+    "on": "対象",
+    "wholeOrg": "組織全体",
+    "answer": "回答",
+    "compareQuestion": "<who></who> にできて <other></other> にできないことは何ですか? 逆の場合は?",
+    "someoneElse": "別の誰か",
+    "firstPerson": "1 人目",
+    "secondPerson": "2 人目",
+    "sideBySide": "並べて比較",
+    "compareNeeds": "2 人を比較するには {permission} が必要です。",
+    "checkNeeds": "自分のアクセスは確認できます。他のユーザーを確認するには {permission} が必要です。",
+    "answerCovers": "回答は権限チェックそのものの結果です。選択したオブジェクトについて、IdP グループ、チーム共有、組織のポリシーが反映されます。"
+  },
+  "adminNewRole": {
+    "title": "新しいロール",
+    "roles": "ロール",
+    "duplicate": "{name} を複製",
+    "customName": "{name} (カスタム)",
+    "context": "カスタムロールは、適用範囲に付与する名前付きの権限セットです。",
+    "steps": "ステップ",
+    "step": {
+      "details": "詳細",
+      "permissions": "権限",
+      "review": "確認"
+    },
+    "startFrom": "作成元",
+    "loadingRoles": "ロールを読み込み中…",
+    "blank": "なし (空のロール)",
+    "builtInOption": "{name} ({builtIn})",
+    "name": "名前",
+    "namePlaceholder": "リリースマネージャー",
+    "slug": "スラッグ",
+    "slugHelp": "編集するまでは名前から生成されます。作成後は変更できません。",
+    "bindsAt": "付与レベル",
+    "bindsAtHelp": "付与できる場所: このレベル、またはその内側のもの。作成後は変更できません。",
+    "description": "説明",
+    "descriptionPlaceholder": "このロールの用途を一文で。",
+    "comparedWith": "{name} と比較しています。新しいロールには {name} から複製したことが記録され、権限タブで差分を確認できます。",
+    "cancel": "キャンセル",
+    "back": "戻る",
+    "continue": "続行",
+    "creating": "作成中…",
+    "create": "ロールを作成",
+    "errors": {
+      "name": "ロール名を入力してください。",
+      "slugFormat": "英小文字、数字、ハイフン、アンダースコアのみ。先頭は英字か数字にしてください。",
+      "slugTaken": "{slug} という名前のロールは既に存在します。"
+    },
+    "created": "ロール「{name}」を作成しました",
+    "createFailed": "作成に失敗しました"
+  },
+  "adminBindings": {
+    "title": "割り当て",
+    "context": "ユーザーまたは IdP グループが持つすべてのロールと、その適用先と理由。",
+    "moreActions": "その他のリスト操作",
+    "exporting": "CSV をエクスポート中…",
+    "export": "一致する割り当てを CSV でエクスポート",
+    "listLabel": "ロールの割り当て",
+    "revoke": "取り消す",
+    "revokeCount": "{count} 件を取り消す",
+    "emptyTitle": "ロールの割り当てはありません",
+    "emptyDescription": "ユーザーにロールを付与すると、プラットフォームにアクセスできるようになります。",
+    "bulkTitle": "{count, plural, other {# 件のロール割り当てを取り消しますか?}}",
+    "bulkDescription": "選択したユーザーは、これらのロールで付与された権限を失います。その他の割り当ては引き続き有効です。",
+    "revokeFrom": "{name} から {role} を取り消しますか?",
+    "revokeFallback": "取り消しますか?",
+    "revokeDescription": "ユーザーはこのロールで付与された権限を失います。他のロール割り当てがあれば引き続き有効です。",
+    "holders": "保持者",
+    "holdersEmptyTitle": "このロールの保持者はいません",
+    "holdersEmptyDescription": "{role} を個人またはグループに付与すると、適用先とともにここに表示されます。",
+    "grantAccess": "アクセスを付与",
+    "revokeGroup": "このグループとロールの対応付けを削除します。グループのメンバーは、他の割り当てによるアクセスを保持します。",
+    "revokeHolder": "ここでこのロールにより付与されたものを失います。その他の割り当ては引き続き有効です。",
+    "heldBy": "保持者",
+    "idpGroup": "IdP グループ",
+    "role": "ロール",
+    "where": "適用先",
+    "source": "ソース",
+    "granted": "付与日",
+    "expires": "有効期限",
+    "never": "なし",
+    "exportEmpty": "エクスポートでファイルが返されませんでした",
+    "revoked": "ロールを取り消しました",
+    "revokeFailed": "取り消しに失敗しました",
+    "bulkRevokeFailed": "一括取り消しに失敗しました",
+    "allFailed": "{count, plural, other {# 件の取り消しがすべて失敗しました}}",
+    "revokedCount": "{count, plural, other {# 件の割り当てを取り消しました}}",
+    "partial": "{revoked} 件を取り消し、{failed} 件が失敗"
+  },
+  "adminPermissionLists": {
+    "roles": {
+      "search": "名前またはスラッグでロールを検索…",
+      "fields": {
+        "scope": "付与レベル",
+        "builtin": "組み込み"
+      },
+      "options": {
+        "scope": {
+          "ORG": "組織",
+          "TEAM": "チーム",
+          "PROJECT": "プロジェクト",
+          "APP": "アプリ"
+        },
+        "builtin": {
+          "yes": "組み込み",
+          "no": "カスタム"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "builtin": "組み込み",
+        "custom": "カスタム"
+      }
+    },
+    "assignments": {
+      "search": "ユーザー、グループ、ロールで検索…",
+      "fields": {
+        "role": "ロール",
+        "scope": "適用範囲",
+        "kind": "保持者",
+        "holder": "保持者"
+      },
+      "options": {
+        "scope": {
+          "ORG": "組織",
+          "TEAM": "チーム",
+          "PROJECT": "プロジェクト",
+          "APP": "アプリ"
+        },
+        "kind": {
+          "user": "ユーザー",
+          "group": "グループ"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "groups": "グループ"
+      }
+    },
+    "holders": {
+      "search": "ユーザーまたはグループで保持者を検索…",
+      "fields": {
+        "scope": "適用範囲",
+        "kind": "保持者"
+      },
+      "options": {
+        "scope": {
+          "ORG": "組織",
+          "TEAM": "チーム",
+          "PROJECT": "プロジェクト",
+          "APP": "アプリ"
+        },
+        "kind": {
+          "user": "ユーザー",
+          "group": "グループ"
+        }
+      },
+      "views": {
+        "all": "すべて"
+      }
+    }
+  },
+  "adminRoles": {
+    "title": "ロール",
+    "context": "名前付きの権限セットです。組み込みロールは変更できません。調整するには複製してください。",
+    "newRole": "新しいロール",
+    "columns": {
+      "role": "ロール",
+      "allows": "許可される内容",
+      "bindsAt": "付与レベル",
+      "kind": "種類",
+      "permissions": "権限",
+      "holders": "保持者"
+    },
+    "builtIn": "組み込み",
+    "custom": "カスタム",
+    "duplicatedFrom": "{name} から複製",
+    "from": "複製元: {name}",
+    "fromDeleted": "複製元: {name} (削除済み)",
+    "emptyTitle": "ロールはありません",
+    "emptyDescription": "組み込みロールはデプロイ時に作成されます。表示されない場合は、組織コンテキストがまだ解決されていない可能性があります。"
+  },
+  "adminRolePermissions": {
+    "savedLabel": "保存済み",
+    "builtInNote": "組み込みロールはプラットフォームに付属しており変更できません。複製すると、絞り込めるカスタムロールを作成できます。",
+    "duplicate": "複製してカスタマイズ",
+    "lineage": "<role>{name}</role>{builtIn, select, true { (組み込み)} other {}}{deleted, select, true { (その後削除)} other {}} から複製: 以降 <diff></diff>",
+    "compareWithRole": "{name} と比較",
+    "compareWith": "比較対象",
+    "savedVersion": "保存済みのバージョン",
+    "nothing": "なし",
+    "lineageOption": "{name} (複製元{deleted, select, true {, 削除済み} other {}})",
+    "builtInOption": "{name} (組み込み)",
+    "unsaved": "未保存",
+    "noChanges": "未保存の変更はありません",
+    "discard": "破棄",
+    "saving": "保存中…",
+    "save": "権限を保存"
+  },
+  "adminRoleDetail": {
+    "role": "ロール",
+    "notFoundCrumb": "見つかりません",
+    "notFoundTitle": "ロールが見つかりません",
+    "permissions": "権限",
+    "missingTitle": "この ID のロールはありません",
+    "missingDescription": "この組織に ID {id} のものはありません。削除された可能性があります。",
+    "allRoles": "すべてのロール",
+    "grantAccess": "アクセスを付与",
+    "builtIn": "組み込み",
+    "custom": "カスタム",
+    "tabs": {
+      "permissions": "権限",
+      "holders": "保持者",
+      "settings": "設定"
+    },
+    "gone": "このロールはもう存在しません。",
+    "saved": "ロール「{name}」を保存しました",
+    "saveFailed": "保存に失敗しました",
+    "settings": {
+      "title": "名前と説明",
+      "lockedDescription": "組み込みロールの名前と説明は変更できません。",
+      "description": "このロールを付与するときに表示される内容です。",
+      "name": "名前",
+      "descriptionLabel": "説明",
+      "descriptionPlaceholder": "このロールの用途を一文で。",
+      "slug": "スラッグ",
+      "bindsAt": "付与レベル",
+      "bindsAtValue": "{scope, select, ORG {組織またはその内側のもの} TEAM {チームまたはその内側のもの} PROJECT {プロジェクトまたはその内側のもの} APP {アプリまたはその内側のもの} other {{scope} またはその内側のもの}}",
+      "kind": "種類",
+      "builtIn": "組み込み",
+      "custom": "カスタム"
+    }
+  },
+  "adminPermissions": {
+    "pages": {
+      "roles": "ロール",
+      "assignments": "割り当て",
+      "diagnostics": "診断",
+      "presets": "かんたん設定",
+      "safety": "操作の安全性"
+    },
+    "off": "このインストールではこのコンソールはオフです。",
+    "offHint": "権限は <code>{flag}</code> フラグで提供されます。<link>管理 › 機能</link>でオンにしてください。"
+  },
+  "adminPresets": {
+    "title": "かんたん設定",
+    "intro": "その人が何をする必要があるかから始めます。各選択肢は選んだ適用範囲で既存のロールを付与するため、他の付与と同様に割り当てに表示されます。いずれもインストールのスーパー管理者にはなりません。",
+    "loading": "読み込み中…",
+    "loadError": "プリセットを読み込めませんでした: {error}",
+    "retry": "再試行",
+    "task": "タスク",
+    "scopes": {
+      "ORG": "組織",
+      "TEAM": "チーム",
+      "PROJECT": "プロジェクト",
+      "APP": "アプリ"
+    },
+    "grantAt": "{scope} レベルで {preset} を付与",
+    "grant": "付与",
+    "allowed": "許可",
+    "notIncluded": "含まれない",
+    "footer": "付与するには、<link>割り当て</link>でそのロールを割り当ててください。"
+  },
+  "adminRuns": {
+    "title": "実行",
+    "columns": {
+      "run": "実行",
+      "what": "対象",
+      "startedBy": "開始者",
+      "when": "日時",
+      "took": "所要時間",
+      "outcome": "結果"
+    },
+    "kinds": {
+      "agent": "エージェント実行",
+      "workflow": "ワークフロー実行",
+      "deployment": "デプロイ",
+      "job": "ジョブ実行",
+      "task": "タスク実行"
+    },
+    "notRecorded": "記録なし",
+    "emptyTitle": "実行はまだありません",
+    "emptyDescription": "エージェント実行、ワークフロー実行、デプロイ、ジョブ実行、タスク実行は開始されるとここに表示されます。",
+    "more": "その他",
+    "exportCsv": "CSV をエクスポート",
+    "exportFailed": "エクスポートに失敗しました",
+    "exportCapped": "最初の {count} 件の実行をエクスポートしました。",
+    "list": {
+      "search": "実行、エージェント、アプリ、ID を検索…",
+      "fields": {
+        "kind": "種類",
+        "outcome": "結果",
+        "trigger": "トリガー",
+        "startedBy": "開始者",
+        "project": "プロジェクト",
+        "app": "アプリ",
+        "since": "期間"
+      },
+      "options": {
+        "kind": {
+          "agent": "エージェント実行",
+          "workflow": "ワークフロー実行",
+          "deployment": "デプロイ",
+          "job": "ジョブ実行",
+          "task": "タスク実行"
+        },
+        "since": {
+          "1h": "過去 1 時間",
+          "24h": "過去 24 時間",
+          "7d": "過去 7 日間",
+          "30d": "過去 30 日間",
+          "90d": "過去 90 日間"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目"
+      }
+    }
+  },
   "orgMembers": {
     "searchLabel": "メンバーを検索",
     "searchPlaceholder": "ユーザー名またはメールアドレスで検索…",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import type { SearchedPrincipal } from "@/components/access/use-grant-access";
@@ -70,6 +71,7 @@ const OPEN = new Set(["pending", "approved"]);
  * prompt handles with a retry.
  */
 export function useActionSafety() {
+  const t = useTranslations("actionSafety");
   // Null shows the organization's switches; an app slug shows, read-only, what
   // applies there after team, app and person rules.
   const [inspecting, setInspecting] = React.useState<string | null>(null);
@@ -99,11 +101,10 @@ export function useActionSafety() {
         variables: { input: { action, scopeKind: "ORG", scopeId: null, ...UNCHANGED, ...patch } },
       });
       const payload = result.data?.setActionSafetyRule;
-      if (payload?.ok === false)
-        setSaveError(payload.errors[0]?.message ?? "The rule was not saved.");
+      if (payload?.ok === false) setSaveError(payload.errors[0]?.message ?? t("ruleNotSaved"));
       else await query.refetch();
     } catch (error) {
-      setSaveError(error instanceof Error ? error.message : "The rule was not saved.");
+      setSaveError(error instanceof Error ? error.message : t("ruleNotSaved"));
     } finally {
       setSaving(null);
     }
@@ -120,11 +121,10 @@ export function useActionSafety() {
           : verb === "reject"
             ? (await reject({ variables })).data?.rejectActionRequest
             : (await cancel({ variables })).data?.cancelActionRequest;
-      if (result?.ok === false)
-        setDecideError(result.errors[0]?.message ?? "The decision was not saved.");
+      if (result?.ok === false) setDecideError(result.errors[0]?.message ?? t("decisionNotSaved"));
       await requests.refetch();
     } catch (error) {
-      setDecideError(error instanceof Error ? error.message : "The decision was not saved.");
+      setDecideError(error instanceof Error ? error.message : t("decisionNotSaved"));
     } finally {
       setDeciding(null);
     }
@@ -155,6 +155,7 @@ export function useActionSafety() {
 
 /** Team, app and person rules (#2203): the list, the pickers, add and remove. */
 function useScopedSafetyRules(rows: ActionSafetyRow[]): ScopedSafetyRulesProps {
+  const t = useTranslations("actionSafety");
   const rules = useQuery<ActionSafetyRulesQuery>(ACTION_SAFETY_RULES, {
     fetchPolicy: "cache-and-network",
   });
@@ -182,13 +183,13 @@ function useScopedSafetyRules(rows: ActionSafetyRow[]): ScopedSafetyRulesProps {
     try {
       const result = await step();
       if (result && !result.ok) {
-        setError(result.message ?? "The rule was not saved.");
+        setError(result.message ?? t("ruleNotSaved"));
         return false;
       }
       await rules.refetch();
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "The rule was not saved.");
+      setError(e instanceof Error ? e.message : t("ruleNotSaved"));
       return false;
     } finally {
       setSaving(false);

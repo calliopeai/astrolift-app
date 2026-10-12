@@ -1,11 +1,14 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+import * as React from "react";
 import type { CursorPage } from "@/components/data-table";
 import { useListState } from "@/components/list/use-list-state";
 import { LIST_ROLES_PAGE } from "@/graphql/identity/identity.queries";
 import type { AstroliftRole } from "@/graphql/identity/identity.types";
 
 import { useNumberedListQuery } from "../access/use-list-page-query";
+import { localizeList } from "../localize-list";
 import { ROLES_LIST, rolesFilter } from "./permissions-lists";
 
 interface RolesPageResp {
@@ -19,9 +22,14 @@ interface RolesPageResp {
  * fetches only what it shows.
  */
 export function useRoles() {
+  const lists = useTranslations("adminPermissionLists.roles");
   // `astroliftRolesPage` searches slug, name and description, and filters,
   // sorts and numbers the pages (#2153).
-  const list = useListState(ROLES_LIST);
+  const definition = React.useMemo(
+    () => localizeList(ROLES_LIST, lists, ["scope", "builtin"]),
+    [lists]
+  );
+  const list = useListState(definition);
   const page = useNumberedListQuery<AstroliftRole, ReturnType<typeof rolesFilter>>(
     LIST_ROLES_PAGE,
     list,

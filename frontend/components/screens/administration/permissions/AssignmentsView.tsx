@@ -70,6 +70,8 @@ export function AssignmentsView({
 }: AssignmentsViewProps) {
   const fmt = useFormatters();
   const grantT = useTranslations("shared.access.legacyGrantRole");
+  const t = useTranslations("adminBindings");
+  const scopes = useTranslations("shared.access.scope");
 
   const [grantOpen, setGrantOpen] = React.useState(false);
   const [revokeTarget, setRevokeTarget] = React.useState<AstroliftRoleBinding | null>(null);
@@ -81,15 +83,19 @@ export function AssignmentsView({
     if (await onBulkRevoke(bulkTarget.selectedIds)) bulkTarget.clear();
   }
 
-  const columns = bindingColumns({ formatDate: fmt.formatDate });
+  const columns = bindingColumns({
+    formatDate: fmt.formatDate,
+    t,
+    scopeNoun: (kind) => (scopes.has(kind) ? scopes(kind) : kind),
+  });
 
   return (
     <div className="flex min-w-0 flex-1 flex-col p-6">
       <ListPage<AstroliftRoleBinding>
         header={{
           crumbs: permissionsCrumbs("assignments"),
-          title: "Assignments",
-          context: "Every role held by a user or an IdP group, where it applies, and why.",
+          title: t("title"),
+          context: t("context"),
           primaryAction: (
             <Can permission="org.manage_members">
               <Button size="sm" onClick={() => setGrantOpen(true)} disabled={rolesLoading}>
@@ -102,7 +108,7 @@ export function AssignmentsView({
         menu={
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="size-8" aria-label="More list actions">
+              <Button variant="ghost" size="icon" className="size-8" aria-label={t("moreActions")}>
                 <MoreHorizontalIcon className="size-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -114,13 +120,13 @@ export function AssignmentsView({
                 }}
               >
                 <DownloadIcon className="size-4" />
-                {exportingCsv ? "Exporting CSV…" : "Export matching assignments as CSV"}
+                {exportingCsv ? t("exporting") : t("export")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         }
         list={list}
-        label="Role bindings"
+        label={t("listLabel")}
         columns={columns}
         rows={page.rows}
         getRowId={(b) => b.id}
@@ -139,7 +145,7 @@ export function AssignmentsView({
                   onSelect={() => setRevokeTarget(b)}
                 >
                   <Trash2Icon className="size-4" />
-                  Revoke
+                  {t("revoke")}
                 </DropdownMenuItem>
               )
             : undefined
@@ -154,15 +160,15 @@ export function AssignmentsView({
                   disabled={bulkRevoking}
                 >
                   <Trash2Icon className="size-4" />
-                  Revoke {sel.selectedCount}
+                  {t("revokeCount", { count: sel.selectedCount })}
                 </Button>
               )
             : undefined
         }
         empty={{
           icon: <ShieldIcon className="size-5" />,
-          title: "No role bindings",
-          description: "Grant a role to a user to give them access to the platform.",
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
         }}
       />
 
@@ -171,9 +177,9 @@ export function AssignmentsView({
         onOpenChange={(next) => {
           if (!next) setBulkTarget(null);
         }}
-        title={`Revoke ${bulkCount} role binding${bulkCount === 1 ? "" : "s"}?`}
-        description="The selected users lose the permissions these roles granted. Any other bindings they hold stay in effect."
-        confirmLabel={`Revoke ${bulkCount}`}
+        title={t("bulkTitle", { count: bulkCount })}
+        description={t("bulkDescription")}
+        confirmLabel={t("revokeCount", { count: bulkCount })}
         destructive
         onConfirm={handleBulkRevoke}
       />
@@ -185,11 +191,11 @@ export function AssignmentsView({
         }}
         title={
           revokeTarget
-            ? `Revoke ${revokeTarget.role.slug} from ${subjectLabel(revokeTarget)}?`
-            : "Revoke?"
+            ? t("revokeFrom", { role: revokeTarget.role.slug, name: subjectLabel(revokeTarget) })
+            : t("revokeFallback")
         }
-        description="The user loses the permissions this role granted. Other role bindings, if any, remain in effect."
-        confirmLabel="Revoke"
+        description={t("revokeDescription")}
+        confirmLabel={t("revoke")}
         destructive
         onConfirm={async () => {
           if (revokeTarget) await onRevoke(revokeTarget);

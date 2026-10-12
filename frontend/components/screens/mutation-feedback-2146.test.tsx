@@ -514,11 +514,11 @@ describe("rendered action state", () => {
     }
     render(<Screen />, { wrapper });
     fireEvent.click(screen.getAllByRole("checkbox")[1]);
-    fireEvent.click(screen.getByRole("button", { name: "Revoke 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "revokeCount" }));
     fireEvent.click(screen.getByRole("alertdialog").querySelector("button:last-child")!);
     await waitFor(() => expect(state.error).toHaveBeenCalledWith("Connection lost"));
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Revoke 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "revokeCount" })).toBeInTheDocument();
   });
   it("shows a rejected tool save inline and retains the edited draft", async () => {
     function Screen() {

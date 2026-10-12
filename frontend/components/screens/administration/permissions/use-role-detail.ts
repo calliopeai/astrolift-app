@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -34,6 +35,7 @@ const ROLE_REFETCH = ["ListRolesPage", "GetRole", { query: LIST_ROLES }];
  * cache.
  */
 export function useRoleDetail(id: string) {
+  const t = useTranslations("adminRoleDetail");
   const perms = useMyPermissions();
   const one = useQuery<RoleResp>(GET_ROLE, {
     variables: { id },
@@ -61,7 +63,7 @@ export function useRoleDetail(id: string) {
     description?: string;
   }): Promise<string | null> {
     try {
-      if (!role) return "This role is no longer there.";
+      if (!role) return t("gone");
       const { data: res } = await update({
         variables: {
           input: {
@@ -73,12 +75,12 @@ export function useRoleDetail(id: string) {
         },
       });
       if (res?.updateRole.ok) {
-        toast.success(`Role “${input.name?.trim() || role.name}” saved`);
+        toast.success(t("saved", { name: input.name?.trim() || role.name }));
         return null;
       }
-      return res?.updateRole.errors?.[0]?.message ?? "Save failed";
+      return res?.updateRole.errors?.[0]?.message ?? t("saveFailed");
     } catch (err) {
-      return err instanceof Error ? err.message : "Save failed";
+      return err instanceof Error ? err.message : t("saveFailed");
     }
   }
 

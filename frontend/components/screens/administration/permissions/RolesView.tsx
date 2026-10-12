@@ -2,8 +2,9 @@
 
 import { LockIcon, PlusIcon, ShieldIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
-import { SCOPE_NOUN, summarizePermissions } from "@/components/access/access-model";
+import { summarizePermissions } from "@/components/access/access-model";
 import { Can } from "@/components/Can";
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
@@ -18,10 +19,12 @@ import type { useRoles } from "./use-roles";
 
 export type RolesViewProps = ReturnType<typeof useRoles>;
 
-const COLUMNS: Column<AstroliftRole>[] = [
+type Translator = (key: string, values?: Record<string, string>) => string;
+
+const columns = (t: Translator, scopes: Translator): Column<AstroliftRole>[] => [
   {
     id: "role",
-    header: "Role",
+    header: t("columns.role"),
     sortKey: "name",
     cellClassName: "max-w-72",
     cell: (role) => (
@@ -37,7 +40,7 @@ const COLUMNS: Column<AstroliftRole>[] = [
   },
   {
     id: "allows",
-    header: "What it allows",
+    header: t("columns.allows"),
     cellClassName: "max-w-96",
     cell: (role) => {
       const text = role.description?.trim() || summarizePermissions(role.permissions);
@@ -50,33 +53,34 @@ const COLUMNS: Column<AstroliftRole>[] = [
   },
   {
     id: "scope",
-    header: "Binds at",
+    header: t("columns.bindsAt"),
     sortKey: "scopeLevel",
     cell: (role) => (
       <Badge className={`${SCOPE_TONE[role.scopeLevel] ?? ""} font-mono`} variant="secondary">
-        {SCOPE_NOUN[role.scopeLevel]}
+        {scopes(role.scopeLevel)}
       </Badge>
     ),
   },
   {
     id: "type",
-    header: "Kind",
+    header: t("columns.kind"),
     cell: (role) =>
       role.isSystem ? (
         <Badge variant="outline" className="gap-1">
           <LockIcon className="size-3" />
-          built-in
+          {t("builtIn")}
         </Badge>
       ) : (
         <span className="flex min-w-0 flex-col items-start gap-0.5">
-          <Badge variant="secondary">custom</Badge>
+          <Badge variant="secondary">{t("custom")}</Badge>
           {role.duplicatedFrom && (
             <span
               className="text-muted-foreground block max-w-40 truncate text-xs"
-              title={`Duplicated from ${role.duplicatedFrom.name}`}
+              title={t("duplicatedFrom", { name: role.duplicatedFrom.name })}
             >
-              from {role.duplicatedFrom.name}
-              {role.duplicatedFrom.deleted ? " (deleted)" : ""}
+              {role.duplicatedFrom.deleted
+                ? t("fromDeleted", { name: role.duplicatedFrom.name })
+                : t("from", { name: role.duplicatedFrom.name })}
             </span>
           )}
         </span>
@@ -84,7 +88,7 @@ const COLUMNS: Column<AstroliftRole>[] = [
   },
   {
     id: "permissions",
-    header: "Permissions",
+    header: t("columns.permissions"),
     align: "right",
     cellClassName: "font-mono tabular-nums",
     cell: (role) => role.permissions.length,
@@ -92,7 +96,7 @@ const COLUMNS: Column<AstroliftRole>[] = [
   {
     // Bindings in this org; a shared built-in counts only this org's.
     id: "holders",
-    header: "Holders",
+    header: t("columns.holders"),
     sortKey: "bindings",
     align: "right",
     cellClassName: "font-mono tabular-nums",
@@ -107,28 +111,29 @@ const COLUMNS: Column<AstroliftRole>[] = [
  * with steps (five fields, spec 44 §5.4), not a sheet.
  */
 export function RolesView({ list, page }: RolesViewProps) {
+  const t = useTranslations("adminRoles");
+  const scopes = useTranslations("shared.access.scope");
   return (
     <div className="flex min-w-0 flex-1 flex-col p-6">
       <ListPage<AstroliftRole>
         header={{
           crumbs: permissionsCrumbs("roles"),
-          title: "Roles",
-          context:
-            "Named sets of permissions. Built-in roles are fixed; duplicate one to tailor it.",
+          title: t("title"),
+          context: t("context"),
           primaryAction: (
             <Can permission="org.manage_members">
               <Button size="sm" asChild>
                 <Link href={newRoleHref()}>
                   <PlusIcon className="size-4" />
-                  New role
+                  {t("newRole")}
                 </Link>
               </Button>
             </Can>
           ),
         }}
         list={list}
-        label="Roles"
-        columns={COLUMNS}
+        label={t("title")}
+        columns={columns(t, scopes)}
         rows={page.rows}
         getRowId={(role) => role.id}
         rowHref={(role) => roleHref(role.id)}
@@ -140,9 +145,8 @@ export function RolesView({ list, page }: RolesViewProps) {
         nextCursor={page.nextCursor}
         empty={{
           icon: <ShieldIcon className="size-5" />,
-          title: "No roles",
-          description:
-            "Built-in roles are seeded on deploy; if none appear, the org context may not be resolved yet.",
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
         }}
       />
     </div>

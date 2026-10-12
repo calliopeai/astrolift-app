@@ -4032,6 +4032,584 @@
       "truncated": "200줄 표시 — 콘솔에서 전체 로그를 확인하세요."
     }
   },
+  "adminOrganization": {
+    "title": "조직",
+    "description": "플랫폼의 조직 수준 ID와 보관 기간 기본값을 편집합니다.",
+    "general": {
+      "title": "일반",
+      "description": "사이드바와 이메일에 표시되는 표시 이름과 홈페이지 URL입니다.",
+      "slug": "슬러그",
+      "slugHint": "슬러그는 변경할 수 없으며 URL과 네임스페이스 접두사에 사용됩니다.",
+      "displayName": "표시 이름",
+      "website": "웹사이트"
+    },
+    "retention": {
+      "title": "보관 기간 기본값",
+      "description": "새 앱이 상속하는 기본값입니다. 기존 앱은 명시적으로 편집할 때까지 자체 값을 유지합니다.",
+      "auditDays": "감사 로그 보관 일수",
+      "default": "기본값: <mono>{value}</mono>",
+      "previewCap": "미리보기 환경 상한",
+      "appLogDays": "앱 로그 보관 일수",
+      "pending": "앱 레지스트리 화면이 제공되면 편집할 수 있습니다."
+    },
+    "policies": {
+      "title": "사용자 정책",
+      "description": "셀프 서비스 프로필 편집기를 포함해 모든 구성원에게 적용되는 조직 전체 규칙입니다.",
+      "allowProfileEdit": "사용자가 자신의 프로필을 편집하도록 허용",
+      "allowProfileEditHint": "사용자가 <code>{path}</code>에서 이름, 성, 이메일을 수정할 수 있습니다. ID 공급자가 관리하는 필드는 켜져 있어도 잠긴 상태로 유지됩니다. IdP 필드를 로컬에서 수정해도 다음 로그인 때 덮어쓰기 때문입니다. IdP가 기준 정보인 SSO 전용 배포에서는 끄세요.",
+      "restrictedTitle": "구성원이 변경할 수 없는 설정",
+      "restrictedHint": "설정 › 모양에서 선택하지 않은 구성원에게 적용되는 기본값입니다. 직접 선택한 구성원은 그 선택을 유지합니다.",
+      "restricted": {
+        "show": {
+          "label": "읽기 전용으로 표시",
+          "blurb": "변경할 수 없는 설정을 비활성 상태로, 필요한 권한과 함께 표시합니다"
+        },
+        "hide": {
+          "label": "숨기기",
+          "blurb": "변경할 수 있는 설정만 표시합니다"
+        }
+      }
+    },
+    "sections": {
+      "houseTheme": "하우스 테마",
+      "trustedDomains": "신뢰할 수 있는 도메인",
+      "modules": "모듈"
+    },
+    "idp": {
+      "title": "ID 공급자",
+      "description": "이 조직의 OIDC, SAML, SCIM 로그인 구성입니다.",
+      "comingSoon": "앱 내 설정 곧 제공",
+      "activeByEnvironment": "현재 활성 구성 (환경별):",
+      "development": "개발",
+      "devBypass": "auth1 dev-login 우회",
+      "stagingProduction": "스테이징 및 프로덕션",
+      "roadmap": "앱 내 공급자 선택기가 연결되면 전용 설정 페이지에서 OIDC 검색, SAML 메타데이터, SCIM 토큰 교체가 추가됩니다."
+    },
+    "updated": "조직을 업데이트했습니다",
+    "saveFailed": "저장하지 못했습니다"
+  },
+  "adminTrustedDomains": {
+    "title": "신뢰할 수 있는 이메일 도메인",
+    "description": "이메일이 이 도메인 중 하나에 속한 SSO 사용자는 명시적 초대 없이 이 조직에 참여할 수 있습니다. <em>관리자 검토 필요</em>를 설정하면 활성 액세스를 받기 전에 승인 대기 구성원으로 추가됩니다.",
+    "domain": "도메인",
+    "defaultRole": "기본 역할",
+    "none": "없음",
+    "noneOption": "없음",
+    "mode": "모드",
+    "reviewRequired": "검토 필요",
+    "autoJoin": "자동 참여",
+    "loadingRoles": "역할을 불러오는 중…",
+    "rolesError": "기본 역할을 불러올 수 없습니다",
+    "onSignIn": "로그인 시",
+    "autoJoinNow": "즉시 자동 참여",
+    "requireReview": "관리자 검토 필요",
+    "addDomain": "도메인 추가",
+    "listLabel": "신뢰할 수 있는 도메인",
+    "removeDomain": "{domain} 제거",
+    "emptyTitle": "아직 신뢰할 수 있는 도메인이 없습니다",
+    "emptyDescription": "도메인이 일치하지 않는 SSO 사용자는 여전히 명시적 초대가 있어야 참여할 수 있습니다.",
+    "confirmTitle": "{domain}을(를) 제거할까요?",
+    "confirmTitleFallback": "도메인을 제거할까요?",
+    "confirmDescription": "이 도메인의 새 로그인은 더 이상 조직에 자동 참여하지 않으며 명시적 초대가 필요합니다. 기존 구성원은 액세스와 역할 바인딩을 유지하며, 이 변경은 앞으로만 적용됩니다.",
+    "confirmLabel": "도메인 제거",
+    "added": "{domain}을(를) 추가했습니다",
+    "addFailed": "추가하지 못했습니다",
+    "removed": "{domain}을(를) 제거했습니다",
+    "removeFailed": "제거하지 못했습니다",
+    "list": {
+      "search": "도메인, 역할 검색…",
+      "fields": {
+        "mode": "모드",
+        "role": "기본 역할"
+      },
+      "options": {
+        "mode": {
+          "auto": "자동 참여",
+          "review": "검토 필요"
+        }
+      },
+      "views": {
+        "all": "전체",
+        "mine": "내 항목"
+      },
+      "notes": {
+        "mine": "신뢰할 수 있는 도메인은 아직 추가한 사람을 기록하지 않아 내 항목이 비어 있습니다."
+      }
+    }
+  },
+  "adminHouseTheme": {
+    "title": "하우스 테마",
+    "description": "설정 › 모양에서 직접 선택하지 않은 모든 사용자에게 적용됩니다. 각자 선택하게 하려면 옵션을 <strong>설정 안 함</strong>으로 두세요. 테마가 잠기지 않았다면 강조 색상은 각자 선택할 수 있습니다.",
+    "save": "하우스 테마 저장",
+    "ground": "배경",
+    "accent": "강조 색상",
+    "notSet": "설정 안 함",
+    "lock": "이 테마 잠그기",
+    "lockHint": "모두에게 하우스 테마가 적용되고 개인 선택기는 읽기 전용이 됩니다. 기본값은 꺼짐이며, 기본값을 게시하는 것과 강제하는 것은 서로 다른 결정입니다.",
+    "grounds": {
+      "black": "블랙",
+      "charcoal": "차콜",
+      "graphite": "그래파이트",
+      "emerald": "에메랄드",
+      "paper": "페이퍼",
+      "mist": "미스트"
+    },
+    "modes": {
+      "dark": "다크",
+      "light": "라이트"
+    },
+    "accents": {
+      "green": "그린",
+      "copper": "코퍼",
+      "ice": "아이스",
+      "periwinkle": "페리윙클",
+      "amber": "앰버"
+    },
+    "saved": "하우스 테마를 저장했습니다",
+    "savedLocked": "하우스 테마를 저장하고 잠갔습니다",
+    "saveFailed": "저장하지 못했습니다"
+  },
+  "adminModules": {
+    "title": "모듈",
+    "description": "이 조직의 선택적 통합입니다. 설치 관리자는 여전히 모든 조직에서 강제로 끌 수 있습니다.",
+    "loadError": "모듈을 불러올 수 없습니다",
+    "installOff": "이 설치에서 꺼져 있음",
+    "enable": "{module} 사용",
+    "disable": "{module} 사용 안 함",
+    "enabledToast": "{module} 사용 설정됨",
+    "disabledToast": "{module} 사용 중지됨",
+    "updateError": "모듈을 업데이트할 수 없습니다.",
+    "items": {
+      "chat_studio_integration": {
+        "label": "Chat Studio 통합",
+        "description": "Chat Studio가 builder API를 통해 이 조직의 앱에 접근할 수 있게 합니다."
+      },
+      "agent_live_attach": {
+        "label": "에이전트 실시간 연결",
+        "description": "구성원이 실행 중인 에이전트 세션에 실시간으로 연결할 수 있게 합니다."
+      },
+      "chat_studio_agent_runs": {
+        "label": "Chat Studio 에이전트 실행",
+        "description": "Chat Studio가 이 조직에 등록된 에이전트를 실행할 수 있게 합니다."
+      },
+      "agent_policy_enforcement": {
+        "label": "에이전트 정책 적용",
+        "description": "Zentinelle이 이 조직의 에이전트와 박스에 정책 작업을 적용할 수 있게 합니다."
+      }
+    }
+  },
+  "actionSafety": {
+    "title": "작업 안전",
+    "intro": "민감한 작업은 실행 전에 확인과 재로그인을 요구합니다. 기본적으로 켜져 있습니다. 파괴적인 삭제는 다른 관리자의 승인을 기다리도록 할 수도 있습니다. 여기서의 변경은 조직 전체에 적용되며, 팀, 앱, 사람에게는 더 많이 요구할 수 있지만 더 적게는 할 수 없습니다. 변경하려면 다시 로그인해야 합니다.",
+    "inspect": "적용 내용 표시 대상",
+    "wholeOrg": "조직 전체",
+    "inspectingNote": "읽기 전용: 팀, 앱, 사람 규칙을 반영해 이 앱에서 나에게 적용되는 내용입니다.",
+    "loading": "불러오는 중…",
+    "loadError": "게이트를 읽을 수 없습니다: {error}",
+    "retry": "다시 시도",
+    "columns": {
+      "action": "작업",
+      "confirm": "확인 후 다시 로그인",
+      "approval": "승인",
+      "selfApproval": "관리자의 본인 승인 허용"
+    },
+    "askBefore": "실행 전 확인: {action}",
+    "on": "켜짐",
+    "off": "꺼짐",
+    "narrower": "팀, 앱 또는 사람에도 설정됨",
+    "requireApproval": "승인 필요: {action}",
+    "required": "필수",
+    "approversNeeded": "필요한 승인자 수: {action}",
+    "approvers": "{count, plural, other {승인자 #명}}",
+    "perApp": "앱별로 시크릿 승인에서 설정",
+    "notAvailable": "사용할 수 없음",
+    "selfApprovalFor": "관리자의 본인 승인 허용: {action}",
+    "allowed": "허용",
+    "notAllowed": "허용 안 함",
+    "ruleNotSaved": "규칙이 저장되지 않았습니다.",
+    "decisionNotSaved": "결정이 저장되지 않았습니다.",
+    "requests": {
+      "title": "승인 요청",
+      "loadError": "요청을 읽을 수 없습니다: {error}",
+      "empty": "열린 요청이 없습니다.",
+      "byYou": "내가 요청함",
+      "byEmail": "{email}님이 요청함",
+      "bySomeone": "다른 사용자가 요청함",
+      "progress": "<mono>{approvals}/{required}</mono> 승인됨 · 만료 <expiry></expiry>",
+      "approvedMine": "승인됨: 계속하려면 다시 실행하세요",
+      "approved": "승인됨",
+      "approve": "승인",
+      "reject": "거부",
+      "withdraw": "철회"
+    },
+    "scoped": {
+      "title": "팀, 앱, 사람 규칙",
+      "description": "조직의 게이트에 추가될 뿐 제거하지는 않습니다.",
+      "empty": "팀, 앱, 사람 규칙이 없습니다.",
+      "forKind": "대상: {kind}",
+      "kinds": {
+        "TEAM": "팀",
+        "APP": "앱",
+        "USER": "사람"
+      },
+      "remove": "제거",
+      "addLegend": "규칙 추가",
+      "appliesTo": "적용 대상",
+      "action": "작업",
+      "searchPeoplePlaceholder": "이름 또는 이메일로 사람 검색",
+      "searchPeople": "사람 검색",
+      "searching": "검색 중…",
+      "people": "사람",
+      "pickTeam": "팀 선택",
+      "pickApp": "앱 선택",
+      "teams": "팀",
+      "apps": "앱",
+      "askBefore": "실행 전 확인 (확인 후 다시 로그인)",
+      "requireApproval": "승인 필요",
+      "approversNeeded": "필요한 승인자 수",
+      "approvers": "{count, plural, other {승인자 #명}}",
+      "noSelf": "본인 승인 금지",
+      "add": "규칙 추가",
+      "adds": {
+        "asksBefore": "실행 전 확인",
+        "needsApprovers": "{count, plural, other {승인자 #명 필요}}",
+        "noSelfApproval": "본인 승인 없음",
+        "nothing": "추가 사항 없음"
+      }
+    }
+  },
+  "adminCheckAccess": {
+    "checkTitle": "액세스 확인",
+    "compareTitle": "액세스 비교",
+    "checkOne": "권한 하나 확인",
+    "compareTwo": "두 사람 비교",
+    "me": "나",
+    "question": "<who></who>이(가) <scope></scope>에서 <permission></permission>을(를) 할 수 있나요?",
+    "someone": "누군가",
+    "doSomething": "어떤 작업",
+    "theOrganization": "조직",
+    "who": "누가",
+    "on": "대상",
+    "wholeOrg": "조직 전체",
+    "answer": "답변",
+    "compareQuestion": "<who></who>은(는) 할 수 있지만 <other></other>은(는) 할 수 없는 것은 무엇이며, 그 반대는 무엇인가요?",
+    "someoneElse": "다른 사람",
+    "firstPerson": "첫 번째 사람",
+    "secondPerson": "두 번째 사람",
+    "sideBySide": "나란히 비교",
+    "compareNeeds": "두 사람을 비교하려면 {permission} 권한이 필요합니다.",
+    "checkNeeds": "내 액세스는 확인할 수 있으며, 다른 사람을 확인하려면 {permission} 권한이 필요합니다.",
+    "answerCovers": "답변은 권한 검사 자체의 결과입니다. 선택한 객체에 대해 IdP 그룹, 팀 공유, 조직 정책이 반영됩니다."
+  },
+  "adminNewRole": {
+    "title": "새 역할",
+    "roles": "역할",
+    "duplicate": "{name} 복제",
+    "customName": "{name} (사용자 지정)",
+    "context": "사용자 지정 역할은 특정 범위에서 부여하는 이름이 있는 권한 집합입니다.",
+    "steps": "단계",
+    "step": {
+      "details": "세부 정보",
+      "permissions": "권한",
+      "review": "검토"
+    },
+    "startFrom": "시작 기준",
+    "loadingRoles": "역할을 불러오는 중…",
+    "blank": "없음, 빈 역할",
+    "builtInOption": "{name} ({builtIn})",
+    "name": "이름",
+    "namePlaceholder": "릴리스 관리자",
+    "slug": "슬러그",
+    "slugHelp": "편집하기 전까지 이름에서 생성됩니다. 생성 후에는 고정됩니다.",
+    "bindsAt": "바인딩 수준",
+    "bindsAtHelp": "부여할 수 있는 위치: 이 수준 또는 그 안의 모든 항목. 생성 후에는 고정됩니다.",
+    "description": "설명",
+    "descriptionPlaceholder": "이 역할의 용도를 한 문장으로 적으세요.",
+    "comparedWith": "{name}과(와) 비교했습니다. 새 역할은 {name}에서 복제되었음을 기록하므로 권한 탭에서 얼마나 달라졌는지 볼 수 있습니다.",
+    "cancel": "취소",
+    "back": "뒤로",
+    "continue": "계속",
+    "creating": "생성 중…",
+    "create": "역할 만들기",
+    "errors": {
+      "name": "역할 이름을 입력하세요.",
+      "slugFormat": "소문자, 숫자, 하이픈, 밑줄만 사용하고 문자나 숫자로 시작해야 합니다.",
+      "slugTaken": "{slug}(이)라는 역할이 이미 있습니다."
+    },
+    "created": "역할 “{name}”을(를) 만들었습니다",
+    "createFailed": "만들지 못했습니다"
+  },
+  "adminBindings": {
+    "title": "할당",
+    "context": "사용자나 IdP 그룹이 보유한 모든 역할과 적용 위치, 그 이유입니다.",
+    "moreActions": "기타 목록 작업",
+    "exporting": "CSV 내보내는 중…",
+    "export": "일치하는 할당을 CSV로 내보내기",
+    "listLabel": "역할 바인딩",
+    "revoke": "취소",
+    "revokeCount": "{count}개 취소",
+    "emptyTitle": "역할 바인딩 없음",
+    "emptyDescription": "사용자에게 역할을 부여하면 플랫폼에 액세스할 수 있습니다.",
+    "bulkTitle": "{count, plural, other {역할 바인딩 #개를 취소할까요?}}",
+    "bulkDescription": "선택한 사용자는 이 역할들이 부여한 권한을 잃습니다. 다른 바인딩은 계속 유효합니다.",
+    "revokeFrom": "{name}에게서 {role}을(를) 취소할까요?",
+    "revokeFallback": "취소할까요?",
+    "revokeDescription": "사용자는 이 역할이 부여한 권한을 잃습니다. 다른 역할 바인딩이 있으면 계속 유효합니다.",
+    "holders": "보유자",
+    "holdersEmptyTitle": "이 역할을 보유한 사람이 없습니다",
+    "holdersEmptyDescription": "{role}을(를) 사람이나 그룹에 부여하면 적용 위치와 함께 여기에 표시됩니다.",
+    "grantAccess": "액세스 부여",
+    "revokeGroup": "이 그룹과 역할의 매핑을 제거합니다. 그룹 구성원은 다른 바인딩으로 받은 액세스를 유지합니다.",
+    "revokeHolder": "여기서 이 역할이 부여한 권한을 잃습니다. 다른 바인딩은 계속 유효합니다.",
+    "heldBy": "보유자",
+    "idpGroup": "IdP 그룹",
+    "role": "역할",
+    "where": "위치",
+    "source": "출처",
+    "granted": "부여일",
+    "expires": "만료",
+    "never": "없음",
+    "exportEmpty": "내보내기에서 파일이 반환되지 않았습니다",
+    "revoked": "역할을 취소했습니다",
+    "revokeFailed": "취소하지 못했습니다",
+    "bulkRevokeFailed": "일괄 취소하지 못했습니다",
+    "allFailed": "{count, plural, other {취소 #건이 모두 실패했습니다}}",
+    "revokedCount": "{count, plural, other {바인딩 #개를 취소했습니다}}",
+    "partial": "{revoked}개 취소, {failed}개 실패"
+  },
+  "adminPermissionLists": {
+    "roles": {
+      "search": "이름 또는 슬러그로 역할 검색…",
+      "fields": {
+        "scope": "바인딩 수준",
+        "builtin": "기본 제공"
+      },
+      "options": {
+        "scope": {
+          "ORG": "조직",
+          "TEAM": "팀",
+          "PROJECT": "프로젝트",
+          "APP": "앱"
+        },
+        "builtin": {
+          "yes": "기본 제공",
+          "no": "사용자 지정"
+        }
+      },
+      "views": {
+        "all": "전체",
+        "mine": "내 항목",
+        "builtin": "기본 제공",
+        "custom": "사용자 지정"
+      }
+    },
+    "assignments": {
+      "search": "사용자, 그룹 또는 역할로 검색…",
+      "fields": {
+        "role": "역할",
+        "scope": "적용 범위",
+        "kind": "보유자",
+        "holder": "보유자"
+      },
+      "options": {
+        "scope": {
+          "ORG": "조직",
+          "TEAM": "팀",
+          "PROJECT": "프로젝트",
+          "APP": "앱"
+        },
+        "kind": {
+          "user": "사용자",
+          "group": "그룹"
+        }
+      },
+      "views": {
+        "all": "전체",
+        "mine": "내 항목",
+        "groups": "그룹"
+      }
+    },
+    "holders": {
+      "search": "사용자 또는 그룹으로 보유자 검색…",
+      "fields": {
+        "scope": "적용 범위",
+        "kind": "보유자"
+      },
+      "options": {
+        "scope": {
+          "ORG": "조직",
+          "TEAM": "팀",
+          "PROJECT": "프로젝트",
+          "APP": "앱"
+        },
+        "kind": {
+          "user": "사용자",
+          "group": "그룹"
+        }
+      },
+      "views": {
+        "all": "전체"
+      }
+    }
+  },
+  "adminRoles": {
+    "title": "역할",
+    "context": "이름이 있는 권한 집합입니다. 기본 제공 역할은 고정되어 있으며, 복제해서 조정할 수 있습니다.",
+    "newRole": "새 역할",
+    "columns": {
+      "role": "역할",
+      "allows": "허용 내용",
+      "bindsAt": "바인딩 수준",
+      "kind": "종류",
+      "permissions": "권한",
+      "holders": "보유자"
+    },
+    "builtIn": "기본 제공",
+    "custom": "사용자 지정",
+    "duplicatedFrom": "{name}에서 복제됨",
+    "from": "원본: {name}",
+    "fromDeleted": "원본: {name} (삭제됨)",
+    "emptyTitle": "역할 없음",
+    "emptyDescription": "기본 제공 역할은 배포 시 생성됩니다. 보이지 않으면 조직 컨텍스트가 아직 확인되지 않았을 수 있습니다."
+  },
+  "adminRolePermissions": {
+    "savedLabel": "저장됨",
+    "builtInNote": "기본 제공 역할은 플랫폼과 함께 제공되며 변경할 수 없습니다. 복제하면 줄일 수 있는 사용자 지정 역할을 만들 수 있습니다.",
+    "duplicate": "복제하여 사용자 지정",
+    "lineage": "<role>{name}</role>{builtIn, select, true { (기본 제공)} other {}}{deleted, select, true {, 이후 삭제됨} other {}}에서 복제: 이후 <diff></diff>",
+    "compareWithRole": "{name}과(와) 비교",
+    "compareWith": "비교 대상",
+    "savedVersion": "저장된 버전",
+    "nothing": "없음",
+    "lineageOption": "{name} (복제 원본{deleted, select, true {, 삭제됨} other {}})",
+    "builtInOption": "{name} (기본 제공)",
+    "unsaved": "저장 안 됨",
+    "noChanges": "저장하지 않은 변경 사항 없음",
+    "discard": "취소",
+    "saving": "저장 중…",
+    "save": "권한 저장"
+  },
+  "adminRoleDetail": {
+    "role": "역할",
+    "notFoundCrumb": "찾을 수 없음",
+    "notFoundTitle": "역할을 찾을 수 없음",
+    "permissions": "권한",
+    "missingTitle": "이 ID의 역할이 없습니다",
+    "missingDescription": "이 조직에 ID가 {id}인 항목이 없습니다. 삭제되었을 수 있습니다.",
+    "allRoles": "모든 역할",
+    "grantAccess": "액세스 부여",
+    "builtIn": "기본 제공",
+    "custom": "사용자 지정",
+    "tabs": {
+      "permissions": "권한",
+      "holders": "보유자",
+      "settings": "설정"
+    },
+    "gone": "이 역할은 더 이상 없습니다.",
+    "saved": "역할 “{name}”을(를) 저장했습니다",
+    "saveFailed": "저장하지 못했습니다",
+    "settings": {
+      "title": "이름 및 설명",
+      "lockedDescription": "기본 제공 역할은 제공된 이름과 설명을 유지합니다.",
+      "description": "이 역할을 부여할 때 표시되는 내용입니다.",
+      "name": "이름",
+      "descriptionLabel": "설명",
+      "descriptionPlaceholder": "이 역할의 용도를 한 문장으로 적으세요.",
+      "slug": "슬러그",
+      "bindsAt": "바인딩 수준",
+      "bindsAtValue": "{scope, select, ORG {조직 또는 그 안의 모든 항목} TEAM {팀 또는 그 안의 모든 항목} PROJECT {프로젝트 또는 그 안의 모든 항목} APP {앱 또는 그 안의 모든 항목} other {{scope} 또는 그 안의 모든 항목}}",
+      "kind": "종류",
+      "builtIn": "기본 제공",
+      "custom": "사용자 지정"
+    }
+  },
+  "adminPermissions": {
+    "pages": {
+      "roles": "역할",
+      "assignments": "할당",
+      "diagnostics": "진단",
+      "presets": "간편 설정",
+      "safety": "작업 안전"
+    },
+    "off": "이 설치에서는 이 콘솔이 꺼져 있습니다.",
+    "offHint": "권한은 <code>{flag}</code> 플래그로 제공됩니다. <link>관리 › 기능</link>에서 켜세요."
+  },
+  "adminPresets": {
+    "title": "간편 설정",
+    "intro": "그 사람이 해야 할 일에서 시작하세요. 각 선택은 고른 범위에 기존 역할을 부여하므로 다른 부여처럼 할당에 표시됩니다. 어느 것도 누군가를 설치 슈퍼 관리자로 만들지 않습니다.",
+    "loading": "불러오는 중…",
+    "loadError": "프리셋을 읽을 수 없습니다: {error}",
+    "retry": "다시 시도",
+    "task": "작업",
+    "scopes": {
+      "ORG": "조직",
+      "TEAM": "팀",
+      "PROJECT": "프로젝트",
+      "APP": "앱"
+    },
+    "grantAt": "{scope} 수준에서 {preset} 부여",
+    "grant": "부여",
+    "allowed": "허용",
+    "notIncluded": "포함 안 됨",
+    "footer": "부여하려면 <link>할당</link>에서 해당 역할을 할당하세요."
+  },
+  "adminRuns": {
+    "title": "실행",
+    "columns": {
+      "run": "실행",
+      "what": "대상",
+      "startedBy": "시작한 사람",
+      "when": "시간",
+      "took": "소요 시간",
+      "outcome": "결과"
+    },
+    "kinds": {
+      "agent": "에이전트 실행",
+      "workflow": "워크플로 실행",
+      "deployment": "배포",
+      "job": "작업 실행",
+      "task": "태스크 실행"
+    },
+    "notRecorded": "기록 없음",
+    "emptyTitle": "아직 실행이 없습니다",
+    "emptyDescription": "에이전트 실행, 워크플로 실행, 배포, 작업 실행, 태스크 실행이 시작되면 여기에 표시됩니다.",
+    "more": "더 보기",
+    "exportCsv": "CSV 내보내기",
+    "exportFailed": "내보내기에 실패했습니다",
+    "exportCapped": "처음 {count}개 실행을 내보냈습니다.",
+    "list": {
+      "search": "실행, 에이전트, 앱, ID 검색…",
+      "fields": {
+        "kind": "종류",
+        "outcome": "결과",
+        "trigger": "트리거",
+        "startedBy": "시작한 사람",
+        "project": "프로젝트",
+        "app": "앱",
+        "since": "기간"
+      },
+      "options": {
+        "kind": {
+          "agent": "에이전트 실행",
+          "workflow": "워크플로 실행",
+          "deployment": "배포",
+          "job": "작업 실행",
+          "task": "태스크 실행"
+        },
+        "since": {
+          "1h": "지난 1시간",
+          "24h": "지난 24시간",
+          "7d": "지난 7일",
+          "30d": "지난 30일",
+          "90d": "지난 90일"
+        }
+      },
+      "views": {
+        "all": "전체",
+        "mine": "내 항목"
+      }
+    }
+  },
   "orgMembers": {
     "searchLabel": "멤버 검색",
     "searchPlaceholder": "사용자 이름 또는 이메일로 검색…",
