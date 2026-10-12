@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Dex's login page shows the Astrolift mark: its `frontend.logoURL` points at the mark the Astrolift site publishes (`https://astrolift.ai/img/astrolift-mark.png`), since Dex escapes inline images. With the Cognito hosted UI branded by the installer, every sign-in page now carries Astrolift (#2285).
+
 - App logs show something without a log backend: on a cluster with no log collector, `astroliftAppLogs` answers its first page from the app's current pods (the same one-shot read the live tail uses), windowed to `[since, until]` and filtered by level and search, with `historicalAvailable` still false. Before, `astro app logs` and the web history printed only the "live tail only" note and no lines on such an install, CONFLICT included (#2211).
 
 - A refused permission reads the same on every client: GraphQL errors raised by a permission check now carry `extensions.code = "PERMISSION_DENIED"` (the code mutation envelopes already use) with `extensions.reason` and `extensions.permission`; the message is unchanged. The CLI and web can tell a refusal from any other failure and show why (#1867).
