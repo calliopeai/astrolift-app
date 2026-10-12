@@ -24,6 +24,7 @@ class Notification(BaseCoreModel):
         QUOTA_WARNING = "quota_warning"
         WEBHOOK_DELIVERY_FAILED = "webhook_delivery_failed"
         SYSTEM = "system"
+        ACTION_APPROVAL = "action_approval"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
