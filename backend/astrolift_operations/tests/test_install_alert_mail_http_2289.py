@@ -532,8 +532,11 @@ def test_actual_migration_preserves_retained_intents_then_empty_roundtrip(world)
     from django.db import connection
     from django.db.migrations.executor import MigrationExecutor
 
+    original_targets = MigrationExecutor(connection).loader.graph.leaf_nodes()
+    # Start at 0030 itself: a later migration in this app would otherwise be
+    # unapplied by the refused rollback before 0030's guard raises.
+    MigrationExecutor(connection).migrate([("astrolift_operations", "0030_installalertmailtest")])
     executor = MigrationExecutor(connection)
-    original_targets = executor.loader.graph.leaf_nodes()
     applied = set(executor.loader.applied_migrations)
     row = InstallAlertMailTest.objects.create(
         organization=world.org,
@@ -558,7 +561,7 @@ def test_actual_migration_preserves_retained_intents_then_empty_roundtrip(world)
         InstallAlertMailTest._base_manager.filter(pk=row.pk).delete()  # owned synthetic fixture only
         MigrationExecutor(connection).migrate([("astrolift_operations", "0029_preview_log_export_source")])
         assert "astrolift_operations_installalertmailtest" not in connection.introspection.table_names()
-        MigrationExecutor(connection).migrate(original_targets)
+        MigrationExecutor(connection).migrate([("astrolift_operations", "0030_installalertmailtest")])
         assert set(MigrationExecutor(connection).loader.applied_migrations) == applied
         assert not InstallAlertMailTest.objects.exists()
     finally:
