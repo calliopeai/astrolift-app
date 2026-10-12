@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -41,6 +42,8 @@ export function CreateProjectSheet({
   creating,
   createProject,
 }: CreateProjectSheetProps) {
+  const copy = useTranslations("projectSheets");
+  const confirmation = useTranslations("shared.confirmation");
   const [name, setName] = React.useState("");
   const [slug, setSlug] = React.useState("");
   const [description, setDescription] = React.useState("");
@@ -76,18 +79,15 @@ export function CreateProjectSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col">
         <SheetHeader>
-          <SheetTitle>New project</SheetTitle>
-          <SheetDescription>
-            Projects group apps that share a deploy cadence or stack. Slugs are unique within a team
-            and reclaimable after delete.
-          </SheetDescription>
+          <SheetTitle>{copy("newTitle")}</SheetTitle>
+          <SheetDescription>{copy("newDescription")}</SheetDescription>
         </SheetHeader>
         <form onSubmit={submit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
           <div className="space-y-2">
-            <Label htmlFor="team">Team</Label>
+            <Label htmlFor="team">{copy("team")}</Label>
             <Select value={teamId} onValueChange={setTeamId}>
               <SelectTrigger id="team">
-                <SelectValue placeholder="Select a team" />
+                <SelectValue placeholder={copy("selectTeam")} />
               </SelectTrigger>
               <SelectContent>
                 {teams.map((t) => (
@@ -99,14 +99,12 @@ export function CreateProjectSheet({
               </SelectContent>
             </Select>
             {teams.length === 0 && (
-              <p className="text-muted-foreground text-xs">
-                No teams yet. Create one on the Teams page first.
-              </p>
+              <p className="text-muted-foreground text-xs">{copy("noTeams")}</p>
             )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="name">Display name</Label>
+            <Label htmlFor="name">{copy("displayName")}</Label>
             <Input
               id="name"
               value={name}
@@ -114,14 +112,14 @@ export function CreateProjectSheet({
                 setName(e.target.value);
                 if (!slugTouched) setSlug(slugify(e.target.value));
               }}
-              placeholder="API gateway"
+              placeholder={copy("namePlaceholder")}
               autoFocus
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="slug">Slug</Label>
+            <Label htmlFor="slug">{copy("slug")}</Label>
             <Input
               id="slug"
               value={slug}
@@ -135,32 +133,29 @@ export function CreateProjectSheet({
               aria-invalid={slug.length > 0 && !isValidSlug(slug)}
               required
             />
-            <p className="text-muted-foreground text-xs">
-              Start with a lowercase letter; use letters, numbers and hyphens, up to 40 characters.
-              End with a letter or number.
-            </p>
+            <p className="text-muted-foreground text-xs">{copy("slugHint")}</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Description (optional)</Label>
+            <Label htmlFor="description">{copy("description")}</Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What this project is for"
+              placeholder={copy("descriptionPlaceholder")}
               rows={3}
             />
           </div>
 
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {confirmation("cancel")}
             </Button>
             <Button
               type="submit"
               disabled={creating || !name.trim() || !teamId || !isValidSlug(slug)}
             >
-              {creating ? "Creating…" : "Create project"}
+              {creating ? copy("creating") : copy("create")}
             </Button>
           </SheetFooter>
         </form>

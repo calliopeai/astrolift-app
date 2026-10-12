@@ -10,6 +10,7 @@ import {
   SparklesIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -33,6 +34,7 @@ export type DownloadsScreenProps = ReturnType<typeof useDetectedPlatform>;
 
 /** The CLI downloads page; `detected` is the visitor's platform, if known. */
 export function DownloadsScreen({ detected, detectionDone }: DownloadsScreenProps) {
+  const t = useTranslations("downloadsScreen");
   const otherPlatforms = React.useMemo(
     () => (detected ? PLATFORMS.filter((p) => p.id !== detected.id) : PLATFORMS),
     [detected]
@@ -40,13 +42,13 @@ export function DownloadsScreen({ detected, detectionDone }: DownloadsScreenProp
 
   return (
     <PageShell
-      title="Downloads"
-      description={`Install the ${CLI_BINARY} CLI to interact with Astrolift from your shell or CI. Native releases and container images are public.`}
+      title={t("title")}
+      description={t("description", { cli: CLI_BINARY })}
       actions={
         <Button asChild variant="outline">
           <a href={RELEASES_URL} target="_blank" rel="noreferrer">
             <ExternalLinkIcon className="size-4" />
-            All releases
+            {t("allReleases")}
           </a>
         </Button>
       }
@@ -58,11 +60,11 @@ export function DownloadsScreen({ detected, detectionDone }: DownloadsScreenProp
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <DownloadIcon className="size-4" /> {detected ? "Other platforms" : "Native binaries"}
+            <DownloadIcon className="size-4" />{" "}
+            {detected ? t("otherPlatforms") : t("nativeBinaries")}
           </CardTitle>
           <CardDescription>
-            Download the archive for your platform and verify it against {CHECKSUMS_FILENAME} before
-            extracting the binary into a directory on your PATH.
+            {t("binariesDescription", { file: CHECKSUMS_FILENAME })}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -78,23 +80,20 @@ export function DownloadsScreen({ detected, detectionDone }: DownloadsScreenProp
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <PackageIcon className="size-4" /> Install channels
+            <PackageIcon className="size-4" /> {t("channels")}
           </CardTitle>
-          <CardDescription>
-            Native archives and checksum files are public. Direct downloads and curl are supported.
-            Homebrew and Scoop packages are not published.
-          </CardDescription>
+          <CardDescription>{t("channelsDescription")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <PackageRow
             name="GitHub CLI"
             command={`gh release view --repo ${CLI_REPO} --web`}
-            note="GitHub CLI is optional. Direct downloads require no account; each platform command also fetches the release checksum list."
+            note={t("ghNote")}
           />
           <PackageRow
             name="Docker"
             command="docker run --rm docker.io/calliopeai/astrolift-cli:latest version"
-            note="Public multi-architecture image for CI agents that do not need a host install."
+            note={t("dockerNote")}
           />
         </CardContent>
       </Card>
@@ -103,32 +102,31 @@ export function DownloadsScreen({ detected, detectionDone }: DownloadsScreenProp
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <ShieldCheckIcon className="size-4" /> Verify your download
+            <ShieldCheckIcon className="size-4" /> {t("verify")}
           </CardTitle>
-          <CardDescription>
-            Every release publishes a {CHECKSUMS_FILENAME} file with SHA-256 sums for each archive.
-            Verify before extracting.
-          </CardDescription>
+          <CardDescription>{t("verifyDescription", { file: CHECKSUMS_FILENAME })}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <CopyableCommand
-            label="Fetch checksums"
+            label={t("fetchChecksums")}
             command={`curl -fL '${LATEST_URL}/download/${CHECKSUMS_FILENAME}' -o '${CHECKSUMS_FILENAME}'`}
           />
           <CopyableCommand
-            label="Verify (macOS/Linux)"
+            label={t("verifyUnix")}
             command={`shasum -a 256 ${CLI_BINARY}-*.tar.gz`}
           />
           <CopyableCommand
-            label="Verify (Windows PowerShell)"
+            label={t("verifyWindows")}
             command={`Get-FileHash ${CLI_BINARY}-windows-*.zip -Algorithm SHA256`}
           />
           <p className="text-muted-foreground text-xs">
-            Compare the computed digest with the checksum published alongside the archive on{" "}
-            <a href={LATEST_URL} target="_blank" rel="noreferrer" className="underline">
-              GitHub
-            </a>{" "}
-            before installing.
+            {t.rich("compareDigest", {
+              link: (chunks) => (
+                <a href={LATEST_URL} target="_blank" rel="noreferrer" className="underline">
+                  {chunks}
+                </a>
+              ),
+            })}
           </p>
         </CardContent>
       </Card>
@@ -136,19 +134,17 @@ export function DownloadsScreen({ detected, detectionDone }: DownloadsScreenProp
       {/* ─── quickstart ────────────────────────────────────────────────── */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">After installing</CardTitle>
-          <CardDescription>
-            Log in to this Astrolift install and list your apps to confirm the CLI is wired up.
-          </CardDescription>
+          <CardTitle className="text-base">{t("afterInstalling")}</CardTitle>
+          <CardDescription>{t("afterInstallingDescription")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
-          <CopyableCommand label="Authenticate" command={`${CLI_BINARY} auth login`} />
-          <CopyableCommand label="List apps" command={`${CLI_BINARY} app list`} />
+          <CopyableCommand label={t("authenticate")} command={`${CLI_BINARY} auth login`} />
+          <CopyableCommand label={t("listApps")} command={`${CLI_BINARY} app list`} />
           <Link
             href="/settings"
             className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
           >
-            Manage API tokens <ExternalLinkIcon className="size-3" />
+            {t("manageTokens")} <ExternalLinkIcon className="size-3" />
           </Link>
         </CardContent>
       </Card>
@@ -166,14 +162,15 @@ function FeaturedPlatformCallout({
   // Pre-detection (SSR + first paint): render a neutral placeholder so
   // the layout doesn't jump. After detection settles, show either the
   // matched platform or a "couldn't detect" fallback.
+  const t = useTranslations("downloadsScreen");
   if (!detectionDone) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <SparklesIcon className="size-4" /> For your system
+            <SparklesIcon className="size-4" /> {t("forYourSystem")}
           </CardTitle>
-          <CardDescription>Detecting your platform…</CardDescription>
+          <CardDescription>{t("detecting")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="border-border bg-muted/30 h-28 animate-pulse rounded-md border" />
@@ -187,12 +184,9 @@ function FeaturedPlatformCallout({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <SparklesIcon className="size-4" /> For your system
+            <SparklesIcon className="size-4" /> {t("forYourSystem")}
           </CardTitle>
-          <CardDescription>
-            We couldn&apos;t detect your platform automatically. Pick the matching native binary
-            below.
-          </CardDescription>
+          <CardDescription>{t("detectFailed")}</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -203,11 +197,9 @@ function FeaturedPlatformCallout({
     <Card className="border-primary/40 bg-primary/[0.03]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <SparklesIcon className="size-4" /> For your system
+          <SparklesIcon className="size-4" /> {t("forYourSystem")}
         </CardTitle>
-        <CardDescription>
-          We detected {platform.label}. This is the one-liner you want.
-        </CardDescription>
+        <CardDescription>{t("detected", { platform: platform.label })}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
@@ -217,26 +209,25 @@ function FeaturedPlatformCallout({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold">{platform.label}</span>
-              <Badge className="text-2xs tracking-wide uppercase">
-                Recommended for your system
-              </Badge>
+              <Badge className="text-2xs tracking-wide uppercase">{t("recommended")}</Badge>
             </div>
             <div className="text-muted-foreground font-mono text-xs">{platform.filename}</div>
           </div>
           <Button asChild size="sm">
             <a href={LATEST_URL} target="_blank" rel="noreferrer">
               <DownloadIcon className="size-3" />
-              Open release
+              {t("openRelease")}
             </a>
           </Button>
         </div>
-        <CopyableCommand label="Download" command={platform.installLine} />
+        <CopyableCommand label={t("download")} command={platform.installLine} />
       </CardContent>
     </Card>
   );
 }
 
 function PlatformCard({ platform }: { platform: PlatformAsset }) {
+  const t = useTranslations("downloadsScreen");
   const Icon = platform.icon;
   return (
     <div className="border-border bg-card flex flex-col gap-3 rounded-md border p-4">
@@ -256,16 +247,17 @@ function PlatformCard({ platform }: { platform: PlatformAsset }) {
         <Button asChild size="sm" className="flex-1">
           <a href={LATEST_URL} target="_blank" rel="noreferrer">
             <DownloadIcon className="size-3" />
-            Open release
+            {t("openRelease")}
           </a>
         </Button>
-        <CopyButton value={platform.installLine} label="Copy download commands" />
+        <CopyButton value={platform.installLine} label={t("copyDownload")} />
       </div>
     </div>
   );
 }
 
 function CopyableCommand({ label, command }: { label: string; command: string }) {
+  const t = useTranslations("downloadsScreen");
   return (
     <div>
       <div className="text-muted-foreground mb-1 text-xs tracking-wide uppercase">{label}</div>
@@ -273,13 +265,14 @@ function CopyableCommand({ label, command }: { label: string; command: string })
         <pre className="flex-1 overflow-x-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
           {command}
         </pre>
-        <CopyButton value={command} label={`Copy ${label}`} />
+        <CopyButton value={command} label={t("copyLabel", { label })} />
       </div>
     </div>
   );
 }
 
 function PackageRow({ name, command, note }: { name: string; command: string; note?: string }) {
+  const t = useTranslations("downloadsScreen");
   return (
     <div className="border-border rounded-md border p-3">
       <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -289,7 +282,7 @@ function PackageRow({ name, command, note }: { name: string; command: string; no
         <pre className="flex-1 overflow-x-auto font-mono text-xs leading-relaxed break-all whitespace-pre-wrap">
           {command}
         </pre>
-        <CopyButton value={command} label={`Copy ${name} install`} />
+        <CopyButton value={command} label={t("copyInstall", { name })} />
       </div>
       {note && <p className="text-muted-foreground mt-2 text-xs">{note}</p>}
     </div>
@@ -297,6 +290,7 @@ function PackageRow({ name, command, note }: { name: string; command: string; no
 }
 
 function CopyButton({ value, label }: { value: string; label: string }) {
+  const t = useTranslations("downloadsScreen");
   const [copied, setCopied] = React.useState(false);
   return (
     <Button
@@ -309,10 +303,10 @@ function CopyButton({ value, label }: { value: string; label: string }) {
         try {
           await navigator.clipboard.writeText(value);
           setCopied(true);
-          toast.success("Copied to clipboard");
+          toast.success(t("copied"));
           setTimeout(() => setCopied(false), 1200);
         } catch {
-          toast.error("Couldn't copy — clipboard access blocked");
+          toast.error(t("copyFailed"));
         }
       }}
     >

@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2Icon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Section } from "@/components/ui/section";
 
@@ -19,6 +20,7 @@ export function FleetMapPanel({
   errorMessage,
   firstLoad,
 }: FleetMapPanelProps) {
+  const copy = useTranslations("fleetMap");
   const runningCount = tasks.filter((t) => t.status === "running").length;
 
   return (
@@ -37,8 +39,8 @@ export function FleetMapPanel({
 
       {!firstLoad && tasks.length === 0 && errorMessage === null && (
         <div className="text-muted-foreground rounded-md border border-dashed p-12 text-center text-sm">
-          <p className="text-foreground mb-1 font-medium">No agent activity</p>
-          <p>Dispatched agents appear here as they are queued, provisioned, and run.</p>
+          <p className="text-foreground mb-1 font-medium">{copy("noActivity")}</p>
+          <p>{copy("noActivityDescription")}</p>
         </div>
       )}
 
@@ -46,7 +48,7 @@ export function FleetMapPanel({
         <>
           <FleetMap tasks={tasks} clusterLiveness={clusterLiveness} />
           <p className="text-muted-foreground text-2xs">
-            {tasks.length} task{tasks.length === 1 ? "" : "s"} · {runningCount} running · live
+            {copy("summary", { count: tasks.length, running: runningCount })}
           </p>
         </>
       )}

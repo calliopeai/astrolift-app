@@ -1,6 +1,7 @@
 "use client";
 
 import { Building2Icon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -9,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
  * session today, so it names it; switching lands here when there are more.
  */
 export function OrgMenu({ name, loading }: { name: string | null | undefined; loading?: boolean }) {
+  const t = useTranslations("orgMenu");
   if (loading) return <Skeleton className="h-5 w-32" />;
   return (
     <span
@@ -16,7 +18,7 @@ export function OrgMenu({ name, loading }: { name: string | null | undefined; lo
       title={name ?? undefined}
     >
       <Building2Icon className="text-muted-foreground size-4 shrink-0" aria-hidden />
-      <span className="truncate">{name ?? "Control plane"}</span>
+      <span className="truncate">{name ?? t("controlPlane")}</span>
     </span>
   );
 }

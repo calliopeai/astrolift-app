@@ -9,16 +9,17 @@ import {
   type NodeTypes,
 } from "@xyflow/react";
 import { BotIcon, ListOrderedIcon, RadioTowerIcon, ServerIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { FlowGraph, rankLayout } from "@/components/viz";
 import type { AgentTaskTransition, FleetTaskDispatcher } from "@/graphql/agents/agents.types";
 import {
-  formatHeartbeatAge,
   heartbeatPresentation,
   isClusterLive,
   type HeartbeatStatus,
 } from "@/lib/cluster-heartbeat";
+import { heartbeatAge } from "@/lib/i18n/cluster-heartbeat";
 import { cn } from "@/lib/utils";
 
 // ─── node model ─────────────────────────────────────────────────────────────
@@ -106,23 +107,48 @@ function clusterTone(status: HeartbeatStatus): FleetTone {
   }
 }
 
-function formatDuration(startedAt: string | null, finishedAt: string | null): string | null {
+type Copy = ReturnType<typeof useTranslations>;
+
+/** The translators the graph builder labels nodes with. */
+interface FleetGraphCopy {
+  /** `fleetMap` namespace. */
+  map: Copy;
+  /** `agentActivity.statuses` namespace. */
+  status: Copy;
+  /** `clusterConnection` namespace. */
+  connection: Copy;
+}
+
+const HEARTBEAT_LABEL_KEYS: Record<string, string> = {
+  connected: "connected",
+  degraded: "degraded",
+  offline: "offline",
+  never_seen: "noAgent",
+};
+
+function formatDuration(
+  startedAt: string | null,
+  finishedAt: string | null,
+  map: Copy
+): string | null {
   if (!startedAt) return null;
   const start = Date.parse(startedAt);
   if (Number.isNaN(start)) return null;
   const end = finishedAt ? Date.parse(finishedAt) : NaN;
-  if (Number.isNaN(end)) return "running";
+  if (Number.isNaN(end)) return map("durationRunning");
   const s = Math.max(0, Math.round((end - start) / 1000));
-  if (s < 60) return `${s}s`;
+  if (s < 60) return map("durationSeconds", { s });
   const m = Math.floor(s / 60);
   const rem = s % 60;
-  return rem ? `${m}m ${rem}s` : `${m}m`;
+  return rem ? map("durationMinutesSeconds", { m, s: rem }) : map("durationMinutes", { m });
 }
 
-function agentSublabel(t: AgentTaskTransition): string {
+function agentSublabel(t: AgentTaskTransition, copy: FleetGraphCopy): string {
   const status = t.status.replace(/_/g, " ");
-  const titled = status.charAt(0).toUpperCase() + status.slice(1);
-  const dur = formatDuration(t.startedAt, t.finishedAt);
+  const titled = copy.status.has(t.status)
+    ? copy.status(t.status)
+    : status.charAt(0).toUpperCase() + status.slice(1);
+  const dur = formatDuration(t.startedAt, t.finishedAt, copy.map);
   return dur ? `${titled} · ${dur}` : titled;
 }
 
@@ -182,7 +208,8 @@ const QUEUE_ID = "queue";
  */
 function buildFleetGraph(
   tasks: AgentTaskTransition[],
-  clusterLiveness: FleetClusterLiveness
+  clusterLiveness: FleetClusterLiveness,
+  copy: FleetGraphCopy
 ): { nodes: Node<FleetNodeData>[]; edges: Edge[] } {
   const descriptors: FleetNodeData[] = [];
   const dispatcherNodeId = (id: string) => `dispatcher:${id}`;
@@ -196,7 +223,7 @@ function buildFleetGraph(
     descriptors.push({
       id: DISPATCH_SERVICE_ID,
       kind: "dispatcher",
-      label: "Dispatch Service",
+      label: copy.map("dispatchService"),
       tone: "muted",
       needs: [],
     });
@@ -206,7 +233,7 @@ function buildFleetGraph(
       descriptors.push({
         id: dispatcherNodeId(d.id),
         kind: "dispatcher",
-        label: d.name || d.slug || "Dispatcher",
+        label: d.name || d.slug || copy.map("dispatcher"),
         sublabel: loc || undefined,
         tone: "muted",
         needs: [],
@@ -220,8 +247,8 @@ function buildFleetGraph(
   descriptors.push({
     id: QUEUE_ID,
     kind: "queue",
-    label: "Task Queue",
-    sublabel: `${queuedCount} queued`,
+    label: copy.map("taskQueue"),
+    sublabel: copy.map("queued", { count: queuedCount }),
     tone: queuedCount > 0 ? "pending" : "muted",
     needs: dispatcherIds,
   });
@@ -236,13 +263,14 @@ function buildFleetGraph(
   for (const [clusterId, name] of clusters) {
     const live = clusterLiveness.get(clusterId);
     const status = live?.status ?? "never_seen";
-    const age = formatHeartbeatAge(live?.ageSeconds ?? null);
-    const pres = heartbeatPresentation(status);
+    const age = heartbeatAge(live?.ageSeconds ?? null, copy.connection);
+    const labelKey = HEARTBEAT_LABEL_KEYS[status];
+    const presLabel = labelKey ? copy.connection(labelKey) : status || copy.connection("unknown");
     descriptors.push({
       id: clusterNodeId(clusterId),
       kind: "cluster",
       label: name,
-      sublabel: age ? `${pres.label} · ${age}` : pres.label,
+      sublabel: age ? `${presLabel} · ${age}` : presLabel,
       tone: clusterTone(status),
       pulse: isClusterLive(status),
       needs: [QUEUE_ID],
@@ -258,8 +286,8 @@ function buildFleetGraph(
     descriptors.push({
       id: `agent:${t.id}`,
       kind: "agent",
-      label: t.podName || `task ${t.id.slice(0, 8)}`,
-      sublabel: agentSublabel(t),
+      label: t.podName || copy.map("task", { id: t.id.slice(0, 8) }),
+      sublabel: agentSublabel(t, copy),
       tone,
       pulse,
       needs: [parent],
@@ -310,9 +338,12 @@ export interface FleetMapProps {
  * static status colours via the globals.css media query.
  */
 export function FleetMap({ tasks, clusterLiveness, height = 560 }: FleetMapProps) {
+  const map = useTranslations("fleetMap");
+  const status = useTranslations("agentActivity.statuses");
+  const connection = useTranslations("clusterConnection");
   const { nodes, edges } = React.useMemo(
-    () => buildFleetGraph(tasks, clusterLiveness),
-    [tasks, clusterLiveness]
+    () => buildFleetGraph(tasks, clusterLiveness, { map, status, connection }),
+    [tasks, clusterLiveness, map, status, connection]
   );
 
   // Remount signature: any status change, new task, or cluster-liveness change

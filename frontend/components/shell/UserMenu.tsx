@@ -65,7 +65,7 @@ export function UserMenu({ fullName, email, onSignOut, collapsed = false }: User
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        aria-label={`${fullName}: account menu`}
+        aria-label={t("accountMenu", { name: fullName })}
         className={cn(
           "hover:bg-sidebar-accent/60 focus-visible:ring-ring flex h-10 w-full min-w-0 items-center gap-2 rounded-md px-1.5 text-left focus-visible:ring-2 focus-visible:outline-none",
           collapsed && "justify-center px-0"

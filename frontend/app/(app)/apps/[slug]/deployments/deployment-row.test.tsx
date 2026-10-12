@@ -1,7 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
+import { renderWithIntl as render } from "@/test/render-with-intl";
 import { DeploymentStatusCell } from "@/components/screens/apps/deployments/AppDeploymentsScreen";
 
 // Why a deploy failed, or what a pending one waits on, on the row itself (#2123).

@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
 /** The root 404 (app/not-found.tsx). */
 export function NotFoundScreen() {
+  const t = useTranslations("errorScreens");
   return (
     <div className="bg-background flex min-h-screen items-center justify-center">
       <div className="flex max-w-md flex-col items-center gap-6 px-4 text-center">
@@ -14,15 +16,13 @@ export function NotFoundScreen() {
             orientation="vertical"
             className="h-10 data-vertical:h-10 data-vertical:self-auto"
           />
-          <span className="text-muted-foreground text-lg">Page not found</span>
+          <span className="text-muted-foreground text-lg">{t("notFound")}</span>
         </div>
 
-        <p className="text-muted-foreground text-sm">
-          The page you are looking for does not exist or has been moved.
-        </p>
+        <p className="text-muted-foreground text-sm">{t("notFoundDescription")}</p>
 
         <Button asChild>
-          <Link href="/">Go home</Link>
+          <Link href="/">{t("goHome")}</Link>
         </Button>
       </div>
     </div>
