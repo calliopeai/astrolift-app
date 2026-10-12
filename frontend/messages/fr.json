@@ -6874,6 +6874,12 @@
       "network": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez."
     }
   },
+  "pageShell": {
+    "collapseHeader": "Réduire l’en-tête",
+    "expandHeader": "Développer l’en-tête",
+    "collapse": "Réduire",
+    "details": "Détails"
+  },
   "a11y": {
     "skipToContent": "Skip to main content"
   },

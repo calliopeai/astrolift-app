@@ -522,6 +522,12 @@
     "zh-Hans": "Chinese (Simplified)",
     "pt-BR": "Portuguese (Brazil)"
   },
+  "pageShell": {
+    "collapseHeader": "Collapse header",
+    "expandHeader": "Expand header",
+    "collapse": "Collapse",
+    "details": "Details"
+  },
   "a11y": {
     "skipToContent": "Skip to main content"
   },

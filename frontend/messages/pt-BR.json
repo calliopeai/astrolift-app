@@ -585,6 +585,12 @@
     "zh-Hans": "Chinese (Simplified)",
     "pt-BR": "Portuguese (Brazil)"
   },
+  "pageShell": {
+    "collapseHeader": "Recolher cabeçalho",
+    "expandHeader": "Expandir cabeçalho",
+    "collapse": "Recolher",
+    "details": "Detalhes"
+  },
   "a11y": {
     "skipToContent": "Skip to main content"
   },

@@ -585,6 +585,12 @@
     "zh-Hans": "Chinese (Simplified)",
     "pt-BR": "Portuguese (Brazil)"
   },
+  "pageShell": {
+    "collapseHeader": "헤더 접기",
+    "expandHeader": "헤더 펼치기",
+    "collapse": "접기",
+    "details": "세부 정보"
+  },
   "a11y": {
     "skipToContent": "Skip to main content"
   },
