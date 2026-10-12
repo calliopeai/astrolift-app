@@ -335,6 +335,30 @@ export type AstroliftActionPermission = {
   reason: Scalars['String']['output'];
 };
 
+export type AstroliftActionSafetyRequirement = {
+  action: Scalars['String']['output'];
+  allowSelfApproval: Scalars['Boolean']['output'];
+  confirmation: Scalars['Boolean']['output'];
+  enabled: Scalars['Boolean']['output'];
+  label: Scalars['String']['output'];
+  sources: Array<Scalars['String']['output']>;
+  verification: Scalars['Boolean']['output'];
+};
+
+export type AstroliftActionSafetyRule = {
+  action: Scalars['String']['output'];
+  allowSelfApproval?: Maybe<Scalars['Boolean']['output']>;
+  enabled?: Maybe<Scalars['Boolean']['output']>;
+  scopeId?: Maybe<Scalars['GUID']['output']>;
+  scopeKind: Scalars['String']['output'];
+};
+
+export type AstroliftActionSafetyRuleMutationResult = {
+  data?: Maybe<AstroliftActionSafetyRule>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftActiveSession = {
   attestationKind: Scalars['String']['output'];
   attestationTrustLevel: Scalars['String']['output'];
@@ -8960,6 +8984,7 @@ export type Mutation = {
   sendEmailDeliveryTest: EmailDeliveryTestMutationResult;
   sendInstallAlertMailTest: InstallAlertMailTestMutationResult;
   sendManagedServiceTestEmail: AstroliftManagedServiceTestEmailResultMutationResult;
+  setActionSafetyRule: AstroliftActionSafetyRuleMutationResult;
   setActiveIdentityProvider: AstroliftIdentityProviderMutationResult;
   setAgentBundleSecretValue: AstroliftAgentSecretBundleMutationResult;
   setAgentSecretValue: AstroliftAgentSecretStatusMutationResult;
@@ -10655,6 +10680,11 @@ export type MutationSendManagedServiceTestEmailArgs = {
 };
 
 
+export type MutationSetActionSafetyRuleArgs = {
+  input: SetActionSafetyRuleInput;
+};
+
+
 export type MutationSetActiveIdentityProviderArgs = {
   input: SetActiveIdentityProviderInput;
 };
@@ -11708,6 +11738,8 @@ export type Query = {
   astroliftAccessOn: AstroliftAccessEntryPage;
   /** Easy-mode starting points (#2272): each names the stock role it grants per scope and, from that role's permissions, the tasks it allows and excludes. Never super-admin. */
   astroliftAccessPresets: Array<AstroliftAccessPreset>;
+  /** What each gated action asks of the viewer (#2202), optionally on one app: confirmation, fresh verification and whether an admin may approve their own. */
+  astroliftActionSafety: Array<AstroliftActionSafetyRequirement>;
   astroliftActiveIdentityProvider?: Maybe<AstroliftIdentityProvider>;
   astroliftActiveSessions: Array<AstroliftActiveSession>;
   /** @deprecated Caps at 500 rows with no way to reach the 501st. Use astroliftAgentRunsPage. */
@@ -12359,6 +12391,11 @@ export type QueryAstroliftAccessOnArgs = {
   scopeId: Scalars['String']['input'];
   scopeKind: Scalars['String']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftActionSafetyArgs = {
+  appSlug?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -15036,6 +15073,14 @@ export type SendManagedServiceTestEmailInput = {
   recipient: Scalars['String']['input'];
   requestId: InputMaybe<Scalars['GUID']['input']>;
   subject: InputMaybe<Scalars['String']['input']>;
+};
+
+export type SetActionSafetyRuleInput = {
+  action: Scalars['String']['input'];
+  allowSelfApproval: InputMaybe<Scalars['Boolean']['input']>;
+  enabled: InputMaybe<Scalars['Boolean']['input']>;
+  scopeId: InputMaybe<Scalars['GUID']['input']>;
+  scopeKind: Scalars['String']['input'];
 };
 
 export type SetActiveIdentityProviderInput = {
