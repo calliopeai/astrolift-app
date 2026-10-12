@@ -161,6 +161,20 @@ _PARSERS = {
 }
 
 
+#: Why a push does not deploy an app whose image the platform does not build.
+CI_DEPLOYS_AFTER_PUSH = "CI_DEPLOYS_AFTER_PUSHING_THE_IMAGE"
+
+
+def _push_builds_the_image(app: RegisteredApp) -> bool:
+    """Whether a push can deploy ``app`` by itself: only when the platform
+    builds the commit. A ``ci_pushed`` app's image exists only once its CI
+    has pushed it, and CI deploys it then (the managed workflow's notify
+    step); an image-only app has no image named after a commit at all.
+    Deploying the commit SHA from the webhook rolled out a tag no one had
+    built, and every pod failed to pull it (ConflictHQ/bdr, 2026-09-27)."""
+    return app.build_mode == RegisteredApp.BuildMode.PLATFORM_BUILD
+
+
 def _fire_deploy(app: RegisteredApp, branch: str, head_sha: str) -> Deployment | None:
     """Create a PENDING Deployment + start DeployAppWorkflow.
 
@@ -389,7 +403,11 @@ def _handle(kind: str, request: HttpRequest, connection_id: str) -> HttpResponse
 
     refused = []
     for app in apps:
-        if app.trigger_mode == RegisteredApp.TriggerMode.AUTO_ON_PUSH.value:
+        if app.trigger_mode == RegisteredApp.TriggerMode.AUTO_ON_PUSH.value and not _push_builds_the_image(
+            app
+        ):
+            refused.append({"app": app.slug, "reason": CI_DEPLOYS_AFTER_PUSH})
+        elif app.trigger_mode == RegisteredApp.TriggerMode.AUTO_ON_PUSH.value:
             from astrolift_lifecycle.deployment_identity_origin import DeploymentOriginError
 
             try:

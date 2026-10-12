@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- A push deploys only what the platform builds: an `auto_on_push` app whose image comes from CI (`ci_pushed`) or is supplied directly (`none`) is no longer deployed by the push webhook with the commit SHA as its tag. CI deploys it after pushing the image (the managed workflow's notify step); the webhook reports `CI_DEPLOYS_AFTER_PUSHING_THE_IMAGE`. On CONFLICT the webhook had rolled out a tag no one built for both BDR apps on 2026-09-27, and every BDR job had failed to pull its image since.
+
+- A rollout is healthy only when the new revision is: a Deployment counts as ready only pods on its current template, and none until the controller has observed it, as `kubectl rollout status` does. The old ReplicaSet's pods had made a revision whose pods could not pull their image read as rolled out, so those deployments showed `running`.
+
 - Deploying an image tag that is already in the registry deploys it instead of rebuilding it: the rebuild could only fail at push, because registry tags are immutable (ECR `TAG_INVALID`), which is how a redeploy of a built commit failed on CONFLICT. And the build activity heartbeats every 30 seconds while the build runs in its worker thread, so a build longer than the two-minute heartbeat timeout is no longer killed as stuck (`activity Heartbeat timeout`) (#2263, #2184).
 
 - A refused permission reads the same on every client: GraphQL errors raised by a permission check now carry `extensions.code = "PERMISSION_DENIED"` (the code mutation envelopes already use) with `extensions.reason` and `extensions.permission`; the message is unchanged. The CLI and web can tell a refusal from any other failure and show why (#1867).

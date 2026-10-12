@@ -258,6 +258,22 @@ def workload_status_from_object(
     else:
         ready = int(status.get("readyReplicas") or 0)
         desired = int(spec.get("replicas", status.get("replicas", 0)) or 0)
+        if kind == "Deployment":
+            # Ready means ready on the current template. During a rolling
+            # update the old ReplicaSet's pods stay ready, so readyReplicas
+            # alone read a new revision whose pods cannot even pull their
+            # image as healthy (ConflictHQ/bdr, 2026-09-27). As ``kubectl
+            # rollout status`` does: nothing is ready until the controller has
+            # observed the current spec, and pods still on an old template
+            # (``replicas - updatedReplicas``) are not counted. A status that
+            # does not report these fields keeps the plain reading.
+            generation = (obj.get("metadata") or {}).get("generation")
+            observed = status.get("observedGeneration")
+            if generation is not None and observed is not None and int(observed) < int(generation):
+                ready = 0
+            elif "updatedReplicas" in status and "replicas" in status:
+                old = max(0, int(status.get("replicas") or 0) - int(status.get("updatedReplicas") or 0))
+                ready = max(0, ready - old)
     return WorkloadStatus(
         kind=kind,
         name=name,
