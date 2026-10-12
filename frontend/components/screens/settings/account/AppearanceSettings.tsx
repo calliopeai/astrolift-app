@@ -1,6 +1,7 @@
 "use client";
 
 import { LockIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -20,16 +21,15 @@ import { CustomAccentPicker } from "@/components/settings/CustomAccentPicker";
 
 import type { useAppearanceSettings } from "./use-appearance-settings";
 
-const DENSITIES: { value: Density; label: string; hint: string }[] = [
-  { value: "compact", label: "Compact", hint: "Dense rows with hairline dividers" },
-  { value: "cards", label: "Cards", hint: "Boxed items that flow into columns" },
-];
+// Labels and hints live under appearanceSettings.densities.<value>.
+const DENSITIES: Density[] = ["compact", "cards"];
 
-const CORNERS: { value: Corners; label: string }[] = [
-  { value: 0, label: "Square" },
+// `labelKey` names an appearanceSettings message; the pixel sizes need none.
+const CORNERS: { value: Corners; label?: string; labelKey?: "cornerSquare" | "cornerRounded" }[] = [
+  { value: 0, labelKey: "cornerSquare" },
   { value: 2, label: "2px" },
   { value: 4, label: "4px" },
-  { value: 10, label: "Rounded" },
+  { value: 10, labelKey: "cornerRounded" },
 ];
 
 /** A miniature of the chrome: sidebar, ground, accent. */
@@ -73,6 +73,7 @@ export function AppearanceSettings({
   restrictedSettingsOrgDefault,
   setRestrictedSettings,
 }: ReturnType<typeof useAppearanceSettings>) {
+  const tr = useTranslations("appearanceSettings");
   const activeTheme = THEMES.find(
     (t) => t.ground === appearance.ground && t.accent === appearance.accent
   );
@@ -82,16 +83,14 @@ export function AppearanceSettings({
       {locked && (
         <div className="border-info-border bg-info-bg text-info-fg flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
           <LockIcon className="size-4 shrink-0" />
-          <span>Your organization has locked the theme. These controls are read-only.</span>
+          <span>{tr("locked")}</span>
         </div>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle>Theme</CardTitle>
-          <CardDescription>
-            Ground and accent. Picking a light theme switches the app to light mode.
-          </CardDescription>
+          <CardTitle>{tr("themeTitle")}</CardTitle>
+          <CardDescription>{tr("themeDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2">
@@ -112,7 +111,9 @@ export function AppearanceSettings({
                   <ThemePreview ground={t.ground} accent={ACCENTS[t.accent].swatch} />
                   <span>
                     <span className="block text-sm font-semibold">{t.name}</span>
-                    <span className="text-muted-foreground block text-xs">{t.hint}</span>
+                    <span className="text-muted-foreground block text-xs">
+                      {tr(`themeHints.${t.id}`)}
+                    </span>
                   </span>
                 </button>
               );
@@ -120,7 +121,7 @@ export function AppearanceSettings({
           </div>
 
           <p className="text-muted-foreground text-2xs mt-4 mb-2 font-semibold tracking-[0.08em] uppercase">
-            Accent
+            {tr("accent")}
           </p>
           <div className="flex flex-wrap gap-2">
             {(Object.keys(ACCENTS) as (keyof typeof ACCENTS)[]).map((key) => (
@@ -140,7 +141,7 @@ export function AppearanceSettings({
                   className="size-3.5 rounded-full"
                   style={{ background: ACCENTS[key].swatch }}
                 />
-                {ACCENTS[key].label}
+                {tr(`accents.${key}`)}
               </button>
             ))}
           </div>
@@ -153,7 +154,7 @@ export function AppearanceSettings({
           />
 
           <p className="text-muted-foreground text-2xs mt-4 mb-2 font-semibold tracking-[0.08em] uppercase">
-            Ground
+            {tr("ground")}
           </p>
           <div className="flex flex-wrap gap-2">
             {(Object.keys(GROUNDS) as (keyof typeof GROUNDS)[]).map((key) => (
@@ -168,8 +169,10 @@ export function AppearanceSettings({
                   appearance.ground === key && "border-primary ring-primary ring-1"
                 )}
               >
-                {GROUNDS[key].label}
-                <span className="text-muted-foreground ml-1.5 text-xs">{GROUNDS[key].mode}</span>
+                {tr(`grounds.${key}`)}
+                <span className="text-muted-foreground ml-1.5 text-xs">
+                  {tr(`modes.${GROUNDS[key].mode}`)}
+                </span>
               </button>
             ))}
           </div>
@@ -178,31 +181,31 @@ export function AppearanceSettings({
 
       <Card>
         <CardHeader>
-          <CardTitle>Layout</CardTitle>
-          <CardDescription>
-            How much room lists and panels take, and how sharp their corners are.
-          </CardDescription>
+          <CardTitle>{tr("layoutTitle")}</CardTitle>
+          <CardDescription>{tr("layoutDescription")}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div>
             <p className="text-muted-foreground text-2xs mb-2 font-semibold tracking-[0.08em] uppercase">
-              Density
+              {tr("density")}
             </p>
             <div className="flex flex-wrap gap-2">
               {DENSITIES.map((d) => (
                 <button
-                  key={d.value}
+                  key={d}
                   type="button"
                   disabled={locked}
-                  aria-pressed={appearance.density === d.value}
-                  onClick={() => setAppearance({ density: d.value })}
+                  aria-pressed={appearance.density === d}
+                  onClick={() => setAppearance({ density: d })}
                   className={cn(
                     "border-border hover:border-primary flex-1 rounded-md border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60",
-                    appearance.density === d.value && "border-primary ring-primary ring-1"
+                    appearance.density === d && "border-primary ring-primary ring-1"
                   )}
                 >
-                  <span className="block text-sm font-semibold">{d.label}</span>
-                  <span className="text-muted-foreground block text-xs">{d.hint}</span>
+                  <span className="block text-sm font-semibold">{tr(`densities.${d}.label`)}</span>
+                  <span className="text-muted-foreground block text-xs">
+                    {tr(`densities.${d}.hint`)}
+                  </span>
                 </button>
               ))}
             </div>
@@ -210,7 +213,7 @@ export function AppearanceSettings({
 
           <div>
             <p className="text-muted-foreground text-2xs mb-2 font-semibold tracking-[0.08em] uppercase">
-              Corners
+              {tr("corners")}
             </p>
             <div className="flex flex-wrap gap-2">
               {CORNERS.map((c) => (
@@ -226,7 +229,7 @@ export function AppearanceSettings({
                   )}
                   style={{ borderRadius: c.value }}
                 >
-                  {c.label}
+                  {c.labelKey ? tr(c.labelKey) : c.label}
                 </button>
               ))}
             </div>
@@ -236,15 +239,13 @@ export function AppearanceSettings({
 
       <Card>
         <CardHeader>
-          <CardTitle>Settings you can&apos;t change</CardTitle>
-          <CardDescription>
-            On settings pages, parts you don&apos;t have the permission to change.
-          </CardDescription>
+          <CardTitle>{tr("restrictedTitle")}</CardTitle>
+          <CardDescription>{tr("restrictedDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <div
             role="radiogroup"
-            aria-label="Settings you can't change"
+            aria-label={tr("restrictedTitle")}
             className="grid gap-2 sm:grid-cols-2"
           >
             {(Object.keys(RESTRICTED_SETTINGS) as RestrictedSettings[]).map((key) => (
@@ -259,11 +260,9 @@ export function AppearanceSettings({
                   restrictedSettings === key && "border-primary ring-primary ring-1"
                 )}
               >
-                <span className="block text-sm font-semibold">
-                  {RESTRICTED_SETTINGS[key].label}
-                </span>
+                <span className="block text-sm font-semibold">{tr(`restricted.${key}.label`)}</span>
                 <span className="text-muted-foreground block text-xs">
-                  {RESTRICTED_SETTINGS[key].blurb}
+                  {tr(`restricted.${key}.blurb`)}
                 </span>
               </button>
             ))}
@@ -271,18 +270,14 @@ export function AppearanceSettings({
           {restrictedSettingsOrgDefault && (
             <div className="text-muted-foreground mt-3 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
               <span className="min-w-0">
-                {restrictedSettingsChoice === null
-                  ? "Following your organization's default"
-                  : "Your organization's default"}
-                :{" "}
-                <span className="text-foreground font-medium">
-                  {RESTRICTED_SETTINGS[restrictedSettingsOrgDefault].label}
-                </span>
-                .
+                {tr.rich(restrictedSettingsChoice === null ? "followingDefault" : "orgDefault", {
+                  setting: tr(`restricted.${restrictedSettingsOrgDefault}.label`),
+                  strong: (chunks) => <span className="text-foreground font-medium">{chunks}</span>,
+                })}
               </span>
               {restrictedSettingsChoice !== null && (
                 <Button variant="link" size="xs" onClick={() => setRestrictedSettings(null)}>
-                  Use the organization&apos;s default
+                  {tr("useOrgDefault")}
                 </Button>
               )}
             </div>
@@ -293,7 +288,7 @@ export function AppearanceSettings({
       {!locked && (
         <div>
           <Button variant="outline" size="sm" onClick={reset}>
-            Reset to defaults
+            {tr("reset")}
           </Button>
         </div>
       )}

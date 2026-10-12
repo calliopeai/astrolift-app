@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,8 @@ export function CustomAccentPicker({
   disabled,
   onChange,
 }: CustomAccentPickerProps) {
+  const t = useTranslations("appearanceSettings.customAccent");
+  const tGround = useTranslations("appearanceSettings.grounds");
   const [draft, setDraft] = React.useState(value ?? "");
   React.useEffect(() => {
     if (value) setDraft(value);
@@ -64,58 +67,45 @@ export function CustomAccentPicker({
     if (ok) onChange(hex);
   }
 
+  const mono = (chunks: React.ReactNode) => <span className="font-mono">{chunks}</span>;
   let help: React.ReactNode;
   if (!draft) {
-    help = <>Any colour, as long as it reads against the ground. Status colours never change.</>;
+    help = t("helpEmpty");
   } else if (!parsed) {
-    help = (
-      <>
-        Use a hex colour, like <span className="font-mono">#2f9e52</span>.
-      </>
-    );
+    help = t.rich("helpInvalid", { mono });
   } else if (ground && usable) {
-    help = (
-      <>
-        <span className="font-mono">{checks[0].ratio.toFixed(1)}:1</span> on {GROUNDS[ground].label}
-        . Status colours never change.
-      </>
-    );
+    help = t.rich("helpOk", {
+      mono,
+      ratio: checks[0].ratio.toFixed(1),
+      ground: tGround(ground),
+    });
   } else if (ground) {
-    help = (
-      <>
-        Too faint on {GROUNDS[ground].label}:{" "}
-        <span className="font-mono">{checks[0].ratio.toFixed(1)}:1</span>, it needs{" "}
-        <span className="font-mono">{MIN_ACCENT_CONTRAST}:1</span>. Pick a{" "}
-        {modeFor(ground) === "dark" ? "lighter" : "darker"} colour.
-      </>
-    );
+    help = t.rich(modeFor(ground) === "dark" ? "helpTooFaintLighter" : "helpTooFaintDarker", {
+      mono,
+      ratio: checks[0].ratio.toFixed(1),
+      min: MIN_ACCENT_CONTRAST,
+      ground: tGround(ground),
+    });
   } else if (!usable) {
-    help = (
-      <>
-        Too faint on every ground; it needs{" "}
-        <span className="font-mono">{MIN_ACCENT_CONTRAST}:1</span>.
-      </>
-    );
+    help = t.rich("helpFaintEverywhere", { mono, min: MIN_ACCENT_CONTRAST });
   } else if (failing.length === 0) {
-    help = <>Reads on every ground. Status colours never change.</>;
+    help = t("helpReadsEverywhere");
   } else {
-    help = (
-      <>
-        Too faint on {failing.map((c) => GROUNDS[c.ground].label).join(", ")}: people on{" "}
-        {failing.length === 1 ? "that ground" : "those grounds"} keep the default accent.
-      </>
-    );
+    help = t("helpFaintSome", {
+      grounds: failing.map((c) => tGround(c.ground)).join(", "),
+      count: failing.length,
+    });
   }
 
   return (
     <div className="mt-3 flex min-w-0 flex-col gap-1.5">
       <label htmlFor={id} className="text-sm font-medium">
-        Custom accent
+        {t("label")}
       </label>
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <input
           type="color"
-          aria-label="Pick a custom accent"
+          aria-label={t("pick")}
           disabled={disabled}
           value={parsed ?? "#2f9e52"}
           onChange={(e) => update(e.target.value)}
@@ -133,7 +123,7 @@ export function CustomAccentPicker({
         />
         {value && (
           <span className="text-muted-foreground text-xs" aria-live="polite">
-            In use
+            {t("inUse")}
           </span>
         )}
       </div>

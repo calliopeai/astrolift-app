@@ -17,6 +17,7 @@
  * Issue: #395.
  */
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { GithubIcon, GitlabIcon, GitBranchIcon } from "lucide-react";
 
@@ -43,10 +44,11 @@ interface StatusChipProps {
 }
 
 function StatusChip({ account }: StatusChipProps) {
+  const t = useTranslations("securitySettings.connected");
   if (!account.isConnected) {
     return (
       <Badge variant="outline" className="text-2xs">
-        Not connected
+        {t("notConnected")}
       </Badge>
     );
   }
@@ -56,7 +58,7 @@ function StatusChip({ account }: StatusChipProps) {
         variant="outline"
         className="border-warning-border bg-warning/10 text-2xs text-warning-fg"
       >
-        Re-authorize
+        {t("reauthorize")}
       </Badge>
     );
   }
@@ -65,7 +67,7 @@ function StatusChip({ account }: StatusChipProps) {
       variant="outline"
       className="border-success-border bg-success/10 text-2xs text-success-fg"
     >
-      Connected
+      {t("connected")}
     </Badge>
   );
 }
@@ -84,6 +86,7 @@ export function ConnectedAccountsSection({
   const [disconnectTarget, setDisconnectTarget] =
     React.useState<AstroliftMyConnectedAccount | null>(null);
   const [confirmInput, setConfirmInput] = React.useState("");
+  const t = useTranslations("securitySettings.connected");
 
   // Hide entirely when the org hasn't enabled any user-flow source
   // providers. Don't surface a placeholder — operators shouldn't see
@@ -101,7 +104,7 @@ export function ConnectedAccountsSection({
     <>
       <div className="border-t pt-4">
         <p className="text-muted-foreground mb-3 text-xs font-medium tracking-wide uppercase">
-          Connected accounts
+          {t("title")}
         </p>
         <div className="flex flex-col gap-3">
           {accounts.map((account) => (
@@ -130,7 +133,7 @@ export function ConnectedAccountsSection({
                     disabled={connecting}
                     onClick={() => onConnect(account)}
                   >
-                    Connect
+                    {t("connect")}
                   </Button>
                 ) : account.reauthRequired ? (
                   <Button
@@ -139,7 +142,7 @@ export function ConnectedAccountsSection({
                     disabled={connecting}
                     onClick={() => onConnect(account)}
                   >
-                    Re-authorize
+                    {t("reauthorize")}
                   </Button>
                 ) : (
                   <Button
@@ -151,17 +154,14 @@ export function ConnectedAccountsSection({
                       setConfirmInput("");
                     }}
                   >
-                    Disconnect
+                    {t("disconnect")}
                   </Button>
                 )}
               </div>
             </div>
           ))}
         </div>
-        <p className="text-muted-foreground text-2xs mt-3">
-          Refetch on focus by reloading the page — connection state updates after the OAuth dance
-          completes on the host.
-        </p>
+        <p className="text-muted-foreground text-2xs mt-3">{t("refetchHint")}</p>
       </div>
 
       <ConfirmDialog
@@ -172,24 +172,24 @@ export function ConnectedAccountsSection({
             setConfirmInput("");
           }
         }}
-        title={`Disconnect ${disconnectTarget?.providerLabel ?? "this account"}?`}
+        title={t("disconnectTitle", {
+          provider: disconnectTarget?.providerLabel ?? t("thisAccount"),
+        })}
         description={
           <div className="flex flex-col gap-3">
             <p>
-              Astrolift will lose access to{" "}
-              <span className="font-mono">
-                {disconnectTarget?.linkedAccountLogin ?? "this account"}
-              </span>{" "}
-              on {disconnectTarget?.providerLabel}. Any deploys that flow through your identity will
-              fail until you reconnect.
+              {t.rich("disconnectBody", {
+                account: disconnectTarget?.linkedAccountLogin ?? t("thisAccount"),
+                provider: disconnectTarget?.providerLabel ?? "",
+                mono: (chunks) => <span className="font-mono">{chunks}</span>,
+              })}
             </p>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="connected-accounts-disconnect-confirm" className="text-xs">
-                Type{" "}
-                <span className="font-mono">
-                  {disconnectTarget?.linkedAccountLogin ?? "the linked account"}
-                </span>{" "}
-                to confirm.
+                {t.rich("typeToConfirm", {
+                  account: disconnectTarget?.linkedAccountLogin ?? t("theLinkedAccount"),
+                  mono: (chunks) => <span className="font-mono">{chunks}</span>,
+                })}
               </Label>
               <Input
                 id="connected-accounts-disconnect-confirm"
@@ -200,7 +200,7 @@ export function ConnectedAccountsSection({
             </div>
           </div>
         }
-        confirmLabel="Disconnect"
+        confirmLabel={t("disconnect")}
         destructive
         onConfirm={handleDisconnect}
       />

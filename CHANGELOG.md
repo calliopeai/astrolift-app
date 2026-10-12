@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Settings speak every supported language: source providers (hosts, SSH deploy keys, the GitHub, GitLab and paste-credentials connect sheets, the Client ID sheet, webhook secret reveal), identity providers, profile, appearance and the custom accent picker, visualizations, notifications and alert subscriptions, security cards, the settings sub-navigation and connected accounts now render through next-intl in all 8 locales, including their toasts, empty states, aria-labels and confirm dialogs. Copy that used em-dashes now reads with commas, semicolons or full stops (#2145).
+
 - A refused permission reads the same on every client: GraphQL errors raised by a permission check now carry `extensions.code = "PERMISSION_DENIED"` (the code mutation envelopes already use) with `extensions.reason` and `extensions.permission`; the message is unchanged. The CLI and web can tell a refusal from any other failure and show why (#1867).
 
 - Every tab inside an app or agent offers actions from that app's own permissions, not the account's: the header (deploy, archive, delete), Settings sections (resync, retention, environments, managed services, archive, the danger zone) and Access (tokens, security, edge). A grant held on another project no longer offers an action this app refuses. Account grants only bridge the first load (`useAppCan`, fed by the frame) (#1867).
