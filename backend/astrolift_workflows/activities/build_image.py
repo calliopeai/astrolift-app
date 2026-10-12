@@ -275,6 +275,28 @@ def _build_image_sync(inp: BuildImageInput) -> dict:
 
     from astrolift_lifecycle.run_history import record, record_failure
 
+    # The tag is already in the registry (a redeploy of a built commit, or an
+    # explicitly chosen tag): deploy it. Rebuilding would only fail at push,
+    # because registry tags are immutable (ECR TAG_INVALID).
+    existing = _read_pushed_digest(prepared.registry_driver, prepared.repo_name, inp.image_tag)
+    if existing:
+        record(deployment.pk, "build", "completed", "Image already in the registry; build skipped.")
+        _record_build_outcome(deployment, image_tag=inp.image_tag, digest=existing)
+        log.info(
+            "build_image reuse deployment=%s image=%s:%s digest=%s",
+            inp.deployment_id,
+            prepared.repo_uri,
+            inp.image_tag,
+            existing,
+        )
+        return {
+            "ok": True,
+            "image_ref": f"{prepared.repo_uri}:{inp.image_tag}",
+            "digest": existing,
+            "stub": False,
+            "reused": True,
+        }
+
     record(deployment.pk, "build", "started")
     try:
         result = prepared.driver.build(spec, prepared.repo_uri, inp.image_tag)
@@ -626,6 +648,10 @@ async def fetch_app_build_strategy(registered_app_id: int) -> str:
     return await sync_to_async(_fetch_app_build_strategy_sync)(registered_app_id)
 
 
+#: Well inside the workflow's two-minute heartbeat timeout for this activity.
+_HEARTBEAT_EVERY_SECONDS = 30
+
+
 @activity.defn(name="astrolift.build.build_image")
 async def build_image(inp: BuildImageInput) -> dict:
     """Build a container image from source via the registered BuildDriver.
@@ -636,9 +662,15 @@ async def build_image(inp: BuildImageInput) -> dict:
     reference — callers can treat it as the image to deploy regardless of
     whether a real build ran.
     """
+    import asyncio
+
     from asgiref.sync import sync_to_async
 
-    activity.heartbeat()
-    result = await sync_to_async(_build_image_sync)(inp)
-    activity.heartbeat()
-    return result
+    # The build runs in a worker thread, where heartbeats do not reach the
+    # activity, so beat from here until it finishes; otherwise a build longer
+    # than the heartbeat timeout is killed as stuck.
+    build = asyncio.ensure_future(sync_to_async(_build_image_sync)(inp))
+    while not build.done():
+        activity.heartbeat()
+        await asyncio.wait({build}, timeout=_HEARTBEAT_EVERY_SECONDS)
+    return build.result()

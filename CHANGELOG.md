@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Deploying an image tag that is already in the registry deploys it instead of rebuilding it: the rebuild could only fail at push, because registry tags are immutable (ECR `TAG_INVALID`), which is how a redeploy of a built commit failed on CONFLICT. And the build activity heartbeats every 30 seconds while the build runs in its worker thread, so a build longer than the two-minute heartbeat timeout is no longer killed as stuck (`activity Heartbeat timeout`) (#2263, #2184).
+
 - A refused permission reads the same on every client: GraphQL errors raised by a permission check now carry `extensions.code = "PERMISSION_DENIED"` (the code mutation envelopes already use) with `extensions.reason` and `extensions.permission`; the message is unchanged. The CLI and web can tell a refusal from any other failure and show why (#1867).
 
 - Every tab inside an app or agent offers actions from that app's own permissions, not the account's: the header (deploy, archive, delete), Settings sections (resync, retention, environments, managed services, archive, the danger zone) and Access (tokens, security, edge). A grant held on another project no longer offers an action this app refuses. Account grants only bridge the first load (`useAppCan`, fed by the frame) (#1867).

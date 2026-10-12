@@ -158,10 +158,12 @@ def test_build_image_sync_real_build_records_digest(monkeypatch):
     from providers._sdk.build import BuildResult
 
     deployment = _make_deployment(image_tag="sha-abc")
+    built = []
 
     class FakeDriver:
         def build(self, spec, repo, tag):
             assert tag == "sha-abc"
+            built.append(tag)
             return BuildResult(success=True, image_uri=f"{repo}:{tag}", digest="", duration_seconds=1.0)
 
     class FakeTag:
@@ -170,8 +172,9 @@ def test_build_image_sync_real_build_records_digest(monkeypatch):
             self.digest = digest
 
     class FakeRegistry:
+        # The tag exists only once the build has pushed it.
         def list_tags(self, repo_name):
-            return [FakeTag("sha-abc", _GOOD_DIGEST)]
+            return [FakeTag("sha-abc", _GOOD_DIGEST)] if built else []
 
     prepared = _PreparedBuild(
         driver=FakeDriver(),
@@ -748,3 +751,66 @@ def test_a_non_github_host_keeps_the_anonymous_clone(monkeypatch):
     _connection(app, kind="gitlab_pat")
 
     assert build_image_mod._clone_credential(app) == ("", "")
+
+
+def test_a_tag_already_in_the_registry_is_deployed_without_rebuilding(monkeypatch):
+    """Registry tags are immutable: rebuilding one fails at push (ECR TAG_INVALID)."""
+
+    deployment = _make_deployment(image_tag="sha-d026adc")
+
+    class NeverBuild:
+        def build(self, spec, repo, tag):
+            raise AssertionError("an existing tag must not be rebuilt")
+
+    class FakeTag:
+        name = "sha-d026adc"
+        digest = _GOOD_DIGEST
+
+    class FakeRegistry:
+        def list_tags(self, repo_name):
+            return [FakeTag()]
+
+    prepared = _PreparedBuild(
+        driver=NeverBuild(),
+        registry_driver=FakeRegistry(),
+        repo_name="conflict/quake",
+        repo_uri="123.dkr.ecr.us-west-2.amazonaws.com/conflict/quake",
+    )
+    monkeypatch.setattr(build_image_mod, "cluster_for_deployment", lambda _d: object(), raising=False)
+    monkeypatch.setattr(build_image_mod, "_prepare_build", lambda *a, **k: prepared)
+
+    result = _build_image_sync(
+        BuildImageInput(deployment_id=deployment.pk, image_tag="sha-d026adc", commit_sha="")
+    )
+
+    assert result == {
+        "ok": True,
+        "image_ref": "123.dkr.ecr.us-west-2.amazonaws.com/conflict/quake:sha-d026adc",
+        "digest": _GOOD_DIGEST,
+        "stub": False,
+        "reused": True,
+    }
+    deployment.refresh_from_db()
+    assert deployment.image_digest == _GOOD_DIGEST
+
+
+def test_the_activity_heartbeats_while_a_slow_build_runs(monkeypatch):
+    """The build runs in a worker thread; the activity must keep beating."""
+    import asyncio
+    import time
+
+    beats = []
+    monkeypatch.setattr(build_image_mod.activity, "heartbeat", lambda *a: beats.append(time.monotonic()))
+    monkeypatch.setattr(build_image_mod, "_HEARTBEAT_EVERY_SECONDS", 0.05)
+
+    def slow_build(inp):
+        time.sleep(0.4)
+        return {"ok": True, "image_ref": "r:t", "stub": False}
+
+    monkeypatch.setattr(build_image_mod, "_build_image_sync", slow_build)
+    result = asyncio.run(
+        build_image_mod.build_image(BuildImageInput(deployment_id=1, image_tag="t", commit_sha=""))
+    )
+
+    assert result["ok"] is True
+    assert len(beats) >= 4
