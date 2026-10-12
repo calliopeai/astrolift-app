@@ -2,7 +2,7 @@
 PreviewEnvironment — a per-PR ephemeral deploy.
 
 Created when ``preview_enabled`` is true on the registered app and a
-PR is opened. Hostname follows ``pr-{n}-{slug}.pr.{org}.{base-zone}``;
+PR is opened. Hostname follows ``pr-{n}-{slug}.{base-zone}`` (#2091);
 namespace is segregated per preview. Torn down on PR close (with a
 short grace period for re-open).
 """

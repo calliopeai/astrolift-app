@@ -11,8 +11,9 @@ The platform's hostname rules (spec 05 §12) compress to:
                        for each, flat suffix so a single wildcard
                        cert covers them all.
 
-Preview environments follow:
-``pr-<n>-<app-slug>.pr.<org-slug>.<base-zone>``
+Preview environments are one label below the zone, so the zone's wildcard
+certificate covers them (#2091): ``pr-<n>-<app-slug>.<base-zone>`` for a pull
+request, ``preview-<branch>-<app-slug>.<base-zone>`` for a manual preview.
 
 This module is pure-Python (no DB, no I/O) so it composes into the
 renderer + the env-creation flow + the preview-build flow without
@@ -134,6 +135,27 @@ def compute_hostnames(manifest: NormalizedManifest, inputs: HostnameInputs) -> l
     ]
 
 
+#: A label a preview's hostname starts with; no app may take one (#2091).
+PREVIEW_LABEL_RE = re.compile(r"^(pr-[0-9]+|preview)-")
+
+
+def preview_hostname(*, label: str, app_slug: str, zone: str | None, org_slug: str) -> str:
+    """The one preview hostname scheme (#2091): ``<label>-<app>.<zone>``, one
+    label below the zone like every other environment, so ``*.<zone>`` covers
+    it on ALB, CloudFront and cert-manager alike. ``label`` is ``pr-<n>`` or
+    ``preview-<branch>``. A first label over 63 characters keeps its start and
+    ends in a short digest, so it stays a valid, stable DNS label. Without a
+    managed zone it stops at the org slug; nothing serves that name publicly.
+    """
+    import hashlib
+
+    first = f"{label}-{app_slug}".lower().strip("-")
+    if len(first) > 63:
+        digest = hashlib.sha256(first.encode()).hexdigest()[:8]
+        first = f"{first[:54].rstrip('-')}-{digest}"
+    return f"{first}.{zone}".lower() if zone else f"{first}.{org_slug}".lower()
+
+
 def compute_preview_hostname(
     *,
     pr_number: int,
@@ -141,10 +163,10 @@ def compute_preview_hostname(
     org_slug: str,
     base_zone: str,
 ) -> str:
-    """``pr-<n>-<app>.pr.<base-zone>`` — org slug omitted for clean URLs."""
+    """``pr-<n>-<app>.<base-zone>`` (see :func:`preview_hostname`)."""
     if pr_number <= 0:
         raise ValueError(f"pr_number must be positive, got {pr_number}")
-    return f"pr-{pr_number}-{app_slug}.pr.{base_zone}"
+    return preview_hostname(label=f"pr-{pr_number}", app_slug=app_slug, zone=base_zone, org_slug=org_slug)
 
 
 # ---- helpers ----------------------------------------------------------

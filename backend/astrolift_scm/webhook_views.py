@@ -199,13 +199,16 @@ def _ensure_preview_environment(app, pr_ctx: github_pr_dispatch.PrEventContext):
     from astrolift_clusters.models import resolve_managed_domain
 
     _managed_domain = resolve_managed_domain(org, for_preview=True)
-    # Stable per-PR label: ``pr-<n>.<app>.<org>``. When the install has a
-    # managed DNS zone we append it to form the full FQDN; without one we
-    # stop at the org slug rather than repeating it (the old fallback
-    # ``base_zone = ... or org_slug`` produced ``…<org>.<org>``).
-    base = f"pr-{pr_ctx.pr_number}.{app_slug}.{org_slug}"
-    zone = getattr(_managed_domain, "zone", None)
-    hostname = (f"{base}.{zone}" if zone else base).lower()
+    # ``pr-<n>-<app>.<zone>``: one label below the zone, so the zone's
+    # wildcard certificate covers it (#2091).
+    from astrolift_manifest.hostname import preview_hostname
+
+    hostname = preview_hostname(
+        label=f"pr-{pr_ctx.pr_number}",
+        app_slug=app_slug,
+        zone=getattr(_managed_domain, "zone", None),
+        org_slug=org_slug,
+    )
 
     from astrolift_lifecycle.services.preview_lineage import (
         resolve_previewed_environment,

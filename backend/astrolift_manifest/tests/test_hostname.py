@@ -143,9 +143,30 @@ def test_uppercase_subdomain_normalized_to_lower():
 
 def test_preview_hostname_pattern():
     h = compute_preview_hostname(pr_number=42, app_slug="hello", org_slug="acme", base_zone="astrolift.dev")
-    assert h == "pr-42-hello.pr.astrolift.dev"
+    assert h == "pr-42-hello.astrolift.dev"
+
+
+def test_preview_hostname_is_one_label_below_the_zone_even_for_a_long_branch():
+    """The zone's ``*.<zone>`` wildcard covers it (#2091)."""
+    from astrolift_manifest.hostname import preview_hostname
+
+    branch = "preview-" + "feature-" * 10
+    host = preview_hostname(label=branch, app_slug="billing-api", zone="apps.example", org_slug="acme")
+    first, _, rest = host.partition(".")
+    assert rest == "apps.example" and len(first) <= 63 and not first.endswith("-")
+    assert host == preview_hostname(
+        label=branch, app_slug="billing-api", zone="apps.example", org_slug="acme"
+    )
 
 
 def test_preview_hostname_rejects_non_positive_pr_number():
     with pytest.raises(ValueError):
         compute_preview_hostname(pr_number=0, app_slug="x", org_slug="y", base_zone="z")
+
+
+@pytest.mark.parametrize("label", ["pr-3-web", "PR-12-api", "preview-main-web"])
+def test_an_app_cannot_take_a_preview_shaped_label(label):
+    """It could collide with some app's preview in the same zone (#2091)."""
+    from astrolift_registry.hostname_claims import hostname_label_refusal
+
+    assert "preview hostname" in hostname_label_refusal(label, organization=object())
