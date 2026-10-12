@@ -57,6 +57,7 @@ from astrolift_operations.schema.mutations.types import (  # noqa: F401
     SetNotificationPreferenceInput,
     SetNotificationProfileInput,
     SetZentinelleGatewayEnabledInput,
+    SetZentinelleGatewayUrlInput,
     TestNotificationInput,
     TestWebhookInput,
     UnmuteAlertRuleInput,

@@ -413,6 +413,20 @@ class ConnectZentinelleInput:
     enrollment_code: str
     """The one-time code generated in Zentinelle (Settings > Astrolift)."""
 
+    gateway_url: str | None = None
+    """Where cluster gateways reach Zentinelle when that is not ``url``: a
+    private, in-cluster address (#1905). Plain http only to an in-cluster
+    Service (``*.svc.cluster.local``)."""
+
+
+@strawberry.input
+class SetZentinelleGatewayUrlInput:
+    """Point this organization's cluster gateways at another Zentinelle URL (#1905)."""
+
+    gateway_url: str | None = None
+    """The in-cluster address; empty or null puts the gateways back on the
+    connection's URL."""
+
 
 @strawberry.input
 class DisconnectZentinelleInput:

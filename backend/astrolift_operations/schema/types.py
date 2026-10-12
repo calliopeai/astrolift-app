@@ -1061,6 +1061,9 @@ class ZentinelleConnectionType:
 
     id: GUID
     base_url: str
+    gateway_url: str
+    """Where cluster gateways reach Zentinelle; empty means ``base_url`` (#1905)."""
+
     status: str
     """``connected``, ``revoked`` (Zentinelle refused the install credential)
     or ``disconnected``."""
@@ -1110,6 +1113,7 @@ def zentinelle_connection_to_type(row) -> ZentinelleConnectionType:
     return ZentinelleConnectionType(
         id=GUID(str(row.guid)),
         base_url=row.base_url,
+        gateway_url=row.gateway_url,
         status=row.status,
         zentinelle_install_id=row.zentinelle_install_id,
         tenant_ids=[str(t) for t in row.tenant_ids or []],

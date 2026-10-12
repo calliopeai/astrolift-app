@@ -6617,6 +6617,7 @@ type AstroliftZentinelleClusterGatewayMutationResult {
 type AstroliftZentinelleConnection {
   id: GUID!
   baseUrl: String!
+  gatewayUrl: String!
   status: String!
   zentinelleInstallId: String!
   tenantIds: [String!]!
@@ -7245,6 +7246,7 @@ input ConnectUserSourceProviderInput {
 input ConnectZentinelleInput {
   url: String!
   enrollmentCode: String!
+  gatewayUrl: String = null
 }
 
 enum CostWindow {
@@ -9460,6 +9462,7 @@ type Mutation {
   placeObservabilityRetentionHold(input: PlaceObservabilityRetentionHoldInput!): ObservabilityRetentionHoldTypeMutationResult!
   releaseObservabilityRetentionHold(input: ReleaseObservabilityRetentionHoldInput!): ObservabilityRetentionHoldTypeMutationResult!
   connectZentinelle(input: ConnectZentinelleInput!): AstroliftZentinelleConnectionMutationResult!
+  setZentinelleGatewayUrl(input: SetZentinelleGatewayUrlInput!): AstroliftZentinelleConnectionMutationResult!
   disconnectZentinelle(input: DisconnectZentinelleInput!): AstroliftZentinelleDisconnectMutationResult!
   registerZentinelleCluster(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
   setZentinelleGatewayEnabled(input: SetZentinelleGatewayEnabledInput!): AstroliftZentinelleClusterGatewayMutationResult!
@@ -11427,6 +11430,10 @@ input SetRetentionPolicyInput {
 input SetZentinelleGatewayEnabledInput {
   clusterId: GUID!
   enabled: Boolean!
+}
+
+input SetZentinelleGatewayUrlInput {
+  gatewayUrl: String = null
 }
 
 type SharedDirectoryType {

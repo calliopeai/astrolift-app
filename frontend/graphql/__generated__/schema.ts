@@ -6194,6 +6194,7 @@ export type AstroliftZentinelleConnection = {
   connectedAt?: Maybe<Scalars['DateTime']['output']>;
   disconnectedAt?: Maybe<Scalars['DateTime']['output']>;
   gatewayFeatureEnabled: Scalars['Boolean']['output'];
+  gatewayUrl: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   lastError: Scalars['String']['output'];
   status: Scalars['String']['output'];
@@ -6800,6 +6801,7 @@ export type ConnectUserSourceProviderInput = {
 
 export type ConnectZentinelleInput = {
   enrollmentCode: Scalars['String']['input'];
+  gatewayUrl: InputMaybe<Scalars['String']['input']>;
   url: Scalars['String']['input'];
 };
 
@@ -9060,6 +9062,7 @@ export type Mutation = {
   /** Enable or disable an exact owned workflow definition at its reviewed revision. Does not start a run or confirm schedule state. */
   setWorkflowDefinitionEnabled: WorkflowDefinitionActivationResult;
   setZentinelleGatewayEnabled: AstroliftZentinelleClusterGatewayMutationResult;
+  setZentinelleGatewayUrl: AstroliftZentinelleConnectionMutationResult;
   /** Cancel a sign request. Sign requests are not available: this always refuses. */
   signRequestCancel: Scalars['Boolean']['output'];
   /** Sign a sign request. Sign requests are not available: this always refuses. */
@@ -10887,6 +10890,11 @@ export type MutationSetWorkflowDefinitionEnabledArgs = {
 
 export type MutationSetZentinelleGatewayEnabledArgs = {
   input: SetZentinelleGatewayEnabledInput;
+};
+
+
+export type MutationSetZentinelleGatewayUrlArgs = {
+  input: SetZentinelleGatewayUrlInput;
 };
 
 
@@ -15294,6 +15302,10 @@ export type SetRetentionPolicyInput = {
 export type SetZentinelleGatewayEnabledInput = {
   clusterId: Scalars['GUID']['input'];
   enabled: Scalars['Boolean']['input'];
+};
+
+export type SetZentinelleGatewayUrlInput = {
+  gatewayUrl: InputMaybe<Scalars['String']['input']>;
 };
 
 export type SharedDirectoryType = {

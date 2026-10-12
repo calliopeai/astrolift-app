@@ -26,6 +26,7 @@ from astrolift_operations.schema.mutations.types import (
     DisconnectZentinelleInput,
     RotateZentinelleGatewayCredentialInput,
     SetZentinelleGatewayEnabledInput,
+    SetZentinelleGatewayUrlInput,
     ZentinelleClusterInput,
 )
 from astrolift_operations.schema.types import (
@@ -119,6 +120,12 @@ def _connect_extras(result):
     }
 
 
+def _gateway_url_extras(result):
+    if not result.ok or result.data is None:
+        return None
+    return {"gateway_url": result.data.gateway_url}
+
+
 def _disconnect_extras(result):
     if not result.ok or result.data is None:
         return None
@@ -157,10 +164,35 @@ class ZentinelleMutations:
                 url=input.url,
                 code=input.enrollment_code,
                 install_url=zentinelle_connect.install_base_url(),
+                gateway_url=input.gateway_url or "",
                 actor=_actor(),
             )
         except ZentinelleConnectError as exc:
             return _refusal(exc)
+        return gql_success(zentinelle_connection_to_type(connection))
+
+    @strawberry.field
+    @mutation_audit(
+        action="zentinelle.gateway_url.set", target=_connection_target, extras=_gateway_url_extras
+    )
+    @requires_elevation(action_label="Change where Zentinelle gateways reach Zentinelle")
+    @require_permission(Permission.ZENTINELLE_CONNECT, scope=org_scope(Permission.ZENTINELLE_CONNECT))
+    @tenant_scoped()
+    def set_zentinelle_gateway_url(
+        self, info: Info, input: SetZentinelleGatewayUrlInput
+    ) -> MutationResultType[ZentinelleConnectionType]:
+        """Point this organization's cluster gateways at a private, in-cluster
+        Zentinelle URL (or back at the connection's URL) and redeploy the running
+        ones. A cluster that could not be redeployed carries the reason in its
+        ``lastError``."""
+        connection = _connection(_caller_org_id())
+        if connection is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "this organization is not connected to Zentinelle")
+        try:
+            zentinelle_connect.set_gateway_url(connection=connection, url=input.gateway_url)
+        except ZentinelleConnectError as exc:
+            return _refusal(exc)
+        connection.refresh_from_db()
         return gql_success(zentinelle_connection_to_type(connection))
 
     @strawberry.field
