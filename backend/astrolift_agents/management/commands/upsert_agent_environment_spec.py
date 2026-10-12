@@ -108,6 +108,13 @@ class Command(BaseCommand):
         spec = AgentEnvironmentSpec.objects.filter(
             organization=org, slug=slug, deleted_at__isnull=True
         ).first()
+        # A spec this command creates is org-shared; an existing one keeps its owner (#2102).
+        owner = spec or AgentEnvironmentSpec(organization=org)
+        for ref in secret_refs:
+            try:
+                assert_org_scoped_secret_ref(ref["uri"], organization=org, spec=owner)
+            except SecretRefNamespaceError as exc:
+                raise CommandError(str(exc)) from exc
         is_new = spec is None
         if spec is None:
             spec = AgentEnvironmentSpec(organization=org, slug=slug)

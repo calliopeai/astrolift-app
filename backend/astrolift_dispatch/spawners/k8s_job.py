@@ -403,9 +403,15 @@ class K8sJobSpawner(ContainerSpawner):
                     ),
                 ),
             )
-            from astrolift_dispatch.agent_network_fence import agent_fence_manifests
+            from astrolift_dispatch.agent_network_fence import GATEWAY_LABEL, agent_fence_manifests
 
-            manifests.extend(agent_fence_manifests(self._cluster, self._namespace))
+            manifests.extend(
+                agent_fence_manifests(
+                    self._cluster,
+                    self._namespace,
+                    gateway=bool(GATEWAY_LABEL in job_manifest["spec"]["template"]["metadata"]["labels"]),
+                )
+            )
             manifests.append(job_manifest)
             result = driver.apply_manifests(ctx.slug, self._namespace, manifests)
             if not getattr(result, "ok", False):
@@ -951,6 +957,12 @@ def _render_agent_job(
             },
         },
     }
+    if getattr(spec, "model_gateway", False):
+        # Selected by the default-deny gateway fence (#1950).
+        from astrolift_dispatch.agent_network_fence import GATEWAY_LABEL
+
+        job["metadata"]["labels"][GATEWAY_LABEL] = "true"
+        job["spec"]["template"]["metadata"]["labels"][GATEWAY_LABEL] = "true"
     harden_agent_pod(
         job["spec"]["template"]["spec"], non_root=bool(getattr(spec, "run_as_non_root", False)), spec=spec
     )

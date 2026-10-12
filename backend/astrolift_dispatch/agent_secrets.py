@@ -191,15 +191,43 @@ def _agent_secret_ref_reason(uri: str, *, organization, typed: str) -> str | Non
     )
 
 
-def assert_org_scoped_secret_ref(uri: str, *, organization) -> None:
+def owner_enforced() -> bool:
+    """Whether typed agent refs are held to their spec owner's namespace (#2102).
+
+    Off until an install has migrated its refs (``migrate_agent_secret_owners``)
+    and ``audit_agent_secret_owner_cutover --require-ready`` passes; switching
+    it on before that would stop every agent still on a legacy location."""
+    try:
+        from constance import config as constance_config
+
+        return bool(getattr(constance_config, "AGENT_SECRET_OWNER_ENFORCEMENT", False))
+    except Exception:  # noqa: BLE001 -- no settings store: keep the compatible behaviour
+        return False
+
+
+def _owner_reason(uri: str, *, spec) -> str | None:
+    """Why canonical ``uri`` is outside ``spec``'s owner namespace, when enforced."""
+    if spec is None or not owner_enforced():
+        return None
+    from astrolift_agents.services.secret_owner_namespaces import _spec_secret_ref_reason
+
+    return _spec_secret_ref_reason(uri, spec=spec)
+
+
+def assert_org_scoped_secret_ref(uri: str, *, organization, spec=None) -> None:
     """Raise :class:`SecretRefNamespaceError` unless the typed agent secret
-    ref ``uri`` names a location under ``agents/<org guid>/``.
+    ref ``uri`` names a location under ``agents/<org guid>/`` and, once owner
+    enforcement is on and ``spec`` (saved or not) is given, under that spec
+    owner's own prefix (#2102).
 
     It is judged in its canonical form (:func:`canonical_secret_ref`), the one
     resolution hands the store, so ``secret://agents/<org guid>/x`` passes and
     resolves exactly like ``agents/<org guid>/x``.
     """
-    reason = _agent_secret_ref_reason(canonical_secret_ref(uri), organization=organization, typed=uri)
+    canonical = canonical_secret_ref(uri)
+    reason = _agent_secret_ref_reason(canonical, organization=organization, typed=uri) or _owner_reason(
+        canonical, spec=spec
+    )
     if reason is not None:
         raise SecretRefNamespaceError(reason)
 
@@ -333,7 +361,9 @@ def unscoped_secret_refs(spec) -> dict[str, str]:
             reason = managed_binding_ref_reason(binding.managed_service, ref["uri"])
         else:
             # Already canonical: judge the very string the store will get.
-            reason = _agent_secret_ref_reason(ref["uri"], organization=spec.organization, typed=ref["uri"])
+            reason = _agent_secret_ref_reason(
+                ref["uri"], organization=spec.organization, typed=ref["uri"]
+            ) or _owner_reason(ref["uri"], spec=spec)
         if reason is not None:
             unscoped[env_var] = reason
     return unscoped

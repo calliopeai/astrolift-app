@@ -159,7 +159,9 @@ def world(monkeypatch, settings):
         "core.cluster_observability.list_app_pods",
         lambda **kwargs: [SimpleNamespace(name="managed-pod", ready=True)],
     )
-    monkeypatch.setattr("astrolift_dispatch.agent_network_fence.agent_fence_manifests", lambda *args: [])
+    monkeypatch.setattr(
+        "astrolift_dispatch.agent_network_fence.agent_fence_manifests", lambda *args, **kwargs: []
+    )
     monkeypatch.setattr(
         "astrolift_dispatch.agent_secrets.resolve_task_secret_manifest",
         lambda **kw: {
