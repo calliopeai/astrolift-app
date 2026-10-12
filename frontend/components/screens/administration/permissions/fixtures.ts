@@ -359,6 +359,15 @@ export const ACTION_SAFETY_FIXTURE = [
     sources: [],
   },
   {
+    action: "exec.attach",
+    label: "Open a console in a workload",
+    enabled: true,
+    confirmation: true,
+    verification: true,
+    allowSelfApproval: true,
+    sources: [],
+  },
+  {
     action: "secret.reveal",
     label: "Reveal a secret",
     enabled: false,
