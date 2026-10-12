@@ -29,7 +29,7 @@ import {
   ScrollTextIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -140,6 +140,7 @@ export function PodEventsPanel({
   nowMs,
 }: PodEventsPanelProps) {
   const t = useTranslations("apps.observability");
+  const format = useFormatter();
 
   // ``Date.now()`` is impure; calling it during render trips
   // react-hooks/purity. Use a prop-driven effect so the "now"
@@ -240,7 +241,10 @@ export function PodEventsPanel({
                   <li key={e.id} className="px-6 py-2 text-sm">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-muted-foreground w-44 shrink-0 font-mono text-xs">
-                        {new Date(e.occurredAt).toLocaleString()}
+                        {format.dateTime(new Date(e.occurredAt), {
+                          dateStyle: "medium",
+                          timeStyle: "medium",
+                        })}
                       </span>
                       <Badge
                         variant={isWarning ? "destructive" : "outline"}

@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
+import { renderWithIntl } from "@/test/render-with-intl";
 
 import { PromqlQueryPanel } from "./PromqlQueryPanel";
 import { usePromql } from "./use-promql";
@@ -59,7 +61,7 @@ vi.mock("recharts", () => ({
 }));
 
 function openPanel() {
-  render(<Wired appSlug="shop" environmentName="production" />);
+  renderWithIntl(<Wired appSlug="shop" environmentName="production" />);
   // Collapsed by default — discovery is a Prometheus round trip and should
   // not fire for an operator who never opens the panel.
   fireEvent.click(screen.getByRole("button", { name: /query/i }));

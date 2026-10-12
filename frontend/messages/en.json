@@ -7107,6 +7107,406 @@
       "started": "Started"
     }
   },
+  "obsPanelReason": {
+    "notConfiguredTitle": "Not configured",
+    "notSupportedTitle": "Not available on this cloud",
+    "notSupportedDescription": "This cluster's provider plugin doesn't implement this read. It's supported on other clouds.",
+    "errorTitle": "Couldn't load",
+    "errorDescription": "Something went wrong loading this panel. Try again."
+  },
+  "obsManagedServiceMetrics": {
+    "metric": {
+      "connections": {
+        "title": "Connections",
+        "description": "Active client connections to this database."
+      },
+      "cpu": {
+        "title": "CPU",
+        "description": "Exporter process CPU usage (proxy for engine load)."
+      },
+      "iops": {
+        "title": "IOPS",
+        "description": "Block reads + cache hits per second."
+      },
+      "slow_queries": {
+        "title": "Slow queries",
+        "description": "Rate of queries exceeding 1s."
+      },
+      "replica_lag": {
+        "title": "Replica lag",
+        "description": "Highest replica lag across this cluster's replicas."
+      },
+      "bucket_size": {
+        "title": "Bucket size",
+        "description": "Total bytes stored in this bucket."
+      },
+      "request_count": {
+        "title": "Requests",
+        "description": "Total requests per second to the bucket."
+      },
+      "errors_4xx": {
+        "title": "4xx errors",
+        "description": "Client errors per second."
+      },
+      "errors_5xx": {
+        "title": "5xx errors",
+        "description": "Server errors per second."
+      },
+      "egress_bytes": {
+        "title": "Egress",
+        "description": "Bytes downloaded per second from this bucket."
+      },
+      "tokens_per_second": {
+        "title": "Tokens/sec",
+        "description": "Generated tokens per second across replicas."
+      },
+      "requests_running": {
+        "title": "Running",
+        "description": "Requests being decoded right now."
+      },
+      "requests_waiting": {
+        "title": "Waiting",
+        "description": "Requests queued for a slot."
+      },
+      "ttft_p95": {
+        "title": "Time to first token",
+        "description": "95th percentile time to the first generated token."
+      },
+      "kv_cache_usage": {
+        "title": "KV cache",
+        "description": "Share of the GPU KV cache in use."
+      }
+    },
+    "kind": {
+      "postgres": {
+        "label": "Database",
+        "description": "Connections, IO, slow-query rate, and replica lag for this database."
+      },
+      "object_store": {
+        "label": "Storage",
+        "description": "Bucket size, request rate, error breakdown, and egress for this bucket."
+      },
+      "model_endpoint": {
+        "label": "Model",
+        "description": "Throughput, queue, time to first token and KV cache for this hosted model."
+      }
+    },
+    "noSamples": "No samples in this window.",
+    "source": "source: {source}",
+    "notFlowing": "Metrics not yet flowing: either the cluster's Prometheus endpoint isn't configured, or the exporter sidecar hasn't emitted samples for this service yet."
+  },
+  "obsPromql": {
+    "discovering": "Looking up what this app exposes…",
+    "discoveryFailed": "Can't list this app's metrics ({reason}). You can still run a query below.",
+    "unknownReason": "unknown reason",
+    "noMetrics": "This app exposes no metrics of its own yet. Add <code>{section}</code> with a <code>{port}</code> to your astrolift.toml and redeploy.",
+    "exposes": "This app exposes",
+    "filterLabel": "Filter metrics",
+    "filterPlaceholder": "Filter metrics…",
+    "truncated": "showing the first {limit}; this app emits more distinct metric names than that, which usually means a label belongs in a label rather than in the name",
+    "noMatch": "No metric matches “{filter}”.",
+    "title": "Query",
+    "description": "Run an ad-hoc PromQL expression against the cluster's Prometheus stack.",
+    "queryLabel": "PromQL query",
+    "running": "Running…",
+    "run": "Run",
+    "enterExpression": "Enter a PromQL expression above",
+    "executionFailed": "PromQL execution failed",
+    "noSeries": "Query returned no series.",
+    "error": "PromQL error"
+  },
+  "obsGoldenSignals": {
+    "title": "Golden signals",
+    "description": "Traffic, errors, latency, and saturation pulled live from the cluster's Prometheus stack.",
+    "prometheusNotConfigured": "Prometheus endpoint isn't wired for this cluster.",
+    "redNotConfigured": "Nothing feeds this signal: the app exposes no Prometheus metrics (set metrics.enabled on a workload) and this cluster's ingress controller has no metrics mapping.",
+    "metrics": {
+      "noDataTitle": "No metrics yet",
+      "noDataDescription": "Nothing to show for this window. Metrics will appear here once there's activity."
+    },
+    "traffic": {
+      "title": "Traffic",
+      "description": "Requests per second (sum across all replicas).",
+      "noDataTitle": "No traffic yet",
+      "noDataDescription": "Nothing to show for this window. Traffic will appear here once there's activity."
+    },
+    "errors": {
+      "title": "Errors",
+      "description": "5xx rate divided by total request rate.",
+      "noDataTitle": "No errors yet",
+      "noDataDescription": "Nothing to show for this window. Errors will appear here once there's activity."
+    },
+    "saturationCpu": {
+      "title": "Saturation (CPU)",
+      "description": "Container CPU usage divided by CPU limits.",
+      "noDataTitle": "No CPU saturation yet",
+      "noDataDescription": "Nothing to show for this window. CPU saturation will appear here once there's activity."
+    },
+    "saturationMemory": {
+      "title": "Saturation (memory)",
+      "description": "Working-set memory divided by memory limits.",
+      "noDataTitle": "No memory saturation yet",
+      "noDataDescription": "Nothing to show for this window. Memory saturation will appear here once there's activity."
+    },
+    "latency": {
+      "title": "Latency",
+      "description": "p50, p95, p99 request latency. p90 available via the PromQL disclosure.",
+      "noDataTitle": "No latency yet",
+      "noDataDescription": "Nothing to show for this window. Latency will appear here once there's activity."
+    },
+    "statusCodes": {
+      "title": "Status-code breakdown",
+      "description": "Stacked request rate by HTTP status class. Hover for the top individual codes in each class.",
+      "rate": "{rate} req/s",
+      "rateWithTop": "{rate} req/s (top: {top})"
+    },
+    "showPromql": "Show PromQL",
+    "tryAgain": "Try again",
+    "seeDocs": "See the docs"
+  },
+  "obsAgentTheatre": {
+    "justNow": "just now",
+    "seconds": "{s}s",
+    "minutes": "{m}m {s}s",
+    "hours": "{h}h {m}m",
+    "noOrgTitle": "No active organization",
+    "noOrgDescription": "Pick an organization from the sidebar to watch its running agents.",
+    "loadError": "Couldn't load the agent theatre: {error}",
+    "retry": "Retry",
+    "emptyTitle": "No agents to watch",
+    "emptyDescription": "Running agents launched on a VNC-capable environment appear here as live snapshot tiles you can explode into a full session. Dispatch a watchable agent to populate the theatre.",
+    "goToAgents": "Go to Agents",
+    "summary": "{count, plural, one {# live agent} other {# live agents}} · snapshots refresh every {seconds}s",
+    "refresh": "Refresh",
+    "liveSession": "Live agent session",
+    "popOut": "Pop out",
+    "endedTitle": "Session ended",
+    "endedDescription": "This agent is no longer running, so its live session has closed.",
+    "watchLabel": "Watch live session for agent {id}",
+    "snapshotAlt": "Latest snapshot of agent {id}",
+    "waitingFrame": "Waiting for first frame…",
+    "watchLive": "Watch live",
+    "runningFor": "running for {elapsed}",
+    "watch": "Watch"
+  },
+  "obsLists": {
+    "views": {
+      "all": "All",
+      "mine": "Mine"
+    },
+    "traces": {
+      "searchPlaceholder": "Search services, operations, trace ids…",
+      "fields": {
+        "status": {
+          "label": "Status"
+        }
+      },
+      "mineNote": "Traces are the app's, not a person's, so Mine is empty."
+    },
+    "dnsRecords": {
+      "searchPlaceholder": "Search names, values…",
+      "fields": {
+        "type": {
+          "label": "Type"
+        },
+        "propagation": {
+          "label": "Propagation",
+          "options": {
+            "propagated": "propagated",
+            "pending": "pending",
+            "unknown": "unknown"
+          }
+        }
+      },
+      "mineNote": "Driver records are the cluster's, not a person's, so Mine is empty."
+    },
+    "tlsCertificates": {
+      "searchPlaceholder": "Search hostnames, issuers…",
+      "fields": {
+        "renewal": {
+          "label": "Renewal",
+          "options": {
+            "auto": "auto",
+            "manual": "manual",
+            "failed": "failed",
+            "unknown": "unknown"
+          }
+        },
+        "expiring": {
+          "label": "Expiring",
+          "options": {
+            "30": "within 30 days",
+            "90": "within 90 days"
+          }
+        }
+      },
+      "mineNote": "Driver records are the cluster's, not a person's, so Mine is empty."
+    },
+    "endpoints": {
+      "searchPlaceholder": "Search routes…",
+      "fields": {
+        "errors": {
+          "label": "Errors",
+          "options": {
+            "any": "above 0%",
+            "high": "above 5%"
+          }
+        }
+      },
+      "mineNote": "Routes are the app's, not a person's, so Mine is empty."
+    }
+  },
+  "obsTraces": {
+    "columns": {
+      "operation": "Root Operation",
+      "service": "Root Service",
+      "spans": "Spans",
+      "duration": "Duration",
+      "status": "Status"
+    },
+    "title": "Traces",
+    "description": "Recent distributed traces from the last 1h. Click an operation to expand its spans.",
+    "emptyTitle": "No traces",
+    "emptyDescription": "The tracing backend is not configured.",
+    "noSpans": "No spans returned for this trace."
+  },
+  "obsEndpoints": {
+    "columns": {
+      "route": "Route",
+      "rate": "Req/s",
+      "error": "Error %"
+    },
+    "title": "Endpoints",
+    "description": "Request rate, error ratio, and latency quantiles per route. Refreshed every 30s.",
+    "emptyTitle": "No endpoint data",
+    "emptyDescription": "OTEL instrumentation not detected."
+  },
+  "obsDnsRecords": {
+    "noDataTitle": "No DNS records yet",
+    "noDataDescription": "Nothing to show for this window. DNS records will appear here once there's activity.",
+    "notConfigured": "No DNS provider is wired for this cluster. Set up a managed domain to publish records.",
+    "columns": {
+      "name": "Name",
+      "type": "Type",
+      "value": "Value",
+      "ttl": "TTL",
+      "propagation": "Propagation"
+    },
+    "propagation": {
+      "propagated": "Propagated",
+      "pending": "Pending",
+      "unknown": "Unknown"
+    },
+    "title": "DNS records",
+    "description": "Live records from the cluster's DNS driver. Propagation reflects the most recent change set; use <code>dig</code> for per-vantage-point checks.",
+    "refresh": "Refresh",
+    "tryAgain": "Try again",
+    "forceRebind": "Force re-bind",
+    "forceRebindDescription": "Re-applying DNS records is per-domain: head to the Domains tab and click Re-validate on the affected hostname.",
+    "setUpDns": "Set up DNS"
+  },
+  "obsTlsCertificates": {
+    "noDataTitle": "No TLS certificates yet",
+    "noDataDescription": "Nothing to show for this window. TLS certificates will appear here once there's activity.",
+    "notConfigured": "No public hostname or TLS driver is wired for this app. Set up a managed domain to issue a cert.",
+    "columns": {
+      "hostname": "Hostname",
+      "issuer": "Issuer",
+      "notAfter": "Not after",
+      "expires": "Expires in",
+      "renewal": "Renewal"
+    },
+    "expired": "expired",
+    "days": "{count, plural, one {# day} other {# days}}",
+    "renewal": {
+      "auto": "Auto-renew",
+      "manual": "Manual",
+      "failed": "Renewal failed",
+      "unknown": "Unknown"
+    },
+    "title": "TLS certificates",
+    "description": "Certs the cluster's TLS driver knows about, filtered by this app's slug. Days-until-expiry are colour-coded: red < 30, amber < 90.",
+    "refresh": "Refresh",
+    "tryAgain": "Try again",
+    "forceRebind": "Force re-bind",
+    "forceRebindDescription": "Cert re-issue is per-hostname: open the Domains tab and use the cert-rotate action on the affected entry.",
+    "issueCert": "Issue cert"
+  },
+  "obsWorkloadIdentity": {
+    "noDataTitle": "No workload identity binding yet",
+    "noDataDescription": "Nothing to show for this window. The workload identity binding will appear here once there's activity.",
+    "notConfigured": "No cloud-IAM role is provisioned for this app. Configure workload identity to grant pods credentials.",
+    "title": "Workload identity",
+    "description": "The cloud-IAM identity bound to this app's pods. Source: cluster's WorkloadIdentityDriver (<code>{method}</code>).",
+    "refresh": "Refresh",
+    "tryAgain": "Try again",
+    "forceRebind": "Force re-bind",
+    "forceRebindDescription": "The next deployment will re-apply the ServiceAccount annotation. Trigger a redeploy from the Deployments tab.",
+    "configure": "Configure workload identity",
+    "kind": "Kind",
+    "kinds": {
+      "irsa": "IAM Roles for Service Accounts (AWS)",
+      "workload_identity": "GKE Workload Identity (GCP)",
+      "federated": "AKS Federated Credentials (Azure)",
+      "unknown": "Unknown binding"
+    },
+    "lastUsed": "Last used",
+    "rolePrincipal": "Role / principal",
+    "trustPolicy": "Trust policy"
+  },
+  "obsPodExpander": {
+    "noDataTitle": "No pod metrics yet",
+    "noDataDescription": "Nothing to show for this window. Pod metrics will appear here once there's activity.",
+    "notConfigured": "Prometheus endpoint isn't wired for this cluster.",
+    "restarts": "{count, plural, one {<strong>#</strong> restart} other {<strong>#</strong> restarts}}",
+    "lastRestart": "Last restart: <value>{time}</value>",
+    "openShell": "Open shell",
+    "tryAgain": "Try again",
+    "cpuTitle": "CPU",
+    "cpuDescription": "Per-pod cores in use (1m rate).",
+    "cores": "{cores} cores",
+    "memoryTitle": "Memory",
+    "memoryDescription": "Per-pod working-set bytes (OOM accounting)."
+  },
+  "obsWorkflowTimeline": {
+    "runStatus": {
+      "running": "Running",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled",
+      "terminated": "Terminated"
+    },
+    "activityStatus": {
+      "pending": "Pending",
+      "running": "Running",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "runId": "{workflowId} · run {runId}…",
+    "started": "started {started}",
+    "startedEnded": "started {started} · ended {ended}",
+    "cancel": "Cancel",
+    "failed": "Workflow failed",
+    "activities": "Activities",
+    "noActivities": "No activities recorded yet.",
+    "retries": "{count, plural, one {# retry} other {# retries}}",
+    "hideAttempts": "Hide attempts",
+    "attempts": "{count, plural, one {# attempt} other {# attempts}}",
+    "retry": "Retry"
+  },
+  "obsAgentActivityGraph": {
+    "running": "{count} running",
+    "idle": "idle",
+    "noTools": "No tools bound yet; the graph fills in as skills & tools are attached."
+  },
+  "obsGitOpsCommits": {
+    "label": "Config-repo commits",
+    "empty": "No config-repo commits yet.",
+    "run": "run {id}…",
+    "diff": "Diff",
+    "source": "Source"
+  },
   "clusters": {
     "chrome": {
       "admin": "Admin",

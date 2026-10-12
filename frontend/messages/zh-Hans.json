@@ -7027,6 +7027,406 @@
       "started": "开始时间"
     }
   },
+  "obsPanelReason": {
+    "notConfiguredTitle": "未配置",
+    "notSupportedTitle": "此云平台不可用",
+    "notSupportedDescription": "此集群的提供商插件未实现该读取操作。其他云平台支持此功能。",
+    "errorTitle": "无法加载",
+    "errorDescription": "加载此面板时出错。请重试。"
+  },
+  "obsManagedServiceMetrics": {
+    "metric": {
+      "connections": {
+        "title": "连接",
+        "description": "到此数据库的活动客户端连接。"
+      },
+      "cpu": {
+        "title": "CPU",
+        "description": "导出器进程的 CPU 使用率（引擎负载的近似指标）。"
+      },
+      "iops": {
+        "title": "IOPS",
+        "description": "每秒块读取 + 缓存命中次数。"
+      },
+      "slow_queries": {
+        "title": "慢查询",
+        "description": "超过 1 秒的查询速率。"
+      },
+      "replica_lag": {
+        "title": "副本延迟",
+        "description": "此集群所有副本中的最大副本延迟。"
+      },
+      "bucket_size": {
+        "title": "存储桶大小",
+        "description": "此存储桶中存储的总字节数。"
+      },
+      "request_count": {
+        "title": "请求",
+        "description": "每秒发往该存储桶的请求总数。"
+      },
+      "errors_4xx": {
+        "title": "4xx 错误",
+        "description": "每秒客户端错误数。"
+      },
+      "errors_5xx": {
+        "title": "5xx 错误",
+        "description": "每秒服务器错误数。"
+      },
+      "egress_bytes": {
+        "title": "出站流量",
+        "description": "每秒从此存储桶下载的字节数。"
+      },
+      "tokens_per_second": {
+        "title": "令牌/秒",
+        "description": "所有副本每秒生成的令牌数。"
+      },
+      "requests_running": {
+        "title": "运行中",
+        "description": "正在解码的请求。"
+      },
+      "requests_waiting": {
+        "title": "等待中",
+        "description": "排队等待槽位的请求。"
+      },
+      "ttft_p95": {
+        "title": "首个令牌时间",
+        "description": "生成首个令牌所需时间的第 95 百分位。"
+      },
+      "kv_cache_usage": {
+        "title": "KV 缓存",
+        "description": "GPU KV 缓存的使用比例。"
+      }
+    },
+    "kind": {
+      "postgres": {
+        "label": "数据库",
+        "description": "此数据库的连接、IO、慢查询率和副本延迟。"
+      },
+      "object_store": {
+        "label": "存储",
+        "description": "此存储桶的大小、请求速率、错误细分和出站流量。"
+      },
+      "model_endpoint": {
+        "label": "模型",
+        "description": "此托管模型的吞吐量、队列、首个令牌时间和 KV 缓存。"
+      }
+    },
+    "noSamples": "此时间窗口内没有样本。",
+    "source": "来源：{source}",
+    "notFlowing": "指标尚未上报：可能是集群的 Prometheus 端点未配置，或导出器 sidecar 尚未为此服务发出样本。"
+  },
+  "obsPromql": {
+    "discovering": "正在查询此应用暴露的指标…",
+    "discoveryFailed": "无法列出此应用的指标 ({reason})。你仍可以在下方运行查询。",
+    "unknownReason": "原因未知",
+    "noMetrics": "此应用尚未暴露自己的指标。请在 astrolift.toml 中添加带有 <code>{port}</code> 的 <code>{section}</code> 并重新部署。",
+    "exposes": "此应用暴露的指标",
+    "filterLabel": "筛选指标",
+    "filterPlaceholder": "筛选指标…",
+    "truncated": "仅显示前 {limit} 个；此应用发出的不同指标名称更多，这通常意味着本应作为标签的值被放进了名称中",
+    "noMatch": "没有与“{filter}”匹配的指标。",
+    "title": "查询",
+    "description": "针对集群的 Prometheus 栈运行临时 PromQL 表达式。",
+    "queryLabel": "PromQL 查询",
+    "running": "运行中…",
+    "run": "运行",
+    "enterExpression": "请在上方输入 PromQL 表达式",
+    "executionFailed": "PromQL 执行失败",
+    "noSeries": "查询未返回任何序列。",
+    "error": "PromQL 错误"
+  },
+  "obsGoldenSignals": {
+    "title": "黄金信号",
+    "description": "从集群 Prometheus 栈实时获取的流量、错误、延迟和饱和度。",
+    "prometheusNotConfigured": "此集群未接入 Prometheus 端点。",
+    "redNotConfigured": "没有数据源为此信号提供数据：应用未暴露 Prometheus 指标（请在工作负载上设置 metrics.enabled）,且此集群的 Ingress 控制器没有指标映射。",
+    "metrics": {
+      "noDataTitle": "暂无指标",
+      "noDataDescription": "此时间窗口内没有可显示的内容。有活动后指标将显示在这里。"
+    },
+    "traffic": {
+      "title": "流量",
+      "description": "每秒请求数（所有副本之和）。",
+      "noDataTitle": "暂无流量",
+      "noDataDescription": "此时间窗口内没有可显示的内容。有活动后流量将显示在这里。"
+    },
+    "errors": {
+      "title": "错误",
+      "description": "5xx 速率除以总请求速率。",
+      "noDataTitle": "暂无错误",
+      "noDataDescription": "此时间窗口内没有可显示的内容。有活动后错误将显示在这里。"
+    },
+    "saturationCpu": {
+      "title": "饱和度(CPU)",
+      "description": "容器 CPU 使用量除以 CPU 限制。",
+      "noDataTitle": "暂无 CPU 饱和度",
+      "noDataDescription": "此时间窗口内没有可显示的内容。有活动后 CPU 饱和度将显示在这里。"
+    },
+    "saturationMemory": {
+      "title": "饱和度（内存）",
+      "description": "工作集内存除以内存限制。",
+      "noDataTitle": "暂无内存饱和度",
+      "noDataDescription": "此时间窗口内没有可显示的内容。有活动后内存饱和度将显示在这里。"
+    },
+    "latency": {
+      "title": "延迟",
+      "description": "请求延迟 p50、p95、p99。p90 可在 PromQL 展开项中查看。",
+      "noDataTitle": "暂无延迟数据",
+      "noDataDescription": "此时间窗口内没有可显示的内容。有活动后延迟将显示在这里。"
+    },
+    "statusCodes": {
+      "title": "状态码细分",
+      "description": "按 HTTP 状态类别堆叠的请求速率。悬停可查看每个类别中最常见的状态码。",
+      "rate": "{rate} 请求/秒",
+      "rateWithTop": "{rate} 请求/秒(最多：{top})"
+    },
+    "showPromql": "显示 PromQL",
+    "tryAgain": "重试",
+    "seeDocs": "查看文档"
+  },
+  "obsAgentTheatre": {
+    "justNow": "刚刚",
+    "seconds": "{s} 秒",
+    "minutes": "{m} 分 {s} 秒",
+    "hours": "{h} 小时 {m} 分",
+    "noOrgTitle": "没有活动组织",
+    "noOrgDescription": "从侧边栏选择一个组织以查看其正在运行的代理。",
+    "loadError": "无法加载代理观看室：{error}",
+    "retry": "重试",
+    "emptyTitle": "没有可观看的代理",
+    "emptyDescription": "在支持 VNC 的环境中启动的运行中代理会以实时快照磁贴显示在这里，可展开为完整会话。分派一个可观看的代理即可填充观看室。",
+    "goToAgents": "前往代理",
+    "summary": "{count, plural, other {# 个实时代理}} · 快照每 {seconds} 秒刷新一次",
+    "refresh": "刷新",
+    "liveSession": "实时代理会话",
+    "popOut": "弹出",
+    "endedTitle": "会话已结束",
+    "endedDescription": "此代理已停止运行，其实时会话已关闭。",
+    "watchLabel": "观看代理 {id} 的实时会话",
+    "snapshotAlt": "代理 {id} 的最新快照",
+    "waitingFrame": "正在等待第一帧…",
+    "watchLive": "实时观看",
+    "runningFor": "已运行 {elapsed}",
+    "watch": "观看"
+  },
+  "obsLists": {
+    "views": {
+      "all": "全部",
+      "mine": "我的"
+    },
+    "traces": {
+      "searchPlaceholder": "搜索服务、操作、追踪 ID…",
+      "fields": {
+        "status": {
+          "label": "状态"
+        }
+      },
+      "mineNote": "追踪属于应用而非个人，因此“我的”为空。"
+    },
+    "dnsRecords": {
+      "searchPlaceholder": "搜索名称、值…",
+      "fields": {
+        "type": {
+          "label": "类型"
+        },
+        "propagation": {
+          "label": "传播",
+          "options": {
+            "propagated": "已传播",
+            "pending": "待处理",
+            "unknown": "未知"
+          }
+        }
+      },
+      "mineNote": "驱动记录属于集群而非个人，因此“我的”为空。"
+    },
+    "tlsCertificates": {
+      "searchPlaceholder": "搜索主机名、颁发者…",
+      "fields": {
+        "renewal": {
+          "label": "续期",
+          "options": {
+            "auto": "自动",
+            "manual": "手动",
+            "failed": "失败",
+            "unknown": "未知"
+          }
+        },
+        "expiring": {
+          "label": "即将过期",
+          "options": {
+            "30": "30 天内",
+            "90": "90 天内"
+          }
+        }
+      },
+      "mineNote": "驱动记录属于集群而非个人，因此“我的”为空。"
+    },
+    "endpoints": {
+      "searchPlaceholder": "搜索路由…",
+      "fields": {
+        "errors": {
+          "label": "错误",
+          "options": {
+            "any": "高于 0%",
+            "high": "高于 5%"
+          }
+        }
+      },
+      "mineNote": "路由属于应用而非个人，因此“我的”为空。"
+    }
+  },
+  "obsTraces": {
+    "columns": {
+      "operation": "根操作",
+      "service": "根服务",
+      "spans": "跨度",
+      "duration": "时长",
+      "status": "状态"
+    },
+    "title": "追踪",
+    "description": "最近 1 小时的分布式追踪。点击某个操作可展开其跨度。",
+    "emptyTitle": "没有追踪",
+    "emptyDescription": "追踪后端未配置。",
+    "noSpans": "此追踪未返回任何跨度。"
+  },
+  "obsEndpoints": {
+    "columns": {
+      "route": "路由",
+      "rate": "请求/秒",
+      "error": "错误率"
+    },
+    "title": "端点",
+    "description": "每个路由的请求速率、错误比例和延迟分位数。每 30 秒刷新一次。",
+    "emptyTitle": "没有端点数据",
+    "emptyDescription": "未检测到 OTEL 插桩。"
+  },
+  "obsDnsRecords": {
+    "noDataTitle": "暂无 DNS 记录",
+    "noDataDescription": "此时间窗口内没有可显示的内容。有活动后 DNS 记录将显示在这里。",
+    "notConfigured": "此集群未接入 DNS 提供商。请设置托管域名以发布记录。",
+    "columns": {
+      "name": "名称",
+      "type": "类型",
+      "value": "值",
+      "ttl": "TTL",
+      "propagation": "传播"
+    },
+    "propagation": {
+      "propagated": "已传播",
+      "pending": "待处理",
+      "unknown": "未知"
+    },
+    "title": "DNS 记录",
+    "description": "来自集群 DNS 驱动的实时记录。传播状态反映最近一次变更；如需按观测点检查，请使用 <code>dig</code>。",
+    "refresh": "刷新",
+    "tryAgain": "重试",
+    "forceRebind": "强制重新绑定",
+    "forceRebindDescription": "DNS 记录按域名重新应用：请前往“域名”标签页，在受影响的主机名上点击“重新验证”。",
+    "setUpDns": "设置 DNS"
+  },
+  "obsTlsCertificates": {
+    "noDataTitle": "暂无 TLS 证书",
+    "noDataDescription": "此时间窗口内没有可显示的内容。有活动后 TLS 证书将显示在这里。",
+    "notConfigured": "此应用未接入公共主机名或 TLS 驱动。请设置托管域名以签发证书。",
+    "columns": {
+      "hostname": "主机名",
+      "issuer": "颁发者",
+      "notAfter": "有效期至",
+      "expires": "剩余有效期",
+      "renewal": "续期"
+    },
+    "expired": "已过期",
+    "days": "{count, plural, other {# 天}}",
+    "renewal": {
+      "auto": "自动续期",
+      "manual": "手动",
+      "failed": "续期失败",
+      "unknown": "未知"
+    },
+    "title": "TLS 证书",
+    "description": "集群 TLS 驱动已知的证书，按此应用的 slug 筛选。距过期天数以颜色标示：红色 < 30，琥珀色 < 90。",
+    "refresh": "刷新",
+    "tryAgain": "重试",
+    "forceRebind": "强制重新绑定",
+    "forceRebindDescription": "证书按主机名重新签发：请打开“域名”标签页，对受影响的条目使用证书轮换操作。",
+    "issueCert": "签发证书"
+  },
+  "obsWorkloadIdentity": {
+    "noDataTitle": "暂无工作负载身份绑定",
+    "noDataDescription": "此时间窗口内没有可显示的内容。有活动后工作负载身份绑定将显示在这里。",
+    "notConfigured": "此应用未预置云 IAM 角色。请配置工作负载身份以向 Pod 授予凭据。",
+    "title": "工作负载身份",
+    "description": "绑定到此应用 Pod 的云 IAM 身份。来源：集群的 WorkloadIdentityDriver（<code>{method}</code>）。",
+    "refresh": "刷新",
+    "tryAgain": "重试",
+    "forceRebind": "强制重新绑定",
+    "forceRebindDescription": "下次部署会重新应用 ServiceAccount 注解。请在“部署”标签页中触发重新部署。",
+    "configure": "配置工作负载身份",
+    "kind": "类型",
+    "kinds": {
+      "irsa": "IAM Roles for Service Accounts (AWS)",
+      "workload_identity": "GKE Workload Identity (GCP)",
+      "federated": "AKS Federated Credentials (Azure)",
+      "unknown": "未知绑定"
+    },
+    "lastUsed": "上次使用",
+    "rolePrincipal": "角色 / 主体",
+    "trustPolicy": "信任策略"
+  },
+  "obsPodExpander": {
+    "noDataTitle": "暂无 Pod 指标",
+    "noDataDescription": "此时间窗口内没有可显示的内容。有活动后 Pod 指标将显示在这里。",
+    "notConfigured": "此集群未接入 Prometheus 端点。",
+    "restarts": "{count, plural, other {重启 <strong>#</strong> 次}}",
+    "lastRestart": "上次重启：<value>{time}</value>",
+    "openShell": "打开 Shell",
+    "tryAgain": "重试",
+    "cpuTitle": "CPU",
+    "cpuDescription": "每个 Pod 使用的核心数（1 分钟速率）。",
+    "cores": "{cores} 核",
+    "memoryTitle": "内存",
+    "memoryDescription": "每个 Pod 的工作集字节数（OOM 计算依据）。"
+  },
+  "obsWorkflowTimeline": {
+    "runStatus": {
+      "running": "运行中",
+      "completed": "已完成",
+      "failed": "失败",
+      "cancelled": "已取消",
+      "terminated": "已终止"
+    },
+    "activityStatus": {
+      "pending": "待处理",
+      "running": "运行中",
+      "succeeded": "成功",
+      "failed": "失败",
+      "cancelled": "已取消"
+    },
+    "runId": "{workflowId} · 运行 {runId}…",
+    "started": "开始于 {started}",
+    "startedEnded": "开始于 {started} · 结束于 {ended}",
+    "cancel": "取消",
+    "failed": "工作流失败",
+    "activities": "活动",
+    "noActivities": "尚未记录任何活动。",
+    "retries": "{count, plural, other {重试 # 次}}",
+    "hideAttempts": "隐藏尝试",
+    "attempts": "{count, plural, other {尝试 # 次}}",
+    "retry": "重试"
+  },
+  "obsAgentActivityGraph": {
+    "running": "{count} 个运行中",
+    "idle": "空闲",
+    "noTools": "尚未绑定工具；随着技能和工具的添加，图会逐步填充。"
+  },
+  "obsGitOpsCommits": {
+    "label": "配置仓库提交",
+    "empty": "暂无配置仓库提交。",
+    "run": "运行 {id}…",
+    "diff": "差异",
+    "source": "来源"
+  },
   "clusters": {
     "chrome": {
       "admin": "管理",

@@ -7027,6 +7027,406 @@
       "started": "시작 시각"
     }
   },
+  "obsPanelReason": {
+    "notConfiguredTitle": "구성되지 않음",
+    "notSupportedTitle": "이 클라우드에서는 사용할 수 없음",
+    "notSupportedDescription": "이 클러스터의 공급자 플러그인은 이 읽기를 구현하지 않습니다. 다른 클라우드에서는 지원됩니다.",
+    "errorTitle": "불러올 수 없음",
+    "errorDescription": "이 패널을 불러오는 중 문제가 발생했습니다. 다시 시도하세요."
+  },
+  "obsManagedServiceMetrics": {
+    "metric": {
+      "connections": {
+        "title": "연결",
+        "description": "이 데이터베이스에 대한 활성 클라이언트 연결입니다."
+      },
+      "cpu": {
+        "title": "CPU",
+        "description": "익스포터 프로세스 CPU 사용량(엔진 부하의 대리 지표)입니다."
+      },
+      "iops": {
+        "title": "IOPS",
+        "description": "초당 블록 읽기 + 캐시 적중 수입니다."
+      },
+      "slow_queries": {
+        "title": "느린 쿼리",
+        "description": "1초를 초과하는 쿼리 비율입니다."
+      },
+      "replica_lag": {
+        "title": "복제본 지연",
+        "description": "이 클러스터 복제본 중 가장 큰 복제 지연입니다."
+      },
+      "bucket_size": {
+        "title": "버킷 크기",
+        "description": "이 버킷에 저장된 총 바이트 수입니다."
+      },
+      "request_count": {
+        "title": "요청",
+        "description": "버킷에 대한 초당 총 요청 수입니다."
+      },
+      "errors_4xx": {
+        "title": "4xx 오류",
+        "description": "초당 클라이언트 오류 수입니다."
+      },
+      "errors_5xx": {
+        "title": "5xx 오류",
+        "description": "초당 서버 오류 수입니다."
+      },
+      "egress_bytes": {
+        "title": "송신",
+        "description": "이 버킷에서 초당 다운로드된 바이트 수입니다."
+      },
+      "tokens_per_second": {
+        "title": "토큰/초",
+        "description": "복제본 전체에서 초당 생성된 토큰 수입니다."
+      },
+      "requests_running": {
+        "title": "실행 중",
+        "description": "현재 디코딩 중인 요청입니다."
+      },
+      "requests_waiting": {
+        "title": "대기 중",
+        "description": "슬롯을 기다리며 대기열에 있는 요청입니다."
+      },
+      "ttft_p95": {
+        "title": "첫 토큰까지 시간",
+        "description": "첫 번째 토큰이 생성되기까지 걸린 시간의 95번째 백분위수입니다."
+      },
+      "kv_cache_usage": {
+        "title": "KV 캐시",
+        "description": "사용 중인 GPU KV 캐시의 비율입니다."
+      }
+    },
+    "kind": {
+      "postgres": {
+        "label": "데이터베이스",
+        "description": "이 데이터베이스의 연결, IO, 느린 쿼리 비율, 복제본 지연입니다."
+      },
+      "object_store": {
+        "label": "스토리지",
+        "description": "이 버킷의 크기, 요청 비율, 오류 분류, 송신량입니다."
+      },
+      "model_endpoint": {
+        "label": "모델",
+        "description": "이 호스팅 모델의 처리량, 대기열, 첫 토큰까지 시간, KV 캐시입니다."
+      }
+    },
+    "noSamples": "이 기간에 샘플이 없습니다.",
+    "source": "소스: {source}",
+    "notFlowing": "아직 메트릭이 수집되지 않습니다. 클러스터의 Prometheus 엔드포인트가 구성되지 않았거나 익스포터 사이드카가 이 서비스의 샘플을 아직 내보내지 않았습니다."
+  },
+  "obsPromql": {
+    "discovering": "이 앱이 노출하는 항목을 확인하는 중…",
+    "discoveryFailed": "이 앱의 메트릭을 나열할 수 없습니다({reason}). 아래에서 쿼리는 계속 실행할 수 있습니다.",
+    "unknownReason": "알 수 없는 이유",
+    "noMetrics": "이 앱은 아직 자체 메트릭을 노출하지 않습니다. astrolift.toml에 <code>{port}</code>가 포함된 <code>{section}</code>을 추가하고 다시 배포하세요.",
+    "exposes": "이 앱이 노출하는 메트릭",
+    "filterLabel": "메트릭 필터",
+    "filterPlaceholder": "메트릭 필터…",
+    "truncated": "처음 {limit}개만 표시합니다. 이 앱은 그보다 많은 고유 메트릭 이름을 내보내며, 이는 보통 레이블이어야 할 값이 이름에 들어 있다는 뜻입니다",
+    "noMatch": "“{filter}”와 일치하는 메트릭이 없습니다.",
+    "title": "쿼리",
+    "description": "클러스터의 Prometheus 스택에 대해 임시 PromQL 식을 실행합니다.",
+    "queryLabel": "PromQL 쿼리",
+    "running": "실행 중…",
+    "run": "실행",
+    "enterExpression": "위에 PromQL 식을 입력하세요",
+    "executionFailed": "PromQL 실행 실패",
+    "noSeries": "쿼리가 시리즈를 반환하지 않았습니다.",
+    "error": "PromQL 오류"
+  },
+  "obsGoldenSignals": {
+    "title": "골든 시그널",
+    "description": "클러스터의 Prometheus 스택에서 실시간으로 가져온 트래픽, 오류, 지연 시간, 포화도입니다.",
+    "prometheusNotConfigured": "이 클러스터에는 Prometheus 엔드포인트가 연결되어 있지 않습니다.",
+    "redNotConfigured": "이 시그널에 데이터를 공급하는 것이 없습니다. 앱이 Prometheus 메트릭을 노출하지 않으며(워크로드에 metrics.enabled를 설정하세요) 이 클러스터의 인그레스 컨트롤러에도 메트릭 매핑이 없습니다.",
+    "metrics": {
+      "noDataTitle": "아직 메트릭이 없습니다",
+      "noDataDescription": "이 기간에 표시할 내용이 없습니다. 활동이 생기면 메트릭이 여기에 표시됩니다."
+    },
+    "traffic": {
+      "title": "트래픽",
+      "description": "초당 요청 수(모든 복제본 합계)입니다.",
+      "noDataTitle": "아직 트래픽이 없습니다",
+      "noDataDescription": "이 기간에 표시할 내용이 없습니다. 활동이 생기면 트래픽이 여기에 표시됩니다."
+    },
+    "errors": {
+      "title": "오류",
+      "description": "5xx 비율을 전체 요청 비율로 나눈 값입니다.",
+      "noDataTitle": "아직 오류가 없습니다",
+      "noDataDescription": "이 기간에 표시할 내용이 없습니다. 활동이 생기면 오류가 여기에 표시됩니다."
+    },
+    "saturationCpu": {
+      "title": "포화도(CPU)",
+      "description": "컨테이너 CPU 사용량을 CPU 제한으로 나눈 값입니다.",
+      "noDataTitle": "아직 CPU 포화도가 없습니다",
+      "noDataDescription": "이 기간에 표시할 내용이 없습니다. 활동이 생기면 CPU 포화도가 여기에 표시됩니다."
+    },
+    "saturationMemory": {
+      "title": "포화도(메모리)",
+      "description": "워킹 세트 메모리를 메모리 제한으로 나눈 값입니다.",
+      "noDataTitle": "아직 메모리 포화도가 없습니다",
+      "noDataDescription": "이 기간에 표시할 내용이 없습니다. 활동이 생기면 메모리 포화도가 여기에 표시됩니다."
+    },
+    "latency": {
+      "title": "지연 시간",
+      "description": "요청 지연 시간 p50, p95, p99입니다. p90은 PromQL 펼치기에서 볼 수 있습니다.",
+      "noDataTitle": "아직 지연 시간 데이터가 없습니다",
+      "noDataDescription": "이 기간에 표시할 내용이 없습니다. 활동이 생기면 지연 시간이 여기에 표시됩니다."
+    },
+    "statusCodes": {
+      "title": "상태 코드 분류",
+      "description": "HTTP 상태 클래스별 누적 요청 비율입니다. 마우스를 올리면 클래스별 상위 개별 코드가 표시됩니다.",
+      "rate": "{rate} req/s",
+      "rateWithTop": "{rate} req/s (상위: {top})"
+    },
+    "showPromql": "PromQL 보기",
+    "tryAgain": "다시 시도",
+    "seeDocs": "문서 보기"
+  },
+  "obsAgentTheatre": {
+    "justNow": "방금",
+    "seconds": "{s}초",
+    "minutes": "{m}분 {s}초",
+    "hours": "{h}시간 {m}분",
+    "noOrgTitle": "활성 조직 없음",
+    "noOrgDescription": "사이드바에서 조직을 선택하면 실행 중인 에이전트를 볼 수 있습니다.",
+    "loadError": "에이전트 시어터를 불러올 수 없습니다: {error}",
+    "retry": "다시 시도",
+    "emptyTitle": "볼 수 있는 에이전트가 없습니다",
+    "emptyDescription": "VNC를 지원하는 환경에서 시작된 실행 중인 에이전트가 실시간 스냅샷 타일로 여기에 표시되며, 전체 세션으로 펼쳐 볼 수 있습니다. 관찰 가능한 에이전트를 디스패치하면 시어터가 채워집니다.",
+    "goToAgents": "에이전트로 이동",
+    "summary": "{count, plural, other {실시간 에이전트 #개}} · 스냅샷은 {seconds}초마다 새로 고침",
+    "refresh": "새로 고침",
+    "liveSession": "실시간 에이전트 세션",
+    "popOut": "새 창으로 열기",
+    "endedTitle": "세션 종료됨",
+    "endedDescription": "이 에이전트는 더 이상 실행 중이 아니므로 실시간 세션이 닫혔습니다.",
+    "watchLabel": "에이전트 {id}의 실시간 세션 보기",
+    "snapshotAlt": "에이전트 {id}의 최신 스냅샷",
+    "waitingFrame": "첫 프레임을 기다리는 중…",
+    "watchLive": "실시간 보기",
+    "runningFor": "{elapsed} 동안 실행 중",
+    "watch": "보기"
+  },
+  "obsLists": {
+    "views": {
+      "all": "전체",
+      "mine": "내 항목"
+    },
+    "traces": {
+      "searchPlaceholder": "서비스, 작업, 트레이스 ID 검색…",
+      "fields": {
+        "status": {
+          "label": "상태"
+        }
+      },
+      "mineNote": "트레이스는 개인이 아니라 앱의 것이므로 내 항목은 비어 있습니다."
+    },
+    "dnsRecords": {
+      "searchPlaceholder": "이름, 값 검색…",
+      "fields": {
+        "type": {
+          "label": "유형"
+        },
+        "propagation": {
+          "label": "전파",
+          "options": {
+            "propagated": "전파됨",
+            "pending": "대기 중",
+            "unknown": "알 수 없음"
+          }
+        }
+      },
+      "mineNote": "드라이버 레코드는 개인이 아니라 클러스터의 것이므로 내 항목은 비어 있습니다."
+    },
+    "tlsCertificates": {
+      "searchPlaceholder": "호스트 이름, 발급자 검색…",
+      "fields": {
+        "renewal": {
+          "label": "갱신",
+          "options": {
+            "auto": "자동",
+            "manual": "수동",
+            "failed": "실패",
+            "unknown": "알 수 없음"
+          }
+        },
+        "expiring": {
+          "label": "만료 예정",
+          "options": {
+            "30": "30일 이내",
+            "90": "90일 이내"
+          }
+        }
+      },
+      "mineNote": "드라이버 레코드는 개인이 아니라 클러스터의 것이므로 내 항목은 비어 있습니다."
+    },
+    "endpoints": {
+      "searchPlaceholder": "경로 검색…",
+      "fields": {
+        "errors": {
+          "label": "오류",
+          "options": {
+            "any": "0% 초과",
+            "high": "5% 초과"
+          }
+        }
+      },
+      "mineNote": "경로는 개인이 아니라 앱의 것이므로 내 항목은 비어 있습니다."
+    }
+  },
+  "obsTraces": {
+    "columns": {
+      "operation": "루트 작업",
+      "service": "루트 서비스",
+      "spans": "스팬",
+      "duration": "소요 시간",
+      "status": "상태"
+    },
+    "title": "트레이스",
+    "description": "최근 1시간의 분산 트레이스입니다. 작업을 클릭하면 스팬이 펼쳐집니다.",
+    "emptyTitle": "트레이스 없음",
+    "emptyDescription": "트레이싱 백엔드가 구성되지 않았습니다.",
+    "noSpans": "이 트레이스에 대해 반환된 스팬이 없습니다."
+  },
+  "obsEndpoints": {
+    "columns": {
+      "route": "경로",
+      "rate": "요청/초",
+      "error": "오류율"
+    },
+    "title": "엔드포인트",
+    "description": "경로별 요청 비율, 오류 비율, 지연 시간 분위수입니다. 30초마다 새로 고칩니다.",
+    "emptyTitle": "엔드포인트 데이터 없음",
+    "emptyDescription": "OTEL 계측이 감지되지 않았습니다."
+  },
+  "obsDnsRecords": {
+    "noDataTitle": "아직 DNS 레코드가 없습니다",
+    "noDataDescription": "이 기간에 표시할 내용이 없습니다. 활동이 생기면 DNS 레코드가 여기에 표시됩니다.",
+    "notConfigured": "이 클러스터에는 DNS 공급자가 연결되어 있지 않습니다. 레코드를 게시하려면 관리형 도메인을 설정하세요.",
+    "columns": {
+      "name": "이름",
+      "type": "유형",
+      "value": "값",
+      "ttl": "TTL",
+      "propagation": "전파"
+    },
+    "propagation": {
+      "propagated": "전파됨",
+      "pending": "대기 중",
+      "unknown": "알 수 없음"
+    },
+    "title": "DNS 레코드",
+    "description": "클러스터 DNS 드라이버의 실시간 레코드입니다. 전파 상태는 가장 최근 변경 세트를 반영합니다. 위치별 확인에는 <code>dig</code>를 사용하세요.",
+    "refresh": "새로 고침",
+    "tryAgain": "다시 시도",
+    "forceRebind": "강제 재바인딩",
+    "forceRebindDescription": "DNS 레코드 재적용은 도메인별로 이루어집니다. 도메인 탭에서 해당 호스트 이름의 재검증을 클릭하세요.",
+    "setUpDns": "DNS 설정"
+  },
+  "obsTlsCertificates": {
+    "noDataTitle": "아직 TLS 인증서가 없습니다",
+    "noDataDescription": "이 기간에 표시할 내용이 없습니다. 활동이 생기면 TLS 인증서가 여기에 표시됩니다.",
+    "notConfigured": "이 앱에는 공개 호스트 이름이나 TLS 드라이버가 연결되어 있지 않습니다. 인증서를 발급하려면 관리형 도메인을 설정하세요.",
+    "columns": {
+      "hostname": "호스트 이름",
+      "issuer": "발급자",
+      "notAfter": "만료일",
+      "expires": "만료까지",
+      "renewal": "갱신"
+    },
+    "expired": "만료됨",
+    "days": "{count, plural, other {#일}}",
+    "renewal": {
+      "auto": "자동 갱신",
+      "manual": "수동",
+      "failed": "갱신 실패",
+      "unknown": "알 수 없음"
+    },
+    "title": "TLS 인증서",
+    "description": "클러스터 TLS 드라이버가 알고 있는 인증서를 이 앱의 슬러그로 필터링해 보여 줍니다. 만료까지 남은 일수는 색으로 구분됩니다: 빨강 < 30, 주황 < 90.",
+    "refresh": "새로 고침",
+    "tryAgain": "다시 시도",
+    "forceRebind": "강제 재바인딩",
+    "forceRebindDescription": "인증서 재발급은 호스트 이름별로 이루어집니다. 도메인 탭에서 해당 항목의 인증서 교체 작업을 사용하세요.",
+    "issueCert": "인증서 발급"
+  },
+  "obsWorkloadIdentity": {
+    "noDataTitle": "아직 워크로드 ID 바인딩이 없습니다",
+    "noDataDescription": "이 기간에 표시할 내용이 없습니다. 활동이 생기면 워크로드 ID 바인딩이 여기에 표시됩니다.",
+    "notConfigured": "이 앱에 프로비저닝된 클라우드 IAM 역할이 없습니다. 파드에 자격 증명을 부여하려면 워크로드 ID를 구성하세요.",
+    "title": "워크로드 ID",
+    "description": "이 앱의 파드에 바인딩된 클라우드 IAM ID입니다. 출처: 클러스터의 WorkloadIdentityDriver(<code>{method}</code>).",
+    "refresh": "새로 고침",
+    "tryAgain": "다시 시도",
+    "forceRebind": "강제 재바인딩",
+    "forceRebindDescription": "다음 배포에서 ServiceAccount 어노테이션이 다시 적용됩니다. 배포 탭에서 재배포를 실행하세요.",
+    "configure": "워크로드 ID 구성",
+    "kind": "종류",
+    "kinds": {
+      "irsa": "IAM Roles for Service Accounts(AWS)",
+      "workload_identity": "GKE Workload Identity(GCP)",
+      "federated": "AKS Federated Credentials(Azure)",
+      "unknown": "알 수 없는 바인딩"
+    },
+    "lastUsed": "마지막 사용",
+    "rolePrincipal": "역할 / 주체",
+    "trustPolicy": "신뢰 정책"
+  },
+  "obsPodExpander": {
+    "noDataTitle": "아직 파드 메트릭이 없습니다",
+    "noDataDescription": "이 기간에 표시할 내용이 없습니다. 활동이 생기면 파드 메트릭이 여기에 표시됩니다.",
+    "notConfigured": "이 클러스터에는 Prometheus 엔드포인트가 연결되어 있지 않습니다.",
+    "restarts": "{count, plural, other {재시작 <strong>#</strong>회}}",
+    "lastRestart": "마지막 재시작: <value>{time}</value>",
+    "openShell": "셸 열기",
+    "tryAgain": "다시 시도",
+    "cpuTitle": "CPU",
+    "cpuDescription": "파드별 사용 중인 코어 수(1분 비율)입니다.",
+    "cores": "{cores}코어",
+    "memoryTitle": "메모리",
+    "memoryDescription": "파드별 워킹 세트 바이트(OOM 산정 기준)입니다."
+  },
+  "obsWorkflowTimeline": {
+    "runStatus": {
+      "running": "실행 중",
+      "completed": "완료",
+      "failed": "실패",
+      "cancelled": "취소됨",
+      "terminated": "종료됨"
+    },
+    "activityStatus": {
+      "pending": "대기 중",
+      "running": "실행 중",
+      "succeeded": "성공",
+      "failed": "실패",
+      "cancelled": "취소됨"
+    },
+    "runId": "{workflowId} · 실행 {runId}…",
+    "started": "시작 {started}",
+    "startedEnded": "시작 {started} · 종료 {ended}",
+    "cancel": "취소",
+    "failed": "워크플로 실패",
+    "activities": "활동",
+    "noActivities": "아직 기록된 활동이 없습니다.",
+    "retries": "{count, plural, other {재시도 #회}}",
+    "hideAttempts": "시도 숨기기",
+    "attempts": "{count, plural, other {시도 #회}}",
+    "retry": "다시 시도"
+  },
+  "obsAgentActivityGraph": {
+    "running": "{count}개 실행 중",
+    "idle": "유휴",
+    "noTools": "아직 연결된 도구가 없습니다. 스킬과 도구를 연결하면 그래프가 채워집니다."
+  },
+  "obsGitOpsCommits": {
+    "label": "구성 저장소 커밋",
+    "empty": "아직 구성 저장소 커밋이 없습니다.",
+    "run": "실행 {id}…",
+    "diff": "Diff",
+    "source": "소스"
+  },
   "clusters": {
     "chrome": {
       "admin": "관리",
