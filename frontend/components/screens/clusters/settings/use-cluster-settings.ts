@@ -53,7 +53,8 @@ export function useClusterSettings(slug: string) {
   // account's current grants both allow it: an account-wide grant does not
   // reach a shared cluster, whose writes are the operator's, and a withdrawn
   // grant counts before the cluster is read again.
-  const held = data?.astroliftCluster?.slug === slug ? data.astroliftCluster.viewerPermissions : null;
+  const held =
+    data?.astroliftCluster?.slug === slug ? data.astroliftCluster.viewerPermissions : null;
   const allow = (p: AstroliftPermission) =>
     (held ? held.includes(p) : true) && (permissionPending || perms.can(p));
   const access: ClusterSettingsAccess = {
