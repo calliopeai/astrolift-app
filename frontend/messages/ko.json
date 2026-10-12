@@ -12070,6 +12070,963 @@
       }
     }
   },
+  "vizRender": {
+    "health": {
+      "ok": "정상",
+      "degraded": "저하됨",
+      "failing": "실패 중",
+      "idle": "유휴"
+    },
+    "healthInline": {
+      "ok": "정상",
+      "degraded": "저하됨",
+      "failing": "실패 중",
+      "idle": "유휴"
+    },
+    "frame": {
+      "legend": "범례",
+      "reducedMotion": "동작 줄이기: 정지 화면을 표시합니다",
+      "viewStyle": "보기 스타일",
+      "fleetTitle": "에이전트 플릿",
+      "fleetDescription": "{clusters, plural, other {클러스터 #개}}에 걸친 {agents, plural, other {에이전트 #개}}",
+      "workflowsTitle": "워크플로",
+      "workflowsDescription": "{workflows, plural, other {워크플로 #개}}, {runs, plural, other {실행 #개}}"
+    },
+    "styles": {
+      "fleet": {
+        "orbit": {
+          "label": "궤도",
+          "blurb": "클러스터는 행성, 에이전트는 위성으로 표시"
+        },
+        "heartbeat": {
+          "label": "하트비트",
+          "blurb": "이벤트마다 서서히 사라지는 잔광 점"
+        },
+        "hive": {
+          "label": "하이브",
+          "blurb": "에이전트마다 타일 하나, 대규모 플릿용"
+        },
+        "manifest": {
+          "label": "출발 안내판",
+          "blurb": "실행 대기열을 출발 안내판으로 표시"
+        },
+        "isometric": {
+          "label": "아이소메트릭",
+          "blurb": "클러스터는 플랫폼, 부하는 높이로 표시"
+        },
+        "graph": {
+          "label": "그래프",
+          "blurb": "디스패치 펄스가 흐르는 실시간 포스 그래프"
+        },
+        "swarm": {
+          "label": "스웜",
+          "blurb": "에이전트가 덩굴손으로 클러스터 주위에 모여드는 표시"
+        },
+        "list": {
+          "label": "목록",
+          "blurb": "단순한 표"
+        }
+      },
+      "workflow": {
+        "transit": {
+          "label": "노선도",
+          "blurb": "워크플로는 노선, 실행은 열차로 표시"
+        },
+        "isometric": {
+          "label": "아이소메트릭",
+          "blurb": "단계를 조립 라인으로 표시"
+        },
+        "graph": {
+          "label": "그래프",
+          "blurb": "애니메이션 단계 그래프"
+        },
+        "list": {
+          "label": "목록",
+          "blurb": "단순한 표"
+        }
+      },
+      "app": {
+        "auto": {
+          "label": "자동",
+          "blurb": "앱 토폴로지에 맞춰 배치"
+        },
+        "isometric": {
+          "label": "아이소메트릭",
+          "blurb": "워크로드를 플랫폼 위 블록으로 표시"
+        },
+        "graph": {
+          "label": "그래프",
+          "blurb": "워크로드와 트래픽을 실시간 그래프로 표시"
+        },
+        "classic": {
+          "label": "클래식",
+          "blurb": "카드만, 다이어그램 없음"
+        }
+      }
+    },
+    "topology": {
+      "service": "단일 서비스",
+      "service-data": "서비스와 데이터",
+      "service-worker": "웹과 워커",
+      "microservices": "마이크로서비스",
+      "service-agent": "앱과 에이전트",
+      "agent": "에이전트",
+      "functions": "함수",
+      "scheduled": "예약됨",
+      "task": "작업",
+      "workflow": "워크플로",
+      "mixed": "혼합"
+    },
+    "legend": {
+      "shape": {
+        "returnTrack": "복귀 선로: 이전 단계로 되돌아간 작업, 라운드 한도를 표시",
+        "roundBadge": "라운드 배지: 실행이 몇 번째 라운드인지",
+        "roundNearBound": "주황색 라운드 배지: 한도까지 한 라운드 남음, 넘으면 실행이 실패합니다",
+        "siding": "측선: 같은 단계의 재시도, 시도 한도를 표시",
+        "join": "합류: 모든 분기가 끝나면 병렬 분기가 합쳐집니다",
+        "supervisorSwarm": "슈퍼바이저 스웜: 하위 작업을 처리하는 동안 워커가 켜짐",
+        "nestedStack": "중첩 스택: 하위 워크플로 전체를 실행하는 단계"
+      },
+      "healthy": "정상",
+      "degradedLoad85": "저하됨: 부하 85% 초과",
+      "flickerFailing": "깜박임: 실패 중",
+      "idle": "유휴",
+      "fleetListLoadBar": "막대: 부하, 에이전트 상태 색상",
+      "manifestQueued": "대기 중, 발사까지 카운트다운",
+      "manifestHolding": "보류 중(대기하는 동안 깜박임)",
+      "manifestLiftedOff": "발사됨 / 비행 중",
+      "manifestLanded": "착륙함",
+      "failed": "실패",
+      "manifestFlip": "실행 상태가 바뀌면 상태가 한 번 뒤집힙니다",
+      "graphHealthy": "정상, 크기는 활성 실행 수",
+      "degradedLoadOver85": "저하됨(부하 85% 초과)",
+      "failing": "실패 중",
+      "idleDarkShort": "유휴, 어둡게",
+      "graphRunsFlow": "진행 중인 실행, 빠르고 넓을수록 더 바쁨",
+      "graphDispatch": "디스패치는 허브, 클러스터, 에이전트 순으로 이동(정지 시: 링이 있는 에이전트)",
+      "graphQueued": "대기 중인 실행",
+      "graphPinned": "고정됨, 두 번 클릭해 해제",
+      "orbitHealthy": "정상, 궤도 속도는 부하",
+      "orbitDegraded": "저하됨, 부하 85% 초과",
+      "orbitFailing": "실패 중, 낮은 궤도로 하강",
+      "orbitIdle": "유휴, 대기 궤도",
+      "orbitLaunch": "실행 시작(발사)",
+      "clusterDegraded": "클러스터 저하됨",
+      "clusterOffline": "클러스터 오프라인",
+      "heartbeatRun": "실행 시작 또는 완료",
+      "heartbeatRunFailed": "실행 실패",
+      "heartbeatDispatched": "실행 디스패치됨",
+      "heartbeatDrift": "점은 12초에 걸쳐 왼쪽으로 흐르며 사라집니다",
+      "heartbeatBusy": "바쁜 에이전트: 부하에 따라 행이 빛남",
+      "heartbeatDegraded": "저하됨(과부하)",
+      "heartbeatFailing": "실패 중인 에이전트",
+      "heartbeatIdle": "유휴: 행이 어둡게 유지됨",
+      "hiveBrightness": "밝기: 부하",
+      "hiveBorder": "테두리: 정상",
+      "degraded": "저하됨",
+      "hiveDark": "어두움: 유휴",
+      "hiveRing": "링: 클러스터 허브에서 디스패치",
+      "hiveStillDot": "고정 점: 최근 12초 안에 작업을 받음",
+      "swarmSpeed": "스웜 속도: 에이전트가 얼마나 바쁜지",
+      "swarmIdle": "가라앉아 정지: 유휴",
+      "swarmTendril": "덩굴손 두께: 활성 실행",
+      "swarmFailing": "멀어지며 덩굴손이 해짐: 실패 중",
+      "swarmPulse": "덩굴손을 따라 흐르는 펄스: 디스패치",
+      "isoHealthy": "정상(높이는 부하)",
+      "isoIdle": "유휴(낮고 어두움)",
+      "isoRunStarted": "실행 시작(동작 줄이기 시 고정 점)",
+      "isoClusterDegraded": "클러스터 저하됨(플랫폼 가장자리)",
+      "jobsRunning": "실행 중: 빛남",
+      "jobsFailing": "실패 중인 작업 또는 단계",
+      "jobsPastOk": "이전 실행 성공",
+      "jobsPastFailed": "이전 실행 실패",
+      "jobsNoRecord": "실행 기록이 없는 예약 슬롯",
+      "jobsStepTraffic": "단계 트래픽: 빠를수록 더 바쁨",
+      "jobsInvoked": "방금 호출되었거나 동작함(혼합)",
+      "idleStaysDark": "유휴: 어둡게 유지",
+      "idleStaysDarkComma": "유휴, 어둡게 유지",
+      "saAction": "에이전트 작업, 12초에 걸쳐 사라짐",
+      "saActionFailing": "실패한 호출에 대한 에이전트 작업",
+      "saJustCalled": "에이전트가 방금 호출함",
+      "saCallTraffic": "에이전트 호출 트래픽: 빠를수록 더 바쁨",
+      "saCallFailing": "호출 실패(오류 5% 초과)",
+      "load": "부하",
+      "failingWorkload": "실패 중인 워크로드",
+      "swDegraded": "저하됨: 적체, 오류 1% 초과 또는 복제본 부족",
+      "darkNoTraffic": "어두움: 트래픽 없음",
+      "swTank": "탱크: 대기열 깊이, 적체되는 동안 깜박임",
+      "swDash": "움직이는 점선: 메시지 입출력, 바쁠수록 빠름",
+      "swGauge": "게이지: CPU",
+      "degradedErrorsReplicas": "저하됨: 오류 1% 초과 또는 복제본 부족",
+      "flickerFailingErrors": "깜박임: 실패 중, 오류 5% 초과",
+      "squaresReplicas": "사각형: 준비된 복제본, 깜박이는 테두리는 아직 준비되지 않은 복제본",
+      "sdDash": "움직이는 점선: 저장소 호출, 바쁠수록 빠름",
+      "sdGauge": "게이지: 서비스는 CPU, 저장소는 연결",
+      "degradedErrors": "저하됨: 오류 1% 초과",
+      "msHotSpot": "핫스폿 막대: 실패한 호출 비율",
+      "msDash": "움직이는 점선: 경로의 호출, 바쁠수록 빠름",
+      "agentTick": "에이전트 작업(눈금), 12초에 걸쳐 흐려짐",
+      "agentTickFailing": "실패한 호출에 대한 작업",
+      "agentToolTraffic": "도구 호출 트래픽: 빠르고 두꺼울수록 더 바쁨",
+      "agentToolFailing": "도구 호출 실패(오류 5% 초과)",
+      "agentToolJustCalled": "방금 호출된 도구",
+      "agentFailing": "실패 중인 에이전트 또는 도구",
+      "fnInvoked": "방금 호출됨",
+      "fnTileLight": "타일 조명: 최근 호출, 12초에 걸쳐 사라짐",
+      "fnConcurrency": "사용 중인 동시성",
+      "fnCold": "콜드 스타트: 5초간 조용한 뒤 호출됨",
+      "fnTraffic": "호출 트래픽: 빠르고 두꺼울수록 더 바쁨",
+      "fnFailingPath": "실패 중인 경로(오류 5% 초과)",
+      "fnFailing": "실패 중인 함수",
+      "trafficBusier": "트래픽, 바쁠수록 빠르고 밝음",
+      "callsFailing": "호출의 5% 초과 실패",
+      "graphDegradedShort": "저하됨 또는 복제본 부족",
+      "graphFunctionInvoked": "함수 호출됨, 12초에 걸쳐 사라짐",
+      "agentActed": "에이전트가 동작함, 비콘이 12초에 걸쳐 사라짐",
+      "isoBlockHeight": "블록 높이는 부하",
+      "isoSlab": "준비된 복제본마다 판 하나",
+      "isoReplicaMissing": "복제본 누락 또는 저하됨",
+      "isoFunctionInvoked": "함수 호출됨, 윗면이 12초에 걸쳐 사라짐",
+      "replaySegment": "구간 너비는 실제 소요 시간",
+      "replayPlayhead": "재생 헤드 이동 중: 재생 중",
+      "replayActive": "재생 헤드 아래 단계",
+      "succeeded": "성공",
+      "replayGate": "게이트 대기 중(깜박임)",
+      "replaySkipped": "도달하지 않음 또는 건너뜀",
+      "replayLoopMark": "루프 표시: 루프가 작업을 되돌리고 다음 라운드가 시작된 지점",
+      "replayRoundBand": "라운드 띠: 각 구간이 속한 라운드",
+      "replayParallel": "병렬 막대: 팬아웃의 분기, 각각 고유한 시간",
+      "listMoving": "이동 중",
+      "listBreathing": "깜박임: 게이트에서 보류됨",
+      "listFlicker": "깜박임: 실패",
+      "listDone": "완료",
+      "listLoopRow": "루프 행: 작업이 돌아가는 곳과 한도, 실행이 되돌려지는 동안 주황색",
+      "listRoundAmber": "주황색 라운드: 한도까지 한 라운드, 넘으면 실행 실패",
+      "trMoving": "이동 중인 실행(열차)",
+      "trHeld": "게이트에서 보류된 실행, 깜박임",
+      "trFailed": "실패하여 멈춘 실행",
+      "trDone": "완료된 실행, 종점에서 사라짐",
+      "trGateHolding": "실행을 보류 중인 게이트",
+      "trGateClear": "게이트 통과 가능",
+      "trThroughput": "처리량: 입자 밀도와 속도, 선 두께",
+      "trBacklog": "3개 초과 실행 적체",
+      "trReturnTrack": "노선 위 복귀 선로: 트리거와 한도가 있는 되돌림 루프, 실행이 지나가는 동안 켜짐",
+      "trSmallLoop": "한 역 위의 작은 루프: 시도 한도가 있는 재시도",
+      "trRoundBadge": "라운드 배지: 실행의 현재 라운드 / 한도",
+      "trSiding": "측선: 병렬 분기 하나, 실행 중에는 차량이 켜지고 완료 후 합류 지점에 위치",
+      "trBranchFailed": "실패한 분기(완료, 빨간색)",
+      "trJoin": "합류: 모든 분기가 도착하면 빛남",
+      "trSwarm": "슈퍼바이저 스웜: 바쁜 워커가 덩굴손에서 켜지고 부하만큼 빠르게 회전",
+      "trStacked": "겹친 역: 하위 워크플로, 열면 노선이 보임",
+      "grFlowing": "흐르는 실행, 바쁠수록 빠름",
+      "grBackedUp": "적체(3개 초과 대기)",
+      "grGateWaiting": "승인 대기 중인 게이트",
+      "grGateApproved": "승인된 게이트",
+      "grGateDenied": "거부되거나 반려된 게이트",
+      "grRunsAtStage": "단계에 있는 실행",
+      "grFailedRun": "실패한 실행",
+      "grIdle": "유휴 또는 완료",
+      "grReturnTrack": "복귀 선로: 이전 단계로 가는 루프와 라운드 한도, 실행이 되돌려지는 동안 흐름",
+      "grFanoutBox": "팬아웃 상자: 분기마다 한 행, 실행 중인 분기는 흐르고 완료되면 한 번 깜박임",
+      "grSatellites": "슈퍼바이저 위성: 바쁜 워커는 켜져서 돌고, 부하가 클수록 빠름",
+      "grNestedGroup": "중첩 그룹: 하위 워크플로를 실행하는 단계, 접으면 스택이 됨",
+      "isoWfMoving": "이동 중인 실행(상자) / 작업 중인 단계",
+      "isoWfHeld": "게이트에서 보류: 부스 닫힘, 깜박임",
+      "isoWfFailed": "해당 기계에서 실행 실패",
+      "isoWfBacklog": "투입구에서 대기 중인 적체",
+      "isoWfBelt": "벨트 속도 = 처리량",
+      "isoWfIdle": "유휴 / 완료",
+      "isoWfRamp": "복귀 경사로: 되돌려진 작업이 한 단계 올라 이전 단계로 이동, 한도는 경사로에 표시",
+      "isoWfDeck": "루프 단계 위의 라운드별 데크, 현재 라운드는 켜지고 이전 라운드는 흐림",
+      "isoWfHoop": "단계 위의 고리: 해당 단계의 재시도, 시도 한도를 표시",
+      "isoWfRails": "높은 레일: 팬아웃 분기, 실행 중에는 켜지고 완료되면 합류 블록으로 이동",
+      "isoWfSupervisor": "슈퍼바이저 타일: 바쁜 워커는 허브를 돌며 부하가 클수록 빠르고, 유휴 워커는 멈춰 있음",
+      "isoWfStacked": "겹친 블록: 하위 워크플로, 열면 하위 플랫폼에 단계가 보임",
+      "airlockWaiting": "승인 대기: 게이지가 깜박이며 보류 시간만큼 차오름",
+      "airlockApproved": "승인됨: 문이 열림",
+      "airlockDenied": "거부됨: 봉인되고 한 번 흔들림"
+    },
+    "listSeparator": ", ",
+    "unknown": "알 수 없음",
+    "offline": "오프라인",
+    "selectedAgent": ", 선택된 에이전트",
+    "agentSummary": "{name}: {health}, 부하 {load}%, 실행 중 {running}, 대기 {queued}",
+    "counts": {
+      "failing": "실패 중 {count}",
+      "degraded": "저하됨 {count}",
+      "busy": "바쁨 {count}",
+      "idle": "유휴 {count}",
+      "queued": "대기 {count}",
+      "clustersNotHealthy": "{count, plural, other {정상이 아닌 클러스터 #개}}"
+    },
+    "fleetList": {
+      "summary": "에이전트 {agents}개, 실패 중 {failing}, 바쁨 {busy}",
+      "searchPlaceholder": "에이전트, 클러스터 검색…",
+      "health": "상태",
+      "views": {
+        "all": "전체",
+        "mine": "내 항목"
+      },
+      "mineNote": "에이전트는 개인이 아니라 플릿에 속하므로 내 항목은 비어 있습니다.",
+      "columns": {
+        "agent": "에이전트",
+        "health": "상태",
+        "load": "부하",
+        "runs": "활성 실행",
+        "queued": "대기",
+        "cluster": "클러스터"
+      },
+      "agentLabel": "{name}, {health}",
+      "label": "에이전트",
+      "empty": "이 플릿에 에이전트가 없습니다"
+    },
+    "manifest": {
+      "count": {
+        "queued": "대기 {count}",
+        "holding": "보류 {count}",
+        "lifted_off": "발사됨 {count}",
+        "in_flight": "비행 중 {count}",
+        "landed": "착륙함 {count}",
+        "failed": "실패 {count}"
+      },
+      "state": {
+        "queued": "대기",
+        "holding": "보류",
+        "lifted_off": "발사됨",
+        "in_flight": "비행 중",
+        "landed": "착륙함",
+        "failed": "실패"
+      },
+      "summary": "{count, plural, other {실행 #개}}: {parts}",
+      "summaryEmpty": "{count, plural, other {보드의 실행 #개}}",
+      "label": "발사 목록. {summary}",
+      "queue": "실행 대기열",
+      "columns": {
+        "clock": "T- / UTC",
+        "run": "실행",
+        "agent": "에이전트",
+        "cluster": "클러스터",
+        "status": "상태"
+      },
+      "empty": "보드에 실행이 없습니다"
+    },
+    "fleetGraph": {
+      "summary": "클러스터 {clusters}개에 에이전트 {agents}개, 실패 중 {failing}, 바쁨 {busy}, 대기 중인 실행 {queued}",
+      "hub": "조직 허브",
+      "org": "조직",
+      "agentLabel": "{name}: {health}, 활성 {active}, 대기 {queued}",
+      "agentTitle": "{name}: {health}, 활성 {active}, 대기 {queued}, 부하 {load}%",
+      "clusterTitle": "{name}: {health}",
+      "clusterRegionTitle": "{name}({region}): {health}"
+    },
+    "orbit": {
+      "planet": "에이전트 {agents}개 · 바쁨 {busy}"
+    },
+    "heartbeat": {
+      "summary": "하트비트: 에이전트 {agents}개, 실패 중 {failing}, 바쁨 {busy}, 최근 {seconds}초 동안 이벤트 {recent}개",
+      "agent": "에이전트",
+      "now": "지금"
+    },
+    "hive": {
+      "summary": "클러스터 {clusters}개에 에이전트 {agents}개, 실패 중 {failing}, 저하됨 {degraded}, 바쁨 {busy}",
+      "group": "{name}, 에이전트 {count}개",
+      "groupRegion": "{name}({region}), 에이전트 {count}개",
+      "dispatcher": "{name} 디스패처, 클러스터 {health}",
+      "agent": "{name}, {cluster}, {health}, 부하 {load}%, 실행 중 {running}, 대기 {queued}"
+    },
+    "swarm": {
+      "summary": "스웜 중인 에이전트 {agents}개: 바쁨 {busy}, 유휴 {idle}, 실패 중 {failing}"
+    },
+    "isoFleet": {
+      "summary": "아이소메트릭 플릿: {fleet}, 실패 중 {failing}, 저하됨 {degraded}, 바쁨 {busy}, 유휴 {idle}",
+      "agent": "{name}: {health}, 부하 {load}%, {count, plural, other {활성 실행 #개}}",
+      "cluster": "{name}: 에이전트 {count}개",
+      "clusterRegion": "{name}({region}): 에이전트 {count}개",
+      "peek": "{health} · 부하 {load}% · 실행 중 {running} · 대기 {queued}"
+    },
+    "feed": {
+      "queried": "<a>{agent}</a>이(가) <b>{target}</b>을(를) 조회함",
+      "publishedTo": "<a>{agent}</a>이(가) <b>{target}</b>에 게시함",
+      "invoked": "<a>{agent}</a>이(가) <b>{target}</b>을(를) 호출함",
+      "called": "<a>{agent}</a>이(가) <b>{target}</b>을(를) 호출함",
+      "workedOn": "<a>{agent}</a>이(가) <b>{target}</b> 작업을 함"
+    },
+    "tick": {
+      "queried": "{seconds}초 전 {target} 조회",
+      "publishedTo": "{seconds}초 전 {target}에 게시",
+      "invoked": "{seconds}초 전 {target} 호출",
+      "called": "{seconds}초 전 {target} 호출",
+      "workedOn": "{seconds}초 전 {target} 작업"
+    },
+    "work": "작업",
+    "nodeTitle": "{name}({kind}): {health}",
+    "loadBar": "{label} {pct}%",
+    "load": "부하",
+    "loadPct": "부하 {pct}%",
+    "loadOf": "{name} 부하",
+    "connectionsOf": "{name} 연결",
+    "cpuOf": "{name} CPU",
+    "appSummary": "{app}: {summary}",
+    "nouns": {
+      "workloads": "{count, plural, other {워크로드 #개}}",
+      "nodes": "{count, plural, other {노드 #개}}",
+      "appWorkloads": "{count, plural, other {앱 워크로드 #개}}",
+      "agents": "{count, plural, other {에이전트 #개}}",
+      "tools": "{count, plural, other {도구 #개}}",
+      "functions": "{count, plural, other {함수 #개}}"
+    },
+    "sections": {
+      "traffic": "트래픽",
+      "services": "서비스",
+      "functions": "함수",
+      "jobs": "작업",
+      "agents": "에이전트",
+      "queues": "대기열",
+      "data": "데이터",
+      "external": "외부"
+    },
+    "roles": {
+      "ingress": "인그레스",
+      "service": "서비스",
+      "worker": "워커",
+      "data": "데이터",
+      "queue": "대기열",
+      "function": "함수",
+      "trigger": "트리거",
+      "agent": "에이전트",
+      "schedule": "일정",
+      "external": "외부"
+    },
+    "utc": "{time} UTC",
+    "notApplicable": "해당 없음",
+    "nodeLoadLabel": "{name}, {kind}, {health}, 부하 {load}%",
+    "nodeRoleLabel": "{name}, {role}, {health}",
+    "nameHealth": "{name}, {health}",
+    "readyReplicas": "{ready}/{desired} 준비됨",
+    "reqPerSec": "요청/초",
+    "jobsPerSec": "작업/초",
+    "errors": "오류",
+    "distribution": "분포",
+    "trend": "추세",
+    "topologyGraph": "토폴로지 그래프",
+    "trafficSummary": "{app}, {topology}: {health}, 초당 요청 {rps}, 오류 {errors}",
+    "jobs": {
+      "scheduleLabel": "{name}: {next}, {health}",
+      "nextRunIn": "다음 실행까지 {countdown}",
+      "notParsed": "일정을 해석할 수 없음",
+      "nextRun": "다음 실행까지",
+      "running": "실행 중",
+      "notRunning": "실행 안 함",
+      "lastSlots": "최근 {count}개 슬롯",
+      "history": "실행 기록",
+      "slot": "{time} UTC: {outcome}",
+      "succeeded": "성공",
+      "failed": "실패",
+      "noRecord": "기록 없음",
+      "noSchedules": "작업에 연결된 일정이 없습니다.",
+      "noTask": "이 앱에 작업이 없습니다.",
+      "stateFailed": "실패",
+      "stateRunning": "실행 중",
+      "stateNotRunning": "실행 안 함",
+      "runLabel": "{name} 실행: {state}",
+      "run": "실행",
+      "kind": "종류",
+      "pods": "파드",
+      "writes": "쓰기",
+      "errPct": "오류 {pct}%",
+      "steps": "워크플로 단계",
+      "stepsTitle": "단계",
+      "stepLabel": "{n}단계, {name}: {state}",
+      "runningPct": "실행 중 {pct}%"
+    },
+    "serviceAgent": {
+      "summary": "{app}: {workloads}; {agents}; 최근 12초 동안 에이전트 작업 {actions}개",
+      "app": "앱",
+      "doing": "에이전트가 하는 일",
+      "quiet": "조용함: 최근 12초 동안 에이전트 작업 없음",
+      "agent": "에이전트",
+      "calls": "에이전트 호출",
+      "callLabel": "에이전트가 {name} 호출: {rps}/초, 오류 {errors}%",
+      "calledLabel": "{label}, 에이전트가 호출함",
+      "agentTag": "에이전트"
+    },
+    "serviceWorker": {
+      "behind": "+{rps}/초 지연",
+      "keepingUp": "따라가는 중",
+      "empty": "비어 있음",
+      "in": "입력",
+      "out": "출력",
+      "depth": "깊이",
+      "lag": "지연",
+      "depthTrend": "깊이 추세",
+      "enqueued": "대기열 추가/초",
+      "consumed": "소비/초",
+      "summary": "{head}, 대기열 {queue} {fill} 찼고 {health}, 초당 입력 {inRps}, 출력 {outRps}",
+      "fallingBehind": ", 초당 {rps}씩 뒤처짐",
+      "summaryNoQueue": "{head}, 대기열 없음",
+      "web": "웹",
+      "webHeading": "웹 · {rps} 요청/초 · 오류 {errors}",
+      "queue": "대기열",
+      "noQueue": "이 앱에 대기열이 없습니다.",
+      "workers": "워커",
+      "workersHeading": "워커 · {rps} 작업/초"
+    },
+    "service": {
+      "summary": "{app}, {topology}: {health}, 초당 요청 {rps}, p50 {p50}, 오류 {errors}, 복제본 {desired}개 중 {ready}개 준비됨"
+    },
+    "kpi": {
+      "requests": "요청/초",
+      "p50": "p50 지연 시간",
+      "errorRate": "오류율",
+      "replicas": "준비된 복제본"
+    },
+    "serviceData": {
+      "connections": "연결",
+      "callErrors": "호출 오류",
+      "summary": "{head}, {count, plural, other {데이터 저장소 #개}}",
+      "worstStore": ", {name} {health}",
+      "storeAt": ", {name} {load}"
+    },
+    "micro": {
+      "summary": "{app}, {topology}: 서비스 {services}개, 실패 중 {failing}, 실패 중인 호출 경로 {paths}, 초당 요청 {rps}",
+      "hottest": ", 가장 심각한 {name} 오류 {errors}",
+      "services": "서비스",
+      "replicas": "복제본",
+      "failingPaths": "실패 경로",
+      "hotSpots": "핫스폿",
+      "callPaths": "호출 경로",
+      "callPathsHeading": "초당 요청 기준 호출 경로",
+      "fromTo": "출발 → 도착",
+      "traffic": "트래픽",
+      "quieter": "외 조용한 경로 {count}개"
+    },
+    "agentLayout": {
+      "summary": "{app}: {agents}; 최근 12초 동안 작업 {actions}개; {tools}",
+      "runs": "실행",
+      "actions": "작업, 최근 12초",
+      "toolCalls": "도구 호출",
+      "diagram": "다이어그램",
+      "stripLabel": "{name}: 최근 12초 동안 작업 {count}개, {health}",
+      "noActions": "작업 없음"
+    },
+    "functions": {
+      "summary": "{app}: {functions}; 최근 12초 동안 {invoked}개 호출됨",
+      "coldStarts": ", {count, plural, other {콜드 스타트 #회}}",
+      "tile": "{name}: 호출 {rps}, 동시성 {pct}%, 최근 12초 동안 {recent}, {health}",
+      "tileCold": "{name}: 호출 {rps}, 동시성 {pct}%, 최근 12초 동안 {recent}, 콜드 스타트, {health}",
+      "cold": "콜드",
+      "in12s": "12초 동안 {count}"
+    },
+    "graph": {
+      "nodeName": "{name}({role})",
+      "replicas": "복제본 {desired}개 중 {ready}개",
+      "perSecond": "초당 {rps}",
+      "invocations": "12초 동안 호출 {count}회",
+      "actions": "12초 동안 작업 {count}개",
+      "erroring": "연결 {total}개 중 {erroring}개 오류",
+      "connectionsHealthy": "연결 {count}개 정상",
+      "acts": "작업 {count}",
+      "retrying": "{stage} 재시도 중, 시도 {n}/{max}",
+      "sentBack": "{from}에서 {to}(으)로 되돌려져 라운드 {n}/{max} 진행",
+      "state": {
+        "failed": "실패",
+        "rejected": "반려됨, 작업을 되돌리는 중",
+        "sendingBack": "작업을 되돌리는 중",
+        "waitingApproval": "승인 대기 중",
+        "runningWaiting": "실행 중, 대기 {held}",
+        "held": "보류됨",
+        "backedUp": "적체, 대기 {backlog}",
+        "running": "실행 중",
+        "finished": "완료"
+      },
+      "kind": {
+        "gate": "게이트",
+        "fanout": "팬아웃",
+        "join": "합류",
+        "supervisor": "슈퍼바이저",
+        "workflow": "중첩 워크플로"
+      },
+      "group": {
+        "moving": "실행 중 {count}: {runs}",
+        "held": "보류 {count}: {runs}",
+        "failed": "실패 {count}: {runs}",
+        "done": "완료 {count}: {runs}"
+      },
+      "branches": "{count, plural, other {분기 #개}}, {count}개 중 {settled}개 완료",
+      "branchesDynamic": "실행마다 정해지는 {count, plural, other {분기 #개}}, {count}개 중 {settled}개 완료",
+      "branchesFailed": ", 실패 {count}",
+      "noBranches": "아직 분기 없음",
+      "waitsOn": "{count, plural, other {분기 #개}} 대기, 완료 {settled}",
+      "waitsOnFanout": "팬아웃 대기",
+      "subtasksShort": "하위 작업 {done}/{total}",
+      "subtasksDone": "하위 작업 {total}개 중 {done}개 완료",
+      "workerBusy": "{label}: 바쁨, 부하 {load}%",
+      "workerIdle": "{label}: 유휴, 부하 {load}%",
+      "firstStage": "첫 단계",
+      "loopRun": "{label}, {text}",
+      "trackShort": {
+        "failed": "{stage} 실패, 최대 {max}라운드",
+        "rejected": "{stage} 반려, 최대 {max}라운드",
+        "condition": "{stage} 조건 충족, 최대 {max}라운드"
+      },
+      "maxAttempts": "최대 {max}회",
+      "workflows": "{count, plural, other {워크플로 #개}}",
+      "backedUpStages": "{count, plural, other {적체된 단계 #개}}"
+    },
+    "loop": {
+      "attemptOf": "시도 {n}/{max}",
+      "roundOf": "라운드 {n}/{max}",
+      "stage": "단계",
+      "retry": {
+        "failed": "{stage} 실패 시 재시도, 최대 {max}회",
+        "rejected": "{stage} 반려 시 재시도, 최대 {max}회",
+        "condition": "{stage} 조건 충족 시 재시도, 최대 {max}회"
+      },
+      "when": {
+        "failed": "{stage} 실패",
+        "rejected": "{stage} 반려",
+        "condition": "{stage} 조건 충족"
+      },
+      "back": "{when} 시 {to}(으)로 복귀, 최대 {max}라운드"
+    },
+    "station": {
+      "gateFailed": "여기서 실행이 실패함",
+      "holding": "실행 보류 중",
+      "open": "열림",
+      "runsWaiting": "{count, plural, other {, 대기 중인 실행 #개}}",
+      "idleLastRun": "{count, plural, other {유휴, 마지막 실행은 분기 #개}}",
+      "branches": "{count, plural, other {분기 #개}}, 완료 {settled}, 실행 중 {running}",
+      "branchesFailed": ", 실패 {count}",
+      "waitingOn": "{count, plural, other {분기 #개}} 중 {pending}개 대기 중",
+      "workersBusy": "{count, plural, other {워커 #개}} 중 {busy}개 바쁨",
+      "childFailed": "하위 실행이 실패함",
+      "childFinished": "하위 실행 완료",
+      "childAt": "하위 실행이 {stage}에 있음, {n}/{total}단계",
+      "aStage": "어떤 단계",
+      "name": "{line}, {station}: {state}{loops}",
+      "kind": {
+        "stage": "{name}",
+        "gate": "{name} 게이트",
+        "fanout": "{name} 팬아웃",
+        "join": "{name} 합류",
+        "supervisor": "{name} 슈퍼바이저",
+        "workflow": "{name} 하위 워크플로"
+      }
+    },
+    "run": {
+      "retrying": "{stage} 재시도 중",
+      "theStage": "해당 단계",
+      "sentBackTo": "{stage}(으)로 되돌려짐",
+      "anEarlierStage": "이전 단계",
+      "waitingFanout": "팬아웃이 비기를 기다리는 중",
+      "held": "보류됨",
+      "failed": "실패",
+      "finished": "완료",
+      "waitingBranches": "분기 대기 중, {total}개 중 {settled}개 완료",
+      "subtasks": "하위 작업 {total}개 중 {done}개 완료",
+      "childAt": "하위 실행이 {stage}에 있음",
+      "moving": "이동 중",
+      "round": "라운드 {n}",
+      "childRun": "하위 실행",
+      "name": "실행 {label}: {parts}"
+    },
+    "trains": {
+      "moving": "이동 중 {count}",
+      "heldAtGates": "게이트에서 보류 {count}",
+      "failed": "실패 {count}",
+      "sentBackOnLoop": "루프로 되돌려짐 {count}",
+      "backedUp": "적체 {count}",
+      "running": "실행 중 {count}",
+      "sentBackAlongLoop": "루프를 따라 되돌려짐 {count}"
+    },
+    "list": {
+      "trigger": {
+        "failed": "{stage} 실패",
+        "rejected": "{stage} 반려",
+        "condition": "{stage} 조건 충족",
+        "custom": "{stage}: {condition}"
+      },
+      "retrying": "{what}, {stage} 재시도 중, 시도 {n}/{max}",
+      "goesBack": "{what}, {to}(으)로 복귀, 라운드 {n}/{max}",
+      "inside": "{base}; {label}은(는) 라운드 {n}/{max}",
+      "branchesPerRun": "분기는 실행마다 결정",
+      "noBranches": "아직 분기 없음",
+      "done": "{settled} / {total} 완료",
+      "waitsAllSettled": "{count, plural, other {분기 #개}} 대기, 모두 완료",
+      "waitsToGo": "{count, plural, other {분기 #개}} 대기, {pending}개 남음",
+      "waitsOn": "{name} 대기",
+      "subtasks": "하위 작업 {done} / {total}, {workers}",
+      "runsChild": "{name} 실행",
+      "childAt": "하위 실행 {stage}, {n} / {total}",
+      "start": "시작",
+      "stages": {
+        "search": "단계, 워크플로, 루프 검색…"
+      },
+      "runs": {
+        "search": "실행, 워크플로, 역 검색…"
+      },
+      "fields": {
+        "state": "상태",
+        "kind": "종류"
+      },
+      "kind": {
+        "stage": "단계",
+        "gate": "게이트",
+        "fanout": "팬아웃",
+        "join": "합류",
+        "supervisor": "슈퍼바이저",
+        "workflow": "중첩 워크플로",
+        "loop": "루프",
+        "retry": "재시도"
+      },
+      "kindInline": {
+        "stage": "단계",
+        "gate": "게이트",
+        "fanout": "팬아웃",
+        "join": "합류",
+        "supervisor": "슈퍼바이저",
+        "workflow": "중첩 워크플로",
+        "loop": "루프",
+        "retry": "재시도"
+      },
+      "stageState": {
+        "failed": "실패",
+        "sendingBack": "되돌리는 중",
+        "held": "보류됨",
+        "waitingApproval": "승인 대기 중",
+        "backedUp": "적체",
+        "running": "실행 중",
+        "finished": "완료",
+        "idle": "유휴"
+      },
+      "stageStateInline": {
+        "failed": "실패",
+        "sendingBack": "되돌리는 중",
+        "held": "보류됨",
+        "waitingApproval": "승인 대기 중",
+        "backedUp": "적체",
+        "running": "실행 중",
+        "finished": "완료",
+        "idle": "유휴"
+      },
+      "trainState": {
+        "moving": "이동 중",
+        "held": "보류됨",
+        "failed": "실패",
+        "done": "완료",
+        "sent": "되돌려짐"
+      },
+      "trainStateInline": {
+        "moving": "이동 중",
+        "held": "보류됨",
+        "failed": "실패",
+        "done": "완료",
+        "sent": "되돌려짐"
+      },
+      "views": {
+        "all": "전체",
+        "mine": "내 항목"
+      },
+      "mineNote": "워크플로 단계와 실행은 개인이 아니라 워크플로의 것이므로 내 항목은 비어 있습니다.",
+      "agoSeconds": "{s}초 전",
+      "agoMinutes": "{m}분 전",
+      "agoHours": "{h}시간 {m}분 전",
+      "summary": "{head}: 이동 중 {moving}, 게이트에서 보류 {held}, 실패 {failed}, 완료 {done}",
+      "summarySent": ", 루프를 따라 되돌려짐 {count}",
+      "none": "없음",
+      "nearBound": ", 한도까지 한 라운드",
+      "where": {
+        "retrying": "{stage} 재시도 중",
+        "sentBack": "{stage}(으)로 되돌려짐"
+      },
+      "whereInline": {
+        "retrying": "{stage} 재시도 중",
+        "sentBack": "{stage}(으)로 되돌려짐"
+      },
+      "loopLabel": "{workflow}: {words}, {state}",
+      "stageLabel": "{name}, {workflow}의 {kind}",
+      "attempt": "시도 {n}",
+      "columns": {
+        "stage": "단계",
+        "workflow": "워크플로",
+        "kind": "종류",
+        "state": "상태",
+        "round": "라운드",
+        "attempts": "시도",
+        "progress": "진행",
+        "runs": "실행",
+        "run": "실행",
+        "station": "역",
+        "started": "시작"
+      },
+      "show": "표시",
+      "stagesCount": "단계({count})",
+      "runsCount": "실행({count})",
+      "stagesLabel": "단계",
+      "runsLabel": "실행",
+      "noWorkflows": "워크플로 없음",
+      "noRuns": "어떤 워크플로에도 실행이 없음"
+    },
+    "replay": {
+      "round": "라운드 {n}",
+      "roundShort": "R{n}",
+      "roundLower": "라운드 {n}",
+      "running": "실행 중",
+      "queued": "대기 중",
+      "noCanvas": "이 브라우저에서는 내보내기를 그릴 수 없습니다(2D 캔버스 없음).",
+      "noVideo": "이 브라우저에서는 동영상을 녹화할 수 없습니다.",
+      "waitingApproval": "승인 대기 중",
+      "deniedBy": "{who}이(가) 거부함",
+      "approvedBy": "{who}이(가) 승인함",
+      "runningFor": "{duration} 동안 실행 중",
+      "took": "{duration} 소요",
+      "stages": "{count, plural, other {단계 #개}}",
+      "rounds": "{count, plural, other {라운드 #개}}",
+      "sentBack": "{count, plural, other {# 회 되돌려짐}}",
+      "parallel": "{count, plural, other {병렬 분기 #개}}",
+      "waitingAtGate": "게이트에서 대기 {count}",
+      "describe": "실행 {label}: {parts}, {span}",
+      "outcome": {
+        "rejected": "반려됨",
+        "failed": "실패",
+        "waiting": "대기 중",
+        "running": "실행 중",
+        "skipped": "건너뜀"
+      },
+      "elapsedAt": "{clock} 경과, {stage}",
+      "elapsed": "{clock} 경과",
+      "exportFailed": "재생을 내보낼 수 없습니다: {error}",
+      "status": {
+        "succeeded": "성공",
+        "failed": "실패",
+        "skipped": "건너뜀",
+        "running": "실행 중",
+        "waiting": "대기 중"
+      },
+      "kind": {
+        "stage": "단계",
+        "gate": "게이트",
+        "fanout": "팬아웃",
+        "join": "합류",
+        "supervisor": "슈퍼바이저",
+        "workflow": "하위 워크플로"
+      },
+      "roundsOnTrack": "트랙의 라운드",
+      "markLabel": "라운드 {n}: {reason}, {to}(으)로 되돌려짐. 여기로 이동",
+      "markTitle": "{reason}, {to}(으)로 복귀(라운드 {n})",
+      "segment": "{name}({kind}): {status}, {duration}",
+      "segmentRound": "{name}({kind}, 라운드 {n}): {status}, {duration}",
+      "decidedBy": "{who}이(가) 결정함",
+      "sentBackReason": "되돌려짐: {reason}",
+      "branch": "{name}(분기): {status}, {duration}",
+      "position": "재생 위치",
+      "slowest": "<label>가장 느린 단계: </label><strong>{name}</strong>은(는) <mono>{duration}</mono> 걸려 실행의 <mono>{share}%</mono>를 차지",
+      "roundsList": "라운드",
+      "cause": "(되돌려짐: <em>{reason}</em>)",
+      "reducedHint": "동작 줄이기: 재생 헤드를 끌거나 화살표 키 사용",
+      "pauseLabel": "재생 일시 중지",
+      "playLabel": "재생",
+      "pause": "일시 중지",
+      "play": "재생",
+      "speed": "재생 속도",
+      "recording": "녹화 중…",
+      "encoding": "인코딩 중…",
+      "export": "내보내기",
+      "exportGif": "GIF(6초 타임랩스)",
+      "exportVideo": "동영상, WebM(6초 타임랩스)"
+    },
+    "transit": {
+      "trigger": {
+        "failed": "{stage} 실패",
+        "rejected": "{stage} 반려",
+        "condition": "{stage}"
+      },
+      "maxRounds": "{trigger} · 최대 {max}라운드",
+      "maxAttempts": "{trigger} · 최대 {max}회",
+      "retryingNext": "{stage} 재시도 중, 다음은 시도 {n}/{max}",
+      "sentBackNext": {
+        "failed": "{from} 실패로 {to}(으)로 되돌려짐, 다음은 라운드 {n}/{max}",
+        "rejected": "{from} 반려로 {to}(으)로 되돌려짐, 다음은 라운드 {n}/{max}",
+        "condition": "{from} 조건 충족으로 {to}(으)로 되돌려짐, 다음은 라운드 {n}/{max}"
+      },
+      "roundOverall": "전체 라운드 {n}",
+      "summary": "{head}: 이동 중 {moving}, 보류 {held}, 실패 {failed}, 완료 {done}",
+      "sentBackOnLoop": ", 루프로 되돌려짐 {count}",
+      "segmentsBackedUp": ", 적체 구간 {count, plural, other {#개}}",
+      "done": "완료 {count}",
+      "trainLabel": {
+        "moving": "{line}의 실행 {label}, {station}에서 이동 중",
+        "held": "{line}의 실행 {label}, {station}에서 보류됨",
+        "failed": "{line}의 실행 {label}, {station}에서 실패",
+        "done": "{line}의 실행 {label}, {station}에서 완료"
+      },
+      "backClose": "{parent}(으)로 돌아가기: {child} 닫기",
+      "backTo": "{parent}(으)로 돌아가기",
+      "backToInline": "{parent}(으)로 돌아가기",
+      "stationName": "{line}: {station}",
+      "nearBound": ", 한도 근접",
+      "gateHolding": "실행을 보류 중인 게이트",
+      "gateClear": "게이트 통과 가능",
+      "parallelPerRun": "병렬 분기, 개수는 실행마다 결정, 유휴",
+      "parallelIdle": "병렬 분기, 유휴",
+      "branchesSettled": "분기 {total}개 중 {settled}개 완료",
+      "waitingOn": ", {names} 대기 중",
+      "and": " 및 ",
+      "joinReady": "합류 준비됨",
+      "joinWaiting": "합류가 분기 {total}개 중 {pending}개를 기다리는 중",
+      "merging": "합류 중",
+      "supervisor": "슈퍼바이저, {count, plural, other {워커 #개}} 중 {busy}개 바쁨",
+      "childWorkflow": "하위 워크플로 {name}",
+      "childWorkflowBare": "하위 워크플로",
+      "closed": "닫힘",
+      "branchTitle": "{label}: {state}",
+      "branchState": {
+        "queued": "대기 중",
+        "running": "실행 중",
+        "succeeded": "성공",
+        "failed": "실패"
+      },
+      "moreRunning": ", 실행 중 {count}",
+      "waiting": "대기 {count}"
+    },
+    "graphView": {
+      "more": "외 {count}개",
+      "branchesPerRun": "실행별 분기",
+      "noBranches": "분기 없음",
+      "childWorkflow": "{name}, 하위 워크플로",
+      "collapseLabel": "하위 워크플로 {name} 접기",
+      "expandLabel": "하위 워크플로 {name} 펼치기",
+      "collapse": "{name} 접기",
+      "expand": "{name} 펼치기"
+    },
+    "isoWf": {
+      "closeChild": "{station}이(가) 실행하는 하위 워크플로 {child} 닫기",
+      "openChild": "{station}이(가) 실행하는 하위 워크플로 {child} 열기",
+      "childStages": "{name}: 하위 워크플로의 단계",
+      "deckLit": "라운드 {n}: 현재 이 라운드에 실행이 있음",
+      "deckEarlier": "라운드 {n}: 이전 라운드",
+      "branchesPerRun": "{name}: 분기는 실행마다 결정",
+      "branchLastRun": "{label}: {state}(마지막 실행)"
+    },
+    "airlock": {
+      "wait": "대기 {time}",
+      "waiting": "대기 중",
+      "open": "열림",
+      "denied": "거부됨",
+      "labelHeld": "승인 대기 중인 게이트, {time} 보류",
+      "labelWaiting": "승인 대기 중인 게이트",
+      "labelBy": {
+        "approved": "{who}이(가) 승인한 게이트",
+        "denied": "{who}이(가) 거부한 게이트"
+      },
+      "label": {
+        "approved": "승인된 게이트",
+        "denied": "거부된 게이트"
+      },
+      "approve": "승인",
+      "deny": "거부"
+    }
+  },
   "clusterConnection": {
     "title": "클러스터 연결",
     "help": "클러스터 내 에이전트가 보고하는 하트비트입니다. 30초마다 조회합니다.",

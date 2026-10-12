@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -13,12 +14,12 @@ import {
   flowDuration,
   type Health,
 } from "../core/semantics";
+import type { VizT } from "../core/viz-t";
 import type { LegendItem } from "../core/VizLegend";
 
 import {
   ISO_UNIT as U,
   MAX_SLABS,
-  ROLE_TAG,
   dataHeight,
   describeApp,
   encodePts,
@@ -54,15 +55,15 @@ import { useEdgeParticles } from "./use-edge-particles";
  */
 
 export const APP_ISOMETRIC_LEGEND: LegendItem[] = [
-  { glyph: "bar", color: HEALTH_COLOR.ok, label: "Block height is load" },
-  { glyph: "dot", color: HEALTH_COLOR.ok, label: "Slab per ready replica" },
-  { glyph: "ring", color: HEALTH_COLOR.degraded, label: "Replica missing or degraded" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Failing" },
-  { glyph: "flow", color: HEALTH_COLOR.ok, label: "Traffic, faster and brighter when busier" },
-  { glyph: "flow", color: HEALTH_COLOR.failing, label: "Over 5% of calls failing" },
-  { glyph: "spark", color: HEALTH_COLOR.ok, label: "Function invoked, top fades over 12 s" },
-  { glyph: "signal", color: HEALTH_COLOR.ok, label: "Agent acted, beacon fades over 12 s" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Idle, stays dark" },
+  { glyph: "bar", color: HEALTH_COLOR.ok, labelKey: "isoBlockHeight" },
+  { glyph: "dot", color: HEALTH_COLOR.ok, labelKey: "isoSlab" },
+  { glyph: "ring", color: HEALTH_COLOR.degraded, labelKey: "isoReplicaMissing" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "failing" },
+  { glyph: "flow", color: HEALTH_COLOR.ok, labelKey: "trafficBusier" },
+  { glyph: "flow", color: HEALTH_COLOR.failing, labelKey: "callsFailing" },
+  { glyph: "spark", color: HEALTH_COLOR.ok, labelKey: "isoFunctionInvoked" },
+  { glyph: "signal", color: HEALTH_COLOR.ok, labelKey: "agentActed" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "idleStaysDarkComma" },
 ];
 
 const SQRT2 = Math.SQRT2;
@@ -304,7 +305,7 @@ function Block({
 const xy = ([x, y]: [number, number]) => ({ x, y });
 
 /** What a node shows, shared by its block and its caption. */
-function nodeView(place: IsoNodePlace, snapshot: AppSnapshot) {
+function nodeView(place: IsoNodePlace, snapshot: AppSnapshot, t: VizT) {
   const { node, wx, wy, w, d, cx, cy } = place;
   const short = !!node.replicas && node.replicas.ready < node.replicas.desired;
   const health: Health = node.health === "ok" && short ? "degraded" : node.health;
@@ -316,8 +317,8 @@ function nodeView(place: IsoNodePlace, snapshot: AppSnapshot) {
     : invokes
       ? `×${invokes}`
       : actions
-        ? `${actions} acts`
-        : ROLE_TAG[node.role];
+        ? t("graph.acts", { count: actions })
+        : t(`roles.${node.role}`);
   const [, fy] = iso(wx + w, wy + d, 0, U);
   const [lx] = iso(cx, cy, 0, U);
   return { health, short, invokes, actions, metric, fy, lx };
@@ -334,9 +335,10 @@ function Node({
   motion: AppViewProps["motion"];
   onSelect?: AppViewProps["onSelectNode"];
 }) {
+  const t = useTranslations("vizRender");
   const { node, wx, wy, w, d } = place;
-  const { health, invokes, actions } = nodeView(place, snapshot);
-  const label = nodeLabel(node, health, invokes, actions);
+  const { health, invokes, actions } = nodeView(place, snapshot, t);
+  const label = nodeLabel(node, health, invokes, actions, t);
   const select = () => onSelect?.(node.id);
   const ring = points([
     iso(wx - 0.25, wy - 0.25, 0, U),
@@ -370,7 +372,8 @@ function Node({
 
 /** Name and metric, drawn after every block so no block hides a caption. */
 function Caption({ place, snapshot }: { place: IsoNodePlace; snapshot: AppSnapshot }) {
-  const { health, short, metric, fy, lx } = nodeView(place, snapshot);
+  const t = useTranslations("vizRender");
+  const { health, short, metric, fy, lx } = nodeView(place, snapshot, t);
   return (
     <g aria-hidden className="pointer-events-none">
       <text
@@ -404,6 +407,7 @@ function Caption({ place, snapshot }: { place: IsoNodePlace; snapshot: AppSnapsh
 }
 
 function Edge({ path, particles }: { path: IsoEdgePath; particles: boolean }) {
+  const t = useTranslations("vizRender");
   const color = HEALTH_COLOR[path.health];
   const failing = path.health === "failing";
   const width = failing ? 3 : 2;
@@ -453,7 +457,7 @@ function Edge({ path, particles }: { path: IsoEdgePath; particles: boolean }) {
           className="font-mono"
           fill={color}
         >
-          {Math.round(path.edge.errorRate * 100)}% err
+          {t("jobs.errPct", { pct: Math.round(path.edge.errorRate * 100) })}
         </text>
       )}
     </g>
@@ -467,6 +471,7 @@ export function AppIsometric({
   onSelectNode,
   className,
 }: AppViewProps) {
+  const t = useTranslations("vizRender");
   const layout = React.useMemo(() => layoutAppIso(snapshot), [snapshot]);
   const svgRef = React.useRef<SVGSVGElement>(null);
   const particles = flowParticles && motion === "full";
@@ -478,7 +483,7 @@ export function AppIsometric({
   return (
     <div
       role="group"
-      aria-label={describeApp(snapshot)}
+      aria-label={describeApp(snapshot, t)}
       data-motion={motion}
       className={cn("h-full w-full overflow-hidden", className)}
     >

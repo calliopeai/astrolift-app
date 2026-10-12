@@ -1,11 +1,12 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
 import { EVENT_WINDOW_MS, type FleetCluster, type FleetViewProps } from "../core/fleet-model";
-import { HEALTH_COLOR, HEALTH_GLOWS, HEALTH_LABEL, MOTION_CLASS } from "../core/semantics";
+import { HEALTH_COLOR, HEALTH_GLOWS, MOTION_CLASS } from "../core/semantics";
 import type { LegendItem } from "../core/VizLegend";
 
 import {
@@ -29,14 +30,14 @@ import {
  */
 
 export const FLEET_HEARTBEAT_LEGEND: LegendItem[] = [
-  { glyph: "dot", color: HEALTH_COLOR.ok, label: "Run started or finished" },
-  { glyph: "dot", color: HEALTH_COLOR.failing, label: "Run failed" },
-  { glyph: "ring", color: "var(--foreground)", label: "Run dispatched" },
-  { glyph: "flow", color: "var(--muted-foreground)", label: "Dots drift left and fade over 12s" },
-  { glyph: "glow", color: HEALTH_COLOR.ok, label: "Busy agent: row glows with load" },
-  { glyph: "dot", color: HEALTH_COLOR.degraded, label: "Degraded (overloaded)" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Failing agent" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Idle: row stays dark" },
+  { glyph: "dot", color: HEALTH_COLOR.ok, labelKey: "heartbeatRun" },
+  { glyph: "dot", color: HEALTH_COLOR.failing, labelKey: "heartbeatRunFailed" },
+  { glyph: "ring", color: "var(--foreground)", labelKey: "heartbeatDispatched" },
+  { glyph: "flow", color: "var(--muted-foreground)", labelKey: "heartbeatDrift" },
+  { glyph: "glow", color: HEALTH_COLOR.ok, labelKey: "heartbeatBusy" },
+  { glyph: "dot", color: HEALTH_COLOR.degraded, labelKey: "heartbeatDegraded" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "heartbeatFailing" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "heartbeatIdle" },
 ];
 
 const CLUSTER_COLOR: Record<FleetCluster["health"], string> = {
@@ -90,10 +91,17 @@ function Row({
   selected: boolean;
   onSelect?: (agentId: string) => void;
 }) {
+  const t = useTranslations("vizRender");
   const { agent } = row;
   const glow = HEALTH_GLOWS[agent.health] ? rowGlowPercent(agent) : 0;
   const color = HEALTH_COLOR[agent.health];
-  const label = `${agent.name}: ${HEALTH_LABEL[agent.health]}, ${Math.round(agent.load * 100)}% load, ${agent.activeRuns} running, ${agent.queued} queued`;
+  const label = t("agentSummary", {
+    name: agent.name,
+    health: t(`health.${agent.health}`),
+    load: Math.round(agent.load * 100),
+    running: agent.activeRuns,
+    queued: agent.queued,
+  });
   return (
     <div
       role="button"
@@ -160,6 +168,7 @@ export function FleetHeartbeat({
   selectedAgentId,
   className,
 }: FleetViewProps) {
+  const t = useTranslations("vizRender");
   const rootRef = React.useRef<HTMLDivElement>(null);
   const groups = React.useMemo(() => layoutHeartbeat(snapshot), [snapshot]);
   const hasDots = groups.some((g) => g.rows.some((r) => r.dots.length > 0));
@@ -187,16 +196,16 @@ export function FleetHeartbeat({
     <div
       ref={rootRef}
       role="group"
-      aria-label={summarizeHeartbeat(snapshot)}
+      aria-label={summarizeHeartbeat(snapshot, t)}
       data-motion={motion}
       className={cn("bg-card relative w-full py-2", className)}
     >
       <div className="text-muted-foreground flex h-5 items-center font-mono text-xs">
-        <div className="w-28 shrink-0 px-2 sm:w-40">agent</div>
+        <div className="w-28 shrink-0 px-2 sm:w-40">{t("heartbeat.agent")}</div>
         <div className="relative h-full flex-1">
           <span className="absolute left-1">-{windowS}s</span>
           <span className="absolute left-1/2 -translate-x-1/2">-{windowS / 2}s</span>
-          <span className="absolute right-1">now</span>
+          <span className="absolute right-1">{t("heartbeat.now")}</span>
         </div>
       </div>
       <div className="relative">

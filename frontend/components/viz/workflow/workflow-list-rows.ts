@@ -1,4 +1,5 @@
 import type { Health } from "../core/semantics";
+import type { VizT } from "../core/viz-t";
 import type {
   WorkflowLine,
   WorkflowLoop,
@@ -80,12 +81,6 @@ const KIND: Record<WorkflowStation["kind"], string> = {
   workflow: "Nested workflow",
 };
 
-const PAST: Record<WorkflowLoop["trigger"], string> = {
-  failed: "failed",
-  rejected: "rejected",
-  condition: "met its condition",
-};
-
 function stateOf(station: WorkflowStation, here: WorkflowTrain[], backlog: number): StageStateWord {
   if (here.some((t) => t.state === "failed")) return "Failed";
   if (here.some((t) => t.onLoopId && t.state === "moving")) return "Sending back";
@@ -122,10 +117,17 @@ function furthestRound(line: WorkflowLine, runs: WorkflowTrain[], index: number)
  * of 5". Otherwise the loop and its bound, and where the furthest run inside
  * it stands.
  */
-export function loopWords(line: WorkflowLine, loop: WorkflowLoop, trains: WorkflowTrain[]): string {
-  const from = line.stations[loop.from]?.name ?? "stage";
-  const to = line.stations[loop.to]?.name ?? "stage";
-  const what = loop.condition ?? PAST[loop.trigger];
+export function loopWords(
+  line: WorkflowLine,
+  loop: WorkflowLoop,
+  trains: WorkflowTrain[],
+  vt: VizT
+): string {
+  const from = line.stations[loop.from]?.name ?? vt("loop.stage");
+  const to = line.stations[loop.to]?.name ?? vt("loop.stage");
+  const what = loop.condition
+    ? vt("list.trigger.custom", { stage: from, condition: loop.condition })
+    : vt(`list.trigger.${loop.trigger}`, { stage: from });
   const on = trains.filter((t) => t.onLoopId === loop.id);
   const lead = (ts: WorkflowTrain[]) =>
     ts.reduce<WorkflowTrain | null>(
@@ -135,20 +137,29 @@ export function loopWords(line: WorkflowLine, loop: WorkflowLoop, trains: Workfl
   if (loop.kind === "retry" || loop.from === loop.to) {
     const t = lead(on);
     if (t)
-      return `${from} ${what}, retrying ${from}, attempt ${loopRound(t, loop) + 1} of ${loop.maxRounds}`;
-    return loopLabel(line, loop);
+      return vt("list.retrying", {
+        what,
+        stage: from,
+        n: loopRound(t, loop) + 1,
+        max: loop.maxRounds,
+      });
+    return loopLabel(line, loop, vt);
   }
   const t = lead(on);
-  if (t)
-    return `${from} ${what} goes back to ${to}, round ${loopRound(t, loop) + 1} of ${loop.maxRounds}`;
+  if (t) return vt("list.goesBack", { what, to, n: loopRound(t, loop) + 1, max: loop.maxRounds });
   const inside = lead(
     trains.filter(
       (x) => !x.onLoopId && x.at >= loop.to && x.at <= loop.from && loopRound(x, loop) > 1
     )
   );
-  const base = loopLabel(line, loop);
+  const base = loopLabel(line, loop, vt);
   return inside
-    ? `${base}; ${inside.label} is on round ${loopRound(inside, loop)} of ${loop.maxRounds}`
+    ? vt("list.inside", {
+        base,
+        label: inside.label,
+        n: loopRound(inside, loop),
+        max: loop.maxRounds,
+      })
     : base;
 }
 
@@ -157,26 +168,33 @@ function progressOf(
   station: WorkflowStation,
   here: WorkflowTrain[],
   snapshot: WorkflowSnapshot,
-  lines: Map<string, WorkflowLine>
+  lines: Map<string, WorkflowLine>,
+  vt: VizT
 ): string | null {
   if (station.kind === "fanout") {
     const j = joinReady(station);
-    if (!j.total) return station.dynamic ? "Branches decided per run" : "No branches yet";
-    return `${j.settled} / ${j.total} done${j.failed ? `, ${j.failed} failed` : ""}`;
+    if (!j.total) return station.dynamic ? vt("list.branchesPerRun") : vt("list.noBranches");
+    return (
+      vt("list.done", { settled: j.settled, total: j.total }) +
+      (j.failed ? vt("graph.branchesFailed", { count: j.failed }) : "")
+    );
   }
   if (station.kind === "join") {
     const fan = line.stations[station.waitsOn];
     if (fan?.kind !== "fanout") return null;
     const j = joinReady(fan);
     return j.total
-      ? `Waits on ${j.total} branches, ${j.ready ? "all settled" : `${j.pending} to go`}`
-      : `Waits on ${fan.name}`;
+      ? vt(j.ready ? "list.waitsAllSettled" : "list.waitsToGo", {
+          count: j.total,
+          pending: j.pending,
+        })
+      : vt("list.waitsOn", { name: fan.name });
   }
   if (station.kind === "supervisor") {
     const busy = station.workers.filter((w) => w.busy).length;
     const lead = here.find((t) => t.subtasks)?.subtasks;
-    const tasks = lead ? `${lead.done} / ${lead.total} sub-tasks, ` : "";
-    return `${tasks}${busy} of ${station.workers.length} workers busy`;
+    const workers = vt("station.workersBusy", { busy, count: station.workers.length });
+    return lead ? vt("list.subtasks", { done: lead.done, total: lead.total, workers }) : workers;
   }
   if (station.kind === "workflow") {
     const child = lines.get(station.childLineId);
@@ -184,14 +202,18 @@ function progressOf(
       .map((t) => (t.childRunId ? snapshot.trains.find((c) => c.id === t.childRunId) : undefined))
       .find(Boolean);
     if (!child) return null;
-    if (!run) return `Runs ${child.name}`;
-    return `Child run at ${child.stations[run.at]?.name ?? "start"}, ${run.at + 1} / ${child.stations.length}`;
+    if (!run) return vt("list.runsChild", { name: child.name });
+    return vt("list.childAt", {
+      stage: child.stations[run.at]?.name ?? vt("list.start"),
+      n: run.at + 1,
+      total: child.stations.length,
+    });
   }
   return null;
 }
 
 /** Every stage row and loop row, workflow by workflow; a child line follows its parent. */
-export function workflowRows(snapshot: WorkflowSnapshot): WorkflowRow[] {
+export function workflowRows(snapshot: WorkflowSnapshot, vt: VizT): WorkflowRow[] {
   const lines = new Map(snapshot.lines.map((l) => [l.id, l]));
   const ordered: WorkflowLine[] = [];
   const children = snapshot.lines.filter((l) => l.parent && lines.has(l.parent.lineId));
@@ -226,7 +248,7 @@ export function workflowRows(snapshot: WorkflowSnapshot): WorkflowRow[] {
           : attempt > 1
             ? `${attempt}`
             : null,
-        progress: progressOf(line, station, here, snapshot, lines),
+        progress: progressOf(line, station, here, snapshot, lines, vt),
       });
       for (const loop of loopsAt(line, index)) {
         const on = trains.filter((t) => t.onLoopId === loop.id);
@@ -242,7 +264,7 @@ export function workflowRows(snapshot: WorkflowSnapshot): WorkflowRow[] {
           workflow,
           loop,
           kind: loop.kind === "retry" || loop.to === loop.from ? "Retry" : "Loop",
-          words: loopWords(line, loop, trains),
+          words: loopWords(line, loop, trains, vt),
           state: on.length ? "Sending back" : "Idle",
           runs: on,
           round:

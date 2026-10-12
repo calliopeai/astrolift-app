@@ -1,18 +1,13 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
 import type { FleetCluster, FleetViewProps } from "../core/fleet-model";
 import { isoBox, iso, points, shade } from "../core/iso";
-import {
-  HEALTH_COLOR,
-  HEALTH_GLOWS,
-  HEALTH_LABEL,
-  MOTION_CLASS,
-  type Health,
-} from "../core/semantics";
+import { HEALTH_COLOR, HEALTH_GLOWS, MOTION_CLASS, type Health } from "../core/semantics";
 import type { LegendItem } from "../core/VizLegend";
 
 import {
@@ -42,12 +37,12 @@ import {
  */
 
 export const FLEET_ISOMETRIC_LEGEND: LegendItem[] = [
-  { glyph: "glow", color: HEALTH_COLOR.ok, label: "Healthy (height is load)" },
-  { glyph: "glow", color: HEALTH_COLOR.degraded, label: "Degraded (load over 85%)" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Failing" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Idle (low, dark)" },
-  { glyph: "spark", color: "var(--foreground)", label: "Run started (a still pip when reduced)" },
-  { glyph: "ring", color: HEALTH_COLOR.degraded, label: "Cluster degraded (platform edge)" },
+  { glyph: "glow", color: HEALTH_COLOR.ok, labelKey: "isoHealthy" },
+  { glyph: "glow", color: HEALTH_COLOR.degraded, labelKey: "degradedLoadOver85" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "failing" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "isoIdle" },
+  { glyph: "spark", color: "var(--foreground)", labelKey: "isoRunStarted" },
+  { glyph: "ring", color: HEALTH_COLOR.degraded, labelKey: "isoClusterDegraded" },
 ];
 
 /** Pixels per world unit; the viewBox scales the whole picture to the container. */
@@ -156,6 +151,7 @@ const AgentBox = React.memo(function AgentBox({
   onSelect,
   onPeek,
 }: AgentBoxProps) {
+  const t = useTranslations("vizRender");
   const topRef = React.useRef<SVGPolygonElement>(null);
   const leftRef = React.useRef<SVGPolygonElement>(null);
   const rightRef = React.useRef<SVGPolygonElement>(null);
@@ -194,7 +190,12 @@ const AgentBox = React.memo(function AgentBox({
   const faces = isoBox(x, y, BOX, BOX, height, UNIT);
   const color = topColor(health);
   const failing = health === "failing";
-  const label = `${name}: ${HEALTH_LABEL[health]}, load ${Math.round(load * 100)}%, ${activeRuns} active run${activeRuns === 1 ? "" : "s"}`;
+  const label = t("isoFleet.agent", {
+    name,
+    health: t(`health.${health}`),
+    load: Math.round(load * 100),
+    count: activeRuns,
+  });
 
   return (
     <g
@@ -290,6 +291,7 @@ export function FleetIsometric({
   selectedAgentId,
   className,
 }: FleetViewProps) {
+  const t = useTranslations("vizRender");
   const reduced = motion === "reduced";
   const [animator] = React.useState(createAnimator);
   React.useEffect(() => () => animator.cancel(), [animator]);
@@ -319,7 +321,7 @@ export function FleetIsometric({
     <div
       data-motion={motion}
       role="group"
-      aria-label={fleetAriaLabel(summary)}
+      aria-label={fleetAriaLabel(summary, t)}
       className={cn("relative h-full w-full", className)}
     >
       <svg
@@ -399,7 +401,13 @@ export function FleetIsometric({
                 key={`label-${p.cluster.id}`}
                 transform={`translate(${lx.toFixed(1)} ${ly.toFixed(1)}) rotate(30)`}
               >
-                <title>{`${cluster.name}${cluster.region ? ` (${cluster.region})` : ""}: ${p.boxes.length} agents`}</title>
+                <title>
+                  {t(cluster.region ? "isoFleet.clusterRegion" : "isoFleet.cluster", {
+                    name: cluster.name,
+                    region: cluster.region ?? "",
+                    count: p.boxes.length,
+                  })}
+                </title>
                 <circle
                   cx={3}
                   cy={11}
@@ -440,8 +448,13 @@ export function FleetIsometric({
             </span>
           </div>
           <div className="text-muted-foreground truncate">
-            {HEALTH_LABEL[peek.health]} · load {Math.round(peek.load * 100)}% · {peek.activeRuns}{" "}
-            running · {peek.queued} queued{peekCluster ? ` · ${peekCluster.name}` : ""}
+            {t("isoFleet.peek", {
+              health: t(`health.${peek.health}`),
+              load: Math.round(peek.load * 100),
+              running: peek.activeRuns,
+              queued: peek.queued,
+            })}
+            {peekCluster ? ` · ${peekCluster.name}` : ""}
           </div>
         </div>
       )}

@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -36,6 +37,7 @@ export function Sparkline({
   className,
   ariaLabel,
 }: SparklineProps) {
+  const t = useTranslations("vizRender");
   // Pad so the stroke never clips at the top/bottom edge.
   const pad = strokeWidth;
   const innerH = Math.max(1, height - pad * 2);
@@ -70,7 +72,7 @@ export function Sparkline({
       viewBox={`0 0 ${width} ${height}`}
       className={cn("text-chart-1 overflow-visible", className)}
       role="img"
-      aria-label={ariaLabel ?? "Trend"}
+      aria-label={ariaLabel ?? t("trend")}
       preserveAspectRatio="none"
     >
       {variant === "area" && areaPath && (

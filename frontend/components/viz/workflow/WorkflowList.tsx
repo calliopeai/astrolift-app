@@ -1,6 +1,7 @@
 "use client";
 
 import { WorkflowIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import type { Column } from "@/components/data-table";
@@ -12,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { HEALTH_COLOR, MOTION_CLASS, type Health } from "../core/semantics";
+import type { VizT } from "../core/viz-t";
 import { WORKFLOW_SHAPE_LEGEND, type LegendItem } from "../core/VizLegend";
 import type {
   TrainState,
@@ -42,18 +44,12 @@ import {
  */
 
 export const WORKFLOW_LIST_LEGEND: LegendItem[] = [
-  { glyph: "dot", color: HEALTH_COLOR.ok, label: "Moving" },
-  { glyph: "glow", color: HEALTH_COLOR.degraded, label: "Breathing: held at a gate" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Flicker: failed" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Done" },
-  {
-    ...WORKFLOW_SHAPE_LEGEND.returnTrack,
-    label: "Loop row: where work goes back and its bound, amber while a run is sent back",
-  },
-  {
-    ...WORKFLOW_SHAPE_LEGEND.roundNearBound,
-    label: "Round in amber: one round from the bound; past it the run fails",
-  },
+  { glyph: "dot", color: HEALTH_COLOR.ok, labelKey: "listMoving" },
+  { glyph: "glow", color: HEALTH_COLOR.degraded, labelKey: "listBreathing" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "listFlicker" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "listDone" },
+  { ...WORKFLOW_SHAPE_LEGEND.returnTrack, labelKey: "listLoopRow" },
+  { ...WORKFLOW_SHAPE_LEGEND.roundNearBound, labelKey: "listRoundAmber" },
 ];
 
 const STATE_HEALTH: Record<TrainState, Health> = {
@@ -63,15 +59,29 @@ const STATE_HEALTH: Record<TrainState, Health> = {
   done: "idle",
 };
 
-const STATE_LABEL: Record<TrainState, string> = {
-  moving: "Moving",
-  held: "Held",
-  failed: "Failed",
-  done: "Done",
+/** A stage row's state word as its key under `vizRender.list.stageState`. */
+const STAGE_STATE_KEY: Record<StageStateWord, string> = {
+  Failed: "failed",
+  "Sending back": "sendingBack",
+  Held: "held",
+  "Waiting for approval": "waitingApproval",
+  "Backed up": "backedUp",
+  Running: "running",
+  Finished: "finished",
+  Idle: "idle",
 };
 
-const NOT_PERSONAL =
-  "Workflow stages and runs are the workflow's, not a person's, so Mine is empty.";
+/** A row's kind as its key under `vizRender.list.kind`. */
+const KIND_KEY: Record<string, string> = {
+  Stage: "stage",
+  Gate: "gate",
+  "Fan-out": "fanout",
+  Join: "join",
+  Supervisor: "supervisor",
+  "Nested workflow": "workflow",
+  Loop: "loop",
+  Retry: "retry",
+};
 
 const STAGE_STATES: StageStateWord[] = [
   "Failed",
@@ -90,7 +100,7 @@ export const WORKFLOW_STAGES_LIST: ListDefinition = {
     {
       key: "state",
       label: "State",
-      options: STAGE_STATES.map((w) => ({ value: w, label: w.toLowerCase() })),
+      options: STAGE_STATES.map((w) => ({ value: w, label: w })),
     },
     {
       key: "kind",
@@ -104,13 +114,13 @@ export const WORKFLOW_STAGES_LIST: ListDefinition = {
         "Nested workflow",
         "Loop",
         "Retry",
-      ].map((k) => ({ value: k, label: k.toLowerCase() })),
+      ].map((k) => ({ value: k, label: k })),
     },
   ],
-  searchPlaceholder: "Search stages, workflows, loops…",
+  searchPlaceholder: "",
   // The snapshot's order: stages in line order, each loop after the stage it leaves.
   defaultSort: [{ key: "order", dir: "asc" }],
-  views: standardViews({ owner: "me" }, [], { mineNote: NOT_PERSONAL }),
+  views: standardViews({ owner: "me" }, [], { mineNote: "" }),
   paging: "numbered",
   pageSizes: [25, 50, 100],
 };
@@ -124,15 +134,15 @@ export const WORKFLOW_RUNS_LIST: ListDefinition = {
       key: "state",
       label: "State",
       options: [
-        ...TRAIN_STATES.map((t) => ({ value: t, label: STATE_LABEL[t].toLowerCase() })),
-        { value: "sent", label: "sent back" },
+        ...TRAIN_STATES.map((t) => ({ value: t, label: t })),
+        { value: "sent", label: "sent" },
       ],
     },
   ],
-  searchPlaceholder: "Search runs, workflows, stations…",
+  searchPlaceholder: "",
   // The snapshot's order.
   defaultSort: [{ key: "order", dir: "asc" }],
-  views: standardViews({ owner: "me" }, [], { mineNote: NOT_PERSONAL }),
+  views: standardViews({ owner: "me" }, [], { mineNote: "" }),
   paging: "numbered",
   pageSizes: [25, 50, 100],
 };
@@ -140,37 +150,78 @@ export const WORKFLOW_RUNS_LIST: ListDefinition = {
 type Showing = "stages" | "runs";
 
 /** Only waiting breathes and only failure flickers; every other state holds still. */
+/** A run state's word, for the motion a state dot carries. */
+const TRAIN_WORD: Record<TrainState, string> = {
+  moving: "Moving",
+  held: "Held",
+  failed: "Failed",
+  done: "Done",
+};
+
 const WORD_MOTION: Record<string, string> = {
   Held: MOTION_CLASS.breathe,
   "Waiting for approval": MOTION_CLASS.breathe,
   Failed: MOTION_CLASS.flicker,
 };
 
-function formatAge(ms: number): string {
-  const s = Math.max(0, Math.round(ms / 1000));
-  if (s < 60) return `${s}s ago`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m ago`;
-  return `${Math.floor(m / 60)}h ${m % 60}m ago`;
+/** Localize the two list declarations: search, field and option labels, views. */
+function localizeList(def: ListDefinition, list: "stages" | "runs", vt: VizT): ListDefinition {
+  return {
+    ...def,
+    searchPlaceholder: vt(`list.${list}.search`),
+    fields: def.fields.map((field) => ({
+      ...field,
+      label: vt(`list.fields.${field.key}`),
+      options: field.options?.map((o) => ({
+        ...o,
+        label:
+          field.key === "kind"
+            ? vt(`list.kindInline.${KIND_KEY[o.value]}`)
+            : list === "stages"
+              ? vt(`list.stageStateInline.${STAGE_STATE_KEY[o.value as StageStateWord]}`)
+              : vt(`list.trainStateInline.${o.value}`),
+      })),
+    })),
+    views: def.views.map((view) => ({
+      ...view,
+      label: vt(`list.views.${view.key}`),
+      note: view.note === undefined ? undefined : vt("list.mineNote"),
+    })),
+  };
 }
 
-function summarize(trains: WorkflowTrain[], lines: number): string {
+function formatAge(ms: number, vt: VizT): string {
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 60) return vt("list.agoSeconds", { s });
+  const m = Math.floor(s / 60);
+  if (m < 60) return vt("list.agoMinutes", { m });
+  return vt("list.agoHours", { h: Math.floor(m / 60), m: m % 60 });
+}
+
+function summarize(trains: WorkflowTrain[], lines: number, vt: VizT): string {
   const count = (s: TrainState) => trains.filter((t) => t.state === s).length;
   const sent = trains.filter((t) => t.onLoopId).length;
   return (
-    `${lines} ${lines === 1 ? "workflow" : "workflows"}, ${trains.length} ${trains.length === 1 ? "run" : "runs"}: ${count("moving")} moving, ` +
-    `${count("held")} held at gates, ${count("failed")} failed, ${count("done")} done` +
-    (sent ? `, ${sent} sent back along a loop` : "")
+    vt("list.summary", {
+      head: vt("frame.workflowsDescription", { workflows: lines, runs: trains.length }),
+      moving: count("moving"),
+      held: count("held"),
+      failed: count("failed"),
+      done: count("done"),
+    }) + (sent ? vt("list.summarySent", { count: sent }) : "")
   );
 }
 
 function StateDot({
   health,
   word,
+  label,
   motion,
 }: {
   health: Health;
   word: string;
+  /** What the dot says; `word` picks its motion. */
+  label: string;
   motion: "full" | "reduced";
 }) {
   return (
@@ -180,30 +231,32 @@ function StateDot({
         className={cn("size-2 shrink-0 rounded-full", motion === "full" && WORD_MOTION[word])}
         style={{ background: HEALTH_COLOR[health] }}
       />
-      <span className="text-xs">{word}</span>
+      <span className="text-xs">{label}</span>
     </span>
   );
 }
 
 function Count({ value, near }: { value: string | null; near?: boolean }) {
-  if (!value) return <span className="sr-only">none</span>;
+  const vt = useTranslations("vizRender");
+  if (!value) return <span className="sr-only">{vt("list.none")}</span>;
   return (
     <span
       className="font-mono text-xs tabular-nums"
       style={near ? { color: HEALTH_COLOR.degraded } : undefined}
     >
       {value}
-      {near && <span className="sr-only">, one round from the bound</span>}
+      {near && <span className="sr-only">{vt("list.nearBound")}</span>}
     </span>
   );
 }
 
 /** "Sent back to Code" for a run on a return track, else the station it is at. */
-function where(line: WorkflowLine | undefined, t: WorkflowTrain): string {
+function where(line: WorkflowLine | undefined, t: WorkflowTrain, vt: VizT, inline = false): string {
   const loop = t.onLoopId ? line?.loops?.find((l) => l.id === t.onLoopId) : undefined;
   if (loop && line) {
-    const to = line.stations[loop.to]?.name ?? "stage";
-    return loop.kind === "retry" ? `Retrying ${to}` : `Sent back to ${to}`;
+    const to = line.stations[loop.to]?.name ?? vt("loop.stage");
+    const group = inline ? "list.whereInline" : "list.where";
+    return vt(`${group}.${loop.kind === "retry" ? "retrying" : "sentBack"}`, { stage: to });
   }
   return line?.stations[t.at]?.name ?? `#${t.at}`;
 }
@@ -246,10 +299,13 @@ export function WorkflowList({
     () => new Map(snapshot.lines.map((l) => [l.id, l])),
     [snapshot.lines]
   );
-  const rows = React.useMemo(() => workflowRows(snapshot), [snapshot]);
+  const vt = useTranslations("vizRender");
+  const rows = React.useMemo(() => workflowRows(snapshot, vt), [snapshot, vt]);
   const [showing, setShowing] = React.useState<Showing>("stages");
-  const stageList = useLocalListState(WORKFLOW_STAGES_LIST);
-  const runList = useLocalListState(WORKFLOW_RUNS_LIST);
+  const stagesDef = React.useMemo(() => localizeList(WORKFLOW_STAGES_LIST, "stages", vt), [vt]);
+  const runsDef = React.useMemo(() => localizeList(WORKFLOW_RUNS_LIST, "runs", vt), [vt]);
+  const stageList = useLocalListState(stagesDef);
+  const runList = useLocalListState(runsDef);
 
   const stageSelect = React.useMemo<SelectRowsSpec<WorkflowRow>>(() => {
     const order = new Map(rows.map((r, i) => [`${r.type}:${r.id}`, i]));
@@ -278,7 +334,11 @@ export function WorkflowList({
         state: (t, v) =>
           v === "sent" ? Boolean(t.onLoopId) && t.state === "moving" : t.state === v,
       },
-      text: (t) => [t.label, lines.get(t.lineId)?.name ?? t.lineId, where(lines.get(t.lineId), t)],
+      text: (t) => [
+        t.label,
+        lines.get(t.lineId)?.name ?? t.lineId,
+        where(lines.get(t.lineId), t, vt),
+      ],
       sort: {
         order: (t) => order.get(t.id) ?? 0,
         run: (t) => t.label.toLowerCase(),
@@ -288,7 +348,7 @@ export function WorkflowList({
       },
       id: (t) => t.id,
     };
-  }, [snapshot.trains, lines]);
+  }, [snapshot.trains, lines, vt]);
 
   const stationOf = (r: WorkflowRow) =>
     r.type === "stage" ? r.station : r.line.stations[r.loop.from];
@@ -300,23 +360,33 @@ export function WorkflowList({
           else if (r.runs[0]) onSelectRun?.(r.runs[0].id);
         }
       : undefined;
+  // "2 / 5" reads as "round 2 of 5"; a lone "3" as "round 3".
+  const ofBound = (text: string, of: string, alone: string) => {
+    const [n, max] = text.split(" / ");
+    return max === undefined ? vt(alone, { n }) : vt(of, { n, max });
+  };
+  const stateInline = (r: WorkflowRow) => vt(`list.stageStateInline.${STAGE_STATE_KEY[r.state]}`);
   const stageLabel = (r: WorkflowRow) =>
     r.type === "loop"
-      ? `${r.workflow}: ${r.words}, ${r.state.toLowerCase()}`
+      ? vt("list.loopLabel", { workflow: r.workflow, words: r.words, state: stateInline(r) })
       : [
-          `${r.station.name}, ${r.kind.toLowerCase()} in ${r.workflow}`,
-          r.round ? `round ${r.round.text.replace(" / ", " of ")}` : null,
-          r.attempts ? `attempt ${r.attempts.replace(" / ", " of ")}` : null,
+          vt("list.stageLabel", {
+            name: r.station.name,
+            kind: vt(`list.kindInline.${KIND_KEY[r.kind]}`),
+            workflow: r.workflow,
+          }),
+          r.round ? ofBound(r.round.text, "loop.roundOf", "run.round") : null,
+          r.attempts ? ofBound(r.attempts, "loop.attemptOf", "list.attempt") : null,
           r.progress,
-          r.state.toLowerCase(),
+          stateInline(r),
         ]
           .filter(Boolean)
-          .join(", ");
+          .join(vt("listSeparator"));
 
   const stageColumns: Column<WorkflowRow>[] = [
     {
       id: "stage",
-      header: "Stage",
+      header: vt("list.columns.stage"),
       cell: (r) => (
         <RowButton label={stageLabel(r)} onActivate={activateStage && (() => activateStage(r))}>
           {r.type === "loop" ? (
@@ -338,7 +408,7 @@ export function WorkflowList({
     },
     {
       id: "workflow",
-      header: "Workflow",
+      header: vt("list.columns.workflow"),
       sortKey: "workflow",
       cell: (r) => (
         <span title={r.workflow} className="text-muted-foreground block max-w-40 truncate text-xs">
@@ -348,43 +418,52 @@ export function WorkflowList({
     },
     {
       id: "kind",
-      header: "Kind",
+      header: vt("list.columns.kind"),
       sortKey: "kind",
       width: "w-28",
-      cell: (r) => <span className="text-muted-foreground text-xs">{r.kind}</span>,
+      cell: (r) => (
+        <span className="text-muted-foreground text-xs">{vt(`list.kind.${KIND_KEY[r.kind]}`)}</span>
+      ),
     },
     {
       id: "state",
-      header: "State",
+      header: vt("list.columns.state"),
       sortKey: "state",
       width: "w-40",
-      cell: (r) => <StateDot health={STATE_WORD_HEALTH[r.state]} word={r.state} motion={motion} />,
+      cell: (r) => (
+        <StateDot
+          health={STATE_WORD_HEALTH[r.state]}
+          word={r.state}
+          label={vt(`list.stageState.${STAGE_STATE_KEY[r.state]}`)}
+          motion={motion}
+        />
+      ),
     },
     {
       id: "round",
-      header: "Round",
+      header: vt("list.columns.round"),
       width: "w-20",
       cell: (r) => <Count value={r.round?.text ?? null} near={r.round?.near} />,
     },
     {
       id: "attempts",
-      header: "Attempts",
+      header: vt("list.columns.attempts"),
       width: "w-20",
       cell: (r) => <Count value={r.type === "stage" ? r.attempts : null} />,
     },
     {
       id: "progress",
-      header: "Progress",
+      header: vt("list.columns.progress"),
       cell: (r) =>
         r.type === "stage" && r.progress ? (
           <span className="font-mono text-xs tabular-nums">{r.progress}</span>
         ) : (
-          <span className="sr-only">none</span>
+          <span className="sr-only">{vt("list.none")}</span>
         ),
     },
     {
       id: "runs",
-      header: "Runs",
+      header: vt("list.columns.runs"),
       width: "w-32",
       cell: (r) =>
         r.runs.length ? (
@@ -402,18 +481,20 @@ export function WorkflowList({
 
   const runLabel = (t: WorkflowTrain) => {
     const line = lines.get(t.lineId);
-    const r = line ? runRound(line, t) : null;
+    const r = line ? runRound(line, t, vt) : null;
     const state =
       t.onLoopId && t.state === "moving"
-        ? where(line, t).toLowerCase()
-        : STATE_LABEL[t.state].toLowerCase();
-    return [t.label, line?.name ?? t.lineId, r?.text, state].filter(Boolean).join(", ");
+        ? where(line, t, vt, true)
+        : vt(`list.trainStateInline.${t.state}`);
+    return [t.label, line?.name ?? t.lineId, r?.text, state]
+      .filter(Boolean)
+      .join(vt("listSeparator"));
   };
 
   const runColumns: Column<WorkflowTrain>[] = [
     {
       id: "run",
-      header: "Run",
+      header: vt("list.columns.run"),
       sortKey: "run",
       width: "w-24",
       cell: (t) => (
@@ -426,7 +507,7 @@ export function WorkflowList({
     },
     {
       id: "line",
-      header: "Workflow",
+      header: vt("list.columns.workflow"),
       sortKey: "line",
       cell: (t) => {
         const name = lines.get(t.lineId)?.name ?? t.lineId;
@@ -439,11 +520,11 @@ export function WorkflowList({
     },
     {
       id: "station",
-      header: "Station",
+      header: vt("list.columns.station"),
       cell: (t) => {
         const line = lines.get(t.lineId);
         const station = line?.stations[t.at];
-        const name = where(line, t);
+        const name = where(line, t, vt);
         const last = line ? line.stations.length - 1 : t.at;
         return (
           <span className="flex items-center gap-2 text-xs">
@@ -458,7 +539,9 @@ export function WorkflowList({
               {t.at + 1}/{last + 1}
             </span>
             {station?.kind === "gate" && (
-              <span className="text-muted-foreground text-2xs uppercase">gate</span>
+              <span className="text-muted-foreground text-2xs uppercase">
+                {vt("list.kindInline.gate")}
+              </span>
             )}
           </span>
         );
@@ -466,35 +549,45 @@ export function WorkflowList({
     },
     {
       id: "round",
-      header: "Round",
+      header: vt("list.columns.round"),
       width: "w-28",
       cell: (t) => {
         const line = lines.get(t.lineId);
-        const r = line ? runRound(line, t) : null;
+        const r = line ? runRound(line, t, vt) : null;
         return <Count value={r ? r.text : null} near={r?.near} />;
       },
     },
     {
       id: "state",
-      header: "State",
+      header: vt("list.columns.state"),
       sortKey: "state",
       width: "w-28",
       cell: (t) =>
         t.onLoopId && t.state === "moving" ? (
-          <StateDot health="degraded" word="Sent back" motion={motion} />
+          <StateDot
+            health="degraded"
+            word="Sent back"
+            label={vt("list.trainState.sent")}
+            motion={motion}
+          />
         ) : (
-          <StateDot health={STATE_HEALTH[t.state]} word={STATE_LABEL[t.state]} motion={motion} />
+          <StateDot
+            health={STATE_HEALTH[t.state]}
+            word={TRAIN_WORD[t.state]}
+            label={vt(`list.trainState.${t.state}`)}
+            motion={motion}
+          />
         ),
     },
     {
       id: "started",
-      header: "Started",
+      header: vt("list.columns.started"),
       sortKey: "started",
       width: "w-28",
       align: "right",
       cell: (t) => (
         <span className="text-muted-foreground font-mono text-xs tabular-nums">
-          {formatAge(snapshot.now - t.startedAt)}
+          {formatAge(snapshot.now - t.startedAt, vt)}
         </span>
       ),
     },
@@ -505,20 +598,20 @@ export function WorkflowList({
     // buttons from assistive tech.
     <div
       role="group"
-      aria-label={summarize(snapshot.trains, snapshot.lines.length)}
+      aria-label={summarize(snapshot.trains, snapshot.lines.length, vt)}
       data-motion={motion}
       className={cn("flex flex-col gap-4", className)}
     >
       {/* One list at a time (one list per screen): stages or runs. */}
       <div
         role="radiogroup"
-        aria-label="Show"
+        aria-label={vt("list.show")}
         className="bg-muted/50 flex w-fit flex-wrap rounded-md p-0.5"
       >
         {(
           [
-            ["stages", `Stages (${rows.length})`],
-            ["runs", `Runs (${snapshot.trains.length})`],
+            ["stages", vt("list.stagesCount", { count: rows.length })],
+            ["runs", vt("list.runsCount", { count: snapshot.trains.length })],
           ] as const
         ).map(([key, label]) => (
           <Button
@@ -538,21 +631,21 @@ export function WorkflowList({
       {showing === "stages" ? (
         <EmbeddedList
           list={stageList}
-          label="Stages"
+          label={vt("list.stagesLabel")}
           columns={stageColumns}
           all={rows}
           select={stageSelect}
-          empty="No workflows"
+          empty={vt("list.noWorkflows")}
           activatable={Boolean(activateStage)}
         />
       ) : (
         <EmbeddedList
           list={runList}
-          label="Runs"
+          label={vt("list.runsLabel")}
           columns={runColumns}
           all={snapshot.trains}
           select={runSelect}
-          empty="No runs on any workflow"
+          empty={vt("list.noRuns")}
           activatable={Boolean(onSelectRun)}
         />
       )}

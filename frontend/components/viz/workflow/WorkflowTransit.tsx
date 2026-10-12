@@ -1,10 +1,12 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
 import { HEALTH_COLOR, MOTION_CLASS, flowDuration } from "../core/semantics";
+import type { VizT } from "../core/viz-t";
 import { WORKFLOW_SHAPE_LEGEND, type LegendItem } from "../core/VizLegend";
 import type {
   FanoutBranch,
@@ -65,44 +67,23 @@ import {
  */
 
 export const WORKFLOW_TRANSIT_LEGEND: LegendItem[] = [
-  { glyph: "dot", color: HEALTH_COLOR.ok, label: "Run moving (a train)" },
-  { glyph: "ring", color: HEALTH_COLOR.ok, label: "Run held at a gate, breathing" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Run failed, stopped" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Run done, fades at the terminus" },
-  { glyph: "signal", color: HEALTH_COLOR.failing, label: "Gate holding a run" },
-  { glyph: "signal", color: HEALTH_COLOR.ok, label: "Gate clear" },
-  {
-    glyph: "flow",
-    color: HEALTH_COLOR.ok,
-    label: "Throughput: particle density and speed, line thickness",
-  },
-  { glyph: "flow", color: HEALTH_COLOR.degraded, label: "Backlog over 3 runs" },
-  {
-    ...WORKFLOW_SHAPE_LEGEND.returnTrack,
-    label:
-      "Return track over the line: a loop back, with its trigger and bound; lit while a run rides it",
-  },
-  {
-    ...WORKFLOW_SHAPE_LEGEND.returnTrack,
-    label: "Small loop over one station: a retry, with its attempt bound",
-  },
-  { ...WORKFLOW_SHAPE_LEGEND.roundBadge, label: "Round badge: round a run is on, of the bound" },
+  { glyph: "dot", color: HEALTH_COLOR.ok, labelKey: "trMoving" },
+  { glyph: "ring", color: HEALTH_COLOR.ok, labelKey: "trHeld" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "trFailed" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "trDone" },
+  { glyph: "signal", color: HEALTH_COLOR.failing, labelKey: "trGateHolding" },
+  { glyph: "signal", color: HEALTH_COLOR.ok, labelKey: "trGateClear" },
+  { glyph: "flow", color: HEALTH_COLOR.ok, labelKey: "trThroughput" },
+  { glyph: "flow", color: HEALTH_COLOR.degraded, labelKey: "trBacklog" },
+  { ...WORKFLOW_SHAPE_LEGEND.returnTrack, labelKey: "trReturnTrack" },
+  { ...WORKFLOW_SHAPE_LEGEND.returnTrack, labelKey: "trSmallLoop" },
+  { ...WORKFLOW_SHAPE_LEGEND.roundBadge, labelKey: "trRoundBadge" },
   WORKFLOW_SHAPE_LEGEND.roundNearBound,
-  {
-    glyph: "siding",
-    color: HEALTH_COLOR.ok,
-    label: "Siding: one parallel branch; its car lit while running, at the join once settled",
-  },
-  { glyph: "dot", color: HEALTH_COLOR.failing, label: "Branch failed (settled, in red)" },
-  { ...WORKFLOW_SHAPE_LEGEND.join, label: "Join: glows once every branch has arrived" },
-  {
-    ...WORKFLOW_SHAPE_LEGEND.supervisorSwarm,
-    label: "Supervisor swarm: busy workers lit on tendrils, circling as fast as they are loaded",
-  },
-  {
-    ...WORKFLOW_SHAPE_LEGEND.nestedStack,
-    label: "Stacked station: a child workflow; open it to see its line",
-  },
+  { glyph: "siding", color: HEALTH_COLOR.ok, labelKey: "trSiding" },
+  { glyph: "dot", color: HEALTH_COLOR.failing, labelKey: "trBranchFailed" },
+  { ...WORKFLOW_SHAPE_LEGEND.join, labelKey: "trJoin" },
+  { ...WORKFLOW_SHAPE_LEGEND.supervisorSwarm, labelKey: "trSwarm" },
+  { ...WORKFLOW_SHAPE_LEGEND.nestedStack, labelKey: "trStacked" },
 ];
 
 /** Tween length; shorter than a snapshot interval so trains settle before the next. */
@@ -136,13 +117,6 @@ function onActivate(fn: () => void) {
   };
 }
 
-const TRAIN_WORD: Record<WorkflowTrain["state"], string> = {
-  moving: "moving",
-  held: "held",
-  failed: "failed",
-  done: "done",
-};
-
 function trainColor(state: WorkflowTrain["state"]): string {
   if (state === "failed") return HEALTH_COLOR.failing;
   if (state === "done") return HEALTH_COLOR.idle;
@@ -161,28 +135,34 @@ const FOCUS_RING =
 const FOCUS = `cursor-pointer ${FOCUS_RING}`;
 
 /** A run's round and loop state in words, for its accessible name. */
-function trainShapeWords(t: WorkflowTrain, line: WorkflowLine): string {
+function trainShapeWords(t: WorkflowTrain, line: WorkflowLine, vt: VizT): string {
   const parts: string[] = [];
   if (t.onLoopId) {
     const loop = line.loops?.find((l) => l.id === t.onLoopId);
     if (loop) {
-      const from = line.stations[loop.from]?.name ?? "stage";
-      const to = line.stations[loop.to]?.name ?? "stage";
+      const from = line.stations[loop.from]?.name ?? vt("loop.stage");
+      const to = line.stations[loop.to]?.name ?? vt("loop.stage");
       const next = loopRound(t, loop) + 1;
       parts.push(
         loop.kind === "retry"
-          ? `retrying ${from}, attempt ${next} of ${loop.maxRounds} next`
-          : `sent back to ${to} because ${from} ${loop.trigger === "rejected" ? "was rejected" : loop.trigger === "failed" ? "failed" : "met its condition"}, round ${next} of ${loop.maxRounds} next`
+          ? vt("transit.retryingNext", { stage: from, n: next, max: loop.maxRounds })
+          : vt(`transit.sentBackNext.${loop.trigger}`, {
+              to,
+              from,
+              n: next,
+              max: loop.maxRounds,
+            })
       );
     }
   } else {
     for (const loop of loopsAt(line, t.at)) {
-      if (loopRound(t, loop) > 1) parts.push(roundLabel(t, loop));
+      if (loopRound(t, loop) > 1) parts.push(roundLabel(t, loop, vt));
     }
   }
-  if ((t.round ?? 1) > 1) parts.unshift(`round ${t.round} overall`);
-  if (t.subtasks) parts.push(`${t.subtasks.done} of ${t.subtasks.total} sub-tasks done`);
-  return parts.length ? `, ${parts.join(", ")}` : "";
+  if ((t.round ?? 1) > 1) parts.unshift(vt("transit.roundOverall", { n: t.round ?? 1 }));
+  if (t.subtasks)
+    parts.push(vt("graph.subtasksDone", { done: t.subtasks.done, total: t.subtasks.total }));
+  return parts.length ? `${vt("listSeparator")}${parts.join(vt("listSeparator"))}` : "";
 }
 
 export interface WorkflowTransitProps extends WorkflowViewProps {
@@ -199,12 +179,13 @@ export function WorkflowTransit({
   className,
   defaultExpanded,
 }: WorkflowTransitProps) {
+  const vt = useTranslations("vizRender");
   const [expanded, setExpanded] = React.useState<ReadonlySet<string>>(
     () => new Set(defaultExpanded ?? [])
   );
   const layout = React.useMemo(
-    () => layoutTransit(snapshot.lines, expanded),
-    [snapshot.lines, expanded]
+    () => layoutTransit(snapshot.lines, vt, expanded),
+    [snapshot.lines, vt, expanded]
   );
   const geomById = React.useMemo(() => new Map(layout.lines.map((l) => [l.id, l])), [layout]);
   const lineById = React.useMemo(
@@ -353,11 +334,15 @@ export function WorkflowTransit({
   const backedUp = snapshot.segments.filter((s) => s.backlog > BACKLOG_WARN).length;
   const topLevel = snapshot.lines.filter((l) => !l.parent).length;
   const summary =
-    `${topLevel} ${topLevel === 1 ? "workflow" : "workflows"}, ${snapshot.trains.length} ${snapshot.trains.length === 1 ? "run" : "runs"}: ` +
-    `${counts.moving} moving, ${counts.held} held, ${counts.failed} failed, ` +
-    `${counts.done} done` +
-    (sentBack ? `, ${sentBack} sent back on a loop` : "") +
-    (backedUp ? `, ${backedUp} ${backedUp === 1 ? "segment" : "segments"} backed up` : "");
+    vt("transit.summary", {
+      head: vt("frame.workflowsDescription", { workflows: topLevel, runs: snapshot.trains.length }),
+      moving: counts.moving,
+      held: counts.held,
+      failed: counts.failed,
+      done: counts.done,
+    }) +
+    (sentBack ? vt("transit.sentBackOnLoop", { count: sentBack }) : "") +
+    (backedUp ? vt("transit.segmentsBackedUp", { count: backedUp }) : "");
 
   return (
     <div role="group" aria-label={summary} data-motion={motion} className={cn("w-full", className)}>
@@ -436,7 +421,7 @@ export function WorkflowTransit({
                 <ReturnTrack
                   key={lg.id}
                   geom={lg}
-                  full={loopLabel(line, line.loops!.find((l) => l.id === lg.id)!)}
+                  full={loopLabel(line, line.loops!.find((l) => l.id === lg.id)!, vt)}
                   active={lineTrains.some((t) => t.onLoopId === lg.id)}
                 />
               ))}
@@ -474,7 +459,7 @@ export function WorkflowTransit({
                   if (nested) toggle(st.id);
                   onSelectStation?.(line.id, st.id);
                 };
-                const label = stationLabel({
+                const label = stationLabel(vt, {
                   line,
                   station: st,
                   index: j,
@@ -521,7 +506,7 @@ export function WorkflowTransit({
                         className="fill-muted-foreground font-mono"
                         fontSize={10}
                       >
-                        {done} done
+                        {vt("transit.done", { count: done })}
                       </text>
                     )}
                   </g>
@@ -543,7 +528,9 @@ export function WorkflowTransit({
               : t.state === "failed"
                 ? MOTION_CLASS.flicker
                 : undefined;
-          const label = `Run ${t.label} on ${line.name}, ${TRAIN_WORD[t.state]} at ${station}${trainShapeWords(t, line)}`;
+          const label =
+            vt(`transit.trainLabel.${t.state}`, { label: t.label, line: line.name, station }) +
+            trainShapeWords(t, line, vt);
           return (
             <g
               key={t.id}
@@ -615,66 +602,74 @@ function BackLink({
   child: string;
   onBack: () => void;
 }) {
+  const vt = useTranslations("vizRender");
   return (
     <text
       x={at.x}
       y={at.y}
       role="button"
       tabIndex={0}
-      aria-label={`Back to ${parent}: close ${child}`}
+      aria-label={vt("transit.backClose", { parent, child })}
       className={cn("fill-muted-foreground font-mono underline", FOCUS)}
       fontSize={10}
       onClick={onBack}
       onKeyDown={onActivate(onBack)}
     >
-      <title>{`Back to ${parent}`}</title>
-      {truncate(`back to ${parent}`, 20)}
+      <title>{vt("transit.backTo", { parent })}</title>
+      {truncate(vt("transit.backToInline", { parent }), 20)}
     </text>
   );
 }
 
 /** A station's accessible name: what it is and its state, in words. */
-function stationLabel({
-  line,
-  station: st,
-  index,
-  held,
-  round,
-  trains,
-  trainById,
-  lineById,
-  open,
-}: {
-  line: WorkflowLine;
-  station: WorkflowStation;
-  index: number;
-  held: boolean;
-  round?: StationRound;
-  trains: WorkflowTrain[];
-  trainById: Map<string, WorkflowTrain>;
-  lineById: Map<string, WorkflowLine>;
-  open: boolean;
-}): string {
-  const parts = [`${line.name}: ${st.name}`];
+function stationLabel(
+  vt: VizT,
+  {
+    line,
+    station: st,
+    index,
+    held,
+    round,
+    trains,
+    trainById,
+    lineById,
+    open,
+  }: {
+    line: WorkflowLine;
+    station: WorkflowStation;
+    index: number;
+    held: boolean;
+    round?: StationRound;
+    trains: WorkflowTrain[];
+    trainById: Map<string, WorkflowTrain>;
+    lineById: Map<string, WorkflowLine>;
+    open: boolean;
+  }
+): string {
+  const parts = [vt("transit.stationName", { line: line.name, station: st.name })];
   if (round)
     parts.push(
-      `${round.loop.kind === "retry" ? "attempt" : "round"} ${round.round} of ${round.loop.maxRounds}${round.near ? ", near the bound" : ""}`
+      vt(round.loop.kind === "retry" ? "loop.attemptOf" : "loop.roundOf", {
+        n: round.round,
+        max: round.loop.maxRounds,
+      }) + (round.near ? vt("transit.nearBound") : "")
     );
   const here = trains.filter((t) => t.at === index && !t.onLoopId);
-  if (here.some((t) => t.state === "failed")) parts.push("failed");
-  if (st.kind === "gate") parts.push(held ? "gate holding a run" : "gate clear");
+  if (here.some((t) => t.state === "failed")) parts.push(vt("run.failed"));
+  if (st.kind === "gate") parts.push(held ? vt("transit.gateHolding") : vt("transit.gateClear"));
   if (st.kind === "fanout") {
     const r = joinReady(st);
     if (!st.runId)
-      parts.push(
-        st.dynamic ? "parallel branches, count set per run, idle" : "parallel branches, idle"
-      );
+      parts.push(st.dynamic ? vt("transit.parallelPerRun") : vt("transit.parallelIdle"));
     else {
       const straggler = st.branches.filter((b) => b.state === "running" || b.state === "queued");
       parts.push(
-        `${r.settled} of ${r.total} branches settled${r.failed ? `, ${r.failed} failed` : ""}` +
+        vt("transit.branchesSettled", { settled: r.settled, total: r.total }) +
+          (r.failed ? vt("graph.branchesFailed", { count: r.failed }) : "") +
           (straggler.length && straggler.length <= 2
-            ? `, waiting on ${straggler.map((b) => b.label).join(" and ")}`
+            ? vt("transit.waitingOn", {
+                names: straggler.map((b) => b.label).join(vt("transit.and")),
+              })
             : "")
       );
     }
@@ -683,24 +678,32 @@ function stationLabel({
     const fan = line.stations[st.waitsOn];
     if (fan?.kind === "fanout" && fan.runId) {
       const r = joinReady(fan);
-      parts.push(r.ready ? "join ready" : `join waiting on ${r.pending} of ${r.total} branches`);
-    } else if (here.some((t) => t.state === "moving")) parts.push("merging");
+      parts.push(
+        r.ready
+          ? vt("transit.joinReady")
+          : vt("transit.joinWaiting", { pending: r.pending, total: r.total })
+      );
+    } else if (here.some((t) => t.state === "moving")) parts.push(vt("transit.merging"));
   }
   if (st.kind === "supervisor") {
     const busy = st.workers.filter((w) => w.busy).length;
-    parts.push(`supervisor, ${busy} of ${st.workers.length} workers busy`);
+    parts.push(vt("transit.supervisor", { busy, count: st.workers.length }));
     const sub = here.find((t) => t.subtasks);
-    if (sub?.subtasks) parts.push(`${sub.subtasks.done} of ${sub.subtasks.total} sub-tasks done`);
+    if (sub?.subtasks)
+      parts.push(vt("graph.subtasksDone", { done: sub.subtasks.done, total: sub.subtasks.total }));
   }
   if (st.kind === "workflow") {
     const child = lineById.get(st.childLineId);
-    parts.push(`child workflow ${child?.name ?? ""}`.trim());
+    parts.push(
+      child ? vt("transit.childWorkflow", { name: child.name }) : vt("transit.childWorkflowBare")
+    );
     const run = here.map((t) => t.childRunId && trainById.get(t.childRunId)).find(Boolean);
-    if (run && child) parts.push(`child run at ${child.stations[run.at]?.name ?? "start"}`);
-    parts.push(open ? "open" : "closed");
+    if (run && child)
+      parts.push(vt("run.childAt", { stage: child.stations[run.at]?.name ?? vt("list.start") }));
+    parts.push(open ? vt("station.open") : vt("transit.closed"));
   }
-  for (const loop of loopsAt(line, index)) parts.push(loopLabel(line, loop));
-  return parts.join(", ");
+  for (const loop of loopsAt(line, index)) parts.push(loopLabel(line, loop, vt));
+  return parts.join(vt("listSeparator"));
 }
 
 /** The station glyph: a circle, a gate ring, a join block, or a stack for a child workflow. */
@@ -871,6 +874,7 @@ function Sidings({
   color: string;
   reduced: boolean;
 }) {
+  const vt = useTranslations("vizRender");
   const { shown, hidden } = visibleBranches(fanout.branches);
   const holding = !!fanout.runId;
   const hiddenPending = hidden.filter((b) => b.state === "queued" || b.state === "running").length;
@@ -903,7 +907,12 @@ function Sidings({
                 transition: reduced ? undefined : "transform 700ms var(--ease-standard)",
               }}
             >
-              <title>{`${b.label}: ${b.state}`}</title>
+              <title>
+                {vt("transit.branchTitle", {
+                  label: b.label,
+                  state: vt(`transit.branchState.${b.state}`),
+                })}
+              </title>
               <circle
                 r={lit ? 3.5 : 2.75}
                 fill={c}
@@ -922,7 +931,7 @@ function Sidings({
           fontSize={9}
           fill={hiddenPending ? HEALTH_COLOR.ok : "var(--muted-foreground)"}
         >
-          {`+${sd.hidden}${hiddenPending ? `, ${hiddenPending} running` : ""}`}
+          {`+${sd.hidden}${hiddenPending ? vt("transit.moreRunning", { count: hiddenPending }) : ""}`}
         </text>
       )}
       {holding && (
@@ -954,6 +963,7 @@ function Swarm({
   registerWorker: (id: string, el: SVGGElement | null) => void;
   registerTendril: (id: string, el: SVGPathElement | null) => void;
 }) {
+  const vt = useTranslations("vizRender");
   const busy = supervisor.workers.filter((w) => w.busy).length;
   return (
     <g aria-hidden>
@@ -998,7 +1008,12 @@ function Swarm({
             ref={(el) => registerWorker(seed.id, el)}
             transform={`translate(${p.x.toFixed(1)} ${p.y.toFixed(1)})`}
           >
-            <title>{`${w.label}: ${w.busy ? "busy" : "idle"}, ${Math.round(w.load * 100)}% load`}</title>
+            <title>
+              {vt(w.busy ? "graph.workerBusy" : "graph.workerIdle", {
+                label: w.label,
+                load: Math.round(w.load * 100),
+              })}
+            </title>
             <circle
               r={2 + w.load * 2}
               fill={color}
@@ -1080,6 +1095,7 @@ function FlowParticles({ d, seg }: { d: string; seg: WorkflowSegment }) {
 
 /** The still stand-in for particles: how many runs wait to enter the next station. */
 function BacklogBadge({ poly, backlog }: { poly: Pt[]; backlog: number }) {
+  const vt = useTranslations("vizRender");
   const a = poly[0];
   const b = poly[poly.length - 1];
   const x = (a.x + b.x) / 2;
@@ -1088,7 +1104,7 @@ function BacklogBadge({ poly, backlog }: { poly: Pt[]; backlog: number }) {
   const color = warn ? HEALTH_COLOR.degraded : "var(--muted-foreground)";
   return (
     <g aria-hidden>
-      <title>{`${backlog} waiting`}</title>
+      <title>{vt("transit.waiting", { count: backlog })}</title>
       <rect
         x={x - 11}
         y={y - 7}

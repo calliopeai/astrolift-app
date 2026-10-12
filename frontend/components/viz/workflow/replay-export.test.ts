@@ -1,9 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
+import messages from "@/messages/en.json";
+
+import { vizTranslator } from "../core/viz-t";
+
 import { makeFeatureTimeline } from "../core/workflow-model";
 
 import { makeFanoutTimeline, placeRun } from "./replay";
 import { drawFrame, exportHeight, frameTimes, type ExportPalette } from "./replay-export";
+
+const vt = vizTranslator(messages);
 
 describe("frameTimes", () => {
   it("spans the run from start to finish at the requested rate", () => {
@@ -48,14 +54,14 @@ describe("drawFrame", () => {
       ["bg", "fg", "muted", "border", "ok", "degraded", "failing", "idle"].map((k) => [k, k])
     ) as ExportPalette;
     const rounds = placeRun(makeFeatureTimeline());
-    drawFrame(ctx, rounds, rounds.total, colors, "Feature");
+    drawFrame(ctx, rounds, rounds.total, colors, "Feature", vt);
     expect(texts).toEqual(expect.arrayContaining(["Round 1", "Round 4"]));
     expect(texts.at(-1)).toBe("Round 4 · Deploy · succeeded");
     const fan = placeRun(makeFanoutTimeline());
     texts.length = 0;
     const rects: number[] = [];
     (ctx as unknown as Record<string, unknown>).fillRect = (_x: number, y: number) => rects.push(y);
-    drawFrame(ctx, fan, fan.total / 2, colors, "Research");
+    drawFrame(ctx, fan, fan.total / 2, colors, "Research", vt);
     // Six branch bars under the 64px track at y 70.
     expect(rects.filter((y) => y >= 140)).toHaveLength(6);
   });

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -41,18 +42,14 @@ import { fmtRps, healthLabel, selectProps } from "./layouts-b-parts";
  */
 
 export const FUNCTIONS_LAYOUT_LEGEND: LegendItem[] = [
-  { glyph: "ring", color: HEALTH_COLOR.ok, label: "Invoked just now" },
-  { glyph: "glow", color: HEALTH_COLOR.ok, label: "Tile light: recent invocation, fades over 12s" },
-  { glyph: "bar", color: HEALTH_COLOR.ok, label: "Concurrency in use" },
-  { glyph: "dot", color: HEALTH_COLOR.degraded, label: "Cold start: invoked after 5s of quiet" },
-  {
-    glyph: "flow",
-    color: HEALTH_COLOR.ok,
-    label: "Invocation traffic: faster and thicker is busier",
-  },
-  { glyph: "flow", color: HEALTH_COLOR.failing, label: "Failing path (over 5% errors)" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Failing function" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Idle: stays dark" },
+  { glyph: "ring", color: HEALTH_COLOR.ok, labelKey: "fnInvoked" },
+  { glyph: "glow", color: HEALTH_COLOR.ok, labelKey: "fnTileLight" },
+  { glyph: "bar", color: HEALTH_COLOR.ok, labelKey: "fnConcurrency" },
+  { glyph: "dot", color: HEALTH_COLOR.degraded, labelKey: "fnCold" },
+  { glyph: "flow", color: HEALTH_COLOR.ok, labelKey: "fnTraffic" },
+  { glyph: "flow", color: HEALTH_COLOR.failing, labelKey: "fnFailingPath" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "fnFailing" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "idleStaysDark" },
 ];
 
 const W = 800;
@@ -79,6 +76,7 @@ export function FunctionsLayout({
   className,
   diagram,
 }: FunctionsLayoutProps) {
+  const t = useTranslations("vizRender");
   const stats = new Map(functionStats(snapshot).map((s) => [s.node.id, s]));
   const cols = layerNodes(snapshot.nodes, snapshot.edges);
   const colW = W / Math.max(1, cols.length);
@@ -99,10 +97,16 @@ export function FunctionsLayout({
   const fns = [...stats.values()];
   const recent = fns.filter((s) => s.last && snapshot.now - s.last.at < EVENT_WINDOW_MS);
   const cold = fns.filter((s) => s.cold).length;
-  const label = `${snapshot.app.name}: ${summarize(
-    fns.map((s) => s.node),
-    "functions"
-  )}; ${recent.length} invoked in the last 12s${cold ? `, ${cold} cold starts` : ""}`;
+  const label =
+    t("functions.summary", {
+      app: snapshot.app.name,
+      functions: summarize(
+        fns.map((s) => s.node),
+        "functions",
+        t
+      ),
+      invoked: recent.length,
+    }) + (cold ? t("functions.coldStarts", { count: cold }) : "");
 
   return (
     <div
@@ -221,6 +225,7 @@ function FunctionTile({
   motion: "full" | "reduced";
   onSelect?: (id: string) => void;
 }) {
+  const t = useTranslations("vizRender");
   const { node } = p;
   const color = HEALTH_COLOR[node.health];
   const failing = node.health === "failing";
@@ -230,7 +235,13 @@ function FunctionTile({
   return (
     <g
       {...selectProps(node.id, onSelect)}
-      aria-label={`${node.name}: ${fmtRps(node.rps)} invocations, concurrency ${pct}%, ${stat?.invocations ?? 0} in the last 12s${stat?.cold ? ", cold start" : ""}, ${healthLabel(node)}`}
+      aria-label={t(stat?.cold ? "functions.tileCold" : "functions.tile", {
+        name: node.name,
+        rps: fmtRps(node.rps),
+        pct,
+        recent: stat?.invocations ?? 0,
+        health: healthLabel(node, t),
+      })}
       className="group cursor-pointer outline-none"
     >
       <title>{node.name}</title>
@@ -283,13 +294,15 @@ function FunctionTile({
             className="font-mono"
             fill={HEALTH_COLOR.degraded}
           >
-            cold
+            {t("functions.cold")}
           </text>
         </g>
       )}
       <text x={p.x + 10} y={p.y + 38} fontSize="11" className="font-mono" fill="var(--foreground)">
         {fmtRps(node.rps)}
-        <tspan fill="var(--muted-foreground)">{`  ${stat?.invocations ?? 0} in 12s`}</tspan>
+        <tspan fill="var(--muted-foreground)">
+          {`  ${t("functions.in12s", { count: stat?.invocations ?? 0 })}`}
+        </tspan>
       </text>
       <rect x={p.x + 10} y={p.y + 47} width={barW} height={5} rx={1} fill="var(--muted)" />
       <rect x={p.x + 10} y={p.y + 47} width={(barW * pct) / 100} height={5} rx={1} fill={color} />
@@ -298,12 +311,17 @@ function FunctionTile({
 }
 
 function PlainTile({ p, onSelect }: { p: Placed; onSelect?: (id: string) => void }) {
+  const t = useTranslations("vizRender");
   const { node } = p;
   const color = HEALTH_COLOR[node.health];
   return (
     <g
       {...selectProps(node.id, onSelect)}
-      aria-label={`${node.name}, ${node.role}, ${healthLabel(node)}`}
+      aria-label={t("nodeRoleLabel", {
+        name: node.name,
+        role: t(`roles.${node.role}`),
+        health: healthLabel(node, t),
+      })}
       className="group cursor-pointer outline-none"
     >
       <title>{node.name}</title>

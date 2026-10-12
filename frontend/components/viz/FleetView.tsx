@@ -1,11 +1,12 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import { FLEET_VIEWS, useMotion, useVizPrefs, type FleetView as FleetStyle } from "@/lib/viz-prefs";
 
 import type { FleetSnapshot, FleetViewProps } from "./core/fleet-model";
-import { VizFrame } from "./core/VizFrame";
+import { VizFrame, useStyleCopy } from "./core/VizFrame";
 import type { LegendItem } from "./core/VizLegend";
 import { FLEET_GRAPH_LEGEND, FleetGraph } from "./fleet/FleetGraph";
 import { FLEET_SWARM_LEGEND, FleetSwarm } from "./fleet/FleetSwarm";
@@ -51,13 +52,15 @@ export function FleetView({
   snapshot,
   onSelectAgent,
   selectedAgentId,
-  title = "Agent fleet",
+  title,
   description,
   value,
   onChange,
   motion,
   className,
 }: FleetViewFrameProps) {
+  const t = useTranslations("vizRender");
+  const styles = useStyleCopy(FLEET_VIEWS, "fleet");
   const [prefs, update] = useVizPrefs();
   const resolved = useMotion();
   const style = value ?? prefs.fleetView;
@@ -65,12 +68,15 @@ export function FleetView({
   const { Component, legend } = FLEET_RENDERERS[style];
   return (
     <VizFrame
-      title={title}
+      title={title ?? t("frame.fleetTitle")}
       description={
         description ??
-        `${snapshot.agents.length} agents across ${snapshot.clusters.length} clusters`
+        t("frame.fleetDescription", {
+          agents: snapshot.agents.length,
+          clusters: snapshot.clusters.length,
+        })
       }
-      styles={FLEET_VIEWS}
+      styles={styles}
       value={style}
       onChange={onChange ?? ((fleetView) => update({ fleetView }))}
       motion={m}

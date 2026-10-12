@@ -13,6 +13,7 @@ import {
   type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
@@ -68,8 +69,9 @@ export function FlowGraph({
   maxZoom = 1.8,
   showMiniMap = true,
   variant = "default",
-  ariaLabel = "Topology graph",
+  ariaLabel,
 }: FlowGraphProps) {
+  const t = useTranslations("vizRender");
   // Fill in edge defaults (arrowhead + stroke) without clobbering caller
   // overrides. Computed once — the graph reads its initial data on mount.
   const initialEdges = React.useMemo<Edge[]>(
@@ -108,7 +110,7 @@ export function FlowGraph({
         </div>
       )}
       <ReactFlow
-        aria-label={ariaLabel}
+        aria-label={ariaLabel ?? t("topologyGraph")}
         nodes={flowNodes}
         edges={flowEdges}
         nodeTypes={nodeTypes}

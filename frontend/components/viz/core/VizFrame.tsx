@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,23 @@ import { VizLegend, type LegendItem } from "./VizLegend";
 export interface VizStyleOption {
   label: string;
   blurb: string;
+}
+
+/** A style switcher's options in the viewer's language (`vizRender.styles.<group>.<key>`). */
+export function useStyleCopy<K extends string>(
+  styles: Record<K, VizStyleOption>,
+  group: "fleet" | "workflow" | "app"
+): Record<K, VizStyleOption> {
+  const t = useTranslations("vizRender");
+  return Object.fromEntries(
+    (Object.keys(styles) as K[]).map((key) => [
+      key,
+      {
+        label: t(`styles.${group}.${key}.label` as string),
+        blurb: t(`styles.${group}.${key}.blurb` as string),
+      },
+    ])
+  ) as Record<K, VizStyleOption>;
 }
 
 export interface VizFrameProps<K extends string> {
@@ -45,6 +63,7 @@ export function VizFrame<K extends string>({
   children,
   className,
 }: VizFrameProps<K>) {
+  const t = useTranslations("vizRender");
   return (
     <section data-motion={motion} className={cn("bg-card rounded-md border", className)}>
       <header className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3">
@@ -55,7 +74,7 @@ export function VizFrame<K extends string>({
         <div className="flex flex-wrap items-center gap-2">
           <div
             role="radiogroup"
-            aria-label="View style"
+            aria-label={t("frame.viewStyle")}
             className="bg-muted/50 flex flex-wrap rounded-md p-0.5"
           >
             {(Object.keys(styles) as K[]).map((key) => (

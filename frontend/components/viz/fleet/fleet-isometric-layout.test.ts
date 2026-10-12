@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import messages from "@/messages/en.json";
+
+import { vizTranslator } from "../core/viz-t";
+
 import { makeFleet, stepFleet } from "../core/fleet-model";
 import { depth } from "../core/iso";
 import { mulberry32 } from "../core/semantics";
@@ -86,7 +90,8 @@ describe("summary", () => {
     }));
     const s = summarizeFleet({ ...fleet, agents });
     expect(s).toEqual({ agents: 6, clusters: 2, failing: 1, degraded: 1, busy: 3, idle: 1 });
-    expect(fleetAriaLabel(s)).toBe(
+    const t = vizTranslator(messages);
+    expect(fleetAriaLabel(s, t)).toBe(
       "Isometric fleet: 6 agents across 2 clusters, 1 failing, 1 degraded, 3 busy, 1 idle"
     );
   });

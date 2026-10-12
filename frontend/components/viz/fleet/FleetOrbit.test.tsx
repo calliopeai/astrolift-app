@@ -1,7 +1,11 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
+
+import messages from "@/messages/en.json";
+import { renderWithIntl } from "@/test/render-with-intl";
 
 import { makeFleet } from "../core/fleet-model";
 import { MOTION_CLASS } from "../core/semantics";
@@ -13,7 +17,7 @@ describe("FleetOrbit", () => {
   const failing = fleet.agents.filter((a) => a.health === "failing").length;
 
   it("summarises the fleet and marks the motion mode", () => {
-    render(<FleetOrbit snapshot={fleet} motion="full" />);
+    renderWithIntl(<FleetOrbit snapshot={fleet} motion="full" />);
     const root = screen.getByRole("group");
     expect(root).toHaveAttribute("data-motion", "full");
     expect(root.getAttribute("aria-label")).toContain(
@@ -22,7 +26,11 @@ describe("FleetOrbit", () => {
   });
 
   it("hydrates server-rendered cluster titles with their accessible region text", async () => {
-    const tree = <FleetOrbit snapshot={fleet} motion="reduced" />;
+    const tree = (
+      <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
+        <FleetOrbit snapshot={fleet} motion="reduced" />
+      </NextIntlClientProvider>
+    );
     const container = document.createElement("div");
     container.innerHTML = renderToString(tree);
     document.body.append(container);
@@ -46,7 +54,7 @@ describe("FleetOrbit", () => {
 
   it("selects an agent with Enter", () => {
     const onSelect = vi.fn();
-    const { container } = render(
+    const { container } = renderWithIntl(
       <FleetOrbit snapshot={fleet} motion="full" onSelectAgent={onSelect} />
     );
     const sat = container.querySelector('[role="button"]') as SVGGElement;
@@ -57,10 +65,10 @@ describe("FleetOrbit", () => {
 
   it("flickers failing agents in full motion and rings them when reduced", () => {
     expect(failing).toBeGreaterThan(0);
-    const full = render(<FleetOrbit snapshot={fleet} motion="full" />);
+    const full = renderWithIntl(<FleetOrbit snapshot={fleet} motion="full" />);
     expect(full.container.querySelectorAll(`.${MOTION_CLASS.flicker}`)).toHaveLength(failing);
     full.unmount();
-    const still = render(<FleetOrbit snapshot={fleet} motion="reduced" />);
+    const still = renderWithIntl(<FleetOrbit snapshot={fleet} motion="reduced" />);
     expect(still.container.querySelectorAll(`.${MOTION_CLASS.flicker}`)).toHaveLength(0);
   });
 });

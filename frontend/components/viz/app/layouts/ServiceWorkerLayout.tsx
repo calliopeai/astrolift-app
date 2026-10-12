@@ -1,14 +1,14 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { RadialGauge } from "@/components/viz/radial-gauge";
 import { Sparkline } from "@/components/viz/sparkline";
-import { TOPOLOGY_META } from "@/lib/topology";
 import { cn } from "@/lib/utils";
 
 import type { AppNode, AppSnapshot, AppViewProps } from "../../core/app-model";
-import { HEALTH_COLOR, HEALTH_LABEL, MOTION_CLASS, type Health } from "../../core/semantics";
+import { HEALTH_COLOR, MOTION_CLASS, type Health } from "../../core/semantics";
 import type { LegendItem } from "../../core/VizLegend";
 
 import {
@@ -44,25 +44,13 @@ import {
  */
 
 export const SERVICE_WORKER_LAYOUT_LEGEND: LegendItem[] = [
-  { glyph: "dot", color: HEALTH_COLOR.ok, label: "Healthy" },
-  {
-    glyph: "dot",
-    color: HEALTH_COLOR.degraded,
-    label: "Degraded: backing up, over 1% errors or replicas missing",
-  },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Flicker: failing" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Dark: no traffic" },
-  {
-    glyph: "bar",
-    color: HEALTH_COLOR.ok,
-    label: "Tank: queue depth; it breathes while backing up",
-  },
-  {
-    glyph: "flow",
-    color: HEALTH_COLOR.ok,
-    label: "Moving dash: messages in and out, faster when busier",
-  },
-  { glyph: "ring", color: HEALTH_COLOR.ok, label: "Gauge: CPU" },
+  { glyph: "dot", color: HEALTH_COLOR.ok, labelKey: "healthy" },
+  { glyph: "dot", color: HEALTH_COLOR.degraded, labelKey: "swDegraded" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "flickerFailing" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "darkNoTraffic" },
+  { glyph: "bar", color: HEALTH_COLOR.ok, labelKey: "swTank" },
+  { glyph: "flow", color: HEALTH_COLOR.ok, labelKey: "swDash" },
+  { glyph: "ring", color: HEALTH_COLOR.ok, labelKey: "swGauge" },
 ];
 
 export type ServiceWorkerLayoutProps = AppViewProps & { diagram: React.ReactNode };
@@ -80,13 +68,19 @@ function Workload({
   rate: number;
   onSelect?: (id: string) => void;
 }) {
+  const t = useTranslations("vizRender");
   const s = nodeStats(snapshot, node);
   const r = node.replicas ?? { ready: 0, desired: 0 };
   return (
     <NodeButton node={node} health={s.health} onSelect={onSelect}>
       <span className="flex items-center gap-3">
         <span style={{ color: HEALTH_COLOR[s.health] }}>
-          <RadialGauge value={node.load} size={44} thickness={5} ariaLabel={`${node.name} CPU`} />
+          <RadialGauge
+            value={node.load}
+            size={44}
+            thickness={5}
+            ariaLabel={t("cpuOf", { name: node.name })}
+          />
         </span>
         <span className="grid min-w-0 flex-1 gap-1">
           <Figure label={rateLabel} value={fmtRps(rate)} />
@@ -116,8 +110,14 @@ function QueueTank({
   flowParticles: boolean;
   onSelect?: (id: string) => void;
 }) {
+  const t = useTranslations("vizRender");
   const color = HEALTH_COLOR[q.health];
-  const lag = q.net > 0 ? `+${fmtRps(q.net)}/s behind` : q.inRps > 0 ? "keeping up" : "empty";
+  const lag =
+    q.net > 0
+      ? t("serviceWorker.behind", { rps: fmtRps(q.net) })
+      : q.inRps > 0
+        ? t("serviceWorker.keepingUp")
+        : t("serviceWorker.empty");
   return (
     <div className="flex min-w-0 items-stretch gap-2">
       <div className="flex w-10 shrink-0 flex-col justify-center gap-0.5 @2xl:w-16">
@@ -127,12 +127,18 @@ function QueueTank({
           health={q.health === "failing" ? "failing" : q.inRps > 0 ? "ok" : "idle"}
           flowParticles={flowParticles}
         />
-        <span className="text-muted-foreground text-center font-mono text-xs">in</span>
+        <span className="text-muted-foreground text-center font-mono text-xs">
+          {t("serviceWorker.in")}
+        </span>
       </div>
       <button
         type="button"
         tabIndex={0}
-        title={`${q.node.name} (${q.node.kind}): ${HEALTH_LABEL[q.health]}`}
+        title={t("nodeTitle", {
+          name: q.node.name,
+          kind: q.node.kind,
+          health: t(`health.${q.health}`),
+        })}
         onClick={() => onSelect?.(q.node.id)}
         className={cn(
           "bg-card flex min-w-0 flex-1 flex-col gap-3 rounded-sm border-2 p-3 text-left",
@@ -169,22 +175,22 @@ function QueueTank({
             />
           </span>
           <span className="grid min-w-0 flex-1 gap-2">
-            <Figure label="depth" value={fmtPct(q.fill)} emphasis />
-            <Figure label="lag" value={lag} />
+            <Figure label={t("serviceWorker.depth")} value={fmtPct(q.fill)} emphasis />
+            <Figure label={t("serviceWorker.lag")} value={lag} />
             <span style={{ color }}>
               <Sparkline
                 data={depthSeries}
                 width={96}
                 height={20}
                 variant="area"
-                ariaLabel="Depth trend"
+                ariaLabel={t("serviceWorker.depthTrend")}
               />
             </span>
           </span>
         </span>
         <span className="grid grid-cols-2 gap-2">
-          <Figure label="enqueued/s" value={fmtRps(q.inRps)} />
-          <Figure label="consumed/s" value={fmtRps(q.outRps)} />
+          <Figure label={t("serviceWorker.enqueued")} value={fmtRps(q.inRps)} />
+          <Figure label={t("serviceWorker.consumed")} value={fmtRps(q.outRps)} />
         </span>
       </button>
       <div className="flex w-10 shrink-0 flex-col justify-center gap-0.5 @2xl:w-16">
@@ -194,7 +200,9 @@ function QueueTank({
           health={q.outRps > 0 ? "ok" : "idle"}
           flowParticles={flowParticles}
         />
-        <span className="text-muted-foreground text-center font-mono text-xs">out</span>
+        <span className="text-muted-foreground text-center font-mono text-xs">
+          {t("serviceWorker.out")}
+        </span>
       </div>
     </div>
   );
@@ -208,6 +216,7 @@ export function ServiceWorkerLayout({
   className,
   diagram,
 }: ServiceWorkerLayoutProps) {
+  const t = useTranslations("vizRender");
   const totals = appTotals(snapshot);
   const web = nodesWithRole(snapshot, "service");
   const workers = nodesWithRole(snapshot, "worker");
@@ -217,15 +226,23 @@ export function ServiceWorkerLayout({
   const throughput = q?.outRps ?? 0;
 
   const queueHealth: Health = q?.health ?? "idle";
-  const label =
-    `${snapshot.app.name}, ${TOPOLOGY_META[snapshot.topology].label.toLowerCase()}: ` +
-    `${HEALTH_LABEL[totals.health].toLowerCase()}, ${fmtRps(totals.rps)} requests per second, ` +
-    `${fmtPct(totals.errorRate)} errors` +
-    (q
-      ? `, queue ${q.node.name} ${fmtPct(q.fill)} full and ${HEALTH_LABEL[queueHealth].toLowerCase()}, ` +
-        `${fmtRps(q.inRps)} in and ${fmtRps(q.outRps)} out per second` +
-        (q.net > 0 ? `, falling behind by ${fmtRps(q.net)} per second` : "")
-      : ", no queue");
+  const head = t("trafficSummary", {
+    app: snapshot.app.name,
+    topology: t(`topology.${snapshot.topology}`),
+    health: t(`healthInline.${totals.health}`),
+    rps: fmtRps(totals.rps),
+    errors: fmtPct(totals.errorRate),
+  });
+  const label = q
+    ? t("serviceWorker.summary", {
+        head,
+        queue: q.node.name,
+        fill: fmtPct(q.fill),
+        health: t(`healthInline.${queueHealth}`),
+        inRps: fmtRps(q.inRps),
+        outRps: fmtRps(q.outRps),
+      }) + (q.net > 0 ? t("serviceWorker.fallingBehind", { rps: fmtRps(q.net) }) : "")
+    : t("serviceWorker.summaryNoQueue", { head });
 
   return (
     <div
@@ -235,24 +252,27 @@ export function ServiceWorkerLayout({
       className={cn("@container w-full space-y-3", className)}
     >
       <div className="grid gap-3 @2xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)_minmax(0,2fr)] @2xl:items-center">
-        <section className="grid min-w-0 gap-2" aria-label="Web">
+        <section className="grid min-w-0 gap-2" aria-label={t("serviceWorker.web")}>
           <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-            Web · {fmtRps(totals.rps)} req/s · {fmtPct(totals.errorRate)} errors
+            {t("serviceWorker.webHeading", {
+              rps: fmtRps(totals.rps),
+              errors: fmtPct(totals.errorRate),
+            })}
           </h3>
           {web.map((node) => (
             <Workload
               key={node.id}
               snapshot={snapshot}
               node={node}
-              rateLabel="req/s"
+              rateLabel={t("reqPerSec")}
               rate={node.rps ?? 0}
               onSelect={onSelectNode}
             />
           ))}
         </section>
-        <section className="grid min-w-0 gap-2" aria-label="Queue">
+        <section className="grid min-w-0 gap-2" aria-label={t("serviceWorker.queue")}>
           <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-            Queue
+            {t("serviceWorker.queue")}
           </h3>
           {q ? (
             <QueueTank
@@ -263,19 +283,19 @@ export function ServiceWorkerLayout({
               onSelect={onSelectNode}
             />
           ) : (
-            <p className="text-muted-foreground text-sm">No queue in this app.</p>
+            <p className="text-muted-foreground text-sm">{t("serviceWorker.noQueue")}</p>
           )}
         </section>
-        <section className="grid min-w-0 gap-2" aria-label="Workers">
+        <section className="grid min-w-0 gap-2" aria-label={t("serviceWorker.workers")}>
           <h3 className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-            Workers · {fmtRps(throughput)} jobs/s
+            {t("serviceWorker.workersHeading", { rps: fmtRps(throughput) })}
           </h3>
           {workers.map((node) => (
             <Workload
               key={node.id}
               snapshot={snapshot}
               node={node}
-              rateLabel="jobs/s"
+              rateLabel={t("jobsPerSec")}
               rate={nodeStats(snapshot, node).inRps}
               onSelect={onSelectNode}
             />

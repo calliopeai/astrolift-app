@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import messages from "@/messages/en.json";
+
+import { vizTranslator } from "../core/viz-t";
+
 import { makeWorkflows, type WorkflowTrain } from "../core/workflow-model";
 
 import {
@@ -23,6 +27,8 @@ const train = (at: number, state: WorkflowTrain["state"]): WorkflowTrain => ({
   state,
   startedAt: 0,
 });
+
+const vt = vizTranslator(messages);
 
 describe("gateState", () => {
   it("reads denied, waiting, approved, or nothing from the runs", () => {
@@ -54,7 +60,7 @@ describe("truncate", () => {
 describe("layoutWorkflowGraph", () => {
   it("lays each line out as its own lane with stations a column apart", () => {
     const s = makeWorkflows({ lines: 3 });
-    const layout = layoutWorkflowGraph(s);
+    const layout = layoutWorkflowGraph(s, vt);
     expect(layout.lanes).toHaveLength(3);
     const release = layout.nodes.filter((n) => n.lineId === "l0");
     expect(release).toHaveLength(6);
@@ -65,7 +71,7 @@ describe("layoutWorkflowGraph", () => {
 
   it("marks backed-up segments degraded and groups runs by station and state", () => {
     const s = makeWorkflows({ backedUp: true });
-    const layout = layoutWorkflowGraph(s);
+    const layout = layoutWorkflowGraph(s, vt);
     expect(layout.edges.some((e) => e.backedUp && e.health === "degraded")).toBe(true);
     const total = layout.groups.reduce((n, g) => n + g.trains.length, 0);
     expect(total).toBe(s.trains.length);
@@ -74,7 +80,7 @@ describe("layoutWorkflowGraph", () => {
   it("treats zero throughput as idle", () => {
     const s = makeWorkflows({ trainsPerLine: 0 });
     const idle = { ...s, segments: s.segments.map((g) => ({ ...g, rate: 0, backlog: 0 })) };
-    const layout = layoutWorkflowGraph(idle);
+    const layout = layoutWorkflowGraph(idle, vt);
     expect(layout.edges.every((e) => !e.flowing && e.health === "idle")).toBe(true);
     expect(layout.nodes.every((n) => n.health === "idle")).toBe(true);
   });
@@ -83,7 +89,7 @@ describe("layoutWorkflowGraph", () => {
 describe("describeWorkflowGraph", () => {
   it("summarises lines and run states", () => {
     const s = makeWorkflows({ lines: 2, trainsPerLine: 0 });
-    expect(describeWorkflowGraph(s)).toBe("2 workflows, 0 running, 0 held at gates, 0 failed");
+    expect(describeWorkflowGraph(s, vt)).toBe("2 workflows, 0 running, 0 held at gates, 0 failed");
   });
 });
 
@@ -104,14 +110,14 @@ describe("pointAlong", () => {
 describe("the shapes", () => {
   const s = makeWorkflows({ lines: 0, shapes: true });
   const [feature] = s.lines;
-  const layout = layoutWorkflowGraph(s);
+  const layout = layoutWorkflowGraph(s, vt);
 
   it("says a run's round against the loop it is inside", () => {
     const onRound2 = s.trains.find((t) => t.lineId === feature.id && t.round === 2)!;
-    expect(runRound(feature, onRound2)).toMatchObject({ text: "round 2 of 5", short: "r2" });
+    expect(runRound(feature, onRound2, vt)).toMatchObject({ text: "round 2 of 5", short: "r2" });
     const at = (i: number) => ({ ...onRound2, at: i, round: 1, loopRounds: {} });
-    expect(runRound(feature, at(0))).toBeNull();
-    expect(runRound(feature, { ...at(5), attempt: 2 })).toMatchObject({
+    expect(runRound(feature, at(0), vt)).toBeNull();
+    expect(runRound(feature, { ...at(5), attempt: 2 }, vt)).toMatchObject({
       text: "attempt 2 of 3",
       near: true,
     });
@@ -198,19 +204,19 @@ describe("the shapes", () => {
       expect(n.y).toBeGreaterThan(group.y);
       expect(n.y).toBeLessThan(group.y + group.h);
     });
-    const shut = layoutWorkflowGraph(s, { collapsed: new Set([group.stationId]) });
+    const shut = layoutWorkflowGraph(s, vt, { collapsed: new Set([group.stationId]) });
     expect(shut.nested[0].expanded).toBe(false);
     expect(shut.nodes.some((n) => n.lineId === child.id)).toBe(false);
     expect(shut.lanes.at(-1)!.height).toBeLessThan(layout.lanes.at(-1)!.height);
   });
 
   it("keeps classic lanes exactly as tall as before", () => {
-    const plain = layoutWorkflowGraph(makeWorkflows());
+    const plain = layoutWorkflowGraph(makeWorkflows(), vt);
     expect(plain.lanes.map((l) => l.height)).toEqual([92, 92, 92]);
     expect(plain.tracks).toHaveLength(0);
   });
 
   it("counts runs sent back in the summary", () => {
-    expect(describeWorkflowGraph(s)).toMatch(/1 sent back along a loop$/);
+    expect(describeWorkflowGraph(s, vt)).toMatch(/1 sent back along a loop$/);
   });
 });

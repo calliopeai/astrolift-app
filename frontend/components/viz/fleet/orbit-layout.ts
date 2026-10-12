@@ -1,5 +1,6 @@
 import type { FleetCluster, FleetSnapshot } from "../core/fleet-model";
 import type { Health } from "../core/semantics";
+import type { VizT } from "../core/viz-t";
 
 /**
  * Geometry for the orbit fleet view, kept pure so it can be tested and so the
@@ -204,18 +205,18 @@ export function recentLaunches(
 }
 
 /** The whole state in one sentence, for the root aria-label. */
-export function summarizeFleet(snapshot: FleetSnapshot): string {
+export function summarizeFleet(snapshot: FleetSnapshot, t: VizT): string {
   const { agents, clusters } = snapshot;
   const count = (h: Health) => agents.filter((a) => a.health === h).length;
   const busy = agents.filter((a) => a.activeRuns > 0).length;
   const parts = [
-    `${agents.length} agent${agents.length === 1 ? "" : "s"} across ${clusters.length} cluster${clusters.length === 1 ? "" : "s"}`,
-    `${count("failing")} failing`,
-    `${count("degraded")} degraded`,
-    `${busy} busy`,
-    `${count("idle")} idle`,
+    t("frame.fleetDescription", { agents: agents.length, clusters: clusters.length }),
+    t("counts.failing", { count: count("failing") }),
+    t("counts.degraded", { count: count("degraded") }),
+    t("counts.busy", { count: busy }),
+    t("counts.idle", { count: count("idle") }),
   ];
   const down = clusters.filter((c) => c.health !== "ok").length;
-  if (down) parts.push(`${down} cluster${down === 1 ? "" : "s"} not healthy`);
-  return parts.join(", ");
+  if (down) parts.push(t("counts.clustersNotHealthy", { count: down }));
+  return parts.join(t("listSeparator"));
 }

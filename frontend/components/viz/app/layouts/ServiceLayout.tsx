@@ -1,13 +1,13 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { RadialGauge } from "@/components/viz/radial-gauge";
-import { TOPOLOGY_META } from "@/lib/topology";
 import { cn } from "@/lib/utils";
 
 import type { AppViewProps } from "../../core/app-model";
-import { HEALTH_COLOR, HEALTH_LABEL, type Health } from "../../core/semantics";
+import { HEALTH_COLOR, type Health } from "../../core/semantics";
 import type { LegendItem } from "../../core/VizLegend";
 
 import { DiagramSlot, Figure, Kpi, NodeButton, ReplicaPips, useSeries } from "./layout-parts";
@@ -30,19 +30,11 @@ import {
  */
 
 export const SERVICE_LAYOUT_LEGEND: LegendItem[] = [
-  { glyph: "dot", color: HEALTH_COLOR.ok, label: "Healthy" },
-  {
-    glyph: "dot",
-    color: HEALTH_COLOR.degraded,
-    label: "Degraded: over 1% errors or replicas missing",
-  },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Flicker: failing, over 5% errors" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Dark: no traffic" },
-  {
-    glyph: "bar",
-    color: HEALTH_COLOR.ok,
-    label: "Squares: replicas ready; a breathing outline is one not ready yet",
-  },
+  { glyph: "dot", color: HEALTH_COLOR.ok, labelKey: "healthy" },
+  { glyph: "dot", color: HEALTH_COLOR.degraded, labelKey: "degradedErrorsReplicas" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "flickerFailingErrors" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "darkNoTraffic" },
+  { glyph: "bar", color: HEALTH_COLOR.ok, labelKey: "squaresReplicas" },
 ];
 
 export type ServiceLayoutProps = AppViewProps & { diagram: React.ReactNode };
@@ -54,6 +46,7 @@ export function ServiceLayout({
   className,
   diagram,
 }: ServiceLayoutProps) {
+  const t = useTranslations("vizRender");
   const totals = appTotals(snapshot);
   const services = nodesWithRole(snapshot, "service");
   const series = useSeries(snapshot.now, {
@@ -72,11 +65,16 @@ export function ServiceLayout({
           : "ok";
   const trafficHealth: Health = totals.rps > 0 ? "ok" : "idle";
 
-  const label =
-    `${snapshot.app.name}, ${TOPOLOGY_META[snapshot.topology].label.toLowerCase()}: ` +
-    `${HEALTH_LABEL[totals.health].toLowerCase()}, ${fmtRps(totals.rps)} requests per second, ` +
-    `p50 ${fmtMs(totals.p50)}, ${fmtPct(totals.errorRate)} errors, ` +
-    `${totals.replicas.ready} of ${totals.replicas.desired} replicas ready`;
+  const label = t("service.summary", {
+    app: snapshot.app.name,
+    topology: t(`topology.${snapshot.topology}`),
+    health: t(`healthInline.${totals.health}`),
+    rps: fmtRps(totals.rps),
+    p50: fmtMs(totals.p50),
+    errors: fmtPct(totals.errorRate),
+    ready: totals.replicas.ready,
+    desired: totals.replicas.desired,
+  });
 
   return (
     <div
@@ -93,25 +91,25 @@ export function ServiceLayout({
           )}
         >
           <Kpi
-            label="Requests/s"
+            label={t("kpi.requests")}
             value={fmtRps(totals.rps)}
             health={trafficHealth}
             series={series.rps}
           />
           <Kpi
-            label="p50 latency"
+            label={t("kpi.p50")}
             value={fmtMs(totals.p50)}
             health={trafficHealth}
             series={series.p50}
           />
           <Kpi
-            label="Error rate"
+            label={t("kpi.errorRate")}
             value={fmtPct(totals.errorRate)}
             health={errHealth}
             series={series.err}
           />
           <Kpi
-            label="Replicas ready"
+            label={t("kpi.replicas")}
             value={`${totals.replicas.ready}/${totals.replicas.desired}`}
             health={replicaHealth}
             caption={
@@ -137,13 +135,13 @@ export function ServiceLayout({
                     value={node.load}
                     size={48}
                     thickness={5}
-                    ariaLabel={`${node.name} CPU`}
+                    ariaLabel={t("cpuOf", { name: node.name })}
                   />
                 </span>
                 <span className="grid min-w-0 flex-1 grid-cols-3 gap-2">
-                  <Figure label="req/s" value={fmtRps(node.rps ?? s.inRps)} />
+                  <Figure label={t("reqPerSec")} value={fmtRps(node.rps ?? s.inRps)} />
                   <Figure label="p50" value={fmtMs(node.p50)} />
-                  <Figure label="errors" value={fmtPct(s.errorRate)} />
+                  <Figure label={t("errors")} value={fmtPct(s.errorRate)} />
                 </span>
               </span>
               <ReplicaPips ready={r.ready} desired={r.desired} health={s.health} />

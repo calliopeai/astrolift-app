@@ -1,12 +1,18 @@
 import { describe, expect, it } from "vitest";
 
+import messages from "@/messages/en.json";
+
+import { vizTranslator } from "../core/viz-t";
+
 import { makeWorkflows, type WorkflowTrain } from "../core/workflow-model";
 
 import { loopWords, workflowRows, type LoopRow, type StageRow } from "./workflow-list-rows";
 
+const vt = vizTranslator(messages);
+
 const s = makeWorkflows({ lines: 0, shapes: true });
 const [feature] = s.lines;
-const rows = workflowRows(s);
+const rows = workflowRows(s, vt);
 const stage = (name: string) =>
   rows.find((r): r is StageRow => r.type === "stage" && r.station.name === name)!;
 const loops = rows.filter((r): r is LoopRow => r.type === "loop");
@@ -61,11 +67,15 @@ describe("loopWords", () => {
 
   it("names the round a run is being sent back into", () => {
     const t = run({ onLoopId: testLoop.id, loopRounds: { [testLoop.id]: 2 } });
-    expect(loopWords(feature, testLoop, [t])).toBe("Test failed goes back to Code, round 4 of 5");
+    expect(loopWords(feature, testLoop, [t], vt)).toBe(
+      "Test failed goes back to Code, round 4 of 5"
+    );
   });
 
   it("names the attempt a retry is going for", () => {
     const t = run({ at: 5, onLoopId: retry.id, attempt: 1 });
-    expect(loopWords(feature, retry, [t])).toBe("Deploy failed, retrying Deploy, attempt 2 of 3");
+    expect(loopWords(feature, retry, [t], vt)).toBe(
+      "Deploy failed, retrying Deploy, attempt 2 of 3"
+    );
   });
 });

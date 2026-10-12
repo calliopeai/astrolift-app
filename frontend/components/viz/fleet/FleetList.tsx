@@ -1,6 +1,7 @@
 "use client";
 
 import { BotIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import type { Column } from "@/components/data-table";
@@ -11,7 +12,7 @@ import { useLocalListState } from "@/components/list/use-list-state";
 import { cn } from "@/lib/utils";
 
 import type { FleetAgent, FleetViewProps } from "../core/fleet-model";
-import { HEALTH_COLOR, HEALTH_LABEL, MOTION_CLASS, type Health } from "../core/semantics";
+import { HEALTH_COLOR, MOTION_CLASS, type Health } from "../core/semantics";
 import type { LegendItem } from "../core/VizLegend";
 
 /**
@@ -31,7 +32,7 @@ export const FLEET_LIST: ListDefinition = {
     {
       key: "health",
       label: "Health",
-      options: HEALTHS.map((h) => ({ value: h, label: HEALTH_LABEL[h].toLowerCase() })),
+      options: HEALTHS.map((h) => ({ value: h, label: h })),
     },
   ],
   searchPlaceholder: "Search agents, clusters…",
@@ -45,20 +46,21 @@ export const FLEET_LIST: ListDefinition = {
 };
 
 export const FLEET_LIST_LEGEND: LegendItem[] = [
-  { glyph: "dot", color: HEALTH_COLOR.ok, label: "Healthy" },
-  { glyph: "dot", color: HEALTH_COLOR.degraded, label: "Degraded: over 85% load" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Flicker: failing" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Idle" },
-  { glyph: "bar", color: HEALTH_COLOR.ok, label: "Bar: load, in the agent's health colour" },
+  { glyph: "dot", color: HEALTH_COLOR.ok, labelKey: "healthy" },
+  { glyph: "dot", color: HEALTH_COLOR.degraded, labelKey: "degradedLoad85" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "flickerFailing" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "idle" },
+  { glyph: "bar", color: HEALTH_COLOR.ok, labelKey: "fleetListLoadBar" },
 ];
 
-function summarize(agents: FleetAgent[]): string {
+function summarize(agents: FleetAgent[], t: ReturnType<typeof useTranslations<"vizRender">>) {
   const failing = agents.filter((a) => a.health === "failing").length;
   const busy = agents.filter((a) => a.health !== "idle" && a.activeRuns > 0).length;
-  return `${agents.length} agents, ${failing} failing, ${busy} busy`;
+  return t("fleetList.summary", { agents: agents.length, failing, busy });
 }
 
 function HealthCell({ health, motion }: { health: Health; motion: FleetViewProps["motion"] }) {
+  const t = useTranslations("vizRender");
   return (
     <span className="inline-flex items-center gap-1.5">
       <span
@@ -69,7 +71,7 @@ function HealthCell({ health, motion }: { health: Health; motion: FleetViewProps
         )}
         style={{ background: HEALTH_COLOR[health] }}
       />
-      <span className="text-xs">{HEALTH_LABEL[health]}</span>
+      <span className="text-xs">{t(`health.${health}`)}</span>
     </span>
   );
 }
@@ -118,7 +120,25 @@ export function FleetList({
     };
   }, [snapshot.agents, clusters]);
 
-  const list = useLocalListState(FLEET_LIST);
+  const t = useTranslations("vizRender");
+  const fleetList = React.useMemo<ListDefinition>(
+    () => ({
+      ...FLEET_LIST,
+      searchPlaceholder: t("fleetList.searchPlaceholder"),
+      fields: FLEET_LIST.fields.map((field) => ({
+        ...field,
+        label: t("fleetList.health"),
+        options: field.options?.map((o) => ({ ...o, label: t(`healthInline.${o.value}`) })),
+      })),
+      views: FLEET_LIST.views.map((view) => ({
+        ...view,
+        label: t(`fleetList.views.${view.key}`),
+        note: view.note && t("fleetList.mineNote"),
+      })),
+    }),
+    [t]
+  );
+  const list = useLocalListState(fleetList);
   const page = selectRows(
     snapshot.agents,
     {
@@ -134,7 +154,7 @@ export function FleetList({
   const columns: Column<FleetAgent>[] = [
     {
       id: "agent",
-      header: "Agent",
+      header: t("fleetList.columns.agent"),
       sortKey: "name",
       cell: (a) => {
         const name = (
@@ -147,7 +167,10 @@ export function FleetList({
         return onSelectAgent ? (
           <button
             type="button"
-            aria-label={`${a.name}, ${HEALTH_LABEL[a.health].toLowerCase()}`}
+            aria-label={t("fleetList.agentLabel", {
+              name: a.name,
+              health: t(`healthInline.${a.health}`),
+            })}
             onClick={() => onSelectAgent(a.id)}
             className="text-left after:absolute after:inset-0"
           >
@@ -160,21 +183,21 @@ export function FleetList({
     },
     {
       id: "health",
-      header: "Health",
+      header: t("fleetList.columns.health"),
       sortKey: "health",
       width: "w-28",
       cell: (a) => <HealthCell health={a.health} motion={motion} />,
     },
     {
       id: "load",
-      header: "Load",
+      header: t("fleetList.columns.load"),
       sortKey: "load",
       width: "w-32",
       cell: (a) => <LoadCell agent={a} />,
     },
     {
       id: "runs",
-      header: "Active runs",
+      header: t("fleetList.columns.runs"),
       sortKey: "runs",
       width: "w-24",
       align: "right",
@@ -182,7 +205,7 @@ export function FleetList({
     },
     {
       id: "queued",
-      header: "Queued",
+      header: t("fleetList.columns.queued"),
       sortKey: "queued",
       width: "w-20",
       align: "right",
@@ -190,7 +213,7 @@ export function FleetList({
     },
     {
       id: "cluster",
-      header: "Cluster",
+      header: t("fleetList.columns.cluster"),
       sortKey: "cluster",
       cell: (a) => {
         const c = clusters.get(a.clusterId);
@@ -209,19 +232,19 @@ export function FleetList({
     // buttons from assistive tech.
     <div
       role="group"
-      aria-label={summarize(snapshot.agents)}
+      aria-label={summarize(snapshot.agents, t)}
       data-motion={motion}
       className={className}
     >
       <ListPage<FleetAgent>
         embedded
         list={list}
-        label="Agents"
+        label={t("fleetList.label")}
         columns={columns}
         rows={page.rows}
         getRowId={(a) => a.id}
         totalCount={page.totalCount}
-        empty={{ icon: <BotIcon className="size-5" />, title: "No agents in this fleet" }}
+        empty={{ icon: <BotIcon className="size-5" />, title: t("fleetList.empty") }}
         rowClassName={(a) =>
           cn(onSelectAgent && "relative cursor-pointer", a.id === selectedAgentId && "bg-muted") ||
           undefined

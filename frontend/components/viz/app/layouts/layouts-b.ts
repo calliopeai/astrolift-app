@@ -1,4 +1,5 @@
 import type { AppEdge, AppEvent, AppNode, AppNodeRole, AppSnapshot } from "../../core/app-model";
+import type { VizT } from "../../core/viz-t";
 
 /**
  * Pure derivations for the service-agent, agent, functions and jobs auto
@@ -49,13 +50,14 @@ export interface FeedItem {
   agentId: string;
   target?: AppNode;
   edge?: AppEdge;
+  /** What the agent did, a key under `vizRender.verbs`. */
   verb: string;
   failing: boolean;
 }
 
 const VERB: Partial<Record<AppNodeRole, string>> = {
   data: "queried",
-  queue: "published to",
+  queue: "publishedTo",
   function: "invoked",
   external: "called",
   service: "called",
@@ -90,7 +92,7 @@ export function agentFeed(snapshot: AppSnapshot, agentId?: string): FeedItem[] {
         agentId: e.nodeId,
         target,
         edge,
-        verb: (target && VERB[target.role]) ?? "worked on",
+        verb: (target && VERB[target.role]) ?? "workedOn",
         failing: (edge ? edgeFailing(edge) : false) || target?.health === "failing",
       };
     })
@@ -241,33 +243,35 @@ export function formatCountdown(ms: number): string {
 
 // ------------------------------------------------------------------- mixed
 
-export const ROLE_SECTIONS: { title: string; roles: AppNodeRole[] }[] = [
-  { title: "Traffic", roles: ["ingress"] },
-  { title: "Services", roles: ["service"] },
-  { title: "Functions", roles: ["trigger", "function"] },
-  { title: "Jobs", roles: ["schedule", "worker"] },
-  { title: "Agents", roles: ["agent"] },
-  { title: "Queues", roles: ["queue"] },
-  { title: "Data", roles: ["data"] },
-  { title: "External", roles: ["external"] },
+/** Sections of the mixed layout; `key` names its title under `vizRender.sections`. */
+export const ROLE_SECTIONS: { key: string; roles: AppNodeRole[] }[] = [
+  { key: "traffic", roles: ["ingress"] },
+  { key: "services", roles: ["service"] },
+  { key: "functions", roles: ["trigger", "function"] },
+  { key: "jobs", roles: ["schedule", "worker"] },
+  { key: "agents", roles: ["agent"] },
+  { key: "queues", roles: ["queue"] },
+  { key: "data", roles: ["data"] },
+  { key: "external", roles: ["external"] },
 ];
 
-export function roleSections(nodes: AppNode[]): { title: string; nodes: AppNode[] }[] {
+export function roleSections(nodes: AppNode[]): { key: string; nodes: AppNode[] }[] {
   return ROLE_SECTIONS.map((s) => ({
-    title: s.title,
+    key: s.key,
     nodes: nodes.filter((n) => s.roles.includes(n.role)),
   })).filter((s) => s.nodes.length > 0);
 }
 
 // ---------------------------------------------------------------- summaries
 
-export function summarize(nodes: AppNode[], noun: string): string {
+/** "5 nodes, 1 failing, 2 busy"; `noun` is a key under `vizRender.nouns`. */
+export function summarize(nodes: AppNode[], noun: string, t: VizT): string {
   const failing = nodes.filter((n) => n.health === "failing").length;
   const busy = nodes.filter((n) => n.health !== "failing" && n.load >= BUSY_LOAD).length;
   const idle = nodes.filter((n) => n.health === "idle").length;
-  const parts = [`${nodes.length} ${noun}`];
-  if (failing) parts.push(`${failing} failing`);
-  if (busy) parts.push(`${busy} busy`);
-  if (idle) parts.push(`${idle} idle`);
-  return parts.join(", ");
+  const parts = [t(`nouns.${noun}`, { count: nodes.length })];
+  if (failing) parts.push(t("counts.failing", { count: failing }));
+  if (busy) parts.push(t("counts.busy", { count: busy }));
+  if (idle) parts.push(t("counts.idle", { count: idle }));
+  return parts.join(t("listSeparator"));
 }

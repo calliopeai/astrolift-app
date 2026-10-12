@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import messages from "@/messages/en.json";
+
+import { vizTranslator } from "../core/viz-t";
+
 import type {
   FanoutStation,
   SupervisorWorker,
@@ -75,6 +79,8 @@ const train = (
   startedAt: 0,
 });
 
+const vt = vizTranslator(messages);
+
 describe("stationHealth", () => {
   it("is idle with nothing there, ok with a run leaving", () => {
     const s = snap({});
@@ -131,7 +137,7 @@ describe("helpers", () => {
 
   it("summarize counts states", () => {
     const s = snap({ trains: [train("a", 1, "held"), train("b", 2, "failed")] });
-    expect(summarize(s)).toBe("1 workflow, 2 runs, 0 moving, 1 held at gates, 1 failed");
+    expect(summarize(s, vt)).toBe("1 workflow, 2 runs, 0 moving, 1 held at gates, 1 failed");
   });
 
   it("truncate and easeOut", () => {
@@ -231,20 +237,20 @@ describe("rounds climb", () => {
       loopRounds: { [testLoop.id]: 2 },
     });
     expect(roundBadge(feature, t)).toBe("3/5");
-    expect(runName(shaped([t]), feature, t)).toBe("Run #5310: Test, round 3 of 5, failed");
+    expect(runName(shaped([t]), feature, t, vt)).toBe("Run #5310: Test, round 3 of 5, failed");
     const first = run({ id: "1", lineId: feature.id, at: 2 });
     expect(roundBadge(feature, first)).toBeNull();
     const retry = run({ id: "2", lineId: feature.id, at: 5, attempt: 2 });
     expect(roundBadge(feature, retry)).toBe("2/3");
-    expect(runName(shaped([retry]), feature, retry)).toContain("attempt 2 of 3");
+    expect(runName(shaped([retry]), feature, retry, vt)).toContain("attempt 2 of 3");
   });
 
   it("a station's name carries every loop leaving it, with its bound", () => {
     const s = shaped([]);
-    expect(stationName(s, feature, 2)).toBe(
+    expect(stationName(s, feature, 2, vt)).toBe(
       "Feature delivery, Test: idle. Back to Code when Test fails, at most 5 rounds"
     );
-    expect(stationName(s, feature, 3)).toContain("at most 3 rounds");
+    expect(stationName(s, feature, 3, vt)).toContain("at most 3 rounds");
     expect(reviewLoop.maxRounds).toBe(3);
   });
 });
@@ -286,7 +292,7 @@ describe("fanout rails", () => {
     expect(p.get("b0")!.track!.s).toBe(BRANCH_S.succeeded);
     expect(p.get("b0")!.x).toBeGreaterThan(p.get("b1")!.x);
     expect(p.get("b0")!.live).toBe(true);
-    expect(stationName(s, line, 1)).toContain("2 branches, 1 settled, 1 running");
+    expect(stationName(s, line, 1, vt)).toContain("2 branches, 1 settled, 1 running");
     expect(stationHealth(s, line, 2)).toBe("ok");
   });
 });
@@ -301,7 +307,7 @@ describe("supervisor and nested workflow", () => {
     });
     expect(workerSpeed(w(false, 0.9))).toBe(0);
     expect(workerSpeed(w(true, 0.8))).toBeGreaterThan(workerSpeed(w(true, 0.2)));
-    expect(stationName(shaped([]), support, 1)).toBe(
+    expect(stationName(shaped([]), support, 1, vt)).toBe(
       "Support triage, Supervisor supervisor: 0 of 5 workers busy"
     );
   });
@@ -320,8 +326,8 @@ describe("supervisor and nested workflow", () => {
     const open = placeCrates(s, new Set([close.stations[1].id]));
     expect(open.get("p/child")!.child).toBe(true);
     expect(open.get("p/child")!.lane).toBe(close.id);
-    expect(stationName(s, close, 1)).toContain("child run at Investigate, stage 2 of 3");
-    expect(runName(s, close, parent)).toBe("Run #p: Reconcile, child run at Investigate");
+    expect(stationName(s, close, 1, vt)).toContain("child run at Investigate, stage 2 of 3");
+    expect(runName(s, close, parent, vt)).toBe("Run #p: Reconcile, child run at Investigate");
   });
 
   it("gives shaped lanes extra room and keeps classic lanes LANE apart", () => {
@@ -345,7 +351,7 @@ describe("supervisor and nested workflow", () => {
       onLoopId: reviewLoop.id,
       loopProgress: 0.2,
     });
-    expect(summarize(shaped([t]))).toBe(
+    expect(summarize(shaped([t]), vt)).toBe(
       "4 workflows, 1 run, 0 moving, 0 held at gates, 0 failed, 1 sent back on a loop"
     );
   });

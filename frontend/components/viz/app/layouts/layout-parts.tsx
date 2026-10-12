@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { StatTile } from "@/components/ui/stat-tile";
@@ -11,7 +12,6 @@ import {
   flowDuration,
   HEALTH_COLOR,
   HEALTH_GLOWS,
-  HEALTH_LABEL,
   MOTION_CLASS,
   type Health,
 } from "../../core/semantics";
@@ -88,6 +88,7 @@ export function Kpi({
   caption?: React.ReactNode;
   className?: string;
 }) {
+  const t = useTranslations("vizRender");
   return (
     <StatTile
       className={cn("rounded-sm", className)}
@@ -95,7 +96,7 @@ export function Kpi({
         <span className="inline-flex items-center gap-1.5">
           <StatusDot health={health} />
           <span className="truncate">{label}</span>
-          <span className="sr-only">{HEALTH_LABEL[health]}</span>
+          <span className="sr-only">{t(`health.${health}`)}</span>
         </span>
       }
       value={value}
@@ -220,12 +221,13 @@ export function NodeButton({
   className?: string;
   style?: React.CSSProperties;
 }) {
+  const t = useTranslations("vizRender");
   const color = HEALTH_COLOR[health];
   return (
     <button
       type="button"
       tabIndex={0}
-      title={`${node.name} (${node.kind}): ${HEALTH_LABEL[health]}`}
+      title={t("nodeTitle", { name: node.name, kind: node.kind, health: t(`health.${health}`) })}
       onClick={() => onSelect?.(node.id)}
       className={cn(
         "bg-card flex min-w-0 flex-col gap-2 rounded-sm border p-3 text-left",
