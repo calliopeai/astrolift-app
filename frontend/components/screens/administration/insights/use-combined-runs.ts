@@ -2,6 +2,7 @@
 
 import { useApolloClient, useQuery } from "@apollo/client/react";
 import * as React from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { exportCsv } from "@/components/list/exportCsv";
@@ -9,6 +10,7 @@ import { useHeldRows } from "@/components/list/use-held-rows";
 import { useListState } from "@/components/list/use-list-state";
 import { RUN_AUDIT } from "@/graphql/operations/run-audit.queries";
 
+import { localizeList } from "../localize-list";
 import {
   type CombinedRun,
   fromRunAuditItem,
@@ -41,7 +43,14 @@ interface RunAuditResp {
  */
 export function useCombinedRuns(): CombinedRunsScreenProps {
   const client = useApolloClient();
-  const list = useListState(RUN_AUDIT_LIST);
+  const t = useTranslations("adminRuns");
+  const lists = useTranslations("adminRuns.list");
+  const format = useFormatter();
+  const definition = React.useMemo(
+    () => localizeList(RUN_AUDIT_LIST, lists, ["kind", "since"]),
+    [lists]
+  );
+  const list = useListState(definition);
   // `since:24h` is anchored when the page opens, so the variables stay stable.
   const [now] = React.useState(() => Date.now());
   const variables = runAuditVariables(
@@ -87,10 +96,10 @@ export function useCombinedRuns(): CombinedRunsScreenProps {
         after = chunk?.nextCursor ?? null;
       } while (after && out.length < EXPORT_CAP);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "The export failed");
+      toast.error(err instanceof Error ? err.message : t("exportFailed"));
       return;
     }
-    if (after) toast.warning(`Exported the first ${EXPORT_CAP.toLocaleString("en-US")} runs.`);
+    if (after) toast.warning(t("exportCapped", { count: format.number(EXPORT_CAP) }));
     exportCsv(`run-audit-${new Date().toISOString().slice(0, 10)}`, out, RUN_CSV);
   }
 

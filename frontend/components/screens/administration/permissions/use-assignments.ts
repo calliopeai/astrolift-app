@@ -1,6 +1,8 @@
 "use client";
 
 import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
+import * as React from "react";
 import { toast } from "sonner";
 
 import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
@@ -28,6 +30,7 @@ import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import { numberedVariables } from "../access/identity-lists";
 import { useNumberedListQuery } from "../access/use-list-page-query";
+import { localizeList } from "../localize-list";
 import { ASSIGNMENTS_LIST, bindingsFilter } from "./permissions-lists";
 
 interface BindingsPageResp {
@@ -47,6 +50,8 @@ const REVOKE_REFETCH = ["ListRoleBindingsPage", { query: LIST_ROLE_BINDINGS }];
 
 /** The data half of AssignmentsView: the role-bindings page, the roles, and revoke. */
 export function useAssignments() {
+  const t = useTranslations("adminBindings");
+  const lists = useTranslations("adminPermissionLists.assignments");
   const client = useApolloClient();
   const perms = useMyPermissions();
   const canManage = perms.can("org.manage_members");
@@ -54,7 +59,11 @@ export function useAssignments() {
   // `astroliftRoleBindingsPage` searches username, email, first / last
   // name, group external id and role slug / name, and filters, sorts and
   // numbers the pages (#2153).
-  const list = useListState(ASSIGNMENTS_LIST);
+  const definition = React.useMemo(
+    () => localizeList(ASSIGNMENTS_LIST, lists, ["scope", "kind"]),
+    [lists]
+  );
+  const list = useListState(definition);
   const page = useNumberedListQuery<AstroliftRoleBinding, ReturnType<typeof bindingsFilter>>(
     LIST_ROLE_BINDINGS_PAGE,
     list,
@@ -74,7 +83,7 @@ export function useAssignments() {
       variables: { search: variables.search, filter: variables.filter, sort: variables.sort },
       fetchPolicy: "network-only",
     });
-    if (!result.data?.astroliftRoleBindingsCsv) throw new Error("The export returned no file");
+    if (!result.data?.astroliftRoleBindingsCsv) throw new Error(t("exportEmpty"));
     return result.data.astroliftRoleBindingsCsv;
   });
 
@@ -99,9 +108,9 @@ export function useAssignments() {
   async function onRevoke(b: AstroliftRoleBinding): Promise<void> {
     const { data } = await revokeBinding({ variables: { input: { id: b.id } } });
     if (data?.revokeRoleBinding.ok) {
-      toast.success("Role revoked");
+      toast.success(t("revoked"));
     } else {
-      throw new Error(data?.revokeRoleBinding.errors?.[0]?.message ?? "Revoke failed");
+      throw new Error(data?.revokeRoleBinding.errors?.[0]?.message ?? t("revokeFailed"));
     }
   }
 
@@ -114,14 +123,15 @@ export function useAssignments() {
     const { data } = await bulkRevoke({ variables: { input: { bindingIds: ids } } });
     const env = data?.bulkRevokeAstroliftRoleBindings;
     if (!env?.ok || !env.data) {
-      throw new Error(env?.errors?.[0]?.message ?? "Bulk revoke failed");
+      throw new Error(env?.errors?.[0]?.message ?? t("bulkRevokeFailed"));
     }
     const { revokedCount, failedCount } = env.data;
-    if (revokedCount === 0 && failedCount > 0) throw new Error(`All ${failedCount} revokes failed`);
+    if (revokedCount === 0 && failedCount > 0)
+      throw new Error(t("allFailed", { count: failedCount }));
     if (failedCount === 0) {
-      toast.success(`Revoked ${revokedCount} binding${revokedCount === 1 ? "" : "s"}`);
+      toast.success(t("revokedCount", { count: revokedCount }));
     } else {
-      toast.warning(`Revoked ${revokedCount}, ${failedCount} failed`);
+      toast.warning(t("partial", { revoked: revokedCount, failed: failedCount }));
     }
     return true;
   }

@@ -4624,6 +4624,584 @@
       "truncated": "已显示 200 行 — 在控制台中查看完整日志。"
     }
   },
+  "adminOrganization": {
+    "title": "组织",
+    "description": "编辑平台的组织级身份信息和保留期限默认值。",
+    "general": {
+      "title": "常规",
+      "description": "显示在侧边栏和邮件中的显示名称与主页 URL。",
+      "slug": "Slug",
+      "slugHint": "Slug 不可更改，用于 URL 和命名空间前缀。",
+      "displayName": "显示名称",
+      "website": "网站"
+    },
+    "retention": {
+      "title": "保留期限默认值",
+      "description": "新应用继承的默认值。现有应用在被显式编辑之前保留各自的值。",
+      "auditDays": "审计日志保留天数",
+      "default": "默认 <mono>{value}</mono>。",
+      "previewCap": "预览环境上限",
+      "appLogDays": "应用日志保留天数",
+      "pending": "应用注册表界面上线后即可编辑。"
+    },
+    "policies": {
+      "title": "用户策略",
+      "description": "适用于每位成员的组织级规则，包括自助资料编辑器。",
+      "allowProfileEdit": "允许用户编辑自己的资料",
+      "allowProfileEditHint": "允许用户在 <code>{path}</code> 更新名字、姓氏和邮箱。即使开启，由身份提供商管理的字段仍保持锁定，因为对这些字段的本地修改会在下次登录时被覆盖。在以 IdP 为唯一可信来源的纯 SSO 部署中请关闭此项。",
+      "restrictedTitle": "成员无法更改的设置",
+      "restrictedHint": "未在“设置 › 外观”中选择的成员使用此默认值。自行选择的成员保留其选择。",
+      "restricted": {
+        "show": {
+          "label": "以只读方式显示",
+          "blurb": "以禁用状态显示无法更改的设置，并注明所需权限"
+        },
+        "hide": {
+          "label": "隐藏",
+          "blurb": "仅显示可更改的设置"
+        }
+      }
+    },
+    "sections": {
+      "houseTheme": "内部主题",
+      "trustedDomains": "受信任的域名",
+      "modules": "模块"
+    },
+    "idp": {
+      "title": "身份提供商",
+      "description": "此组织的 OIDC、SAML 和 SCIM 登录配置。",
+      "comingSoon": "应用内设置即将推出",
+      "activeByEnvironment": "当前生效（按环境）：",
+      "development": "开发",
+      "devBypass": "auth1 dev-login 绕过",
+      "stagingProduction": "预发布与生产",
+      "roadmap": "应用内提供商选择器接通后，专门的设置子页面将加入 OIDC 发现、SAML 元数据和 SCIM 令牌轮换。"
+    },
+    "updated": "组织已更新",
+    "saveFailed": "保存失败"
+  },
+  "adminTrustedDomains": {
+    "title": "受信任的邮件域名",
+    "description": "邮箱属于这些域名的 SSO 用户无需明确邀请即可加入此组织。设置<em>需要管理员审核</em>后，他们将作为待审批成员加入，获批后才有访问权限。",
+    "domain": "域名",
+    "defaultRole": "默认角色",
+    "none": "无",
+    "noneOption": "无",
+    "mode": "模式",
+    "reviewRequired": "需要审核",
+    "autoJoin": "自动加入",
+    "loadingRoles": "正在加载角色…",
+    "rolesError": "无法加载默认角色",
+    "onSignIn": "登录时",
+    "autoJoinNow": "立即自动加入",
+    "requireReview": "需要管理员审核",
+    "addDomain": "添加域名",
+    "listLabel": "受信任的域名",
+    "removeDomain": "移除 {domain}",
+    "emptyTitle": "暂无受信任的域名",
+    "emptyDescription": "域名不匹配的 SSO 用户仍需明确邀请才能加入。",
+    "confirmTitle": "移除 {domain}？",
+    "confirmTitleFallback": "移除域名？",
+    "confirmDescription": "来自此域名的新登录将不再自动加入组织，需要明确邀请。现有成员保留其访问权限和角色绑定；此更改仅对之后生效。",
+    "confirmLabel": "移除域名",
+    "added": "已添加 {domain}",
+    "addFailed": "添加失败",
+    "removed": "已移除 {domain}",
+    "removeFailed": "移除失败",
+    "list": {
+      "search": "搜索域名、角色…",
+      "fields": {
+        "mode": "模式",
+        "role": "默认角色"
+      },
+      "options": {
+        "mode": {
+          "auto": "自动加入",
+          "review": "需要审核"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的"
+      },
+      "notes": {
+        "mine": "受信任的域名尚未记录添加者，因此“我的”为空。"
+      }
+    }
+  },
+  "adminHouseTheme": {
+    "title": "内部主题",
+    "description": "适用于尚未在“设置 › 外观”中自行选择的所有人。将某项保留为<strong>未设置</strong>即可让每个人自行选择。除非主题已锁定，用户仍可自选强调色。",
+    "save": "保存内部主题",
+    "ground": "背景",
+    "accent": "强调色",
+    "notSet": "未设置",
+    "lock": "锁定此主题",
+    "lockHint": "所有人都会使用内部主题，个人选择器变为只读。默认关闭；发布默认值与强制执行是两个不同的决定。",
+    "grounds": {
+      "black": "黑色",
+      "charcoal": "炭灰",
+      "graphite": "石墨",
+      "emerald": "翡翠绿",
+      "paper": "纸白",
+      "mist": "雾灰"
+    },
+    "modes": {
+      "dark": "深色",
+      "light": "浅色"
+    },
+    "accents": {
+      "green": "绿色",
+      "copper": "铜色",
+      "ice": "冰蓝",
+      "periwinkle": "长春花蓝",
+      "amber": "琥珀色"
+    },
+    "saved": "内部主题已保存",
+    "savedLocked": "内部主题已保存并锁定",
+    "saveFailed": "保存失败"
+  },
+  "adminModules": {
+    "title": "模块",
+    "description": "此组织的可选集成。安装管理员仍可为所有组织强制关闭其中任一项。",
+    "loadError": "无法加载模块",
+    "installOff": "已在此安装中关闭",
+    "enable": "启用 {module}",
+    "disable": "停用 {module}",
+    "enabledToast": "已启用 {module}",
+    "disabledToast": "已停用 {module}",
+    "updateError": "无法更新该模块。",
+    "items": {
+      "chat_studio_integration": {
+        "label": "Chat Studio 集成",
+        "description": "允许 Chat Studio 通过 builder API 访问此组织的应用。"
+      },
+      "agent_live_attach": {
+        "label": "智能体实时接入",
+        "description": "允许成员实时接入正在运行的智能体会话。"
+      },
+      "chat_studio_agent_runs": {
+        "label": "Chat Studio 智能体运行",
+        "description": "允许 Chat Studio 启动此组织已注册的智能体。"
+      },
+      "agent_policy_enforcement": {
+        "label": "智能体策略执行",
+        "description": "允许 Zentinelle 对此组织的智能体和 box 执行策略操作。"
+      }
+    }
+  },
+  "actionSafety": {
+    "title": "操作安全",
+    "intro": "敏感操作在执行前需要确认并重新登录，默认开启。破坏性删除还可以等待其他管理员审批。此处的更改适用于整个组织；团队、应用或个人只能被要求更多，不能更少。更改这些设置需要重新登录。",
+    "inspect": "查看适用于",
+    "wholeOrg": "整个组织",
+    "inspectingNote": "只读：在应用团队、应用和个人规则后，此应用对你生效的内容。",
+    "loading": "正在加载…",
+    "loadError": "无法读取防护规则：{error}",
+    "retry": "重试",
+    "columns": {
+      "action": "操作",
+      "confirm": "确认并重新登录",
+      "approval": "审批",
+      "selfApproval": "管理员可审批自己的请求"
+    },
+    "askBefore": "执行前确认：{action}",
+    "on": "开",
+    "off": "关",
+    "narrower": "也已为团队、应用或个人设置",
+    "requireApproval": "需要审批：{action}",
+    "required": "必需",
+    "approversNeeded": "所需审批人：{action}",
+    "approvers": "{count, plural, other {# 位审批人}}",
+    "perApp": "按应用在密钥审批中设置",
+    "notAvailable": "不可用",
+    "selfApprovalFor": "管理员可审批自己的请求：{action}",
+    "allowed": "允许",
+    "notAllowed": "不允许",
+    "ruleNotSaved": "规则未保存。",
+    "decisionNotSaved": "决定未保存。",
+    "requests": {
+      "title": "审批请求",
+      "loadError": "无法读取请求：{error}",
+      "empty": "没有待处理的请求。",
+      "byYou": "由你发起",
+      "byEmail": "由 {email} 发起",
+      "bySomeone": "由他人发起",
+      "progress": "已批准 <mono>{approvals}/{required}</mono> · 到期 <expiry></expiry>",
+      "approvedMine": "已批准：再次执行即可继续",
+      "approved": "已批准",
+      "approve": "批准",
+      "reject": "拒绝",
+      "withdraw": "撤回"
+    },
+    "scoped": {
+      "title": "团队、应用和人员规则",
+      "description": "这些规则只会在组织防护之上叠加，不会移除。",
+      "empty": "没有团队、应用或个人规则。",
+      "forKind": "适用于{kind}",
+      "kinds": {
+        "TEAM": "团队",
+        "APP": "应用",
+        "USER": "个人"
+      },
+      "remove": "移除",
+      "addLegend": "添加规则",
+      "appliesTo": "适用对象",
+      "action": "操作",
+      "searchPeoplePlaceholder": "按姓名或邮箱搜索人员",
+      "searchPeople": "搜索人员",
+      "searching": "正在搜索…",
+      "people": "人员",
+      "pickTeam": "选择团队",
+      "pickApp": "选择应用",
+      "teams": "团队",
+      "apps": "应用",
+      "askBefore": "执行前确认（确认并重新登录）",
+      "requireApproval": "需要审批",
+      "approversNeeded": "所需审批人",
+      "approvers": "{count, plural, other {# 位审批人}}",
+      "noSelf": "不得审批自己的请求",
+      "add": "添加规则",
+      "adds": {
+        "asksBefore": "执行前确认",
+        "needsApprovers": "{count, plural, other {需要 # 位审批人}}",
+        "noSelfApproval": "不允许自我审批",
+        "nothing": "未添加任何限制"
+      }
+    }
+  },
+  "adminCheckAccess": {
+    "checkTitle": "检查访问权限",
+    "compareTitle": "比较访问权限",
+    "checkOne": "检查单个权限",
+    "compareTwo": "比较两个人",
+    "me": "我",
+    "question": "<who></who> 能否在 <scope></scope> 上执行 <permission></permission>？",
+    "someone": "某人",
+    "doSomething": "某项操作",
+    "theOrganization": "组织",
+    "who": "谁",
+    "on": "对象",
+    "wholeOrg": "整个组织",
+    "answer": "结果",
+    "compareQuestion": "<who></who> 能做而 <other></other> 不能做的是什么？反过来呢？",
+    "someoneElse": "另一个人",
+    "firstPerson": "第一个人",
+    "secondPerson": "第二个人",
+    "sideBySide": "并排对比",
+    "compareNeeds": "比较两个人需要 {permission}。",
+    "checkNeeds": "你可以检查自己的访问权限；检查他人需要 {permission}。",
+    "answerCovers": "结果直接来自权限检查本身：针对所选对象，已包含 IdP 组、团队共享和组织策略。"
+  },
+  "adminNewRole": {
+    "title": "新建角色",
+    "roles": "角色",
+    "duplicate": "复制 {name}",
+    "customName": "{name}（自定义）",
+    "context": "自定义角色是在某个适用范围内授予的一组具名权限。",
+    "steps": "步骤",
+    "step": {
+      "details": "详情",
+      "permissions": "权限",
+      "review": "确认"
+    },
+    "startFrom": "起始角色",
+    "loadingRoles": "正在加载角色…",
+    "blank": "无，空白角色",
+    "builtInOption": "{name}（{builtIn}）",
+    "name": "名称",
+    "namePlaceholder": "发布经理",
+    "slug": "Slug",
+    "slugHelp": "在你编辑前由名称生成。创建后不可更改。",
+    "bindsAt": "绑定层级",
+    "bindsAtHelp": "可授予的位置：此层级或其中的任何对象。创建后不可更改。",
+    "description": "描述",
+    "descriptionPlaceholder": "用一句话说明此角色的用途。",
+    "comparedWith": "与 {name} 比较。新角色会记录它复制自 {name}，以便其“权限”标签页显示与原角色的差异。",
+    "cancel": "取消",
+    "back": "上一步",
+    "continue": "继续",
+    "creating": "正在创建…",
+    "create": "创建角色",
+    "errors": {
+      "name": "请为角色命名。",
+      "slugFormat": "仅限小写字母、数字、连字符和下划线，且以字母或数字开头。",
+      "slugTaken": "名为 {slug} 的角色已存在。"
+    },
+    "created": "角色“{name}”已创建",
+    "createFailed": "创建失败"
+  },
+  "adminBindings": {
+    "title": "分配",
+    "context": "用户或 IdP 组持有的每个角色、适用位置及原因。",
+    "moreActions": "更多列表操作",
+    "exporting": "正在导出 CSV…",
+    "export": "将匹配的分配导出为 CSV",
+    "listLabel": "角色绑定",
+    "revoke": "撤销",
+    "revokeCount": "撤销 {count} 项",
+    "emptyTitle": "没有角色绑定",
+    "emptyDescription": "为用户授予角色即可让其访问平台。",
+    "bulkTitle": "{count, plural, other {撤销 # 个角色绑定？}}",
+    "bulkDescription": "所选用户将失去这些角色授予的权限，其持有的其他绑定仍然有效。",
+    "revokeFrom": "撤销 {name} 的 {role}？",
+    "revokeFallback": "撤销？",
+    "revokeDescription": "该用户将失去此角色授予的权限。其他角色绑定（如有）仍然有效。",
+    "holders": "持有者",
+    "holdersEmptyTitle": "没有人持有此角色",
+    "holdersEmptyDescription": "将 {role} 授予个人或组后，他们会连同适用位置显示在这里。",
+    "grantAccess": "授予访问权限",
+    "revokeGroup": "移除此组与该角色的映射。组成员保留其他绑定授予的访问权限。",
+    "revokeHolder": "将失去此角色在这里授予的权限，其持有的其他绑定仍然有效。",
+    "heldBy": "持有者",
+    "idpGroup": "IdP 组",
+    "role": "角色",
+    "where": "位置",
+    "source": "来源",
+    "granted": "授予时间",
+    "expires": "到期",
+    "never": "永不",
+    "exportEmpty": "导出未返回文件",
+    "revoked": "角色已撤销",
+    "revokeFailed": "撤销失败",
+    "bulkRevokeFailed": "批量撤销失败",
+    "allFailed": "{count, plural, other {全部 # 项撤销均失败}}",
+    "revokedCount": "{count, plural, other {已撤销 # 个绑定}}",
+    "partial": "已撤销 {revoked} 项，{failed} 项失败"
+  },
+  "adminPermissionLists": {
+    "roles": {
+      "search": "按名称或 slug 搜索角色…",
+      "fields": {
+        "scope": "绑定层级",
+        "builtin": "内置"
+      },
+      "options": {
+        "scope": {
+          "ORG": "组织",
+          "TEAM": "团队",
+          "PROJECT": "项目",
+          "APP": "应用"
+        },
+        "builtin": {
+          "yes": "内置",
+          "no": "自定义"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "builtin": "内置",
+        "custom": "自定义"
+      }
+    },
+    "assignments": {
+      "search": "按用户、组或角色搜索…",
+      "fields": {
+        "role": "角色",
+        "scope": "适用范围",
+        "kind": "持有者",
+        "holder": "持有者"
+      },
+      "options": {
+        "scope": {
+          "ORG": "组织",
+          "TEAM": "团队",
+          "PROJECT": "项目",
+          "APP": "应用"
+        },
+        "kind": {
+          "user": "用户",
+          "group": "组"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "groups": "组"
+      }
+    },
+    "holders": {
+      "search": "按用户或组搜索持有者…",
+      "fields": {
+        "scope": "适用范围",
+        "kind": "持有者"
+      },
+      "options": {
+        "scope": {
+          "ORG": "组织",
+          "TEAM": "团队",
+          "PROJECT": "项目",
+          "APP": "应用"
+        },
+        "kind": {
+          "user": "用户",
+          "group": "组"
+        }
+      },
+      "views": {
+        "all": "全部"
+      }
+    }
+  },
+  "adminRoles": {
+    "title": "角色",
+    "context": "具名的权限集合。内置角色不可更改；复制一个即可自定义。",
+    "newRole": "新建角色",
+    "columns": {
+      "role": "角色",
+      "allows": "允许的操作",
+      "bindsAt": "绑定层级",
+      "kind": "类型",
+      "permissions": "权限",
+      "holders": "持有者"
+    },
+    "builtIn": "内置",
+    "custom": "自定义",
+    "duplicatedFrom": "复制自 {name}",
+    "from": "来自 {name}",
+    "fromDeleted": "来自 {name}（已删除）",
+    "emptyTitle": "没有角色",
+    "emptyDescription": "内置角色在部署时创建；如果没有显示，可能尚未解析组织上下文。"
+  },
+  "adminRolePermissions": {
+    "savedLabel": "已保存",
+    "builtInNote": "内置角色随平台提供，不可更改。复制后可创建可精简的自定义角色。",
+    "duplicate": "复制以自定义",
+    "lineage": "复制自 <role>{name}</role>{builtIn, select, true {（内置）} other {}}{deleted, select, true {，现已删除} other {}}：此后 <diff></diff>。",
+    "compareWithRole": "与 {name} 比较",
+    "compareWith": "比较对象",
+    "savedVersion": "已保存的版本",
+    "nothing": "无",
+    "lineageOption": "{name}（复制来源{deleted, select, true {，已删除} other {}}）",
+    "builtInOption": "{name}（内置）",
+    "unsaved": "未保存",
+    "noChanges": "没有未保存的更改",
+    "discard": "放弃",
+    "saving": "正在保存…",
+    "save": "保存权限"
+  },
+  "adminRoleDetail": {
+    "role": "角色",
+    "notFoundCrumb": "未找到",
+    "notFoundTitle": "未找到角色",
+    "permissions": "权限",
+    "missingTitle": "没有此 ID 的角色",
+    "missingDescription": "此组织中没有 ID 为 {id} 的对象，可能已被删除。",
+    "allRoles": "所有角色",
+    "grantAccess": "授予访问权限",
+    "builtIn": "内置",
+    "custom": "自定义",
+    "tabs": {
+      "permissions": "权限",
+      "holders": "持有者",
+      "settings": "设置"
+    },
+    "gone": "此角色已不存在。",
+    "saved": "角色“{name}”已保存",
+    "saveFailed": "保存失败",
+    "settings": {
+      "title": "名称和描述",
+      "lockedDescription": "内置角色保留其自带的名称和描述。",
+      "description": "授予此角色时显示的内容。",
+      "name": "名称",
+      "descriptionLabel": "描述",
+      "descriptionPlaceholder": "用一句话说明此角色的用途。",
+      "slug": "Slug",
+      "bindsAt": "绑定层级",
+      "bindsAtValue": "{scope, select, ORG {组织或其中的任何对象} TEAM {团队或其中的任何对象} PROJECT {项目或其中的任何对象} APP {应用或其中的任何对象} other {{scope} 或其中的任何对象}}",
+      "kind": "类型",
+      "builtIn": "内置",
+      "custom": "自定义"
+    }
+  },
+  "adminPermissions": {
+    "pages": {
+      "roles": "角色",
+      "assignments": "分配",
+      "diagnostics": "诊断",
+      "presets": "快速设置",
+      "safety": "操作安全"
+    },
+    "off": "此安装已关闭此控制台。",
+    "offHint": "权限功能由 <code>{flag}</code> 标志控制。请在<link>管理 › 功能</link>中开启。"
+  },
+  "adminPresets": {
+    "title": "快速设置",
+    "intro": "从一个人需要做什么开始。每个选项都会在你选择的范围内授予一个现有角色，因此会像其他授权一样显示在“分配”下。所有选项都不会让人成为安装的超级管理员。",
+    "loading": "正在加载…",
+    "loadError": "无法读取预设：{error}",
+    "retry": "重试",
+    "task": "任务",
+    "scopes": {
+      "ORG": "组织",
+      "TEAM": "团队",
+      "PROJECT": "项目",
+      "APP": "应用"
+    },
+    "grantAt": "在{scope}级别授予 {preset}",
+    "grant": "授予",
+    "allowed": "允许",
+    "notIncluded": "不包含",
+    "footer": "如需授予，请在<link>分配</link>下分配其角色。"
+  },
+  "adminRuns": {
+    "title": "运行",
+    "columns": {
+      "run": "运行",
+      "what": "内容",
+      "startedBy": "启动者",
+      "when": "时间",
+      "took": "耗时",
+      "outcome": "结果"
+    },
+    "kinds": {
+      "agent": "智能体运行",
+      "workflow": "工作流运行",
+      "deployment": "部署",
+      "job": "作业运行",
+      "task": "任务运行"
+    },
+    "notRecorded": "未记录",
+    "emptyTitle": "暂无运行",
+    "emptyDescription": "智能体运行、工作流运行、部署、作业运行和任务运行在启动后会显示在这里。",
+    "more": "更多",
+    "exportCsv": "导出 CSV",
+    "exportFailed": "导出失败",
+    "exportCapped": "已导出前 {count} 条运行记录。",
+    "list": {
+      "search": "搜索运行、智能体、应用、ID…",
+      "fields": {
+        "kind": "类型",
+        "outcome": "结果",
+        "trigger": "触发方式",
+        "startedBy": "启动者",
+        "project": "项目",
+        "app": "应用",
+        "since": "起始时间"
+      },
+      "options": {
+        "kind": {
+          "agent": "智能体运行",
+          "workflow": "工作流运行",
+          "deployment": "部署",
+          "job": "作业运行",
+          "task": "任务运行"
+        },
+        "since": {
+          "1h": "过去 1 小时",
+          "24h": "过去 24 小时",
+          "7d": "过去 7 天",
+          "30d": "过去 30 天",
+          "90d": "过去 90 天"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的"
+      }
+    }
+  },
   "orgMembers": {
     "searchLabel": "搜索成员",
     "searchPlaceholder": "按用户名或邮箱搜索…",

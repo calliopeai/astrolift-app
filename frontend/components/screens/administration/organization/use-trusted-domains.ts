@@ -1,6 +1,8 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
+import * as React from "react";
 import { toast } from "sonner";
 
 import { selectRows } from "@/components/list/select-rows";
@@ -20,6 +22,7 @@ import type {
   MutationResult,
 } from "@/graphql/identity/identity.types";
 
+import { localizeList } from "../localize-list";
 import { TRUSTED_DOMAINS_LIST, TRUSTED_DOMAINS_SELECT } from "./trusted-domains-list";
 
 interface ListResp {
@@ -42,7 +45,13 @@ export interface TrustedDomainInput {
  * owns `?section=`) and its mutations.
  */
 export function useTrustedDomains() {
-  const listState = useLocalListState(TRUSTED_DOMAINS_LIST);
+  const t = useTranslations("adminTrustedDomains");
+  const lists = useTranslations("adminTrustedDomains.list");
+  const definition = React.useMemo(
+    () => localizeList(TRUSTED_DOMAINS_LIST, lists, ["mode"]),
+    [lists]
+  );
+  const listState = useLocalListState(definition);
   const list = useQuery<ListResp>(LIST_ORGANIZATION_ALLOWLIST_DOMAINS, {
     fetchPolicy: "cache-and-network",
   });
@@ -87,10 +96,10 @@ export function useTrustedDomains() {
       },
     });
     if (data?.addOrganizationAllowlistDomain.ok) {
-      toast.success(`Added ${cleaned}`);
+      toast.success(t("added", { domain: cleaned }));
       return true;
     }
-    toast.error(data?.addOrganizationAllowlistDomain.errors?.[0]?.message ?? "Add failed");
+    toast.error(data?.addOrganizationAllowlistDomain.errors?.[0]?.message ?? t("addFailed"));
     return false;
   }
 
@@ -100,10 +109,10 @@ export function useTrustedDomains() {
       variables: { input: { id: row.id } },
     });
     if (data?.removeOrganizationAllowlistDomain.ok) {
-      toast.success(`Removed ${row.domain}`);
+      toast.success(t("removed", { domain: row.domain }));
     } else {
       throw new Error(
-        data?.removeOrganizationAllowlistDomain.errors?.[0]?.message ?? "Remove failed"
+        data?.removeOrganizationAllowlistDomain.errors?.[0]?.message ?? t("removeFailed")
       );
     }
   }

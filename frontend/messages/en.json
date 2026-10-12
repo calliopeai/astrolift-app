@@ -4649,6 +4649,584 @@
       "truncated": "200 lines shown — open in console for the full tail."
     }
   },
+  "adminOrganization": {
+    "title": "Organization",
+    "description": "Edit the platform's organization-level identity and retention defaults.",
+    "general": {
+      "title": "General",
+      "description": "Display name and homepage URL surfaced in the sidebar and emails.",
+      "slug": "Slug",
+      "slugHint": "Slug is immutable; used in URLs and namespace prefixes.",
+      "displayName": "Display name",
+      "website": "Website"
+    },
+    "retention": {
+      "title": "Retention defaults",
+      "description": "Defaults inherited by new apps. Existing apps retain their own values until edited explicitly.",
+      "auditDays": "Audit log days",
+      "default": "Default <mono>{value}</mono>.",
+      "previewCap": "Preview env cap",
+      "appLogDays": "App log days",
+      "pending": "Editable once the App registry surface lands."
+    },
+    "policies": {
+      "title": "User policies",
+      "description": "Org-wide rules that apply to every member, including the self-service profile editor.",
+      "allowProfileEdit": "Allow users to edit their own profile",
+      "allowProfileEditHint": "Lets users update their first name, last name, and email on <code>{path}</code>. Fields managed by the identity provider stay locked even when this is on, because local edits to IdP-claimed fields would be overwritten on next sign-in. Turn this off for SSO-only deployments where the IdP is the source of truth.",
+      "restrictedTitle": "Settings members can't change",
+      "restrictedHint": "The default for members who haven't chosen under Settings › Appearance. Anyone who picks their own keeps it.",
+      "restricted": {
+        "show": {
+          "label": "Show read-only",
+          "blurb": "See settings you can't change, disabled, with the permission that would allow it"
+        },
+        "hide": {
+          "label": "Hide",
+          "blurb": "Only show settings you can change"
+        }
+      }
+    },
+    "sections": {
+      "houseTheme": "House theme",
+      "trustedDomains": "Trusted domains",
+      "modules": "Modules"
+    },
+    "idp": {
+      "title": "Identity provider",
+      "description": "OIDC, SAML, and SCIM sign-in configuration for this organization.",
+      "comingSoon": "In-app setup coming soon",
+      "activeByEnvironment": "Currently active, by environment:",
+      "development": "Development",
+      "devBypass": "auth1 dev-login bypass",
+      "stagingProduction": "Staging & production",
+      "roadmap": "A dedicated setup sub-route will add OIDC discovery, SAML metadata, and SCIM token rotation once the in-app provider picker is wired."
+    },
+    "updated": "Organization updated",
+    "saveFailed": "Save failed"
+  },
+  "adminTrustedDomains": {
+    "title": "Trusted email domains",
+    "description": "SSO users whose email belongs to one of these domains can join this organization without an explicit invitation. Set <em>Require admin review</em> to land them as pending members for approval before they get active access.",
+    "domain": "Domain",
+    "defaultRole": "Default role",
+    "none": "none",
+    "noneOption": "None",
+    "mode": "Mode",
+    "reviewRequired": "Review required",
+    "autoJoin": "Auto-join",
+    "loadingRoles": "Loading roles…",
+    "rolesError": "Could not load default roles",
+    "onSignIn": "On sign-in",
+    "autoJoinNow": "Auto-join immediately",
+    "requireReview": "Require admin review",
+    "addDomain": "Add domain",
+    "listLabel": "Trusted domains",
+    "removeDomain": "Remove {domain}",
+    "emptyTitle": "No trusted domains yet",
+    "emptyDescription": "SSO users without a domain match still need an explicit invitation to join.",
+    "confirmTitle": "Remove {domain}?",
+    "confirmTitleFallback": "Remove domain?",
+    "confirmDescription": "New sign-ins from this domain stop auto-joining the org and need an explicit invitation. Existing members keep their access and role bindings; this is a forward-only change.",
+    "confirmLabel": "Remove domain",
+    "added": "Added {domain}",
+    "addFailed": "Add failed",
+    "removed": "Removed {domain}",
+    "removeFailed": "Remove failed",
+    "list": {
+      "search": "Search domains, roles…",
+      "fields": {
+        "mode": "Mode",
+        "role": "Default role"
+      },
+      "options": {
+        "mode": {
+          "auto": "auto-join",
+          "review": "review required"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine"
+      },
+      "notes": {
+        "mine": "Trusted domains do not record who added them yet, so Mine is empty."
+      }
+    }
+  },
+  "adminHouseTheme": {
+    "title": "House theme",
+    "description": "Applies to anyone who hasn't picked their own under Settings › Appearance. Leave an option on <strong>Not set</strong> to let people choose it for themselves. People can still pick their own accent there unless the theme is locked.",
+    "save": "Save house theme",
+    "ground": "Ground",
+    "accent": "Accent",
+    "notSet": "Not set",
+    "lock": "Lock this theme",
+    "lockHint": "Everyone gets the house theme and their personal picker becomes read-only. Off by default; publishing a default and forcing it are different decisions.",
+    "grounds": {
+      "black": "Black",
+      "charcoal": "Charcoal",
+      "graphite": "Graphite",
+      "emerald": "Emerald",
+      "paper": "Paper",
+      "mist": "Mist"
+    },
+    "modes": {
+      "dark": "dark",
+      "light": "light"
+    },
+    "accents": {
+      "green": "Green",
+      "copper": "Copper",
+      "ice": "Ice",
+      "periwinkle": "Periwinkle",
+      "amber": "Amber"
+    },
+    "saved": "House theme saved",
+    "savedLocked": "House theme saved and locked",
+    "saveFailed": "Save failed"
+  },
+  "adminModules": {
+    "title": "Modules",
+    "description": "Optional integrations for this organization. An install admin can still force one off for every organization.",
+    "loadError": "Could not load modules",
+    "installOff": "Turned off on this install",
+    "enable": "Enable {module}",
+    "disable": "Disable {module}",
+    "enabledToast": "{module} enabled",
+    "disabledToast": "{module} disabled",
+    "updateError": "Could not update the module.",
+    "items": {
+      "chat_studio_integration": {
+        "label": "Chat Studio integration",
+        "description": "Lets Chat Studio reach this organization's apps through the builder API."
+      },
+      "agent_live_attach": {
+        "label": "Agent live attach",
+        "description": "Lets members attach live to a running agent session."
+      },
+      "chat_studio_agent_runs": {
+        "label": "Chat Studio agent runs",
+        "description": "Lets Chat Studio launch this organization's registered agents."
+      },
+      "agent_policy_enforcement": {
+        "label": "Agent policy enforcement",
+        "description": "Lets Zentinelle apply policy actions to this organization's agents and boxes."
+      }
+    }
+  },
+  "actionSafety": {
+    "title": "Action safety",
+    "intro": "Sensitive actions ask for a confirmation and a fresh sign-in before they run. They are on by default. A destructive delete can also wait for approval from other admins. Changes here apply to the whole organization; a team, app or person can still be asked for more, never less. Changing these asks you to sign in again.",
+    "inspect": "Show what applies on",
+    "wholeOrg": "The whole organization",
+    "inspectingNote": "Read-only: what applies on this app for you, after team, app and person rules.",
+    "loading": "Loading…",
+    "loadError": "The gates could not be read: {error}",
+    "retry": "Retry",
+    "columns": {
+      "action": "Action",
+      "confirm": "Confirm and sign in again",
+      "approval": "Approval",
+      "selfApproval": "Admins may approve their own"
+    },
+    "askBefore": "Ask before: {action}",
+    "on": "On",
+    "off": "Off",
+    "narrower": "Also set for a team, app or person",
+    "requireApproval": "Require approval: {action}",
+    "required": "Required",
+    "approversNeeded": "Approvers needed: {action}",
+    "approvers": "{count, plural, one {# approver} other {# approvers}}",
+    "perApp": "Set per app, under secret approval",
+    "notAvailable": "Not available",
+    "selfApprovalFor": "Admins may approve their own: {action}",
+    "allowed": "Allowed",
+    "notAllowed": "Not allowed",
+    "ruleNotSaved": "The rule was not saved.",
+    "decisionNotSaved": "The decision was not saved.",
+    "requests": {
+      "title": "Approval requests",
+      "loadError": "The requests could not be read: {error}",
+      "empty": "No open requests.",
+      "byYou": "Requested by you",
+      "byEmail": "Requested by {email}",
+      "bySomeone": "Requested by someone",
+      "progress": "<mono>{approvals}/{required}</mono> approved · expires <expiry></expiry>",
+      "approvedMine": "Approved: run it again to go ahead",
+      "approved": "Approved",
+      "approve": "Approve",
+      "reject": "Reject",
+      "withdraw": "Withdraw"
+    },
+    "scoped": {
+      "title": "Rules for teams, apps and people",
+      "description": "These add to the organization's gates, never remove them.",
+      "empty": "No team, app or person rules.",
+      "forKind": "for {kind}",
+      "kinds": {
+        "TEAM": "Team",
+        "APP": "App",
+        "USER": "Person"
+      },
+      "remove": "Remove",
+      "addLegend": "Add a rule",
+      "appliesTo": "Applies to",
+      "action": "Action",
+      "searchPeoplePlaceholder": "Search people by name or email",
+      "searchPeople": "Search people",
+      "searching": "Searching…",
+      "people": "People",
+      "pickTeam": "Pick a team",
+      "pickApp": "Pick an app",
+      "teams": "Teams",
+      "apps": "Apps",
+      "askBefore": "Ask before (confirm and sign in again)",
+      "requireApproval": "Require approval",
+      "approversNeeded": "Approvers needed",
+      "approvers": "{count, plural, one {# approver} other {# approvers}}",
+      "noSelf": "No approving your own",
+      "add": "Add rule",
+      "adds": {
+        "asksBefore": "asks before",
+        "needsApprovers": "{count, plural, one {needs # approver} other {needs # approvers}}",
+        "noSelfApproval": "no self-approval",
+        "nothing": "adds nothing"
+      }
+    }
+  },
+  "adminCheckAccess": {
+    "checkTitle": "Check access",
+    "compareTitle": "Compare access",
+    "checkOne": "Check one permission",
+    "compareTwo": "Compare two people",
+    "me": "Me",
+    "question": "Can <who></who> <permission></permission> on <scope></scope>?",
+    "someone": "someone",
+    "doSomething": "do something",
+    "theOrganization": "the organization",
+    "who": "Who",
+    "on": "On",
+    "wholeOrg": "Whole organization",
+    "answer": "Answer",
+    "compareQuestion": "What can <who></who> do that <other></other> cannot, and the other way round?",
+    "someoneElse": "someone else",
+    "firstPerson": "First person",
+    "secondPerson": "Second person",
+    "sideBySide": "Side by side",
+    "compareNeeds": "Comparing two people needs {permission}.",
+    "checkNeeds": "You can check your own access; checking someone else needs {permission}.",
+    "answerCovers": "The answer is the permission check's own: IdP groups, team shares and the organization's policies are in it, on the object you pick."
+  },
+  "adminNewRole": {
+    "title": "New role",
+    "roles": "Roles",
+    "duplicate": "Duplicate {name}",
+    "customName": "{name} (custom)",
+    "context": "A custom role is a named set of permissions you grant at a scope.",
+    "steps": "Steps",
+    "step": {
+      "details": "Details",
+      "permissions": "Permissions",
+      "review": "Review"
+    },
+    "startFrom": "Start from",
+    "loadingRoles": "Loading roles…",
+    "blank": "Nothing, a blank role",
+    "builtInOption": "{name} ({builtIn})",
+    "name": "Name",
+    "namePlaceholder": "Release manager",
+    "slug": "Slug",
+    "slugHelp": "Derived from the name until you edit it. Fixed once created.",
+    "bindsAt": "Binds at",
+    "bindsAtHelp": "Where it may be granted: at this level or anything inside it. Fixed once created.",
+    "description": "Description",
+    "descriptionPlaceholder": "What this role is for, in one sentence.",
+    "comparedWith": "Compared with {name}. The new role records that it was duplicated from {name}, so its Permissions tab can show how far it moves from it.",
+    "cancel": "Cancel",
+    "back": "Back",
+    "continue": "Continue",
+    "creating": "Creating…",
+    "create": "Create role",
+    "errors": {
+      "name": "Name the role.",
+      "slugFormat": "Lowercase letters, digits, hyphens and underscores, starting with a letter or digit.",
+      "slugTaken": "A role called {slug} already exists."
+    },
+    "created": "Role “{name}” created",
+    "createFailed": "Create failed"
+  },
+  "adminBindings": {
+    "title": "Assignments",
+    "context": "Every role held by a user or an IdP group, where it applies, and why.",
+    "moreActions": "More list actions",
+    "exporting": "Exporting CSV…",
+    "export": "Export matching assignments as CSV",
+    "listLabel": "Role bindings",
+    "revoke": "Revoke",
+    "revokeCount": "Revoke {count}",
+    "emptyTitle": "No role bindings",
+    "emptyDescription": "Grant a role to a user to give them access to the platform.",
+    "bulkTitle": "{count, plural, one {Revoke # role binding?} other {Revoke # role bindings?}}",
+    "bulkDescription": "The selected users lose the permissions these roles granted. Any other bindings they hold stay in effect.",
+    "revokeFrom": "Revoke {role} from {name}?",
+    "revokeFallback": "Revoke?",
+    "revokeDescription": "The user loses the permissions this role granted. Other role bindings, if any, remain in effect.",
+    "holders": "Holders",
+    "holdersEmptyTitle": "Nobody holds this role",
+    "holdersEmptyDescription": "Grant {role} to a person or a group and they appear here, with where it applies.",
+    "grantAccess": "Grant access",
+    "revokeGroup": "Removes this group's mapping to the role. The group's members keep any access other bindings give them.",
+    "revokeHolder": "They lose what this role granted here. Other bindings they hold stay in effect.",
+    "heldBy": "Held by",
+    "idpGroup": "IdP group",
+    "role": "Role",
+    "where": "Where",
+    "source": "Source",
+    "granted": "Granted",
+    "expires": "Expires",
+    "never": "never",
+    "exportEmpty": "The export returned no file",
+    "revoked": "Role revoked",
+    "revokeFailed": "Revoke failed",
+    "bulkRevokeFailed": "Bulk revoke failed",
+    "allFailed": "{count, plural, one {The revoke failed} other {All # revokes failed}}",
+    "revokedCount": "{count, plural, one {Revoked # binding} other {Revoked # bindings}}",
+    "partial": "Revoked {revoked}, {failed} failed"
+  },
+  "adminPermissionLists": {
+    "roles": {
+      "search": "Search roles by name or slug…",
+      "fields": {
+        "scope": "Binds at",
+        "builtin": "Built-in"
+      },
+      "options": {
+        "scope": {
+          "ORG": "organization",
+          "TEAM": "team",
+          "PROJECT": "project",
+          "APP": "app"
+        },
+        "builtin": {
+          "yes": "built-in",
+          "no": "custom"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "builtin": "Built-in",
+        "custom": "Custom"
+      }
+    },
+    "assignments": {
+      "search": "Search by user, group, or role…",
+      "fields": {
+        "role": "Role",
+        "scope": "Scope",
+        "kind": "Held by",
+        "holder": "Holder"
+      },
+      "options": {
+        "scope": {
+          "ORG": "organization",
+          "TEAM": "team",
+          "PROJECT": "project",
+          "APP": "app"
+        },
+        "kind": {
+          "user": "user",
+          "group": "group"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "groups": "Groups"
+      }
+    },
+    "holders": {
+      "search": "Search holders by user or group…",
+      "fields": {
+        "scope": "Scope",
+        "kind": "Held by"
+      },
+      "options": {
+        "scope": {
+          "ORG": "organization",
+          "TEAM": "team",
+          "PROJECT": "project",
+          "APP": "app"
+        },
+        "kind": {
+          "user": "user",
+          "group": "group"
+        }
+      },
+      "views": {
+        "all": "All"
+      }
+    }
+  },
+  "adminRoles": {
+    "title": "Roles",
+    "context": "Named sets of permissions. Built-in roles are fixed; duplicate one to tailor it.",
+    "newRole": "New role",
+    "columns": {
+      "role": "Role",
+      "allows": "What it allows",
+      "bindsAt": "Binds at",
+      "kind": "Kind",
+      "permissions": "Permissions",
+      "holders": "Holders"
+    },
+    "builtIn": "built-in",
+    "custom": "custom",
+    "duplicatedFrom": "Duplicated from {name}",
+    "from": "from {name}",
+    "fromDeleted": "from {name} (deleted)",
+    "emptyTitle": "No roles",
+    "emptyDescription": "Built-in roles are seeded on deploy; if none appear, the org context may not be resolved yet."
+  },
+  "adminRolePermissions": {
+    "savedLabel": "saved",
+    "builtInNote": "Built-in roles ship with the platform and cannot be changed. Duplicate it to make a custom role you can prune.",
+    "duplicate": "Duplicate to customise",
+    "lineage": "Duplicated from <role>{name}</role>{builtIn, select, true { (built-in)} other {}}{deleted, select, true {, since deleted} other {}}: <diff></diff> since.",
+    "compareWithRole": "Compare with {name}",
+    "compareWith": "Compare with",
+    "savedVersion": "Saved version",
+    "nothing": "Nothing",
+    "lineageOption": "{name} (duplicated from{deleted, select, true {, deleted} other {}})",
+    "builtInOption": "{name} (built-in)",
+    "unsaved": "unsaved",
+    "noChanges": "No unsaved changes",
+    "discard": "Discard",
+    "saving": "Saving…",
+    "save": "Save permissions"
+  },
+  "adminRoleDetail": {
+    "role": "Role",
+    "notFoundCrumb": "Not found",
+    "notFoundTitle": "Role not found",
+    "permissions": "Permissions",
+    "missingTitle": "No role with this id",
+    "missingDescription": "Nothing in this organization has the id {id}. It may have been removed.",
+    "allRoles": "All roles",
+    "grantAccess": "Grant access",
+    "builtIn": "built-in",
+    "custom": "custom",
+    "tabs": {
+      "permissions": "Permissions",
+      "holders": "Holders",
+      "settings": "Settings"
+    },
+    "gone": "This role is no longer there.",
+    "saved": "Role “{name}” saved",
+    "saveFailed": "Save failed",
+    "settings": {
+      "title": "Name and description",
+      "lockedDescription": "Built-in roles keep the name and description they ship with.",
+      "description": "What people see when they grant this role.",
+      "name": "Name",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "What this role is for, in one sentence.",
+      "slug": "Slug",
+      "bindsAt": "Binds at",
+      "bindsAtValue": "{scope, select, ORG {an org or anything inside one} TEAM {a team or anything inside one} PROJECT {a project or anything inside one} APP {an app or anything inside one} other {{scope} or anything inside one}}",
+      "kind": "Kind",
+      "builtIn": "built-in",
+      "custom": "custom"
+    }
+  },
+  "adminPermissions": {
+    "pages": {
+      "roles": "Roles",
+      "assignments": "Assignments",
+      "diagnostics": "Diagnostics",
+      "presets": "Easy setup",
+      "safety": "Action safety"
+    },
+    "off": "This console is turned off for this install.",
+    "offHint": "Permissions ships behind the <code>{flag}</code> flag. Turn it on under <link>Administration › Features</link>."
+  },
+  "adminPresets": {
+    "title": "Easy setup",
+    "intro": "Start from what a person needs to do. Each choice grants an existing role at the scope you pick, so it shows up under Assignments like any other grant. None of them makes someone an installation super-admin.",
+    "loading": "Loading…",
+    "loadError": "The presets could not be read: {error}",
+    "retry": "Retry",
+    "task": "Task",
+    "scopes": {
+      "ORG": "Organization",
+      "TEAM": "Team",
+      "PROJECT": "Project",
+      "APP": "App"
+    },
+    "grantAt": "Grant {preset} at {scope} level",
+    "grant": "Grant",
+    "allowed": "Allowed",
+    "notIncluded": "Not included",
+    "footer": "To grant one, assign its role under <link>Assignments</link>."
+  },
+  "adminRuns": {
+    "title": "Runs",
+    "columns": {
+      "run": "Run",
+      "what": "What",
+      "startedBy": "Started by",
+      "when": "When",
+      "took": "Took",
+      "outcome": "Outcome"
+    },
+    "kinds": {
+      "agent": "Agent run",
+      "workflow": "Workflow run",
+      "deployment": "Deployment",
+      "job": "Job run",
+      "task": "Task run"
+    },
+    "notRecorded": "not recorded",
+    "emptyTitle": "No runs yet",
+    "emptyDescription": "Agent runs, workflow runs, deployments, job runs and task runs appear here as they start.",
+    "more": "More",
+    "exportCsv": "Export CSV",
+    "exportFailed": "The export failed",
+    "exportCapped": "Exported the first {count} runs.",
+    "list": {
+      "search": "Search runs, agents, apps, ids…",
+      "fields": {
+        "kind": "Kind",
+        "outcome": "Outcome",
+        "trigger": "Trigger",
+        "startedBy": "Started by",
+        "project": "Project",
+        "app": "App",
+        "since": "Since"
+      },
+      "options": {
+        "kind": {
+          "agent": "Agent run",
+          "workflow": "Workflow run",
+          "deployment": "Deployment",
+          "job": "Job run",
+          "task": "Task run"
+        },
+        "since": {
+          "1h": "Last hour",
+          "24h": "Last 24 hours",
+          "7d": "Last 7 days",
+          "30d": "Last 30 days",
+          "90d": "Last 90 days"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine"
+      }
+    }
+  },
   "orgMembers": {
     "searchLabel": "Search members",
     "searchPlaceholder": "Search by username or email…",

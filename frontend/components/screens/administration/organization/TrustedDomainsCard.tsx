@@ -3,6 +3,7 @@
 import { QueryError } from "@/components/QueryError";
 
 import { GlobeIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -52,6 +53,7 @@ export function TrustedDomainsCard({
   onAdd,
   onRemove,
 }: TrustedDomainsCardProps) {
+  const t = useTranslations("adminTrustedDomains");
   const [domain, setDomain] = React.useState("");
   const [roleSlug, setRoleSlug] = React.useState<string>(NONE_ROLE_VALUE);
   const [reviewMode, setReviewMode] = React.useState<string>(NONE_REVIEW_VALUE);
@@ -76,7 +78,7 @@ export function TrustedDomainsCard({
   const columns: Column<AstroliftOrganizationAllowlistedDomain>[] = [
     {
       id: "domain",
-      header: "Domain",
+      header: t("domain"),
       sortKey: "domain",
       cellClassName: "max-w-80",
       cell: (row) => (
@@ -87,7 +89,7 @@ export function TrustedDomainsCard({
     },
     {
       id: "role",
-      header: "Default role",
+      header: t("defaultRole"),
       sortKey: "role",
       cellClassName: "max-w-56",
       cell: (row) =>
@@ -96,37 +98,31 @@ export function TrustedDomainsCard({
             {row.defaultRoleSlug}
           </Badge>
         ) : (
-          <span className="text-muted-foreground text-xs">none</span>
+          <span className="text-muted-foreground text-xs">{t("none")}</span>
         ),
     },
     {
       id: "mode",
-      header: "Mode",
+      header: t("mode"),
       cell: (row) =>
         row.requiresReview ? (
-          <Badge variant="outline">Review required</Badge>
+          <Badge variant="outline">{t("reviewRequired")}</Badge>
         ) : (
-          <Badge variant="outline">Auto-join</Badge>
+          <Badge variant="outline">{t("autoJoin")}</Badge>
         ),
     },
   ];
 
   return (
     <Section
-      title="Trusted email domains"
-      description={
-        <>
-          SSO users whose email belongs to one of these domains can join this organization without
-          an explicit invitation. Set <em>Require admin review</em> to land them as pending members
-          for approval before they get active access.
-        </>
-      }
+      title={t("title")}
+      description={t.rich("description", { em: (chunks) => <em>{chunks}</em> })}
       divided
     >
       <div className="grid min-w-0 gap-6">
         <form onSubmit={handleAdd} className="grid min-w-0 gap-3 sm:grid-cols-2 sm:items-end">
           <div className="min-w-0 space-y-2 sm:col-span-2">
-            <Label htmlFor="allowlist-domain">Domain</Label>
+            <Label htmlFor="allowlist-domain">{t("domain")}</Label>
             <Input
               id="allowlist-domain"
               placeholder="example.com"
@@ -138,17 +134,17 @@ export function TrustedDomainsCard({
             />
           </div>
           <div className="min-w-0 space-y-2">
-            <Label htmlFor="allowlist-role">Default role</Label>
+            <Label htmlFor="allowlist-role">{t("defaultRole")}</Label>
             <Select
               value={roleSlug}
               onValueChange={setRoleSlug}
               disabled={rolesLoading || Boolean(rolesError)}
             >
               <SelectTrigger id="allowlist-role">
-                <SelectValue placeholder="None" />
+                <SelectValue placeholder={t("noneOption")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={NONE_ROLE_VALUE}>None</SelectItem>
+                <SelectItem value={NONE_ROLE_VALUE}>{t("noneOption")}</SelectItem>
                 {roleOptions.map((r) => (
                   <SelectItem key={r.id} value={r.slug}>
                     {r.name}
@@ -158,31 +154,27 @@ export function TrustedDomainsCard({
             </Select>
             {rolesLoading && (
               <p role="status" className="text-muted-foreground text-xs">
-                Loading roles…
+                {t("loadingRoles")}
               </p>
             )}
-            <QueryError
-              title="Could not load default roles"
-              error={rolesError}
-              onRetry={onRetryRoles}
-            />
+            <QueryError title={t("rolesError")} error={rolesError} onRetry={onRetryRoles} />
           </div>
           <div className="min-w-0 space-y-2">
-            <Label htmlFor="allowlist-review">On sign-in</Label>
+            <Label htmlFor="allowlist-review">{t("onSignIn")}</Label>
             <Select value={reviewMode} onValueChange={setReviewMode}>
               <SelectTrigger id="allowlist-review">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={NONE_REVIEW_VALUE}>Auto-join immediately</SelectItem>
-                <SelectItem value={REVIEW_VALUE}>Require admin review</SelectItem>
+                <SelectItem value={NONE_REVIEW_VALUE}>{t("autoJoinNow")}</SelectItem>
+                <SelectItem value={REVIEW_VALUE}>{t("requireReview")}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="flex justify-end sm:col-span-2">
             <Button type="submit" disabled={adding || !domain.trim()}>
               <PlusIcon className="size-4" />
-              Add domain
+              {t("addDomain")}
             </Button>
           </div>
         </form>
@@ -190,7 +182,7 @@ export function TrustedDomainsCard({
         <ListPage<AstroliftOrganizationAllowlistedDomain>
           embedded
           list={list}
-          label="Trusted domains"
+          label={t("listLabel")}
           columns={columns}
           rows={rows}
           getRowId={(row) => row.id}
@@ -201,7 +193,7 @@ export function TrustedDomainsCard({
               onSelect={() => setRemoveTarget(row)}
             >
               <Trash2Icon className="size-4" />
-              Remove {row.domain}
+              {t("removeDomain", { domain: row.domain })}
             </DropdownMenuItem>
           )}
           loading={loading}
@@ -210,9 +202,8 @@ export function TrustedDomainsCard({
           totalCount={totalCount}
           empty={{
             icon: <GlobeIcon className="size-5" />,
-            title: "No trusted domains yet",
-            description:
-              "SSO users without a domain match still need an explicit invitation to join.",
+            title: t("emptyTitle"),
+            description: t("emptyDescription"),
           }}
         />
       </div>
@@ -222,9 +213,13 @@ export function TrustedDomainsCard({
         onOpenChange={(next) => {
           if (!next) setRemoveTarget(null);
         }}
-        title={removeTarget ? `Remove ${removeTarget.domain}?` : "Remove domain?"}
-        description="New sign-ins from this domain stop auto-joining the org and need an explicit invitation. Existing members keep their access and role bindings — this is a forward-only change."
-        confirmLabel="Remove domain"
+        title={
+          removeTarget
+            ? t("confirmTitle", { domain: removeTarget.domain })
+            : t("confirmTitleFallback")
+        }
+        description={t("confirmDescription")}
+        confirmLabel={t("confirmLabel")}
         destructive
         onConfirm={async () => {
           if (removeTarget) await onRemove(removeTarget);

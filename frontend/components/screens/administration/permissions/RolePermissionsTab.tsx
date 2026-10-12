@@ -2,6 +2,7 @@
 
 import { CopyPlusIcon, LockIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { diffPermissions } from "@/components/access/access-model";
@@ -55,6 +56,7 @@ export function RolePermissionsTab({
   onSave,
   duplicateHref,
 }: RolePermissionsTabProps) {
+  const t = useTranslations("adminRolePermissions");
   const editable = canManage && !role.isSystem;
   const lineage = role.duplicatedFrom ?? null;
   const [draft, setDraft] = React.useState<string[]>(role.permissions);
@@ -71,7 +73,8 @@ export function RolePermissionsTab({
       : compare === LINEAGE
         ? lineage?.permissions
         : other?.permissions;
-  const baseLabel = compare === SAVED ? "saved" : compare === LINEAGE ? lineage?.name : other?.name;
+  const baseLabel =
+    compare === SAVED ? t("savedLabel") : compare === LINEAGE ? lineage?.name : other?.name;
 
   async function save() {
     setError(await onSave([...draft].sort((a, b) => a.localeCompare(b))));
@@ -82,15 +85,12 @@ export function RolePermissionsTab({
       {role.isSystem && (
         <div className="bg-muted/30 flex min-w-0 flex-wrap items-center gap-3 rounded-md border p-3 text-sm">
           <LockIcon aria-hidden className="text-muted-foreground size-4 shrink-0" />
-          <p className="min-w-0 flex-1">
-            Built-in roles ship with the platform and cannot be changed. Duplicate it to make a
-            custom role you can prune.
-          </p>
+          <p className="min-w-0 flex-1">{t("builtInNote")}</p>
           {canManage && (
             <Button size="sm" variant="outline" asChild>
               <Link href={duplicateHref}>
                 <CopyPlusIcon className="size-4" />
-                Duplicate to customise
+                {t("duplicate")}
               </Link>
             </Button>
           )}
@@ -99,14 +99,18 @@ export function RolePermissionsTab({
 
       {lineage && moved && (
         <p className="text-muted-foreground min-w-0 text-sm [overflow-wrap:anywhere]">
-          Duplicated from <span className="text-foreground font-medium">{lineage.name}</span>
-          {lineage.isSystem ? " (built-in)" : ""}
-          {lineage.deleted ? ", since deleted" : ""}:{" "}
-          <span className="font-mono text-xs tabular-nums">
-            <span className="text-success-fg">+{moved.added.length}</span>{" "}
-            <span className="text-danger-fg">−{moved.removed.length}</span>
-          </span>{" "}
-          since.
+          {t.rich("lineage", {
+            name: lineage.name,
+            builtIn: String(Boolean(lineage.isSystem)),
+            deleted: String(Boolean(lineage.deleted)),
+            role: (chunks) => <span className="text-foreground font-medium">{chunks}</span>,
+            diff: () => (
+              <span className="font-mono text-xs tabular-nums">
+                <span className="text-success-fg">+{moved.added.length}</span>{" "}
+                <span className="text-danger-fg">−{moved.removed.length}</span>
+              </span>
+            ),
+          })}
           {compare !== LINEAGE && (
             <>
               {" "}
@@ -115,7 +119,7 @@ export function RolePermissionsTab({
                 onClick={() => setCompare(LINEAGE)}
                 className="text-foreground underline underline-offset-2"
               >
-                Compare with {lineage.name}
+                {t("compareWithRole", { name: lineage.name })}
               </button>
             </>
           )}
@@ -124,7 +128,7 @@ export function RolePermissionsTab({
 
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <Label htmlFor="role-compare" className="text-muted-foreground text-sm font-normal">
-          Compare with
+          {t("compareWith")}
         </Label>
         <Select value={compare} onValueChange={setCompare}>
           <SelectTrigger id="role-compare" className="h-8 w-64 max-w-full min-w-0">
@@ -132,21 +136,23 @@ export function RolePermissionsTab({
           </SelectTrigger>
           <SelectContent>
             {editable ? (
-              <SelectItem value={SAVED}>Saved version</SelectItem>
+              <SelectItem value={SAVED}>{t("savedVersion")}</SelectItem>
             ) : (
-              <SelectItem value={NONE}>Nothing</SelectItem>
+              <SelectItem value={NONE}>{t("nothing")}</SelectItem>
             )}
             {lineage && (
               <SelectItem value={LINEAGE}>
-                {lineage.name} (duplicated from{lineage.deleted ? ", deleted" : ""})
+                {t("lineageOption", {
+                  name: lineage.name,
+                  deleted: String(Boolean(lineage.deleted)),
+                })}
               </SelectItem>
             )}
             {roles
               .filter((r) => r.id !== role.id && r.id !== lineage?.id)
               .map((r) => (
                 <SelectItem key={r.id} value={r.id}>
-                  {r.name}
-                  {r.isSystem ? " (built-in)" : ""}
+                  {r.isSystem ? t("builtInOption", { name: r.name }) : r.name}
                 </SelectItem>
               ))}
           </SelectContent>
@@ -175,10 +181,10 @@ export function RolePermissionsTab({
               {dirty ? (
                 <>
                   <span className="text-success-fg">+{pending.added.length}</span>{" "}
-                  <span className="text-danger-fg">−{pending.removed.length}</span> unsaved
+                  <span className="text-danger-fg">−{pending.removed.length}</span> {t("unsaved")}
                 </>
               ) : (
-                "No unsaved changes"
+                t("noChanges")
               )}
             </p>
           )}
@@ -192,10 +198,10 @@ export function RolePermissionsTab({
               setError(null);
             }}
           >
-            Discard
+            {t("discard")}
           </Button>
           <Button type="button" size="sm" disabled={!dirty || saving} onClick={save}>
-            {saving ? "Saving…" : "Save permissions"}
+            {saving ? t("saving") : t("save")}
           </Button>
         </div>
       )}

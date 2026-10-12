@@ -2,6 +2,7 @@
 
 import { CheckIcon, MinusIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Button } from "@/components/ui/button";
@@ -12,12 +13,7 @@ import type { useAccessPresets } from "./use-access-presets";
 
 export type AccessPresetsViewProps = ReturnType<typeof useAccessPresets>;
 
-const SCOPE_LABEL: Record<string, string> = {
-  ORG: "Organization",
-  TEAM: "Team",
-  PROJECT: "Project",
-  APP: "App",
-};
+const SCOPES = ["ORG", "TEAM", "PROJECT", "APP"];
 
 /**
  * Admin › Permissions › Easy setup (#2272): the plain-language starting
@@ -26,23 +22,21 @@ const SCOPE_LABEL: Record<string, string> = {
  * permissions. Assigning one is an ordinary assignment of that role.
  */
 export function AccessPresetsView({ presets, loading, error, onRetry }: AccessPresetsViewProps) {
+  const t = useTranslations("adminPresets");
+  const scopeLabel = (level: string) => (SCOPES.includes(level) ? t(`scopes.${level}`) : level);
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
-      <ShellHeader crumbs={permissionsCrumbs("presets")} title="Easy setup" />
-      <p className="text-muted-foreground max-w-prose text-sm">
-        Start from what a person needs to do. Each choice grants an existing role at the scope you
-        pick, so it shows up under Assignments like any other grant. None of them makes someone an
-        installation super-admin.
-      </p>
+      <ShellHeader crumbs={permissionsCrumbs("presets")} title={t("title")} />
+      <p className="text-muted-foreground max-w-prose text-sm">{t("intro")}</p>
       {loading ? (
         <p role="status" className="text-muted-foreground text-sm">
-          Loading…
+          {t("loading")}
         </p>
       ) : error ? (
         <div role="alert" className="space-y-2 text-sm">
-          <p>The presets could not be read: {error}</p>
+          <p>{t("loadError", { error })}</p>
           <Button size="sm" variant="outline" onClick={onRetry}>
-            Retry
+            {t("retry")}
           </Button>
         </div>
       ) : (
@@ -58,11 +52,11 @@ export function AccessPresetsView({ presets, loading, error, onRetry }: AccessPr
                   <thead>
                     <tr className="border-b">
                       <th scope="col" className="text-muted-foreground p-2 text-left font-medium">
-                        Task
+                        {t("task")}
                       </th>
                       {preset.roles.map((role) => (
                         <th key={role.scopeLevel} scope="col" className="p-2 text-left font-medium">
-                          {SCOPE_LABEL[role.scopeLevel] ?? role.scopeLevel}
+                          {scopeLabel(role.scopeLevel)}
                           <span className="text-muted-foreground block font-mono text-xs font-normal">
                             {role.roleSlug}
                           </span>
@@ -72,9 +66,12 @@ export function AccessPresetsView({ presets, loading, error, onRetry }: AccessPr
                               role: role.roleSlug,
                               returnTo: "/administration/permissions/presets",
                             })}
-                            aria-label={`Grant ${preset.label} at ${SCOPE_LABEL[role.scopeLevel] ?? role.scopeLevel} level`}
+                            aria-label={t("grantAt", {
+                              preset: preset.label,
+                              scope: scopeLabel(role.scopeLevel),
+                            })}
                           >
-                            Grant
+                            {t("grant")}
                           </Link>
                         </th>
                       ))}
@@ -91,11 +88,14 @@ export function AccessPresetsView({ presets, loading, error, onRetry }: AccessPr
                           return (
                             <td key={role.scopeLevel} className="p-2">
                               {granted ? (
-                                <CheckIcon className="text-success size-4" aria-label="Allowed" />
+                                <CheckIcon
+                                  className="text-success size-4"
+                                  aria-label={t("allowed")}
+                                />
                               ) : (
                                 <MinusIcon
                                   className="text-muted-foreground size-4"
-                                  aria-label="Not included"
+                                  aria-label={t("notIncluded")}
                                 />
                               )}
                             </td>
@@ -109,14 +109,16 @@ export function AccessPresetsView({ presets, loading, error, onRetry }: AccessPr
             </section>
           ))}
           <p className="text-sm">
-            To grant one, assign its role under{" "}
-            <Link
-              className="underline underline-offset-2"
-              href="/administration/permissions/assignments"
-            >
-              Assignments
-            </Link>
-            .
+            {t.rich("footer", {
+              link: (chunks) => (
+                <Link
+                  className="underline underline-offset-2"
+                  href="/administration/permissions/assignments"
+                >
+                  {chunks}
+                </Link>
+              ),
+            })}
           </p>
         </div>
       )}

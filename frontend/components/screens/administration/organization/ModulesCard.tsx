@@ -2,6 +2,8 @@
 
 import { QueryError } from "@/components/QueryError";
 
+import { useTranslations } from "next-intl";
+
 import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
@@ -69,6 +71,7 @@ function ModuleRow({
   // organization, regardless of what this org's own row says.
   const { installAllowed, enabled } = item;
   const disabled = pending || permsLoading || !canManage || !installAllowed;
+  const t = useTranslations("adminModules");
 
   return (
     <div className="border-border/60 flex items-center gap-4 border-b py-3 last:border-b-0">
@@ -77,15 +80,13 @@ function ModuleRow({
         <p className="text-muted-foreground mt-0.5 text-sm [overflow-wrap:anywhere]">
           {item.description}
         </p>
-        {!installAllowed && (
-          <p className="text-muted-foreground mt-1 text-xs">Turned off on this install</p>
-        )}
+        {!installAllowed && <p className="text-muted-foreground mt-1 text-xs">{t("installOff")}</p>}
       </div>
       <ModuleToggle
         checked={enabled}
         disabled={disabled}
         onToggle={() => onToggle(!enabled)}
-        label={`${enabled ? "Disable" : "Enable"} ${item.label}`}
+        label={t(enabled ? "disable" : "enable", { module: item.label })}
       />
     </div>
   );
@@ -101,15 +102,12 @@ export function ModulesCard({
   pendingKey,
   onToggle,
 }: ModulesCardProps) {
+  const t = useTranslations("adminModules");
   return (
-    <Section
-      title="Modules"
-      description="Optional integrations for this organization. An install admin can still force one off for every organization."
-      divided
-    >
+    <Section title={t("title")} description={t("description")} divided>
       <div className="flex min-w-0 flex-col">
         {error ? (
-          <QueryError title="Could not load modules" error={error} onRetry={onRetry} />
+          <QueryError title={t("loadError")} error={error} onRetry={onRetry} />
         ) : loading ? (
           <div className="flex flex-col gap-3 py-2">
             {items.map((m) => (

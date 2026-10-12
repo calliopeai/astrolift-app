@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeftRightIcon, InfoIcon, ShieldQuestionIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import type { Principal } from "@/components/access/access-model";
@@ -40,20 +41,21 @@ export type PermissionsDiagnosticsViewProps = Omit<Hook, "scopeTree" | "explaine
  */
 export function PermissionsDiagnosticsView(props: PermissionsDiagnosticsViewProps) {
   const { comparing, onCompareToggle } = props;
+  const t = useTranslations("adminCheckAccess");
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
       <ShellHeader
         crumbs={permissionsCrumbs("diagnostics")}
-        title={comparing ? "Compare access" : "Check access"}
+        title={comparing ? t("compareTitle") : t("checkTitle")}
         primaryAction={
           <Button variant="outline" size="sm" onClick={() => onCompareToggle(!comparing)}>
             {comparing ? (
               <>
-                <ShieldQuestionIcon className="size-4" /> Check one permission
+                <ShieldQuestionIcon className="size-4" /> {t("checkOne")}
               </>
             ) : (
               <>
-                <ArrowLeftRightIcon className="size-4" /> Compare two people
+                <ArrowLeftRightIcon className="size-4" /> {t("compareTwo")}
               </>
             )}
           </Button>
@@ -64,8 +66,8 @@ export function PermissionsDiagnosticsView(props: PermissionsDiagnosticsViewProp
   );
 }
 
-function meQuickPick(me: Principal | null) {
-  return me ? [{ label: "Me", principal: me }] : [];
+function meQuickPick(me: Principal | null, label: string) {
+  return me ? [{ label, principal: me }] : [];
 }
 
 function CheckBody({
@@ -81,42 +83,47 @@ function CheckBody({
   explainer,
   bindingHref,
 }: PermissionsDiagnosticsViewProps) {
+  const t = useTranslations("adminCheckAccess");
   return (
     <>
       <p className="max-w-3xl min-w-0 text-base [overflow-wrap:anywhere]" aria-live="polite">
-        Can <Slot filled={Boolean(who)}>{who?.name ?? "someone"}</Slot>{" "}
-        <Slot filled={Boolean(permission)} mono>
-          {permission ?? "do something"}
-        </Slot>{" "}
-        on{" "}
-        <Slot filled={Boolean(scope)} mono={Boolean(scope)}>
-          {scope?.name ?? "the organization"}
-        </Slot>
-        ?
+        {t.rich("question", {
+          who: () => <Slot filled={Boolean(who)}>{who?.name ?? t("someone")}</Slot>,
+          permission: () => (
+            <Slot filled={Boolean(permission)} mono>
+              {permission ?? t("doSomething")}
+            </Slot>
+          ),
+          scope: () => (
+            <Slot filled={Boolean(scope)} mono={Boolean(scope)}>
+              {scope?.name ?? t("theOrganization")}
+            </Slot>
+          ),
+        })}
       </p>
 
       <div className="grid min-w-0 gap-5 lg:grid-cols-3">
         <PrincipalPicker
-          label="Who"
+          label={t("who")}
           value={who}
           onChange={onWhoChange}
           search={whoSearch}
-          quickPicks={meQuickPick(me)}
+          quickPicks={meQuickPick(me, t("me"))}
         />
         <PermissionPicker value={permission} onChange={onPermissionChange} />
         <div className="flex min-w-0 flex-col gap-2">
           <div className="flex min-w-0 items-center justify-between gap-2">
             <span className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-              On
+              {t("on")}
             </span>
             {scope && (
               <Button size="sm" variant="ghost" onClick={() => onScopeChange(null)}>
-                Whole organization
+                {t("wholeOrg")}
               </Button>
             )}
           </div>
           <ScopePicker
-            label="On"
+            label={t("on")}
             roots={scopeTree.roots}
             loading={scopeTree.loading}
             error={scopeTree.error}
@@ -127,7 +134,7 @@ function CheckBody({
         </div>
       </div>
 
-      <Section title="Answer" divided className="min-w-0">
+      <Section title={t("answer")} divided className="min-w-0">
         <AccessExplainer
           diagnosis={explainer.diagnosis}
           target={scope}
@@ -152,29 +159,31 @@ function CompareBody({
   onOtherChange,
   compare,
 }: PermissionsDiagnosticsViewProps) {
+  const t = useTranslations("adminCheckAccess");
   return (
     <>
       <p className="max-w-3xl min-w-0 text-base [overflow-wrap:anywhere]" aria-live="polite">
-        What can <Slot filled={Boolean(who)}>{who?.name ?? "someone"}</Slot> do that{" "}
-        <Slot filled={Boolean(other)}>{other?.name ?? "someone else"}</Slot> cannot, and the other
-        way round?
+        {t.rich("compareQuestion", {
+          who: () => <Slot filled={Boolean(who)}>{who?.name ?? t("someone")}</Slot>,
+          other: () => <Slot filled={Boolean(other)}>{other?.name ?? t("someoneElse")}</Slot>,
+        })}
       </p>
       <div className="grid min-w-0 gap-5 lg:grid-cols-2">
         <PrincipalPicker
-          label="First person"
+          label={t("firstPerson")}
           value={who}
           onChange={onWhoChange}
           search={whoSearch}
-          quickPicks={meQuickPick(me)}
+          quickPicks={meQuickPick(me, t("me"))}
         />
         <PrincipalPicker
-          label="Second person"
+          label={t("secondPerson")}
           value={other}
           onChange={onOtherChange}
           search={otherSearch}
         />
       </div>
-      <Section title="Side by side" divided className="min-w-0">
+      <Section title={t("sideBySide")} divided className="min-w-0">
         <AccessCompare
           comparison={compare.comparison}
           loading={compare.loading}
@@ -189,15 +198,15 @@ function CompareBody({
 
 /** Who may ask and what the answer covers, said once under the answer. */
 function Scoping({ compare = false }: { compare?: boolean }) {
+  const t = useTranslations("adminCheckAccess");
   return (
     <p className="text-muted-foreground flex max-w-3xl min-w-0 items-start gap-2 text-xs">
       <InfoIcon aria-hidden className="mt-0.5 size-3.5 shrink-0" />
       <span className="min-w-0">
         {compare
-          ? "Comparing two people needs org.manage_members."
-          : "You can check your own access; checking someone else needs org.manage_members."}{" "}
-        The answer is the permission check&apos;s own: IdP groups, team shares and the
-        organization&apos;s policies are in it, on the object you pick.
+          ? t("compareNeeds", { permission: "org.manage_members" })
+          : t("checkNeeds", { permission: "org.manage_members" })}{" "}
+        {t("answerCovers")}
       </span>
     </p>
   );

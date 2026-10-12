@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -12,6 +14,7 @@ import {
 } from "@/components/ui/select";
 
 import type { ScopeNode } from "@/components/access/access-model";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import { permissionsCrumbs } from "../access/admin-crumbs";
 import { ScopedSafetyRules } from "./ScopedSafetyRules";
@@ -53,31 +56,27 @@ export function ActionSafetyView({
   onDecide,
   scoped,
 }: ActionSafetyViewProps) {
+  const t = useTranslations("actionSafety");
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
-      <ShellHeader crumbs={permissionsCrumbs("safety")} title="Action safety" />
-      <p className="text-muted-foreground max-w-prose text-sm">
-        Sensitive actions ask for a confirmation and a fresh sign-in before they run. They are on by
-        default. A destructive delete can also wait for approval from other admins. Changes here
-        apply to the whole organization; a team, app or person can still be asked for more, never
-        less. Changing these asks you to sign in again.
-      </p>
+      <ShellHeader crumbs={permissionsCrumbs("safety")} title={t("title")} />
+      <p className="text-muted-foreground max-w-prose text-sm">{t("intro")}</p>
       {saveError && (
         <p role="alert" className="text-destructive text-sm">
           {saveError}
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-muted-foreground text-xs">Show what applies on</span>
+        <span className="text-muted-foreground text-xs">{t("inspect")}</span>
         <Select
           value={inspecting ?? WHOLE_ORG}
           onValueChange={(value) => onInspect(value === WHOLE_ORG ? null : value)}
         >
-          <SelectTrigger size="sm" className="w-auto" aria-label="Show what applies on">
+          <SelectTrigger size="sm" className="w-auto" aria-label={t("inspect")}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={WHOLE_ORG}>The whole organization</SelectItem>
+            <SelectItem value={WHOLE_ORG}>{t("wholeOrg")}</SelectItem>
             {[...new Map(appsIn(scoped.scopeTree.roots).map((a) => [a.slug!, a])).values()].map(
               (app) => (
                 <SelectItem key={app.slug} value={app.slug!}>
@@ -87,21 +86,17 @@ export function ActionSafetyView({
             )}
           </SelectContent>
         </Select>
-        {inspecting && (
-          <span className="text-muted-foreground text-xs">
-            Read-only: what applies on this app for you, after team, app and person rules.
-          </span>
-        )}
+        {inspecting && <span className="text-muted-foreground text-xs">{t("inspectingNote")}</span>}
       </div>
       {loading ? (
         <p role="status" className="text-muted-foreground text-sm">
-          Loading…
+          {t("loading")}
         </p>
       ) : error ? (
         <div role="alert" className="space-y-2 text-sm">
-          <p>The gates could not be read: {error}</p>
+          <p>{t("loadError", { error })}</p>
           <Button size="sm" variant="outline" onClick={onRetry}>
-            Retry
+            {t("retry")}
           </Button>
         </div>
       ) : (
@@ -110,16 +105,16 @@ export function ActionSafetyView({
             <thead>
               <tr className="border-b">
                 <th scope="col" className="text-muted-foreground p-2 text-left font-medium">
-                  Action
+                  {t("columns.action")}
                 </th>
                 <th scope="col" className="text-muted-foreground p-2 text-left font-medium">
-                  Confirm and sign in again
+                  {t("columns.confirm")}
                 </th>
                 <th scope="col" className="text-muted-foreground p-2 text-left font-medium">
-                  Approval
+                  {t("columns.approval")}
                 </th>
                 <th scope="col" className="text-muted-foreground p-2 text-left font-medium">
-                  Admins may approve their own
+                  {t("columns.selfApproval")}
                 </th>
               </tr>
             </thead>
@@ -143,14 +138,12 @@ export function ActionSafetyView({
                           onCheckedChange={(value) =>
                             void onSetRule(row.action, { enabled: value === true })
                           }
-                          aria-label={`Ask before: ${row.label}`}
+                          aria-label={t("askBefore", { action: row.label })}
                         />
-                        <span className="text-xs">{row.enabled ? "On" : "Off"}</span>
+                        <span className="text-xs">{row.enabled ? t("on") : t("off")}</span>
                       </label>
                       {narrower && (
-                        <span className="text-muted-foreground block text-xs">
-                          Also set for a team, app or person
-                        </span>
+                        <span className="text-muted-foreground block text-xs">{t("narrower")}</span>
                       )}
                     </td>
                     <td className="p-2">
@@ -163,9 +156,11 @@ export function ActionSafetyView({
                               onCheckedChange={(value) =>
                                 void onSetRule(row.action, { requireApproval: value === true })
                               }
-                              aria-label={`Require approval: ${row.label}`}
+                              aria-label={t("requireApproval", { action: row.label })}
                             />
-                            <span className="text-xs">{row.approval ? "Required" : "Off"}</span>
+                            <span className="text-xs">
+                              {row.approval ? t("required") : t("off")}
+                            </span>
                           </label>
                           {row.approval && (
                             <Select
@@ -178,14 +173,14 @@ export function ActionSafetyView({
                               <SelectTrigger
                                 size="sm"
                                 className="w-auto"
-                                aria-label={`Approvers needed: ${row.label}`}
+                                aria-label={t("approversNeeded", { action: row.label })}
                               >
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 {QUORUMS.map((n) => (
                                   <SelectItem key={n} value={String(n)}>
-                                    {n} {n === 1 ? "approver" : "approvers"}
+                                    {t("approvers", { count: n })}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -194,9 +189,7 @@ export function ActionSafetyView({
                         </div>
                       ) : (
                         <span className="text-muted-foreground text-xs">
-                          {row.action === "secret.change"
-                            ? "Set per app, under secret approval"
-                            : "Not available"}
+                          {row.action === "secret.change" ? t("perApp") : t("notAvailable")}
                         </span>
                       )}
                     </td>
@@ -209,10 +202,10 @@ export function ActionSafetyView({
                             onCheckedChange={(value) =>
                               void onSetRule(row.action, { allowSelfApproval: value === true })
                             }
-                            aria-label={`Admins may approve their own: ${row.label}`}
+                            aria-label={t("selfApprovalFor", { action: row.label })}
                           />
                           <span className="text-xs">
-                            {row.allowSelfApproval ? "Allowed" : "Not allowed"}
+                            {row.allowSelfApproval ? t("allowed") : t("notAllowed")}
                           </span>
                         </label>
                       ) : (
@@ -251,10 +244,12 @@ function ApprovalRequests({
   decideError: string | null;
   onDecide: ActionSafetyViewProps["onDecide"];
 }) {
+  const t = useTranslations("actionSafety.requests");
+  const fmt = useFormatters();
   return (
     <section aria-labelledby="approval-requests" className="space-y-2">
       <h2 id="approval-requests" className="text-sm font-medium">
-        Approval requests
+        {t("title")}
       </h2>
       {decideError && (
         <p role="alert" className="text-destructive text-sm">
@@ -263,10 +258,10 @@ function ApprovalRequests({
       )}
       {error ? (
         <p role="alert" className="text-sm">
-          The requests could not be read: {error}
+          {t("loadError", { error })}
         </p>
       ) : requests.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No open requests.</p>
+        <p className="text-muted-foreground text-sm">{t("empty")}</p>
       ) : (
         <ul className="divide-y rounded-sm border text-sm">
           {requests.map((request) => {
@@ -282,22 +277,25 @@ function ApprovalRequests({
                   {request.label} <span className="font-mono text-xs">{request.targetLabel}</span>
                   <span className="text-muted-foreground block text-xs">
                     {mine
-                      ? "Requested by you"
-                      : `Requested by ${request.requesterEmail ?? "someone"}`}
+                      ? t("byYou")
+                      : request.requesterEmail
+                        ? t("byEmail", { email: request.requesterEmail })
+                        : t("bySomeone")}
                     {" · "}
-                    <span className="font-mono">
-                      {request.approvals}/{request.requiredApprovals}
-                    </span>{" "}
-                    approved · expires{" "}
-                    <time className="font-mono" dateTime={String(request.expiresAt)}>
-                      {new Date(String(request.expiresAt)).toLocaleString()}
-                    </time>
+                    {t.rich("progress", {
+                      approvals: request.approvals,
+                      required: request.requiredApprovals,
+                      mono: (chunks) => <span className="font-mono">{chunks}</span>,
+                      expiry: () => (
+                        <time className="font-mono" dateTime={String(request.expiresAt)}>
+                          {fmt.formatDateTime(String(request.expiresAt))}
+                        </time>
+                      ),
+                    })}
                   </span>
                 </span>
                 {request.status === "approved" ? (
-                  <span className="text-xs">
-                    {mine ? "Approved: run it again to go ahead" : "Approved"}
-                  </span>
+                  <span className="text-xs">{mine ? t("approvedMine") : t("approved")}</span>
                 ) : (
                   (!mine || request.allowSelfApproval) && (
                     <Button
@@ -305,7 +303,7 @@ function ApprovalRequests({
                       disabled={busy}
                       onClick={() => void onDecide(request.id, "approve")}
                     >
-                      Approve
+                      {t("approve")}
                     </Button>
                   )
                 )}
@@ -316,7 +314,7 @@ function ApprovalRequests({
                     disabled={busy}
                     onClick={() => void onDecide(request.id, "reject")}
                   >
-                    Reject
+                    {t("reject")}
                   </Button>
                 )}
                 {mine && (
@@ -326,7 +324,7 @@ function ApprovalRequests({
                     disabled={busy}
                     onClick={() => void onDecide(request.id, "cancel")}
                   >
-                    Withdraw
+                    {t("withdraw")}
                   </Button>
                 )}
               </li>

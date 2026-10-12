@@ -4624,6 +4624,584 @@
       "truncated": "200 lignes affichées — ouvrez la console pour la suite."
     }
   },
+  "adminOrganization": {
+    "title": "Organisation",
+    "description": "Modifiez l'identité et les valeurs de conservation par défaut de la plateforme au niveau de l'organisation.",
+    "general": {
+      "title": "Général",
+      "description": "Nom d'affichage et URL du site affichés dans la barre latérale et les e-mails.",
+      "slug": "Slug",
+      "slugHint": "Le slug est immuable ; il sert dans les URL et les préfixes de namespace.",
+      "displayName": "Nom d'affichage",
+      "website": "Site web"
+    },
+    "retention": {
+      "title": "Conservation par défaut",
+      "description": "Valeurs héritées par les nouvelles apps. Les apps existantes gardent les leurs tant qu'on ne les modifie pas explicitement.",
+      "auditDays": "Jours du journal d'audit",
+      "default": "Par défaut : <mono>{value}</mono>.",
+      "previewCap": "Plafond d'environnements de prévisualisation",
+      "appLogDays": "Jours de logs d'app",
+      "pending": "Modifiable dès que l'écran du registre d'apps sera disponible."
+    },
+    "policies": {
+      "title": "Politiques utilisateur",
+      "description": "Règles valables pour toute l'organisation et chaque membre, y compris l'éditeur de profil en libre-service.",
+      "allowProfileEdit": "Autoriser les utilisateurs à modifier leur profil",
+      "allowProfileEditHint": "Permet aux utilisateurs de modifier leur prénom, leur nom et leur e-mail sur <code>{path}</code>. Les champs gérés par le fournisseur d'identité restent verrouillés même si l'option est active, car les modifications locales seraient écrasées à la prochaine connexion. Désactivez-la pour les déploiements SSO uniquement, où l'IdP fait foi.",
+      "restrictedTitle": "Paramètres que les membres ne peuvent pas modifier",
+      "restrictedHint": "La valeur par défaut des membres qui n'ont rien choisi dans Paramètres › Apparence. Ceux qui ont choisi gardent leur choix.",
+      "restricted": {
+        "show": {
+          "label": "Afficher en lecture seule",
+          "blurb": "Voir, désactivés, les paramètres que vous ne pouvez pas modifier, avec la permission qui le permettrait"
+        },
+        "hide": {
+          "label": "Masquer",
+          "blurb": "N'afficher que les paramètres modifiables"
+        }
+      }
+    },
+    "sections": {
+      "houseTheme": "Thème maison",
+      "trustedDomains": "Domaines de confiance",
+      "modules": "Modules"
+    },
+    "idp": {
+      "title": "Fournisseur d'identité",
+      "description": "Configuration de connexion OIDC, SAML et SCIM de cette organisation.",
+      "comingSoon": "Configuration dans l'app bientôt disponible",
+      "activeByEnvironment": "Actif actuellement, par environnement :",
+      "development": "Développement",
+      "devBypass": "Contournement dev-login auth1",
+      "stagingProduction": "Préproduction et production",
+      "roadmap": "Une sous-page de configuration dédiée ajoutera la découverte OIDC, les métadonnées SAML et la rotation des jetons SCIM une fois le sélecteur de fournisseur branché."
+    },
+    "updated": "Organisation mise à jour",
+    "saveFailed": "Échec de l'enregistrement"
+  },
+  "adminTrustedDomains": {
+    "title": "Domaines de messagerie de confiance",
+    "description": "Les utilisateurs SSO dont l'e-mail appartient à l'un de ces domaines peuvent rejoindre cette organisation sans invitation explicite. Choisissez <em>Exiger une validation admin</em> pour qu'ils arrivent en membres en attente d'approbation avant d'obtenir l'accès.",
+    "domain": "Domaine",
+    "defaultRole": "Rôle par défaut",
+    "none": "aucun",
+    "noneOption": "Aucun",
+    "mode": "Mode",
+    "reviewRequired": "Validation requise",
+    "autoJoin": "Adhésion automatique",
+    "loadingRoles": "Chargement des rôles…",
+    "rolesError": "Impossible de charger les rôles par défaut",
+    "onSignIn": "À la connexion",
+    "autoJoinNow": "Adhésion automatique immédiate",
+    "requireReview": "Exiger une validation admin",
+    "addDomain": "Ajouter un domaine",
+    "listLabel": "Domaines de confiance",
+    "removeDomain": "Retirer {domain}",
+    "emptyTitle": "Aucun domaine de confiance pour l'instant",
+    "emptyDescription": "Les utilisateurs SSO sans domaine correspondant ont toujours besoin d'une invitation explicite.",
+    "confirmTitle": "Retirer {domain} ?",
+    "confirmTitleFallback": "Retirer le domaine ?",
+    "confirmDescription": "Les nouvelles connexions depuis ce domaine ne rejoignent plus l'organisation automatiquement et nécessitent une invitation explicite. Les membres existants gardent leur accès et leurs rôles ; le changement ne vaut que pour l'avenir.",
+    "confirmLabel": "Retirer le domaine",
+    "added": "{domain} ajouté",
+    "addFailed": "Échec de l'ajout",
+    "removed": "{domain} retiré",
+    "removeFailed": "Échec du retrait",
+    "list": {
+      "search": "Rechercher domaines, rôles…",
+      "fields": {
+        "mode": "Mode",
+        "role": "Rôle par défaut"
+      },
+      "options": {
+        "mode": {
+          "auto": "adhésion automatique",
+          "review": "validation requise"
+        }
+      },
+      "views": {
+        "all": "Tous",
+        "mine": "Les miens"
+      },
+      "notes": {
+        "mine": "Les domaines de confiance n'enregistrent pas encore qui les a ajoutés, donc Les miens est vide."
+      }
+    }
+  },
+  "adminHouseTheme": {
+    "title": "Thème maison",
+    "description": "S'applique à toute personne qui n'a rien choisi dans Paramètres › Apparence. Laissez une option sur <strong>Non défini</strong> pour que chacun la choisisse. Chacun peut toujours choisir sa couleur d'accent, sauf si le thème est verrouillé.",
+    "save": "Enregistrer le thème maison",
+    "ground": "Fond",
+    "accent": "Accent",
+    "notSet": "Non défini",
+    "lock": "Verrouiller ce thème",
+    "lockHint": "Tout le monde reçoit le thème maison et le sélecteur personnel passe en lecture seule. Désactivé par défaut ; publier une valeur par défaut et l'imposer sont deux décisions distinctes.",
+    "grounds": {
+      "black": "Noir",
+      "charcoal": "Charbon",
+      "graphite": "Graphite",
+      "emerald": "Émeraude",
+      "paper": "Papier",
+      "mist": "Brume"
+    },
+    "modes": {
+      "dark": "sombre",
+      "light": "clair"
+    },
+    "accents": {
+      "green": "Vert",
+      "copper": "Cuivre",
+      "ice": "Glace",
+      "periwinkle": "Pervenche",
+      "amber": "Ambre"
+    },
+    "saved": "Thème maison enregistré",
+    "savedLocked": "Thème maison enregistré et verrouillé",
+    "saveFailed": "Échec de l'enregistrement"
+  },
+  "adminModules": {
+    "title": "Modules",
+    "description": "Intégrations facultatives pour cette organisation. Un admin de l'installation peut toujours en désactiver une pour toutes les organisations.",
+    "loadError": "Impossible de charger les modules",
+    "installOff": "Désactivé sur cette installation",
+    "enable": "Activer {module}",
+    "disable": "Désactiver {module}",
+    "enabledToast": "{module} activé",
+    "disabledToast": "{module} désactivé",
+    "updateError": "Impossible de mettre à jour le module.",
+    "items": {
+      "chat_studio_integration": {
+        "label": "Intégration Chat Studio",
+        "description": "Permet à Chat Studio d'accéder aux apps de cette organisation via l'API builder."
+      },
+      "agent_live_attach": {
+        "label": "Connexion en direct aux agents",
+        "description": "Permet aux membres de se connecter en direct à une session d'agent en cours."
+      },
+      "chat_studio_agent_runs": {
+        "label": "Exécutions d'agents depuis Chat Studio",
+        "description": "Permet à Chat Studio de lancer les agents enregistrés de cette organisation."
+      },
+      "agent_policy_enforcement": {
+        "label": "Application des politiques aux agents",
+        "description": "Permet à Zentinelle d'appliquer des actions de politique aux agents et boxes de cette organisation."
+      }
+    }
+  },
+  "actionSafety": {
+    "title": "Sécurité des actions",
+    "intro": "Les actions sensibles demandent une confirmation et une nouvelle connexion avant de s'exécuter. Elles sont actives par défaut. Une suppression destructive peut aussi attendre l'approbation d'autres admins. Les changements ici valent pour toute l'organisation ; une équipe, une app ou une personne peut se voir demander plus, jamais moins. Les modifier vous demande de vous reconnecter.",
+    "inspect": "Afficher ce qui s'applique à",
+    "wholeOrg": "Toute l'organisation",
+    "inspectingNote": "Lecture seule : ce qui s'applique à vous sur cette app, après les règles d'équipe, d'app et de personne.",
+    "loading": "Chargement…",
+    "loadError": "Impossible de lire les garde-fous : {error}",
+    "retry": "Réessayer",
+    "columns": {
+      "action": "Action",
+      "confirm": "Confirmer et se reconnecter",
+      "approval": "Approbation",
+      "selfApproval": "Les admins peuvent approuver les leurs"
+    },
+    "askBefore": "Demander avant : {action}",
+    "on": "Activé",
+    "off": "Désactivé",
+    "narrower": "Aussi défini pour une équipe, une app ou une personne",
+    "requireApproval": "Exiger une approbation : {action}",
+    "required": "Requise",
+    "approversNeeded": "Approbateurs requis : {action}",
+    "approvers": "{count, plural, one {# approbateur} other {# approbateurs}}",
+    "perApp": "Défini par app, dans l'approbation des secrets",
+    "notAvailable": "Non disponible",
+    "selfApprovalFor": "Les admins peuvent approuver les leurs : {action}",
+    "allowed": "Autorisé",
+    "notAllowed": "Non autorisé",
+    "ruleNotSaved": "La règle n'a pas été enregistrée.",
+    "decisionNotSaved": "La décision n'a pas été enregistrée.",
+    "requests": {
+      "title": "Demandes d'approbation",
+      "loadError": "Impossible de lire les demandes : {error}",
+      "empty": "Aucune demande en cours.",
+      "byYou": "Demandée par vous",
+      "byEmail": "Demandée par {email}",
+      "bySomeone": "Demandée par quelqu'un",
+      "progress": "<mono>{approvals}/{required}</mono> approuvées · expire le <expiry></expiry>",
+      "approvedMine": "Approuvée : relancez l'action pour continuer",
+      "approved": "Approuvée",
+      "approve": "Approuver",
+      "reject": "Refuser",
+      "withdraw": "Retirer"
+    },
+    "scoped": {
+      "title": "Règles pour les équipes, apps et personnes",
+      "description": "Elles s'ajoutent aux garde-fous de l'organisation, sans jamais en retirer.",
+      "empty": "Aucune règle d'équipe, d'app ou de personne.",
+      "forKind": "pour {kind}",
+      "kinds": {
+        "TEAM": "Équipe",
+        "APP": "App",
+        "USER": "Personne"
+      },
+      "remove": "Retirer",
+      "addLegend": "Ajouter une règle",
+      "appliesTo": "S'applique à",
+      "action": "Action",
+      "searchPeoplePlaceholder": "Rechercher des personnes par nom ou e-mail",
+      "searchPeople": "Rechercher des personnes",
+      "searching": "Recherche…",
+      "people": "Personnes",
+      "pickTeam": "Choisissez une équipe",
+      "pickApp": "Choisissez une app",
+      "teams": "Équipes",
+      "apps": "Apps",
+      "askBefore": "Demander avant (confirmer et se reconnecter)",
+      "requireApproval": "Exiger une approbation",
+      "approversNeeded": "Approbateurs requis",
+      "approvers": "{count, plural, one {# approbateur} other {# approbateurs}}",
+      "noSelf": "Pas d'approbation de ses propres demandes",
+      "add": "Ajouter la règle",
+      "adds": {
+        "asksBefore": "demande avant",
+        "needsApprovers": "{count, plural, one {nécessite # approbateur} other {nécessite # approbateurs}}",
+        "noSelfApproval": "pas d'auto-approbation",
+        "nothing": "n'ajoute rien"
+      }
+    }
+  },
+  "adminCheckAccess": {
+    "checkTitle": "Vérifier l'accès",
+    "compareTitle": "Comparer les accès",
+    "checkOne": "Vérifier une permission",
+    "compareTwo": "Comparer deux personnes",
+    "me": "Moi",
+    "question": "<who></who> peut-il <permission></permission> sur <scope></scope> ?",
+    "someone": "quelqu'un",
+    "doSomething": "faire quelque chose",
+    "theOrganization": "l'organisation",
+    "who": "Qui",
+    "on": "Sur",
+    "wholeOrg": "Toute l'organisation",
+    "answer": "Réponse",
+    "compareQuestion": "Que peut faire <who></who> que <other></other> ne peut pas, et inversement ?",
+    "someoneElse": "quelqu'un d'autre",
+    "firstPerson": "Première personne",
+    "secondPerson": "Deuxième personne",
+    "sideBySide": "Côte à côte",
+    "compareNeeds": "Comparer deux personnes nécessite {permission}.",
+    "checkNeeds": "Vous pouvez vérifier votre propre accès ; vérifier celui d'une autre personne nécessite {permission}.",
+    "answerCovers": "La réponse est celle de la vérification de permission elle-même : groupes IdP, partages d'équipe et politiques de l'organisation y figurent, sur l'objet choisi."
+  },
+  "adminNewRole": {
+    "title": "Nouveau rôle",
+    "roles": "Rôles",
+    "duplicate": "Dupliquer {name}",
+    "customName": "{name} (personnalisé)",
+    "context": "Un rôle personnalisé est un ensemble nommé de permissions que vous accordez sur une portée.",
+    "steps": "Étapes",
+    "step": {
+      "details": "Détails",
+      "permissions": "Permissions",
+      "review": "Vérification"
+    },
+    "startFrom": "Partir de",
+    "loadingRoles": "Chargement des rôles…",
+    "blank": "Rien, un rôle vide",
+    "builtInOption": "{name} ({builtIn})",
+    "name": "Nom",
+    "namePlaceholder": "Responsable des releases",
+    "slug": "Slug",
+    "slugHelp": "Dérivé du nom tant que vous ne le modifiez pas. Figé après la création.",
+    "bindsAt": "S'attribue au niveau",
+    "bindsAtHelp": "Où il peut être accordé : à ce niveau ou à tout ce qu'il contient. Figé après la création.",
+    "description": "Description",
+    "descriptionPlaceholder": "À quoi sert ce rôle, en une phrase.",
+    "comparedWith": "Comparé à {name}. Le nouveau rôle enregistre qu'il a été dupliqué depuis {name}, pour que son onglet Permissions montre à quel point il s'en écarte.",
+    "cancel": "Annuler",
+    "back": "Retour",
+    "continue": "Continuer",
+    "creating": "Création…",
+    "create": "Créer le rôle",
+    "errors": {
+      "name": "Nommez le rôle.",
+      "slugFormat": "Minuscules, chiffres, tirets et tirets bas, en commençant par une lettre ou un chiffre.",
+      "slugTaken": "Un rôle nommé {slug} existe déjà."
+    },
+    "created": "Rôle « {name} » créé",
+    "createFailed": "Échec de la création"
+  },
+  "adminBindings": {
+    "title": "Attributions",
+    "context": "Chaque rôle détenu par un utilisateur ou un groupe IdP, où il s'applique et pourquoi.",
+    "moreActions": "Autres actions de liste",
+    "exporting": "Export CSV…",
+    "export": "Exporter les attributions correspondantes en CSV",
+    "listLabel": "Attributions de rôle",
+    "revoke": "Révoquer",
+    "revokeCount": "Révoquer {count}",
+    "emptyTitle": "Aucune attribution de rôle",
+    "emptyDescription": "Accordez un rôle à un utilisateur pour lui donner accès à la plateforme.",
+    "bulkTitle": "{count, plural, one {Révoquer # attribution de rôle ?} other {Révoquer # attributions de rôle ?}}",
+    "bulkDescription": "Les utilisateurs sélectionnés perdent les permissions accordées par ces rôles. Leurs autres attributions restent en vigueur.",
+    "revokeFrom": "Révoquer {role} pour {name} ?",
+    "revokeFallback": "Révoquer ?",
+    "revokeDescription": "L'utilisateur perd les permissions accordées par ce rôle. Ses autres attributions de rôle restent en vigueur.",
+    "holders": "Détenteurs",
+    "holdersEmptyTitle": "Personne ne détient ce rôle",
+    "holdersEmptyDescription": "Accordez {role} à une personne ou à un groupe et il apparaîtra ici, avec sa portée.",
+    "grantAccess": "Accorder l'accès",
+    "revokeGroup": "Supprime l'association de ce groupe au rôle. Les membres du groupe gardent l'accès donné par leurs autres attributions.",
+    "revokeHolder": "Cette personne perd ce que ce rôle lui accordait ici. Ses autres attributions restent en vigueur.",
+    "heldBy": "Détenu par",
+    "idpGroup": "Groupe IdP",
+    "role": "Rôle",
+    "where": "Où",
+    "source": "Source",
+    "granted": "Accordé",
+    "expires": "Expire",
+    "never": "jamais",
+    "exportEmpty": "L'export n'a renvoyé aucun fichier",
+    "revoked": "Rôle révoqué",
+    "revokeFailed": "Échec de la révocation",
+    "bulkRevokeFailed": "Échec de la révocation groupée",
+    "allFailed": "{count, plural, one {La révocation a échoué} other {Les # révocations ont échoué}}",
+    "revokedCount": "{count, plural, one {# attribution révoquée} other {# attributions révoquées}}",
+    "partial": "{revoked} révoquées, {failed} en échec"
+  },
+  "adminPermissionLists": {
+    "roles": {
+      "search": "Rechercher des rôles par nom ou slug…",
+      "fields": {
+        "scope": "S'attribue au niveau",
+        "builtin": "Intégré"
+      },
+      "options": {
+        "scope": {
+          "ORG": "organisation",
+          "TEAM": "équipe",
+          "PROJECT": "projet",
+          "APP": "app"
+        },
+        "builtin": {
+          "yes": "intégré",
+          "no": "personnalisé"
+        }
+      },
+      "views": {
+        "all": "Tous",
+        "mine": "Les miens",
+        "builtin": "Intégrés",
+        "custom": "Personnalisés"
+      }
+    },
+    "assignments": {
+      "search": "Rechercher par utilisateur, groupe ou rôle…",
+      "fields": {
+        "role": "Rôle",
+        "scope": "Portée",
+        "kind": "Détenu par",
+        "holder": "Détenteur"
+      },
+      "options": {
+        "scope": {
+          "ORG": "organisation",
+          "TEAM": "équipe",
+          "PROJECT": "projet",
+          "APP": "app"
+        },
+        "kind": {
+          "user": "utilisateur",
+          "group": "groupe"
+        }
+      },
+      "views": {
+        "all": "Toutes",
+        "mine": "Les miennes",
+        "groups": "Groupes"
+      }
+    },
+    "holders": {
+      "search": "Rechercher des détenteurs par utilisateur ou groupe…",
+      "fields": {
+        "scope": "Portée",
+        "kind": "Détenu par"
+      },
+      "options": {
+        "scope": {
+          "ORG": "organisation",
+          "TEAM": "équipe",
+          "PROJECT": "projet",
+          "APP": "app"
+        },
+        "kind": {
+          "user": "utilisateur",
+          "group": "groupe"
+        }
+      },
+      "views": {
+        "all": "Tous"
+      }
+    }
+  },
+  "adminRoles": {
+    "title": "Rôles",
+    "context": "Ensembles nommés de permissions. Les rôles intégrés sont figés ; dupliquez-en un pour l'adapter.",
+    "newRole": "Nouveau rôle",
+    "columns": {
+      "role": "Rôle",
+      "allows": "Ce qu'il permet",
+      "bindsAt": "S'attribue au niveau",
+      "kind": "Type",
+      "permissions": "Permissions",
+      "holders": "Détenteurs"
+    },
+    "builtIn": "intégré",
+    "custom": "personnalisé",
+    "duplicatedFrom": "Dupliqué depuis {name}",
+    "from": "depuis {name}",
+    "fromDeleted": "depuis {name} (supprimé)",
+    "emptyTitle": "Aucun rôle",
+    "emptyDescription": "Les rôles intégrés sont créés au déploiement ; si aucun n'apparaît, le contexte de l'organisation n'est peut-être pas encore résolu."
+  },
+  "adminRolePermissions": {
+    "savedLabel": "enregistré",
+    "builtInNote": "Les rôles intégrés sont livrés avec la plateforme et ne peuvent pas être modifiés. Dupliquez-le pour créer un rôle personnalisé à affiner.",
+    "duplicate": "Dupliquer pour personnaliser",
+    "lineage": "Dupliqué depuis <role>{name}</role>{builtIn, select, true { (intégré)} other {}}{deleted, select, true {, supprimé depuis} other {}} : <diff></diff> depuis.",
+    "compareWithRole": "Comparer avec {name}",
+    "compareWith": "Comparer avec",
+    "savedVersion": "Version enregistrée",
+    "nothing": "Rien",
+    "lineageOption": "{name} (dupliqué depuis{deleted, select, true {, supprimé} other {}})",
+    "builtInOption": "{name} (intégré)",
+    "unsaved": "non enregistré",
+    "noChanges": "Aucune modification non enregistrée",
+    "discard": "Annuler les modifications",
+    "saving": "Enregistrement…",
+    "save": "Enregistrer les permissions"
+  },
+  "adminRoleDetail": {
+    "role": "Rôle",
+    "notFoundCrumb": "Introuvable",
+    "notFoundTitle": "Rôle introuvable",
+    "permissions": "Permissions",
+    "missingTitle": "Aucun rôle avec cet identifiant",
+    "missingDescription": "Rien dans cette organisation n'a l'identifiant {id}. Il a peut-être été supprimé.",
+    "allRoles": "Tous les rôles",
+    "grantAccess": "Accorder l'accès",
+    "builtIn": "intégré",
+    "custom": "personnalisé",
+    "tabs": {
+      "permissions": "Permissions",
+      "holders": "Détenteurs",
+      "settings": "Paramètres"
+    },
+    "gone": "Ce rôle n'existe plus.",
+    "saved": "Rôle « {name} » enregistré",
+    "saveFailed": "Échec de l'enregistrement",
+    "settings": {
+      "title": "Nom et description",
+      "lockedDescription": "Les rôles intégrés gardent le nom et la description fournis.",
+      "description": "Ce que l'on voit en accordant ce rôle.",
+      "name": "Nom",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "À quoi sert ce rôle, en une phrase.",
+      "slug": "Slug",
+      "bindsAt": "S'attribue au niveau",
+      "bindsAtValue": "{scope, select, ORG {une organisation ou tout ce qu'elle contient} TEAM {une équipe ou tout ce qu'elle contient} PROJECT {un projet ou tout ce qu'il contient} APP {une app ou tout ce qu'elle contient} other {{scope} ou tout ce qu'il contient}}",
+      "kind": "Type",
+      "builtIn": "intégré",
+      "custom": "personnalisé"
+    }
+  },
+  "adminPermissions": {
+    "pages": {
+      "roles": "Rôles",
+      "assignments": "Attributions",
+      "diagnostics": "Diagnostic",
+      "presets": "Configuration simple",
+      "safety": "Sécurité des actions"
+    },
+    "off": "Cette console est désactivée sur cette installation.",
+    "offHint": "Les permissions sont derrière le flag <code>{flag}</code>. Activez-le dans <link>Administration › Fonctionnalités</link>."
+  },
+  "adminPresets": {
+    "title": "Configuration simple",
+    "intro": "Partez de ce qu'une personne doit faire. Chaque choix accorde un rôle existant sur la portée choisie, et apparaît donc dans Attributions comme toute autre attribution. Aucun ne fait de quelqu'un un super-admin de l'installation.",
+    "loading": "Chargement…",
+    "loadError": "Impossible de lire les préréglages : {error}",
+    "retry": "Réessayer",
+    "task": "Tâche",
+    "scopes": {
+      "ORG": "Organisation",
+      "TEAM": "Équipe",
+      "PROJECT": "Projet",
+      "APP": "App"
+    },
+    "grantAt": "Accorder {preset} au niveau {scope}",
+    "grant": "Accorder",
+    "allowed": "Autorisé",
+    "notIncluded": "Non inclus",
+    "footer": "Pour en accorder une, attribuez son rôle dans <link>Attributions</link>."
+  },
+  "adminRuns": {
+    "title": "Exécutions",
+    "columns": {
+      "run": "Exécution",
+      "what": "Quoi",
+      "startedBy": "Lancée par",
+      "when": "Quand",
+      "took": "Durée",
+      "outcome": "Résultat"
+    },
+    "kinds": {
+      "agent": "Exécution d'agent",
+      "workflow": "Exécution de workflow",
+      "deployment": "Déploiement",
+      "job": "Exécution de job",
+      "task": "Exécution de tâche"
+    },
+    "notRecorded": "non enregistré",
+    "emptyTitle": "Aucune exécution pour l'instant",
+    "emptyDescription": "Les exécutions d'agents, de workflows, les déploiements, les exécutions de jobs et de tâches apparaissent ici dès leur lancement.",
+    "more": "Plus",
+    "exportCsv": "Exporter en CSV",
+    "exportFailed": "L'export a échoué",
+    "exportCapped": "Les {count} premières exécutions ont été exportées.",
+    "list": {
+      "search": "Rechercher exécutions, agents, apps, identifiants…",
+      "fields": {
+        "kind": "Type",
+        "outcome": "Résultat",
+        "trigger": "Déclencheur",
+        "startedBy": "Lancée par",
+        "project": "Projet",
+        "app": "App",
+        "since": "Depuis"
+      },
+      "options": {
+        "kind": {
+          "agent": "Exécution d'agent",
+          "workflow": "Exécution de workflow",
+          "deployment": "Déploiement",
+          "job": "Exécution de job",
+          "task": "Exécution de tâche"
+        },
+        "since": {
+          "1h": "Dernière heure",
+          "24h": "Dernières 24 heures",
+          "7d": "7 derniers jours",
+          "30d": "30 derniers jours",
+          "90d": "90 derniers jours"
+        }
+      },
+      "views": {
+        "all": "Toutes",
+        "mine": "Les miennes"
+      }
+    }
+  },
   "orgMembers": {
     "searchLabel": "Rechercher des membres",
     "searchPlaceholder": "Rechercher par nom d'utilisateur ou e-mail…",

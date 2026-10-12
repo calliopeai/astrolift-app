@@ -4624,6 +4624,584 @@
       "truncated": "200 linhas exibidas — abra o console para o registro completo."
     }
   },
+  "adminOrganization": {
+    "title": "Organização",
+    "description": "Edite a identidade e os padrões de retenção da plataforma no nível da organização.",
+    "general": {
+      "title": "Geral",
+      "description": "Nome de exibição e URL da página inicial mostrados na barra lateral e nos e-mails.",
+      "slug": "Slug",
+      "slugHint": "O slug é imutável; usado em URLs e prefixos de namespace.",
+      "displayName": "Nome de exibição",
+      "website": "Site"
+    },
+    "retention": {
+      "title": "Padrões de retenção",
+      "description": "Padrões herdados por novos apps. Apps existentes mantêm seus próprios valores até serem editados explicitamente.",
+      "auditDays": "Dias do log de auditoria",
+      "default": "Padrão: <mono>{value}</mono>.",
+      "previewCap": "Limite de ambientes de preview",
+      "appLogDays": "Dias de log do app",
+      "pending": "Editável quando a área de registro de apps for lançada."
+    },
+    "policies": {
+      "title": "Políticas de usuário",
+      "description": "Regras de toda a organização que valem para cada membro, incluindo o editor de perfil de autoatendimento.",
+      "allowProfileEdit": "Permitir que usuários editem o próprio perfil",
+      "allowProfileEditHint": "Permite que usuários atualizem nome, sobrenome e e-mail em <code>{path}</code>. Campos gerenciados pelo provedor de identidade continuam bloqueados mesmo com isto ativado, pois edições locais em campos do IdP seriam sobrescritas no próximo login. Desative em implantações só com SSO, em que o IdP é a fonte da verdade.",
+      "restrictedTitle": "Configurações que membros não podem alterar",
+      "restrictedHint": "O padrão para membros que não escolheram em Configurações › Aparência. Quem escolher o próprio o mantém.",
+      "restricted": {
+        "show": {
+          "label": "Mostrar como somente leitura",
+          "blurb": "Ver desativadas as configurações que você não pode alterar, com a permissão que permitiria"
+        },
+        "hide": {
+          "label": "Ocultar",
+          "blurb": "Mostrar só as configurações que você pode alterar"
+        }
+      }
+    },
+    "sections": {
+      "houseTheme": "Tema da casa",
+      "trustedDomains": "Domínios confiáveis",
+      "modules": "Módulos"
+    },
+    "idp": {
+      "title": "Provedor de identidade",
+      "description": "Configuração de login OIDC, SAML e SCIM desta organização.",
+      "comingSoon": "Configuração no app em breve",
+      "activeByEnvironment": "Ativo no momento, por ambiente:",
+      "development": "Desenvolvimento",
+      "devBypass": "Bypass de dev-login do auth1",
+      "stagingProduction": "Staging e produção",
+      "roadmap": "Uma sub-rota de configuração dedicada adicionará descoberta OIDC, metadados SAML e rotação de tokens SCIM quando o seletor de provedores estiver conectado."
+    },
+    "updated": "Organização atualizada",
+    "saveFailed": "Falha ao salvar"
+  },
+  "adminTrustedDomains": {
+    "title": "Domínios de e-mail confiáveis",
+    "description": "Usuários de SSO cujo e-mail pertence a um destes domínios podem entrar nesta organização sem convite explícito. Defina <em>Exigir revisão do admin</em> para que entrem como membros pendentes de aprovação antes de terem acesso.",
+    "domain": "Domínio",
+    "defaultRole": "Função padrão",
+    "none": "nenhuma",
+    "noneOption": "Nenhuma",
+    "mode": "Modo",
+    "reviewRequired": "Revisão necessária",
+    "autoJoin": "Entrada automática",
+    "loadingRoles": "Carregando funções…",
+    "rolesError": "Não foi possível carregar as funções padrão",
+    "onSignIn": "No login",
+    "autoJoinNow": "Entrar automaticamente na hora",
+    "requireReview": "Exigir revisão do admin",
+    "addDomain": "Adicionar domínio",
+    "listLabel": "Domínios confiáveis",
+    "removeDomain": "Remover {domain}",
+    "emptyTitle": "Nenhum domínio confiável ainda",
+    "emptyDescription": "Usuários de SSO sem domínio correspondente ainda precisam de convite explícito para entrar.",
+    "confirmTitle": "Remover {domain}?",
+    "confirmTitleFallback": "Remover domínio?",
+    "confirmDescription": "Novos logins deste domínio deixam de entrar automaticamente na organização e precisam de convite explícito. Membros existentes mantêm acesso e vínculos de função; a mudança vale só daqui em diante.",
+    "confirmLabel": "Remover domínio",
+    "added": "{domain} adicionado",
+    "addFailed": "Falha ao adicionar",
+    "removed": "{domain} removido",
+    "removeFailed": "Falha ao remover",
+    "list": {
+      "search": "Buscar domínios, funções…",
+      "fields": {
+        "mode": "Modo",
+        "role": "Função padrão"
+      },
+      "options": {
+        "mode": {
+          "auto": "entrada automática",
+          "review": "revisão necessária"
+        }
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Meus"
+      },
+      "notes": {
+        "mine": "Domínios confiáveis ainda não registram quem os adicionou, então Meus fica vazio."
+      }
+    }
+  },
+  "adminHouseTheme": {
+    "title": "Tema da casa",
+    "description": "Vale para quem não escolheu o próprio em Configurações › Aparência. Deixe uma opção em <strong>Não definido</strong> para que cada pessoa escolha. Ainda é possível escolher a própria cor de destaque, a menos que o tema esteja bloqueado.",
+    "save": "Salvar tema da casa",
+    "ground": "Fundo",
+    "accent": "Destaque",
+    "notSet": "Não definido",
+    "lock": "Bloquear este tema",
+    "lockHint": "Todos recebem o tema da casa e o seletor pessoal fica somente leitura. Desativado por padrão; publicar um padrão e impô-lo são decisões diferentes.",
+    "grounds": {
+      "black": "Preto",
+      "charcoal": "Carvão",
+      "graphite": "Grafite",
+      "emerald": "Esmeralda",
+      "paper": "Papel",
+      "mist": "Névoa"
+    },
+    "modes": {
+      "dark": "escuro",
+      "light": "claro"
+    },
+    "accents": {
+      "green": "Verde",
+      "copper": "Cobre",
+      "ice": "Gelo",
+      "periwinkle": "Pervinca",
+      "amber": "Âmbar"
+    },
+    "saved": "Tema da casa salvo",
+    "savedLocked": "Tema da casa salvo e bloqueado",
+    "saveFailed": "Falha ao salvar"
+  },
+  "adminModules": {
+    "title": "Módulos",
+    "description": "Integrações opcionais para esta organização. Um admin da instalação ainda pode desativar uma delas para todas as organizações.",
+    "loadError": "Não foi possível carregar os módulos",
+    "installOff": "Desativado nesta instalação",
+    "enable": "Ativar {module}",
+    "disable": "Desativar {module}",
+    "enabledToast": "{module} ativado",
+    "disabledToast": "{module} desativado",
+    "updateError": "Não foi possível atualizar o módulo.",
+    "items": {
+      "chat_studio_integration": {
+        "label": "Integração com o Chat Studio",
+        "description": "Permite que o Chat Studio acesse os apps desta organização pela API de builder."
+      },
+      "agent_live_attach": {
+        "label": "Conexão ao vivo com agentes",
+        "description": "Permite que membros se conectem ao vivo a uma sessão de agente em execução."
+      },
+      "chat_studio_agent_runs": {
+        "label": "Execuções de agentes pelo Chat Studio",
+        "description": "Permite que o Chat Studio inicie os agentes registrados desta organização."
+      },
+      "agent_policy_enforcement": {
+        "label": "Aplicação de políticas a agentes",
+        "description": "Permite que o Zentinelle aplique ações de política aos agentes e boxes desta organização."
+      }
+    }
+  },
+  "actionSafety": {
+    "title": "Segurança de ações",
+    "intro": "Ações sensíveis pedem confirmação e um novo login antes de rodar. Ficam ativadas por padrão. Uma exclusão destrutiva também pode aguardar a aprovação de outros admins. As mudanças aqui valem para toda a organização; um time, app ou pessoa pode ter exigências maiores, nunca menores. Alterá-las pede que você faça login de novo.",
+    "inspect": "Mostrar o que vale em",
+    "wholeOrg": "Toda a organização",
+    "inspectingNote": "Somente leitura: o que vale para você neste app, após as regras de time, app e pessoa.",
+    "loading": "Carregando…",
+    "loadError": "Não foi possível ler as proteções: {error}",
+    "retry": "Tentar novamente",
+    "columns": {
+      "action": "Ação",
+      "confirm": "Confirmar e fazer login de novo",
+      "approval": "Aprovação",
+      "selfApproval": "Admins podem aprovar as próprias"
+    },
+    "askBefore": "Perguntar antes: {action}",
+    "on": "Ativado",
+    "off": "Desativado",
+    "narrower": "Também definido para um time, app ou pessoa",
+    "requireApproval": "Exigir aprovação: {action}",
+    "required": "Obrigatória",
+    "approversNeeded": "Aprovadores necessários: {action}",
+    "approvers": "{count, plural, one {# aprovador} other {# aprovadores}}",
+    "perApp": "Definido por app, na aprovação de segredos",
+    "notAvailable": "Indisponível",
+    "selfApprovalFor": "Admins podem aprovar as próprias: {action}",
+    "allowed": "Permitido",
+    "notAllowed": "Não permitido",
+    "ruleNotSaved": "A regra não foi salva.",
+    "decisionNotSaved": "A decisão não foi salva.",
+    "requests": {
+      "title": "Solicitações de aprovação",
+      "loadError": "Não foi possível ler as solicitações: {error}",
+      "empty": "Nenhuma solicitação aberta.",
+      "byYou": "Solicitada por você",
+      "byEmail": "Solicitada por {email}",
+      "bySomeone": "Solicitada por alguém",
+      "progress": "<mono>{approvals}/{required}</mono> aprovadas · expira em <expiry></expiry>",
+      "approvedMine": "Aprovada: execute de novo para seguir",
+      "approved": "Aprovada",
+      "approve": "Aprovar",
+      "reject": "Rejeitar",
+      "withdraw": "Retirar"
+    },
+    "scoped": {
+      "title": "Regras para times, apps e pessoas",
+      "description": "Elas somam às proteções da organização, nunca as removem.",
+      "empty": "Nenhuma regra de time, app ou pessoa.",
+      "forKind": "para {kind}",
+      "kinds": {
+        "TEAM": "Time",
+        "APP": "App",
+        "USER": "Pessoa"
+      },
+      "remove": "Remover",
+      "addLegend": "Adicionar uma regra",
+      "appliesTo": "Aplica-se a",
+      "action": "Ação",
+      "searchPeoplePlaceholder": "Buscar pessoas por nome ou e-mail",
+      "searchPeople": "Buscar pessoas",
+      "searching": "Buscando…",
+      "people": "Pessoas",
+      "pickTeam": "Escolha um time",
+      "pickApp": "Escolha um app",
+      "teams": "Times",
+      "apps": "Apps",
+      "askBefore": "Perguntar antes (confirmar e fazer login de novo)",
+      "requireApproval": "Exigir aprovação",
+      "approversNeeded": "Aprovadores necessários",
+      "approvers": "{count, plural, one {# aprovador} other {# aprovadores}}",
+      "noSelf": "Sem aprovar as próprias",
+      "add": "Adicionar regra",
+      "adds": {
+        "asksBefore": "pergunta antes",
+        "needsApprovers": "{count, plural, one {precisa de # aprovador} other {precisa de # aprovadores}}",
+        "noSelfApproval": "sem autoaprovação",
+        "nothing": "não adiciona nada"
+      }
+    }
+  },
+  "adminCheckAccess": {
+    "checkTitle": "Verificar acesso",
+    "compareTitle": "Comparar acesso",
+    "checkOne": "Verificar uma permissão",
+    "compareTwo": "Comparar duas pessoas",
+    "me": "Eu",
+    "question": "<who></who> pode <permission></permission> em <scope></scope>?",
+    "someone": "alguém",
+    "doSomething": "fazer algo",
+    "theOrganization": "a organização",
+    "who": "Quem",
+    "on": "Em",
+    "wholeOrg": "Toda a organização",
+    "answer": "Resposta",
+    "compareQuestion": "O que <who></who> pode fazer que <other></other> não pode, e vice-versa?",
+    "someoneElse": "outra pessoa",
+    "firstPerson": "Primeira pessoa",
+    "secondPerson": "Segunda pessoa",
+    "sideBySide": "Lado a lado",
+    "compareNeeds": "Comparar duas pessoas exige {permission}.",
+    "checkNeeds": "Você pode verificar o próprio acesso; verificar o de outra pessoa exige {permission}.",
+    "answerCovers": "A resposta é a da própria verificação de permissão: grupos do IdP, compartilhamentos de time e as políticas da organização estão incluídos, no objeto escolhido."
+  },
+  "adminNewRole": {
+    "title": "Nova função",
+    "roles": "Funções",
+    "duplicate": "Duplicar {name}",
+    "customName": "{name} (personalizada)",
+    "context": "Uma função personalizada é um conjunto nomeado de permissões concedido em um escopo.",
+    "steps": "Etapas",
+    "step": {
+      "details": "Detalhes",
+      "permissions": "Permissões",
+      "review": "Revisão"
+    },
+    "startFrom": "Começar de",
+    "loadingRoles": "Carregando funções…",
+    "blank": "Nada, uma função em branco",
+    "builtInOption": "{name} ({builtIn})",
+    "name": "Nome",
+    "namePlaceholder": "Gerente de releases",
+    "slug": "Slug",
+    "slugHelp": "Derivado do nome até você editá-lo. Fixo depois de criado.",
+    "bindsAt": "Vincula em",
+    "bindsAtHelp": "Onde pode ser concedida: neste nível ou em qualquer coisa dentro dele. Fixo depois de criada.",
+    "description": "Descrição",
+    "descriptionPlaceholder": "Para que serve esta função, em uma frase.",
+    "comparedWith": "Comparado com {name}. A nova função registra que foi duplicada de {name}, para que a aba Permissões mostre o quanto se afasta dela.",
+    "cancel": "Cancelar",
+    "back": "Voltar",
+    "continue": "Continuar",
+    "creating": "Criando…",
+    "create": "Criar função",
+    "errors": {
+      "name": "Dê um nome à função.",
+      "slugFormat": "Letras minúsculas, dígitos, hífens e sublinhados, começando por letra ou dígito.",
+      "slugTaken": "Já existe uma função chamada {slug}."
+    },
+    "created": "Função “{name}” criada",
+    "createFailed": "Falha ao criar"
+  },
+  "adminBindings": {
+    "title": "Atribuições",
+    "context": "Cada função de um usuário ou grupo do IdP, onde se aplica e por quê.",
+    "moreActions": "Mais ações da lista",
+    "exporting": "Exportando CSV…",
+    "export": "Exportar atribuições correspondentes como CSV",
+    "listLabel": "Vínculos de função",
+    "revoke": "Revogar",
+    "revokeCount": "Revogar {count}",
+    "emptyTitle": "Nenhum vínculo de função",
+    "emptyDescription": "Conceda uma função a um usuário para dar acesso à plataforma.",
+    "bulkTitle": "{count, plural, one {Revogar # vínculo de função?} other {Revogar # vínculos de função?}}",
+    "bulkDescription": "Os usuários selecionados perdem as permissões que essas funções concediam. Outros vínculos continuam valendo.",
+    "revokeFrom": "Revogar {role} de {name}?",
+    "revokeFallback": "Revogar?",
+    "revokeDescription": "O usuário perde as permissões que esta função concedia. Outros vínculos de função, se houver, continuam valendo.",
+    "holders": "Titulares",
+    "holdersEmptyTitle": "Ninguém tem esta função",
+    "holdersEmptyDescription": "Conceda {role} a uma pessoa ou grupo e ela aparece aqui, com onde se aplica.",
+    "grantAccess": "Conceder acesso",
+    "revokeGroup": "Remove o mapeamento deste grupo para a função. Os membros do grupo mantêm o acesso dado por outros vínculos.",
+    "revokeHolder": "A pessoa perde o que esta função concedia aqui. Outros vínculos continuam valendo.",
+    "heldBy": "Atribuída a",
+    "idpGroup": "Grupo do IdP",
+    "role": "Função",
+    "where": "Onde",
+    "source": "Origem",
+    "granted": "Concedida",
+    "expires": "Expira",
+    "never": "nunca",
+    "exportEmpty": "A exportação não retornou arquivo",
+    "revoked": "Função revogada",
+    "revokeFailed": "Falha ao revogar",
+    "bulkRevokeFailed": "Falha na revogação em massa",
+    "allFailed": "{count, plural, one {A revogação falhou} other {Todas as # revogações falharam}}",
+    "revokedCount": "{count, plural, one {# vínculo revogado} other {# vínculos revogados}}",
+    "partial": "{revoked} revogados, {failed} com falha"
+  },
+  "adminPermissionLists": {
+    "roles": {
+      "search": "Buscar funções por nome ou slug…",
+      "fields": {
+        "scope": "Vincula em",
+        "builtin": "Integrada"
+      },
+      "options": {
+        "scope": {
+          "ORG": "organização",
+          "TEAM": "time",
+          "PROJECT": "projeto",
+          "APP": "app"
+        },
+        "builtin": {
+          "yes": "integrada",
+          "no": "personalizada"
+        }
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas",
+        "builtin": "Integradas",
+        "custom": "Personalizadas"
+      }
+    },
+    "assignments": {
+      "search": "Buscar por usuário, grupo ou função…",
+      "fields": {
+        "role": "Função",
+        "scope": "Escopo",
+        "kind": "Atribuída a",
+        "holder": "Titular"
+      },
+      "options": {
+        "scope": {
+          "ORG": "organização",
+          "TEAM": "time",
+          "PROJECT": "projeto",
+          "APP": "app"
+        },
+        "kind": {
+          "user": "usuário",
+          "group": "grupo"
+        }
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Meus",
+        "groups": "Grupos"
+      }
+    },
+    "holders": {
+      "search": "Buscar titulares por usuário ou grupo…",
+      "fields": {
+        "scope": "Escopo",
+        "kind": "Atribuída a"
+      },
+      "options": {
+        "scope": {
+          "ORG": "organização",
+          "TEAM": "time",
+          "PROJECT": "projeto",
+          "APP": "app"
+        },
+        "kind": {
+          "user": "usuário",
+          "group": "grupo"
+        }
+      },
+      "views": {
+        "all": "Todos"
+      }
+    }
+  },
+  "adminRoles": {
+    "title": "Funções",
+    "context": "Conjuntos nomeados de permissões. Funções integradas são fixas; duplique uma para ajustá-la.",
+    "newRole": "Nova função",
+    "columns": {
+      "role": "Função",
+      "allows": "O que permite",
+      "bindsAt": "Vincula em",
+      "kind": "Tipo",
+      "permissions": "Permissões",
+      "holders": "Titulares"
+    },
+    "builtIn": "integrada",
+    "custom": "personalizada",
+    "duplicatedFrom": "Duplicada de {name}",
+    "from": "de {name}",
+    "fromDeleted": "de {name} (excluída)",
+    "emptyTitle": "Nenhuma função",
+    "emptyDescription": "Funções integradas são criadas no deploy; se nenhuma aparecer, o contexto da organização talvez ainda não tenha sido resolvido."
+  },
+  "adminRolePermissions": {
+    "savedLabel": "salvo",
+    "builtInNote": "Funções integradas vêm com a plataforma e não podem ser alteradas. Duplique-a para criar uma função personalizada que você pode enxugar.",
+    "duplicate": "Duplicar para personalizar",
+    "lineage": "Duplicada de <role>{name}</role>{builtIn, select, true { (integrada)} other {}}{deleted, select, true {, já excluída} other {}}: <diff></diff> desde então.",
+    "compareWithRole": "Comparar com {name}",
+    "compareWith": "Comparar com",
+    "savedVersion": "Versão salva",
+    "nothing": "Nada",
+    "lineageOption": "{name} (duplicada de{deleted, select, true {, excluída} other {}})",
+    "builtInOption": "{name} (integrada)",
+    "unsaved": "não salvo",
+    "noChanges": "Nenhuma alteração não salva",
+    "discard": "Descartar",
+    "saving": "Salvando…",
+    "save": "Salvar permissões"
+  },
+  "adminRoleDetail": {
+    "role": "Função",
+    "notFoundCrumb": "Não encontrada",
+    "notFoundTitle": "Função não encontrada",
+    "permissions": "Permissões",
+    "missingTitle": "Nenhuma função com este id",
+    "missingDescription": "Nada nesta organização tem o id {id}. Talvez tenha sido removido.",
+    "allRoles": "Todas as funções",
+    "grantAccess": "Conceder acesso",
+    "builtIn": "integrada",
+    "custom": "personalizada",
+    "tabs": {
+      "permissions": "Permissões",
+      "holders": "Titulares",
+      "settings": "Configurações"
+    },
+    "gone": "Esta função não existe mais.",
+    "saved": "Função “{name}” salva",
+    "saveFailed": "Falha ao salvar",
+    "settings": {
+      "title": "Nome e descrição",
+      "lockedDescription": "Funções integradas mantêm o nome e a descrição originais.",
+      "description": "O que as pessoas veem ao conceder esta função.",
+      "name": "Nome",
+      "descriptionLabel": "Descrição",
+      "descriptionPlaceholder": "Para que serve esta função, em uma frase.",
+      "slug": "Slug",
+      "bindsAt": "Vincula em",
+      "bindsAtValue": "{scope, select, ORG {uma organização ou qualquer coisa dentro dela} TEAM {um time ou qualquer coisa dentro dele} PROJECT {um projeto ou qualquer coisa dentro dele} APP {um app ou qualquer coisa dentro dele} other {{scope} ou qualquer coisa dentro}}",
+      "kind": "Tipo",
+      "builtIn": "integrada",
+      "custom": "personalizada"
+    }
+  },
+  "adminPermissions": {
+    "pages": {
+      "roles": "Funções",
+      "assignments": "Atribuições",
+      "diagnostics": "Diagnóstico",
+      "presets": "Configuração fácil",
+      "safety": "Segurança de ações"
+    },
+    "off": "Este console está desativado nesta instalação.",
+    "offHint": "Permissões ficam atrás da flag <code>{flag}</code>. Ative em <link>Administração › Recursos</link>."
+  },
+  "adminPresets": {
+    "title": "Configuração fácil",
+    "intro": "Comece pelo que a pessoa precisa fazer. Cada opção concede uma função existente no escopo escolhido, então aparece em Atribuições como qualquer outra concessão. Nenhuma torna alguém super-admin da instalação.",
+    "loading": "Carregando…",
+    "loadError": "Não foi possível ler as predefinições: {error}",
+    "retry": "Tentar novamente",
+    "task": "Tarefa",
+    "scopes": {
+      "ORG": "Organização",
+      "TEAM": "Time",
+      "PROJECT": "Projeto",
+      "APP": "App"
+    },
+    "grantAt": "Conceder {preset} no nível {scope}",
+    "grant": "Conceder",
+    "allowed": "Permitido",
+    "notIncluded": "Não incluído",
+    "footer": "Para conceder uma, atribua a função em <link>Atribuições</link>."
+  },
+  "adminRuns": {
+    "title": "Execuções",
+    "columns": {
+      "run": "Execução",
+      "what": "O quê",
+      "startedBy": "Iniciada por",
+      "when": "Quando",
+      "took": "Duração",
+      "outcome": "Resultado"
+    },
+    "kinds": {
+      "agent": "Execução de agente",
+      "workflow": "Execução de workflow",
+      "deployment": "Deploy",
+      "job": "Execução de job",
+      "task": "Execução de tarefa"
+    },
+    "notRecorded": "não registrado",
+    "emptyTitle": "Nenhuma execução ainda",
+    "emptyDescription": "Execuções de agentes, de workflows, deploys, execuções de jobs e de tarefas aparecem aqui quando começam.",
+    "more": "Mais",
+    "exportCsv": "Exportar CSV",
+    "exportFailed": "A exportação falhou",
+    "exportCapped": "As primeiras {count} execuções foram exportadas.",
+    "list": {
+      "search": "Buscar execuções, agentes, apps, ids…",
+      "fields": {
+        "kind": "Tipo",
+        "outcome": "Resultado",
+        "trigger": "Gatilho",
+        "startedBy": "Iniciada por",
+        "project": "Projeto",
+        "app": "App",
+        "since": "Desde"
+      },
+      "options": {
+        "kind": {
+          "agent": "Execução de agente",
+          "workflow": "Execução de workflow",
+          "deployment": "Deploy",
+          "job": "Execução de job",
+          "task": "Execução de tarefa"
+        },
+        "since": {
+          "1h": "Última hora",
+          "24h": "Últimas 24 horas",
+          "7d": "Últimos 7 dias",
+          "30d": "Últimos 30 dias",
+          "90d": "Últimos 90 dias"
+        }
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas"
+      }
+    }
+  },
   "orgMembers": {
     "searchLabel": "Pesquisar membros",
     "searchPlaceholder": "Pesquisar por nome de usuário ou e-mail…",

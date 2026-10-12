@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
@@ -25,6 +26,7 @@ interface RolesResp {
  * the new role's page.
  */
 export function useNewRole() {
+  const t = useTranslations("adminNewRole");
   const router = useRouter();
   const fromId = useSearchParams()?.get("from") ?? null;
   const { data, loading } = useQuery<RolesResp>(LIST_ROLES, { fetchPolicy: "cache-and-network" });
@@ -55,13 +57,13 @@ export function useNewRole() {
       });
       const created = res?.createRole;
       if (created?.ok && created.data) {
-        toast.success(`Role “${draft.name.trim()}” created`);
+        toast.success(t("created", { name: draft.name.trim() }));
         router.push(roleHref(created.data.id));
         return null;
       }
-      return created?.errors?.[0]?.message ?? "Create failed";
+      return created?.errors?.[0]?.message ?? t("createFailed");
     } catch (err) {
-      return err instanceof Error ? err.message : "Create failed";
+      return err instanceof Error ? err.message : t("createFailed");
     }
   }
 
