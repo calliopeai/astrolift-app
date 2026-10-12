@@ -4077,6 +4077,29 @@ export type AstroliftPipelineSecretChangeMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftPlatformSecretInventory = {
+  canReveal: Scalars['Boolean']['output'];
+  provider: Scalars['String']['output'];
+  refs: Array<AstroliftPlatformSecretRef>;
+  store: AstroliftPlatformSecretStore;
+};
+
+export type AstroliftPlatformSecretRef = {
+  envVar: Scalars['String']['output'];
+  error: Scalars['String']['output'];
+  exists: Scalars['Boolean']['output'];
+  specSlug: Scalars['String']['output'];
+  uri: Scalars['String']['output'];
+};
+
+export type AstroliftPlatformSecretStore = {
+  clusterSlug: Scalars['String']['output'];
+  organizationName: Scalars['String']['output'];
+  organizationSlug: Scalars['String']['output'];
+  sharedCluster: Scalars['Boolean']['output'];
+  specCount: Scalars['Int']['output'];
+};
+
 export type AstroliftPlatformSetting = {
   changed: Scalars['Boolean']['output'];
   choices: Array<Scalars['String']['output']>;
@@ -12050,6 +12073,10 @@ export type Query = {
   astroliftPipelines: Array<AstroliftPipeline>;
   astroliftPipelinesPage: AstroliftPipelinePage;
   astroliftPlatformApiUrl: Scalars['String']['output'];
+  /** One organization's agent secret refs and whether its store holds each, never the values (#1861). Probed as dispatch resolves them. */
+  astroliftPlatformSecretInventory?: Maybe<AstroliftPlatformSecretInventory>;
+  /** Each organization's agent secret store: the cluster it resolves from (#1861). */
+  astroliftPlatformSecretStores: Array<AstroliftPlatformSecretStore>;
   /** Every install setting, grouped, for the platform operator (#1861). */
   astroliftPlatformSettings: Array<AstroliftPlatformSetting>;
   astroliftPodResourceUsage?: Maybe<AstroliftPodResourceUsage>;
@@ -13556,6 +13583,11 @@ export type QueryAstroliftPipelinesPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftPlatformSecretInventoryArgs = {
+  organizationSlug: Scalars['String']['input'];
 };
 
 

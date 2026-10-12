@@ -10,6 +10,8 @@ fresh sign-in and are audited with the old and new value. The rules live in
 
 from __future__ import annotations
 
+import dataclasses
+
 import strawberry
 from strawberry.types import Info
 
@@ -17,7 +19,7 @@ from astrolift_graphql import MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.step_up import requires_elevation
-from core import platform_settings
+from core import platform_secrets, platform_settings
 from core.mutations import mutation_audit
 from core.permissions import Permission, check_platform_operator, require_permission
 
@@ -80,6 +82,38 @@ def _extras(result):
     return {"previous_value": result.data.previous_value, "value": result.data.setting.value}
 
 
+@strawberry.type(name="AstroliftPlatformSecretStore")
+class PlatformSecretStoreType:
+    organization_slug: str
+    organization_name: str
+    cluster_slug: str
+    """The cluster whose store holds the organization's agent secrets; empty when it has none."""
+    shared_cluster: bool
+    spec_count: int
+
+
+@strawberry.type(name="AstroliftPlatformSecretRef")
+class PlatformSecretRefType:
+    spec_slug: str
+    env_var: str
+    uri: str
+    exists: bool
+    """The store holds a value; false with ``error`` when the probe could not tell."""
+    error: str
+
+
+@strawberry.type(name="AstroliftPlatformSecretInventory")
+class PlatformSecretInventoryType:
+    store: PlatformSecretStoreType
+    provider: str
+    can_reveal: bool
+    refs: list[PlatformSecretRefType]
+
+
+def _store_type(row: platform_secrets.SecretStore) -> PlatformSecretStoreType:
+    return PlatformSecretStoreType(**dataclasses.asdict(row))
+
+
 @strawberry.type
 class PlatformSettingsQuery:
     @strawberry.field(description="Every install setting, grouped, for the platform operator (#1861).")
@@ -87,6 +121,35 @@ class PlatformSettingsQuery:
     def astrolift_platform_settings(self, info: Info) -> list[PlatformSettingType]:
         check_platform_operator(info.context.user, gate=Permission.ADMIN_ELEVATE)
         return [_to_type(row) for row in platform_settings.list_settings()]
+
+    @strawberry.field(
+        description="Each organization's agent secret store: the cluster it resolves from (#1861)."
+    )
+    @require_permission(Permission.ADMIN_ELEVATE)
+    def astrolift_platform_secret_stores(self, info: Info) -> list[PlatformSecretStoreType]:
+        check_platform_operator(info.context.user, gate=Permission.ADMIN_ELEVATE)
+        return [_store_type(row) for row in platform_secrets.list_stores()]
+
+    @strawberry.field(
+        description=(
+            "One organization's agent secret refs and whether its store holds each, never the "
+            "values (#1861). Probed as dispatch resolves them."
+        )
+    )
+    @require_permission(Permission.ADMIN_ELEVATE)
+    def astrolift_platform_secret_inventory(
+        self, info: Info, organization_slug: str
+    ) -> PlatformSecretInventoryType | None:
+        check_platform_operator(info.context.user, gate=Permission.ADMIN_ELEVATE)
+        found = platform_secrets.inventory(organization_slug)
+        if found is None:
+            return None
+        return PlatformSecretInventoryType(
+            store=_store_type(found.store),
+            provider=found.provider,
+            can_reveal=found.can_reveal,
+            refs=[PlatformSecretRefType(**dataclasses.asdict(ref)) for ref in found.refs],
+        )
 
 
 @strawberry.type

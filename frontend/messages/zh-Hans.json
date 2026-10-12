@@ -7614,7 +7614,20 @@
       "confirmTitle": "更改 {key}？",
       "confirm": "更改设置",
       "saveError": "设置未保存。",
-      "saved": "已保存 {key}"
+      "saved": "已保存 {key}",
+      "secrets": {
+        "title": "代理密钥存储",
+        "description": "每个组织的代理密钥存放位置，以及其代理引用的每个密钥是否有值。不会显示值；请在组织的代理密钥中设置。",
+        "empty": "此安装中没有组织。",
+        "noCluster": "没有供代理使用的托管集群",
+        "shared": "共享集群",
+        "specs": "{count, plural, other {# 个代理环境}}",
+        "check": "检查密钥",
+        "noRefs": "此组织的代理未引用任何密钥。",
+        "provider": "存储：{provider}",
+        "present": "已有值",
+        "missing": "未设置值"
+      }
     },
     "metrics": {
       "title": "平台指标",

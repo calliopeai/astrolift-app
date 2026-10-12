@@ -62,3 +62,36 @@ export const PLATFORM_SETTINGS = gql`
   }
   ${PLATFORM_SETTING_FIELDS}
 `;
+
+// Each organization's agent secret store, for the platform operator (#1861).
+export const PLATFORM_SECRET_STORES = gql`
+  query PlatformSecretStores {
+    astroliftPlatformSecretStores {
+      organizationSlug
+      organizationName
+      clusterSlug
+      sharedCluster
+      specCount
+    }
+  }
+`;
+
+// One organization's agent secret refs with presence, never values (#1861).
+export const PLATFORM_SECRET_INVENTORY = gql`
+  query PlatformSecretInventory($organizationSlug: String!) {
+    astroliftPlatformSecretInventory(organizationSlug: $organizationSlug) {
+      provider
+      canReveal
+      store {
+        organizationSlug
+      }
+      refs {
+        specSlug
+        envVar
+        uri
+        exists
+        error
+      }
+    }
+  }
+`;

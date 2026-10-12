@@ -7617,7 +7617,20 @@
       "confirmTitle": "¿Cambiar {key}?",
       "confirm": "Cambiar ajuste",
       "saveError": "No se guardó el ajuste.",
-      "saved": "{key} guardado"
+      "saved": "{key} guardado",
+      "secrets": {
+        "title": "Almacenes de secretos de agentes",
+        "description": "Dónde se guardan los secretos de agentes de cada organización y si cada secreto que usan sus agentes tiene valor. Los valores nunca se muestran; se definen en los secretos de agentes de la organización.",
+        "empty": "No hay organizaciones en esta instalación.",
+        "noCluster": "Sin clúster gestionado para agentes",
+        "shared": "Clúster compartido",
+        "specs": "{count, plural, one {# entorno de agente} other {# entornos de agente}}",
+        "check": "Comprobar secretos",
+        "noRefs": "Los agentes de esta organización no usan secretos.",
+        "provider": "Almacén: {provider}",
+        "present": "Tiene valor",
+        "missing": "Sin valor"
+      }
     },
     "metrics": {
       "title": "Métricas de la plataforma",

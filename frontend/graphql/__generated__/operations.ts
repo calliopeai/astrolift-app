@@ -4077,6 +4077,29 @@ export type AstroliftPipelineSecretChangeMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftPlatformSecretInventory = {
+  canReveal: Scalars['Boolean']['output'];
+  provider: Scalars['String']['output'];
+  refs: Array<AstroliftPlatformSecretRef>;
+  store: AstroliftPlatformSecretStore;
+};
+
+export type AstroliftPlatformSecretRef = {
+  envVar: Scalars['String']['output'];
+  error: Scalars['String']['output'];
+  exists: Scalars['Boolean']['output'];
+  specSlug: Scalars['String']['output'];
+  uri: Scalars['String']['output'];
+};
+
+export type AstroliftPlatformSecretStore = {
+  clusterSlug: Scalars['String']['output'];
+  organizationName: Scalars['String']['output'];
+  organizationSlug: Scalars['String']['output'];
+  sharedCluster: Scalars['Boolean']['output'];
+  specCount: Scalars['Int']['output'];
+};
+
 export type AstroliftPlatformSetting = {
   changed: Scalars['Boolean']['output'];
   choices: Array<Scalars['String']['output']>;
@@ -12050,6 +12073,10 @@ export type Query = {
   astroliftPipelines: Array<AstroliftPipeline>;
   astroliftPipelinesPage: AstroliftPipelinePage;
   astroliftPlatformApiUrl: Scalars['String']['output'];
+  /** One organization's agent secret refs and whether its store holds each, never the values (#1861). Probed as dispatch resolves them. */
+  astroliftPlatformSecretInventory?: Maybe<AstroliftPlatformSecretInventory>;
+  /** Each organization's agent secret store: the cluster it resolves from (#1861). */
+  astroliftPlatformSecretStores: Array<AstroliftPlatformSecretStore>;
   /** Every install setting, grouped, for the platform operator (#1861). */
   astroliftPlatformSettings: Array<AstroliftPlatformSetting>;
   astroliftPodResourceUsage?: Maybe<AstroliftPodResourceUsage>;
@@ -13556,6 +13583,11 @@ export type QueryAstroliftPipelinesPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftPlatformSecretInventoryArgs = {
+  organizationSlug: Scalars['String']['input'];
 };
 
 
@@ -19537,6 +19569,18 @@ export type PlatformSettingsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type PlatformSettingsQuery = { astroliftPlatformSettings: Array<{ key: string, group: string, kind: string, helpText: string, value: string, default: string, changed: boolean, choices: Array<string>, editable: boolean, readOnlyReason: string, warning: string }> };
+
+export type PlatformSecretStoresQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type PlatformSecretStoresQuery = { astroliftPlatformSecretStores: Array<{ organizationSlug: string, organizationName: string, clusterSlug: string, sharedCluster: boolean, specCount: number }> };
+
+export type PlatformSecretInventoryQueryVariables = Exact<{
+  organizationSlug: Scalars['String']['input'];
+}>;
+
+
+export type PlatformSecretInventoryQuery = { astroliftPlatformSecretInventory?: { provider: string, canReveal: boolean, store: { organizationSlug: string }, refs: Array<{ specSlug: string, envVar: string, uri: string, exists: boolean, error: string }> } | null };
 
 export type EmailDeliveryTestFieldsFragment = { id: string, managedServiceId: string, version: number, requestId: string, sender: string, recipient: string, status: string, accountId: string, region: string, identity: string, transport: string, providerMessageId?: string | null, eventTrackingConfigured: boolean, simulator: boolean, createdAt: string, acceptedAt?: string | null, observedAt?: string | null, reasonCode?: string | null };
 

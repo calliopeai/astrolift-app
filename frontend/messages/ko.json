@@ -7614,7 +7614,20 @@
       "confirmTitle": "{key}을(를) 변경할까요?",
       "confirm": "설정 변경",
       "saveError": "설정이 저장되지 않았습니다.",
-      "saved": "{key} 저장됨"
+      "saved": "{key} 저장됨",
+      "secrets": {
+        "title": "에이전트 시크릿 저장소",
+        "description": "각 조직의 에이전트 시크릿이 저장된 위치와, 에이전트가 참조하는 시크릿에 값이 있는지 보여줍니다. 값은 표시되지 않으며 조직의 에이전트 시크릿에서 설정합니다.",
+        "empty": "이 설치에 조직이 없습니다.",
+        "noCluster": "에이전트용 관리 클러스터 없음",
+        "shared": "공유 클러스터",
+        "specs": "{count, plural, other {에이전트 환경 #개}}",
+        "check": "시크릿 확인",
+        "noRefs": "이 조직의 에이전트는 시크릿을 참조하지 않습니다.",
+        "provider": "저장소: {provider}",
+        "present": "값 있음",
+        "missing": "값 없음"
+      }
     },
     "metrics": {
       "title": "플랫폼 지표",

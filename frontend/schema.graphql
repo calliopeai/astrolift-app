@@ -4263,6 +4263,29 @@ type AstroliftPipelineSecretChangeMutationResult {
   data: AstroliftPipelineSecretChange
 }
 
+type AstroliftPlatformSecretInventory {
+  store: AstroliftPlatformSecretStore!
+  provider: String!
+  canReveal: Boolean!
+  refs: [AstroliftPlatformSecretRef!]!
+}
+
+type AstroliftPlatformSecretRef {
+  specSlug: String!
+  envVar: String!
+  uri: String!
+  exists: Boolean!
+  error: String!
+}
+
+type AstroliftPlatformSecretStore {
+  organizationSlug: String!
+  organizationName: String!
+  clusterSlug: String!
+  sharedCluster: Boolean!
+  specCount: Int!
+}
+
 type AstroliftPlatformSetting {
   key: String!
   group: String!
@@ -10311,6 +10334,16 @@ type Query {
 
   """Every install setting, grouped, for the platform operator (#1861)."""
   astroliftPlatformSettings: [AstroliftPlatformSetting!]!
+
+  """
+  Each organization's agent secret store: the cluster it resolves from (#1861).
+  """
+  astroliftPlatformSecretStores: [AstroliftPlatformSecretStore!]!
+
+  """
+  One organization's agent secret refs and whether its store holds each, never the values (#1861). Probed as dispatch resolves them.
+  """
+  astroliftPlatformSecretInventory(organizationSlug: String!): AstroliftPlatformSecretInventory
   organization(id: ID!): OrganizationType
   organizations(query: String = null): [OrganizationType!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use organizationsPage.")
 

@@ -25,6 +25,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { humanizeKey } from "./feature-key";
+import { PlatformSecretStores } from "./PlatformSecretStores";
+import type { PlatformSecretStoresProps } from "./use-platform-secret-stores";
 import type { PlatformSetting, usePlatformSettings } from "./use-platform-settings";
 
 export type PlatformSettingsScreenProps = Omit<
@@ -34,6 +36,8 @@ export type PlatformSettingsScreenProps = Omit<
   onRetry: () => void;
   /** Which group is shown (`?section=`); without it every group renders. */
   section?: SectionSelection;
+  /** The agent secret stores section; left out when absent. */
+  secrets?: PlatformSecretStoresProps;
 };
 
 type Pending = { setting: PlatformSetting; value: string | null };
@@ -166,6 +170,7 @@ export function PlatformSettingsScreen({
   save,
   reset,
   section,
+  secrets,
 }: PlatformSettingsScreenProps) {
   const t = useTranslations("administration.platformSettings");
   const [confirm, setConfirm] = React.useState<Pending | null>(null);
@@ -214,29 +219,44 @@ export function PlatformSettingsScreen({
       ) : (
         <SettingsPage
           single={section}
-          sections={groups.map(([group, rows]) => ({
-            id: slug(group),
-            title: group,
-            content: (
-              <Section title={group}>
-                <Card>
-                  <CardContent className="flex min-w-0 flex-col">
-                    {rows.map((setting) => (
-                      <SettingRow
-                        // Keyed by value too: a saved value starts a fresh draft.
-                        key={`${setting.key}:${setting.value}`}
-                        setting={setting}
-                        pending={pendingKey === setting.key}
-                        locked={pendingKey !== null && pendingKey !== setting.key}
-                        onSave={(value) => request(setting, value)}
-                        onReset={() => request(setting, null)}
-                      />
-                    ))}
-                  </CardContent>
-                </Card>
-              </Section>
-            ),
-          }))}
+          sections={[
+            ...groups.map(([group, rows]) => ({
+              id: slug(group),
+              title: group,
+              content: (
+                <Section title={group}>
+                  <Card>
+                    <CardContent className="flex min-w-0 flex-col">
+                      {rows.map((setting) => (
+                        <SettingRow
+                          // Keyed by value too: a saved value starts a fresh draft.
+                          key={`${setting.key}:${setting.value}`}
+                          setting={setting}
+                          pending={pendingKey === setting.key}
+                          locked={pendingKey !== null && pendingKey !== setting.key}
+                          onSave={(value) => request(setting, value)}
+                          onReset={() => request(setting, null)}
+                        />
+                      ))}
+                    </CardContent>
+                  </Card>
+                </Section>
+              ),
+            })),
+            ...(secrets
+              ? [
+                  {
+                    id: "agent-secret-stores",
+                    title: t("secrets.title"),
+                    content: (
+                      <Section title={t("secrets.title")}>
+                        <PlatformSecretStores {...secrets} />
+                      </Section>
+                    ),
+                  },
+                ]
+              : []),
+          ]}
         />
       )}
 
