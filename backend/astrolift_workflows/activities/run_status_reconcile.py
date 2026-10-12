@@ -22,21 +22,25 @@ class RunStatusReconcileSummary:
     unchanged: int
     skipped: int
     errors: int
+    stuck_deployments_failed: int = 0
 
 
 @activity.defn(name="astrolift.runs.reconcile_status_tick")
 async def reconcile_runs_tick() -> RunStatusReconcileSummary:
     """One sweep: reconcile every non-terminal ScheduledJobRun + TaskRun
-    against its k8s Job status, writing back status/timings/exit_code."""
+    against its k8s Job status, writing back status/timings/exit_code, and
+    fail deployments whose deploy workflow is gone (#2184)."""
     from asgiref.sync import sync_to_async
 
     return await sync_to_async(_reconcile_runs_tick_sync, thread_sensitive=False)()
 
 
 def _reconcile_runs_tick_sync() -> RunStatusReconcileSummary:
+    from astrolift_lifecycle.services.deployment_sweeper import sweep_stuck_deployments
     from astrolift_lifecycle.services.run_reconciler import reconcile_runs
 
     summary = reconcile_runs()
+    stuck = sweep_stuck_deployments()
     return RunStatusReconcileSummary(
         evaluated=summary["evaluated"],
         succeeded=summary["succeeded"],
@@ -45,4 +49,5 @@ def _reconcile_runs_tick_sync() -> RunStatusReconcileSummary:
         unchanged=summary["unchanged"],
         skipped=summary["skipped"],
         errors=summary["errors"],
+        stuck_deployments_failed=stuck,
     )

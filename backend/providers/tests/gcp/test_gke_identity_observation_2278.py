@@ -119,7 +119,8 @@ class Wire(grpc.Channel):
         def call(request, **kwargs):
             assert name in types, "GET-only observation, no create/set/update/list clusters"
             typed = types[name].deserialize(request_serializer(request))
-            assert kwargs["timeout"] == module.TIMEOUT
+            # google-api-core passes the time left to the deadline, a hair under it.
+            assert 0 < kwargs["timeout"] <= module.TIMEOUT
             if name == "GetProject":
                 assert typed.name == f"projects/{IDENTITY.project_number}"
             elif name == "GetCluster":
