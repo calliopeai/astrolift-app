@@ -32,6 +32,7 @@ export function CommandRunsScreen({
   totalCount,
 }: CommandRunsScreenProps) {
   const t = useTranslations("jobs.commands");
+  const tl = useTranslations("jobsList");
   const fmt = useFormatters();
 
   const columns: Column<AstroliftCommandRun>[] = [
@@ -87,9 +88,12 @@ export function CommandRunsScreen({
 
   return (
     <ListPage<AstroliftCommandRun>
-      header={{ crumbs: appsListCrumbs("jobs", { label: "Commands" }), title: "Command runs" }}
+      header={{
+        crumbs: appsListCrumbs("jobs", { label: tl("commands") }),
+        title: tl("commandRuns"),
+      }}
       list={list}
-      label="Command runs"
+      label={tl("commandRuns")}
       columns={columns}
       rows={rows}
       getRowId={(c) => c.id}

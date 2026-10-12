@@ -2,6 +2,7 @@
 
 import { InfoIcon, ScrollIcon, TerminalIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { DetailTimestamp } from "@/components/detail/EntityDetailShell";
 import { Identifier } from "@/components/Identifier";
@@ -27,9 +28,13 @@ import type { useCommandRunDetail } from "./use-command-run-detail";
 export type CommandRunDetailProps = ReturnType<typeof useCommandRunDetail> & { id: string };
 
 /** Scheduled jobs ▾ › Commands › billing › command 8b7c6d5e (spec 44 §4.4). */
-function crumbs(id: string, run: AstroliftCommandRun | null) {
-  const last = { label: `command ${id.slice(0, 8)}` };
-  const commands = { label: "Commands", href: "/jobs/commands" };
+function crumbs(
+  id: string,
+  run: AstroliftCommandRun | null,
+  t: ReturnType<typeof useTranslations<"runPages">>
+) {
+  const last = { label: t("commandTitle", { id: id.slice(0, 8) }) };
+  const commands = { label: t("commands"), href: "/jobs/commands" };
   if (!run) return appsDetailCrumbs("jobs", commands, last);
   return appsDetailCrumbs(
     "jobs",
@@ -56,31 +61,32 @@ export function CommandRunDetail({
   now,
   onDownload,
 }: CommandRunDetailProps) {
+  const t = useTranslations("runPages");
   if (!run && loading) {
     return (
       <RunPage
-        crumbs={crumbs(id, null)}
-        title={`command ${id.slice(0, 8)}`}
+        crumbs={crumbs(id, null, t)}
+        title={t("commandTitle", { id: id.slice(0, 8) })}
         steps={[]}
         stepsLoading
-        log={{ lines: [], loading: true, title: "Output" }}
+        log={{ lines: [], loading: true, title: t("output") }}
       />
     );
   }
   if (!run) {
     return (
       <RunMissing
-        crumbs={crumbs(id, null)}
-        title="Command run"
+        crumbs={crumbs(id, null, t)}
+        title={t("commandRun")}
         icon={<TerminalIcon className="size-4" />}
         error={error}
         onRetry={onRetry}
         empty={{
           icon: <TerminalIcon className="size-5" />,
-          title: "Command run not found",
-          description: "No command run has this id, or you do not have permission to see it.",
+          title: t("commandRunNotFound"),
+          description: t("commandRunNotFoundDescription"),
           actionHref: "/jobs/commands",
-          actionLabel: "Open command runs",
+          actionLabel: t("openCommandRuns"),
         }}
       />
     );
@@ -97,16 +103,16 @@ export function CommandRunDetail({
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6">
       <RunPage
-        crumbs={crumbs(id, run)}
-        title={`command ${id.slice(0, 8)}`}
+        crumbs={crumbs(id, run, t)}
+        title={t("commandTitle", { id: id.slice(0, 8) })}
         status={<RunStatusBadge status={status} exitCode={run.exitCode} />}
         durationMs={runElapsed(run, live, now)}
-        context={run.invokedByUsername ? `by ${run.invokedByUsername}` : undefined}
+        context={run.invokedByUsername ? t("by", { who: run.invokedByUsername }) : undefined}
         primaryAction={
           <Button size="sm" variant="outline" asChild>
             <Link href={logsHref}>
               <ScrollIcon className="size-4" />
-              Open logs
+              {t("openLogs")}
             </Link>
           </Button>
         }
@@ -114,11 +120,11 @@ export function CommandRunDetail({
           <RunMenu
             id={run.id}
             links={[
-              { label: "Open app", href: `/apps/${run.registeredAppSlug}` },
+              { label: t("openApp"), href: `/apps/${run.registeredAppSlug}` },
               ...(run.workloadSlug
                 ? [
                     {
-                      label: "Open workload",
+                      label: t("openWorkload"),
                       href: `/apps/${run.registeredAppSlug}/workloads/${run.workloadSlug}`,
                     },
                   ]
@@ -129,26 +135,26 @@ export function CommandRunDetail({
         steps={runSteps(
           run,
           status,
-          command || "command",
+          command || t("commandFallback"),
           now,
-          run.exitCode != null ? `exit ${run.exitCode}` : undefined
+          run.exitCode != null ? t("exit", { code: run.exitCode }) : undefined
         )}
         failure={runFailure(status, run.exitCode, output, run.logExcerpt ?? "")}
         log={{
-          title: "Output",
+          title: t("output"),
           lines: outputLines(output, run.startedAt ?? run.createdAt),
           onDownload: output ? onDownload : undefined,
-          emptyHint: live ? "No output yet." : "This command wrote no output.",
+          emptyHint: live ? t("noOutputYet") : t("commandNoOutput"),
         }}
       />
 
       <PanelGrid>
-        <Panel title="Details" icon={<InfoIcon className="size-4" />} span={6}>
+        <Panel title={t("details")} icon={<InfoIcon className="size-4" />} span={6}>
           <DefinitionList
             items={[
-              { term: "Run ID", description: <Identifier value={run.id} form="full" /> },
+              { term: t("runId"), description: <Identifier value={run.id} form="full" /> },
               {
-                term: "App",
+                term: t("app"),
                 description: (
                   <Link href={`/apps/${run.registeredAppSlug}`} className="hover:underline">
                     {run.registeredAppSlug}
@@ -156,7 +162,7 @@ export function CommandRunDetail({
                 ),
               },
               {
-                term: "Workload",
+                term: t("workload"),
                 description: run.workloadSlug ? (
                   <Link
                     href={`/apps/${run.registeredAppSlug}/workloads/${run.workloadSlug}`}
@@ -169,21 +175,21 @@ export function CommandRunDetail({
                 ),
               },
               {
-                term: "Command",
+                term: t("command"),
                 description: (
                   <span className="font-mono text-xs [overflow-wrap:anywhere]">
                     {command || "—"}
                   </span>
                 ),
               },
-              { term: "Invoked by", description: run.invokedByUsername ?? "—" },
+              { term: t("invokedBy"), description: run.invokedByUsername ?? "—" },
               {
-                term: "Exit code",
+                term: t("exitCode"),
                 description: <span className="font-mono">{run.exitCode ?? "—"}</span>,
               },
-              { term: "Created", description: <DetailTimestamp iso={run.createdAt} /> },
-              { term: "Started", description: <DetailTimestamp iso={run.startedAt} /> },
-              { term: "Ended", description: <DetailTimestamp iso={run.endedAt} /> },
+              { term: t("created"), description: <DetailTimestamp iso={run.createdAt} /> },
+              { term: t("started"), description: <DetailTimestamp iso={run.startedAt} /> },
+              { term: t("ended"), description: <DetailTimestamp iso={run.endedAt} /> },
             ]}
           />
         </Panel>

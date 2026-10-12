@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import {
   ActivityIcon,
   ClipboardListIcon,
@@ -33,7 +34,7 @@ import { VizLegend } from "@/components/viz/core/VizLegend";
 import { formatTriggerKind } from "@/components/screens/workflows/detail/workflow-run-state";
 import { formatRelativeAge } from "@/lib/format";
 
-import { WORKFLOW_GLYPH_LEGEND, WorkflowGlyph } from "./WorkflowGlyph";
+import { useWorkflowGlyphLegend, WorkflowGlyph } from "./WorkflowGlyph";
 import {
   LAST_RUN_DOT,
   LAST_RUN_LABEL,
@@ -74,12 +75,13 @@ const workflowHref = (w: Pick<WorkflowRow, "slug" | "configured" | "definition">
 
 /** Where the workflow comes from, in one muted line. */
 function Origin({ row }: { row: WorkflowRow }) {
+  const t = useTranslations("workflowList");
   const text =
     row.kind === "configured"
-      ? `from ${row.definitionName}`
+      ? t("fromDefinition", { name: row.definitionName })
       : row.kind === "template"
-        ? "Platform template"
-        : (row.sourcePath ?? "Organization definition");
+        ? t("platformTemplate")
+        : (row.sourcePath ?? t("orgDefinition"));
   return (
     <span
       className={`text-muted-foreground block truncate text-xs ${row.sourcePath ? "font-mono" : ""}`}
@@ -91,6 +93,7 @@ function Origin({ row }: { row: WorkflowRow }) {
 }
 
 function Name({ row }: { row: WorkflowRow }) {
+  const t = useTranslations("workflowList");
   return (
     <span className="block min-w-0">
       <span className="flex min-w-0 items-center gap-2">
@@ -99,7 +102,7 @@ function Name({ row }: { row: WorkflowRow }) {
         </span>
         {!row.isEnabled && (
           <Badge variant="secondary" className="shrink-0">
-            Disabled
+            {t("disabled")}
           </Badge>
         )}
       </span>
@@ -123,8 +126,9 @@ function LastRun({ row }: { row: WorkflowRow }) {
 }
 
 function Trigger({ row }: { row: WorkflowRow }) {
+  const t = useTranslations("workflowList");
   if (row.triggerKind === null)
-    return <span className="text-muted-foreground text-xs">Manual</span>;
+    return <span className="text-muted-foreground text-xs">{t("manual")}</span>;
   return (
     <span className="block min-w-0">
       <span className="block truncate text-sm">{formatTriggerKind(row.triggerKind)}</span>
@@ -138,8 +142,9 @@ function Trigger({ row }: { row: WorkflowRow }) {
 }
 
 function Stages({ row }: { row: WorkflowRow }) {
+  const t = useTranslations("workflowList");
   return row.stageCount === null ? (
-    <span className="text-muted-foreground text-xs">unknown</span>
+    <span className="text-muted-foreground text-xs">{t("unknown")}</span>
   ) : (
     <span className="font-mono text-xs tabular-nums">{row.stageCount}</span>
   );
@@ -147,6 +152,7 @@ function Stages({ row }: { row: WorkflowRow }) {
 
 /** A card: the stage-shape glyph, name, pattern, stage count and last run. */
 function WorkflowCard({ row }: { row: WorkflowRow }) {
+  const t = useTranslations("workflowList");
   return (
     <div className="bg-card hover:bg-accent/30 flex h-full min-w-0 flex-col gap-3 rounded-md border p-4 transition-colors">
       <div className="min-w-0">
@@ -157,7 +163,7 @@ function WorkflowCard({ row }: { row: WorkflowRow }) {
         <Badge variant="outline">{workflowPatternLabel(row.patternKind)}</Badge>
         {row.stageCount !== null && (
           <span className="text-muted-foreground font-mono tabular-nums">
-            {row.stageCount} {row.stageCount === 1 ? "stage" : "stages"}
+            {t("stageCount", { count: row.stageCount })}
           </span>
         )}
         {row.projectSlug && (
@@ -178,10 +184,11 @@ function WorkflowCard({ row }: { row: WorkflowRow }) {
 
 /** The header's `⋯`: workflow runs, and the platform's Temporal instances for audit readers. */
 function HeaderMenu({ canViewPlatformRuns }: { canViewPlatformRuns: boolean }) {
+  const t = useTranslations("workflowList");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="size-8" aria-label="More workflow actions">
+        <Button variant="outline" size="icon" className="size-8" aria-label={t("moreActions")}>
           <MoreHorizontalIcon className="size-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -189,14 +196,14 @@ function HeaderMenu({ canViewPlatformRuns }: { canViewPlatformRuns: boolean }) {
         <DropdownMenuItem asChild>
           <Link href="/tasks?kind=workflow">
             <ClipboardListIcon className="size-4" />
-            Workflow runs
+            {t("workflowRuns")}
           </Link>
         </DropdownMenuItem>
         {canViewPlatformRuns && (
           <DropdownMenuItem asChild>
             <Link href="/workflows/instances">
               <ActivityIcon className="size-4" />
-              Platform instances
+              {t("platformInstances")}
             </Link>
           </DropdownMenuItem>
         )}
@@ -233,33 +240,34 @@ export function WorkflowsListScreen({
   onDelete,
   onClone,
 }: WorkflowsListScreenProps) {
+  const t = useTranslations("workflowList");
+  const glyphLegend = useWorkflowGlyphLegend();
   const empty: EmptyStateSpec = {
     icon: <WorkflowIcon className="size-5" />,
-    title: "No workflows",
-    description:
-      "Author a workflow from a pattern or a manifest, configure a platform template, or import one from an agent repository.",
-    ...(canCreate ? { actionHref: "/workflows/new", actionLabel: "New workflow" } : {}),
+    title: t("emptyTitle"),
+    description: t("emptyDescription"),
+    ...(canCreate ? { actionHref: "/workflows/new", actionLabel: t("newWorkflow") } : {}),
     learnMoreHref: "https://github.com/calliopeai/astrolift-docs/blob/main/reference/workflows.md",
   };
 
   const columns: Column<WorkflowRow>[] = [
     {
       id: "workflow",
-      header: "Workflow",
+      header: t("workflow"),
       sortKey: "name",
       cellClassName: "max-w-80",
       cell: (w) => <Name row={w} />,
     },
     {
       id: "pattern",
-      header: "Pattern",
+      header: t("pattern"),
       sortKey: "pattern",
       cell: (w) => <span className="text-sm">{workflowPatternLabel(w.patternKind)}</span>,
     },
-    { id: "stages", header: "Stages", sortKey: "stages", cell: (w) => <Stages row={w} /> },
+    { id: "stages", header: t("stages"), sortKey: "stages", cell: (w) => <Stages row={w} /> },
     {
       id: "project",
-      header: "Project",
+      header: t("project"),
       cellClassName: "max-w-48",
       cell: (w) =>
         w.projectSlug ? (
@@ -267,22 +275,24 @@ export function WorkflowsListScreen({
             {w.projectSlug}
           </span>
         ) : (
-          <span className="text-muted-foreground text-xs">none</span>
+          <span className="text-muted-foreground text-xs">{t("none")}</span>
         ),
     },
-    { id: "trigger", header: "Trigger", cell: (w) => <Trigger row={w} /> },
-    { id: "lastRun", header: "Last run", sortKey: "lastRun", cell: (w) => <LastRun row={w} /> },
+    { id: "trigger", header: t("trigger"), cell: (w) => <Trigger row={w} /> },
+    { id: "lastRun", header: t("lastRun"), sortKey: "lastRun", cell: (w) => <LastRun row={w} /> },
   ];
 
   const notices = (
     <>
       {truncatedAt !== null && (
         <p className="text-muted-foreground text-xs">
-          Showing the newest <span className="font-mono">{truncatedAt}</span> configured workflows;
-          the list does not page past that yet.
+          {t.rich("truncated", {
+            count: truncatedAt,
+            mono: (chunks) => <span className="font-mono">{chunks}</span>,
+          })}
         </p>
       )}
-      {list.mode === "card" && <VizLegend items={WORKFLOW_GLYPH_LEGEND} motion="full" />}
+      {list.mode === "card" && <VizLegend items={glyphLegend} motion="full" />}
     </>
   );
 
@@ -292,19 +302,19 @@ export function WorkflowsListScreen({
       <ListPage<WorkflowRow>
         header={{
           crumbs: workflowsCrumbs(),
-          title: "Workflows",
+          title: t("title"),
           primaryAction: canCreate ? (
             <Button size="sm" asChild>
               <Link href="/workflows/new">
                 <PlusIcon className="size-4" />
-                New workflow
+                {t("newWorkflow")}
               </Link>
             </Button>
           ) : undefined,
           menu: <HeaderMenu canViewPlatformRuns={canViewPlatformRuns} />,
         }}
         list={list}
-        label="Workflows"
+        label={t("title")}
         columns={columns}
         rows={rows}
         getRowId={(w) => w.id}
@@ -317,7 +327,7 @@ export function WorkflowsListScreen({
               {canRun && w.kind !== "template" && (
                 <DropdownMenuItem disabled={busy || !w.isEnabled} onSelect={() => void onRun(w)}>
                   <PlayIcon className="size-4" />
-                  Run now
+                  {t("runNow")}
                 </DropdownMenuItem>
               )}
               {canManage && w.kind === "configured" && (
@@ -327,14 +337,14 @@ export function WorkflowsListScreen({
                   ) : (
                     <PowerIcon className="size-4" />
                   )}
-                  {w.isEnabled ? "Disable" : "Enable"}
+                  {w.isEnabled ? t("disable") : t("enable")}
                 </DropdownMenuItem>
               )}
               {w.kind === "configured" && (
                 <DropdownMenuItem asChild>
                   <Link href={workflowHref(w, "/triggers")}>
                     <TimerIcon className="size-4" />
-                    Edit triggers
+                    {t("editTriggers")}
                   </Link>
                 </DropdownMenuItem>
               )}
@@ -342,14 +352,14 @@ export function WorkflowsListScreen({
                 <DropdownMenuItem asChild>
                   <Link href={`/workflows/new?definition=${encodeURIComponent(w.slug)}`}>
                     <LayoutTemplateIcon className="size-4" />
-                    Create workflow from
+                    {t("createFrom")}
                   </Link>
                 </DropdownMenuItem>
               )}
               {canCreate && w.kind === "template" && (
                 <DropdownMenuItem disabled={busy} onSelect={() => void onClone(w)}>
                   <CopyIcon className="size-4" />
-                  Clone to edit
+                  {t("cloneToEdit")}
                 </DropdownMenuItem>
               )}
               {canManage && w.deletable && (
@@ -361,7 +371,7 @@ export function WorkflowsListScreen({
                     onSelect={() => void onDelete(w)}
                   >
                     <TrashIcon className="size-4" />
-                    Delete
+                    {t("delete")}
                   </DropdownMenuItem>
                 </>
               )}

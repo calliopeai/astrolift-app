@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 import type { LegendItem } from "@/components/viz/core/VizLegend";
 import type { WorkflowLine, WorkflowStation } from "@/components/viz/core/workflow-model";
 import { lineShape } from "@/components/workflows/definition-line";
@@ -18,15 +20,20 @@ const MID = 12;
 /** Past this many stages the rest read "+n". */
 export const GLYPH_MAX_STATIONS = 7;
 
+const GLYPH_LEGEND = [
+  { glyph: "dot", color: INK, key: "stage" },
+  { glyph: "signal", color: INK, key: "gate" },
+  { glyph: "join", color: INK, key: "join" },
+  { glyph: "swarm", color: INK, key: "swarm" },
+  { glyph: "nested", color: INK, key: "nested" },
+  { glyph: "siding", color: MUTED, key: "siding" },
+] as const;
+
 /** What the glyph's marks mean, for the legend under a card grid. */
-export const WORKFLOW_GLYPH_LEGEND: LegendItem[] = [
-  { glyph: "dot", color: INK, label: "Stage" },
-  { glyph: "signal", color: INK, label: "Human gate" },
-  { glyph: "join", color: INK, label: "Fan-out, and the join that merges it" },
-  { glyph: "swarm", color: INK, label: "Supervisor and its workers" },
-  { glyph: "nested", color: INK, label: "Nested workflow" },
-  { glyph: "siding", color: MUTED, label: "Retried on failure" },
-];
+export function useWorkflowGlyphLegend(): LegendItem[] {
+  const t = useTranslations("workflowGlyph");
+  return GLYPH_LEGEND.map(({ key, ...item }) => ({ ...item, label: t(key) }));
+}
 
 function Station({ station, cx }: { station: WorkflowStation; cx: number }) {
   switch (station.kind) {

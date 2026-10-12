@@ -10,6 +10,7 @@ import {
   ZapIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -92,6 +93,7 @@ export function WorkflowFrame({
   onCopyId,
   children,
 }: WorkflowFrameProps) {
+  const t = useTranslations("workflowFrame");
   const [runOpen, setRunOpen] = React.useState(false);
   const preserveDefinition = (href: string) =>
     exactDefinitionId
@@ -102,7 +104,7 @@ export function WorkflowFrame({
     href: preserveDefinition(tab.href),
   }));
   const areaCrumb: Crumb = areaSwitcher(NAV, "agents", "workflows");
-  const listCrumb: Crumb = { label: "Workflows", href: "/workflows" };
+  const listCrumb: Crumb = { label: t("workflows"), href: "/workflows" };
   const pending = loading && !workflow;
 
   if (!workflow) {
@@ -112,19 +114,19 @@ export function WorkflowFrame({
           crumbs={[
             areaCrumb,
             listCrumb,
-            { label: pending ? slug : error ? "Unavailable" : "Not found" },
+            { label: pending ? slug : error ? t("unavailableCrumb") : t("notFoundCrumb") },
           ]}
           title={
             pending ? (
               <Skeleton className="h-6 w-48" />
             ) : error ? (
-              "Workflow unavailable"
+              t("unavailableTitle")
             ) : (
-              "Workflow not found"
+              t("notFoundTitle")
             )
           }
           tabs={pending ? tabs : undefined}
-          tabsAriaLabel="Workflow sections"
+          tabsAriaLabel={t("sections")}
         />
         {pending ? (
           <div className="grid min-w-0 grid-cols-12 gap-4" aria-busy>
@@ -138,24 +140,24 @@ export function WorkflowFrame({
           >
             <ServerCrashIcon className="text-danger size-5" aria-hidden />
             <div className="min-w-0 px-6">
-              <p className="font-medium">Could not load this workflow</p>
+              <p className="font-medium">{t("loadFailed")}</p>
               <p className="text-muted-foreground mt-1 max-w-md font-mono text-xs [overflow-wrap:anywhere]">
                 {error}
               </p>
             </div>
             {onRetry && (
               <Button size="sm" variant="outline" onClick={onRetry}>
-                Retry
+                {t("retry")}
               </Button>
             )}
           </div>
         ) : (
           <EmptyState
             icon={<AlertTriangleIcon className="size-5" />}
-            title={`No workflow with slug ${slug}`}
-            description="It may have been deleted, belong to a different organization, or you may not have permission to view it."
+            title={t("noWorkflowWithSlug", { slug })}
+            description={t("notFoundDescription")}
             actionHref="/workflows"
-            actionLabel="Back to workflows"
+            actionLabel={t("backToWorkflows")}
           />
         )}
       </div>
@@ -165,9 +167,7 @@ export function WorkflowFrame({
   const status = workflowStatus(workflow);
   const pattern = patternLabel(workflow.patternKind);
   const stages =
-    workflow.stageCount === null
-      ? null
-      : `${workflow.stageCount} ${workflow.stageCount === 1 ? "stage" : "stages"}`;
+    workflow.stageCount === null ? null : t("stageCount", { count: workflow.stageCount });
 
   const context = (
     <>
@@ -183,14 +183,14 @@ export function WorkflowFrame({
           {" · "}
           <Link
             href={`/projects/${encodeURIComponent(workflow.projectSlug)}`}
-            title={`Open project ${workflow.projectSlug}`}
+            title={t("openProject", { project: workflow.projectSlug })}
             className="hover:text-foreground font-mono underline-offset-2 hover:underline"
           >
             {workflow.projectSlug}
           </Link>
         </>
       )}
-      {workflow.kind === "definition" && " · definition"}
+      {workflow.kind === "definition" && ` · ${t("definition")}`}
     </>
   );
 
@@ -199,17 +199,17 @@ export function WorkflowFrame({
       size="sm"
       onClick={() => (reviewedDefinitionStart ? void onRun() : setRunOpen(true))}
       disabled={dispatching || !workflow.isEnabled}
-      title={workflow.isEnabled ? undefined : "Enable this workflow to run it"}
+      title={workflow.isEnabled ? undefined : t("enableToRun")}
     >
       <PlayIcon className="size-4" />
-      Run
+      {t("run")}
     </Button>
   ) : null;
 
   const menu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="icon" variant="ghost" className="size-8" aria-label="More actions">
+        <Button size="icon" variant="ghost" className="size-8" aria-label={t("moreActions")}>
           <MoreHorizontalIcon className="size-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -217,12 +217,12 @@ export function WorkflowFrame({
         <DropdownMenuItem asChild>
           <Link href={preserveDefinition(workflowTabHref(workflow.slug, "triggers"))}>
             <ZapIcon className="size-4" />
-            Edit triggers
+            {t("editTriggers")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem onSelect={onCopyId}>
           <CopyIcon className="size-4" />
-          Copy workflow ID
+          {t("copyId")}
         </DropdownMenuItem>
         {canDelete && (
           <>
@@ -234,7 +234,7 @@ export function WorkflowFrame({
                 )}
               >
                 <Trash2Icon className="size-4" />
-                Delete workflow
+                {t("deleteWorkflow")}
               </Link>
             </DropdownMenuItem>
           </>
@@ -260,14 +260,14 @@ export function WorkflowFrame({
         primaryAction={primaryAction}
         menu={menu}
         tabs={tabs}
-        tabsAriaLabel="Workflow sections"
+        tabsAriaLabel={t("sections")}
       />
 
       {failedRun && (
         <div role="alert" className="border-destructive/40 bg-destructive/5 rounded-md border p-3">
           <div className="flex min-w-0 flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
             <p className="text-destructive text-xs font-semibold">
-              Last run failed
+              {t("lastRunFailed")}
               {failedAt && (
                 <span className="text-muted-foreground font-mono font-normal" title={failedAt}>
                   {" "}
@@ -279,11 +279,11 @@ export function WorkflowFrame({
               href={failedRun.href}
               className="text-primary text-xs font-medium hover:underline"
             >
-              Open run
+              {t("openRun")}
             </Link>
           </div>
           <p className="text-muted-foreground mt-1 font-mono text-xs break-all">
-            {failedRun.reason || "The run reported no reason."}
+            {failedRun.reason || t("noReason")}
           </p>
         </div>
       )}
@@ -295,33 +295,32 @@ export function WorkflowFrame({
         <Sheet open={runOpen && !reviewedDefinitionStart} onOpenChange={setRunOpen}>
           <SheetContent className="flex flex-col">
             <SheetHeader>
-              <SheetTitle className="[overflow-wrap:anywhere]">Run {workflow.name}</SheetTitle>
-              <SheetDescription>
-                Starts one run with the workflow&apos;s saved stages and inputs. It shows under Runs
-                with a live status.
-              </SheetDescription>
+              <SheetTitle className="[overflow-wrap:anywhere]">
+                {t("runTitle", { name: workflow.name })}
+              </SheetTitle>
+              <SheetDescription>{t("runDescription")}</SheetDescription>
             </SheetHeader>
             <dl className="flex min-w-0 flex-col gap-3 px-4 text-sm">
               <div className="min-w-0">
-                <dt className="text-muted-foreground text-xs">Pattern</dt>
+                <dt className="text-muted-foreground text-xs">{t("pattern")}</dt>
                 <dd>{pattern}</dd>
               </div>
               {stages && (
                 <div className="min-w-0">
-                  <dt className="text-muted-foreground text-xs">Stages</dt>
+                  <dt className="text-muted-foreground text-xs">{t("stages")}</dt>
                   <dd className="font-mono">{workflow.stageCount}</dd>
                 </div>
               )}
               {workflow.projectSlug && (
                 <div className="min-w-0">
-                  <dt className="text-muted-foreground text-xs">Project</dt>
+                  <dt className="text-muted-foreground text-xs">{t("project")}</dt>
                   <dd className="font-mono break-all">{workflow.projectSlug}</dd>
                 </div>
               )}
             </dl>
             <SheetFooter className="mt-auto flex-row justify-end gap-2">
               <Button variant="outline" onClick={() => setRunOpen(false)}>
-                Cancel
+                {t("cancel")}
               </Button>
               <Button
                 disabled={dispatching || !workflow.isEnabled}
@@ -330,7 +329,7 @@ export function WorkflowFrame({
                 }}
               >
                 <PlayIcon className="size-4" />
-                {dispatching ? "Starting…" : "Run"}
+                {dispatching ? t("starting") : t("run")}
               </Button>
             </SheetFooter>
           </SheetContent>

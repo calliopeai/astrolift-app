@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { PipelineDag, type PipelineDagStage } from "@/components/viz";
 import type {
@@ -42,6 +43,7 @@ export function WorkflowTopology({
   height?: number;
   statusByOrder?: Record<number, string>;
 }) {
+  const t = useTranslations("workflowTopology");
   const dagStages = React.useMemo<PipelineDagStage[]>(() => {
     const ordered = [...stages].sort((a, b) => a.order - b.order);
     return ordered.map((stage, index) => {
@@ -63,7 +65,7 @@ export function WorkflowTopology({
   }, [stages, statusByOrder]);
 
   if (dagStages.length === 0) {
-    return <p className="text-muted-foreground text-sm">No stages declared.</p>;
+    return <p className="text-muted-foreground text-sm">{t("noStages")}</p>;
   }
 
   const signature = dagStages
@@ -80,7 +82,7 @@ export function WorkflowTopology({
       className={cn("bg-muted/15", className)}
       variant={Object.keys(statusByOrder ?? {}).length > 0 ? "telemetry" : "default"}
       animateActiveEdges
-      ariaLabel="Workflow stage topology"
+      ariaLabel={t("stageTopology")}
     />
   );
 }
@@ -104,13 +106,14 @@ export function ProjectWorkflowTopology({
   className?: string;
   height?: number;
 }) {
+  const t = useTranslations("workflowTopology");
   const dagStages = React.useMemo(
     () => buildProjectWorkflowDag(workflows, runStatusByWorkflow, stageStatusByWorkflow),
     [runStatusByWorkflow, stageStatusByWorkflow, workflows]
   );
 
   if (dagStages.length === 0) {
-    return <p className="text-muted-foreground text-sm">No workflows declared.</p>;
+    return <p className="text-muted-foreground text-sm">{t("noWorkflows")}</p>;
   }
 
   const signature = dagStages
@@ -128,7 +131,7 @@ export function ProjectWorkflowTopology({
       className={cn("bg-muted/15", className)}
       variant={hasRuntimeState ? "telemetry" : "default"}
       animateActiveEdges
-      ariaLabel="Project workflow topology"
+      ariaLabel={t("projectTopology")}
     />
   );
 }

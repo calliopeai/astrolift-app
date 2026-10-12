@@ -5,6 +5,7 @@ import cronstrue from "cronstrue";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
+import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 
 /**
@@ -26,6 +27,7 @@ export interface CronSchedulePreviewProps {
 
 export function CronSchedulePreview({ schedule, className }: CronSchedulePreviewProps) {
   const t = useTranslations("jobs.cron");
+  const fmt = useFormatters();
   const human = useHumanSchedule(schedule, t("invalid"));
   const nextFire = useNextFire(schedule);
 
@@ -34,7 +36,7 @@ export function CronSchedulePreview({ schedule, className }: CronSchedulePreview
       <code className="text-muted-foreground font-mono">{schedule}</code>
       <span className="text-foreground">{human}</span>
       {nextFire ? (
-        <span className="text-muted-foreground" title={nextFire.toLocaleString()}>
+        <span className="text-muted-foreground" title={fmt.formatDateTime(nextFire)}>
           {t("firesIn", { relative: relativeFromNow(nextFire, t) })}
         </span>
       ) : null}

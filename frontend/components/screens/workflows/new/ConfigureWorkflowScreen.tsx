@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import {
   AlertTriangleIcon,
   ArrowLeftIcon,
@@ -46,15 +47,15 @@ export type ConfigureWorkflowScreenProps = ReturnType<typeof useConfigureWorkflo
 
 type Step = 1 | 2 | 3;
 
-const STEPS = [{ label: "Source" }, { label: "Stages" }, { label: "Review" }];
+const STEPS = ["source", "stages", "review"] as const;
 
-const STAGE_KIND_LABEL: Record<string, string> = {
-  agent_dispatch: "Agent",
-  human_gate: "Human gate",
-  aggregation: "Aggregation",
-  checkpoint: "Checkpoint",
-  workflow: "Nested workflow",
-};
+const STAGE_KINDS = new Set([
+  "agent_dispatch",
+  "human_gate",
+  "aggregation",
+  "checkpoint",
+  "workflow",
+]);
 
 function ReviewRow({ term, children }: { term: string; children: React.ReactNode }) {
   return (
@@ -66,11 +67,17 @@ function ReviewRow({ term, children }: { term: string; children: React.ReactNode
 }
 
 function Header({ step }: { step?: Step }) {
+  const t = useTranslations("workflowConfigure");
+  const tn = useTranslations("workflowNew");
   return (
     <ShellHeader
-      crumbs={workflowsCrumbs({ label: "Configure workflow" })}
-      title="Configure workflow"
-      context={step ? <FlowSteps steps={STEPS} current={step} /> : undefined}
+      crumbs={workflowsCrumbs({ label: t("title") })}
+      title={t("title")}
+      context={
+        step ? (
+          <FlowSteps steps={STEPS.map((s) => ({ label: tn(`steps.${s}`) }))} current={step} />
+        ) : undefined
+      }
     />
   );
 }
@@ -100,6 +107,8 @@ export function ConfigureWorkflowScreen({
   initialValues = {},
   initialErrors = {},
 }: ConfigureWorkflowScreenProps) {
+  const t = useTranslations("workflowConfigure");
+  const tn = useTranslations("workflowNew");
   const [step, setStep] = React.useState<Step>(initialStep);
   const [values, setValues] = React.useState<ConfigureWorkflowValues>({
     name: "",
@@ -135,14 +144,10 @@ export function ConfigureWorkflowScreen({
         <Header />
         <EmptyState
           icon={<LayoutTemplateIcon className="size-5" />}
-          title={error ? "Couldn't load this template" : "Template not found"}
-          description={
-            error
-              ? error.message
-              : `The workflow definition "${definitionSlug}" may have been deleted, or you may not have access to it.`
-          }
+          title={error ? t("loadFailed") : t("notFound")}
+          description={error ? error.message : t("notFoundDescription", { slug: definitionSlug })}
           actionHref="/workflows?view=templates"
-          actionLabel="Back to templates"
+          actionLabel={t("backToTemplates")}
         />
       </div>
     );
@@ -154,10 +159,10 @@ export function ConfigureWorkflowScreen({
         <Header />
         <EmptyState
           icon={<LayoutTemplateIcon className="size-5" />}
-          title="No permission to create workflows"
-          description="Your role does not include workflow creation. Ask an organization admin for access."
+          title={t("noPermission")}
+          description={t("noPermissionDescription")}
           actionHref="/workflows?view=templates"
-          actionLabel="Back to templates"
+          actionLabel={t("backToTemplates")}
         />
       </div>
     );
@@ -209,7 +214,7 @@ export function ConfigureWorkflowScreen({
                 </span>
                 <Badge variant="outline">{definition.patternKind || "pipeline"}</Badge>
                 <span className="text-muted-foreground font-mono text-xs">
-                  {orderedStages.length} {orderedStages.length === 1 ? "stage" : "stages"}
+                  {t("stageCount", { count: orderedStages.length })}
                 </span>
               </div>
               {definition.description && (
@@ -221,17 +226,17 @@ export function ConfigureWorkflowScreen({
                 href={`/workflows/${encodeURIComponent(definition.slug)}`}
                 className="text-muted-foreground hover:text-foreground w-fit text-xs underline"
               >
-                Open the template in the Builder
+                {t("openInBuilder")}
               </Link>
             </div>
 
             <Field data-invalid={Boolean(errors.name) || undefined} className="min-w-0">
-              <FieldLabel htmlFor="wf-name">Workflow name</FieldLabel>
+              <FieldLabel htmlFor="wf-name">{t("workflowName")}</FieldLabel>
               <Input
                 id="wf-name"
                 value={values.name}
                 onChange={(e) => patch({ name: e.target.value }, "name")}
-                placeholder={`e.g. ${definition.name}, production`}
+                placeholder={t("namePlaceholder", { name: definition.name })}
                 aria-invalid={Boolean(errors.name) || undefined}
               />
               <FieldError className="[overflow-wrap:anywhere]">{errors.name}</FieldError>
@@ -239,23 +244,23 @@ export function ConfigureWorkflowScreen({
 
             <div className="grid min-w-0 gap-4 sm:grid-cols-2">
               <Field className="min-w-0">
-                <FieldLabel>Trigger</FieldLabel>
+                <FieldLabel>{t("trigger")}</FieldLabel>
                 <Select
                   value={values.triggerKind}
                   onValueChange={(v) => patch({ triggerKind: v as TriggerKind }, "scheduleCron")}
                 >
-                  <SelectTrigger aria-label="Trigger">
+                  <SelectTrigger aria-label={t("trigger")}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="manual">Manual</SelectItem>
-                    <SelectItem value="schedule">Schedule</SelectItem>
+                    <SelectItem value="manual">{t("manual")}</SelectItem>
+                    <SelectItem value="schedule">{t("schedule")}</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>
               {values.triggerKind === "schedule" && (
                 <Field data-invalid={Boolean(errors.scheduleCron) || undefined} className="min-w-0">
-                  <FieldLabel htmlFor="wf-cron">Cron expression</FieldLabel>
+                  <FieldLabel htmlFor="wf-cron">{t("cron")}</FieldLabel>
                   <Input
                     id="wf-cron"
                     value={values.scheduleCron}
@@ -272,7 +277,7 @@ export function ConfigureWorkflowScreen({
             </div>
 
             <Field data-invalid={Boolean(errors.inputs) || undefined} className="min-w-0">
-              <FieldLabel htmlFor="wf-inputs">Inputs (JSON, optional)</FieldLabel>
+              <FieldLabel htmlFor="wf-inputs">{t("inputsLabel")}</FieldLabel>
               <Textarea
                 id="wf-inputs"
                 value={values.inputsText}
@@ -282,9 +287,7 @@ export function ConfigureWorkflowScreen({
                 className="max-h-64 font-mono text-sm"
                 aria-invalid={Boolean(errors.inputs) || undefined}
               />
-              <FieldDescription>
-                Workflow-level defaults, merged with per-trigger inputs at run time.
-              </FieldDescription>
+              <FieldDescription>{t("inputsHint")}</FieldDescription>
               <FieldError className="[overflow-wrap:anywhere]">{errors.inputs}</FieldError>
             </Field>
           </>
@@ -292,12 +295,9 @@ export function ConfigureWorkflowScreen({
 
         {step === 2 && (
           <div className="flex min-w-0 flex-col gap-3">
-            <p className="text-muted-foreground text-sm">
-              Bind a registered agent to each agent stage. Stages with a default agent run it unless
-              you pick an override.
-            </p>
+            <p className="text-muted-foreground text-sm">{t("bindIntro")}</p>
             {orderedStages.length === 0 ? (
-              <p className="text-muted-foreground text-sm">This template has no stages yet.</p>
+              <p className="text-muted-foreground text-sm">{t("noStages")}</p>
             ) : (
               <ol className="flex min-w-0 flex-col gap-3">
                 {orderedStages.map((stage) => {
@@ -309,7 +309,7 @@ export function ConfigureWorkflowScreen({
                           {stage.order}.
                         </span>
                         <Badge variant="outline" className="text-xs">
-                          {STAGE_KIND_LABEL[stage.kind] ?? stage.kind}
+                          {STAGE_KINDS.has(stage.kind) ? t(`kinds.${stage.kind}`) : stage.kind}
                         </Badge>
                         {stage.role && (
                           <span className="min-w-0 truncate text-sm" title={stage.role}>
@@ -318,7 +318,7 @@ export function ConfigureWorkflowScreen({
                         )}
                         {stage.kind === "agent_dispatch" && stage.agentDefinitionName && (
                           <span className="text-muted-foreground min-w-0 truncate text-xs">
-                            default: {stage.agentDefinitionName}
+                            {t("defaultAgent", { name: stage.agentDefinitionName })}
                           </span>
                         )}
                       </div>
@@ -350,39 +350,41 @@ export function ConfigureWorkflowScreen({
 
         {step === 3 && (
           <dl className="flex min-w-0 flex-col gap-3">
-            <ReviewRow term="Name">{values.name}</ReviewRow>
-            <ReviewRow term="Template">{definition.name}</ReviewRow>
-            <ReviewRow term="Trigger">
+            <ReviewRow term={tn("name")}>{values.name}</ReviewRow>
+            <ReviewRow term={t("template")}>{definition.name}</ReviewRow>
+            <ReviewRow term={t("trigger")}>
               {values.triggerKind === "schedule" ? (
                 <>
-                  Schedule <span className="font-mono">{values.scheduleCron}</span>
+                  {t("schedule")} <span className="font-mono">{values.scheduleCron}</span>
                 </>
               ) : (
-                "Manual"
+                t("manual")
               )}
             </ReviewRow>
-            <ReviewRow term="Agents">
+            <ReviewRow term={t("agents")}>
               {agentStages.length === 0 ? (
-                "No agent stages"
+                t("noAgentStages")
               ) : (
                 <ul className="flex min-w-0 flex-col gap-1">
                   {agentStages.map((s) => (
                     <li key={s.guid} className="min-w-0">
                       <span className="text-muted-foreground font-mono">{s.order}.</span>{" "}
                       {workloadName(values.bindings[s.order]) ??
-                        (s.agentDefinitionName ? `${s.agentDefinitionName} (default)` : "unbound")}
+                        (s.agentDefinitionName
+                          ? t("defaultSuffix", { name: s.agentDefinitionName })
+                          : t("unbound"))}
                     </li>
                   ))}
                 </ul>
               )}
             </ReviewRow>
-            <ReviewRow term="Inputs">
+            <ReviewRow term={t("inputs")}>
               {values.inputsText.trim() ? (
                 <pre className="bg-muted/40 max-h-40 overflow-auto rounded-md border p-2 font-mono text-xs">
                   {values.inputsText}
                 </pre>
               ) : (
-                "none"
+                tn("none")
               )}
             </ReviewRow>
           </dl>
@@ -390,23 +392,23 @@ export function ConfigureWorkflowScreen({
 
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 border-t pt-4">
           <Button type="button" variant="ghost" asChild className="mr-auto">
-            <Link href="/workflows?view=templates">Cancel</Link>
+            <Link href="/workflows?view=templates">{tn("cancel")}</Link>
           </Button>
           {step > 1 && (
             <Button type="button" variant="outline" onClick={() => setStep((s) => (s - 1) as Step)}>
               <ArrowLeftIcon className="size-4" />
-              Back
+              {tn("back")}
             </Button>
           )}
           {step < 3 ? (
             <Button type="submit">
-              Continue
+              {tn("continue")}
               <ArrowRightIcon className="size-4" />
             </Button>
           ) : (
             <Button type="submit" disabled={submitting}>
               {submitting && <Loader2Icon className="size-4 animate-spin" />}
-              Create workflow
+              {tn("create")}
             </Button>
           )}
         </div>

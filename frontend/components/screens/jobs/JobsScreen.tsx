@@ -68,12 +68,13 @@ export function JobsScreen({
   onRun,
 }: JobsScreenProps) {
   const t = useTranslations("jobs");
+  const tl = useTranslations("jobsList");
   const fmt = useFormatters();
 
   const columns: Column<JobRow>[] = [
     {
       id: "job",
-      header: "Job",
+      header: tl("job"),
       sortKey: "name",
       cellClassName: "max-w-80",
       cell: (j) => (
@@ -98,17 +99,17 @@ export function JobsScreen({
     },
     {
       id: "schedule",
-      header: "Schedule",
+      header: tl("schedule"),
       cell: (j) => <CronSchedulePreview schedule={j.schedule} />,
     },
     {
       id: "concurrency",
-      header: "Concurrency",
+      header: tl("concurrency"),
       cell: (j) => <ConcurrencyBadge policy={j.concurrencyPolicy} />,
     },
     {
       id: "lastRun",
-      header: "Last run",
+      header: tl("lastRun"),
       cell: (j) =>
         j.lastRun ? (
           <span className="flex min-w-0 flex-col gap-1">
@@ -118,7 +119,7 @@ export function JobsScreen({
             </span>
           </span>
         ) : (
-          <span className="text-muted-foreground text-xs">Never run</span>
+          <span className="text-muted-foreground text-xs">{tl("neverRun")}</span>
         ),
     },
   ];
@@ -129,9 +130,9 @@ export function JobsScreen({
     return (
       <>
         <DropdownMenuLabel className="text-muted-foreground text-xs font-normal">
-          Run now in
+          {tl("runNowIn")}
         </DropdownMenuLabel>
-        {envs.length === 0 && <DropdownMenuItem disabled>No environments</DropdownMenuItem>}
+        {envs.length === 0 && <DropdownMenuItem disabled>{tl("noEnvironments")}</DropdownMenuItem>}
         {envs.map((e) => (
           <DropdownMenuItem key={e.id} disabled={busy} onSelect={() => void onRun(j, e.name)}>
             <PlayIcon className="size-4" />
@@ -142,7 +143,7 @@ export function JobsScreen({
         <DropdownMenuItem asChild>
           <Link href={`/apps/${j.registeredAppSlug}/workloads/${j.slug}`}>
             <CalendarClockIcon className="size-4" />
-            Open workload
+            {tl("openWorkload")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
@@ -160,7 +161,7 @@ export function JobsScreen({
   const menu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Run lists">
+        <Button variant="ghost" size="icon" aria-label={tl("runLists")}>
           <MoreHorizontalIcon className="size-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -168,7 +169,7 @@ export function JobsScreen({
         <DropdownMenuItem asChild>
           <Link href={appSlug ? jobRunsHref(appSlug) : "/jobs/runs"}>
             <HistoryIcon className="size-4" />
-            Job runs
+            {tl("jobRuns")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
@@ -176,7 +177,7 @@ export function JobsScreen({
             href={appSlug ? `/jobs/commands?app=${encodeURIComponent(appSlug)}` : "/jobs/commands"}
           >
             <TerminalIcon className="size-4" />
-            Command runs
+            {tl("commandRuns")}
           </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -193,7 +194,7 @@ export function JobsScreen({
 
   const body = {
     list,
-    label: "Scheduled jobs",
+    label: tl("scheduledJobs"),
     columns,
     rows,
     getRowId: (j: JobRow) => j.id,
@@ -212,7 +213,7 @@ export function JobsScreen({
     <ListPage<JobRow> embedded {...body} />
   ) : (
     <ListPage<JobRow>
-      header={{ crumbs: appsListCrumbs("jobs"), title: "Scheduled jobs" }}
+      header={{ crumbs: appsListCrumbs("jobs"), title: tl("scheduledJobs") }}
       {...body}
     />
   );

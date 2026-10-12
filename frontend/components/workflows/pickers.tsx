@@ -17,6 +17,7 @@
  */
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import {
   Combobox,
@@ -55,6 +56,7 @@ export function AgentWorkloadPicker({
   loading,
   disabled = false,
 }: AgentWorkloadPickerProps) {
+  const t = useTranslations("workflowPickers");
   const selected = workloads.find((w) => w.id === value) ?? null;
 
   return (
@@ -67,13 +69,13 @@ export function AgentWorkloadPicker({
       disabled={disabled || !orgScoped}
     >
       <ComboboxInput
-        placeholder={loading ? "Loading agents…" : "Select an agent"}
+        placeholder={loading ? t("loadingAgents") : t("selectAgent")}
         disabled={disabled || !orgScoped}
         showClear
-        aria-label="Agent workload"
+        aria-label={t("agentWorkload")}
       />
       <ComboboxContent>
-        <ComboboxEmpty>No agent workloads found.</ComboboxEmpty>
+        <ComboboxEmpty>{t("noAgents")}</ComboboxEmpty>
         <ComboboxList>
           {(item: AstroliftAgentListItem) => (
             <ComboboxItem key={item.id} value={item}>
@@ -117,6 +119,7 @@ export function SkillRefsPicker({
   loading,
   disabled = false,
 }: SkillRefsPickerProps) {
+  const t = useTranslations("workflowPickers");
   const anchor = useComboboxAnchor();
 
   const selected = React.useMemo<SkillOption[]>(
@@ -137,7 +140,7 @@ export function SkillRefsPicker({
       onValueChange={(v) => onChange(v.map((s) => s.slug))}
       disabled={disabled || !orgScoped}
     >
-      <ComboboxChips ref={anchor} aria-label="Skill refs">
+      <ComboboxChips ref={anchor} aria-label={t("skillRefs")}>
         <ComboboxValue>
           {(vals: SkillOption[]) => (
             <React.Fragment>
@@ -147,7 +150,7 @@ export function SkillRefsPicker({
                 </ComboboxChip>
               ))}
               <ComboboxChipsInput
-                placeholder={vals.length > 0 ? "" : loading ? "Loading skills…" : "Add skills"}
+                placeholder={vals.length > 0 ? "" : loading ? t("loadingSkills") : t("addSkills")}
                 disabled={disabled || !orgScoped}
               />
             </React.Fragment>
@@ -155,14 +158,14 @@ export function SkillRefsPicker({
         </ComboboxValue>
       </ComboboxChips>
       <ComboboxContent anchor={anchor}>
-        <ComboboxEmpty>No matching skills.</ComboboxEmpty>
+        <ComboboxEmpty>{t("noSkills")}</ComboboxEmpty>
         <ComboboxList>
           {(item: SkillOption) => (
             <ComboboxItem key={item.slug} value={item}>
               <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
                 <span className="truncate text-sm">{item.name}</span>
                 <span className="text-muted-foreground truncate font-mono text-xs">
-                  {item.isGlobal ? "platform" : item.slug}
+                  {item.isGlobal ? t("platform") : item.slug}
                 </span>
               </div>
             </ComboboxItem>

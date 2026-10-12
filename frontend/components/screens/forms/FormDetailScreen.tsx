@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Loader2Icon, PenLineIcon, SendIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -19,11 +20,7 @@ import { FormSubmissionsTab } from "./FormSubmissionsTab";
 
 type Tab = "overview" | "preview" | "submissions";
 
-const TABS: { key: Tab; label: string }[] = [
-  { key: "overview", label: "Overview" },
-  { key: "preview", label: "Preview" },
-  { key: "submissions", label: "Submissions" },
-];
+const TABS: Tab[] = ["overview", "preview", "submissions"];
 
 export type FormDetailScreenProps = {
   slug: string;
@@ -51,6 +48,7 @@ export function FormDetailScreen({
   onPublish,
   onArchive,
 }: FormDetailScreenProps) {
+  const t = useTranslations("formScreens");
   const [tab, setTab] = useState<Tab>("overview");
 
   if (loading && !form) {
@@ -65,7 +63,7 @@ export function FormDetailScreen({
     return (
       <div className="flex flex-1 flex-col gap-6 p-6">
         <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-4 text-sm">
-          {error ? `Error: ${error.message}` : `No form found for "${slug}"`}
+          {error ? t("error", { message: error.message }) : t("notFound", { slug })}
         </div>
       </div>
     );
@@ -91,18 +89,18 @@ export function FormDetailScreen({
           {form.status === "published" && (
             <Button asChild>
               <Link href={`/forms/${slug}/submit`}>
-                <PenLineIcon className="mr-2 h-4 w-4" /> Fill Out
+                <PenLineIcon className="mr-2 h-4 w-4" /> {t("fillOut")}
               </Link>
             </Button>
           )}
           {form.status === "draft" && (
             <Button onClick={onPublish}>
-              <SendIcon className="mr-2 h-4 w-4" /> Publish
+              <SendIcon className="mr-2 h-4 w-4" /> {t("publish")}
             </Button>
           )}
           {form.status === "published" && (
             <Button variant="outline" onClick={onArchive}>
-              Archive
+              {t("archive")}
             </Button>
           )}
         </div>
@@ -111,13 +109,13 @@ export function FormDetailScreen({
 
       <nav className="border-b">
         <ul className="flex gap-1">
-          {TABS.map((t) => {
-            const active = tab === t.key;
+          {TABS.map((key) => {
+            const active = tab === key;
             return (
-              <li key={t.key}>
+              <li key={key}>
                 <button
                   type="button"
-                  onClick={() => setTab(t.key)}
+                  onClick={() => setTab(key)}
                   className={cn(
                     "border-b-2 px-4 py-2 text-sm transition-colors",
                     active
@@ -125,8 +123,8 @@ export function FormDetailScreen({
                       : "text-muted-foreground hover:text-foreground border-transparent"
                   )}
                 >
-                  {t.label}
-                  {t.key === "submissions" && form.submissionCount > 0 && (
+                  {t(`tabs.${key}`)}
+                  {key === "submissions" && form.submissionCount > 0 && (
                     <span className="bg-muted text-muted-foreground ml-2 rounded-full px-2 py-0.5 text-xs">
                       {form.submissionCount}
                     </span>
@@ -165,19 +163,20 @@ function FormOverview({
   };
   fieldCount: number;
 }) {
+  const t = useTranslations("formScreens");
   const fmt = useFormatters();
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <StatTile label="Fields" value={fieldCount} />
-        <StatTile label="Submissions" value={form.submissionCount} />
+        <StatTile label={t("fields")} value={fieldCount} />
+        <StatTile label={t("tabs.submissions")} value={form.submissionCount} />
         <StatTile
-          label="Published"
-          value={form.publishedAt ? fmt.formatDate(form.publishedAt) : "Not yet"}
+          label={t("published")}
+          value={form.publishedAt ? fmt.formatDate(form.publishedAt) : t("notYet")}
         />
       </div>
 
-      <Section title="Schema">
+      <Section title={t("schema")}>
         <pre className="bg-muted max-h-96 overflow-auto rounded-lg p-4 text-sm">
           {JSON.stringify(form.schema, null, 2)}
         </pre>

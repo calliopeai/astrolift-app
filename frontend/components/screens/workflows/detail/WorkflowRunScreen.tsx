@@ -106,28 +106,37 @@ const DOT: Record<ExecState, "ok" | "warn" | "error" | "muted" | "pending"> = {
 };
 
 /** `Agents ▾ › Workflows › <workflow> › run <id8>` (spec 44 §4.4): four crumbs. */
-export function workflowRunCrumbs(slug: string, workflowName: string, runId: string) {
+export function workflowRunCrumbs(
+  slug: string,
+  workflowName: string,
+  runId: string,
+  t: ReturnType<typeof useTranslations<"workflowRun">>
+) {
   return [
     areaSwitcher(NAV, "agents", "workflows"),
-    { label: "Workflows", href: "/workflows" },
+    { label: t("workflows"), href: "/workflows" },
     { label: workflowName, href: workflowTabHref(slug, "runs") },
-    { label: `run ${runId.slice(0, 8)}` },
+    { label: t("runTitle", { id: runId.slice(0, 8) }) },
   ];
 }
 
 function BranchList({ item }: { item: RunStepItem }) {
   const t = useTranslations("workflowBounds");
+  const tr = useTranslations("workflowRun");
   const format = useFormatter();
   const settled = item.branches.filter((b) => b.state === "ok" || b.state === "failed").length;
   return (
     <span className="mt-1 flex min-w-0 flex-col gap-1">
       <span className="font-mono">
-        {settled} of {item.plannedBranches ?? item.branches.length} branches settled
+        {tr("branchesSettled", {
+          settled,
+          total: item.plannedBranches ?? item.branches.length,
+        })}
       </span>
       <span
         className="flex min-w-0 flex-col gap-0.5"
         role="list"
-        aria-label={`${item.name} branches`}
+        aria-label={tr("branchesAria", { name: item.name })}
       >
         {item.branches.map((b) => (
           <span key={b.id} role="listitem" className="flex min-w-0 items-start gap-2">
@@ -197,8 +206,9 @@ export function WorkflowRunScreen({
 }: WorkflowRunScreenProps) {
   const [confirmCancel, setConfirmCancel] = React.useState(false);
   const tBounds = useTranslations("workflowBounds");
-  const title = `run ${runId.slice(0, 8)}`;
-  const crumbs = workflowRunCrumbs(slug, workflowName, runId);
+  const t = useTranslations("workflowRun");
+  const title = t("runTitle", { id: runId.slice(0, 8) });
+  const crumbs = workflowRunCrumbs(slug, workflowName, runId, t);
 
   if (!run && loading) {
     return (
@@ -215,18 +225,16 @@ export function WorkflowRunScreen({
     return (
       <RunMissing
         crumbs={crumbs}
-        title="Workflow run"
+        title={t("workflowRun")}
         icon={<HistoryIcon className="size-4" />}
         error={error}
         onRetry={onRetry}
         empty={{
           icon: <HistoryIcon className="size-5" />,
-          title: "Run not found",
-          description: windowed
-            ? "No recent run of this workflow has this id. Only the newest 100 runs in its project are searched, so an older run may not open here yet."
-            : "No run of this workflow has this id, or you may not have access to it.",
+          title: t("notFoundTitle"),
+          description: windowed ? t("notFoundWindowed") : t("notFoundDescription"),
           actionHref: workflowTabHref(slug, "runs"),
-          actionLabel: "Open this workflow's runs",
+          actionLabel: t("openRuns"),
         }}
       />
     );
@@ -243,7 +251,10 @@ export function WorkflowRunScreen({
     const items = r.items.map(
       (item): TimelineStep => ({
         id: item.id,
-        name: item.attempt > 1 ? `${item.name} · attempt ${item.attempt}` : item.name,
+        name:
+          item.attempt > 1
+            ? t("stepAttempt", { name: item.name, attempt: item.attempt })
+            : item.name,
         state: STEP[item.state],
         durationMs: item.durationMs,
         detail: (
@@ -277,7 +288,7 @@ export function WorkflowRunScreen({
         detail: r.cause
           ? `${r.cause}${r.maxRounds && r.edgeRound !== r.round ? ` · ${tBounds("edgeBound", { edgeRound: r.edgeRound!, max: r.maxRounds })}` : ""}`
           : r.round === 1
-            ? "The first pass"
+            ? t("firstPass")
             : undefined,
       },
       ...items,
@@ -291,11 +302,11 @@ export function WorkflowRunScreen({
   const failure =
     run.outcome === "failed"
       ? {
-          title: "Run failed",
+          title: t("runFailed"),
           reason:
             failedItem?.error ??
             failedItem?.branches.find((b) => b.error)?.error ??
-            (failedItem ? `${failedItem.name} failed` : "The run reported no reason."),
+            (failedItem ? t("stepFailed", { name: failedItem.name }) : t("noReason")),
         }
       : null;
 
@@ -316,7 +327,7 @@ export function WorkflowRunScreen({
       onClick={() => void decide(viewerGate, "approved", "")}
     >
       <CheckIcon className="size-4" />
-      Approve
+      {t("approve")}
     </Button>
   ) : stop ? (
     <Button
@@ -326,14 +337,14 @@ export function WorkflowRunScreen({
       onClick={() => setConfirmCancel(true)}
     >
       <XCircleIcon className="size-4" />
-      {cancelling ? "Stopping…" : "Stop"}
+      {cancelling ? t("stopping") : t("stop")}
     </Button>
   ) : undefined;
 
   const menu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="size-8" aria-label="More actions">
+        <Button variant="outline" size="icon" className="size-8" aria-label={t("moreActions")}>
           <MoreHorizontalIcon className="size-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -341,27 +352,27 @@ export function WorkflowRunScreen({
         {viewerGate && (
           <DropdownMenuItem onSelect={() => void decide(viewerGate, "rejected", "")}>
             <XIcon className="size-4" />
-            Reject
+            {t("reject")}
           </DropdownMenuItem>
         )}
         {viewerGate && stop && (
           <DropdownMenuItem onSelect={() => setConfirmCancel(true)}>
             <XCircleIcon className="size-4" />
-            Stop run
+            {t("stopRun")}
           </DropdownMenuItem>
         )}
         {viewerGate && <DropdownMenuSeparator />}
         <DropdownMenuItem asChild>
           <Link href={workflowTabHref(slug, "runs")}>
             <HistoryIcon className="size-4" />
-            All runs of this workflow
+            {t("allRuns")}
           </Link>
         </DropdownMenuItem>
         {run.parentRunGuid && (
           <DropdownMenuItem asChild>
             <Link href={`/tasks?kind=workflow&q=${encodeURIComponent(run.parentRunGuid)}`}>
               <WorkflowIcon className="size-4" />
-              Find the parent run
+              {t("findParent")}
             </Link>
           </DropdownMenuItem>
         )}
@@ -369,12 +380,12 @@ export function WorkflowRunScreen({
           onSelect={() => {
             navigator.clipboard
               .writeText(run.guid)
-              .then(() => toast.success("Run ID copied."))
-              .catch(() => toast.error("Couldn't copy to clipboard."));
+              .then(() => toast.success(t("idCopied")))
+              .catch(() => toast.error(t("copyFailed")));
           }}
         >
           <CopyIcon className="size-4" />
-          Copy run ID
+          {t("copyId")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -393,7 +404,7 @@ export function WorkflowRunScreen({
               {run.temporalWorkflowId}
             </span>
           ) : (
-            "not reached the engine"
+            t("notReachedEngine")
           )
         }
         primaryAction={primaryAction}
@@ -410,32 +421,32 @@ export function WorkflowRunScreen({
           onRetry: onRetryHistory,
           onDownload: lines.length > 0 ? onDownloadLog : undefined,
           emptyHint: !run.temporalWorkflowId
-            ? "This run never reached the engine, so it has no stages or history."
+            ? t("logNeverReached")
             : run.live
-              ? "No events yet. Stage starts and engine events appear here as they happen."
-              : "This run recorded no stage or engine events.",
+              ? t("logNoEventsYet")
+              : t("logNoEvents"),
         }}
       />
 
       {snapshot.lines.length > 0 && (
         <WorkflowView
           snapshot={snapshot}
-          title="Workflow view"
-          description="This run on its workflow: where it is, and each fan-out's branches as they stand"
+          title={t("workflowView")}
+          description={t("workflowViewDescription")}
           motion={motion}
         />
       )}
 
       <Panel
-        title="Replay"
+        title={t("replay")}
         icon={<FilmIcon className="size-4" />}
-        description="Scrub the run on real time; export it as a GIF or a video."
+        description={t("replayDescription")}
         empty={
           replay
             ? null
             : {
                 icon: <FilmIcon className="size-5" />,
-                title: "Nothing to replay until a stage starts",
+                title: t("replayEmpty"),
               }
         }
       >
@@ -451,13 +462,13 @@ export function WorkflowRunScreen({
         <ConfirmDialog
           open={confirmCancel}
           onOpenChange={setConfirmCancel}
-          title="Stop this run?"
-          description="The run gets a cooperative cancel and may clean up first. A stage already running finishes or is cancelled by its worker."
-          confirmLabel="Stop run"
-          cancelLabel="Keep running"
+          title={t("stopTitle")}
+          description={t("stopDescription")}
+          confirmLabel={t("stopRun")}
+          cancelLabel={t("keepRunning")}
           destructive
           onConfirm={async () => {
-            if (!(await onCancel())) throw new Error("The run was not stopped");
+            if (!(await onCancel())) throw new Error(t("notStopped"));
           }}
         />
       )}
@@ -467,6 +478,7 @@ export function WorkflowRunScreen({
 
 function StepDetail({ item, gate }: { item: RunStepItem; gate: React.ReactNode }) {
   const collectionT = useTranslations("workflowCollections");
+  const t = useTranslations("workflowRun");
   const parts: React.ReactNode[] = [];
   if (item.collectionItem != null)
     parts.push(<span key="collection">{collectionT("item", { index: item.collectionItem })}</span>);
@@ -479,12 +491,14 @@ function StepDetail({ item, gate }: { item: RunStepItem; gate: React.ReactNode }
     );
   if (item.planned && item.plannedBranches)
     parts.push(
-      <span key="width" className="font-mono">{`${item.plannedBranches} branches planned`}</span>
+      <span key="width" className="font-mono">
+        {t("branchesPlanned", { count: item.plannedBranches })}
+      </span>
     );
   if (item.childHref)
     parts.push(
       <Link key="child" href={item.childHref} className="underline underline-offset-2">
-        Open the child run
+        {t("openChild")}
       </Link>
     );
   if (item.branches.length > 0) parts.push(<BranchList key="branches" item={item} />);

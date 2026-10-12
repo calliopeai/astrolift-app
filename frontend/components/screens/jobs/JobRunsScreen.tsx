@@ -34,6 +34,7 @@ export function JobRunsScreen({
   totalCount,
 }: JobRunsScreenProps) {
   const t = useTranslations("jobs.scheduled");
+  const tl = useTranslations("jobsList");
   const fmt = useFormatters();
 
   const columns: Column<AstroliftScheduledJobRun>[] = [
@@ -87,9 +88,9 @@ export function JobRunsScreen({
 
   return (
     <ListPage<AstroliftScheduledJobRun>
-      header={{ crumbs: appsListCrumbs("jobs", { label: "Runs" }), title: "Job runs" }}
+      header={{ crumbs: appsListCrumbs("jobs", { label: tl("runs") }), title: tl("jobRuns") }}
       list={list}
-      label="Job runs"
+      label={tl("jobRuns")}
       columns={columns}
       rows={rows}
       getRowId={(j) => j.id}

@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { FieldValues, UseFormRegister, FieldErrors, Control } from "react-hook-form";
 import { Controller } from "react-hook-form";
+import { useTranslations } from "next-intl";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -30,33 +31,42 @@ type FieldWidgetProps = {
 // ---------------------------------------------------------------------------
 
 function TextWidget({ name, schema, register }: FieldWidgetProps) {
+  const t = useTranslations("formFieldWidgets");
   return (
     <Input
       {...register(name)}
-      placeholder={(schema.placeholder as string) || `Enter ${schema.title || name}`}
+      placeholder={
+        (schema.placeholder as string) || t("enterField", { field: String(schema.title || name) })
+      }
       type="text"
     />
   );
 }
 
 function TextareaWidget({ name, schema, register }: FieldWidgetProps) {
+  const t = useTranslations("formFieldWidgets");
   return (
     <Textarea
       {...register(name)}
-      placeholder={(schema.placeholder as string) || `Enter ${schema.title || name}`}
+      placeholder={
+        (schema.placeholder as string) || t("enterField", { field: String(schema.title || name) })
+      }
       rows={4}
     />
   );
 }
 
 function NumberWidget({ name, schema, register }: FieldWidgetProps) {
+  const t = useTranslations("formFieldWidgets");
   return (
     <Input
       {...register(name, { valueAsNumber: true })}
       type="number"
       min={schema.minimum as number | undefined}
       max={schema.maximum as number | undefined}
-      placeholder={(schema.placeholder as string) || `Enter ${schema.title || name}`}
+      placeholder={
+        (schema.placeholder as string) || t("enterField", { field: String(schema.title || name) })
+      }
     />
   );
 }
@@ -71,21 +81,23 @@ function BooleanWidget({ name, schema, register }: FieldWidgetProps) {
 }
 
 function EmailWidget({ name, schema, register }: FieldWidgetProps) {
+  const t = useTranslations("formFieldWidgets");
   return (
     <Input
       {...register(name)}
       type="email"
-      placeholder={(schema.placeholder as string) || "Enter email"}
+      placeholder={(schema.placeholder as string) || t("enterEmail")}
     />
   );
 }
 
 function UrlWidget({ name, schema, register }: FieldWidgetProps) {
+  const t = useTranslations("formFieldWidgets");
   return (
     <Input
       {...register(name)}
       type="url"
-      placeholder={(schema.placeholder as string) || "Enter URL"}
+      placeholder={(schema.placeholder as string) || t("enterUrl")}
     />
   );
 }
@@ -108,6 +120,7 @@ function DateWidget({ name, schema, register }: FieldWidgetProps) {
 // ---------------------------------------------------------------------------
 
 function SelectWidget({ name, schema, control }: FieldWidgetProps) {
+  const t = useTranslations("formFieldWidgets");
   const options = (schema.enum as string[]) || [];
   return (
     <Controller
@@ -116,7 +129,9 @@ function SelectWidget({ name, schema, control }: FieldWidgetProps) {
       render={({ field }) => (
         <Select onValueChange={field.onChange} value={field.value || ""}>
           <SelectTrigger>
-            <SelectValue placeholder={`Select ${(schema.title as string) || name}`} />
+            <SelectValue
+              placeholder={t("selectField", { field: (schema.title as string) || name })}
+            />
           </SelectTrigger>
           <SelectContent>
             {options.map((opt) => (
@@ -158,6 +173,7 @@ function RadioWidget({ name, schema, control }: FieldWidgetProps) {
 }
 
 function MultiSelectWidget({ name, schema, control }: FieldWidgetProps) {
+  const t = useTranslations("formFieldWidgets");
   const items = (schema.items as Record<string, unknown>) || {};
   const options = (items.enum as string[]) || (schema.enum as string[]) || [];
   return (
@@ -185,7 +201,7 @@ function MultiSelectWidget({ name, schema, control }: FieldWidgetProps) {
               </label>
             ))}
             {options.length === 0 && (
-              <span className="text-muted-foreground text-xs">No options defined</span>
+              <span className="text-muted-foreground text-xs">{t("noOptions")}</span>
             )}
           </div>
         );
@@ -257,6 +273,7 @@ function ScaleWidget({ name, schema, control }: FieldWidgetProps) {
 // ---------------------------------------------------------------------------
 
 function FileWidget({ name, schema, control }: FieldWidgetProps) {
+  const t = useTranslations("formFieldWidgets");
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const accept = (schema["x-accept"] as string) || "";
@@ -287,10 +304,12 @@ function FileWidget({ name, schema, control }: FieldWidgetProps) {
               className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-6 transition-colors ${dragOver ? "border-primary bg-primary/5" : "border-border hover:border-border"}`}
             >
               <UploadIcon className="text-muted-foreground h-8 w-8" />
-              <span className="text-muted-foreground text-sm">
-                Drag files here or click to browse
-              </span>
-              {accept && <span className="text-muted-foreground text-xs">Accepted: {accept}</span>}
+              <span className="text-muted-foreground text-sm">{t("dropFiles")}</span>
+              {accept && (
+                <span className="text-muted-foreground text-xs">
+                  {t("accepted", { types: accept })}
+                </span>
+              )}
             </div>
             <input
               ref={inputRef}
@@ -331,6 +350,7 @@ function FileWidget({ name, schema, control }: FieldWidgetProps) {
 // ---------------------------------------------------------------------------
 
 function SignatureWidget({ name, control }: FieldWidgetProps) {
+  const t = useTranslations("formFieldWidgets");
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drawing, setDrawing] = useState(false);
 
@@ -397,7 +417,7 @@ function SignatureWidget({ name, control }: FieldWidgetProps) {
               onClick={clear}
               className="text-muted-foreground hover:text-foreground self-start text-xs"
             >
-              Clear signature
+              {t("clearSignature")}
             </button>
           </div>
         );
@@ -411,6 +431,7 @@ function SignatureWidget({ name, control }: FieldWidgetProps) {
 // ---------------------------------------------------------------------------
 
 function PinWidget({ name, register }: FieldWidgetProps) {
+  const t = useTranslations("formFieldWidgets");
   return (
     <Input
       {...register(name)}
@@ -418,7 +439,7 @@ function PinWidget({ name, register }: FieldWidgetProps) {
       inputMode="numeric"
       pattern="[0-9]*"
       maxLength={6}
-      placeholder="Enter PIN"
+      placeholder={t("enterPin")}
       className="w-32 text-center tracking-[0.5em]"
     />
   );
@@ -440,9 +461,10 @@ function TextBlockWidget({ schema }: FieldWidgetProps) {
 }
 
 function SectionHeaderWidget({ schema }: FieldWidgetProps) {
+  const t = useTranslations("formFieldWidgets");
   return (
     <div className="pt-2">
-      <h3 className="text-base font-semibold">{(schema.title as string) || "Section"}</h3>
+      <h3 className="text-base font-semibold">{(schema.title as string) || t("section")}</h3>
       {!!schema.description && (
         <p className="text-muted-foreground mt-1 text-sm">{schema.description as string}</p>
       )}
@@ -452,11 +474,12 @@ function SectionHeaderWidget({ schema }: FieldWidgetProps) {
 }
 
 function PageBreakWidget({ schema }: FieldWidgetProps) {
+  const t = useTranslations("formFieldWidgets");
   return (
     <div className="flex items-center gap-3 py-2">
       <Separator className="flex-1" />
       <span className="text-muted-foreground text-xs font-medium uppercase">
-        {(schema.title as string) || "Next Page"}
+        {(schema.title as string) || t("nextPage")}
       </span>
       <Separator className="flex-1" />
     </div>
@@ -464,19 +487,26 @@ function PageBreakWidget({ schema }: FieldWidgetProps) {
 }
 
 function ImageWidget({ schema }: FieldWidgetProps) {
+  const t = useTranslations("formFieldWidgets");
   const src = (schema["x-src"] as string) || (schema.default as string) || "";
-  const alt = (schema.title as string) || "Image";
+  const alt = (schema.title as string) || t("image");
   if (!src)
     return (
       <div className="text-muted-foreground rounded border border-dashed p-4 text-center text-xs">
-        Image URL not set
+        {t("imageNotSet")}
       </div>
     );
   return <img src={src} alt={alt} className="max-h-64 rounded-md" />;
 }
 
 function FallbackWidget({ name, schema, register }: FieldWidgetProps) {
-  return <Input {...register(name)} placeholder={`Enter ${(schema.title as string) || name}`} />;
+  const t = useTranslations("formFieldWidgets");
+  return (
+    <Input
+      {...register(name)}
+      placeholder={t("enterField", { field: (schema.title as string) || name })}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
