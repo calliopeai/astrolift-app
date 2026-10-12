@@ -17,7 +17,7 @@ export function useGrantPage() {
   const t = useTranslations("shared.access.grant");
   const router = useRouter();
   const params = useSearchParams();
-  const { principal, scope, returnTo } = parseGrantParams(
+  const { principal, scope, role, returnTo } = parseGrantParams(
     new URLSearchParams(params?.toString() ?? "")
   );
   const flow = useGrantAccess();
@@ -51,7 +51,12 @@ export function useGrantPage() {
     initialDraft: {
       principals: principal ? [principal] : [],
       scope,
+      // A preset's role (#2272), once the grantable roles have loaded; a role
+      // the viewer cannot grant is simply not preselected.
+      ...(role ? { roleId: flow.roles.find((r) => r.slug === role)?.id ?? null } : {}),
     },
+    /** The flow seeds its draft once; remounting on this key reseeds it after the roles load. */
+    draftKey: role && flow.rolesLoading ? "roles-loading" : "ready",
     onCancel: () => router.push(returnTo),
     onDone: (outcomes: { ok: boolean }[]) => {
       const n = outcomes.filter((o) => o.ok).length;

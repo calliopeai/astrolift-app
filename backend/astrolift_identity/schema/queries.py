@@ -47,6 +47,7 @@ from astrolift_identity.models import (
     Team,
 )
 from astrolift_identity.schema import identity_lists as lists
+from astrolift_identity.schema.access_presets import AccessPresetType, access_presets
 from astrolift_identity.schema.access_ux import (
     ConditionCatalogType,
     GrantPreviewInput,
@@ -1305,6 +1306,17 @@ class IdentityQuery:
         lists.invitation_activity(result.rows, _tenant_ids()[0])
         userinfo_by_user_id = _userinfo_by_inviter_id(result.rows)
         return result.map(lambda r: invitation_to_type(r, userinfo_by_user_id=userinfo_by_user_id))
+
+    @strawberry.field(
+        description=(
+            "Easy-mode starting points (#2272): each names the stock role it grants per scope and, "
+            "from that role's permissions, the tasks it allows and excludes. Never super-admin."
+        )
+    )
+    @require_permission(Permission.ORG_READ, scope=identity_organization_scope(Permission.ORG_READ))
+    @tenant_scoped()
+    def astrolift_access_presets(self, info: Info) -> list[AccessPresetType]:
+        return access_presets()
 
     @strawberry.field(
         deprecation_reason="Caps at 200 rows with no way to reach the 201st. Use astroliftRolesPage."

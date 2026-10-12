@@ -4,5 +4,6 @@ import { GrantAccessFlow } from "@/components/access/GrantAccessFlow";
 import { useGrantPage } from "@/components/screens/administration/access/use-grant-page";
 
 export function GrantClient() {
-  return <GrantAccessFlow {...useGrantPage()} />;
+  const { draftKey, ...page } = useGrantPage();
+  return <GrantAccessFlow key={draftKey} {...page} />;
 }
