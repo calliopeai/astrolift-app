@@ -261,6 +261,7 @@ def _approved_or_requested(tenant: Any, action: str, requirements: Requirements,
                 created_by_id=tenant.actor_user_id,
                 updated_by_id=tenant.actor_user_id,
             )
+            transaction.on_commit(lambda: notify_approvers(row))
             audit(
                 "action_safety.approval.request",
                 row,
@@ -274,4 +275,97 @@ def _approved_or_requested(tenant: Any, action: str, requirements: Requirements,
         f"{ACTIONS[action]} needs approval from {n} approver{'s' if n != 1 else ''}; "
         "run it again once it is approved.",
         approval_request_id=str(row.guid),
+    )
+
+
+#: Where approval requests are decided; notifications link here.
+APPROVALS_PATH = "/administration/permissions/safety"
+#: An upper bound on members checked for approval authority per request.
+MAX_NOTIFIED_MEMBERS = 500
+
+
+def approver_permission(row: Any):
+    """What deciding ``row`` asks of the approver: the authority the action itself needs."""
+    from core.permissions import Permission, PermissionScope, ScopeKind
+
+    org = PermissionScope(kind=ScopeKind.ORG, id=row.organization_id)
+    app = PermissionScope(kind=ScopeKind.APP, id=row.registered_app_id) if row.registered_app_id else None
+    if row.action == "app.deregister":
+        return Permission.APP_DELETE, app or org
+    if row.action == "cluster.decommission":
+        return Permission.CLUSTER_UNREGISTER, org
+    return (Permission.APP_UPDATE, app) if app else (Permission.ORG_UPDATE, org)
+
+
+def notify_approvers(row: Any) -> int:
+    """Tell every active member who could decide ``row``, other than the
+    requester, that it is waiting. Opening the notification only links to the
+    requests; it never approves anything. Returns how many were notified."""
+    from astrolift_identity.api_tokens import reset_current_api_token, set_current_api_token
+    from astrolift_identity.models import Member
+    from astrolift_operations.models import Notification
+    from core.permissions import PermissionDenied, check_permission
+    from core.tenancy import TenantContext, tenant_context
+
+    permission, scope = approver_permission(row)
+    members = (
+        Member.objects.filter(
+            scope_kind="ORG",
+            scope_id=row.organization_id,
+            is_active=True,
+            lifecycle="active",
+            user__is_active=True,
+        )
+        .exclude(user_id=row.requester_id)
+        .select_related("user")[:MAX_NOTIFIED_MEMBERS]
+    )
+    requester = getattr(row.requester, "email", "") or "Someone"
+    sent = 0
+    marker = set_current_api_token(None)
+    try:
+        for member in members:
+            with tenant_context(
+                TenantContext(organization_id=row.organization_id, actor_user_id=member.user_id)
+            ):
+                try:
+                    check_permission(permission, scope=scope)
+                except PermissionDenied:
+                    continue
+            Notification.objects.create(
+                organization_id=row.organization_id,
+                user=member.user,
+                kind=Notification.Kind.ACTION_APPROVAL,
+                title=f"Approval requested: {ACTIONS.get(row.action, row.action)} {row.target_label}"[:255],
+                body=(
+                    f"{requester} asked to {ACTIONS.get(row.action, row.action).lower()} "
+                    f"{row.target_label}. It needs {row.required_approvals} approval(s) "
+                    f"and expires at {row.expires_at:%Y-%m-%d %H:%M} UTC."
+                ),
+                link=APPROVALS_PATH,
+            )
+            sent += 1
+    finally:
+        reset_current_api_token(marker)
+    return sent
+
+
+def notify_requester(row: Any) -> None:
+    """Tell the requester their request was approved (run it again) or rejected."""
+    from astrolift_operations.models import Notification
+
+    if row.requester_id is None:
+        return
+    label = f"{ACTIONS.get(row.action, row.action)} {row.target_label}"
+    approved = row.status == "approved"
+    Notification.objects.create(
+        organization_id=row.organization_id,
+        user_id=row.requester_id,
+        kind=Notification.Kind.ACTION_APPROVAL,
+        title=(f"Approved: {label}" if approved else f"Rejected: {label}")[:255],
+        body=(
+            "Run it again to go ahead; the approval is spent on that run."
+            if approved
+            else "An approver rejected this request. Nothing was run."
+        ),
+        link=APPROVALS_PATH,
     )

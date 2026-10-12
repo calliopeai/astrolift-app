@@ -379,3 +379,45 @@ def test_a_person_rule_is_addressed_by_user_id_and_a_malformed_scope_is_not_foun
     assert {"scopeKind": "USER", "scopeId": str(alice.pk), "scopeLabel": alice.email} in listed["data"][
         "astroliftActionSafetyRules"
     ]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_approvers_with_the_authority_are_notified_and_the_requester_hears_the_outcome(client):
+    from astrolift_operations.models import Notification
+
+    world = ScopeWorld("notify-" + uuid4().hex[:8])
+    alice, alice_h = _admin(world, "alice")
+    bob, bob_h = _admin(world, "bob")
+    viewer = make_user("viewer" + uuid4().hex[:6])
+    Member.objects.create(user=viewer, scope_kind="ORG", scope_id=world.org.pk)
+    bind_role(viewer, permissions=[Permission.ORG_READ], kind="ORG", scope_id=world.org.pk, slug=uuid4().hex)
+    ActionSafetyRule.objects.create(
+        organization=world.org,
+        scope_kind="ORG",
+        scope_id=None,
+        action="app.deregister",
+        require_approval=True,
+    )
+    variables = {"i": {"id": str(world.medops_app.guid)}}
+    request_id = graphql_http(client, alice_h, SOFT_DELETE, variables)["data"]["softDeleteApp"]["errors"][0][
+        "approvalRequestId"
+    ]
+    graphql_http(client, alice_h, SOFT_DELETE, variables)  # asking again notifies nobody twice
+
+    def inbox(user):
+        return list(
+            Notification.objects.filter(user=user, kind="action_approval").values_list("title", "link")
+        )
+
+    assert inbox(bob) == [
+        (
+            f"Approval requested: Deregister an app {world.medops_app.name}",
+            "/administration/permissions/safety",
+        )
+    ]
+    assert inbox(viewer) == [] and inbox(alice) == []
+
+    graphql_http(client, bob_h, DECIDE % "approveActionRequest", {"i": {"id": request_id}})
+    assert inbox(alice) == [
+        (f"Approved: Deregister an app {world.medops_app.name}", "/administration/permissions/safety")
+    ]

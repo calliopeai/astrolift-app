@@ -13,7 +13,15 @@ from strawberry.types import Info
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
-from astrolift_identity.action_safety import ACTIONS, APPROVABLE, MAX_APPROVALS, audit, effective
+from astrolift_identity.action_safety import (
+    ACTIONS,
+    APPROVABLE,
+    MAX_APPROVALS,
+    approver_permission,
+    audit,
+    effective,
+    notify_requester,
+)
 from astrolift_identity.scopes import identity_organization_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
@@ -444,17 +452,6 @@ def _locked_request(tenant, guid):
     )
 
 
-def _approver_permission(row) -> tuple[Permission, PermissionScope]:
-    """What deciding ``row`` asks of the approver: the authority the action itself needs."""
-    org = PermissionScope(kind=ScopeKind.ORG, id=row.organization_id)
-    app = PermissionScope(kind=ScopeKind.APP, id=row.registered_app_id) if row.registered_app_id else None
-    if row.action == "app.deregister":
-        return Permission.APP_DELETE, app or org
-    if row.action == "cluster.decommission":
-        return Permission.CLUSTER_UNREGISTER, org
-    return (Permission.APP_UPDATE, app) if app else (Permission.ORG_UPDATE, org)
-
-
 def _decide(info: Info, input: DecideActionApprovalInput, *, approve: bool):
     from astrolift_identity.models import ActionApprovalDecision, ActionApprovalRequest
     from astrolift_identity.step_up import check_elevation
@@ -474,7 +471,7 @@ def _decide(info: Info, input: DecideActionApprovalInput, *, approve: bool):
             audit("action_safety.approval.expire", row, actor_user_id=actor)
         if row.status != Status.PENDING:
             return gql_failure(ErrorCode.PRECONDITION.value, f"the request is already {row.status}")
-        permission, scope = _approver_permission(row)
+        permission, scope = approver_permission(row)
         own = row.requester_id == actor
         try:
             check_permission(permission, scope=scope)
@@ -525,6 +522,7 @@ def _decide(info: Info, input: DecideActionApprovalInput, *, approve: bool):
         if not approve:
             row.transition_to(Status.REJECTED)
             row.save(update_fields=["status", "decided_at", "updated_at", "version"])
+            transaction.on_commit(lambda: notify_requester(row))
         else:
             approvals = row.decisions.filter(
                 decision=ActionApprovalDecision.Decision.APPROVED, deleted_at__isnull=True
@@ -532,4 +530,6 @@ def _decide(info: Info, input: DecideActionApprovalInput, *, approve: bool):
             if approvals >= row.required_approvals:
                 row.transition_to(Status.APPROVED)
                 row.save(update_fields=["status", "decided_at", "updated_at", "version"])
+                if not own:
+                    transaction.on_commit(lambda: notify_requester(row))
     return gql_success(request_to_type(row, actor))
