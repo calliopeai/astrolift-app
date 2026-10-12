@@ -9,7 +9,9 @@ Decisions (Leo, 2026-10-11):
   user rules can only add: the **strictest** requirement from any applicable
   scope wins, so a narrower scope never weakens an inherited one.
 * First cut: destructive deletes, exec/console attach, and secret reveal and
-  change.
+  change. Second cut (Leo, 2026-10-12): deploying to and rolling back a
+  production environment (named ``production`` or ``prod``). Approval for
+  deploys stays with the environment's own required approvals.
 * Approval is off by default; any scope can add it to a destructive delete
   (``APPROVABLE``), and the largest quorum asked for wins. The mutation then
   records an ``ActionApprovalRequest`` and refuses with ``APPROVAL_REQUIRED``;
@@ -48,6 +50,8 @@ ACTIONS: dict[str, str] = {
     "exec.attach": "Open a console in a workload",
     "secret.reveal": "Reveal a secret",
     "secret.change": "Change a secret",
+    "deploy.production": "Deploy to production",
+    "rollback.production": "Roll back production",
 }
 
 #: The actions a rule can add approval to, and the kind of target each binds to.

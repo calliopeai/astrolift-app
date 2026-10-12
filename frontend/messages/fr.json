@@ -6062,6 +6062,7 @@
     "approversNeeded": "Approbateurs requis : {action}",
     "approvers": "{count, plural, one {# approbateur} other {# approbateurs}}",
     "perApp": "Défini par app, dans l'approbation des secrets",
+    "perEnvironment": "Défini par environnement, dans les approbations requises",
     "notAvailable": "Non disponible",
     "selfApprovalFor": "Les admins peuvent approuver les leurs : {action}",
     "allowed": "Autorisé",

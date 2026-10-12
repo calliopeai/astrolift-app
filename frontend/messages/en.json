@@ -6005,6 +6005,7 @@
     "approversNeeded": "Approvers needed: {action}",
     "approvers": "{count, plural, one {# approver} other {# approvers}}",
     "perApp": "Set per app, under secret approval",
+    "perEnvironment": "Set per environment, under required approvals",
     "notAvailable": "Not available",
     "selfApprovalFor": "Admins may approve their own: {action}",
     "allowed": "Allowed",

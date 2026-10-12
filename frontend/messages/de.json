@@ -6062,6 +6062,7 @@
     "approversNeeded": "Benötigte Genehmigende: {action}",
     "approvers": "{count, plural, one {# Genehmigende Person} other {# Genehmigende}}",
     "perApp": "Pro App festgelegt, unter Secret-Genehmigung",
+    "perEnvironment": "Pro Umgebung festgelegt, unter erforderlichen Genehmigungen",
     "notAvailable": "Nicht verfügbar",
     "selfApprovalFor": "Admins dürfen eigene genehmigen: {action}",
     "allowed": "Erlaubt",

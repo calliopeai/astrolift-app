@@ -462,7 +462,7 @@ def test_pr_opened_creates_preview_and_returns_workflow_id(stack):
     assert preview.status == PreviewEnvironment.Status.BUILDING
     assert preview.is_manual is False
     assert preview.namespace == "acme-pr-hello-pr-pr-7"
-    assert preview.hostname == "pr-7.hello-pr.acme-pr"
+    assert preview.hostname == "pr-7-hello-pr.acme-pr"
     assert preview.branch == "feature/x"
 
     env = AppEnvironment.objects.get(registered_app=stack["app"], name="preview-pr-7")

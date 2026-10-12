@@ -6068,6 +6068,7 @@
     "approversNeeded": "Aprovadores necessários: {action}",
     "approvers": "{count, plural, one {# aprovador} other {# aprovadores}}",
     "perApp": "Definido por app, na aprovação de segredos",
+    "perEnvironment": "Definido por ambiente, nas aprovações obrigatórias",
     "notAvailable": "Indisponível",
     "selfApprovalFor": "Admins podem aprovar as próprias: {action}",
     "allowed": "Permitido",

@@ -189,7 +189,11 @@ export function ActionSafetyView({
                         </div>
                       ) : (
                         <span className="text-muted-foreground text-xs">
-                          {row.action === "secret.change" ? t("perApp") : t("notAvailable")}
+                          {row.action === "secret.change"
+                            ? t("perApp")
+                            : row.action.endsWith(".production")
+                              ? t("perEnvironment")
+                              : t("notAvailable")}
                         </span>
                       )}
                     </td>

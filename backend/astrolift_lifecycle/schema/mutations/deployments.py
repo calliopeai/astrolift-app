@@ -95,6 +95,16 @@ from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
 
 
+def _production_gate(info: Info, action: str, app, env, resolver_name: str):
+    """The action-safety gate for a production environment (#2202), else None."""
+    from astrolift_identity.action_safety import gate
+    from astrolift_lifecycle.schema.types import environment_kind
+
+    if env is None or environment_kind(env.name) != "production":
+        return None
+    return gate(info, action, app=app, resolver_name=resolver_name)
+
+
 @strawberry.type
 class DeploymentMutations:
     @strawberry.field
@@ -129,6 +139,9 @@ class DeploymentMutations:
                 f"app {input.app_slug!r} environment {input.environment_name!r} not found",
             )
         app, env = resolved
+        deny = _production_gate(info, "deploy.production", app, env, "start_deployment")
+        if deny is not None:
+            return deny
         try:
             origin = capture_deployment_origin(getattr(info.context, "request", None), app, env)
         except DeploymentOriginError as exc:
@@ -805,6 +818,15 @@ class DeploymentMutations:
             if mismatch is not None:
                 return mismatch
             recheck_action(Permission.APP_ROLLBACK, deployment, deployment.app_environment, deployment=True)
+            deny = _production_gate(
+                info,
+                "rollback.production",
+                deployment.registered_app,
+                deployment.app_environment,
+                "rollback_deployment",
+            )
+            if deny is not None:
+                return deny
             from astrolift_lifecycle.deployment_identity_origin import native_origin_required
 
             if native_origin_required(deployment.registered_app, deployment.app_environment):
@@ -915,6 +937,11 @@ class DeploymentMutations:
             if mismatch is not None:
                 return mismatch
             recheck_action(Permission.APP_DEPLOY, source, source.app_environment, deployment=True)
+            deny = _production_gate(
+                info, "deploy.production", source.registered_app, source.app_environment, "redeploy_app"
+            )
+            if deny is not None:
+                return deny
 
             if (
                 source.registered_app.effective_build_strategy != RegisteredApp.BuildStrategy.OFF.value
@@ -1066,6 +1093,9 @@ class DeploymentMutations:
                 f"target environment {input.target_environment_name!r} not found",
                 field="targetEnvironmentName",
             )
+        deny = _production_gate(info, "deploy.production", app, target_env, "promote_deployment")
+        if deny is not None:
+            return deny
 
         try:
             origin = capture_deployment_origin(getattr(info.context, "request", None), app, target_env)

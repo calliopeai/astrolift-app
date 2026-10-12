@@ -6068,6 +6068,7 @@
     "approversNeeded": "必要な承認者数: {action}",
     "approvers": "{count, plural, other {承認者 # 人}}",
     "perApp": "アプリごとにシークレット承認で設定",
+    "perEnvironment": "環境ごとに必須承認で設定",
     "notAvailable": "利用不可",
     "selfApprovalFor": "管理者による自己承認: {action}",
     "allowed": "許可",

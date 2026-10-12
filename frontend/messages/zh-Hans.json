@@ -6068,6 +6068,7 @@
     "approversNeeded": "所需审批人：{action}",
     "approvers": "{count, plural, other {# 位审批人}}",
     "perApp": "按应用在密钥审批中设置",
+    "perEnvironment": "按环境在必需审批中设置",
     "notAvailable": "不可用",
     "selfApprovalFor": "管理员可审批自己的请求：{action}",
     "allowed": "允许",
