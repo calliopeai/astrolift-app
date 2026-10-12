@@ -41,7 +41,8 @@ describe("create sheet admission", () => {
           teams={TEAMS}
           creating={false}
           createProject={createProject}
-        />
+        />,
+        { wrapper: Context }
       );
       fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Demo" } });
       fireEvent.change(screen.getByLabelText("Slug"), { target: { value: slug } });
@@ -77,7 +78,7 @@ describe("create sheet admission", () => {
       createProject,
       initialTeamSlug: TEAMS[1].slug,
     };
-    const view = render(<CreateProjectSheet {...props} />);
+    const view = render(<CreateProjectSheet {...props} />, { wrapper: Context });
     view.rerender(<CreateProjectSheet {...props} teams={TEAMS} />);
     fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Demo" } });
     fireEvent.submit(screen.getByLabelText("Slug").closest("form")!);
@@ -104,7 +105,8 @@ describe("create sheet admission", () => {
         initialTeamSlug="hidden-team"
         creating={false}
         createProject={createProject}
-      />
+      />,
+      { wrapper: Context }
     );
     fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Demo" } });
     fireEvent.submit(screen.getByLabelText("Slug").closest("form")!);

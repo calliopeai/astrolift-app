@@ -1,6 +1,7 @@
 "use client";
 
 import { LogInIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button";
  * trigger the modal to re-open or stack.
  */
 export function SessionExpiredModal() {
+  const t = useTranslations("sessionExpired");
   const [open, setOpen] = React.useState(false);
   const firedRef = React.useRef(false);
 
@@ -28,8 +30,7 @@ export function SessionExpiredModal() {
       setOpen(true);
     }
     window.addEventListener("astrolift:session-expired", onSessionExpired);
-    return () =>
-      window.removeEventListener("astrolift:session-expired", onSessionExpired);
+    return () => window.removeEventListener("astrolift:session-expired", onSessionExpired);
   }, []);
 
   if (!open) return null;
@@ -51,17 +52,14 @@ export function SessionExpiredModal() {
     >
       <div className="bg-background w-full max-w-md rounded-lg border p-6 shadow-2xl">
         <h2 id="session-expired-title" className="text-lg font-semibold">
-          Your session expired
+          {t("title")}
         </h2>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Please sign in again to continue. Your unsaved work in this tab
-          will be lost — copy any draft text before signing in.
-        </p>
+        <p className="text-muted-foreground mt-2 text-sm">{t("description")}</p>
         <div className="mt-6 flex justify-end">
           <Button asChild>
             <a href={loginHref}>
               <LogInIcon className="size-4" />
-              Sign in
+              {t("signIn")}
             </a>
           </Button>
         </div>

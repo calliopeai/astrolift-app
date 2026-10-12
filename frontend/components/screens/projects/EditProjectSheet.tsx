@@ -1,6 +1,7 @@
 "use client";
 
 import { Wand2Icon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,8 @@ export function EditProjectSheet({
   generateSlug,
   save,
 }: EditProjectSheetProps) {
+  const copy = useTranslations("projectSheets");
+  const confirmation = useTranslations("shared.confirmation");
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (await save()) onOpenChange(false);
@@ -48,20 +51,21 @@ export function EditProjectSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col">
         <SheetHeader>
-          <SheetTitle>Edit project</SheetTitle>
+          <SheetTitle>{copy("editTitle")}</SheetTitle>
           <SheetDescription>
-            Rename this project or change its slug. Slugs are unique within the team
-            {project ? ` (${project.team.slug})` : ""} and are used in URLs.
+            {project
+              ? copy("editDescriptionTeam", { team: project.team.slug })
+              : copy("editDescription")}
           </SheetDescription>
         </SheetHeader>
         <form onSubmit={submit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
           <div className="space-y-2">
-            <Label htmlFor="edit-project-name">Display name</Label>
+            <Label htmlFor="edit-project-name">{copy("displayName")}</Label>
             <Input
               id="edit-project-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="API gateway"
+              placeholder={copy("namePlaceholder")}
               autoFocus
               required
             />
@@ -69,7 +73,7 @@ export function EditProjectSheet({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="edit-project-slug">Slug</Label>
+              <Label htmlFor="edit-project-slug">{copy("slug")}</Label>
               <Button
                 type="button"
                 size="sm"
@@ -78,7 +82,7 @@ export function EditProjectSheet({
                 onClick={generateSlug}
               >
                 <Wand2Icon className="size-3" />
-                Generate
+                {copy("generate")}
               </Button>
             </div>
             <Input
@@ -95,10 +99,10 @@ export function EditProjectSheet({
 
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {confirmation("cancel")}
             </Button>
             <Button type="submit" disabled={!canSubmit}>
-              {saving ? "Saving…" : "Save changes"}
+              {saving ? copy("saving") : copy("save")}
             </Button>
           </SheetFooter>
         </form>

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
 
@@ -13,10 +14,11 @@ export function BrandMark({
   collapsed?: boolean;
   href?: string;
 }) {
+  const t = useTranslations("brandMark");
   return (
     <Link
       href={href}
-      aria-label="Astrolift home"
+      aria-label={t("home")}
       className={cn(
         "focus-visible:ring-ring flex min-w-0 items-center gap-2 rounded-md focus-visible:ring-2 focus-visible:outline-none",
         collapsed && "justify-center"

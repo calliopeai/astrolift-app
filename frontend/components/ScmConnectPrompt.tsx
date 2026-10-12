@@ -12,6 +12,7 @@
  */
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { providerFamily, type UseScmConnect } from "@/components/use-scm-connect";
@@ -32,6 +33,7 @@ export function ScmReauthAction({
   connectionKind: string;
   scm: UseScmConnect;
 }) {
+  const t = useTranslations("scmConnect");
   const { accounts, loading, starting, startConnect } = scm;
   const family = providerFamily(connectionKind);
   const match =
@@ -49,7 +51,9 @@ export function ScmReauthAction({
         disabled={starting}
         onClick={() => startConnect(match.providerConfigId)}
       >
-        {match.isConnected ? `Reconnect ${match.providerLabel}` : `Connect ${match.providerLabel}`}
+        {match.isConnected
+          ? t("reconnect", { provider: match.providerLabel })
+          : t("connect", { provider: match.providerLabel })}
       </Button>
     );
   }
@@ -58,7 +62,7 @@ export function ScmReauthAction({
   if (loading) return null;
   return (
     <Link href={PROVIDERS_SETUP_HREF} className="underline">
-      Reconnect on the providers page
+      {t("reconnectOnProviders")}
     </Link>
   );
 }
@@ -70,6 +74,7 @@ export function ScmReauthAction({
  * page with a note that an org admin has to configure one first.
  */
 export function ScmEmptyConnectAction({ scm }: { scm: UseScmConnect }) {
+  const t = useTranslations("scmConnect");
   const { accounts, loading, starting, startConnect } = scm;
   const connectable = accounts.filter((a) => !a.isConnected);
 
@@ -85,7 +90,7 @@ export function ScmEmptyConnectAction({ scm }: { scm: UseScmConnect }) {
             disabled={starting}
             onClick={() => startConnect(a.providerConfigId)}
           >
-            Connect {a.providerLabel}
+            {t("connect", { provider: a.providerLabel })}
           </Button>
         ))}
       </div>
@@ -98,11 +103,9 @@ export function ScmEmptyConnectAction({ scm }: { scm: UseScmConnect }) {
         href={PROVIDERS_SETUP_HREF}
         className="text-primary text-sm underline-offset-4 hover:underline"
       >
-        Set up a source provider →
+        {t("setUp")} →
       </Link>
-      <span className="text-muted-foreground text-xs">
-        An org admin must configure a source provider before you can connect a personal identity.
-      </span>
+      <span className="text-muted-foreground text-xs">{t("adminRequired")}</span>
     </div>
   );
 }

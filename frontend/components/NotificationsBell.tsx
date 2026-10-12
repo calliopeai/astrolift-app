@@ -2,6 +2,7 @@
 
 import { BellIcon, BellOffIcon, CheckCheckIcon } from "lucide-react";
 import Link from "next/link";
+import { useFormatter, useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -28,13 +29,15 @@ export function NotificationsBell({
   onMarkRead,
   onMarkAll,
 }: NotificationsBellProps) {
+  const t = useTranslations("notificationsBell");
+  const format = useFormatter();
   const unread = list.filter((n) => !n.readAt);
   const recent = list.slice(0, 5);
 
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
+        <Button variant="ghost" size="icon" className="relative" aria-label={t("title")}>
           <BellIcon className="size-5" />
           {unread.length > 0 && (
             <Badge
@@ -48,7 +51,7 @@ export function NotificationsBell({
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0">
         <div className="flex items-center justify-between border-b px-4 py-2.5">
-          <p className="text-sm font-medium">Notifications</p>
+          <p className="text-sm font-medium">{t("title")}</p>
           <div className="flex items-center gap-1">
             {unread.length > 0 && (
               <Button
@@ -59,18 +62,18 @@ export function NotificationsBell({
                 className="h-7 text-xs"
               >
                 <CheckCheckIcon className="size-3" />
-                Mark all
+                {t("markAll")}
               </Button>
             )}
           </div>
         </div>
 
         {loading && list.length === 0 ? (
-          <div className="text-muted-foreground px-4 py-8 text-center text-sm">Loading…</div>
+          <div className="text-muted-foreground px-4 py-8 text-center text-sm">{t("loading")}</div>
         ) : recent.length === 0 ? (
           <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
             <BellOffIcon className="text-muted-foreground size-5" />
-            <p className="text-muted-foreground text-sm">All clear.</p>
+            <p className="text-muted-foreground text-sm">{t("empty")}</p>
           </div>
         ) : (
           <ul className="max-h-96 divide-y overflow-y-auto">
@@ -101,7 +104,12 @@ export function NotificationsBell({
                       <Badge variant="outline" className="text-2xs">
                         {n.kind.replace(/_/g, " ")}
                       </Badge>
-                      <span className="text-muted-foreground text-2xs">{timeAgo(n.createdAt)}</span>
+                      <span className="text-muted-foreground text-2xs">
+                        {format.relativeTime(new Date(n.createdAt), {
+                          now: new Date(),
+                          style: "narrow",
+                        })}
+                      </span>
                     </div>
                     <p className="mt-1 line-clamp-2 font-medium">{n.title}</p>
                     {n.body && (
@@ -116,18 +124,10 @@ export function NotificationsBell({
 
         <div className="border-t">
           <Button asChild variant="ghost" size="sm" className="w-full justify-center text-xs">
-            <Link href="/settings/notifications">View all</Link>
+            <Link href="/settings/notifications">{t("viewAll")}</Link>
           </Button>
         </div>
       </PopoverContent>
     </Popover>
   );
-}
-
-function timeAgo(iso: string): string {
-  const seconds = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (seconds < 60) return `${Math.floor(seconds)}s`;
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
-  return `${Math.floor(seconds / 86400)}d`;
 }

@@ -1,5 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { renderWithIntl as render } from "@/test/render-with-intl";
 
 import { useWayfinding } from "./use-wayfinding";
 import { WayfindingBubble } from "./WayfindingBubble";
