@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- A deployment whose deploy workflow died no longer reads as deploying until the next deploy (#2184): each run-status reconcile tick asks Temporal about in-flight deployments untouched for 15 minutes and fails one whose workflow is closed, never ran, or is running a run it did not bind to, with the reason "the deploy workflow ended without finishing this deployment". An engine that does not answer leaves the row as it is.
+
 - Agent secret refs can be held to their spec's owner (#2102): with `AGENT_SECRET_OWNER_ENFORCEMENT` on (Constance, Agent pods; off by default), every typed ref must sit under `agents/<org>/projects/<project>/`, `agents/<org>/teams/<team>/` or `agents/<org>/shared/`, checked on spec create and update, binding upsert, manifest sync, agent import and `upsert_agent_environment_spec`, and at dispatch and secret-value access. A team or project can no longer bind or read a sibling's secret once an install switches it on, after `migrate_agent_secret_owners` and a clean `audit_agent_secret_owner_cutover --require-ready`. The operator guide's cutover step now names the switch.
 
 - Preview hostnames are one label below the zone, so the zone's `*.<zone>` wildcard certificate covers them on ALB, CloudFront and cert-manager alike: `pr-<n>-<app>.<zone>` for a pull request, `preview-<branch>-<app>.<zone>` for a manual preview (a first label over 63 characters is shortened with a stable digest). The four schemes in the code (`pr-<n>.<app>.<org>.<zone>`, `preview-<branch>.<app>.<org>.<zone>` and two unused helpers) now share one builder. An app label starting `pr-<n>-` or `preview-` is refused, since it could collide with a preview. Existing previews keep their stored hostname until they are recreated (#2091).

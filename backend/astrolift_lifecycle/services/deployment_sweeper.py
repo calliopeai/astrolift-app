@@ -92,7 +92,9 @@ def sweep_stuck_deployments(*, now=None) -> int:
                     deployment.save(update_fields=["aborted_reason", "updated_at", "version"])
                 deployment.transition_to(Deployment.Status.FAILED)
             failed += 1
-            log.warning("deployment sweep: failed deployment %s: %s", deployment.guid, deployment.aborted_reason)
+            log.warning(
+                "deployment sweep: failed deployment %s: %s", deployment.guid, deployment.aborted_reason
+            )
         except Exception:  # noqa: BLE001 — one row must not stop the sweep
             log.exception("deployment sweep: could not settle deployment %s", deployment.pk)
     return failed
