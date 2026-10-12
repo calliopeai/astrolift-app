@@ -11,7 +11,7 @@ import type { MutationResult } from "@/graphql/identity/identity.types";
 import { DEREGISTER_APP } from "@/graphql/lifecycle/lifecycle.mutations";
 import { PREVIEW_DEREGISTER_APP } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftDeregisterPreview } from "@/graphql/lifecycle/lifecycle.types";
-import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+import { useAppCan } from "@/lib/permissions/app-permissions";
 
 interface DeregisterResp {
   deregisterAstroliftApp: MutationResult<{
@@ -42,8 +42,8 @@ export function useDangerZone(appSlug: string, appName: string) {
   const [stillLive, setStillLive] = React.useState<string[]>([]);
   const [deregister, { loading }] = useMutation<DeregisterResp>(DEREGISTER_APP);
 
-  const permissions = useMyPermissions();
-  const previewEnabled = !!appSlug && !permissions.loading && permissions.can("app.delete");
+  const mayDelete = useAppCan("app.delete", { optimistic: false });
+  const previewEnabled = !!appSlug && mayDelete;
   // This is a scoped database read; the server still checks the actual app.
   // Load the badge before confirmation, then refresh on each modal open.
   const previewQuery = useQuery<PreviewResp>(PREVIEW_DEREGISTER_APP, {

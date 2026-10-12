@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { AppChromeProvider } from "@/lib/app-chrome-context";
+import { AppPermissionsProvider } from "@/lib/permissions/app-permissions";
 import { AgentFrame } from "@/components/screens/agents/detail/AgentFrame";
 import { useAgentFrame } from "@/components/screens/agents/detail/use-agent-frame";
 
@@ -27,9 +28,11 @@ export function AgentFrameContainer({
   return (
     <AgentFrame {...frame}>
       <FramedAgentContext.Provider value={value}>
-        <AppChromeProvider basePath="/agents" framed>
-          {children}
-        </AppChromeProvider>
+        <AppPermissionsProvider slug={agentSlug}>
+          <AppChromeProvider basePath="/agents" framed>
+            {children}
+          </AppChromeProvider>
+        </AppPermissionsProvider>
       </FramedAgentContext.Provider>
     </AgentFrame>
   );

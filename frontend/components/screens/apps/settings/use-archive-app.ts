@@ -11,7 +11,7 @@ import { ARCHIVE_APP, RESTORE_APP } from "@/graphql/registry/registry.mutations"
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
-import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+import { useAppCan } from "@/lib/permissions/app-permissions";
 
 export type ArchiveSource = Pick<
   AstroliftRegisteredApp,
@@ -33,8 +33,7 @@ interface RestoreAppResp {
 export function useArchiveApp(appSlug: string, source?: ArchiveSource | null) {
   const t = useTranslations("apps.settings.archiveFlow");
   const router = useRouter();
-  const perms = useMyPermissions();
-  const allowed = (perms.loading && perms.granted.size === 0) || perms.can("app.update");
+  const allowed = useAppCan("app.update");
   const observed =
     source === undefined ||
     (!!source?.id && source.slug === appSlug && typeof source.isArchived === "boolean");

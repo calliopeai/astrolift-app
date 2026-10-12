@@ -783,3 +783,13 @@ export const GET_APP_DEPENDENCY_CONTEXT = gql`
     }
   }
 `;
+
+/** The app's own effective permissions for the viewer, for its frame (#1867). */
+export const APP_VIEWER_PERMISSIONS = gql`
+  query AppViewerPermissions($slug: String!) {
+    astroliftApp(slug: $slug) {
+      id
+      viewerPermissions
+    }
+  }
+`;

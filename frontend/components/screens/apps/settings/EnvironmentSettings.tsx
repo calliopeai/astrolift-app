@@ -4,7 +4,7 @@ import { KeyIcon, Loader2Icon, PlusIcon, Trash2Icon } from "lucide-react";
 import * as React from "react";
 import { useTranslations } from "next-intl";
 
-import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+import { useAppCan } from "@/lib/permissions/app-permissions";
 
 import { Can } from "@/components/Can";
 import { Button } from "@/components/ui/button";
@@ -48,8 +48,7 @@ export function EnvironmentSettingsView({
   onRetry,
 }: EnvironmentSettingsViewProps) {
   const t = useTranslations("apps.environmentOverrides");
-  const perms = useMyPermissions();
-  const allowed = (perms.loading && perms.granted.size === 0) || perms.can("app.update");
+  const allowed = useAppCan("app.update");
   const [selectedEnvId, setSelectedEnvId] = React.useState<string>("");
   const effectiveEnv = envs.find((e) => e.id === selectedEnvId) ?? envs[0];
   const settings = effectiveEnv?.settings ?? [];

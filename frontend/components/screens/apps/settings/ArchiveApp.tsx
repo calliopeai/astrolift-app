@@ -8,7 +8,7 @@ import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+import { useAppCan } from "@/lib/permissions/app-permissions";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import type { useArchiveApp } from "./use-archive-app";
@@ -41,8 +41,7 @@ export function ArchiveAppView({
   const fmt = useFormatters();
   const t = useTranslations("apps.frame.archive");
   const copy = useTranslations("apps.settings.archiveFlow");
-  const perms = useMyPermissions();
-  const allowed = (perms.loading && perms.granted.size === 0) || perms.can("app.update");
+  const allowed = useAppCan("app.update");
   const fingerprint = JSON.stringify([
     appId,
     appName,

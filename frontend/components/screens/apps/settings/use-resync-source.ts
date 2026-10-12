@@ -10,7 +10,7 @@ import { RESYNC_MANIFEST_FROM_REPO } from "@/graphql/registry/registry.mutations
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
-import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+import { useAppCan } from "@/lib/permissions/app-permissions";
 
 interface ResyncResp {
   resyncAstroliftManifestFromRepo: MutationResult<{
@@ -44,8 +44,7 @@ export type ResyncSource = Pick<
 
 export function useResyncSource(appSlug: string, source?: ResyncSource | null, agentMode = false) {
   const t = useTranslations("apps.settings.agentResyncFlow");
-  const perms = useMyPermissions();
-  const allowed = (perms.loading && perms.granted.size === 0) || perms.can("app.update");
+  const allowed = useAppCan("app.update");
   const observed = source === undefined || (!!source?.id && source.slug === appSlug);
   const fingerprint = JSON.stringify([
     appSlug,

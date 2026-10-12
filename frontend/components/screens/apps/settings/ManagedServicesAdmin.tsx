@@ -4,7 +4,7 @@ import { Loader2Icon, PencilIcon, PlugIcon, RefreshCwIcon } from "lucide-react";
 import * as React from "react";
 import { useTranslations } from "next-intl";
 
-import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+import { useAppCan } from "@/lib/permissions/app-permissions";
 
 import { Can } from "@/components/Can";
 import { StatusDot } from "@/components/StatusDot";
@@ -75,9 +75,8 @@ export function ManagedServicesAdminView({
   onRetry,
 }: ManagedServicesAdminViewProps) {
   const t = useTranslations("apps.managedServicesAdmin");
-  const perms = useMyPermissions();
   // Keep Can's existing optimistic loading policy and exact app.deploy gate.
-  const allowed = (perms.loading && perms.granted.size === 0) || perms.can("app.deploy");
+  const allowed = useAppCan("app.deploy");
   const fingerprint = JSON.stringify([target, allowed]);
   const [scope, setScope] = React.useState({ fingerprint, serial: 0 });
   if (scope.fingerprint !== fingerprint) setScope({ fingerprint, serial: scope.serial + 1 });

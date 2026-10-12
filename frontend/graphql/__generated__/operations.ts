@@ -19275,6 +19275,13 @@ export type GetAppDependencyContextQueryVariables = Exact<{
 
 export type GetAppDependencyContextQuery = { astroliftAppDependencyContext?: { appId: string, environmentId: string, environmentName: string, readAt: string, managedDomainState: DependencyObservationState, domainsScope: string, domainsState: DependencyObservationState, domainsTruncated: boolean, domainLimit: number, liveProviderObservationState: DependencyObservationState, liveProviderObservationReason: string, permissions: { requiredPermission: string, appReadAllowed: boolean, appDeployGateAllowed: boolean, clusterRegisterGateAllowed: boolean }, cluster: { id: string, slug: string, providerId: string, providerSlug: string, region?: string | null, lifecycle: string, isActive: boolean, heartbeatSource: string, heartbeatState: DependencyObservationState, heartbeatStatus: string, heartbeatObservedAt?: string | null }, managedDomain?: { id: string, zone: string } | null, domains: Array<{ id: string, hostname: string, isActive: boolean, validationStatus: string, validationObservedAt?: string | null, configuredCertificateReferencePresent: boolean, certificateSource: string, storedCertificateState: string, certificateMetadataState: DependencyObservationState, certificateObservedAt?: string | null, storedCertificateExpiresAt?: string | null, storedCertificateRenewalStatus?: string | null }> } | null };
 
+export type AppViewerPermissionsQueryVariables = Exact<{
+  slug: Scalars['String']['input'];
+}>;
+
+
+export type AppViewerPermissionsQuery = { astroliftApp?: { id: string, viewerPermissions: Array<string> } | null };
+
 export type StartReviewedWorkflowMutationVariables = Exact<{
   input: StartWorkflowDefinitionInput;
 }>;
