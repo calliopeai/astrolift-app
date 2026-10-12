@@ -9,7 +9,8 @@ import {
   RotateCwIcon,
   ShieldOffIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useTranslations } from "next-intl";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
@@ -17,6 +18,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import type { useDeployToken } from "./use-deploy-token";
 
@@ -41,6 +43,8 @@ export function DeployTokenControlView({
 }: DeployTokenControlViewProps) {
   const [confirmRotate, setConfirmRotate] = useState(false);
   const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const t = useTranslations("appControls.deployToken");
+  const fmt = useFormatters();
 
   const missingToken = !loading && !active;
 
@@ -55,11 +59,9 @@ export function DeployTokenControlView({
               <KeyRoundIcon className="text-muted-foreground mt-0.5 size-4" />
             )}
             <div>
-              <p className="text-sm font-medium">Deploy token</p>
+              <p className="text-sm font-medium">{t("title")}</p>
               <p className="text-muted-foreground mt-0.5 max-w-md text-xs">
-                App-scoped machine token. Use as{" "}
-                <code className="bg-muted rounded px-1 font-mono">ASTROLIFT_DEPLOY_TOKEN</code> in
-                your CI.
+                {t.rich("description", { code })}
               </p>
               {!loading && active && (
                 <div className="text-muted-foreground mt-2 flex flex-wrap items-center gap-2 text-xs">
@@ -68,15 +70,13 @@ export function DeployTokenControlView({
                   </Badge>
                   <span>
                     {active.lastUsedAt
-                      ? `last used ${new Date(active.lastUsedAt).toLocaleDateString()}`
-                      : "never used"}
+                      ? t("lastUsed", { date: fmt.formatDate(active.lastUsedAt) })
+                      : t("neverUsed")}
                   </span>
                 </div>
               )}
               {missingToken && (
-                <p className="text-warning-fg mt-2 text-xs font-medium">
-                  No token — CI cannot trigger deployments until one is generated.
-                </p>
+                <p className="text-warning-fg mt-2 text-xs font-medium">{t("missing")}</p>
               )}
             </div>
           </div>
@@ -97,7 +97,7 @@ export function DeployTokenControlView({
                     ) : (
                       <RotateCwIcon className="size-3.5" />
                     )}
-                    Rotate
+                    {t("rotate")}
                   </Button>
                   <Button
                     size="sm"
@@ -111,7 +111,7 @@ export function DeployTokenControlView({
                     ) : (
                       <ShieldOffIcon className="size-3.5" />
                     )}
-                    Revoke
+                    {t("revoke")}
                   </Button>
                 </>
               ) : (
@@ -126,7 +126,7 @@ export function DeployTokenControlView({
                   ) : (
                     <KeyRoundIcon className="size-3.5" />
                   )}
-                  Generate token
+                  {t("generate")}
                 </Button>
               )}
             </div>
@@ -139,18 +139,18 @@ export function DeployTokenControlView({
       <ConfirmDialog
         open={confirmRotate}
         onOpenChange={setConfirmRotate}
-        title="Rotate deploy token?"
-        description="The previous value stops working immediately. Any CI run still holding the old token will fail until you update the secret on the CI side."
-        confirmLabel="Rotate token"
+        title={t("rotateTitle")}
+        description={t("rotateDescription")}
+        confirmLabel={t("rotateConfirm")}
         onConfirm={onRotate}
       />
 
       <ConfirmDialog
         open={confirmRevoke}
         onOpenChange={setConfirmRevoke}
-        title="Revoke deploy token?"
-        description="CI runs using this token will start failing immediately. Mint a new token afterwards and update your CI secret to recover. No way to un-revoke — soft delete only."
-        confirmLabel="Revoke token"
+        title={t("revokeTitle")}
+        description={t("revokeDescription")}
+        confirmLabel={t("revokeConfirm")}
         destructive
         onConfirm={onRevoke}
       />
@@ -158,42 +158,41 @@ export function DeployTokenControlView({
   );
 }
 
+const code = (chunks: ReactNode) => (
+  <code className="bg-muted rounded px-1 font-mono">{chunks}</code>
+);
+
 function RevealDialog({ token, onClose }: { token: string; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
+  const t = useTranslations("appControls.deployToken");
 
   async function copy() {
     try {
       await navigator.clipboard.writeText(token);
       setCopied(true);
-      toast.success("Copied to clipboard.");
+      toast.success(t("copied"));
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error("Copy failed — select the value and copy manually.");
+      toast.error(t("copyFailed"));
     }
   }
 
   return (
     <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
       <div className="bg-card border-border w-full max-w-lg rounded-lg border p-6 shadow-xl">
-        <h3 className="text-base font-semibold">Deploy token — copy it now</h3>
-        <p className="text-warning-fg mt-2 text-xs">
-          This is the only time the token is shown. If you navigate away without copying, rotate
-          again to mint a fresh one.
-        </p>
+        <h3 className="text-base font-semibold">{t("revealTitle")}</h3>
+        <p className="text-warning-fg mt-2 text-xs">{t("revealWarning")}</p>
         <div className="bg-muted/50 mt-4 flex items-center gap-2 rounded-md border p-3">
           <code className="flex-1 font-mono text-xs break-all">{token}</code>
           <Button size="sm" variant="outline" onClick={copy} className="shrink-0 gap-1.5">
             {copied ? <CheckIcon className="size-3.5" /> : <CopyIcon className="size-3.5" />}
-            {copied ? "Copied" : "Copy"}
+            {copied ? t("copiedLabel") : t("copy")}
           </Button>
         </div>
-        <p className="text-muted-foreground mt-4 text-xs">
-          Store as <code className="bg-muted rounded px-1 font-mono">ASTROLIFT_DEPLOY_TOKEN</code>{" "}
-          in your CI provider&rsquo;s secrets.
-        </p>
+        <p className="text-muted-foreground mt-4 text-xs">{t.rich("revealStore", { code })}</p>
         <div className="mt-5 flex justify-end">
           <Button size="sm" onClick={onClose}>
-            I&rsquo;ve saved it
+            {t("saved")}
           </Button>
         </div>
       </div>

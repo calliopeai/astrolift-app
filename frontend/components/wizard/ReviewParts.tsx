@@ -7,6 +7,7 @@ import {
   EditIcon,
   Loader2Icon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,6 +34,7 @@ export function SummaryCard({
   onJump: (step: 1 | 2) => void;
   rows: Array<{ label: string; value: string; mono?: boolean }>;
 }) {
+  const t = useTranslations("wizardReview");
   return (
     <Card className="border-muted-foreground/20 min-w-0">
       <CardContent className="flex flex-col gap-2 p-4 text-sm">
@@ -46,10 +48,10 @@ export function SummaryCard({
             size="sm"
             onClick={() => onJump(step)}
             className="text-muted-foreground hover:text-foreground -mt-1 -mr-2 h-7 gap-1 px-2 text-xs"
-            aria-label={`Edit ${title}`}
+            aria-label={t("editAria", { title })}
           >
             <EditIcon className="size-3" />
-            Edit
+            {t("edit")}
           </Button>
         </div>
         <dl className="grid gap-1">
@@ -92,37 +94,38 @@ export function errorFor(effects: SideEffectStep[], key: string): string | undef
 }
 
 export function StatusBadge({ status, error }: { status: StepStatus; error?: string }) {
+  const t = useTranslations("wizardReview");
   if (status === "running") {
     return (
       <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
-        <Loader2Icon className="size-3.5 animate-spin" /> Running
+        <Loader2Icon className="size-3.5 animate-spin" /> {t("running")}
       </span>
     );
   }
   if (status === "done") {
     return (
       <span className="text-success-fg inline-flex items-center gap-1 text-xs">
-        <CheckCircle2Icon className="size-3.5" /> Done
+        <CheckCircle2Icon className="size-3.5" /> {t("done")}
       </span>
     );
   }
   if (status === "failed") {
     return (
       <span className="text-destructive inline-flex items-center gap-1 text-xs" title={error}>
-        <AlertCircleIcon className="size-3.5" /> Failed
+        <AlertCircleIcon className="size-3.5" /> {t("failed")}
       </span>
     );
   }
   if (status === "skipped") {
     return (
       <Badge variant="outline" className="text-2xs">
-        Skipped
+        {t("skipped")}
       </Badge>
     );
   }
   return (
     <span className="text-muted-foreground inline-flex items-center gap-1 text-xs">
-      <CircleDashedIcon className="size-3.5" /> Pending
+      <CircleDashedIcon className="size-3.5" /> {t("pending")}
     </span>
   );
 }

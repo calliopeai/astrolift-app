@@ -1,12 +1,12 @@
 "use client";
 
 import { LinkIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import {
   canBindAt,
   type RoleRef,
-  SCOPE_NOUN,
   type ScopeNode,
   type ScopeRef,
 } from "@/components/access/access-model";
@@ -90,13 +90,15 @@ export function GroupMappingsPanel({
   initialAdding = false,
 }: GroupMappingsPanelProps) {
   const fmt = useFormatters();
+  const t = useTranslations("adminGroupMappings");
+  const scopes = useTranslations("shared.access.scope");
   const [adding, setAdding] = React.useState(initialAdding);
   const [target, setTarget] = React.useState<GroupMapping | null>(null);
 
   const columns: Column<GroupMapping>[] = [
     {
       id: "role",
-      header: "Role",
+      header: t("columns.role"),
       cellClassName: "max-w-72",
       cell: (m) => (
         <span className="block min-w-0">
@@ -114,12 +116,12 @@ export function GroupMappingsPanel({
     },
     {
       id: "scope",
-      header: "Where",
+      header: t("columns.where"),
       cellClassName: "max-w-64",
       cell: (m) => (
         <span className="flex min-w-0 items-center gap-1.5">
           <Badge variant="outline" className="text-2xs shrink-0 font-mono uppercase">
-            {SCOPE_NOUN[m.scopeKind as keyof typeof SCOPE_NOUN] ?? m.scopeKind}
+            {scopes.has(m.scopeKind) ? scopes(m.scopeKind) : m.scopeKind}
           </Badge>
           <span className="min-w-0 truncate text-xs" title={m.sourceScopeLabel}>
             {m.sourceScopeLabel}
@@ -129,32 +131,32 @@ export function GroupMappingsPanel({
     },
     {
       id: "members",
-      header: "Reaches",
+      header: t("columns.reaches"),
       align: "right",
       cellClassName: "font-mono text-xs tabular-nums",
-      cell: (m) => `${m.memberCount} ${m.memberCount === 1 ? "member" : "members"}`,
+      cell: (m) => t("members", { count: m.memberCount }),
     },
     {
       id: "created",
-      header: "Mapped",
+      header: t("columns.mapped"),
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (m) => fmt.formatDate(m.createdAt),
     },
   ];
 
   return (
-    <section aria-label="Role mappings" className="flex min-w-0 flex-col gap-3">
+    <section aria-label={t("title")} className="flex min-w-0 flex-col gap-3">
       <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="text-sm font-medium">Role mappings</h2>
+          <h2 className="text-sm font-medium">{t("title")}</h2>
           <p className="text-muted-foreground text-xs [overflow-wrap:anywhere]">
-            Everyone the identity provider puts in {externalId} gets these roles, as with a grant.
+            {t("description", { group: externalId })}
           </p>
         </div>
         {canManage && !adding && (
           <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
             <PlusIcon className="size-4" />
-            Map a role
+            {t("mapRole")}
           </Button>
         )}
       </div>
@@ -171,7 +173,7 @@ export function GroupMappingsPanel({
       <ListPage<GroupMapping>
         embedded
         list={list}
-        label="Role mappings"
+        label={t("title")}
         columns={columns}
         rows={rows}
         getRowId={(m) => m.id}
@@ -185,15 +187,15 @@ export function GroupMappingsPanel({
             ? (m) => (
                 <DropdownMenuItem variant="destructive" onSelect={() => setTarget(m)}>
                   <Trash2Icon className="size-4" />
-                  Remove this mapping
+                  {t("removeThis")}
                 </DropdownMenuItem>
               )
             : undefined
         }
         empty={{
           icon: <LinkIcon className="size-5" />,
-          title: "No role mappings",
-          description: `${externalId} is not mapped to any role. Its members get only what grants give them.`,
+          title: t("emptyTitle"),
+          description: t("emptyDescription", { group: externalId }),
         }}
       />
 
@@ -202,13 +204,22 @@ export function GroupMappingsPanel({
         onOpenChange={(next) => {
           if (!next) setTarget(null);
         }}
-        title={target ? `Remove ${target.role.slug} from ${externalId}?` : "Remove mapping?"}
+        title={
+          target
+            ? t("removeTitle", { role: target.role.slug, group: externalId })
+            : t("removeFallback")
+        }
         description={
           target
-            ? `The ${target.memberCount} ${target.memberCount === 1 ? "member" : "members"} of ${externalId} lose what ${target.role.name} gives at ${target.sourceScopeLabel}, unless another grant gives it.`
+            ? t("removeDescription", {
+                count: target.memberCount,
+                group: externalId,
+                role: target.role.name,
+                scope: target.sourceScopeLabel,
+              })
             : ""
         }
-        confirmLabel="Remove mapping"
+        confirmLabel={t("removeConfirm")}
         destructive
         onConfirm={async () => {
           if (target) await onDelete(target);
@@ -225,6 +236,7 @@ function AddMapping({
   onCreate,
   onDone,
 }: Pick<GroupMappingsPanelProps, "roles" | "scopeTree" | "onCreate"> & { onDone: () => void }) {
+  const t = useTranslations("adminGroupMappings");
   const [roleId, setRoleId] = React.useState<string>("");
   const [scope, setScope] = React.useState<ScopeRef | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -232,8 +244,8 @@ function AddMapping({
   const role = roles.find((r) => r.id === roleId) ?? null;
 
   async function submit() {
-    if (!role) return setError("Pick a role.");
-    if (!scope) return setError("Pick where the role applies.");
+    if (!role) return setError(t("errors.role"));
+    if (!scope) return setError(t("errors.scope"));
     const bindable = canBindAt(role, scope.kind);
     if (bindable !== true) return setError(bindable);
     setSaving(true);
@@ -246,7 +258,7 @@ function AddMapping({
   return (
     <div className="flex min-w-0 flex-col gap-3 border-t pt-3">
       <div className="flex min-w-0 flex-col gap-2">
-        <Label htmlFor="mapping-role">Role</Label>
+        <Label htmlFor="mapping-role">{t("columns.role")}</Label>
         <Select
           value={roleId}
           onValueChange={(v) => {
@@ -255,7 +267,7 @@ function AddMapping({
           }}
         >
           <SelectTrigger id="mapping-role" className="max-w-sm min-w-0">
-            <SelectValue placeholder="Pick a role" />
+            <SelectValue placeholder={t("pickRole")} />
           </SelectTrigger>
           <SelectContent>
             {roles.map((r) => (
@@ -267,7 +279,7 @@ function AddMapping({
         </Select>
       </div>
       <ScopePicker
-        label="Where it applies"
+        label={t("whereApplies")}
         roots={scopeTree.roots}
         loading={scopeTree.loading}
         error={scopeTree.error}
@@ -287,10 +299,10 @@ function AddMapping({
       )}
       <div className="flex flex-wrap justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onDone}>
-          Cancel
+          {t("cancel")}
         </Button>
         <Button type="button" size="sm" disabled={saving} onClick={() => void submit()}>
-          {saving ? "Mapping…" : "Map role"}
+          {saving ? t("mapping") : t("submit")}
         </Button>
       </div>
     </div>

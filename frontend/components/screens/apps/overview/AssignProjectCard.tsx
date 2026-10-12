@@ -1,6 +1,7 @@
 "use client";
 
 import { FileBoxIcon, FolderInputIcon, Loader2Icon, XCircleIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -50,6 +51,7 @@ export function AssignProjectCardView({
   // Selected project drives the Save button enablement. Default to the
   // current project so re-opening the card doesn't reset the picker.
   const [selectedProjectId, setSelectedProjectId] = React.useState<string>(currentProjectId ?? "");
+  const t = useTranslations("appOverviewCards.assignProject");
   React.useEffect(() => {
     setSelectedProjectId(currentProjectId ?? "");
   }, [currentProjectId]);
@@ -63,7 +65,7 @@ export function AssignProjectCardView({
 
   const currentLabel = currentProjectId
     ? `${currentProjectName} (${currentTeamName})`
-    : "Unassigned";
+    : t("unassigned");
 
   return (
     <Card>
@@ -72,17 +74,13 @@ export function AssignProjectCardView({
           <FolderInputIcon className="size-5" />
         </div>
         <div className="flex-1">
-          <CardTitle className="text-base">Project assignment</CardTitle>
-          <CardDescription className="mt-1">
-            Place this app under a project to group it in the sidebar and scope team-level
-            permissions. Apps without a project surface in the team&apos;s &quot;Unassigned&quot;
-            bucket.
-          </CardDescription>
+          <CardTitle className="text-base">{t("title")}</CardTitle>
+          <CardDescription className="mt-1">{t("description")}</CardDescription>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-1.5">
-          <Label className="text-xs">Current project</Label>
+          <Label className="text-xs">{t("current")}</Label>
           <div className="flex items-center gap-2">
             {currentProjectId ? (
               <Badge variant="outline" className="gap-1.5">
@@ -94,7 +92,7 @@ export function AssignProjectCardView({
                 variant="outline"
                 className="border-warning-border bg-warning/10 text-warning-fg"
               >
-                Unassigned
+                {t("unassigned")}
               </Badge>
             )}
           </div>
@@ -104,15 +102,17 @@ export function AssignProjectCardView({
           permission="app.update"
           fallback={
             <p className="text-muted-foreground text-xs italic">
-              You need the <span className="font-mono">app.update</span> permission to change this
-              assignment.
+              {t.rich("needsPermission", {
+                permission: "app.update",
+                mono: (chunks) => <span className="font-mono">{chunks}</span>,
+              })}
             </p>
           }
         >
           <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
             <div className="space-y-1.5">
               <Label htmlFor="assign-project-picker" className="text-xs">
-                Move to project
+                {t("moveTo")}
               </Label>
               {projectsLoading ? (
                 <Skeleton className="h-9 w-full" />
@@ -124,11 +124,7 @@ export function AssignProjectCardView({
                 >
                   <SelectTrigger id="assign-project-picker" className="w-full">
                     <SelectValue
-                      placeholder={
-                        byTeam.length === 0
-                          ? "No projects you can assign to"
-                          : "Pick a target project"
-                      }
+                      placeholder={byTeam.length === 0 ? t("noProjects") : t("pickProject")}
                     />
                   </SelectTrigger>
                   <SelectContent>
@@ -157,7 +153,7 @@ export function AssignProjectCardView({
               ) : (
                 <FolderInputIcon className="size-4" />
               )}
-              Save
+              {t("save")}
             </Button>
             {currentProjectId ? (
               <Button
@@ -171,7 +167,7 @@ export function AssignProjectCardView({
                 ) : (
                   <XCircleIcon className="size-4" />
                 )}
-                Unassign
+                {t("unassign")}
               </Button>
             ) : null}
           </div>

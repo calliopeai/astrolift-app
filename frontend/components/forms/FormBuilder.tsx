@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useTranslations } from "next-intl";
 import {
   DndContext,
   closestCenter,
@@ -43,65 +44,30 @@ import {
 import { Separator } from "@/components/ui/separator";
 
 const FIELD_TYPES = [
-  { value: "text", label: "Text", icon: "Aa", hint: "Single-line text input" },
-  { value: "textarea", label: "Textarea", icon: "¶", hint: "Multi-line text area" },
-  { value: "number", label: "Number", icon: "#", hint: "Decimal number input" },
-  { value: "integer", label: "Integer", icon: "1", hint: "Whole number input" },
-  { value: "boolean", label: "Checkbox", icon: "☑", hint: "True/false toggle" },
-  { value: "date", label: "Date", icon: "📅", hint: "Date picker (YYYY-MM-DD)" },
-  { value: "datetime", label: "Date & Time", icon: "🕐", hint: "Date and time picker" },
-  { value: "email", label: "Email", icon: "@", hint: "Email address with validation" },
-  { value: "url", label: "URL", icon: "🔗", hint: "Web URL with validation" },
-  { value: "select", label: "Dropdown", icon: "▼", hint: "Choose one from a list of options" },
-  { value: "multi_select", label: "Multi-Select", icon: "☰", hint: "Choose multiple from a list" },
-  { value: "rating", label: "Rating (Stars)", icon: "★", hint: "Star rating (1-5 by default)" },
-  {
-    value: "scale",
-    label: "Scale (Slider)",
-    icon: "─●─",
-    hint: "Numeric slider (0-10 by default)",
-  },
-  {
-    value: "radio",
-    label: "Radio Buttons",
-    icon: "◉",
-    hint: "Choose one, displayed as radio group",
-  },
-  { value: "file", label: "File Upload", icon: "📎", hint: "Drag-and-drop file upload" },
-  { value: "signature", label: "Signature", icon: "✍", hint: "Draw a signature on a canvas" },
-  { value: "pin", label: "PIN Input", icon: "🔑", hint: "Masked numeric PIN entry" },
-  {
-    value: "text_block",
-    label: "Text Block",
-    icon: "📝",
-    hint: "Static text, instructions, or intro paragraph",
-  },
-  {
-    value: "section_header",
-    label: "Section Header",
-    icon: "═",
-    hint: "Section title with separator",
-  },
-  {
-    value: "page_break",
-    label: "Page Break",
-    icon: "⏎",
-    hint: "Start a new page in multi-step forms",
-  },
-  { value: "image", label: "Image", icon: "🖼", hint: "Display an image from URL" },
-  { value: "time", label: "Time Only", icon: "⏰", hint: "Time picker (HH:MM)" },
-  {
-    value: "repeatable",
-    label: "Repeatable Section",
-    icon: "⟳",
-    hint: "Add multiple rows of the same fields",
-  },
-  {
-    value: "percentage_split",
-    label: "Percentage Split",
-    icon: "%",
-    hint: "Allocate percentages across categories",
-  },
+  { value: "text", icon: "Aa" },
+  { value: "textarea", icon: "¶" },
+  { value: "number", icon: "#" },
+  { value: "integer", icon: "1" },
+  { value: "boolean", icon: "☑" },
+  { value: "date", icon: "📅" },
+  { value: "datetime", icon: "🕐" },
+  { value: "email", icon: "@" },
+  { value: "url", icon: "🔗" },
+  { value: "select", icon: "▼" },
+  { value: "multi_select", icon: "☰" },
+  { value: "rating", icon: "★" },
+  { value: "scale", icon: "─●─" },
+  { value: "radio", icon: "◉" },
+  { value: "file", icon: "📎" },
+  { value: "signature", icon: "✍" },
+  { value: "pin", icon: "🔑" },
+  { value: "text_block", icon: "📝" },
+  { value: "section_header", icon: "═" },
+  { value: "page_break", icon: "⏎" },
+  { value: "image", icon: "🖼" },
+  { value: "time", icon: "⏰" },
+  { value: "repeatable", icon: "⟳" },
+  { value: "percentage_split", icon: "%" },
 ];
 
 type FieldDef = {
@@ -172,10 +138,11 @@ type FormBuilderProps = {
 // ---------------------------------------------------------------------------
 
 function TextConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: FieldDef) => void }) {
+  const t = useTranslations("formBuilder");
   return (
     <div className="grid grid-cols-3 gap-2">
       <div>
-        <Label className="text-xs">Placeholder</Label>
+        <Label className="text-xs">{t("placeholder")}</Label>
         <Input
           value={field.placeholder}
           onChange={(e) => onUpdate({ ...field, placeholder: e.target.value })}
@@ -183,7 +150,7 @@ function TextConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: FieldD
         />
       </div>
       <div>
-        <Label className="text-xs">Min length</Label>
+        <Label className="text-xs">{t("minLength")}</Label>
         <Input
           value={field.minLength}
           onChange={(e) => onUpdate({ ...field, minLength: e.target.value })}
@@ -192,7 +159,7 @@ function TextConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: FieldD
         />
       </div>
       <div>
-        <Label className="text-xs">Max length</Label>
+        <Label className="text-xs">{t("maxLength")}</Label>
         <Input
           value={field.maxLength}
           onChange={(e) => onUpdate({ ...field, maxLength: e.target.value })}
@@ -201,16 +168,16 @@ function TextConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: FieldD
         />
       </div>
       <div className="col-span-2">
-        <Label className="text-xs">Regex pattern</Label>
+        <Label className="text-xs">{t("regexPattern")}</Label>
         <Input
           value={field.pattern}
           onChange={(e) => onUpdate({ ...field, pattern: e.target.value })}
-          placeholder="e.g. ^[A-Z].*"
+          placeholder={t("regexPlaceholder", { example: "^[A-Z].*" })}
           className="text-xs"
         />
       </div>
       <div>
-        <Label className="text-xs">Default value</Label>
+        <Label className="text-xs">{t("defaultValue")}</Label>
         <Input
           value={field.defaultValue}
           onChange={(e) => onUpdate({ ...field, defaultValue: e.target.value })}
@@ -222,10 +189,11 @@ function TextConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: FieldD
 }
 
 function NumberConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: FieldDef) => void }) {
+  const t = useTranslations("formBuilder");
   return (
     <div className="grid grid-cols-3 gap-2">
       <div>
-        <Label className="text-xs">Min</Label>
+        <Label className="text-xs">{t("min")}</Label>
         <Input
           value={field.min}
           onChange={(e) => onUpdate({ ...field, min: e.target.value })}
@@ -234,7 +202,7 @@ function NumberConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: Fiel
         />
       </div>
       <div>
-        <Label className="text-xs">Max</Label>
+        <Label className="text-xs">{t("max")}</Label>
         <Input
           value={field.max}
           onChange={(e) => onUpdate({ ...field, max: e.target.value })}
@@ -243,7 +211,7 @@ function NumberConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: Fiel
         />
       </div>
       <div>
-        <Label className="text-xs">Step</Label>
+        <Label className="text-xs">{t("step")}</Label>
         <Input
           value={field.step}
           onChange={(e) => onUpdate({ ...field, step: e.target.value })}
@@ -252,7 +220,7 @@ function NumberConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: Fiel
         />
       </div>
       <div>
-        <Label className="text-xs">Prefix</Label>
+        <Label className="text-xs">{t("prefix")}</Label>
         <Input
           value={field.prefix}
           onChange={(e) => onUpdate({ ...field, prefix: e.target.value })}
@@ -261,7 +229,7 @@ function NumberConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: Fiel
         />
       </div>
       <div>
-        <Label className="text-xs">Suffix</Label>
+        <Label className="text-xs">{t("suffix")}</Label>
         <Input
           value={field.suffix}
           onChange={(e) => onUpdate({ ...field, suffix: e.target.value })}
@@ -270,7 +238,7 @@ function NumberConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: Fiel
         />
       </div>
       <div>
-        <Label className="text-xs">Default</Label>
+        <Label className="text-xs">{t("default")}</Label>
         <Input
           value={field.defaultValue}
           onChange={(e) => onUpdate({ ...field, defaultValue: e.target.value })}
@@ -283,8 +251,12 @@ function NumberConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: Fiel
 }
 
 function SelectConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: FieldDef) => void }) {
+  const t = useTranslations("formBuilder");
   const addOption = () =>
-    onUpdate({ ...field, options: [...field.options, `Option ${field.options.length + 1}`] });
+    onUpdate({
+      ...field,
+      options: [...field.options, t("defaultOption", { n: field.options.length + 1 })],
+    });
   const removeOption = (i: number) =>
     onUpdate({ ...field, options: field.options.filter((_, j) => j !== i) });
   const updateOption = (i: number, val: string) => {
@@ -295,7 +267,7 @@ function SelectConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: Fiel
 
   return (
     <div className="flex flex-col gap-2">
-      <Label className="text-xs">Options</Label>
+      <Label className="text-xs">{t("options")}</Label>
       {field.options.map((opt, i) => (
         <div key={i} className="flex gap-1">
           <Input
@@ -317,17 +289,18 @@ function SelectConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: Fiel
         onClick={addOption}
         className="text-info-fg self-start text-xs hover:underline"
       >
-        + Add option
+        {t("addOption")}
       </button>
     </div>
   );
 }
 
 function RatingConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: FieldDef) => void }) {
+  const t = useTranslations("formBuilder");
   return (
     <div className="grid grid-cols-2 gap-2">
       <div>
-        <Label className="text-xs">Max stars</Label>
+        <Label className="text-xs">{t("maxStars")}</Label>
         <Input
           value={field.max || "5"}
           onChange={(e) => onUpdate({ ...field, max: e.target.value })}
@@ -336,7 +309,7 @@ function RatingConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: Fiel
         />
       </div>
       <div>
-        <Label className="text-xs">Default</Label>
+        <Label className="text-xs">{t("default")}</Label>
         <Input
           value={field.defaultValue}
           onChange={(e) => onUpdate({ ...field, defaultValue: e.target.value })}
@@ -349,10 +322,11 @@ function RatingConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: Fiel
 }
 
 function ScaleConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: FieldDef) => void }) {
+  const t = useTranslations("formBuilder");
   return (
     <div className="grid grid-cols-2 gap-2">
       <div>
-        <Label className="text-xs">Min</Label>
+        <Label className="text-xs">{t("min")}</Label>
         <Input
           value={field.min || "0"}
           onChange={(e) => onUpdate({ ...field, min: e.target.value })}
@@ -361,7 +335,7 @@ function ScaleConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: Field
         />
       </div>
       <div>
-        <Label className="text-xs">Max</Label>
+        <Label className="text-xs">{t("max")}</Label>
         <Input
           value={field.max || "10"}
           onChange={(e) => onUpdate({ ...field, max: e.target.value })}
@@ -370,20 +344,20 @@ function ScaleConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: Field
         />
       </div>
       <div>
-        <Label className="text-xs">Min label</Label>
+        <Label className="text-xs">{t("minLabel")}</Label>
         <Input
           value={field.scaleMinLabel}
           onChange={(e) => onUpdate({ ...field, scaleMinLabel: e.target.value })}
-          placeholder="Not at all"
+          placeholder={t("minLabelPlaceholder")}
           className="text-xs"
         />
       </div>
       <div>
-        <Label className="text-xs">Max label</Label>
+        <Label className="text-xs">{t("maxLabel")}</Label>
         <Input
           value={field.scaleMaxLabel}
           onChange={(e) => onUpdate({ ...field, scaleMaxLabel: e.target.value })}
-          placeholder="Extremely"
+          placeholder={t("maxLabelPlaceholder")}
           className="text-xs"
         />
       </div>
@@ -392,10 +366,11 @@ function ScaleConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: Field
 }
 
 function FileConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: FieldDef) => void }) {
+  const t = useTranslations("formBuilder");
   return (
     <div className="grid grid-cols-2 gap-2">
       <div>
-        <Label className="text-xs">Accepted types</Label>
+        <Label className="text-xs">{t("acceptedTypes")}</Label>
         <Input
           value={field.acceptedFileTypes}
           onChange={(e) => onUpdate({ ...field, acceptedFileTypes: e.target.value })}
@@ -404,7 +379,7 @@ function FileConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: FieldD
         />
       </div>
       <div>
-        <Label className="text-xs">Max size (MB)</Label>
+        <Label className="text-xs">{t("maxSize")}</Label>
         <Input
           value={field.maxFileSize}
           onChange={(e) => onUpdate({ ...field, maxFileSize: e.target.value })}
@@ -419,7 +394,7 @@ function FileConfig({ field, onUpdate }: { field: FieldDef; onUpdate: (f: FieldD
           onChange={(e) => onUpdate({ ...field, allowMultiple: e.target.checked })}
           className="h-3 w-3"
         />
-        Allow multiple files
+        {t("allowMultiple")}
       </label>
     </div>
   );
@@ -432,10 +407,11 @@ function PercentageSplitConfig({
   field: FieldDef;
   onUpdate: (f: FieldDef) => void;
 }) {
+  const t = useTranslations("formBuilder");
   const addCategory = () =>
     onUpdate({
       ...field,
-      categories: [...field.categories, `Category ${field.categories.length + 1}`],
+      categories: [...field.categories, t("defaultCategory", { n: field.categories.length + 1 })],
     });
   const removeCategory = (i: number) =>
     onUpdate({ ...field, categories: field.categories.filter((_, j) => j !== i) });
@@ -447,7 +423,7 @@ function PercentageSplitConfig({
 
   return (
     <div className="flex flex-col gap-2">
-      <Label className="text-xs">Categories (must sum to 100%)</Label>
+      <Label className="text-xs">{t("categories")}</Label>
       {field.categories.map((cat, i) => (
         <div key={i} className="flex gap-1">
           <Input
@@ -469,7 +445,7 @@ function PercentageSplitConfig({
         onClick={addCategory}
         className="text-info-fg self-start text-xs hover:underline"
       >
-        + Add category
+        {t("addCategory")}
       </button>
     </div>
   );
@@ -516,6 +492,7 @@ function SortableField({
   onRemove: () => void;
   onDuplicate: () => void;
 }) {
+  const t = useTranslations("formBuilder");
   const [expanded, setExpanded] = useState(false);
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
     id: field.id,
@@ -535,18 +512,23 @@ function SortableField({
         >
           <GripVerticalIcon className="h-4 w-4" />
         </button>
-        <span className="text-muted-foreground w-6 text-center text-xs" title={typeInfo?.hint}>
+        <span
+          className="text-muted-foreground w-6 text-center text-xs"
+          title={typeInfo ? t(`types.${typeInfo.value}.hint`) : undefined}
+        >
           {typeInfo?.icon}
         </span>
         <Input
           value={field.title}
           onChange={(e) => onUpdate({ ...field, title: e.target.value })}
           className="flex-1 border-none bg-transparent p-0 font-medium shadow-none focus-visible:ring-0"
-          placeholder="Field label"
+          placeholder={t("fieldLabel")}
         />
         <Select value={field.type} onValueChange={(v) => onUpdate({ ...field, type: v })}>
           <SelectTrigger className="w-40">
-            <SelectValue placeholder="Type">{typeInfo?.label ?? field.type}</SelectValue>
+            <SelectValue placeholder={t("type")}>
+              {typeInfo ? t(`types.${typeInfo.value}.label`) : field.type}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {FIELD_TYPES.map((ft) => (
@@ -554,9 +536,11 @@ function SortableField({
                 <div className="flex flex-col">
                   <span>
                     <span className="mr-2">{ft.icon}</span>
-                    {ft.label}
+                    {t(`types.${ft.value}.label`)}
                   </span>
-                  <span className="text-2xs text-muted-foreground">{ft.hint}</span>
+                  <span className="text-2xs text-muted-foreground">
+                    {t(`types.${ft.value}.hint`)}
+                  </span>
                 </div>
               </SelectItem>
             ))}
@@ -570,9 +554,9 @@ function SortableField({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="full">Full</SelectItem>
-            <SelectItem value="half">Half</SelectItem>
-            <SelectItem value="third">Third</SelectItem>
+            <SelectItem value="full">{t("widthFull")}</SelectItem>
+            <SelectItem value="half">{t("widthHalf")}</SelectItem>
+            <SelectItem value="third">{t("widthThird")}</SelectItem>
           </SelectContent>
         </Select>
         <label className="flex items-center gap-1 text-xs whitespace-nowrap">
@@ -582,7 +566,7 @@ function SortableField({
             onChange={(e) => onUpdate({ ...field, required: e.target.checked })}
             className="h-3 w-3"
           />
-          Req
+          {t("requiredShort")}
         </label>
         <button
           type="button"
@@ -607,15 +591,17 @@ function SortableField({
         </button>
       </div>
 
-      {!expanded && typeInfo?.hint && (
-        <div className="text-2xs text-muted-foreground px-3 pb-2">{typeInfo.hint}</div>
+      {!expanded && typeInfo && (
+        <div className="text-2xs text-muted-foreground px-3 pb-2">
+          {t(`types.${typeInfo.value}.hint`)}
+        </div>
       )}
 
       {expanded && (
         <div className="border-t px-3 pt-3 pb-3">
           <div className="mb-3 grid grid-cols-3 gap-2">
             <div>
-              <Label className="text-xs">Field name (slug)</Label>
+              <Label className="text-xs">{t("fieldName")}</Label>
               <Input
                 value={field.name}
                 onChange={(e) =>
@@ -625,7 +611,7 @@ function SortableField({
               />
             </div>
             <div>
-              <Label className="text-xs">Help text</Label>
+              <Label className="text-xs">{t("helpText")}</Label>
               <Input
                 value={field.description}
                 onChange={(e) => onUpdate({ ...field, description: e.target.value })}
@@ -633,7 +619,7 @@ function SortableField({
               />
             </div>
             <div>
-              <Label className="text-xs">Placeholder</Label>
+              <Label className="text-xs">{t("placeholder")}</Label>
               <Input
                 value={field.placeholder}
                 onChange={(e) => onUpdate({ ...field, placeholder: e.target.value })}
@@ -786,6 +772,7 @@ function fieldsToSchema(fields: FieldDef[]): Record<string, unknown> {
 // ---------------------------------------------------------------------------
 
 export function FormBuilder({ schema, onSave, onChange }: FormBuilderProps) {
+  const t = useTranslations("formBuilder");
   const [fields, setFields] = useState<FieldDef[]>(() => schemaToFields(schema));
   const [allExpanded, setAllExpanded] = useState(false);
 
@@ -814,7 +801,10 @@ export function FormBuilder({ schema, onSave, onChange }: FormBuilderProps) {
   };
 
   const addField = () => {
-    setFields((prev) => [...prev, defaultField(prev.length)]);
+    setFields((prev) => [
+      ...prev,
+      { ...defaultField(prev.length), title: t("defaultFieldTitle", { n: prev.length + 1 }) },
+    ]);
   };
 
   const updateField = (id: string, updated: FieldDef) => {
@@ -846,7 +836,7 @@ export function FormBuilder({ schema, onSave, onChange }: FormBuilderProps) {
       <div className="flex items-center justify-between">
         <div className="flex gap-2">
           <Button type="button" variant="outline" size="sm" onClick={addField}>
-            <PlusIcon className="mr-1 h-3 w-3" /> Add Field
+            <PlusIcon className="mr-1 h-3 w-3" /> {t("addField")}
           </Button>
           <Button
             type="button"
@@ -859,11 +849,11 @@ export function FormBuilder({ schema, onSave, onChange }: FormBuilderProps) {
             ) : (
               <ChevronDownIcon className="mr-1 h-3 w-3" />
             )}
-            {allExpanded ? "Collapse All" : "Expand All"}
+            {allExpanded ? t("collapseAll") : t("expandAll")}
           </Button>
         </div>
         <Button type="button" size="sm" onClick={handleSave}>
-          <SaveIcon className="mr-1 h-3 w-3" /> Save Schema
+          <SaveIcon className="mr-1 h-3 w-3" /> {t("saveSchema")}
         </Button>
       </div>
 
@@ -885,17 +875,19 @@ export function FormBuilder({ schema, onSave, onChange }: FormBuilderProps) {
 
       {fields.length === 0 && (
         <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center">
-          No fields yet. Click &quot;Add Field&quot; to start building your form.
+          {t("empty")}
         </div>
       )}
 
       <div className="text-muted-foreground text-xs">
-        Drag to reorder. Click ⚙ to configure type-specific settings.
+        {t("reorderHint")}
         {fields.length > 0 && (
           <span>
             {" "}
-            {fields.length} field{fields.length !== 1 ? "s" : ""},{" "}
-            {fields.filter((f) => f.required).length} required.
+            {t("fieldSummary", {
+              count: fields.length,
+              required: fields.filter((f) => f.required).length,
+            })}
           </span>
         )}
       </div>

@@ -1,7 +1,9 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
+
+import { renderWithIntl as render } from "@/test/render-with-intl";
 
 import messages from "@/messages/en.json";
 
@@ -41,7 +43,8 @@ describe("create sheet admission", () => {
           teams={TEAMS}
           creating={false}
           createProject={createProject}
-        />
+        />,
+        { wrapper: Context }
       );
       fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Demo" } });
       fireEvent.change(screen.getByLabelText("Slug"), { target: { value: slug } });
@@ -77,7 +80,7 @@ describe("create sheet admission", () => {
       createProject,
       initialTeamSlug: TEAMS[1].slug,
     };
-    const view = render(<CreateProjectSheet {...props} />);
+    const view = render(<CreateProjectSheet {...props} />, { wrapper: Context });
     view.rerender(<CreateProjectSheet {...props} teams={TEAMS} />);
     fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Demo" } });
     fireEvent.submit(screen.getByLabelText("Slug").closest("form")!);
@@ -104,7 +107,8 @@ describe("create sheet admission", () => {
         initialTeamSlug="hidden-team"
         creating={false}
         createProject={createProject}
-      />
+      />,
+      { wrapper: Context }
     );
     fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Demo" } });
     fireEvent.submit(screen.getByLabelText("Slug").closest("form")!);

@@ -4,7 +4,7 @@ import { QueryError } from "@/components/QueryError";
 
 import { type ReactNode, useMemo, useState } from "react";
 import { Loader2Icon, XIcon } from "lucide-react";
-import { useTimeZone } from "next-intl";
+import { useTimeZone, useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,7 @@ export function FormSubmissionsTab({
   error?: { message: string } | null;
   onRetry?: () => void;
 }) {
+  const t = useTranslations("formSubmissions");
   const fmt = useFormatters();
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<FormSubmission | null>(null);
@@ -66,12 +67,11 @@ export function FormSubmissionsTab({
   }
 
   if (error && submissions.length === 0)
-    return <QueryError title="Could not load submissions" error={error} onRetry={onRetry} />;
+    return <QueryError title={t("loadFailed")} error={error} onRetry={onRetry} />;
   if (submissions.length === 0) {
     return (
       <div className="text-muted-foreground rounded-md border border-dashed p-8 text-center text-sm">
-        No submissions yet. Submissions will appear here once the form is published and submitters
-        fill it out.
+        {t("empty")}
       </div>
     );
   }
@@ -84,10 +84,10 @@ export function FormSubmissionsTab({
         <table className="w-full text-sm">
           <thead className="bg-muted/40 text-muted-foreground text-xs uppercase">
             <tr>
-              <th className="px-3 py-2 text-left">Submitted</th>
-              <th className="px-3 py-2 text-left">Version</th>
-              <th className="px-3 py-2 text-left">Status</th>
-              <th className="px-3 py-2 text-left">Preview</th>
+              <th className="px-3 py-2 text-left">{t("submitted")}</th>
+              <th className="px-3 py-2 text-left">{t("version")}</th>
+              <th className="px-3 py-2 text-left">{t("status")}</th>
+              <th className="px-3 py-2 text-left">{t("preview")}</th>
             </tr>
           </thead>
           <tbody>
@@ -105,7 +105,7 @@ export function FormSubmissionsTab({
                   <Badge variant="outline">{sub.status}</Badge>
                 </td>
                 <td className="text-muted-foreground truncate px-3 py-2 text-xs">
-                  {summarizePayload(sub.payload)}
+                  {summarizePayload(sub.payload, t("emptySummary"))}
                 </td>
               </tr>
             ))}
@@ -116,7 +116,7 @@ export function FormSubmissionsTab({
       {totalPages > 1 && (
         <div className="text-muted-foreground flex items-center justify-between text-xs">
           <span>
-            Page {page + 1} of {totalPages} · {submissions.length} total
+            {t("pageOf", { page: page + 1, pages: totalPages, total: submissions.length })}
           </span>
           <div className="flex gap-2">
             <Button
@@ -125,7 +125,7 @@ export function FormSubmissionsTab({
               disabled={page === 0}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
             >
-              Previous
+              {t("previous")}
             </Button>
             <Button
               variant="outline"
@@ -133,7 +133,7 @@ export function FormSubmissionsTab({
               disabled={page >= totalPages - 1}
               onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
             >
-              Next
+              {t("next")}
             </Button>
           </div>
         </div>
@@ -151,6 +151,7 @@ function SubmissionDetailSheet({
   submission: FormSubmission | null;
   onClose: () => void;
 }) {
+  const t = useTranslations("formSubmissions");
   const fmt = useFormatters();
   return (
     <Sheet open={submission !== null} onOpenChange={(o) => !o && onClose()}>
@@ -159,12 +160,15 @@ function SubmissionDetailSheet({
           <>
             <SheetHeader>
               <SheetTitle className="flex items-center gap-2">
-                Submission detail
+                {t("detailTitle")}
                 <Badge variant="outline">{submission.status}</Badge>
               </SheetTitle>
               <SheetDescription>
-                {submission.formName} · v{submission.formVersion} · submitted{" "}
-                {submission.submittedAt ? fmt.formatDateTime(submission.submittedAt) : ""}
+                {t("detailDescription", {
+                  form: submission.formName,
+                  version: submission.formVersion,
+                  time: submission.submittedAt ? fmt.formatDateTime(submission.submittedAt) : "",
+                })}
               </SheetDescription>
             </SheetHeader>
             <div className="overflow-y-auto px-4 pb-4">
@@ -172,7 +176,7 @@ function SubmissionDetailSheet({
             </div>
             <div className="flex justify-end border-t px-4 py-3">
               <Button variant="outline" size="sm" onClick={onClose}>
-                <XIcon className="mr-1 size-3" /> Close
+                <XIcon className="mr-1 size-3" /> {t("close")}
               </Button>
             </div>
           </>
@@ -183,9 +187,10 @@ function SubmissionDetailSheet({
 }
 
 function PayloadView({ payload }: { payload: Record<string, unknown> }) {
+  const t = useTranslations("formSubmissions");
   const entries = Object.entries(payload ?? {});
   if (entries.length === 0) {
-    return <p className="text-muted-foreground text-sm">Empty payload.</p>;
+    return <p className="text-muted-foreground text-sm">{t("emptyPayload")}</p>;
   }
   return (
     <dl className="grid grid-cols-1 gap-3 sm:grid-cols-[max-content_1fr]">
@@ -238,9 +243,9 @@ function isUrlLike(s: string): boolean {
   return /^(https?:\/\/|s3:\/\/|gs:\/\/|\/uploads\/)/i.test(s);
 }
 
-function summarizePayload(payload: Record<string, unknown>): string {
+function summarizePayload(payload: Record<string, unknown>, emptyLabel: string): string {
   const entries = Object.entries(payload ?? {}).slice(0, 3);
-  if (entries.length === 0) return "(empty)";
+  if (entries.length === 0) return emptyLabel;
   return entries.map(([k, v]) => `${k}: ${formatLeaf(v)}`).join(" · ");
 }
 
@@ -260,13 +265,14 @@ function useSparkline(submissions: FormSubmission[]): SparklinePoint[] {
 }
 
 function SubmissionsSparkline({ data, total }: { data: SparklinePoint[]; total: number }) {
+  const t = useTranslations("formSubmissions");
   return (
     <div className="bg-muted/30 flex items-end justify-between gap-4 rounded-md border p-3">
       <div>
-        <p className="text-muted-foreground text-xs uppercase">Last 30 days</p>
+        <p className="text-muted-foreground text-xs uppercase">{t("last30Days")}</p>
         <p className="text-2xl font-bold">{total}</p>
         <p className="text-muted-foreground text-xs">
-          {data.reduce((acc, d) => acc + d.count, 0)} new in window
+          {t("newInWindow", { count: data.reduce((acc, d) => acc + d.count, 0) })}
         </p>
       </div>
       <Sparkline
@@ -275,7 +281,7 @@ function SubmissionsSparkline({ data, total }: { data: SparklinePoint[]; total: 
         height={48}
         variant="area"
         className="text-primary"
-        ariaLabel="Submission trend"
+        ariaLabel={t("trend")}
       />
     </div>
   );

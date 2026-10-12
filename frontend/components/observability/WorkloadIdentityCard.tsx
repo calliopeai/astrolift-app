@@ -13,6 +13,7 @@
 
 import { KeyRoundIcon, RefreshCwIcon, RotateCcwIcon } from "lucide-react";
 import * as React from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
@@ -25,10 +26,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import type {
-  AstroliftAppIdentityBinding,
-  IdentityBindingKind,
-} from "@/graphql/lifecycle/lifecycle.types";
+import type { AstroliftAppIdentityBinding } from "@/graphql/lifecycle/lifecycle.types";
 
 export interface WorkloadIdentityCardData {
   astroliftAppIdentityBinding: {
@@ -37,18 +35,14 @@ export interface WorkloadIdentityCardData {
   };
 }
 
-const KIND_LABEL: Record<IdentityBindingKind, string> = {
-  irsa: "IAM Roles for Service Accounts (AWS)",
-  workload_identity: "GKE Workload Identity (GCP)",
-  federated: "AKS Federated Credentials (Azure)",
-  unknown: "Unknown binding",
-};
-
-function formatLastUsed(iso: string | null | undefined): string {
+function formatLastUsed(
+  iso: string | null | undefined,
+  formatDateTime: (d: Date) => string
+): string {
   if (!iso) return "—";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString();
+  return formatDateTime(d);
 }
 
 export interface WorkloadIdentityCardProps {
@@ -66,15 +60,20 @@ export function WorkloadIdentityCard({
   loading: boolean;
   onRefresh: () => void;
 }) {
+  const t = useTranslations("obsWorkloadIdentity");
+  const reasonT = useTranslations("obsPanelReason");
+  const format = useFormatter();
   const binding = data?.astroliftAppIdentityBinding?.binding ?? null;
   const reason = data?.astroliftAppIdentityBinding?.reason;
   const isEmptyAfterLoad = !loading && binding === null;
-  const empty = panelEmptyState(reason ?? "NO_DATA_YET", {
-    thing: "workload identity binding",
-    notConfigured:
-      "No cloud-IAM role is provisioned for this app. Configure workload identity to grant pods credentials.",
-    provider: "this cloud",
-  });
+  const empty = panelEmptyState(
+    reason ?? "NO_DATA_YET",
+    {
+      noData: { title: t("noDataTitle"), description: t("noDataDescription") },
+      notConfigured: t("notConfigured"),
+    },
+    reasonT
+  );
   const showConfigureAction =
     reason === "NOT_CONFIGURED" || reason === "NO_DATA_YET" || reason == null;
 
@@ -83,12 +82,13 @@ export function WorkloadIdentityCard({
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
         <div>
           <CardTitle className="flex items-center gap-2 text-base">
-            <KeyRoundIcon className="size-4" /> Workload identity
+            <KeyRoundIcon className="size-4" /> {t("title")}
           </CardTitle>
           <CardDescription>
-            The cloud-IAM identity bound to this app&apos;s pods. Source: cluster&apos;s
-            WorkloadIdentityDriver ( <code className="text-2xs font-mono">describe_identity</code>{" "}
-            ).
+            {t.rich("description", {
+              method: "describe_identity",
+              code: (chunks) => <code className="text-2xs font-mono">{chunks}</code>,
+            })}
           </CardDescription>
         </div>
         <div className="flex items-center gap-2">
@@ -100,7 +100,7 @@ export function WorkloadIdentityCard({
             }}
             disabled={loading}
           >
-            <RefreshCwIcon className="size-3" /> Refresh
+            <RefreshCwIcon className="size-3" /> {t("refresh")}
           </Button>
           <Can permission="app.update">
             <Button
@@ -113,13 +113,12 @@ export function WorkloadIdentityCard({
                 // the lifecycle surface; surface intent via a toast so
                 // operators know the next deploy will re-stamp the
                 // annotation.
-                toast.message("Force re-bind", {
-                  description:
-                    "The next deployment will re-apply the ServiceAccount annotation. Trigger a redeploy from the Deployments tab.",
+                toast.message(t("forceRebind"), {
+                  description: t("forceRebindDescription"),
                 });
               }}
             >
-              <RotateCcwIcon className="size-3" /> Force re-bind
+              <RotateCcwIcon className="size-3" /> {t("forceRebind")}
             </Button>
           </Can>
         </div>
@@ -137,11 +136,11 @@ export function WorkloadIdentityCard({
             title={empty.title}
             description={empty.description}
             actionHref={showConfigureAction ? `/apps/${appSlug}/security` : undefined}
-            actionLabel={showConfigureAction ? "Configure workload identity" : undefined}
+            actionLabel={showConfigureAction ? t("configure") : undefined}
             secondary={
               reason === "ERROR" ? (
                 <Button size="sm" variant="outline" onClick={() => onRefresh()}>
-                  Try again
+                  {t("tryAgain")}
                 </Button>
               ) : undefined
             }
@@ -149,28 +148,32 @@ export function WorkloadIdentityCard({
         ) : binding ? (
           <dl className="grid grid-cols-1 gap-4 text-sm md:grid-cols-2">
             <div>
-              <dt className="text-muted-foreground text-xs tracking-wide uppercase">Kind</dt>
+              <dt className="text-muted-foreground text-xs tracking-wide uppercase">{t("kind")}</dt>
               <dd className="mt-1">
                 <Badge variant="secondary" className="font-mono text-xs">
-                  {KIND_LABEL[binding.kind]}
+                  {t.has(`kinds.${binding.kind}`) ? t(`kinds.${binding.kind}`) : binding.kind}
                 </Badge>
               </dd>
             </div>
             <div>
-              <dt className="text-muted-foreground text-xs tracking-wide uppercase">Last used</dt>
+              <dt className="text-muted-foreground text-xs tracking-wide uppercase">
+                {t("lastUsed")}
+              </dt>
               <dd className="text-muted-foreground mt-1 font-mono text-xs">
-                {formatLastUsed(binding.lastUsedAt)}
+                {formatLastUsed(binding.lastUsedAt, (d) =>
+                  format.dateTime(d, { dateStyle: "medium", timeStyle: "medium" })
+                )}
               </dd>
             </div>
             <div className="md:col-span-2">
               <dt className="text-muted-foreground text-xs tracking-wide uppercase">
-                Role / principal
+                {t("rolePrincipal")}
               </dt>
               <dd className="mt-1 font-mono text-xs break-all">{binding.roleArnOrPrincipal}</dd>
             </div>
             <div className="md:col-span-2">
               <dt className="text-muted-foreground text-xs tracking-wide uppercase">
-                Trust policy
+                {t("trustPolicy")}
               </dt>
               <dd className="text-muted-foreground mt-1 font-mono text-xs">
                 {binding.trustPolicySummary}

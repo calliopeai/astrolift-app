@@ -1,6 +1,7 @@
 "use client";
 
 import { ExternalLinkIcon, GitCommitIcon } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 
 import { Feed } from "@/components/feed/Feed";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,7 @@ export interface GitOpsCommitTimelineProps {
  */
 export function GitOpsCommitTimeline({
   commits,
-  emptyMessage = "No config-repo commits yet.",
+  emptyMessage,
   hasMore,
   loadingMore,
   onLoadMore,
@@ -44,9 +45,11 @@ export function GitOpsCommitTimeline({
   maxHeight,
   className,
 }: GitOpsCommitTimelineProps) {
+  const t = useTranslations("obsGitOpsCommits");
+  const format = useFormatter();
   return (
     <Feed<GitOpsCommit>
-      label="Config-repo commits"
+      label={t("label")}
       items={commits}
       keyOf={(c) => c.hash}
       groupBy={{ day: (c) => c.occurredAt }}
@@ -58,7 +61,7 @@ export function GitOpsCommitTimeline({
       onRetry={onRetry}
       maxHeight={maxHeight}
       className={className}
-      empty={{ icon: <GitCommitIcon className="size-5" />, title: emptyMessage }}
+      empty={{ icon: <GitCommitIcon className="size-5" />, title: emptyMessage ?? t("empty") }}
       renderItem={(commit) => (
         <div className="flex min-w-0 items-start gap-3 px-1">
           <span className="bg-card mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border">
@@ -74,10 +77,15 @@ export function GitOpsCommitTimeline({
             <div className="text-muted-foreground mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs">
               <span className="min-w-0 [overflow-wrap:anywhere]">{commit.author}</span>
               <time dateTime={commit.occurredAt} className="font-mono">
-                {new Date(commit.occurredAt).toLocaleString()}
+                {format.dateTime(new Date(commit.occurredAt), {
+                  dateStyle: "medium",
+                  timeStyle: "medium",
+                })}
               </time>
               {commit.workflowRunId && (
-                <span className="font-mono">run {commit.workflowRunId.slice(0, 12)}…</span>
+                <span className="font-mono">
+                  {t("run", { id: commit.workflowRunId.slice(0, 12) })}
+                </span>
               )}
             </div>
             {(commit.diffUrl || commit.sourceCommitUrl) && (
@@ -86,7 +94,7 @@ export function GitOpsCommitTimeline({
                   <Button asChild variant="outline" size="sm" className="h-7 text-xs">
                     <a href={commit.diffUrl} target="_blank" rel="noreferrer">
                       <ExternalLinkIcon className="size-3" />
-                      Diff
+                      {t("diff")}
                     </a>
                   </Button>
                 )}
@@ -94,7 +102,7 @@ export function GitOpsCommitTimeline({
                   <Button asChild variant="outline" size="sm" className="h-7 text-xs">
                     <a href={commit.sourceCommitUrl} target="_blank" rel="noreferrer">
                       <ExternalLinkIcon className="size-3" />
-                      Source
+                      {t("source")}
                     </a>
                   </Button>
                 )}

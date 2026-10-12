@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { CREATE_IDENTITY_PROVIDER } from "@/graphql/identity/identity.mutations";
@@ -24,6 +25,7 @@ export interface CreateIdentityProviderInput {
 
 /** The create mutation behind CreateIdentityProviderSheet. */
 export function useCreateIdentityProvider() {
+  const t = useTranslations("identityProviders.toasts");
   const [createIdp, { loading: creating }] = useMutation<{
     createIdentityProvider: MutationResult<AstroliftIdentityProvider>;
   }>(CREATE_IDENTITY_PROVIDER, {
@@ -35,10 +37,12 @@ export function useCreateIdentityProvider() {
   async function onCreate(input: CreateIdentityProviderInput): Promise<boolean> {
     const { data } = await createIdp({ variables: { input } });
     if (data?.createIdentityProvider.ok) {
-      toast.success(`Configured ${data.createIdentityProvider.data?.name ?? input.kind}`);
+      toast.success(
+        t("configured", { name: data.createIdentityProvider.data?.name ?? input.kind })
+      );
       return true;
     }
-    toast.error(data?.createIdentityProvider.errors?.[0]?.message ?? "Failed");
+    toast.error(data?.createIdentityProvider.errors?.[0]?.message ?? t("failed"));
     return false;
   }
 

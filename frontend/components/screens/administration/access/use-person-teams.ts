@@ -1,10 +1,13 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import type { SortState } from "@/components/data-table";
 import { type ListDefinition, useListState } from "@/components/list/use-list-state";
 import type { AstroliftMember } from "@/graphql/identity/identity.types";
+
+import { localizeList } from "../localize-list";
 
 export interface TeamMembershipRow {
   /** The TEAM-scope Member row. */
@@ -62,7 +65,9 @@ export function usePersonTeams(
   member: AstroliftMember | null,
   memberships: readonly AstroliftMember[]
 ) {
-  const list = useListState(PERSON_TEAMS_LIST);
+  const lists = useTranslations("adminPersonTeams.list");
+  const definition = React.useMemo(() => localizeList(PERSON_TEAMS_LIST, lists), [lists]);
+  const list = useListState(definition);
 
   const rows = React.useMemo<TeamMembershipRow[]>(
     () =>

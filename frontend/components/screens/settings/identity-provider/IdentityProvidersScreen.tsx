@@ -2,6 +2,7 @@
 
 import { BookOpenIcon, CheckCircle2Icon, KeyRoundIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -31,17 +32,18 @@ export type IdentityProvidersScreenProps = Omit<ReturnType<typeof useIdentityPro
   }) => React.ReactNode;
 };
 
-const KIND_LABEL: Record<string, string> = {
-  oidc: "Generic OIDC",
-  saml: "SAML 2.0",
-  cognito: "Amazon Cognito",
-  auth0: "Auth0",
-  okta: "Okta",
-  azure_ad: "Azure AD / Entra ID",
-  google: "Google Workspace",
-  github: "GitHub OAuth",
-  local: "Local accounts",
-};
+// Kinds with a label under identityProviders.kinds; any other value renders raw.
+const KIND_LABEL_KEYS = new Set([
+  "oidc",
+  "saml",
+  "cognito",
+  "auth0",
+  "okta",
+  "azure_ad",
+  "google",
+  "github",
+  "local",
+]);
 
 /**
  * Providers › Identity: the org's sign-in methods as the tab's one embedded
@@ -60,6 +62,7 @@ export function IdentityProvidersScreen({
   onDelete,
   renderCreateSheet,
 }: IdentityProvidersScreenProps & { list: ListStateController }) {
+  const t = useTranslations("identityProviders");
   const [open, setOpen] = React.useState(false);
   const fmt = useFormatters();
 
@@ -94,7 +97,7 @@ export function IdentityProvidersScreen({
   const columns: Column<AstroliftIdentityProvider>[] = [
     {
       id: "provider",
-      header: "Provider",
+      header: t("list.columns.provider"),
       sortKey: "name",
       cellClassName: "max-w-72",
       cell: (idp) => (
@@ -104,7 +107,9 @@ export function IdentityProvidersScreen({
           </span>
           {idp.clientId && (
             <span className="text-muted-foreground block truncate font-mono text-xs">
-              client {idp.clientId.length > 12 ? `${idp.clientId.slice(0, 12)}…` : idp.clientId}
+              {t("list.client", {
+                id: idp.clientId.length > 12 ? `${idp.clientId.slice(0, 12)}…` : idp.clientId,
+              })}
             </span>
           )}
         </span>
@@ -112,13 +117,17 @@ export function IdentityProvidersScreen({
     },
     {
       id: "kind",
-      header: "Kind",
+      header: t("list.columns.kind"),
       sortKey: "kind",
-      cell: (idp) => <Badge variant="outline">{KIND_LABEL[idp.kind] ?? idp.kind}</Badge>,
+      cell: (idp) => (
+        <Badge variant="outline">
+          {KIND_LABEL_KEYS.has(idp.kind) ? t(`kinds.${idp.kind}`) : idp.kind}
+        </Badge>
+      ),
     },
     {
       id: "endpoint",
-      header: "Endpoint",
+      header: t("list.columns.endpoint"),
       cellClassName: "max-w-80",
       cell: (idp) => {
         const endpoint = idp.oidcDiscoveryUrl || idp.metadataUrl || "—";
@@ -131,25 +140,25 @@ export function IdentityProvidersScreen({
     },
     {
       id: "status",
-      header: "Status",
+      header: t("list.columns.status"),
       cell: (idp) => (
         <div className="flex min-w-0 flex-col items-start gap-1">
           {idp.isActive ? (
             <Badge className="bg-success/15 text-success-fg gap-1" variant="secondary">
               <CheckCircle2Icon className="size-3" />
-              active
+              {t("list.active")}
             </Badge>
           ) : (
-            <Badge variant="secondary">configured</Badge>
+            <Badge variant="secondary">{t("list.configured")}</Badge>
           )}
           {idp.isActive && idp.activatedAt && (
             <span className="text-muted-foreground text-2xs">
-              Active since {fmt.formatDate(idp.activatedAt)}
+              {t("list.activeSince", { date: fmt.formatDate(idp.activatedAt) })}
             </span>
           )}
           {idp.isActive && idp.lastSwitchedByUsername && (
             <span className="text-muted-foreground text-2xs max-w-full truncate">
-              by {idp.lastSwitchedByUsername}
+              {t("list.by", { name: idp.lastSwitchedByUsername })}
             </span>
           )}
         </div>
@@ -161,23 +170,20 @@ export function IdentityProvidersScreen({
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">Identity providers</h2>
-          <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Sign-in methods configured for the organization. Auth0, generic OIDC, Cognito, Okta,
-            Azure AD, Google, GitHub, SAML, or local accounts. Exactly one is active at a time.
-          </p>
+          <h2 className="text-lg font-semibold tracking-tight">{t("list.title")}</h2>
+          <p className="text-muted-foreground mt-1 max-w-2xl text-sm">{t("list.description")}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button asChild size="sm" variant="outline">
             <Link href={DOC_LINKS.identityProviders}>
               <BookOpenIcon className="size-4" />
-              Learn more
+              {t("list.learnMore")}
             </Link>
           </Button>
           <Can permission="org.update">
             <Button onClick={() => setOpen(true)}>
               <PlusIcon className="size-4" />
-              New provider
+              {t("list.newProvider")}
             </Button>
           </Can>
         </div>
@@ -185,7 +191,7 @@ export function IdentityProvidersScreen({
       <ListPage<AstroliftIdentityProvider>
         embedded
         list={list}
-        label="Identity providers"
+        label={t("list.title")}
         columns={columns}
         rows={page.rows}
         getRowId={(idp) => idp.id}
@@ -196,7 +202,7 @@ export function IdentityProvidersScreen({
                   {!idp.isActive && (
                     <DropdownMenuItem disabled={switching} onSelect={() => requestSetActive(idp)}>
                       <CheckCircle2Icon className="size-4" />
-                      Make active
+                      {t("list.makeActive")}
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem
@@ -205,7 +211,7 @@ export function IdentityProvidersScreen({
                     onSelect={() => requestDelete(idp)}
                   >
                     <Trash2Icon className="size-4" />
-                    Delete
+                    {t("list.delete")}
                   </DropdownMenuItem>
                 </>
               )
@@ -216,9 +222,8 @@ export function IdentityProvidersScreen({
         totalCount={page.totalCount}
         empty={{
           icon: <KeyRoundIcon className="size-5" />,
-          title: "No identity providers configured",
-          description:
-            "Configure at least one provider so users can sign in. Local accounts are useful for first-run; production installs typically wire OIDC or Cognito.",
+          title: t("list.emptyTitle"),
+          description: t("list.emptyDescription"),
         }}
       />
 
@@ -231,11 +236,11 @@ export function IdentityProvidersScreen({
         }}
         title={
           activateTarget
-            ? `Switch active provider to ${activateTarget.name}?`
-            : "Switch active provider?"
+            ? t("list.switchTitle", { name: activateTarget.name })
+            : t("list.switchTitleGeneric")
         }
-        description="Users already signed in keep their sessions. The next sign-in routes through the new provider. If users only exist in the old provider, they'll be unable to log in until provisioned here."
-        confirmLabel="Switch provider"
+        description={t("list.switchDescription")}
+        confirmLabel={t("list.switchConfirm")}
         onConfirm={async () => {
           if (activateTarget) await onSetActive(activateTarget);
         }}
@@ -246,9 +251,13 @@ export function IdentityProvidersScreen({
         onOpenChange={(next) => {
           if (!next) setDeleteTarget(null);
         }}
-        title={deleteTarget ? `Delete ${deleteTarget.name}?` : "Delete identity provider?"}
-        description="Soft-deletes the IdP record. Users whose identity exists only in this provider can no longer sign in — provision them in the active provider first if they need continued access."
-        confirmLabel="Delete provider"
+        title={
+          deleteTarget
+            ? t("list.deleteTitle", { name: deleteTarget.name })
+            : t("list.deleteTitleGeneric")
+        }
+        description={t("list.deleteDescription")}
+        confirmLabel={t("list.deleteConfirm")}
         destructive
         onConfirm={async () => {
           if (deleteTarget) await onDelete(deleteTarget);

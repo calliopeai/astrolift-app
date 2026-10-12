@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/sheet";
 import { DOC_LINKS } from "@/lib/docs/urls";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import type { ScmConnectionKind, ScmVisibilityScope } from "@/graphql/scm/scm.types";
 
 import type { useConnectSource } from "./use-connect-source";
@@ -31,73 +32,55 @@ export type ConnectSourceDialogViewProps = ReturnType<typeof useConnectSource> &
   onOpenChange: (open: boolean) => void;
 };
 
+// Labels and hints live under sourceProviders.connect.kinds.<value>.
 const KINDS: {
   value: ScmConnectionKind;
-  label: string;
-  hint: string;
   takesOauthApp: boolean;
 }[] = [
   {
     value: "github_oauth_app",
-    label: "GitHub OAuth App config",
-    hint: "Operator-registered OAuth app. Holds client_id + client_secret. Per-user tokens get stored as separate connections after the OAuth dance (phase 2).",
     takesOauthApp: true,
   },
   {
     value: "github_app_install",
-    label: "GitHub App installation",
-    hint: "Per-org App installation. Secret holds the App's private-key PEM; we mint per-installation tokens at deploy time.",
     takesOauthApp: false,
   },
   {
     value: "github_pat",
-    label: "GitHub PAT",
-    hint: "Paste a Personal Access Token (fine-grained or classic). Simplest path; tied to the user that minted it.",
     takesOauthApp: false,
   },
   {
     value: "gitlab_oauth_app",
-    label: "GitLab OAuth App config",
-    hint: "GitLab OAuth Application. SaaS gitlab.com or self-hosted (set api_base_url).",
     takesOauthApp: true,
   },
   {
     value: "gitlab_pat",
-    label: "GitLab PAT",
-    hint: "GitLab personal or project access token. Self-hosted: set api_base_url.",
     takesOauthApp: false,
   },
   {
     value: "bitbucket_oauth_app",
-    label: "Bitbucket OAuth Consumer",
-    hint: "Bitbucket OAuth 2.0 Consumer.",
     takesOauthApp: true,
   },
   {
     value: "bitbucket_pat",
-    label: "Bitbucket app password",
-    hint: "Bitbucket app password (workspace-scoped).",
     takesOauthApp: false,
   },
   {
     value: "gitea_oauth_app",
-    label: "Gitea OAuth App",
-    hint: "Self-hosted Gitea instance.",
     takesOauthApp: true,
   },
   {
     value: "gitea_pat",
-    label: "Gitea token",
-    hint: "Self-hosted Gitea API token.",
     takesOauthApp: false,
   },
 ];
 
-const VISIBILITY_SCOPES: { value: ScmVisibilityScope; label: string }[] = [
-  { value: "private_org", label: "private repos in connected org" },
-  { value: "public_org", label: "public repos in connected org" },
-  { value: "user_repos", label: "user repos" },
-  { value: "public_non_org", label: "public repos outside the org" },
+// Labels live under sourceProviders.connect.scopes.<value>.
+const VISIBILITY_SCOPES: ScmVisibilityScope[] = [
+  "private_org",
+  "public_org",
+  "user_repos",
+  "public_non_org",
 ];
 
 /** "Connect a source host": the generic any-kind connect sheet. */
@@ -111,6 +94,7 @@ function ConnectSourceDialogViewForm({
   loading,
   onConnect,
 }: ConnectSourceDialogViewProps) {
+  const t = useTranslations("sourceProviders.connect");
   const [kind, setKind] = React.useState<ScmConnectionKind>("github_pat");
   const [displayName, setDisplayName] = React.useState("");
   const [accountLogin, setAccountLogin] = React.useState("");
@@ -176,21 +160,21 @@ function ConnectSourceDialogViewForm({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col">
         <SheetHeader>
-          <SheetTitle>Connect a source host</SheetTitle>
+          <SheetTitle>{t("title")}</SheetTitle>
           <SheetDescription>
-            Tokens and OAuth client secrets are encrypted at rest via the platform secrets backend
-            (default: local Fernet derived from
-            <code> SECRET_KEY</code>; switch to AWS Secrets Manager / GCP Secret Manager / Azure Key
-            Vault per install).{" "}
-            <Link href={DOC_LINKS.sourceProviders} className="underline">
-              Source-provider setup guide
-            </Link>
-            .
+            {t.rich("description", {
+              code: (chunks) => <code>{chunks}</code>,
+              guide: (chunks) => (
+                <Link href={DOC_LINKS.sourceProviders} className="underline">
+                  {chunks}
+                </Link>
+              ),
+            })}
           </SheetDescription>
         </SheetHeader>
         <form onSubmit={submit} className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
           <div className="space-y-2">
-            <Label htmlFor="kind">Kind</Label>
+            <Label htmlFor="kind">{t("kind")}</Label>
             <Select value={kind} onValueChange={(v) => setKind(v as ScmConnectionKind)}>
               <SelectTrigger id="kind">
                 <SelectValue />
@@ -198,32 +182,34 @@ function ConnectSourceDialogViewForm({
               <SelectContent>
                 {KINDS.map((k) => (
                   <SelectItem key={k.value} value={k.value}>
-                    {k.label}
+                    {t(`kinds.${k.value}.label`)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {meta && <p className="text-muted-foreground text-xs">{meta.hint}</p>}
+            {meta && (
+              <p className="text-muted-foreground text-xs">{t(`kinds.${meta.value}.hint`)}</p>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="display-name">Display name (optional)</Label>
+            <Label htmlFor="display-name">{t("displayName")}</Label>
             <Input
               id="display-name"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="e.g. Production GitHub, Acme corp GitLab"
+              placeholder={t("displayNamePlaceholder")}
             />
           </div>
 
           {!isOauthApp && (
             <div className="space-y-2">
-              <Label htmlFor="account">Account / org login</Label>
+              <Label htmlFor="account">{t("account")}</Label>
               <Input
                 id="account"
                 value={accountLogin}
                 onChange={(e) => setAccountLogin(e.target.value)}
-                placeholder="acme-org or alice"
+                placeholder={t("accountPlaceholder")}
                 className="font-mono text-xs"
               />
             </div>
@@ -231,7 +217,7 @@ function ConnectSourceDialogViewForm({
 
           {kind === "github_app_install" && (
             <div className="space-y-2">
-              <Label htmlFor="installation-id">Installation ID</Label>
+              <Label htmlFor="installation-id">{t("installationId")}</Label>
               <Input
                 id="installation-id"
                 value={installationId}
@@ -244,7 +230,7 @@ function ConnectSourceDialogViewForm({
 
           {!kind.startsWith("github_") && (
             <div className="space-y-2">
-              <Label htmlFor="api-base-url">API base URL (self-hosted)</Label>
+              <Label htmlFor="api-base-url">{t("apiBaseUrl")}</Label>
               <Input
                 id="api-base-url"
                 value={apiBaseUrl}
@@ -260,9 +246,7 @@ function ConnectSourceDialogViewForm({
             <>
               <div className="space-y-2">
                 <Label htmlFor="oauth-client-id">
-                  {isGithub
-                    ? "GitHub App ID (numeric — webhook payload lookups)"
-                    : "OAuth Client ID"}
+                  {isGithub ? t("githubAppId") : t("oauthClientId")}
                 </Label>
                 <Input
                   id="oauth-client-id"
@@ -273,15 +257,11 @@ function ConnectSourceDialogViewForm({
                   required
                 />
                 {isGithub && (
-                  <p className="text-muted-foreground text-xs">
-                    The numeric App ID GitHub shows on your App settings page. Used for
-                    webhook-payload App lookups; the user-to-server OAuth Client ID is separate
-                    (below).
-                  </p>
+                  <p className="text-muted-foreground text-xs">{t("githubAppIdHelp")}</p>
                 )}
               </div>
               <div className="space-y-2">
-                <Label htmlFor="oauth-redirect">OAuth redirect URI</Label>
+                <Label htmlFor="oauth-redirect">{t("redirectUri")}</Label>
                 <Input
                   id="oauth-redirect"
                   value={oauthRedirectUri}
@@ -291,8 +271,7 @@ function ConnectSourceDialogViewForm({
                   className="font-mono text-xs"
                 />
                 <p className="text-muted-foreground text-xs">
-                  Must match the redirect URI registered on the OAuth application at the host side (
-                  {isGitlab ? "GitLab" : "GitHub"}).
+                  {t("redirectUriHelp", { host: isGitlab ? "GitLab" : "GitHub" })}
                 </p>
               </div>
             </>
@@ -300,7 +279,7 @@ function ConnectSourceDialogViewForm({
 
           {needsAppClientId && (
             <div className="space-y-2">
-              <Label htmlFor="app-client-id">GitHub App Client ID</Label>
+              <Label htmlFor="app-client-id">{t("appClientId")}</Label>
               <Input
                 id="app-client-id"
                 value={appClientId}
@@ -311,21 +290,23 @@ function ConnectSourceDialogViewForm({
                 required
               />
               <p className="text-muted-foreground text-xs">
-                Find this on your GitHub App settings page — looks like <code>Iv23l...</code> for
-                new GitHub Apps or a 20-char hex string for legacy OAuth Apps.{" "}
-                <a
-                  href="https://github.com/settings/apps"
-                  target="_blank"
-                  rel="noreferrer noopener"
-                  className="underline"
-                >
-                  Open GitHub App settings →
-                </a>
+                {t.rich("appClientIdHelp", {
+                  code: (chunks) => <code>{chunks}</code>,
+                  link: (chunks) => (
+                    <a
+                      href="https://github.com/settings/apps"
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="underline"
+                    >
+                      {chunks}
+                    </a>
+                  ),
+                })}
               </p>
               {!appClientIdOk && appClientId !== "" && (
                 <p className="text-destructive text-xs">
-                  Doesn&apos;t look like a GitHub App Client ID — expected <code>Iv…</code> or a
-                  20-char hex string.
+                  {t.rich("appClientIdInvalid", { code: (chunks) => <code>{chunks}</code> })}
                 </p>
               )}
             </div>
@@ -334,10 +315,10 @@ function ConnectSourceDialogViewForm({
           <div className="space-y-2">
             <Label htmlFor="secret">
               {isOauthApp
-                ? "OAuth Client Secret"
+                ? t("secretOauth")
                 : kind === "github_app_install"
-                  ? "GitHub App private-key PEM"
-                  : "Personal Access Token / app password"}
+                  ? t("secretPem")
+                  : t("secretToken")}
             </Label>
             <Input
               id="secret"
@@ -348,27 +329,24 @@ function ConnectSourceDialogViewForm({
               required
               autoComplete="off"
             />
-            <p className="text-muted-foreground text-xs">
-              Stored encrypted at rest. Never logged. Rotate by editing this connection later.
-            </p>
+            <p className="text-muted-foreground text-xs">{t("secretHelp")}</p>
           </div>
 
           {(isGithub || isGitlab) && (
             <div className="space-y-2">
-              <Label>Repo visibility scopes</Label>
+              <Label>{t("visibility")}</Label>
               <p className="text-muted-foreground text-xs">
-                Constrain what repos this connection is allowed to surface when listing queries call
-                the {isGitlab ? "GitLab" : "GitHub"} API. No selections = no scope restriction.
+                {t("visibilityHelp", { host: isGitlab ? "GitLab" : "GitHub" })}
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {VISIBILITY_SCOPES.map((s) => (
-                  <label key={s.value} className="flex items-center gap-2 text-xs">
+                  <label key={s} className="flex items-center gap-2 text-xs">
                     <input
                       type="checkbox"
-                      checked={scopes.includes(s.value)}
-                      onChange={() => toggleScope(s.value)}
+                      checked={scopes.includes(s)}
+                      onChange={() => toggleScope(s)}
                     />
-                    {s.label}
+                    {t(`scopes.${s}`)}
                   </label>
                 ))}
               </div>
@@ -377,7 +355,7 @@ function ConnectSourceDialogViewForm({
 
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button
               type="submit"
@@ -385,7 +363,7 @@ function ConnectSourceDialogViewForm({
                 loading || !secret || (needsAppClientId && (!appClientId.trim() || !appClientIdOk))
               }
             >
-              {loading ? "Connecting…" : "Connect"}
+              {loading ? t("connecting") : t("connect")}
             </Button>
           </SheetFooter>
         </form>

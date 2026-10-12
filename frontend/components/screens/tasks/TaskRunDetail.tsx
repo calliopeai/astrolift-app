@@ -2,6 +2,7 @@
 
 import { ClipboardListIcon, InfoIcon, ScrollIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { DetailTimestamp } from "@/components/detail/EntityDetailShell";
 import { Identifier } from "@/components/Identifier";
@@ -21,8 +22,12 @@ import type { useTaskRunDetail } from "./use-task-run-detail";
 export type TaskRunDetailProps = ReturnType<typeof useTaskRunDetail> & { id: string };
 
 /** Agents ▾ › Runs › billing › run a1b2c3d4 (spec 44 §4.4). */
-function crumbs(id: string, run: AstroliftTaskRun | null) {
-  const last = { label: `run ${id.slice(0, 8)}` };
+function crumbs(
+  id: string,
+  run: AstroliftTaskRun | null,
+  t: ReturnType<typeof useTranslations<"runPages">>
+) {
+  const last = { label: t("runTitle", { id: id.slice(0, 8) }) };
   return run
     ? runCrumbs(
         {
@@ -50,11 +55,12 @@ const STEP_STATUS: Record<string, RunStatus> = {
  * data half is useTaskRunDetail.
  */
 export function TaskRunDetail({ id, loading, run, error, onRetry, now }: TaskRunDetailProps) {
+  const t = useTranslations("runPages");
   if (!run && loading) {
     return (
       <RunPage
-        crumbs={crumbs(id, null)}
-        title={`run ${id.slice(0, 8)}`}
+        crumbs={crumbs(id, null, t)}
+        title={t("runTitle", { id: id.slice(0, 8) })}
         steps={[]}
         stepsLoading
         log={{ lines: [], loading: true }}
@@ -64,17 +70,17 @@ export function TaskRunDetail({ id, loading, run, error, onRetry, now }: TaskRun
   if (!run) {
     return (
       <RunMissing
-        crumbs={crumbs(id, null)}
-        title="Task run"
+        crumbs={crumbs(id, null, t)}
+        title={t("taskRun")}
         icon={<ClipboardListIcon className="size-4" />}
         error={error}
         onRetry={onRetry}
         empty={{
           icon: <ClipboardListIcon className="size-5" />,
-          title: "Task run not found",
-          description: "No task run has this id, or you do not have permission to see it.",
+          title: t("taskRunNotFound"),
+          description: t("taskRunNotFoundDescription"),
           actionHref: "/tasks?kind=task",
-          actionLabel: "Open task runs",
+          actionLabel: t("openTaskRuns"),
         }}
       />
     );
@@ -94,8 +100,8 @@ export function TaskRunDetail({ id, loading, run, error, onRetry, now }: TaskRun
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6">
       <RunPage
-        crumbs={crumbs(id, run)}
-        title={`run ${id.slice(0, 8)}`}
+        crumbs={crumbs(id, run, t)}
+        title={t("runTitle", { id: id.slice(0, 8) })}
         status={<RunOutcomeCell run={row} />}
         durationMs={runElapsed(run, live, now)}
         context={
@@ -108,7 +114,7 @@ export function TaskRunDetail({ id, loading, run, error, onRetry, now }: TaskRun
           <Button size="sm" variant="outline" asChild>
             <Link href={consoleHref}>
               <ScrollIcon className="size-4" />
-              Open logs
+              {t("openLogs")}
             </Link>
           </Button>
         }
@@ -116,8 +122,8 @@ export function TaskRunDetail({ id, loading, run, error, onRetry, now }: TaskRun
           <RunMenu
             id={run.id}
             links={[
-              { label: "Open app", href: appHref },
-              { label: "Open workload", href: workloadHref },
+              { label: t("openApp"), href: appHref },
+              { label: t("openWorkload"), href: workloadHref },
             ]}
           />
         }
@@ -126,13 +132,13 @@ export function TaskRunDetail({ id, loading, run, error, onRetry, now }: TaskRun
           status,
           run.k8sJobName || run.workloadSlug,
           now,
-          run.exitCode != null ? `exit ${run.exitCode}` : undefined
+          run.exitCode != null ? t("exit", { code: run.exitCode }) : undefined
         )}
         failure={
           run.status === "failed"
             ? {
-                title: "Run failed",
-                reason: run.exitCode != null ? `exit ${run.exitCode}` : "failed",
+                title: t("runFailed"),
+                reason: run.exitCode != null ? t("exit", { code: run.exitCode }) : t("failed"),
               }
             : null
         }
@@ -140,23 +146,25 @@ export function TaskRunDetail({ id, loading, run, error, onRetry, now }: TaskRun
           lines: [],
           emptyHint: (
             <>
-              Task run output is stored on the pod.{" "}
-              <Link href={consoleHref} className="not-italic underline underline-offset-2">
-                Open the app console
-              </Link>{" "}
-              for the full log tail.
+              {t.rich("taskOutputHint", {
+                link: (chunks) => (
+                  <Link href={consoleHref} className="not-italic underline underline-offset-2">
+                    {chunks}
+                  </Link>
+                ),
+              })}
             </>
           ),
         }}
       />
 
       <PanelGrid>
-        <Panel title="Details" icon={<InfoIcon className="size-4" />} span={6}>
+        <Panel title={t("details")} icon={<InfoIcon className="size-4" />} span={6}>
           <DefinitionList
             items={[
-              { term: "Run ID", description: <Identifier value={run.id} form="full" /> },
+              { term: t("runId"), description: <Identifier value={run.id} form="full" /> },
               {
-                term: "App",
+                term: t("app"),
                 description: (
                   <Link href={appHref} className="font-mono text-xs hover:underline">
                     {run.registeredAppSlug}
@@ -164,7 +172,7 @@ export function TaskRunDetail({ id, loading, run, error, onRetry, now }: TaskRun
                 ),
               },
               {
-                term: "Workload",
+                term: t("workload"),
                 description: (
                   <Link href={workloadHref} className="font-mono text-xs hover:underline">
                     {run.workloadSlug}
@@ -172,7 +180,7 @@ export function TaskRunDetail({ id, loading, run, error, onRetry, now }: TaskRun
                 ),
               },
               {
-                term: "Command",
+                term: t("command"),
                 description: (
                   <span className="font-mono text-xs [overflow-wrap:anywhere]">
                     {command || "—"}
@@ -180,20 +188,20 @@ export function TaskRunDetail({ id, loading, run, error, onRetry, now }: TaskRun
                 ),
               },
               {
-                term: "Exit code",
+                term: t("exitCode"),
                 description: <span className="font-mono">{run.exitCode ?? "—"}</span>,
               },
               {
-                term: "K8s job",
+                term: t("k8sJob"),
                 description: (
                   <span className="font-mono text-xs [overflow-wrap:anywhere]">
                     {run.k8sJobName || "—"}
                   </span>
                 ),
               },
-              { term: "Created", description: <DetailTimestamp iso={run.createdAt} /> },
-              { term: "Started", description: <DetailTimestamp iso={run.startedAt} /> },
-              { term: "Ended", description: <DetailTimestamp iso={run.endedAt} /> },
+              { term: t("created"), description: <DetailTimestamp iso={run.createdAt} /> },
+              { term: t("started"), description: <DetailTimestamp iso={run.startedAt} /> },
+              { term: t("ended"), description: <DetailTimestamp iso={run.endedAt} /> },
             ]}
           />
         </Panel>

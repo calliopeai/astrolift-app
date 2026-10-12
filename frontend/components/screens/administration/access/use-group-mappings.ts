@@ -1,6 +1,8 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
+import * as React from "react";
 import { toast } from "sonner";
 
 import type { RoleRef, ScopeRef } from "@/components/access/access-model";
@@ -16,6 +18,7 @@ import { LIST_ROLES_I_CAN_GRANT } from "@/graphql/identity/identity.queries";
 import type { AstroliftRole, MutationResult } from "@/graphql/identity/identity.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
+import { localizeList } from "../localize-list";
 import { GROUP_MAPPINGS_LIST, groupMappingsVariables } from "./group-mappings";
 import type { GroupMapping, GroupMappingsPanelProps } from "./GroupMappingsPanel";
 
@@ -34,7 +37,10 @@ const REFETCH = ["ListGroupRoleMappingsPage", "AccessOn", "PrincipalSearch"];
 export function useGroupMappings(externalId: string): GroupMappingsPanelProps {
   const perms = useMyPermissions();
   const canManage = perms.can("org.manage_members");
-  const list = useLocalListState(GROUP_MAPPINGS_LIST);
+  const t = useTranslations("adminGroupMappings");
+  const lists = useTranslations("adminGroupMappings.list");
+  const definition = React.useMemo(() => localizeList(GROUP_MAPPINGS_LIST, lists), [lists]);
+  const list = useLocalListState(definition);
   const query = useQuery<MappingsResp>(LIST_GROUP_ROLE_MAPPINGS_PAGE, {
     variables: groupMappingsVariables(externalId, list.state),
     fetchPolicy: "cache-and-network",
@@ -84,18 +90,18 @@ export function useGroupMappings(externalId: string): GroupMappingsPanelProps {
           },
         });
         if (res?.createGroupRoleMapping.ok) {
-          toast.success(`Mapped ${externalId}`);
+          toast.success(t("mapped", { group: externalId }));
           return null;
         }
-        return res?.createGroupRoleMapping.errors?.[0]?.message ?? "The mapping failed";
+        return res?.createGroupRoleMapping.errors?.[0]?.message ?? t("mappingFailed");
       } catch (err) {
-        return err instanceof Error ? err.message : "The mapping failed";
+        return err instanceof Error ? err.message : t("mappingFailed");
       }
     },
     onDelete: async (mapping: GroupMapping) => {
       const { data: res } = await remove({ variables: { input: { id: mapping.id } } });
-      if (res?.deleteGroupRoleMapping.ok) toast.success(`Removed ${mapping.role.slug}`);
-      else throw new Error(res?.deleteGroupRoleMapping.errors?.[0]?.message ?? "Remove failed");
+      if (res?.deleteGroupRoleMapping.ok) toast.success(t("removed", { role: mapping.role.slug }));
+      else throw new Error(res?.deleteGroupRoleMapping.errors?.[0]?.message ?? t("removeFailed"));
     },
   };
 }

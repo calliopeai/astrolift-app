@@ -1,6 +1,7 @@
 "use client";
 
 import { Download, Loader2, Pause, Play } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -14,6 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 
 import { HEALTH_COLOR, MOTION_CLASS } from "../core/semantics";
+import type { VizT } from "../core/viz-t";
 import { WORKFLOW_SHAPE_LEGEND, type LegendItem } from "../core/VizLegend";
 import type { RunTimeline } from "../core/workflow-model";
 
@@ -66,23 +68,16 @@ export interface RunReplayProps {
 }
 
 export const RUN_REPLAY_LEGEND: LegendItem[] = [
-  { glyph: "bar", color: "var(--muted-foreground)", label: "Segment width is real duration" },
-  { glyph: "flow", color: "var(--foreground)", label: "Playhead moving: replaying" },
-  { glyph: "glow", color: HEALTH_COLOR.ok, label: "Stage under the playhead" },
-  { glyph: "dot", color: HEALTH_COLOR.ok, label: "Succeeded" },
-  { glyph: "glow", color: HEALTH_COLOR.failing, label: "Failed" },
-  { glyph: "ring", color: HEALTH_COLOR.degraded, label: "Gate waiting (breathes)" },
-  { glyph: "ring", color: HEALTH_COLOR.idle, label: "Not reached or skipped" },
-  {
-    ...WORKFLOW_SHAPE_LEGEND.returnTrack,
-    label: "Loop mark: where a loop sent work back and the next round began",
-  },
-  { ...WORKFLOW_SHAPE_LEGEND.roundBadge, label: "Round band: which round each stretch belongs to" },
-  {
-    glyph: "bar",
-    color: HEALTH_COLOR.ok,
-    label: "Parallel bars: a fan-out's branches, each on its own times",
-  },
+  { glyph: "bar", color: "var(--muted-foreground)", labelKey: "replaySegment" },
+  { glyph: "flow", color: "var(--foreground)", labelKey: "replayPlayhead" },
+  { glyph: "glow", color: HEALTH_COLOR.ok, labelKey: "replayActive" },
+  { glyph: "dot", color: HEALTH_COLOR.ok, labelKey: "succeeded" },
+  { glyph: "glow", color: HEALTH_COLOR.failing, labelKey: "failed" },
+  { glyph: "ring", color: HEALTH_COLOR.degraded, labelKey: "replayGate" },
+  { glyph: "ring", color: HEALTH_COLOR.idle, labelKey: "replaySkipped" },
+  { ...WORKFLOW_SHAPE_LEGEND.returnTrack, labelKey: "replayLoopMark" },
+  { ...WORKFLOW_SHAPE_LEGEND.roundBadge, labelKey: "replayRoundBand" },
+  { glyph: "bar", color: HEALTH_COLOR.ok, labelKey: "replayParallel" },
 ];
 
 /** Main track height, and the branch bars under it, px. */
@@ -122,39 +117,45 @@ function segmentStyle(p: PlacedStage, state: SegmentState): React.CSSProperties 
   };
 }
 
-function gateNote(p: PlacedStage, reached: boolean, done: boolean): string | null {
+function gateNote(p: PlacedStage, reached: boolean, done: boolean, vt: VizT): string | null {
   if (p.stage.kind !== "gate") return null;
   if (!reached) return null;
-  if (!done || p.stage.status === "waiting") return "waiting for approval";
+  if (!done || p.stage.status === "waiting") return vt("replay.waitingApproval");
   if (!p.stage.decidedBy) return null;
-  return `${p.stage.status === "failed" ? "denied" : "approved"} by ${p.stage.decidedBy}`;
+  return vt(p.stage.status === "failed" ? "replay.deniedBy" : "replay.approvedBy", {
+    who: p.stage.decidedBy,
+  });
 }
 
-function describe(timeline: RunTimeline, run: PlacedRun): string {
+function describe(timeline: RunTimeline, run: PlacedRun, vt: VizT): string {
   const main = timeline.stages.filter((s) => !s.branchId);
   const n = main.length;
   const failed = main.filter((s) => s.status === "failed").length;
   const waiting = main.filter((s) => s.status === "waiting").length;
   const span =
     timeline.finishedAt === null
-      ? `running for ${formatDuration(run.total)}`
-      : `took ${formatDuration(run.total)}`;
-  const parts = [`${n} stage${n === 1 ? "" : "s"}`];
-  if (run.rounds.length > 1) parts.push(`${run.rounds.length} rounds`);
-  if (run.marks.length)
-    parts.push(`sent back ${run.marks.length} time${run.marks.length === 1 ? "" : "s"}`);
-  if (run.lanes) parts.push(`${run.lanes} parallel branches`);
-  if (failed) parts.push(`${failed} failed`);
-  if (waiting) parts.push(`${waiting} waiting at a gate`);
-  return `Run ${timeline.label}: ${parts.join(", ")}, ${span}`;
+      ? vt("replay.runningFor", { duration: formatDuration(run.total) })
+      : vt("replay.took", { duration: formatDuration(run.total) });
+  const parts = [vt("replay.stages", { count: n })];
+  if (run.rounds.length > 1) parts.push(vt("replay.rounds", { count: run.rounds.length }));
+  if (run.marks.length) parts.push(vt("replay.sentBack", { count: run.marks.length }));
+  if (run.lanes) parts.push(vt("replay.parallel", { count: run.lanes }));
+  if (failed) parts.push(vt("trains.failed", { count: failed }));
+  if (waiting) parts.push(vt("replay.waitingAtGate", { count: waiting }));
+  return vt("replay.describe", {
+    label: timeline.label,
+    parts: parts.join(vt("listSeparator")),
+    span,
+  });
 }
 
 /** "failed", or "rejected" for a gate, as a round's summary says it. */
-function outcomeWord(stage: PlacedStage["stage"]): string | null {
-  if (stage.status === "failed") return stage.kind === "gate" ? "rejected" : "failed";
-  if (stage.status === "waiting") return "waiting";
-  if (stage.status === "running") return "running";
-  if (stage.status === "skipped") return "skipped";
+function outcomeWord(stage: PlacedStage["stage"], vt: VizT): string | null {
+  if (stage.status === "failed")
+    return stage.kind === "gate" ? vt("replay.outcome.rejected") : vt("replay.outcome.failed");
+  if (stage.status === "waiting") return vt("replay.outcome.waiting");
+  if (stage.status === "running") return vt("replay.outcome.running");
+  if (stage.status === "skipped") return vt("replay.outcome.skipped");
   return null;
 }
 
@@ -167,6 +168,7 @@ function laneKey(run: PlacedRun, t: number): string {
 }
 
 export function RunReplay({ timeline, motion, now, onSelectStage, className }: RunReplayProps) {
+  const vt = useTranslations("vizRender");
   const run = React.useMemo(() => placeRun(timeline, now), [timeline, now]);
   const slow = React.useMemo(() => slowestStage(run), [run]);
   const reduced = motion === "reduced";
@@ -209,7 +211,9 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
       headRef.current.setAttribute("aria-valuenow", String(Math.round(t / 1000)));
       headRef.current.setAttribute(
         "aria-valuetext",
-        `${formatClock(t)} elapsed${active ? `, ${active.stage.name}` : ""}`
+        active
+          ? vt("replay.elapsedAt", { clock: formatClock(t), stage: active.stage.name })
+          : vt("replay.elapsed", { clock: formatClock(t) })
       );
     }
     if (fillRef.current) {
@@ -232,7 +236,7 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
       viewRef.current = { idx, done, lanes, t };
       setView(viewRef.current);
     }
-  }, []);
+  }, [vt]);
 
   const seek = React.useCallback(
     (t: number) => {
@@ -324,12 +328,12 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
     setExporting(kind);
     try {
       const colors = readPalette(rootRef.current);
-      const opts = { label: timeline.label };
+      const opts = { label: timeline.label, vt };
       const blob =
         kind === "gif" ? await exportGif(run, colors, opts) : await exportVideo(run, colors, opts);
       downloadBlob(blob, `${timeline.runId}-replay.${kind === "gif" ? "gif" : "webm"}`);
     } catch (e) {
-      toast.error(`Couldn't export the replay: ${e instanceof Error ? e.message : String(e)}`);
+      toast.error(vt("replay.exportFailed", { error: e instanceof Error ? e.message : String(e) }));
     } finally {
       setExporting(null);
     }
@@ -348,10 +352,11 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
     : "background-color 240ms, border-color 240ms, box-shadow 240ms";
 
   let status: string;
-  if (!active) status = "Queued";
-  else if (!done) status = active.stage.kind === "gate" ? "waiting for approval" : "running";
-  else status = active.stage.status;
-  const note = active ? gateNote(active, true, done) : null;
+  if (!active) status = vt("replay.queued");
+  else if (!done)
+    status = active.stage.kind === "gate" ? vt("replay.waitingApproval") : vt("replay.running");
+  else status = vt(`replay.status.${active.stage.status}`);
+  const note = active ? gateNote(active, true, done, vt) : null;
   const activeColor = active ? HEALTH_COLOR[STAGE_HEALTH[active.stage.status]] : undefined;
 
   return (
@@ -359,7 +364,7 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
       ref={rootRef}
       data-motion={motion}
       role="figure"
-      aria-label={describe(timeline, run)}
+      aria-label={describe(timeline, run, vt)}
       onKeyDown={onKeyDown}
       className={cn("bg-card flex min-w-0 flex-col gap-3 p-4 text-sm", className)}
     >
@@ -400,7 +405,7 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
               {looped && (
                 <span className="text-muted-foreground font-mono">
                   {" "}
-                  · round {active.stage.round ?? 1}
+                  · {vt("replay.roundLower", { n: active.stage.round ?? 1 })}
                 </span>
               )}
               {note && <span className="text-muted-foreground font-mono"> · {note}</span>}
@@ -412,7 +417,7 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
       </div>
 
       {looped && (
-        <div className="relative h-5" aria-label="Rounds on the track">
+        <div className="relative h-5" aria-label={vt("replay.roundsOnTrack")}>
           {run.rounds.map((r) => (
             <span
               key={r.round}
@@ -427,15 +432,15 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
                 borderColor: r.causeIndex !== null ? HEALTH_COLOR.degraded : "var(--border)",
               }}
             >
-              Round {r.round}
+              {vt("replay.round", { n: r.round })}
             </span>
           ))}
           {run.marks.map((m) => (
             <button
               key={m.index}
               type="button"
-              aria-label={`Round ${m.round}: ${m.reason}, sent back to ${m.to}. Jump here`}
-              title={`${m.reason}, back to ${m.to} (round ${m.round})`}
+              aria-label={vt("replay.markLabel", { n: m.round, reason: m.reason, to: m.to })}
+              title={vt("replay.markTitle", { n: m.round, reason: m.reason, to: m.to })}
               onClick={() => {
                 setPlaying(false);
                 seek(m.at);
@@ -498,15 +503,23 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
           const holding =
             p.stage.kind === "gate" &&
             (state === "active" || (state === "settled" && p.stage.status === "waiting"));
-          const gate = gateNote(p, reached, state === "settled");
+          const gate = gateNote(p, reached, state === "settled", vt);
           const dur = formatDuration(p.end - p.start);
           const tip = [
-            `${p.stage.name} (${p.stage.kind}${looped ? `, round ${p.stage.round ?? 1}` : ""}): ${p.stage.status}, ${dur}`,
-            p.stage.decidedBy ? `decided by ${p.stage.decidedBy}` : null,
-            p.stage.causedBy ? `sent back: ${p.stage.causedBy.reason}` : null,
+            vt(looped ? "replay.segmentRound" : "replay.segment", {
+              name: p.stage.name,
+              kind: vt(`replay.kind.${p.stage.kind}`),
+              n: p.stage.round ?? 1,
+              status: vt(`replay.status.${p.stage.status}`),
+              duration: dur,
+            }),
+            p.stage.decidedBy ? vt("replay.decidedBy", { who: p.stage.decidedBy }) : null,
+            p.stage.causedBy
+              ? vt("replay.sentBackReason", { reason: p.stage.causedBy.reason })
+              : null,
           ]
             .filter(Boolean)
-            .join(", ");
+            .join(vt("listSeparator"));
           return (
             <div
               key={p.stage.id}
@@ -554,7 +567,11 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
           if (p.lane === 0) return null;
           const state = laneState(p, view.t);
           const dur = formatDuration(p.end - p.start);
-          const tip = `${p.stage.name} (branch): ${p.stage.status}, ${dur}`;
+          const tip = vt("replay.branch", {
+            name: p.stage.name,
+            status: vt(`replay.status.${p.stage.status}`),
+            duration: dur,
+          });
           return (
             <div
               key={p.stage.id}
@@ -602,7 +619,7 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
           ref={headRef}
           role="slider"
           tabIndex={0}
-          aria-label="Replay position"
+          aria-label={vt("replay.position")}
           aria-valuemin={0}
           aria-valuemax={Math.round(total / 1000)}
           aria-valuenow={Math.round(t0 / 1000)}
@@ -634,15 +651,19 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
 
       {slow && (
         <p className="text-xs">
-          <span className="text-muted-foreground">Slowest stage: </span>
-          <span className="font-medium">{slow.stage.name}</span> took{" "}
-          <span className="font-mono">{formatDuration(slow.ms)}</span>,{" "}
-          <span className="font-mono">{Math.round(slow.share * 100)}%</span> of the run
+          {vt.rich("replay.slowest", {
+            name: slow.stage.name,
+            duration: formatDuration(slow.ms),
+            share: Math.round(slow.share * 100),
+            label: (chunks) => <span className="text-muted-foreground">{chunks}</span>,
+            strong: (chunks) => <span className="font-medium">{chunks}</span>,
+            mono: (chunks) => <span className="font-mono">{chunks}</span>,
+          })}
         </p>
       )}
 
       {looped && (
-        <ol aria-label="Rounds" className="flex flex-col gap-1 text-xs">
+        <ol aria-label={vt("replay.roundsList")} className="flex flex-col gap-1 text-xs">
           {run.rounds.map((r) => {
             const stages = run.stages.filter(
               (p) => p.lane === 0 && (p.stage.round ?? 1) === r.round
@@ -666,21 +687,25 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
                   }}
                   className="focus-visible:ring-ring rounded-sm font-mono font-medium outline-none focus-visible:ring-2"
                 >
-                  Round {r.round}
+                  {vt("replay.round", { n: r.round })}
                 </button>
                 {cause && (
                   <span className="text-muted-foreground">
-                    (sent back: <span style={{ color: HEALTH_COLOR.degraded }}>{cause.reason}</span>
-                    )
+                    {vt.rich("replay.cause", {
+                      reason: cause.reason,
+                      em: (chunks) => (
+                        <span style={{ color: HEALTH_COLOR.degraded }}>{chunks}</span>
+                      ),
+                    })}
                   </span>
                 )}
                 <span className="min-w-0">
                   <span aria-hidden>: </span>
                   {stages.map((p, k) => {
-                    const word = outcomeWord(p.stage);
+                    const word = outcomeWord(p.stage, vt);
                     return (
                       <React.Fragment key={p.stage.id}>
-                        {k > 0 && ", "}
+                        {k > 0 && vt("listSeparator")}
                         {p.stage.name}
                         {word && (
                           <span
@@ -709,13 +734,17 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
           variant="secondary"
           onClick={togglePlay}
           disabled={reduced}
-          title={reduced ? "Reduced motion: drag the playhead or use the arrow keys" : undefined}
-          aria-label={playing ? "Pause replay" : "Play replay"}
+          title={reduced ? vt("replay.reducedHint") : undefined}
+          aria-label={playing ? vt("replay.pauseLabel") : vt("replay.playLabel")}
         >
           {playing ? <Pause aria-hidden /> : <Play aria-hidden />}
-          {playing ? "Pause" : "Play"}
+          {playing ? vt("replay.pause") : vt("replay.play")}
         </Button>
-        <div role="radiogroup" aria-label="Replay speed" className="flex rounded-md border p-0.5">
+        <div
+          role="radiogroup"
+          aria-label={vt("replay.speed")}
+          className="flex rounded-md border p-0.5"
+        >
           {SPEEDS.map((s) => (
             <Button
               key={s}
@@ -745,15 +774,19 @@ export function RunReplay({ timeline, motion, now, onSelectStage, className }: R
               ) : (
                 <Download aria-hidden />
               )}
-              {exporting === "video" ? "Recording…" : exporting === "gif" ? "Encoding…" : "Export"}
+              {exporting === "video"
+                ? vt("replay.recording")
+                : exporting === "gif"
+                  ? vt("replay.encoding")
+                  : vt("replay.export")}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onSelect={() => void runExport("gif")}>
-              GIF (6s time-lapse)
+              {vt("replay.exportGif")}
             </DropdownMenuItem>
             <DropdownMenuItem disabled={!canExportVideo()} onSelect={() => void runExport("video")}>
-              Video, WebM (6s time-lapse)
+              {vt("replay.exportVideo")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

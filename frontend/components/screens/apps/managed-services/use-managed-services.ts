@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
@@ -63,6 +64,7 @@ interface EnvsResp {
  * deprovision mutations. The data half of ManagedServicesScreen.
  */
 export function useManagedServices(slug: string) {
+  const t = useTranslations("appManagedServices.toasts");
   const envs = useQuery<EnvsResp>(LIST_ENVIRONMENTS, {
     variables: { appSlug: slug },
   });
@@ -113,13 +115,13 @@ export function useManagedServices(slug: string) {
         variables: { input: { appSlug: slug, ...input } },
       });
       if (data?.provisionManagedService.ok) {
-        toast.success(`Provisioning ${input.kind}`);
+        toast.success(t("provisioning", { kind: input.kind }));
         return true;
       }
-      toast.error(data?.provisionManagedService.errors?.[0]?.message ?? "Provision failed");
+      toast.error(data?.provisionManagedService.errors?.[0]?.message ?? t("provisionFailed"));
       return false;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Provision failed");
+      toast.error(err instanceof Error ? err.message : t("provisionFailed"));
       return false;
     }
   }
@@ -138,20 +140,22 @@ export function useManagedServices(slug: string) {
         },
       });
       if (data?.deprovisionManagedService.ok) {
-        const verb =
+        const key =
           deleteData && forceDestroy
-            ? "Force-deprovisioning + deleting data for"
+            ? "forceDeleting"
             : deleteData
-              ? "Deprovisioning + deleting data for"
+              ? "deleting"
               : forceDestroy
-                ? "Force-deprovisioning"
-                : "Deprovisioning";
-        toast.success(`${verb} ${s.name}`);
+                ? "forceDeprovisioning"
+                : "deprovisioning";
+        toast.success(t(key, { name: s.name }));
         return true;
       }
-      throw new Error(data?.deprovisionManagedService.errors?.[0]?.message ?? "Deprovision failed");
+      throw new Error(
+        data?.deprovisionManagedService.errors?.[0]?.message ?? t("deprovisionFailed")
+      );
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Deprovision failed");
+      toast.error(err instanceof Error ? err.message : t("deprovisionFailed"));
       return false;
     }
   }

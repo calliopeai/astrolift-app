@@ -1,6 +1,7 @@
 "use client";
 
 import { UsersIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { DetailStatusBadge, type Dot } from "@/components/detail/EntityDetailShell";
 import type { Column } from "@/components/data-table";
@@ -38,10 +39,11 @@ export function PersonTeamsPanel({
   onRetry,
 }: PersonTeamsPanelProps) {
   const fmt = useFormatters();
+  const t = useTranslations("adminPersonTeams");
   const columns: Column<TeamMembershipRow>[] = [
     {
       id: "team",
-      header: "Team",
+      header: t("columns.team"),
       sortKey: "team",
       cellClassName: "max-w-80",
       cell: (r) =>
@@ -52,22 +54,22 @@ export function PersonTeamsPanel({
         ) : (
           <span
             className="text-muted-foreground block min-w-0 truncate font-mono text-sm"
-            title="Named once someone holds a role on this team"
+            title={t("unnamedHint")}
           >
-            team #{r.pk}
+            {t("unnamed", { pk: r.pk })}
           </span>
         ),
     },
     {
       id: "membership",
-      header: "Membership",
+      header: t("columns.membership"),
       cell: (r) => (
         <DetailStatusBadge status={r.member.lifecycle} tone={TONE[r.member.lifecycle] ?? "muted"} />
       ),
     },
     {
       id: "joined",
-      header: "Joined",
+      header: t("columns.joined"),
       sortKey: "joined",
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (r) => fmt.formatDate(r.member.joinedAt ?? r.member.createdAt),
@@ -78,7 +80,7 @@ export function PersonTeamsPanel({
     <ListPage<TeamMembershipRow>
       embedded
       list={list}
-      label="Teams"
+      label={t("listLabel")}
       columns={columns}
       rows={rows}
       getRowId={(r) => r.member.id}
@@ -90,8 +92,8 @@ export function PersonTeamsPanel({
       totalCount={totalCount}
       empty={{
         icon: <UsersIcon className="size-5" />,
-        title: "Not on a team",
-        description: "Granting a role at a team's scope puts a person on that team.",
+        title: t("emptyTitle"),
+        description: t("emptyDescription"),
       }}
     />
   );

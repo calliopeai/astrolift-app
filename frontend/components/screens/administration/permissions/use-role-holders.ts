@@ -1,6 +1,8 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
+import * as React from "react";
 import { toast } from "sonner";
 
 import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
@@ -17,6 +19,7 @@ import type {
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import { type ListPageData, useNumberedListQuery } from "../access/use-list-page-query";
+import { localizeList } from "../localize-list";
 import { bindingsFilter, ROLE_HOLDERS_LIST } from "./permissions-lists";
 
 interface BindingsPageResp {
@@ -33,8 +36,14 @@ const REVOKE_REFETCH = ["ListRoleBindingsPage", { query: LIST_ROLE_BINDINGS }];
  * pages are this role's (#2153).
  */
 export function useRoleHolders(role: Pick<AstroliftRole, "id">) {
+  const t = useTranslations("adminBindings");
+  const lists = useTranslations("adminPermissionLists.holders");
   const perms = useMyPermissions();
-  const list = useListState(ROLE_HOLDERS_LIST);
+  const definition = React.useMemo(
+    () => localizeList(ROLE_HOLDERS_LIST, lists, ["scope", "kind"]),
+    [lists]
+  );
+  const list = useListState(definition);
   const page: ListPageData<AstroliftRoleBinding> = useNumberedListQuery(
     LIST_ROLE_BINDINGS_PAGE,
     list,
@@ -53,8 +62,8 @@ export function useRoleHolders(role: Pick<AstroliftRole, "id">) {
   /** Throws on failure, so the confirm dialog stays open and shows why. */
   async function onRevoke(b: AstroliftRoleBinding): Promise<void> {
     const { data } = await revokeBinding({ variables: { input: { id: b.id } } });
-    if (data?.revokeRoleBinding.ok) toast.success("Role revoked");
-    else throw new Error(data?.revokeRoleBinding.errors?.[0]?.message ?? "Revoke failed");
+    if (data?.revokeRoleBinding.ok) toast.success(t("revoked"));
+    else throw new Error(data?.revokeRoleBinding.errors?.[0]?.message ?? t("revokeFailed"));
   }
 
   return { list, page, canManage: perms.can("org.manage_members"), revoking, onRevoke };

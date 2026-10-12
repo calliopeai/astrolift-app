@@ -1,11 +1,12 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
 import { EVENT_WINDOW_MS, type FleetCluster, type FleetViewProps } from "../core/fleet-model";
-import { HEALTH_COLOR, HEALTH_LABEL, MOTION_CLASS, type Health } from "../core/semantics";
+import { HEALTH_COLOR, MOTION_CLASS, type Health } from "../core/semantics";
 import type { LegendItem } from "../core/VizLegend";
 
 import { hexPath, layoutHive, loadMix, truncate, type HiveCell } from "./hive-layout";
@@ -19,13 +20,13 @@ import { hexPath, layoutHive, loadMix, truncate, type HiveCell } from "./hive-la
  */
 
 export const FLEET_HIVE_LEGEND: LegendItem[] = [
-  { glyph: "glow", color: HEALTH_COLOR.ok, label: "Brightness: load" },
-  { glyph: "dot", color: HEALTH_COLOR.ok, label: "Border: healthy" },
-  { glyph: "dot", color: HEALTH_COLOR.degraded, label: "Degraded" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Flicker: failing" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Dark: idle" },
-  { glyph: "ring", label: "Ring: dispatch from the cluster hub" },
-  { glyph: "dot", label: "Still dot: received work in the last 12s" },
+  { glyph: "glow", color: HEALTH_COLOR.ok, labelKey: "hiveBrightness" },
+  { glyph: "dot", color: HEALTH_COLOR.ok, labelKey: "hiveBorder" },
+  { glyph: "dot", color: HEALTH_COLOR.degraded, labelKey: "degraded" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "flickerFailing" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "hiveDark" },
+  { glyph: "ring", labelKey: "hiveRing" },
+  { glyph: "dot", labelKey: "hiveStillDot" },
 ];
 
 /** How long after a dispatch its ripple is still drawn. */
@@ -75,6 +76,7 @@ export function FleetHive({
   selectedAgentId,
   className,
 }: FleetViewProps) {
+  const t = useTranslations("vizRender");
   const rootRef = React.useRef<HTMLDivElement>(null);
   const width = useWidth(rootRef, 960);
   const { now, clusters, agents, events } = snapshot;
@@ -176,9 +178,13 @@ export function FleetHive({
     return { failing, degraded, busy };
   }, [agents]);
 
-  const label =
-    `${agents.length} agents in ${clusters.length} clusters, ` +
-    `${counts.failing} failing, ${counts.degraded} degraded, ${counts.busy} busy`;
+  const label = t("hive.summary", {
+    agents: agents.length,
+    clusters: clusters.length,
+    failing: counts.failing,
+    degraded: counts.degraded,
+    busy: counts.busy,
+  });
 
   const charsPerPx = 1 / 6.2;
 
@@ -213,12 +219,23 @@ export function FleetHive({
                 fontSize={10}
                 fill="var(--muted-foreground)"
               >
-                <title>{`${g.name}${cluster?.region ? ` (${cluster.region})` : ""}, ${count} agents`}</title>
+                <title>
+                  {t(cluster?.region ? "hive.groupRegion" : "hive.group", {
+                    name: g.name,
+                    region: cluster?.region ?? "",
+                    count,
+                  })}
+                </title>
                 {name}
                 {suffix}
               </text>
               <g transform={`translate(${g.hub.x} ${g.hub.y})`}>
-                <title>{`${g.name} dispatcher, cluster ${HEALTH_LABEL[health].toLowerCase()}`}</title>
+                <title>
+                  {t("hive.dispatcher", {
+                    name: g.name,
+                    health: t(`healthInline.${health}`),
+                  })}
+                </title>
                 <path d={tile} fill="var(--card)" stroke={HEALTH_COLOR[health]} strokeWidth={1.5} />
                 <path
                   d={hexPath(r * 0.4)}
@@ -236,7 +253,14 @@ export function FleetHive({
             const color = HEALTH_COLOR[a.health];
             const selected = a.id === selectedAgentId;
             const select = () => onSelectAgent?.(a.id);
-            const desc = `${a.name}, ${clusterName.get(a.clusterId) ?? a.clusterId}, ${HEALTH_LABEL[a.health].toLowerCase()}, load ${Math.round(a.load * 100)}%, ${a.activeRuns} running, ${a.queued} queued`;
+            const desc = t("hive.agent", {
+              name: a.name,
+              cluster: clusterName.get(a.clusterId) ?? a.clusterId,
+              health: t(`healthInline.${a.health}`),
+              load: Math.round(a.load * 100),
+              running: a.activeRuns,
+              queued: a.queued,
+            });
             return (
               <g
                 key={a.id}

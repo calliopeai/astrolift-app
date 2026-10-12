@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import {
   AlertTriangleIcon,
   BookOpenIcon,
@@ -24,48 +25,54 @@ export interface DocsNavSection {
   links: { href: string; label: string; icon: typeof BookOpenIcon }[];
 }
 
-export const DOCS_NAV_SECTIONS: DocsNavSection[] = [
+interface KeyedNavSection {
+  /** Key under `docsNav.sections`; each link's `labelKey` is under `docsNav.links`. */
+  labelKey: string;
+  links: { href: string; labelKey: string; icon: typeof BookOpenIcon }[];
+}
+
+const DOCS_NAV: KeyedNavSection[] = [
   {
-    label: "Getting started",
+    labelKey: "gettingStarted",
     links: [
-      { href: "/documentation/introduction", label: "Introduction", icon: BookOpenIcon },
-      { href: "/documentation/quickstart", label: "Quickstart", icon: ZapIcon },
-      { href: "/documentation/get-started", label: "Local dev setup", icon: RocketIcon },
-      { href: "/documentation/tutorials", label: "Tutorials", icon: GraduationCapIcon },
+      { href: "/documentation/introduction", labelKey: "introduction", icon: BookOpenIcon },
+      { href: "/documentation/quickstart", labelKey: "quickstart", icon: ZapIcon },
+      { href: "/documentation/get-started", labelKey: "localDev", icon: RocketIcon },
+      { href: "/documentation/tutorials", labelKey: "tutorials", icon: GraduationCapIcon },
     ],
   },
   {
-    label: "Operator guides",
+    labelKey: "operatorGuides",
     links: [
       {
         href: "/documentation/cluster-prerequisites",
-        label: "Cluster prerequisites",
+        labelKey: "clusterPrerequisites",
         icon: ServerCogIcon,
       },
-      { href: "/documentation/custom-domains", label: "Custom domains", icon: GlobeIcon },
-      { href: "/documentation/source-providers", label: "Source providers", icon: GitBranchIcon },
+      { href: "/documentation/custom-domains", labelKey: "customDomains", icon: GlobeIcon },
+      { href: "/documentation/source-providers", labelKey: "sourceProviders", icon: GitBranchIcon },
       {
         href: "/documentation/identity-providers",
-        label: "Identity providers",
+        labelKey: "identityProviders",
         icon: KeyRoundIcon,
       },
-      { href: "/documentation/policies", label: "ABAC policies", icon: ScaleIcon },
-      { href: "/documentation/webhooks", label: "Webhooks", icon: WebhookIcon },
+      { href: "/documentation/policies", labelKey: "policies", icon: ScaleIcon },
+      { href: "/documentation/webhooks", labelKey: "webhooks", icon: WebhookIcon },
     ],
   },
   {
-    label: "Runbooks",
-    links: [{ href: "/documentation/runbooks", label: "All runbooks", icon: AlertTriangleIcon }],
+    labelKey: "runbooks",
+    links: [{ href: "/documentation/runbooks", labelKey: "allRunbooks", icon: AlertTriangleIcon }],
   },
   {
-    label: "Reference",
+    labelKey: "reference",
     links: [
-      { href: "/documentation/configuration", label: "Configuration", icon: SettingsIcon },
-      { href: "/documentation/manifest", label: "Manifest reference", icon: FileTextIcon },
-      { href: "/documentation/drivers", label: "Driver reference", icon: PlugIcon },
-      { href: "/documentation/webhook-events", label: "Webhook events", icon: ListTreeIcon },
-      { href: "/documentation/changelog", label: "Changelog", icon: ScrollIcon },
-      { href: "/documentation/help", label: "Get help", icon: LifeBuoyIcon },
+      { href: "/documentation/configuration", labelKey: "configuration", icon: SettingsIcon },
+      { href: "/documentation/manifest", labelKey: "manifest", icon: FileTextIcon },
+      { href: "/documentation/drivers", labelKey: "drivers", icon: PlugIcon },
+      { href: "/documentation/webhook-events", labelKey: "webhookEvents", icon: ListTreeIcon },
+      { href: "/documentation/changelog", labelKey: "changelog", icon: ScrollIcon },
+      { href: "/documentation/help", labelKey: "help", icon: LifeBuoyIcon },
     ],
   },
 ];
@@ -74,16 +81,24 @@ export interface DocsShellProps {
   /** Current path; the matching nav link (or its parent) is marked active. */
   pathname: string;
   children: React.ReactNode;
+  /** Already-localized sections; defaults to the built-in nav. */
   sections?: DocsNavSection[];
 }
 
 /** The documentation shell: section nav on the left, the page on the right. */
-export function DocsShell({ pathname, children, sections = DOCS_NAV_SECTIONS }: DocsShellProps) {
+export function DocsShell({ pathname, children, sections }: DocsShellProps) {
+  const t = useTranslations("docsNav");
+  const resolved: DocsNavSection[] =
+    sections ??
+    DOCS_NAV.map(({ labelKey, links }) => ({
+      label: t(`sections.${labelKey}`),
+      links: links.map(({ labelKey: key, ...link }) => ({ ...link, label: t(`links.${key}`) })),
+    }));
   return (
     <div className="flex flex-1">
       <aside className="hidden w-56 shrink-0 border-r lg:flex lg:flex-col">
         <div className="flex flex-col gap-5 p-4">
-          {sections.map((section) => (
+          {resolved.map((section) => (
             <div key={section.label} className="flex flex-col gap-1">
               <p className="text-muted-foreground mb-1 px-2 text-xs font-semibold tracking-wider uppercase">
                 {section.label}

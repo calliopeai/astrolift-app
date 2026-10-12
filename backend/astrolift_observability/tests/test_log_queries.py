@@ -727,3 +727,42 @@ def test_historical_query_denies_without_read_logs(permission_resolver):
             since=dt.datetime.now(UTC) - dt.timedelta(minutes=1),
             until=dt.datetime.now(UTC),
         )
+
+
+@pytest.mark.django_db
+def test_without_a_log_backend_the_query_answers_from_the_running_pods(permission_resolver, monkeypatch):
+    """No aggregator on the cluster used to mean no lines at all, in the CLI
+    and the web (#2211). The current pods' recent lines answer instead,
+    windowed and filtered; ``historicalAvailable`` stays false."""
+    from _sdk.cluster import PodLogLine
+
+    org, app, _cluster = _scaffold(log_driver=None)
+    permission_resolver.grant(Permission.APP_READ_LOGS)
+    now = dt.datetime.now(UTC)
+    seen = {}
+
+    async def fake_stream(**kwargs):
+        seen.update(kwargs)
+        for minutes, message in ((90, "too old"), (5, "GET /health 200"), (2, "ERROR boom")):
+            yield PodLogLine(
+                pod_name="web-1",
+                container="web",
+                timestamp=now - dt.timedelta(minutes=minutes),
+                message=message,
+                stream="stdout",
+            )
+
+    monkeypatch.setattr("core.cluster_observability.stream_app_logs_multi", fake_stream)
+    with _tenant(org):
+        page = LogHistoryQuery().astrolift_app_logs(
+            _info(), app_slug=app.slug, since=now - dt.timedelta(minutes=30), until=now
+        )
+        errors = LogHistoryQuery().astrolift_app_logs(
+            _info(), app_slug=app.slug, since=now - dt.timedelta(minutes=30), until=now, search="boom"
+        )
+
+    assert [line.message for line in page.items] == ["GET /health 200", "ERROR boom"]
+    assert page.historical_available is False and page.reason == ObservabilityPanelReason.OK
+    assert page.next_cursor == ""
+    assert seen["follow"] is False and seen["app_slug"] == app.slug
+    assert [line.message for line in errors.items] == ["ERROR boom"]

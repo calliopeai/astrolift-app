@@ -44,72 +44,40 @@ export interface AppDeployStrategyStepProps<S extends AppDeployStrategyFields> {
   approverSlot: React.ReactNode;
 }
 
+/** Labels live under `appWizard.strategy.timing.<value>`. */
 const DEPLOY_TIMINGS: Array<{
   value: AppDeployTiming;
-  label: string;
-  description: string;
   icon: typeof RocketIcon;
 }> = [
-  {
-    value: "now",
-    label: "Deploy now",
-    description: "Pick a trigger and kick off the first deploy as soon as registration completes.",
-    icon: RocketIcon,
-  },
-  {
-    value: "later",
-    label: "Configure, deploy later",
-    description: "Lock in trigger and approval settings now; first deploy runs on the next event.",
-    icon: PauseIcon,
-  },
-  {
-    value: "skip",
-    label: "Skip — configure later",
-    description:
-      "Just register the app. Set up triggers, approvals, and deploys from the app page.",
-    icon: CoffeeIcon,
-  },
+  { value: "now", icon: RocketIcon },
+  { value: "later", icon: PauseIcon },
+  { value: "skip", icon: CoffeeIcon },
 ];
 
+/** Labels live under `apps.deployStrategy.modes.<value>`, descriptions under `appWizard.strategy.modes.<value>`. */
 const TRIGGER_MODES: Array<{
   value: TriggerMode;
-  label: string;
-  description: string;
   icon: typeof ZapIcon;
   comingSoon?: boolean;
 }> = [
-  {
-    value: "auto_on_push",
-    label: "Auto on push",
-    description: "Deploy whenever a commit lands on the selected branch (via SCM webhook).",
-    icon: ZapIcon,
-  },
-  {
-    value: "cron",
-    label: "Cron schedule",
-    description: "Deploy on a recurring schedule.",
-    icon: ClockIcon,
-  },
-  {
-    value: "manual",
-    label: "Manual only",
-    description: "Deploys only run when someone explicitly triggers them.",
-    icon: HandIcon,
-  },
+  { value: "auto_on_push", icon: ZapIcon },
+  { value: "cron", icon: ClockIcon },
+  { value: "manual", icon: HandIcon },
 ];
 
+/** Key under `appWizard.strategy.cronHint`. */
 function naturalCronHint(expr: string): string {
   // Lightweight read-back, not a real parser. Just translates a few
   // very common patterns so an operator can sanity-check before
   // submitting.
   const e = expr.trim();
-  if (!CRON_FIELD.test(e)) return "Five-field cron expression expected.";
-  if (e === "0 * * * *") return "Hourly, on the hour.";
-  if (e === "*/5 * * * *") return "Every 5 minutes.";
-  if (e === "0 3 * * *") return "Daily at 03:00.";
-  if (e === "0 0 * * 0") return "Weekly on Sunday at 00:00.";
-  if (e === "0 0 1 * *") return "Monthly on the 1st at 00:00.";
-  return "Custom schedule.";
+  if (!CRON_FIELD.test(e)) return "invalid";
+  if (e === "0 * * * *") return "hourly";
+  if (e === "*/5 * * * *") return "every5";
+  if (e === "0 3 * * *") return "daily";
+  if (e === "0 0 * * 0") return "weekly";
+  if (e === "0 0 1 * *") return "monthly";
+  return "custom";
 }
 
 /**
@@ -121,6 +89,8 @@ export function AppDeployStrategyStep<S extends AppDeployStrategyFields>({
   approverSlot,
 }: AppDeployStrategyStepProps<S>) {
   const t = useTranslations("apps.wizard.approval");
+  const copy = useTranslations("appWizard.strategy");
+  const modes = useTranslations("apps.deployStrategy.modes");
 
   const showTriggerConfig = state.deployTiming !== "skip";
 
@@ -128,10 +98,8 @@ export function AppDeployStrategyStep<S extends AppDeployStrategyFields>({
     <div className="flex flex-col gap-5">
       <section className="flex flex-col gap-3">
         <div>
-          <h3 className="font-medium">When should this app deploy?</h3>
-          <p className="text-muted-foreground text-xs">
-            Pick a path for first deploy. You can change strategy later from the app page.
-          </p>
+          <h3 className="font-medium">{copy("timingTitle")}</h3>
+          <p className="text-muted-foreground text-xs">{copy("timingHelp")}</p>
         </div>
         <div className="grid gap-2 md:grid-cols-3">
           {DEPLOY_TIMINGS.map((opt) => (
@@ -147,8 +115,8 @@ export function AppDeployStrategyStep<S extends AppDeployStrategyFields>({
                 }))
               }
               icon={opt.icon}
-              label={opt.label}
-              description={opt.description}
+              label={copy(`timing.${opt.value}.label`)}
+              description={copy(`timing.${opt.value}.description`)}
             />
           ))}
         </div>
@@ -157,8 +125,8 @@ export function AppDeployStrategyStep<S extends AppDeployStrategyFields>({
       {showTriggerConfig && (
         <section className="flex flex-col gap-3">
           <div>
-            <h3 className="font-medium">Trigger mode</h3>
-            <p className="text-muted-foreground text-xs">What event causes a deploy to run?</p>
+            <h3 className="font-medium">{copy("triggerTitle")}</h3>
+            <p className="text-muted-foreground text-xs">{copy("triggerHelp")}</p>
           </div>
           <div className="grid gap-2 md:grid-cols-3">
             {TRIGGER_MODES.map((opt) => (
@@ -167,9 +135,9 @@ export function AppDeployStrategyStep<S extends AppDeployStrategyFields>({
                 selected={state.triggerMode === opt.value}
                 onClick={() => setState((s) => ({ ...s, triggerMode: opt.value }))}
                 icon={opt.icon}
-                label={opt.label}
-                description={opt.description}
-                badge={opt.comingSoon ? "Coming soon" : undefined}
+                label={modes(`${opt.value}.label`)}
+                description={copy(`modes.${opt.value}`)}
+                badge={opt.comingSoon ? copy("comingSoon") : undefined}
               />
             ))}
           </div>
@@ -179,7 +147,7 @@ export function AppDeployStrategyStep<S extends AppDeployStrategyFields>({
       {showTriggerConfig && state.triggerMode === "auto_on_push" && (
         <section className="flex flex-col gap-3 rounded-md border p-4">
           <div className="space-y-2">
-            <Label htmlFor="deploy-branch">Deploy branch</Label>
+            <Label htmlFor="deploy-branch">{copy("deployBranch")}</Label>
             <Input
               id="deploy-branch"
               value={state.deployBranch}
@@ -189,13 +157,10 @@ export function AppDeployStrategyStep<S extends AppDeployStrategyFields>({
               aria-invalid={!state.deployBranch.trim() || undefined}
             />
             {state.deployBranch.trim() ? (
-              <p className="text-muted-foreground text-xs">
-                Pushes to this branch will trigger a deploy. Defaults to the repo&apos;s default
-                branch.
-              </p>
+              <p className="text-muted-foreground text-xs">{copy("deployBranchHelp")}</p>
             ) : (
               <p role="alert" className="text-destructive text-xs">
-                Name the branch whose pushes deploy.
+                {copy("deployBranchRequired")}
               </p>
             )}
           </div>
@@ -205,7 +170,7 @@ export function AppDeployStrategyStep<S extends AppDeployStrategyFields>({
       {showTriggerConfig && state.triggerMode === "cron" && (
         <section className="flex flex-col gap-3 rounded-md border p-4">
           <div className="space-y-2">
-            <Label htmlFor="cron-expression">Cron expression</Label>
+            <Label htmlFor="cron-expression">{copy("cronLabel")}</Label>
             <Input
               id="cron-expression"
               value={state.cronExpression}
@@ -223,7 +188,7 @@ export function AppDeployStrategyStep<S extends AppDeployStrategyFields>({
                   : "text-destructive"
               )}
             >
-              Five fields (minute hour day month weekday). {naturalCronHint(state.cronExpression)}
+              {copy("cronHelp")} {copy(`cronHint.${naturalCronHint(state.cronExpression)}`)}
             </p>
           </div>
         </section>
@@ -263,8 +228,7 @@ export function AppDeployStrategyStep<S extends AppDeployStrategyFields>({
 
       {!showTriggerConfig && (
         <section className="bg-muted/30 text-muted-foreground rounded-md border border-dashed p-4 text-xs">
-          Trigger mode and approval gates are skipped for now. Once registration completes you can
-          wire those up from the app&apos;s Settings tab.
+          {copy("skipped")}
         </section>
       )}
     </div>

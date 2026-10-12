@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { DeploymentStatusPill } from "@/components/DeploymentStatusPill";
 import { StatusDot } from "@/components/StatusDot";
+import { renderWithIntl as render } from "@/test/render-with-intl";
 
 import { DOT_TONE, PILL_TONE } from "./status-tones";
 

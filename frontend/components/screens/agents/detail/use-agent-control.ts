@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { UPDATE_AGENT_RUN_SPEC } from "@/graphql/agents/agents.mutations";
@@ -33,6 +34,7 @@ export type SaveRunSpecResult =
  * state itself lives in AgentControlScreen.
  */
 export function useAgentControl(agent: AstroliftAgentListItem) {
+  const t = useTranslations("agentControl");
   // Refetch the fleet list after a save so the resolved row re-seeds with the
   // persisted run-spec. `updateAgentRunSpec` returns an `AstroliftAgentRunSpec`
   // — a DIFFERENT GraphQL type than the `AstroliftAgentListItem` the shell
@@ -53,12 +55,12 @@ export function useAgentControl(agent: AstroliftAgentListItem) {
       const { data } = await save({ variables: { agentSlug: agent.slug, input } });
       const result = data?.updateAgentRunSpec;
       if (result?.ok) {
-        toast.success(`Run spec saved for ${agent.name}`);
+        toast.success(t("toasts.saved", { name: agent.name }));
         return { ok: true, persisted: result.data ?? null };
       }
       const err = result?.errors?.[0];
-      toast.error(`Couldn't save run spec`, {
-        description: err?.message ?? "Unknown error",
+      toast.error(t("toasts.saveFailed"), {
+        description: err?.message ?? t("toasts.unknownError"),
       });
       return {
         ok: false,
@@ -66,7 +68,7 @@ export function useAgentControl(agent: AstroliftAgentListItem) {
       };
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      toast.error(`Couldn't save run spec for ${agent.name}`, { description: message });
+      toast.error(t("toasts.saveFailedFor", { name: agent.name }), { description: message });
       return { ok: false, fieldError: null };
     }
   }

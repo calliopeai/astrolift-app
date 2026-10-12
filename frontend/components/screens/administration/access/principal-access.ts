@@ -268,7 +268,10 @@ export function selectAccess(
  * What a principal holds, counted over every binding (not the filtered page):
  * a summary that changes as you type is not a summary of what they hold.
  */
-export function summarizeAccess(rows: readonly AccessRow[]): string | null {
+export function summarizeAccess(
+  rows: readonly AccessRow[],
+  t: (key: string, values?: Record<string, string | number>) => string
+): string | null {
   if (rows.length === 0) return null;
   const roles = new Set(rows.map((r) => r.binding.role.id)).size;
   const byScope = SCOPE_ORDER.map((k) => ({
@@ -278,11 +281,11 @@ export function summarizeAccess(rows: readonly AccessRow[]): string | null {
   const covered = rows.filter((r) => r.coveredBy).length;
   const expiring = rows.filter((r) => r.binding.expiresAt).length;
   const parts = [
-    `${roles} ${roles === 1 ? "role" : "roles"} across ${rows.length} ${rows.length === 1 ? "grant" : "grants"}`,
-    byScope.map((x) => `${x.n} at ${SCOPE_GROUP_LABEL[x.k].toLowerCase()}`).join(", "),
+    t("rolesAcross", { roles, grants: rows.length }),
+    byScope.map((x) => t("atScope", { count: x.n, scope: x.k })).join(", "),
   ];
-  if (covered > 0) parts.push(`${covered} also granted wider`);
-  if (expiring > 0) parts.push(`${expiring} expiring`);
+  if (covered > 0) parts.push(t("alsoWider", { count: covered }));
+  if (expiring > 0) parts.push(t("expiring", { count: expiring }));
   return parts.join("; ");
 }
 

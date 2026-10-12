@@ -1,5 +1,6 @@
 import type { FleetAgent, FleetCluster, FleetSnapshot } from "../core/fleet-model";
 import { depth, iso, type Point } from "../core/iso";
+import type { VizT } from "../core/viz-t";
 
 /**
  * Pure geometry for the isometric fleet: where each cluster's platform and
@@ -143,12 +144,14 @@ export function summarizeFleet(snapshot: Pick<FleetSnapshot, "clusters" | "agent
 }
 
 /** The root aria-label: the state in one sentence. */
-export function fleetAriaLabel(s: FleetSummary): string {
-  const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
-  return (
-    `Isometric fleet: ${plural(s.agents, "agent")} across ${plural(s.clusters, "cluster")}, ` +
-    `${s.failing} failing, ${s.degraded} degraded, ${s.busy} busy, ${s.idle} idle`
-  );
+export function fleetAriaLabel(s: FleetSummary, t: VizT): string {
+  return t("isoFleet.summary", {
+    fleet: t("frame.fleetDescription", { agents: s.agents, clusters: s.clusters }),
+    failing: s.failing,
+    degraded: s.degraded,
+    busy: s.busy,
+    idle: s.idle,
+  });
 }
 
 /** Cut a label to `max` characters with an ellipsis; the full text goes in a <title>. */

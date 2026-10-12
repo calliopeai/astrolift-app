@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -55,6 +56,7 @@ export interface ModuleItem {
 
 /** The server half of ModulesCard: entitlements, the install gate and the toggle. */
 export function useModulesCard() {
+  const t = useTranslations("adminModules");
   const { modules, loading: modulesLoading, error, refetch, hasData } = useModules();
   const { can, loading: permsLoading } = useMyPermissions();
   const canManage = can("org.update");
@@ -87,12 +89,13 @@ export function useModulesCard() {
       });
       const result = data?.setOrganizationModule;
       if (!result?.ok) {
-        throw new Error(result?.errors?.[0]?.message ?? "Could not update the module.");
+        throw new Error(result?.errors?.[0]?.message ?? t("updateError"));
       }
-      toast.success(`${config.label} ${next ? "enabled" : "disabled"}`);
+      toast.success(
+        t(next ? "enabledToast" : "disabledToast", { module: t(`items.${config.key}.label`) })
+      );
     } catch (err) {
-      const message =
-        err instanceof Error && err.message ? err.message : "Could not update the module.";
+      const message = err instanceof Error && err.message ? err.message : t("updateError");
       toast.error(message);
     } finally {
       setPendingKey(null);
@@ -101,8 +104,8 @@ export function useModulesCard() {
 
   const items: ModuleItem[] = MODULE_CONFIG.map((config, i) => ({
     key: config.key,
-    label: config.label,
-    description: config.description,
+    label: t(`items.${config.key}.label`),
+    description: t(`items.${config.key}.description`),
     enabled: modules.get(config.key)?.enabled ?? false,
     installAllowed: installAllowed[i],
   }));

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -26,6 +27,7 @@ interface ResumeIngressResp {
  * with a toggle in flight, so each row spins on its own.
  */
 export function useIngressControls(appSlug: string) {
+  const t = useTranslations("appSettingsToasts.ingress");
   const { data, loading } = useQuery<EnvsResp>(LIST_ENVIRONMENTS, {
     variables: { appSlug },
     fetchPolicy: "cache-and-network",
@@ -49,16 +51,16 @@ export function useIngressControls(appSlug: string) {
       if (env.ingressPaused) {
         const { data } = await resume({ variables: { input: { id: env.id } } });
         if (data?.resumeAppIngress.ok) {
-          toast.success(`Ingress resumed for ${env.name}.`);
+          toast.success(t("resumed", { env: env.name }));
         } else {
-          toast.error(data?.resumeAppIngress.errors?.[0]?.message ?? "Resume failed.");
+          toast.error(data?.resumeAppIngress.errors?.[0]?.message ?? t("resumeFailed"));
         }
       } else {
         const { data } = await pause({ variables: { input: { id: env.id } } });
         if (data?.pauseAppIngress.ok) {
-          toast.success(`Ingress paused for ${env.name}.`);
+          toast.success(t("paused", { env: env.name }));
         } else {
-          toast.error(data?.pauseAppIngress.errors?.[0]?.message ?? "Pause failed.");
+          toast.error(data?.pauseAppIngress.errors?.[0]?.message ?? t("pauseFailed"));
         }
       }
     } finally {

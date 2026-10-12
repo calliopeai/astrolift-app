@@ -454,7 +454,7 @@ describe("real Apollo refetch rejection", () => {
         })
       ).toEqual({});
     });
-    expect(state.success).toHaveBeenCalledWith("Skill saved");
+    expect(state.success).toHaveBeenCalledWith("skillSaved");
     // Apollo's onQueryUpdated passes a cache diff as its second argument.
     expect(state.warning).toHaveBeenCalledWith(
       "Could not refresh the view. Refresh to see current data."
@@ -514,24 +514,24 @@ describe("rendered action state", () => {
     }
     render(<Screen />, { wrapper });
     fireEvent.click(screen.getAllByRole("checkbox")[1]);
-    fireEvent.click(screen.getByRole("button", { name: "Revoke 1" }));
+    fireEvent.click(screen.getByRole("button", { name: "revokeCount" }));
     fireEvent.click(screen.getByRole("alertdialog").querySelector("button:last-child")!);
     await waitFor(() => expect(state.error).toHaveBeenCalledWith("Connection lost"));
     expect(screen.getByRole("alertdialog")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Revoke 1" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "revokeCount" })).toBeInTheDocument();
   });
   it("shows a rejected tool save inline and retains the edited draft", async () => {
     function Screen() {
       return <ToolDetailScreen {...useToolDetail("tool-1")} />;
     }
     render(<Screen />, { wrapper });
-    fireEvent.change(screen.getByRole("textbox", { name: "Name" }), {
+    fireEvent.change(screen.getByRole("textbox", { name: "name" }), {
       target: { value: "Edited tool" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save tool" }));
+    fireEvent.click(screen.getByRole("button", { name: "save" }));
     await waitFor(() => expect(screen.getByText("Connection lost")).toBeInTheDocument());
-    expect(screen.getByRole("textbox", { name: "Name" })).toHaveValue("Edited tool");
-    expect(screen.getByRole("button", { name: "Save tool" })).toBeEnabled();
+    expect(screen.getByRole("textbox", { name: "name" })).toHaveValue("Edited tool");
+    expect(screen.getByRole("button", { name: "save" })).toBeEnabled();
   });
 });
 

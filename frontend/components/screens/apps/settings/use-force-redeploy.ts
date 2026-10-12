@@ -1,6 +1,7 @@
 "use client";
 
 import { useLazyQuery, useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -30,6 +31,7 @@ interface ForceRedeployPreviewResp {
  * recovery will fail; the view calls it when its confirm dialog opens.
  */
 export function useForceRedeploy(appSlug: string) {
+  const t = useTranslations("appSettingsToasts.forceRedeploy");
   const [forceRedeploy, { loading }] = useMutation<ForceRedeployResp>(FORCE_REDEPLOY);
 
   // ``cache-and-network`` keeps the list fresh between reopens — a deploy
@@ -61,36 +63,37 @@ export function useForceRedeploy(appSlug: string) {
       });
       const env = data?.forceAstroliftRedeploy;
       if (!env) {
-        toast.error("Force redeploy failed: no response from backend.");
+        toast.error(t("noResponse"));
         return false;
       }
       if (!env.ok) {
-        toast.error(env.errors?.[0]?.message ?? "Force redeploy failed.");
+        toast.error(env.errors?.[0]?.message ?? t("failed"));
         return false;
       }
       const payload = env.data;
       if (!payload) {
-        toast.error("Force redeploy returned no payload.");
+        toast.error(t("noPayload"));
         return false;
       }
-      const counts =
-        `Cancelled ${payload.deploymentsCancelled} deploy(s), deleted ${payload.k8sObjectsDeleted}` +
-        " k8s object(s).";
+      const counts = t("counts", {
+        deploys: payload.deploymentsCancelled,
+        objects: payload.k8sObjectsDeleted,
+      });
       if (payload.workflowDispatched) {
-        const tail = payload.runUrl ? ` Watch run: ${payload.runUrl}` : "";
-        toast.success(`${counts} Workflow dispatched.${tail}`, { duration: 8000 });
+        const tail = payload.runUrl ? ` ${t("watchRun", { url: payload.runUrl })}` : "";
+        toast.success(`${counts} ${t("dispatched")}${tail}`, { duration: 8000 });
       } else {
         // Partial success — cancellation + delete still landed even
         // though the CI dispatch failed. The operator can re-fire the
         // dispatch via the CI-setup section once the host is reachable.
         toast.warning(
-          `${counts} Workflow dispatch failed: ${payload.dispatchMessage ?? "unknown error"}`,
+          `${counts} ${t("dispatchFailed", { message: payload.dispatchMessage ?? t("unknownError") })}`,
           { duration: 10000 }
         );
       }
       return true;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Force redeploy failed.");
+      toast.error(err instanceof Error ? err.message : t("failed"));
       return false;
     }
   }

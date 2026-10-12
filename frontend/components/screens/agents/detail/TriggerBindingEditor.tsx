@@ -4,6 +4,7 @@ import { QueryError } from "@/components/QueryError";
 
 import { CheckCircle2Icon, InfoIcon, Loader2Icon, Trash2Icon, WebhookIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -18,7 +19,7 @@ import type {
   AstroliftAgentTrigger,
   AstroliftAgentTriggerResult,
 } from "@/graphql/agents/agents.types";
-import { formatRelativeAge } from "@/lib/format";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import type { useTriggerBindings } from "./use-trigger-bindings";
 
@@ -60,6 +61,8 @@ export function TriggerBindingEditorView({
   onCreate,
   onUnbind,
 }: TriggerBindingEditorViewProps) {
+  const tr = useTranslations("agentTriggers");
+  const fmt = useFormatters();
   const [scmRepo, setScmRepo] = React.useState<string>("");
   const [branchPattern, setBranchPattern] = React.useState<string>("");
   const [mappingText, setMappingText] = React.useState<string>("");
@@ -82,13 +85,13 @@ export function TriggerBindingEditorView({
     try {
       const parsed = JSON.parse(t);
       if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-        setMappingError("Input mapping must be a JSON object of key → payload-path.");
+        setMappingError(tr("mappingNotObject"));
         return false;
       }
       setMappingError(null);
       return true;
     } catch {
-      setMappingError("Invalid JSON — check syntax.");
+      setMappingError(tr("invalidJson"));
       return false;
     }
   }
@@ -121,16 +124,16 @@ export function TriggerBindingEditorView({
       <div className="bg-muted/30 text-muted-foreground flex items-start gap-2 rounded-md border border-dashed p-3 text-xs">
         <InfoIcon className="mt-0.5 size-4 shrink-0" />
         <span>
-          A trigger dispatches this agent when a push matching the source repo and branch pattern
-          arrives, applying the input mapping to the webhook payload. Pausing the agent (below)
-          halts dispatch without dropping the binding. Delivery history lives on the{" "}
-          <Link
-            href={`/agents/${encodeURIComponent(agentSlug)}/webhooks`}
-            className="text-foreground font-medium underline underline-offset-2"
-          >
-            Webhooks tab
-          </Link>
-          .
+          {tr.rich("intro", {
+            link: (chunks) => (
+              <Link
+                href={`/agents/${encodeURIComponent(agentSlug)}/webhooks`}
+                className="text-foreground font-medium underline underline-offset-2"
+              >
+                {chunks}
+              </Link>
+            ),
+          })}
         </span>
       </div>
 
@@ -140,41 +143,42 @@ export function TriggerBindingEditorView({
         <div className="border-success-border bg-success/5 space-y-3 rounded-md border p-4">
           <div className="flex items-center gap-2">
             <CheckCircle2Icon className="text-success-fg size-4" />
-            <p className="text-sm font-medium">Trigger bound — save the signing secret</p>
+            <p className="text-sm font-medium">{tr("boundTitle")}</p>
           </div>
-          <p className="text-muted-foreground text-xs">
-            The signing secret is shown once and never again. Configure it and the endpoint URL in
-            the source repo&apos;s webhook settings so the platform can verify deliveries.
-          </p>
+          <p className="text-muted-foreground text-xs">{tr("boundHelp")}</p>
           {reveal.endpoint && (
             <div className="space-y-1">
-              <Label className="text-xs">Endpoint</Label>
+              <Label className="text-xs">{tr("endpoint")}</Label>
               <div className="flex items-center gap-2">
                 <code className="bg-background flex-1 rounded-md border px-3 py-2 font-mono text-xs break-all">
                   {reveal.endpoint}
                 </code>
-                <CopyBadge value={reveal.endpoint} label="Copy" toastMessage="Endpoint copied" />
+                <CopyBadge
+                  value={reveal.endpoint}
+                  label={tr("copy")}
+                  toastMessage={tr("endpointCopied")}
+                />
               </div>
             </div>
           )}
           {reveal.signingSecret && (
             <div className="space-y-1">
-              <Label className="text-xs">Signing secret</Label>
+              <Label className="text-xs">{tr("signingSecret")}</Label>
               <div className="flex items-center gap-2">
                 <code className="bg-background flex-1 rounded-md border px-3 py-2 font-mono text-xs break-all">
                   {reveal.signingSecret}
                 </code>
                 <CopyBadge
                   value={reveal.signingSecret}
-                  label="Copy"
-                  toastMessage="Signing secret copied"
+                  label={tr("copy")}
+                  toastMessage={tr("signingSecretCopied")}
                 />
               </div>
             </div>
           )}
           <div className="flex justify-end">
             <Button size="sm" variant="ghost" onClick={() => setReveal(null)}>
-              Dismiss
+              {tr("dismiss")}
             </Button>
           </div>
         </div>
@@ -182,14 +186,14 @@ export function TriggerBindingEditorView({
 
       {/* Bound triggers list. */}
       <div className="space-y-2">
-        <Label>Bound triggers</Label>
+        <Label>{tr("boundTriggers")}</Label>
         {error ? (
-          <QueryError title="Could not load trigger bindings" error={error} onRetry={onRetry} />
+          <QueryError title={tr("loadError")} error={error} onRetry={onRetry} />
         ) : loading && triggers.length === 0 ? (
           <Skeleton className="h-16 w-full" />
         ) : triggers.length === 0 ? (
           <p className="text-muted-foreground rounded-md border border-dashed p-4 text-xs">
-            No triggers bound yet. Bind one below to dispatch this agent on a matching push.
+            {tr("empty")}
           </p>
         ) : (
           <ul className="space-y-2">
@@ -203,24 +207,24 @@ export function TriggerBindingEditorView({
                   <div className="min-w-0 space-y-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <WebhookIcon className="text-muted-foreground size-4 shrink-0" />
-                      <span className="font-mono text-sm break-all">{t.scmRepo || "any repo"}</span>
+                      <span className="font-mono text-sm break-all">
+                        {t.scmRepo || tr("anyRepo")}
+                      </span>
                       <Badge variant="outline" className="font-normal">
-                        {t.branchPattern || "any branch"}
+                        {t.branchPattern || tr("anyBranch")}
                       </Badge>
                       <Badge variant={t.enabled ? "secondary" : "outline"}>
-                        {t.enabled ? "Enabled" : "Disabled"}
+                        {t.enabled ? tr("enabled") : tr("disabled")}
                       </Badge>
                     </div>
                     <div className="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                       <span className="break-all">{t.endpoint}</span>
-                      {mappings > 0 && (
-                        <span>
-                          {mappings} input mapping{mappings === 1 ? "" : "s"}
-                        </span>
-                      )}
-                      <span>Bound {formatRelativeAge(t.createdAt)}</span>
+                      {mappings > 0 && <span>{tr("mappings", { count: mappings })}</span>}
+                      <span>{tr("boundAgo", { age: fmt.formatRelativeTime(t.createdAt) })}</span>
                       {t.lastTriggeredAt && (
-                        <span>Last fired {formatRelativeAge(t.lastTriggeredAt)}</span>
+                        <span>
+                          {tr("lastFired", { age: fmt.formatRelativeTime(t.lastTriggeredAt) })}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -231,7 +235,7 @@ export function TriggerBindingEditorView({
                     onClick={() => setPendingRemove(t)}
                   >
                     <Trash2Icon className="size-4" />
-                    Remove
+                    {tr("remove")}
                   </Button>
                 </li>
               );
@@ -242,11 +246,11 @@ export function TriggerBindingEditorView({
 
       {/* Bind a new trigger. */}
       <div className="space-y-3 border-t pt-4">
-        <Label>Bind a new trigger</Label>
+        <Label>{tr("bindNew")}</Label>
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="trigger-scm-repo" className="text-xs">
-              Source repo
+              {tr("sourceRepo")}
             </Label>
             <Input
               id="trigger-scm-repo"
@@ -258,11 +262,11 @@ export function TriggerBindingEditorView({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="trigger-branch-pattern" className="text-xs">
-              Branch pattern
+              {tr("branchPattern")}
             </Label>
             <Input
               id="trigger-branch-pattern"
-              placeholder="main (blank = any branch)"
+              placeholder={tr("branchPlaceholder")}
               value={branchPattern}
               onChange={(e) => setBranchPattern(e.target.value)}
               className="font-mono text-sm"
@@ -271,7 +275,7 @@ export function TriggerBindingEditorView({
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="trigger-input-mapping" className="text-xs">
-            Input mapping (optional)
+            {tr("inputMapping")}
           </Label>
           <Textarea
             id="trigger-input-mapping"
@@ -288,10 +292,7 @@ export function TriggerBindingEditorView({
           {mappingError ? (
             <p className="text-destructive text-xs">{mappingError}</p>
           ) : (
-            <p className="text-muted-foreground text-xs">
-              A JSON object mapping each agent input key to a path in the webhook payload. Leave
-              blank to pass the raw payload.
-            </p>
+            <p className="text-muted-foreground text-xs">{tr("mappingHelp")}</p>
           )}
         </div>
         <div className="flex justify-end">
@@ -301,7 +302,7 @@ export function TriggerBindingEditorView({
             ) : (
               <WebhookIcon className="size-4" />
             )}
-            Bind trigger
+            {tr("bind")}
           </Button>
         </div>
       </div>
@@ -311,17 +312,19 @@ export function TriggerBindingEditorView({
         onOpenChange={(o) => {
           if (!o) setPendingRemove(null);
         }}
-        title="Remove trigger?"
+        title={tr("removeTitle")}
         description={
           pendingRemove ? (
             <>
-              Unbinds <span className="font-mono">{pendingRemove.scmRepo || "any repo"}</span> from{" "}
-              {agentName}. The webhook stops dispatching this agent. This can&apos;t be undone —
-              rebinding issues a new endpoint and signing secret.
+              {tr.rich("removeDescription", {
+                repo: pendingRemove.scmRepo || tr("anyRepo"),
+                agent: agentName,
+                code: (chunks) => <span className="font-mono">{chunks}</span>,
+              })}
             </>
           ) : null
         }
-        confirmLabel="Remove trigger"
+        confirmLabel={tr("removeConfirm")}
         destructive
         onConfirm={async () => {
           if (!pendingRemove) return;

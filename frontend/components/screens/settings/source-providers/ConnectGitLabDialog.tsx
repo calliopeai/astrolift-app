@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckIcon, CopyIcon, ExternalLinkIcon, GitlabIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,7 @@ function ConnectGitLabDialogViewForm({
   copyCallback,
   onConnect,
 }: ConnectGitLabDialogViewProps) {
+  const t = useTranslations("sourceProviders.gitlab");
   const [groupOrInstance, setGroupOrInstance] = React.useState("");
   const [instanceUrl, setInstanceUrl] = React.useState("");
   const [clientId, setClientId] = React.useState("");
@@ -101,14 +103,9 @@ function ConnectGitLabDialogViewForm({
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <GitlabIcon className="size-5" />
-            Connect to GitLab
+            {t("title")}
           </SheetTitle>
-          <SheetDescription>
-            GitLab doesn&apos;t support one-click App registration like GitHub, so we walk you
-            through creating a Group OAuth Application by hand. Step 1: tell us your GitLab group +
-            instance. Step 2: click the link to GitLab and paste the callback URL we generate. Step
-            3: paste the resulting Application ID + Secret back here.
-          </SheetDescription>
+          <SheetDescription>{t("description")}</SheetDescription>
         </SheetHeader>
 
         <form onSubmit={submit} className="flex flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4">
@@ -116,30 +113,27 @@ function ConnectGitLabDialogViewForm({
           <section className="space-y-3">
             <h3 className="text-sm font-semibold">
               <span className="text-muted-foreground mr-1.5">1.</span>
-              Where does your GitLab live?
+              {t("step1")}
             </h3>
             <div className="space-y-2">
-              <Label htmlFor="gl-group">GitLab group (optional)</Label>
+              <Label htmlFor="gl-group">{t("group")}</Label>
               <Input
                 id="gl-group"
                 value={groupOrInstance}
                 onChange={(e) => setGroupOrInstance(e.target.value)}
-                placeholder="acme-corp (leave blank to use a user-level App)"
+                placeholder={t("groupPlaceholder")}
                 className="font-mono text-xs"
                 autoComplete="off"
               />
-              <p className="text-muted-foreground text-xs">
-                Group OAuth Apps are shared by everyone in the group; user-level Apps are tied to a
-                single user.
-              </p>
+              <p className="text-muted-foreground text-xs">{t("groupHelp")}</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="gl-instance">GitLab instance URL (self-hosted)</Label>
+              <Label htmlFor="gl-instance">{t("instance")}</Label>
               <Input
                 id="gl-instance"
                 value={instanceUrl}
                 onChange={(e) => setInstanceUrl(e.target.value)}
-                placeholder="https://gitlab.acme.example (leave blank for SaaS gitlab.com)"
+                placeholder={t("instancePlaceholder")}
                 type="url"
                 className="font-mono text-xs"
                 autoComplete="off"
@@ -151,32 +145,33 @@ function ConnectGitLabDialogViewForm({
           <section className="space-y-3">
             <h3 className="text-sm font-semibold">
               <span className="text-muted-foreground mr-1.5">2.</span>
-              Create the Application on GitLab
+              {t("step2")}
             </h3>
             <Button asChild variant="outline" className="w-full justify-start">
               <a href={gitlabAppsUrl} target="_blank" rel="noreferrer">
                 <ExternalLinkIcon className="size-4" />
-                Open GitLab Applications
+                {t("openApps")}
                 <span className="text-muted-foreground text-2xs ml-2 truncate font-mono">
                   {gitlabAppsUrl}
                 </span>
               </a>
             </Button>
             <div className="space-y-1.5">
-              <Label className="text-xs">Paste this Callback URL on GitLab</Label>
+              <Label className="text-xs">{t("callbackLabel")}</Label>
               <div className="flex items-center gap-2">
                 <code className="bg-muted text-2xs flex-1 rounded px-2 py-1 font-mono break-all">
                   {callbackUrl}
                 </code>
                 <Button type="button" size="sm" variant="outline" onClick={onCopy}>
                   {copied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
-                  {copied ? "Copied" : "Copy"}
+                  {copied ? t("copied") : t("copy")}
                 </Button>
               </div>
               <p className="text-muted-foreground text-xs">
-                Required GitLab scopes: <code className="font-mono">read_api</code>,{" "}
-                <code className="font-mono">read_repository</code>,{" "}
-                <code className="font-mono">read_user</code>. Leave <em>Confidential</em> checked.
+                {t.rich("scopes", {
+                  code: (chunks) => <code className="font-mono">{chunks}</code>,
+                  em: (chunks) => <em>{chunks}</em>,
+                })}
               </p>
             </div>
           </section>
@@ -185,10 +180,10 @@ function ConnectGitLabDialogViewForm({
           <section className="space-y-3">
             <h3 className="text-sm font-semibold">
               <span className="text-muted-foreground mr-1.5">3.</span>
-              Paste the result back here
+              {t("step3")}
             </h3>
             <div className="space-y-2">
-              <Label htmlFor="gl-client-id">Application ID</Label>
+              <Label htmlFor="gl-client-id">{t("applicationId")}</Label>
               <Input
                 id="gl-client-id"
                 value={clientId}
@@ -199,7 +194,7 @@ function ConnectGitLabDialogViewForm({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="gl-client-secret">Secret</Label>
+              <Label htmlFor="gl-client-secret">{t("secret")}</Label>
               <Input
                 id="gl-client-secret"
                 type="password"
@@ -209,19 +204,16 @@ function ConnectGitLabDialogViewForm({
                 autoComplete="off"
                 required
               />
-              <p className="text-muted-foreground text-xs">
-                Stored encrypted at rest. GitLab shows the Secret exactly once — copy it before
-                clicking away.
-              </p>
+              <p className="text-muted-foreground text-xs">{t("secretHelp")}</p>
             </div>
           </section>
 
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button type="submit" disabled={loading || !clientId || !clientSecret}>
-              {loading ? "Connecting…" : "Save & connect"}
+              {loading ? t("connecting") : t("save")}
             </Button>
           </SheetFooter>
         </form>

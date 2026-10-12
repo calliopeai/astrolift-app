@@ -1,5 +1,6 @@
 import { AlertTriangleIcon, FileWarningIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
 
@@ -33,10 +34,10 @@ export function StaleManifestNotice({
   context?: "deploy" | "registration";
   className?: string;
 }) {
+  const t = useTranslations("staleManifest");
   // applied / in_sync / no_source are healthy or not-applicable; empty means
   // the row predates the field.
-  const failed =
-    status === "diverged" || status === "fetch_failed" || status === "parse_failed";
+  const failed = status === "diverged" || status === "fetch_failed" || status === "parse_failed";
   if (!failed) return null;
 
   const diverged = status === "diverged";
@@ -47,44 +48,29 @@ export function StaleManifestNotice({
     <div
       className={cn(
         "border-warning-border bg-warning-bg text-warning-fg flex items-start gap-2.5 rounded-lg border px-3 py-2.5 text-sm",
-        className,
+        className
       )}
     >
       <Icon aria-hidden className="mt-0.5 size-4 shrink-0" />
       <div className="min-w-0 space-y-1">
         <p className="font-semibold">
           {registration
-            ? "This app registered without its workloads"
+            ? t("registrationTitle")
             : diverged
-              ? "This deploy used the saved manifest, not your repo"
-              : "This deploy used the last known manifest"}
+              ? t("divergedTitle")
+              : t("fallbackTitle")}
         </p>
         <p className="text-foreground/80">
-          {registration ? (
-            <>
-              Its <code className="font-mono text-xs">astrolift.toml</code> couldn&apos;t be read
-              when the app was registered, so no services were created from it. Fix the manifest
-              and resync, or the next deploy will have nothing to ship.
-            </>
-          ) : diverged ? (
-            <>
-              An unsaved draft of <code className="font-mono text-xs">astrolift.toml</code> is
-              held on the platform, so the copy in your repo was left alone to avoid discarding
-              it. Push or discard the draft, then deploy again.
-            </>
-          ) : (
-            <>
-              The manifest couldn&apos;t be read from your repo, so the previous one was used.
-              Anything you pushed since the last successful read is not in this rollout.
-            </>
-          )}
+          {t.rich(registration ? "registrationBody" : diverged ? "divergedBody" : "fallbackBody", {
+            code: (chunks) => <code className="font-mono text-xs">{chunks}</code>,
+          })}
         </p>
-        {error && <p className="text-muted-foreground font-mono text-2xs break-words">{error}</p>}
+        {error && <p className="text-muted-foreground text-2xs font-mono break-words">{error}</p>}
         <Link
           href={`/apps/${appSlug}/manifest`}
           className="text-primary inline-block font-medium underline-offset-4 hover:underline"
         >
-          {diverged ? "Review the draft" : "Open the manifest"} →
+          {diverged ? t("reviewDraft") : t("openManifest")} →
         </Link>
       </div>
     </div>

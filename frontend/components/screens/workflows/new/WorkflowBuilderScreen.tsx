@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { AlertTriangleIcon, ArrowLeftIcon, ArrowRightIcon, Loader2Icon } from "lucide-react";
 
 import { FlowSteps } from "@/components/screens/agents/skills/FlowSteps";
@@ -41,7 +42,7 @@ export type WorkflowBuilderScreenProps = ReturnType<typeof useWorkflowBuilder> &
 
 type Step = 1 | 2 | 3;
 
-const STEPS = [{ label: "Source" }, { label: "Stages" }, { label: "Review" }];
+const STEPS = ["source", "stages", "review"] as const;
 
 export function PatternCard({
   pattern,
@@ -52,6 +53,7 @@ export function PatternCard({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const t = useTranslations("workflowNew");
   return (
     <button
       type="button"
@@ -63,14 +65,14 @@ export function PatternCard({
       )}
     >
       <div className="flex min-w-0 items-center justify-between gap-2">
-        <span className="min-w-0 truncate font-medium">{pattern.label}</span>
+        <span className="min-w-0 truncate font-medium">{t(`patterns.${pattern.value}.label`)}</span>
         {selected && (
           <Badge variant="default" className="shrink-0 text-xs">
-            Selected
+            {t("selected")}
           </Badge>
         )}
       </div>
-      <p className="text-muted-foreground text-xs">{pattern.description}</p>
+      <p className="text-muted-foreground text-xs">{t(`patterns.${pattern.value}.description`)}</p>
       <pre className="text-muted-foreground mt-1 overflow-x-auto font-mono text-xs leading-relaxed">
         {pattern.diagram}
       </pre>
@@ -85,40 +87,30 @@ function SourceChoice({
   value: NewWorkflowSource;
   onChange: (source: NewWorkflowSource) => void;
 }) {
-  const options: { value: NewWorkflowSource; label: string; hint: string }[] = [
-    {
-      value: "pattern",
-      label: "A pattern",
-      hint: "Name it, pick a shape, add stages in the Builder.",
-    },
-    {
-      value: "manifest",
-      label: "A manifest",
-      hint: "Paste a TOML workflow manifest with its stages.",
-    },
-  ];
+  const t = useTranslations("workflowNew");
+  const options: NewWorkflowSource[] = ["pattern", "manifest"];
   return (
     <fieldset className="grid min-w-0 gap-3 sm:grid-cols-2">
-      <legend className="mb-2 text-sm font-medium">Start from</legend>
+      <legend className="mb-2 text-sm font-medium">{t("startFrom")}</legend>
       {options.map((o) => (
         <label
-          key={o.value}
+          key={o}
           className={cn(
             "flex min-w-0 cursor-pointer items-start gap-3 rounded-md border p-3",
-            value === o.value ? "border-primary bg-primary/5" : "hover:bg-muted"
+            value === o ? "border-primary bg-primary/5" : "hover:bg-muted"
           )}
         >
           <input
             type="radio"
             name="new-workflow-source"
-            value={o.value}
-            checked={value === o.value}
-            onChange={() => onChange(o.value)}
+            value={o}
+            checked={value === o}
+            onChange={() => onChange(o)}
             className="accent-primary mt-1"
           />
           <span className="min-w-0">
-            <span className="block text-sm font-medium">{o.label}</span>
-            <span className="text-muted-foreground block text-xs">{o.hint}</span>
+            <span className="block text-sm font-medium">{t(`sources.${o}.label`)}</span>
+            <span className="text-muted-foreground block text-xs">{t(`sources.${o}.hint`)}</span>
           </span>
         </label>
       ))}
@@ -158,6 +150,7 @@ export function WorkflowBuilderScreen({
   initialPreview = null,
   initialErrors = {},
 }: WorkflowBuilderScreenProps) {
+  const t = useTranslations("workflowNew");
   const [step, setStep] = React.useState<Step>(initialStep);
   const [source, setSource] = React.useState<NewWorkflowSource>(initialSource);
   const [name, setName] = React.useState("");
@@ -202,17 +195,21 @@ export function WorkflowBuilderScreen({
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6">
       <ShellHeader
-        crumbs={workflowsCrumbs({ label: "New workflow" })}
-        title="New workflow"
-        context={<FlowSteps steps={STEPS} current={step} />}
+        crumbs={workflowsCrumbs({ label: t("title") })}
+        title={t("title")}
+        context={
+          <FlowSteps steps={STEPS.map((s) => ({ label: t(`steps.${s}`) }))} current={step} />
+        }
       />
 
       <p className="text-muted-foreground max-w-2xl text-sm">
-        Author a workflow definition. To run a platform template with your own agents and trigger,{" "}
-        <Link href="/workflows?view=templates" className="text-foreground underline">
-          configure it from Templates
-        </Link>
-        .
+        {t.rich("intro", {
+          link: (chunks) => (
+            <Link href="/workflows?view=templates" className="text-foreground underline">
+              {chunks}
+            </Link>
+          ),
+        })}
       </p>
 
       <form
@@ -243,11 +240,11 @@ export function WorkflowBuilderScreen({
               <>
                 <div className="grid min-w-0 gap-4 sm:grid-cols-2">
                   <Field data-invalid={Boolean(errors.name) || undefined} className="min-w-0">
-                    <FieldLabel htmlFor="new-workflow-name">Name</FieldLabel>
+                    <FieldLabel htmlFor="new-workflow-name">{t("name")}</FieldLabel>
                     <Input
                       id="new-workflow-name"
                       value={name}
-                      placeholder="e.g. PR Review Loop"
+                      placeholder={t("example", { value: "PR Review Loop" })}
                       aria-invalid={Boolean(errors.name) || undefined}
                       onChange={(e) => {
                         setName(e.target.value);
@@ -258,11 +255,11 @@ export function WorkflowBuilderScreen({
                     <FieldError className="[overflow-wrap:anywhere]">{errors.name}</FieldError>
                   </Field>
                   <Field data-invalid={Boolean(errors.slug) || undefined} className="min-w-0">
-                    <FieldLabel htmlFor="new-workflow-slug">Slug</FieldLabel>
+                    <FieldLabel htmlFor="new-workflow-slug">{t("slug")}</FieldLabel>
                     <Input
                       id="new-workflow-slug"
                       value={slug}
-                      placeholder="e.g. pr-review-loop"
+                      placeholder={t("example", { value: "pr-review-loop" })}
                       className="font-mono"
                       spellCheck={false}
                       aria-invalid={Boolean(errors.slug) || undefined}
@@ -276,16 +273,16 @@ export function WorkflowBuilderScreen({
                   </Field>
                 </div>
                 <Field className="min-w-0">
-                  <FieldLabel htmlFor="new-workflow-description">Description</FieldLabel>
+                  <FieldLabel htmlFor="new-workflow-description">{t("description")}</FieldLabel>
                   <Input
                     id="new-workflow-description"
                     value={description}
-                    placeholder="What does this workflow do?"
+                    placeholder={t("descriptionPlaceholder")}
                     onChange={(e) => setDescription(e.target.value)}
                   />
                 </Field>
                 <fieldset className="flex min-w-0 flex-col gap-2">
-                  <legend className="mb-2 text-sm font-medium">Pattern</legend>
+                  <legend className="mb-2 text-sm font-medium">{t("pattern")}</legend>
                   <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {PATTERNS.map((p) => (
                       <PatternCard
@@ -300,7 +297,7 @@ export function WorkflowBuilderScreen({
               </>
             ) : (
               <Field data-invalid={Boolean(errors.toml) || undefined} className="min-w-0">
-                <FieldLabel htmlFor="new-workflow-toml">Manifest (TOML)</FieldLabel>
+                <FieldLabel htmlFor="new-workflow-toml">{t("manifest")}</FieldLabel>
                 <Textarea
                   id="new-workflow-toml"
                   value={toml}
@@ -317,10 +314,7 @@ export function WorkflowBuilderScreen({
                     clear("toml");
                   }}
                 />
-                <FieldDescription>
-                  The manifest names the workflow and declares its stages; it is checked before the
-                  next step.
-                </FieldDescription>
+                <FieldDescription>{t("manifestHint")}</FieldDescription>
                 <FieldError className="[overflow-wrap:anywhere]">{errors.toml}</FieldError>
               </Field>
             )}
@@ -341,20 +335,19 @@ export function WorkflowBuilderScreen({
                     manifestStages
                   )
                 )}
-                title="Stages"
-                description={`${manifestStages.length} ${manifestStages.length === 1 ? "stage" : "stages"} from the manifest`}
+                title={t("stages")}
+                description={t("stagesFromManifest", { count: manifestStages.length })}
               />
             ) : (
-              <p className="text-muted-foreground text-sm">
-                The manifest declares no stages; add them in the Builder once the workflow exists.
-              </p>
+              <p className="text-muted-foreground text-sm">{t("manifestNoStages")}</p>
             )
           ) : (
             <div className="flex min-w-0 flex-col gap-3">
               <p className="text-sm">
-                A <span className="font-medium">{chosen.label}</span> workflow starts with no
-                stages. You add them in the Builder, which opens once the workflow exists, drawn in
-                your workflow view beside the stage form.
+                {t.rich("patternNoStages", {
+                  pattern: t(`patterns.${chosen.value}.label`),
+                  strong: (chunks) => <span className="font-medium">{chunks}</span>,
+                })}
               </p>
               <pre className="bg-muted/40 text-muted-foreground overflow-x-auto rounded-md border p-3 font-mono text-xs leading-relaxed">
                 {chosen.diagram}
@@ -366,28 +359,30 @@ export function WorkflowBuilderScreen({
           <dl className="flex min-w-0 flex-col gap-3">
             {source === "manifest" ? (
               <>
-                <ReviewRow term="Name">
-                  {preview?.definition?.name ?? "From the manifest"}
+                <ReviewRow term={t("name")}>
+                  {preview?.definition?.name ?? t("fromManifest")}
                 </ReviewRow>
-                <ReviewRow term="Slug">
+                <ReviewRow term={t("slug")}>
                   <span className="font-mono">
-                    {preview?.definition?.slug ?? "From the manifest"}
+                    {preview?.definition?.slug ?? t("fromManifest")}
                   </span>
                 </ReviewRow>
-                <ReviewRow term="Pattern">{preview?.definition?.pattern || "none"}</ReviewRow>
-                <ReviewRow term="Stages">
+                <ReviewRow term={t("pattern")}>
+                  {preview?.definition?.pattern || t("none")}
+                </ReviewRow>
+                <ReviewRow term={t("stages")}>
                   <span className="font-mono">{preview?.stages.length ?? 0}</span>
                 </ReviewRow>
               </>
             ) : (
               <>
-                <ReviewRow term="Name">{name}</ReviewRow>
-                <ReviewRow term="Slug">
+                <ReviewRow term={t("name")}>{name}</ReviewRow>
+                <ReviewRow term={t("slug")}>
                   <span className="font-mono">{finalSlug}</span>
                 </ReviewRow>
-                <ReviewRow term="Description">{description || "none"}</ReviewRow>
-                <ReviewRow term="Pattern">{chosen.label}</ReviewRow>
-                <ReviewRow term="Stages">Added in the Builder</ReviewRow>
+                <ReviewRow term={t("description")}>{description || t("none")}</ReviewRow>
+                <ReviewRow term={t("pattern")}>{t(`patterns.${chosen.value}.label`)}</ReviewRow>
+                <ReviewRow term={t("stages")}>{t("addedInBuilder")}</ReviewRow>
               </>
             )}
           </dl>
@@ -395,28 +390,28 @@ export function WorkflowBuilderScreen({
 
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 border-t pt-4">
           <Button type="button" variant="ghost" asChild className="mr-auto">
-            <Link href="/workflows">Cancel</Link>
+            <Link href="/workflows">{t("cancel")}</Link>
           </Button>
           {step > 1 && (
             <Button type="button" variant="outline" onClick={() => setStep((s) => (s - 1) as Step)}>
               <ArrowLeftIcon className="size-4" />
-              Back
+              {t("back")}
             </Button>
           )}
           {step < 3 ? (
             <Button type="submit" disabled={previewing}>
               {previewing && <Loader2Icon className="size-4 animate-spin" />}
-              Continue
+              {t("continue")}
               <ArrowRightIcon className="size-4" />
             </Button>
           ) : (
             <Button
               type="submit"
               disabled={creating || entitlementLoading || !canCreate}
-              title={entitlementLoading || canCreate ? undefined : "You don't have create access"}
+              title={entitlementLoading || canCreate ? undefined : t("noCreateAccess")}
             >
               {(creating || entitlementLoading) && <Loader2Icon className="size-4 animate-spin" />}
-              Create workflow
+              {t("create")}
             </Button>
           )}
         </div>

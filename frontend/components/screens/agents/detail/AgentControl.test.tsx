@@ -1,5 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
+import { renderWithIntl as render } from "@/test/render-with-intl";
 
 import { AgentControlScreen } from "./AgentControl";
 import { CONTROL, CONTROL_AGENT, PERSISTED_SERVICE_SPEC } from "./agent-control.fixtures";

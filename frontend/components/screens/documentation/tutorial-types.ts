@@ -12,5 +12,15 @@ export type Tutorial = {
   }[];
 };
 
+/** Message key under `docsTutorials.levels` for a known level; unknown levels show as written. */
+export const levelKey = (level: string): "beginner" | "intermediate" | "advanced" | null =>
+  level === "Beginner"
+    ? "beginner"
+    : level === "Intermediate"
+      ? "intermediate"
+      : level === "Advanced"
+        ? "advanced"
+        : null;
+
 export const levelVariant = (level: string): "default" | "secondary" | "outline" =>
   level === "Beginner" ? "secondary" : level === "Advanced" ? "default" : "outline";

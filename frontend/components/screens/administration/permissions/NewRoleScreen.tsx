@@ -1,8 +1,9 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { SCOPE_NOUN, SCOPE_ORDER } from "@/components/access/access-model";
+import { SCOPE_ORDER } from "@/components/access/access-model";
 import { PermissionMatrix } from "@/components/access/PermissionMatrix";
 import { RoleSummary } from "@/components/access/RoleSummary";
 import { ShellHeader } from "@/components/shell/ShellHeader";
@@ -36,7 +37,7 @@ export interface RoleDraft {
 }
 
 type Step = 0 | 1 | 2;
-const STEPS = ["Details", "Permissions", "Review"] as const;
+const STEPS = ["details", "permissions", "review"] as const;
 const BLANK = "blank";
 
 export interface NewRoleScreenProps {
@@ -65,10 +66,10 @@ const slugify = (s: string) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 64);
 
-function seed(from: AstroliftRole | null): RoleDraft {
+function seed(from: AstroliftRole | null, customName: (name: string) => string): RoleDraft {
   return {
     slug: "",
-    name: from ? `${from.name} (custom)` : "",
+    name: from ? customName(from.name) : "",
     description: from?.description ?? "",
     scopeLevel: from?.scopeLevel ?? "ORG",
     permissions: [...(from?.permissions ?? [])].sort(),
@@ -95,9 +96,15 @@ export function NewRoleScreen({
   initialStep = 0,
   initialDraft,
 }: NewRoleScreenProps) {
+  const t = useTranslations("adminNewRole");
+  const scopes = useTranslations("shared.access.scope");
+  const roleKind = useTranslations("shared.access.role");
   const [step, setStep] = React.useState<Step>(initialStep);
   const [origin, setOrigin] = React.useState<AstroliftRole | null>(from);
-  const [draft, setDraft] = React.useState<RoleDraft>({ ...seed(from), ...initialDraft });
+  const [draft, setDraft] = React.useState<RoleDraft>({
+    ...seed(from, (name) => t("customName", { name })),
+    ...initialDraft,
+  });
   const [slugTouched, setSlugTouched] = React.useState(Boolean(initialDraft?.slug));
   const [errors, setErrors] = React.useState<Partial<Record<"name" | "slug", string>>>({});
   const [submitError, setSubmitError] = React.useState<string | null>(null);
@@ -118,12 +125,9 @@ export function NewRoleScreen({
 
   function validate(): boolean {
     const next: typeof errors = {};
-    if (!draft.name.trim()) next.name = "Name the role.";
-    if (!/^[a-z0-9][a-z0-9_-]*$/.test(slug))
-      next.slug =
-        "Lowercase letters, digits, hyphens and underscores, starting with a letter or digit.";
-    else if (roles.some((r) => r.slug === slug))
-      next.slug = `A role called ${slug} already exists.`;
+    if (!draft.name.trim()) next.name = t("errors.name");
+    if (!/^[a-z0-9][a-z0-9_-]*$/.test(slug)) next.slug = t("errors.slugFormat");
+    else if (roles.some((r) => r.slug === slug)) next.slug = t("errors.slugTaken", { slug });
     setErrors(next);
     return Object.keys(next).length === 0;
   }
@@ -146,14 +150,14 @@ export function NewRoleScreen({
       <ShellHeader
         crumbs={[
           ...permissionsCrumbs("roles").slice(0, 2),
-          { label: "Roles", href: ROLES_HREF },
-          { label: from ? `Duplicate ${from.name}` : "New role" },
+          { label: t("roles"), href: ROLES_HREF },
+          { label: from ? t("duplicate", { name: from.name }) : t("title") },
         ]}
-        title={from ? `Duplicate ${from.name}` : "New role"}
-        context="A custom role is a named set of permissions you grant at a scope."
+        title={from ? t("duplicate", { name: from.name }) : t("title")}
+        context={t("context")}
       />
 
-      <ol aria-label="Steps" className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+      <ol aria-label={t("steps")} className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
         {STEPS.map((label, i) => (
           <li key={label} className="min-w-0">
             <button
@@ -173,7 +177,7 @@ export function NewRoleScreen({
               >
                 {i + 1}
               </span>
-              {label}
+              {t(`step.${label}`)}
             </button>
           </li>
         ))}
@@ -182,38 +186,34 @@ export function NewRoleScreen({
       <div className="bg-card flex max-w-4xl min-w-0 flex-col gap-5 rounded-md border p-5">
         {step === 0 && (
           <>
-            <Field id="role-from" label="Start from">
+            <Field id="role-from" label={t("startFrom")}>
               <Select value={origin?.id ?? BLANK} onValueChange={startFrom} disabled={loading}>
                 <SelectTrigger id="role-from" className="max-w-md min-w-0">
-                  <SelectValue placeholder={loading ? "Loading roles…" : undefined} />
+                  <SelectValue placeholder={loading ? t("loadingRoles") : undefined} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={BLANK}>Nothing, a blank role</SelectItem>
+                  <SelectItem value={BLANK}>{t("blank")}</SelectItem>
                   {roles.map((r) => (
                     <SelectItem key={r.id} value={r.id}>
-                      {r.name}
-                      {r.isSystem ? " (built-in)" : ""}
+                      {r.isSystem
+                        ? t("builtInOption", { name: r.name, builtIn: roleKind("builtIn") })
+                        : r.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </Field>
             <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-              <Field id="role-name" label="Name" error={errors.name}>
+              <Field id="role-name" label={t("name")} error={errors.name}>
                 <Input
                   id="role-name"
                   value={draft.name}
                   onChange={(e) => patch({ name: e.target.value })}
-                  placeholder="Release manager"
+                  placeholder={t("namePlaceholder")}
                   aria-invalid={Boolean(errors.name)}
                 />
               </Field>
-              <Field
-                id="role-slug"
-                label="Slug"
-                error={errors.slug}
-                help="Derived from the name until you edit it. Fixed once created."
-              >
+              <Field id="role-slug" label={t("slug")} error={errors.slug} help={t("slugHelp")}>
                 <Input
                   id="role-slug"
                   value={slug}
@@ -226,11 +226,7 @@ export function NewRoleScreen({
                 />
               </Field>
             </div>
-            <Field
-              id="role-scope"
-              label="Binds at"
-              help="Where it may be granted: at this level or anything inside it. Fixed once created."
-            >
+            <Field id="role-scope" label={t("bindsAt")} help={t("bindsAtHelp")}>
               <Select
                 value={draft.scopeLevel}
                 onValueChange={(v) => patch({ scopeLevel: v as ScopeKind })}
@@ -241,18 +237,18 @@ export function NewRoleScreen({
                 <SelectContent>
                   {SCOPE_ORDER.map((s) => (
                     <SelectItem key={s} value={s}>
-                      {SCOPE_NOUN[s]}
+                      {scopes(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </Field>
-            <Field id="role-description" label="Description">
+            <Field id="role-description" label={t("description")}>
               <Textarea
                 id="role-description"
                 value={draft.description}
                 onChange={(e) => patch({ description: e.target.value })}
-                placeholder="What this role is for, in one sentence."
+                placeholder={t("descriptionPlaceholder")}
                 rows={2}
               />
             </Field>
@@ -279,8 +275,7 @@ export function NewRoleScreen({
             />
             {origin && (
               <p className="text-muted-foreground text-xs">
-                Compared with {origin.name}. The new role records that it was duplicated from{" "}
-                {origin.name}, so its Permissions tab can show how far it moves from it.
+                {t("comparedWith", { name: origin.name })}
               </p>
             )}
             {submitError && (
@@ -293,20 +288,20 @@ export function NewRoleScreen({
 
         <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
           <Button type="button" variant="ghost" onClick={onCancel}>
-            Cancel
+            {t("cancel")}
           </Button>
           {step > 0 && (
             <Button type="button" variant="outline" onClick={() => setStep((step - 1) as Step)}>
-              Back
+              {t("back")}
             </Button>
           )}
           {step < 2 ? (
             <Button type="button" onClick={() => goTo((step + 1) as Step)}>
-              Continue
+              {t("continue")}
             </Button>
           ) : (
             <Button type="button" onClick={submit} disabled={creating}>
-              {creating ? "Creating…" : "Create role"}
+              {creating ? t("creating") : t("create")}
             </Button>
           )}
         </div>

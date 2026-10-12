@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type { ConnectSourceInput } from "@/graphql/__generated__/schema";
@@ -17,6 +18,7 @@ interface MutationResp {
  * ConnectSourceDialogView; the view owns the form.
  */
 export function useConnectSource() {
+  const t = useTranslations("sourceProviders.toasts");
   const [connect, { loading }] = useMutation<MutationResp>(CONNECT_SOURCE, {
     refetchQueries: [{ query: LIST_SOURCE_CONNECTIONS }],
     awaitRefetchQueries: true,
@@ -26,10 +28,10 @@ export function useConnectSource() {
   async function onConnect(input: ConnectSourceInput): Promise<boolean> {
     const { data } = await connect({ variables: { input } });
     if (data?.connectSource.ok) {
-      toast.success(`Connected ${data.connectSource.data?.name ?? input.kind}`);
+      toast.success(t("connected", { name: data.connectSource.data?.name ?? input.kind }));
       return true;
     }
-    toast.error(data?.connectSource.errors?.[0]?.message ?? "Connect failed");
+    toast.error(data?.connectSource.errors?.[0]?.message ?? t("connectFailed"));
     return false;
   }
 

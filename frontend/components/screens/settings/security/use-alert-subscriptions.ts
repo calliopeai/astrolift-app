@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
@@ -45,6 +46,7 @@ interface SubsResp {
  * half of AlertSubscriptionsView.
  */
 export function useAlertSubscriptions() {
+  const t = useTranslations("notificationSettings.toasts");
   // `astroliftAppsPage` takes `search`, `limit` and `cursor` (not `after`):
   // the search is a server argument, and no column declares a `sortKey`.
   const list = useLocalListState(ALERT_SUBSCRIPTIONS_LIST);
@@ -96,7 +98,7 @@ export function useAlertSubscriptions() {
       },
     });
     if (!data?.setAlertSubscription.ok) {
-      throw new Error(data?.setAlertSubscription.errors?.[0]?.message ?? "Save failed");
+      throw new Error(data?.setAlertSubscription.errors?.[0]?.message ?? t("saveFailed"));
     }
   }
 
@@ -107,13 +109,13 @@ export function useAlertSubscriptions() {
       if (!enabled && sub) {
         const { data } = await clearSubscription({ variables: { input: { id: sub.id } } });
         if (!data?.clearAlertSubscription.ok) {
-          throw new Error(data?.clearAlertSubscription.errors?.[0]?.message ?? "Save failed");
+          throw new Error(data?.clearAlertSubscription.errors?.[0]?.message ?? t("saveFailed"));
         }
       } else {
         await setEnabled(appSlug, alertKind, enabled);
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Save failed");
+      toast.error(err instanceof Error ? err.message : t("saveFailed"));
     }
   }
 
@@ -125,9 +127,9 @@ export function useAlertSubscriptions() {
           await setEnabled(appSlug, kind.value, true);
         }
       }
-      toast.success(`Subscribed to all on ${appSlug}`);
+      toast.success(t("subscribedAll", { app: appSlug }));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Subscribe failed");
+      toast.error(err instanceof Error ? err.message : t("subscribeFailed"));
     }
   }
 
@@ -141,10 +143,12 @@ export function useAlertSubscriptions() {
         variables: { input: { id: existing.id } },
       });
       if (!data?.clearAlertSubscription.ok) {
-        throw new Error(data?.clearAlertSubscription.errors?.[0]?.message ?? "Unsubscribe failed");
+        throw new Error(
+          data?.clearAlertSubscription.errors?.[0]?.message ?? t("unsubscribeFailed")
+        );
       }
     }
-    toast.success(`Unsubscribed from ${appSlug}`);
+    toast.success(t("unsubscribed", { app: appSlug }));
   }
 
   return {

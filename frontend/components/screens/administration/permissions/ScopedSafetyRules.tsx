@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import type { ScopeNode } from "@/components/access/access-model";
@@ -60,18 +61,20 @@ export type ScopedSafetyRulesProps = {
   onClear: (rule: ScopedRule) => void;
 };
 
-const KIND_LABEL: Record<ScopedKind, string> = { TEAM: "Team", APP: "App", USER: "Person" };
+const KINDS: ScopedKind[] = ["TEAM", "APP", "USER"];
+
+/** The `actionSafety.scoped` translator, or one bound to it. */
+type ScopedTranslator = (key: string, values?: Record<string, string | number>) => string;
 
 /** What one narrower rule adds, in words. */
-export function describeRule(rule: ScopedRule): string {
+export function describeRule(rule: ScopedRule, t: ScopedTranslator): string {
   const parts: string[] = [];
-  if (rule.enabled) parts.push("asks before");
+  if (rule.enabled) parts.push(t("adds.asksBefore"));
   if (rule.requireApproval) {
-    const n = rule.minimumApprovals ?? 1;
-    parts.push(`needs ${n} ${n === 1 ? "approver" : "approvers"}`);
+    parts.push(t("adds.needsApprovers", { count: rule.minimumApprovals ?? 1 }));
   }
-  if (rule.allowSelfApproval === false) parts.push("no self-approval");
-  return parts.join(" · ") || "adds nothing";
+  if (rule.allowSelfApproval === false) parts.push(t("adds.noSelfApproval"));
+  return parts.join(" · ") || t("adds.nothing");
 }
 
 /**
@@ -90,6 +93,9 @@ export function ScopedSafetyRules({
   onAdd,
   onClear,
 }: ScopedSafetyRulesProps) {
+  const t = useTranslations("actionSafety.scoped");
+  const kindLabel = (k: string) =>
+    (KINDS as string[]).includes(k) ? t(`kinds.${k as ScopedKind}`) : k;
   const [kind, setKind] = React.useState<ScopedKind>("TEAM");
   const [target, setTarget] = React.useState<{ id: string; name: string } | null>(null);
   const [action, setAction] = React.useState(actions[0]?.action ?? "");
@@ -121,11 +127,9 @@ export function ScopedSafetyRules({
     <section aria-labelledby="scoped-rules" className="space-y-3">
       <div>
         <h2 id="scoped-rules" className="text-sm font-medium">
-          Rules for teams, apps and people
+          {t("title")}
         </h2>
-        <p className="text-muted-foreground text-xs">
-          These add to the organization&apos;s gates, never remove them.
-        </p>
+        <p className="text-muted-foreground text-xs">{t("description")}</p>
       </div>
       {error && (
         <p role="alert" className="text-destructive text-sm">
@@ -133,7 +137,7 @@ export function ScopedSafetyRules({
         </p>
       )}
       {rules.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No team, app or person rules.</p>
+        <p className="text-muted-foreground text-sm">{t("empty")}</p>
       ) : (
         <ul className="divide-y rounded-sm border text-sm">
           {rules.map((rule) => (
@@ -145,13 +149,13 @@ export function ScopedSafetyRules({
               <span className="min-w-0 flex-1">
                 {labelOf(rule.action)}{" "}
                 <span className="text-muted-foreground text-xs">
-                  for {KIND_LABEL[rule.scopeKind as ScopedKind] ?? rule.scopeKind}
+                  {t("forKind", { kind: kindLabel(rule.scopeKind) })}
                 </span>{" "}
                 <span className="font-mono text-xs">{rule.scopeLabel}</span>
-                <span className="text-muted-foreground block text-xs">{describeRule(rule)}</span>
+                <span className="text-muted-foreground block text-xs">{describeRule(rule, t)}</span>
               </span>
               <Button size="sm" variant="ghost" disabled={saving} onClick={() => onClear(rule)}>
-                Remove
+                {t("remove")}
               </Button>
             </li>
           ))}
@@ -159,7 +163,7 @@ export function ScopedSafetyRules({
       )}
 
       <fieldset className="space-y-3 rounded-sm border p-3 text-sm" disabled={saving}>
-        <legend className="px-1 text-xs font-medium">Add a rule</legend>
+        <legend className="px-1 text-xs font-medium">{t("addLegend")}</legend>
         <div className="flex flex-wrap items-center gap-3">
           <Select
             value={kind}
@@ -168,19 +172,19 @@ export function ScopedSafetyRules({
               setTarget(null);
             }}
           >
-            <SelectTrigger size="sm" className="w-auto" aria-label="Applies to">
+            <SelectTrigger size="sm" className="w-auto" aria-label={t("appliesTo")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(Object.keys(KIND_LABEL) as ScopedKind[]).map((k) => (
+              {KINDS.map((k) => (
                 <SelectItem key={k} value={k}>
-                  {KIND_LABEL[k]}
+                  {kindLabel(k)}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Select value={action} onValueChange={setAction}>
-            <SelectTrigger size="sm" className="w-auto" aria-label="Action">
+            <SelectTrigger size="sm" className="w-auto" aria-label={t("action")}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -193,7 +197,7 @@ export function ScopedSafetyRules({
           </Select>
           {target && (
             <span className="text-xs">
-              {KIND_LABEL[kind]}: <span className="font-mono">{target.name}</span>
+              {kindLabel(kind)}: <span className="font-mono">{target.name}</span>
             </span>
           )}
         </div>
@@ -203,17 +207,17 @@ export function ScopedSafetyRules({
             <Input
               value={people.query}
               onChange={(event) => people.onQuery(event.target.value)}
-              placeholder="Search people by name or email"
-              aria-label="Search people"
+              placeholder={t("searchPeoplePlaceholder")}
+              aria-label={t("searchPeople")}
               className="max-w-sm"
             />
             {people.loading ? (
               <p role="status" className="text-muted-foreground text-xs">
-                Searching…
+                {t("searching")}
               </p>
             ) : (
               people.results.length > 0 && (
-                <ul aria-label="People" className="max-w-sm divide-y rounded-sm border">
+                <ul aria-label={t("people")} className="max-w-sm divide-y rounded-sm border">
                   {people.results.map((person) => (
                     <li key={person.id}>
                       <button
@@ -240,9 +244,9 @@ export function ScopedSafetyRules({
             value={target ? { kind, id: target.id, name: target.name } : null}
             onChange={(node) => setTarget({ id: node.id, name: node.name })}
             selectable={(node) =>
-              node.kind === kind ? true : `Pick ${kind === "TEAM" ? "a team" : "an app"}`
+              node.kind === kind ? true : kind === "TEAM" ? t("pickTeam") : t("pickApp")
             }
-            label={kind === "TEAM" ? "Teams" : "Apps"}
+            label={kind === "TEAM" ? t("teams") : t("apps")}
             className="max-h-56 max-w-sm overflow-auto"
           />
         )}
@@ -250,23 +254,23 @@ export function ScopedSafetyRules({
         <div className="flex flex-wrap items-center gap-4">
           <label className="flex items-center gap-2">
             <Checkbox checked={askBefore} onCheckedChange={(v) => setAskBefore(v === true)} />
-            <span className="text-xs">Ask before (confirm and sign in again)</span>
+            <span className="text-xs">{t("askBefore")}</span>
           </label>
           {approvable && (
             <>
               <label className="flex items-center gap-2">
                 <Checkbox checked={approval} onCheckedChange={(v) => setApproval(v === true)} />
-                <span className="text-xs">Require approval</span>
+                <span className="text-xs">{t("requireApproval")}</span>
               </label>
               {approval && (
                 <Select value={String(quorum)} onValueChange={(v) => setQuorum(Number(v))}>
-                  <SelectTrigger size="sm" className="w-auto" aria-label="Approvers needed">
+                  <SelectTrigger size="sm" className="w-auto" aria-label={t("approversNeeded")}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {[1, 2, 3, 4, 5].map((n) => (
                       <SelectItem key={n} value={String(n)}>
-                        {n} {n === 1 ? "approver" : "approvers"}
+                        {t("approvers", { count: n })}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -274,12 +278,12 @@ export function ScopedSafetyRules({
               )}
               <label className="flex items-center gap-2">
                 <Checkbox checked={noSelf} onCheckedChange={(v) => setNoSelf(v === true)} />
-                <span className="text-xs">No approving your own</span>
+                <span className="text-xs">{t("noSelf")}</span>
               </label>
             </>
           )}
           <Button size="sm" disabled={!target || !adds} onClick={() => void add()}>
-            Add rule
+            {t("add")}
           </Button>
         </div>
       </fieldset>

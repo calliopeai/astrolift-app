@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type { ConnectExistingGithubAppInput } from "@/graphql/__generated__/schema";
@@ -20,6 +21,7 @@ interface ConnectExistingResp {
  * ConnectGitHubDialogView; the view owns the form.
  */
 export function useConnectGitHub() {
+  const t = useTranslations("sourceProviders.toasts");
   const [connectExisting, { loading }] = useMutation<ConnectExistingResp>(
     CONNECT_EXISTING_GITHUB_APP,
     {
@@ -41,10 +43,10 @@ export function useConnectGitHub() {
     const { data } = await connectExisting({ variables: { input } });
     const res = data?.connectExistingGithubApp;
     if (res?.ok) {
-      toast.success(`Connected GitHub App: ${res.data?.name ?? input.appId}`);
+      toast.success(t("githubConnected", { name: res.data?.name ?? input.appId }));
       return true;
     }
-    toast.error(res?.errors?.[0]?.message ?? "Couldn't connect the GitHub App");
+    toast.error(res?.errors?.[0]?.message ?? t("githubConnectFailed"));
     return false;
   }
 

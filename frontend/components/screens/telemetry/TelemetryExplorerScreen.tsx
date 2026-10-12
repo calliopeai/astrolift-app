@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 import Link from "next/link";
-import { useLocale, useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { PageShell } from "@/components/PageShell";
 import { QueryError } from "@/components/QueryError";
 import { EmptyState } from "@/components/EmptyState";
@@ -26,7 +26,7 @@ export const TELEMETRY_SETUP =
   "https://github.com/calliopeai/astrolift-app/blob/main/docs/operators/scoped-telemetry-explorers.md";
 export function TelemetryExplorerScreen(props: ExplorerProps) {
   const t = useTranslations("TelemetryExplorer");
-  const locale = useLocale();
+  const format = useFormatter();
   const sampleDefinition = {
     id: "telemetry.trace.sample",
     fields: [],
@@ -118,7 +118,9 @@ export function TelemetryExplorerScreen(props: ExplorerProps) {
         const stamp = new Date(Number(row.startTime) / 1_000_000);
         return (
           <span title={row.startTime}>
-            {Number.isFinite(stamp.getTime()) ? stamp.toLocaleString(locale) : row.startTime}
+            {Number.isFinite(stamp.getTime())
+              ? format.dateTime(stamp, { dateStyle: "short", timeStyle: "medium" })
+              : row.startTime}
           </span>
         );
       },

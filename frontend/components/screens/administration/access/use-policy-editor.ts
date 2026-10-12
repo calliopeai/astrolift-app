@@ -2,6 +2,7 @@
 
 import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type { ConditionCatalogEntry } from "@/components/access/PolicyConditionHelp";
@@ -59,6 +60,7 @@ const REFETCH = [{ query: LIST_POLICIES }, "ListPoliciesPage", "GetPolicy"];
  * refused rather than overwritten, and the refusal shows in place.
  */
 export function usePolicyEditor(id?: string) {
+  const t = useTranslations("adminPolicies.editor");
   const router = useRouter();
   const client = useApolloClient();
   const perms = useMyPermissions();
@@ -88,7 +90,7 @@ export function usePolicyEditor(id?: string) {
       },
       fetchPolicy: "network-only",
     });
-    if (!data?.astroliftPolicySimulation) throw error ?? new Error("The simulation failed");
+    if (!data?.astroliftPolicySimulation) throw error ?? new Error(t("simulationFailed"));
     return data.astroliftPolicySimulation;
   }
 
@@ -107,19 +109,19 @@ export function usePolicyEditor(id?: string) {
         variables: { input: { id: policy.id, ...fields, ifMatchVersion: policy.version } },
       });
       if (data?.updatePolicy.ok) {
-        toast.success(`Policy ${policy.slug} saved`);
+        toast.success(t("saved", { slug: policy.slug }));
         router.push(POLICIES_HREF);
         return null;
       }
-      return data?.updatePolicy.errors?.[0]?.message ?? "Save failed";
+      return data?.updatePolicy.errors?.[0]?.message ?? t("saveFailed");
     }
     const { data } = await create({ variables: { input } });
     if (data?.createPolicy.ok) {
-      toast.success(`Policy ${input.slug} created`);
+      toast.success(t("created", { slug: input.slug }));
       router.push(POLICIES_HREF);
       return null;
     }
-    return data?.createPolicy.errors?.[0]?.message ?? "Create failed";
+    return data?.createPolicy.errors?.[0]?.message ?? t("createFailed");
   }
 
   return {

@@ -2,6 +2,7 @@
 
 import { Loader2Icon, PlayIcon, ScrollTextIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
@@ -32,6 +33,7 @@ export function WorkloadRowActions({
   canRun,
   onRun,
 }: WorkloadRowActionsProps) {
+  const t = useTranslations("appWorkloads.rowActions");
   const pending = pendingSlug === w.slug;
   const runnable = w.kind === "cronjob" && canRun;
   return (
@@ -39,12 +41,12 @@ export function WorkloadRowActions({
       <DropdownMenuItem asChild>
         <Link href={logsHref}>
           <ScrollTextIcon className="size-4" />
-          Open logs
+          {t("openLogs")}
         </Link>
       </DropdownMenuItem>
       {runnable && <DropdownMenuSeparator />}
       {runnable && environments.length === 0 && (
-        <DropdownMenuItem disabled>Run now: no environments yet</DropdownMenuItem>
+        <DropdownMenuItem disabled>{t("noEnvironments")}</DropdownMenuItem>
       )}
       {runnable &&
         environments.map((env) => (
@@ -60,7 +62,10 @@ export function WorkloadRowActions({
               <PlayIcon className="size-4" />
             )}
             <span className="min-w-0 truncate">
-              Run now in <span className="font-mono">{env.name}</span>
+              {t.rich("runIn", {
+                env: env.name,
+                mono: (chunks) => <span className="font-mono">{chunks}</span>,
+              })}
             </span>
           </DropdownMenuItem>
         ))}

@@ -8,6 +8,7 @@ import {
   Loader2Icon,
   XIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { ShellHeader } from "@/components/shell/ShellHeader";
@@ -19,22 +20,10 @@ import { agentsCrumbs } from "../list/agents-list";
 export type NewAgentStep = 1 | 2 | 3;
 
 /** The three steps (spec 44 §5.4): where the agents are, where they live, then what registers. */
-export const NEW_AGENT_STEPS: { n: NewAgentStep; label: string; description: string }[] = [
-  {
-    n: 1,
-    label: "Source",
-    description: "The repository, and the agent manifests a scan of it finds.",
-  },
-  {
-    n: 2,
-    label: "Configure",
-    description: "The project the agents are registered under.",
-  },
-  {
-    n: 3,
-    label: "Review",
-    description: "What will be registered. Nothing happens until you register it.",
-  },
+export const NEW_AGENT_STEPS: { n: NewAgentStep; key: "source" | "configure" | "review" }[] = [
+  { n: 1, key: "source" },
+  { n: 2, key: "configure" },
+  { n: 3, key: "review" },
 ];
 
 export interface NewAgentPageProps {
@@ -64,23 +53,24 @@ export function NewAgentPage({
   onStep,
   onBack,
   onContinue,
-  continueLabel = "Continue",
+  continueLabel,
   busy = false,
   onCancel,
   children,
 }: NewAgentPageProps) {
+  const t = useTranslations("agentWizard");
   const current = NEW_AGENT_STEPS[step - 1];
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4">
       <ShellHeader
-        crumbs={agentsCrumbs("agents", [{ label: "New agent" }])}
-        title="New agent"
+        crumbs={agentsCrumbs("agents", [{ label: t("newAgent") }])}
+        title={t("newAgent")}
         context={
-          <ol aria-label="Steps" className="inline-flex flex-wrap items-center gap-2">
+          <ol aria-label={t("stepsLabel")} className="inline-flex flex-wrap items-center gap-2">
             {NEW_AGENT_STEPS.map((s, i) => {
               const label = (
                 <>
-                  <span className="font-mono">{s.n}</span> {s.label}
+                  <span className="font-mono">{s.n}</span> {t(`steps.${s.key}.label`)}
                 </>
               );
               return (
@@ -100,7 +90,7 @@ export function NewAgentPage({
                       className="hover:text-foreground focus-visible:ring-ring inline-flex items-center gap-1 rounded-sm focus-visible:ring-2 focus-visible:outline-none"
                     >
                       {label}
-                      <CheckIcon className="size-3.5" aria-label="done" />
+                      <CheckIcon className="size-3.5" aria-label={t("done")} />
                     </button>
                   ) : (
                     <span>{label}</span>
@@ -114,7 +104,7 @@ export function NewAgentPage({
           onCancel ? (
             <Button variant="ghost" size="sm" onClick={onCancel}>
               <XIcon className="size-4" />
-              Cancel
+              {t("cancel")}
             </Button>
           ) : undefined
         }
@@ -126,9 +116,11 @@ export function NewAgentPage({
       >
         <div className="min-w-0">
           <h2 id="new-agent-step" className="text-lg font-semibold">
-            {current.label}
+            {t(`steps.${current.key}.label`)}
           </h2>
-          <p className="text-muted-foreground mt-1 text-sm">{current.description}</p>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {t(`steps.${current.key}.description`)}
+          </p>
         </div>
         {children}
       </section>
@@ -136,11 +128,11 @@ export function NewAgentPage({
       <div className="flex max-w-5xl min-w-0 items-center justify-between gap-2">
         <Button type="button" variant="ghost" onClick={onBack} disabled={!onBack}>
           <ArrowLeftIcon className="size-4" />
-          Back
+          {t("back")}
         </Button>
         <Button type="button" onClick={onContinue} disabled={busy}>
           {busy && <Loader2Icon className="size-4 animate-spin" />}
-          {continueLabel}
+          {continueLabel ?? t("continue")}
           {!busy && step < 3 && <ArrowRightIcon className="size-4" />}
         </Button>
       </div>

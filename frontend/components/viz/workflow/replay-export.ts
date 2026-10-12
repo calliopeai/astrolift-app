@@ -1,6 +1,7 @@
 "use client";
 
 import { HEALTH_COLOR } from "../core/semantics";
+import type { VizT } from "../core/viz-t";
 
 import {
   STAGE_HEALTH,
@@ -24,6 +25,8 @@ import {
 
 export interface ExportOptions {
   label: string;
+  /** Words drawn into the frames and the errors thrown. */
+  vt: VizT;
   width?: number;
   height?: number;
   /** Length of the exported time-lapse. */
@@ -80,7 +83,8 @@ export function drawFrame(
   run: PlacedRun,
   t: number,
   colors: ExportPalette,
-  label: string
+  label: string,
+  vt: VizT
 ) {
   const { width: w, height: h } = ctx.canvas;
   const pad = 24;
@@ -176,7 +180,8 @@ export function drawFrame(
       ctx.stroke();
       ctx.fillStyle = r.round === current?.round ? colors.fg : colors.muted;
       const room = x(r.end) - x(r.start) - 8;
-      const text = room > 52 ? `Round ${r.round}` : `R${r.round}`;
+      const text =
+        room > 52 ? vt("replay.round", { n: r.round }) : vt("replay.roundShort", { n: r.round });
       if (room > 14) ctx.fillText(text, rx + 5, 62);
     }
   }
@@ -216,36 +221,37 @@ export function drawFrame(
   const active = idx >= 0 ? run.stages[idx] : null;
   ctx.font = `12px system-ui, sans-serif`;
   ctx.fillStyle = colors.muted;
-  const round = run.rounds.length > 1 && current ? `Round ${current.round} · ` : "";
+  const round =
+    run.rounds.length > 1 && current ? `${vt("replay.round", { n: current.round })} · ` : "";
   ctx.fillText(
     active
-      ? `${round}${active.stage.name} · ${t >= active.end ? active.stage.status : "running"}`
-      : "Queued",
+      ? `${round}${active.stage.name} · ${t >= active.end ? active.stage.status : vt("replay.running")}`
+      : vt("replay.queued"),
     pad,
     h - 20
   );
 }
 
-function canvasFor(width: number, height: number): CanvasRenderingContext2D {
+function canvasFor(width: number, height: number, vt: VizT): CanvasRenderingContext2D {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("This browser cannot draw the export (no 2D canvas).");
+  if (!ctx) throw new Error(vt("replay.noCanvas"));
   return ctx;
 }
 
 export async function exportGif(
   run: PlacedRun,
   colors: ExportPalette,
-  { label, width = 720, height = exportHeight(run, 180), seconds = 6, fps = 12 }: ExportOptions
+  { label, vt, width = 720, height = exportHeight(run, 180), seconds = 6, fps = 12 }: ExportOptions
 ): Promise<Blob> {
   const { GIFEncoder, quantize, applyPalette } = await import("gifenc");
-  const ctx = canvasFor(width, height);
+  const ctx = canvasFor(width, height, vt);
   const gif = GIFEncoder();
   const times = frameTimes(run.total, seconds, fps);
   times.forEach((t, i) => {
-    drawFrame(ctx, run, t, colors, label);
+    drawFrame(ctx, run, t, colors, label, vt);
     const { data } = ctx.getImageData(0, 0, width, height);
     const palette = quantize(data, 256);
     // Hold the finished picture for a beat before the loop restarts.
@@ -267,10 +273,10 @@ export function canExportVideo(): boolean {
 export async function exportVideo(
   run: PlacedRun,
   colors: ExportPalette,
-  { label, width = 1280, height = exportHeight(run, 320), seconds = 6, fps = 30 }: ExportOptions
+  { label, vt, width = 1280, height = exportHeight(run, 320), seconds = 6, fps = 30 }: ExportOptions
 ): Promise<Blob> {
-  if (!canExportVideo()) throw new Error("This browser cannot record video.");
-  const ctx = canvasFor(width, height);
+  if (!canExportVideo()) throw new Error(vt("replay.noVideo"));
+  const ctx = canvasFor(width, height, vt);
   const mime = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find((m) =>
     MediaRecorder.isTypeSupported(m)
   );
@@ -282,13 +288,13 @@ export async function exportVideo(
   recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
   const stopped = new Promise<void>((resolve) => (recorder.onstop = () => resolve()));
   const times = frameTimes(run.total, seconds, fps);
-  drawFrame(ctx, run, 0, colors, label);
+  drawFrame(ctx, run, 0, colors, label, vt);
   recorder.start();
   // Recording is real time: paint one frame per tick, then hold the end.
   await new Promise<void>((resolve) => {
     let i = 0;
     const id = window.setInterval(() => {
-      drawFrame(ctx, run, times[Math.min(i, times.length - 1)], colors, label);
+      drawFrame(ctx, run, times[Math.min(i, times.length - 1)], colors, label, vt);
       i += 1;
       if (i >= times.length + fps) {
         window.clearInterval(id);

@@ -78,7 +78,10 @@ def test_real_kaniko_activity_persists_output_and_never_confirms_failed_or_stub_
             driver=driver, registry_driver=object(), repo_name="app", repo_uri="registry/app"
         ),
     )
-    monkeypatch.setattr(module, "_read_pushed_digest", lambda *args: "sha256:" + "ab" * 32)
+    # The tag is in the registry only once the build has pushed it.
+    monkeypatch.setattr(
+        module, "_read_pushed_digest", lambda *args: "sha256:" + "ab" * 32 if cluster.ticks > 1 else ""
+    )
     if outcome == "failed":
         with pytest.raises(RuntimeError, match="image build failed"):
             _build_image_sync(BuildImageInput(deployment.pk, "sha-run", ""))

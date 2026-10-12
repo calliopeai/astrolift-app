@@ -1,6 +1,7 @@
 "use client";
 
 import NextLink from "next/link";
+import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,17 +15,13 @@ export type BucketMembersProps = ReturnType<typeof useBucketMembers>;
 /** The raw events folded into one bucket, each linked to its detail. */
 export function BucketMembers({ loading, members }: BucketMembersProps) {
   const fmt = useFormatters();
+  const t = useTranslations("eventDetail");
 
   if (loading && members.length === 0) {
     return <Skeleton className="h-24 w-full" />;
   }
   if (members.length === 0) {
-    return (
-      <p className="text-muted-foreground text-sm">
-        These events have aged out of the window this view reads. Open the representative event for
-        its full payload.
-      </p>
-    );
+    return <p className="text-muted-foreground text-sm">{t("agedOut")}</p>;
   }
 
   return (
@@ -34,7 +31,7 @@ export function BucketMembers({ loading, members }: BucketMembersProps) {
           <NextLink
             href={`/events/${e.id}`}
             className="hover:bg-accent/30 focus-visible:outline-ring -m-1 flex flex-wrap items-center gap-2 rounded-md p-1 focus-visible:outline-2"
-            aria-label={`Open event ${e.eventType}`}
+            aria-label={t("openEvent", { type: e.eventType })}
           >
             <Badge variant="outline" className="max-w-full shrink font-mono text-xs">
               <span className="min-w-0 truncate" title={e.eventType}>

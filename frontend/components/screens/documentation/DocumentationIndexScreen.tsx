@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import {
   AlertTriangleIcon,
   ArrowRightIcon,
@@ -38,185 +39,158 @@ export interface DocSection {
   cards: DocCard[];
 }
 
-export const DOCS_INDEX_SECTIONS: DocSection[] = [
+interface KeyedDocSection {
+  /** Key under `docsNav.sections`. */
+  labelKey: string;
+  /** `key` names the card under `docsIndex.cards`. */
+  cards: (Omit<DocCard, "title" | "description"> & { key: string })[];
+}
+
+const DOCS_INDEX: KeyedDocSection[] = [
   {
-    label: "Getting started",
+    labelKey: "gettingStarted",
     cards: [
       {
         href: "/documentation/introduction",
-        title: "Introduction",
-        description: "What Astrolift is and the concepts you'll meet first.",
+        key: "introduction",
         icon: BookOpenIcon,
       },
       {
         href: "/documentation/quickstart",
-        title: "Quickstart",
-        description: "Connect a cluster and source, register a manifest, and deploy an image.",
+        key: "quickstart",
         icon: ZapIcon,
       },
       {
         href: "/documentation/get-started",
-        title: "Local dev setup",
-        description: "Bring up the full stack locally with Docker Compose.",
+        key: "localDev",
         icon: RocketIcon,
       },
       {
         href: "/documentation/tutorials",
-        title: "Tutorials",
-        description: "Step-by-step walkthroughs for the most common build paths.",
+        key: "tutorials",
         icon: GraduationCapIcon,
       },
     ],
   },
   {
-    label: "Operator guides",
+    labelKey: "operatorGuides",
     cards: [
       {
         href: "/documentation/cluster-prerequisites",
-        title: "Cluster prerequisites",
-        description:
-          "What a tenant cluster needs (cert-manager, ingress, external-dns) before Astrolift can use it.",
+        key: "clusterPrerequisites",
         icon: ServerCogIcon,
       },
       {
         href: "/documentation/custom-domains",
-        title: "Custom domains",
-        description: "Bind app.acme.com to an app with auto-managed TLS via cert-manager.",
+        key: "customDomains",
         icon: GlobeIcon,
       },
       {
         href: "/documentation/source-providers",
-        title: "Source providers",
-        description:
-          "Connect GitHub or GitLab for repository access, managed CI, and source webhooks.",
+        key: "sourceProviders",
         icon: GitBranchIcon,
       },
       {
         href: "/documentation/identity-providers",
-        title: "Identity providers",
-        description:
-          "Route sign-in through OIDC, SAML, Cognito, Auth0, Okta, Azure AD, Google, or GitHub.",
+        key: "identityProviders",
         icon: KeyRoundIcon,
       },
       {
         href: "/documentation/policies",
-        title: "ABAC policies",
-        description: "Author fine-grained allow/deny rules on top of role bindings.",
+        key: "policies",
         icon: ScaleIcon,
       },
       {
         href: "/documentation/webhooks",
-        title: "Webhooks",
-        description:
-          "Review outbound event subscriptions, availability, and the HMAC receiver contract.",
+        key: "webhooks",
         icon: WebhookIcon,
       },
     ],
   },
   {
-    label: "Runbooks",
+    labelKey: "runbooks",
     cards: [
       {
         href: "/documentation/runbooks",
-        title: "Operator runbooks",
-        description:
-          "Deploy workflow, rollback, cluster management, agent dispatch, and incident response.",
+        key: "runbooks",
         icon: AlertTriangleIcon,
       },
     ],
   },
   {
-    label: "Reference",
+    labelKey: "reference",
     cards: [
       {
         href: "/documentation/configuration",
-        title: "Configuration",
-        description:
-          "Every environment variable Astrolift reads — purpose, defaults, and who sets them.",
+        key: "configuration",
         icon: SettingsIcon,
       },
       {
         href: "/documentation/webhook-events",
-        title: "Webhook events",
-        description: "Payload schema and JSON examples for every outbound webhook event.",
+        key: "webhookEvents",
         icon: ListTreeIcon,
       },
       {
         href: "/documentation/changelog",
-        title: "Changelog",
-        description: "New features and fixes, most recent first.",
+        key: "changelog",
         icon: ScrollIcon,
       },
     ],
   },
   {
-    label: "Public reference",
+    labelKey: "publicReference",
     cards: [
       {
         href: `${PUBLIC_DOCS_URL}/reference/astrolift-toml/`,
-        title: "astrolift.toml manifest",
-        description:
-          "Full schema for the per-app manifest — sections, fields, validation, examples.",
+        key: "manifest",
         icon: FileTextIcon,
         external: true,
       },
       {
         href: `${PUBLIC_DOCS_URL}/reference/cli/`,
-        title: "CLI reference",
-        description: "Authentication, app and agent operations, CI, portable docs, and man pages.",
+        key: "cli",
         icon: TerminalIcon,
         external: true,
       },
       {
         href: `${PUBLIC_DOCS_URL}/reference/api/`,
-        title: "Control API",
-        description: "GraphQL, focused REST routes, bearer authentication, tenancy, and errors.",
+        key: "api",
         icon: KeyRoundIcon,
         external: true,
       },
       {
         href: `${PUBLIC_DOCS_URL}/reference/mcp/`,
-        title: "MCP reference",
-        description:
-          "Authenticated remote agent inspection, dispatch, cancellation, and source reconciliation.",
+        key: "mcp",
         icon: ZapIcon,
         external: true,
       },
       {
         href: `${PUBLIC_DOCS_URL}/reference/agent-packages/`,
-        title: "Agent packages",
-        description:
-          "Briefs, skills, tools, source slices, monorepos, federation, and imported formats.",
+        key: "agentPackages",
         icon: ListTreeIcon,
         external: true,
       },
       {
         href: `${PUBLIC_DOCS_URL}/reference/workflow-toml/`,
-        title: "Workflow TOML",
-        description:
-          "Ordered agent stages, environment recipes, skill overlays, named outputs, and repo sync.",
+        key: "workflowToml",
         icon: GitBranchIcon,
         external: true,
       },
       {
         href: `${PUBLIC_DOCS_URL}/guides/plugin-sdk-cookbook/`,
-        title: "Provider plugin SDK",
-        description: "Build and test provider extensions against the current driver contracts.",
+        key: "pluginSdk",
         icon: ServerCogIcon,
         external: true,
       },
       {
         href: `${PUBLIC_DOCS_URL}/demo-scenarios/`,
-        title: "Demo scenarios",
-        description: "Worked app, agent, workflow, and operational validation scenarios.",
+        key: "demoScenarios",
         icon: RocketIcon,
         external: true,
       },
       {
         href: `${PUBLIC_DOCS_URL}/operators/install/`,
-        title: "Install Astrolift",
-        description:
-          "Cloud and Kubernetes installation paths, prerequisites, and canonical runbooks.",
+        key: "install",
         icon: GlobeIcon,
         external: true,
       },
@@ -225,24 +199,32 @@ export const DOCS_INDEX_SECTIONS: DocSection[] = [
 ];
 
 export interface DocumentationIndexScreenProps {
+  /** Already-localized sections; defaults to the built-in index. */
   sections?: DocSection[];
 }
 
 /** The documentation landing page: a card grid per section. */
-export function DocumentationIndexScreen({
-  sections = DOCS_INDEX_SECTIONS,
-}: DocumentationIndexScreenProps) {
+export function DocumentationIndexScreen({ sections }: DocumentationIndexScreenProps) {
+  const t = useTranslations("docsIndex");
+  const nav = useTranslations("docsNav");
+  const resolved: DocSection[] =
+    sections ??
+    DOCS_INDEX.map(({ labelKey, cards }) => ({
+      label: nav(`sections.${labelKey}`),
+      cards: cards.map(({ key, ...card }) => ({
+        ...card,
+        title: t(`cards.${key}.title`),
+        description: t(`cards.${key}.description`),
+      })),
+    }));
   return (
     <div className="flex flex-1 flex-col gap-8 p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Documentation</h1>
-        <p className="text-muted-foreground mt-2 max-w-2xl text-sm">
-          How Astrolift works, how to install it, and the operator runbooks for the surfaces that
-          need configuration.
-        </p>
+        <h1 className="text-2xl font-semibold">{t("title")}</h1>
+        <p className="text-muted-foreground mt-2 max-w-2xl text-sm">{t("intro")}</p>
       </div>
 
-      {sections.map((section) => (
+      {resolved.map((section) => (
         <section key={section.label} className="flex flex-col gap-3">
           <h2 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
             {section.label}
@@ -261,7 +243,7 @@ export function DocumentationIndexScreen({
                   <CardContent className="flex flex-1 flex-col justify-between gap-3">
                     <CardDescription>{card.description}</CardDescription>
                     <span className="text-muted-foreground group-hover:text-foreground flex items-center gap-1 text-xs transition-colors">
-                      {card.external ? "Read public docs" : "Read guide"}
+                      {card.external ? t("readPublicDocs") : t("readGuide")}
                       {card.external ? (
                         <ExternalLinkIcon className="h-3 w-3" />
                       ) : (

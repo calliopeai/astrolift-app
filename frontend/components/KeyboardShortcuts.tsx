@@ -18,6 +18,7 @@
  * platform's chord shortcuts (cmd-k, cmd-/) alone.
  */
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -31,33 +32,35 @@ import {
 
 interface NavShortcut {
   combo: string;
-  label: string;
+  /** `keyboardShortcuts.nav` key. */
+  labelKey: string;
   href: string;
 }
 
 export const NAV_SHORTCUTS: NavShortcut[] = [
-  { combo: "g a", label: "Apps", href: "/apps" },
-  { combo: "g o", label: "Operations", href: "/ops" },
-  { combo: "g d", label: "Deployments", href: "/deployments" },
-  { combo: "g p", label: "Previews", href: "/previews" },
-  { combo: "g c", label: "Clusters", href: "/clusters" },
-  { combo: "g j", label: "Jobs", href: "/jobs" },
-  { combo: "g t", label: "Teams", href: "/administration/teams" },
-  { combo: "g s", label: "Settings", href: "/administration/organization" },
+  { combo: "g a", labelKey: "apps", href: "/apps" },
+  { combo: "g o", labelKey: "operations", href: "/ops" },
+  { combo: "g d", labelKey: "deployments", href: "/deployments" },
+  { combo: "g p", labelKey: "previews", href: "/previews" },
+  { combo: "g c", labelKey: "clusters", href: "/clusters" },
+  { combo: "g j", labelKey: "jobs", href: "/jobs" },
+  { combo: "g t", labelKey: "teams", href: "/administration/teams" },
+  { combo: "g s", labelKey: "settings", href: "/administration/organization" },
 ];
 
 interface OneShotShortcut {
   combo: string;
-  label: string;
+  /** `keyboardShortcuts.actions` key. */
+  labelKey: string;
 }
 
 const ONE_SHOT_SHORTCUTS: OneShotShortcut[] = [
-  { combo: "?", label: "Show this overlay" },
-  { combo: "/", label: "Focus the first input on the page" },
-  { combo: "⌘ K", label: "Open command palette (also Ctrl-K)" },
-  { combo: "Esc", label: "Close any open overlay / drawer" },
-  { combo: "[", label: "Collapse or expand the main rail" },
-  { combo: "]", label: "Show or hide your projects" },
+  { combo: "?", labelKey: "overlay" },
+  { combo: "/", labelKey: "focusInput" },
+  { combo: "⌘ K", labelKey: "palette" },
+  { combo: "Esc", labelKey: "close" },
+  { combo: "[", labelKey: "rail" },
+  { combo: "]", labelKey: "projects" },
 ];
 
 /** The shortcut overlay, opened with `?`. Pure: its state comes from useKeyboardShortcuts. */
@@ -68,33 +71,38 @@ export function KeyboardShortcuts({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useTranslations("keyboardShortcuts");
   return (
     <Dialog open={overlayOpen} onOpenChange={setOverlayOpen}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Keyboard shortcuts</DialogTitle>
+          <DialogTitle>{t("title")}</DialogTitle>
           <DialogDescription>
-            Discoverable from anywhere by pressing <Kbd>?</Kbd>.
+            {t.rich("description", { kbd: (chunks) => <Kbd>{chunks}</Kbd> })}
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <section>
-            <p className="text-muted-foreground mb-2 text-xs tracking-wide uppercase">Navigation</p>
+            <p className="text-muted-foreground mb-2 text-xs tracking-wide uppercase">
+              {t("navigation")}
+            </p>
             <ul className="space-y-1.5 text-sm">
               {NAV_SHORTCUTS.map((s) => (
                 <li key={s.combo} className="flex items-center justify-between">
-                  <span>{s.label}</span>
+                  <span>{t(`nav.${s.labelKey}`)}</span>
                   <Kbd>{s.combo}</Kbd>
                 </li>
               ))}
             </ul>
           </section>
           <section>
-            <p className="text-muted-foreground mb-2 text-xs tracking-wide uppercase">Actions</p>
+            <p className="text-muted-foreground mb-2 text-xs tracking-wide uppercase">
+              {t("actionsHeading")}
+            </p>
             <ul className="space-y-1.5 text-sm">
               {ONE_SHOT_SHORTCUTS.map((s) => (
                 <li key={s.combo} className="flex items-center justify-between">
-                  <span>{s.label}</span>
+                  <span>{t(`actions.${s.labelKey}`)}</span>
                   <Kbd>{s.combo}</Kbd>
                 </li>
               ))}

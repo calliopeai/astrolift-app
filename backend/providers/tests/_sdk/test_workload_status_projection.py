@@ -215,3 +215,30 @@ def test_every_cloud_driver_reads_a_running_job_as_ready(plugin_id):
 
     assert (status.ready_replicas, status.desired_replicas) == (1, 1)
     assert status.kind == "Job"
+
+
+def test_a_deployment_mid_rollout_counts_only_pods_on_the_new_template():
+    """The old ReplicaSet's ready pods are not the new revision's (ConflictHQ/bdr, 2026-09-27)."""
+    from _sdk.cluster import workload_status_from_object
+
+    stuck = {
+        "metadata": {"generation": 3},
+        "spec": {"replicas": 1},
+        # The new pod exists but cannot pull its image; the old one still serves.
+        "status": {"observedGeneration": 3, "readyReplicas": 1, "updatedReplicas": 1, "replicas": 2},
+    }
+    assert workload_status_from_object("Deployment", "worker", "ns", stuck).ready_replicas == 0
+
+    unseen = {
+        "metadata": {"generation": 4},
+        "spec": {"replicas": 1},
+        "status": {"observedGeneration": 3, "readyReplicas": 1, "updatedReplicas": 1},
+    }
+    assert workload_status_from_object("Deployment", "worker", "ns", unseen).ready_replicas == 0
+
+    done = {
+        "metadata": {"generation": 4},
+        "spec": {"replicas": 2},
+        "status": {"observedGeneration": 4, "readyReplicas": 2, "updatedReplicas": 2},
+    }
+    assert workload_status_from_object("Deployment", "worker", "ns", done).ready_replicas == 2

@@ -68,4 +68,8 @@ def test_dex_names_astrolift_on_its_dark_theme():
     [dex] = [
         c for c in driver.bootstrap_components(ClusterContext(slug="t", auth_method="kubeconfig")) if c.key == "dex"
     ]
-    assert dex.helm_values["config"]["frontend"] == {"issuer": "Astrolift", "theme": "dark"}
+    assert dex.helm_values["config"]["frontend"] == {
+        "issuer": "Astrolift",
+        "theme": "dark",
+        "logoURL": "https://astrolift.ai/img/astrolift-mark.png",
+    }

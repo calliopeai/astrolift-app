@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { useListState } from "@/components/list/use-list-state";
@@ -26,6 +27,7 @@ type DeleteToolDefData = {
  * SkillToolsScreen.
  */
 export function useSkillTools(id: string) {
+  const t = useTranslations("agentSkills.toasts");
   const skill = useSkill(id);
   const { org } = useActiveOrg();
   const orgId = org?.id ?? "";
@@ -60,8 +62,8 @@ export function useSkillTools(id: string) {
   // message, instead of closing on a remove that never happened.
   async function removeTool(toolId: string) {
     const { data } = await deleteToolDef({ variables: { id: toolId } });
-    if (!data?.deleteToolDef?.ok) throw new Error("Failed to remove tool");
-    toast.success("Tool removed");
+    if (!data?.deleteToolDef?.ok) throw new Error(t("toolRemoveFailed"));
+    toast.success(t("toolRemoved"));
   }
 
   return {

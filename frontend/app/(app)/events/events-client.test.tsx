@@ -94,7 +94,7 @@ vi.mock("next-intl", async (importOriginal) => {
   return {
     ...actual,
     useTranslations: (namespace?: string) =>
-      namespace?.startsWith("shared.")
+      namespace?.startsWith("shared.") || namespace === "eventDetail"
         ? actual.useTranslations(namespace)
         : (key: string, vars?: Record<string, unknown>) =>
             key === "aggregateBadge" ? `×${vars?.count} similar` : (MESSAGES[key] ?? key),

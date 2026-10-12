@@ -1,6 +1,7 @@
 "use client";
 
 import { FileBoxIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -60,6 +61,7 @@ export function ProjectsScreen({
   renderEditDialog,
 }: ProjectsScreenProps) {
   const fmt = useFormatters();
+  const t = useTranslations("projectsList");
   const [open, setOpen] = React.useState(false);
   const [editTarget, setEditTarget] = React.useState<AstroliftProject | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<AstroliftProject | null>(null);
@@ -80,7 +82,7 @@ export function ProjectsScreen({
   const columns: Column<AstroliftProject>[] = [
     {
       id: "name",
-      header: "Project",
+      header: t("project"),
       cellClassName: "max-w-80",
       cell: (p) => (
         <span className="block min-w-0">
@@ -95,7 +97,7 @@ export function ProjectsScreen({
     },
     {
       id: "team",
-      header: "Team",
+      header: t("team"),
       cellClassName: "max-w-48",
       cell: (p) => (
         <Badge variant="secondary" className="max-w-full truncate">
@@ -105,7 +107,7 @@ export function ProjectsScreen({
     },
     {
       id: "createdAt",
-      header: "Created",
+      header: t("created"),
       cell: (p) => (
         <span className="text-muted-foreground font-mono text-xs">
           {fmt.formatDate(p.createdAt)}
@@ -118,21 +120,20 @@ export function ProjectsScreen({
     <>
       <ListPage<AstroliftProject>
         header={{
-          crumbs: adminCrumbs("projects", "Projects"),
-          title: "Projects",
-          context:
-            "Group apps that share a deploy cadence, a domain, or a stack. Cost reporting rolls up at this level.",
+          crumbs: adminCrumbs("projects", t("title")),
+          title: t("title"),
+          context: t("context"),
           primaryAction: (
             <Can permission="project.create">
               <Button onClick={() => setOpen(true)} disabled={teamsLoading}>
                 <PlusIcon className="size-4" />
-                New project
+                {t("newProject")}
               </Button>
             </Can>
           ),
         }}
         list={list}
-        label="Projects"
+        label={t("title")}
         columns={columns}
         rows={rows}
         getRowId={(p) => p.id}
@@ -142,7 +143,7 @@ export function ProjectsScreen({
             <Can permission="project.update">
               <DropdownMenuItem onSelect={() => setEditTarget(p)}>
                 <PencilIcon className="size-4" />
-                Edit
+                {t("edit")}
               </DropdownMenuItem>
             </Can>
             <Can permission="project.delete">
@@ -152,7 +153,7 @@ export function ProjectsScreen({
                 onSelect={() => setDeleteTarget(p)}
               >
                 <Trash2Icon className="size-4" />
-                Delete
+                {t("delete")}
               </DropdownMenuItem>
             </Can>
           </>
@@ -164,12 +165,10 @@ export function ProjectsScreen({
         nextCursor={nextCursor}
         empty={{
           icon: <FileBoxIcon className="size-5" />,
-          title: "No projects yet",
-          description: noTeams
-            ? "Create a team first — projects live under teams."
-            : "Group your apps under a project so cost and quotas roll up cleanly.",
+          title: t("empty"),
+          description: noTeams ? t("emptyNoTeams") : t("emptyDescription"),
           actionHref: noTeams ? "/administration/teams" : undefined,
-          actionLabel: noTeams ? "Manage teams" : undefined,
+          actionLabel: noTeams ? t("manageTeams") : undefined,
         }}
       />
 
@@ -190,11 +189,11 @@ export function ProjectsScreen({
         }}
         title={
           deleteTarget
-            ? `Delete project ${deleteTarget.team.slug}/${deleteTarget.slug}?`
-            : "Delete project?"
+            ? t("deleteTitle", { team: deleteTarget.team.slug, project: deleteTarget.slug })
+            : t("deleteTitleGeneric")
         }
-        description="Soft delete — apps remain visible until you reassign them. The slug becomes reclaimable."
-        confirmLabel="Delete project"
+        description={t("deleteDescription")}
+        confirmLabel={t("deleteProject")}
         destructive
         onConfirm={async () => {
           if (deleteTarget) await deleteProject(deleteTarget);

@@ -2,6 +2,7 @@
 
 import { ShieldCheckIcon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -83,6 +84,7 @@ export function GateCardView({
   onDecide: (decision: GateDecision, note: string) => Promise<boolean>;
   canDecide?: boolean;
 }) {
+  const t = useTranslations("gateReview");
   const [note, setNote] = React.useState("");
   const [done, setDone] = React.useState("");
 
@@ -92,12 +94,12 @@ export function GateCardView({
 
   return (
     <section
-      aria-label={`Gate ${gate.stageRole || gate.stageOrder}`}
+      aria-label={t("gateAria", { gate: gate.stageRole || gate.stageOrder })}
       className="rounded-md border p-4"
     >
       <div className="mb-2 flex items-center gap-2 text-sm font-medium">
         <ShieldCheckIcon className="size-4" />
-        Waiting for approval{gate.stageRole ? `: ${gate.stageRole}` : ""}
+        {gate.stageRole ? t("waitingForRole", { role: gate.stageRole }) : t("waiting")}
         {gate.stageApprovers && gate.stageApprovers.length > 0 && (
           <span className="text-muted-foreground font-normal">
             ({gate.stageApprovers.join(", ")})
@@ -105,34 +107,38 @@ export function GateCardView({
         )}
       </div>
       <pre className="bg-muted/40 mb-3 max-h-96 overflow-auto rounded p-3 text-xs whitespace-pre-wrap">
-        {upstream || "The previous stage produced no output."}
+        {upstream || t("noOutput")}
       </pre>
       {done ? (
         <p className="text-muted-foreground text-sm">
-          Decision sent: {done}. The run continues shortly.
+          {t("decisionSent", {
+            decision:
+              done === "approved" ? t("approved") : done === "rejected" ? t("rejected") : done,
+          })}
         </p>
       ) : !canDecide ? (
         <p className="text-muted-foreground text-sm [overflow-wrap:anywhere]">
-          Waiting on{" "}
-          {gate.stageApprovers && gate.stageApprovers.length > 0
-            ? gate.stageApprovers.join(", ")
-            : "this gate's approvers"}
-          . You are not one of them.
+          {t("waitingOn", {
+            approvers:
+              gate.stageApprovers && gate.stageApprovers.length > 0
+                ? gate.stageApprovers.join(", ")
+                : t("gateApprovers"),
+          })}
         </p>
       ) : (
         <div className="grid gap-2">
           <Textarea
-            aria-label="Decision note"
-            placeholder="Note for the record (optional)"
+            aria-label={t("noteAria")}
+            placeholder={t("notePlaceholder")}
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
           <div className="flex gap-2">
             <Button disabled={loading} onClick={() => decide("approved")}>
-              Approve
+              {t("approve")}
             </Button>
             <Button variant="outline" disabled={loading} onClick={() => decide("rejected")}>
-              Reject
+              {t("reject")}
             </Button>
           </div>
         </div>

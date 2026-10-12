@@ -20,20 +20,28 @@ export type ObservabilityPanelReason =
   | "ERROR";
 
 export interface PanelEmptyCopy {
-  /** Noun for the benign NO_DATA_YET line, e.g. "DNS records". */
-  thing: string;
+  /**
+   * Translated title + description for the benign NO_DATA_YET state, e.g.
+   * "No DNS records yet". Each panel words its own, since a noun spliced
+   * into a shared sentence does not translate.
+   */
+  noData: PanelEmptyMessage;
   /**
    * Operator-facing next step for NOT_CONFIGURED, e.g.
    * "Prometheus endpoint isn't wired for this cluster".
    */
   notConfigured: string;
-  /**
-   * Provider label for NOT_SUPPORTED_BY_PROVIDER (only ever shown on a
-   * cloud that lacks the capability), e.g. "this cloud". Defaults to a
-   * generic phrasing when omitted.
-   */
-  provider?: string;
 }
+
+/** Translator over the `obsPanelReason` messages. */
+export type PanelReasonTranslator = (
+  key:
+    | "notConfiguredTitle"
+    | "notSupportedTitle"
+    | "notSupportedDescription"
+    | "errorTitle"
+    | "errorDescription"
+) => string;
 
 export interface PanelEmptyMessage {
   title: string;
@@ -47,35 +55,28 @@ export interface PanelEmptyMessage {
  */
 export function panelEmptyState(
   reason: ObservabilityPanelReason,
-  copy: PanelEmptyCopy
+  copy: PanelEmptyCopy,
+  t: PanelReasonTranslator
 ): PanelEmptyMessage {
   switch (reason) {
     case "NOT_CONFIGURED":
       return {
-        title: "Not configured",
+        title: t("notConfiguredTitle"),
         description: copy.notConfigured,
       };
     case "NOT_SUPPORTED_BY_PROVIDER":
       return {
-        title: `Not available on ${copy.provider ?? "this provider"}`,
-        description:
-          "This cluster's provider plugin doesn't implement this read. It's supported on other clouds.",
+        title: t("notSupportedTitle"),
+        description: t("notSupportedDescription"),
       };
     case "ERROR":
       return {
-        title: "Couldn't load",
-        description: "Something went wrong loading this panel. Try again.",
+        title: t("errorTitle"),
+        description: t("errorDescription"),
       };
     case "NO_DATA_YET":
     case "OK":
     default:
-      return {
-        title: `No ${copy.thing} yet`,
-        description: `Nothing to show for this window. ${capitalize(copy.thing)} will appear here once there's activity.`,
-      };
+      return copy.noData;
   }
-}
-
-function capitalize(s: string): string {
-  return s.length ? s[0].toUpperCase() + s.slice(1) : s;
 }

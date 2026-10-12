@@ -1001,9 +1001,14 @@ class K8sNativeClusterDriver(ClusterDriver):
                         "storage": {"type": "kubernetes", "config": {"inCluster": True}},
                         "oauth2": {"skipApprovalScreen": True},
                         # Dex's own login page, when a person lands on it,
-                        # names Astrolift on the dark theme (#2285). An inline
-                        # logo would not survive Dex's html/template escaping.
-                        "frontend": {"issuer": "Astrolift", "theme": "dark"},
+                        # names Astrolift on the dark theme with its mark
+                        # (#2285). Dex escapes inline images, so the logo is
+                        # the mark the Astrolift site publishes.
+                        "frontend": {
+                            "issuer": "Astrolift",
+                            "theme": "dark",
+                            "logoURL": "https://astrolift.ai/img/astrolift-mark.png",
+                        },
                         "staticClients": [],
                         "connectors": [],
                     },

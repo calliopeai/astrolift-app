@@ -157,7 +157,7 @@ describe("one-time webhook secret dialog", () => {
     });
     await user.click(screen.getByRole("button", { name: "Show rotated secret" }));
     await user.click(screen.getByRole("button", { name: "Copy secret" }));
-    expect(mocks.error).toHaveBeenCalledWith("Couldn't copy — select the text and copy manually");
+    expect(mocks.error).toHaveBeenCalledWith("Couldn't copy. Select the text and copy manually.");
     expect(mocks.success).not.toHaveBeenCalled();
     expect(screen.getByText(REVEAL.plaintextSecret)).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Done" }));

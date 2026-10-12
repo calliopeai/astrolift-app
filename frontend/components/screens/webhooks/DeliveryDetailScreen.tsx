@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { DetailTimestamp, EntityDetailShell } from "@/components/detail/EntityDetailShell";
@@ -19,25 +20,26 @@ export function DeliveryDetailScreen({
   loading,
   delivery: d,
 }: WebhookDeliveryData) {
+  const t = useTranslations("webhooksScreen");
   return (
     <EntityDetailShell
       loading={loading}
       notFound={!d}
-      breadcrumb={{ label: "Webhook", href: `/webhooks/${subscriptionId}` }}
-      heading={`Delivery ${deliveryId.slice(0, 8)}`}
-      status={d ? (d.success ? "delivered" : "failed") : undefined}
+      breadcrumb={{ label: t("webhook"), href: `/webhooks/${subscriptionId}` }}
+      heading={t("deliveryHeading", { id: deliveryId.slice(0, 8) })}
+      status={d ? (d.success ? t("delivered") : t("failed")) : undefined}
       statusTone={d ? (d.success ? "ok" : "error") : undefined}
       createdAt={d?.deliveredAt}
-      notFoundLabel="delivery"
+      notFoundLabel={t("deliveryNoun")}
       overview={
         d
           ? [
               {
-                term: "Event",
+                term: t("event"),
                 description: <span className="font-mono text-xs">{d.eventType}</span>,
               },
               {
-                term: "HTTP status",
+                term: t("httpStatus"),
                 description: (
                   <Badge variant={d.success ? "secondary" : "outline"}>
                     {d.statusCode ?? "ERR"}
@@ -45,18 +47,18 @@ export function DeliveryDetailScreen({
                 ),
               },
               {
-                term: "Attempt",
+                term: t("attempt"),
                 description: <span className="font-mono text-xs">{d.retryAttempt}</span>,
               },
-              { term: "Latency", description: `${d.latencyMs}ms` },
-              { term: "Test", description: d.isTest ? "Yes" : "No" },
+              { term: t("latency"), description: t("ms", { ms: d.latencyMs }) },
+              { term: t("test"), description: d.isTest ? t("yes") : t("no") },
               {
-                term: "Delivery ID",
+                term: t("deliveryId"),
                 description: (
                   <span className="font-mono text-xs break-all">{d.deliveryId || "—"}</span>
                 ),
               },
-              { term: "Delivered", description: <DetailTimestamp iso={d.deliveredAt} /> },
+              { term: t("deliveredAt"), description: <DetailTimestamp iso={d.deliveredAt} /> },
             ]
           : []
       }
@@ -66,7 +68,7 @@ export function DeliveryDetailScreen({
           {d.error ? (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Error</CardTitle>
+                <CardTitle className="text-base">{t("error")}</CardTitle>
               </CardHeader>
               <CardContent>
                 <pre className="bg-muted/40 max-h-60 overflow-auto rounded-md border p-3 font-mono text-xs whitespace-pre-wrap">
@@ -77,7 +79,7 @@ export function DeliveryDetailScreen({
           ) : null}
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Request payload</CardTitle>
+              <CardTitle className="text-base">{t("requestPayload")}</CardTitle>
             </CardHeader>
             <CardContent>
               {d.requestPayloadExcerpt ? (
@@ -85,13 +87,13 @@ export function DeliveryDetailScreen({
                   {d.requestPayloadExcerpt}
                 </pre>
               ) : (
-                <p className="text-muted-foreground text-sm">No request payload recorded.</p>
+                <p className="text-muted-foreground text-sm">{t("noRequestPayload")}</p>
               )}
             </CardContent>
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Response body</CardTitle>
+              <CardTitle className="text-base">{t("responseBody")}</CardTitle>
             </CardHeader>
             <CardContent>
               {d.responseBodyExcerpt ? (
@@ -99,7 +101,7 @@ export function DeliveryDetailScreen({
                   {d.responseBodyExcerpt}
                 </pre>
               ) : (
-                <p className="text-muted-foreground text-sm">No response body recorded.</p>
+                <p className="text-muted-foreground text-sm">{t("noResponseBody")}</p>
               )}
             </CardContent>
           </Card>

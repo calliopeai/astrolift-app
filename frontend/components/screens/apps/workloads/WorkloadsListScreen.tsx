@@ -12,6 +12,7 @@ import {
   RocketIcon,
   WorkflowIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import type { Column } from "@/components/data-table";
@@ -73,12 +74,13 @@ export function WorkloadsListScreen({
   renderScale,
   renderRowActions,
 }: WorkloadsListScreenProps) {
+  const t = useTranslations("appWorkloads");
   const at = (...segments: string[]) => [`${basePath}/${slug}`, ...segments].join("/");
 
   const columns: Column<AstroliftWorkload>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("name"),
       sortKey: "name",
       cellClassName: "max-w-72",
       cell: (w) => {
@@ -103,7 +105,7 @@ export function WorkloadsListScreen({
     },
     {
       id: "kind",
-      header: "Kind",
+      header: t("kind"),
       sortKey: "kind",
       cell: (w) => (
         <Badge variant="outline" className="capitalize">
@@ -113,7 +115,7 @@ export function WorkloadsListScreen({
     },
     {
       id: "replicas",
-      header: "Ready / desired",
+      header: t("readyDesired"),
       // The row link is an ::after overlay stretched from the first
       // cell; the scale popover lives in this one and has to be lifted
       // back on top of it or the only thing a click here can do is
@@ -130,7 +132,7 @@ export function WorkloadsListScreen({
           <>
             <div className="flex items-center gap-1.5">
               <Badge className={readinessTone(live.ready, live.desired)}>
-                Ready {live.ready}/{live.desired}
+                {t("ready", { ready: live.ready, desired: live.desired })}
               </Badge>
               {/* #668 — inline scale popover so operators can bump
                   replicas during an incident without navigating to the
@@ -140,7 +142,11 @@ export function WorkloadsListScreen({
             </div>
             {w.hpaMinReplicas && w.hpaMaxReplicas ? (
               <div className="text-muted-foreground mt-1">
-                HPA {w.hpaMinReplicas}–{w.hpaMaxReplicas} @ {w.hpaTargetCpuPct}% CPU
+                {t("hpa", {
+                  min: w.hpaMinReplicas,
+                  max: w.hpaMaxReplicas,
+                  cpu: w.hpaTargetCpuPct ?? 0,
+                })}
               </div>
             ) : null}
             {/* #666 — inline error chip for ImagePullBackOff /
@@ -165,7 +171,7 @@ export function WorkloadsListScreen({
     },
     {
       id: "restarts",
-      header: "Restarts",
+      header: t("restarts"),
       cellClassName: "font-mono text-xs",
       cell: (w) => {
         const restarts = liveStatus.get(w.slug)?.maxRestarts ?? 0;
@@ -187,25 +193,25 @@ export function WorkloadsListScreen({
     },
     {
       id: "public",
-      header: "Public",
+      header: t("public"),
       cell: (w) =>
         w.isPublic ? (
           <Badge className="bg-success/15 text-success-fg">
-            <GlobeIcon className="size-3" /> public
+            <GlobeIcon className="size-3" /> {t("publicBadge")}
           </Badge>
         ) : (
-          <Badge variant="secondary">internal</Badge>
+          <Badge variant="secondary">{t("internal")}</Badge>
         ),
     },
     {
       id: "resources",
-      header: "Resources",
+      header: t("resources"),
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (w) => `${w.cpuRequest || "—"} cpu · ${w.memoryRequest || "—"} mem`,
     },
     {
       id: "schedule",
-      header: "Schedule",
+      header: t("schedule"),
       cellClassName: "font-mono text-xs",
       cell: (w) =>
         w.schedule ? (
@@ -223,7 +229,7 @@ export function WorkloadsListScreen({
     <ListPage<AstroliftWorkload>
       embedded
       list={list}
-      label="Workloads"
+      label={t("label")}
       columns={columns}
       rows={rows}
       getRowId={(w) => w.id}
@@ -235,11 +241,10 @@ export function WorkloadsListScreen({
       totalCount={totalCount}
       empty={{
         icon: <BoxIcon className="size-5" />,
-        title: "No workloads declared",
-        description:
-          "Workloads are parsed from this app's manifest. Add a workload section to astrolift.yaml and push to repopulate this view.",
+        title: t("emptyTitle"),
+        description: t("emptyBody"),
         actionHref: at("manifest"),
-        actionLabel: "Open manifest",
+        actionLabel: t("openManifest"),
       }}
     />
   );

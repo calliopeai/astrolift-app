@@ -1,5 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+
+import { renderWithIntl as render } from "@/test/render-with-intl";
 
 import {
   AlertDialog,

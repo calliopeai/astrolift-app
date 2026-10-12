@@ -2,6 +2,7 @@
 
 import { InfoIcon, PlusIcon, ScaleIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -11,7 +12,6 @@ import { ListPage } from "@/components/list/ListPage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
-import { SCOPE_NOUN } from "@/components/access/access-model";
 import { parsePolicy } from "@/components/access/policy-model";
 import { PolicySentence } from "@/components/access/PolicySentence";
 import type { AstroliftPolicy } from "@/graphql/identity/identity.types";
@@ -37,12 +37,14 @@ export function PoliciesScreen({
   deletePolicy,
 }: PoliciesScreenProps) {
   const fmt = useFormatters();
+  const t = useTranslations("adminPolicies");
+  const scopes = useTranslations("shared.access.scope");
   const [deleteTarget, setDeleteTarget] = React.useState<AstroliftPolicy | null>(null);
 
   const columns: Column<AstroliftPolicy>[] = [
     {
       id: "policy",
-      header: "Policy",
+      header: t("columns.policy"),
       sortKey: "name",
       cellClassName: "max-w-[36rem]",
       // The sentence is the row (design 3.6): what it denies, on what, for
@@ -66,7 +68,7 @@ export function PoliciesScreen({
     },
     {
       id: "effect",
-      header: "Effect",
+      header: t("columns.effect"),
       sortKey: "effect",
       cell: (p) => (
         <Badge variant={p.effect === "DENY" ? "destructive" : "secondary"} className="font-mono">
@@ -76,30 +78,30 @@ export function PoliciesScreen({
     },
     {
       id: "scope",
-      header: "Scope",
+      header: t("columns.scope"),
       sortKey: "scopeLevel",
       cell: (p) => (
         <Badge variant="outline" className="font-mono">
-          {SCOPE_NOUN[p.scopeLevel] ?? p.scopeLevel}
+          {scopes.has(p.scopeLevel) ? scopes(p.scopeLevel) : p.scopeLevel}
         </Badge>
       ),
     },
     {
       id: "createdBy",
-      header: "Created by",
+      header: t("columns.createdBy"),
       cellClassName: "max-w-48",
       cell: (p) => (
         <span
           className="text-muted-foreground block min-w-0 truncate font-mono text-xs"
           title={p.createdByUsername ?? undefined}
         >
-          {p.createdByUsername ?? "unknown"}
+          {p.createdByUsername ?? t("unknown")}
         </span>
       ),
     },
     {
       id: "updatedAt",
-      header: "Updated",
+      header: t("columns.updated"),
       sortKey: "updated",
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (p) => fmt.formatDate(p.updatedAt || p.createdAt),
@@ -111,22 +113,21 @@ export function PoliciesScreen({
       <ListPage<AstroliftPolicy>
         header={{
           crumbs: policiesCrumbs(),
-          title: "Policies",
-          context:
-            "Rules that narrow what roles allow, checked on every request. A condition the request cannot answer denies.",
+          title: t("title"),
+          context: t("context"),
           primaryAction: (
             <Can permission="org.update">
               <Button size="sm" asChild>
                 <Link href={NEW_POLICY_HREF}>
                   <PlusIcon className="size-4" />
-                  New policy
+                  {t("newPolicy")}
                 </Link>
               </Button>
             </Can>
           ),
         }}
         list={list}
-        label="Policies"
+        label={t("title")}
         columns={columns}
         rows={page.rows}
         getRowId={(p) => p.id}
@@ -151,18 +152,17 @@ export function PoliciesScreen({
                   onSelect={() => setDeleteTarget(p)}
                 >
                   <Trash2Icon className="size-4" />
-                  Delete
+                  {t("delete")}
                 </DropdownMenuItem>
               )
             : undefined
         }
         empty={{
           icon: <ScaleIcon className="size-5" />,
-          title: "No policies yet",
-          description:
-            "A policy narrows what roles allow: deny an action unless it is working hours, the office network, approved, or a fresh sign-in. It never grants more than a role does.",
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
           actionHref: canManage ? NEW_POLICY_HREF : undefined,
-          actionLabel: canManage ? "New policy" : undefined,
+          actionLabel: canManage ? t("newPolicy") : undefined,
           learnMoreHref: DOC_LINKS.policies,
         }}
       />
@@ -170,12 +170,11 @@ export function PoliciesScreen({
       <div className="border-warning-border bg-warning/10 flex min-w-0 items-start gap-2 rounded-md border p-3">
         <InfoIcon className="text-warning-fg mt-0.5 size-4 shrink-0" />
         <p className="text-muted-foreground min-w-0 text-xs leading-relaxed">
-          <span className="text-foreground font-medium">Enforced on every check.</span> A DENY that
-          matches the action, resource and person wins over any role that allows it. A condition the
-          request cannot answer (no client address, no session) denies, so a policy fails closed.
-          Search matches name, slug, description and action.{" "}
+          {t.rich("enforced", {
+            strong: (chunks) => <span className="text-foreground font-medium">{chunks}</span>,
+          })}{" "}
           <Link className="underline underline-offset-2" href={DOC_LINKS.policies}>
-            Learn more
+            {t("learnMore")}
           </Link>
         </p>
       </div>
@@ -185,9 +184,9 @@ export function PoliciesScreen({
         onOpenChange={(next) => {
           if (!next) setDeleteTarget(null);
         }}
-        title={deleteTarget ? `Delete policy ${deleteTarget.slug}?` : "Delete policy?"}
-        description="Soft-deletes the policy and frees its slug for a new one. Whatever it denied is allowed again at once, wherever a role allows it."
-        confirmLabel="Delete policy"
+        title={deleteTarget ? t("deleteTitle", { slug: deleteTarget.slug }) : t("deleteFallback")}
+        description={t("deleteDescription")}
+        confirmLabel={t("deleteConfirm")}
         destructive
         onConfirm={async () => {
           if (deleteTarget) await deletePolicy(deleteTarget);

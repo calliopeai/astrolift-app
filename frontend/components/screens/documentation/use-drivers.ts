@@ -18,13 +18,13 @@ interface ClusterCountResp {
 // columns of the matrix. Mirrors the kinds enumerated in
 // astrolift-providers / docs/reference/providers.md.
 export const CAPABILITIES = [
-  { key: "cluster", label: "Cluster" },
-  { key: "ingress", label: "Ingress" },
-  { key: "dns", label: "DNS" },
-  { key: "tls", label: "TLS" },
-  { key: "secrets", label: "Secrets" },
-  { key: "identity", label: "Identity" },
-  { key: "registry", label: "Registry" },
+  { key: "cluster" },
+  { key: "ingress" },
+  { key: "dns" },
+  { key: "tls" },
+  { key: "secrets" },
+  { key: "identity" },
+  { key: "registry" },
 ] as const;
 
 // Known managed-service kinds the platform supports. Each provider

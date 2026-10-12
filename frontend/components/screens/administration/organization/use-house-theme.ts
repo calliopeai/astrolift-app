@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { UPDATE_ORGANIZATION } from "@/graphql/identity/identity.mutations";
@@ -9,6 +10,7 @@ import type { AstroliftOrganization, MutationResult } from "@/graphql/identity/i
 
 /** The server half of HouseThemeCard (#135): saves the org's house theme. */
 export function useHouseTheme(org: AstroliftOrganization) {
+  const t = useTranslations("adminHouseTheme");
   const [updateOrg, { loading: saving }] = useMutation<{
     updateOrganization: MutationResult<AstroliftOrganization>;
   }>(UPDATE_ORGANIZATION, {
@@ -26,10 +28,10 @@ export function useHouseTheme(org: AstroliftOrganization) {
       },
     });
     if (data?.updateOrganization.ok) {
-      toast.success(locked ? "House theme saved and locked" : "House theme saved");
+      toast.success(locked ? t("savedLocked") : t("saved"));
       return true;
     }
-    toast.error(data?.updateOrganization.errors?.[0]?.message ?? "Save failed");
+    toast.error(data?.updateOrganization.errors?.[0]?.message ?? t("saveFailed"));
     return false;
   }
 

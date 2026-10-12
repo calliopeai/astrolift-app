@@ -52,7 +52,3 @@ export function environmentSpecsVariables(q: NumberedListQuery) {
   if (q.filters.createdBy) filter.createdBy = [q.filters.createdBy];
   return numberedPageVariables(q, filter, ENVIRONMENT_SPECS_LIST.defaultSort);
 }
-
-export function specOwner(spec: EnvironmentSpec): string {
-  return spec.projectId ? "Project" : spec.teamId ? "Team" : "Organization shared";
-}

@@ -1,9 +1,10 @@
 import { BotIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { StatusDot } from "@/components/StatusDot";
 import { cn } from "@/lib/utils";
 
-import { AGENT_STATUS_DOT, AGENT_STATUS_LABEL, type AgentStatusKey } from "./agents-list";
+import { AGENT_STATUS_DOT, type AgentStatusKey } from "./agents-list";
 
 export interface AgentGlyphProps {
   status: AgentStatusKey;
@@ -18,8 +19,11 @@ export interface AgentGlyphProps {
  * in flight, so motion always means state.
  */
 export function AgentGlyph({ status, running = 0, className }: AgentGlyphProps) {
+  const t = useTranslations("agentsList");
   const label =
-    running > 1 ? `${AGENT_STATUS_LABEL[status]}, ${running} runs` : AGENT_STATUS_LABEL[status];
+    running > 1
+      ? t("glyphRuns", { status: t(`status.${status}`), count: running })
+      : t(`status.${status}`);
   return (
     <span
       role="img"

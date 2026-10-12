@@ -2,6 +2,7 @@
 
 import { BoxesIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
@@ -10,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 
 import type { WorkloadsListState } from "./use-workloads-list";
-import { KIND_LABEL, scaleLabel } from "./workloads-list";
+import { scaleLabel } from "./workloads-list";
 
 export type WorkloadsScreenProps = WorkloadsListState;
 
@@ -18,10 +19,10 @@ export type WorkloadsScreenProps = WorkloadsListState;
 // link in a cell has to sit above it to be reachable.
 const ABOVE_ROW_LINK = "relative z-10";
 
-const columns: Column<AstroliftWorkload>[] = [
+const columnsFor = (t: ReturnType<typeof useTranslations>): Column<AstroliftWorkload>[] => [
   {
     id: "workload",
-    header: "Workload",
+    header: t("columns.workload"),
     sortKey: "name",
     cellClassName: "max-w-80",
     cell: (w) => (
@@ -37,13 +38,15 @@ const columns: Column<AstroliftWorkload>[] = [
   },
   {
     id: "kind",
-    header: "Kind",
+    header: t("columns.kind"),
     sortKey: "kind",
-    cell: (w) => <Badge variant="outline">{KIND_LABEL[w.kind] ?? w.kind}</Badge>,
+    cell: (w) => (
+      <Badge variant="outline">{t.has(`kinds.${w.kind}`) ? t(`kinds.${w.kind}`) : w.kind}</Badge>
+    ),
   },
   {
     id: "app",
-    header: "App",
+    header: t("columns.app"),
     sortKey: "app",
     cellClassName: `${ABOVE_ROW_LINK} max-w-64`,
     cell: (w) => (
@@ -58,18 +61,18 @@ const columns: Column<AstroliftWorkload>[] = [
   },
   {
     id: "scale",
-    header: "Replicas",
+    header: t("columns.replicas"),
     align: "right",
     cell: (w) => <span className="font-mono text-xs">{scaleLabel(w)}</span>,
   },
   {
     id: "schedule",
-    header: "Schedule",
+    header: t("columns.schedule"),
     cell: (w) =>
       w.schedule ? (
         <span className="font-mono text-xs">{w.schedule}</span>
       ) : (
-        <span className="text-muted-foreground text-xs">none</span>
+        <span className="text-muted-foreground text-xs">{t("none")}</span>
       ),
   },
 ];
@@ -89,16 +92,17 @@ export function WorkloadsScreen({
   error,
   onRetry,
 }: WorkloadsScreenProps) {
+  const t = useTranslations("workloadsScreen");
   return (
     <ListPage<AstroliftWorkload>
       header={{
         crumbs: agentsCrumbs("workloads"),
-        title: "Workloads",
-        context: "An app's deployments, jobs and cron jobs stay on that app's Workloads tab.",
+        title: t("title"),
+        context: t("context"),
       }}
       list={list}
-      label="Workloads"
-      columns={columns}
+      label={t("title")}
+      columns={columnsFor(t)}
       rows={rows}
       getRowId={(w) => w.id}
       rowHref={(w) => `/apps/${w.registeredAppSlug}/workloads/${w.slug}`}
@@ -108,11 +112,10 @@ export function WorkloadsScreen({
       onRetry={onRetry}
       empty={{
         icon: <BoxesIcon className="size-5" />,
-        title: "No agent, workflow or function workloads",
-        description:
-          "Apps with kind: agent, workflow or function in their manifest appear here once registered.",
+        title: t("empty.title"),
+        description: t("empty.description"),
         actionHref: "/agents",
-        actionLabel: "Go to agents",
+        actionLabel: t("empty.action"),
       }}
       totalCount={totalCount}
     />

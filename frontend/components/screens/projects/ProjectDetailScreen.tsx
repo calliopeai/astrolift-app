@@ -16,6 +16,7 @@ import {
   WorkflowIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -47,7 +48,6 @@ import type {
   WorkflowDefinitionRun,
   WorkflowDefinitionSummary,
 } from "@/graphql/workflows/tiered.types";
-import { formatRelativeAge } from "@/lib/format";
 import { useFormatters } from "@/lib/i18n/formatters";
 
 import type { useProjectDetail } from "./use-project-detail";
@@ -100,6 +100,8 @@ export function ProjectDetailScreen({
   onDelete,
 }: ProjectDetailScreenProps) {
   const fmt = useFormatters();
+  const t = useTranslations("projectDetail");
+  const appStatus = useTranslations("apps.frame.status");
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const liveByWorkloadId = React.useMemo(() => {
@@ -112,7 +114,7 @@ export function ProjectDetailScreen({
 
   if (loading) {
     return (
-      <PageShell title="Loading…">
+      <PageShell title={t("loading")}>
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-48 w-full" />
       </PageShell>
@@ -121,13 +123,13 @@ export function ProjectDetailScreen({
 
   if (!project) {
     return (
-      <PageShell title="Project not found">
+      <PageShell title={t("notFound")}>
         <EmptyState
           icon={<AlertTriangleIcon className="size-5" />}
-          title={`No project with slug ${slug}`}
-          description="It may have been soft-deleted, or you may not have permission to read it."
+          title={t("notFoundTitle", { slug })}
+          description={t("notFoundDescription")}
           actionHref="/administration/projects"
-          actionLabel="Back to projects"
+          actionLabel={t("backToProjects")}
         />
       </PageShell>
     );
@@ -217,16 +219,16 @@ export function ProjectDetailScreen({
           {project.name}
           {!workloadQueriesLoading && agentOnlyProject && (
             <Badge variant="secondary">
-              {hasWorkflows ? "Agent workflow project" : "Agent project"}
+              {hasWorkflows ? t("agentWorkflowProject") : t("agentProject")}
             </Badge>
           )}
           {!workloadQueriesLoading && mixedProject && (
-            <Badge variant="secondary">Apps + agents</Badge>
+            <Badge variant="secondary">{t("appsAndAgents")}</Badge>
           )}
         </span>
       }
       description={
-        <nav aria-label="breadcrumb" className="text-muted-foreground text-sm">
+        <nav aria-label={t("breadcrumb")} className="text-muted-foreground text-sm">
           <ol className="flex flex-wrap items-center gap-1">
             <li>
               <Link href="/administration/teams" className="hover:text-foreground hover:underline">
@@ -253,32 +255,32 @@ export function ProjectDetailScreen({
           {!workloadQueriesLoading && hasAgents && (
             <Button asChild variant="outline">
               <Link href={`/agents?project=${encodeURIComponent(project.slug)}`}>
-                <ActivityIcon className="size-4" /> Agent activity
+                <ActivityIcon className="size-4" /> {t("agentActivity")}
               </Link>
             </Button>
           )}
           {!workloadQueriesLoading && hasWorkflows && (
             <Button asChild variant="outline">
               <Link href="/workflows">
-                <WorkflowIcon className="size-4" /> Workflows
+                <WorkflowIcon className="size-4" /> {t("workflows")}
               </Link>
             </Button>
           )}
           {!workloadQueriesLoading && agentOnlyProject && canCreateAgent ? (
             <Button asChild>
               <Link href="/agents/new">
-                <PlusIcon className="size-4" /> Register agent repo
+                <PlusIcon className="size-4" /> {t("registerAgentRepo")}
               </Link>
             </Button>
           ) : !workloadQueriesLoading && hasApps && canCreateApp ? (
             <Button asChild variant="outline">
               <Link href="/apps/new">
-                <PlusIcon className="size-4" /> New app
+                <PlusIcon className="size-4" /> {t("newApp")}
               </Link>
             </Button>
           ) : null}
           <Button variant="outline" onClick={() => setSettingsOpen(true)}>
-            <Settings2Icon className="size-4" /> Settings
+            <Settings2Icon className="size-4" /> {t("settings")}
           </Button>
         </>
       }
@@ -294,20 +296,25 @@ export function ProjectDetailScreen({
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatTile
             icon={BotIcon}
-            label="Registered agents"
+            label={t("registeredAgents")}
             value={projectAgents.length}
-            footer={`${sourceRepoCount} source ${sourceRepoCount === 1 ? "repo" : "repos"}`}
+            footer={t("sourceRepos", { count: sourceRepoCount })}
             href="#agents"
           />
           {canViewWorkflows && (
             <StatTile
               icon={WorkflowIcon}
-              label="Workflows"
+              label={t("workflows")}
               value={projectWorkflows.length}
               footer={
                 activeWorkflowRuns > 0
-                  ? `${activeWorkflowRuns} active ${activeWorkflowRuns === 1 ? "run" : "runs"}`
-                  : `${projectWorkflows.reduce((count, workflow) => count + workflow.stageCount, 0)} total stages`
+                  ? t("activeRuns", { count: activeWorkflowRuns })
+                  : t("totalStages", {
+                      count: projectWorkflows.reduce(
+                        (count, workflow) => count + workflow.stageCount,
+                        0
+                      ),
+                    })
               }
               href="#workflows"
             />
@@ -315,25 +322,29 @@ export function ProjectDetailScreen({
           {mixedProject && (
             <StatTile
               icon={RocketIcon}
-              label="Registered apps"
+              label={t("registeredApps")}
               value={projectApps.length}
-              footer={failingApps > 0 ? `${failingApps} failing` : `${activeApps} ready`}
+              footer={
+                failingApps > 0
+                  ? t("failingApps", { count: failingApps })
+                  : t("readyApps", { count: activeApps })
+              }
               className={failingApps > 0 ? "border-warning-border bg-warning/5" : undefined}
               href="#apps"
             />
           )}
           <StatTile
             icon={ActivityIcon}
-            label="Active agent runs"
+            label={t("activeAgentRuns")}
             value={runningAgentRuns}
-            footer={runningAgentRuns === 1 ? "run in progress" : "runs in progress"}
+            footer={t("runsInProgress", { count: runningAgentRuns })}
             href={`/agents?project=${encodeURIComponent(project.slug)}`}
           />
           <StatTile
             icon={AlertTriangleIcon}
-            label="Needs attention"
+            label={t("needsAttention")}
             value={agentsNeedingAttention + workflowsNeedingAttention}
-            footer="paused or latest agent/workflow run failed"
+            footer={t("needsAttentionFooter")}
             className={
               agentsNeedingAttention + workflowsNeedingAttention > 0
                 ? "border-warning-border bg-warning/5"
@@ -345,9 +356,9 @@ export function ProjectDetailScreen({
           />
           <StatTile
             icon={BoxIcon}
-            label="Project resources"
+            label={t("projectResources")}
             value={resourceCount}
-            footer="infrastructure and shared secret bundles"
+            footer={t("projectResourcesFooter")}
             loading={resourcesLoading}
             href={`/projects/${encodeURIComponent(project.slug)}/resources`}
           />
@@ -356,33 +367,37 @@ export function ProjectDetailScreen({
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatTile
             icon={RocketIcon}
-            label="Registered apps"
+            label={t("registeredApps")}
             value={projectApps.length}
-            footer={failingApps > 0 ? `${failingApps} failing` : `${activeApps} ready`}
+            footer={
+              failingApps > 0
+                ? t("failingApps", { count: failingApps })
+                : t("readyApps", { count: activeApps })
+            }
             className={failingApps > 0 ? "border-warning-border bg-warning/5" : undefined}
             href="#apps"
           />
           <StatTile
             icon={BoxIcon}
-            label="Active deployments"
+            label={t("activeDeployments")}
             value={activeApps}
-            footer="apps with a healthy latest rollout"
+            footer={t("activeDeploymentsFooter")}
             href="#apps"
           />
           <StatTile
             icon={BoxIcon}
-            label="Project resources"
+            label={t("projectResources")}
             value={resourceCount}
-            footer="infrastructure and shared secret bundles"
+            footer={t("projectResourcesFooter")}
             loading={resourcesLoading}
             href={`/projects/${encodeURIComponent(project.slug)}/resources`}
           />
           {canManageMembers && (
             <StatTile
               icon={UsersIcon}
-              label="Direct members"
+              label={t("directMembers")}
               value={directMembers.length}
-              footer="users granted project-scope access"
+              footer={t("directMembersFooter")}
               href="#members"
             />
           )}
@@ -392,33 +407,35 @@ export function ProjectDetailScreen({
           <StatTile
             icon={FileBoxIcon}
             label={
-              workloadQueryError || !canViewAgents ? "Visible workloads" : "Registered workloads"
+              workloadQueryError || !canViewAgents
+                ? t("visibleWorkloads")
+                : t("registeredWorkloads")
             }
             value={0}
             footer={
               workloadQueryError
-                ? "some workload data could not be loaded"
+                ? t("workloadsPartial")
                 : canViewAgents
-                  ? "apps and agents in this project"
-                  : "workloads available to your modules"
+                  ? t("workloadsAppsAndAgents")
+                  : t("workloadsForModules")
             }
             className={workloadQueryError ? "border-warning-border bg-warning/5" : undefined}
             href="/apps"
           />
           <StatTile
             icon={BoxIcon}
-            label="Project resources"
+            label={t("projectResources")}
             value={resourceCount}
-            footer="infrastructure and shared secret bundles"
+            footer={t("projectResourcesFooter")}
             loading={resourcesLoading}
             href={`/projects/${encodeURIComponent(project.slug)}/resources`}
           />
           {canManageMembers && (
             <StatTile
               icon={UsersIcon}
-              label="Direct members"
+              label={t("directMembers")}
               value={directMembers.length}
-              footer="users granted project-scope access"
+              footer={t("directMembersFooter")}
               href="#members"
             />
           )}
@@ -431,13 +448,13 @@ export function ProjectDetailScreen({
           <CardContent className="flex items-start gap-3 p-6">
             <AlertTriangleIcon className="text-danger-fg mt-0.5 size-5 shrink-0" />
             <div>
-              <p className="text-danger-fg font-medium">Workload summary incomplete</p>
+              <p className="text-danger-fg font-medium">{t("summaryIncomplete")}</p>
               <p className="text-muted-foreground mt-1 text-sm">
                 {appsQueryError && agentQueryError
-                  ? "Astrolift could not load application or agent workloads for this project."
+                  ? t("summaryBothFailed")
                   : appsQueryError
-                    ? "Application workloads could not be loaded. Agent data is shown, but this project has not been classified as agent-only."
-                    : "Agent workloads could not be loaded. Application data is shown, but this project has not been classified as app-only."}
+                    ? t("summaryAppsFailed")
+                    : t("summaryAgentsFailed")}
               </p>
             </div>
           </CardContent>
@@ -449,9 +466,9 @@ export function ProjectDetailScreen({
           <CardContent className="flex items-start gap-3 p-6">
             <AlertTriangleIcon className="text-danger-fg mt-0.5 size-5 shrink-0" />
             <div>
-              <p className="text-danger-fg font-medium">Workflow topology unavailable</p>
+              <p className="text-danger-fg font-medium">{t("topologyUnavailable")}</p>
               <p className="text-muted-foreground mt-1 text-sm">
-                Agents are still shown, but Astrolift could not load their workflow membership.
+                {t("topologyUnavailableDescription")}
               </p>
             </div>
           </CardContent>
@@ -463,14 +480,12 @@ export function ProjectDetailScreen({
           <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
             <div>
               <CardTitle className="flex items-center gap-2 text-base">
-                <WorkflowIcon className="size-4" /> Workflow topology
+                <WorkflowIcon className="size-4" /> {t("topology")}
               </CardTitle>
-              <CardDescription>
-                Repository-declared pipelines, bound agents, and latest run state.
-              </CardDescription>
+              <CardDescription>{t("topologyDescription")}</CardDescription>
             </div>
             <Button asChild size="sm" variant="outline">
-              <Link href="/workflows">View all</Link>
+              <Link href="/workflows">{t("viewAll")}</Link>
             </Button>
           </CardHeader>
           <CardContent>
@@ -495,8 +510,8 @@ export function ProjectDetailScreen({
         <ListSummary<AstroliftAgentListItem>
           className="scroll-mt-20"
           icon={<BotIcon className="size-4" />}
-          title="Agents in this project"
-          description={`Registered agent workloads for ${project.team.slug}/${project.slug}. Live status refreshes automatically.`}
+          title={t("agentsTitle")}
+          description={t("agentsDescription", { team: project.team.slug, project: project.slug })}
           count={projectAgents.length}
           rows={projectAgents}
           keyOf={(agent) => agent.id}
@@ -510,7 +525,7 @@ export function ProjectDetailScreen({
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium">{agent.name}</span>
                   <span className="text-muted-foreground block truncate font-mono text-xs">
-                    {agent.slug} · {formatAgentRunMode(agent.runFamily, agent.runMode)}
+                    {agent.slug} · {formatAgentRunMode(agent.runFamily, agent.runMode, t)}
                   </span>
                 </span>
                 {usedBy.length > 0 ? (
@@ -519,7 +534,7 @@ export function ProjectDetailScreen({
                     {usedBy.length > 1 ? ` +${usedBy.length - 1}` : ""}
                   </Badge>
                 ) : (
-                  <Badge variant="outline">Standalone</Badge>
+                  <Badge variant="outline">{t("standalone")}</Badge>
                 )}
                 <AgentLiveStatus agent={agent} live={live} />
                 <AgentLastRun
@@ -544,26 +559,24 @@ export function ProjectDetailScreen({
               </div>
               <div>
                 <h2 className="font-semibold">
-                  {canViewAgents ? "No workloads in this project" : "No visible workloads"}
+                  {canViewAgents ? t("noWorkloads") : t("noVisibleWorkloads")}
                 </h2>
                 <p className="text-muted-foreground mt-1 max-w-lg text-sm">
-                  {canViewAgents
-                    ? "Connect an agent repository or register an application. Astrolift will adapt this overview to the workload types you add."
-                    : "No application workloads are visible in this project. Other workload types may be hidden by your module access."}
+                  {canViewAgents ? t("noWorkloadsDescription") : t("noVisibleWorkloadsDescription")}
                 </p>
               </div>
               <div className="flex flex-wrap justify-center gap-2">
                 {canCreateAgent && (
                   <Button asChild>
                     <Link href="/agents/new">
-                      <BotIcon className="size-4" /> Register agent repo
+                      <BotIcon className="size-4" /> {t("registerAgentRepo")}
                     </Link>
                   </Button>
                 )}
                 {canCreateApp && (
                   <Button asChild variant="outline">
                     <Link href="/apps/new">
-                      <RocketIcon className="size-4" /> Register app
+                      <RocketIcon className="size-4" /> {t("registerApp")}
                     </Link>
                   </Button>
                 )}
@@ -577,8 +590,8 @@ export function ProjectDetailScreen({
         <ListSummary<(typeof projectApps)[number]>
           className="scroll-mt-20"
           icon={<RocketIcon className="size-4" />}
-          title="Apps in this project"
-          description={`Registered apps associated with ${project.team.slug}/${project.slug}.`}
+          title={t("appsTitle")}
+          description={t("appsDescription", { team: project.team.slug, project: project.slug })}
           count={projectApps.length}
           rows={projectApps}
           keyOf={(a) => a.id}
@@ -596,7 +609,9 @@ export function ProjectDetailScreen({
                 </span>
               </span>
               <Badge variant="secondary" className="shrink-0 capitalize">
-                {a.provisioningStatus}
+                {appStatus.has(a.provisioningStatus)
+                  ? appStatus(a.provisioningStatus)
+                  : a.provisioningStatus}
               </Badge>
               <span className="text-muted-foreground shrink-0 font-mono text-xs">
                 {fmt.formatDate(a.createdAt)}
@@ -611,8 +626,8 @@ export function ProjectDetailScreen({
         <ListSummary<(typeof directMembers)[number]>
           className="scroll-mt-20"
           icon={<ShieldIcon className="size-4" />}
-          title="Project members"
-          description="Members with explicit access granted at the project scope. Org-wide and team-wide members are not listed here."
+          title={t("membersTitle")}
+          description={t("membersDescription")}
           count={directMembers.length}
           rows={directMembers}
           keyOf={(m) => m.id}
@@ -620,11 +635,10 @@ export function ProjectDetailScreen({
           loading={membersLoading && directMembers.length === 0}
           empty={{
             icon: <UsersIcon className="size-5" />,
-            title: "No direct project members",
-            description:
-              "Anyone with team or org-wide access already sees this project. Grant explicit project-scope access from the Members page.",
+            title: t("noMembers"),
+            description: t("noMembersDescription"),
             actionHref: "/administration/members",
-            actionLabel: "Manage members",
+            actionLabel: t("manageMembers"),
           }}
           renderRow={(m) => (
             <span className="flex min-w-0 items-center justify-between gap-3">
@@ -633,7 +647,8 @@ export function ProjectDetailScreen({
                   {m.user.username || m.user.email}
                 </span>
                 <span className="text-muted-foreground block truncate text-xs">
-                  {m.user.email} · joined {m.joinedAt ? fmt.formatDate(m.joinedAt) : "—"}
+                  {m.user.email} ·{" "}
+                  {t("joined", { date: m.joinedAt ? fmt.formatDate(m.joinedAt) : "—" })}
                 </span>
               </span>
               <Badge variant="outline" className="shrink-0 text-xs uppercase">
@@ -648,35 +663,29 @@ export function ProjectDetailScreen({
       <Sheet open={settingsOpen} onOpenChange={setSettingsOpen}>
         <SheetContent side="right" className="sm:max-w-md">
           <SheetHeader>
-            <SheetTitle>Project settings</SheetTitle>
+            <SheetTitle>{t("settingsTitle")}</SheetTitle>
             <SheetDescription>
-              Configure or remove {project.team.slug}/{project.slug}.
+              {t("settingsDescription", { team: project.team.slug, project: project.slug })}
             </SheetDescription>
           </SheetHeader>
           <div className="space-y-6 px-4 py-4">
             <section className="space-y-2">
-              <h3 className="text-sm font-medium">Identity</h3>
+              <h3 className="text-sm font-medium">{t("identity")}</h3>
               <dl className="grid grid-cols-3 gap-x-3 gap-y-1.5 text-sm">
-                <dt className="text-muted-foreground">Name</dt>
+                <dt className="text-muted-foreground">{t("name")}</dt>
                 <dd className="col-span-2">{project.name}</dd>
-                <dt className="text-muted-foreground">Slug</dt>
+                <dt className="text-muted-foreground">{t("slug")}</dt>
                 <dd className="col-span-2 font-mono text-xs">{project.slug}</dd>
-                <dt className="text-muted-foreground">Team</dt>
+                <dt className="text-muted-foreground">{t("team")}</dt>
                 <dd className="col-span-2 font-mono text-xs">{project.team.slug}</dd>
-                <dt className="text-muted-foreground">Created</dt>
+                <dt className="text-muted-foreground">{t("created")}</dt>
                 <dd className="col-span-2 text-xs">{fmt.formatDateTime(project.createdAt)}</dd>
               </dl>
-              <p className="text-muted-foreground text-xs">
-                Project rename ships when the backend mutation lands; the slug is intentionally
-                immutable so downstream cost allocation stays stable across rename.
-              </p>
+              <p className="text-muted-foreground text-xs">{t("renameNote")}</p>
             </section>
             <section className="space-y-2">
-              <h3 className="text-destructive text-sm font-medium">Danger zone</h3>
-              <p className="text-muted-foreground text-xs">
-                Soft delete removes this project from listings. Workloads attached to it remain
-                visible until reassigned.
-              </p>
+              <h3 className="text-destructive text-sm font-medium">{t("dangerZone")}</h3>
+              <p className="text-muted-foreground text-xs">{t("dangerZoneDescription")}</p>
               <Can permission="project.delete">
                 <Button
                   variant="outline"
@@ -685,14 +694,14 @@ export function ProjectDetailScreen({
                   onClick={() => setConfirmOpen(true)}
                 >
                   <Trash2Icon className="size-4" />
-                  Delete project
+                  {t("deleteProject")}
                 </Button>
               </Can>
             </section>
           </div>
           <SheetFooter>
             <Button variant="outline" onClick={() => setSettingsOpen(false)}>
-              Close
+              {t("close")}
             </Button>
           </SheetFooter>
         </SheetContent>
@@ -701,9 +710,9 @@ export function ProjectDetailScreen({
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title={`Delete project ${project.team.slug}/${project.slug}?`}
-        description="Soft delete — apps and agents remain visible until you reassign them. The slug becomes reclaimable."
-        confirmLabel="Delete project"
+        title={t("deleteTitle", { team: project.team.slug, project: project.slug })}
+        description={t("deleteDescription")}
+        confirmLabel={t("deleteProject")}
         destructive
         onConfirm={onDelete}
       />
@@ -711,17 +720,17 @@ export function ProjectDetailScreen({
   );
 }
 
-const RUN_FAMILY_LABELS: Record<string, string> = {
-  task: "Task",
-  service: "Service",
+const RUN_FAMILY_KEYS: Record<string, string> = {
+  task: "runFamily.task",
+  service: "runFamily.service",
 };
 
-const RUN_MODE_LABELS: Record<string, string> = {
-  once: "Once",
-  loop: "Loop",
-  schedule: "Schedule",
-  trigger: "Trigger",
-  service: "Service",
+const RUN_MODE_KEYS: Record<string, string> = {
+  once: "runMode.once",
+  loop: "runMode.loop",
+  schedule: "runMode.schedule",
+  trigger: "runMode.trigger",
+  service: "runMode.service",
 };
 
 const AGENT_RUN_STATUS_DOT: Record<string, "ok" | "warn" | "error" | "muted" | "pending"> = {
@@ -744,9 +753,15 @@ function titleCase(value: string): string {
     .join(" ");
 }
 
-function formatAgentRunMode(runFamily: string, runMode: string): string {
-  const family = RUN_FAMILY_LABELS[runFamily.toLowerCase()] ?? titleCase(runFamily);
-  const mode = RUN_MODE_LABELS[runMode.toLowerCase()] ?? titleCase(runMode);
+function formatAgentRunMode(
+  runFamily: string,
+  runMode: string,
+  t: (key: string) => string
+): string {
+  const familyKey = RUN_FAMILY_KEYS[runFamily.toLowerCase()];
+  const modeKey = RUN_MODE_KEYS[runMode.toLowerCase()];
+  const family = familyKey ? t(familyKey) : titleCase(runFamily);
+  const mode = modeKey ? t(modeKey) : titleCase(runMode);
   if (!mode || mode === family) return family || "—";
   return `${family} · ${mode}`;
 }
@@ -758,6 +773,8 @@ function AgentLiveStatus({
   agent: AstroliftAgentListItem;
   live: AstroliftAgentLiveStatus | undefined;
 }) {
+  const t = useTranslations("projectDetail");
+  const fmt = useFormatters();
   const runningCount = live?.runningCount ?? agent.runningCount;
   const isPaused = live?.isPaused ?? agent.runPaused;
 
@@ -765,7 +782,7 @@ function AgentLiveStatus({
     return (
       <span className="inline-flex items-center gap-1.5">
         <StatusDot status="pending" />
-        <Badge>{runningCount} running</Badge>
+        <Badge>{t("running", { count: runningCount })}</Badge>
       </span>
     );
   }
@@ -773,7 +790,7 @@ function AgentLiveStatus({
     return (
       <span className="inline-flex items-center gap-1.5">
         <StatusDot status="muted" />
-        <Badge variant="outline">Paused</Badge>
+        <Badge variant="outline">{t("paused")}</Badge>
       </span>
     );
   }
@@ -782,7 +799,7 @@ function AgentLiveStatus({
       <span className="inline-flex items-center gap-1.5">
         <StatusDot status="warn" />
         <Badge variant="secondary" title={live.nextScheduledAt}>
-          Next {formatRelativeAge(live.nextScheduledAt)}
+          {t("next", { when: fmt.formatRelativeTime(live.nextScheduledAt) })}
         </Badge>
       </span>
     );
@@ -790,7 +807,7 @@ function AgentLiveStatus({
   return (
     <span className="inline-flex items-center gap-1.5">
       <StatusDot status="muted" />
-      <Badge variant="outline">Idle</Badge>
+      <Badge variant="outline">{t("idle")}</Badge>
     </span>
   );
 }
@@ -802,8 +819,11 @@ function AgentLastRun({
   status: string | null | undefined;
   at: string | null | undefined;
 }) {
+  const t = useTranslations("projectDetail");
+  const statusLabel = useTranslations("agentActivity.statuses");
+  const fmt = useFormatters();
   if (!status && !at) {
-    return <span className="text-muted-foreground text-sm">Never run</span>;
+    return <span className="text-muted-foreground text-sm">{t("neverRun")}</span>;
   }
   const dot = AGENT_RUN_STATUS_DOT[(status ?? "").toLowerCase()] ?? "muted";
   return (
@@ -811,12 +831,16 @@ function AgentLastRun({
       {status && (
         <>
           <StatusDot status={dot} />
-          <Badge variant={dot === "error" ? "destructive" : "secondary"}>{titleCase(status)}</Badge>
+          <Badge variant={dot === "error" ? "destructive" : "secondary"}>
+            {statusLabel.has(status.toLowerCase())
+              ? statusLabel(status.toLowerCase())
+              : titleCase(status)}
+          </Badge>
         </>
       )}
       {at && (
         <span className="text-muted-foreground text-xs" title={at}>
-          {formatRelativeAge(at)}
+          {fmt.formatRelativeTime(at)}
         </span>
       )}
     </span>

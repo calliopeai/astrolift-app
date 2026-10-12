@@ -8,6 +8,7 @@ import {
   Trash2Icon,
   UsersIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -39,12 +40,6 @@ import type { AppTeamAccessLevel, AstroliftAppTeamAccess } from "@/graphql/regis
 import type { useTeamsCard } from "./use-teams-card";
 
 export type TeamsCardViewProps = ReturnType<typeof useTeamsCard>;
-
-const LEVEL_DESCRIPTIONS: Record<AppTeamAccessLevel, string> = {
-  viewer: "Read-only — can view this app, no deploy or mutate rights.",
-  deployer: "Read + deploy — can trigger rollouts, rotate tokens, edit manifest.",
-  owner: "Full control — including granting access to other teams.",
-};
 
 const LEVEL_BADGE: Record<AppTeamAccessLevel, string> = {
   viewer: "border-info-border bg-info/10 text-info-fg",
@@ -82,11 +77,12 @@ export function TeamsCardView({
   const [revokeTarget, setRevokeTarget] = React.useState<AstroliftAppTeamAccess | null>(null);
   const [addOpen, setAddOpen] = React.useState(false);
   const [moveOpen, setMoveOpen] = React.useState(false);
+  const t = useTranslations("appOverviewCards.teams");
 
   const columns: Column<AstroliftAppTeamAccess>[] = [
     {
       id: "team",
-      header: "Team",
+      header: t("team"),
       cell: (a) => (
         <>
           <div className="flex items-center gap-2">
@@ -97,7 +93,7 @@ export function TeamsCardView({
                 className="border-warning-border bg-warning/10 text-warning-fg"
               >
                 <HomeIcon className="size-3" />
-                Home
+                {t("home")}
               </Badge>
             )}
           </div>
@@ -107,14 +103,14 @@ export function TeamsCardView({
     },
     {
       id: "level",
-      header: "Access level",
+      header: t("accessLevel"),
       cell: (a) => (
         <>
           <Can
             permission="app.update"
             fallback={
               <Badge variant="outline" className={LEVEL_BADGE[a.accessLevel]}>
-                {a.accessLevel}
+                {t.has(`levels.${a.accessLevel}`) ? t(`levels.${a.accessLevel}`) : a.accessLevel}
               </Badge>
             }
           >
@@ -125,28 +121,28 @@ export function TeamsCardView({
             >
               <SelectTrigger
                 className="h-8 w-[140px]"
-                title={
-                  a.isHome
-                    ? "Home team access is fixed at OWNER. Move the app to a different team to change this."
-                    : undefined
-                }
+                title={a.isHome ? t("homeLevelFixed") : undefined}
               >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="viewer">Viewer</SelectItem>
-                <SelectItem value="deployer">Deployer</SelectItem>
-                <SelectItem value="owner">Owner</SelectItem>
+                <SelectItem value="viewer">{t("levels.viewer")}</SelectItem>
+                <SelectItem value="deployer">{t("levels.deployer")}</SelectItem>
+                <SelectItem value="owner">{t("levels.owner")}</SelectItem>
               </SelectContent>
             </Select>
           </Can>
-          <p className="text-muted-foreground text-2xs mt-1">{LEVEL_DESCRIPTIONS[a.accessLevel]}</p>
+          <p className="text-muted-foreground text-2xs mt-1">
+            {t.has(`levelDescriptions.${a.accessLevel}`)
+              ? t(`levelDescriptions.${a.accessLevel}`)
+              : ""}
+          </p>
         </>
       ),
     },
     {
       id: "actions",
-      header: "Actions",
+      header: t("actions"),
       align: "right",
       width: "w-16",
       cell: (a) => (
@@ -157,14 +153,10 @@ export function TeamsCardView({
             className="size-8"
             onClick={() => setRevokeTarget(a)}
             disabled={revoking || a.isHome}
-            title={
-              a.isHome
-                ? "Cannot revoke the home team. Move the app to a different team first."
-                : "Revoke access"
-            }
+            title={a.isHome ? t("cannotRevokeHome") : t("revokeAccess")}
           >
             <Trash2Icon className="size-4" />
-            <span className="sr-only">Revoke</span>
+            <span className="sr-only">{t("revoke")}</span>
           </Button>
         </Can>
       ),
@@ -176,18 +168,15 @@ export function TeamsCardView({
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
         <div>
           <CardTitle className="flex items-center gap-2 text-base">
-            <UsersIcon className="size-4" /> Teams
+            <UsersIcon className="size-4" /> {t("title")}
           </CardTitle>
-          <CardDescription>
-            Teams that can reach this app. The home team owns the app and inherits OWNER access;
-            additional teams can be granted viewer, deployer, or owner roles.
-          </CardDescription>
+          <CardDescription>{t("description")}</CardDescription>
         </div>
         <div className="flex items-center gap-2">
           <Can permission="app.update">
             <Button size="sm" variant="outline" onClick={() => setMoveOpen(true)} disabled={moving}>
               <ArrowRightLeftIcon className="size-4" />
-              Move home team
+              {t("moveHomeTeam")}
             </Button>
           </Can>
           <Can permission="app.update">
@@ -195,14 +184,10 @@ export function TeamsCardView({
               size="sm"
               onClick={() => setAddOpen(true)}
               disabled={candidateTeams.length === 0}
-              title={
-                candidateTeams.length === 0
-                  ? "Every team in this org already has access."
-                  : undefined
-              }
+              title={candidateTeams.length === 0 ? t("allTeamsHaveAccess") : undefined}
             >
               <PlusIcon className="size-4" />
-              Add team
+              {t("addTeam")}
             </Button>
           </Can>
         </div>
@@ -210,8 +195,15 @@ export function TeamsCardView({
       <CardContent>
         <ListPage<AstroliftAppTeamAccess>
           embedded
-          list={list}
-          label="Team access grants"
+          list={{
+            ...list,
+            definition: {
+              ...list.definition,
+              searchPlaceholder: t("searchPlaceholder"),
+              views: [{ key: "all", label: t("allView"), filters: {} }],
+            },
+          }}
+          label={t("grantsLabel")}
           columns={columns}
           rows={rows}
           getRowId={(a) => a.id}
@@ -223,8 +215,8 @@ export function TeamsCardView({
           totalCount={totalCount}
           empty={{
             icon: <UsersIcon className="size-5" />,
-            title: "No team access grants",
-            description: "Add a team to give it visibility and operational rights on this app.",
+            title: t("emptyTitle"),
+            description: t("emptyDescription"),
           }}
         />
       </CardContent>
@@ -255,9 +247,11 @@ export function TeamsCardView({
         onOpenChange={(next) => {
           if (!next) setRevokeTarget(null);
         }}
-        title={revokeTarget ? `Revoke ${revokeTarget.teamSlug}'s access?` : "Revoke access?"}
-        description="The team loses visibility and operational rights on this app. Soft-delete only — the grant can be re-added at any time."
-        confirmLabel="Revoke"
+        title={
+          revokeTarget ? t("revokeTitle", { team: revokeTarget.teamSlug }) : t("revokeTitleGeneric")
+        }
+        description={t("revokeDescription")}
+        confirmLabel={t("revoke")}
         destructive
         onConfirm={async () => {
           if (revokeTarget) await onRevoke(revokeTarget);
@@ -289,6 +283,7 @@ export function AddTeamSheetView({
 }: AddTeamSheetViewProps) {
   const [teamId, setTeamId] = React.useState("");
   const [level, setLevel] = React.useState<AppTeamAccessLevel>("deployer");
+  const copy = useTranslations("appOverviewCards.teams");
 
   React.useEffect(() => {
     if (!open) {
@@ -307,14 +302,12 @@ export function AddTeamSheetView({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col">
         <SheetHeader>
-          <SheetTitle>Add team access</SheetTitle>
-          <SheetDescription>
-            Pick a team in this organization and the access level it should hold on this app.
-          </SheetDescription>
+          <SheetTitle>{copy("addTitle")}</SheetTitle>
+          <SheetDescription>{copy("addDescription")}</SheetDescription>
         </SheetHeader>
         <form onSubmit={submit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
           <div className="space-y-2">
-            <Label htmlFor="team">Team</Label>
+            <Label htmlFor="team">{copy("team")}</Label>
             <Select
               value={teamId}
               onValueChange={setTeamId}
@@ -324,10 +317,10 @@ export function AddTeamSheetView({
                 <SelectValue
                   placeholder={
                     teamsLoading
-                      ? "Loading teams…"
+                      ? copy("loadingTeams")
                       : candidateTeams.length === 0
-                        ? "Every team already has access"
-                        : "Select a team"
+                        ? copy("everyTeamHasAccess")
+                        : copy("selectTeam")
                   }
                 />
               </SelectTrigger>
@@ -342,31 +335,33 @@ export function AddTeamSheetView({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="level">Access level</Label>
+            <Label htmlFor="level">{copy("accessLevel")}</Label>
             <Select value={level} onValueChange={(v) => setLevel(v as AppTeamAccessLevel)}>
               <SelectTrigger id="level">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="viewer">Viewer</SelectItem>
-                <SelectItem value="deployer">Deployer</SelectItem>
-                <SelectItem value="owner">Owner</SelectItem>
+                <SelectItem value="viewer">{copy("levels.viewer")}</SelectItem>
+                <SelectItem value="deployer">{copy("levels.deployer")}</SelectItem>
+                <SelectItem value="owner">{copy("levels.owner")}</SelectItem>
               </SelectContent>
             </Select>
-            <p className="text-muted-foreground text-xs">{LEVEL_DESCRIPTIONS[level]}</p>
+            <p className="text-muted-foreground text-xs">
+              {copy.has(`levelDescriptions.${level}`) ? copy(`levelDescriptions.${level}`) : ""}
+            </p>
           </div>
 
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {copy("cancel")}
             </Button>
             <Button type="submit" disabled={loading || !teamId}>
               {loading ? (
                 <>
-                  <Loader2Icon className="size-3.5 animate-spin" /> Granting…
+                  <Loader2Icon className="size-3.5 animate-spin" /> {copy("granting")}
                 </>
               ) : (
-                "Grant access"
+                copy("grantAccess")
               )}
             </Button>
           </SheetFooter>
@@ -398,6 +393,7 @@ export function MoveTeamSheetView({
   onMove,
 }: MoveTeamSheetViewProps) {
   const [targetTeamId, setTargetTeamId] = React.useState("");
+  const copy = useTranslations("appOverviewCards.teams");
 
   React.useEffect(() => {
     if (!open) setTargetTeamId("");
@@ -416,23 +412,19 @@ export function MoveTeamSheetView({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col">
         <SheetHeader>
-          <SheetTitle>Move home team</SheetTitle>
-          <SheetDescription>
-            Change the app&apos;s primary / home team. The target team gains OWNER access; the
-            previous home team is downgraded to DEPLOYER (not revoked). The app&apos;s project must
-            already belong to the target team — otherwise re-anchor the project first.
-          </SheetDescription>
+          <SheetTitle>{copy("moveHomeTeam")}</SheetTitle>
+          <SheetDescription>{copy("moveDescription")}</SheetDescription>
         </SheetHeader>
         <form onSubmit={submit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
           <div className="space-y-2">
-            <Label>Current home team</Label>
+            <Label>{copy("currentHomeTeam")}</Label>
             <div className="bg-muted/30 text-muted-foreground rounded-md border px-3 py-2 font-mono text-xs">
               {homeTeamSlug}
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="target-team">Move to team</Label>
+            <Label htmlFor="target-team">{copy("moveToTeam")}</Label>
             <Select
               value={targetTeamId}
               onValueChange={setTargetTeamId}
@@ -442,10 +434,10 @@ export function MoveTeamSheetView({
                 <SelectValue
                   placeholder={
                     teamsLoading
-                      ? "Loading teams…"
+                      ? copy("loadingTeams")
                       : candidates.length === 0
-                        ? "No other teams in this org"
-                        : "Pick a target team"
+                        ? copy("noOtherTeams")
+                        : copy("pickTargetTeam")
                   }
                 />
               </SelectTrigger>
@@ -461,15 +453,15 @@ export function MoveTeamSheetView({
 
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {copy("cancel")}
             </Button>
             <Button type="submit" disabled={moveLoading || !targetTeamId}>
               {moveLoading ? (
                 <>
-                  <Loader2Icon className="size-3.5 animate-spin" /> Moving…
+                  <Loader2Icon className="size-3.5 animate-spin" /> {copy("moving")}
                 </>
               ) : (
-                "Move app"
+                copy("moveApp")
               )}
             </Button>
           </SheetFooter>

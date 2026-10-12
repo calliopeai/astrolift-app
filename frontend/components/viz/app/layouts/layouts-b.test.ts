@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import messages from "@/messages/en.json";
+
+import { vizTranslator } from "../../core/viz-t";
+
 import { makeApp, stepApp, type AppSnapshot } from "../../core/app-model";
 import { mulberry32 } from "../../core/semantics";
 
@@ -142,13 +146,14 @@ describe("schedule", () => {
 describe("roleSections and summaries", () => {
   it("groups mixed nodes by role, dropping empty sections", () => {
     const s = makeApp("mixed");
-    const titles = roleSections(s.nodes).map((x) => x.title);
-    expect(titles).toEqual(["Traffic", "Services", "Functions", "Jobs", "Data"]);
+    const keys = roleSections(s.nodes).map((x) => x.key);
+    expect(keys).toEqual(["traffic", "services", "functions", "jobs", "data"]);
   });
 
   it("summarises failing, busy and idle", () => {
     const s = makeApp("service-agent", { incident: true });
-    expect(summarize(s.nodes, "nodes")).toMatch(/^5 nodes, 1 failing/);
+    const t = vizTranslator(messages);
+    expect(summarize(s.nodes, "nodes", t)).toMatch(/^5 nodes, 1 failing/);
   });
 
   it("truncates with an ellipsis", () => {

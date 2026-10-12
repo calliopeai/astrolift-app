@@ -1,6 +1,8 @@
 import { fireEvent, screen, within } from "@testing-library/react";
+import { createTranslator } from "next-intl";
 import { describe, expect, it, vi } from "vitest";
 
+import en from "@/messages/en.json";
 import { renderWithIntl } from "@/test/render-with-intl";
 
 import { SCOPED_SAFETY_FIXTURE } from "./fixtures";
@@ -70,6 +72,14 @@ describe("Team, app and person action-safety rules (#2203)", () => {
   });
 
   it("describes a rule that adds nothing honestly", () => {
-    expect(describeRule({ action: "x", scopeKind: "APP", scopeLabel: "a" })).toBe("adds nothing");
+    const scoped = createTranslator({
+      locale: "en",
+      messages: en,
+      namespace: "actionSafety.scoped",
+    });
+    const t = (key: string) => scoped(key as never);
+    expect(describeRule({ action: "x", scopeKind: "APP", scopeLabel: "a" }, t)).toBe(
+      "adds nothing"
+    );
   });
 });

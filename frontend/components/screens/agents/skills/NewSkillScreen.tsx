@@ -2,6 +2,7 @@
 
 import { AlertTriangleIcon, ArrowLeftIcon, ArrowRightIcon, Loader2Icon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { ShellHeader } from "@/components/shell/ShellHeader";
@@ -22,8 +23,6 @@ export type NewSkillScreenProps = NewSkillState & {
   initialErrors?: SkillErrors;
 };
 
-const STEPS = [{ label: "Skill" }, { label: "Instructions" }];
-
 const slugify = (value: string) =>
   value
     .toLowerCase()
@@ -43,6 +42,10 @@ export function NewSkillScreen({
   initialStep = 1,
   initialErrors = {},
 }: NewSkillScreenProps) {
+  const tr = useTranslations("agentSkills.newSkill");
+  const common = useTranslations("agentSkills.common");
+  const validation = useTranslations("agentSkills.validation");
+  const steps = [{ label: common("skill") }, { label: tr("stepInstructions") }];
   const [step, setStep] = React.useState<1 | 2>(initialStep);
   const [name, setName] = React.useState("");
   const [slug, setSlug] = React.useState("");
@@ -58,8 +61,8 @@ export function NewSkillScreen({
     e.preventDefault();
     if (step === 1) {
       const found: SkillErrors = {};
-      if (!name.trim()) found.name = "Give the skill a name.";
-      if (!slug.trim()) found.slug = "A slug is required.";
+      if (!name.trim()) found.name = validation("skillName");
+      if (!slug.trim()) found.slug = validation("slugRequired");
       setErrors(found);
       if (!found.name && !found.slug) setStep(2);
       return;
@@ -72,14 +75,12 @@ export function NewSkillScreen({
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6">
       <ShellHeader
-        crumbs={agentsCrumbs("skills", { label: "New skill" })}
-        title="New skill"
-        context={<FlowSteps steps={STEPS} current={step} />}
+        crumbs={agentsCrumbs("skills", { label: common("newSkill") })}
+        title={common("newSkill")}
+        context={<FlowSteps steps={steps} current={step} />}
       />
 
-      <p className="text-muted-foreground max-w-2xl text-sm">
-        Define a skill: instructions and tool bindings your agents draw on at dispatch time.
-      </p>
+      <p className="text-muted-foreground max-w-2xl text-sm">{tr("intro")}</p>
 
       <form
         onSubmit={submit}
@@ -100,11 +101,11 @@ export function NewSkillScreen({
           <>
             <div className="grid min-w-0 gap-4 sm:grid-cols-2">
               <Field data-invalid={Boolean(errors.name) || undefined} className="min-w-0">
-                <FieldLabel htmlFor="new-skill-name">Name</FieldLabel>
+                <FieldLabel htmlFor="new-skill-name">{common("name")}</FieldLabel>
                 <Input
                   id="new-skill-name"
                   value={name}
-                  placeholder="e.g. Document Summariser"
+                  placeholder={tr("namePlaceholder")}
                   aria-invalid={Boolean(errors.name) || undefined}
                   onChange={(e) => {
                     setName(e.target.value);
@@ -115,7 +116,7 @@ export function NewSkillScreen({
                 <FieldError className="[overflow-wrap:anywhere]">{errors.name}</FieldError>
               </Field>
               <Field data-invalid={Boolean(errors.slug) || undefined} className="min-w-0">
-                <FieldLabel htmlFor="new-skill-slug">Slug</FieldLabel>
+                <FieldLabel htmlFor="new-skill-slug">{common("slug")}</FieldLabel>
                 <Input
                   id="new-skill-slug"
                   value={slug}
@@ -133,11 +134,11 @@ export function NewSkillScreen({
               </Field>
             </div>
             <Field data-invalid={Boolean(errors.description) || undefined} className="min-w-0">
-              <FieldLabel htmlFor="new-skill-description">Description</FieldLabel>
+              <FieldLabel htmlFor="new-skill-description">{common("description")}</FieldLabel>
               <Input
                 id="new-skill-description"
                 value={description}
-                placeholder="Short description shown in search and picker"
+                placeholder={common("skillDescriptionPlaceholder")}
                 aria-invalid={Boolean(errors.description) || undefined}
                 onChange={(e) => {
                   setDescription(e.target.value);
@@ -149,11 +150,11 @@ export function NewSkillScreen({
           </>
         ) : (
           <Field data-invalid={Boolean(errors.content) || undefined} className="min-w-0">
-            <FieldLabel htmlFor="new-skill-content">Instructions / content</FieldLabel>
+            <FieldLabel htmlFor="new-skill-content">{common("instructionsLabel")}</FieldLabel>
             <Textarea
               id="new-skill-content"
               value={content}
-              placeholder="System prompt / instructions injected into the agent brief when this skill is active"
+              placeholder={common("instructionsPlaceholder")}
               rows={10}
               className="max-h-96 font-mono text-sm"
               aria-invalid={Boolean(errors.content) || undefined}
@@ -168,23 +169,23 @@ export function NewSkillScreen({
 
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 border-t pt-4">
           <Button type="button" variant="ghost" asChild className="mr-auto">
-            <Link href="/agents/skills">Cancel</Link>
+            <Link href="/agents/skills">{common("cancel")}</Link>
           </Button>
           {step === 2 && (
             <Button type="button" variant="outline" onClick={() => setStep(1)}>
               <ArrowLeftIcon className="size-4" />
-              Back
+              {common("back")}
             </Button>
           )}
           {step === 1 ? (
             <Button type="submit">
-              Continue
+              {common("continue")}
               <ArrowRightIcon className="size-4" />
             </Button>
           ) : (
             <Button type="submit" disabled={loading || !orgReady}>
               {loading && <Loader2Icon className="size-4 animate-spin" />}
-              Create skill
+              {tr("create")}
             </Button>
           )}
         </div>

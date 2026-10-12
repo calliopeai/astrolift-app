@@ -133,6 +133,7 @@ function ApproverChip({
   approver: AstroliftDeploymentApprover;
   variant: "approved" | "awaiting";
 }) {
+  const tx = useTranslations("quorumChip");
   const initials = computeInitials(approver.displayName || approver.email);
   const ring =
     variant === "approved"
@@ -165,7 +166,7 @@ function ApproverChip({
         >
           <a
             href={approver.mailtoUrl}
-            aria-label={`Email ${approver.displayName}`}
+            aria-label={tx("email", { name: approver.displayName })}
             className="text-muted-foreground hover:text-foreground"
           >
             <MailIcon className="size-3" />

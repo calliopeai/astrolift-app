@@ -34,6 +34,7 @@ export type AggregatedEventsListProps = ReturnType<typeof useAggregatedEvents> &
  */
 export function AggregatedEventsList({ buckets, renderMembers }: AggregatedEventsListProps) {
   const t = useTranslations("lists.events");
+  const tx = useTranslations("eventDetail");
   const fmt = useFormatters();
   const [openBucket, setOpenBucket] = React.useState<AggregatedEvent | null>(null);
 
@@ -42,8 +43,12 @@ export function AggregatedEventsList({ buckets, renderMembers }: AggregatedEvent
   const bucketSummary = openBucket
     ? [
         openBucket.count > 1
-          ? `${openBucket.count} events between ${fmt.formatDateTime(openBucket.firstAt)} and ${fmt.formatDateTime(openBucket.lastAt)}`
-          : `1 event at ${fmt.formatDateTime(openBucket.lastAt)}`,
+          ? tx("bucketRange", {
+              count: openBucket.count,
+              first: fmt.formatDateTime(openBucket.firstAt),
+              last: fmt.formatDateTime(openBucket.lastAt),
+            })
+          : tx("bucketSingle", { at: fmt.formatDateTime(openBucket.lastAt) }),
         openBucket.resourceKind || openBucket.resourceId
           ? `${openBucket.resourceKind || "?"}:${openBucket.resourceId || "?"}`
           : null,
@@ -55,7 +60,7 @@ export function AggregatedEventsList({ buckets, renderMembers }: AggregatedEvent
   return (
     <>
       <Feed<AggregatedEvent>
-        label="Event groups"
+        label={tx("groupsLabel")}
         {...buckets}
         keyOf={bucketKey}
         groupBy={{ day: (b) => b.lastAt }}

@@ -21,9 +21,9 @@ export const ROLE_BASE = "/administration/permissions/roles";
 export type RoleTab = "permissions" | "holders" | "settings";
 
 export const ROLE_TABS: readonly DetailTabSpec<RoleTab>[] = [
-  { key: "permissions", label: "Permissions", segment: "", owns: [] },
-  { key: "holders", label: "Holders", segment: "holders", owns: [] },
-  { key: "settings", label: "Settings", segment: "settings", owns: [] },
+  { key: "permissions", label: "permissions", segment: "", owns: [] },
+  { key: "holders", label: "holders", segment: "holders", owns: [] },
+  { key: "settings", label: "settings", segment: "settings", owns: [] },
 ];
 
 export function roleHref(id: string, tab: RoleTab = "permissions"): string {
@@ -35,9 +35,10 @@ export function newRoleHref(from?: string): string {
   return from ? `${ROLE_BASE}/new?from=${encodeURIComponent(from)}` : `${ROLE_BASE}/new`;
 }
 
-export function roleTabs(id: string, active: RoleTab): DetailTab[] {
+/** `label` turns a tab's key (`permissions`, `holders`, `settings`) into its translated name. */
+export function roleTabs(id: string, active: RoleTab, label: (key: string) => string): DetailTab[] {
   const slug = encodeURIComponent(id);
-  return detailTabs(ROLE_TABS, ROLE_BASE, slug, roleHref(id, active), (label) => label, active);
+  return detailTabs(ROLE_TABS, ROLE_BASE, slug, roleHref(id, active), label, active);
 }
 
 /** `Admin ▾ › Permissions ▾ › Roles › <role>`: four crumbs, the most spec 44 §4.4 allows. */

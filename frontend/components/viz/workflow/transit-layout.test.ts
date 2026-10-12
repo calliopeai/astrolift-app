@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import messages from "@/messages/en.json";
+
+import { vizTranslator } from "../core/viz-t";
+
 import {
   makeWorkflows,
   type FanoutBranch,
@@ -39,6 +43,8 @@ const train = (over: Partial<WorkflowTrain>): WorkflowTrain => ({
   ...over,
 });
 
+const vt = vizTranslator(messages);
+
 describe("transit layout", () => {
   it("jogs at 45 degrees between rows of different height", () => {
     const p = segmentPath({ x: 0, y: 0 }, { x: 100, y: 20 });
@@ -50,7 +56,7 @@ describe("transit layout", () => {
 
   it("lays every line out in its own row, fitting the widest line", () => {
     const snap = makeWorkflows({ lines: 8 });
-    const layout = layoutTransit(snap.lines);
+    const layout = layoutTransit(snap.lines, vt);
     expect(layout.lines).toHaveLength(8);
     layout.lines.forEach((l, i) => {
       expect(l.stations).toHaveLength(snap.lines[i].stations.length);
@@ -79,7 +85,7 @@ describe("transit layout", () => {
     expect(trainT(train({}), 6)).toBe(1.5);
     expect(trainT(train({ state: "held", at: 3 }), 6)).toBeCloseTo(3 - HOLD_SHORT);
     expect(trainT(train({ state: "done", at: 2 }), 6)).toBe(5);
-    const line = layoutTransit(makeWorkflows({ lines: 1 }).lines).lines[0];
+    const line = layoutTransit(makeWorkflows({ lines: 1 }).lines, vt).lines[0];
     const mid = positionOnLine(line, 0.5);
     expect(mid.x).toBeGreaterThan(line.stations[0].x);
     expect(mid.x).toBeLessThan(line.stations[1].x);
@@ -100,7 +106,7 @@ const [feature, research, support, close, reconcile] = shaped.lines;
 describe("transit layout: shapes", () => {
   it("keeps classic lines exactly as before", () => {
     const classic = makeWorkflows({ lines: 3 }).lines;
-    const layout = layoutTransit(classic);
+    const layout = layoutTransit(classic, vt);
     expect(layout.height).toBe(TRANSIT.padTop + 3 * TRANSIT.rowH + TRANSIT.padBottom);
     layout.lines.forEach((l) => {
       expect(l.loops).toEqual([]);
@@ -110,7 +116,7 @@ describe("transit layout: shapes", () => {
   });
 
   it("arcs back-edges above the line, taller over the loops they span", () => {
-    const g = layoutTransit([feature]).lines[0];
+    const g = layoutTransit([feature], vt).lines[0];
     const [test, review, retry] = g.loops;
     const y = g.stations[0].y;
     for (const loop of [test, review, retry]) {
@@ -131,18 +137,18 @@ describe("transit layout: shapes", () => {
   });
 
   it("labels a loop with its trigger and bound", () => {
-    expect(loopShortLabel(feature, feature.loops![0])).toBe("test failed · max 5 rounds");
-    expect(loopShortLabel(feature, feature.loops![1])).toBe("review rejected · max 3 rounds");
-    expect(loopShortLabel(feature, feature.loops![2])).toBe("deploy failed · max 3 attempts");
+    expect(loopShortLabel(feature, feature.loops![0], vt)).toBe("test failed · max 5 rounds");
+    expect(loopShortLabel(feature, feature.loops![1], vt)).toBe("review rejected · max 3 rounds");
+    expect(loopShortLabel(feature, feature.loops![2], vt)).toBe("deploy failed · max 3 attempts");
     const long = {
       ...feature,
       stations: feature.stations.map((s) => ({ ...s, name: `${s.name} across every ledger` })),
     };
-    expect(loopShortLabel(long, feature.loops![0])).toBe("test across… failed · max 5 rounds");
+    expect(loopShortLabel(long, feature.loops![0], vt)).toBe("test across… failed · max 5 rounds");
   });
 
   it("puts a train riding a loop on its return arc, and glides it on and off", () => {
-    const g = layoutTransit([feature]).lines[0];
+    const g = layoutTransit([feature], vt).lines[0];
     const loopId = feature.loops![0].id;
     const t = {
       id: "r",
@@ -205,7 +211,7 @@ describe("transit layout: shapes", () => {
         s.kind === "fanout" ? ({ ...s, branches: branches(n), runId: "r" } as FanoutStation) : s
       ),
     });
-    const g = layoutTransit([withBranches(5)]).lines[0];
+    const g = layoutTransit([withBranches(5)], vt).lines[0];
     const [sd] = g.sidings;
     expect(sd).toMatchObject({ fanout: 1, join: 2, hidden: 0, placeholder: false });
     expect(sd.tracks).toHaveLength(5);
@@ -216,18 +222,18 @@ describe("transit layout: shapes", () => {
       expect(t.slots.queued.x).toBeLessThan(t.slots.running.x);
       expect(t.slots.running.x).toBeLessThan(t.slots.settled.x);
     });
-    const wide = layoutTransit([withBranches(11)]).lines[0].sidings[0];
+    const wide = layoutTransit([withBranches(11)], vt).lines[0].sidings[0];
     expect(wide.tracks).toHaveLength(8);
     expect(wide.hidden).toBe(3);
     expect(visibleBranches(branches(11)).hidden).toHaveLength(3);
     // No run has set the count yet: dashed placeholders.
-    expect(layoutTransit([research]).lines[0].sidings[0]).toMatchObject({ placeholder: true });
+    expect(layoutTransit([research], vt).lines[0].sidings[0]).toMatchObject({ placeholder: true });
     expect(branchSlot("failed")).toBe("settled");
     expect(branchSlot("queued")).toBe("queued");
   });
 
   it("holds a run at the fanout split while its branches work", () => {
-    const g = layoutTransit([research]).lines[0];
+    const g = layoutTransit([research], vt).lines[0];
     const t = {
       id: "r",
       lineId: research.id,
@@ -245,7 +251,7 @@ describe("transit layout: shapes", () => {
   });
 
   it("gives a supervisor a swarm above it; busy workers circle by load, idle ones hold still", () => {
-    const g = layoutTransit([support]).lines[0];
+    const g = layoutTransit([support], vt).lines[0];
     const [sw] = g.swarms;
     expect(sw.station).toBe(1);
     expect(sw.workers).toHaveLength(5);
@@ -256,14 +262,14 @@ describe("transit layout: shapes", () => {
 
   it("draws a child line only while its nested station is open, under the parent", () => {
     const lines = [close, reconcile];
-    expect(layoutTransit(lines).lines.map((l) => l.id)).toEqual([close.id]);
-    const open = layoutTransit(lines, new Set([close.stations[1].id]));
+    expect(layoutTransit(lines, vt).lines.map((l) => l.id)).toEqual([close.id]);
+    const open = layoutTransit(lines, vt, new Set([close.stations[1].id]));
     expect(open.lines.map((l) => l.id)).toEqual([close.id, reconcile.id]);
     const [parent, child] = open.lines;
     expect(child.depth).toBe(1);
     expect(child.parent).toEqual({ lineId: close.id, station: 1 });
     expect(child.stations[0].x).toBe(parent.stations[1].x);
     expect(child.stations[0].y).toBeGreaterThan(parent.stations[1].y);
-    expect(open.height).toBeGreaterThan(layoutTransit(lines).height);
+    expect(open.height).toBeGreaterThan(layoutTransit(lines, vt).height);
   });
 });

@@ -46,11 +46,12 @@ export function InstanceDetailView({
 }: InstanceDetailViewProps) {
   const fmt = useFormatters();
   const t = useTranslations("shared.versionMismatch");
+  const ti = useTranslations("workflowInstances");
 
   if (!workflowId) {
     return (
       <div className="text-muted-foreground hidden items-center justify-center rounded-md border border-dashed p-6 text-center text-sm md:flex">
-        Select an instance to view its activity feed.
+        {ti("selectInstance")}
       </div>
     );
   }
@@ -70,16 +71,20 @@ export function InstanceDetailView({
                 <span className="font-mono">{detail.instance.runId.slice(0, 8)}</span>
               )}
               {detail.instance.startedAt && (
-                <span>Started {fmt.formatDateTime(detail.instance.startedAt)}</span>
+                <span>
+                  {ti("startedAt", { time: fmt.formatDateTime(detail.instance.startedAt) })}
+                </span>
               )}
               {detail.instance.durationSeconds != null && (
                 <span>{formatInstanceDuration(detail.instance.durationSeconds)}</span>
               )}
-              {detail.instance.triggeredBy && <span>by {detail.instance.triggeredBy}</span>}
+              {detail.instance.triggeredBy && (
+                <span>{ti("by", { who: detail.instance.triggeredBy })}</span>
+              )}
             </div>
           )}
         </div>
-        <Button size="icon" variant="ghost" onClick={onClose} aria-label="Close">
+        <Button size="icon" variant="ghost" onClick={onClose} aria-label={ti("close")}>
           <XIcon className="size-4" />
         </Button>
       </div>
@@ -120,6 +125,7 @@ export function InstanceAdminControlsView({
   cancelLoading,
   terminateLoading,
 }: InstanceAdminControlsViewProps) {
+  const ti = useTranslations("workflowInstances");
   return (
     <div className="flex items-center gap-2 border-b pb-3">
       <Button
@@ -129,7 +135,7 @@ export function InstanceAdminControlsView({
         disabled={cancelLoading || terminateLoading}
       >
         <CircleSlashIcon className="mr-1 size-3" />
-        Cancel
+        {ti("cancel")}
       </Button>
       <Button
         size="sm"
@@ -139,7 +145,7 @@ export function InstanceAdminControlsView({
         disabled={cancelLoading || terminateLoading}
       >
         <OctagonXIcon className="mr-1 size-3" />
-        Terminate
+        {ti("terminate")}
       </Button>
     </div>
   );
@@ -147,10 +153,11 @@ export function InstanceAdminControlsView({
 
 function ActivityFeed({ history }: { history: WorkflowHistoryEvent[] }) {
   const fmt = useFormatters();
+  const ti = useTranslations("workflowInstances");
   if (history.length === 0) {
     return (
       <div className="text-muted-foreground rounded-md border border-dashed p-4 text-center text-xs">
-        No history events available for this instance.
+        {ti("noHistory")}
       </div>
     );
   }
@@ -178,7 +185,9 @@ function ActivityFeed({ history }: { history: WorkflowHistoryEvent[] }) {
                     {ev.decision}
                   </Badge>
                 )}
-                {ev.retryCount > 1 && <Badge variant="outline">retry {ev.retryCount}</Badge>}
+                {ev.retryCount > 1 && (
+                  <Badge variant="outline">{ti("retry", { count: ev.retryCount })}</Badge>
+                )}
               </div>
               {Object.keys(ev.payload).length > 0 && (
                 <pre className="text-muted-foreground bg-muted/40 text-2xs mt-1 max-h-32 overflow-auto rounded p-2">

@@ -53,13 +53,10 @@ export type WorkflowInstancesScreenProps =
       } & WorkflowInstancesListProps)
   ) & { title?: string; crumbs?: import("@/components/shell/ShellHeader").Crumb[] };
 
-const CRUMBS = workflowsCrumbs({ label: "Platform instances" });
-const TITLE = "Platform instances";
-const CONTEXT = (
-  <span className="text-muted-foreground text-sm">
-    Temporal operations across apps and platform services
-  </span>
-);
+function Context() {
+  const t = useTranslations("workflowInstances");
+  return <span className="text-muted-foreground text-sm">{t("context")}</span>;
+}
 
 /**
  * Agents › Workflows › Platform instances (spec 44 §5.1): the Temporal
@@ -70,18 +67,19 @@ const CONTEXT = (
  * from the Workflows `⋯` menu, behind `audit_log.read`. Pure.
  */
 export function WorkflowInstancesScreen(props: WorkflowInstancesScreenProps) {
+  const ti = useTranslations("workflowInstances");
   if (props.access !== "granted") {
     return (
       <div className="flex min-w-0 flex-1 flex-col gap-6">
         <ShellHeader
-          crumbs={props.crumbs ?? CRUMBS}
-          title={props.title ?? TITLE}
-          context={CONTEXT}
+          crumbs={props.crumbs ?? workflowsCrumbs({ label: ti("title") })}
+          title={props.title ?? ti("title")}
+          context={<Context />}
         />
         {props.access === "loading" ? (
           <Skeleton className="h-40 w-full rounded-md" />
         ) : (
-          <PermissionNote permission="audit_log.read" verb="Viewing platform instances" />
+          <PermissionNote permission="audit_log.read" verb={ti("viewingVerb")} />
         )}
       </div>
     );
@@ -102,8 +100,8 @@ function InstancesList({
   selectedRunId,
   onCloseInstance,
   detail,
-  title = TITLE,
-  crumbs = CRUMBS,
+  title,
+  crumbs,
 }: WorkflowInstancesListProps & {
   detail: ReactNode;
   title?: string;
@@ -111,11 +109,12 @@ function InstancesList({
 }) {
   const fmt = useFormatters();
   const t = useTranslations("shared.versionMismatch");
+  const ti = useTranslations("workflowInstances");
 
   const columns: Column<WorkflowInstance>[] = [
     {
       id: "instance",
-      header: "Instance",
+      header: ti("instance"),
       cellClassName: "max-w-80",
       cell: (i) => (
         <span className="block truncate font-mono text-xs" title={i.workflowId}>
@@ -125,7 +124,7 @@ function InstancesList({
     },
     {
       id: "type",
-      header: "Type",
+      header: ti("type"),
       cellClassName: "max-w-64",
       cell: (i) => (
         <span className="block truncate text-sm" title={i.workflowType}>
@@ -135,25 +134,25 @@ function InstancesList({
     },
     {
       id: "status",
-      header: "Status",
+      header: ti("status"),
       cell: (i) => <InstanceStatusBadge status={i.status} />,
     },
     {
       id: "started",
-      header: "Started",
+      header: ti("started"),
       cellClassName: "font-mono text-xs whitespace-nowrap",
-      cell: (i) => (i.startedAt ? fmt.formatDateTime(i.startedAt) : "not started"),
+      cell: (i) => (i.startedAt ? fmt.formatDateTime(i.startedAt) : ti("notStarted")),
     },
     {
       id: "duration",
-      header: "Took",
+      header: ti("took"),
       align: "right",
       cellClassName: "font-mono text-xs tabular-nums",
       cell: (i) => (i.durationSeconds != null ? formatInstanceDuration(i.durationSeconds) : ""),
     },
     {
       id: "triggeredBy",
-      header: "Started by",
+      header: ti("startedBy"),
       cellClassName: "max-w-48",
       cell: (i) =>
         i.triggeredBy ? (
@@ -161,7 +160,7 @@ function InstancesList({
             {i.triggeredBy}
           </span>
         ) : (
-          <span className="text-muted-foreground text-xs">platform</span>
+          <span className="text-muted-foreground text-xs">{ti("platform")}</span>
         ),
     },
   ];
@@ -170,9 +169,9 @@ function InstancesList({
     <>
       <ListPage<WorkflowInstance>
         header={{
-          crumbs,
-          title,
-          context: CONTEXT,
+          crumbs: crumbs ?? workflowsCrumbs({ label: ti("title") }),
+          title: title ?? ti("title"),
+          context: <Context />,
           primaryAction: (
             <Button variant="outline" size="sm" onClick={onRetry} disabled={loading || stale}>
               {t("refresh")}
@@ -180,7 +179,7 @@ function InstancesList({
           ),
         }}
         list={list}
-        label="Instances"
+        label={ti("instances")}
         columns={columns}
         rows={rows}
         getRowId={instanceKey}
@@ -194,10 +193,8 @@ function InstancesList({
         onRetry={onRetry}
         empty={{
           icon: <ActivityIcon className="size-5" />,
-          title: "No platform instances",
-          description: nextCursor
-            ? "No authorized instances on this page. Choose Older to continue through the workflow engine’s pages."
-            : "No authorized instances on this page, or the workflow engine is unavailable. Refresh to check again.",
+          title: ti("emptyTitle"),
+          description: nextCursor ? ti("emptyOlder") : ti("emptyUnavailable"),
         }}
         nextCursor={nextCursor}
       />
@@ -208,7 +205,9 @@ function InstancesList({
           aria-describedby={undefined}
           className="overflow-y-auto p-4 data-[side=right]:w-full data-[side=right]:sm:max-w-xl"
         >
-          <SheetTitle className="sr-only">Instance {selectedWorkflowId}</SheetTitle>
+          <SheetTitle className="sr-only">
+            {ti("instanceTitle", { id: selectedWorkflowId ?? "" })}
+          </SheetTitle>
           {detail}
         </SheetContent>
       </Sheet>

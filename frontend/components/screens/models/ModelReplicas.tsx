@@ -1,6 +1,7 @@
 "use client";
 
 import { MinusIcon, PlusIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 
@@ -17,24 +18,25 @@ export function ModelReplicasView({
   loading,
   setReplicas,
 }: ModelReplicasViewProps) {
+  const t = useTranslations("modelReplicas");
   return (
     <div className="flex items-center gap-1">
       <Button
         size="icon"
         variant="ghost"
-        aria-label={`Scale ${name} down`}
+        aria-label={t("scaleDown", { name })}
         disabled={loading || replicas <= 1}
         onClick={() => setReplicas(replicas - 1)}
       >
         <MinusIcon className="size-3.5" />
       </Button>
-      <span className="w-6 text-center text-sm tabular-nums" aria-label={`${name} replicas`}>
+      <span className="w-6 text-center text-sm tabular-nums" aria-label={t("replicas", { name })}>
         {replicas}
       </span>
       <Button
         size="icon"
         variant="ghost"
-        aria-label={`Scale ${name} up`}
+        aria-label={t("scaleUp", { name })}
         disabled={loading || replicas >= MAX_REPLICAS}
         onClick={() => setReplicas(replicas + 1)}
       >
@@ -46,7 +48,7 @@ export function ModelReplicasView({
         disabled={loading}
         onClick={() => setReplicas(replicas === 0 ? 1 : 0)}
       >
-        {replicas === 0 ? "Start" : "Stop"}
+        {replicas === 0 ? t("start") : t("stop")}
       </Button>
     </div>
   );

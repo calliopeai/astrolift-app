@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import {
   DetailTimestamp,
   EntityDetailShell,
@@ -27,31 +29,32 @@ export type AlertRuleDetailProps = Omit<
 
 /** Alert rule detail (#1106): state, target, mute, and the raw predicate/channels. */
 export function AlertRuleDetail({ id, rule: r, loading, error, onRetry }: AlertRuleDetailProps) {
+  const t = useTranslations("alertDetail");
   return (
     <EntityDetailShell
       loading={loading}
       notFound={!r && !error}
-      breadcrumb={{ label: "Alerts", href: "/alerts" }}
-      heading={r ? r.name : `Rule ${id.slice(0, 8)}`}
+      breadcrumb={{ label: t("alerts"), href: "/alerts" }}
+      heading={r ? r.name : t("ruleHeading", { id: id.slice(0, 8) })}
       status={r?.severity}
       statusTone={r ? (SEVERITY_TONE[r.severity] ?? "muted") : undefined}
       createdAt={r?.createdAt}
-      notFoundLabel="alert rule"
+      notFoundLabel={t("ruleNoun")}
       overview={
         r
           ? [
               {
-                term: "State",
+                term: t("state"),
                 description: r.activeMute ? (
-                  <Badge variant="secondary">Muted</Badge>
+                  <Badge variant="secondary">{t("muted")}</Badge>
                 ) : r.isActive ? (
-                  <Badge variant="secondary">Active</Badge>
+                  <Badge variant="secondary">{t("active")}</Badge>
                 ) : (
-                  <Badge variant="outline">Inactive</Badge>
+                  <Badge variant="outline">{t("inactive")}</Badge>
                 ),
               },
               {
-                term: "Target",
+                term: t("target"),
                 description: (
                   <span>
                     <Badge variant="outline">{r.target}</Badge>
@@ -63,9 +66,12 @@ export function AlertRuleDetail({ id, rule: r, loading, error, onRetry }: AlertR
                   </span>
                 ),
               },
-              { term: "Severity", description: <span className="capitalize">{r.severity}</span> },
               {
-                term: "Managed service",
+                term: t("severity"),
+                description: <span className="capitalize">{r.severity}</span>,
+              },
+              {
+                term: t("managedService"),
                 description: r.managedServiceId ? (
                   <span className="font-mono text-xs">{r.managedServiceId}</span>
                 ) : (
@@ -73,20 +79,20 @@ export function AlertRuleDetail({ id, rule: r, loading, error, onRetry }: AlertR
                 ),
               },
               {
-                term: "Organization",
+                term: t("organization"),
                 description: <span className="font-mono text-xs">{r.organizationSlug}</span>,
               },
-              { term: "Created", description: <DetailTimestamp iso={r.createdAt} /> },
-              { term: "Updated", description: <DetailTimestamp iso={r.updatedAt} /> },
+              { term: t("created"), description: <DetailTimestamp iso={r.createdAt} /> },
+              { term: t("updated"), description: <DetailTimestamp iso={r.updatedAt} /> },
               ...(r.activeMute
                 ? [
                     {
-                      term: "Muted until",
+                      term: t("mutedUntil"),
                       description: <DetailTimestamp iso={r.activeMute.ttlUntil} />,
                     },
-                    { term: "Mute reason", description: r.activeMute.reason || "—" },
+                    { term: t("muteReason"), description: r.activeMute.reason || "—" },
                     {
-                      term: "Muted by",
+                      term: t("mutedBy"),
                       description: (
                         <span className="font-mono text-xs">{r.activeMute.createdBy}</span>
                       ),
@@ -97,12 +103,12 @@ export function AlertRuleDetail({ id, rule: r, loading, error, onRetry }: AlertR
           : []
       }
     >
-      {error ? <QueryError title="Could not load detail" error={error} onRetry={onRetry} /> : null}
+      {error ? <QueryError title={t("loadError")} error={error} onRetry={onRetry} /> : null}
       {r ? (
         <>
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Predicate</CardTitle>
+              <CardTitle className="text-base">{t("predicate")}</CardTitle>
             </CardHeader>
             <CardContent>
               <pre className="bg-muted/40 max-h-96 overflow-auto rounded-md border p-3 font-mono text-xs">
@@ -112,7 +118,7 @@ export function AlertRuleDetail({ id, rule: r, loading, error, onRetry }: AlertR
           </Card>
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Notify channels</CardTitle>
+              <CardTitle className="text-base">{t("notifyChannels")}</CardTitle>
             </CardHeader>
             <CardContent>
               <pre className="bg-muted/40 max-h-96 overflow-auto rounded-md border p-3 font-mono text-xs">

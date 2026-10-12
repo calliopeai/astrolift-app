@@ -1,51 +1,66 @@
 import Link from "next/link";
+import { useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
-import type { IdentityProviderKind } from "./identity-provider-kinds";
+import { IDENTITY_PROVIDER_KINDS, type IdentityProviderKind } from "./identity-provider-kinds";
 
 export type IdentityProvidersDocProps = {
-  kinds: IdentityProviderKind[];
+  /** Already-localized kinds; defaults to the built-in list. */
+  kinds?: IdentityProviderKind[];
 };
+
+const code = (chunks: ReactNode) => <code>{chunks}</code>;
+const strong = (chunks: ReactNode) => <strong>{chunks}</strong>;
+const strongTerm = (chunks: ReactNode) => <strong className="text-foreground">{chunks}</strong>;
+function docLink(href: string) {
+  return function DocLink(chunks: ReactNode) {
+    return (
+      <Link href={href} className="text-foreground underline-offset-2 hover:underline">
+        {chunks}
+      </Link>
+    );
+  };
+}
 
 /** Static "Identity providers" documentation page. */
 export function IdentityProvidersDoc({ kinds }: IdentityProvidersDocProps) {
+  const t = useTranslations("docsIdentityProviders");
+  const resolved: IdentityProviderKind[] =
+    kinds ??
+    IDENTITY_PROVIDER_KINDS.map(({ id, key, badge, steps }) => ({
+      id,
+      title: t(`kinds.${key}.title`),
+      badge: badge ?? t(`kinds.${key}.badge`),
+      intro: t(`kinds.${key}.intro`),
+      steps: steps.map((step) => t(`kinds.${key}.steps.${step.key}`, step.values)),
+    }));
   return (
     <article className="flex max-w-2xl flex-1 flex-col gap-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Identity providers</h1>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Route sign-in through your corporate IdP: OIDC, SAML, Cognito, Auth0, Okta, Azure AD,
-          Google Workspace, GitHub, or local accounts.
-        </p>
+        <h1 className="text-2xl font-semibold">{t("title")}</h1>
+        <p className="text-muted-foreground mt-2 text-sm">{t("intro")}</p>
       </div>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">When you need this</h2>
-        <p className="text-muted-foreground text-sm leading-relaxed">
-          You want users to sign in with their existing corporate identity instead of a separate
-          Astrolift password, and you want central control over who has access (deprovision in the
-          IdP, lose access here). Exactly one provider is active at a time; the rest are standby.
-        </p>
+        <h2 className="text-lg font-medium">{t("whenTitle")}</h2>
+        <p className="text-muted-foreground text-sm leading-relaxed">{t("whenBody")}</p>
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Prerequisites</h2>
+        <h2 className="text-lg font-medium">{t("prerequisitesTitle")}</h2>
         <ul className="text-muted-foreground flex flex-col gap-2 text-sm">
+          <li>{t.rich("prereqPermission", { code, strong: strongTerm })}</li>
+          <li>{t.rich("prereqAdmin", { strong: strongTerm })}</li>
           <li>
-            <strong className="text-foreground">Permission.</strong> An operator role with{" "}
-            <code>org.update</code> (Owner and Admin have it).
-          </li>
-          <li>
-            <strong className="text-foreground">Admin access to the IdP.</strong> You will register
-            a new OIDC or SAML client there.
-          </li>
-          <li>
-            <strong className="text-foreground">Astrolift&apos;s redirect URI.</strong> Visible in
-            the <strong>New provider</strong> dialog. Format is{" "}
-            <code>https://&lt;your-install&gt;/app/auth1/callback</code>. Every IdP needs this exact
-            value in its allowed callback list.
+            {t.rich("prereqRedirect", {
+              code,
+              strong: strongTerm,
+              bold: strong,
+              uri: "https://<your-install>/app/auth1/callback",
+            })}
           </li>
         </ul>
       </section>
@@ -53,21 +68,13 @@ export function IdentityProvidersDoc({ kinds }: IdentityProvidersDocProps) {
       <Separator />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Configure by provider kind</h2>
+        <h2 className="text-lg font-medium">{t("configureTitle")}</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Pick the matching subsection. Every kind ends with the same three clicks in Astrolift:{" "}
-          <Link
-            href="/settings/identity-provider"
-            className="text-foreground underline-offset-2 hover:underline"
-          >
-            Settings · Identity providers
-          </Link>{" "}
-          → <strong>New provider</strong> → pick the kind → paste the credentials →{" "}
-          <strong>Set active</strong>.
+          {t.rich("configureBody", { strong, link: docLink("/settings/identity-provider") })}
         </p>
       </section>
 
-      {kinds.map((k) => (
+      {resolved.map((k) => (
         <section key={k.id} id={k.id} className="flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <h3 className="text-base font-medium">{k.title}</h3>
@@ -87,72 +94,39 @@ export function IdentityProvidersDoc({ kinds }: IdentityProvidersDocProps) {
       <Separator />
 
       <section id="domain-allowlist" className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Domain allowlist (auto-signup)</h2>
-        <p className="text-muted-foreground text-sm leading-relaxed">
-          By default, an SSO sign-in succeeds only if Astrolift already has an account for that
-          user. To let new users self-onboard, mark their email domains as trusted.
-        </p>
+        <h2 className="text-lg font-medium">{t("allowlistTitle")}</h2>
+        <p className="text-muted-foreground text-sm leading-relaxed">{t("allowlistBody")}</p>
         <ol className="text-muted-foreground flex flex-col gap-2 pl-5 text-sm">
           <li className="list-decimal leading-relaxed">
-            Open{" "}
-            <Link
-              href="/administration/organization"
-              className="text-foreground underline-offset-2 hover:underline"
-            >
-              Administration · Organization
-            </Link>
-            .
+            {t.rich("allowlistStep1", { link: docLink("/administration/organization") })}
           </li>
           <li className="list-decimal leading-relaxed">
-            Scroll to the <strong>Trusted email domains</strong> card and add <code>corp.com</code>{" "}
-            (no <code>@</code>).
+            {t.rich("allowlistStep2", { code, strong })}
           </li>
-          <li className="list-decimal leading-relaxed">
-            Save. Anyone who signs in via SSO with an <code>@corp.com</code> email is auto-joined to
-            the organization with the default member role.
-          </li>
+          <li className="list-decimal leading-relaxed">{t.rich("allowlistStep3", { code })}</li>
         </ol>
       </section>
 
       <Separator />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Troubleshooting</h2>
+        <h2 className="text-lg font-medium">{t("troubleshootingTitle")}</h2>
         <ul className="text-muted-foreground flex flex-col gap-3 text-sm">
           <li>
-            <strong className="text-foreground">&ldquo;No IdP configured.&rdquo;</strong> The
-            install&apos;s <code>bootstrap_idp</code> environment variables were not set. Configure
-            a provider from{" "}
-            <Link
-              href="/settings/identity-provider"
-              className="text-foreground underline-offset-2 hover:underline"
-            >
-              Settings · Identity providers
-            </Link>{" "}
-            and set it active.
+            <strong className="text-foreground">{t("troubleNoIdpTitle")}</strong>{" "}
+            {t.rich("troubleNoIdpBody", { code, link: docLink("/settings/identity-provider") })}
           </li>
           <li>
-            <strong className="text-foreground">
-              Login redirects to the wrong host (or returns redirect_uri_mismatch).
-            </strong>{" "}
-            <code>APP_BASE_URL</code> in the backend and the redirect URI registered at the IdP must
-            match exactly — protocol, host, path, and trailing slash.
+            <strong className="text-foreground">{t("troubleRedirectTitle")}</strong>{" "}
+            {t.rich("troubleRedirectBody", { code })}
           </li>
           <li>
-            <strong className="text-foreground">Auto-signup not happening.</strong> The user&apos;s
-            email domain isn&apos;t in the trusted list. See{" "}
-            <Link
-              href="#domain-allowlist"
-              className="text-foreground underline-offset-2 hover:underline"
-            >
-              Domain allowlist
-            </Link>{" "}
-            above.
+            <strong className="text-foreground">{t("troubleSignupTitle")}</strong>{" "}
+            {t.rich("troubleSignupBody", { link: docLink("#domain-allowlist") })}
           </li>
           <li>
-            <strong className="text-foreground">SAML signature verification fails.</strong> The IdP
-            rotated its signing certificate. Re-paste the metadata URL (or upload the fresh XML) —
-            Astrolift refreshes the trust store on save.
+            <strong className="text-foreground">{t("troubleSamlTitle")}</strong>{" "}
+            {t("troubleSamlBody")}
           </li>
         </ul>
       </section>

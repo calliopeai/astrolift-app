@@ -83,6 +83,8 @@ def stack():
         source_repo="acme-org/hello",
         deploy_branch="main",
         trigger_mode=RegisteredApp.TriggerMode.AUTO_ON_PUSH.value,
+        # A push deploys only what the platform builds.
+        build_mode=RegisteredApp.BuildMode.PLATFORM_BUILD.value,
     )
     AppEnvironment.objects.create(
         registered_app=app,

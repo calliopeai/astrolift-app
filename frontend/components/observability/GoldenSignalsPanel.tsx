@@ -19,6 +19,7 @@
 import { AlertTriangleIcon, ChartSplineIcon } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import {
   Area,
   AreaChart,
@@ -35,6 +36,7 @@ import { EmptyState } from "@/components/EmptyState";
 import {
   type ObservabilityPanelReason,
   type PanelEmptyMessage,
+  type PanelReasonTranslator,
   panelEmptyState,
 } from "@/components/observability/panel-reason";
 import { Button } from "@/components/ui/button";
@@ -71,6 +73,8 @@ export function GoldenSignalsPanel({
   statusLoading,
   onStatusRetry,
 }: GoldenSignalsPanelProps) {
+  const t = useTranslations("obsGoldenSignals");
+  const reasonT = useTranslations("obsPanelReason");
   // Pick out the individual signals from the backend's flat list so
   // the rest of the render is a simple grid of cards. Latency rolls up
   // p50 + p90 + p99 into one card with a stacked line.
@@ -93,21 +97,21 @@ export function GoldenSignalsPanel({
     (signalsReason === "NOT_CONFIGURED" ||
       signalsReason === "NOT_SUPPORTED_BY_PROVIDER" ||
       signalsReason === "ERROR");
-  const panelEmpty = panelEmptyState(signalsReason ?? "NO_DATA_YET", {
-    thing: "metrics",
-    notConfigured: "Prometheus endpoint isn't wired for this cluster.",
-    provider: "this cloud",
-  });
+  const panelEmpty = panelEmptyState(
+    signalsReason ?? "NO_DATA_YET",
+    {
+      noData: { title: t("metrics.noDataTitle"), description: t("metrics.noDataDescription") },
+      notConfigured: t("prometheusNotConfigured"),
+    },
+    reasonT
+  );
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-base font-medium">Golden signals</h3>
-          <p className="text-muted-foreground text-xs">
-            Traffic, errors, latency, and saturation pulled live from the cluster&apos;s Prometheus
-            stack.
-          </p>
+          <h3 className="text-base font-medium">{t("title")}</h3>
+          <p className="text-muted-foreground text-xs">{t("description")}</p>
         </div>
         <TimeRangePicker value={range} onChange={setRange} />
       </div>
@@ -122,15 +126,13 @@ export function GoldenSignalsPanel({
         <>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <SignalCard
-              title="Traffic"
-              description="Requests per second (sum across all replicas)."
+              copyKey="traffic"
               signal={signalsByKind.TRAFFIC}
               loading={isLoading}
               lineColor="var(--chart-2)"
             />
             <SignalCard
-              title="Errors"
-              description="5xx rate divided by total request rate."
+              copyKey="errors"
               signal={signalsByKind.ERRORS}
               loading={isLoading}
               lineColor="var(--chart-1)"
@@ -146,8 +148,7 @@ export function GoldenSignalsPanel({
               loading={isLoading}
             />
             <SignalCard
-              title="Saturation (CPU)"
-              description="Container CPU usage divided by CPU limits."
+              copyKey="saturationCpu"
               signal={signalsByKind.SATURATION_CPU}
               loading={isLoading}
               lineColor="var(--chart-4)"
@@ -156,8 +157,7 @@ export function GoldenSignalsPanel({
                 Working-set bytes vs the memory limit; > 100% means an OOM
                 kill is imminent. */}
             <SignalCard
-              title="Saturation (memory)"
-              description="Working-set memory divided by memory limits."
+              copyKey="saturationMemory"
               signal={signalsByKind.SATURATION_MEMORY}
               loading={isLoading}
               lineColor="var(--chart-5)"
@@ -208,8 +208,8 @@ function TimeRangePicker({ value, onChange }: TimeRangePickerProps) {
 // ----------------------------------------------------------------------
 
 interface SignalCardProps {
-  title: string;
-  description: string;
+  /** Copy under `obsGoldenSignals.<copyKey>`: title, description, empty state. */
+  copyKey: "traffic" | "errors" | "saturationCpu" | "saturationMemory";
   signal: AstroliftAppGoldenSignal | undefined;
   loading: boolean;
   lineColor: string;
@@ -219,21 +219,27 @@ interface SignalCardProps {
 // healthy app with no traffic unless we say otherwise (#1708). The
 // backend labels each signal; this turns that label into the card's
 // empty state.
-const RED_NOT_CONFIGURED =
-  "Nothing feeds this signal: the app exposes no Prometheus metrics (set metrics.enabled on a workload) and this cluster's ingress controller has no metrics mapping.";
-
 function signalEmptyState(
   signal: AstroliftAppGoldenSignal | undefined,
-  thing: string
+  noData: PanelEmptyMessage,
+  notConfigured: string,
+  reasonT: PanelReasonTranslator
 ): PanelEmptyMessage {
-  return panelEmptyState(signal?.reason ?? "NO_DATA_YET", {
-    thing,
-    notConfigured: RED_NOT_CONFIGURED,
-    provider: "this cloud",
-  });
+  return panelEmptyState(signal?.reason ?? "NO_DATA_YET", { noData, notConfigured }, reasonT);
 }
 
-function SignalCard({ title, description, signal, loading, lineColor }: SignalCardProps) {
+function SignalCard({ copyKey, signal, loading, lineColor }: SignalCardProps) {
+  const t = useTranslations("obsGoldenSignals");
+  const reasonT = useTranslations("obsPanelReason");
+  const format = useFormatter();
+  const title = t(`${copyKey}.title`);
+  const description = t(`${copyKey}.description`);
+  const empty = signalEmptyState(
+    signal,
+    { title: t(`${copyKey}.noDataTitle`), description: t(`${copyKey}.noDataDescription`) },
+    t("redNotConfigured"),
+    reasonT
+  );
   const samples = signal?.samples ?? [];
   const unit = signal?.unit ?? "";
   const promql = signal?.promql ?? "";
@@ -252,14 +258,11 @@ function SignalCard({ title, description, signal, loading, lineColor }: SignalCa
         {loading ? (
           <Skeleton className="h-40 w-full" />
         ) : !signal || !hasData ? (
-          <NoMetricsCallout
-            title={signalEmptyState(signal, title.toLowerCase()).title}
-            description={signalEmptyState(signal, title.toLowerCase()).description}
-          />
+          <NoMetricsCallout title={empty.title} description={empty.description} />
         ) : (
           <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={toChartRows(samples, unit)}>
+              <LineChart data={toChartRows(samples, unit, (d) => format.dateTime(d, TIME_OF_DAY))}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="ts"
@@ -310,8 +313,20 @@ interface LatencyCardProps {
 }
 
 function LatencyCard({ p50, p95, p99, p90, loading }: LatencyCardProps) {
+  const t = useTranslations("obsGoldenSignals");
+  const reasonT = useTranslations("obsPanelReason");
+  const format = useFormatter();
   const unit = p50?.unit ?? p95?.unit ?? p99?.unit ?? "seconds";
-  const rows = React.useMemo(() => mergeLatencyRows(p50, p95, p99), [p50, p95, p99]);
+  const rows = React.useMemo(
+    () => mergeLatencyRows(p50, p95, p99, (d) => format.dateTime(d, TIME_OF_DAY)),
+    [p50, p95, p99, format]
+  );
+  const empty = signalEmptyState(
+    p95 ?? p50 ?? p99,
+    { title: t("latency.noDataTitle"), description: t("latency.noDataDescription") },
+    t("redNotConfigured"),
+    reasonT
+  );
   // p90 is intentionally exposed via the disclosure only — the chart
   // renders three lines so the SLO-typical p95 isn't visually crowded
   // out by a fourth nearby quantile (#640).
@@ -322,11 +337,9 @@ function LatencyCard({ p50, p95, p99, p90, loading }: LatencyCardProps) {
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm">
-          <ChartSplineIcon className="size-4" /> Latency
+          <ChartSplineIcon className="size-4" /> {t("latency.title")}
         </CardTitle>
-        <CardDescription className="text-xs">
-          p50, p95, p99 request latency. p90 available via the PromQL disclosure.
-        </CardDescription>
+        <CardDescription className="text-xs">{t("latency.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         {!loading &&
@@ -341,10 +354,7 @@ function LatencyCard({ p50, p95, p99, p90, loading }: LatencyCardProps) {
         {loading ? (
           <Skeleton className="h-40 w-full" />
         ) : !hasData ? (
-          <NoMetricsCallout
-            title={signalEmptyState(p95 ?? p50 ?? p99, "latency").title}
-            description={signalEmptyState(p95 ?? p50 ?? p99, "latency").description}
-          />
+          <NoMetricsCallout title={empty.title} description={empty.description} />
         ) : (
           <div className="h-40">
             <ResponsiveContainer width="100%" height="100%">
@@ -412,17 +422,23 @@ interface StatusCodeCardProps {
 const EMPTY_STATUS_SERIES: AstroliftStatusCodeSeries[] = [];
 
 function StatusCodeCard({ breakdown, loading, onRetry }: StatusCodeCardProps) {
+  const t = useTranslations("obsGoldenSignals");
+  const reasonT = useTranslations("obsPanelReason");
+  const format = useFormatter();
   const series = breakdown?.series ?? EMPTY_STATUS_SERIES;
   const promql = breakdown?.promql ?? "";
   // `null` is reserved for "no such app"; a populated breakdown carries
   // a reason (#1111). Fall back to NOT_CONFIGURED when the whole object
   // is absent so the copy stays honest rather than hedged.
   const reason: ObservabilityPanelReason = breakdown?.reason ?? "NOT_CONFIGURED";
-  const empty = panelEmptyState(reason, {
-    thing: "traffic",
-    notConfigured: "Prometheus endpoint isn't wired for this cluster.",
-    provider: "this cloud",
-  });
+  const empty = panelEmptyState(
+    reason,
+    {
+      noData: { title: t("traffic.noDataTitle"), description: t("traffic.noDataDescription") },
+      notConfigured: t("prometheusNotConfigured"),
+    },
+    reasonT
+  );
   // Pre-sort series into the canonical 2xx/3xx/4xx/5xx/other order so
   // the stacked-area legend reads top-to-bottom by severity.
   const orderedSeries = React.useMemo(() => {
@@ -432,7 +448,10 @@ function StatusCodeCard({ breakdown, loading, onRetry }: StatusCodeCardProps) {
         STATUS_CLASS_ORDER.indexOf(b.codeClass as (typeof STATUS_CLASS_ORDER)[number])
     );
   }, [series]);
-  const rows = React.useMemo(() => mergeStatusRows(orderedSeries), [orderedSeries]);
+  const rows = React.useMemo(
+    () => mergeStatusRows(orderedSeries, (d) => format.dateTime(d, TIME_OF_DAY)),
+    [orderedSeries, format]
+  );
   const topByClass = React.useMemo(() => {
     const map: Record<string, string[]> = {};
     for (const s of orderedSeries) {
@@ -445,12 +464,9 @@ function StatusCodeCard({ breakdown, loading, onRetry }: StatusCodeCardProps) {
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm">
-          <ChartSplineIcon className="size-4" /> Status-code breakdown
+          <ChartSplineIcon className="size-4" /> {t("statusCodes.title")}
         </CardTitle>
-        <CardDescription className="text-xs">
-          Stacked request rate by HTTP status class. Hover for the top individual codes in each
-          class.
-        </CardDescription>
+        <CardDescription className="text-xs">{t("statusCodes.description")}</CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -480,8 +496,13 @@ function StatusCodeCard({ breakdown, loading, onRetry }: StatusCodeCardProps) {
                 <Tooltip
                   formatter={(v: number, name: string) => {
                     const top = topByClass[name] ?? [];
-                    const topSuffix = top.length > 0 ? ` (top: ${top.slice(0, 5).join(", ")})` : "";
-                    return [`${v.toFixed(2)} req/s${topSuffix}`, name];
+                    const rate = v.toFixed(2);
+                    return [
+                      top.length > 0
+                        ? t("statusCodes.rateWithTop", { rate, top: top.slice(0, 5).join(", ") })
+                        : t("statusCodes.rate", { rate }),
+                      name,
+                    ];
                   }}
                 />
                 {orderedSeries.map((s) => (
@@ -515,9 +536,15 @@ interface ChartRow {
   value: number;
 }
 
-function toChartRows(samples: AstroliftTimeSeriesPoint[], _unit: string): ChartRow[] {
+const TIME_OF_DAY = { hour: "numeric", minute: "2-digit", second: "2-digit" } as const;
+
+function toChartRows(
+  samples: AstroliftTimeSeriesPoint[],
+  _unit: string,
+  formatTime: (d: Date) => string
+): ChartRow[] {
   return samples.map((s) => ({
-    ts: new Date(s.ts).toLocaleTimeString(),
+    ts: formatTime(new Date(s.ts)),
     value: s.value,
   }));
 }
@@ -532,7 +559,8 @@ interface LatencyRow {
 function mergeLatencyRows(
   p50: AstroliftAppGoldenSignal | undefined,
   p95: AstroliftAppGoldenSignal | undefined,
-  p99: AstroliftAppGoldenSignal | undefined
+  p99: AstroliftAppGoldenSignal | undefined,
+  formatTime: (d: Date) => string
 ): LatencyRow[] {
   // The backend hits Prometheus with the same start/end/step for all
   // three quantile queries, so the per-quantile sample arrays line up
@@ -543,7 +571,7 @@ function mergeLatencyRows(
     [] as AstroliftTimeSeriesPoint[]
   );
   return longest.map((point, i) => ({
-    ts: new Date(point.ts).toLocaleTimeString(),
+    ts: formatTime(new Date(point.ts)),
     p50: p50?.samples[i]?.value ?? null,
     p95: p95?.samples[i]?.value ?? null,
     p99: p99?.samples[i]?.value ?? null,
@@ -552,7 +580,10 @@ function mergeLatencyRows(
 
 type StatusRow = Record<string, number | string>;
 
-function mergeStatusRows(series: AstroliftStatusCodeSeries[]): StatusRow[] {
+function mergeStatusRows(
+  series: AstroliftStatusCodeSeries[],
+  formatTime: (d: Date) => string
+): StatusRow[] {
   // Pivot per-class series into a single row-per-timestamp shape that
   // recharts' stacked AreaChart can consume directly.
   const tsIndex = new Map<string, StatusRow>();
@@ -561,7 +592,7 @@ function mergeStatusRows(series: AstroliftStatusCodeSeries[]): StatusRow[] {
       const tsKey = new Date(point.ts).toISOString();
       let row = tsIndex.get(tsKey);
       if (!row) {
-        row = { ts: new Date(point.ts).toLocaleTimeString(), _key: tsKey };
+        row = { ts: formatTime(new Date(point.ts)), _key: tsKey };
         tsIndex.set(tsKey, row);
       }
       row[s.codeClass] = point.value;
@@ -589,11 +620,12 @@ interface PromQLDisclosureProps {
 }
 
 function PromQLDisclosure({ promql }: PromQLDisclosureProps) {
+  const t = useTranslations("obsGoldenSignals");
   if (!promql) return null;
   return (
     <details className="mt-3">
       <summary className="text-muted-foreground cursor-pointer text-xs select-none">
-        Show PromQL
+        {t("showPromql")}
       </summary>
       <pre className="bg-muted/40 text-2xs mt-2 overflow-x-auto rounded border p-2 font-mono whitespace-pre-wrap">
         {promql}
@@ -607,14 +639,15 @@ function PromQLDisclosure({ promql }: PromQLDisclosureProps) {
 // ----------------------------------------------------------------------
 
 function NoMetricsCallout({
-  title = "No data in this window",
-  description = "No data points landed inside the selected time range.",
+  title,
+  description,
   onRetry,
 }: {
-  title?: string;
-  description?: string;
+  title: string;
+  description: string;
   onRetry?: () => void;
 }) {
+  const t = useTranslations("obsGoldenSignals");
   return (
     <div className="flex h-40 flex-col items-center justify-center gap-2 text-center">
       <EmptyState
@@ -624,13 +657,13 @@ function NoMetricsCallout({
         secondary={
           onRetry ? (
             <Button size="sm" variant="outline" onClick={onRetry}>
-              Try again
+              {t("tryAgain")}
             </Button>
           ) : undefined
         }
       />
       <Link href={PROMETHEUS_DOC_LINK} className="text-xs underline">
-        See the docs
+        {t("seeDocs")}
       </Link>
     </div>
   );

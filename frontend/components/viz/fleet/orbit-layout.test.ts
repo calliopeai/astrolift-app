@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import messages from "@/messages/en.json";
+
+import { vizTranslator } from "../core/viz-t";
+
 import { makeFleet, stepFleet } from "../core/fleet-model";
 import { mulberry32 } from "../core/semantics";
 
@@ -114,7 +118,8 @@ describe("recentLaunches", () => {
 describe("summarizeFleet", () => {
   it("counts agents, failing and busy", () => {
     const fleet = makeFleet({ clusters: 2, agentsPerCluster: 3, idle: true });
-    expect(summarizeFleet(fleet)).toBe(
+    const t = vizTranslator(messages);
+    expect(summarizeFleet(fleet, t)).toBe(
       "6 agents across 2 clusters, 0 failing, 0 degraded, 0 busy, 6 idle"
     );
   });

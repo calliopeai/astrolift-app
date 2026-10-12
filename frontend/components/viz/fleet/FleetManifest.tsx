@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -11,7 +12,6 @@ import type { LegendItem } from "../core/VizLegend";
 import {
   RUN_STATE_GLOWS,
   RUN_STATE_HEALTH,
-  RUN_STATE_LABEL,
   boardOrder,
   runClock,
   runDetail,
@@ -32,16 +32,12 @@ import {
  */
 
 export const FLEET_MANIFEST_LEGEND: LegendItem[] = [
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Queued, T-minus to lift-off" },
-  { glyph: "ring", color: HEALTH_COLOR.degraded, label: "Holding (breathes while it waits)" },
-  { glyph: "glow", color: HEALTH_COLOR.ok, label: "Lifted off / in flight" },
-  { glyph: "dot", color: HEALTH_COLOR.ok, label: "Landed" },
-  { glyph: "glow", color: HEALTH_COLOR.failing, label: "Failed" },
-  {
-    glyph: "signal",
-    color: "var(--foreground)",
-    label: "Status flips once when a run changes state",
-  },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "manifestQueued" },
+  { glyph: "ring", color: HEALTH_COLOR.degraded, labelKey: "manifestHolding" },
+  { glyph: "glow", color: HEALTH_COLOR.ok, labelKey: "manifestLiftedOff" },
+  { glyph: "dot", color: HEALTH_COLOR.ok, labelKey: "manifestLanded" },
+  { glyph: "glow", color: HEALTH_COLOR.failing, labelKey: "failed" },
+  { glyph: "signal", color: "var(--foreground)", labelKey: "manifestFlip" },
 ];
 
 const GRID =
@@ -70,6 +66,7 @@ function StatusFlap({
   motion: FleetViewProps["motion"];
   seen: React.RefObject<Map<string, FleetRun["state"]>>;
 }) {
+  const t = useTranslations("vizRender");
   const ref = React.useRef<HTMLSpanElement>(null);
   React.useLayoutEffect(() => {
     const el = ref.current;
@@ -122,7 +119,7 @@ function StatusFlap({
           textShadow: RUN_STATE_GLOWS[run.state] ? glow(color) : undefined,
         }}
       >
-        {RUN_STATE_LABEL[run.state]}
+        {t(`manifest.state.${run.state}`)}
       </span>
       {detail && (
         <span
@@ -154,6 +151,7 @@ export function FleetManifest({
   selectedAgentId,
   className,
 }: FleetViewProps) {
+  const t = useTranslations("vizRender");
   const { now, runs } = snapshot;
   const agents = React.useMemo(
     () => new Map(snapshot.agents.map((a) => [a.id, a])),
@@ -171,16 +169,16 @@ export function FleetManifest({
     seen.current = new Map(runs.map((r) => [r.id, r.state]));
   }, [runs]);
 
-  const summary = summarizeRuns(runs);
+  const summary = summarizeRuns(runs, t);
 
   return (
     <div
       data-motion={motion}
       role="group"
-      aria-label={`Launch manifest. ${summary}`}
+      aria-label={t("manifest.label", { summary })}
       className={cn("bg-card w-full min-w-0 text-sm", className)}
     >
-      <div role="table" aria-label="Run queue" aria-rowcount={ordered.length + 1}>
+      <div role="table" aria-label={t("manifest.queue")} aria-rowcount={ordered.length + 1}>
         <div role="rowgroup">
           <div
             role="row"
@@ -189,17 +187,17 @@ export function FleetManifest({
               "text-muted-foreground text-2xs border-b px-3 py-2 font-mono tracking-widest uppercase"
             )}
           >
-            <span role="columnheader">T- / UTC</span>
-            <span role="columnheader">Run</span>
-            <span role="columnheader">Agent</span>
-            <span role="columnheader">Cluster</span>
-            <span role="columnheader">Status</span>
+            <span role="columnheader">{t("manifest.columns.clock")}</span>
+            <span role="columnheader">{t("manifest.columns.run")}</span>
+            <span role="columnheader">{t("manifest.columns.agent")}</span>
+            <span role="columnheader">{t("manifest.columns.cluster")}</span>
+            <span role="columnheader">{t("manifest.columns.status")}</span>
           </div>
         </div>
         <div role="rowgroup" className="max-h-[32rem] overflow-y-auto">
           {ordered.length === 0 && (
             <div role="row" className="text-muted-foreground px-3 py-6 text-center text-xs">
-              <span role="cell">No runs on the board</span>
+              <span role="cell">{t("manifest.empty")}</span>
             </div>
           )}
           {ordered.map((run) => {
@@ -246,7 +244,7 @@ export function FleetManifest({
                 <Truncated text={run.label} className="font-medium" />
                 <Truncated text={agent?.name ?? run.agentId} className="font-mono text-xs" />
                 <Truncated
-                  text={cluster?.name ?? "unknown"}
+                  text={cluster?.name ?? t("unknown")}
                   className="text-muted-foreground font-mono text-xs"
                 />
                 <span role="cell" className="min-w-0 overflow-hidden">
@@ -257,7 +255,7 @@ export function FleetManifest({
                     motion={motion}
                     seen={seen}
                   />
-                  {selected && <span className="sr-only">, selected agent</span>}
+                  {selected && <span className="sr-only">{t("selectedAgent")}</span>}
                 </span>
               </div>
             );

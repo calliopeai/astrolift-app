@@ -2,6 +2,7 @@
 
 import { CopyIcon, MoreHorizontalIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 import { toast } from "sonner";
 
@@ -18,10 +19,11 @@ import {
 
 /** A run detail's ⋯: its links, then Copy run ID. */
 export function RunMenu({ id, links }: { id: string; links: { label: string; href: string }[] }) {
+  const t = useTranslations("runPages");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="size-8" aria-label="More actions">
+        <Button variant="outline" size="icon" className="size-8" aria-label={t("moreActions")}>
           <MoreHorizontalIcon className="size-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -35,12 +37,12 @@ export function RunMenu({ id, links }: { id: string; links: { label: string; hre
           onSelect={() => {
             navigator.clipboard
               .writeText(id)
-              .then(() => toast.success("Run ID copied."))
-              .catch(() => toast.error("Couldn't copy to clipboard."));
+              .then(() => toast.success(t("idCopied")))
+              .catch(() => toast.error(t("copyFailed")));
           }}
         >
           <CopyIcon className="size-4" />
-          Copy run ID
+          {t("copyId")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

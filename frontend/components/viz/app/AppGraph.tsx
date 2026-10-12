@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -17,7 +18,6 @@ import type { LegendItem } from "../core/VizLegend";
 import {
   G_NODE_H,
   G_NODE_W,
-  ROLE_TAG,
   describeApp,
   encodePts,
   layoutAppGraph,
@@ -47,15 +47,15 @@ import { useEdgeParticles } from "./use-edge-particles";
  */
 
 export const APP_GRAPH_LEGEND: LegendItem[] = [
-  { glyph: "flow", color: HEALTH_COLOR.ok, label: "Traffic, faster and brighter when busier" },
-  { glyph: "flow", color: HEALTH_COLOR.failing, label: "Over 5% of calls failing" },
-  { glyph: "ring", color: HEALTH_COLOR.ok, label: "Healthy" },
-  { glyph: "ring", color: HEALTH_COLOR.degraded, label: "Degraded or replicas short" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Failing" },
-  { glyph: "bar", color: HEALTH_COLOR.ok, label: "Load" },
-  { glyph: "glow", color: HEALTH_COLOR.ok, label: "Function invoked, fades over 12 s" },
-  { glyph: "signal", color: HEALTH_COLOR.ok, label: "Agent acted, beacon fades over 12 s" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Idle" },
+  { glyph: "flow", color: HEALTH_COLOR.ok, labelKey: "trafficBusier" },
+  { glyph: "flow", color: HEALTH_COLOR.failing, labelKey: "callsFailing" },
+  { glyph: "ring", color: HEALTH_COLOR.ok, labelKey: "healthy" },
+  { glyph: "ring", color: HEALTH_COLOR.degraded, labelKey: "graphDegradedShort" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "failing" },
+  { glyph: "bar", color: HEALTH_COLOR.ok, labelKey: "load" },
+  { glyph: "glow", color: HEALTH_COLOR.ok, labelKey: "graphFunctionInvoked" },
+  { glyph: "signal", color: HEALTH_COLOR.ok, labelKey: "agentActed" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "idle" },
 ];
 
 const tint = (color: string, pct: number) => `color-mix(in oklab, ${color} ${pct}%, var(--card))`;
@@ -94,6 +94,7 @@ function Edge({
   particles: boolean;
   showRate: boolean;
 }) {
+  const t = useTranslations("vizRender");
   const color = HEALTH_COLOR[path.health];
   const failing = path.health === "failing";
   const width = failing ? 2.5 : 1.5;
@@ -143,7 +144,9 @@ function Edge({
           className="font-mono"
           fill={failing ? color : "var(--muted-foreground)"}
         >
-          {failing ? `${Math.round(path.edge.errorRate * 100)}% err` : fmtRps(path.edge.rps)}
+          {failing
+            ? t("jobs.errPct", { pct: Math.round(path.edge.errorRate * 100) })
+            : fmtRps(path.edge.rps)}
         </text>
       )}
     </g>
@@ -159,6 +162,7 @@ function Node({
   snapshot: AppSnapshot;
   onSelect?: AppViewProps["onSelectNode"];
 }) {
+  const t = useTranslations("vizRender");
   const { node, x, y } = box;
   const short = node.replicas && node.replicas.ready < node.replicas.desired;
   // Replicas short of desired reads as degraded even if the model says ok.
@@ -170,7 +174,7 @@ function Node({
   const lastInvoke = invokes.at(-1);
   const lastAction = actions.at(-1);
   const select = () => onSelect?.(node.id);
-  const label = nodeLabel(node, h, invokes.length, actions.length);
+  const label = nodeLabel(node, h, invokes.length, actions.length, t);
   const metric = node.replicas
     ? `${node.replicas.ready}/${node.replicas.desired}`
     : node.rps !== undefined
@@ -227,9 +231,9 @@ function Node({
         />
       )}
       <text x={x + 8} y={y + 13} fontSize={9} className="font-mono" fill="var(--muted-foreground)">
-        {ROLE_TAG[node.role]}
+        {t(`roles.${node.role}`)}
         {invokes.length > 0 && ` ×${invokes.length}`}
-        {actions.length > 0 && ` ${actions.length} acts`}
+        {actions.length > 0 && ` ${t("graph.acts", { count: actions.length })}`}
       </text>
       {metric && (
         <text
@@ -301,6 +305,7 @@ export function AppGraph({
   onSelectNode,
   className,
 }: AppViewProps) {
+  const t = useTranslations("vizRender");
   const layout = React.useMemo(() => layoutAppGraph(snapshot), [snapshot]);
   const svgRef = React.useRef<SVGSVGElement>(null);
   const particles = flowParticles && motion === "full";
@@ -309,7 +314,7 @@ export function AppGraph({
   return (
     <div
       role="group"
-      aria-label={describeApp(snapshot)}
+      aria-label={describeApp(snapshot, t)}
       data-motion={motion}
       className={cn("h-full w-full overflow-hidden", className)}
     >

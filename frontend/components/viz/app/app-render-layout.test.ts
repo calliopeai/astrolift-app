@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import messages from "@/messages/en.json";
+
+import { vizTranslator } from "../core/viz-t";
+
 import { makeApp, type AppSnapshot } from "../core/app-model";
 
 import {
@@ -127,7 +131,8 @@ describe("layouts", () => {
 describe("summaries", () => {
   it("counts failing, busy and erroring connections", () => {
     const s = makeApp("microservices", { incident: true, name: "shop" });
-    const text = describeApp(s);
+    const t = vizTranslator(messages);
+    const text = describeApp(s, t);
     expect(text).toMatch(/^shop: 9 nodes, 1 failing/);
     expect(text).toMatch(/1 of 10 connections erroring/);
     expect(truncate("abcdefgh", 5)).toBe("abcd…");

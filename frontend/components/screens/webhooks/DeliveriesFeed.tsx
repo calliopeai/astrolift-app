@@ -2,6 +2,7 @@
 
 import { SendIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { Feed } from "@/components/feed/Feed";
 import { Badge } from "@/components/ui/badge";
@@ -26,9 +27,10 @@ export type DeliveriesFeedProps = SubscriptionDeliveriesData & {
  */
 export function DeliveriesFeed({ deliveries, hrefOf, emptyHint, maxHeight }: DeliveriesFeedProps) {
   const fmt = useFormatters();
+  const t = useTranslations("webhooksScreen");
   return (
     <Feed<AstroliftWebhookDelivery>
-      label="Deliveries"
+      label={t("deliveries")}
       {...deliveries}
       keyOf={(d) => d.id}
       groupBy={{ day: (d) => d.deliveredAt }}
@@ -36,7 +38,7 @@ export function DeliveriesFeed({ deliveries, hrefOf, emptyHint, maxHeight }: Del
       dense
       empty={{
         icon: <SendIcon className="size-5" />,
-        title: "No deliveries yet",
+        title: t("noDeliveries"),
         description: emptyHint,
       }}
       renderItem={(d) => {
@@ -50,12 +52,12 @@ export function DeliveriesFeed({ deliveries, hrefOf, emptyHint, maxHeight }: Del
             </span>
             {d.isTest && (
               <Badge variant="outline" className="text-2xs">
-                test
+                {t("testBadge")}
               </Badge>
             )}
             <span className="text-muted-foreground ml-auto flex shrink-0 items-center gap-3 font-mono text-xs">
-              <span title="Attempt">#{d.retryAttempt}</span>
-              <span>{d.latencyMs}ms</span>
+              <span title={t("attempt")}>#{d.retryAttempt}</span>
+              <span>{t("ms", { ms: d.latencyMs })}</span>
               <time dateTime={d.deliveredAt}>{fmt.formatDateTime(d.deliveredAt)}</time>
             </span>
             {(d.error || d.responseBodyExcerpt) && (

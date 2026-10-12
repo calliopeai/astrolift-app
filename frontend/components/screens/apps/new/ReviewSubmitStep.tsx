@@ -1,6 +1,8 @@
 "use client";
 
 import { AlertCircleIcon, Loader2Icon } from "lucide-react";
+import { useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import type { SourceKind, TriggerMode } from "@/graphql/registry/registry.types";
@@ -57,28 +59,26 @@ export interface ReviewSubmitStepViewProps {
   sideEffects: SideEffectStep[];
 }
 
-const TRIGGER_LABELS: Record<string, string> = {
-  auto_on_push: "Auto on push",
-  cron: "Cron schedule",
-  manual: "Manual only",
-  external_ci: "External CI",
-};
+/** Trigger modes with a label under `apps.deployStrategy.modes`. */
+const TRIGGER_MODES = new Set(["auto_on_push", "cron", "manual", "external_ci"]);
 
-const DEPLOY_TIMING_LABELS: Record<string, string> = {
-  now: "Deploy now",
-  later: "Configure, deploy later",
-  skip: "Skip — configure after onboarding",
-};
+/** Deploy timings with a label under `appWizard.review.timing`. */
+const DEPLOY_TIMINGS = new Set(["now", "later", "skip"]);
 
-function describeApprovalPolicy(state: ReviewSubmitFields): string {
-  if (!state.requiresApproval) return "Not required";
+type ReviewT = ReturnType<typeof useTranslations<"appWizard.review">>;
+
+function describeApprovalPolicy(state: ReviewSubmitFields, t: ReviewT): string {
+  if (!state.requiresApproval) return t("approval.notRequired");
   if (state.approverTeamId) {
-    return `Team approval — ${state.minimumApprovals} required`;
+    return t("approval.team", { count: state.minimumApprovals });
   }
   if (state.approverUserIds.length > 0) {
-    return `${state.minimumApprovals} of ${state.approverUserIds.length} selected user(s)`;
+    return t("approval.users", {
+      min: state.minimumApprovals,
+      count: state.approverUserIds.length,
+    });
   }
-  return "Required, no approvers selected (fix on Run)";
+  return t("approval.none");
 }
 
 function ciWorkflowPathFor(sourceKind: SourceKind): string {
@@ -100,55 +100,63 @@ export function ReviewSubmitStepView({
   submitError,
   sideEffects,
 }: ReviewSubmitStepViewProps) {
+  const t = useTranslations("appWizard.review");
+  const modes = useTranslations("apps.deployStrategy.modes");
+  const timing = (value: string) => (DEPLOY_TIMINGS.has(value) ? t(`timing.${value}`) : value);
+  const trigger = (mode: string) => (TRIGGER_MODES.has(mode) ? modes(`${mode}.label`) : mode);
+  const code = (chunks: ReactNode) => (
+    <code className="bg-muted rounded px-1 py-0.5 font-mono">{chunks}</code>
+  );
   return (
     <div className="flex flex-col gap-5">
       <section className="grid min-w-0 gap-3 sm:grid-cols-2">
         <SummaryCard
           step={1}
-          title="Source"
+          title={t("source")}
           onJump={onJumpToStep}
           rows={[
-            { label: "Repository", value: state.sourceRepo, mono: true },
-            { label: "Default branch", value: state.defaultBranch, mono: true },
-            { label: "Source kind", value: state.sourceKind },
-            { label: "Manifest path", value: state.manifestPath, mono: true },
+            { label: t("repository"), value: state.sourceRepo, mono: true },
+            { label: t("defaultBranch"), value: state.defaultBranch, mono: true },
+            { label: t("sourceKind"), value: state.sourceKind },
+            { label: t("manifestPath"), value: state.manifestPath, mono: true },
             {
-              label: "Manifest",
+              label: t("manifest"),
               value: state.manifestLater
-                ? "Set up later"
-                : `${state.manifestFromRepo ? "Loaded from repo" : "Drafted here"}, ${
-                    state.manifestValid ? "valid shape" : "invalid"
-                  }`,
+                ? t("manifestLater")
+                : t("manifestState", {
+                    origin: state.manifestFromRepo ? "repo" : "draft",
+                    valid: state.manifestValid ? "yes" : "no",
+                  }),
             },
           ]}
         />
         <SummaryCard
           step={2}
-          title="Run"
+          title={t("run")}
           onJump={onJumpToStep}
           rows={[
-            { label: "Name", value: state.name },
-            { label: "Slug", value: state.slug, mono: true },
-            ...(state.description ? [{ label: "Description", value: state.description }] : []),
+            { label: t("name"), value: state.name },
+            { label: t("slug"), value: state.slug, mono: true },
+            ...(state.description ? [{ label: t("description"), value: state.description }] : []),
             ...(state.deployTiming === "skip"
               ? [
-                  { label: "Deploy timing", value: DEPLOY_TIMING_LABELS[state.deployTiming] },
-                  { label: "Trigger", value: "Manual (configure later)" },
+                  { label: t("deployTiming"), value: timing(state.deployTiming) },
+                  { label: t("trigger"), value: t("triggerLater") },
                 ]
               : [
                   {
-                    label: "Deploy timing",
-                    value: DEPLOY_TIMING_LABELS[state.deployTiming] ?? state.deployTiming,
+                    label: t("deployTiming"),
+                    value: timing(state.deployTiming),
                   },
                   {
-                    label: "Trigger",
-                    value: TRIGGER_LABELS[state.triggerMode] ?? state.triggerMode,
+                    label: t("trigger"),
+                    value: trigger(state.triggerMode),
                   },
-                  { label: "Deploy branch", value: state.deployBranch, mono: true },
+                  { label: t("deployBranch"), value: state.deployBranch, mono: true },
                   ...(state.triggerMode === "cron"
-                    ? [{ label: "Cron", value: state.cronExpression, mono: true }]
+                    ? [{ label: t("cron"), value: state.cronExpression, mono: true }]
                     : []),
-                  { label: "Approval gate", value: describeApprovalPolicy(state) },
+                  { label: t("approvalGate"), value: describeApprovalPolicy(state, t) },
                 ]),
           ]}
         />
@@ -158,21 +166,17 @@ export function ReviewSubmitStepView({
 
       <section className="flex flex-col gap-3">
         <div>
-          <h3 className="font-medium">What happens when you submit</h3>
-          <p className="text-muted-foreground text-xs">
-            Toggle the side-effects you want. Items that depend on backend work that hasn&apos;t
-            shipped yet (webhook install for PAT / OAuth-User connections) stay grayed out.
-          </p>
+          <h3 className="font-medium">{t("sideEffectsTitle")}</h3>
+          <p className="text-muted-foreground text-xs">{t("sideEffectsHelp")}</p>
         </div>
 
         <ul className="flex flex-col divide-y rounded-md border">
           <li className="flex items-center gap-3 p-3">
             <CheckboxLocked checked disabled />
             <div className="flex min-w-0 flex-1 flex-col">
-              <span className="text-sm">Register the app</span>
+              <span className="text-sm">{t("register")}</span>
               <span className="text-muted-foreground text-xs">
-                Calls <code className="bg-muted rounded px-1 py-0.5 font-mono">registerApp</code>;
-                the onboarding workflow provisions namespace + registry repo.
+                {t.rich("registerHelp", { code })}
               </span>
             </div>
             <StatusBadge
@@ -184,15 +188,13 @@ export function ReviewSubmitStepView({
           <li className="flex items-center gap-3 p-3 opacity-70">
             <CheckboxLocked checked={state.connectionIsAppInstall} disabled />
             <div className="flex min-w-0 flex-1 flex-col">
-              <span className="text-sm">Install SCM webhook</span>
+              <span className="text-sm">{t("webhook")}</span>
               <span className="text-muted-foreground text-xs">
-                {state.connectionIsAppInstall
-                  ? "Already covered by your GitHub App install — no action needed."
-                  : "GitHub App installs handle this automatically; PAT/OAuth-User connections will get a per-repo webhook once that mutation lands."}
+                {state.connectionIsAppInstall ? t("webhookCovered") : t("webhookPending")}
               </span>
             </div>
             <Badge variant="outline" className="text-2xs">
-              {state.connectionIsAppInstall ? "Already installed" : "Coming soon"}
+              {state.connectionIsAppInstall ? t("alreadyInstalled") : t("comingSoon")}
             </Badge>
           </li>
 
@@ -207,15 +209,10 @@ export function ReviewSubmitStepView({
             </label>
             <div className="flex min-w-0 flex-1 flex-col">
               <span className="text-sm">
-                Push{" "}
-                <code className="bg-muted rounded px-1 py-0.5 font-mono">
-                  {ciWorkflowPathFor(state.sourceKind)}
-                </code>
+                {t.rich("pushWorkflow", { path: ciWorkflowPathFor(state.sourceKind), code })}
               </span>
               <span className="text-muted-foreground text-xs">
-                {canPushCiWorkflow
-                  ? "Commits a starter workflow that calls astro app deploy on every push to the deploy branch. You'll need to set ASTROLIFT_DEPLOY_TOKEN as a repo secret."
-                  : "Available for GitHub or GitLab user-OAuth connections (and GitHub App installs). The selected connection can't push commits."}
+                {canPushCiWorkflow ? t("pushWorkflowHelp") : t("pushWorkflowUnavailable")}
               </span>
             </div>
             <StatusBadge
@@ -233,10 +230,9 @@ export function ReviewSubmitStepView({
               />
             </label>
             <div className="flex min-w-0 flex-1 flex-col">
-              <span className="text-sm">Trigger first deploy</span>
+              <span className="text-sm">{t("firstDeploy")}</span>
               <span className="text-muted-foreground text-xs">
-                Kick off an initial deploy once the onboarding workflow flips the app to{" "}
-                <code className="bg-muted rounded px-1 py-0.5 font-mono">ready</code>.
+                {t.rich("firstDeployHelp", { code })}
               </span>
             </div>
             <StatusBadge
@@ -251,7 +247,7 @@ export function ReviewSubmitStepView({
         <div className="border-destructive/40 bg-destructive/10 rounded-md border p-3 text-sm">
           <p className="text-destructive font-medium">
             <AlertCircleIcon className="mr-1 inline size-4" />
-            Submit failed
+            {t("submitFailed")}
           </p>
           <p className="text-destructive/80 mt-1 text-xs">{submitError}</p>
         </div>
@@ -260,7 +256,7 @@ export function ReviewSubmitStepView({
       {submitting && sideEffects.length === 0 && (
         <p className="text-muted-foreground inline-flex items-center gap-2 text-xs">
           <Loader2Icon className="size-3.5 animate-spin" />
-          Submitting…
+          {t("submitting")}
         </p>
       )}
     </div>
@@ -272,27 +268,24 @@ export function ReviewSubmitStepView({
  * managed services, the app's shape, and whether a first deploy follows.
  */
 function WhatWillDeploy({ state }: { state: ReviewSubmitFields }) {
+  const t = useTranslations("appWizard.review");
   const preview = state.manifestLater ? null : deployPreview(state.manifestRaw);
   const deploys = state.deployTiming !== "skip" && state.triggerFirstDeploy;
   return (
     <section className="flex min-w-0 flex-col gap-3">
       <div>
-        <h3 className="font-medium">What will deploy</h3>
+        <h3 className="font-medium">{t("willDeployTitle")}</h3>
         <p className="text-muted-foreground text-xs">
-          {deploys
-            ? "A first deploy runs once onboarding lands the app in ready."
-            : "Nothing deploys yet: registration only. Start a deploy from the app page."}
+          {deploys ? t("willDeployFirst") : t("willDeployNothing")}
         </p>
       </div>
       {state.manifestLater ? (
         <p className="text-muted-foreground rounded-md border border-dashed p-3 text-xs">
-          No manifest yet, so there is nothing to deploy until you add one on the app&apos;s
-          Manifest tab.
+          {t("noManifest")}
         </p>
       ) : !preview || preview.workloads.length === 0 ? (
         <p className="text-muted-foreground rounded-md border border-dashed p-3 text-xs">
-          The manifest declares no workloads Astrolift can read here. The server validates it on
-          create.
+          {t("noWorkloads")}
         </p>
       ) : (
         <div className="min-w-0 rounded-md border">
@@ -321,7 +314,7 @@ function WhatWillDeploy({ state }: { state: ReviewSubmitFields }) {
             {preview.services.map((svc, i) => (
               <li key={`${svc}-${i}`} className="flex min-w-0 items-center gap-3 p-3 text-sm">
                 <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
-                  Managed service
+                  {t("managedService")}
                 </span>
                 <Badge variant="secondary" className="shrink-0 font-mono">
                   {svc}

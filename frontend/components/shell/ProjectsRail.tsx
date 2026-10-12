@@ -11,6 +11,7 @@ import {
   WorkflowIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { StatusDot } from "@/components/StatusDot";
@@ -64,10 +65,11 @@ export function ProjectsRail({
   onCollapsedChange,
   className,
 }: ProjectsRailProps) {
+  const t = useTranslations("projectsRail");
   if (collapsed) {
     return (
       <aside
-        aria-label="Projects"
+        aria-label={t("label")}
         className={cn(
           "bg-sidebar border-sidebar-border flex h-full w-8 shrink-0 flex-col items-center border-l py-2",
           className
@@ -76,8 +78,8 @@ export function ProjectsRail({
         <button
           type="button"
           onClick={() => onCollapsedChange(false)}
-          aria-label="Show your projects"
-          title="Projects  ]"
+          aria-label={t("show")}
+          title={t("showTitle")}
           className="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent focus-visible:ring-ring flex size-7 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none"
         >
           <ChevronsLeftIcon className="size-4" />
@@ -89,7 +91,7 @@ export function ProjectsRail({
 
   return (
     <aside
-      aria-label="Projects"
+      aria-label={t("label")}
       className={cn(
         "bg-sidebar text-sidebar-foreground border-sidebar-border flex h-full w-[260px] shrink-0 flex-col border-l",
         className
@@ -100,15 +102,15 @@ export function ProjectsRail({
         <button
           type="button"
           onClick={() => onCollapsedChange(true)}
-          aria-label="Hide your projects"
-          title="Hide  ]"
+          aria-label={t("hide")}
+          title={t("hideTitle")}
           className="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent focus-visible:ring-ring flex size-7 shrink-0 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none"
         >
           <ChevronsRightIcon className="size-4" />
         </button>
       </div>
       <div className="text-muted-foreground text-2xs px-3 pt-3 pb-1 font-semibold tracking-wider uppercase">
-        My projects
+        {t("mine")}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         {loading ? (
@@ -118,9 +120,7 @@ export function ProjectsRail({
             ))}
           </div>
         ) : projects.length === 0 ? (
-          <p className="text-muted-foreground px-2 py-2 text-xs">
-            You are not in any project yet. Join one from All projects.
-          </p>
+          <p className="text-muted-foreground px-2 py-2 text-xs">{t("empty")}</p>
         ) : (
           projects.map((p) => <ProjectBranch key={p.slug} project={p} activeHref={activeHref} />)
         )}
@@ -130,7 +130,7 @@ export function ProjectsRail({
           href={allProjectsHref}
           className="text-muted-foreground hover:text-foreground text-xs underline-offset-2 hover:underline"
         >
-          All projects →
+          {t("all")} →
         </Link>
       </div>
     </aside>

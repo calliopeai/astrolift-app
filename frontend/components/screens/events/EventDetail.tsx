@@ -2,6 +2,7 @@
 
 import { ExternalLinkIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { DetailTimestamp, EntityDetailShell } from "@/components/detail/EntityDetailShell";
 import { QueryError } from "@/components/QueryError";
@@ -18,6 +19,7 @@ export type EventDetailProps = Omit<ReturnType<typeof useEventDetail>, "error" |
 
 /** Event detail (#1106) — full payload + metadata for a single platform event. */
 export function EventDetail({ id, event: e, loading, error, onRetry }: EventDetailProps) {
+  const t = useTranslations("eventDetail");
   const sourceHref = e
     ? resolveSourceHref(e.resourceKind ?? "", e.resourceId ?? "", e.payload ?? {})
     : null;
@@ -26,12 +28,12 @@ export function EventDetail({ id, event: e, loading, error, onRetry }: EventDeta
   const overview: DefinitionListItem[] = e
     ? [
         {
-          term: "Event type",
+          term: t("eventType"),
           description: <span className="font-mono text-xs">{e.eventType}</span>,
         },
-        { term: "Occurred", description: <DetailTimestamp iso={e.occurredAt} /> },
+        { term: t("occurred"), description: <DetailTimestamp iso={e.occurredAt} /> },
         {
-          term: "Source",
+          term: t("source"),
           description:
             !e.resourceKind && !e.resourceId ? (
               <span className="text-muted-foreground">—</span>
@@ -51,25 +53,25 @@ export function EventDetail({ id, event: e, loading, error, onRetry }: EventDeta
 
   if (e?.registeredAppId) {
     overview.push({
-      term: "App",
+      term: t("app"),
       description: <span className="font-mono text-xs break-all">{e.registeredAppId}</span>,
     });
   }
   if (e?.organizationId) {
     overview.push({
-      term: "Organization",
+      term: t("organization"),
       description: <span className="font-mono text-xs break-all">{e.organizationId}</span>,
     });
   }
   if (e?.teamId) {
     overview.push({
-      term: "Team",
+      term: t("team"),
       description: <span className="font-mono text-xs break-all">{e.teamId}</span>,
     });
   }
   if (e?.projectId) {
     overview.push({
-      term: "Project",
+      term: t("project"),
       description: <span className="font-mono text-xs break-all">{e.projectId}</span>,
     });
   }
@@ -78,16 +80,16 @@ export function EventDetail({ id, event: e, loading, error, onRetry }: EventDeta
     <EntityDetailShell
       loading={loading}
       notFound={!e && !error}
-      breadcrumb={{ label: "Events", href: "/events" }}
-      heading={e ? e.eventType : `Event ${id.slice(0, 8)}`}
-      notFoundLabel="event"
+      breadcrumb={{ label: t("events"), href: "/events" }}
+      heading={e ? e.eventType : t("eventHeading", { id: id.slice(0, 8) })}
+      notFoundLabel={t("eventNoun")}
       overview={overview}
     >
-      {error ? <QueryError title="Could not load detail" error={error} onRetry={onRetry} /> : null}
+      {error ? <QueryError title={t("loadError")} error={error} onRetry={onRetry} /> : null}
       {e ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Payload</CardTitle>
+            <CardTitle className="text-base">{t("payload")}</CardTitle>
           </CardHeader>
           <CardContent>
             {eventPayloadText(e.payload) !== null ? (
@@ -95,7 +97,7 @@ export function EventDetail({ id, event: e, loading, error, onRetry }: EventDeta
                 {JSON.stringify(e.payload, null, 2)}
               </pre>
             ) : (
-              <p className="text-muted-foreground text-sm">This event carries no payload.</p>
+              <p className="text-muted-foreground text-sm">{t("noPayload")}</p>
             )}
           </CardContent>
         </Card>

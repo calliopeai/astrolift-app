@@ -64,6 +64,7 @@ export function SecuritySettingsView({
   onRevoke,
 }: SecuritySettingsViewProps & { list: ListStateController }) {
   const t = useTranslations("securitySessions");
+  const ts = useTranslations("securitySettings");
   const fmt = useFormatters();
 
   const [confirmSignOut, setConfirmSignOut] = React.useState(false);
@@ -233,15 +234,13 @@ export function SecuritySettingsView({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <KeyRoundIcon className="size-4" /> API tokens
+              <KeyRoundIcon className="size-4" /> {ts("apiTokens")}
             </CardTitle>
-            <CardDescription>
-              Long-lived credentials for CLIs, CI runs, and scripts.
-            </CardDescription>
+            <CardDescription>{ts("apiTokensDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild variant="outline">
-              <Link href="/tokens">Manage tokens</Link>
+              <Link href="/tokens">{ts("manageTokens")}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -249,17 +248,12 @@ export function SecuritySettingsView({
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <ShieldCheckIcon className="size-4" /> Multi-factor authentication
+              <ShieldCheckIcon className="size-4" /> {ts("mfa")}
             </CardTitle>
-            <CardDescription>
-              Configured at the IdP layer. Astrolift sees the assertion via OIDC.
-            </CardDescription>
+            <CardDescription>{ts("mfaDescription")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-muted-foreground text-sm">
-              Set up MFA in your identity provider (Auth0 / Okta / Azure AD / Google Workspace). The
-              platform enforces session-freshness for high-risk actions via ABAC policies.
-            </p>
+            <p className="text-muted-foreground text-sm">{ts("mfaBody")}</p>
           </CardContent>
         </Card>
       </div>
