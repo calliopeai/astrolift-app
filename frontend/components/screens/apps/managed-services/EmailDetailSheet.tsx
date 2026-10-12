@@ -53,7 +53,7 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import * as React from "react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
@@ -99,6 +99,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useFormatters } from "@/lib/i18n/formatters";
 import type {
   AstroliftEmailDnsAuthCheck,
   AstroliftEmailMessage,
@@ -130,16 +131,19 @@ const OUTCOME_DOT: Record<EmailDnsCheckOutcome, string> = {
 };
 
 const OUTCOME_LABEL: Record<EmailDnsCheckOutcome, string> = {
-  GREEN: "Healthy",
-  YELLOW: "Suboptimal",
-  RED: "Broken",
-  UNKNOWN: "Unknown",
+  GREEN: "outcome.healthy",
+  YELLOW: "outcome.suboptimal",
+  RED: "outcome.broken",
+  UNKNOWN: "outcome.unknown",
 };
 
-function copyToClipboard(value: string, label = "Value") {
+type Translate = (key: string, values?: Record<string, string | number>) => string;
+type Formatter = ReturnType<typeof useFormatter>;
+
+function copyToClipboard(value: string, copied: string, failed: string) {
   void navigator.clipboard.writeText(value).then(
-    () => toast.success(`${label} copied`),
-    () => toast.error("Copy failed")
+    () => toast.success(copied),
+    () => toast.error(failed)
   );
 }
 
@@ -148,20 +152,20 @@ function formatPct(value: number | null | undefined, digits = 2): string {
   return `${value.toFixed(digits)}%`;
 }
 
-function formatNumber(value: number, digits = 0): string {
+function formatNumber(fmt: Formatter, value: number, digits = 0): string {
   if (!Number.isFinite(value)) return "—";
-  return value.toLocaleString("en-US", {
+  return fmt.number(value, {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
 }
 
-function formatMoney(cents: number, currency: string): string {
-  return new Intl.NumberFormat(undefined, {
+function formatMoney(fmt: Formatter, cents: number, currency: string): string {
+  return fmt.number(cents / 100, {
     style: "currency",
     currency,
     maximumFractionDigits: 2,
-  }).format(cents / 100);
+  });
 }
 
 /** The client-side step's input, from a panel's own list state. */
@@ -175,10 +179,9 @@ function pageOf(list: ListStateController) {
   };
 }
 
-const NOT_PERSONAL = "These belong to the email service, not a person, so Mine is empty.";
-
 /** An embedded list's declaration over one payload's rows. */
 function emailList(
+  t: Translate,
   id: string,
   fields: ListDefinition["fields"],
   searchPlaceholder: string,
@@ -189,7 +192,7 @@ function emailList(
     fields,
     searchPlaceholder,
     defaultSort,
-    views: standardViews({ owner: "me" }, [], { mineNote: NOT_PERSONAL }),
+    views: standardViews({ owner: "me" }, [], { mineNote: t("notPersonal") }),
     paging: "numbered",
     pageSizes: [25, 50, 100],
   };
@@ -248,15 +251,20 @@ export function EmailDetailSheetView({
   dnsRestriction,
 }: EmailDetailSheetViewProps) {
   const deliveryText = useTranslations("emailDelivery");
+  const t = useTranslations("appEmailService");
   const [section, setSection] = React.useState<EmailDetailSection>(defaultSection);
   const sections: { id: EmailDetailSection; label: string; shown: boolean }[] = [
     { id: "delivery", label: deliveryText("title"), shown: !!panels?.delivery },
-    { id: "health", label: "Health", shown: true },
-    { id: "sending", label: "Identity & sending", shown: true },
-    { id: "suppressions", label: "Suppressions", shown: Boolean(panels?.suppression) },
-    { id: "alerts", label: "Alert rules", shown: Boolean(panels?.alertRules) },
-    { id: "messages", label: "Messages", shown: Boolean(panels?.messageLog) },
-    { id: "templates", label: "Templates", shown: Boolean(panels?.templates) },
+    { id: "health", label: t("sections.health"), shown: true },
+    { id: "sending", label: t("sections.sending"), shown: true },
+    {
+      id: "suppressions",
+      label: t("sections.suppressions"),
+      shown: Boolean(panels?.suppression),
+    },
+    { id: "alerts", label: t("sections.alerts"), shown: Boolean(panels?.alertRules) },
+    { id: "messages", label: t("sections.messages"), shown: Boolean(panels?.messageLog) },
+    { id: "templates", label: t("sections.templates"), shown: Boolean(panels?.templates) },
   ];
   const tabs = sections.filter((s) => s.shown);
   const active = tabs.some((s) => s.id === section) ? section : "health";
@@ -264,11 +272,8 @@ export function EmailDetailSheetView({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-3xl">
         <SheetHeader>
-          <SheetTitle>Email service: {serviceName}</SheetTitle>
-          <SheetDescription>
-            Deliverability health, identity verification, and suppression list for this bound email
-            backend.
-          </SheetDescription>
+          <SheetTitle>{t("title", { name: serviceName })}</SheetTitle>
+          <SheetDescription>{t("description")}</SheetDescription>
         </SheetHeader>
 
         {panels?.delivery ? (
@@ -289,23 +294,23 @@ export function EmailDetailSheetView({
           <div className="space-y-6 p-1">
             <div
               role="tablist"
-              aria-label="Email service sections"
+              aria-label={t("sectionsLabel")}
               className="bg-muted/40 flex max-w-full flex-wrap gap-1 rounded-md border p-1"
             >
-              {tabs.map((t) => (
+              {tabs.map((tab) => (
                 <button
-                  key={t.id}
+                  key={tab.id}
                   type="button"
                   role="tab"
-                  aria-selected={active === t.id}
-                  onClick={() => setSection(t.id)}
+                  aria-selected={active === tab.id}
+                  onClick={() => setSection(tab.id)}
                   className={`rounded px-3 py-1 text-sm font-medium transition ${
-                    active === t.id
+                    active === tab.id
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {t.label}
+                  {tab.label}
                 </button>
               ))}
             </div>
@@ -318,7 +323,7 @@ export function EmailDetailSheetView({
                 {detail.unsupportedNotes.length > 0 ? (
                   <Card className="bg-muted/40 p-3">
                     <p className="text-muted-foreground text-2xs mb-1 font-semibold uppercase">
-                      Notes from {detail.pluginSlug.toUpperCase()}
+                      {t("notesFrom", { plugin: detail.pluginSlug.toUpperCase() })}
                     </p>
                     <ul className="text-muted-foreground space-y-0.5 text-xs">
                       {detail.unsupportedNotes.map((note) => (
@@ -348,15 +353,12 @@ export function EmailDetailSheetView({
             )}
           </div>
         ) : (
-          <p className="text-muted-foreground p-3 text-sm">
-            Email detail unavailable. This managed service may have been deprovisioned, or the cloud
-            driver isn&apos;t reachable.
-          </p>
+          <p className="text-muted-foreground p-3 text-sm">{t("unavailable")}</p>
         )}
 
         <SheetFooter className="mt-6">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
+            {t("close")}
           </Button>
         </SheetFooter>
       </SheetContent>
@@ -367,12 +369,13 @@ export function EmailDetailSheetView({
 // ── Reputation / sandbox status (#633) ─────────────────────────────
 
 function ReputationPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
+  const t = useTranslations("appEmailService.reputation");
   const status = detail.accountStatus;
   if (!status) {
     return (
       <PanelEmpty
-        title="Sender reputation"
-        message="The backend doesn't expose reputation / sandbox status."
+        title={t("title")}
+        message={t("unsupported")}
         icon={<ShieldXIcon className="size-4" />}
       />
     );
@@ -391,7 +394,7 @@ function ReputationPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
       <div className="mb-3 flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <ShieldIcon className="size-4" />
-          Sender reputation
+          {t("title")}
         </h3>
         <Badge
           variant={status.productionAccess ? "default" : "outline"}
@@ -401,12 +404,12 @@ function ReputationPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
               : "border-warning-border bg-warning/10 text-warning-fg"
           }
         >
-          {status.productionAccess ? "Production access" : "Sandbox"}
+          {status.productionAccess ? t("productionAccess") : t("sandbox")}
         </Badge>
       </div>
       <div className="grid grid-cols-3 gap-3">
         <div>
-          <p className="text-muted-foreground text-2xs uppercase">Reputation</p>
+          <p className="text-muted-foreground text-2xs uppercase">{t("reputation")}</p>
           <p className="font-mono text-lg">{repPct === null ? "—" : `${repPct.toFixed(0)}%`}</p>
           {repPct !== null ? (
             <div className="bg-muted mt-1.5 h-1.5 w-full overflow-hidden rounded-full">
@@ -418,21 +421,20 @@ function ReputationPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
           ) : null}
         </div>
         <div>
-          <p className="text-muted-foreground text-2xs uppercase">Bounce rate (7d)</p>
+          <p className="text-muted-foreground text-2xs uppercase">{t("bounceRate")}</p>
           <p className="font-mono text-lg">{formatPct(status.bounceRatePct)}</p>
-          <p className="text-muted-foreground text-2xs">SES throttles at ~10%</p>
+          <p className="text-muted-foreground text-2xs">{t("bounceThrottle")}</p>
         </div>
         <div>
-          <p className="text-muted-foreground text-2xs uppercase">Complaint rate (7d)</p>
+          <p className="text-muted-foreground text-2xs uppercase">{t("complaintRate")}</p>
           <p className="font-mono text-lg">{formatPct(status.complaintRatePct)}</p>
-          <p className="text-muted-foreground text-2xs">SES throttles at ~0.5%</p>
+          <p className="text-muted-foreground text-2xs">{t("complaintThrottle")}</p>
         </div>
       </div>
       {!status.productionAccess ? (
         <p className="text-muted-foreground mt-3 flex items-start gap-1.5 text-xs">
           <AlertTriangleIcon className="text-warning-fg size-3.5 shrink-0" />
-          Sandbox mode: this identity can only send to verified recipients + verified domains.
-          Request production access from AWS Support before shipping to end users.
+          {t("sandboxNote")}
         </p>
       ) : null}
     </Card>
@@ -442,12 +444,14 @@ function ReputationPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
 // ── Quota tile (#629) ──────────────────────────────────────────────
 
 function QuotaPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
+  const t = useTranslations("appEmailService.quota");
+  const fmt = useFormatter();
   const quota = detail.quota;
   if (!quota) {
     return (
       <PanelEmpty
-        title="Send quota"
-        message="The backend doesn't expose send-rate quota."
+        title={t("title")}
+        message={t("unsupported")}
         icon={<GaugeIcon className="size-4" />}
       />
     );
@@ -458,19 +462,21 @@ function QuotaPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
     <Card className="p-4">
       <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
         <GaugeIcon className="size-4" />
-        Send quota
+        {t("title")}
       </h3>
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <p className="text-muted-foreground text-2xs uppercase">Max send rate</p>
-          <p className="font-mono text-lg">{formatNumber(quota.maxSendRate, 1)} /sec</p>
+          <p className="text-muted-foreground text-2xs uppercase">{t("maxSendRate")}</p>
+          <p className="font-mono text-lg">
+            {t("perSecond", { rate: formatNumber(fmt, quota.maxSendRate, 1) })}
+          </p>
         </div>
         <div>
-          <p className="text-muted-foreground text-2xs uppercase">Sent today</p>
+          <p className="text-muted-foreground text-2xs uppercase">{t("sentToday")}</p>
           <p className="font-mono text-lg">
-            {formatNumber(quota.sentLast24h)} /{" "}
+            {formatNumber(fmt, quota.sentLast24h)} /{" "}
             <span className="text-muted-foreground text-base">
-              {formatNumber(quota.max24HourSend)}
+              {formatNumber(fmt, quota.max24HourSend)}
             </span>
           </p>
           <div className="mt-2">
@@ -485,8 +491,7 @@ function QuotaPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
                 dailyOverThreshold ? "text-warning-fg" : "text-muted-foreground"
               }`}
             >
-              {dailyPct.toFixed(1)}% of 24h quota
-              {dailyOverThreshold ? " — close to the daily ceiling" : ""}
+              {t(dailyOverThreshold ? "nearCeiling" : "ofQuota", { pct: dailyPct.toFixed(1) })}
             </p>
           </div>
         </div>
@@ -503,13 +508,15 @@ export function CostPanelView({
   currency,
   loading,
 }: ReturnType<typeof useEmailCost>) {
+  const t = useTranslations("appEmailService.cost");
+  const fmt = useFormatter();
   const haveAny = (mtdSum !== null && mtdSum > 0) || (trailingSum !== null && trailingSum > 0);
 
   return (
     <Card className="p-4">
       <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
         <CoinsIcon className="size-4" />
-        Cost
+        {t("title")}
       </h3>
       {loading && !haveAny ? (
         <div className="grid grid-cols-2 gap-4">
@@ -517,25 +524,22 @@ export function CostPanelView({
           <Skeleton className="h-12 w-full" />
         </div>
       ) : !haveAny && mtdSum === null && trailingSum === null ? (
-        <p className="text-muted-foreground text-xs">
-          No cost data attributed to this service yet. Costs appear after the cost driver runs its
-          next reconciliation pass.
-        </p>
+        <p className="text-muted-foreground text-xs">{t("empty")}</p>
       ) : (
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-muted-foreground text-2xs uppercase">This month</p>
+            <p className="text-muted-foreground text-2xs uppercase">{t("thisMonth")}</p>
             <p className="font-mono text-lg tabular-nums">
-              {mtdSum === null ? "—" : formatMoney(mtdSum, currency)}
+              {mtdSum === null ? "—" : formatMoney(fmt, mtdSum, currency)}
             </p>
-            <p className="text-muted-foreground text-2xs">Month-to-date</p>
+            <p className="text-muted-foreground text-2xs">{t("monthToDate")}</p>
           </div>
           <div>
-            <p className="text-muted-foreground text-2xs uppercase">Last 30 days</p>
+            <p className="text-muted-foreground text-2xs uppercase">{t("last30")}</p>
             <p className="font-mono text-lg tabular-nums">
-              {trailingSum === null ? "—" : formatMoney(trailingSum, currency)}
+              {trailingSum === null ? "—" : formatMoney(fmt, trailingSum, currency)}
             </p>
-            <p className="text-muted-foreground text-2xs">Trailing 30-day spend</p>
+            <p className="text-muted-foreground text-2xs">{t("trailing30")}</p>
           </div>
         </div>
       )}
@@ -552,12 +556,13 @@ function IdentityPanel({
   detail: AstroliftEmailServiceDetail;
   dnsRestriction?: string | null;
 }) {
+  const t = useTranslations("appEmailService");
   const iv = detail.identityVerification;
   if (!iv) {
     return (
       <PanelEmpty
-        title="Identity verification"
-        message="The backend doesn't expose identity-verification details."
+        title={t("identity.title")}
+        message={t("identity.unsupported")}
         icon={<HelpCircleIcon className="size-4" />}
       />
     );
@@ -568,7 +573,7 @@ function IdentityPanel({
   return (
     <Card className="p-4">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="flex items-center gap-2 text-sm font-semibold">Identity verification</h3>
+        <h3 className="flex items-center gap-2 text-sm font-semibold">{t("identity.title")}</h3>
         <Badge
           className={
             verified
@@ -591,24 +596,25 @@ function IdentityPanel({
       </div>
       <p className="text-muted-foreground mb-2 text-xs">
         <span className="text-foreground font-mono">{iv.identity}</span> (
-        {iv.isDomain ? "domain identity" : "email identity"})
+        {iv.isDomain ? t("identity.domainIdentity") : t("identity.emailIdentity")})
       </p>
       {iv.isDomain && !verified && !failed && dnsRestriction ? (
         <p className="text-warning-fg mb-3 text-xs">
-          Astrolift publishes no verification records on this install; publish them in the
-          identity&apos;s DNS zone. {dnsRestriction}
+          {t("identity.dnsWithheld")} {dnsRestriction}
         </p>
       ) : null}
       {iv.verificationToken ? (
         <div className="bg-muted/40 text-2xs mb-3 rounded-md border p-2 font-mono">
-          <p className="text-muted-foreground">TXT verification challenge:</p>
+          <p className="text-muted-foreground">{t("identity.txtChallenge")}</p>
           <div className="mt-0.5 flex items-center gap-2">
             <code className="flex-1 break-all">{iv.verificationToken}</code>
             <Button
               variant="ghost"
               size="icon"
               className="size-6"
-              onClick={() => copyToClipboard(iv.verificationToken, "Token")}
+              onClick={() =>
+                copyToClipboard(iv.verificationToken, t("copied.token"), t("copyFailed"))
+              }
             >
               <CopyIcon className="size-3" />
             </Button>
@@ -617,7 +623,7 @@ function IdentityPanel({
       ) : null}
       {iv.dkimTokens.length > 0 ? (
         <div className="space-y-1.5">
-          <p className="text-muted-foreground text-2xs uppercase">DKIM CNAMEs to publish</p>
+          <p className="text-muted-foreground text-2xs uppercase">{t("identity.dkimCnames")}</p>
           {iv.dkimTokens.map((tok) => (
             <div
               key={tok.token}
@@ -632,7 +638,11 @@ function IdentityPanel({
                 size="icon"
                 className="size-6 shrink-0"
                 onClick={() =>
-                  copyToClipboard(`${tok.cnameHost} CNAME ${tok.cnameTarget}`, "CNAME")
+                  copyToClipboard(
+                    `${tok.cnameHost} CNAME ${tok.cnameTarget}`,
+                    t("copied.cname"),
+                    t("copyFailed")
+                  )
                 }
               >
                 <CopyIcon className="size-3" />
@@ -648,12 +658,14 @@ function IdentityPanel({
 // ── DNS auth panel (#632) ──────────────────────────────────────────
 
 function DnsAuthPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
+  const t = useTranslations("appEmailService");
+  const { formatDateTime } = useFormatters();
   const dns = detail.dnsAuthStatus;
   if (!dns) {
     return (
       <PanelEmpty
         title="DKIM / SPF / DMARC"
-        message="The backend doesn't expose DNS auth probing for this identity."
+        message={t("dns.unsupported")}
         icon={<ShieldIcon className="size-4" />}
       />
     );
@@ -664,7 +676,7 @@ function DnsAuthPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
         <h3 className="flex items-center gap-2 text-sm font-semibold">DKIM / SPF / DMARC</h3>
         <Badge variant="outline" className="flex items-center gap-1.5">
           <span className={`inline-block size-2 rounded-full ${OUTCOME_DOT[dns.overall]}`} />
-          {OUTCOME_LABEL[dns.overall]}
+          {t(OUTCOME_LABEL[dns.overall])}
         </Badge>
       </div>
       <div className="space-y-2">
@@ -673,13 +685,14 @@ function DnsAuthPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {
         <DnsCheckRow check={dns.dmarc} />
       </div>
       <p className="text-muted-foreground text-2xs mt-3">
-        Probed {new Date(dns.checkedAt).toLocaleString()}
+        {t("dns.probed", { time: formatDateTime(dns.checkedAt) })}
       </p>
     </Card>
   );
 }
 
 function DnsCheckRow({ check }: { check: AstroliftEmailDnsAuthCheck }) {
+  const t = useTranslations("appEmailService");
   return (
     <div className="flex items-start gap-3 rounded-md border p-2">
       <span
@@ -688,13 +701,13 @@ function DnsCheckRow({ check }: { check: AstroliftEmailDnsAuthCheck }) {
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">
           {check.protocol}{" "}
-          <span className="text-muted-foreground text-2xs">{OUTCOME_LABEL[check.outcome]}</span>
+          <span className="text-muted-foreground text-2xs">{t(OUTCOME_LABEL[check.outcome])}</span>
         </p>
         {check.message ? <p className="text-muted-foreground text-xs">{check.message}</p> : null}
         {check.records.length > 0 ? (
           <details className="mt-1">
             <summary className="text-muted-foreground text-2xs cursor-pointer uppercase">
-              {check.records.length} record{check.records.length > 1 ? "s" : ""}
+              {t("dns.records", { count: check.records.length })}
             </summary>
             <ul className="mt-1 space-y-0.5">
               {check.records.map((r) => (
@@ -725,12 +738,19 @@ const SUPPRESSION_SELECT: SelectRowsSpec<AstroliftEmailSuppressionEntry> = {
   id: suppressionKey,
 };
 
-function suppressionList(entries: AstroliftEmailSuppressionEntry[]): ListDefinition {
+function suppressionList(t: Translate, entries: AstroliftEmailSuppressionEntry[]): ListDefinition {
   const reasons = [...new Set(entries.map((e) => e.reason).filter(Boolean))].sort();
   return emailList(
+    t,
     "suppressions",
-    [{ key: "reason", label: "Reason", options: reasons.map((r) => ({ value: r, label: r })) }],
-    "Search addresses…",
+    [
+      {
+        key: "reason",
+        label: t("suppression.reason"),
+        options: reasons.map((r) => ({ value: r, label: r })),
+      },
+    ],
+    t("suppression.search"),
     [{ key: "date", dir: "desc" }]
   );
 }
@@ -751,20 +771,22 @@ export function SuppressionPanelView({
   const [removalTarget, setRemovalTarget] = React.useState<AstroliftEmailSuppressionEntry | null>(
     null
   );
-  const [def] = React.useState(() => suppressionList(detail.suppressionEntries));
+  const t = useTranslations("appEmailService");
+  const { formatDate } = useFormatters();
+  const [def] = React.useState(() => suppressionList(t, detail.suppressionEntries));
   const list = useLocalListState(def);
   const page = selectRows(detail.suppressionEntries, pageOf(list), SUPPRESSION_SELECT);
   const columns: Column<AstroliftEmailSuppressionEntry>[] = [
     {
       id: "address",
-      header: "Address",
+      header: t("suppression.address"),
       sortKey: "address",
       cellClassName: "font-mono text-xs [overflow-wrap:anywhere]",
       cell: (entry) => entry.address,
     },
     {
       id: "reason",
-      header: "Reason",
+      header: t("suppression.reason"),
       sortKey: "reason",
       cell: (entry) => (
         <Badge variant="outline" className="text-2xs">
@@ -774,15 +796,15 @@ export function SuppressionPanelView({
     },
     {
       id: "date",
-      header: "Date",
+      header: t("suppression.date"),
       sortKey: "date",
       cellClassName: "text-muted-foreground text-xs",
-      cell: (entry) => new Date(entry.suppressedAt).toLocaleDateString(),
+      cell: (entry) => formatDate(entry.suppressedAt),
     },
     {
       id: "remove",
-      header: <span className="sr-only">Remove</span>,
-      label: "Remove",
+      header: <span className="sr-only">{t("suppression.remove")}</span>,
+      label: t("suppression.remove"),
       width: "w-12",
       align: "right",
       cell: (entry) => (
@@ -797,10 +819,10 @@ export function SuppressionPanelView({
                 disabled={removing}
               >
                 <TrashIcon className="size-3.5" />
-                <span className="sr-only">Remove from suppression</span>
+                <span className="sr-only">{t("suppression.removeSr")}</span>
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Un-suppress (allow sends again)</TooltipContent>
+            <TooltipContent>{t("suppression.unsuppressTooltip")}</TooltipContent>
           </Tooltip>
         </Can>
       ),
@@ -825,8 +847,8 @@ export function SuppressionPanelView({
   if (isUnsupported) {
     return (
       <PanelEmpty
-        title="Suppression list"
-        message="The backend doesn't expose an account-level suppression list."
+        title={t("suppression.title")}
+        message={t("suppression.unsupported")}
         icon={<TrashIcon className="size-4" />}
       />
     );
@@ -835,7 +857,7 @@ export function SuppressionPanelView({
   return (
     <Card className="p-4">
       <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold">
-        Suppression list
+        {t("suppression.title")}
         <Badge variant="secondary" className="text-2xs">
           {detail.suppressionEntries.length}
         </Badge>
@@ -843,11 +865,13 @@ export function SuppressionPanelView({
 
       <Can permission="managed_service.update">
         <div className="bg-muted/30 mb-3 rounded-md border p-3">
-          <p className="text-muted-foreground text-2xs mb-2 uppercase">Add manual entry</p>
+          <p className="text-muted-foreground text-2xs mb-2 uppercase">
+            {t("suppression.addManual")}
+          </p>
           <div className="space-y-2">
             <div>
               <Label htmlFor="suppress-address" className="text-xs">
-                Address
+                {t("suppression.address")}
               </Label>
               <Input
                 id="suppress-address"
@@ -860,13 +884,13 @@ export function SuppressionPanelView({
             </div>
             <div>
               <Label htmlFor="suppress-note" className="text-xs">
-                Note (audit trail)
+                {t("suppression.note")}
               </Label>
               <Input
                 id="suppress-note"
                 value={addNote}
                 onChange={(e) => setAddNote(e.target.value)}
-                placeholder="e.g. support ticket #4567"
+                placeholder={t("suppression.notePlaceholder")}
                 className="text-xs"
                 disabled={adding}
               />
@@ -878,24 +902,24 @@ export function SuppressionPanelView({
               className="w-full"
             >
               {adding ? <Loader2Icon className="mr-1.5 size-3 animate-spin" /> : null}
-              Suppress address
+              {t("suppression.suppress")}
             </Button>
           </div>
         </div>
       </Can>
 
       {detail.suppressionEntries.length === 0 ? (
-        <p className="text-muted-foreground py-4 text-center text-xs">No suppressed addresses.</p>
+        <p className="text-muted-foreground py-4 text-center text-xs">{t("suppression.empty")}</p>
       ) : (
         <ListPage<AstroliftEmailSuppressionEntry>
           embedded
           list={list}
-          label="Suppressed addresses"
+          label={t("suppression.listLabel")}
           columns={columns}
           rows={page.rows}
           getRowId={suppressionKey}
           totalCount={page.totalCount}
-          empty={{ icon: <TrashIcon className="size-5" />, title: "No suppressed addresses." }}
+          empty={{ icon: <TrashIcon className="size-5" />, title: t("suppression.empty") }}
         />
       )}
 
@@ -907,15 +931,13 @@ export function SuppressionPanelView({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Un-suppress {removalTarget?.address}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Removes this address from the SES account-level suppression list. SES will accept
-              future sends to this recipient. If the original suppression was a legitimate hard
-              bounce, re-suppressing after another failure may damage sender reputation.
-            </AlertDialogDescription>
+            <AlertDialogTitle>
+              {t("suppression.confirmTitle", { address: removalTarget?.address ?? "" })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>{t("suppression.confirmBody")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={removing}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={removing}>{t("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={removing}
               onClick={() => {
@@ -925,7 +947,7 @@ export function SuppressionPanelView({
               }}
             >
               {removing ? <Loader2Icon className="mr-1.5 size-3 animate-spin" /> : null}
-              Un-suppress
+              {t("suppression.unsuppress")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -938,40 +960,14 @@ export function SuppressionPanelView({
 
 const SENDER_FIELDS: ReadonlyArray<{
   key: string;
-  label: string;
+  messageKey: string;
   placeholder: string;
-  hint: string;
 }> = [
-  {
-    key: "from_name",
-    label: "From / display name",
-    placeholder: "Pulse Notifications",
-    hint: "Shown in recipients' inboxes alongside the From address.",
-  },
-  {
-    key: "reply_to",
-    label: "Reply-to address",
-    placeholder: "support@example.com",
-    hint: "Where replies land if it differs from the From address.",
-  },
-  {
-    key: "return_path",
-    label: "Return-path (bounce handling)",
-    placeholder: "bounce@example.com",
-    hint: "Envelope sender; bounce notifications return here.",
-  },
-  {
-    key: "production_from",
-    label: "Production sender",
-    placeholder: "noreply@example.com",
-    hint: "Used when an app is deployed to the production environment.",
-  },
-  {
-    key: "preview_from",
-    label: "Preview sender",
-    placeholder: "preview@example.com",
-    hint: "Used in preview envs so test mail can't impersonate production.",
-  },
+  { key: "from_name", messageKey: "fromName", placeholder: "Pulse Notifications" },
+  { key: "reply_to", messageKey: "replyTo", placeholder: "support@example.com" },
+  { key: "return_path", messageKey: "returnPath", placeholder: "bounce@example.com" },
+  { key: "production_from", messageKey: "productionFrom", placeholder: "noreply@example.com" },
+  { key: "preview_from", messageKey: "previewFrom", placeholder: "preview@example.com" },
 ];
 
 export function SenderConfigPanelView({
@@ -979,6 +975,7 @@ export function SenderConfigPanelView({
   saving: loading,
   onSave,
 }: ReturnType<typeof useSenderConfig>) {
+  const t = useTranslations("appEmailService");
   const initial = React.useMemo(
     () =>
       Object.fromEntries(
@@ -1014,7 +1011,7 @@ export function SenderConfigPanelView({
       <div className="mb-3 flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <SettingsIcon className="size-4" />
-          Sender config
+          {t("sender.title")}
         </h3>
         <Can permission="managed_service.update">
           {editing ? (
@@ -1025,17 +1022,17 @@ export function SenderConfigPanelView({
                 disabled={loading}
                 onClick={() => setEditing(false)}
               >
-                Cancel
+                {t("cancel")}
               </Button>
               <Button size="sm" disabled={loading || !dirty} onClick={() => void handleSave()}>
                 {loading ? <Loader2Icon className="mr-1.5 size-3 animate-spin" /> : null}
-                Save
+                {t("save")}
               </Button>
             </div>
           ) : (
             <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
               <PencilIcon className="mr-1 size-3" />
-              Edit
+              {t("edit")}
             </Button>
           )}
         </Can>
@@ -1050,7 +1047,7 @@ export function SenderConfigPanelView({
                 htmlFor={`sender-${f.key}`}
                 className="text-muted-foreground text-xs uppercase"
               >
-                {f.label}
+                {t(`sender.fields.${f.messageKey}.label`)}
               </Label>
               {editing ? (
                 <Input
@@ -1071,11 +1068,15 @@ export function SenderConfigPanelView({
                   {displayValue ? (
                     displayValue
                   ) : (
-                    <span className="text-muted-foreground italic">not set</span>
+                    <span className="text-muted-foreground italic">{t("sender.notSet")}</span>
                   )}
                 </p>
               )}
-              {editing ? <p className="text-muted-foreground text-2xs">{f.hint}</p> : null}
+              {editing ? (
+                <p className="text-muted-foreground text-2xs">
+                  {t(`sender.fields.${f.messageKey}.hint`)}
+                </p>
+              ) : null}
             </div>
           );
         })}
@@ -1087,6 +1088,7 @@ export function SenderConfigPanelView({
 // ── SNS event publishing (#636) ────────────────────────────────────
 
 function SnsEventPublishingPanel({ serviceConfig }: { serviceConfig: Record<string, unknown> }) {
+  const t = useTranslations("appEmailService");
   const arn =
     typeof serviceConfig.sns_event_destination_arn === "string"
       ? (serviceConfig.sns_event_destination_arn as string)
@@ -1101,7 +1103,7 @@ function SnsEventPublishingPanel({ serviceConfig }: { serviceConfig: Record<stri
       <div className="mb-3 flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <SendIcon className="size-4" />
-          SES event publishing
+          {t("sns.title")}
         </h3>
         <Badge
           variant="outline"
@@ -1111,16 +1113,12 @@ function SnsEventPublishingPanel({ serviceConfig }: { serviceConfig: Record<stri
               : "border-warning-border bg-warning/10 text-warning-fg"
           }
         >
-          {enabled ? "Active" : "Not configured"}
+          {enabled ? t("sns.active") : t("sns.notConfigured")}
         </Badge>
       </div>
       {enabled ? (
         <>
-          <p className="text-muted-foreground mb-2 text-xs">
-            SES is publishing send / delivery / bounce / complaint / open / click events to the
-            platform&apos;s ingester via SNS. The recent-message log and engagement metrics below
-            stay live.
-          </p>
+          <p className="text-muted-foreground mb-2 text-xs">{t("sns.activeBody")}</p>
           <div className="bg-muted/40 text-2xs mb-2 flex items-center gap-2 rounded-md border p-2 font-mono">
             <code className="flex-1 truncate" title={arn}>
               {arn}
@@ -1129,28 +1127,28 @@ function SnsEventPublishingPanel({ serviceConfig }: { serviceConfig: Record<stri
               variant="ghost"
               size="icon"
               className="size-6 shrink-0"
-              onClick={() => copyToClipboard(arn, "Topic ARN")}
+              onClick={() => copyToClipboard(arn, t("copied.topicArn"), t("copyFailed"))}
             >
               <CopyIcon className="size-3" />
             </Button>
           </div>
           {configSet ? (
             <p className="text-muted-foreground text-2xs">
-              Configuration set: <code className="text-foreground font-mono">{configSet}</code>
+              {t.rich("sns.configSet", {
+                name: configSet,
+                code: (chunks) => <code className="text-foreground font-mono">{chunks}</code>,
+              })}
             </p>
           ) : null}
         </>
       ) : (
         <div className="text-muted-foreground space-y-2 text-xs">
+          <p>{t("sns.missing")}</p>
           <p>
-            SNS event publishing is not configured for this identity. Without it the platform
-            can&apos;t render the per-message log, bounce drill-in, or open/click engagement.
-          </p>
-          <p>
-            Set{" "}
-            <code className="text-foreground font-mono">ASTROLIFT_SES_EVENTS_SNS_TOPIC_ARN</code> in
-            the install&apos;s environment config and re-provision this managed service to wire the
-            SES configuration set, SNS topic, and platform subscription.
+            {t.rich("sns.howTo", {
+              env: "ASTROLIFT_SES_EVENTS_SNS_TOPIC_ARN",
+              code: (chunks) => <code className="text-foreground font-mono">{chunks}</code>,
+            })}
           </p>
         </div>
       )}
@@ -1162,32 +1160,25 @@ function SnsEventPublishingPanel({ serviceConfig }: { serviceConfig: Record<stri
 
 const SES_ALERT_KINDS: ReadonlyArray<{
   value: "ses_bounce_rate" | "ses_complaint_rate";
-  label: string;
+  messageKey: string;
   defaultThreshold: number;
   unit: string;
-  hint: string;
 }> = [
   {
     value: "ses_bounce_rate",
-    label: "Bounce rate >",
+    messageKey: "bounce",
     defaultThreshold: 5,
     unit: "%",
-    hint: "SES throttles at ~10%. Warn early so you have time to react.",
   },
   {
     value: "ses_complaint_rate",
-    label: "Complaint rate >",
+    messageKey: "complaint",
     defaultThreshold: 0.1,
     unit: "%",
-    hint: "SES throttles at ~0.5%. The ceiling is unforgiving here.",
   },
 ];
 
-const SEVERITY_OPTIONS = [
-  { value: "critical", label: "Critical" },
-  { value: "warning", label: "Warning" },
-  { value: "info", label: "Info" },
-] as const;
+const SEVERITY_OPTIONS = ["critical", "warning", "info"] as const;
 
 function severityBadge(severity: string): string {
   switch (severity) {
@@ -1200,22 +1191,31 @@ function severityBadge(severity: string): string {
   }
 }
 
-const ALERT_RULES_LIST = emailList(
-  "alert-rules",
-  [
-    { key: "severity", label: "Severity", options: SEVERITY_OPTIONS.map((o) => ({ ...o })) },
-    {
-      key: "status",
-      label: "Status",
-      options: [
-        { value: "active", label: "Active" },
-        { value: "inactive", label: "Inactive" },
-      ],
-    },
-  ],
-  "Search rules, conditions…",
-  [{ key: "name", dir: "asc" }]
-);
+const alertRulesList = (t: Translate) =>
+  emailList(
+    t,
+    "alert-rules",
+    [
+      {
+        key: "severity",
+        label: t("alerts.severity"),
+        options: SEVERITY_OPTIONS.map((value) => ({
+          value,
+          label: t(`alerts.severities.${value}`),
+        })),
+      },
+      {
+        key: "status",
+        label: t("alerts.status"),
+        options: [
+          { value: "active", label: t("alerts.active") },
+          { value: "inactive", label: t("alerts.inactive") },
+        ],
+      },
+    ],
+    t("alerts.search"),
+    [{ key: "name", dir: "asc" }]
+  );
 
 const SEVERITY_RANK: Record<string, number> = { critical: 0, warning: 1, info: 2 };
 
@@ -1246,43 +1246,47 @@ export function AlertRulesPanelView({
   const [threshold, setThreshold] = React.useState<string>("5");
   const [severity, setSeverity] = React.useState<string>("warning");
   const [name, setName] = React.useState("");
-  const list = useLocalListState(ALERT_RULES_LIST);
+  const t = useTranslations("appEmailService");
+  const [def] = React.useState(() => alertRulesList(t));
+  const list = useLocalListState(def);
   const page = selectRows(rules, pageOf(list), ALERT_RULES_SELECT);
   const columns: Column<AlertRuleRow>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("alerts.name"),
       sortKey: "name",
       cellClassName: "text-xs [overflow-wrap:anywhere]",
       cell: (r) => r.name,
     },
     {
       id: "condition",
-      header: "Condition",
+      header: t("alerts.condition"),
       cellClassName: "text-muted-foreground text-2xs font-mono [overflow-wrap:anywhere]",
       cell: (r) => predicateLabel(r.predicate),
     },
     {
       id: "severity",
-      header: "Severity",
+      header: t("alerts.severity"),
       sortKey: "severity",
       cell: (r) => (
         <Badge variant="outline" className={`capitalize ${severityBadge(r.severity)}`}>
-          {r.severity}
+          {(SEVERITY_OPTIONS as readonly string[]).includes(r.severity)
+            ? t(`alerts.severities.${r.severity}`)
+            : r.severity}
         </Badge>
       ),
     },
     {
       id: "status",
-      header: "Status",
+      header: t("alerts.status"),
       sortKey: "status",
       cellClassName: "text-xs",
-      cell: (r) => (r.isActive ? "Active" : "Inactive"),
+      cell: (r) => (r.isActive ? t("alerts.active") : t("alerts.inactive")),
     },
     {
       id: "delete",
-      header: <span className="sr-only">Delete</span>,
-      label: "Delete",
+      header: <span className="sr-only">{t("delete")}</span>,
+      label: t("delete"),
       width: "w-10",
       align: "right",
       cell: (r) => (
@@ -1295,7 +1299,7 @@ export function AlertRulesPanelView({
             onClick={() => void onDelete(r)}
           >
             <TrashIcon className="size-3.5" />
-            <span className="sr-only">Delete alert rule</span>
+            <span className="sr-only">{t("alerts.deleteSr")}</span>
           </Button>
         </Can>
       ),
@@ -1316,7 +1320,7 @@ export function AlertRulesPanelView({
       <div className="mb-3 flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <BellIcon className="size-4" />
-          Alert rules
+          {t("sections.alerts")}
           <Badge variant="secondary" className="text-2xs">
             {rules.length}
           </Badge>
@@ -1325,29 +1329,26 @@ export function AlertRulesPanelView({
       {loading && rules.length === 0 ? (
         <Skeleton className="h-12 w-full" />
       ) : rules.length === 0 ? (
-        <p className="text-muted-foreground mb-3 text-xs">
-          No alert rules wired up. Add one below — defaults match SES enforcement headroom so you
-          hear before the throttle.
-        </p>
+        <p className="text-muted-foreground mb-3 text-xs">{t("alerts.emptyBody")}</p>
       ) : (
         <ListPage<AlertRuleRow>
           embedded
           list={list}
-          label="Alert rules"
+          label={t("sections.alerts")}
           columns={columns}
           rows={page.rows}
           getRowId={(r) => r.id}
           totalCount={page.totalCount}
-          empty={{ icon: <BellIcon className="size-5" />, title: "No alert rules" }}
+          empty={{ icon: <BellIcon className="size-5" />, title: t("alerts.emptyTitle") }}
         />
       )}
 
       <Can permission="managed_service.update">
         <div className="bg-muted/30 mt-3 rounded-md border p-3">
-          <p className="text-muted-foreground text-2xs mb-2 uppercase">Add alert</p>
+          <p className="text-muted-foreground text-2xs mb-2 uppercase">{t("alerts.add")}</p>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label className="text-xs">Condition</Label>
+              <Label className="text-xs">{t("alerts.condition")}</Label>
               <Select value={kind} onValueChange={(v) => setKind(v as SesAlertKind)}>
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue />
@@ -1355,14 +1356,14 @@ export function AlertRulesPanelView({
                 <SelectContent>
                   {SES_ALERT_KINDS.map((k) => (
                     <SelectItem key={k.value} value={k.value}>
-                      {k.label}
+                      {t(`alerts.kinds.${k.messageKey}.label`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Threshold (%)</Label>
+              <Label className="text-xs">{t("alerts.threshold")}</Label>
               <Input
                 type="number"
                 min={0}
@@ -1373,22 +1374,22 @@ export function AlertRulesPanelView({
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Severity</Label>
+              <Label className="text-xs">{t("alerts.severity")}</Label>
               <Select value={severity} onValueChange={setSeverity}>
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {SEVERITY_OPTIONS.map((s) => (
-                    <SelectItem key={s.value} value={s.value}>
-                      {s.label}
+                    <SelectItem key={s} value={s}>
+                      {t(`alerts.severities.${s}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Name (optional)</Label>
+              <Label className="text-xs">{t("alerts.nameOptional")}</Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -1408,10 +1409,12 @@ export function AlertRulesPanelView({
             ) : (
               <PlusIcon className="mr-1.5 size-3" />
             )}
-            Create alert rule
+            {t("alerts.create")}
           </Button>
           <p className="text-muted-foreground text-2xs mt-2">
-            {SES_ALERT_KINDS.find((k) => k.value === kind)?.hint}
+            {t(
+              `alerts.kinds.${SES_ALERT_KINDS.find((k) => k.value === kind)?.messageKey ?? "bounce"}.hint`
+            )}
           </p>
         </div>
       </Can>
@@ -1447,6 +1450,8 @@ export function EngagementMetricsPanelView({
   loading,
   snsConfigured,
 }: EngagementMetricsPanelViewProps) {
+  const t = useTranslations("appEmailService.engagement");
+  const fmt = useFormatter();
   const tiles: Array<{
     label: string;
     pct: number;
@@ -1459,36 +1464,36 @@ export function EngagementMetricsPanelView({
   }> = m
     ? [
         {
-          label: "Open rate",
+          label: t("openRate"),
           pct: m.openRatePct,
           count: m.totalOpens,
-          denomLabel: "deliveries",
+          denomLabel: "ofDeliveries",
           denom: m.totalDeliveries,
           direction: "higher_better",
         },
         {
-          label: "Click rate",
+          label: t("clickRate"),
           pct: m.clickRatePct,
           count: m.totalClicks,
-          denomLabel: "deliveries",
+          denomLabel: "ofDeliveries",
           denom: m.totalDeliveries,
           direction: "higher_better",
         },
         {
-          label: "Bounce rate",
+          label: t("bounceRate"),
           pct: m.bounceRatePct,
           count: m.totalBounces,
-          denomLabel: "sends",
+          denomLabel: "ofSends",
           denom: m.totalSends,
           warnAt: 5,
           critAt: 10,
           direction: "lower_better",
         },
         {
-          label: "Complaint rate",
+          label: t("complaintRate"),
           pct: m.complaintRatePct,
           count: m.totalComplaints,
-          denomLabel: "sends",
+          denomLabel: "ofSends",
           denom: m.totalSends,
           warnAt: 0.1,
           critAt: 0.5,
@@ -1502,16 +1507,16 @@ export function EngagementMetricsPanelView({
       <div className="mb-3 flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <BarChart3Icon className="size-4" />
-          Engagement metrics
+          {t("title")}
         </h3>
-        {m ? <span className="text-muted-foreground text-2xs">Last {m.windowDays}d</span> : null}
+        {m ? (
+          <span className="text-muted-foreground text-2xs">
+            {t("lastDays", { days: m.windowDays })}
+          </span>
+        ) : null}
       </div>
       {!snsConfigured ? (
-        <p className="text-muted-foreground mb-3 text-xs">
-          Engagement counts come from SES event publishing. Configure the SNS topic above to start
-          collecting opens, clicks, bounces, and complaints; the tiles will populate from the next
-          batch.
-        </p>
+        <p className="text-muted-foreground mb-3 text-xs">{t("notConfigured")}</p>
       ) : null}
       {loading && !m ? (
         <div className="grid grid-cols-2 gap-2">
@@ -1521,24 +1526,29 @@ export function EngagementMetricsPanelView({
           <Skeleton className="h-20 w-full" />
         </div>
       ) : !m || m.totalSends === 0 ? (
-        <p className="text-muted-foreground text-xs">No engagement data in the last 30 days.</p>
+        <p className="text-muted-foreground text-xs">{t("empty")}</p>
       ) : (
         <div className="grid grid-cols-2 gap-2">
-          {tiles.map((t) => {
+          {tiles.map((tile) => {
             const tone =
-              t.direction === "lower_better"
-                ? t.critAt && t.pct >= t.critAt
+              tile.direction === "lower_better"
+                ? tile.critAt && tile.pct >= tile.critAt
                   ? "text-danger-fg"
-                  : t.warnAt && t.pct >= t.warnAt
+                  : tile.warnAt && tile.pct >= tile.warnAt
                     ? "text-warning-fg"
                     : "text-success-fg"
                 : "text-foreground";
             return (
-              <div key={t.label} className="bg-muted/30 rounded-md border p-3">
-                <p className="text-muted-foreground text-2xs uppercase">{t.label}</p>
-                <p className={`font-mono text-2xl tabular-nums ${tone}`}>{formatPct(t.pct, 2)}</p>
+              <div key={tile.label} className="bg-muted/30 rounded-md border p-3">
+                <p className="text-muted-foreground text-2xs uppercase">{tile.label}</p>
+                <p className={`font-mono text-2xl tabular-nums ${tone}`}>
+                  {formatPct(tile.pct, 2)}
+                </p>
                 <p className="text-muted-foreground text-2xs">
-                  {formatNumber(t.count)} of {formatNumber(t.denom)} {t.denomLabel}
+                  {t(tile.denomLabel, {
+                    count: formatNumber(fmt, tile.count),
+                    total: formatNumber(fmt, tile.denom),
+                  })}
                 </p>
               </div>
             );
@@ -1547,8 +1557,11 @@ export function EngagementMetricsPanelView({
       )}
       {m && m.totalSends > 0 ? (
         <p className="text-muted-foreground text-2xs mt-3">
-          {formatNumber(m.totalSends)} sends · {formatNumber(m.totalDeliveries)} delivered · last{" "}
-          {m.windowDays}d
+          {t("summary", {
+            sends: formatNumber(fmt, m.totalSends),
+            delivered: formatNumber(fmt, m.totalDeliveries),
+            days: m.windowDays,
+          })}
         </p>
       ) : null}
     </Card>
@@ -1557,15 +1570,14 @@ export function EngagementMetricsPanelView({
 
 // ── Message log + bounce/complaint drill-in (#624, #625) ───────────
 
-const EVENT_KIND_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
-  { value: "", label: "All events" },
-  { value: "delivery", label: "Delivered" },
-  { value: "bounce", label: "Bounced" },
-  { value: "complaint", label: "Complaints" },
-  { value: "open", label: "Opens" },
-  { value: "click", label: "Clicks" },
-  { value: "send", label: "Sends" },
-  { value: "reject", label: "Rejected" },
+const EVENT_KIND_OPTIONS: ReadonlyArray<string> = [
+  "delivery",
+  "bounce",
+  "complaint",
+  "open",
+  "click",
+  "send",
+  "reject",
 ];
 
 function eventKindBadge(kind: string): string {
@@ -1590,19 +1602,24 @@ function eventKindBadge(kind: string): string {
  * Event and recipient are the query's filters (the hook sends them); search,
  * sort and numbered pages run over the page of messages it returns.
  */
-const MESSAGES_LIST = emailList(
-  "messages",
-  [
-    {
-      key: "event",
-      label: "Event",
-      options: EVENT_KIND_OPTIONS.filter((o) => o.value !== "").map((o) => ({ ...o })),
-    },
-    { key: "recipient", label: "Recipient" },
-  ],
-  "Search recipients, subjects…",
-  [{ key: "when", dir: "desc" }]
-);
+const messagesList = (t: Translate) =>
+  emailList(
+    t,
+    "messages",
+    [
+      {
+        key: "event",
+        label: t("messages.event"),
+        options: EVENT_KIND_OPTIONS.map((value) => ({
+          value,
+          label: t(`messages.events.${value}`),
+        })),
+      },
+      { key: "recipient", label: t("messages.recipient") },
+    ],
+    t("messages.search"),
+    [{ key: "when", dir: "desc" }]
+  );
 
 const MESSAGES_SELECT: SelectRowsSpec<AstroliftEmailMessage> = {
   filter: { owner: () => false },
@@ -1626,7 +1643,10 @@ export function MessageLogPanelView({
 }: ReturnType<typeof useMessageLog>) {
   const [expanded, setExpanded] = React.useState<Set<string>>(() => new Set<string>());
   const detailsId = React.useId();
-  const list = useLocalListState(MESSAGES_LIST, {
+  const t = useTranslations("appEmailService");
+  const { formatDateTime } = useFormatters();
+  const [def] = React.useState(() => messagesList(t));
+  const list = useLocalListState(def, {
     filters: eventKind ? { event: eventKind } : {},
   });
   const event = list.filters.event ?? "";
@@ -1652,7 +1672,7 @@ export function MessageLogPanelView({
   const columns: Column<AstroliftEmailMessage>[] = [
     {
       id: "recipient",
-      header: "Recipient",
+      header: t("messages.recipient"),
       sortKey: "recipient",
       cellClassName: "min-w-0",
       cell: (m) => {
@@ -1680,7 +1700,7 @@ export function MessageLogPanelView({
               <div
                 id={`${detailsId}-${m.id}`}
                 role="region"
-                aria-label={`Message details for ${m.recipient}`}
+                aria-label={t("messages.detailsFor", { recipient: m.recipient })}
                 className="bg-muted/30 rounded-md"
               >
                 <MessageMetadata
@@ -1696,19 +1716,19 @@ export function MessageLogPanelView({
     },
     {
       id: "subject",
-      header: "Subject",
+      header: t("messages.subject"),
       sortKey: "subject",
       cellClassName: "max-w-[14rem] truncate align-top text-xs",
       cell: (m) =>
         m.subject ? (
           <span title={m.subject}>{m.subject}</span>
         ) : (
-          <span className="text-muted-foreground italic">(no subject)</span>
+          <span className="text-muted-foreground italic">{t("messages.noSubject")}</span>
         ),
     },
     {
       id: "event",
-      header: "Event",
+      header: t("messages.event"),
       sortKey: "event",
       cellClassName: "align-top",
       cell: (m) => (
@@ -1719,10 +1739,10 @@ export function MessageLogPanelView({
     },
     {
       id: "when",
-      header: "When",
+      header: t("messages.when"),
       sortKey: "when",
       cellClassName: "text-muted-foreground text-2xs align-top",
-      cell: (m) => new Date(m.occurredAt).toLocaleString(),
+      cell: (m) => formatDateTime(m.occurredAt),
     },
   ];
 
@@ -1731,20 +1751,20 @@ export function MessageLogPanelView({
       <div className="mb-3 flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <InboxIcon className="size-4" />
-          Recent messages
+          {t("messages.title")}
           <Badge variant="secondary" className="text-2xs">
             {messages.length}
           </Badge>
         </h3>
         <Button variant="ghost" size="sm" onClick={onRefresh} disabled={loading}>
           <RefreshCwIcon className={`mr-1 size-3 ${loading ? "animate-spin" : ""}`} />
-          Refresh
+          {t("messages.refresh")}
         </Button>
       </div>
       <ListPage<AstroliftEmailMessage>
         embedded
         list={list}
-        label="Messages"
+        label={t("sections.messages")}
         columns={columns}
         rows={page.rows}
         getRowId={(m) => m.id}
@@ -1753,9 +1773,8 @@ export function MessageLogPanelView({
         stale={loading && messages.length > 0}
         empty={{
           icon: <InboxIcon className="size-5" />,
-          title: "No messages",
-          description:
-            "Either nothing has been sent in the retention window or SNS event publishing isn't configured.",
+          title: t("messages.emptyTitle"),
+          description: t("messages.emptyBody"),
         }}
       />
     </Card>
@@ -1771,6 +1790,7 @@ function MessageMetadata({
   messageId: string;
   metadata: Record<string, unknown>;
 }) {
+  const t = useTranslations("appEmailService");
   const bounceType =
     typeof metadata.bounce_type === "string" ? (metadata.bounce_type as string) : null;
   const bounceSubType =
@@ -1793,10 +1813,10 @@ function MessageMetadata({
           variant="ghost"
           size="icon"
           className="size-5"
-          aria-label="Copy message ID"
+          aria-label={t("messages.copyId")}
           onClick={(e) => {
             e.stopPropagation();
-            copyToClipboard(messageId, "Message ID");
+            copyToClipboard(messageId, t("copied.messageId"), t("copyFailed"));
           }}
         >
           <CopyIcon className="size-3" />
@@ -1826,7 +1846,7 @@ function MessageMetadata({
       ) : null}
       <details>
         <summary className="text-muted-foreground text-2xs cursor-pointer uppercase">
-          Raw metadata
+          {t("messages.rawMetadata")}
         </summary>
         <pre className="bg-background/60 text-2xs mt-1 max-h-48 overflow-auto rounded-md border p-2 font-mono break-all whitespace-pre-wrap">
           {JSON.stringify(metadata, null, 2)}
@@ -1838,9 +1858,8 @@ function MessageMetadata({
 
 // ── Template management (#635, #628) ───────────────────────────────
 
-const TEMPLATES_LIST = emailList("templates", [], "Search templates, subjects…", [
-  { key: "name", dir: "asc" },
-]);
+const templatesList = (t: Translate) =>
+  emailList(t, "templates", [], t("templates.search"), [{ key: "name", dir: "asc" }]);
 
 const TEMPLATES_SELECT: SelectRowsSpec<AstroliftEmailTemplate> = {
   filter: { owner: () => false },
@@ -1871,7 +1890,10 @@ export function TemplatesPanelView({
   const [editingName, setEditingName] = React.useState<string | null>(null);
   const [statsOpen, setStatsOpen] = React.useState<Set<string>>(() => new Set<string>());
   const [deleteTarget, setDeleteTarget] = React.useState<AstroliftEmailTemplate | null>(null);
-  const list = useLocalListState(TEMPLATES_LIST);
+  const t = useTranslations("appEmailService");
+  const { formatDate } = useFormatters();
+  const [def] = React.useState(() => templatesList(t));
+  const list = useLocalListState(def);
   const page = selectRows(templates, pageOf(list), TEMPLATES_SELECT);
 
   const [draft, setDraft] = React.useState({
@@ -1931,56 +1953,56 @@ export function TemplatesPanelView({
   const columns: Column<AstroliftEmailTemplate>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("templates.name"),
       sortKey: "name",
       cellClassName: "min-w-0",
-      cell: (t) => (
+      cell: (tpl) => (
         <div className="flex min-w-0 flex-col gap-2">
-          <span className="font-mono text-xs [overflow-wrap:anywhere]">{t.name}</span>
-          {statsOpen.has(t.name) ? (
-            <div className="bg-muted/30 rounded-md p-3">{renderStats(t.name)}</div>
+          <span className="font-mono text-xs [overflow-wrap:anywhere]">{tpl.name}</span>
+          {statsOpen.has(tpl.name) ? (
+            <div className="bg-muted/30 rounded-md p-3">{renderStats(tpl.name)}</div>
           ) : null}
         </div>
       ),
     },
     {
       id: "subject",
-      header: "Subject",
+      header: t("templates.subject"),
       sortKey: "subject",
       cellClassName: "max-w-[14rem] truncate align-top text-xs",
-      cell: (t) => <span title={t.subject}>{t.subject}</span>,
+      cell: (tpl) => <span title={tpl.subject}>{tpl.subject}</span>,
     },
     {
       id: "created",
-      header: "Created",
+      header: t("templates.created"),
       sortKey: "created",
       cellClassName: "text-muted-foreground text-2xs align-top",
-      cell: (t) => (t.createdAt ? new Date(t.createdAt).toLocaleDateString() : "unknown"),
+      cell: (tpl) => (tpl.createdAt ? formatDate(tpl.createdAt) : t("templates.unknown")),
     },
     {
       id: "actions",
-      header: <span className="sr-only">Actions</span>,
-      label: "Actions",
+      header: <span className="sr-only">{t("templates.actions")}</span>,
+      label: t("templates.actions"),
       width: "w-28",
       align: "right",
       cellClassName: "align-top",
-      cell: (t) => (
+      cell: (tpl) => (
         <div className="inline-flex items-center gap-1">
           <Button
             variant="ghost"
             size="icon"
             className="size-7"
-            onClick={() => toggleStats(t.name)}
-            title="Toggle 14d send stats"
-            aria-expanded={statsOpen.has(t.name)}
+            onClick={() => toggleStats(tpl.name)}
+            title={t("templates.toggleStats")}
+            aria-expanded={statsOpen.has(tpl.name)}
           >
             <BarChart3Icon className="size-3.5" />
-            <span className="sr-only">Stats</span>
+            <span className="sr-only">{t("templates.stats")}</span>
           </Button>
           <Can permission="managed_service.update">
-            <Button variant="ghost" size="icon" className="size-7" onClick={() => beginEdit(t)}>
+            <Button variant="ghost" size="icon" className="size-7" onClick={() => beginEdit(tpl)}>
               <PencilIcon className="size-3.5" />
-              <span className="sr-only">Edit</span>
+              <span className="sr-only">{t("edit")}</span>
             </Button>
           </Can>
           <Can permission="managed_service.update">
@@ -1988,11 +2010,11 @@ export function TemplatesPanelView({
               variant="ghost"
               size="icon"
               className="size-7"
-              onClick={() => setDeleteTarget(t)}
+              onClick={() => setDeleteTarget(tpl)}
               disabled={deleting}
             >
               <TrashIcon className="size-3.5" />
-              <span className="sr-only">Delete</span>
+              <span className="sr-only">{t("delete")}</span>
             </Button>
           </Can>
         </div>
@@ -2005,7 +2027,7 @@ export function TemplatesPanelView({
       <div className="mb-3 flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-sm font-semibold">
           <FileTextIcon className="size-4" />
-          Templates
+          {t("sections.templates")}
           <Badge variant="secondary" className="text-2xs">
             {templates.length}
           </Badge>
@@ -2014,7 +2036,7 @@ export function TemplatesPanelView({
           {!formOpen ? (
             <Button size="sm" variant="ghost" onClick={beginCreate}>
               <PlusIcon className="mr-1 size-3" />
-              New template
+              {t("templates.new")}
             </Button>
           ) : null}
         </Can>
@@ -2023,10 +2045,10 @@ export function TemplatesPanelView({
       {formOpen ? (
         <div className="bg-muted/30 mb-3 space-y-2 rounded-md border p-3">
           <p className="text-muted-foreground text-2xs uppercase">
-            {creatingNew ? "New template" : `Editing ${editingName}`}
+            {creatingNew ? t("templates.new") : t("templates.editing", { name: editingName ?? "" })}
           </p>
           <div className="space-y-1">
-            <Label className="text-xs">Name</Label>
+            <Label className="text-xs">{t("templates.name")}</Label>
             <Input
               value={draft.name}
               onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
@@ -2035,13 +2057,11 @@ export function TemplatesPanelView({
               className="font-mono text-xs"
             />
             {!creatingNew ? (
-              <p className="text-muted-foreground text-2xs">
-                Name is the template identifier and can&apos;t be changed.
-              </p>
+              <p className="text-muted-foreground text-2xs">{t("templates.nameFixed")}</p>
             ) : null}
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Subject</Label>
+            <Label className="text-xs">{t("templates.subject")}</Label>
             <Input
               value={draft.subject}
               onChange={(e) => setDraft((d) => ({ ...d, subject: e.target.value }))}
@@ -2051,7 +2071,7 @@ export function TemplatesPanelView({
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">HTML body</Label>
+            <Label className="text-xs">{t("templates.htmlBody")}</Label>
             <Textarea
               value={draft.htmlBody}
               onChange={(e) => setDraft((d) => ({ ...d, htmlBody: e.target.value }))}
@@ -2062,7 +2082,7 @@ export function TemplatesPanelView({
             />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Text body</Label>
+            <Label className="text-xs">{t("templates.textBody")}</Label>
             <Textarea
               value={draft.textBody}
               onChange={(e) => setDraft((d) => ({ ...d, textBody: e.target.value }))}
@@ -2074,11 +2094,11 @@ export function TemplatesPanelView({
           </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button size="sm" variant="ghost" onClick={cancelForm} disabled={busy}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button size="sm" disabled={busy} onClick={() => void handleSave()}>
               {busy ? <Loader2Icon className="mr-1.5 size-3 animate-spin" /> : null}
-              {creatingNew ? "Create" : "Save changes"}
+              {creatingNew ? t("templates.create") : t("templates.saveChanges")}
             </Button>
           </div>
         </div>
@@ -2090,19 +2110,17 @@ export function TemplatesPanelView({
           <Skeleton className="h-8 w-full" />
         </div>
       ) : templates.length === 0 ? (
-        <p className="text-muted-foreground py-3 text-center text-xs">
-          No templates yet. Create one above to start sending templated email.
-        </p>
+        <p className="text-muted-foreground py-3 text-center text-xs">{t("templates.emptyBody")}</p>
       ) : (
         <ListPage<AstroliftEmailTemplate>
           embedded
           list={list}
-          label="Templates"
+          label={t("sections.templates")}
           columns={columns}
           rows={page.rows}
-          getRowId={(t) => t.name}
+          getRowId={(tpl) => tpl.name}
           totalCount={page.totalCount}
-          empty={{ icon: <FileTextIcon className="size-5" />, title: "No templates" }}
+          empty={{ icon: <FileTextIcon className="size-5" />, title: t("templates.emptyTitle") }}
         />
       )}
 
@@ -2114,17 +2132,16 @@ export function TemplatesPanelView({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete template {deleteTarget?.name}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Removes the SES template from the cloud account. Workloads that send via this template
-              will fail until you recreate it or update the app to use a different template.
-            </AlertDialogDescription>
+            <AlertDialogTitle>
+              {t("templates.deleteTitle", { name: deleteTarget?.name ?? "" })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>{t("templates.deleteBody")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t("cancel")}</AlertDialogCancel>
             <AlertDialogAction disabled={deleting} onClick={() => void handleDelete()}>
               {deleting ? <Loader2Icon className="mr-1.5 size-3 animate-spin" /> : null}
-              Delete template
+              {t("templates.deleteConfirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -2134,15 +2151,14 @@ export function TemplatesPanelView({
 }
 
 export function TemplateStatsView({ name, points, loading }: ReturnType<typeof useTemplateStats>) {
+  const t = useTranslations("appEmailService.stats");
+  const fmt = useFormatter();
+  const { formatDate } = useFormatters();
   if (loading && points.length === 0) {
     return <Skeleton className="h-16 w-full" />;
   }
   if (points.length === 0) {
-    return (
-      <p className="text-muted-foreground text-xs">
-        No send activity for {name} in the last 14 days.
-      </p>
-    );
+    return <p className="text-muted-foreground text-xs">{t("noActivity", { name })}</p>;
   }
 
   const max = Math.max(...points.map((p) => p.sends), 1);
@@ -2181,12 +2197,10 @@ export function TemplateStatsView({ name, points, loading }: ReturnType<typeof u
               </TooltipTrigger>
               <TooltipContent className="text-2xs">
                 <div className="font-mono">
-                  <div>{new Date(p.timestamp).toLocaleDateString()}</div>
-                  <div>
-                    {p.sends} sends · {p.deliveries} delivered
-                  </div>
-                  {p.bounces > 0 ? <div>{p.bounces} bounces</div> : null}
-                  {p.complaints > 0 ? <div>{p.complaints} complaints</div> : null}
+                  <div>{formatDate(p.timestamp)}</div>
+                  <div>{t("day", { sends: p.sends, delivered: p.deliveries })}</div>
+                  {p.bounces > 0 ? <div>{t("bounces", { count: p.bounces })}</div> : null}
+                  {p.complaints > 0 ? <div>{t("complaints", { count: p.complaints })}</div> : null}
                 </div>
               </TooltipContent>
             </Tooltip>
@@ -2194,8 +2208,12 @@ export function TemplateStatsView({ name, points, loading }: ReturnType<typeof u
         })}
       </div>
       <p className="text-muted-foreground text-2xs">
-        14d · {formatNumber(totals.sends)} sends · {formatNumber(totals.deliveries)} delivered ·{" "}
-        {formatNumber(totals.bounces)} bounces · {formatNumber(totals.complaints)} complaints
+        {t("summary", {
+          sends: formatNumber(fmt, totals.sends),
+          delivered: formatNumber(fmt, totals.deliveries),
+          bounces: formatNumber(fmt, totals.bounces),
+          complaints: formatNumber(fmt, totals.complaints),
+        })}
       </p>
     </div>
   );

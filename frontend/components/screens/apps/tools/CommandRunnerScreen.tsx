@@ -1,6 +1,7 @@
 "use client";
 
 import { PlayIcon, SquareIcon, TerminalIcon, XIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import { PageShell } from "@/components/PageShell";
@@ -107,29 +108,29 @@ export function CommandRunnerScreen({
   onDownload,
   tabs,
 }: CommandRunnerScreenProps) {
+  const t = useTranslations("appCommandRunner");
   const lines = outputToLines(output);
   const failed = connState === "closed" && exitCode !== null && exitCode !== 0;
 
   return (
     <PageShell
-      title="Run command"
+      title={t("title")}
       description={
         <span className="font-mono text-xs [overflow-wrap:anywhere]">
-          Open a one-shot exec session against a container in {slug}. Each invocation runs sh -c
-          &lt;command&gt; in the chosen container; stdout + stderr stream live below.
+          {t("description", { slug, cmd: "<command>" })}
         </span>
       }
     >
       {tabs}
       <PanelGrid>
-        <Panel title="Command" icon={<TerminalIcon className="size-4" />}>
+        <Panel title={t("command")} icon={<TerminalIcon className="size-4" />}>
           <div className="flex min-w-0 flex-col gap-4">
             <div className="grid min-w-0 gap-4 sm:grid-cols-2">
               <div className="min-w-0 space-y-2">
-                <Label htmlFor="cmd-workload">Workload</Label>
+                <Label htmlFor="cmd-workload">{t("workload")}</Label>
                 <Select value={workloadSlug} onValueChange={onWorkloadChange} disabled={running}>
                   <SelectTrigger id="cmd-workload" className="w-full min-w-0">
-                    <SelectValue placeholder="Select workload" />
+                    <SelectValue placeholder={t("selectWorkload")} />
                   </SelectTrigger>
                   <SelectContent>
                     {workloads.map((w) => (
@@ -142,14 +143,14 @@ export function CommandRunnerScreen({
                 </Select>
               </div>
               <div className="min-w-0 space-y-2">
-                <Label htmlFor="cmd-container">Container</Label>
+                <Label htmlFor="cmd-container">{t("container")}</Label>
                 <Select
                   value={containerName}
                   onValueChange={onContainerChange}
                   disabled={running || containerList.length === 0}
                 >
                   <SelectTrigger id="cmd-container" className="w-full min-w-0">
-                    <SelectValue placeholder="Select container" />
+                    <SelectValue placeholder={t("selectContainer")} />
                   </SelectTrigger>
                   <SelectContent>
                     {containerList.map((c) => (
@@ -157,7 +158,7 @@ export function CommandRunnerScreen({
                         <span className="font-mono">{c.name}</span>
                         {c.isPrimary && (
                           <Badge variant="outline" className="text-2xs ml-2">
-                            primary
+                            {t("primary")}
                           </Badge>
                         )}
                       </SelectItem>
@@ -178,7 +179,7 @@ export function CommandRunnerScreen({
                   }
                 }}
                 placeholder="ls -la /tmp"
-                aria-label="Command"
+                aria-label={t("command")}
                 disabled={running}
                 spellCheck={false}
                 className="min-w-0 font-mono"
@@ -186,7 +187,7 @@ export function CommandRunnerScreen({
               {running ? (
                 <Button onClick={onStop} variant="destructive">
                   <SquareIcon className="size-3.5" />
-                  Stop
+                  {t("stop")}
                 </Button>
               ) : (
                 <Button
@@ -194,7 +195,7 @@ export function CommandRunnerScreen({
                   disabled={!command.trim() || !workloadSlug || !containerName}
                 >
                   <PlayIcon className="size-3.5" />
-                  Run
+                  {t("run")}
                 </Button>
               )}
             </div>
@@ -202,7 +203,7 @@ export function CommandRunnerScreen({
             {history.length > 0 && (
               <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                 <span className="text-muted-foreground text-xs tracking-wide uppercase">
-                  History
+                  {t("history")}
                 </span>
                 {history.slice(0, 8).map((h, i) => (
                   <button
@@ -222,7 +223,7 @@ export function CommandRunnerScreen({
                   className="text-muted-foreground hover:text-foreground text-2xs inline-flex items-center gap-1"
                 >
                   <XIcon className="size-3" />
-                  clear
+                  {t("clear")}
                 </button>
               </div>
             )}
@@ -230,11 +231,11 @@ export function CommandRunnerScreen({
         </Panel>
 
         <LogView
-          title="Output"
+          title={t("output")}
           className="col-span-12"
           lines={lines}
           onDownload={onDownload}
-          emptyHint="No output yet. Pick a workload + container, type a command, and Run."
+          emptyHint={t("empty")}
           actions={
             <span className="flex items-center gap-2 text-xs">
               <StatusDot
@@ -248,14 +249,14 @@ export function CommandRunnerScreen({
                         : "muted"
                 }
               />
-              <span className="capitalize">{connState}</span>
+              <span className="capitalize">{t(`conn.${connState}`)}</span>
               {exitCode !== null && (
                 <span
                   className={
                     failed ? "text-danger-fg font-mono" : "text-muted-foreground font-mono"
                   }
                 >
-                  exit {exitCode}
+                  {t("exit", { code: exitCode })}
                 </span>
               )}
             </span>

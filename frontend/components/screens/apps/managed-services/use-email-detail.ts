@@ -7,6 +7,7 @@
  */
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -131,6 +132,7 @@ interface RemoveResp {
 
 /** Add / remove manual suppression entries; refetches the detail on success. */
 export function useSuppressionList(managedServiceId: string, onRefetch: () => void) {
+  const t = useTranslations("appEmailService.toasts");
   const [addEntry, { loading: adding }] = useMutation<AddResp>(ADD_EMAIL_SUPPRESSION_ENTRY, {
     refetchQueries: [
       {
@@ -169,18 +171,18 @@ export function useSuppressionList(managedServiceId: string, onRefetch: () => vo
       });
       const env = data?.addEmailSuppressionEntry;
       if (!env) {
-        toast.error("No response from server");
+        toast.error(t("noResponse"));
         return false;
       }
       if (!env.ok) {
-        toast.error(env.errors[0]?.message ?? "Suppression add failed");
+        toast.error(env.errors[0]?.message ?? t("suppressAddFailed"));
         return false;
       }
-      toast.success(`Suppressed ${address}`);
+      toast.success(t("suppressed", { address }));
       onRefetch();
       return true;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Suppression add failed");
+      toast.error(err instanceof Error ? err.message : t("suppressAddFailed"));
       return false;
     }
   }
@@ -198,22 +200,22 @@ export function useSuppressionList(managedServiceId: string, onRefetch: () => vo
       });
       const env = data?.removeEmailSuppressionEntry;
       if (!env) {
-        toast.error("No response from server");
+        toast.error(t("noResponse"));
         return false;
       }
       if (!env.ok) {
-        toast.error(env.errors[0]?.message ?? "Suppression remove failed");
+        toast.error(env.errors[0]?.message ?? t("suppressRemoveFailed"));
         return false;
       }
       if (env.data?.removed) {
-        toast.success(`Removed ${entry.address} from suppression list`);
+        toast.success(t("unsuppressed", { address: entry.address }));
       } else {
-        toast.info(`${entry.address} was already removed`);
+        toast.info(t("alreadyRemoved", { address: entry.address }));
       }
       onRefetch();
       return true;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Suppression remove failed");
+      toast.error(err instanceof Error ? err.message : t("suppressRemoveFailed"));
       return false;
     }
   }
@@ -229,6 +231,7 @@ interface UpdateManagedServiceResp {
 
 /** Saves the sender fields into the service config. */
 export function useSenderConfig(managedServiceId: string, serviceConfig: Record<string, unknown>) {
+  const t = useTranslations("appEmailService.toasts");
   const [updateSvc, { loading }] = useMutation<UpdateManagedServiceResp>(UPDATE_MANAGED_SERVICE);
 
   /**
@@ -250,17 +253,17 @@ export function useSenderConfig(managedServiceId: string, serviceConfig: Record<
       });
       const env = data?.updateManagedService;
       if (!env) {
-        toast.error("No response from server");
+        toast.error(t("noResponse"));
         return false;
       }
       if (!env.ok) {
-        toast.error(env.errors[0]?.message ?? "Update failed");
+        toast.error(env.errors[0]?.message ?? t("updateFailed"));
         return false;
       }
-      toast.success("Sender config saved");
+      toast.success(t("senderSaved"));
       return true;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Update failed");
+      toast.error(err instanceof Error ? err.message : t("updateFailed"));
       return false;
     }
   }
@@ -311,6 +314,7 @@ export function defaultAlertName(kind: SesAlertKind, threshold: number): string 
 
 /** The service's alert rules, plus create and delete. */
 export function useSenderAlertRules(managedServiceId: string) {
+  const t = useTranslations("appEmailService.toasts");
   const queryVars = React.useMemo(
     () => ({
       target: "managed_service",
@@ -341,7 +345,7 @@ export function useSenderAlertRules(managedServiceId: string) {
   async function onCreate({ kind, threshold, severity, name }: NewAlertRule): Promise<boolean> {
     const n = Number(threshold);
     if (!Number.isFinite(n) || n <= 0) {
-      toast.error("Threshold must be a positive number");
+      toast.error(t("thresholdInvalid"));
       return false;
     }
     const ruleName = name.trim() || defaultAlertName(kind, n);
@@ -362,17 +366,17 @@ export function useSenderAlertRules(managedServiceId: string) {
       });
       const env = data?.createAlertRule;
       if (!env) {
-        toast.error("No response from server");
+        toast.error(t("noResponse"));
         return false;
       }
       if (!env.ok) {
-        toast.error(env.errors[0]?.message ?? "Create alert failed");
+        toast.error(env.errors[0]?.message ?? t("createAlertFailed"));
         return false;
       }
-      toast.success(`Created ${ruleName}`);
+      toast.success(t("created", { name: ruleName }));
       return true;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Create alert failed");
+      toast.error(err instanceof Error ? err.message : t("createAlertFailed"));
       return false;
     }
   }
@@ -385,12 +389,12 @@ export function useSenderAlertRules(managedServiceId: string) {
       const env = data?.deleteAlertRule;
       if (!env) return;
       if (!env.ok) {
-        toast.error(env.errors[0]?.message ?? "Delete alert failed");
+        toast.error(env.errors[0]?.message ?? t("deleteAlertFailed"));
         return;
       }
-      toast.success(`Deleted ${rule.name}`);
+      toast.success(t("deleted", { name: rule.name }));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Delete alert failed");
+      toast.error(err instanceof Error ? err.message : t("deleteAlertFailed"));
     }
   }
 
@@ -484,6 +488,7 @@ interface DeleteTemplateResp {
 
 /** The service's SES templates, plus create / update / delete. */
 export function useEmailTemplates(managedServiceId: string) {
+  const t = useTranslations("appEmailService.toasts");
   const queryVars = React.useMemo(() => ({ managedServiceId }), [managedServiceId]);
   const { data, loading } = useQuery<TemplatesResp>(GET_EMAIL_TEMPLATES, {
     variables: queryVars,
@@ -524,11 +529,11 @@ export function useEmailTemplates(managedServiceId: string) {
     const name = draft.name.trim();
     const subject = draft.subject.trim();
     if (!name) {
-      toast.error("Template name required");
+      toast.error(t("templateNameRequired"));
       return false;
     }
     if (!subject) {
-      toast.error("Subject required");
+      toast.error(t("subjectRequired"));
       return false;
     }
     try {
@@ -546,14 +551,14 @@ export function useEmailTemplates(managedServiceId: string) {
         });
         const env = data?.createEmailTemplate;
         if (!env) {
-          toast.error("No response from server");
+          toast.error(t("noResponse"));
           return false;
         }
         if (!env.ok) {
-          toast.error(env.errors[0]?.message ?? "Create template failed");
+          toast.error(env.errors[0]?.message ?? t("createTemplateFailed"));
           return false;
         }
-        toast.success(`Created template ${name}`);
+        toast.success(t("templateCreated", { name }));
       } else {
         const { data } = await updateTemplate({
           variables: {
@@ -568,18 +573,18 @@ export function useEmailTemplates(managedServiceId: string) {
         });
         const env = data?.updateEmailTemplate;
         if (!env) {
-          toast.error("No response from server");
+          toast.error(t("noResponse"));
           return false;
         }
         if (!env.ok) {
-          toast.error(env.errors[0]?.message ?? "Update template failed");
+          toast.error(env.errors[0]?.message ?? t("updateTemplateFailed"));
           return false;
         }
-        toast.success(`Updated template ${editingName}`);
+        toast.success(t("templateUpdated", { name: editingName }));
       }
       return true;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Save failed");
+      toast.error(err instanceof Error ? err.message : t("saveFailed"));
       return false;
     }
   }
@@ -595,13 +600,13 @@ export function useEmailTemplates(managedServiceId: string) {
       const env = data?.deleteEmailTemplate;
       if (!env) return false;
       if (!env.ok) {
-        toast.error(env.errors[0]?.message ?? "Delete failed");
+        toast.error(env.errors[0]?.message ?? t("deleteFailed"));
         return false;
       }
-      toast.success(`Deleted ${template.name}`);
+      toast.success(t("deleted", { name: template.name }));
       return true;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Delete failed");
+      toast.error(err instanceof Error ? err.message : t("deleteFailed"));
       return false;
     }
   }

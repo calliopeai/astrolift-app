@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -81,6 +82,7 @@ interface AlertEventsPageResp {
  * mute / unmute / delete actions.
  */
 export function useAlertRules(appId: string) {
+  const t = useTranslations("appAlertRules.toasts");
   const refetchVars = React.useMemo(
     () => ({ target: "app", targetId: appId, activeOnly: false }),
     [appId]
@@ -119,9 +121,9 @@ export function useAlertRules(appId: string) {
   async function onUnmute(r: AlertRule) {
     const { data } = await unmuteRule({ variables: { input: { ruleId: r.id } } });
     if (data?.unmuteAlertRule.ok) {
-      toast.success(`Unmuted ${r.name}`);
+      toast.success(t("unmuted", { name: r.name }));
     } else {
-      toast.error(data?.unmuteAlertRule.errors?.[0]?.message ?? "Unmute failed");
+      toast.error(data?.unmuteAlertRule.errors?.[0]?.message ?? t("unmuteFailed"));
     }
   }
 
@@ -129,10 +131,10 @@ export function useAlertRules(appId: string) {
   async function onCreate(input: CreateAlertRuleInput): Promise<boolean> {
     const { data } = await createRule({ variables: { input } });
     if (data?.createAlertRule.ok) {
-      toast.success(`Created ${input.name}`);
+      toast.success(t("created", { name: input.name }));
       return true;
     }
-    toast.error(data?.createAlertRule.errors?.[0]?.message ?? "Create failed");
+    toast.error(data?.createAlertRule.errors?.[0]?.message ?? t("createFailed"));
     return false;
   }
 
@@ -142,10 +144,10 @@ export function useAlertRules(appId: string) {
       variables: { input: { ruleId: r.id, durationSeconds, reason } },
     });
     if (data?.muteAlertRule.ok) {
-      toast.success(`Muted ${r.name}`);
+      toast.success(t("muted", { name: r.name }));
       return true;
     }
-    toast.error(data?.muteAlertRule.errors?.[0]?.message ?? "Mute failed");
+    toast.error(data?.muteAlertRule.errors?.[0]?.message ?? t("muteFailed"));
     return false;
   }
 
@@ -155,9 +157,9 @@ export function useAlertRules(appId: string) {
       variables: { input: { id: r.id } },
     });
     if (!data?.deleteAlertRule.ok) {
-      throw new Error(data?.deleteAlertRule.errors?.[0]?.message ?? "Delete failed");
+      throw new Error(data?.deleteAlertRule.errors?.[0]?.message ?? t("deleteFailed"));
     }
-    toast.success(`Deleted ${r.name}`);
+    toast.success(t("deleted", { name: r.name }));
   }
 
   return {
@@ -185,6 +187,7 @@ const EVENTS_PAGE_SIZE = 25;
  * acknowledge.
  */
 export function useAlertEvents(ruleId: string) {
+  const t = useTranslations("appAlertRules.toasts");
   const vars = { ruleId, unresolvedOnly: false, limit: EVENTS_PAGE_SIZE };
   const events = useQuery<AlertEventsPageResp>(LIST_ALERT_EVENTS_PAGE, {
     variables: vars,
@@ -231,7 +234,7 @@ export function useAlertEvents(ruleId: string) {
   async function onAck(e: AlertEvent) {
     const { data } = await ackEvent({ variables: { input: { id: e.id } } });
     if (!data?.acknowledgeAlertEvent.ok) {
-      toast.error(data?.acknowledgeAlertEvent.errors?.[0]?.message ?? "Ack failed");
+      toast.error(data?.acknowledgeAlertEvent.errors?.[0]?.message ?? t("ackFailed"));
     }
   }
 
