@@ -100,6 +100,8 @@ def _make_org_app(
         source_repo=source_repo,
         deploy_branch="main",
         trigger_mode=RegisteredApp.TriggerMode.AUTO_ON_PUSH.value,
+        # A push deploys only what the platform builds.
+        build_mode=RegisteredApp.BuildMode.PLATFORM_BUILD.value,
     )
     AppEnvironment.objects.create(
         registered_app=app,
