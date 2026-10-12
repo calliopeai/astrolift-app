@@ -7027,6 +7027,406 @@
       "started": "開始日時"
     }
   },
+  "obsPanelReason": {
+    "notConfiguredTitle": "未構成",
+    "notSupportedTitle": "このクラウドでは利用できません",
+    "notSupportedDescription": "このクラスターのプロバイダープラグインはこの読み取りを実装していません。他のクラウドではサポートされています。",
+    "errorTitle": "読み込めませんでした",
+    "errorDescription": "このパネルの読み込み中に問題が発生しました。もう一度お試しください。"
+  },
+  "obsManagedServiceMetrics": {
+    "metric": {
+      "connections": {
+        "title": "接続",
+        "description": "このデータベースへのアクティブなクライアント接続。"
+      },
+      "cpu": {
+        "title": "CPU",
+        "description": "エクスポータープロセスの CPU 使用率（エンジン負荷の目安）。"
+      },
+      "iops": {
+        "title": "IOPS",
+        "description": "1 秒あたりのブロック読み取り + キャッシュヒット。"
+      },
+      "slow_queries": {
+        "title": "低速クエリ",
+        "description": "1 秒を超えるクエリの割合。"
+      },
+      "replica_lag": {
+        "title": "レプリカ遅延",
+        "description": "このクラスターのレプリカ全体での最大レプリカ遅延。"
+      },
+      "bucket_size": {
+        "title": "バケットサイズ",
+        "description": "このバケットに保存されている合計バイト数。"
+      },
+      "request_count": {
+        "title": "リクエスト",
+        "description": "バケットへの 1 秒あたりの合計リクエスト数。"
+      },
+      "errors_4xx": {
+        "title": "4xx エラー",
+        "description": "1 秒あたりのクライアントエラー。"
+      },
+      "errors_5xx": {
+        "title": "5xx エラー",
+        "description": "1 秒あたりのサーバーエラー。"
+      },
+      "egress_bytes": {
+        "title": "エグレス",
+        "description": "このバケットから 1 秒あたりにダウンロードされたバイト数。"
+      },
+      "tokens_per_second": {
+        "title": "トークン/秒",
+        "description": "レプリカ全体で 1 秒あたりに生成されたトークン数。"
+      },
+      "requests_running": {
+        "title": "実行中",
+        "description": "現在デコード中のリクエスト。"
+      },
+      "requests_waiting": {
+        "title": "待機中",
+        "description": "スロットを待っているキュー内のリクエスト。"
+      },
+      "ttft_p95": {
+        "title": "最初のトークンまでの時間",
+        "description": "最初のトークンが生成されるまでの時間の 95 パーセンタイル。"
+      },
+      "kv_cache_usage": {
+        "title": "KV キャッシュ",
+        "description": "使用中の GPU KV キャッシュの割合。"
+      }
+    },
+    "kind": {
+      "postgres": {
+        "label": "データベース",
+        "description": "このデータベースの接続、IO、低速クエリ率、レプリカ遅延。"
+      },
+      "object_store": {
+        "label": "ストレージ",
+        "description": "このバケットのサイズ、リクエストレート、エラー内訳、エグレス。"
+      },
+      "model_endpoint": {
+        "label": "モデル",
+        "description": "このホスト型モデルのスループット、キュー、最初のトークンまでの時間、KV キャッシュ。"
+      }
+    },
+    "noSamples": "この期間にサンプルはありません。",
+    "source": "ソース：{source}",
+    "notFlowing": "メトリクスはまだ届いていません。クラスターの Prometheus エンドポイントが構成されていないか、エクスポーターサイドカーがこのサービスのサンプルをまだ送信していません。"
+  },
+  "obsPromql": {
+    "discovering": "このアプリが公開しているものを確認しています…",
+    "discoveryFailed": "このアプリのメトリクスを一覧表示できません ({reason})。下でクエリを実行することはできます。",
+    "unknownReason": "不明な理由",
+    "noMetrics": "このアプリはまだ独自のメトリクスを公開していません。astrolift.toml に <code>{port}</code> を指定した <code>{section}</code> を追加して再デプロイしてください。",
+    "exposes": "このアプリが公開するメトリクス",
+    "filterLabel": "メトリクスを絞り込む",
+    "filterPlaceholder": "メトリクスを絞り込む…",
+    "truncated": "最初の {limit} 件を表示中。このアプリはそれ以上の異なるメトリクス名を出力しています。通常、ラベルにすべき値が名前に含まれていることを意味します",
+    "noMatch": "「{filter}」に一致するメトリクスはありません。",
+    "title": "クエリ",
+    "description": "クラスターの Prometheus スタックに対して PromQL 式をその場で実行します。",
+    "queryLabel": "PromQL クエリ",
+    "running": "実行中…",
+    "run": "実行",
+    "enterExpression": "上に PromQL 式を入力してください",
+    "executionFailed": "PromQL の実行に失敗しました",
+    "noSeries": "クエリは系列を返しませんでした。",
+    "error": "PromQL エラー"
+  },
+  "obsGoldenSignals": {
+    "title": "ゴールデンシグナル",
+    "description": "クラスターの Prometheus スタックからライブで取得したトラフィック、エラー、レイテンシー、飽和度。",
+    "prometheusNotConfigured": "このクラスターには Prometheus エンドポイントが接続されていません。",
+    "redNotConfigured": "このシグナルにデータを送るものがありません。アプリは Prometheus メトリクスを公開しておらず（ワークロードで metrics.enabled を設定してください）、このクラスターの Ingress コントローラーにもメトリクスのマッピングがありません。",
+    "metrics": {
+      "noDataTitle": "メトリクスはまだありません",
+      "noDataDescription": "この期間に表示するものはありません。アクティビティがあるとメトリクスがここに表示されます。"
+    },
+    "traffic": {
+      "title": "トラフィック",
+      "description": "1 秒あたりのリクエスト数（全レプリカの合計）。",
+      "noDataTitle": "トラフィックはまだありません",
+      "noDataDescription": "この期間に表示するものはありません。アクティビティがあるとトラフィックがここに表示されます。"
+    },
+    "errors": {
+      "title": "エラー",
+      "description": "5xx の発生率を総リクエストレートで割った値。",
+      "noDataTitle": "エラーはまだありません",
+      "noDataDescription": "この期間に表示するものはありません。アクティビティがあるとエラーがここに表示されます。"
+    },
+    "saturationCpu": {
+      "title": "飽和度 (CPU)",
+      "description": "コンテナの CPU 使用量を CPU 制限で割った値。",
+      "noDataTitle": "CPU 飽和度はまだありません",
+      "noDataDescription": "この期間に表示するものはありません。アクティビティがあると CPU 飽和度がここに表示されます。"
+    },
+    "saturationMemory": {
+      "title": "飽和度（メモリ）",
+      "description": "ワーキングセットメモリをメモリ制限で割った値。",
+      "noDataTitle": "メモリ飽和度はまだありません",
+      "noDataDescription": "この期間に表示するものはありません。アクティビティがあるとメモリ飽和度がここに表示されます。"
+    },
+    "latency": {
+      "title": "レイテンシー",
+      "description": "リクエストレイテンシーの p50、p95、p99。p90 は PromQL の表示から確認できます。",
+      "noDataTitle": "レイテンシーはまだありません",
+      "noDataDescription": "この期間に表示するものはありません。アクティビティがあるとレイテンシーがここに表示されます。"
+    },
+    "statusCodes": {
+      "title": "ステータスコードの内訳",
+      "description": "HTTP ステータスクラス別の積み上げリクエストレート。カーソルを合わせると各クラスの上位コードが表示されます。",
+      "rate": "{rate} req/s",
+      "rateWithTop": "{rate} req/s (上位：{top})"
+    },
+    "showPromql": "PromQL を表示",
+    "tryAgain": "再試行",
+    "seeDocs": "ドキュメントを見る"
+  },
+  "obsAgentTheatre": {
+    "justNow": "たった今",
+    "seconds": "{s}秒",
+    "minutes": "{m}分{s}秒",
+    "hours": "{h}時間{m}分",
+    "noOrgTitle": "アクティブな組織がありません",
+    "noOrgDescription": "サイドバーで組織を選ぶと、実行中のエージェントを見られます。",
+    "loadError": "エージェントシアターを読み込めませんでした：{error}",
+    "retry": "再試行",
+    "emptyTitle": "表示できるエージェントがありません",
+    "emptyDescription": "VNC 対応環境で起動した実行中のエージェントが、ライブのスナップショットタイルとしてここに表示され、フルセッションに展開できます。観察可能なエージェントをディスパッチするとシアターに表示されます。",
+    "goToAgents": "エージェントへ移動",
+    "summary": "{count, plural, other {ライブエージェント # 件}} · スナップショットは {seconds} 秒ごとに更新",
+    "refresh": "更新",
+    "liveSession": "ライブエージェントセッション",
+    "popOut": "別ウィンドウで開く",
+    "endedTitle": "セッションは終了しました",
+    "endedDescription": "このエージェントは実行を終了したため、ライブセッションは閉じられました。",
+    "watchLabel": "エージェント {id} のライブセッションを見る",
+    "snapshotAlt": "エージェント {id} の最新スナップショット",
+    "waitingFrame": "最初のフレームを待っています…",
+    "watchLive": "ライブで見る",
+    "runningFor": "{elapsed} 実行中",
+    "watch": "見る"
+  },
+  "obsLists": {
+    "views": {
+      "all": "すべて",
+      "mine": "自分"
+    },
+    "traces": {
+      "searchPlaceholder": "サービス、オペレーション、トレース ID を検索…",
+      "fields": {
+        "status": {
+          "label": "ステータス"
+        }
+      },
+      "mineNote": "トレースは個人ではなくアプリのものなので、「自分」は空です。"
+    },
+    "dnsRecords": {
+      "searchPlaceholder": "名前、値を検索…",
+      "fields": {
+        "type": {
+          "label": "タイプ"
+        },
+        "propagation": {
+          "label": "伝播",
+          "options": {
+            "propagated": "伝播済み",
+            "pending": "保留中",
+            "unknown": "不明"
+          }
+        }
+      },
+      "mineNote": "ドライバーのレコードは個人ではなくクラスターのものなので、「自分」は空です。"
+    },
+    "tlsCertificates": {
+      "searchPlaceholder": "ホスト名、発行者を検索…",
+      "fields": {
+        "renewal": {
+          "label": "更新",
+          "options": {
+            "auto": "自動",
+            "manual": "手動",
+            "failed": "失敗",
+            "unknown": "不明"
+          }
+        },
+        "expiring": {
+          "label": "期限切れ間近",
+          "options": {
+            "30": "30 日以内",
+            "90": "90 日以内"
+          }
+        }
+      },
+      "mineNote": "ドライバーのレコードは個人ではなくクラスターのものなので、「自分」は空です。"
+    },
+    "endpoints": {
+      "searchPlaceholder": "ルートを検索…",
+      "fields": {
+        "errors": {
+          "label": "エラー",
+          "options": {
+            "any": "0% 超",
+            "high": "5% 超"
+          }
+        }
+      },
+      "mineNote": "ルートは個人ではなくアプリのものなので、「自分」は空です。"
+    }
+  },
+  "obsTraces": {
+    "columns": {
+      "operation": "ルートオペレーション",
+      "service": "ルートサービス",
+      "spans": "スパン",
+      "duration": "所要時間",
+      "status": "ステータス"
+    },
+    "title": "トレース",
+    "description": "過去 1 時間の分散トレース。オペレーションをクリックするとスパンが展開されます。",
+    "emptyTitle": "トレースはありません",
+    "emptyDescription": "トレースのバックエンドが構成されていません。",
+    "noSpans": "このトレースのスパンは返されませんでした。"
+  },
+  "obsEndpoints": {
+    "columns": {
+      "route": "ルート",
+      "rate": "Req/s",
+      "error": "エラー率"
+    },
+    "title": "エンドポイント",
+    "description": "ルートごとのリクエストレート、エラー率、レイテンシーの分位数。30 秒ごとに更新されます。",
+    "emptyTitle": "エンドポイントのデータはありません",
+    "emptyDescription": "OTEL インストルメンテーションが検出されませんでした。"
+  },
+  "obsDnsRecords": {
+    "noDataTitle": "DNS レコードはまだありません",
+    "noDataDescription": "この期間に表示するものはありません。アクティビティがあると DNS レコードがここに表示されます。",
+    "notConfigured": "このクラスターには DNS プロバイダーが接続されていません。レコードを公開するにはマネージドドメインを設定してください。",
+    "columns": {
+      "name": "名前",
+      "type": "タイプ",
+      "value": "値",
+      "ttl": "TTL",
+      "propagation": "伝播"
+    },
+    "propagation": {
+      "propagated": "伝播済み",
+      "pending": "保留中",
+      "unknown": "不明"
+    },
+    "title": "DNS レコード",
+    "description": "クラスターの DNS ドライバーから取得したライブレコード。伝播状態は最新の変更セットを反映します。地点ごとの確認には <code>dig</code> を使ってください。",
+    "refresh": "更新",
+    "tryAgain": "再試行",
+    "forceRebind": "強制再バインド",
+    "forceRebindDescription": "DNS レコードの再適用はドメインごとに行います。「ドメイン」タブを開き、対象のホスト名で「再検証」をクリックしてください。",
+    "setUpDns": "DNS を設定"
+  },
+  "obsTlsCertificates": {
+    "noDataTitle": "TLS 証明書はまだありません",
+    "noDataDescription": "この期間に表示するものはありません。アクティビティがあると TLS 証明書がここに表示されます。",
+    "notConfigured": "このアプリには公開ホスト名も TLS ドライバーも接続されていません。証明書を発行するにはマネージドドメインを設定してください。",
+    "columns": {
+      "hostname": "ホスト名",
+      "issuer": "発行者",
+      "notAfter": "有効期限",
+      "expires": "期限まで",
+      "renewal": "更新"
+    },
+    "expired": "期限切れ",
+    "days": "{count, plural, other {# 日}}",
+    "renewal": {
+      "auto": "自動更新",
+      "manual": "手動",
+      "failed": "更新に失敗",
+      "unknown": "不明"
+    },
+    "title": "TLS 証明書",
+    "description": "クラスターの TLS ドライバーが把握している証明書を、このアプリのスラッグで絞り込んで表示します。期限までの日数は色分けされます：赤 < 30、黄 < 90。",
+    "refresh": "更新",
+    "tryAgain": "再試行",
+    "forceRebind": "強制再バインド",
+    "forceRebindDescription": "証明書の再発行はホスト名ごとに行います。「ドメイン」タブを開き、対象エントリで証明書のローテーション操作を使ってください。",
+    "issueCert": "証明書を発行"
+  },
+  "obsWorkloadIdentity": {
+    "noDataTitle": "ワークロード ID のバインドはまだありません",
+    "noDataDescription": "この期間に表示するものはありません。アクティビティがあるとワークロード ID のバインドがここに表示されます。",
+    "notConfigured": "このアプリにはクラウド IAM ロールがプロビジョニングされていません。Pod に認証情報を付与するにはワークロード ID を構成してください。",
+    "title": "ワークロード ID",
+    "description": "このアプリの Pod にバインドされたクラウド IAM ID。ソース：クラスターの WorkloadIdentityDriver (<code>{method}</code>)。",
+    "refresh": "更新",
+    "tryAgain": "再試行",
+    "forceRebind": "強制再バインド",
+    "forceRebindDescription": "次回のデプロイで ServiceAccount のアノテーションが再適用されます。「デプロイ」タブから再デプロイを実行してください。",
+    "configure": "ワークロード ID を構成",
+    "kind": "種類",
+    "kinds": {
+      "irsa": "IAM Roles for Service Accounts (AWS)",
+      "workload_identity": "GKE Workload Identity (GCP)",
+      "federated": "AKS Federated Credentials (Azure)",
+      "unknown": "不明なバインド"
+    },
+    "lastUsed": "最終使用",
+    "rolePrincipal": "ロール / プリンシパル",
+    "trustPolicy": "信頼ポリシー"
+  },
+  "obsPodExpander": {
+    "noDataTitle": "Pod のメトリクスはまだありません",
+    "noDataDescription": "この期間に表示するものはありません。アクティビティがあると Pod のメトリクスがここに表示されます。",
+    "notConfigured": "このクラスターには Prometheus エンドポイントが接続されていません。",
+    "restarts": "{count, plural, other {再起動 <strong>#</strong> 回}}",
+    "lastRestart": "最終再起動：<value>{time}</value>",
+    "openShell": "シェルを開く",
+    "tryAgain": "再試行",
+    "cpuTitle": "CPU",
+    "cpuDescription": "Pod ごとの使用コア数（1 分間のレート）。",
+    "cores": "{cores} コア",
+    "memoryTitle": "メモリ",
+    "memoryDescription": "Pod ごとのワーキングセットのバイト数（OOM の算定基準）。"
+  },
+  "obsWorkflowTimeline": {
+    "runStatus": {
+      "running": "実行中",
+      "completed": "完了",
+      "failed": "失敗",
+      "cancelled": "キャンセル済み",
+      "terminated": "強制終了"
+    },
+    "activityStatus": {
+      "pending": "保留中",
+      "running": "実行中",
+      "succeeded": "成功",
+      "failed": "失敗",
+      "cancelled": "キャンセル済み"
+    },
+    "runId": "{workflowId} · 実行 {runId}…",
+    "started": "開始 {started}",
+    "startedEnded": "開始 {started} · 終了 {ended}",
+    "cancel": "キャンセル",
+    "failed": "ワークフローが失敗しました",
+    "activities": "アクティビティ",
+    "noActivities": "記録されたアクティビティはまだありません。",
+    "retries": "{count, plural, other {再試行 # 回}}",
+    "hideAttempts": "試行を隠す",
+    "attempts": "{count, plural, other {試行 # 回}}",
+    "retry": "再試行"
+  },
+  "obsAgentActivityGraph": {
+    "running": "{count} 件実行中",
+    "idle": "待機中",
+    "noTools": "ツールはまだバインドされていません。スキルとツールを追加するとグラフが埋まっていきます。"
+  },
+  "obsGitOpsCommits": {
+    "label": "設定リポジトリのコミット",
+    "empty": "設定リポジトリのコミットはまだありません。",
+    "run": "実行 {id}…",
+    "diff": "差分",
+    "source": "ソース"
+  },
   "clusters": {
     "chrome": {
       "admin": "管理",

@@ -12,6 +12,7 @@
 
 import { RefreshCwIcon, RotateCcwIcon, ShieldCheckIcon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
@@ -33,6 +34,7 @@ import type {
   CertificateRenewalStatus,
 } from "@/graphql/lifecycle/lifecycle.types";
 
+import { localizeList } from "./localize-list";
 import { TLS_CERTIFICATES_LIST, TLS_CERTIFICATES_SELECT } from "./network-lists";
 
 export interface TlsCertificatesCardData {
@@ -52,13 +54,6 @@ const RENEWAL_TONE: Record<
   unknown: "outline",
 };
 
-const RENEWAL_LABEL: Record<CertificateRenewalStatus, string> = {
-  auto: "Auto-renew",
-  manual: "Manual",
-  failed: "Renewal failed",
-  unknown: "Unknown",
-};
-
 function expiryChipClass(days: number): string {
   // < 30 days = red, < 90 = amber, else muted. Operators have to act
   // on red within the rotation window; amber is a heads-up.
@@ -69,12 +64,6 @@ function expiryChipClass(days: number): string {
     return "bg-warning/10 text-warning-fg border-warning-border";
   }
   return "bg-muted text-muted-foreground border-transparent";
-}
-
-function formatDays(days: number): string {
-  if (days <= 0) return "expired";
-  if (days === 1) return "1 day";
-  return `${days} days`;
 }
 
 function formatNotAfter(iso: string): string {
@@ -98,18 +87,27 @@ export function TlsCertificatesCard({
   loading: boolean;
   onRefresh: () => void;
 }) {
+  const t = useTranslations("obsTlsCertificates");
+  const reasonT = useTranslations("obsPanelReason");
+  const listT = useTranslations("obsLists");
   const certs = data?.astroliftAppCertificates?.certificates ?? [];
   const reason = data?.astroliftAppCertificates?.reason;
   const isEmptyAfterLoad = !loading && certs.length === 0;
-  const empty = panelEmptyState(reason ?? "NO_DATA_YET", {
-    thing: "TLS certificates",
-    notConfigured:
-      "No public hostname or TLS driver is wired for this app. Set up a managed domain to issue a cert.",
-    provider: "this cloud",
-  });
+  const empty = panelEmptyState(
+    reason ?? "NO_DATA_YET",
+    {
+      noData: { title: t("noDataTitle"), description: t("noDataDescription") },
+      notConfigured: t("notConfigured"),
+    },
+    reasonT
+  );
   const showIssueAction = reason === "NOT_CONFIGURED" || reason === "NO_DATA_YET" || reason == null;
 
-  const list = useLocalListState(TLS_CERTIFICATES_LIST);
+  const tlsList = React.useMemo(
+    () => localizeList(TLS_CERTIFICATES_LIST, "tlsCertificates", listT),
+    [listT]
+  );
+  const list = useLocalListState(tlsList);
   const page = selectRows(
     certs,
     {
@@ -124,7 +122,7 @@ export function TlsCertificatesCard({
   const columns: Column<AstroliftAppCertificate>[] = [
     {
       id: "hostname",
-      header: "Hostname",
+      header: t("columns.hostname"),
       sortKey: "hostname",
       cellClassName: "max-w-72",
       cell: (c) => (
@@ -135,7 +133,7 @@ export function TlsCertificatesCard({
     },
     {
       id: "issuer",
-      header: "Issuer",
+      header: t("columns.issuer"),
       cellClassName: "text-muted-foreground max-w-56",
       cell: (c) => (
         <span className="block truncate font-mono text-xs" title={c.issuer || undefined}>
@@ -145,28 +143,28 @@ export function TlsCertificatesCard({
     },
     {
       id: "notAfter",
-      header: "Not after",
+      header: t("columns.notAfter"),
       cellClassName: "font-mono text-xs",
       cell: (c) => formatNotAfter(c.notAfter),
     },
     {
       id: "expires",
-      header: "Expires in",
+      header: t("columns.expires"),
       sortKey: "expires",
       cell: (c) => (
         <span
           className={`text-2xs inline-flex items-center rounded border px-2 py-0.5 font-mono ${expiryChipClass(c.daysUntilExpiry)}`}
         >
-          {formatDays(c.daysUntilExpiry)}
+          {c.daysUntilExpiry <= 0 ? t("expired") : t("days", { count: c.daysUntilExpiry })}
         </span>
       ),
     },
     {
       id: "renewal",
-      header: "Renewal",
+      header: t("columns.renewal"),
       cell: (c) => (
         <Badge variant={RENEWAL_TONE[c.renewalStatus]} className="font-mono text-xs">
-          {RENEWAL_LABEL[c.renewalStatus]}
+          {t(`renewal.${c.renewalStatus}`)}
         </Badge>
       ),
     },
@@ -177,12 +175,9 @@ export function TlsCertificatesCard({
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
         <div>
           <CardTitle className="flex items-center gap-2 text-base">
-            <ShieldCheckIcon className="size-4" /> TLS certificates
+            <ShieldCheckIcon className="size-4" /> {t("title")}
           </CardTitle>
-          <CardDescription>
-            Certs the cluster&apos;s TLS driver knows about, filtered by this app&apos;s slug.
-            Days-until-expiry are colour-coded: red &lt; 30, amber &lt; 90.
-          </CardDescription>
+          <CardDescription>{t("description")}</CardDescription>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -193,7 +188,7 @@ export function TlsCertificatesCard({
             }}
             disabled={loading}
           >
-            <RefreshCwIcon className="size-3" /> Refresh
+            <RefreshCwIcon className="size-3" /> {t("refresh")}
           </Button>
           <Can permission="app.update">
             <Button
@@ -204,13 +199,12 @@ export function TlsCertificatesCard({
                 // a per-cert rotate. The rotate mutation lives on the
                 // domain-handshake side (#397) per cert; surface the
                 // pointer here until we have a generic rotate-all.
-                toast.message("Force re-bind", {
-                  description:
-                    "Cert re-issue is per-hostname — open the Domains tab and use the cert-rotate action on the affected entry.",
+                toast.message(t("forceRebind"), {
+                  description: t("forceRebindDescription"),
                 });
               }}
             >
-              <RotateCcwIcon className="size-3" /> Force re-bind
+              <RotateCcwIcon className="size-3" /> {t("forceRebind")}
             </Button>
           </Can>
         </div>
@@ -228,11 +222,11 @@ export function TlsCertificatesCard({
               title={empty.title}
               description={empty.description}
               actionHref={showIssueAction ? `/apps/${appSlug}/domains` : undefined}
-              actionLabel={showIssueAction ? "Issue cert" : undefined}
+              actionLabel={showIssueAction ? t("issueCert") : undefined}
               secondary={
                 reason === "ERROR" ? (
                   <Button size="sm" variant="outline" onClick={() => onRefresh()}>
-                    Try again
+                    {t("tryAgain")}
                   </Button>
                 ) : undefined
               }
@@ -243,7 +237,7 @@ export function TlsCertificatesCard({
             <ListPage<AstroliftAppCertificate>
               embedded
               list={list}
-              label="TLS certificates"
+              label={t("title")}
               columns={columns}
               rows={page.rows}
               getRowId={(c) => c.id}

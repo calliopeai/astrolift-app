@@ -23,6 +23,7 @@
 import { ChartSplineIcon, RotateCcwIcon, TerminalIcon } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import {
   CartesianGrid,
   Line,
@@ -66,18 +67,30 @@ export function PodExpander({
   loading: isLoading,
   onRetry,
 }: PodExpanderProps) {
+  const t = useTranslations("obsPodExpander");
+  const reasonT = useTranslations("obsPanelReason");
+  const format = useFormatter();
   const samples = data?.samples ?? [];
   const restartCount = data?.restartCount ?? fallbackRestartCount;
-  const podEmpty = panelEmptyState(data?.reason ?? "NOT_CONFIGURED", {
-    thing: "pod metrics",
-    notConfigured: "Prometheus endpoint isn't wired for this cluster.",
-    provider: "this cloud",
-  });
+  const podEmpty = panelEmptyState(
+    data?.reason ?? "NOT_CONFIGURED",
+    {
+      noData: { title: t("noDataTitle"), description: t("noDataDescription") },
+      notConfigured: t("notConfigured"),
+    },
+    reasonT
+  );
   const lastRestartAt = data?.lastRestartAt ?? null;
   const hasSamples = samples.length > 0;
 
-  const cpuRows = React.useMemo(() => samplesToCpuRows(samples), [samples]);
-  const memRows = React.useMemo(() => samplesToMemRows(samples), [samples]);
+  const cpuRows = React.useMemo(
+    () => samplesToCpuRows(samples, (d) => format.dateTime(d, TIME_OF_DAY)),
+    [samples, format]
+  );
+  const memRows = React.useMemo(
+    () => samplesToMemRows(samples, (d) => format.dateTime(d, TIME_OF_DAY)),
+    [samples, format]
+  );
 
   const shellHref = buildShellHref({
     appSlug,
@@ -91,21 +104,30 @@ export function PodExpander({
         <div className="text-muted-foreground inline-flex items-center gap-3 text-xs">
           <span className="inline-flex items-center gap-1">
             <RotateCcwIcon className="size-3" />
-            <strong className="text-foreground tabular-nums">{restartCount}</strong>
-            {restartCount === 1 ? " restart" : " restarts"}
+            {t.rich("restarts", {
+              count: restartCount,
+              strong: (chunks) => (
+                <strong className="text-foreground tabular-nums">{chunks}</strong>
+              ),
+            })}
           </span>
           <span>·</span>
           <span>
-            Last restart:{" "}
-            <span className="text-foreground tabular-nums">
-              {lastRestartAt ? new Date(lastRestartAt).toLocaleString() : "—"}
-            </span>
+            {t.rich("lastRestart", {
+              time: lastRestartAt
+                ? format.dateTime(new Date(lastRestartAt), {
+                    dateStyle: "medium",
+                    timeStyle: "medium",
+                  })
+                : "—",
+              value: (chunks) => <span className="text-foreground tabular-nums">{chunks}</span>,
+            })}
           </span>
         </div>
         <Button asChild variant="outline" size="sm">
           <Link href={shellHref}>
             <TerminalIcon className="size-3" />
-            Open shell
+            {t("openShell")}
           </Link>
         </Button>
       </div>
@@ -121,22 +143,22 @@ export function PodExpander({
           <p className="mt-1">{podEmpty.description}</p>
           {data?.reason === "ERROR" && (
             <Button size="sm" variant="outline" className="mt-3" onClick={onRetry}>
-              Try again
+              {t("tryAgain")}
             </Button>
           )}
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <MiniChart
-            title="CPU"
-            description="Per-pod cores in use (1m rate)."
+            title={t("cpuTitle")}
+            description={t("cpuDescription")}
             rows={cpuRows}
             color="var(--chart-4)"
-            yFormatter={(v) => `${v.toFixed(2)} cores`}
+            yFormatter={(v) => t("cores", { cores: v.toFixed(2) })}
           />
           <MiniChart
-            title="Memory"
-            description="Per-pod working-set bytes (OOM accounting)."
+            title={t("memoryTitle")}
+            description={t("memoryDescription")}
             rows={memRows}
             color="var(--chart-5)"
             yFormatter={(v) => formatBytes(v)}
@@ -156,16 +178,24 @@ interface ChartRow {
   value: number;
 }
 
-function samplesToCpuRows(samples: AstroliftPodResourceUsagePoint[]): ChartRow[] {
+const TIME_OF_DAY = { hour: "numeric", minute: "2-digit", second: "2-digit" } as const;
+
+function samplesToCpuRows(
+  samples: AstroliftPodResourceUsagePoint[],
+  formatTime: (d: Date) => string
+): ChartRow[] {
   return samples.map((s) => ({
-    ts: new Date(s.ts).toLocaleTimeString(),
+    ts: formatTime(new Date(s.ts)),
     value: s.cpuCores,
   }));
 }
 
-function samplesToMemRows(samples: AstroliftPodResourceUsagePoint[]): ChartRow[] {
+function samplesToMemRows(
+  samples: AstroliftPodResourceUsagePoint[],
+  formatTime: (d: Date) => string
+): ChartRow[] {
   return samples.map((s) => ({
-    ts: new Date(s.ts).toLocaleTimeString(),
+    ts: formatTime(new Date(s.ts)),
     value: s.memoryBytes,
   }));
 }

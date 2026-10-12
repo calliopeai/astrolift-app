@@ -1,6 +1,8 @@
 "use client";
 
 import { BarChart2Icon } from "lucide-react";
+import { useTranslations } from "next-intl";
+import * as React from "react";
 
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
@@ -10,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import type { AstroliftAppEndpointMetric } from "@/graphql/__generated__/schema";
 
 import { ENDPOINT_METRICS_LIST, ENDPOINT_METRICS_SELECT } from "./endpoint-metrics-list";
+import { localizeList } from "./localize-list";
 
 function formatMs(v: number | null | undefined): string {
   if (v == null) return "—";
@@ -23,10 +26,12 @@ function errorClass(ratio: number): string {
   return "text-muted-foreground";
 }
 
-const COLUMNS: Column<AstroliftAppEndpointMetric>[] = [
+const COLUMNS = (
+  header: (key: "route" | "rate" | "error") => string
+): Column<AstroliftAppEndpointMetric>[] => [
   {
     id: "route",
-    header: "Route",
+    header: header("route"),
     sortKey: "route",
     cellClassName: "max-w-80",
     cell: (row) => (
@@ -40,7 +45,7 @@ const COLUMNS: Column<AstroliftAppEndpointMetric>[] = [
   },
   {
     id: "rate",
-    header: "Req/s",
+    header: header("rate"),
     sortKey: "rate",
     align: "right",
     cellClassName: "font-mono text-xs",
@@ -48,7 +53,7 @@ const COLUMNS: Column<AstroliftAppEndpointMetric>[] = [
   },
   {
     id: "error",
-    header: "Error %",
+    header: header("error"),
     sortKey: "error",
     align: "right",
     cell: (row) => (
@@ -96,7 +101,13 @@ export function EndpointMetricsPanel({
   metrics: AstroliftAppEndpointMetric[];
   loading: boolean;
 }) {
-  const list = useLocalListState(ENDPOINT_METRICS_LIST);
+  const t = useTranslations("obsEndpoints");
+  const listT = useTranslations("obsLists");
+  const endpointsList = React.useMemo(
+    () => localizeList(ENDPOINT_METRICS_LIST, "endpoints", listT),
+    [listT]
+  );
+  const list = useLocalListState(endpointsList);
   const all = metrics ?? [];
   const page = selectRows(
     all,
@@ -114,26 +125,24 @@ export function EndpointMetricsPanel({
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
-          <BarChart2Icon className="size-4" /> Endpoints
+          <BarChart2Icon className="size-4" /> {t("title")}
         </CardTitle>
-        <CardDescription>
-          Request rate, error ratio, and latency quantiles per route. Refreshed every 30s.
-        </CardDescription>
+        <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <ListPage<AstroliftAppEndpointMetric>
           embedded
           list={list}
-          label="Endpoints"
-          columns={COLUMNS}
+          label={t("title")}
+          columns={COLUMNS((key) => t(`columns.${key}`))}
           rows={page.rows}
           getRowId={(r) => r.route}
           loading={loading && all.length === 0}
           totalCount={page.totalCount}
           empty={{
             icon: <BarChart2Icon className="size-5" />,
-            title: "No endpoint data",
-            description: "OTEL instrumentation not detected.",
+            title: t("emptyTitle"),
+            description: t("emptyDescription"),
           }}
         />
       </CardContent>

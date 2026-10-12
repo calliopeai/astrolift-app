@@ -13,6 +13,7 @@ import {
   XIcon,
 } from "lucide-react";
 import * as React from "react";
+import { useFormatter, useTranslations } from "next-intl";
 
 import { Feed } from "@/components/feed/Feed";
 import { Badge } from "@/components/ui/badge";
@@ -102,7 +103,11 @@ export function WorkflowTimeline({
   maxHeight,
   className,
 }: WorkflowTimelineProps) {
+  const t = useTranslations("obsWorkflowTimeline");
+  const format = useFormatter();
   const isTerminal = run.status !== "running";
+  const dateTime = (iso: string) =>
+    format.dateTime(new Date(iso), { dateStyle: "medium", timeStyle: "medium" });
 
   return (
     <div className={cn("bg-card rounded-md border", className)}>
@@ -110,16 +115,18 @@ export function WorkflowTimeline({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-medium tracking-tight">{run.workflowKind}</span>
-            <Badge variant={RUN_STATUS_VARIANT[run.status]} className="capitalize">
-              {run.status}
-            </Badge>
+            <Badge variant={RUN_STATUS_VARIANT[run.status]}>{t(`runStatus.${run.status}`)}</Badge>
           </div>
           <div className="text-muted-foreground mt-1 truncate font-mono text-xs">
-            {run.workflowId} · run {run.runId.slice(0, 12)}…
+            {t("runId", { workflowId: run.workflowId, runId: run.runId.slice(0, 12) })}
           </div>
           <div className="text-muted-foreground mt-1 text-xs">
-            started {new Date(run.startedAt).toLocaleString()}
-            {run.endedAt && ` · ended ${new Date(run.endedAt).toLocaleString()}`}
+            {run.endedAt
+              ? t("startedEnded", {
+                  started: dateTime(run.startedAt),
+                  ended: dateTime(run.endedAt),
+                })
+              : t("started", { started: dateTime(run.startedAt) })}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -134,7 +141,7 @@ export function WorkflowTimeline({
           {!isTerminal && onCancel && (
             <Button variant="ghost" size="sm" onClick={() => onCancel()} disabled={busy}>
               <XIcon className="size-3.5" />
-              Cancel
+              {t("cancel")}
             </Button>
           )}
         </div>
@@ -145,7 +152,7 @@ export function WorkflowTimeline({
           <div className="flex items-start gap-2 text-sm">
             <AlertTriangleIcon className="text-destructive mt-0.5 size-4" />
             <div className="min-w-0 flex-1">
-              <p className="text-destructive font-medium">Workflow failed</p>
+              <p className="text-destructive font-medium">{t("failed")}</p>
               <p className="text-muted-foreground mt-1 break-words">{run.errorMessage}</p>
               {run.errorStack && (
                 <pre className="bg-muted/40 text-2xs text-muted-foreground mt-2 overflow-x-auto rounded p-2 font-mono leading-relaxed">
@@ -158,7 +165,7 @@ export function WorkflowTimeline({
       )}
 
       <Feed<WorkflowActivity>
-        label="Activities"
+        label={t("activities")}
         items={activities}
         keyOf={(a) => a.id}
         hasMore={hasMore}
@@ -167,7 +174,7 @@ export function WorkflowTimeline({
         maxHeight={maxHeight}
         dense
         className="px-2"
-        empty={{ icon: <CircleIcon className="size-5" />, title: "No activities recorded yet." }}
+        empty={{ icon: <CircleIcon className="size-5" />, title: t("noActivities") }}
         renderItem={(activity) => (
           <ActivityRow activity={activity} onRetry={onRetryActivity} busy={busy} />
         )}
@@ -185,6 +192,8 @@ function ActivityRow({
   onRetry?: (activityId: string) => void | Promise<void>;
   busy?: boolean;
 }) {
+  const t = useTranslations("obsWorkflowTimeline");
+  const format = useFormatter();
   const [expanded, setExpanded] = React.useState(activity.status === "failed");
   const Icon = ACTIVITY_ICON[activity.status];
   const lastFailedAttempt = activity.attempts.findLast?.((a) => a.status === "failed");
@@ -202,7 +211,7 @@ function ActivityRow({
             <span className="font-mono text-sm">{activity.name}</span>
             {retryCount > 0 && (
               <Badge variant="outline" className="text-2xs">
-                {retryCount} retr{retryCount === 1 ? "y" : "ies"}
+                {t("retries", { count: retryCount })}
               </Badge>
             )}
             <span className="text-muted-foreground text-xs">
@@ -219,7 +228,7 @@ function ActivityRow({
               ) : (
                 <ChevronRightIcon className="size-3" />
               )}
-              {expanded ? "Hide attempts" : `${activity.attempts.length} attempts`}
+              {expanded ? t("hideAttempts") : t("attempts", { count: activity.attempts.length })}
             </button>
           )}
           {expanded && (
@@ -231,12 +240,18 @@ function ActivityRow({
                     className="text-muted-foreground flex items-center gap-2 text-xs"
                   >
                     <span className="font-mono">#{attempt.attemptNumber}</span>
-                    <span className="capitalize">{attempt.status}</span>
+                    <span>{t(`activityStatus.${attempt.status}`)}</span>
                     <Separator
                       orientation="vertical"
                       className="h-3 data-vertical:h-3 data-vertical:self-auto"
                     />
-                    <span>{new Date(attempt.startedAt).toLocaleTimeString()}</span>
+                    <span>
+                      {format.dateTime(new Date(attempt.startedAt), {
+                        hour: "numeric",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })}
+                    </span>
                     {attempt.errorMessage && (
                       <span className="text-destructive truncate">{attempt.errorMessage}</span>
                     )}
@@ -254,7 +269,7 @@ function ActivityRow({
         {activity.status === "failed" && onRetry && (
           <Button variant="ghost" size="sm" onClick={() => onRetry(activity.id)} disabled={busy}>
             <RefreshCwIcon className="size-3.5" />
-            Retry
+            {t("retry")}
           </Button>
         )}
       </div>

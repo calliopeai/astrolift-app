@@ -7030,6 +7030,406 @@
       "started": "Inicio"
     }
   },
+  "obsPanelReason": {
+    "notConfiguredTitle": "No configurado",
+    "notSupportedTitle": "No disponible en esta nube",
+    "notSupportedDescription": "El plugin de proveedor de este clúster no implementa esta lectura. Es compatible en otras nubes.",
+    "errorTitle": "No se pudo cargar",
+    "errorDescription": "Algo salió mal al cargar este panel. Inténtalo de nuevo."
+  },
+  "obsManagedServiceMetrics": {
+    "metric": {
+      "connections": {
+        "title": "Conexiones",
+        "description": "Conexiones de cliente activas a esta base de datos."
+      },
+      "cpu": {
+        "title": "CPU",
+        "description": "Uso de CPU del proceso exportador (aproximación de la carga del motor)."
+      },
+      "iops": {
+        "title": "IOPS",
+        "description": "Lecturas de bloque + aciertos de caché por segundo."
+      },
+      "slow_queries": {
+        "title": "Consultas lentas",
+        "description": "Tasa de consultas que superan 1 s."
+      },
+      "replica_lag": {
+        "title": "Retraso de réplica",
+        "description": "Mayor retraso entre las réplicas de este clúster."
+      },
+      "bucket_size": {
+        "title": "Tamaño del bucket",
+        "description": "Total de bytes almacenados en este bucket."
+      },
+      "request_count": {
+        "title": "Solicitudes",
+        "description": "Total de solicitudes por segundo al bucket."
+      },
+      "errors_4xx": {
+        "title": "Errores 4xx",
+        "description": "Errores de cliente por segundo."
+      },
+      "errors_5xx": {
+        "title": "Errores 5xx",
+        "description": "Errores de servidor por segundo."
+      },
+      "egress_bytes": {
+        "title": "Salida",
+        "description": "Bytes descargados por segundo desde este bucket."
+      },
+      "tokens_per_second": {
+        "title": "Tokens/s",
+        "description": "Tokens generados por segundo entre réplicas."
+      },
+      "requests_running": {
+        "title": "En ejecución",
+        "description": "Solicitudes que se están decodificando ahora mismo."
+      },
+      "requests_waiting": {
+        "title": "En espera",
+        "description": "Solicitudes en cola esperando un hueco."
+      },
+      "ttft_p95": {
+        "title": "Tiempo hasta el primer token",
+        "description": "Percentil 95 del tiempo hasta el primer token generado."
+      },
+      "kv_cache_usage": {
+        "title": "Caché KV",
+        "description": "Proporción de la caché KV de la GPU en uso."
+      }
+    },
+    "kind": {
+      "postgres": {
+        "label": "Base de datos",
+        "description": "Conexiones, E/S, tasa de consultas lentas y retraso de réplica de esta base de datos."
+      },
+      "object_store": {
+        "label": "Almacenamiento",
+        "description": "Tamaño, tasa de solicitudes, desglose de errores y salida de este bucket."
+      },
+      "model_endpoint": {
+        "label": "Modelo",
+        "description": "Rendimiento, cola, tiempo hasta el primer token y caché KV de este modelo alojado."
+      }
+    },
+    "noSamples": "No hay muestras en este intervalo.",
+    "source": "origen: {source}",
+    "notFlowing": "Aún no llegan métricas: o el endpoint de Prometheus del clúster no está configurado, o el sidecar exportador todavía no ha emitido muestras para este servicio."
+  },
+  "obsPromql": {
+    "discovering": "Consultando qué expone esta app…",
+    "discoveryFailed": "No se pueden listar las métricas de esta app ({reason}). Aún puedes ejecutar una consulta abajo.",
+    "unknownReason": "motivo desconocido",
+    "noMetrics": "Esta app aún no expone métricas propias. Añade <code>{section}</code> con un <code>{port}</code> a tu astrolift.toml y vuelve a desplegar.",
+    "exposes": "Esta app expone",
+    "filterLabel": "Filtrar métricas",
+    "filterPlaceholder": "Filtrar métricas…",
+    "truncated": "se muestran las primeras {limit}; esta app emite más nombres de métrica distintos, lo que suele indicar que un valor que debería ser una etiqueta está en el nombre",
+    "noMatch": "Ninguna métrica coincide con «{filter}».",
+    "title": "Consulta",
+    "description": "Ejecuta una expresión PromQL puntual contra el stack de Prometheus del clúster.",
+    "queryLabel": "Consulta PromQL",
+    "running": "Ejecutando…",
+    "run": "Ejecutar",
+    "enterExpression": "Introduce una expresión PromQL arriba",
+    "executionFailed": "Error al ejecutar PromQL",
+    "noSeries": "La consulta no devolvió series.",
+    "error": "Error de PromQL"
+  },
+  "obsGoldenSignals": {
+    "title": "Señales doradas",
+    "description": "Tráfico, errores, latencia y saturación obtenidos en vivo del stack de Prometheus del clúster.",
+    "prometheusNotConfigured": "Este clúster no tiene un endpoint de Prometheus conectado.",
+    "redNotConfigured": "Nada alimenta esta señal: la app no expone métricas de Prometheus (activa metrics.enabled en una carga de trabajo) y el controlador de ingress de este clúster no tiene mapeo de métricas.",
+    "metrics": {
+      "noDataTitle": "Aún no hay métricas",
+      "noDataDescription": "No hay nada que mostrar en este intervalo. Las métricas aparecerán aquí cuando haya actividad."
+    },
+    "traffic": {
+      "title": "Tráfico",
+      "description": "Solicitudes por segundo (suma de todas las réplicas).",
+      "noDataTitle": "Aún no hay tráfico",
+      "noDataDescription": "No hay nada que mostrar en este intervalo. El tráfico aparecerá aquí cuando haya actividad."
+    },
+    "errors": {
+      "title": "Errores",
+      "description": "Tasa de 5xx dividida entre la tasa total de solicitudes.",
+      "noDataTitle": "Aún no hay errores",
+      "noDataDescription": "No hay nada que mostrar en este intervalo. Los errores aparecerán aquí cuando haya actividad."
+    },
+    "saturationCpu": {
+      "title": "Saturación (CPU)",
+      "description": "Uso de CPU del contenedor dividido entre los límites de CPU.",
+      "noDataTitle": "Aún no hay saturación de CPU",
+      "noDataDescription": "No hay nada que mostrar en este intervalo. La saturación de CPU aparecerá aquí cuando haya actividad."
+    },
+    "saturationMemory": {
+      "title": "Saturación (memoria)",
+      "description": "Memoria del working set dividida entre los límites de memoria.",
+      "noDataTitle": "Aún no hay saturación de memoria",
+      "noDataDescription": "No hay nada que mostrar en este intervalo. La saturación de memoria aparecerá aquí cuando haya actividad."
+    },
+    "latency": {
+      "title": "Latencia",
+      "description": "Latencia de solicitudes p50, p95, p99. p90 disponible en la sección de PromQL.",
+      "noDataTitle": "Aún no hay latencia",
+      "noDataDescription": "No hay nada que mostrar en este intervalo. La latencia aparecerá aquí cuando haya actividad."
+    },
+    "statusCodes": {
+      "title": "Desglose por código de estado",
+      "description": "Tasa de solicitudes apilada por clase de estado HTTP. Pasa el cursor para ver los códigos más frecuentes de cada clase.",
+      "rate": "{rate} sol./s",
+      "rateWithTop": "{rate} sol./s (principales: {top})"
+    },
+    "showPromql": "Mostrar PromQL",
+    "tryAgain": "Reintentar",
+    "seeDocs": "Ver la documentación"
+  },
+  "obsAgentTheatre": {
+    "justNow": "justo ahora",
+    "seconds": "{s} s",
+    "minutes": "{m} min {s} s",
+    "hours": "{h} h {m} min",
+    "noOrgTitle": "No hay una organización activa",
+    "noOrgDescription": "Elige una organización en la barra lateral para ver sus agentes en ejecución.",
+    "loadError": "No se pudo cargar la sala de agentes: {error}",
+    "retry": "Reintentar",
+    "emptyTitle": "No hay agentes para ver",
+    "emptyDescription": "Los agentes en ejecución iniciados en un entorno compatible con VNC aparecen aquí como miniaturas en vivo que puedes ampliar a una sesión completa. Despacha un agente observable para llenar la sala.",
+    "goToAgents": "Ir a Agentes",
+    "summary": "{count, plural, one {# agente en vivo} other {# agentes en vivo}} · las capturas se actualizan cada {seconds} s",
+    "refresh": "Actualizar",
+    "liveSession": "Sesión del agente en vivo",
+    "popOut": "Abrir aparte",
+    "endedTitle": "Sesión finalizada",
+    "endedDescription": "Este agente ya no está en ejecución, así que su sesión en vivo se cerró.",
+    "watchLabel": "Ver la sesión en vivo del agente {id}",
+    "snapshotAlt": "Última captura del agente {id}",
+    "waitingFrame": "Esperando el primer fotograma…",
+    "watchLive": "Ver en vivo",
+    "runningFor": "en ejecución desde hace {elapsed}",
+    "watch": "Ver"
+  },
+  "obsLists": {
+    "views": {
+      "all": "Todos",
+      "mine": "Míos"
+    },
+    "traces": {
+      "searchPlaceholder": "Buscar servicios, operaciones, ids de traza…",
+      "fields": {
+        "status": {
+          "label": "Estado"
+        }
+      },
+      "mineNote": "Las trazas son de la app, no de una persona, así que Míos está vacío."
+    },
+    "dnsRecords": {
+      "searchPlaceholder": "Buscar nombres, valores…",
+      "fields": {
+        "type": {
+          "label": "Tipo"
+        },
+        "propagation": {
+          "label": "Propagación",
+          "options": {
+            "propagated": "propagado",
+            "pending": "pendiente",
+            "unknown": "desconocido"
+          }
+        }
+      },
+      "mineNote": "Los registros del driver son del clúster, no de una persona, así que Míos está vacío."
+    },
+    "tlsCertificates": {
+      "searchPlaceholder": "Buscar hosts, emisores…",
+      "fields": {
+        "renewal": {
+          "label": "Renovación",
+          "options": {
+            "auto": "automática",
+            "manual": "manual",
+            "failed": "fallida",
+            "unknown": "desconocida"
+          }
+        },
+        "expiring": {
+          "label": "Vence",
+          "options": {
+            "30": "en 30 días",
+            "90": "en 90 días"
+          }
+        }
+      },
+      "mineNote": "Los registros del driver son del clúster, no de una persona, así que Míos está vacío."
+    },
+    "endpoints": {
+      "searchPlaceholder": "Buscar rutas…",
+      "fields": {
+        "errors": {
+          "label": "Errores",
+          "options": {
+            "any": "más del 0 %",
+            "high": "más del 5 %"
+          }
+        }
+      },
+      "mineNote": "Las rutas son de la app, no de una persona, así que Míos está vacío."
+    }
+  },
+  "obsTraces": {
+    "columns": {
+      "operation": "Operación raíz",
+      "service": "Servicio raíz",
+      "spans": "Spans",
+      "duration": "Duración",
+      "status": "Estado"
+    },
+    "title": "Trazas",
+    "description": "Trazas distribuidas recientes de la última hora. Haz clic en una operación para ver sus spans.",
+    "emptyTitle": "No hay trazas",
+    "emptyDescription": "El backend de trazas no está configurado.",
+    "noSpans": "Esta traza no devolvió spans."
+  },
+  "obsEndpoints": {
+    "columns": {
+      "route": "Ruta",
+      "rate": "Sol./s",
+      "error": "% de error"
+    },
+    "title": "Endpoints",
+    "description": "Tasa de solicitudes, proporción de errores y cuantiles de latencia por ruta. Se actualiza cada 30 s.",
+    "emptyTitle": "No hay datos de endpoints",
+    "emptyDescription": "No se detectó instrumentación OTEL."
+  },
+  "obsDnsRecords": {
+    "noDataTitle": "Aún no hay registros DNS",
+    "noDataDescription": "No hay nada que mostrar en este intervalo. Los registros DNS aparecerán aquí cuando haya actividad.",
+    "notConfigured": "Este clúster no tiene un proveedor DNS conectado. Configura un dominio administrado para publicar registros.",
+    "columns": {
+      "name": "Nombre",
+      "type": "Tipo",
+      "value": "Valor",
+      "ttl": "TTL",
+      "propagation": "Propagación"
+    },
+    "propagation": {
+      "propagated": "Propagado",
+      "pending": "Pendiente",
+      "unknown": "Desconocido"
+    },
+    "title": "Registros DNS",
+    "description": "Registros en vivo del driver DNS del clúster. La propagación refleja el último conjunto de cambios; usa <code>dig</code> para comprobar desde cada punto de observación.",
+    "refresh": "Actualizar",
+    "tryAgain": "Reintentar",
+    "forceRebind": "Forzar revinculación",
+    "forceRebindDescription": "Los registros DNS se vuelven a aplicar por dominio: ve a la pestaña Dominios y haz clic en Revalidar en el host afectado.",
+    "setUpDns": "Configurar DNS"
+  },
+  "obsTlsCertificates": {
+    "noDataTitle": "Aún no hay certificados TLS",
+    "noDataDescription": "No hay nada que mostrar en este intervalo. Los certificados TLS aparecerán aquí cuando haya actividad.",
+    "notConfigured": "Esta app no tiene un host público ni un driver TLS conectado. Configura un dominio administrado para emitir un certificado.",
+    "columns": {
+      "hostname": "Host",
+      "issuer": "Emisor",
+      "notAfter": "Válido hasta",
+      "expires": "Vence en",
+      "renewal": "Renovación"
+    },
+    "expired": "vencido",
+    "days": "{count, plural, one {# día} other {# días}}",
+    "renewal": {
+      "auto": "Renovación automática",
+      "manual": "Manual",
+      "failed": "Renovación fallida",
+      "unknown": "Desconocida"
+    },
+    "title": "Certificados TLS",
+    "description": "Certificados que conoce el driver TLS del clúster, filtrados por el slug de esta app. Los días hasta el vencimiento tienen código de color: rojo < 30, ámbar < 90.",
+    "refresh": "Actualizar",
+    "tryAgain": "Reintentar",
+    "forceRebind": "Forzar revinculación",
+    "forceRebindDescription": "Los certificados se reemiten por host: abre la pestaña Dominios y usa la acción de rotar certificado en la entrada afectada.",
+    "issueCert": "Emitir certificado"
+  },
+  "obsWorkloadIdentity": {
+    "noDataTitle": "Aún no hay vinculación de identidad de carga de trabajo",
+    "noDataDescription": "No hay nada que mostrar en este intervalo. La vinculación de identidad aparecerá aquí cuando haya actividad.",
+    "notConfigured": "Esta app no tiene un rol de IAM de nube aprovisionado. Configura la identidad de carga de trabajo para dar credenciales a los pods.",
+    "title": "Identidad de carga de trabajo",
+    "description": "La identidad de IAM de nube vinculada a los pods de esta app. Origen: WorkloadIdentityDriver del clúster (<code>{method}</code>).",
+    "refresh": "Actualizar",
+    "tryAgain": "Reintentar",
+    "forceRebind": "Forzar revinculación",
+    "forceRebindDescription": "El próximo despliegue volverá a aplicar la anotación del ServiceAccount. Lanza un redespliegue desde la pestaña Despliegues.",
+    "configure": "Configurar identidad de carga de trabajo",
+    "kind": "Tipo",
+    "kinds": {
+      "irsa": "IAM Roles for Service Accounts (AWS)",
+      "workload_identity": "GKE Workload Identity (GCP)",
+      "federated": "AKS Federated Credentials (Azure)",
+      "unknown": "Vinculación desconocida"
+    },
+    "lastUsed": "Último uso",
+    "rolePrincipal": "Rol / principal",
+    "trustPolicy": "Política de confianza"
+  },
+  "obsPodExpander": {
+    "noDataTitle": "Aún no hay métricas del pod",
+    "noDataDescription": "No hay nada que mostrar en este intervalo. Las métricas del pod aparecerán aquí cuando haya actividad.",
+    "notConfigured": "Este clúster no tiene un endpoint de Prometheus conectado.",
+    "restarts": "{count, plural, one {<strong>#</strong> reinicio} other {<strong>#</strong> reinicios}}",
+    "lastRestart": "Último reinicio: <value>{time}</value>",
+    "openShell": "Abrir shell",
+    "tryAgain": "Reintentar",
+    "cpuTitle": "CPU",
+    "cpuDescription": "Núcleos en uso por pod (tasa de 1 min).",
+    "cores": "{cores} núcleos",
+    "memoryTitle": "Memoria",
+    "memoryDescription": "Bytes del working set por pod (cálculo de OOM)."
+  },
+  "obsWorkflowTimeline": {
+    "runStatus": {
+      "running": "En ejecución",
+      "completed": "Completado",
+      "failed": "Fallido",
+      "cancelled": "Cancelado",
+      "terminated": "Terminado"
+    },
+    "activityStatus": {
+      "pending": "Pendiente",
+      "running": "En ejecución",
+      "succeeded": "Correcto",
+      "failed": "Fallido",
+      "cancelled": "Cancelado"
+    },
+    "runId": "{workflowId} · ejecución {runId}…",
+    "started": "iniciado {started}",
+    "startedEnded": "iniciado {started} · finalizado {ended}",
+    "cancel": "Cancelar",
+    "failed": "El workflow falló",
+    "activities": "Actividades",
+    "noActivities": "Aún no se han registrado actividades.",
+    "retries": "{count, plural, one {# reintento} other {# reintentos}}",
+    "hideAttempts": "Ocultar intentos",
+    "attempts": "{count, plural, one {# intento} other {# intentos}}",
+    "retry": "Reintentar"
+  },
+  "obsAgentActivityGraph": {
+    "running": "{count} en ejecución",
+    "idle": "inactivo",
+    "noTools": "Aún no hay herramientas vinculadas; el grafo se completa a medida que se añaden skills y herramientas."
+  },
+  "obsGitOpsCommits": {
+    "label": "Commits del repo de configuración",
+    "empty": "Aún no hay commits en el repo de configuración.",
+    "run": "ejecución {id}…",
+    "diff": "Diff",
+    "source": "Origen"
+  },
   "clusters": {
     "chrome": {
       "admin": "Administración",
