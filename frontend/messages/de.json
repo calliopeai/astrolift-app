@@ -6609,6 +6609,249 @@
       "reviewConfirm": "Personenbezogene Daten bereinigen"
     }
   },
+  "adminPolicies": {
+    "title": "Richtlinien",
+    "context": "Regeln, die einschränken, was Rollen erlauben, bei jeder Anfrage geprüft. Eine Bedingung, die die Anfrage nicht beantworten kann, verweigert.",
+    "columns": {
+      "policy": "Richtlinie",
+      "effect": "Wirkung",
+      "scope": "Geltungsbereich",
+      "createdBy": "Erstellt von",
+      "updated": "Aktualisiert"
+    },
+    "unknown": "unbekannt",
+    "newPolicy": "Neue Richtlinie",
+    "delete": "Löschen",
+    "emptyTitle": "Noch keine Richtlinien",
+    "emptyDescription": "Eine Richtlinie schränkt ein, was Rollen erlauben: Sie verweigert eine Aktion außer während der Arbeitszeit, im Büronetz, nach Genehmigung oder nach frischer Anmeldung. Sie gewährt nie mehr als eine Rolle.",
+    "enforced": "<strong>Bei jeder Prüfung durchgesetzt.</strong> Ein DENY, das zu Aktion, Ressource und Person passt, hat Vorrang vor jeder Rolle, die es erlaubt. Eine Bedingung, die die Anfrage nicht beantworten kann (keine Client-Adresse, keine Sitzung), verweigert, sodass eine Richtlinie im Zweifel sperrt. Die Suche findet Name, Slug, Beschreibung und Aktion.",
+    "learnMore": "Mehr erfahren",
+    "deleteTitle": "Richtlinie {slug} löschen?",
+    "deleteFallback": "Richtlinie löschen?",
+    "deleteDescription": "Löscht die Richtlinie vorläufig und gibt ihren Slug für eine neue frei. Was sie verweigert hat, ist sofort wieder erlaubt, wo eine Rolle es erlaubt.",
+    "deleteConfirm": "Richtlinie löschen",
+    "deleted": "{slug} gelöscht",
+    "deleteFailed": "Löschen fehlgeschlagen",
+    "list": {
+      "search": "Richtlinien suchen…",
+      "fields": {
+        "effect": "Wirkung",
+        "scope": "Geltungsbereich"
+      },
+      "options": {
+        "effect": {
+          "DENY": "verweigern",
+          "ALLOW": "erlauben"
+        },
+        "scope": {
+          "ORG": "Organisation",
+          "TEAM": "Team",
+          "PROJECT": "Projekt",
+          "APP": "App"
+        }
+      },
+      "views": {
+        "all": "Alle",
+        "mine": "Meine",
+        "deny": "Verweigern",
+        "allow": "Erlauben"
+      }
+    },
+    "editor": {
+      "newPolicy": "Neue Richtlinie",
+      "policy": "Richtlinie",
+      "notFoundCrumb": "Nicht gefunden",
+      "notFoundTitle": "Richtlinie nicht gefunden",
+      "rule": "Regel",
+      "missingTitle": "Keine Richtlinie mit dieser ID",
+      "missingDescription": "Nichts in dieser Organisation hat die ID {id}. Sie wurde eventuell gelöscht.",
+      "allPolicies": "Alle Richtlinien",
+      "needsPermission": "Zum Ändern einer Richtlinie ist <mono>{permission}</mono> nötig.",
+      "simulationFailed": "Die Simulation ist fehlgeschlagen",
+      "errors": {
+        "name": "Geben Sie der Richtlinie einen Namen.",
+        "slug": "Nur Kleinbuchstaben, Ziffern und Bindestriche.",
+        "conditions": "{count, plural, one {Korrigieren Sie zuerst die unten markierte Bedingung.} other {Korrigieren Sie zuerst die # unten markierten Bedingungen.}}",
+        "action": "Geben Sie eine Aktion an, oder * für alle Aktionen."
+      },
+      "context": "Eine Richtlinie schränkt ein, was Rollen erlauben; sie gewährt nie mehr.",
+      "steps": "Schritte",
+      "step": {
+        "details": "Details",
+        "rule": "Regel",
+        "review": "Überprüfen"
+      },
+      "name": "Name",
+      "namePlaceholder": "Keine Prod-Deployments nach Feierabend",
+      "slug": "Slug",
+      "slugHelp": "Wird aus dem Namen abgeleitet, bis Sie ihn ändern. Nach dem Erstellen fest.",
+      "fixed": "Nach dem Erstellen fest.",
+      "appliesAcross": "Gilt für",
+      "appliesAcrossHelp": "Wie weit die Regel reicht. Nach dem Erstellen fest.",
+      "description": "Beschreibung",
+      "descriptionPlaceholder": "Warum es diese Regel gibt, in einem Satz.",
+      "theRule": "Die Regel",
+      "was": "Vorher: {sentence}",
+      "inForce": "Beim Speichern tritt die Regel in Kraft: Jede Berechtigungsprüfung wertet sie ab dann aus, und eine Bedingung, die die Anfrage nicht beantworten kann, verweigert.",
+      "cancel": "Abbrechen",
+      "back": "Zurück",
+      "continue": "Weiter",
+      "saving": "Wird gespeichert…",
+      "create": "Richtlinie erstellen",
+      "save": "Richtlinie speichern",
+      "none": "keiner",
+      "conditions": "Bedingungen",
+      "saved": "Richtlinie {slug} gespeichert",
+      "saveFailed": "Speichern fehlgeschlagen",
+      "created": "Richtlinie {slug} erstellt",
+      "createFailed": "Erstellen fehlgeschlagen"
+    }
+  },
+  "adminGroupMappings": {
+    "title": "Rollenzuordnungen",
+    "columns": {
+      "role": "Rolle",
+      "where": "Wo",
+      "reaches": "Erreicht",
+      "mapped": "Zugeordnet"
+    },
+    "members": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
+    "description": "Alle, die der Identity Provider in {group} aufnimmt, erhalten diese Rollen wie bei einer Zuweisung.",
+    "mapRole": "Rolle zuordnen",
+    "removeThis": "Diese Zuordnung entfernen",
+    "emptyTitle": "Keine Rollenzuordnungen",
+    "emptyDescription": "{group} ist keiner Rolle zugeordnet. Ihre Mitglieder erhalten nur, was Zuweisungen ihnen geben.",
+    "removeTitle": "{role} von {group} entfernen?",
+    "removeFallback": "Zuordnung entfernen?",
+    "removeDescription": "{count, plural, one {Das # Mitglied} other {Die # Mitglieder}} von {group} verlieren, was {role} bei {scope} gewährt, sofern keine andere Zuweisung es gibt.",
+    "removeConfirm": "Zuordnung entfernen",
+    "errors": {
+      "role": "Wählen Sie eine Rolle.",
+      "scope": "Wählen Sie, wo die Rolle gilt."
+    },
+    "pickRole": "Rolle wählen",
+    "whereApplies": "Wo sie gilt",
+    "cancel": "Abbrechen",
+    "mapping": "Wird zugeordnet…",
+    "submit": "Rolle zuordnen",
+    "mapped": "{group} zugeordnet",
+    "mappingFailed": "Die Zuordnung ist fehlgeschlagen",
+    "removed": "{role} entfernt",
+    "removeFailed": "Entfernen fehlgeschlagen",
+    "list": {
+      "search": "Zuordnungen nach Rolle suchen…",
+      "views": {
+        "all": "Alle"
+      }
+    }
+  },
+  "adminPrincipalAccess": {
+    "columns": {
+      "scope": "Geltungsbereich",
+      "who": "Wer",
+      "role": "Rolle",
+      "source": "Quelle",
+      "expires": "Läuft ab",
+      "granted": "Gewährt"
+    },
+    "alsoGranted": "auch gewährt bei {kind} <mono>{name}</mono>",
+    "never": "nie",
+    "truncated": "Es gibt mehr Zuweisungen, als ein Abruf liefert, daher zeigt diese Liste die ersten {count}. Grenzen Sie sie unter Zuweisungen ein, wo jede Zuweisung serverseitig paginiert wird.",
+    "listLabel": "Zuweisungen",
+    "removeThis": "Diese Zuweisung entfernen",
+    "removeCount": "{count} entfernen",
+    "emptyTitle": "Keine Zuweisungen",
+    "emptyDescription": "Hier ist noch nichts gewährt.",
+    "grantAccess": "Zugriff gewähren",
+    "remove": "Entfernen",
+    "removeManyTitle": "{count, plural, one {# Zuweisung entfernen?} other {# Zuweisungen entfernen?}}",
+    "removeManyDescription": "Jede Person verliert, was die entfernten Zuweisungen in ihrem Geltungsbereich und darunter gewährt haben. Andere Zuweisungen, weiter oder enger, bleiben wirksam.",
+    "removeOneTitle": "{role} bei {kind} {name} entfernen?",
+    "removeCovered": "{holder} behält sie: Dieselbe Rolle ist auch bei {kind} {name} gewährt. Entfernen Sie auch diese Zuweisung, um sie zu entziehen.",
+    "removeOneDescription": "{holder} verliert, was {role} bei {kind} {name} und allem darunter gewährt. Andere Zuweisungen bleiben wirksam.",
+    "removeGrant": "Zuweisung entfernen",
+    "removed": "{name} entfernt",
+    "removeFailed": "Entfernen fehlgeschlagen",
+    "noneRemoved": "Nichts wurde entfernt: {error}",
+    "unknownError": "unbekannter Fehler",
+    "removedCount": "{count} entfernt",
+    "partial": "{removed} entfernt; {failed} konnten nicht entfernt werden",
+    "summary": {
+      "rolesAcross": "{roles, plural, one {# Rolle} other {# Rollen}} in {grants, plural, one {# Zuweisung} other {# Zuweisungen}}",
+      "atScope": "{scope, select, ORG {{count} bei Organisation} TEAM {{count} bei Teams} PROJECT {{count} bei Projekten} APP {{count} bei Apps} other {{count} bei {scope}}}",
+      "alsoWider": "{count} auch weiter gefasst gewährt",
+      "expiring": "{count} laufen ab"
+    },
+    "list": {
+      "search": "Rollen und Geltungsbereiche suchen…  can:app.deploy",
+      "fields": {
+        "scope": "Geltungsbereich",
+        "role": "Rolle",
+        "can": "Darf"
+      },
+      "options": {
+        "scope": {
+          "ORG": "Organisation",
+          "TEAM": "Teams",
+          "PROJECT": "Projekte",
+          "APP": "Apps"
+        }
+      },
+      "views": {
+        "all": "Alle"
+      }
+    }
+  },
+  "adminPersonTeams": {
+    "columns": {
+      "team": "Team",
+      "membership": "Mitgliedschaft",
+      "joined": "Beigetreten"
+    },
+    "unnamedHint": "Erhält einen Namen, sobald jemand eine Rolle in diesem Team hat",
+    "unnamed": "Team #{pk}",
+    "listLabel": "Teams",
+    "emptyTitle": "In keinem Team",
+    "emptyDescription": "Wer eine Rolle im Geltungsbereich eines Teams erhält, wird Mitglied dieses Teams.",
+    "list": {
+      "search": "Teams suchen…",
+      "views": {
+        "all": "Alle"
+      }
+    }
+  },
+  "adminPersonActivity": {
+    "verb": "Aktivität lesen",
+    "intro": "Was diese Person getan hat, neueste zuerst.",
+    "openAudit": "Im Auditprotokoll öffnen",
+    "label": "Aktivität",
+    "emptyTitle": "Noch keine Aktivität",
+    "emptyDescription": "Aktionen dieser Person erscheinen hier, sobald das Auditprotokoll sie erfasst."
+  },
+  "adminPrincipal": {
+    "tabsLabel": "Navigation des Prinzipals",
+    "loadFailed": "Diese Seite konnte nicht geladen werden",
+    "retry": "Erneut versuchen",
+    "idpGroup": "IdP-Gruppe",
+    "grantAccess": "Zugriff gewähren",
+    "tabs": {
+      "access": "Zugriff",
+      "members": "Mitglieder",
+      "teams": "Teams",
+      "activity": "Aktivität"
+    },
+    "groupNotFound": "Gruppe nicht gefunden",
+    "backToPeople": "Zurück zu Personen",
+    "memberFallback": "Mitglied {id}",
+    "memberNotFound": "Mitglied nicht gefunden",
+    "memberNotFoundDescription": "Dieses Mitglied existiert eventuell nicht, hat die Organisation verlassen, oder Sie haben keinen Zugriff darauf.",
+    "chooseNamed": "{name} auswählen",
+    "groupMembers": {
+      "title": "Mitglieder kommen aus Ihrem Identity Provider",
+      "description": "Astrolift erfasst bei jeder Anmeldung, wer in {group} ist, listet die Personen hier aber noch nicht auf. Die Mitglieder stehen in der Konsole des Anbieters; was die Gruppe ihnen gibt, steht im Tab Zugriff.",
+      "action": "Identity Provider"
+    }
+  },
   "stepUp": {
     "title": "Bestätige deine Identität",
     "description": "Diese Aktion erfordert eine aktuelle Authentifizierung. Bestätige dein Passwort, um fortzufahren.",

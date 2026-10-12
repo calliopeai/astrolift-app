@@ -2,6 +2,7 @@
 
 import { HistoryIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { Feed } from "@/components/feed/Feed";
 import { PermissionNote } from "@/components/settings/Restricted";
@@ -45,17 +46,18 @@ export function PersonActivityPanel({
   auditHref,
 }: PersonActivityPanelProps) {
   const fmt = useFormatters();
-  if (!allowed) return <PermissionNote permission="audit_log.read" verb="Reading activity" />;
+  const t = useTranslations("adminPersonActivity");
+  if (!allowed) return <PermissionNote permission="audit_log.read" verb={t("verb")} />;
   return (
     <div className="flex min-w-0 flex-col gap-2">
       <p className="text-muted-foreground text-xs">
-        What they did, newest first.{" "}
+        {t("intro")}{" "}
         <Link href={auditHref} className="text-foreground underline-offset-2 hover:underline">
-          Open in the audit log
+          {t("openAudit")}
         </Link>
       </p>
       <Feed<AstroliftAuditEvent>
-        label="Activity"
+        label={t("label")}
         items={items}
         keyOf={(e) => e.id}
         groupBy={{ day: (e) => e.occurredAt }}
@@ -68,8 +70,8 @@ export function PersonActivityPanel({
         maxHeight="max-h-[32rem]"
         empty={{
           icon: <HistoryIcon className="size-5" />,
-          title: "No activity yet",
-          description: "Actions this person takes show here as the audit log records them.",
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
         }}
         renderItem={(e) => (
           <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">

@@ -6609,6 +6609,249 @@
       "reviewConfirm": "個人情報の削減を実行"
     }
   },
+  "adminPolicies": {
+    "title": "ポリシー",
+    "context": "ロールで許可される内容を絞り込むルールで、すべてのリクエストで確認されます。リクエストが満たせない条件は拒否になります。",
+    "columns": {
+      "policy": "ポリシー",
+      "effect": "効果",
+      "scope": "適用範囲",
+      "createdBy": "作成者",
+      "updated": "更新日"
+    },
+    "unknown": "不明",
+    "newPolicy": "新しいポリシー",
+    "delete": "削除",
+    "emptyTitle": "ポリシーはまだありません",
+    "emptyDescription": "ポリシーはロールで許可される内容を絞り込みます。業務時間内、社内ネットワーク、承認済み、再サインイン直後でない限り操作を拒否する、といった使い方です。ロール以上の権限を付与することはありません。",
+    "enforced": "<strong>すべてのチェックで適用されます。</strong>操作、リソース、ユーザーに一致する DENY は、それを許可するどのロールよりも優先されます。リクエストが満たせない条件 (クライアントアドレスなし、セッションなし) は拒否となるため、ポリシーは安全側に失敗します。検索対象は名前、スラッグ、説明、操作です。",
+    "learnMore": "詳細",
+    "deleteTitle": "ポリシー {slug} を削除しますか?",
+    "deleteFallback": "ポリシーを削除しますか?",
+    "deleteDescription": "ポリシーを論理削除し、スラッグを新しいポリシーで使えるようにします。拒否していた操作は、ロールが許可する範囲ですぐに再び許可されます。",
+    "deleteConfirm": "ポリシーを削除",
+    "deleted": "{slug} を削除しました",
+    "deleteFailed": "削除に失敗しました",
+    "list": {
+      "search": "ポリシーを検索…",
+      "fields": {
+        "effect": "効果",
+        "scope": "適用範囲"
+      },
+      "options": {
+        "effect": {
+          "DENY": "拒否",
+          "ALLOW": "許可"
+        },
+        "scope": {
+          "ORG": "組織",
+          "TEAM": "チーム",
+          "PROJECT": "プロジェクト",
+          "APP": "アプリ"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "deny": "拒否",
+        "allow": "許可"
+      }
+    },
+    "editor": {
+      "newPolicy": "新しいポリシー",
+      "policy": "ポリシー",
+      "notFoundCrumb": "見つかりません",
+      "notFoundTitle": "ポリシーが見つかりません",
+      "rule": "ルール",
+      "missingTitle": "この ID のポリシーはありません",
+      "missingDescription": "この組織に ID {id} のものはありません。削除された可能性があります。",
+      "allPolicies": "すべてのポリシー",
+      "needsPermission": "ポリシーを変更するには <mono>{permission}</mono> が必要です。",
+      "simulationFailed": "シミュレーションに失敗しました",
+      "errors": {
+        "name": "ポリシー名を入力してください。",
+        "slug": "英小文字、数字、ハイフンのみ使用できます。",
+        "conditions": "{count, plural, other {まず下でマークされた # 件の条件を修正してください。}}",
+        "action": "操作を指定してください。すべての操作には * を使います。"
+      },
+      "context": "ポリシーはロールで許可される内容を絞り込むもので、権限を追加することはありません。",
+      "steps": "ステップ",
+      "step": {
+        "details": "詳細",
+        "rule": "ルール",
+        "review": "確認"
+      },
+      "name": "名前",
+      "namePlaceholder": "業務時間外は本番デプロイ禁止",
+      "slug": "スラッグ",
+      "slugHelp": "編集するまでは名前から生成されます。作成後は変更できません。",
+      "fixed": "作成後は変更できません。",
+      "appliesAcross": "適用範囲",
+      "appliesAcrossHelp": "ルールが及ぶ範囲です。作成後は変更できません。",
+      "description": "説明",
+      "descriptionPlaceholder": "このルールが必要な理由を一文で。",
+      "theRule": "ルール",
+      "was": "変更前: {sentence}",
+      "inForce": "保存するとこのルールが有効になります。以降すべての権限チェックで評価され、リクエストが満たせない条件は拒否になります。",
+      "cancel": "キャンセル",
+      "back": "戻る",
+      "continue": "続行",
+      "saving": "保存中…",
+      "create": "ポリシーを作成",
+      "save": "ポリシーを保存",
+      "none": "なし",
+      "conditions": "条件",
+      "saved": "ポリシー {slug} を保存しました",
+      "saveFailed": "保存に失敗しました",
+      "created": "ポリシー {slug} を作成しました",
+      "createFailed": "作成に失敗しました"
+    }
+  },
+  "adminGroupMappings": {
+    "title": "ロールの対応付け",
+    "columns": {
+      "role": "ロール",
+      "where": "適用先",
+      "reaches": "対象人数",
+      "mapped": "対応付け日"
+    },
+    "members": "{count, plural, other {# 人のメンバー}}",
+    "description": "ID プロバイダーが {group} に含めたすべてのユーザーに、付与と同様にこれらのロールが与えられます。",
+    "mapRole": "ロールを対応付け",
+    "removeThis": "この対応付けを削除",
+    "emptyTitle": "ロールの対応付けはありません",
+    "emptyDescription": "{group} はどのロールにも対応付けられていません。メンバーには付与された権限のみが与えられます。",
+    "removeTitle": "{group} から {role} を削除しますか?",
+    "removeFallback": "対応付けを削除しますか?",
+    "removeDescription": "{count, plural, other {{group} のメンバー # 人}}は、他の付与で与えられていない限り、{scope} で {role} が与えるものを失います。",
+    "removeConfirm": "対応付けを削除",
+    "errors": {
+      "role": "ロールを選択してください。",
+      "scope": "ロールの適用先を選択してください。"
+    },
+    "pickRole": "ロールを選択",
+    "whereApplies": "適用先",
+    "cancel": "キャンセル",
+    "mapping": "対応付け中…",
+    "submit": "ロールを対応付け",
+    "mapped": "{group} を対応付けました",
+    "mappingFailed": "対応付けに失敗しました",
+    "removed": "{role} を削除しました",
+    "removeFailed": "削除に失敗しました",
+    "list": {
+      "search": "ロールで対応付けを検索…",
+      "views": {
+        "all": "すべて"
+      }
+    }
+  },
+  "adminPrincipalAccess": {
+    "columns": {
+      "scope": "適用範囲",
+      "who": "対象者",
+      "role": "ロール",
+      "source": "ソース",
+      "expires": "有効期限",
+      "granted": "付与日"
+    },
+    "alsoGranted": "{kind} <mono>{name}</mono> でも付与",
+    "never": "なし",
+    "truncated": "1 回の読み込みで返せる以上の付与があるため、最初の {count} 件のみ表示しています。すべての付与をサーバー側でページ分割する割り当て画面で絞り込んでください。",
+    "listLabel": "付与",
+    "removeThis": "この付与を削除",
+    "removeCount": "{count} 件を削除",
+    "emptyTitle": "付与はありません",
+    "emptyDescription": "ここではまだ何も付与されていません。",
+    "grantAccess": "アクセスを付与",
+    "remove": "削除",
+    "removeManyTitle": "{count, plural, other {# 件の付与を削除しますか?}}",
+    "removeManyDescription": "各保持者は、削除した付与がその適用範囲以下で与えていたものを失います。他の場所の付与は、広くても狭くても引き続き有効です。",
+    "removeOneTitle": "{kind} {name} の {role} を削除しますか?",
+    "removeCovered": "{holder} は引き続き保持します。同じロールが {kind} {name} でも付与されています。取り除くにはその付与も削除してください。",
+    "removeOneDescription": "{holder} は、{kind} {name} とその配下で {role} が与えるものを失います。他の付与は引き続き有効です。",
+    "removeGrant": "付与を削除",
+    "removed": "{name} を削除しました",
+    "removeFailed": "削除に失敗しました",
+    "noneRemoved": "何も削除されませんでした: {error}",
+    "unknownError": "不明なエラー",
+    "removedCount": "{count} 件を削除しました",
+    "partial": "{removed} 件を削除、{failed} 件は削除できませんでした",
+    "summary": {
+      "rolesAcross": "{grants, plural, other {# 件の付与}}で{roles, plural, other {# 個のロール}}",
+      "atScope": "{scope, select, ORG {組織で {count} 件} TEAM {チームで {count} 件} PROJECT {プロジェクトで {count} 件} APP {アプリで {count} 件} other {{scope} で {count} 件}}",
+      "alsoWider": "{count} 件はより広い範囲でも付与",
+      "expiring": "{count} 件が期限付き"
+    },
+    "list": {
+      "search": "ロールと適用範囲を検索…  can:app.deploy",
+      "fields": {
+        "scope": "適用範囲",
+        "role": "ロール",
+        "can": "可能な操作"
+      },
+      "options": {
+        "scope": {
+          "ORG": "組織",
+          "TEAM": "チーム",
+          "PROJECT": "プロジェクト",
+          "APP": "アプリ"
+        }
+      },
+      "views": {
+        "all": "すべて"
+      }
+    }
+  },
+  "adminPersonTeams": {
+    "columns": {
+      "team": "チーム",
+      "membership": "メンバーシップ",
+      "joined": "参加日"
+    },
+    "unnamedHint": "誰かがこのチームでロールを持つと名前が付きます",
+    "unnamed": "チーム #{pk}",
+    "listLabel": "チーム",
+    "emptyTitle": "チームに所属していません",
+    "emptyDescription": "チームの適用範囲でロールを付与すると、その人はそのチームに所属します。",
+    "list": {
+      "search": "チームを検索…",
+      "views": {
+        "all": "すべて"
+      }
+    }
+  },
+  "adminPersonActivity": {
+    "verb": "アクティビティの閲覧",
+    "intro": "このユーザーの操作 (新しい順)。",
+    "openAudit": "監査ログで開く",
+    "label": "アクティビティ",
+    "emptyTitle": "アクティビティはまだありません",
+    "emptyDescription": "このユーザーの操作は、監査ログに記録されるとここに表示されます。"
+  },
+  "adminPrincipal": {
+    "tabsLabel": "プリンシパルのナビゲーション",
+    "loadFailed": "このページを読み込めませんでした",
+    "retry": "再試行",
+    "idpGroup": "IdP グループ",
+    "grantAccess": "アクセスを付与",
+    "tabs": {
+      "access": "アクセス",
+      "members": "メンバー",
+      "teams": "チーム",
+      "activity": "アクティビティ"
+    },
+    "groupNotFound": "グループが見つかりません",
+    "backToPeople": "ユーザー一覧に戻る",
+    "memberFallback": "メンバー {id}",
+    "memberNotFound": "メンバーが見つかりません",
+    "memberNotFoundDescription": "このメンバーは存在しないか、組織を離れたか、アクセス権がない可能性があります。",
+    "chooseNamed": "{name} を選択",
+    "groupMembers": {
+      "title": "メンバーは ID プロバイダーから取得されます",
+      "description": "Astrolift は各ユーザーのサインイン時に {group} の所属を記録しますが、まだここには一覧表示しません。メンバーはプロバイダーのコンソールで確認できます。グループが与える権限はアクセスタブにあります。",
+      "action": "ID プロバイダー"
+    }
+  },
   "stepUp": {
     "title": "本人確認",
     "description": "この操作には最近の認証が必要です。続行するにはパスワードを確認してください。",

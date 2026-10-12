@@ -2,6 +2,7 @@
 
 import { ShieldPlusIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import { DetailStatusBadge, type Dot } from "@/components/detail/EntityDetailShell";
@@ -40,11 +41,18 @@ export function MemberDetail({
   tab,
   children,
 }: MemberDetailProps) {
-  const fallback = `Member ${id.slice(0, 8)}`;
-  const tabHref = personTabs(id, tab).find((t) => t.active)?.href ?? PEOPLE_HREF;
+  const t = useTranslations("adminPrincipal");
+  const fallback = t("memberFallback", { id: id.slice(0, 8) });
+  const tabs = personTabs(id, tab).map((item) => ({ ...item, label: t(`tabs.${item.key}`) }));
+  const tabHref = tabs.find((item) => item.active)?.href ?? PEOPLE_HREF;
   return (
     <PrincipalPage
       crumbs={accessCrumbs("people", m?.user.username ?? fallback)}
+      presentation={{
+        tabsAriaLabel: t("tabsLabel"),
+        loadFailed: t("loadFailed"),
+        retry: t("retry"),
+      }}
       principal={
         m ? { kind: "user", id: m.user.id, name: m.user.username, detail: m.user.email } : null
       }
@@ -65,22 +73,21 @@ export function MemberDetail({
               })}
             >
               <ShieldPlusIcon className="size-4" />
-              Grant access
+              {t("grantAccess")}
             </Link>
           </Button>
         ) : undefined
       }
-      tabs={personTabs(id, tab)}
+      tabs={tabs}
       loading={loading}
       error={error}
       onRetry={onRetry}
       notFound={!loading && !error && !m}
       notFoundCopy={{
-        title: "Member not found",
-        description:
-          "This member may not exist, may have left the organization, or you may not have access to it.",
+        title: t("memberNotFound"),
+        description: t("memberNotFoundDescription"),
         backHref: PEOPLE_HREF,
-        backLabel: "Back to People",
+        backLabel: t("backToPeople"),
       }}
     >
       {children}

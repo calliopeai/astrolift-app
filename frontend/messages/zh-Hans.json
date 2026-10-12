@@ -6609,6 +6609,249 @@
       "reviewConfirm": "执行个人信息清理"
     }
   },
+  "adminPolicies": {
+    "title": "策略",
+    "context": "收窄角色所允许范围的规则，每次请求都会检查。请求无法满足的条件将被拒绝。",
+    "columns": {
+      "policy": "策略",
+      "effect": "效果",
+      "scope": "适用范围",
+      "createdBy": "创建者",
+      "updated": "更新时间"
+    },
+    "unknown": "未知",
+    "newPolicy": "新建策略",
+    "delete": "删除",
+    "emptyTitle": "暂无策略",
+    "emptyDescription": "策略会收窄角色所允许的范围：除非在工作时间、办公网络、已审批或刚重新登录，否则拒绝某项操作。它永远不会授予比角色更多的权限。",
+    "enforced": "<strong>每次检查都会执行。</strong>与操作、资源和人员匹配的 DENY 优先于任何允许它的角色。请求无法满足的条件（无客户端地址、无会话）将被拒绝，因此策略默认拒绝。搜索范围包括名称、slug、描述和操作。",
+    "learnMore": "了解更多",
+    "deleteTitle": "删除策略 {slug}？",
+    "deleteFallback": "删除策略？",
+    "deleteDescription": "软删除该策略并释放其 slug 供新策略使用。它所拒绝的操作将立即在角色允许的范围内恢复允许。",
+    "deleteConfirm": "删除策略",
+    "deleted": "已删除 {slug}",
+    "deleteFailed": "删除失败",
+    "list": {
+      "search": "搜索策略…",
+      "fields": {
+        "effect": "效果",
+        "scope": "适用范围"
+      },
+      "options": {
+        "effect": {
+          "DENY": "拒绝",
+          "ALLOW": "允许"
+        },
+        "scope": {
+          "ORG": "组织",
+          "TEAM": "团队",
+          "PROJECT": "项目",
+          "APP": "应用"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "deny": "拒绝",
+        "allow": "允许"
+      }
+    },
+    "editor": {
+      "newPolicy": "新建策略",
+      "policy": "策略",
+      "notFoundCrumb": "未找到",
+      "notFoundTitle": "未找到策略",
+      "rule": "规则",
+      "missingTitle": "没有此 ID 的策略",
+      "missingDescription": "此组织中没有 ID 为 {id} 的对象，可能已被删除。",
+      "allPolicies": "所有策略",
+      "needsPermission": "更改策略需要 <mono>{permission}</mono>。",
+      "simulationFailed": "模拟失败",
+      "errors": {
+        "name": "请为策略命名。",
+        "slug": "仅限小写字母、数字和连字符。",
+        "conditions": "{count, plural, other {请先修正下方标记的 # 个条件。}}",
+        "action": "请指定一个操作，或用 * 表示所有操作。"
+      },
+      "context": "策略只会收窄角色所允许的范围，不会授予更多。",
+      "steps": "步骤",
+      "step": {
+        "details": "详情",
+        "rule": "规则",
+        "review": "确认"
+      },
+      "name": "名称",
+      "namePlaceholder": "非工作时间禁止生产部署",
+      "slug": "Slug",
+      "slugHelp": "在你编辑前由名称生成。创建后不可更改。",
+      "fixed": "创建后不可更改。",
+      "appliesAcross": "适用范围",
+      "appliesAcrossHelp": "规则的作用范围。创建后不可更改。",
+      "description": "描述",
+      "descriptionPlaceholder": "用一句话说明设立此规则的原因。",
+      "theRule": "规则",
+      "was": "原为：{sentence}",
+      "inForce": "保存后此规则即生效：此后每次权限检查都会评估它，请求无法满足的条件将被拒绝。",
+      "cancel": "取消",
+      "back": "上一步",
+      "continue": "继续",
+      "saving": "正在保存…",
+      "create": "创建策略",
+      "save": "保存策略",
+      "none": "无",
+      "conditions": "条件",
+      "saved": "策略 {slug} 已保存",
+      "saveFailed": "保存失败",
+      "created": "策略 {slug} 已创建",
+      "createFailed": "创建失败"
+    }
+  },
+  "adminGroupMappings": {
+    "title": "角色映射",
+    "columns": {
+      "role": "角色",
+      "where": "位置",
+      "reaches": "覆盖",
+      "mapped": "映射时间"
+    },
+    "members": "{count, plural, other {# 名成员}}",
+    "description": "身份提供商加入 {group} 的所有人都会获得这些角色，与授权相同。",
+    "mapRole": "映射角色",
+    "removeThis": "移除此映射",
+    "emptyTitle": "没有角色映射",
+    "emptyDescription": "{group} 未映射到任何角色，其成员仅拥有授权所给予的权限。",
+    "removeTitle": "从 {group} 移除 {role}？",
+    "removeFallback": "移除映射？",
+    "removeDescription": "{count, plural, other {{group} 的 # 名成员}}将失去 {role} 在 {scope} 授予的权限，除非其他授权也给予了。",
+    "removeConfirm": "移除映射",
+    "errors": {
+      "role": "请选择角色。",
+      "scope": "请选择角色的适用位置。"
+    },
+    "pickRole": "选择角色",
+    "whereApplies": "适用位置",
+    "cancel": "取消",
+    "mapping": "正在映射…",
+    "submit": "映射角色",
+    "mapped": "已映射 {group}",
+    "mappingFailed": "映射失败",
+    "removed": "已移除 {role}",
+    "removeFailed": "移除失败",
+    "list": {
+      "search": "按角色搜索映射…",
+      "views": {
+        "all": "全部"
+      }
+    }
+  },
+  "adminPrincipalAccess": {
+    "columns": {
+      "scope": "适用范围",
+      "who": "持有者",
+      "role": "角色",
+      "source": "来源",
+      "expires": "到期",
+      "granted": "授予时间"
+    },
+    "alsoGranted": "也在{kind} <mono>{name}</mono> 授予",
+    "never": "永不",
+    "truncated": "其授权数量超过单次读取的上限，因此此列表仅显示前 {count} 条。请在“分配”中缩小范围，那里的每条授权都在服务器端分页。",
+    "listLabel": "授权",
+    "removeThis": "移除此授权",
+    "removeCount": "移除 {count} 项",
+    "emptyTitle": "没有授权",
+    "emptyDescription": "此处尚未授予任何内容。",
+    "grantAccess": "授予访问权限",
+    "remove": "移除",
+    "removeManyTitle": "{count, plural, other {移除 # 项授权？}}",
+    "removeManyDescription": "每位持有者将失去所移除授权在其范围及以下授予的权限。其他位置的授权（更宽或更窄）仍然有效。",
+    "removeOneTitle": "移除{kind} {name} 上的 {role}？",
+    "removeCovered": "{holder} 仍保留该权限：同一角色也在{kind} {name} 授予。如需撤除，请一并移除该授权。",
+    "removeOneDescription": "{holder} 将失去 {role} 在{kind} {name} 及其下所有对象上授予的权限。其他授权仍然有效。",
+    "removeGrant": "移除授权",
+    "removed": "已移除 {name}",
+    "removeFailed": "移除失败",
+    "noneRemoved": "未移除任何内容：{error}",
+    "unknownError": "未知错误",
+    "removedCount": "已移除 {count} 项",
+    "partial": "已移除 {removed} 项；{failed} 项无法移除",
+    "summary": {
+      "rolesAcross": "{grants, plural, other {# 项授权}}中的{roles, plural, other {# 个角色}}",
+      "atScope": "{scope, select, ORG {组织级 {count} 项} TEAM {团队级 {count} 项} PROJECT {项目级 {count} 项} APP {应用级 {count} 项} other {{scope} 级 {count} 项}}",
+      "alsoWider": "{count} 项也在更大范围授予",
+      "expiring": "{count} 项将到期"
+    },
+    "list": {
+      "search": "搜索角色和范围…  can:app.deploy",
+      "fields": {
+        "scope": "适用范围",
+        "role": "角色",
+        "can": "可执行"
+      },
+      "options": {
+        "scope": {
+          "ORG": "组织",
+          "TEAM": "团队",
+          "PROJECT": "项目",
+          "APP": "应用"
+        }
+      },
+      "views": {
+        "all": "全部"
+      }
+    }
+  },
+  "adminPersonTeams": {
+    "columns": {
+      "team": "团队",
+      "membership": "成员身份",
+      "joined": "加入时间"
+    },
+    "unnamedHint": "有人在此团队持有角色后即会显示名称",
+    "unnamed": "团队 #{pk}",
+    "listLabel": "团队",
+    "emptyTitle": "未加入任何团队",
+    "emptyDescription": "在团队范围内授予角色即可将该人员加入该团队。",
+    "list": {
+      "search": "搜索团队…",
+      "views": {
+        "all": "全部"
+      }
+    }
+  },
+  "adminPersonActivity": {
+    "verb": "查看活动",
+    "intro": "此人的操作，按时间倒序。",
+    "openAudit": "在审计日志中打开",
+    "label": "活动",
+    "emptyTitle": "暂无活动",
+    "emptyDescription": "此人的操作在审计日志记录后会显示在这里。"
+  },
+  "adminPrincipal": {
+    "tabsLabel": "主体导航",
+    "loadFailed": "无法加载此页面",
+    "retry": "重试",
+    "idpGroup": "IdP 组",
+    "grantAccess": "授予访问权限",
+    "tabs": {
+      "access": "访问权限",
+      "members": "成员",
+      "teams": "团队",
+      "activity": "活动"
+    },
+    "groupNotFound": "未找到组",
+    "backToPeople": "返回人员",
+    "memberFallback": "成员 {id}",
+    "memberNotFound": "未找到成员",
+    "memberNotFoundDescription": "该成员可能不存在、已离开组织，或你无权访问。",
+    "chooseNamed": "选择 {name}",
+    "groupMembers": {
+      "title": "成员来自你的身份提供商",
+      "description": "Astrolift 会在每个人登录时记录其是否属于 {group}，但目前尚未在此列出。成员可在提供商控制台中查看；该组授予的权限见“访问权限”标签页。",
+      "action": "身份提供商"
+    }
+  },
   "stepUp": {
     "title": "确认身份",
     "description": "此操作需要最近的身份验证。请确认您的密码以继续。",

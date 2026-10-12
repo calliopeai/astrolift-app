@@ -6609,6 +6609,249 @@
       "reviewConfirm": "Nettoyer les données personnelles"
     }
   },
+  "adminPolicies": {
+    "title": "Politiques",
+    "context": "Des règles qui restreignent ce que les rôles permettent, vérifiées à chaque requête. Une condition à laquelle la requête ne peut pas répondre refuse.",
+    "columns": {
+      "policy": "Politique",
+      "effect": "Effet",
+      "scope": "Portée",
+      "createdBy": "Créée par",
+      "updated": "Mise à jour"
+    },
+    "unknown": "inconnu",
+    "newPolicy": "Nouvelle politique",
+    "delete": "Supprimer",
+    "emptyTitle": "Aucune politique pour l'instant",
+    "emptyDescription": "Une politique restreint ce que les rôles permettent : refuser une action sauf pendant les heures ouvrées, depuis le réseau du bureau, avec approbation ou après une connexion récente. Elle n'accorde jamais plus qu'un rôle.",
+    "enforced": "<strong>Appliquée à chaque vérification.</strong> Un DENY qui correspond à l'action, à la ressource et à la personne l'emporte sur tout rôle qui l'autorise. Une condition à laquelle la requête ne peut pas répondre (pas d'adresse client, pas de session) refuse, la politique échoue donc en mode fermé. La recherche porte sur le nom, le slug, la description et l'action.",
+    "learnMore": "En savoir plus",
+    "deleteTitle": "Supprimer la politique {slug} ?",
+    "deleteFallback": "Supprimer la politique ?",
+    "deleteDescription": "Supprime la politique de façon réversible et libère son slug pour une nouvelle. Ce qu'elle refusait est de nouveau autorisé immédiatement, partout où un rôle l'autorise.",
+    "deleteConfirm": "Supprimer la politique",
+    "deleted": "{slug} supprimée",
+    "deleteFailed": "Échec de la suppression",
+    "list": {
+      "search": "Rechercher des politiques…",
+      "fields": {
+        "effect": "Effet",
+        "scope": "Portée"
+      },
+      "options": {
+        "effect": {
+          "DENY": "refuser",
+          "ALLOW": "autoriser"
+        },
+        "scope": {
+          "ORG": "organisation",
+          "TEAM": "équipe",
+          "PROJECT": "projet",
+          "APP": "app"
+        }
+      },
+      "views": {
+        "all": "Toutes",
+        "mine": "Les miennes",
+        "deny": "Refus",
+        "allow": "Autorisation"
+      }
+    },
+    "editor": {
+      "newPolicy": "Nouvelle politique",
+      "policy": "Politique",
+      "notFoundCrumb": "Introuvable",
+      "notFoundTitle": "Politique introuvable",
+      "rule": "Règle",
+      "missingTitle": "Aucune politique avec cet identifiant",
+      "missingDescription": "Rien dans cette organisation n'a l'identifiant {id}. Il a peut-être été supprimé.",
+      "allPolicies": "Toutes les politiques",
+      "needsPermission": "Modifier une politique nécessite <mono>{permission}</mono>.",
+      "simulationFailed": "La simulation a échoué",
+      "errors": {
+        "name": "Nommez la politique.",
+        "slug": "Minuscules, chiffres et tirets uniquement.",
+        "conditions": "{count, plural, one {Corrigez d'abord la condition signalée ci-dessous.} other {Corrigez d'abord les # conditions signalées ci-dessous.}}",
+        "action": "Indiquez une action, ou * pour toutes."
+      },
+      "context": "Une politique restreint ce que les rôles permettent ; elle n'accorde jamais plus.",
+      "steps": "Étapes",
+      "step": {
+        "details": "Détails",
+        "rule": "Règle",
+        "review": "Vérification"
+      },
+      "name": "Nom",
+      "namePlaceholder": "Pas de déploiement en prod hors des heures ouvrées",
+      "slug": "Slug",
+      "slugHelp": "Dérivé du nom tant que vous ne le modifiez pas. Figé après la création.",
+      "fixed": "Figé après la création.",
+      "appliesAcross": "S'applique à",
+      "appliesAcrossHelp": "Jusqu'où s'étend la règle. Figé après la création.",
+      "description": "Description",
+      "descriptionPlaceholder": "Pourquoi cette règle existe, en une phrase.",
+      "theRule": "La règle",
+      "was": "Avant : {sentence}",
+      "inForce": "L'enregistrement met la règle en vigueur : chaque vérification de permission l'évalue dès lors, et une condition à laquelle la requête ne peut pas répondre refuse.",
+      "cancel": "Annuler",
+      "back": "Retour",
+      "continue": "Continuer",
+      "saving": "Enregistrement…",
+      "create": "Créer la politique",
+      "save": "Enregistrer la politique",
+      "none": "aucun",
+      "conditions": "Conditions",
+      "saved": "Politique {slug} enregistrée",
+      "saveFailed": "Échec de l'enregistrement",
+      "created": "Politique {slug} créée",
+      "createFailed": "Échec de la création"
+    }
+  },
+  "adminGroupMappings": {
+    "title": "Associations de rôles",
+    "columns": {
+      "role": "Rôle",
+      "where": "Où",
+      "reaches": "Touche",
+      "mapped": "Associé"
+    },
+    "members": "{count, plural, one {# membre} other {# membres}}",
+    "description": "Toute personne que le fournisseur d'identité place dans {group} reçoit ces rôles, comme pour une attribution.",
+    "mapRole": "Associer un rôle",
+    "removeThis": "Retirer cette association",
+    "emptyTitle": "Aucune association de rôle",
+    "emptyDescription": "{group} n'est associé à aucun rôle. Ses membres n'obtiennent que ce que les attributions leur donnent.",
+    "removeTitle": "Retirer {role} de {group} ?",
+    "removeFallback": "Retirer l'association ?",
+    "removeDescription": "{count, plural, one {Le # membre} other {Les # membres}} de {group} perdent ce que {role} donne sur {scope}, sauf si une autre attribution le donne.",
+    "removeConfirm": "Retirer l'association",
+    "errors": {
+      "role": "Choisissez un rôle.",
+      "scope": "Choisissez où le rôle s'applique."
+    },
+    "pickRole": "Choisissez un rôle",
+    "whereApplies": "Où il s'applique",
+    "cancel": "Annuler",
+    "mapping": "Association…",
+    "submit": "Associer le rôle",
+    "mapped": "{group} associé",
+    "mappingFailed": "L'association a échoué",
+    "removed": "{role} retiré",
+    "removeFailed": "Échec du retrait",
+    "list": {
+      "search": "Rechercher des associations par rôle…",
+      "views": {
+        "all": "Toutes"
+      }
+    }
+  },
+  "adminPrincipalAccess": {
+    "columns": {
+      "scope": "Portée",
+      "who": "Qui",
+      "role": "Rôle",
+      "source": "Source",
+      "expires": "Expire",
+      "granted": "Accordé"
+    },
+    "alsoGranted": "aussi accordé sur {kind} <mono>{name}</mono>",
+    "never": "jamais",
+    "truncated": "Cette personne a plus d'attributions qu'une lecture n'en renvoie : la liste affiche les {count} premières. Affinez-la dans Attributions, où chaque attribution est paginée côté serveur.",
+    "listLabel": "Attributions",
+    "removeThis": "Retirer cette attribution",
+    "removeCount": "Retirer {count}",
+    "emptyTitle": "Aucune attribution",
+    "emptyDescription": "Rien n'est encore accordé ici.",
+    "grantAccess": "Accorder l'accès",
+    "remove": "Retirer",
+    "removeManyTitle": "{count, plural, one {Retirer # attribution ?} other {Retirer # attributions ?}}",
+    "removeManyDescription": "Chaque détenteur perd ce que les attributions retirées donnaient sur leur portée et en dessous. Les attributions ailleurs, plus larges ou plus étroites, restent en vigueur.",
+    "removeOneTitle": "Retirer {role} sur {kind} {name} ?",
+    "removeCovered": "{holder} le conserve : le même rôle est aussi accordé sur {kind} {name}. Retirez aussi cette attribution pour le lui enlever.",
+    "removeOneDescription": "{holder} perd ce que {role} donne sur {kind} {name} et tout ce qu'il contient. Les autres attributions restent en vigueur.",
+    "removeGrant": "Retirer l'attribution",
+    "removed": "{name} retiré",
+    "removeFailed": "Échec du retrait",
+    "noneRemoved": "Rien n'a été retiré : {error}",
+    "unknownError": "erreur inconnue",
+    "removedCount": "{count} retirées",
+    "partial": "{removed} retirées ; {failed} n'ont pas pu l'être",
+    "summary": {
+      "rolesAcross": "{roles, plural, one {# rôle} other {# rôles}} sur {grants, plural, one {# attribution} other {# attributions}}",
+      "atScope": "{scope, select, ORG {{count} sur l'organisation} TEAM {{count} sur des équipes} PROJECT {{count} sur des projets} APP {{count} sur des apps} other {{count} sur {scope}}}",
+      "alsoWider": "{count} aussi accordées plus largement",
+      "expiring": "{count} expirent"
+    },
+    "list": {
+      "search": "Rechercher rôles et portées…  can:app.deploy",
+      "fields": {
+        "scope": "Portée",
+        "role": "Rôle",
+        "can": "Peut"
+      },
+      "options": {
+        "scope": {
+          "ORG": "Organisation",
+          "TEAM": "Équipes",
+          "PROJECT": "Projets",
+          "APP": "Apps"
+        }
+      },
+      "views": {
+        "all": "Toutes"
+      }
+    }
+  },
+  "adminPersonTeams": {
+    "columns": {
+      "team": "Équipe",
+      "membership": "Adhésion",
+      "joined": "Arrivée"
+    },
+    "unnamedHint": "Nommée dès que quelqu'un détient un rôle dans cette équipe",
+    "unnamed": "équipe #{pk}",
+    "listLabel": "Équipes",
+    "emptyTitle": "Dans aucune équipe",
+    "emptyDescription": "Accorder un rôle sur la portée d'une équipe ajoute la personne à cette équipe.",
+    "list": {
+      "search": "Rechercher des équipes…",
+      "views": {
+        "all": "Tous"
+      }
+    }
+  },
+  "adminPersonActivity": {
+    "verb": "Consulter l'activité",
+    "intro": "Ce que cette personne a fait, du plus récent au plus ancien.",
+    "openAudit": "Ouvrir dans le journal d'audit",
+    "label": "Activité",
+    "emptyTitle": "Aucune activité pour l'instant",
+    "emptyDescription": "Les actions de cette personne apparaissent ici à mesure que le journal d'audit les enregistre."
+  },
+  "adminPrincipal": {
+    "tabsLabel": "Navigation du principal",
+    "loadFailed": "Impossible de charger cette page",
+    "retry": "Réessayer",
+    "idpGroup": "Groupe IdP",
+    "grantAccess": "Accorder l'accès",
+    "tabs": {
+      "access": "Accès",
+      "members": "Membres",
+      "teams": "Équipes",
+      "activity": "Activité"
+    },
+    "groupNotFound": "Groupe introuvable",
+    "backToPeople": "Retour aux personnes",
+    "memberFallback": "Membre {id}",
+    "memberNotFound": "Membre introuvable",
+    "memberNotFoundDescription": "Ce membre n'existe peut-être pas, a peut-être quitté l'organisation, ou vous n'y avez pas accès.",
+    "chooseNamed": "Sélectionner {name}",
+    "groupMembers": {
+      "title": "Les membres viennent de votre fournisseur d'identité",
+      "description": "Astrolift enregistre qui fait partie de {group} à chaque connexion, mais ne les liste pas encore ici. La console du fournisseur contient les membres ; ce que le groupe leur donne figure dans l'onglet Accès.",
+      "action": "Fournisseur d'identité"
+    }
+  },
   "stepUp": {
     "title": "Confirmez votre identité",
     "description": "Cette action nécessite une authentification récente. Confirmez votre mot de passe pour continuer.",
