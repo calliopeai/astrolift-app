@@ -12,6 +12,7 @@ import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
 import { SOFT_DELETE_APP } from "@/graphql/registry/registry.mutations";
 import { GET_APP, LIST_APPS, LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp, AstroliftWorkload } from "@/graphql/registry/registry.types";
+import { permissionMatches } from "@/lib/permissions/astrolift-permissions";
 import { type PermissionCheck, useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import { useArchiveApp } from "../settings/use-archive-app";
@@ -43,11 +44,16 @@ export function useAppFrame(slug: string): Omit<AppFrameProps, "children"> {
   const tDetail = useTranslations("apps.detail");
   const tFrame = useTranslations("apps.frame");
   const perms = useMyPermissions();
-  // Optimistic while the permission set loads, as `Can` is; the backend
-  // still enforces every one.
-  const allow = (p: PermissionCheck) => (perms.loading && perms.granted.size === 0) || perms.can(p);
-
   const appQ = useQuery<AppResp>(GET_APP, { variables: { slug } });
+  // The app's own permissions once it has loaded (#1867); account grants
+  // bridge the first load, optimistic while they load, as `Can` is. The
+  // backend still enforces every one.
+  const scoped =
+    appQ.data?.astroliftApp?.slug === slug ? appQ.data.astroliftApp.viewerPermissions : null;
+  const allow = (p: PermissionCheck) =>
+    scoped
+      ? permissionMatches(new Set(scoped), p)
+      : (perms.loading && perms.granted.size === 0) || perms.can(p);
   const workloadsQ = useQuery<WorkloadsResp>(LIST_WORKLOADS, { variables: { appSlug: slug } });
   const envsQ = useQuery<EnvsResp>(LIST_ENVIRONMENTS, { variables: { appSlug: slug } });
   // The Overview's panels read the same deploys (one query, see use-app-deploys).

@@ -53,6 +53,13 @@ export const FAILED_RUN: BootstrapRun = {
 };
 
 export const CLUSTER = {
+  viewerPermissions: [
+    "cluster.manage",
+    "cluster.read",
+    "cluster.unregister",
+    "cluster.update",
+    "cluster.users",
+  ],
   id: "c0ffee00-0000-4000-8000-000000000001",
   slug: "prod-west",
   name: "Production West",

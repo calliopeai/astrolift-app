@@ -158,6 +158,7 @@ function cluster(overrides: Partial<AstroliftTenantCluster>): AstroliftTenantClu
     id: "c-1",
     slug: "prod-us-east",
     name: "Production US East",
+    viewerPermissions: ["cluster.read"],
     providerPluginSlug: "aws-eks",
     region: "us-east-1",
     authMethod: "irsa",

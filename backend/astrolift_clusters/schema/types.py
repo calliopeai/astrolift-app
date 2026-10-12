@@ -77,6 +77,20 @@ class TenantClusterType:
     # False for a caller holding ``cluster.read`` without ``cluster.register``:
     # operator-only fields were withheld and bootstrap history stays hidden.
     operator_view: strawberry.Private[bool] = True
+    # No owning organization: every write is the platform operator's (#1918).
+    shared: strawberry.Private[bool] = False
+
+    @strawberry.field(
+        description=(
+            "The cluster permissions the viewer holds on this cluster (#1867), from the "
+            "checker the mutations use; a shared cluster's writes are the platform "
+            "operator's. Advisory: offer only these, the mutation still decides."
+        )
+    )
+    def viewer_permissions(self, info: strawberry.Info) -> list[str]:
+        from astrolift_clusters.viewer_permissions import cluster_viewer_permissions
+
+        return cluster_viewer_permissions(info, shared=self.shared)
 
     @strawberry.field
     def last_bootstrap_run(self) -> ClusterBootstrapRunType | None:
@@ -374,6 +388,7 @@ def cluster_to_type(cluster, *, operator_view: bool = True) -> TenantClusterType
             else None
         ),
         operator_view=operator_view,
+        shared=cluster.organization_id is None,
     )
 
 

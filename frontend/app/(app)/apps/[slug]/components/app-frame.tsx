@@ -6,6 +6,7 @@ import { AppFrame } from "@/components/screens/apps/detail/AppFrame";
 import { useAppFrame } from "@/components/screens/apps/detail/use-app-frame";
 
 import { AppChromeProvider } from "@/lib/app-chrome-context";
+import { AppPermissionsProvider } from "@/lib/permissions/app-permissions";
 
 /**
  * The frame around every `/apps/[slug]/*` route: the header and the one row
@@ -15,7 +16,9 @@ import { AppChromeProvider } from "@/lib/app-chrome-context";
 export function AppFrameContainer({ slug, children }: { slug: string; children: React.ReactNode }) {
   return (
     <AppFrame {...useAppFrame(slug)}>
-      <AppChromeProvider framed>{children}</AppChromeProvider>
+      <AppPermissionsProvider slug={slug}>
+        <AppChromeProvider framed>{children}</AppChromeProvider>
+      </AppPermissionsProvider>
     </AppFrame>
   );
 }

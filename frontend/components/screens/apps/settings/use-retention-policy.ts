@@ -9,7 +9,7 @@ import type { MutationResult } from "@/graphql/identity/identity.types";
 import { SET_RETENTION_POLICY } from "@/graphql/registry/registry.mutations";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
-import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
+import { useAppCan } from "@/lib/permissions/app-permissions";
 import type {
   AstroliftRegisteredApp,
   AstroliftRetentionPolicy,
@@ -41,8 +41,7 @@ export function retentionSignalLabel(signal: string, translate: (key: string) =>
 
 export function useRetentionPolicy(appSlug: string, source?: RetentionSource | null) {
   const t = useTranslations("apps.settings.retentionFlow");
-  const perms = useMyPermissions();
-  const allowed = (perms.loading && perms.granted.size === 0) || perms.can("app.update");
+  const allowed = useAppCan("app.update");
   const observed =
     source === undefined ||
     (!!source?.id && source.slug === appSlug && Array.isArray(source.retentionPolicies));

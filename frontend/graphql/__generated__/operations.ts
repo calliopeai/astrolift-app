@@ -5682,6 +5682,8 @@ export type AstroliftTenantCluster = {
   region: Scalars['String']['output'];
   secretsBackendProvisionedAt?: Maybe<Scalars['DateTime']['output']>;
   slug: Scalars['String']['output'];
+  /** The cluster permissions the viewer holds on this cluster (#1867), from the checker the mutations use; a shared cluster's writes are the platform operator's. Advisory: offer only these, the mutation still decides. */
+  viewerPermissions: Array<Scalars['String']['output']>;
 };
 
 
@@ -16868,7 +16870,7 @@ export type GetClusterQueryVariables = Exact<{
 }>;
 
 
-export type GetClusterQuery = { astroliftCluster?: { oidcAuthConfig?: unknown | null, id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: unknown | null, isActive: boolean, capabilities: unknown, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, createdByUsername?: string | null, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: unknown, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null } | null };
+export type GetClusterQuery = { astroliftCluster?: { oidcAuthConfig?: unknown | null, viewerPermissions: Array<string>, id: string, slug: string, name: string, organizationSlug?: string | null, providerPluginSlug: string, region: string, endpoint: string, authMethod: string, ingressClass: string, albAuthConfig?: unknown | null, isActive: boolean, capabilities: unknown, capabilitiesProbedAt?: string | null, createdAt: string, lifecycle: string, lastManagementError: string, managedAt?: string | null, lastHeartbeatAt?: string | null, heartbeatIntervalSeconds: number, heartbeatStatus: string, heartbeatAgeSeconds?: number | null, agentProvisioned: boolean, createdByUsername?: string | null, lastBootstrapRun?: { id: string, status: string, chartVersion: string, installedReleases: unknown, cliVersion: string, errorMessage: string, startedAt: string, endedAt: string, triggeredByUsername?: string | null } | null } | null };
 
 export type UpdateTenantClusterMutationVariables = Exact<{
   input: UpdateTenantClusterInput;
@@ -19272,6 +19274,13 @@ export type GetAppDependencyContextQueryVariables = Exact<{
 
 
 export type GetAppDependencyContextQuery = { astroliftAppDependencyContext?: { appId: string, environmentId: string, environmentName: string, readAt: string, managedDomainState: DependencyObservationState, domainsScope: string, domainsState: DependencyObservationState, domainsTruncated: boolean, domainLimit: number, liveProviderObservationState: DependencyObservationState, liveProviderObservationReason: string, permissions: { requiredPermission: string, appReadAllowed: boolean, appDeployGateAllowed: boolean, clusterRegisterGateAllowed: boolean }, cluster: { id: string, slug: string, providerId: string, providerSlug: string, region?: string | null, lifecycle: string, isActive: boolean, heartbeatSource: string, heartbeatState: DependencyObservationState, heartbeatStatus: string, heartbeatObservedAt?: string | null }, managedDomain?: { id: string, zone: string } | null, domains: Array<{ id: string, hostname: string, isActive: boolean, validationStatus: string, validationObservedAt?: string | null, configuredCertificateReferencePresent: boolean, certificateSource: string, storedCertificateState: string, certificateMetadataState: DependencyObservationState, certificateObservedAt?: string | null, storedCertificateExpiresAt?: string | null, storedCertificateRenewalStatus?: string | null }> } | null };
+
+export type AppViewerPermissionsQueryVariables = Exact<{
+  slug: Scalars['String']['input'];
+}>;
+
+
+export type AppViewerPermissionsQuery = { astroliftApp?: { id: string, viewerPermissions: Array<string> } | null };
 
 export type StartReviewedWorkflowMutationVariables = Exact<{
   input: StartWorkflowDefinitionInput;

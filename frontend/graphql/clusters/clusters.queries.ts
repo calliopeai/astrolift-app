@@ -254,6 +254,7 @@ export const GET_CLUSTER = gql`
     astroliftCluster(slug: $slug) {
       ...ClusterFields
       oidcAuthConfig
+      viewerPermissions
     }
   }
 `;

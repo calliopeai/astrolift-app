@@ -86,6 +86,7 @@ function mount(locale: string, initial: Mode = "ok", permission = true) {
             provisioningStatus: "ready",
             isArchived: false,
             isActive: true,
+            viewerPermissions: permission ? ["app.delete"] : [],
           },
           astroliftWorkloads: [],
           astroliftEnvironments: [],

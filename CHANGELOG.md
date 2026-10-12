@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Every tab inside an app or agent offers actions from that app's own permissions, not the account's: the header (deploy, archive, delete), Settings sections (resync, retention, environments, managed services, archive, the danger zone) and Access (tokens, security, edge). A grant held on another project no longer offers an action this app refuses. Account grants only bridge the first load (`useAppCan`, fed by the frame) (#1867).
+
+- A cluster says what the viewer may do to it (`viewerPermissions`, from the checker the cluster mutations use, at the owning organization). A shared cluster's writes are the platform operator's, so a tenant sees read only. Cluster settings now offer manage, update, users and unregister only where the cluster and the account's current grants both allow them; before, an org admin was offered actions on a shared cluster that the server refuses (#1867).
+
 - Approval requests notify: when a delete waits on approval, every active member who holds the authority the action needs (other than the requester) gets an inbox notification linking to Admin › Permissions › Action safety, and the requester hears when it is approved (run it again) or rejected. Opening one only links; it never approves (#2202).
 
 - Admin › Permissions › Action safety edits team, app and person rules: pick the team or app from the scope tree or search for a person, then add asking before, approval with a quorum, or no approving your own; each rule lists what it adds and can be removed, so that scope inherits again (`astroliftActionSafetyRules`, `clearActionSafetyRule`). "Show what applies on" picks an app and shows, read-only, the gates in force there for you after every rule. A person rule is addressed by user id, as elsewhere in the API; it used to look up a user guid that does not exist, so person rules could not be set (#2203).

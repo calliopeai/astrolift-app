@@ -6057,6 +6057,11 @@ type AstroliftTenantCluster {
   heartbeatAgeSeconds: Float
   agentProvisioned: Boolean!
   createdByUsername: String
+
+  """
+  The cluster permissions the viewer holds on this cluster (#1867), from the checker the mutations use; a shared cluster's writes are the platform operator's. Advisory: offer only these, the mutation still decides.
+  """
+  viewerPermissions: [String!]!
   lastBootstrapRun: AstroliftClusterBootstrapRun
   bootstrapRuns(limit: Int! = 10): [AstroliftClusterBootstrapRun!]!
 }
