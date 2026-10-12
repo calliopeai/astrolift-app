@@ -327,6 +327,30 @@ type AstroliftActionPermission {
   reason: String!
 }
 
+type AstroliftActionSafetyRequirement {
+  action: String!
+  label: String!
+  enabled: Boolean!
+  confirmation: Boolean!
+  verification: Boolean!
+  allowSelfApproval: Boolean!
+  sources: [String!]!
+}
+
+type AstroliftActionSafetyRule {
+  action: String!
+  scopeKind: String!
+  scopeId: GUID
+  enabled: Boolean
+  allowSelfApproval: Boolean
+}
+
+type AstroliftActionSafetyRuleMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftActionSafetyRule
+}
+
 type AstroliftActiveSession {
   id: String!
   expiresAt: DateTime
@@ -9333,6 +9357,7 @@ type Mutation {
   requestAttestationChallenge(input: RequestAttestationChallengeInput!): AstroliftAttestationChallengePayloadMutationResult!
   attestSession(input: AttestSessionInput!): AstroliftAttestationResultMutationResult!
   assertSession(input: AssertSessionInput!): AstroliftAttestationResultMutationResult!
+  setActionSafetyRule(input: SetActionSafetyRuleInput!): AstroliftActionSafetyRuleMutationResult!
   registerApp(input: RegisterAppInput!): AstroliftRegisteredAppMutationResult!
   registerAgentRepo(input: RegisterAgentRepoInput!): AstroliftRegisterAgentRepoResultMutationResult!
   registerAppRepo(input: RegisterAppRepoInput!): AstroliftRegisterAppRepoResultMutationResult!
@@ -10225,6 +10250,11 @@ type Query {
   astroliftOrgMembersForApprovalPicker(orgSlug: String!): [AstroliftApproverUser!]!
   astroliftInvitations(status: String = null): [AstroliftInvitation!]! @deprecated(reason: "Caps at 500 rows with no way to reach the 501st. Use astroliftInvitationsPage.")
   astroliftInvitationsPage(status: String = null, search: String = null, limit: Int! = 50, after: String = null, filter: AstroliftInvitationsListFilter = null, sort: String = null, page: Int = null, pageSize: Int = null): AstroliftInvitationPage!
+
+  """
+  What each gated action asks of the viewer (#2202), optionally on one app: confirmation, fresh verification and whether an admin may approve their own.
+  """
+  astroliftActionSafety(appSlug: String = null): [AstroliftActionSafetyRequirement!]!
 
   """
   Easy-mode starting points (#2272): each names the stock role it grants per scope and, from that role's permissions, the tasks it allows and excludes. Never super-admin.
@@ -11192,6 +11222,14 @@ input SendManagedServiceTestEmailInput {
   body: String = null
   expectedVersion: Int = null
   requestId: GUID = null
+}
+
+input SetActionSafetyRuleInput {
+  action: String!
+  scopeKind: String!
+  scopeId: GUID = null
+  enabled: Boolean = null
+  allowSelfApproval: Boolean = null
 }
 
 input SetActiveIdentityProviderInput {

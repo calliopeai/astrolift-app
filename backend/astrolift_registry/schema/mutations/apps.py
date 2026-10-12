@@ -331,7 +331,13 @@ class AppMutations:
         app = RegisteredApp.objects.filter(guid=str(input.id), organization_id=org_id).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
         from astrolift_lifecycle.domain_app_route import DomainAppRouteError, require_unbound_app
+
+        deny = _safety_gate(info, "app.deregister", app=app, resolver_name="soft_delete_app")
+        if deny is not None:
+            return deny
 
         try:
             require_unbound_app(app.pk)

@@ -49,7 +49,7 @@ log = logging.getLogger(__name__)
 _DEFAULT_MESSAGE = "Sensitive operation requires recent authentication."
 
 
-def is_elevated_and_attested(info: Any) -> bool:
+def is_elevated_and_attested(info: Any, *, required: bool = False) -> bool:
     """True when ``info``'s call satisfies the gate ``@requires_elevation`` enforces.
 
     The same four rules, in order: an API-token call passes (issuing the
@@ -69,13 +69,16 @@ def is_elevated_and_attested(info: Any) -> bool:
     request = getattr(getattr(info, "context", None), "request", None)
     if request is not None and getattr(request, "_api_token", None) is not None:
         return True
-    try:
-        from constance import config as constance_config
+    # ``required``: an action-safety gate (#2202) asks for verification on
+    # its own terms, on by default, whatever the install-wide switch says.
+    if not required:
+        try:
+            from constance import config as constance_config
 
-        if not getattr(constance_config, "REQUIRE_STEP_UP_AUTH", False):
-            return True
-    except Exception:  # noqa: BLE001 -- as in requires_elevation: fall through to the gate
-        pass
+            if not getattr(constance_config, "REQUIRE_STEP_UP_AUTH", False):
+                return True
+        except Exception:  # noqa: BLE001 -- as in requires_elevation: fall through to the gate
+            pass
     if request is None or not hasattr(request, "session"):
         return True
     session = request.session
@@ -124,6 +127,7 @@ def check_elevation(
     *,
     action_label: str | None = None,
     resolver_name: str = "",
+    required: bool = False,
 ) -> Any | None:
     """The same gate ``@requires_elevation`` applies as a blanket
     decorator, exposed as a plain function for a resolver that only
@@ -148,7 +152,7 @@ def check_elevation(
     resolver's own exception can't be mistaken for a failed config read
     and run it twice (#1963).
     """
-    if is_elevated_and_attested(info):
+    if is_elevated_and_attested(info, required=required):
         return None
     # Only a call with a session gets here: the predicate passes an
     # API-token call, a disabled gate and a call with no session.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import strawberry
 
+from astrolift_identity.schema.action_safety import ActionSafetyMutations
 from astrolift_identity.schema.mutations.allowlist import AllowlistMutations
 from astrolift_identity.schema.mutations.helpers import (  # noqa: F401
     SoftDeleteOrganizationInput,
@@ -105,5 +106,6 @@ class IdentityMutation(
     ProfileMutations,
     SessionMutations,
     StepUpMutations,
+    ActionSafetyMutations,
 ):
     """Root mutation type — inherits fields from each domain mixin."""
