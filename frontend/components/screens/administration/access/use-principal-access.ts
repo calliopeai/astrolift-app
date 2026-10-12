@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type { CursorPage } from "@/components/data-table";
@@ -19,6 +20,7 @@ import type {
 } from "@/graphql/identity/identity.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
+import { localizeList } from "../localize-list";
 import { ACCESS_LIST, buildAccessRows, selectAccess, summarizeAccess } from "./principal-access";
 
 /** Whose access: a user by username, or an IdP group by its external id. */
@@ -50,7 +52,11 @@ interface BindingsResp {
 export function usePrincipalAccess(subject: AccessSubject | null) {
   const perms = useMyPermissions();
   const canManage = perms.can("org.manage_members");
-  const list = useListState(ACCESS_LIST);
+  const t = useTranslations("adminPrincipalAccess");
+  const lists = useTranslations("adminPrincipalAccess.list");
+  const summaryT = useTranslations("adminPrincipalAccess.summary");
+  const definition = React.useMemo(() => localizeList(ACCESS_LIST, lists, ["scope"]), [lists]);
+  const list = useListState(definition);
   const { state } = list;
 
   const bindings = useQuery<BindingsResp>(LIST_ROLE_BINDINGS_PAGE, {
@@ -93,8 +99,8 @@ export function usePrincipalAccess(subject: AccessSubject | null) {
   /** Throws on failure, so the confirm stays open and says why. */
   async function onRevoke(binding: AstroliftRoleBinding): Promise<void> {
     const { data } = await revokeBinding({ variables: { input: { id: binding.id } } });
-    if (data?.revokeRoleBinding.ok) toast.success(`Removed ${binding.role.slug}`);
-    else throw new Error(data?.revokeRoleBinding.errors?.[0]?.message ?? "Remove failed");
+    if (data?.revokeRoleBinding.ok) toast.success(t("removed", { name: binding.role.slug }));
+    else throw new Error(data?.revokeRoleBinding.errors?.[0]?.message ?? t("removeFailed"));
   }
 
   /** Resolves true when any were removed, so the list clears its selection. */
@@ -103,12 +109,12 @@ export function usePrincipalAccess(subject: AccessSubject | null) {
     const { data } = await bulkRevoke({ variables: { input: { bindingIds: ids } } });
     const env = data?.bulkRevokeAstroliftRoleBindings;
     if (!env?.ok || !env.data) {
-      toast.error(`Nothing was removed: ${env?.errors?.[0]?.message ?? "unknown error"}`);
+      toast.error(t("noneRemoved", { error: env?.errors?.[0]?.message ?? t("unknownError") }));
       return false;
     }
     const { revokedCount, failedCount } = env.data;
-    if (failedCount === 0) toast.success(`Removed ${revokedCount}`);
-    else toast.warning(`Removed ${revokedCount}; ${failedCount} could not be removed`);
+    if (failedCount === 0) toast.success(t("removedCount", { count: revokedCount }));
+    else toast.warning(t("partial", { removed: revokedCount, failed: failedCount }));
     return true;
   }
 
@@ -116,7 +122,7 @@ export function usePrincipalAccess(subject: AccessSubject | null) {
     list,
     rows: selected.rows,
     totalCount: selected.totalCount,
-    summary: summarizeAccess(rows),
+    summary: summarizeAccess(rows, summaryT),
     loading: subject === null || (bindings.loading && !data) || (roles.loading && !roles.data),
     stale: bindings.loading && !bindings.data && Boolean(data),
     error: bindings.error ? { message: bindings.error.message } : null,

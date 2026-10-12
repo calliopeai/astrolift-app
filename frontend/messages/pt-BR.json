@@ -4191,6 +4191,249 @@
       "reviewConfirm": "Executar limpeza de dados pessoais"
     }
   },
+  "adminPolicies": {
+    "title": "Políticas",
+    "context": "Regras que restringem o que as funções permitem, verificadas em cada requisição. Uma condição que a requisição não consegue responder nega.",
+    "columns": {
+      "policy": "Política",
+      "effect": "Efeito",
+      "scope": "Escopo",
+      "createdBy": "Criada por",
+      "updated": "Atualizada"
+    },
+    "unknown": "desconhecido",
+    "newPolicy": "Nova política",
+    "delete": "Excluir",
+    "emptyTitle": "Nenhuma política ainda",
+    "emptyDescription": "Uma política restringe o que as funções permitem: nega uma ação a menos que seja horário comercial, a rede do escritório, aprovada ou com login recente. Nunca concede mais do que uma função.",
+    "enforced": "<strong>Aplicada em toda verificação.</strong> Um DENY que corresponde à ação, ao recurso e à pessoa prevalece sobre qualquer função que a permita. Uma condição que a requisição não consegue responder (sem endereço do cliente, sem sessão) nega, então a política falha fechada. A busca abrange nome, slug, descrição e ação.",
+    "learnMore": "Saiba mais",
+    "deleteTitle": "Excluir a política {slug}?",
+    "deleteFallback": "Excluir a política?",
+    "deleteDescription": "Exclui a política de forma reversível e libera o slug para uma nova. O que ela negava volta a ser permitido na hora, onde uma função permitir.",
+    "deleteConfirm": "Excluir política",
+    "deleted": "{slug} excluída",
+    "deleteFailed": "Falha ao excluir",
+    "list": {
+      "search": "Buscar políticas…",
+      "fields": {
+        "effect": "Efeito",
+        "scope": "Escopo"
+      },
+      "options": {
+        "effect": {
+          "DENY": "negar",
+          "ALLOW": "permitir"
+        },
+        "scope": {
+          "ORG": "organização",
+          "TEAM": "time",
+          "PROJECT": "projeto",
+          "APP": "app"
+        }
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas",
+        "deny": "Negar",
+        "allow": "Permitir"
+      }
+    },
+    "editor": {
+      "newPolicy": "Nova política",
+      "policy": "Política",
+      "notFoundCrumb": "Não encontrada",
+      "notFoundTitle": "Política não encontrada",
+      "rule": "Regra",
+      "missingTitle": "Nenhuma política com este id",
+      "missingDescription": "Nada nesta organização tem o id {id}. Talvez tenha sido excluído.",
+      "allPolicies": "Todas as políticas",
+      "needsPermission": "Alterar uma política exige <mono>{permission}</mono>.",
+      "simulationFailed": "A simulação falhou",
+      "errors": {
+        "name": "Dê um nome à política.",
+        "slug": "Somente letras minúsculas, dígitos e hífens.",
+        "conditions": "{count, plural, one {Corrija primeiro a condição marcada abaixo.} other {Corrija primeiro as # condições marcadas abaixo.}}",
+        "action": "Informe uma ação, ou * para todas."
+      },
+      "context": "Uma política restringe o que as funções permitem; nunca concede mais.",
+      "steps": "Etapas",
+      "step": {
+        "details": "Detalhes",
+        "rule": "Regra",
+        "review": "Revisão"
+      },
+      "name": "Nome",
+      "namePlaceholder": "Sem deploys em produção fora do expediente",
+      "slug": "Slug",
+      "slugHelp": "Derivado do nome até você editá-lo. Fixo depois de criada.",
+      "fixed": "Fixo depois de criada.",
+      "appliesAcross": "Aplica-se a",
+      "appliesAcrossHelp": "Até onde a regra alcança. Fixo depois de criada.",
+      "description": "Descrição",
+      "descriptionPlaceholder": "Por que esta regra existe, em uma frase.",
+      "theRule": "A regra",
+      "was": "Antes: {sentence}",
+      "inForce": "Salvar coloca a regra em vigor: toda verificação de permissão passa a avaliá-la, e uma condição que a requisição não consegue responder nega.",
+      "cancel": "Cancelar",
+      "back": "Voltar",
+      "continue": "Continuar",
+      "saving": "Salvando…",
+      "create": "Criar política",
+      "save": "Salvar política",
+      "none": "nenhum",
+      "conditions": "Condições",
+      "saved": "Política {slug} salva",
+      "saveFailed": "Falha ao salvar",
+      "created": "Política {slug} criada",
+      "createFailed": "Falha ao criar"
+    }
+  },
+  "adminGroupMappings": {
+    "title": "Mapeamentos de função",
+    "columns": {
+      "role": "Função",
+      "where": "Onde",
+      "reaches": "Alcança",
+      "mapped": "Mapeado"
+    },
+    "members": "{count, plural, one {# membro} other {# membros}}",
+    "description": "Todos que o provedor de identidade coloca em {group} recebem estas funções, como em uma concessão.",
+    "mapRole": "Mapear uma função",
+    "removeThis": "Remover este mapeamento",
+    "emptyTitle": "Nenhum mapeamento de função",
+    "emptyDescription": "{group} não está mapeado para nenhuma função. Seus membros recebem só o que as concessões dão.",
+    "removeTitle": "Remover {role} de {group}?",
+    "removeFallback": "Remover o mapeamento?",
+    "removeDescription": "{count, plural, one {O # membro} other {Os # membros}} de {group} perdem o que {role} dá em {scope}, a menos que outra concessão dê.",
+    "removeConfirm": "Remover mapeamento",
+    "errors": {
+      "role": "Escolha uma função.",
+      "scope": "Escolha onde a função se aplica."
+    },
+    "pickRole": "Escolha uma função",
+    "whereApplies": "Onde se aplica",
+    "cancel": "Cancelar",
+    "mapping": "Mapeando…",
+    "submit": "Mapear função",
+    "mapped": "{group} mapeado",
+    "mappingFailed": "O mapeamento falhou",
+    "removed": "{role} removido",
+    "removeFailed": "Falha ao remover",
+    "list": {
+      "search": "Buscar mapeamentos por função…",
+      "views": {
+        "all": "Todos"
+      }
+    }
+  },
+  "adminPrincipalAccess": {
+    "columns": {
+      "scope": "Escopo",
+      "who": "Quem",
+      "role": "Função",
+      "source": "Origem",
+      "expires": "Expira",
+      "granted": "Concedida"
+    },
+    "alsoGranted": "também concedida em {kind} <mono>{name}</mono>",
+    "never": "nunca",
+    "truncated": "Há mais concessões do que uma leitura retorna, então esta lista mostra as primeiras {count}. Refine em Atribuições, onde cada concessão é paginada no servidor.",
+    "listLabel": "Concessões",
+    "removeThis": "Remover esta concessão",
+    "removeCount": "Remover {count}",
+    "emptyTitle": "Nenhuma concessão",
+    "emptyDescription": "Nada foi concedido aqui ainda.",
+    "grantAccess": "Conceder acesso",
+    "remove": "Remover",
+    "removeManyTitle": "{count, plural, one {Remover # concessão?} other {Remover # concessões?}}",
+    "removeManyDescription": "Cada titular perde o que as concessões removidas davam no escopo delas e abaixo. Concessões em outros lugares, mais amplas ou mais restritas, continuam valendo.",
+    "removeOneTitle": "Remover {role} em {kind} {name}?",
+    "removeCovered": "{holder} mantém: a mesma função também é concedida em {kind} {name}. Remova essa concessão também para retirá-la.",
+    "removeOneDescription": "{holder} perde o que {role} dá em {kind} {name} e em tudo abaixo. Outras concessões continuam valendo.",
+    "removeGrant": "Remover concessão",
+    "removed": "{name} removido",
+    "removeFailed": "Falha ao remover",
+    "noneRemoved": "Nada foi removido: {error}",
+    "unknownError": "erro desconhecido",
+    "removedCount": "{count} removidas",
+    "partial": "{removed} removidas; {failed} não puderam ser removidas",
+    "summary": {
+      "rolesAcross": "{roles, plural, one {# função} other {# funções}} em {grants, plural, one {# concessão} other {# concessões}}",
+      "atScope": "{scope, select, ORG {{count} em organização} TEAM {{count} em times} PROJECT {{count} em projetos} APP {{count} em apps} other {{count} em {scope}}}",
+      "alsoWider": "{count} também concedidas de forma mais ampla",
+      "expiring": "{count} expiram"
+    },
+    "list": {
+      "search": "Buscar funções e escopos…  can:app.deploy",
+      "fields": {
+        "scope": "Escopo",
+        "role": "Função",
+        "can": "Pode"
+      },
+      "options": {
+        "scope": {
+          "ORG": "Organização",
+          "TEAM": "Times",
+          "PROJECT": "Projetos",
+          "APP": "Apps"
+        }
+      },
+      "views": {
+        "all": "Todas"
+      }
+    }
+  },
+  "adminPersonTeams": {
+    "columns": {
+      "team": "Time",
+      "membership": "Associação",
+      "joined": "Entrada"
+    },
+    "unnamedHint": "Recebe nome quando alguém tiver uma função neste time",
+    "unnamed": "time #{pk}",
+    "listLabel": "Times",
+    "emptyTitle": "Não está em nenhum time",
+    "emptyDescription": "Conceder uma função no escopo de um time coloca a pessoa nesse time.",
+    "list": {
+      "search": "Buscar times…",
+      "views": {
+        "all": "Todos"
+      }
+    }
+  },
+  "adminPersonActivity": {
+    "verb": "Ler a atividade",
+    "intro": "O que a pessoa fez, mais recente primeiro.",
+    "openAudit": "Abrir no log de auditoria",
+    "label": "Atividade",
+    "emptyTitle": "Nenhuma atividade ainda",
+    "emptyDescription": "As ações desta pessoa aparecem aqui conforme o log de auditoria as registra."
+  },
+  "adminPrincipal": {
+    "tabsLabel": "Navegação da entidade",
+    "loadFailed": "Não foi possível carregar esta página",
+    "retry": "Tentar novamente",
+    "idpGroup": "Grupo do IdP",
+    "grantAccess": "Conceder acesso",
+    "tabs": {
+      "access": "Acesso",
+      "members": "Membros",
+      "teams": "Times",
+      "activity": "Atividade"
+    },
+    "groupNotFound": "Grupo não encontrado",
+    "backToPeople": "Voltar para Pessoas",
+    "memberFallback": "Membro {id}",
+    "memberNotFound": "Membro não encontrado",
+    "memberNotFoundDescription": "Este membro talvez não exista, tenha saído da organização ou você não tenha acesso a ele.",
+    "chooseNamed": "Selecionar {name}",
+    "groupMembers": {
+      "title": "Os membros vêm do seu provedor de identidade",
+      "description": "O Astrolift registra quem está em {group} quando cada pessoa faz login, mas ainda não os lista aqui. O console do provedor tem os membros; o que o grupo lhes dá está na aba Acesso.",
+      "action": "Provedor de identidade"
+    }
+  },
   "stepUp": {
     "title": "Confirme sua identidade",
     "description": "Esta ação exige autenticação recente. Confirme sua senha para continuar.",

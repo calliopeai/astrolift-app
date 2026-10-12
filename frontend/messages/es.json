@@ -4191,6 +4191,249 @@
       "reviewConfirm": "Ejecutar limpieza de datos personales"
     }
   },
+  "adminPolicies": {
+    "title": "Políticas",
+    "context": "Reglas que limitan lo que permiten los roles, comprobadas en cada solicitud. Una condición que la solicitud no puede responder deniega.",
+    "columns": {
+      "policy": "Política",
+      "effect": "Efecto",
+      "scope": "Ámbito",
+      "createdBy": "Creada por",
+      "updated": "Actualizada"
+    },
+    "unknown": "desconocido",
+    "newPolicy": "Nueva política",
+    "delete": "Eliminar",
+    "emptyTitle": "Aún no hay políticas",
+    "emptyDescription": "Una política limita lo que permiten los roles: deniega una acción salvo en horario laboral, desde la red de la oficina, con aprobación o tras un inicio de sesión reciente. Nunca concede más que un rol.",
+    "enforced": "<strong>Se aplica en cada comprobación.</strong> Un DENY que coincide con la acción, el recurso y la persona prevalece sobre cualquier rol que lo permita. Una condición que la solicitud no puede responder (sin dirección del cliente, sin sesión) deniega, así que la política falla cerrada. La búsqueda abarca nombre, slug, descripción y acción.",
+    "learnMore": "Más información",
+    "deleteTitle": "¿Eliminar la política {slug}?",
+    "deleteFallback": "¿Eliminar la política?",
+    "deleteDescription": "Elimina la política de forma lógica y libera su slug para una nueva. Lo que denegaba vuelve a permitirse al instante donde un rol lo permita.",
+    "deleteConfirm": "Eliminar política",
+    "deleted": "{slug} eliminada",
+    "deleteFailed": "No se pudo eliminar",
+    "list": {
+      "search": "Buscar políticas…",
+      "fields": {
+        "effect": "Efecto",
+        "scope": "Ámbito"
+      },
+      "options": {
+        "effect": {
+          "DENY": "denegar",
+          "ALLOW": "permitir"
+        },
+        "scope": {
+          "ORG": "organización",
+          "TEAM": "equipo",
+          "PROJECT": "proyecto",
+          "APP": "app"
+        }
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Mías",
+        "deny": "Denegar",
+        "allow": "Permitir"
+      }
+    },
+    "editor": {
+      "newPolicy": "Nueva política",
+      "policy": "Política",
+      "notFoundCrumb": "No encontrada",
+      "notFoundTitle": "Política no encontrada",
+      "rule": "Regla",
+      "missingTitle": "No hay ninguna política con este id",
+      "missingDescription": "Nada en esta organización tiene el id {id}. Puede que se haya eliminado.",
+      "allPolicies": "Todas las políticas",
+      "needsPermission": "Cambiar una política requiere <mono>{permission}</mono>.",
+      "simulationFailed": "La simulación falló",
+      "errors": {
+        "name": "Ponle nombre a la política.",
+        "slug": "Solo minúsculas, dígitos y guiones.",
+        "conditions": "{count, plural, one {Corrige primero la condición marcada abajo.} other {Corrige primero las # condiciones marcadas abajo.}}",
+        "action": "Indica una acción, o * para todas."
+      },
+      "context": "Una política limita lo que permiten los roles; nunca concede más.",
+      "steps": "Pasos",
+      "step": {
+        "details": "Detalles",
+        "rule": "Regla",
+        "review": "Revisión"
+      },
+      "name": "Nombre",
+      "namePlaceholder": "Sin despliegues a producción fuera de horario",
+      "slug": "Slug",
+      "slugHelp": "Se deriva del nombre hasta que lo edites. No cambia una vez creada.",
+      "fixed": "No cambia una vez creada.",
+      "appliesAcross": "Se aplica en",
+      "appliesAcrossHelp": "Hasta dónde llega la regla. No cambia una vez creada.",
+      "description": "Descripción",
+      "descriptionPlaceholder": "Por qué existe esta regla, en una frase.",
+      "theRule": "La regla",
+      "was": "Antes: {sentence}",
+      "inForce": "Al guardar, la regla entra en vigor: cada comprobación de permisos la evalúa a partir de entonces, y una condición que la solicitud no puede responder deniega.",
+      "cancel": "Cancelar",
+      "back": "Atrás",
+      "continue": "Continuar",
+      "saving": "Guardando…",
+      "create": "Crear política",
+      "save": "Guardar política",
+      "none": "ninguno",
+      "conditions": "Condiciones",
+      "saved": "Política {slug} guardada",
+      "saveFailed": "No se pudo guardar",
+      "created": "Política {slug} creada",
+      "createFailed": "No se pudo crear"
+    }
+  },
+  "adminGroupMappings": {
+    "title": "Asignaciones de rol",
+    "columns": {
+      "role": "Rol",
+      "where": "Dónde",
+      "reaches": "Alcanza",
+      "mapped": "Asignado"
+    },
+    "members": "{count, plural, one {# miembro} other {# miembros}}",
+    "description": "Todas las personas que el proveedor de identidad pone en {group} reciben estos roles, como con una concesión.",
+    "mapRole": "Asignar un rol",
+    "removeThis": "Quitar esta asignación",
+    "emptyTitle": "No hay asignaciones de rol",
+    "emptyDescription": "{group} no está asignado a ningún rol. Sus miembros solo obtienen lo que les dan las concesiones.",
+    "removeTitle": "¿Quitar {role} de {group}?",
+    "removeFallback": "¿Quitar la asignación?",
+    "removeDescription": "{count, plural, one {El # miembro} other {Los # miembros}} de {group} pierden lo que {role} da en {scope}, salvo que otra concesión lo dé.",
+    "removeConfirm": "Quitar asignación",
+    "errors": {
+      "role": "Elige un rol.",
+      "scope": "Elige dónde se aplica el rol."
+    },
+    "pickRole": "Elige un rol",
+    "whereApplies": "Dónde se aplica",
+    "cancel": "Cancelar",
+    "mapping": "Asignando…",
+    "submit": "Asignar rol",
+    "mapped": "{group} asignado",
+    "mappingFailed": "La asignación falló",
+    "removed": "{role} quitado",
+    "removeFailed": "No se pudo quitar",
+    "list": {
+      "search": "Buscar asignaciones por rol…",
+      "views": {
+        "all": "Todas"
+      }
+    }
+  },
+  "adminPrincipalAccess": {
+    "columns": {
+      "scope": "Ámbito",
+      "who": "Quién",
+      "role": "Rol",
+      "source": "Origen",
+      "expires": "Vence",
+      "granted": "Concedido"
+    },
+    "alsoGranted": "también concedido en {kind} <mono>{name}</mono>",
+    "never": "nunca",
+    "truncated": "Tiene más concesiones de las que devuelve una lectura, así que esta lista muestra las primeras {count}. Acótala en Asignaciones, donde cada concesión se pagina en el servidor.",
+    "listLabel": "Concesiones",
+    "removeThis": "Quitar esta concesión",
+    "removeCount": "Quitar {count}",
+    "emptyTitle": "No hay concesiones",
+    "emptyDescription": "Aún no hay nada concedido aquí.",
+    "grantAccess": "Conceder acceso",
+    "remove": "Quitar",
+    "removeManyTitle": "{count, plural, one {¿Quitar # concesión?} other {¿Quitar # concesiones?}}",
+    "removeManyDescription": "Cada titular pierde lo que daban las concesiones quitadas en su ámbito y por debajo. Las concesiones en otros lugares, más amplias o más estrechas, siguen vigentes.",
+    "removeOneTitle": "¿Quitar {role} en {kind} {name}?",
+    "removeCovered": "{holder} lo conserva: el mismo rol también está concedido en {kind} {name}. Quita también esa concesión para retirarlo.",
+    "removeOneDescription": "{holder} pierde lo que {role} da en {kind} {name} y en todo lo que contiene. Las demás concesiones siguen vigentes.",
+    "removeGrant": "Quitar concesión",
+    "removed": "{name} quitado",
+    "removeFailed": "No se pudo quitar",
+    "noneRemoved": "No se quitó nada: {error}",
+    "unknownError": "error desconocido",
+    "removedCount": "{count} quitadas",
+    "partial": "{removed} quitadas; {failed} no se pudieron quitar",
+    "summary": {
+      "rolesAcross": "{roles, plural, one {# rol} other {# roles}} en {grants, plural, one {# concesión} other {# concesiones}}",
+      "atScope": "{scope, select, ORG {{count} en organización} TEAM {{count} en equipos} PROJECT {{count} en proyectos} APP {{count} en apps} other {{count} en {scope}}}",
+      "alsoWider": "{count} también concedidas más arriba",
+      "expiring": "{count} vencen"
+    },
+    "list": {
+      "search": "Buscar roles y ámbitos…  can:app.deploy",
+      "fields": {
+        "scope": "Ámbito",
+        "role": "Rol",
+        "can": "Puede"
+      },
+      "options": {
+        "scope": {
+          "ORG": "Organización",
+          "TEAM": "Equipos",
+          "PROJECT": "Proyectos",
+          "APP": "Apps"
+        }
+      },
+      "views": {
+        "all": "Todas"
+      }
+    }
+  },
+  "adminPersonTeams": {
+    "columns": {
+      "team": "Equipo",
+      "membership": "Membresía",
+      "joined": "Se unió"
+    },
+    "unnamedHint": "Recibe nombre cuando alguien tiene un rol en este equipo",
+    "unnamed": "equipo #{pk}",
+    "listLabel": "Equipos",
+    "emptyTitle": "No está en ningún equipo",
+    "emptyDescription": "Conceder un rol en el ámbito de un equipo añade a la persona a ese equipo.",
+    "list": {
+      "search": "Buscar equipos…",
+      "views": {
+        "all": "Todos"
+      }
+    }
+  },
+  "adminPersonActivity": {
+    "verb": "Leer la actividad",
+    "intro": "Lo que hizo, lo más reciente primero.",
+    "openAudit": "Abrir en el registro de auditoría",
+    "label": "Actividad",
+    "emptyTitle": "Aún no hay actividad",
+    "emptyDescription": "Las acciones de esta persona aparecen aquí a medida que el registro de auditoría las anota."
+  },
+  "adminPrincipal": {
+    "tabsLabel": "Navegación de la entidad",
+    "loadFailed": "No se pudo cargar esta página",
+    "retry": "Reintentar",
+    "idpGroup": "Grupo del IdP",
+    "grantAccess": "Conceder acceso",
+    "tabs": {
+      "access": "Acceso",
+      "members": "Miembros",
+      "teams": "Equipos",
+      "activity": "Actividad"
+    },
+    "groupNotFound": "Grupo no encontrado",
+    "backToPeople": "Volver a Personas",
+    "memberFallback": "Miembro {id}",
+    "memberNotFound": "Miembro no encontrado",
+    "memberNotFoundDescription": "Puede que este miembro no exista, haya dejado la organización o no tengas acceso a él.",
+    "chooseNamed": "Seleccionar {name}",
+    "groupMembers": {
+      "title": "Los miembros vienen de tu proveedor de identidad",
+      "description": "Astrolift registra quién está en {group} cuando cada persona inicia sesión, pero aún no los lista aquí. La consola del proveedor tiene los miembros; lo que el grupo les da está en la pestaña Acceso.",
+      "action": "Proveedor de identidad"
+    }
+  },
   "stepUp": {
     "title": "Confirma tu identidad",
     "description": "Esta acción requiere autenticación reciente. Confirma tu contraseña para continuar.",

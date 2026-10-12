@@ -2,6 +2,7 @@
 
 import { ShieldPlusIcon, UsersRoundIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -30,14 +31,20 @@ export interface GroupDetailProps {
  */
 export function GroupDetail({ externalId, tab, children }: GroupDetailProps) {
   const self = `${PEOPLE_HREF}/${encodeURIComponent(`group:${externalId}`)}`;
+  const t = useTranslations("adminPrincipal");
   return (
     <PrincipalPage
       crumbs={accessCrumbs("people", externalId)}
+      presentation={{
+        tabsAriaLabel: t("tabsLabel"),
+        loadFailed: t("loadFailed"),
+        retry: t("retry"),
+      }}
       principal={{ kind: "group", id: externalId, name: externalId }}
       fallbackTitle={externalId}
       status={
         <Badge variant="secondary" className="text-2xs">
-          IdP group
+          {t("idpGroup")}
         </Badge>
       }
       primaryAction={
@@ -50,21 +57,21 @@ export function GroupDetail({ externalId, tab, children }: GroupDetailProps) {
               })}
             >
               <ShieldPlusIcon className="size-4" />
-              Grant access
+              {t("grantAccess")}
             </Link>
           </Button>
         </Can>
       }
-      tabs={groupTabs(externalId, tab)}
+      tabs={groupTabs(externalId, tab).map((item) => ({ ...item, label: t(`tabs.${item.key}`) }))}
       loading={false}
       error={null}
       onRetry={() => {}}
       notFound={false}
       notFoundCopy={{
-        title: "Group not found",
+        title: t("groupNotFound"),
         description: "",
         backHref: PEOPLE_HREF,
-        backLabel: "Back to People",
+        backLabel: t("backToPeople"),
       }}
     >
       {children}
@@ -79,13 +86,14 @@ export function GroupDetail({ externalId, tab, children }: GroupDetailProps) {
  * provider rather than showing an empty table that reads as "nobody".
  */
 export function GroupMembersPanel({ externalId }: { externalId: string }) {
+  const t = useTranslations("adminPrincipal.groupMembers");
   return (
     <EmptyState
       icon={<UsersRoundIcon className="size-5" />}
-      title="Members come from your identity provider"
-      description={`Astrolift records who is in ${externalId} when each person signs in, and does not list them here yet. The provider's own console has the members; what the group gives them is on the Access tab.`}
+      title={t("title")}
+      description={t("description", { group: externalId })}
       actionHref="/providers#identity"
-      actionLabel="Identity provider"
+      actionLabel={t("action")}
     />
   );
 }

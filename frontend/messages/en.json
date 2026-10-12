@@ -4268,6 +4268,249 @@
       "yAgo": "{n}y ago"
     }
   },
+  "adminPolicies": {
+    "title": "Policies",
+    "context": "Rules that narrow what roles allow, checked on every request. A condition the request cannot answer denies.",
+    "columns": {
+      "policy": "Policy",
+      "effect": "Effect",
+      "scope": "Scope",
+      "createdBy": "Created by",
+      "updated": "Updated"
+    },
+    "unknown": "unknown",
+    "newPolicy": "New policy",
+    "delete": "Delete",
+    "emptyTitle": "No policies yet",
+    "emptyDescription": "A policy narrows what roles allow: deny an action unless it is working hours, the office network, approved, or a fresh sign-in. It never grants more than a role does.",
+    "enforced": "<strong>Enforced on every check.</strong> A DENY that matches the action, resource and person wins over any role that allows it. A condition the request cannot answer (no client address, no session) denies, so a policy fails closed. Search matches name, slug, description and action.",
+    "learnMore": "Learn more",
+    "deleteTitle": "Delete policy {slug}?",
+    "deleteFallback": "Delete policy?",
+    "deleteDescription": "Soft-deletes the policy and frees its slug for a new one. Whatever it denied is allowed again at once, wherever a role allows it.",
+    "deleteConfirm": "Delete policy",
+    "deleted": "Deleted {slug}",
+    "deleteFailed": "Delete failed",
+    "list": {
+      "search": "Search policies…",
+      "fields": {
+        "effect": "Effect",
+        "scope": "Scope"
+      },
+      "options": {
+        "effect": {
+          "DENY": "deny",
+          "ALLOW": "allow"
+        },
+        "scope": {
+          "ORG": "organization",
+          "TEAM": "team",
+          "PROJECT": "project",
+          "APP": "app"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "deny": "Deny",
+        "allow": "Allow"
+      }
+    },
+    "editor": {
+      "newPolicy": "New policy",
+      "policy": "Policy",
+      "notFoundCrumb": "Not found",
+      "notFoundTitle": "Policy not found",
+      "rule": "Rule",
+      "missingTitle": "No policy with this id",
+      "missingDescription": "Nothing in this organization has the id {id}. It may have been deleted.",
+      "allPolicies": "All policies",
+      "needsPermission": "Changing a policy needs <mono>{permission}</mono>.",
+      "simulationFailed": "The simulation failed",
+      "errors": {
+        "name": "Name the policy.",
+        "slug": "Lowercase letters, digits and hyphens only.",
+        "conditions": "{count, plural, one {Fix the condition marked below first.} other {Fix # conditions marked below first.}}",
+        "action": "Name an action, or * for every action."
+      },
+      "context": "A policy narrows what roles allow; it never grants more.",
+      "steps": "Steps",
+      "step": {
+        "details": "Details",
+        "rule": "Rule",
+        "review": "Review"
+      },
+      "name": "Name",
+      "namePlaceholder": "No prod deploys after hours",
+      "slug": "Slug",
+      "slugHelp": "Derived from the name until you edit it. Fixed once created.",
+      "fixed": "Fixed once created.",
+      "appliesAcross": "Applies across",
+      "appliesAcrossHelp": "How widely the rule reaches. Fixed once created.",
+      "description": "Description",
+      "descriptionPlaceholder": "Why this rule exists, in one sentence.",
+      "theRule": "The rule",
+      "was": "Was: {sentence}",
+      "inForce": "Saving puts this rule in force: every permission check evaluates it from then on, and a condition the request cannot answer denies.",
+      "cancel": "Cancel",
+      "back": "Back",
+      "continue": "Continue",
+      "saving": "Saving…",
+      "create": "Create policy",
+      "save": "Save policy",
+      "none": "none",
+      "conditions": "Conditions",
+      "saved": "Policy {slug} saved",
+      "saveFailed": "Save failed",
+      "created": "Policy {slug} created",
+      "createFailed": "Create failed"
+    }
+  },
+  "adminGroupMappings": {
+    "title": "Role mappings",
+    "columns": {
+      "role": "Role",
+      "where": "Where",
+      "reaches": "Reaches",
+      "mapped": "Mapped"
+    },
+    "members": "{count, plural, one {# member} other {# members}}",
+    "description": "Everyone the identity provider puts in {group} gets these roles, as with a grant.",
+    "mapRole": "Map a role",
+    "removeThis": "Remove this mapping",
+    "emptyTitle": "No role mappings",
+    "emptyDescription": "{group} is not mapped to any role. Its members get only what grants give them.",
+    "removeTitle": "Remove {role} from {group}?",
+    "removeFallback": "Remove mapping?",
+    "removeDescription": "{count, plural, one {The # member} other {The # members}} of {group} lose what {role} gives at {scope}, unless another grant gives it.",
+    "removeConfirm": "Remove mapping",
+    "errors": {
+      "role": "Pick a role.",
+      "scope": "Pick where the role applies."
+    },
+    "pickRole": "Pick a role",
+    "whereApplies": "Where it applies",
+    "cancel": "Cancel",
+    "mapping": "Mapping…",
+    "submit": "Map role",
+    "mapped": "Mapped {group}",
+    "mappingFailed": "The mapping failed",
+    "removed": "Removed {role}",
+    "removeFailed": "Remove failed",
+    "list": {
+      "search": "Search mappings by role…",
+      "views": {
+        "all": "All"
+      }
+    }
+  },
+  "adminPrincipalAccess": {
+    "columns": {
+      "scope": "Scope",
+      "who": "Who",
+      "role": "Role",
+      "source": "Source",
+      "expires": "Expires",
+      "granted": "Granted"
+    },
+    "alsoGranted": "also granted at {kind} <mono>{name}</mono>",
+    "never": "never",
+    "truncated": "They hold more grants than one read returns, so this list shows the first {count}. Narrow it on Assignments, where every grant is paged on the server.",
+    "listLabel": "Grants",
+    "removeThis": "Remove this grant",
+    "removeCount": "Remove {count}",
+    "emptyTitle": "No grants",
+    "emptyDescription": "Nothing is granted here yet.",
+    "grantAccess": "Grant access",
+    "remove": "Remove",
+    "removeManyTitle": "{count, plural, one {Remove # grant?} other {Remove # grants?}}",
+    "removeManyDescription": "Each holder loses what the removed grants gave at their scope and below. Grants held elsewhere, wider or narrower, stay in effect.",
+    "removeOneTitle": "Remove {role} at {kind} {name}?",
+    "removeCovered": "{holder} keeps it: the same role is also granted at {kind} {name}. Remove that grant too to take it away.",
+    "removeOneDescription": "{holder} loses what {role} gives at {kind} {name} and everything under it. Other grants stay in effect.",
+    "removeGrant": "Remove grant",
+    "removed": "Removed {name}",
+    "removeFailed": "Remove failed",
+    "noneRemoved": "Nothing was removed: {error}",
+    "unknownError": "unknown error",
+    "removedCount": "Removed {count}",
+    "partial": "Removed {removed}; {failed} could not be removed",
+    "summary": {
+      "rolesAcross": "{roles, plural, one {# role} other {# roles}} across {grants, plural, one {# grant} other {# grants}}",
+      "atScope": "{scope, select, ORG {{count} at organization} TEAM {{count} at teams} PROJECT {{count} at projects} APP {{count} at apps} other {{count} at {scope}}}",
+      "alsoWider": "{count} also granted wider",
+      "expiring": "{count} expiring"
+    },
+    "list": {
+      "search": "Search roles and scopes…  can:app.deploy",
+      "fields": {
+        "scope": "Scope",
+        "role": "Role",
+        "can": "Can"
+      },
+      "options": {
+        "scope": {
+          "ORG": "Organization",
+          "TEAM": "Teams",
+          "PROJECT": "Projects",
+          "APP": "Apps"
+        }
+      },
+      "views": {
+        "all": "All"
+      }
+    }
+  },
+  "adminPersonTeams": {
+    "columns": {
+      "team": "Team",
+      "membership": "Membership",
+      "joined": "Joined"
+    },
+    "unnamedHint": "Named once someone holds a role on this team",
+    "unnamed": "team #{pk}",
+    "listLabel": "Teams",
+    "emptyTitle": "Not on a team",
+    "emptyDescription": "Granting a role at a team's scope puts a person on that team.",
+    "list": {
+      "search": "Search teams…",
+      "views": {
+        "all": "All"
+      }
+    }
+  },
+  "adminPersonActivity": {
+    "verb": "Reading activity",
+    "intro": "What they did, newest first.",
+    "openAudit": "Open in the audit log",
+    "label": "Activity",
+    "emptyTitle": "No activity yet",
+    "emptyDescription": "Actions this person takes show here as the audit log records them."
+  },
+  "adminPrincipal": {
+    "tabsLabel": "Principal navigation",
+    "loadFailed": "Could not load this page",
+    "retry": "Retry",
+    "idpGroup": "IdP group",
+    "grantAccess": "Grant access",
+    "tabs": {
+      "access": "Access",
+      "members": "Members",
+      "teams": "Teams",
+      "activity": "Activity"
+    },
+    "groupNotFound": "Group not found",
+    "backToPeople": "Back to People",
+    "memberFallback": "Member {id}",
+    "memberNotFound": "Member not found",
+    "memberNotFoundDescription": "This member may not exist, may have left the organization, or you may not have access to it.",
+    "chooseNamed": "Select {name}",
+    "groupMembers": {
+      "title": "Members come from your identity provider",
+      "description": "Astrolift records who is in {group} when each person signs in, and does not list them here yet. The provider's own console has the members; what the group gives them is on the Access tab.",
+      "action": "Identity provider"
+    }
+  },
   "stepUp": {
     "title": "Confirm your identity",
     "description": "Sensitive operation — please re-enter your credentials to continue.",
