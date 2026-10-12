@@ -18,7 +18,7 @@ export function AppearanceBootScript() {
         __html: `(function(){try{var p=JSON.parse(localStorage.getItem(${JSON.stringify(
           STORAGE_KEY
         )})||"{}");var d=document.documentElement;
-d.dataset.ground=["black","charcoal","graphite","emerald","paper","mist"].indexOf(p.ground)>-1?p.ground:"black";
+d.dataset.ground=["black","charcoal","graphite","emerald","paper","mist"].indexOf(p.ground)>-1?p.ground:"graphite";
 var a=p.accent,G=${JSON.stringify(GROUND_BACKGROUND)};
 function L(h){var n=parseInt(h.slice(1),16);return [n>>16&255,n>>8&255,n&255].map(function(c){c/=255;return c<=.03928?c/12.92:Math.pow((c+.055)/1.055,2.4)}).reduce(function(s,c,i){return s+c*[.2126,.7152,.0722][i]},0)}
 function C(x,y){var u=L(x),v=L(y);return (Math.max(u,v)+.05)/(Math.min(u,v)+.05)}

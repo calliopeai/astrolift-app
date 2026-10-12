@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Graphite is the default theme: neutral graphite surfaces and sidebar, emerald as the accent, lime for state and signal. Anyone who picked a theme keeps it. The server now accepts `graphite` as a ground when a person's or an organization's appearance is saved (it refused it before), and a test keeps the server's grounds and colours in step with the client's (#2286).
+
 - `astroliftAccessPresets` lists the Easy-mode access starting points (Viewer, Deployer, Approver, App owner, Organization administrator). Each names the existing stock role it grants at each scope and, computed from that role's permissions, which plain-language tasks it allows and excludes. Admin › Permissions › Easy setup shows them as a table per preset, with the role it assigns at each scope and a Grant link that opens Grant access with that role preselected. A preset is never a role of its own and never installation super-admin (#2272).
 
 - The Temporal worker starts again: its Workers get a thread executor, which the synchronous `validate_deployment_identity_origin` activity (#2278) needs, so Temporal no longer refuses to construct them. The worker had crash-looped on start with the 68ca1869 build. A test now builds the entrypoint's real worker set.

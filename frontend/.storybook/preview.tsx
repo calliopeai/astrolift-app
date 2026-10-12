@@ -75,7 +75,7 @@ const preview: Preview = {
   },
   initialGlobals: {
     mode: "dark",
-    ground: "black",
+    ground: "graphite",
     accent: "green",
     density: "compact",
     permissions: "all",

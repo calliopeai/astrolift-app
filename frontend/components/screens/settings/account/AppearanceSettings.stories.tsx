@@ -96,7 +96,7 @@ export const CustomAccentTooFaint: Story = {
     const input = within(canvasElement).getByLabelText("Custom accent");
     await userEvent.clear(input);
     await userEvent.type(input, "#101010");
-    await expect(within(canvasElement).getByText(/Too faint on Black/)).toBeInTheDocument();
+    await expect(within(canvasElement).getByText(/Too faint on Graphite/)).toBeInTheDocument();
   },
 };
 
