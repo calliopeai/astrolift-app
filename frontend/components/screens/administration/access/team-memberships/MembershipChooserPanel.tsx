@@ -34,6 +34,7 @@ export function MembershipChooserPanel({
   onChoose: (row: MembershipChoice) => void;
 }) {
   const t = useTranslations("teams.memberships");
+  const named = useTranslations("adminPrincipal");
   const columns: Column<MembershipChoice>[] = [
     {
       id: "name",
@@ -52,7 +53,7 @@ export function MembershipChooserPanel({
         <Button
           variant="outline"
           onClick={() => onChoose(row)}
-          aria-label={`${t("choose")} ${row.name}`}
+          aria-label={named("chooseNamed", { name: row.name })}
         >
           {t("choose")}
         </Button>

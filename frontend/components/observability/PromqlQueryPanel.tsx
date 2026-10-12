@@ -2,6 +2,7 @@
 
 import { AlertTriangleIcon, ChevronDownIcon, ChevronRightIcon, SearchCodeIcon } from "lucide-react";
 import * as React from "react";
+import { useFormatter, useTranslations } from "next-intl";
 import {
   CartesianGrid,
   Line,
@@ -80,10 +81,11 @@ interface MetricNamePickerProps {
  * panels and would bury the app's handful of business metrics.
  */
 function MetricNamePicker({ discovery, loading, onPick }: MetricNamePickerProps) {
+  const t = useTranslations("obsPromql");
   const [filter, setFilter] = React.useState("");
 
   if (loading) {
-    return <p className="text-muted-foreground text-xs">Looking up what this app exposes…</p>;
+    return <p className="text-muted-foreground text-xs">{t("discovering")}</p>;
   }
   if (discovery === null) return null;
 
@@ -93,8 +95,7 @@ function MetricNamePicker({ discovery, loading, onPick }: MetricNamePickerProps)
     // the way.
     return (
       <p className="text-muted-foreground text-xs">
-        Can&apos;t list this app&apos;s metrics ({discovery.error ?? "unknown reason"}). You can
-        still run a query below.
+        {t("discoveryFailed", { reason: discovery.error ?? t("unknownReason") })}
       </p>
     );
   }
@@ -102,9 +103,11 @@ function MetricNamePicker({ discovery, loading, onPick }: MetricNamePickerProps)
   if (discovery.names.length === 0) {
     return (
       <p className="text-muted-foreground text-xs">
-        This app exposes no metrics of its own yet. Add{" "}
-        <code className="font-mono">[workloads.&lt;name&gt;.metrics]</code> with a{" "}
-        <code className="font-mono">port</code> to your astrolift.toml and redeploy.
+        {t.rich("noMetrics", {
+          section: "[workloads.<name>.metrics]",
+          port: "port",
+          code: (chunks) => <code className="font-mono">{chunks}</code>,
+        })}
       </p>
     );
   }
@@ -117,18 +120,17 @@ function MetricNamePicker({ discovery, loading, onPick }: MetricNamePickerProps)
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <Label className="text-muted-foreground text-xs">This app exposes</Label>
+        <Label className="text-muted-foreground text-xs">{t("exposes")}</Label>
         <Input
-          aria-label="Filter metrics"
+          aria-label={t("filterLabel")}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter metrics…"
+          placeholder={t("filterPlaceholder")}
           className="h-7 max-w-56 text-xs"
         />
         {discovery.truncated && (
           <span className="text-muted-foreground text-2xs">
-            showing the first {discovery.limit} — this app emits more distinct metric names than
-            that, which usually means a label belongs in a label rather than in the name
+            {t("truncated", { limit: discovery.limit })}
           </span>
         )}
       </div>
@@ -144,9 +146,7 @@ function MetricNamePicker({ discovery, loading, onPick }: MetricNamePickerProps)
           </button>
         ))}
         {shown.length === 0 && (
-          <span className="text-muted-foreground text-xs">
-            No metric matches &ldquo;{filter}&rdquo;.
-          </span>
+          <span className="text-muted-foreground text-xs">{t("noMatch", { filter })}</span>
         )}
       </div>
     </div>
@@ -164,6 +164,7 @@ export function PromqlQueryPanel({
   result,
   onRun: run,
 }: PromqlQueryPanelProps) {
+  const t = useTranslations("obsPromql");
   const [query, setQuery] = React.useState("");
   const [range, setRange] = React.useState<RangeKey>(DEFAULT_RANGE);
 
@@ -194,13 +195,11 @@ export function PromqlQueryPanel({
             >
               <Chevron className="text-muted-foreground size-4" />
               <CardTitle className="flex flex-1 items-center gap-2 text-base">
-                <SearchCodeIcon className="size-4" /> Query
+                <SearchCodeIcon className="size-4" /> {t("title")}
               </CardTitle>
             </button>
           </CollapsibleTrigger>
-          <CardDescription className="ml-6">
-            Run an ad-hoc PromQL expression against the cluster&apos;s Prometheus stack.
-          </CardDescription>
+          <CardDescription className="ml-6">{t("description")}</CardDescription>
         </CardHeader>
         <CollapsibleContent>
           <CardContent className="space-y-4">
@@ -217,7 +216,7 @@ export function PromqlQueryPanel({
                 // accessible name, and the picker's filter box above it is
                 // also a textbox — so a screen reader had two unlabelled
                 // fields to tell apart.
-                aria-label="PromQL query"
+                aria-label={t("queryLabel")}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder='sum by (route) (rate(http_requests_total{job="myapp"}[5m]))'
@@ -242,7 +241,7 @@ export function PromqlQueryPanel({
                   disabled={loading || !query.trim()}
                   className="h-8"
                 >
-                  {loading ? "Running…" : "Run"}
+                  {loading ? t("running") : t("run")}
                 </Button>
               </div>
             </div>
@@ -262,6 +261,7 @@ interface PromqlBodyProps {
 }
 
 function PromqlBody({ loading, transportError, result }: PromqlBodyProps) {
+  const t = useTranslations("obsPromql");
   if (loading) {
     return <Skeleton className="h-56 w-full" />;
   }
@@ -269,25 +269,23 @@ function PromqlBody({ loading, transportError, result }: PromqlBodyProps) {
     return <ErrorCallout message={transportError} />;
   }
   if (!result) {
-    return (
-      <p className="text-muted-foreground py-8 text-center text-sm">
-        Enter a PromQL expression above
-      </p>
-    );
+    return <p className="text-muted-foreground py-8 text-center text-sm">{t("enterExpression")}</p>;
   }
   if (!result.ok) {
-    return <ErrorCallout message={result.error || "PromQL execution failed"} />;
+    return <ErrorCallout message={result.error || t("executionFailed")} />;
   }
   if (result.series.length === 0) {
-    return (
-      <p className="text-muted-foreground py-8 text-center text-sm">Query returned no series.</p>
-    );
+    return <p className="text-muted-foreground py-8 text-center text-sm">{t("noSeries")}</p>;
   }
   return <PromqlChart series={result.series} />;
 }
 
 function PromqlChart({ series }: { series: AstroliftPromqlSeries[] }) {
-  const { rows, keys } = React.useMemo(() => mergeSeries(series), [series]);
+  const format = useFormatter();
+  const { rows, keys } = React.useMemo(
+    () => mergeSeries(series, (d) => format.dateTime(d, TIME_OF_DAY)),
+    [series, format]
+  );
   return (
     <div className="space-y-3">
       <div className="h-56">
@@ -341,11 +339,12 @@ function PromqlChart({ series }: { series: AstroliftPromqlSeries[] }) {
 }
 
 function ErrorCallout({ message }: { message: string }) {
+  const t = useTranslations("obsPromql");
   return (
     <div className="border-destructive/40 bg-destructive/5 text-destructive flex items-start gap-2 rounded-md border p-3 text-sm">
       <AlertTriangleIcon className="mt-0.5 size-4 shrink-0" />
       <div>
-        <p className="font-medium">PromQL error</p>
+        <p className="font-medium">{t("error")}</p>
         <pre className="mt-1 font-mono text-xs whitespace-pre-wrap">{message}</pre>
       </div>
     </div>
@@ -359,7 +358,12 @@ interface MergedSeries {
   keys: string[];
 }
 
-function mergeSeries(series: AstroliftPromqlSeries[]): MergedSeries {
+const TIME_OF_DAY = { hour: "numeric", minute: "2-digit", second: "2-digit" } as const;
+
+function mergeSeries(
+  series: AstroliftPromqlSeries[],
+  formatTime: (d: Date) => string
+): MergedSeries {
   const tsIndex = new Map<string, ChartRow>();
   const keys: string[] = [];
   series.forEach((s, idx) => {
@@ -369,7 +373,7 @@ function mergeSeries(series: AstroliftPromqlSeries[]): MergedSeries {
       const tsKey = String(point.ts);
       let row = tsIndex.get(tsKey);
       if (!row) {
-        row = { ts: tickFromPoint(point), _key: tsKey };
+        row = { ts: tickFromPoint(point, formatTime), _key: tsKey };
         tsIndex.set(tsKey, row);
       }
       row[k] = point.value;
@@ -413,17 +417,17 @@ function asLabelMap(raw: unknown): Record<string, string> {
   return out;
 }
 
-function tickFromPoint(point: AstroliftTimeSeriesPoint): string {
+function tickFromPoint(point: AstroliftTimeSeriesPoint, formatTime: (d: Date) => string): string {
   const raw = point.ts;
   // The resolver emits a DateTime string; some Prometheus paths send a
   // unix-seconds string, hence the dual-decode.
   if (/^[0-9.]+$/.test(raw)) {
     const asNum = Number(raw);
-    if (asNum > 0) return new Date(asNum * 1000).toLocaleTimeString();
+    if (asNum > 0) return formatTime(new Date(asNum * 1000));
   }
   const d = new Date(raw);
   if (!Number.isNaN(d.getTime())) {
-    return d.toLocaleTimeString();
+    return formatTime(d);
   }
   return raw;
 }

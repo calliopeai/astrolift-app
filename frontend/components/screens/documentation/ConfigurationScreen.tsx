@@ -2,6 +2,7 @@
 
 import { SettingsIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import type { Column } from "@/components/data-table";
@@ -27,35 +28,47 @@ interface VarRow extends EnvVar {
 
 const varKey = (v: VarRow) => `${v.groupId}:${v.name}`;
 
-const SOURCE_OPTIONS: { value: Source; label: string }[] = [
-  { value: "operator", label: "operator" },
-  { value: "image", label: "image" },
-  { value: "platform", label: "platform-injected" },
-];
+function docLink(href: string) {
+  return function DocLink(chunks: React.ReactNode) {
+    return (
+      <Link href={href} className="text-foreground underline-offset-2 hover:underline">
+        {chunks}
+      </Link>
+    );
+  };
+}
 
-function configurationList(groups: Group[]): ListDefinition {
+const SOURCES: Source[] = ["operator", "image", "platform"];
+
+type Translate = (key: string) => string;
+
+function configurationList(groups: Group[], t: Translate): ListDefinition {
   return {
     id: "documentation.configuration",
     fields: [
       {
         key: "group",
-        label: "Group",
+        label: t("filters.group"),
         options: groups.map((g) => ({ value: g.id, label: g.title })),
       },
-      { key: "source", label: "Source", options: SOURCE_OPTIONS },
+      {
+        key: "source",
+        label: t("filters.source"),
+        options: SOURCES.map((value) => ({ value, label: t(`source.${value}`) })),
+      },
       {
         key: "required",
-        label: "Required",
+        label: t("filters.required"),
         options: [
-          { value: "yes", label: "yes" },
-          { value: "no", label: "no" },
+          { value: "yes", label: t("yes") },
+          { value: "no", label: t("no") },
         ],
       },
     ],
-    searchPlaceholder: "Search variables, purposes, defaults…",
+    searchPlaceholder: t("searchPlaceholder"),
     defaultSort: [{ key: "order", dir: "asc" }],
     views: standardViews({ owner: "me" }, [], {
-      mineNote: "The reference is the same for everyone, so Mine is empty.",
+      mineNote: t("mineNote"),
     }),
     paging: "numbered",
     pageSizes: [25, 50, 100],
@@ -81,15 +94,15 @@ const CONFIGURATION_SELECT: SelectRowsSpec<VarRow> = {
   id: varKey,
 };
 
-function sourceBadge(source: Source) {
+function sourceBadge(source: Source, t: Translate) {
   switch (source) {
     case "image":
-      return <Badge variant="outline">image</Badge>;
+      return <Badge variant="outline">{t("source.image")}</Badge>;
     case "platform":
-      return <Badge variant="secondary">platform-injected</Badge>;
+      return <Badge variant="secondary">{t("source.platform")}</Badge>;
     case "operator":
     default:
-      return <Badge variant="outline">operator</Badge>;
+      return <Badge variant="outline">{t("source.operator")}</Badge>;
   }
 }
 
@@ -103,7 +116,8 @@ export interface ConfigurationScreenProps {
  * above it.
  */
 export function ConfigurationScreen({ groups }: ConfigurationScreenProps) {
-  const [def] = React.useState(() => configurationList(groups));
+  const t = useTranslations("docsConfiguration");
+  const [def] = React.useState(() => configurationList(groups, t));
   const list = useLocalListState(def);
   const rows: VarRow[] = [];
   for (const g of groups) {
@@ -126,7 +140,7 @@ export function ConfigurationScreen({ groups }: ConfigurationScreenProps) {
   const columns: Column<VarRow>[] = [
     {
       id: "name",
-      header: "Variable",
+      header: t("columns.variable"),
       sortKey: "name",
       width: "w-1/4",
       cellClassName: "align-top font-mono text-xs [overflow-wrap:anywhere]",
@@ -134,13 +148,13 @@ export function ConfigurationScreen({ groups }: ConfigurationScreenProps) {
     },
     {
       id: "purpose",
-      header: "Purpose",
+      header: t("columns.purpose"),
       cellClassName: "text-muted-foreground align-top text-xs leading-relaxed",
       cell: (v) => v.purpose,
     },
     {
       id: "group",
-      header: "Group",
+      header: t("columns.group"),
       sortKey: "group",
       width: "w-32",
       cellClassName: "text-muted-foreground align-top text-xs",
@@ -148,33 +162,33 @@ export function ConfigurationScreen({ groups }: ConfigurationScreenProps) {
     },
     {
       id: "default",
-      header: "Default",
+      header: t("columns.default"),
       width: "w-32",
       cellClassName: "text-muted-foreground align-top font-mono text-xs [overflow-wrap:anywhere]",
-      cell: (v) => v.default ?? "none",
+      cell: (v) => v.default ?? t("noDefault"),
     },
     {
       id: "required",
-      header: "Required",
+      header: t("columns.required"),
       sortKey: "required",
       width: "w-20",
       cellClassName: "align-top",
       cell: (v) =>
         v.required ? (
           <Badge className="bg-warning/15 text-warning-fg" variant="secondary">
-            yes
+            {t("yes")}
           </Badge>
         ) : (
-          <span className="text-muted-foreground text-xs">no</span>
+          <span className="text-muted-foreground text-xs">{t("no")}</span>
         ),
     },
     {
       id: "source",
-      header: "Source",
+      header: t("columns.source"),
       sortKey: "source",
       width: "w-32",
       cellClassName: "align-top",
-      cell: (v) => sourceBadge(v.source),
+      cell: (v) => sourceBadge(v.source, t),
     },
   ];
 
@@ -186,43 +200,48 @@ export function ConfigurationScreen({ groups }: ConfigurationScreenProps) {
   return (
     <article className="flex max-w-4xl flex-1 flex-col gap-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Configuration</h1>
+        <h1 className="text-2xl font-semibold">{t("title")}</h1>
         <p className="text-muted-foreground mt-2 text-sm">
-          Every environment variable Astrolift reads at runtime. Source ={" "}
-          <Badge variant="outline" className="mx-0.5">
-            operator
-          </Badge>{" "}
-          means the operator sets it,{" "}
-          <Badge variant="outline" className="mx-0.5">
-            image
-          </Badge>{" "}
-          means the container image bakes a default in, and{" "}
-          <Badge variant="secondary" className="mx-0.5">
-            platform-injected
-          </Badge>{" "}
-          means Astrolift writes it into the workload at deploy time.
+          {t.rich("intro", {
+            operator: t("source.operator"),
+            image: t("source.image"),
+            platform: t("source.platform"),
+            outline: (chunks) => (
+              <Badge variant="outline" className="mx-0.5">
+                {chunks}
+              </Badge>
+            ),
+            secondary: (chunks) => (
+              <Badge variant="secondary" className="mx-0.5">
+                {chunks}
+              </Badge>
+            ),
+          })}
         </p>
       </div>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Conventions</h2>
+        <h2 className="text-lg font-medium">{t("conventionsTitle")}</h2>
         <ul className="text-muted-foreground flex flex-col gap-2 text-sm">
           <li>
-            Boolean values accept <code>true / false / 1 / 0 / yes / no / on / off</code>{" "}
-            (case-insensitive).
+            {t.rich("conventionBoolean", {
+              values: "true / false / 1 / 0 / yes / no / on / off",
+              code: (chunks) => <code>{chunks}</code>,
+            })}
           </li>
           <li>
-            Vars marked <strong className="text-foreground">required</strong> either have no default
-            or have a default that&apos;s only safe for local development (e.g.{" "}
-            <code>not-a-secret</code>).
+            {t.rich("conventionRequired", {
+              code: (chunks) => <code>{chunks}</code>,
+              strong: (chunks) => <strong className="text-foreground">{chunks}</strong>,
+            })}
           </li>
-          <li>Anything not listed here is not read by Astrolift — silently ignored if set.</li>
+          <li>{t("conventionUnlisted")}</li>
         </ul>
       </section>
 
       {groups.length > 0 && (
         <section className="flex flex-col gap-3">
-          <h2 className="text-lg font-medium">Groups</h2>
+          <h2 className="text-lg font-medium">{t("groupsTitle")}</h2>
           <dl className="flex min-w-0 flex-col gap-3 text-sm">
             {groups.map((g) => (
               <div key={g.id} id={g.id} className="min-w-0">
@@ -248,18 +267,18 @@ export function ConfigurationScreen({ groups }: ConfigurationScreenProps) {
       )}
 
       <section id="variables" className="flex min-w-0 flex-col gap-3">
-        <h2 className="text-lg font-medium">Variables</h2>
+        <h2 className="text-lg font-medium">{t("variablesTitle")}</h2>
         <ListPage<VarRow>
           embedded
           list={list}
-          label="Variables"
+          label={t("variablesTitle")}
           columns={columns}
           rows={page.rows}
           getRowId={varKey}
           totalCount={page.totalCount}
           empty={{
             icon: <SettingsIcon className="size-5" />,
-            title: "No variables documented",
+            title: t("emptyTitle"),
           }}
         />
       </section>
@@ -267,12 +286,9 @@ export function ConfigurationScreen({ groups }: ConfigurationScreenProps) {
       <Separator />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">How to inspect what&apos;s set</h2>
+        <h2 className="text-lg font-medium">{t("inspectTitle")}</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          The Django management command <code>features</code> prints the current feature-flag state,
-          and <code>python manage.py diffsettings</code> shows every Django setting against its
-          default. The control plane never echoes secret values — settings marked sensitive print as{" "}
-          <code>***</code>.
+          {t.rich("inspectBody", { code: (chunks) => <code>{chunks}</code> })}
         </p>
         <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
           <code>{`./run.sh manage features
@@ -283,35 +299,18 @@ export function ConfigurationScreen({ groups }: ConfigurationScreenProps) {
       <Separator />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Related</h2>
+        <h2 className="text-lg font-medium">{t("relatedTitle")}</h2>
         <ul className="text-muted-foreground flex flex-col gap-1.5 text-sm">
+          <li>{t.rich("relatedGetStarted", { link: docLink("/documentation/get-started") })}</li>
           <li>
-            <Link
-              href="/documentation/get-started"
-              className="text-foreground underline-offset-2 hover:underline"
-            >
-              Get started
-            </Link>{" "}
-            — bring the stack up locally; env vars there default to the docker-compose service
-            names.
+            {t.rich("relatedIdentityProviders", {
+              link: docLink("/documentation/identity-providers"),
+            })}
           </li>
           <li>
-            <Link
-              href="/documentation/identity-providers"
-              className="text-foreground underline-offset-2 hover:underline"
-            >
-              Identity providers
-            </Link>{" "}
-            — the AUTH0_* / ASTROLIFT_IDP_* vars are described in detail.
-          </li>
-          <li>
-            <Link
-              href="/documentation/cluster-prerequisites"
-              className="text-foreground underline-offset-2 hover:underline"
-            >
-              Cluster prerequisites
-            </Link>{" "}
-            — what the tenant cluster needs separately from these env vars.
+            {t.rich("relatedClusterPrerequisites", {
+              link: docLink("/documentation/cluster-prerequisites"),
+            })}
           </li>
         </ul>
       </section>

@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { RUN_AGENT } from "@/graphql/agents/agents.mutations";
@@ -45,6 +46,7 @@ export interface DispatchInput {
  * `runAstroliftAgent` Once dispatch. The data half of DispatchTabView.
  */
 export function useDispatchTab(orgId: string) {
+  const t = useTranslations("agentDispatch");
   // Pre-registered agents (the org fleet) populate the picker; the richer fleet
   // row (vs. raw workloads) carries each agent's configured cadence for the
   // context strip. Environment specs back the Advanced override.
@@ -90,13 +92,13 @@ export function useDispatchTab(orgId: string) {
       });
       const result = data?.runAstroliftAgent;
       if (!result?.ok) {
-        throw new Error(result?.errors?.[0]?.message ?? "Dispatch failed");
+        throw new Error(result?.errors?.[0]?.message ?? t("toasts.dispatchFailed"));
       }
-      toast.success(`Dispatched ${name}`);
+      toast.success(t("toasts.dispatched", { name }));
       return result.data ? { id: result.data.id } : null;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      toast.error(`Couldn't dispatch ${name}`, { description: message });
+      toast.error(t("toasts.dispatchFailedFor", { name }), { description: message });
       return null;
     }
   }

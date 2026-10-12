@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, Loader2Icon, XIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { ShellHeader } from "@/components/shell/ShellHeader";
@@ -11,23 +12,14 @@ import { appsCrumbs } from "../list/apps-list";
 
 export type NewAppStep = 1 | 2 | 3;
 
-/** The three steps (spec 44 §5.4): where the code is, how it runs, then what will deploy. */
-export const NEW_APP_STEPS: { n: NewAppStep; label: string; description: string }[] = [
-  {
-    n: 1,
-    label: "Source",
-    description: "The repository, and the astrolift.toml manifest that says what it runs.",
-  },
-  {
-    n: 2,
-    label: "Run",
-    description: "The app's name and project, then how and when it deploys.",
-  },
-  {
-    n: 3,
-    label: "Review",
-    description: "What will be created and what will deploy. Nothing happens until you create it.",
-  },
+/**
+ * The three steps (spec 44 §5.4): where the code is, how it runs, then what will deploy.
+ * Label and description live under `appWizard.steps.<key>`.
+ */
+export const NEW_APP_STEPS: { n: NewAppStep; key: "source" | "run" | "review" }[] = [
+  { n: 1, key: "source" },
+  { n: 2, key: "run" },
+  { n: 3, key: "review" },
 ];
 
 export interface NewAppPageProps {
@@ -59,25 +51,26 @@ export function NewAppPage({
   onStep,
   onBack,
   onContinue,
-  continueLabel = "Continue",
+  continueLabel,
   continueDisabled = false,
   busy = false,
   onCancel,
   children,
 }: NewAppPageProps) {
+  const t = useTranslations("appWizard");
   const current = NEW_APP_STEPS[step - 1];
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-4">
       <ShellHeader
-        crumbs={appsCrumbs({ label: "New app" })}
-        title="New app"
+        crumbs={appsCrumbs({ label: t("title") })}
+        title={t("title")}
         context={
-          <ol aria-label="Steps" className="inline-flex flex-wrap items-center gap-2">
+          <ol aria-label={t("stepsLabel")} className="inline-flex flex-wrap items-center gap-2">
             {NEW_APP_STEPS.map((s, i) => {
               const done = s.n < step;
               const label = (
                 <>
-                  <span className="font-mono">{s.n}</span> {s.label}
+                  <span className="font-mono">{s.n}</span> {t(`steps.${s.key}.label`)}
                 </>
               );
               return (
@@ -97,7 +90,7 @@ export function NewAppPage({
                       className="hover:text-foreground focus-visible:ring-ring inline-flex items-center gap-1 rounded-sm focus-visible:ring-2 focus-visible:outline-none"
                     >
                       {label}
-                      <CheckIcon className="size-3.5" aria-label="done" />
+                      <CheckIcon className="size-3.5" aria-label={t("done")} />
                     </button>
                   ) : (
                     <span>{label}</span>
@@ -111,7 +104,7 @@ export function NewAppPage({
           onCancel ? (
             <Button variant="ghost" size="sm" onClick={onCancel}>
               <XIcon className="size-4" />
-              Cancel
+              {t("cancel")}
             </Button>
           ) : undefined
         }
@@ -123,9 +116,11 @@ export function NewAppPage({
       >
         <div className="min-w-0">
           <h2 id="new-app-step" className="text-lg font-semibold">
-            {current.label}
+            {t(`steps.${current.key}.label`)}
           </h2>
-          <p className="text-muted-foreground mt-1 text-sm">{current.description}</p>
+          <p className="text-muted-foreground mt-1 text-sm">
+            {t(`steps.${current.key}.description`)}
+          </p>
         </div>
         {children}
       </section>
@@ -133,11 +128,11 @@ export function NewAppPage({
       <div className="flex max-w-5xl min-w-0 items-center justify-between gap-2">
         <Button type="button" variant="ghost" onClick={onBack} disabled={!onBack}>
           <ArrowLeftIcon className="size-4" />
-          Back
+          {t("back")}
         </Button>
         <Button type="button" onClick={onContinue} disabled={continueDisabled || busy}>
           {busy && <Loader2Icon className="size-4 animate-spin" />}
-          {continueLabel}
+          {continueLabel ?? t("continue")}
           {!busy && step < 3 && <ArrowRightIcon className="size-4" />}
         </Button>
       </div>

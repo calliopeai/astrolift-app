@@ -1,9 +1,10 @@
 "use client";
 
 import { SearchXIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { SCOPE_NOUN, SCOPE_ORDER } from "@/components/access/access-model";
+import { SCOPE_ORDER } from "@/components/access/access-model";
 import {
   conditionError,
   parsePolicy,
@@ -41,7 +42,7 @@ import { POLICIES_HREF, policiesCrumbs } from "./policy-routes";
 import type { PolicyInput, usePolicyEditor } from "./use-policy-editor";
 
 type Step = 0 | 1 | 2;
-const STEPS = ["Details", "Rule", "Review"] as const;
+const STEPS = ["details", "rule", "review"] as const;
 
 export interface PolicyDraft {
   name: string;
@@ -119,26 +120,27 @@ function draftOf(policy: PolicyEditorScreenProps["policy"]): PolicyDraft {
  */
 export function PolicyEditorScreen(props: PolicyEditorScreenProps) {
   const { mode, id, policy, loading, error, onRetry, canManage } = props;
-  const title = mode === "create" ? "New policy" : (policy?.name ?? "Policy");
+  const t = useTranslations("adminPolicies.editor");
+  const title = mode === "create" ? t("newPolicy") : (policy?.name ?? t("policy"));
 
   if (mode === "edit" && !policy) {
     return (
       <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
         <ShellHeader
-          crumbs={policiesCrumbs(loading ? "Policy" : "Not found")}
-          title={loading ? <Skeleton className="h-6 w-56" /> : "Policy not found"}
+          crumbs={policiesCrumbs(loading ? t("policy") : t("notFoundCrumb"))}
+          title={loading ? <Skeleton className="h-6 w-56" /> : t("notFoundTitle")}
         />
         {loading ? (
-          <Panel title="Rule" loading />
+          <Panel title={t("rule")} loading />
         ) : error ? (
-          <Panel title="Policy" error={error} onRetry={onRetry} />
+          <Panel title={t("policy")} error={error} onRetry={onRetry} />
         ) : (
           <EmptyState
             icon={<SearchXIcon className="size-5" />}
-            title="No policy with this id"
-            description={`Nothing in this organization has the id ${id}. It may have been deleted.`}
+            title={t("missingTitle")}
+            description={t("missingDescription", { id: id ?? "" })}
             actionHref={POLICIES_HREF}
-            actionLabel="All policies"
+            actionLabel={t("allPolicies")}
           />
         )}
       </div>
@@ -154,7 +156,10 @@ export function PolicyEditorScreen(props: PolicyEditorScreenProps) {
           <PolicySentence policy={shape} className="text-base" />
           <Summary draft={draftOf(policy)} />
           <p className="text-muted-foreground text-xs">
-            Changing a policy needs <span className="font-mono">org.update</span>.
+            {t.rich("needsPermission", {
+              permission: "org.update",
+              mono: (chunks) => <span className="font-mono">{chunks}</span>,
+            })}
           </p>
         </div>
       </div>
@@ -177,6 +182,8 @@ function Editor({
   initialSimulation = null,
   title,
 }: PolicyEditorScreenProps & { title: string }) {
+  const t = useTranslations("adminPolicies.editor");
+  const scopes = useTranslations("shared.access.scope");
   const [step, setStep] = React.useState<Step>(initialStep);
   const [draft, setDraft] = React.useState<PolicyDraft>({ ...draftOf(policy), ...initialDraft });
   const [errors, setErrors] = React.useState<Partial<Record<"name" | "slug" | "rule", string>>>({});
@@ -209,7 +216,7 @@ function Editor({
       setSim({
         data: null,
         loading: false,
-        error: err instanceof Error ? err.message : "The simulation failed",
+        error: err instanceof Error ? err.message : t("simulationFailed"),
       });
     }
   }
@@ -217,16 +224,13 @@ function Editor({
   function validate(at: Step): boolean {
     const next: typeof errors = {};
     if (at === 0) {
-      if (!draft.name.trim()) next.name = "Name the policy.";
-      if (mode === "create" && !/^[a-z0-9-]+$/.test(slug))
-        next.slug = "Lowercase letters, digits and hyphens only.";
+      if (!draft.name.trim()) next.name = t("errors.name");
+      if (mode === "create" && !/^[a-z0-9-]+$/.test(slug)) next.slug = t("errors.slug");
     }
     if (at === 1) {
       const bad = draft.shape.conditions.map(conditionError).filter(Boolean);
-      if (bad.length)
-        next.rule = `Fix ${bad.length === 1 ? "the condition" : `${bad.length} conditions`} marked below first.`;
-      else if (!draft.shape.actionPattern.trim())
-        next.rule = "Name an action, or * for every action.";
+      if (bad.length) next.rule = t("errors.conditions", { count: bad.length });
+      else if (!draft.shape.actionPattern.trim()) next.rule = t("errors.action");
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -255,12 +259,12 @@ function Editor({
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
       <ShellHeader
-        crumbs={policiesCrumbs(mode === "create" ? "New policy" : title)}
+        crumbs={policiesCrumbs(mode === "create" ? t("newPolicy") : title)}
         title={title}
-        context="A policy narrows what roles allow; it never grants more."
+        context={t("context")}
       />
 
-      <ol aria-label="Steps" className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+      <ol aria-label={t("steps")} className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
         {STEPS.map((label, i) => (
           <li key={label} className="min-w-0">
             <button
@@ -280,7 +284,7 @@ function Editor({
               >
                 {i + 1}
               </span>
-              {label}
+              {t(`step.${label}`)}
             </button>
           </li>
         ))}
@@ -290,24 +294,20 @@ function Editor({
         {step === 0 && (
           <>
             <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-              <Field id="policy-name" label="Name" error={errors.name}>
+              <Field id="policy-name" label={t("name")} error={errors.name}>
                 <Input
                   id="policy-name"
                   value={draft.name}
                   onChange={(e) => patch({ name: e.target.value })}
-                  placeholder="No prod deploys after hours"
+                  placeholder={t("namePlaceholder")}
                   aria-invalid={Boolean(errors.name)}
                 />
               </Field>
               <Field
                 id="policy-slug"
-                label="Slug"
+                label={t("slug")}
                 error={errors.slug}
-                help={
-                  mode === "create"
-                    ? "Derived from the name until you edit it. Fixed once created."
-                    : "Fixed once created."
-                }
+                help={mode === "create" ? t("slugHelp") : t("fixed")}
               >
                 <Input
                   id="policy-slug"
@@ -321,12 +321,8 @@ function Editor({
             </div>
             <Field
               id="policy-scope"
-              label="Applies across"
-              help={
-                mode === "create"
-                  ? "How widely the rule reaches. Fixed once created."
-                  : "Fixed once created."
-              }
+              label={t("appliesAcross")}
+              help={mode === "create" ? t("appliesAcrossHelp") : t("fixed")}
             >
               <Select
                 value={draft.scopeLevel}
@@ -339,18 +335,18 @@ function Editor({
                 <SelectContent>
                   {SCOPE_ORDER.map((s) => (
                     <SelectItem key={s} value={s}>
-                      {SCOPE_NOUN[s]}
+                      {scopes(s)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </Field>
-            <Field id="policy-description" label="Description">
+            <Field id="policy-description" label={t("description")}>
               <Textarea
                 id="policy-description"
                 value={draft.description}
                 onChange={(e) => patch({ description: e.target.value })}
-                placeholder="Why this rule exists, in one sentence."
+                placeholder={t("descriptionPlaceholder")}
                 rows={2}
               />
             </Field>
@@ -377,19 +373,16 @@ function Editor({
 
         {step === 2 && (
           <>
-            <section aria-label="The rule" className="flex min-w-0 flex-col gap-2">
+            <section aria-label={t("theRule")} className="flex min-w-0 flex-col gap-2">
               <PolicySentence policy={draft.shape} className="text-base" />
               {changed && was && (
                 <p className="text-muted-foreground text-xs [overflow-wrap:anywhere]">
-                  Was: {policySentence(was)}
+                  {t("was", { sentence: policySentence(was) })}
                 </p>
               )}
             </section>
 
-            <p className="text-muted-foreground text-sm">
-              Saving puts this rule in force: every permission check evaluates it from then on, and
-              a condition the request cannot answer denies.
-            </p>
+            <p className="text-muted-foreground text-sm">{t("inForce")}</p>
 
             <PolicySimulationPanel
               simulation={sim.data}
@@ -412,20 +405,20 @@ function Editor({
 
         <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
           <Button type="button" variant="ghost" onClick={onCancel}>
-            Cancel
+            {t("cancel")}
           </Button>
           {step > 0 && (
             <Button type="button" variant="outline" onClick={() => setStep((step - 1) as Step)}>
-              Back
+              {t("back")}
             </Button>
           )}
           {step < 2 ? (
             <Button type="button" onClick={() => goTo((step + 1) as Step)}>
-              Continue
+              {t("continue")}
             </Button>
           ) : (
             <Button type="button" onClick={submit} disabled={saving}>
-              {saving ? "Saving…" : mode === "create" ? "Create policy" : "Save policy"}
+              {saving ? t("saving") : mode === "create" ? t("create") : t("save")}
             </Button>
           )}
         </div>
@@ -435,22 +428,24 @@ function Editor({
 }
 
 function Summary({ draft }: { draft: PolicyDraft }) {
+  const t = useTranslations("adminPolicies.editor");
+  const scopes = useTranslations("shared.access.scope");
   return (
     <DefinitionList
       items={[
         {
-          term: "Name",
+          term: t("name"),
           description: (
-            <span className="[overflow-wrap:anywhere]">{draft.name.trim() || "none"}</span>
+            <span className="[overflow-wrap:anywhere]">{draft.name.trim() || t("none")}</span>
           ),
         },
         {
-          term: "Slug",
+          term: t("slug"),
           description: <span className="font-mono [overflow-wrap:anywhere]">{draft.slug}</span>,
         },
-        { term: "Applies across", description: SCOPE_NOUN[draft.scopeLevel] },
+        { term: t("appliesAcross"), description: scopes(draft.scopeLevel) },
         {
-          term: "Conditions",
+          term: t("conditions"),
           description: (
             <span className="font-mono tabular-nums">{draft.shape.conditions.length}</span>
           ),

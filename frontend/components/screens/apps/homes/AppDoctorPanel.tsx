@@ -22,6 +22,7 @@ import {
   StethoscopeIcon,
   XCircleIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -32,21 +33,21 @@ import { REPAIRS, type useAppDoctor } from "./use-app-doctor";
 
 export type AppDoctorPanelViewProps = ReturnType<typeof useAppDoctor> & { span?: PanelSpan };
 
-/** Human labels for the service's check keys. */
+/** The service's check keys with a human label under `appHomes.doctor.checks`. */
 // Falls back to the raw key, which is why three checks added since this map
 // was written have been rendering as `cronjob_runs` and `registry_repo`.
-const CHECK_LABELS: Record<string, string> = {
-  manifest: "Manifest",
-  autowire: "Repo wiring",
-  registry_repo: "Container registry",
-  push_role: "Push role",
-  dns: "DNS",
-  identity: "Pod identity",
-  image: "Image pinning",
-  deployments: "Deployments",
-  cronjob_runs: "Scheduled runs",
-  managed_services: "Managed services",
-};
+const CHECK_KEYS = new Set([
+  "manifest",
+  "autowire",
+  "registry_repo",
+  "push_role",
+  "dns",
+  "identity",
+  "image",
+  "deployments",
+  "cronjob_runs",
+  "managed_services",
+]);
 
 /**
  * Per-status presentation. `unknown` is deliberately distinct from `fail`:
@@ -56,13 +57,13 @@ const CHECK_LABELS: Record<string, string> = {
  */
 const STATUS_PRESENTATION: Record<
   string,
-  { icon: React.ComponentType<{ className?: string }>; className: string; label: string }
+  { icon: React.ComponentType<{ className?: string }>; className: string }
 > = {
-  pass: { icon: CheckCircle2Icon, className: "text-success-fg", label: "ok" },
-  fail: { icon: XCircleIcon, className: "text-danger-fg", label: "failing" },
-  warn: { icon: AlertTriangleIcon, className: "text-warning-fg", label: "warning" },
-  skip: { icon: MinusCircleIcon, className: "text-muted-foreground", label: "not applicable" },
-  unknown: { icon: CircleHelpIcon, className: "text-muted-foreground", label: "unverified" },
+  pass: { icon: CheckCircle2Icon, className: "text-success-fg" },
+  fail: { icon: XCircleIcon, className: "text-danger-fg" },
+  warn: { icon: AlertTriangleIcon, className: "text-warning-fg" },
+  skip: { icon: MinusCircleIcon, className: "text-muted-foreground" },
+  unknown: { icon: CircleHelpIcon, className: "text-muted-foreground" },
 };
 
 function RepairButton({
@@ -74,6 +75,7 @@ function RepairButton({
   running: string | null;
   onRun: (verb: string) => void;
 }) {
+  const t = useTranslations("appHomes.doctor.repairs");
   const repair = REPAIRS[verb];
   // An unrecognised verb renders nothing rather than a dead button. The
   // backend's own guard keeps `fix` inside this vocabulary, so reaching here
@@ -91,7 +93,7 @@ function RepairButton({
         onClick={() => onRun(verb)}
       >
         {running === verb ? <Loader2Icon className="size-3 animate-spin" /> : null}
-        {repair.label}
+        {t(`${verb}.label`)}
       </Button>
     </Can>
   );
@@ -107,11 +109,12 @@ export function AppDoctorPanelView({
   running,
   span = 12,
 }: AppDoctorPanelViewProps) {
+  const t = useTranslations("appHomes.doctor");
   return (
     <Panel
-      title="App doctor"
+      title={t("title")}
       icon={<StethoscopeIcon className="size-4" />}
-      description="Checks each dependency this app needs and reports whether it is actually usable. Runs live probes, so it only runs when you ask."
+      description={t("description")}
       span={span}
       loading={loading && !report}
       error={errorMessage || null}
@@ -130,41 +133,36 @@ export function AppDoctorPanelView({
             ) : (
               <StethoscopeIcon className="size-3.5" />
             )}
-            {called ? "Run again" : "Run checks"}
+            {called ? t("runAgain") : t("runChecks")}
           </Button>
         </Can>
       }
     >
       <div className="flex min-w-0 flex-col gap-3">
-        {!called && !report ? (
-          <p className="text-muted-foreground text-xs">
-            Nothing has run yet. Run checks to probe the manifest, registry, push role, DNS and
-            deployments.
-          </p>
-        ) : null}
+        {!called && !report ? <p className="text-muted-foreground text-xs">{t("notRun")}</p> : null}
 
         {report ? (
           <>
             <p className="text-xs font-medium">
               {report.healthy ? (
-                <span className="text-success-fg">Everything this app needs checks out.</span>
+                <span className="text-success-fg">{t("healthy")}</span>
               ) : (
-                <span className="text-warning-fg">
-                  Some dependencies need attention; see below.
-                </span>
+                <span className="text-warning-fg">{t("unhealthy")}</span>
               )}
             </p>
             <ul className="flex flex-col gap-2">
               {report.checks.map((check) => {
-                const presentation =
-                  STATUS_PRESENTATION[check.status] ?? STATUS_PRESENTATION.unknown;
+                const statusKey = check.status in STATUS_PRESENTATION ? check.status : "unknown";
+                const presentation = STATUS_PRESENTATION[statusKey];
                 const Icon = presentation.icon;
                 return (
                   <li key={check.key} className="flex items-start gap-2 text-xs">
                     <Icon className={`mt-0.5 size-3.5 shrink-0 ${presentation.className}`} />
                     <span className="min-w-0">
-                      <span className="font-medium">{CHECK_LABELS[check.key] ?? check.key}</span>
-                      <span className="text-muted-foreground"> · {presentation.label}</span>
+                      <span className="font-medium">
+                        {CHECK_KEYS.has(check.key) ? t(`checks.${check.key}`) : check.key}
+                      </span>
+                      <span className="text-muted-foreground"> · {t(`status.${statusKey}`)}</span>
                       {check.detail ? (
                         <span className="text-muted-foreground block font-mono [overflow-wrap:anywhere]">
                           {check.detail}
@@ -186,7 +184,7 @@ export function AppDoctorPanelView({
         ) : null}
 
         {called && !loading && !errorMessage && report && report.checks.length === 0 ? (
-          <p className="text-muted-foreground text-xs">Nothing to report for this app.</p>
+          <p className="text-muted-foreground text-xs">{t("nothingToReport")}</p>
         ) : null}
       </div>
     </Panel>

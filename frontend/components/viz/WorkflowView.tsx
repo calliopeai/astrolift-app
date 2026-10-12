@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import {
@@ -9,7 +10,7 @@ import {
   type WorkflowView as WorkflowStyle,
 } from "@/lib/viz-prefs";
 
-import { VizFrame } from "./core/VizFrame";
+import { VizFrame, useStyleCopy } from "./core/VizFrame";
 import type { LegendItem } from "./core/VizLegend";
 import type { WorkflowSnapshot, WorkflowViewProps } from "./core/workflow-model";
 import { WORKFLOW_GRAPH_LEGEND, WorkflowGraph } from "./workflow/WorkflowGraph";
@@ -48,13 +49,15 @@ export function WorkflowView({
   snapshot,
   onSelectRun,
   onSelectStation,
-  title = "Workflows",
+  title,
   description,
   value,
   onChange,
   motion,
   className,
 }: WorkflowViewFrameProps) {
+  const t = useTranslations("vizRender");
+  const styles = useStyleCopy(WORKFLOW_VIEWS, "workflow");
   const [prefs, update] = useVizPrefs();
   const resolved = useMotion();
   const style = value ?? prefs.workflowView;
@@ -62,11 +65,15 @@ export function WorkflowView({
   const { Component, legend } = WORKFLOW_RENDERERS[style];
   return (
     <VizFrame
-      title={title}
+      title={title ?? t("frame.workflowsTitle")}
       description={
-        description ?? `${snapshot.lines.length} workflows, ${snapshot.trains.length} runs`
+        description ??
+        t("frame.workflowsDescription", {
+          workflows: snapshot.lines.length,
+          runs: snapshot.trains.length,
+        })
       }
-      styles={WORKFLOW_VIEWS}
+      styles={styles}
       value={style}
       onChange={onChange ?? ((workflowView) => update({ workflowView }))}
       motion={m}

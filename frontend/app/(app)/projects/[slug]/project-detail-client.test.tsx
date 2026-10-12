@@ -143,6 +143,7 @@ vi.mock("@/lib/i18n/formatters", () => ({
   useFormatters: () => ({
     formatDate: () => "Aug 1, 2026",
     formatDateTime: () => "Aug 1, 2026 at 12:00 PM",
+    formatRelativeTime: () => "5 minutes ago",
   }),
 }));
 

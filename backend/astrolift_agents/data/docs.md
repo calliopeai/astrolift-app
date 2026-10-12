@@ -23,96 +23,91 @@ Project changes are maintained in the repository changelog .
 ## /documentation/cluster-prerequisites
 
 # Cluster prerequisites
-Everything a Kubernetes cluster needs to have installed before you register it with Astrolift. Most clusters provisioned by astrolift-opscode already include these — this guide is for operators bringing their own cluster.
+Everything a Kubernetes cluster needs to have installed before you register it with Astrolift. Most clusters provisioned by astrolift-opscode already include these; this guide is for operators bringing their own cluster.
 One-shot install via the CLI
-For a one-shot install of the prereqs below — driver-tuned for your provider — run astro cluster bootstrap --cluster-slug <slug> from your terminal. The CLI plants Flux + the platform's umbrella chart, then the cluster detail page's bootstrap card lets you reconcile the selection over time. Install the CLI .
+For a one-shot install of the prereqs below, driver-tuned for your provider, run astro cluster bootstrap --cluster-slug from your terminal. The CLI plants Flux + the platform's umbrella chart, then the cluster detail page's bootstrap card lets you reconcile the selection over time. Install the CLI .
 ## When you need this
-Astrolift treats a tenant cluster as a runtime that hosts apps — it does not install or own infrastructure components in the cluster itself. Custom-domain TLS, ingress routing, and autoscaling are delegated to controllers that need to exist before Astrolift can use them. The checks below confirm the cluster is wired correctly; if any are missing, the matching features stay disabled and the control plane surfaces a remediation hint on the cluster detail page.
+Astrolift treats a tenant cluster as a runtime that hosts apps; it does not install or own infrastructure components in the cluster itself. Custom-domain TLS, ingress routing, and autoscaling are delegated to controllers that need to exist before Astrolift can use them. The checks below confirm the cluster is wired correctly; if any are missing, the matching features stay disabled and the control plane surfaces a remediation hint on the cluster detail page.
 ## Required
 Without these, registration succeeds but app workloads cannot accept inbound traffic on a custom hostname.
 ### cert-manager (v1.13+)
 Issues and renews TLS certificates for custom domains. Astrolift creates Certificate resources on your behalf; cert-manager handles the ACME dance with Let's Encrypt (or whichever ClusterIssuer you configure). Without cert-manager the custom-domains workflow refuses to bind hostnames.
 Upstream: cert-manager.io/docs/installation
 ### An ingress controller
-Astrolift renders one ingress resource per app whose spec.ingressClassName matches an IngressClass that exists in the cluster. Any of the following controllers is fine — pick the one your platform team already runs.
+Astrolift renders one ingress resource per app whose spec.ingressClassName matches an IngressClass that exists in the cluster. Any of the following controllers is fine; pick the one your platform team already runs.
 #### ingress-nginx default
 #### Istio Gateway
 When Astrolift detects Istio it emits Gateway + VirtualService resources instead of Ingress .
 #### AWS Load Balancer Controller / GCP Gateway API
-On EKS, the ALB controller exposes services through an alb IngressClass. On GKE, the Gateway API controller ships with the cluster — install gateway-api CRDs to use it.
+On EKS, the ALB controller exposes services through an alb IngressClass. On GKE, the Gateway API controller ships with the cluster; install gateway-api CRDs to use it.
 ### external-dns (optional, strongly recommended)
-Reads the hostnames from Certificate.spec.dnsNames / ingress resources and creates the corresponding records at your DNS provider. Required when you want Astrolift to fully self-serve custom-domain publication — otherwise an operator has to add CNAMEs by hand.
+Reads the hostnames from Certificate.spec.dnsNames / ingress resources and creates the corresponding records at your DNS provider. Required when you want Astrolift to fully self-serve custom-domain publication; otherwise an operator has to add CNAMEs by hand.
 Supported providers with controller-friendly APIs include AWS Route53, Google Cloud DNS, Azure DNS, and Cloudflare. See the upstream provider list for the full set.
 ## Recommended
 Astrolift works without these, but specific features stay off until they are present.
 ### A default storage class
-Required for in-cluster managed services that claim PersistentVolumeClaim s — for example the in-cluster Postgres operator, in-cluster Redis, or any app that mounts a PVC directly. If every app you run uses an external RDS/Cloud SQL managed service, you can skip this.
+Required for in-cluster managed services that claim PersistentVolumeClaim s, for example the in-cluster Postgres operator, in-cluster Redis, or any app that mounts a PVC directly. If every app you run uses an external RDS/Cloud SQL managed service, you can skip this.
 ### metrics-server
 The Kubernetes HorizontalPodAutoscaler reads CPU / memory from metrics.k8s.io ; without metrics-server autoscaling rules sit idle at the current replica count. Astrolift falls back to manual replica counts but the autoscale tab on app detail surfaces a banner explaining what's missing.
 ### In-cluster Prometheus
-When Astrolift detects a reachable Prometheus it points the app metrics panels at it. Without one the panels render synthetic time-series so the UI stays useful in dev — but real workload numbers require Prometheus or another Prometheus-compatible scraper.
+When Astrolift detects a reachable Prometheus it points the app metrics panels at it. Without one the panels render synthetic time-series so the UI stays useful in dev, but real workload numbers require Prometheus or another Prometheus-compatible scraper.
 ## Verifying the install
 Run these from a workstation that can reach the cluster. If any check fails, the matching feature stays disabled in Astrolift.
 ### cert-manager
 ### Ingress class
 ### metrics-server
 ## Troubleshooting
-- cert-manager pending forever (Certificate stuck in Pending ). Almost always an ACME challenge problem. For dns-01 : the issuer has no credentials to write the TXT record (check the ClusterIssuer spec, then the controller pod logs for credential errors). For http-01 : the validator pod cannot reach http://<hostname>/.well-known/acme-challenge/... — make sure the ingress controller is exposed publicly. Inspect with:
-- Ingress returns 503 with no backend. The Service the ingress points at has zero ready endpoints. Most often: the app pods are still pulling the image, the readiness probe is failing, or the Service selector doesn't match the pod labels. Confirm with kubectl get endpoints <svc> ; if the address list is empty the ingress has nothing to forward to.
-- external-dns is not creating records. Two common causes: (a) RBAC — the controller's service account needs list/watch on services , ingresses , and the provider's CRDs, plus IAM/credentials to call the DNS provider's API; (b) ownership — external-dns refuses to modify a record it didn't create unless the TXT owner-id marker matches. Check the controller logs for skipping endpoint messages.
-- HPA shows <unknown> for the target metric. metrics-server is not installed or not scraping. Run kubectl top pods — if it errors with Metrics API not available , metrics-server is the fix.
+- cert-manager pending forever (Certificate stuck in Pending ). Almost always an ACME challenge problem. For dns-01 : the issuer has no credentials to write the TXT record (check the ClusterIssuer spec, then the controller pod logs for credential errors). For http-01 : the validator pod cannot reach http:// /.well-known/acme-challenge/... ; make sure the ingress controller is exposed publicly. Inspect with:
+- Ingress returns 503 with no backend. The Service the ingress points at has zero ready endpoints. Most often: the app pods are still pulling the image, the readiness probe is failing, or the Service selector doesn't match the pod labels. Confirm with kubectl get endpoints ; if the address list is empty the ingress has nothing to forward to.
+- external-dns is not creating records. Two common causes: (a) RBAC: the controller's service account needs list/watch on services , ingresses , and the provider's CRDs, plus IAM/credentials to call the DNS provider's API; (b) ownership: external-dns refuses to modify a record it didn't create unless the TXT owner-id marker matches. Check the controller logs for skipping endpoint messages.
+- HPA shows for the target metric. metrics-server is not installed or not scraping. Run kubectl top pods ; if it errors with Metrics API not available , metrics-server is the fix.
 ## Related
-- Custom domains — the feature that depends on cert-manager and an ingress controller being present.
-- Get started — bring up the Astrolift stack locally before pointing it at a tenant cluster.
+- Custom domains : the feature that depends on cert-manager and an ingress controller being present.
+- Get started : bring up the Astrolift stack locally before pointing it at a tenant cluster.
 
 ## /documentation/configuration
 
 # Configuration
-Every environment variable Astrolift reads at runtime. Source = operator means the operator sets it, image means the container image bakes a default in, and platform-injected means Astrolift writes it into the workload at deploy time.
+Every environment variable Astrolift reads at runtime. Source = means the operator sets it, means the container image bakes a default in, and means Astrolift writes it into the workload at deploy time.
 ## Conventions
 - Boolean values accept true / false / 1 / 0 / yes / no / on / off (case-insensitive).
 - Vars marked required either have no default or have a default that's only safe for local development (e.g. not-a-secret ).
-- Anything not listed here is not read by Astrolift — silently ignored if set.
+- Anything not listed here is not read by Astrolift; it is silently ignored if set.
 ## Groups
 ## Variables
 ## How to inspect what's set
-The Django management command features prints the current feature-flag state, and python manage.py diffsettings shows every Django setting against its default. The control plane never echoes secret values — settings marked sensitive print as *** .
+The Django management command features prints the current feature-flag state, and python manage.py diffsettings shows every Django setting against its default. The control plane never echoes secret values; settings marked sensitive print as *** .
 ## Related
-- Get started — bring the stack up locally; env vars there default to the docker-compose service names.
-- Identity providers — the AUTH0_* / ASTROLIFT_IDP_* vars are described in detail.
-- Cluster prerequisites — what the tenant cluster needs separately from these env vars.
+- Get started : bring the stack up locally; env vars there default to the docker-compose service names.
+- Identity providers : the AUTH0_* / ASTROLIFT_IDP_* vars are described in detail.
+- Cluster prerequisites : what the tenant cluster needs separately from these env vars.
 
 ## /documentation/custom-domains
 
 # Custom domains
 Bring your own hostname (for example app.acme.com ) and let Astrolift handle TLS via cert-manager.
 ## When you need this
-Every app gets a generated *.astrolift.app subdomain by default. You only need this guide when you want a branded hostname like app.acme.com or checkout.acme.com in front of your workload — with automatic TLS managed by cert-manager inside the tenant cluster.
+Every app gets a generated *.astrolift.app subdomain by default. You only need this guide when you want a branded hostname like app.acme.com or checkout.acme.com in front of your workload, with automatic TLS managed by cert-manager inside the tenant cluster.
 ## Prerequisites
 - A connected cluster. The app is deployed to a tenant cluster that has cert-manager and the ingress controller installed (this is the default for clusters provisioned by opscode).
 - DNS you can edit. You need access to the DNS provider that holds the parent zone so you can add a CNAME (or TXT) record.
-- Permission. An operator role that includes app.update — Owner, Admin, and Deployer have this by default.
-## Step 1 — Open the Domains tab
+- Permission. An operator role that includes app.update ; Owner, Admin, and Deployer have this by default.
 Navigate to your app, then click the Domains tab. You will see any hostnames already bound to the app and a button to add a new one.
-## Step 2 — Enter the FQDN and validation method
 Type the full hostname. The validation method defaults to dns-01 which works for both apex and wildcard records and does not require the hostname to be publicly reachable before issuance. Leave it blank to accept the platform default.
-## Step 3 — Astrolift returns the record to publish
 After you save, the row appears with a pending_validation cert state and a validation token. For dns-01 this is a TXT record at _acme-challenge.app.acme.com ; for http-01 it is a CNAME pointing at the cluster ingress. Click the token to copy it.
-## Step 4 — Publish the record at your DNS provider
-Add the record verbatim. Most providers propagate within a minute or two, but TTLs are advisory — give it up to ~10 minutes before you escalate to troubleshooting.
-## Step 5 — Wait for activation
+Add the record verbatim. Most providers propagate within a minute or two, but TTLs are advisory; give it up to ~10 minutes before you escalate to troubleshooting.
 Astrolift polls every ~30 seconds. Once the record is visible from its resolvers, cert-manager issues the certificate and the row transitions pending_validation → validated → active . You can force an immediate poll with the Recheck button on the row.
 ## Authentication on a custom domain
-If your cluster has an edge login gate, it covers the app's platform subdomain — not your custom domain. The gate's session cookie is issued by the cluster's auth host and scoped to the platform's own zone, and a response from one domain cannot set a cookie for an unrelated one. A custom domain is therefore outside the gate by construction, and no setting changes that.
-The Domains tab marks any such row No login required , and the Ingress carries astrolift.dev/edge-auth=ungated so it is visible from kubectl too. Treat a custom domain as a public entrance: if the app behind it needs authentication, it has to enforce that itself.
+If your cluster has an edge login gate, it covers the app's platform subdomain, not your custom domain. The gate's session cookie is issued by the cluster's auth host and scoped to the platform's own zone, and a response from one domain cannot set a cookie for an unrelated one. A custom domain is therefore outside the gate by construction, and no setting changes that.
+The Domains tab marks any such row , and the Ingress carries astrolift.dev/edge-auth=ungated so it is visible from kubectl too. Treat a custom domain as a public entrance: if the app behind it needs authentication, it has to enforce that itself.
 ## Troubleshooting
 - Cert stays in pending_validation. DNS likely has not propagated to the issuing resolvers. Check from an outside network:
-- Validation failing. The TXT record value must match the token verbatim — no surrounding quotes, no trailing whitespace, no smart-quoted characters (copy/paste from a terminal, not from a doc).
+- Validation failing. The TXT record value must match the token verbatim: no surrounding quotes, no trailing whitespace, no smart-quoted characters (copy/paste from a terminal, not from a doc).
 - CAA blocks issuance. If the parent zone has a CAA record that does not list letsencrypt.org , ACME cannot issue. Add a CAA entry allowing Let's Encrypt, or remove the restrictive record.
-- Cert expired and was not rotated. cert-manager auto-renews ~30 days before expiry. If it has not, an operator can inspect the cert-manager logs in the tenant cluster — the rotation Workflow re-heals on the next periodic tick.
+- Cert expired and was not rotated. cert-manager auto-renews ~30 days before expiry. If it has not, an operator can inspect the cert-manager logs in the tenant cluster; the rotation Workflow re-heals on the next periodic tick.
 ## Related
-- Source providers — connect GitHub or GitLab so push triggers deploys to your app.
-- Identity providers — register the SSO domains your users sign in from.
+- Source providers : connect GitHub or GitLab so push triggers deploys to your app.
+- Identity providers : register the SSO domains your users sign in from.
 
 ## /documentation/drivers
 
@@ -133,7 +128,7 @@ Backend tests run against real PostgreSQL and Temporal through the local stack. 
 
 ## /documentation/help
 
-- Open
+- {t(`links.$ .label`)} {t(`links.$ .description`)} Open
 Includes platform version, browser user agent, your org slug, and the current URL.
 
 ## /documentation/identity-providers
@@ -145,7 +140,7 @@ You want users to sign in with their existing corporate identity instead of a se
 ## Prerequisites
 - Permission. An operator role with org.update (Owner and Admin have it).
 - Admin access to the IdP. You will register a new OIDC or SAML client there.
-- Astrolift's redirect URI. Visible in the New provider dialog. Format is https://<your-install>/app/auth1/callback . Every IdP needs this exact value in its allowed callback list.
+- Astrolift's redirect URI. Visible in the New provider dialog. Format is https:// /app/auth1/callback . Every IdP needs this exact value in its allowed callback list.
 ## Configure by provider kind
 Pick the matching subsection. Every kind ends with the same three clicks in Astrolift: Settings · Identity providers → New provider → pick the kind → paste the credentials → Set active .
 ## Domain allowlist (auto-signup)
@@ -154,10 +149,10 @@ By default, an SSO sign-in succeeds only if Astrolift already has an account for
 - Scroll to the Trusted email domains card and add corp.com (no @ ).
 - Save. Anyone who signs in via SSO with an @corp.com email is auto-joined to the organization with the default member role.
 ## Troubleshooting
-- &ldquo;No IdP configured.&rdquo; The install's bootstrap_idp environment variables were not set. Configure a provider from Settings · Identity providers and set it active.
-- Login redirects to the wrong host (or returns redirect_uri_mismatch). APP_BASE_URL in the backend and the redirect URI registered at the IdP must match exactly — protocol, host, path, and trailing slash.
+- “No IdP configured.” The install's bootstrap_idp environment variables were not set. Configure a provider from Settings · Identity providers and set it active.
+- Login redirects to the wrong host (or returns redirect_uri_mismatch). APP_BASE_URL in the backend and the redirect URI registered at the IdP must match exactly: protocol, host, path, and trailing slash.
 - Auto-signup not happening. The user's email domain isn't in the trusted list. See Domain allowlist above.
-- SAML signature verification fails. The IdP rotated its signing certificate. Re-paste the metadata URL (or upload the fresh XML) — Astrolift refreshes the trust store on save.
+- SAML signature verification fails. The IdP rotated its signing certificate. Re-paste the metadata URL (or upload the fresh XML); Astrolift refreshes the trust store on save.
 
 ## /documentation/introduction
 
@@ -182,7 +177,7 @@ The dashboard and CLI call the Django and Strawberry GraphQL control plane. Post
 ## /documentation/policies
 
 # ABAC policies
-Fine-grained access rules that layer on top of role bindings. Policies never grant beyond a role — they only carve out additional allow or deny conditions.
+Fine-grained access rules that layer on top of role bindings. Policies never grant beyond a role; they only carve out additional allow or deny conditions.
 ## When you need this
 Astrolift's built-in roles cover most teams. Reach for policies when you need something the role catalog can't express. For example:
 - Only senior engineers can deploy to apps named prod-* .
@@ -191,21 +186,21 @@ Astrolift's built-in roles cover most teams. Reach for policies when you need so
 - Contractors can read everything in a project but can't mutate anything that touches billing.
 ## Prerequisites
 - Permission. policy.create (Owner and Admin have it).
-- Mental model of ABAC vs RBAC. RBAC asks &ldquo;does this user's role include this permission?&rdquo; ABAC asks &ldquo;given the attributes of this request (who, what, when, where), does any policy say deny ?&rdquo; A request only succeeds if RBAC allows it and no policy denies it.
+- Mental model of ABAC vs RBAC. RBAC asks “does this user's role include this permission?” ABAC asks “given the attributes of this request (who, what, when, where), does any policy say deny ?” A request only succeeds if RBAC allows it and no policy denies it.
 ## Create a policy
 Open Settings · Policies and click New policy . Each policy has the following fields:
 ## Example: prod is senior-only
 Only members of the senior-eng role can deploy any app whose slug starts with prod- .
 A senior engineer's deploy passes the role check ( role_slug_not_in returns false → policy does not match → no deny). Anyone else trips the deny and the deploy fails with a permission error.
 ## Example: nightly secret freeze
-Nobody can write secrets between 22:00 and 06:00 UTC — used during incident windows or change-freeze periods.
+Nobody can write secrets between 22:00 and 06:00 UTC; used during incident windows or change-freeze periods.
 ## Troubleshooting
 - Policy is not taking effect. DENY always wins. Check for a broader-scope DENY (ORG-level) that already covers the request. The policies table shows the matching order; sort by scope.
-- A user sees a button they shouldn't. The UI hides controls based on RBAC, not ABAC — the button stays visible because the role technically grants the action, but the request fails at the resolver when ABAC denies. Either tighten the role binding, or surface the ABAC outcome in the UI via Permissions diagnostic .
-- Conditions JSON not parsing. The dialog validates on save and returns a precise error (&ldquo;unknown key time_of_the_day , did you mean time_of_day ?&rdquo;). Re-open the policy to see the stored value.
+- A user sees a button they shouldn't. The UI hides controls based on RBAC, not ABAC; the button stays visible because the role technically grants the action, but the request fails at the resolver when ABAC denies. Either tighten the role binding, or surface the ABAC outcome in the UI via Permissions diagnostic .
+- Conditions JSON not parsing. The dialog validates on save and returns a precise error (“unknown key time_of_the_day , did you mean time_of_day ?”). Re-open the policy to see the stored value.
 ## Related
-- Identity providers — who can sign in. Policies decide what they can do once they have.
-- Permissions diagnostic — debug a specific user's effective permissions on a specific resource.
+- Identity providers : who can sign in. Policies decide what they can do once they have.
+- Permissions diagnostic : debug a specific user's effective permissions on a specific resource.
 
 ## /documentation/source-providers
 
@@ -219,37 +214,29 @@ You want to register an app whose source lives on a hosted Git provider, and hav
 - Your install's public URL. GitHub and GitLab need to reach Astrolift to deliver webhooks. The backend reads this from APP_BASE_URL ; verify it points at the public hostname users hit, not a private IP.
 ## GitHub recommended
 The fastest path. Astrolift submits a GitHub App manifest on your behalf; you only have to approve the permissions and pick which repos the App can see.
-### Step 1 — Open Source providers
 Go to Settings · Source providers and click Connect to GitHub .
-### Step 2 — Enter your GitHub org slug
 Type the org slug (the part of the URL after github.com/ ) and click Continue on GitHub . Astrolift submits a one-shot manifest containing the App name, callback URLs, webhook URL, and the permissions it requests.
-### Step 3 — Approve the App on GitHub
 GitHub shows the permissions the Astrolift App requires:
-- contents: read — clone source at deploy time
-- metadata: read — list repos and branches
-- pull_requests: write — comment with preview URLs
-- checks: write — report build / deploy status on commits
-Click Create GitHub App for <your org> . GitHub creates the App, installs it on the org, and redirects you back to Astrolift.
-### Step 4 — Pick repositories during onboarding
-The connection now appears under Hosts . When you register a new app from Apps · Register app , its onboarding wizard browses the repos the App was granted access to. To widen or narrow that set, edit the install on GitHub ( https://github.com/organizations/<org>/settings/installations ).
+- contents: read : clone source at deploy time
+- metadata: read : list repos and branches
+- pull_requests: write : comment with preview URLs
+- checks: write : report build / deploy status on commits
+Click Create GitHub App for . GitHub creates the App, installs it on the org, and redirects you back to Astrolift.
+The connection now appears under Hosts . When you register a new app from Apps · Register app , its onboarding wizard browses the repos the App was granted access to. To widen or narrow that set, edit the install on GitHub ( https://github.com/organizations/ /settings/installations ).
 ## GitLab guided manual
 GitLab does not have a manifest API equivalent to GitHub Apps, so this flow is a few extra clicks: register an OAuth application on GitLab, then paste the credentials back into Astrolift.
-### Step 1 — Open Source providers
 Go to Settings · Source providers and click Connect to GitLab .
-### Step 2 — Enter group and instance URL
 Type your GitLab group slug. The instance URL defaults to https://gitlab.com ; change it if you run a self-managed instance.
-### Step 3 — Register an Astrolift application on GitLab
 Click Open GitLab Applications . In the new tab, create a Group-owned application with these settings:
 Save. GitLab shows the Application ID and Secret exactly once.
-### Step 4 — Paste the credentials back
 Return to Astrolift, paste the Application ID and Secret into the dialog, and save. The connection appears under Hosts and you can register apps from any project in the group.
 ## Troubleshooting
 - &ldquo;Hook url is not supported because it isn't reachable over the public Internet.&rdquo; GitHub or GitLab can't reach the callback. This is operator-side: set APP_BASE_URL in the backend environment to the public URL of your install (the same hostname users hit), then re-run the connect flow.
-- Can't see private org repos in the onboarding wizard. The GitHub App install was scoped to a subset of repos. Visit github.com/organizations/<org>/settings/installations , open the Astrolift App, and either select the specific repos you need or choose All repositories .
-- Pushes aren't triggering deploys. Open the app's Webhooks tab — incoming SCM webhooks land in the recent deliveries list with response status and body. A 401 means the signing secret drifted; re-rotate from Source providers .
+- Can't see private org repos in the onboarding wizard. The GitHub App install was scoped to a subset of repos. Visit github.com/organizations/ /settings/installations , open the Astrolift App, and either select the specific repos you need or choose All repositories .
+- Pushes aren't triggering deploys. Open the app's Webhooks tab; incoming SCM webhooks land in the recent deliveries list with response status and body. A 401 means the signing secret drifted; re-rotate from Source providers .
 ## Related
-- Webhooks — outbound notifications when builds and deploys finish.
-- Custom domains — point a branded hostname at the app you just connected.
+- Webhooks : outbound notifications when builds and deploys finish.
+- Custom domains : point a branded hostname at the app you just connected.
 
 ## /documentation/tutorials
 
@@ -262,7 +249,7 @@ Step-by-step guides to help you build with the platform.
 Every event type Astrolift emits via outbound webhooks, with the payload schema and a realistic JSON example for each. For setup and signature verification, see the webhooks guide .
 ## Envelope shape
 Every delivery shares the same outer envelope. The event-specific fields live under payload . Optional envelope fields may be empty strings; client receivers should treat missing / empty as the absence of a value.
-- event_id is a ULID — globally unique, time-sortable. Use it for idempotency keys on your side.
+- event_id is a ULID: globally unique, time-sortable. Use it for idempotency keys on your side.
 - delivery_id is unique per attempt; retries reuse the same event_id with a new delivery_id .
 - schema_version follows semver; payload-breaking changes bump the major.
 ## On this page
@@ -270,12 +257,12 @@ Every delivery shares the same outer envelope. The event-specific fields live un
 - ( ) —
 ### Example
 ## Signature verification
-Every delivery is signed with an X-Astrolift-Signature header (HMAC-SHA256 of , hex-encoded, prefixed with sha256= ). The webhooks guide covers verification in Python, Node, and Go — read the raw body before any JSON parsing, and use a constant-time compare.
+Every delivery is signed with an X-Astrolift-Signature header (HMAC-SHA256 of . , hex-encoded, prefixed with sha256= ). The webhooks guide covers verification in Python, Node, and Go: read the raw body before any JSON parsing, and use a constant-time compare.
 ## Subscribing
 To subscribe a receiver to one or more of these events, see the Create a subscription steps. The event-type field accepts either the exact slug (e.g. deployment.failed ) or a wildcard:
-- * — every event.
-- deployment.* — every event in the deployments category.
-- deployment.failed,alert.fired — comma-separated list (also accepts whitespace).
+- * : every event.
+- deployment.* : every event in the deployments category.
+- deployment.failed,alert.fired : comma-separated list (also accepts whitespace).
 ## Related
-- Webhooks — create a subscription, verify signatures, troubleshoot deliveries.
-- ABAC policies — restrict who can create webhook subscriptions in your organization.
+- Webhooks : create a subscription, verify signatures, troubleshoot deliveries.
+- ABAC policies : restrict who can create webhook subscriptions in your organization.

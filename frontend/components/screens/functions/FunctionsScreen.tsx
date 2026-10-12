@@ -2,6 +2,7 @@
 
 import { BoltIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
@@ -16,10 +17,10 @@ export type FunctionsScreenProps = FunctionsState;
 // link in a cell has to sit above it to be reachable.
 const ABOVE_ROW_LINK = "relative z-10";
 
-const columns: Column<AstroliftWorkload>[] = [
+const columnsFor = (t: ReturnType<typeof useTranslations>): Column<AstroliftWorkload>[] => [
   {
     id: "name",
-    header: "Function",
+    header: t("columns.function"),
     sortKey: "name",
     cellClassName: "max-w-80",
     cell: (w) => (
@@ -35,7 +36,7 @@ const columns: Column<AstroliftWorkload>[] = [
   },
   {
     id: "app",
-    header: "App",
+    header: t("columns.app"),
     sortKey: "app",
     cellClassName: `${ABOVE_ROW_LINK} max-w-64`,
     cell: (w) => (
@@ -50,19 +51,19 @@ const columns: Column<AstroliftWorkload>[] = [
   },
   {
     id: "minScale",
-    header: "Min scale",
+    header: t("columns.minScale"),
     align: "right",
     cell: (w) => <span className="font-mono text-xs">{w.hpaMinReplicas ?? 0}</span>,
   },
   {
     id: "maxScale",
-    header: "Max scale",
+    header: t("columns.maxScale"),
     align: "right",
     cell: (w) =>
       w.hpaMaxReplicas != null ? (
         <span className="font-mono text-xs">{w.hpaMaxReplicas}</span>
       ) : (
-        <span className="text-muted-foreground text-xs">none</span>
+        <span className="text-muted-foreground text-xs">{t("none")}</span>
       ),
   },
 ];
@@ -84,17 +85,17 @@ export function FunctionsScreen({
   error,
   onRetry,
 }: FunctionsScreenProps) {
+  const t = useTranslations("functionsScreen");
   return (
     <ListPage<AstroliftWorkload>
       header={{
         crumbs: agentsCrumbs("functions"),
-        title: "Functions",
-        context:
-          "Scale to zero and trigger on HTTP, queues or webhooks. Throughput, errors, latency and logs arrive with the function runtime.",
+        title: t("title"),
+        context: t("context"),
       }}
       list={list}
-      label="Functions"
-      columns={columns}
+      label={t("title")}
+      columns={columnsFor(t)}
       rows={rows}
       getRowId={(w) => w.id}
       rowHref={(w) => `/apps/${w.registeredAppSlug}/workloads/${w.slug}`}
@@ -104,9 +105,8 @@ export function FunctionsScreen({
       onRetry={onRetry}
       empty={{
         icon: <BoltIcon className="size-5" />,
-        title: "No function workloads",
-        description:
-          "Apps with kind: function in their manifest will appear here. Functions scale to zero and trigger on HTTP, queues, or events.",
+        title: t("empty.title"),
+        description: t("empty.description"),
       }}
       totalCount={totalCount}
     />

@@ -3,6 +3,7 @@
 import { QueryError } from "@/components/QueryError";
 
 import { CheckCircle2Icon, ChevronDownIcon, ChevronRightIcon, CloudIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -44,24 +45,21 @@ export function CloudProvidersPanelView({
   viewMode,
   setViewMode,
 }: CloudProvidersPanelViewProps) {
+  const t = useTranslations("cloudProviders");
   const [showAvailable, setShowAvailable] = React.useState(false);
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">Cloud providers</h2>
-          <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-            Driver bundles wired to this organization — a provider shows as configured once it backs
-            a registered cluster (ClusterDriver, IngressDriver, DnsDriver, and so on). Register a
-            cluster on a new cloud to light one up.
-          </p>
+          <h2 className="text-lg font-semibold tracking-tight">{t("title")}</h2>
+          <p className="text-muted-foreground mt-1 max-w-2xl text-sm">{t("description")}</p>
         </div>
         {pluginCount > 0 && <ViewToggle mode={viewMode} onChange={setViewMode} />}
       </div>
 
       {error ? (
-        <QueryError title="Could not load cloud providers" error={error} onRetry={onRetry} />
+        <QueryError title={t("loadError")} error={error} onRetry={onRetry} />
       ) : loading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Skeleton className="h-44 w-full" />
@@ -74,8 +72,8 @@ export function CloudProvidersPanelView({
               <CardContent className="p-6">
                 <EmptyState
                   icon={<CloudIcon className="size-5" />}
-                  title="No cloud providers configured"
-                  description="Register a cluster to bind a provider plugin to this org. The provider that backs it — aws, gcp, azure, or a self-managed Kubernetes endpoint — then shows up here with its wired capabilities."
+                  title={t("empty.title")}
+                  description={t("empty.description")}
                 />
               </CardContent>
             </Card>
@@ -106,8 +104,9 @@ export function CloudProvidersPanelView({
                 ) : (
                   <ChevronRightIcon className="size-4" />
                 )}
-                {showAvailable ? "Hide" : "Show"} {available.length} available provider
-                {available.length === 1 ? "" : "s"}
+                {showAvailable
+                  ? t("hideAvailable", { count: available.length })
+                  : t("showAvailable", { count: available.length })}
               </button>
 
               {showAvailable &&
@@ -144,6 +143,7 @@ function ProviderCard({
   plugin: AstroliftProviderPlugin;
   clusters?: number;
 }) {
+  const t = useTranslations("cloudProviders");
   const drivers = driversOf(plugin);
   const isConfigured = clusters !== undefined;
   return (
@@ -169,14 +169,14 @@ function ProviderCard({
           {isConfigured ? (
             <Badge className="bg-success/15 text-success-fg gap-1" variant="secondary">
               <CheckCircle2Icon className="size-3" />
-              configured
+              {t("configured")}
             </Badge>
           ) : (
-            <Badge variant="outline">available</Badge>
+            <Badge variant="outline">{t("available")}</Badge>
           )}
           <span className="text-muted-foreground text-xs">
-            {isConfigured ? `${clusters} cluster${clusters === 1 ? "" : "s"} · ` : ""}
-            {drivers.length} driver{drivers.length === 1 ? "" : "s"}
+            {isConfigured ? `${t("clusters", { count: clusters })} · ` : ""}
+            {t("drivers", { count: drivers.length })}
           </span>
         </div>
         <div className="mt-2 flex flex-wrap gap-1">
@@ -198,6 +198,7 @@ function ProviderCard({
 
 /** Compact list-view row counterpart to {@link ProviderCard}. */
 function ProviderRow({ plugin, clusters }: { plugin: AstroliftProviderPlugin; clusters?: number }) {
+  const t = useTranslations("cloudProviders");
   const drivers = driversOf(plugin);
   const isConfigured = clusters !== undefined;
   return (
@@ -215,15 +216,15 @@ function ProviderRow({ plugin, clusters }: { plugin: AstroliftProviderPlugin; cl
       </div>
       {isConfigured ? (
         <Badge variant="secondary" className="shrink-0 text-xs">
-          {clusters} cluster{clusters === 1 ? "" : "s"}
+          {t("clusters", { count: clusters })}
         </Badge>
       ) : (
         <Badge variant="outline" className="shrink-0 text-xs">
-          available
+          {t("available")}
         </Badge>
       )}
       <Badge variant="outline" className="shrink-0 text-xs">
-        {drivers.length} driver{drivers.length === 1 ? "" : "s"}
+        {t("drivers", { count: drivers.length })}
       </Badge>
     </div>
   );

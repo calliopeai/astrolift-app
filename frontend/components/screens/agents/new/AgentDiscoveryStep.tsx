@@ -8,6 +8,8 @@ import {
   RefreshCwIcon,
 } from "lucide-react";
 
+import { useTranslations } from "next-intl";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -35,17 +37,18 @@ export function AgentDiscoveryStepView({
   toggle,
   rescan,
 }: AgentDiscoveryStepViewProps) {
+  const t = useTranslations("agentWizard.discovery");
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-2">
         <p className="text-muted-foreground text-sm">
-          Scanning{" "}
-          <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">{state.sourceRepo}</code>{" "}
-          on{" "}
-          <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">
-            {state.ref || state.defaultBranch}
-          </code>{" "}
-          for agent manifests.
+          {t.rich("scanning", {
+            repo: state.sourceRepo,
+            ref: state.ref || state.defaultBranch,
+            code: (chunks) => (
+              <code className="bg-muted rounded px-1 py-0.5 font-mono text-xs">{chunks}</code>
+            ),
+          })}
         </p>
         <Button
           type="button"
@@ -53,10 +56,10 @@ export function AgentDiscoveryStepView({
           variant="ghost"
           onClick={rescan}
           disabled={fetchState === "scanning"}
-          title="Re-scan the repo for agent manifests"
+          title={t("rescanTitle")}
         >
           <RefreshCwIcon className={cn("size-3.5", fetchState === "scanning" && "animate-spin")} />
-          {fetchState === "scanning" ? "Scanning…" : "Re-scan"}
+          {fetchState === "scanning" ? t("scanningButton") : t("rescan")}
         </Button>
       </div>
 
@@ -71,12 +74,13 @@ export function AgentDiscoveryStepView({
         <>
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-medium">
-              {state.discoveredAgents.length} agent
-              {state.discoveredAgents.length === 1 ? "" : "s"} discovered
+              {t("discovered", { count: state.discoveredAgents.length })}
             </h3>
             <span className="text-muted-foreground text-xs">
-              {newAgentCount} new · {state.discoveredAgents.length - newAgentCount} already
-              registered
+              {t("newVsRegistered", {
+                newCount: newAgentCount,
+                registered: state.discoveredAgents.length - newAgentCount,
+              })}
             </span>
           </div>
 
@@ -94,7 +98,7 @@ export function AgentDiscoveryStepView({
                     checked={checked}
                     disabled={a.alreadyRegistered}
                     onChange={() => toggle(a.manifestPath)}
-                    aria-label={`Select ${a.name}`}
+                    aria-label={t("select", { name: a.name })}
                   />
                   <div className="bg-primary/10 text-primary flex size-8 shrink-0 items-center justify-center rounded-md">
                     <BotIcon className="size-4" />
@@ -112,7 +116,7 @@ export function AgentDiscoveryStepView({
                   </div>
                   {a.alreadyRegistered && (
                     <Badge variant="secondary" className="text-2xs shrink-0">
-                      Already registered
+                      {t("alreadyRegistered")}
                     </Badge>
                   )}
                 </li>
@@ -121,9 +125,7 @@ export function AgentDiscoveryStepView({
           </ul>
 
           <p className="text-muted-foreground rounded-md border border-dashed p-3 text-xs">
-            Registration adds <strong>every new agent in the repo</strong> — the backend registers
-            per repo, not per manifest, so the checkboxes are a preview of what will be created.
-            Already-registered agents are matched, not duplicated.
+            {t.rich("previewNote", { strong: (chunks) => <strong>{chunks}</strong> })}
           </p>
         </>
       ) : null}
@@ -140,12 +142,13 @@ function ScanBanner({
   error: string;
   onRetry: () => void;
 }) {
+  const t = useTranslations("agentWizard.discovery");
   if (state === "idle" || state === "scanning") return null;
   if (state === "found") {
     return (
       <div className="border-success-border bg-success/10 flex items-center gap-2 rounded-md border p-3 text-sm">
         <CheckCircle2Icon className="text-success-fg size-4" />
-        <span className="flex-1">Scanned the repo for agent manifests.</span>
+        <span className="flex-1">{t("scanned")}</span>
       </div>
     );
   }
@@ -154,10 +157,7 @@ function ScanBanner({
       <div className="border-warning-border bg-warning/10 flex items-center gap-2 rounded-md border p-3 text-sm">
         <FileXIcon className="text-warning-fg size-4" />
         <span className="flex-1">
-          No agent manifests found. We looked for{" "}
-          <code className="font-mono">agents/*/astrolift.toml</code> and a root{" "}
-          <code className="font-mono">astrolift.toml</code> with an agent workload. Go back to pick
-          a different repo or branch.
+          {t.rich("noneFound", { code: (chunks) => <code className="font-mono">{chunks}</code> })}
         </span>
       </div>
     );
@@ -165,9 +165,9 @@ function ScanBanner({
   return (
     <div className="border-destructive/40 bg-destructive/10 flex items-center gap-2 rounded-md border p-3 text-sm">
       <AlertTriangleIcon className="text-destructive size-4" />
-      <span className="flex-1">Couldn&apos;t scan the repo — {error}</span>
+      <span className="flex-1">{t("scanFailed", { error })}</span>
       <Button type="button" size="sm" variant="outline" onClick={onRetry}>
-        Retry
+        {t("retry")}
       </Button>
     </div>
   );

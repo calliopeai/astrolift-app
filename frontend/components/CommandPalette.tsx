@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import type { AstroliftPermission } from "@/lib/permissions/astrolift-permissions";
@@ -7,9 +8,13 @@ import type { ModuleKey } from "@/graphql/user/user.hooks";
 
 export interface PaletteEntry {
   label: string;
+  /** `commandPalette.entries` key; the label shown and searched in the viewer's locale. */
+  labelKey?: string;
   href: string;
   group: string;
   hint?: string;
+  /** `commandPalette.hints` key for a static hint. */
+  hintKey?: string;
   /**
    * Server-authoritative `me.modules` gate (spec 36 §1.2) — mirrors the
    * sidebar's module switcher. Entries with no `module` are visible to
@@ -39,27 +44,33 @@ export interface PaletteEntry {
 export const QUICK_ACTIONS: PaletteEntry[] = [
   {
     label: "Register new app",
+    labelKey: "registerApp",
     href: "/apps/new",
     group: "Quick Actions",
     hint: "wizard",
+    hintKey: "wizard",
     module: "apps",
     permission: "app.create",
     keywords: ["new", "create", "register", "app"],
   },
   {
     label: "Connect a source",
+    labelKey: "connectSource",
     href: "/providers#source",
     group: "Quick Actions",
     hint: "github / gitlab",
+    hintKey: "githubGitlab",
     module: "admin",
     permission: "scm.connect",
     keywords: ["github", "gitlab", "scm", "source", "repo", "oauth"],
   },
   {
     label: "Manage tokens",
+    labelKey: "manageTokens",
     href: "/tokens",
     group: "Quick Actions",
     hint: "API keys",
+    hintKey: "apiKeys",
     module: "admin",
     permission: "api_token.create",
     keywords: ["api", "token", "pat"],
@@ -73,11 +84,18 @@ export const QUICK_ACTIONS: PaletteEntry[] = [
 // structure, so a flat list is the right shape.
 export const PAGES: PaletteEntry[] = [
   // The flat module landings + Dashboard.
-  { label: "Dashboard", href: "/dashboard", group: "Pages", keywords: ["overview", "home"] },
-  { label: "Apps", href: "/apps", group: "Pages", module: "apps" },
-  { label: "Agents", href: "/agents", group: "Pages", module: "agents" },
+  {
+    label: "Dashboard",
+    labelKey: "dashboard",
+    href: "/dashboard",
+    group: "Pages",
+    keywords: ["overview", "home"],
+  },
+  { label: "Apps", labelKey: "apps", href: "/apps", group: "Pages", module: "apps" },
+  { label: "Agents", labelKey: "agents", href: "/agents", group: "Pages", module: "agents" },
   {
     label: "Workflows",
+    labelKey: "workflows",
     href: "/workflows",
     group: "Pages",
     module: "workflows",
@@ -87,26 +105,29 @@ export const PAGES: PaletteEntry[] = [
   // Admin — Infra.
   {
     label: "Clusters",
+    labelKey: "clusters",
     href: "/clusters",
     group: "Pages",
     module: "admin",
     permission: "cluster.update",
   },
-  { label: "Domains", href: "/domains", group: "Pages", module: "admin" },
+  { label: "Domains", labelKey: "domains", href: "/domains", group: "Pages", module: "admin" },
   {
     label: "Providers",
+    labelKey: "providers",
     href: "/providers",
     group: "Pages",
     module: "admin",
     permission: "cluster.update",
   },
-  { label: "Webhooks", href: "/webhooks", group: "Pages", module: "admin" },
+  { label: "Webhooks", labelKey: "webhooks", href: "/webhooks", group: "Pages", module: "admin" },
 
   // Admin — Settings (org config + RBAC/governance). Destinations match
   // the sidebar's Admin group; /administration/* is canonical (except
   // /tokens, which stays top-level — shipped #893).
   {
     label: "Members",
+    labelKey: "members",
     href: "/administration/members",
     group: "Pages",
     module: "admin",
@@ -114,6 +135,7 @@ export const PAGES: PaletteEntry[] = [
   },
   {
     label: "Teams",
+    labelKey: "teams",
     href: "/administration/teams",
     group: "Pages",
     module: "admin",
@@ -121,6 +143,7 @@ export const PAGES: PaletteEntry[] = [
   },
   {
     label: "Projects",
+    labelKey: "projects",
     href: "/administration/projects",
     group: "Pages",
     module: "admin",
@@ -128,6 +151,7 @@ export const PAGES: PaletteEntry[] = [
   },
   {
     label: "API Keys",
+    labelKey: "apiKeys",
     href: "/tokens",
     group: "Pages",
     module: "admin",
@@ -135,6 +159,7 @@ export const PAGES: PaletteEntry[] = [
   },
   {
     label: "Metrics",
+    labelKey: "metrics",
     href: "/administration/metrics",
     group: "Pages",
     module: "admin",
@@ -142,6 +167,7 @@ export const PAGES: PaletteEntry[] = [
   },
   {
     label: "Audit log",
+    labelKey: "auditLog",
     href: "/administration/audit",
     group: "Pages",
     module: "admin",
@@ -149,13 +175,21 @@ export const PAGES: PaletteEntry[] = [
   },
   {
     label: "Run audit",
+    labelKey: "runAudit",
     href: "/administration/runs",
     group: "Pages",
     module: "admin",
   },
-  { label: "Policies", href: "/administration/policies", group: "Pages", module: "admin" },
+  {
+    label: "Policies",
+    labelKey: "policies",
+    href: "/administration/policies",
+    group: "Pages",
+    module: "admin",
+  },
   {
     label: "Permissions diagnostics",
+    labelKey: "permissionsDiagnostics",
     href: "/administration/permissions",
     group: "Pages",
     module: "admin",
@@ -163,6 +197,7 @@ export const PAGES: PaletteEntry[] = [
   },
   {
     label: "Source providers",
+    labelKey: "sourceProviders",
     href: "/providers#source",
     group: "Pages",
     module: "admin",
@@ -170,6 +205,7 @@ export const PAGES: PaletteEntry[] = [
   },
   {
     label: "Identity provider",
+    labelKey: "identityProvider",
     href: "/providers#identity",
     group: "Pages",
     module: "admin",
@@ -177,6 +213,7 @@ export const PAGES: PaletteEntry[] = [
   },
   {
     label: "Organization",
+    labelKey: "organization",
     href: "/administration/organization",
     group: "Pages",
     module: "admin",
@@ -186,13 +223,19 @@ export const PAGES: PaletteEntry[] = [
   // Always-visible (no module gate): docs + account pages.
   {
     label: "Documentation",
+    labelKey: "documentation",
     href: "/documentation",
     group: "Pages",
     keywords: ["docs", "help", "guide", "reference"],
   },
-  { label: "Profile", href: "/settings/profile", group: "Pages" },
-  { label: "Notifications", href: "/settings/notifications", group: "Pages" },
-  { label: "Security", href: "/settings/security", group: "Pages" },
+  { label: "Profile", labelKey: "profile", href: "/settings/profile", group: "Pages" },
+  {
+    label: "Notifications",
+    labelKey: "notifications",
+    href: "/settings/notifications",
+    group: "Pages",
+  },
+  { label: "Security", labelKey: "security", href: "/settings/security", group: "Pages" },
 ];
 
 // Section ordering for display — Quick Actions on top, then Apps
@@ -201,10 +244,19 @@ export const PAGES: PaletteEntry[] = [
 // bottom in insertion order.
 const SECTION_ORDER = ["Quick Actions", "Apps", "Pages"];
 
-function matches(entry: PaletteEntry, q: string): boolean {
+// Group names stay English as identifiers; these keys localize the headings.
+const GROUP_KEYS: Record<string, string> = {
+  "Quick Actions": "quickActions",
+  Apps: "apps",
+  "Recent deploys": "recentDeploys",
+  Pages: "pages",
+};
+
+function matches(entry: PaletteEntry, q: string, localized: string[]): boolean {
   if (!q) return true;
   const needle = q.toLowerCase();
   if (entry.label.toLowerCase().includes(needle)) return true;
+  if (localized.some((text) => text.toLowerCase().includes(needle))) return true;
   if (entry.group.toLowerCase().includes(needle)) return true;
   if (entry.href.toLowerCase().includes(needle)) return true;
   if (entry.keywords?.some((k) => k.toLowerCase().includes(needle))) return true;
@@ -223,6 +275,15 @@ export function CommandPalette({
   entries: PaletteEntry[];
   onNavigate: (href: string) => void;
 }) {
+  const t = useTranslations("commandPalette");
+  const labelOf = React.useCallback(
+    (entry: PaletteEntry) => (entry.labelKey ? t(`entries.${entry.labelKey}`) : entry.label),
+    [t]
+  );
+  const groupOf = React.useCallback(
+    (group: string) => (GROUP_KEYS[group] ? t(`groups.${GROUP_KEYS[group]}`) : group),
+    [t]
+  );
   const [query, setQuery] = React.useState("");
   const [active, setActive] = React.useState(0);
   const inputRef = React.useRef<HTMLInputElement>(null);
@@ -236,7 +297,10 @@ export function CommandPalette({
     }
   }, [open]);
 
-  const visible = React.useMemo(() => entries.filter((r) => matches(r, query)), [entries, query]);
+  const visible = React.useMemo(
+    () => entries.filter((r) => matches(r, query, [labelOf(r), groupOf(r.group)])),
+    [entries, query, labelOf, groupOf]
+  );
 
   const grouped = React.useMemo(() => {
     const out = new Map<string, PaletteEntry[]>();
@@ -285,7 +349,7 @@ export function CommandPalette({
       onClick={() => setOpen(false)}
       role="dialog"
       aria-modal="true"
-      aria-label="Command palette"
+      aria-label={t("title")}
     >
       <div
         className="bg-popover text-popover-foreground w-full max-w-xl overflow-hidden rounded-lg border shadow-2xl"
@@ -297,18 +361,18 @@ export function CommandPalette({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="Type to search routes, apps, or actions…"
+          placeholder={t("placeholder")}
           className="w-full border-b bg-transparent px-4 py-3 text-sm outline-none"
-          aria-label="Search"
+          aria-label={t("search")}
         />
         <div className="max-h-[60vh] overflow-y-auto">
           {grouped.length === 0 ? (
-            <p className="text-muted-foreground p-4 text-sm">No matches. Try a different query.</p>
+            <p className="text-muted-foreground p-4 text-sm">{t("noMatches")}</p>
           ) : (
             grouped.map(([group, routes]) => (
               <div key={group} className="py-1">
                 <div className="text-muted-foreground text-2xs px-3 py-1 font-semibold tracking-wider uppercase">
-                  {group}
+                  {groupOf(group)}
                 </div>
                 <ul>
                   {routes.map((r) => {
@@ -323,9 +387,9 @@ export function CommandPalette({
                             isActive ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
                           }`}
                         >
-                          <span>{r.label}</span>
+                          <span>{labelOf(r)}</span>
                           <span className="text-muted-foreground font-mono text-xs">
-                            {r.hint ?? r.href}
+                            {r.hintKey ? t(`hints.${r.hintKey}`) : (r.hint ?? r.href)}
                           </span>
                         </button>
                       </li>
@@ -336,9 +400,7 @@ export function CommandPalette({
             ))
           )}
         </div>
-        <div className="text-muted-foreground text-2xs border-t px-3 py-2">
-          ↑↓ navigate · ↵ open · esc close · ⌘K to toggle
-        </div>
+        <div className="text-muted-foreground text-2xs border-t px-3 py-2">{t("footer")}</div>
       </div>
     </div>
   );

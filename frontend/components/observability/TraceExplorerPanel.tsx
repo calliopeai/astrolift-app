@@ -2,6 +2,7 @@
 
 import { ChevronDownIcon, ChevronRightIcon, GitBranchIcon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
@@ -15,6 +16,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AstroliftAppTrace, AstroliftTraceSpan } from "@/graphql/__generated__/schema";
+
+import { localizeList } from "./localize-list";
 
 /** One trace's spans, loaded on first expand. */
 export interface TraceSpans {
@@ -86,7 +89,10 @@ export function TraceExplorerPanel({
   spans,
   onExpand,
 }: TraceExplorerPanelProps) {
-  const list = useLocalListState(TRACES_LIST, {
+  const t = useTranslations("obsTraces");
+  const listT = useTranslations("obsLists");
+  const tracesList = React.useMemo(() => localizeList(TRACES_LIST, "traces", listT), [listT]);
+  const list = useLocalListState(tracesList, {
     filters: statusFilter === "ALL" ? {} : { status: statusFilter },
   });
   const status = list.filters.status;
@@ -122,7 +128,7 @@ export function TraceExplorerPanel({
   const columns: Column<AstroliftAppTrace>[] = [
     {
       id: "operation",
-      header: "Root Operation",
+      header: t("columns.operation"),
       sortKey: "operation",
       cellClassName: "min-w-0",
       cell: (trace) => {
@@ -155,14 +161,14 @@ export function TraceExplorerPanel({
     },
     {
       id: "service",
-      header: "Root Service",
+      header: t("columns.service"),
       sortKey: "service",
       cellClassName: "align-top font-mono text-xs",
       cell: (trace) => trace.rootService,
     },
     {
       id: "spans",
-      header: "Spans",
+      header: t("columns.spans"),
       sortKey: "spans",
       align: "right",
       cellClassName: "align-top font-mono text-xs",
@@ -170,7 +176,7 @@ export function TraceExplorerPanel({
     },
     {
       id: "duration",
-      header: "Duration",
+      header: t("columns.duration"),
       sortKey: "duration",
       align: "right",
       cellClassName: "align-top font-mono text-xs",
@@ -178,7 +184,7 @@ export function TraceExplorerPanel({
     },
     {
       id: "status",
-      header: "Status",
+      header: t("columns.status"),
       cellClassName: "align-top",
       cell: (trace) => <StatusBadge code={trace.statusCode} />,
     },
@@ -188,17 +194,15 @@ export function TraceExplorerPanel({
     <Card>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
-          <GitBranchIcon className="size-4" /> Traces
+          <GitBranchIcon className="size-4" /> {t("title")}
         </CardTitle>
-        <CardDescription>
-          Recent distributed traces from the last 1h. Click an operation to expand its spans.
-        </CardDescription>
+        <CardDescription>{t("description")}</CardDescription>
       </CardHeader>
       <CardContent>
         <ListPage<AstroliftAppTrace>
           embedded
           list={list}
-          label="Traces"
+          label={t("title")}
           columns={columns}
           rows={page.rows}
           getRowId={(t) => t.traceId}
@@ -206,8 +210,8 @@ export function TraceExplorerPanel({
           loading={isInitialLoading}
           empty={{
             icon: <GitBranchIcon className="size-5" />,
-            title: "No traces",
-            description: "The tracing backend is not configured.",
+            title: t("emptyTitle"),
+            description: t("emptyDescription"),
           }}
         />
       </CardContent>
@@ -221,6 +225,7 @@ interface SpanListProps {
 }
 
 function SpanList({ loading, spans }: SpanListProps) {
+  const t = useTranslations("obsTraces");
   const ordered = React.useMemo(() => orderSpansByDepth(spans), [spans]);
 
   if (loading) {
@@ -233,11 +238,7 @@ function SpanList({ loading, spans }: SpanListProps) {
     );
   }
   if (spans.length === 0) {
-    return (
-      <p className="text-muted-foreground px-2 text-center text-xs">
-        No spans returned for this trace.
-      </p>
-    );
+    return <p className="text-muted-foreground px-2 text-center text-xs">{t("noSpans")}</p>;
   }
 
   return (

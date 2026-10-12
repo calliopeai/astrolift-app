@@ -1,11 +1,13 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
 import { EVENT_WINDOW_MS, type FleetAgent, type FleetViewProps } from "../core/fleet-model";
-import { HEALTH_COLOR, HEALTH_GLOWS, HEALTH_LABEL, MOTION_CLASS } from "../core/semantics";
+import { HEALTH_COLOR, HEALTH_GLOWS, MOTION_CLASS } from "../core/semantics";
+import type { VizT } from "../core/viz-t";
 import type { LegendItem } from "../core/VizLegend";
 
 import {
@@ -37,12 +39,12 @@ import {
  */
 
 export const FLEET_SWARM_LEGEND: LegendItem[] = [
-  { glyph: "glow", color: HEALTH_COLOR.ok, label: "Swarm speed: how busy the agent is" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Settled and still: idle" },
-  { glyph: "flow", color: HEALTH_COLOR.ok, label: "Tendril thickness: active runs" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Drifting out, frayed tendril: failing" },
-  { glyph: "dot", color: HEALTH_COLOR.degraded, label: "Degraded: over 85% load" },
-  { glyph: "spark", color: "var(--brand-primary)", label: "Pulse down the tendrils: a dispatch" },
+  { glyph: "glow", color: HEALTH_COLOR.ok, labelKey: "swarmSpeed" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "swarmIdle" },
+  { glyph: "flow", color: HEALTH_COLOR.ok, labelKey: "swarmTendril" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "swarmFailing" },
+  { glyph: "dot", color: HEALTH_COLOR.degraded, labelKey: "degradedLoad85" },
+  { glyph: "spark", color: "var(--brand-primary)", labelKey: "swarmPulse" },
 ];
 
 const mix = (c: string, pct: number) => `color-mix(in oklab, ${c} ${pct}%, transparent)`;
@@ -74,11 +76,11 @@ function bent(a: { x: number; y: number }, b: { x: number; y: number }, bend: nu
   return { x: mx - (dy / len) * bend, y: my + (dx / len) * bend };
 }
 
-function summarize(agents: FleetAgent[]): string {
+function summarize(agents: FleetAgent[], t: VizT): string {
   const failing = agents.filter((a) => a.health === "failing").length;
   const busy = agents.filter((a) => a.activeRuns > 0).length;
   const idle = agents.filter((a) => a.health === "idle").length;
-  return `${agents.length} agents swarming: ${busy} busy, ${idle} idle, ${failing} failing`;
+  return t("swarm.summary", { agents: agents.length, busy, idle, failing });
 }
 
 export function FleetSwarm({
@@ -88,6 +90,7 @@ export function FleetSwarm({
   selectedAgentId,
   className,
 }: FleetViewProps) {
+  const t = useTranslations("vizRender");
   const hives = React.useMemo(() => placeHives(snapshot), [snapshot]);
   const hiveById = React.useMemo(() => new Map(hives.map((h) => [h.id, h])), [hives]);
   const seeds = React.useMemo(() => {
@@ -224,7 +227,7 @@ export function FleetSwarm({
   return (
     <div
       role="group"
-      aria-label={summarize(snapshot.agents)}
+      aria-label={summarize(snapshot.agents, t)}
       data-motion={motion}
       className={cn("h-full w-full", className)}
     >
@@ -308,7 +311,13 @@ export function FleetSwarm({
           const color = HEALTH_COLOR[a.health];
           const selected = a.id === selectedAgentId;
           const r = 4 + Math.min(5, a.activeRuns * 1.5) + a.load * 2;
-          const label = `${a.name}: ${HEALTH_LABEL[a.health]}, ${Math.round(a.load * 100)}% load, ${a.activeRuns} running, ${a.queued} queued`;
+          const label = t("agentSummary", {
+            name: a.name,
+            health: t(`health.${a.health}`),
+            load: Math.round(a.load * 100),
+            running: a.activeRuns,
+            queued: a.queued,
+          });
           return (
             <g
               key={a.id}

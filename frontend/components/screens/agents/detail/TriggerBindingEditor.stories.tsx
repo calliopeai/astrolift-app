@@ -29,7 +29,7 @@ export const InvalidMapping: Story = {
     const mapping = canvas.getByLabelText("Input mapping (optional)");
     await userEvent.type(mapping, "{{not json");
     await userEvent.tab();
-    await expect(await canvas.findByText("Invalid JSON — check syntax.")).toBeInTheDocument();
+    await expect(await canvas.findByText("Invalid JSON. Check the syntax.")).toBeInTheDocument();
   },
 };
 
@@ -40,7 +40,7 @@ export const Bound: Story = {
     await userEvent.type(canvas.getByLabelText("Source repo"), "acme/api");
     await userEvent.click(canvas.getByRole("button", { name: "Bind trigger" }));
     await expect(
-      await canvas.findByText("Trigger bound — save the signing secret")
+      await canvas.findByText("Trigger bound. Save the signing secret.")
     ).toBeInTheDocument();
   },
 };

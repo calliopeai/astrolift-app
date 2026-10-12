@@ -2,6 +2,7 @@
 
 import cronstrue from "cronstrue";
 import { HistoryIcon, RepeatIcon, TimerIcon } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import * as React from "react";
 
 import { useBrowserReady } from "@/hooks/use-browser-ready";
@@ -24,23 +25,25 @@ export type CronjobHomeScreenProps = ReturnType<typeof useCronjobRuns> & {
   workload: Pick<AstroliftWorkload, "schedule" | "concurrencyPolicy">;
 };
 
+type HomeT = ReturnType<typeof useTranslations<"appHomes.cronjob">>;
+
 /** Why the newest run failed: the last lines of its log, else its exit code. */
-function failureReason(run: AstroliftScheduledJobRun): string {
+function failureReason(run: AstroliftScheduledJobRun, t: HomeT): string {
   const tail = (run.logExcerpt ?? "").trim().split("\n").slice(-3).join("\n");
   if (tail) return tail;
-  return run.exitCode != null ? `Exited with code ${run.exitCode}` : "No reason recorded";
+  return run.exitCode != null ? t("exitedWith", { code: run.exitCode }) : t("noReason");
 }
 
-function describe(schedule: string): string {
+function describe(schedule: string, t: HomeT): string {
   try {
     return cronstrue.toString(schedule, { verbose: true, use24HourTimeFormat: false });
   } catch {
-    return "Custom schedule";
+    return t("customSchedule");
   }
 }
 
-function formatCountdown(ms: number): string {
-  if (ms <= 0) return "due now";
+function formatCountdown(ms: number, t: HomeT): string {
+  if (ms <= 0) return t("dueNow");
   const s = Math.floor(ms / 1000);
   const d = Math.floor(s / 86400);
   const h = Math.floor((s % 86400) / 3600);
@@ -54,6 +57,7 @@ function formatCountdown(ms: number): string {
 
 /** One run in the history feed: status, when, how long, and its exit code. */
 function RunLine({ run }: { run: AstroliftScheduledJobRun }) {
+  const t = useTranslations("appHomes.cronjob");
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
       <Badge
@@ -64,13 +68,13 @@ function RunLine({ run }: { run: AstroliftScheduledJobRun }) {
         {titleCaseStatus(run.status)}
       </Badge>
       <span className="text-muted-foreground font-mono text-xs" title={run.startedAt ?? undefined}>
-        {run.startedAt ? formatRelativeAge(run.startedAt) : "not started"}
+        {run.startedAt ? formatRelativeAge(run.startedAt) : t("notStarted")}
       </span>
       <span className="text-muted-foreground font-mono text-xs tabular-nums">
         {formatDuration(run.durationSeconds)}
       </span>
       <span className="text-muted-foreground ml-auto font-mono text-xs">
-        {run.exitCode == null ? "no exit code" : `exit ${run.exitCode}`}
+        {run.exitCode == null ? t("noExitCode") : t("exit", { code: run.exitCode })}
       </span>
     </div>
   );
@@ -95,6 +99,8 @@ export function CronjobHomeScreen({
   onLoadMore,
 }: CronjobHomeScreenProps) {
   const schedule = workload.schedule || "";
+  const t = useTranslations("appHomes.cronjob");
+  const format = useFormatter();
   const browserReady = useBrowserReady();
   const [now, setNow] = React.useState(() => Date.now());
   React.useEffect(() => {
@@ -111,63 +117,66 @@ export function CronjobHomeScreen({
   return (
     <PanelGrid>
       <Panel
-        title="Schedule"
+        title={t("schedule")}
         icon={<RepeatIcon className="size-4" />}
         span={6}
         failure={
           latest && runStatusDot(latest.status) === "error"
             ? {
-                title: "Last run failed",
-                reason: <span className="whitespace-pre-wrap">{failureReason(latest)}</span>,
+                title: t("lastRunFailed"),
+                reason: <span className="whitespace-pre-wrap">{failureReason(latest, t)}</span>,
               }
             : null
         }
       >
         <div className="min-w-0 space-y-1">
           <div className="font-mono text-lg [overflow-wrap:anywhere]">
-            {schedule || "No schedule set"}
+            {schedule || t("noScheduleShort")}
           </div>
           {schedule ? (
-            <div className="text-muted-foreground text-sm">{describe(schedule)}</div>
+            <div className="text-muted-foreground text-sm">{describe(schedule, t)}</div>
           ) : null}
           {workload.concurrencyPolicy ? (
             <div className="text-muted-foreground pt-1 text-xs [overflow-wrap:anywhere]">
-              Concurrency: <span className="font-mono">{workload.concurrencyPolicy}</span>
+              {t.rich("concurrency", {
+                policy: workload.concurrencyPolicy,
+                mono: (chunks) => <span className="font-mono">{chunks}</span>,
+              })}
             </div>
           ) : null}
         </div>
       </Panel>
 
-      <Panel title="Next run" icon={<TimerIcon className="size-4" />} span={6}>
+      <Panel title={t("nextRun")} icon={<TimerIcon className="size-4" />} span={6}>
         {next ? (
           <div className="space-y-1">
             <div className="font-mono text-2xl font-semibold tabular-nums">
-              {now != null ? formatCountdown(next.getTime() - now) : "…"}
+              {now != null ? formatCountdown(next.getTime() - now, t) : "…"}
             </div>
             <div className="text-muted-foreground text-sm" title={next.toISOString()}>
-              {next.toLocaleString()}
+              {format.dateTime(next, { dateStyle: "medium", timeStyle: "medium" })}
             </div>
           </div>
         ) : (
           <p className="text-muted-foreground text-sm">
-            {schedule ? "Couldn't compute the next run for this expression." : "No schedule set."}
+            {schedule ? t("nextRunUnknown") : t("noSchedule")}
           </p>
         )}
       </Panel>
 
       <Panel
-        title="Run history"
+        title={t("runHistory")}
         icon={<HistoryIcon className="size-4" />}
         actions={
           totalCount != null ? (
             <span className="text-muted-foreground font-mono text-xs tabular-nums">
-              {totalCount} total
+              {t("total", { count: totalCount })}
             </span>
           ) : undefined
         }
       >
         <Feed
-          label="Run history"
+          label={t("runHistory")}
           items={runs}
           keyOf={(r) => r.id}
           groupBy={{ day: (r) => r.startedAt ?? r.createdAt }}
@@ -177,8 +186,8 @@ export function CronjobHomeScreen({
           onRetry={onRetry}
           empty={{
             icon: <HistoryIcon className="size-5" />,
-            title: "No runs recorded yet",
-            description: "Each scheduled execution will appear here once it fires.",
+            title: t("emptyTitle"),
+            description: t("emptyDescription"),
           }}
           hasMore={hasMore}
           loadingMore={loadingMore}

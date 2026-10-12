@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { QueryError } from "@/components/QueryError";
 
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,8 +14,8 @@ export type EventRateProps = ReturnType<typeof useEventRate>;
 
 /** Event velocity over the last two weeks, including a successful empty window. */
 export function EventRate({ days, total, loading, error, onRetry }: EventRateProps) {
-  if (error)
-    return <QueryError title="Could not load event rate" error={error} onRetry={onRetry} />;
+  const t = useTranslations("eventDetail");
+  if (error) return <QueryError title={t("rateError")} error={error} onRetry={onRetry} />;
   if (loading)
     return (
       <Card aria-busy="true">
@@ -27,10 +29,10 @@ export function EventRate({ days, total, loading, error, onRetry }: EventRatePro
       <CardContent className="flex items-center justify-between gap-4 p-3">
         <div>
           <p className="text-muted-foreground text-2xs tracking-wide uppercase">
-            Last {RATE_WINDOW_DAYS} days
+            {t("lastDays", { days: RATE_WINDOW_DAYS })}
           </p>
           <p className="text-xl font-semibold tabular-nums">{total}</p>
-          {total === 0 && <p className="text-muted-foreground text-xs">No events in this window</p>}
+          {total === 0 && <p className="text-muted-foreground text-xs">{t("noEventsInWindow")}</p>}
         </div>
         <Sparkline
           data={days}
@@ -38,7 +40,7 @@ export function EventRate({ days, total, loading, error, onRetry }: EventRatePro
           height={40}
           variant="area"
           className="text-chart-1"
-          ariaLabel="Event rate over the last two weeks"
+          ariaLabel={t("rateAria")}
         />
       </CardContent>
     </Card>

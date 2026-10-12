@@ -10,6 +10,7 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useFormatter, useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -27,45 +28,37 @@ export type DeploymentPanelViewProps = ReturnType<typeof useDeploymentPanel>;
 
 const STATUS_TONE: Record<
   DeploymentStatus,
-  { label: string; className: string; icon: React.ComponentType<{ className?: string }> }
+  { className: string; icon: React.ComponentType<{ className?: string }> }
 > = {
   running: {
-    label: "Running",
     className: "bg-success/10 text-success-fg border-success-border",
     icon: CheckCircle2Icon,
   },
   failed: {
-    label: "Failed",
     className: "bg-danger/10 text-danger-fg border-danger-border",
     icon: XCircleIcon,
   },
   rolled_back: {
-    label: "Rolled back",
     className: "bg-muted text-muted-foreground border-muted-foreground/30",
     icon: RotateCcwIcon,
   },
   superseded: {
-    label: "Superseded",
     className: "bg-muted text-muted-foreground border-muted-foreground/30",
     icon: ClockIcon,
   },
   deploying: {
-    label: "Deploying",
     className: "bg-warning/10 text-warning-fg border-warning-border",
     icon: Loader2Icon,
   },
   pending: {
-    label: "Pending",
     className: "bg-warning/10 text-warning-fg border-warning-border",
     icon: ClockIcon,
   },
   pending_approval: {
-    label: "Awaiting approval",
     className: "bg-info/10 text-info-fg border-info-border",
     icon: ClockIcon,
   },
   redeploying: {
-    label: "Redeploying",
     className: "bg-warning/10 text-warning-fg border-warning-border",
     icon: Loader2Icon,
   },
@@ -88,6 +81,8 @@ export function DeploymentPanelView({
 }: DeploymentPanelViewProps) {
   const fmt = useFormatters();
   const [confirmRollback, setConfirmRollback] = React.useState(false);
+  const t = useTranslations("appControls.deploymentPanel");
+  const latest = useTranslations("apps.overview.latestDeploy");
 
   if (loading) {
     return <Skeleton className="h-32 w-full rounded-lg" />;
@@ -99,17 +94,16 @@ export function DeploymentPanelView({
         <CardContent className="py-2">
           <div className="text-muted-foreground flex flex-col items-center gap-2 text-center text-sm">
             <RocketIcon className="size-5" />
-            <p className="font-medium">No deployments yet</p>
-            <p className="text-xs">
-              Trigger a deploy from the CLI or push to the deploy branch to see status here.
-            </p>
+            <p className="font-medium">{t("emptyTitle")}</p>
+            <p className="text-xs">{t("emptyDescription")}</p>
           </div>
         </CardContent>
       </Card>
     );
   }
 
-  const tone = STATUS_TONE[current.status] ?? STATUS_TONE.superseded;
+  const statusKey = current.status in STATUS_TONE ? current.status : "superseded";
+  const tone = STATUS_TONE[statusKey];
   const Icon = tone.icon;
   const inProgress = IN_PROGRESS.has(current.status);
   const elapsedFrom = current.startedAt ?? current.createdAt;
@@ -121,12 +115,12 @@ export function DeploymentPanelView({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">
-              Current deployment
+              {t("current")}
             </p>
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <Badge variant="outline" className={tone.className}>
                 <Icon className={inProgress ? "size-3 animate-spin" : "size-3"} />
-                {tone.label}
+                {latest(`status.${statusKey}`)}
               </Badge>
               <span className="font-mono text-sm">
                 {(current.imageTag || current.id).slice(0, 12)}
@@ -147,14 +141,18 @@ export function DeploymentPanelView({
               {elapsed && (
                 <>
                   {" · "}
-                  {inProgress ? "elapsed " : "took "}
-                  {elapsed}
+                  {inProgress
+                    ? t("elapsed", { duration: elapsed })
+                    : t("took", { duration: elapsed })}
                 </>
               )}
               {current.triggerKind && (
                 <>
-                  {" · trigger: "}
-                  <span className="capitalize">{current.triggerKind}</span>
+                  {" · "}
+                  {t.rich("trigger", {
+                    kind: current.triggerKind,
+                    value: (chunks) => <span className="capitalize">{chunks}</span>,
+                  })}
                 </>
               )}
             </p>
@@ -164,7 +162,7 @@ export function DeploymentPanelView({
             <Button asChild variant="outline" size="sm">
               <Link href={`/deployments/${current.id}`}>
                 <ExternalLinkIcon className="size-3.5" />
-                Open
+                {latest("open")}
               </Link>
             </Button>
             {current.status === "failed" && lastGood && (
@@ -180,7 +178,7 @@ export function DeploymentPanelView({
                   ) : (
                     <RotateCcwIcon className="size-3.5" />
                   )}
-                  Roll back
+                  {latest("rollback")}
                 </Button>
               </Can>
             )}
@@ -193,12 +191,12 @@ export function DeploymentPanelView({
 
         {current.status === "failed" && (
           <div className="border-danger-border bg-danger/5 mt-4 rounded-md border p-3 text-xs">
-            <p className="text-danger-fg font-medium">Deployment failed</p>
+            <p className="text-danger-fg font-medium">{t("failed")}</p>
             <p className="text-muted-foreground mt-1">
-              Open the deployment for the full log.{" "}
+              {t("openForLog")}{" "}
               {lastGood
-                ? `Rolling back targets ${(lastGood.imageTag || lastGood.id).slice(0, 10)}.`
-                : "No earlier successful deploy to roll back to."}
+                ? t("rollbackTarget", { tag: (lastGood.imageTag || lastGood.id).slice(0, 10) })
+                : latest("noLastGood")}
             </p>
           </div>
         )}
@@ -209,11 +207,11 @@ export function DeploymentPanelView({
         onOpenChange={setConfirmRollback}
         title={
           lastGood
-            ? `Roll back to ${(lastGood.imageTag || lastGood.id).slice(0, 10)}?`
-            : "Roll back?"
+            ? latest("confirmTitle", { tag: (lastGood.imageTag || lastGood.id).slice(0, 10) })
+            : t("confirmTitleGeneric")
         }
-        description="This starts a new deployment using the previous image and supersedes the failed one."
-        confirmLabel="Roll back"
+        description={latest("confirmDescription")}
+        confirmLabel={latest("rollback")}
         destructive
         onConfirm={onRollback}
       />
@@ -238,21 +236,25 @@ function ProgressBar({ status, startedAt }: { status: DeploymentStatus; startedA
   // No deterministic progress signal from the backend yet — show an
   // animated indeterminate bar so it's clear the deploy is alive, plus
   // a current-stage hint derived from status.
+  const t = useTranslations("appControls.deploymentPanel");
+  const format = useFormatter();
   const stage =
     status === "pending"
-      ? "Queued"
+      ? t("stage.queued")
       : status === "deploying"
-        ? "Rolling out"
+        ? t("stage.rollingOut")
         : status === "redeploying"
-          ? "Redeploying"
-          : "Working";
+          ? t("stage.redeploying")
+          : t("stage.working");
 
   return (
     <div className="mt-4">
       <div className="text-muted-foreground text-2xs mb-1.5 flex items-center justify-between">
         <span>{stage}</span>
         <span className="font-mono">
-          since {new Date(startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+          {t("since", {
+            time: format.dateTime(new Date(startedAt), { hour: "2-digit", minute: "2-digit" }),
+          })}
         </span>
       </div>
       <div className="bg-muted h-1.5 overflow-hidden rounded-full">

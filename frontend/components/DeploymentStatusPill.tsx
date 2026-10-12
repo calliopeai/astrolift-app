@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -24,20 +25,16 @@ import { cn } from "@/lib/utils";
  *   superseded / rolled_back → muted (terminal, no-op)
  */
 
-interface PillStyle {
-  className: string;
-  label: string;
-}
-
-const STATUS_STYLES: Record<DeploymentStatus, PillStyle> = {
-  pending_approval: { className: PILL_TONE.warn, label: "Pending approval" },
-  pending: { className: PILL_TONE.warn, label: "Pending" },
-  deploying: { className: cn(PILL_TONE.info, IN_FLIGHT), label: "Deploying" },
-  redeploying: { className: cn(PILL_TONE.info, IN_FLIGHT), label: "Redeploying" },
-  running: { className: PILL_TONE.ok, label: "Running" },
-  failed: { className: PILL_TONE.error, label: "Failed" },
-  rolled_back: { className: PILL_TONE.muted, label: "Rolled back" },
-  superseded: { className: cn(PILL_TONE.muted, "line-through"), label: "Superseded" },
+// Labels come from `apps.deployments.statuses`, keyed by the status itself.
+const STATUS_STYLES: Record<DeploymentStatus, string> = {
+  pending_approval: PILL_TONE.warn,
+  pending: PILL_TONE.warn,
+  deploying: cn(PILL_TONE.info, IN_FLIGHT),
+  redeploying: cn(PILL_TONE.info, IN_FLIGHT),
+  running: PILL_TONE.ok,
+  failed: PILL_TONE.error,
+  rolled_back: PILL_TONE.muted,
+  superseded: cn(PILL_TONE.muted, "line-through"),
 };
 
 interface DeploymentStatusPillProps {
@@ -48,18 +45,20 @@ interface DeploymentStatusPillProps {
 }
 
 export function DeploymentStatusPill({ status, label, className }: DeploymentStatusPillProps) {
-  const style = STATUS_STYLES[status];
+  const t = useTranslations("apps.deployments.statuses");
+  const pill = useTranslations("deploymentStatusPill");
+  const text = label ?? t(status);
   return (
     <Badge
       variant="outline"
-      className={cn("font-mono font-semibold", style.className, className)}
-      aria-label={`Status: ${label ?? style.label}`}
+      className={cn("font-mono font-semibold", STATUS_STYLES[status], className)}
+      aria-label={pill("label", { status: text })}
     >
       <span
         aria-hidden
         className="size-1.5 rounded-full bg-current shadow-[0_0_8px_currentColor]"
       />
-      {label ?? style.label}
+      {text}
     </Badge>
   );
 }

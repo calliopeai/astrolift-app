@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -33,13 +34,9 @@ export interface AirlockGateProps {
 }
 
 export const AIRLOCK_LEGEND: LegendItem[] = [
-  {
-    glyph: "signal",
-    color: HEALTH_COLOR.degraded,
-    label: "Waiting for approval: gauge breathes and fills with time held",
-  },
-  { glyph: "glow", color: HEALTH_COLOR.ok, label: "Approved: doors open" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Denied: sealed, shakes once" },
+  { glyph: "signal", color: HEALTH_COLOR.degraded, labelKey: "airlockWaiting" },
+  { glyph: "glow", color: HEALTH_COLOR.ok, labelKey: "airlockApproved" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "airlockDenied" },
 ];
 
 /** The gauge reads full once a run has been held this long. */
@@ -83,6 +80,7 @@ export function AirlockGate({
   motion = "full",
   className,
 }: AirlockGateProps) {
+  const vt = useTranslations("vizRender");
   const clipId = React.useId();
   const booth = React.useRef<SVGGElement>(null);
   const prev = React.useRef(state);
@@ -130,14 +128,18 @@ export function AirlockGate({
   const caption =
     state === "waiting"
       ? waited !== undefined
-        ? `WAIT ${formatWait(waited)}`
-        : "WAITING"
-      : `${state === "approved" ? "OPEN" : "DENIED"}${decidedBy ? ` · ${decidedBy}` : ""}`;
+        ? vt("airlock.wait", { time: formatWait(waited) })
+        : vt("airlock.waiting")
+      : `${state === "approved" ? vt("airlock.open") : vt("airlock.denied")}${decidedBy ? ` · ${decidedBy}` : ""}`;
   const shortCaption = caption.length > 24 ? `${caption.slice(0, 23)}…` : caption;
   const label =
     state === "waiting"
-      ? `Gate waiting for approval${waited !== undefined ? `, held ${formatWait(waited)}` : ""}`
-      : `Gate ${state}${decidedBy ? ` by ${decidedBy}` : ""}`;
+      ? waited !== undefined
+        ? vt("airlock.labelHeld", { time: formatWait(waited) })
+        : vt("airlock.labelWaiting")
+      : decidedBy
+        ? vt(`airlock.labelBy.${state}`, { who: decidedBy })
+        : vt(`airlock.label.${state}`);
   const showActions = state === "waiting" && (onApprove || onDeny);
 
   return (
@@ -240,12 +242,12 @@ export function AirlockGate({
         <div className="flex gap-1.5">
           {onApprove && (
             <Button type="button" size="xs" variant="outline" onClick={onApprove}>
-              Approve
+              {vt("airlock.approve")}
             </Button>
           )}
           {onDeny && (
             <Button type="button" size="xs" variant="destructive" onClick={onDeny}>
-              Deny
+              {vt("airlock.deny")}
             </Button>
           )}
         </div>

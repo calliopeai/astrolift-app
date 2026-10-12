@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import {
@@ -27,6 +28,7 @@ interface DisconnectResp {
 
 /** The viewer's personal source-provider identities, with connect and disconnect (#395). */
 export function useConnectedAccounts() {
+  const t = useTranslations("securitySettings.connected.toasts");
   const { data, loading } = useQuery<ListResp>(LIST_MY_CONNECTED_ACCOUNTS, {
     fetchPolicy: "cache-and-network",
   });
@@ -46,13 +48,13 @@ export function useConnectedAccounts() {
       });
       const payload = data?.astroliftConnectUserSourceProvider;
       if (!payload?.ok || !payload.data) {
-        toast.error(payload?.errors?.[0]?.message ?? "Could not start the OAuth flow");
+        toast.error(payload?.errors?.[0]?.message ?? t("oauthStartFailed"));
         return;
       }
       // Hand off to the OAuth start endpoint; the return picks up the new state.
       window.location.href = payload.data.authorizationUrl;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Connect failed");
+      toast.error(err instanceof Error ? err.message : t("connectFailed"));
     }
   }
 
@@ -63,9 +65,11 @@ export function useConnectedAccounts() {
     });
     const payload = data?.astroliftDisconnectUserSourceProvider;
     if (!payload?.ok) {
-      throw new Error(payload?.errors?.[0]?.message ?? "Could not disconnect this account");
+      throw new Error(payload?.errors?.[0]?.message ?? t("disconnectFailed"));
     }
-    toast.success(`Disconnected ${account.linkedAccountLogin ?? "account"}`);
+    toast.success(
+      t("disconnected", { account: account.linkedAccountLogin ?? t("accountFallback") })
+    );
   }
 
   return {

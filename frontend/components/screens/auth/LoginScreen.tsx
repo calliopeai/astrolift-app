@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -32,26 +33,21 @@ export function LoginScreen({
   continueWithIdp,
   submitLocal,
 }: LoginScreenProps) {
+  const t = useTranslations("loginScreen");
   if (devLogin) {
-    return <AuthSplash message="Redirecting to dev login…" />;
+    return <AuthSplash message={t("redirectingDev")} />;
   }
 
   if (loadError) {
-    return <AuthSplash message="Couldn't reach the API" detail={loadError} tone="destructive" />;
+    return <AuthSplash message={t("apiUnreachable")} detail={loadError} tone="destructive" />;
   }
 
   if (idp === null) {
-    return <AuthSplash message="Detecting identity provider…" />;
+    return <AuthSplash message={t("detecting")} />;
   }
 
   if (!idp.ready) {
-    return (
-      <AuthSplash
-        message="No identity provider configured"
-        detail={idp.hint ?? "An operator must configure an IdP before users can log in."}
-        tone="warning"
-      />
-    );
+    return <AuthSplash message={t("noIdp")} detail={idp.hint ?? t("noIdpHint")} tone="warning" />;
   }
 
   if (idp.kind === "local") {
@@ -77,15 +73,16 @@ export function ExternalIdpCard({
   displayName: string;
   onContinue: () => void;
 }) {
-  const ctaLabel = `Continue with ${DISPLAY_KIND[kind] ?? displayName ?? "your provider"}`;
+  const t = useTranslations("loginScreen");
+  const ctaLabel = t("continueWith", {
+    provider: DISPLAY_KIND[kind] ?? displayName ?? t("yourProvider"),
+  });
   return (
     <div className="flex flex-col items-center gap-6">
       <Image src="/logo.svg" alt="Astrolift" width={48} height={48} priority />
       <div className="flex flex-col items-center gap-1">
-        <div className="text-foreground text-xl font-semibold tracking-tight">
-          Sign in to Astrolift
-        </div>
-        <div className="text-muted-foreground text-sm">via {displayName}</div>
+        <div className="text-foreground text-xl font-semibold tracking-tight">{t("title")}</div>
+        <div className="text-muted-foreground text-sm">{t("via", { provider: displayName })}</div>
       </div>
       <Button onClick={onContinue} size="lg" className="w-72">
         {ctaLabel}
@@ -99,6 +96,7 @@ export function LocalLoginForm({
 }: {
   onSubmit: (username: string, password: string) => Promise<void>;
 }) {
+  const t = useTranslations("loginScreen");
   const [username, setUsername] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [busy, setBusy] = React.useState(false);
@@ -117,14 +115,12 @@ export function LocalLoginForm({
     <form onSubmit={submit} className="flex w-full max-w-sm flex-col items-center gap-6">
       <Image src="/logo.svg" alt="Astrolift" width={48} height={48} priority />
       <div className="flex flex-col items-center gap-1">
-        <div className="text-foreground text-xl font-semibold tracking-tight">
-          Sign in to Astrolift
-        </div>
-        <div className="text-muted-foreground text-sm">Local username + password</div>
+        <div className="text-foreground text-xl font-semibold tracking-tight">{t("title")}</div>
+        <div className="text-muted-foreground text-sm">{t("localSubtitle")}</div>
       </div>
 
       <div className="w-full space-y-2">
-        <Label htmlFor="username">Username or email</Label>
+        <Label htmlFor="username">{t("username")}</Label>
         <Input
           id="username"
           value={username}
@@ -135,7 +131,7 @@ export function LocalLoginForm({
         />
       </div>
       <div className="w-full space-y-2">
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password">{t("password")}</Label>
         <Input
           id="password"
           type="password"
@@ -147,7 +143,7 @@ export function LocalLoginForm({
       </div>
 
       <Button type="submit" size="lg" className="w-full" disabled={busy}>
-        {busy ? "Signing in…" : "Sign in"}
+        {busy ? t("signingIn") : t("signIn")}
       </Button>
     </form>
   );

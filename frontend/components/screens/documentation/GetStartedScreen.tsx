@@ -1,37 +1,37 @@
 import Link from "next/link";
+import { useTranslations } from "next-intl";
+import type { ReactNode } from "react";
+
+function docLink(href: string) {
+  return function DocLink(chunks: ReactNode) {
+    return (
+      <Link href={href} className="text-foreground underline">
+        {chunks}
+      </Link>
+    );
+  };
+}
 
 export function GetStartedScreen() {
+  const t = useTranslations("docsGetStarted");
   return (
     <article className="flex max-w-2xl flex-1 flex-col gap-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Local development setup</h1>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Run the Astrolift control plane from an astrolift-app checkout.
-        </p>
+        <h1 className="text-2xl font-semibold">{t("title")}</h1>
+        <p className="text-muted-foreground mt-2 text-sm">{t("intro")}</p>
       </div>
 
       <div className="bg-muted/40 text-muted-foreground rounded-md border p-4 text-sm leading-relaxed">
-        For your first application deployment, follow the{" "}
-        <Link href="/documentation/quickstart" className="text-foreground underline">
-          Quickstart
-        </Link>
-        . The steps here are for contributors running the local control plane. They require Docker
-        Desktop or Docker Engine with Compose v2. Review the{" "}
-        <Link href="/documentation/configuration" className="text-foreground underline">
-          configuration reference
-        </Link>{" "}
-        and your local environment files before starting the stack.
+        {t.rich("note", {
+          quickstart: docLink("/documentation/quickstart"),
+          configuration: docLink("/documentation/configuration"),
+        })}
       </div>
 
       <section className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
-          <h2 className="text-lg font-medium">Prepare and start the stack</h2>
-          <p className="text-muted-foreground text-sm leading-relaxed">
-            Run these commands from the repository root. Bootstrap checks Docker and creates missing
-            local environment files from the examples. Fill in required configuration values before
-            starting the Compose services. The stack includes the API and UI, PostgreSQL, Redis,
-            Temporal, and local storage and email services.
-          </p>
+          <h2 className="text-lg font-medium">{t("prepareTitle")}</h2>
+          <p className="text-muted-foreground text-sm leading-relaxed">{t("prepareBody")}</p>
           <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
             <code>{`./bootstrap.sh
 ./run.sh up
@@ -40,12 +40,8 @@ export function GetStartedScreen() {
         </div>
 
         <div className="flex flex-col gap-2">
-          <h2 className="text-lg font-medium">Migrate and seed the local identity</h2>
-          <p className="text-muted-foreground text-sm leading-relaxed">
-            Once the API container is running, apply the database migrations and run the development
-            identity seed. This creates the local organization, team, project and development
-            account used by the local sign-in flow.
-          </p>
+          <h2 className="text-lg font-medium">{t("migrateTitle")}</h2>
+          <p className="text-muted-foreground text-sm leading-relaxed">{t("migrateBody")}</p>
           <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
             <code>{`./run.sh migrate
 ./run.sh seed`}</code>
@@ -53,12 +49,13 @@ export function GetStartedScreen() {
         </div>
 
         <div className="flex flex-col gap-2">
-          <h2 className="text-lg font-medium">Explore and inspect</h2>
+          <h2 className="text-lg font-medium">{t("exploreTitle")}</h2>
           <p className="text-muted-foreground text-sm leading-relaxed">
-            The default UI is at http://localhost:3000, the GraphQL API at
-            http://localhost:8000/app/gql/config/, and the Temporal UI at http://localhost:8233.
-            Check your Compose configuration if you override host ports. Use the command wrapper to
-            inspect running containers and logs.
+            {t("exploreBody", {
+              ui: "http://localhost:3000",
+              api: "http://localhost:8000/app/gql/config/",
+              temporal: "http://localhost:8233",
+            })}
           </p>
           <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
             <code>{`./run.sh urls
@@ -68,12 +65,8 @@ export function GetStartedScreen() {
         </div>
 
         <div className="flex flex-col gap-2">
-          <h2 className="text-lg font-medium">Run the checks</h2>
-          <p className="text-muted-foreground text-sm leading-relaxed">
-            Backend tests run against real PostgreSQL and Temporal through the local stack. Ruff
-            checks backend formatting and lint; the frontend has TypeScript, ESLint and React tests.
-            When changing the GraphQL contract, regenerate its schema and frontend types together.
-          </p>
+          <h2 className="text-lg font-medium">{t("checksTitle")}</h2>
+          <p className="text-muted-foreground text-sm leading-relaxed">{t("checksBody")}</p>
           <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
             <code>{`./run.sh test
 make lint

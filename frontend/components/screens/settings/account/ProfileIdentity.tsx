@@ -1,6 +1,7 @@
 "use client";
 
 import { LockIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ export function ProfileIdentity({
   saving,
   save,
 }: ReturnType<typeof useProfileIdentity>) {
+  const t = useTranslations("profileSettings.identity");
   const [firstName, setFirstName] = React.useState("");
   const [lastName, setLastName] = React.useState("");
   const [email, setEmail] = React.useState("");
@@ -33,8 +35,8 @@ export function ProfileIdentity({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Identity</CardTitle>
-          <CardDescription>Loading…</CardDescription>
+          <CardTitle className="text-base">{t("title")}</CardTitle>
+          <CardDescription>{t("loading")}</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -43,8 +45,8 @@ export function ProfileIdentity({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Identity</CardTitle>
-          <CardDescription>Sign in to edit your profile.</CardDescription>
+          <CardTitle className="text-base">{t("title")}</CardTitle>
+          <CardDescription>{t("signIn")}</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -81,34 +83,24 @@ export function ProfileIdentity({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Identity</CardTitle>
+        <CardTitle className="text-base">{t("title")}</CardTitle>
         <CardDescription>
-          {orgAllows ? (
-            <>
-              Your name and email shown across the platform. Fields locked by your identity provider
-              can&apos;t be edited locally — they sync from the IdP.
-            </>
-          ) : (
-            <>
-              Profile editing is disabled by your organization administrator. Ask your admin to flip{" "}
-              <code>allowUserProfileEdit</code> on <code>/administration/organization</code>.
-            </>
-          )}
+          {orgAllows
+            ? t("description")
+            : t.rich("editingDisabled", { code: (chunks) => <code>{chunks}</code> })}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={submit} className="grid gap-4 sm:max-w-sm">
           <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
+            <Label htmlFor="username">{t("username")}</Label>
             <Input id="username" value={profile.username} readOnly className="font-mono text-xs" />
-            <p className="text-muted-foreground text-2xs">
-              Username is the auth identifier; it never changes.
-            </p>
+            <p className="text-muted-foreground text-2xs">{t("usernameHelp")}</p>
           </div>
 
           <FieldRow
             id="first-name"
-            label="First name"
+            label={t("firstName")}
             value={firstName}
             onChange={setFirstName}
             disabled={!canEdit("first_name")}
@@ -116,7 +108,7 @@ export function ProfileIdentity({
           />
           <FieldRow
             id="last-name"
-            label="Last name"
+            label={t("lastName")}
             value={lastName}
             onChange={setLastName}
             disabled={!canEdit("last_name")}
@@ -124,7 +116,7 @@ export function ProfileIdentity({
           />
           <FieldRow
             id="email"
-            label="Email"
+            label={t("email")}
             value={email}
             onChange={setEmail}
             disabled={!canEdit("email")}
@@ -135,7 +127,7 @@ export function ProfileIdentity({
           {orgAllows && (
             <div>
               <Button type="submit" disabled={!dirty || saving}>
-                {saving ? "Saving…" : "Save"}
+                {saving ? t("saving") : t("save")}
               </Button>
             </div>
           )}
@@ -162,6 +154,7 @@ function FieldRow({
   locked: boolean;
   type?: string;
 }) {
+  const t = useTranslations("profileSettings.identity");
   return (
     <div className="space-y-2">
       <Label htmlFor={id} className="flex items-center gap-1">
@@ -169,10 +162,10 @@ function FieldRow({
         {locked && (
           <span
             className="text-muted-foreground text-2xs inline-flex items-center gap-1"
-            title="Managed by your identity provider — local edits would be overwritten on next sign-in"
+            title={t("idpManagedTitle")}
           >
             <LockIcon className="size-3" />
-            IdP-managed
+            {t("idpManaged")}
           </span>
         )}
       </Label>

@@ -1,16 +1,19 @@
 import { ArrowLeftIcon, ClockIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
-import { levelVariant, type Tutorial } from "./tutorial-types";
+import { levelKey, levelVariant, type Tutorial } from "./tutorial-types";
 
 export interface TutorialScreenProps {
   tutorial: Tutorial;
 }
 
 export function TutorialScreen({ tutorial }: TutorialScreenProps) {
+  const t = useTranslations("docsTutorials");
+  const level = levelKey(tutorial.level);
   return (
     <article className="flex max-w-2xl flex-1 flex-col gap-6 p-6">
       <div>
@@ -19,12 +22,14 @@ export function TutorialScreen({ tutorial }: TutorialScreenProps) {
           className="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1.5 text-sm transition-colors"
         >
           <ArrowLeftIcon className="h-3.5 w-3.5" />
-          Back to tutorials
+          {t("back")}
         </Link>
         <h1 className="text-2xl font-semibold">{tutorial.title}</h1>
         <p className="text-muted-foreground mt-2 text-sm">{tutorial.description}</p>
         <div className="mt-3 flex items-center gap-3">
-          <Badge variant={levelVariant(tutorial.level)}>{tutorial.level}</Badge>
+          <Badge variant={levelVariant(tutorial.level)}>
+            {level ? t(`levels.${level}`) : tutorial.level}
+          </Badge>
           <span className="text-muted-foreground flex items-center gap-1 text-xs">
             <ClockIcon className="h-3.5 w-3.5" />
             {tutorial.duration}
@@ -38,7 +43,9 @@ export function TutorialScreen({ tutorial }: TutorialScreenProps) {
         {tutorial.steps.map((step, i) => (
           <section key={i} className="flex flex-col gap-3">
             <h2 className="text-lg font-medium">
-              <span className="text-muted-foreground mr-2 font-normal">Step {i + 1}.</span>
+              <span className="text-muted-foreground mr-2 font-normal">
+                {t("step", { n: i + 1 })}
+              </span>
               {step.title}
             </h2>
             <p className="text-muted-foreground text-sm leading-relaxed">{step.body}</p>

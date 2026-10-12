@@ -93,58 +93,29 @@ type StageKind = "agent_dispatch" | "human_gate" | "aggregation" | "checkpoint" 
 
 const STAGE_KINDS: {
   value: StageKind;
-  label: string;
   icon: React.ComponentType<{ className?: string }>;
-  hint: string;
 }[] = [
-  {
-    value: "agent_dispatch",
-    label: "Agent dispatch",
-    icon: BotIcon,
-    hint: "Dispatches an agent workload, optionally fanned out in parallel.",
-  },
-  {
-    value: "workflow",
-    label: "Nested workflow",
-    icon: WorkflowIcon,
-    hint: "Runs another visible workflow as a linked child run.",
-  },
-  {
-    value: "human_gate",
-    label: "Human gate",
-    icon: UserCheckIcon,
-    hint: "Pauses for human approval or rejection before proceeding.",
-  },
-  {
-    value: "aggregation",
-    label: "Aggregation",
-    icon: MergeIcon,
-    hint: "Collects and merges the outputs of the preceding fan-out stage.",
-  },
-  {
-    value: "checkpoint",
-    label: "Checkpoint",
-    icon: FlagIcon,
-    hint: "Snapshots state at this point, with no external dispatch.",
-  },
+  { value: "agent_dispatch", icon: BotIcon },
+  { value: "workflow", icon: WorkflowIcon },
+  { value: "human_gate", icon: UserCheckIcon },
+  { value: "aggregation", icon: MergeIcon },
+  { value: "checkpoint", icon: FlagIcon },
 ];
 
-const ON_FAILURE_OPTIONS: { value: string; label: string }[] = [
-  { value: "fail", label: "Fail workflow" },
-  { value: "retry", label: "Retry" },
-  { value: "skip", label: "Skip" },
-  { value: "escalate", label: "Escalate" },
-];
+const ON_FAILURE_OPTIONS = ["fail", "retry", "skip", "escalate"] as const;
 
-function stageKindMeta(kind: string) {
-  return (
-    STAGE_KINDS.find((k) => k.value === kind) ?? {
-      value: kind as StageKind,
-      label: kind,
-      icon: WorkflowIcon,
-      hint: "",
-    }
-  );
+type StageBuilderT = ReturnType<typeof useTranslations<"workflowStageBuilder">>;
+
+function stageKindMeta(kind: string, t: StageBuilderT) {
+  const known = STAGE_KINDS.find((k) => k.value === kind);
+  return known
+    ? {
+        value: known.value,
+        label: t(`kinds.${known.value}.label`),
+        icon: known.icon,
+        hint: t(`kinds.${known.value}.hint`),
+      }
+    : { value: kind as StageKind, label: kind, icon: WorkflowIcon, hint: "" };
 }
 
 // ─── Draft model ─────────────────────────────────────────────────────────
@@ -246,6 +217,7 @@ function StageEditorFields({
   disabled: boolean;
 }) {
   const t = useTranslations("workflowCollections");
+  const sb = useTranslations("workflowStageBuilder");
   const followingKeys = useContext(StageTargetsContext)
     .filter((stage) => stage.order > stageOrder && stage.outputKey)
     .map((stage) => stage.outputKey);
@@ -253,7 +225,7 @@ function StageEditorFields({
     .filter((stage) => stage.order < stageOrder && stage.outputKey)
     .map((stage) => stage.outputKey);
   const kindMeta = {
-    ...stageKindMeta(draft.kind),
+    ...stageKindMeta(draft.kind, sb),
     ...(draft.kind === "collection"
       ? { label: t("collectionKind") }
       : draft.kind === "format_record"
@@ -261,10 +233,14 @@ function StageEditorFields({
         : {}),
   };
   const options = useContext(PickerOptionsContext);
+  const kindOptions = STAGE_KINDS.map((k) => ({
+    value: k.value as string,
+    label: sb(`kinds.${k.value}.label`),
+  }));
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <Label className="text-xs">Stage kind</Label>
+        <Label className="text-xs">{sb("stageKind")}</Label>
         <Select
           value={draft.kind}
           onValueChange={(v) =>
@@ -288,8 +264,8 @@ function StageEditorFields({
           </SelectTrigger>
           <SelectContent>
             {(draft.kind === "collection" || followingKeys.length > 0
-              ? [...STAGE_KINDS, { value: "collection", label: t("collectionKind") }]
-              : STAGE_KINDS
+              ? [...kindOptions, { value: "collection", label: t("collectionKind") }]
+              : kindOptions
             )
               .concat([{ value: "format_record", label: t("formatKind") }])
               .map((k) => (
@@ -305,30 +281,28 @@ function StageEditorFields({
       {draft.kind === "agent_dispatch" && (
         <>
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs">Role</Label>
+            <Label className="text-xs">{sb("role")}</Label>
             <Input
               value={draft.role}
-              placeholder="e.g. reviewer"
+              placeholder={sb("example", { value: "reviewer" })}
               className="h-8 text-xs"
               disabled={disabled}
               onChange={(e) => onPatch({ role: e.target.value })}
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs">Agent slug</Label>
+            <Label className="text-xs">{sb("agentSlug")}</Label>
             <Input
               value={draft.agentRef}
-              placeholder="e.g. emr-bug-triage"
+              placeholder={sb("example", { value: "emr-bug-triage" })}
               className="h-8 text-xs"
               disabled={disabled}
               onChange={(e) => onPatch({ agentRef: e.target.value })}
             />
-            <p className="text-muted-foreground text-2xs">
-              Declarative local reference; the selected workload wins when both are set.
-            </p>
+            <p className="text-muted-foreground text-2xs">{sb("agentSlugHint")}</p>
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs">Agent workload</Label>
+            <Label className="text-xs">{sb("agentWorkload")}</Label>
             <AgentWorkloadPicker
               value={draft.agentDefinitionGuid}
               onChange={(id) => onPatch({ agentDefinitionGuid: id })}
@@ -339,17 +313,17 @@ function StageEditorFields({
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs">Environment spec slug</Label>
+            <Label className="text-xs">{sb("environmentSpecSlug")}</Label>
             <Input
               value={draft.environmentSpecSlug}
-              placeholder="Defaults to the agent workload slug"
+              placeholder={sb("environmentSpecPlaceholder")}
               className="h-8 text-xs"
               disabled={disabled}
               onChange={(e) => onPatch({ environmentSpecSlug: e.target.value })}
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs">Skills</Label>
+            <Label className="text-xs">{sb("skills")}</Label>
             <SkillRefsPicker
               value={draft.skillRefs}
               onChange={(refs) => onPatch({ skillRefs: refs })}
@@ -360,22 +334,22 @@ function StageEditorFields({
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs">Stage instructions</Label>
+            <Label className="text-xs">{sb("stageInstructions")}</Label>
             <Textarea
               value={draft.prompt}
-              placeholder="Instructions added to this stage's immutable task packet"
+              placeholder={sb("stageInstructionsPlaceholder")}
               className="min-h-16 text-xs"
               disabled={disabled}
               onChange={(e) => onPatch({ prompt: e.target.value })}
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs">Fan-out count</Label>
+            <Label className="text-xs">{sb("fanOutCount")}</Label>
             <Input
               type="number"
               min={0}
               value={draft.fanOutCount ?? ""}
-              placeholder="0 (no fan-out)"
+              placeholder={sb("fanOutPlaceholder")}
               className="h-8 text-xs"
               disabled={disabled}
               onChange={(e) => {
@@ -383,9 +357,7 @@ function StageEditorFields({
                 onPatch({ fanOutCount: Number.isNaN(n) ? null : n });
               }}
             />
-            <p className="text-muted-foreground text-2xs">
-              Runs N parallel copies of this stage; merge them with a later aggregation stage.
-            </p>
+            <p className="text-muted-foreground text-2xs">{sb("fanOutHint")}</p>
           </div>
         </>
       )}
@@ -393,21 +365,21 @@ function StageEditorFields({
       {draft.kind === "human_gate" && (
         <>
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs">Prompt</Label>
+            <Label className="text-xs">{sb("prompt")}</Label>
             <Textarea
               value={draft.prompt}
-              placeholder="What should the approver decide?"
+              placeholder={sb("promptPlaceholder")}
               className="min-h-16 text-xs"
               disabled={disabled}
               onChange={(e) => onPatch({ prompt: e.target.value })}
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs">Approvers</Label>
+            <Label className="text-xs">{sb("approvers")}</Label>
             <TagInput
               value={draft.approvers}
               onChange={(tags) => onPatch({ approvers: tags })}
-              placeholder="Type an approver and press Enter"
+              placeholder={sb("approversPlaceholder")}
               disabled={disabled}
             />
           </div>
@@ -416,26 +388,23 @@ function StageEditorFields({
 
       {draft.kind === "workflow" && (
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs">Child workflow slug</Label>
+          <Label className="text-xs">{sb("childWorkflowSlug")}</Label>
           <Input
             value={draft.workflowRef}
-            placeholder="e.g. emr-triage-patch"
+            placeholder={sb("example", { value: "emr-triage-patch" })}
             className="h-8 text-xs"
             disabled={disabled}
             onChange={(e) => onPatch({ workflowRef: e.target.value })}
           />
-          <p className="text-muted-foreground text-2xs">
-            Must be in this project or a reusable org/global definition. Cycles and depth over eight
-            are rejected.
-          </p>
+          <p className="text-muted-foreground text-2xs">{sb("childWorkflowHint")}</p>
         </div>
       )}
 
       <div className="flex flex-col gap-1.5">
-        <Label className="text-xs">Output key</Label>
+        <Label className="text-xs">{sb("outputKey")}</Label>
         <Input
           value={draft.outputKey}
-          placeholder="Defaults to stage_<order>"
+          placeholder={sb("outputKeyPlaceholder", { key: "stage_<order>" })}
           className="h-8 text-xs"
           disabled={disabled}
           onChange={(e) => onPatch({ outputKey: e.target.value })}
@@ -444,10 +413,10 @@ function StageEditorFields({
 
       {draft.kind === "checkpoint" && (
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs">Label</Label>
+          <Label className="text-xs">{sb("label")}</Label>
           <Input
             value={draft.role}
-            placeholder="e.g. after-triage"
+            placeholder={sb("example", { value: "after-triage" })}
             className="h-8 text-xs"
             disabled={disabled}
             onChange={(e) => onPatch({ role: e.target.value })}
@@ -458,7 +427,7 @@ function StageEditorFields({
       <div className="grid grid-cols-2 gap-3">
         {["agent_dispatch", "workflow"].includes(draft.kind) && (
           <div className="flex flex-col gap-1.5">
-            <Label className="text-xs">On failure</Label>
+            <Label className="text-xs">{sb("onFailure")}</Label>
             <Select
               value={draft.onFailure}
               onValueChange={(v) => onPatch({ onFailure: v })}
@@ -469,8 +438,8 @@ function StageEditorFields({
               </SelectTrigger>
               <SelectContent>
                 {ON_FAILURE_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
+                  <SelectItem key={o} value={o}>
+                    {sb(`onFailureOptions.${o}`)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -478,7 +447,7 @@ function StageEditorFields({
           </div>
         )}
         <div className="flex flex-col gap-1.5">
-          <Label className="text-xs">Timeout (seconds)</Label>
+          <Label className="text-xs">{sb("timeoutSeconds")}</Label>
           <Input
             type="number"
             min={1}
@@ -541,8 +510,9 @@ function StageCard({
 }: StageCardProps) {
   const [draft, setDraft] = useState<StageDraft>(() => draftFromStage(stage));
   const t = useTranslations("workflowCollections");
+  const sb = useTranslations("workflowStageBuilder");
   const meta = {
-    ...stageKindMeta(stage.kind),
+    ...stageKindMeta(stage.kind, sb),
     ...(stage.kind === "collection"
       ? { label: t("collectionKind") }
       : stage.kind === "format_record"
@@ -559,7 +529,7 @@ function StageCard({
             type="button"
             className="text-muted-foreground hover:text-foreground rounded p-0.5"
             onClick={() => onToggle(stage.guid)}
-            aria-label={expanded ? "Collapse stage" : "Expand stage"}
+            aria-label={expanded ? sb("collapseStage") : sb("expandStage")}
           >
             {expanded ? (
               <ChevronDownIcon className="h-4 w-4" />
@@ -606,7 +576,7 @@ function StageCard({
                 className="h-6 w-6"
                 disabled={index === 0 || saving}
                 onClick={() => onMove(index, -1)}
-                title="Move up"
+                title={sb("moveUp")}
               >
                 <ArrowUpIcon className="h-3 w-3" />
               </Button>
@@ -617,7 +587,7 @@ function StageCard({
                 className="h-6 w-6"
                 disabled={index === total - 1 || saving}
                 onClick={() => onMove(index, 1)}
-                title="Move down"
+                title={sb("moveDown")}
               >
                 <ArrowDownIcon className="h-3 w-3" />
               </Button>
@@ -645,7 +615,7 @@ function StageCard({
                   disabled={saving}
                   onClick={() => onDelete(stage.guid)}
                 >
-                  <TrashIcon className="mr-1 h-3 w-3" /> Delete
+                  <TrashIcon className="mr-1 h-3 w-3" /> {sb("delete")}
                 </Button>
                 <Button
                   type="button"
@@ -658,7 +628,7 @@ function StageCard({
                   ) : (
                     <SaveIcon className="mr-1 h-3 w-3" />
                   )}
-                  Save stage
+                  {sb("saveStage")}
                 </Button>
               </div>
             )}
@@ -683,12 +653,13 @@ function AddStageCard({
   onCancel: () => void;
 }) {
   const [draft, setDraft] = useState<StageDraft>(emptyDraft);
+  const sb = useTranslations("workflowStageBuilder");
   return (
     <Card className="border-dashed">
       <CardContent className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <PlusIcon className="text-muted-foreground h-4 w-4" />
-          <span className="text-sm font-medium">New stage</span>
+          <span className="text-sm font-medium">{sb("newStage")}</span>
         </div>
         <Separator />
         <StageEditorFields
@@ -699,7 +670,7 @@ function AddStageCard({
         />
         <div className="flex items-center justify-end gap-2">
           <Button type="button" variant="ghost" size="sm" disabled={creating} onClick={onCancel}>
-            Cancel
+            {sb("cancel")}
           </Button>
           <Button type="button" size="sm" disabled={creating} onClick={() => onCreate(draft)}>
             {creating ? (
@@ -707,7 +678,7 @@ function AddStageCard({
             ) : (
               <PlusIcon className="mr-1 h-3 w-3" />
             )}
-            Add stage
+            {sb("addStage")}
           </Button>
         </div>
       </CardContent>
@@ -732,6 +703,7 @@ function CodeView({
   const [validating, setValidating] = useState(false);
   const [importing, setImporting] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const sb = useTranslations("workflowStageBuilder");
 
   const { load, exported } = manifest;
 
@@ -786,8 +758,8 @@ function CodeView({
 
   return (
     <Section
-      title="Manifest (TOML)"
-      description="The canonical, versionable form of this definition."
+      title={sb("manifestTitle")}
+      description={sb("manifestDescription")}
       action={
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -802,7 +774,7 @@ function CodeView({
             ) : (
               <CheckCircle2Icon className="mr-1 h-3.5 w-3.5" />
             )}
-            Validate
+            {sb("validate")}
           </Button>
           <Button
             type="button"
@@ -811,7 +783,7 @@ function CodeView({
             disabled={!ready}
             onClick={handleDownload}
           >
-            <FileDownIcon className="mr-1 h-3.5 w-3.5" /> Export .toml
+            <FileDownIcon className="mr-1 h-3.5 w-3.5" /> {sb("exportToml")}
           </Button>
           <Button
             type="button"
@@ -819,21 +791,21 @@ function CodeView({
             size="sm"
             onClick={() => fileRef.current?.click()}
           >
-            <FileUpIcon className="mr-1 h-3.5 w-3.5" /> Upload .toml
+            <FileUpIcon className="mr-1 h-3.5 w-3.5" /> {sb("uploadToml")}
           </Button>
           <Button
             type="button"
             size="sm"
             disabled={!canCreate || importing || !ready}
             onClick={handleImportAsNew}
-            title={canCreate ? undefined : "You don't have create access"}
+            title={canCreate ? undefined : sb("noCreateAccess")}
           >
             {importing ? (
               <Loader2Icon className="mr-1 h-3.5 w-3.5 animate-spin" />
             ) : (
               <CopyIcon className="mr-1 h-3.5 w-3.5" />
             )}
-            Import as new
+            {sb("importAsNew")}
           </Button>
           <input
             ref={fileRef}
@@ -856,7 +828,7 @@ function CodeView({
       ) : exportFailed ? (
         <div className="border-danger/40 bg-danger/10 flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
           <AlertTriangleIcon className="text-danger-fg mt-0.5 h-4 w-4 shrink-0" />
-          <p>{exported?.error ?? manifest.error ?? "Failed to export the manifest."}</p>
+          <p>{exported?.error ?? manifest.error ?? sb("exportFailed")}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -868,23 +840,32 @@ function CodeView({
             }}
             spellCheck={false}
             className="min-h-96 font-mono text-xs"
-            aria-label="Workflow manifest TOML"
+            aria-label={sb("manifestAria")}
           />
           {preview && !preview.ok && (
             <div className="border-danger/40 bg-danger/10 flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
               <AlertTriangleIcon className="text-danger-fg mt-0.5 h-4 w-4 shrink-0" />
               <div className="min-w-0">
-                <p className="font-medium">Invalid manifest</p>
+                <p className="font-medium">{sb("invalidManifest")}</p>
                 <p className="text-muted-foreground text-xs">
                   {preview.error}
                   {preview.errorLine != null && (
                     <span>
                       {" "}
-                      (line {preview.errorLine}
-                      {preview.errorColumn != null ? `, col ${preview.errorColumn}` : ""})
+                      {preview.errorColumn != null
+                        ? sb("errorAtLineColumn", {
+                            line: preview.errorLine,
+                            column: preview.errorColumn,
+                          })
+                        : sb("errorAtLine", { line: preview.errorLine })}
                     </span>
                   )}
-                  {preview.errorPath && <span className="font-mono"> at {preview.errorPath}</span>}
+                  {preview.errorPath && (
+                    <span className="font-mono">
+                      {" "}
+                      {sb("errorAtPath", { path: preview.errorPath })}
+                    </span>
+                  )}
                 </p>
               </div>
             </div>
@@ -893,18 +874,16 @@ function CodeView({
             <div className="border-success/40 bg-success/10 flex items-start gap-2 rounded-md border px-3 py-2 text-sm">
               <CheckCircle2Icon className="text-success-fg mt-0.5 h-4 w-4 shrink-0" />
               <p>
-                Valid: <span className="font-medium">{preview.definition.name}</span> (
-                {preview.definition.pattern}), {preview.stages.length} stage
-                {preview.stages.length === 1 ? "" : "s"}.
+                {sb.rich("valid", {
+                  name: preview.definition.name,
+                  pattern: preview.definition.pattern,
+                  count: preview.stages.length,
+                  strong: (chunks) => <span className="font-medium">{chunks}</span>,
+                })}
               </p>
             </div>
           )}
-          <p className="text-muted-foreground text-xs">
-            Applying code edits to this definition in place isn&apos;t supported yet: TOML stages
-            carry no stable identity, so edits can&apos;t be mapped safely onto existing stages.
-            Export, edit, and use &quot;Import as new&quot; to create a definition from the edited
-            manifest.
-          </p>
+          <p className="text-muted-foreground text-xs">{sb("inPlaceUnsupported")}</p>
         </div>
       )}
     </Section>
@@ -917,11 +896,10 @@ type BuilderView = "stages" | "code";
 
 const VIEW_OPTIONS: {
   value: BuilderView;
-  label: string;
   icon: React.ComponentType<{ className?: string }>;
 }[] = [
-  { value: "stages", label: "Stages", icon: ListIcon },
-  { value: "code", label: "Code", icon: CodeIcon },
+  { value: "stages", icon: ListIcon },
+  { value: "code", icon: CodeIcon },
 ];
 
 export type StageBuilderProps = ReturnType<typeof useStageBuilder>;
@@ -946,6 +924,7 @@ export function StageBuilder({
   manifest,
   pickerOptions,
 }: StageBuilderProps) {
+  const sb = useTranslations("workflowStageBuilder");
   const [view, setView] = useState<BuilderView>("stages");
   // One open card at a time keeps the tab within about two screens.
   const [openGuid, setOpenGuid] = useState<string | null>(null);
@@ -987,13 +966,13 @@ export function StageBuilder({
 
   if (!definition) {
     return (
-      <PageShell title="Workflow definition not found">
+      <PageShell title={sb("notFoundPageTitle")}>
         <EmptyState
           icon={<WorkflowIcon className="size-5" />}
-          title="Definition not found"
-          description={`The workflow definition "${slug}" may have been deleted, or you may not have access to it.`}
+          title={sb("notFoundTitle")}
+          description={sb("notFoundDescription", { slug })}
           actionHref="/workflows"
-          actionLabel="Back to workflows"
+          actionLabel={sb("backToWorkflows")}
         />
       </PageShell>
     );
@@ -1003,9 +982,9 @@ export function StageBuilder({
     <StageTargetsContext.Provider value={sorted}>
       <PickerOptionsContext.Provider value={pickerOptions}>
         <PageShell
-          title={`Builder · ${definition.name}`}
+          title={sb("pageTitle", { name: definition.name })}
           description={
-            definition.description || `Ordered stage pipeline (${definition.patternKind}).`
+            definition.description || sb("pageDescription", { pattern: definition.patternKind })
           }
           actions={
             <div className="flex items-center gap-1 rounded-md border p-0.5">
@@ -1021,7 +1000,7 @@ export function StageBuilder({
                     onClick={() => setView(opt.value)}
                   >
                     <OptIcon className="mr-1 h-3.5 w-3.5" />
-                    {opt.label}
+                    {sb(`views.${opt.value}`)}
                   </Button>
                 );
               })}
@@ -1033,8 +1012,9 @@ export function StageBuilder({
               <div className="flex items-center gap-2 text-sm">
                 <LockIcon className="text-info-fg h-4 w-4 shrink-0" />
                 <span>
-                  <span className="font-medium">Platform template</span>, read-only. Clone it to
-                  create an editable copy in your organization.
+                  {sb.rich("platformTemplate", {
+                    strong: (chunks) => <span className="font-medium">{chunks}</span>,
+                  })}
                 </span>
               </div>
               <Button
@@ -1042,14 +1022,14 @@ export function StageBuilder({
                 size="sm"
                 disabled={!canCreate || cloning}
                 onClick={handleClone}
-                title={canCreate ? undefined : "You don't have create access"}
+                title={canCreate ? undefined : sb("noCreateAccess")}
               >
                 {cloning ? (
                   <Loader2Icon className="mr-1 h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <CopyIcon className="mr-1 h-3.5 w-3.5" />
                 )}
-                Clone to edit
+                {sb("cloneToEdit")}
               </Button>
             </div>
           )}
@@ -1058,13 +1038,13 @@ export function StageBuilder({
             <div className="border-info/40 bg-info/10 flex items-center gap-2 rounded-md border px-4 py-3 text-sm">
               <LockIcon className="text-info-fg h-4 w-4 shrink-0" />
               <span>
-                <span className="font-medium">Repository managed</span>: edit{" "}
-                <code>
-                  {definition.sourceRepo}/{definition.sourcePath}
-                </code>{" "}
-                and sync the agent repository.
+                {sb.rich("repositoryManaged", {
+                  path: `${definition.sourceRepo}/${definition.sourcePath}`,
+                  strong: (chunks) => <span className="font-medium">{chunks}</span>,
+                  code: (chunks) => <code>{chunks}</code>,
+                })}
                 {definition.sourceRef
-                  ? ` Last reconciled at ${definition.sourceRef.slice(0, 12)}.`
+                  ? ` ${sb("lastReconciled", { ref: definition.sourceRef.slice(0, 12) })}`
                   : ""}
               </span>
             </div>
@@ -1074,12 +1054,12 @@ export function StageBuilder({
             <CodeView slug={slug} canCreate={canCreate} manifest={manifest} />
           ) : (
             <Section
-              title="Stages"
-              description="An ordered pipeline: stages run in sequence; fan-out runs parallel copies merged by a later aggregation stage."
+              title={sb("stagesTitle")}
+              description={sb("stagesDescription")}
               action={
                 !readOnly && !adding ? (
                   <Button type="button" variant="outline" size="sm" onClick={() => setAdding(true)}>
-                    <PlusIcon className="mr-1 h-3.5 w-3.5" /> Add stage
+                    <PlusIcon className="mr-1 h-3.5 w-3.5" /> {sb("addStage")}
                   </Button>
                 ) : undefined
               }
@@ -1091,16 +1071,12 @@ export function StageBuilder({
               ) : sorted.length === 0 && !adding ? (
                 <EmptyState
                   icon={<WorkflowIcon className="size-5" />}
-                  title="No stages yet"
-                  description={
-                    readOnly
-                      ? "This definition has no stages."
-                      : "Add stages to define what this workflow does."
-                  }
+                  title={sb("emptyTitle")}
+                  description={readOnly ? sb("emptyReadOnly") : sb("emptyEditable")}
                   secondary={
                     !readOnly ? (
                       <Button size="sm" onClick={() => setAdding(true)}>
-                        <PlusIcon className="mr-1 h-3.5 w-3.5" /> Add first stage
+                        <PlusIcon className="mr-1 h-3.5 w-3.5" /> {sb("addFirstStage")}
                       </Button>
                     ) : undefined
                   }
@@ -1110,13 +1086,13 @@ export function StageBuilder({
                   {line && (
                     <WorkflowView
                       snapshot={definitionSnapshot(line)}
-                      title="Shape"
-                      description={`${lineShape(line)}. Pick a station to open its stage.`}
+                      title={sb("shapeTitle")}
+                      description={sb("shapeDescription", { shape: lineShape(line) })}
                       onSelectStation={(_, stationId) => setOpenGuid(stationId)}
                       className="min-w-0 self-start xl:sticky xl:top-4"
                     />
                   )}
-                  <ol className="flex min-w-0 flex-col gap-3" aria-label="Stages">
+                  <ol className="flex min-w-0 flex-col gap-3" aria-label={sb("stagesTitle")}>
                     {sorted.map((stage, index) => (
                       <li key={stage.guid} className="min-w-0">
                         <StageCard

@@ -36,6 +36,7 @@ export function ManifestCardView({
   defaultMode = "manifest",
 }: ManifestCardViewProps) {
   const t = useTranslations("apps.workloadDetail");
+  const tm = useTranslations("appManifestCard");
   const labels: ManifestCardLabels = {
     title: t("manifest.title"),
     description: t("manifest.description"),
@@ -95,22 +96,21 @@ export function ManifestCardView({
     >
       <div className="mb-3 flex min-w-0 flex-wrap items-center gap-2 text-xs">
         <Badge variant="secondary" className="max-w-full min-w-0">
-          env <span className="ml-1 truncate font-mono">{manifest.environmentName}</span>
+          {tm("env")} <span className="ml-1 truncate font-mono">{manifest.environmentName}</span>
         </Badge>
         <Badge variant="secondary" className="max-w-full min-w-0">
-          ns <span className="ml-1 truncate font-mono">{manifest.namespace}</span>
+          {tm("namespace")} <span className="ml-1 truncate font-mono">{manifest.namespace}</span>
         </Badge>
         <Badge variant="secondary" className="max-w-full min-w-0">
-          image <span className="ml-1 truncate font-mono">{manifest.imageTag}</span>
+          {tm("image")} <span className="ml-1 truncate font-mono">{manifest.imageTag}</span>
         </Badge>
         {hasPrior && mode === "diff" && (
           <Badge variant="outline" className="max-w-full min-w-0 font-mono">
-            <span className="truncate">prev: {manifest.previousImageTag}</span>
+            <span className="truncate">{tm("previous", { tag: manifest.previousImageTag })}</span>
           </Badge>
         )}
         <Badge variant="outline" className="font-mono">
-          {manifest.resources.length} resource
-          {manifest.resources.length === 1 ? "" : "s"}
+          {tm("resources", { count: manifest.resources.length })}
         </Badge>
       </div>
       <div className="min-w-0">
@@ -239,6 +239,8 @@ function ManifestError({
   errorColumn: number | null;
   label: string;
 }) {
+  const tm = useTranslations("appManifestCard");
+  const mono = (chunks: React.ReactNode) => <span className="font-mono">{chunks}</span>;
   return (
     <div className="space-y-2">
       <div className="text-destructive flex items-center gap-2 text-sm font-medium">
@@ -248,16 +250,11 @@ function ManifestError({
       <pre className="bg-muted overflow-auto rounded-md p-3 text-xs">{error}</pre>
       {errorPath && (
         <p className="text-muted-foreground text-xs">
-          path: <span className="font-mono">{errorPath}</span>
+          {tm.rich("errorPath", { path: errorPath, mono })}
           {errorLine && (
             <>
-              {" "}
-              — line <span className="font-mono">{errorLine}</span>
-              {errorColumn && (
-                <>
-                  , col <span className="font-mono">{errorColumn}</span>
-                </>
-              )}
+              {tm.rich("errorLine", { line: errorLine, mono })}
+              {errorColumn && <>{tm.rich("errorColumn", { column: errorColumn, mono })}</>}
             </>
           )}
         </p>

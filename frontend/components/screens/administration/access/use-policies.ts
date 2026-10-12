@@ -1,6 +1,8 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
+import * as React from "react";
 import { toast } from "sonner";
 
 import type { CursorPage } from "@/components/data-table";
@@ -10,6 +12,7 @@ import { LIST_POLICIES, LIST_POLICIES_PAGE } from "@/graphql/identity/identity.q
 import type { AstroliftPolicy, MutationResult } from "@/graphql/identity/identity.types";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
+import { localizeList } from "../localize-list";
 import { POLICIES_LIST, policiesFilter } from "./policies-list";
 import { useNumberedListQuery } from "./use-list-page-query";
 
@@ -19,8 +22,14 @@ interface PoliciesPageResp {
 
 /** The data half of PoliciesScreen: the policy list (URL state) and soft-delete. */
 export function usePolicies() {
+  const t = useTranslations("adminPolicies");
+  const lists = useTranslations("adminPolicies.list");
   const perms = useMyPermissions();
-  const list = useListState(POLICIES_LIST);
+  const definition = React.useMemo(
+    () => localizeList(POLICIES_LIST, lists, ["effect", "scope"]),
+    [lists]
+  );
+  const list = useListState(definition);
   const page = useNumberedListQuery<AstroliftPolicy, ReturnType<typeof policiesFilter>>(
     LIST_POLICIES_PAGE,
     list,
@@ -42,9 +51,9 @@ export function usePolicies() {
   async function deletePolicy(p: AstroliftPolicy) {
     const { data } = await softDelete({ variables: { input: { id: p.id } } });
     if (data?.softDeletePolicy.ok) {
-      toast.success(`Deleted ${p.slug}`);
+      toast.success(t("deleted", { slug: p.slug }));
     } else {
-      throw new Error(data?.softDeletePolicy.errors?.[0]?.message ?? "Delete failed");
+      throw new Error(data?.softDeletePolicy.errors?.[0]?.message ?? t("deleteFailed"));
     }
   }
 

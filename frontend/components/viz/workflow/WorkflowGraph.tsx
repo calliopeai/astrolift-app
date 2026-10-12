@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -60,38 +61,22 @@ import {
  */
 
 export const WORKFLOW_GRAPH_LEGEND: LegendItem[] = [
-  { glyph: "flow", color: HEALTH_COLOR.ok, label: "Runs flowing, faster when busier" },
-  { glyph: "flow", color: HEALTH_COLOR.degraded, label: "Backed up (more than 3 queued)" },
-  { glyph: "signal", color: HEALTH_COLOR.degraded, label: "Gate waiting on approval" },
-  { glyph: "signal", color: HEALTH_COLOR.ok, label: "Gate approved" },
-  { glyph: "signal", color: HEALTH_COLOR.failing, label: "Gate denied or rejected" },
-  { glyph: "glow", color: HEALTH_COLOR.ok, label: "Runs at a stage" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Failed run" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Idle or finished" },
-  {
-    ...WORKFLOW_SHAPE_LEGEND.returnTrack,
-    label:
-      "Return track: a loop back to an earlier stage, with its round bound; flows while a run is sent back",
-  },
+  { glyph: "flow", color: HEALTH_COLOR.ok, labelKey: "grFlowing" },
+  { glyph: "flow", color: HEALTH_COLOR.degraded, labelKey: "grBackedUp" },
+  { glyph: "signal", color: HEALTH_COLOR.degraded, labelKey: "grGateWaiting" },
+  { glyph: "signal", color: HEALTH_COLOR.ok, labelKey: "grGateApproved" },
+  { glyph: "signal", color: HEALTH_COLOR.failing, labelKey: "grGateDenied" },
+  { glyph: "glow", color: HEALTH_COLOR.ok, labelKey: "grRunsAtStage" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "grFailedRun" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "grIdle" },
+  { ...WORKFLOW_SHAPE_LEGEND.returnTrack, labelKey: "grReturnTrack" },
   WORKFLOW_SHAPE_LEGEND.siding,
   WORKFLOW_SHAPE_LEGEND.roundBadge,
   WORKFLOW_SHAPE_LEGEND.roundNearBound,
-  {
-    glyph: "bar",
-    color: HEALTH_COLOR.ok,
-    label:
-      "Fan-out box: one row per branch; a running branch's feed flows, a settled one flashes once",
-  },
+  { glyph: "bar", color: HEALTH_COLOR.ok, labelKey: "grFanoutBox" },
   WORKFLOW_SHAPE_LEGEND.join,
-  {
-    ...WORKFLOW_SHAPE_LEGEND.supervisorSwarm,
-    label:
-      "Supervisor satellites: its workers, lit and circling while busy, faster under more load",
-  },
-  {
-    ...WORKFLOW_SHAPE_LEGEND.nestedStack,
-    label: "Nested group: a stage that runs a child workflow; collapse it to a stack",
-  },
+  { ...WORKFLOW_SHAPE_LEGEND.supervisorSwarm, labelKey: "grSatellites" },
+  { ...WORKFLOW_SHAPE_LEGEND.nestedStack, labelKey: "grNestedGroup" },
 ];
 
 const GATE_HEALTH: Record<GateState, Health> = {
@@ -162,6 +147,7 @@ function Particle({
 }
 
 function Edge({ edge, particles }: { edge: GraphEdge; particles: boolean }) {
+  const vt = useTranslations("vizRender");
   const color = HEALTH_COLOR[edge.health];
   const width = edge.backedUp ? 3.5 : 1.5;
   const n = edge.flowing ? 1 + Math.round(edge.rate * 2) : 0;
@@ -215,7 +201,7 @@ function Edge({ edge, particles }: { edge: GraphEdge; particles: boolean }) {
           className="font-mono"
           fill={edge.backedUp ? color : "var(--muted-foreground)"}
         >
-          {edge.backlog} queued
+          {vt("counts.queued", { count: edge.backlog })}
         </text>
       )}
     </g>
@@ -445,6 +431,7 @@ function FanoutNode({
   box: FanoutBox;
   justSettled: ReadonlySet<string>;
 }) {
+  const vt = useTranslations("vizRender");
   const color = HEALTH_COLOR[node.health];
   const header = node.health === "idle" ? "var(--card)" : tint(color, 14);
   const rows = box.branches;
@@ -519,7 +506,12 @@ function FanoutNode({
         const settled = b.state === "succeeded" || b.state === "failed";
         return (
           <g key={b.id}>
-            <title>{`${b.label}: ${b.state}`}</title>
+            <title>
+              {vt("transit.branchTitle", {
+                label: b.label,
+                state: vt(`transit.branchState.${b.state}`),
+              })}
+            </title>
             <line
               x1={spineL}
               x2={b.x}
@@ -587,7 +579,7 @@ function FanoutNode({
           className="font-mono"
           fill="var(--muted-foreground)"
         >
-          +{box.more} more
+          {vt("graphView.more", { count: box.more })}
         </text>
       )}
       {!rows.length && !box.more && (
@@ -599,7 +591,7 @@ function FanoutNode({
           className="font-mono"
           fill="var(--muted-foreground)"
         >
-          {box.dynamic ? "branches per run" : "no branches"}
+          {box.dynamic ? vt("graphView.branchesPerRun") : vt("graphView.noBranches")}
         </text>
       )}
     </>
@@ -718,8 +710,8 @@ function NestedFrame({
   group: NestedGroup;
   onToggle: (stationId: string) => void;
 }) {
+  const vt = useTranslations("vizRender");
   const toggle = () => onToggle(group.stationId);
-  const verb = group.expanded ? "Collapse" : "Expand";
   const { x, y } = group.toggle;
   return (
     <>
@@ -750,7 +742,10 @@ function NestedFrame({
             className="font-mono"
             fill="var(--muted-foreground)"
           >
-            {truncate(`${group.childName}, child workflow`, Math.floor((group.w - 16) / 5.4))}
+            {truncate(
+              vt("graphView.childWorkflow", { name: group.childName }),
+              Math.floor((group.w - 16) / 5.4)
+            )}
           </text>
         </g>
       )}
@@ -758,12 +753,18 @@ function NestedFrame({
         role="button"
         tabIndex={0}
         aria-expanded={group.expanded}
-        aria-label={`${verb} the ${group.childName} child workflow`}
+        aria-label={vt(group.expanded ? "graphView.collapseLabel" : "graphView.expandLabel", {
+          name: group.childName,
+        })}
         className={FOCUS}
         onClick={toggle}
         onKeyDown={onActivate(toggle)}
       >
-        <title>{`${verb} ${group.childName}`}</title>
+        <title>
+          {vt(group.expanded ? "graphView.collapse" : "graphView.expand", {
+            name: group.childName,
+          })}
+        </title>
         <rect
           x={x - 8}
           y={y - 8}
@@ -1025,10 +1026,11 @@ export function WorkflowGraph({
   onSelectStation,
   className,
 }: WorkflowViewProps) {
+  const vt = useTranslations("vizRender");
   const [collapsed, setCollapsed] = React.useState<ReadonlySet<string>>(() => new Set());
   const layout = React.useMemo(
-    () => layoutWorkflowGraph(snapshot, { collapsed }),
-    [snapshot, collapsed]
+    () => layoutWorkflowGraph(snapshot, vt, { collapsed }),
+    [snapshot, vt, collapsed]
   );
   // The previous snapshot, kept the way React recommends, to flash a branch once as it settles.
   const [seen, setSeen] = React.useState<{
@@ -1066,7 +1068,7 @@ export function WorkflowGraph({
   return (
     <div
       role="group"
-      aria-label={describeWorkflowGraph(snapshot)}
+      aria-label={describeWorkflowGraph(snapshot, vt)}
       data-motion={motion}
       className={cn("h-full w-full overflow-hidden", className)}
     >

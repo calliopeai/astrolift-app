@@ -1,5 +1,6 @@
 import { iso, type Point } from "../core/iso";
-import { HEALTH_LABEL, type Health } from "../core/semantics";
+import { type Health } from "../core/semantics";
+import type { VizT } from "../core/viz-t";
 import type {
   BranchState,
   SupervisorWorker,
@@ -511,112 +512,132 @@ export function placeBranches(snapshot: WorkflowSnapshot): Map<string, PelletPos
 
 /* ---------- Accessible names ---------- */
 
-const KIND_WORD: Record<WorkflowStation["kind"], string> = {
-  stage: "",
-  gate: " gate",
-  fanout: " fan-out",
-  join: " join",
-  supervisor: " supervisor",
-  workflow: " child workflow",
-};
-
-function plural(n: number, one: string, many = `${one}s`): string {
-  return `${n} ${n === 1 ? one : many}`;
-}
-
 /** What a station is doing, in words. */
-export function stationState(snapshot: WorkflowSnapshot, line: WorkflowLine, j: number): string {
+export function stationState(
+  snapshot: WorkflowSnapshot,
+  line: WorkflowLine,
+  j: number,
+  vt: VizT
+): string {
   const st = line.stations[j];
   const health = stationHealth(snapshot, line, j);
   if (st.kind === "gate") {
-    if (health === "failing") return "a run failed here";
-    return health === "degraded" ? "holding runs" : "open";
+    if (health === "failing") return vt("station.gateFailed");
+    return health === "degraded" ? vt("station.holding") : vt("station.open");
   }
   if (st.kind === "fanout") {
     const r = joinReady(st);
     const waiting = snapshot.trains.filter(
       (t) => t.lineId === line.id && t.at === j && t.state === "held"
     ).length;
-    const queue = waiting ? `, ${plural(waiting, "run")} waiting` : "";
+    const queue = waiting ? vt("station.runsWaiting", { count: waiting }) : "";
     if (!st.runId)
       return r.total
-        ? `idle, last run had ${plural(r.total, "branch", "branches")}${queue}`
-        : `idle${queue}`;
-    return `${plural(r.total, "branch", "branches")}, ${r.settled} settled, ${r.pending} running${
-      r.failed ? `, ${r.failed} failed` : ""
-    }${queue}`;
+        ? vt("station.idleLastRun", { count: r.total }) + queue
+        : vt("healthInline.idle") + queue;
+    return (
+      vt("station.branches", { count: r.total, settled: r.settled, running: r.pending }) +
+      (r.failed ? vt("station.branchesFailed", { count: r.failed }) : "") +
+      queue
+    );
   }
   if (st.kind === "join") {
     const fan = line.stations[st.waitsOn];
     if (fan?.kind === "fanout" && fan.runId) {
       const r = joinReady(fan);
-      return `waiting on ${r.pending} of ${plural(r.total, "branch", "branches")}`;
+      return vt("station.waitingOn", { pending: r.pending, count: r.total });
     }
-    return HEALTH_LABEL[health].toLowerCase();
+    return vt(`healthInline.${health}`);
   }
   if (st.kind === "supervisor") {
     const busy = st.workers.filter((w) => w.busy).length;
-    return `${busy} of ${plural(st.workers.length, "worker")} busy`;
+    return vt("station.workersBusy", { busy, count: st.workers.length });
   }
   if (st.kind === "workflow") {
     const child = childLineOf(snapshot, st);
     const parent = snapshot.trains.find((t) => t.lineId === line.id && t.at === j && t.childRunId);
     const run = parent && snapshot.trains.find((t) => t.id === parent.childRunId);
-    if (health === "failing") return "a child run failed";
-    if (!run || !child) return "idle";
+    if (health === "failing") return vt("station.childFailed");
+    if (!run || !child) return vt("healthInline.idle");
     return run.state === "done"
-      ? "child run finished"
-      : `child run at ${child.stations[run.at]?.name ?? "a stage"}, stage ${run.at + 1} of ${child.stations.length}`;
+      ? vt("station.childFinished")
+      : vt("station.childAt", {
+          stage: child.stations[run.at]?.name ?? vt("station.aStage"),
+          n: run.at + 1,
+          total: child.stations.length,
+        });
   }
-  return HEALTH_LABEL[health].toLowerCase();
+  return vt(`healthInline.${health}`);
 }
 
 /** A station's accessible name: what it is, its state, and every loop leaving it with its bound. */
-export function stationName(snapshot: WorkflowSnapshot, line: WorkflowLine, j: number): string {
+export function stationName(
+  snapshot: WorkflowSnapshot,
+  line: WorkflowLine,
+  j: number,
+  vt: VizT
+): string {
   const st = line.stations[j];
-  const loops = loopsAt(line, j).map((l) => loopLabel(line, l));
-  return `${line.name}, ${st.name}${KIND_WORD[st.kind]}: ${stationState(snapshot, line, j)}${
-    loops.length ? `. ${loops.join(". ")}` : ""
-  }`;
+  const loops = loopsAt(line, j).map((l) => loopLabel(line, l, vt));
+  return vt("station.name", {
+    line: line.name,
+    station: vt(`station.kind.${st.kind}`, { name: st.name }),
+    state: stationState(snapshot, line, j, vt),
+    loops: loops.length ? `. ${loops.join(". ")}` : "",
+  });
 }
 
-function runState(snapshot: WorkflowSnapshot, line: WorkflowLine, t: WorkflowTrain): string {
+function runState(
+  snapshot: WorkflowSnapshot,
+  line: WorkflowLine,
+  t: WorkflowTrain,
+  vt: VizT
+): string {
   const st = line.stations[t.at];
   if (t.onLoopId) {
     const loop = line.loops?.find((l) => l.id === t.onLoopId);
-    if (loop?.kind === "retry") return `retrying ${st?.name ?? "the stage"}`;
-    return `sent back to ${line.stations[loop?.to ?? 0]?.name ?? "an earlier stage"}`;
+    if (loop?.kind === "retry")
+      return vt("run.retrying", { stage: st?.name ?? vt("run.theStage") });
+    return vt("run.sentBackTo", {
+      stage: line.stations[loop?.to ?? 0]?.name ?? vt("run.anEarlierStage"),
+    });
   }
-  if (t.state === "held")
-    return st?.kind === "fanout" ? "waiting for the fan-out to free up" : "held";
-  if (t.state === "failed") return "failed";
-  if (t.state === "done") return "finished";
+  if (t.state === "held") return st?.kind === "fanout" ? vt("run.waitingFanout") : vt("run.held");
+  if (t.state === "failed") return vt("run.failed");
+  if (t.state === "done") return vt("run.finished");
   if (st?.kind === "fanout" && st.runId === t.id) {
     const r = joinReady(st);
-    return `waiting on branches, ${r.settled} of ${r.total} settled`;
+    return vt("run.waitingBranches", { settled: r.settled, total: r.total });
   }
   if (st?.kind === "supervisor" && t.subtasks)
-    return `sub-tasks ${t.subtasks.done} of ${t.subtasks.total} done`;
+    return vt("run.subtasks", { done: t.subtasks.done, total: t.subtasks.total });
   if (st?.kind === "workflow" && t.childRunId) {
     const child = snapshot.trains.find((c) => c.id === t.childRunId);
     const childLine = childLineOf(snapshot, st);
     if (child && childLine)
-      return `child run at ${childLine.stations[child.at]?.name ?? "a stage"}`;
+      return vt("run.childAt", {
+        stage: childLine.stations[child.at]?.name ?? vt("station.aStage"),
+      });
   }
-  return "moving";
+  return vt("run.moving");
 }
 
 /** A run's accessible name: "Run #1207: Test, round 3 of 5, failed". */
-export function runName(snapshot: WorkflowSnapshot, line: WorkflowLine, t: WorkflowTrain): string {
+export function runName(
+  snapshot: WorkflowSnapshot,
+  line: WorkflowLine,
+  t: WorkflowTrain,
+  vt: VizT
+): string {
   const parts: string[] = [];
   const where = t.state === "done" ? undefined : line.stations[t.at]?.name;
   if (where) parts.push(where);
   const loop = runLoop(line, t);
-  if (loop && (loopRound(t, loop) > 1 || t.onLoopId)) parts.push(roundLabel(t, loop));
-  else if ((t.round ?? 1) > 1) parts.push(`round ${t.round}`);
-  if (t.parentRunId) parts.push("child run");
-  parts.push(runState(snapshot, line, t));
-  return `Run ${t.label}: ${parts.join(", ")}`;
+  if (loop && (loopRound(t, loop) > 1 || t.onLoopId)) parts.push(roundLabel(t, loop, vt));
+  else if ((t.round ?? 1) > 1) parts.push(vt("run.round", { n: t.round ?? 1 }));
+  if (t.parentRunId) parts.push(vt("run.childRun"));
+  parts.push(runState(snapshot, line, t, vt));
+  return vt("run.name", { label: t.label, parts: parts.join(vt("listSeparator")) });
 }
 
 /* ---------- Frame ---------- */
@@ -705,22 +726,21 @@ export function unionViewBox(a: ViewBox, b: ViewBox): ViewBox {
 }
 
 /** The sentence the picture says, for its aria-label. */
-export function summarize(snapshot: WorkflowSnapshot): string {
+export function summarize(snapshot: WorkflowSnapshot, vt: VizT): string {
   const count = (s: TrainState) =>
     snapshot.trains.filter((t) => t.state === s && !t.onLoopId).length;
   const lines = laneLines(snapshot).length;
   const parts = [
-    `${lines} workflow${lines === 1 ? "" : "s"}`,
-    `${snapshot.trains.length} ${snapshot.trains.length === 1 ? "run" : "runs"}`,
-    `${count("moving")} moving`,
-    `${count("held")} held at gates`,
-    `${count("failed")} failed`,
+    vt("frame.workflowsDescription", { workflows: lines, runs: snapshot.trains.length }),
+    vt("trains.moving", { count: count("moving") }),
+    vt("trains.heldAtGates", { count: count("held") }),
+    vt("trains.failed", { count: count("failed") }),
   ];
   const back = snapshot.trains.filter((t) => t.onLoopId).length;
-  if (back > 0) parts.push(`${back} sent back on a loop`);
+  if (back > 0) parts.push(vt("trains.sentBackOnLoop", { count: back }));
   const backedUp = snapshot.segments.filter((s) => s.backlog >= BACKLOG_WARN).length;
-  if (backedUp > 0) parts.push(`${backedUp} backed up`);
-  return parts.join(", ");
+  if (backedUp > 0) parts.push(vt("trains.backedUp", { count: backedUp }));
+  return parts.join(vt("listSeparator"));
 }
 
 /** Cut a name to `max` characters with an ellipsis; the full name goes in a <title>. */

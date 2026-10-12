@@ -1,17 +1,12 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
 import { EVENT_WINDOW_MS, type FleetViewProps } from "../core/fleet-model";
-import {
-  HEALTH_COLOR,
-  HEALTH_GLOWS,
-  HEALTH_LABEL,
-  MOTION_CLASS,
-  type Health,
-} from "../core/semantics";
+import { HEALTH_COLOR, HEALTH_GLOWS, MOTION_CLASS, type Health } from "../core/semantics";
 import type { LegendItem } from "../core/VizLegend";
 
 import {
@@ -40,13 +35,13 @@ import {
  */
 
 export const FLEET_ORBIT_LEGEND: LegendItem[] = [
-  { glyph: "glow", color: HEALTH_COLOR.ok, label: "Healthy; orbit speed is load" },
-  { glyph: "glow", color: HEALTH_COLOR.degraded, label: "Degraded, over 85% load" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Failing, sunk to a low orbit" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Idle, parked" },
-  { glyph: "spark", color: HEALTH_COLOR.ok, label: "Run started (launch)" },
-  { glyph: "ring", color: HEALTH_COLOR.degraded, label: "Cluster degraded" },
-  { glyph: "ring", color: HEALTH_COLOR.failing, label: "Cluster offline" },
+  { glyph: "glow", color: HEALTH_COLOR.ok, labelKey: "orbitHealthy" },
+  { glyph: "glow", color: HEALTH_COLOR.degraded, labelKey: "orbitDegraded" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "orbitFailing" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "orbitIdle" },
+  { glyph: "spark", color: HEALTH_COLOR.ok, labelKey: "orbitLaunch" },
+  { glyph: "ring", color: HEALTH_COLOR.degraded, labelKey: "clusterDegraded" },
+  { glyph: "ring", color: HEALTH_COLOR.failing, labelKey: "clusterOffline" },
 ];
 
 /** Viewport width each planet column wants before another column fits. */
@@ -124,6 +119,7 @@ function Defs({ uid }: { uid: string }) {
 }
 
 function Planet({ planet, uid }: { planet: OrbitPlanet; uid: string }) {
+  const t = useTranslations("vizRender");
   const { cluster, cx, cy } = planet;
   const offline = cluster.health === "offline";
   const lit = !offline && planet.meanLoad > 0.02;
@@ -192,11 +188,14 @@ function Planet({ planet, uid }: { planet: OrbitPlanet; uid: string }) {
         className="fill-muted-foreground font-mono"
         fontSize={10}
       >
-        {planet.agents} agents · {planet.busy} busy
+        {t("orbit.planet", { agents: planet.agents, busy: planet.busy })}
         {planet.failing > 0 && (
-          <tspan style={{ fill: HEALTH_COLOR.failing }}> · {planet.failing} failing</tspan>
+          <tspan style={{ fill: HEALTH_COLOR.failing }}>
+            {" · "}
+            {t("counts.failing", { count: planet.failing })}
+          </tspan>
         )}
-        {planet.queued > 0 && ` · ${planet.queued} queued`}
+        {planet.queued > 0 && ` · ${t("counts.queued", { count: planet.queued })}`}
       </text>
     </g>
   );
@@ -217,7 +216,14 @@ function Satellite({ sat, uid, motion, selected, onSelect, register }: Satellite
   const color = HEALTH_COLOR[sat.health];
   const failing = sat.health === "failing";
   const core = 2.6 + sat.load * 1.6;
-  const label = `${sat.name}: ${HEALTH_LABEL[sat.health]}, ${Math.round(sat.load * 100)}% load, ${sat.activeRuns} running, ${sat.queued} queued`;
+  const t = useTranslations("vizRender");
+  const label = t("agentSummary", {
+    name: sat.name,
+    health: t(`health.${sat.health}`),
+    load: Math.round(sat.load * 100),
+    running: sat.activeRuns,
+    queued: sat.queued,
+  });
   return (
     <g
       ref={nodeRef}
@@ -272,6 +278,7 @@ export function FleetOrbit({
   selectedAgentId,
   className,
 }: FleetViewProps) {
+  const t = useTranslations("vizRender");
   const rootRef = React.useRef<HTMLDivElement>(null);
   const uid = `orbit${React.useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const cols = useColumns(rootRef, snapshot.clusters.length);
@@ -329,7 +336,7 @@ export function FleetOrbit({
     return () => window.cancelAnimationFrame(frame);
   }, [motion]);
 
-  const summary = summarizeFleet(snapshot);
+  const summary = summarizeFleet(snapshot, t);
 
   return (
     <div

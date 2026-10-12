@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckIcon, GitCommitIcon, Loader2Icon, ShieldCheckIcon, XIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -35,6 +36,7 @@ export function PendingDeploymentsView({
   onReject,
   onlyForApprovers = false,
 }: PendingDeploymentsViewProps) {
+  const t = useTranslations("appControls.pendingDeployments");
   if (onlyForApprovers && !canApprove) return null;
 
   if (loading) {
@@ -47,22 +49,22 @@ export function PendingDeploymentsView({
 
   return (
     <Panel
-      title={canApprove ? "Waiting on your approval" : "Pending approval"}
+      title={canApprove ? t("titleApprover") : t("title")}
       icon={<ShieldCheckIcon className="text-info-fg size-4" />}
       description={
         canApprove
-          ? "Review each candidate before unlocking the rollout."
-          : "Waiting on a reviewer with the `app.approve_deploy` permission."
+          ? t("descriptionApprover")
+          : t("description", { permission: "app.approve_deploy" })
       }
       actions={
         <>
           <span className="text-muted-foreground font-mono text-xs">{pending.length}</span>
           {canApprove ? (
             <Badge variant="secondary" className="text-2xs">
-              You can approve
+              {t("canApprove")}
             </Badge>
           ) : (
-            <span className="text-muted-foreground text-2xs italic">Read-only</span>
+            <span className="text-muted-foreground text-2xs italic">{t("readOnly")}</span>
           )}
         </>
       }
@@ -95,6 +97,7 @@ function PendingRow({
   onReject: (reason: string) => Promise<void>;
 }) {
   const fmt = useFormatters();
+  const t = useTranslations("appControls.pendingDeployments");
   const [busy, setBusy] = useState<"approve" | "reject" | null>(null);
   const [confirmApprove, setConfirmApprove] = useState(false);
   const [confirmReject, setConfirmReject] = useState(false);
@@ -132,11 +135,14 @@ function PendingRow({
               </span>
             )}
             <Badge variant="outline" className="text-2xs">
-              {deployment.approvalsReceived}/{deployment.approvalsRequired || 1} approvals
+              {t("approvals", {
+                received: deployment.approvalsReceived,
+                required: deployment.approvalsRequired || 1,
+              })}
             </Badge>
           </div>
           <div className="text-muted-foreground text-xs">
-            Received {fmt.formatRelativeTime(deployment.createdAt)}
+            {t("received", { when: fmt.formatRelativeTime(deployment.createdAt) })}
             {deployment.triggerKind && ` · ${deployment.triggerKind}`}
           </div>
         </div>
@@ -157,7 +163,7 @@ function PendingRow({
             ) : (
               <XIcon className="size-3.5" />
             )}
-            Reject
+            {t("reject")}
           </Button>
           <Button
             size="sm"
@@ -170,7 +176,7 @@ function PendingRow({
             ) : (
               <CheckIcon className="size-3.5" />
             )}
-            Approve &amp; deploy
+            {t("approve")}
           </Button>
         </div>
       )}
@@ -178,25 +184,26 @@ function PendingRow({
       <ConfirmDialog
         open={confirmApprove}
         onOpenChange={setConfirmApprove}
-        title={`Approve ${shortTag}?`}
-        description={`This unblocks the rollout to ${
-          deployment.environmentName ?? "the target environment"
-        }. Workflow resumes immediately — there is no way to pause it again before traffic shifts.`}
-        confirmLabel="Approve & deploy"
+        title={t("approveTitle", { tag: shortTag })}
+        description={
+          deployment.environmentName
+            ? t("approveDescription", { environment: deployment.environmentName })
+            : t("approveDescriptionDefault")
+        }
+        confirmLabel={t("approve")}
         onConfirm={handleApprove}
       />
 
       <ConfirmDialog
         reason={{
-          label: "Reason for rejection",
-          placeholder:
-            "Why is this deploy being rejected? Stored on the audit log + history sidebar.",
+          label: t("rejectReason"),
+          placeholder: t("rejectReasonPlaceholder"),
         }}
         open={confirmReject}
         onOpenChange={setConfirmReject}
-        title={`Reject ${shortTag}?`}
-        description="The pending deployment is aborted. CI must re-trigger to create a fresh deployment for review."
-        confirmLabel="Reject"
+        title={t("rejectTitle", { tag: shortTag })}
+        description={t("rejectDescription")}
+        confirmLabel={t("reject")}
         destructive
         onConfirm={handleReject}
       />

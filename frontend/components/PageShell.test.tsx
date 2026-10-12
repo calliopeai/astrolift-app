@@ -1,10 +1,12 @@
 import { act, render, screen, within } from "@testing-library/react";
 import Link from "next/link";
+import { NextIntlClientProvider } from "next-intl";
 import { hydrateRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { AppChromeProvider } from "@/lib/app-chrome-context";
+import messages from "@/messages/en.json";
 
 import { PageShell } from "./PageShell";
 
@@ -13,21 +15,23 @@ describe("PageShell server-rendered descriptions", () => {
     "hydrates breadcrumb navigation without replacing its header (collapsible=%s)",
     async (collapsibleHeader) => {
       const tree = (
-        <PageShell
-          title="Project"
-          collapsibleHeader={collapsibleHeader}
-          description={
-            <nav aria-label="Project breadcrumb">
-              <ol>
-                <li>
-                  <Link href="/projects">Projects</Link>
-                </li>
-              </ol>
-            </nav>
-          }
-        >
-          <p>Workloads</p>
-        </PageShell>
+        <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
+          <PageShell
+            title="Project"
+            collapsibleHeader={collapsibleHeader}
+            description={
+              <nav aria-label="Project breadcrumb">
+                <ol>
+                  <li>
+                    <Link href="/projects">Projects</Link>
+                  </li>
+                </ol>
+              </nav>
+            }
+          >
+            <p>Workloads</p>
+          </PageShell>
+        </NextIntlClientProvider>
       );
       const container = document.createElement("div");
       container.innerHTML = renderToString(tree);

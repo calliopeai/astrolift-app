@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -44,14 +45,14 @@ import { Flash, LoadBar, fmtRps, healthLabel, selectProps } from "./layouts-b-pa
  */
 
 export const JOBS_LAYOUT_LEGEND: LegendItem[] = [
-  { glyph: "glow", color: HEALTH_COLOR.ok, label: "Running: glows" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Failing job or step" },
-  { glyph: "bar", color: HEALTH_COLOR.ok, label: "Past run succeeded" },
-  { glyph: "bar", color: HEALTH_COLOR.failing, label: "Past run failed" },
-  { glyph: "ring", color: "var(--muted-foreground)", label: "Scheduled slot with no run record" },
-  { glyph: "flow", color: HEALTH_COLOR.ok, label: "Step traffic: faster is busier" },
-  { glyph: "ring", color: HEALTH_COLOR.ok, label: "Invoked or acted just now (mixed)" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Idle: stays dark" },
+  { glyph: "glow", color: HEALTH_COLOR.ok, labelKey: "jobsRunning" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "jobsFailing" },
+  { glyph: "bar", color: HEALTH_COLOR.ok, labelKey: "jobsPastOk" },
+  { glyph: "bar", color: HEALTH_COLOR.failing, labelKey: "jobsPastFailed" },
+  { glyph: "ring", color: "var(--muted-foreground)", labelKey: "jobsNoRecord" },
+  { glyph: "flow", color: HEALTH_COLOR.ok, labelKey: "jobsStepTraffic" },
+  { glyph: "ring", color: HEALTH_COLOR.ok, labelKey: "jobsInvoked" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "idleStaysDark" },
 ];
 
 /** A finished run, for the scheduled history strip. The snapshot carries none. */
@@ -82,11 +83,16 @@ function glow(n: AppNode): string | undefined {
 
 export function JobsLayout(props: JobsLayoutProps) {
   const { snapshot, motion, className, diagram } = props;
+  const vt = useTranslations("vizRender");
   const t = snapshot.topology;
-  const label = `${snapshot.app.name}: ${summarize(
-    snapshot.nodes.filter((n) => n.role !== "data" && n.role !== "external"),
-    "workloads"
-  )}`;
+  const label = vt("appSummary", {
+    app: snapshot.app.name,
+    summary: summarize(
+      snapshot.nodes.filter((n) => n.role !== "data" && n.role !== "external"),
+      "workloads",
+      vt
+    ),
+  });
   const body =
     t === "scheduled" ? (
       <ScheduledView {...props} />
@@ -130,6 +136,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 // ---------------------------------------------------------------- scheduled
 
 function ScheduledView({ snapshot, runs = [], onSelectNode }: JobsLayoutProps) {
+  const t = useTranslations("vizRender");
   const byId = new Map(snapshot.nodes.map((n) => [n.id, n]));
   const schedules = snapshot.nodes.filter((n) => n.role === "schedule");
   const pairs = schedules.flatMap((s) =>
@@ -151,7 +158,13 @@ function ScheduledView({ snapshot, runs = [], onSelectNode }: JobsLayoutProps) {
           <section
             key={`${s.id}-${job.id}`}
             {...selectProps(job.id, onSelectNode)}
-            aria-label={`${job.name}: ${next ? `next run in ${formatCountdown(next - snapshot.now)}` : "schedule not parsed"}, ${healthLabel(job)}`}
+            aria-label={t("jobs.scheduleLabel", {
+              name: job.name,
+              next: next
+                ? t("jobs.nextRunIn", { countdown: formatCountdown(next - snapshot.now) })
+                : t("jobs.notParsed"),
+              health: healthLabel(job, t),
+            })}
             className={cn("bg-card space-y-3 rounded-sm border p-3", FOCUS_RING)}
             style={{
               borderColor: failing ? tint(HEALTH_COLOR.failing, 70) : undefined,
@@ -171,26 +184,32 @@ function ScheduledView({ snapshot, runs = [], onSelectNode }: JobsLayoutProps) {
               </span>
             </div>
             <div>
-              <div className="text-muted-foreground text-xs">Next run in</div>
+              <div className="text-muted-foreground text-xs">{t("jobs.nextRun")}</div>
               <div className="font-mono text-2xl tabular-nums">
-                {next ? formatCountdown(next - snapshot.now) : "unknown"}
+                {next ? formatCountdown(next - snapshot.now) : t("unknown")}
               </div>
               {next && (
                 <div className="text-muted-foreground font-mono text-xs">
-                  {new Date(next).toISOString().slice(0, 16).replace("T", " ")} UTC
+                  {t("utc", { time: new Date(next).toISOString().slice(0, 16).replace("T", " ") })}
                 </div>
               )}
             </div>
             <div className="flex items-center gap-2 font-mono text-xs">
               <span className="text-muted-foreground w-20 shrink-0">
-                {running(job) ? "running" : failing ? "failing" : "not running"}
+                {running(job)
+                  ? t("jobs.running")
+                  : failing
+                    ? t("healthInline.failing")
+                    : t("jobs.notRunning")}
               </span>
               <LoadBar node={job} />
             </div>
             {slots.length > 0 && (
               <div>
-                <div className="text-muted-foreground mb-1 text-xs">Last {slots.length} slots</div>
-                <div className="flex gap-1" aria-label="Run history">
+                <div className="text-muted-foreground mb-1 text-xs">
+                  {t("jobs.lastSlots", { count: slots.length })}
+                </div>
+                <div className="flex gap-1" aria-label={t("jobs.history")}>
                   {slots.map((slot, i) => {
                     const end = slots[i + 1] ?? next ?? Infinity;
                     const run = jobRuns.find((r) => r.at >= slot && r.at < end);
@@ -202,7 +221,14 @@ function ScheduledView({ snapshot, runs = [], onSelectNode }: JobsLayoutProps) {
                     return (
                       <span
                         key={slot}
-                        title={`${new Date(slot).toISOString().slice(0, 16).replace("T", " ")} UTC: ${run ? (run.ok ? "succeeded" : "failed") : "no record"}`}
+                        title={t("jobs.slot", {
+                          time: new Date(slot).toISOString().slice(0, 16).replace("T", " "),
+                          outcome: run
+                            ? run.ok
+                              ? t("jobs.succeeded")
+                              : t("jobs.failed")
+                            : t("jobs.noRecord"),
+                        })}
                         className="h-5 flex-1 rounded-sm border"
                         style={{
                           background: color,
@@ -219,7 +245,7 @@ function ScheduledView({ snapshot, runs = [], onSelectNode }: JobsLayoutProps) {
         );
       })}
       {pairs.length === 0 && (
-        <p className="text-muted-foreground text-sm">No schedules attached to a job.</p>
+        <p className="text-muted-foreground text-sm">{t("jobs.noSchedules")}</p>
       )}
     </div>
   );
@@ -228,25 +254,30 @@ function ScheduledView({ snapshot, runs = [], onSelectNode }: JobsLayoutProps) {
 // --------------------------------------------------------------------- task
 
 function TaskView({ snapshot, onSelectNode }: JobsLayoutProps) {
+  const t = useTranslations("vizRender");
   const byId = new Map(snapshot.nodes.map((n) => [n.id, n]));
   const job =
     snapshot.nodes.find((n) => n.role === "worker") ??
     snapshot.nodes.find((n) => n.role !== "data" && n.role !== "external");
-  if (!job) return <p className="text-muted-foreground text-sm">No task in this app.</p>;
+  if (!job) return <p className="text-muted-foreground text-sm">{t("jobs.noTask")}</p>;
   const failing = job.health === "failing";
-  const state = failing ? "Failed" : running(job) ? "Running" : "Not running";
+  const state = failing
+    ? t("jobs.stateFailed")
+    : running(job)
+      ? t("jobs.stateRunning")
+      : t("jobs.stateNotRunning");
   const out = snapshot.edges.filter((e) => e.from === job.id);
   return (
     <section
       {...selectProps(job.id, onSelectNode)}
-      aria-label={`${job.name} run: ${state}`}
+      aria-label={t("jobs.runLabel", { name: job.name, state })}
       className={cn("bg-card space-y-3 rounded-sm border p-4", FOCUS_RING)}
       style={{
         borderColor: failing ? tint(HEALTH_COLOR.failing, 70) : undefined,
         boxShadow: glow(job),
       }}
     >
-      <SectionTitle>Run</SectionTitle>
+      <SectionTitle>{t("jobs.run")}</SectionTitle>
       <div className="flex min-w-0 items-center gap-2">
         <StatusDot health={job.health} className="size-3" />
         <span className="min-w-0 flex-1 truncate text-lg font-medium" title={job.name}>
@@ -261,15 +292,17 @@ function TaskView({ snapshot, onSelectNode }: JobsLayoutProps) {
       </div>
       <dl className="grid grid-cols-3 gap-2 font-mono text-xs">
         <div>
-          <dt className="text-muted-foreground">kind</dt>
+          <dt className="text-muted-foreground">{t("jobs.kind")}</dt>
           <dd>{job.kind}</dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">pods</dt>
-          <dd>{job.replicas ? `${job.replicas.ready}/${job.replicas.desired}` : "n/a"}</dd>
+          <dt className="text-muted-foreground">{t("jobs.pods")}</dt>
+          <dd>
+            {job.replicas ? `${job.replicas.ready}/${job.replicas.desired}` : t("notApplicable")}
+          </dd>
         </div>
         <div>
-          <dt className="text-muted-foreground">load</dt>
+          <dt className="text-muted-foreground">{t("load")}</dt>
           <dd>{Math.round(job.load * 100)}%</dd>
         </div>
       </dl>
@@ -281,14 +314,14 @@ function TaskView({ snapshot, onSelectNode }: JobsLayoutProps) {
             const bad = edgeFailing(e);
             return (
               <li key={e.to} className="flex min-w-0 items-center gap-2 font-mono">
-                <span className="text-muted-foreground shrink-0">writes</span>
+                <span className="text-muted-foreground shrink-0">{t("jobs.writes")}</span>
                 <span className="min-w-0 flex-1 truncate" title={target?.name}>
                   {target?.name ?? e.to}
                 </span>
                 <span className="shrink-0 tabular-nums">{fmtRps(e.rps)}</span>
                 {bad && (
                   <span style={{ color: HEALTH_COLOR.failing }}>
-                    {(e.errorRate * 100).toFixed(0)}% err
+                    {t("jobs.errPct", { pct: (e.errorRate * 100).toFixed(0) })}
                   </span>
                 )}
               </li>
@@ -306,6 +339,7 @@ const STEP_GAP = 150;
 const LINE_Y = 34;
 
 function WorkflowView({ snapshot, motion, flowParticles = true, onSelectNode }: JobsLayoutProps) {
+  const t = useTranslations("vizRender");
   const steps = layerNodes(
     snapshot.nodes.filter((n) => n.role !== "data" && n.role !== "external"),
     snapshot.edges
@@ -314,8 +348,8 @@ function WorkflowView({ snapshot, motion, flowParticles = true, onSelectNode }: 
   const xOf = (i: number) => 60 + i * STEP_GAP;
   const maxRps = Math.max(1, ...snapshot.edges.map((e) => e.rps));
   return (
-    <section aria-label="Workflow steps">
-      <SectionTitle>Steps</SectionTitle>
+    <section aria-label={t("jobs.steps")}>
+      <SectionTitle>{t("jobs.stepsTitle")}</SectionTitle>
       <svg viewBox={`0 0 ${W} 80`} className="block h-auto max-h-40 w-full">
         {steps.slice(1).map((step, i) => {
           const prev = steps[i];
@@ -360,7 +394,15 @@ function WorkflowView({ snapshot, motion, flowParticles = true, onSelectNode }: 
             <g
               key={step.id}
               {...selectProps(step.id, onSelectNode)}
-              aria-label={`Step ${i + 1}, ${step.name}: ${failing ? "failing" : active ? "running" : "idle"}`}
+              aria-label={t("jobs.stepLabel", {
+                n: i + 1,
+                name: step.name,
+                state: failing
+                  ? t("healthInline.failing")
+                  : active
+                    ? t("jobs.running")
+                    : t("healthInline.idle"),
+              })}
               className="group cursor-pointer outline-none"
             >
               <title>{step.name}</title>
@@ -402,7 +444,11 @@ function WorkflowView({ snapshot, motion, flowParticles = true, onSelectNode }: 
                 className="font-mono"
                 fill={failing ? HEALTH_COLOR.failing : "var(--muted-foreground)"}
               >
-                {failing ? "failing" : active ? `running ${Math.round(step.load * 100)}%` : "idle"}
+                {failing
+                  ? t("healthInline.failing")
+                  : active
+                    ? t("jobs.runningPct", { pct: Math.round(step.load * 100) })
+                    : t("healthInline.idle")}
               </text>
             </g>
           );
@@ -426,14 +472,19 @@ function lastEventByNode(snapshot: AppSnapshot) {
 }
 
 function MixedView({ snapshot, motion, onSelectNode }: JobsLayoutProps) {
+  const t = useTranslations("vizRender");
   const sections = roleSections(snapshot.nodes);
   const last = lastEventByNode(snapshot);
   return (
     <div className="grid min-w-0 grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
       {sections.map((s) => (
-        <section key={s.title} aria-label={s.title} className="min-w-0 rounded-sm border p-2">
+        <section
+          key={s.key}
+          aria-label={t(`sections.${s.key}`)}
+          className="min-w-0 rounded-sm border p-2"
+        >
           <SectionTitle>
-            {s.title} · {s.nodes.length}
+            {t(`sections.${s.key}`)} · {s.nodes.length}
           </SectionTitle>
           <ul className="space-y-1">
             {s.nodes.map((n) => {
@@ -443,7 +494,12 @@ function MixedView({ snapshot, motion, onSelectNode }: JobsLayoutProps) {
                 <li key={n.id}>
                   <div
                     {...selectProps(n.id, onSelectNode)}
-                    aria-label={`${n.name}, ${n.kind}, ${healthLabel(n)}, load ${Math.round(n.load * 100)}%`}
+                    aria-label={t("nodeLoadLabel", {
+                      name: n.name,
+                      kind: n.kind,
+                      health: healthLabel(n, t),
+                      load: Math.round(n.load * 100),
+                    })}
                     className={cn(
                       "relative grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1 rounded-sm px-1.5 py-1",
                       FOCUS_RING

@@ -1,6 +1,7 @@
 "use client";
 
 import { LockIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { CustomAccentPicker } from "@/components/settings/CustomAccentPicker";
@@ -37,6 +38,7 @@ export type HouseThemeCardProps = ReturnType<typeof useHouseTheme>;
  * Appearance overrides it, unless the theme is locked.
  */
 export function HouseThemeCard({ org, saving, onSave }: HouseThemeCardProps) {
+  const t = useTranslations("adminHouseTheme");
   const current = React.useMemo(
     () => normalizePartial(org.appearanceDefault),
     [org.appearanceDefault]
@@ -67,17 +69,13 @@ export function HouseThemeCard({ org, saving, onSave }: HouseThemeCardProps) {
 
   return (
     <SettingsSection
-      title="House theme"
-      description={
-        <>
-          Applies to anyone who hasn&apos;t picked their own under Settings › Appearance. Leave an
-          option on <span className="font-medium">Not set</span> to let people choose it for
-          themselves. People can still pick their own accent there unless the theme is locked.
-        </>
-      }
+      title={t("title")}
+      description={t.rich("description", {
+        strong: (chunks) => <span className="font-medium">{chunks}</span>,
+      })}
       dirty={dirty}
       saving={saving}
-      saveLabel="Save house theme"
+      saveLabel={t("save")}
       onCancel={() => {
         setGround(current.ground ?? "");
         setAccent(currentAccent);
@@ -86,22 +84,22 @@ export function HouseThemeCard({ org, saving, onSave }: HouseThemeCardProps) {
       onSave={save}
     >
       <Choice
-        label="Ground"
+        label={t("ground")}
         value={ground}
         onChange={(v) => setGround(v as Ground | "")}
         options={(Object.keys(GROUNDS) as Ground[]).map((k) => ({
           value: k,
-          label: GROUNDS[k].label,
-          hint: GROUNDS[k].mode,
+          label: t(`grounds.${k}`),
+          hint: t(`modes.${GROUNDS[k].mode}`),
         }))}
       />
       <Choice
-        label="Accent"
+        label={t("accent")}
         value={accent}
         onChange={(v) => setAccent(v as AccentChoice | "")}
         options={(Object.keys(ACCENTS) as (keyof typeof ACCENTS)[]).map((k) => ({
           value: k,
-          label: ACCENTS[k].label,
+          label: t(`accents.${k}`),
           swatch: ACCENTS[k].swatch,
         }))}
       />
@@ -122,12 +120,9 @@ export function HouseThemeCard({ org, saving, onSave }: HouseThemeCardProps) {
         <span className="min-w-0">
           <span className="flex items-center gap-1.5 text-sm font-semibold">
             <LockIcon aria-hidden className="size-3.5" />
-            Lock this theme
+            {t("lock")}
           </span>
-          <span className="text-muted-foreground block text-xs">
-            Everyone gets the house theme and their personal picker becomes read-only. Off by
-            default — publishing a default and forcing it are different decisions.
-          </span>
+          <span className="text-muted-foreground block text-xs">{t("lockHint")}</span>
         </span>
       </label>
     </SettingsSection>
@@ -145,13 +140,14 @@ function Choice({
   onChange: (value: string) => void;
   options: { value: string; label: string; hint?: string; swatch?: string }[];
 }) {
+  const t = useTranslations("adminHouseTheme");
   return (
     <div>
       <p className="text-muted-foreground text-2xs mb-2 font-semibold tracking-[0.08em] uppercase">
         {label}
       </p>
       <div className="flex flex-wrap gap-2">
-        {[{ value: "", label: "Not set" }, ...options].map((o) => (
+        {[{ value: "", label: t("notSet") }, ...options].map((o) => (
           <button
             key={o.value || "unset"}
             type="button"

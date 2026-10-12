@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 import { cn } from "@/lib/utils";
 
 import { HEALTH_COLOR } from "./semantics";
@@ -27,7 +29,15 @@ export interface LegendItem {
   glyph: LegendGlyph;
   /** A CSS colour, normally one of HEALTH_COLOR. */
   color?: string;
-  label: string;
+  /** Copy under `vizRender.legend`; preferred over `label`. */
+  labelKey?: string;
+  /** Literal copy, for callers that word their own item. */
+  label?: string;
+}
+
+/** What identifies an item: its key, or its literal copy. */
+export function legendItemId(item: LegendItem): string {
+  return item.labelKey ?? item.label ?? "";
 }
 
 export interface VizLegendProps {
@@ -129,56 +139,57 @@ export const WORKFLOW_SHAPE_LEGEND = {
   returnTrack: {
     glyph: "return",
     color: HEALTH_COLOR.degraded,
-    label: "Return track: work sent back to an earlier stage, labelled with its round bound",
+    labelKey: "shape.returnTrack",
   },
   roundBadge: {
     glyph: "round",
     color: HEALTH_COLOR.ok,
-    label: "Round badge: which round a run is on",
+    labelKey: "shape.roundBadge",
   },
   roundNearBound: {
     glyph: "round",
     color: HEALTH_COLOR.degraded,
-    label: "Round badge amber: one round from the bound; past it the run fails",
+    labelKey: "shape.roundNearBound",
   },
   siding: {
     glyph: "siding",
     color: HEALTH_COLOR.degraded,
-    label: "Siding: a retry of the same stage, labelled with its attempt bound",
+    labelKey: "shape.siding",
   },
   join: {
     glyph: "join",
     color: HEALTH_COLOR.ok,
-    label: "Join: parallel branches merge once every branch has settled",
+    labelKey: "shape.join",
   },
   supervisorSwarm: {
     glyph: "swarm",
     color: HEALTH_COLOR.ok,
-    label: "Supervisor swarm: its workers, lit while busy on a sub-task",
+    labelKey: "shape.supervisorSwarm",
   },
   nestedStack: {
     glyph: "nested",
     color: HEALTH_COLOR.ok,
-    label: "Nested stack: a stage that runs a whole child workflow",
+    labelKey: "shape.nestedStack",
   },
 } satisfies Record<string, LegendItem>;
 
 export function VizLegend({ items, motion, className }: VizLegendProps) {
+  const t = useTranslations("vizRender");
   return (
     <div
       className={cn(
         "text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs",
         className
       )}
-      aria-label="Legend"
+      aria-label={t("frame.legend")}
     >
       {items.map((item) => (
-        <span key={item.label} className="inline-flex items-center gap-1.5">
+        <span key={legendItemId(item)} className="inline-flex items-center gap-1.5">
           <Glyph glyph={item.glyph} color={item.color} />
-          {item.label}
+          {item.labelKey ? t(`legend.${item.labelKey}`) : item.label}
         </span>
       ))}
-      {motion === "reduced" && <span className="italic">Reduced motion: showing still frames</span>}
+      {motion === "reduced" && <span className="italic">{t("frame.reducedMotion")}</span>}
     </div>
   );
 }

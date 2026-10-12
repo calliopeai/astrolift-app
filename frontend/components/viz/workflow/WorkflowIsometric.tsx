@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -93,47 +94,20 @@ import {
  */
 
 export const WORKFLOW_ISOMETRIC_LEGEND: LegendItem[] = [
-  { glyph: "dot", color: HEALTH_COLOR.ok, label: "Run moving (crate) / stage working" },
-  { glyph: "signal", color: HEALTH_COLOR.degraded, label: "Held at a gate: booth shut, breathing" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Run failed at that machine" },
-  { glyph: "bar", color: HEALTH_COLOR.degraded, label: "Backlog waiting at an intake" },
-  { glyph: "flow", color: HEALTH_COLOR.ok, label: "Belt speed = throughput" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Idle / finished" },
-  {
-    glyph: "return",
-    color: HEALTH_COLOR.degraded,
-    label:
-      "Return ramp: work sent back climbs one level to the earlier stage; its bound is on the ramp",
-  },
-  {
-    glyph: "round",
-    color: HEALTH_COLOR.ok,
-    label: "Deck per round over the looped stages: the current round lit, earlier rounds ghosted",
-  },
+  { glyph: "dot", color: HEALTH_COLOR.ok, labelKey: "isoWfMoving" },
+  { glyph: "signal", color: HEALTH_COLOR.degraded, labelKey: "isoWfHeld" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "isoWfFailed" },
+  { glyph: "bar", color: HEALTH_COLOR.degraded, labelKey: "isoWfBacklog" },
+  { glyph: "flow", color: HEALTH_COLOR.ok, labelKey: "isoWfBelt" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "isoWfIdle" },
+  { glyph: "return", color: HEALTH_COLOR.degraded, labelKey: "isoWfRamp" },
+  { glyph: "round", color: HEALTH_COLOR.ok, labelKey: "isoWfDeck" },
   WORKFLOW_SHAPE_LEGEND.roundBadge,
   WORKFLOW_SHAPE_LEGEND.roundNearBound,
-  {
-    glyph: "siding",
-    color: HEALTH_COLOR.degraded,
-    label: "Hoop over a stage: a retry of that stage, labelled with its attempt bound",
-  },
-  {
-    glyph: "join",
-    color: HEALTH_COLOR.ok,
-    label:
-      "Raised rails: fan-out branches, lit while running; each rolls to the join block when it settles",
-  },
-  {
-    glyph: "swarm",
-    color: HEALTH_COLOR.ok,
-    label:
-      "Supervisor tile: busy workers orbit the hub, faster with more load; idle workers stand still",
-  },
-  {
-    glyph: "nested",
-    color: HEALTH_COLOR.ok,
-    label: "Stacked block: a child workflow; open it to see its stages on a sub-platform",
-  },
+  { glyph: "siding", color: HEALTH_COLOR.degraded, labelKey: "isoWfHoop" },
+  { glyph: "join", color: HEALTH_COLOR.ok, labelKey: "isoWfRails" },
+  { glyph: "swarm", color: HEALTH_COLOR.ok, labelKey: "isoWfSupervisor" },
+  { glyph: "nested", color: HEALTH_COLOR.ok, labelKey: "isoWfStacked" },
 ];
 
 const UNIT = 20;
@@ -460,6 +434,7 @@ interface StationProps {
 }
 
 function Station({ snapshot, line, j, y, engine, open, onToggle, onSelect }: StationProps) {
+  const vt = useTranslations("vizRender");
   const station = line.stations[j];
   const health = stationHealth(snapshot, line, j);
   const cx = stationX(line, j);
@@ -471,7 +446,7 @@ function Station({ snapshot, line, j, y, engine, open, onToggle, onSelect }: Sta
   const y0 = y - d / 2;
   const [lx, ly] = iso(cx, y + d / 2 + 0.25, 0, UNIT);
   const select = onSelect ? () => onSelect(line.id, station.id) : undefined;
-  const label = stationName(snapshot, line, j);
+  const label = stationName(snapshot, line, j, vt);
   const flicker = health === "failing" ? MOTION_CLASS.flicker : undefined;
   const topLabel = (text: string, color: string, z = h) => {
     const [tx, ty] = iso(cx, y, z, UNIT);
@@ -641,6 +616,7 @@ function Supervisor({
   health: Health;
   engine: Engine;
 }) {
+  const vt = useTranslations("vizRender");
   const hubTop = iso(cx, y, HUB_H, UNIT);
   const n = station.workers.length;
   return (
@@ -678,7 +654,12 @@ function Supervisor({
           ref={(el) => engine.register(engine.workerEls, w.id, el)}
           transform={translate(at(workerPoint(cx, y, workerAngle(i, n))))}
         >
-          <title>{`${w.label}: ${w.busy ? "busy" : "idle"}, load ${Math.round(w.load * 100)}%`}</title>
+          <title>
+            {vt(w.busy ? "graph.workerBusy" : "graph.workerIdle", {
+              label: w.label,
+              load: Math.round(w.load * 100),
+            })}
+          </title>
           <Box
             x={-WORKER / 2}
             y={-WORKER / 2}
@@ -782,10 +763,14 @@ function NestedToggle({
   isOpen: boolean;
   onToggle: () => void;
 }) {
+  const vt = useTranslations("vizRender");
   const child = childLineOf(snapshot, station);
   if (!child) return null;
   const [hx, hy] = iso(cx + MACHINE / 2 + 0.3, y - MACHINE / 2 - 0.3, 0, UNIT);
-  const label = `${isOpen ? "Close" : "Open"} ${child.name}, the child workflow run by ${station.name}`;
+  const label = vt(isOpen ? "isoWf.closeChild" : "isoWf.openChild", {
+    child: child.name,
+    station: station.name,
+  });
   return (
     <g
       tabIndex={0}
@@ -836,6 +821,7 @@ function NestedPlatform({
   y: number;
   onSelect?: (lineId: string, stationId: string) => void;
 }) {
+  const vt = useTranslations("vizRender");
   const child = childLineOf(snapshot, station);
   if (!child) return null;
   const cx = stationX(line, j);
@@ -846,7 +832,7 @@ function NestedPlatform({
   const mini = 0.5;
   return (
     <g>
-      <title>{`${child.name}: the child workflow's stages`}</title>
+      <title>{vt("isoWf.childStages", { name: child.name })}</title>
       <polyline points={points(post)} stroke="var(--border)" strokeWidth="1.25" />
       <polygon points={slab.left} fill={shade("var(--card)", 0.3)} stroke="var(--border)" />
       <polygon points={slab.right} fill={shade("var(--card)", 0.45)} stroke="var(--border)" />
@@ -863,7 +849,7 @@ function NestedPlatform({
         return (
           <Selectable
             key={st.id}
-            label={stationName(snapshot, child, i)}
+            label={stationName(snapshot, child, i, vt)}
             onSelect={onSelect ? () => onSelect(child.id, st.id) : undefined}
             style={glow(health)}
           >
@@ -914,6 +900,7 @@ function Deck({
   level: number;
   lit: boolean;
 }) {
+  const vt = useTranslations("vizRender");
   const span = towerSpan(line)!;
   const x0 = stationX(line, span.lo) - MACHINE / 2 - 0.3;
   const x1 = stationX(line, span.hi) + MACHINE / 2 + 0.3;
@@ -926,7 +913,7 @@ function Deck({
   const [lx, ly] = iso(x1 + 0.15, y0, z + DECK, UNIT);
   return (
     <g opacity={lit ? 1 : 0.35}>
-      <title>{`Round ${level + 1}${lit ? ": a run is on this round now" : ": an earlier round"}`}</title>
+      <title>{vt(lit ? "isoWf.deckLit" : "isoWf.deckEarlier", { n: level + 1 })}</title>
       {posts.map((p, k) => (
         <polyline key={k} points={points(p)} stroke="var(--border)" strokeWidth="1" />
       ))}
@@ -996,6 +983,7 @@ function LoopTracks({
   line: WorkflowLine;
   y: number;
 }) {
+  const vt = useTranslations("vizRender");
   const loops = line.loops ?? [];
   if (loops.length === 0) return null;
   const riders = snapshot.trains.filter((t) => t.lineId === line.id && t.onLoopId);
@@ -1010,7 +998,7 @@ function LoopTracks({
         );
         return (
           <g key={loop.id}>
-            <title>{loopLabel(line, loop)}</title>
+            <title>{loopLabel(line, loop, vt)}</title>
             {!retry && (
               <polyline
                 points={points([at(foot), at({ ...foot, z: 0 })])}
@@ -1044,6 +1032,7 @@ function LoopTracks({
 
 /** Each loop's bound, drawn over everything so no deck or machine hides it. */
 function LoopTags({ line, y }: { line: WorkflowLine; y: number }) {
+  const vt = useTranslations("vizRender");
   return (
     <>
       {(line.loops ?? []).map((loop) => {
@@ -1060,7 +1049,7 @@ function LoopTags({ line, y }: { line: WorkflowLine; y: number }) {
             fill={HEALTH_COLOR.degraded}
             className="font-mono"
           >
-            <title>{loopLabel(line, loop)}</title>
+            <title>{loopLabel(line, loop, vt)}</title>
             {`max ${loop.maxRounds}`}
           </text>
         );
@@ -1095,13 +1084,14 @@ function Rails({
   pellets: Map<string, PelletPose>;
   engine: Engine;
 }) {
+  const vt = useTranslations("vizRender");
   const n = station.branches.length;
   const live = !!station.runId;
   if (n === 0) {
     // No run has fanned out yet: the rails' shape, ghosted; the count is decided per run.
     return (
       <g opacity="0.4">
-        <title>{`${station.name}: branches decided per run`}</title>
+        <title>{vt("isoWf.branchesPerRun", { name: station.name })}</title>
         {[0, 1, 2].map((b) => (
           <polyline
             key={b}
@@ -1154,7 +1144,12 @@ function Rails({
             ref={(el) => engine.register(engine.moverEls, `b:${b.id}`, el)}
             opacity={live ? 1 : 0.45}
           >
-            <title>{`${b.label}: ${b.state}${live ? "" : " (last run)"}`}</title>
+            <title>
+              {vt(live ? "transit.branchTitle" : "isoWf.branchLastRun", {
+                label: b.label,
+                state: vt(`transit.branchState.${b.state}`),
+              })}
+            </title>
             <Box
               x={-PELLET / 2}
               y={-PELLET / 2}
@@ -1188,6 +1183,7 @@ function Crate({
   engine: Engine;
   onSelect?: (id: string) => void;
 }) {
+  const vt = useTranslations("vizRender");
   const size = child ? CHILD_CRATE : CRATE;
   const h = size * 0.84;
   const health = CRATE_HEALTH[t.state];
@@ -1198,7 +1194,7 @@ function Crate({
   const [, by] = iso(0, 0, h, UNIT);
   return (
     <Selectable
-      label={runName(snapshot, line, t)}
+      label={runName(snapshot, line, t, vt)}
       onSelect={onSelect ? () => onSelect(t.id) : undefined}
       ref={(el: SVGGElement | null) => engine.register(engine.moverEls, t.id, el)}
       opacity={t.state === "done" ? 0.45 : 1}
@@ -1256,6 +1252,7 @@ export function WorkflowIsometric({
   className,
   defaultOpen,
 }: WorkflowIsometricProps) {
+  const vt = useTranslations("vizRender");
   const [engine] = React.useState(createEngine);
   const [open, setOpen] = React.useState<ReadonlySet<string>>(() => new Set(defaultOpen));
   const toggle = React.useCallback(
@@ -1326,7 +1323,7 @@ export function WorkflowIsometric({
     <svg
       data-motion={motion}
       role="group"
-      aria-label={summarize(snapshot)}
+      aria-label={summarize(snapshot, vt)}
       viewBox={`${vb.x.toFixed(1)} ${vb.y.toFixed(1)} ${vb.w.toFixed(1)} ${vb.h.toFixed(1)}`}
       preserveAspectRatio="xMidYMid meet"
       className={cn("block h-auto w-full", className)}

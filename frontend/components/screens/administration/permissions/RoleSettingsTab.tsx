@@ -1,8 +1,8 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { SCOPE_NOUN } from "@/components/access/access-model";
 import { SettingsPage, SettingsSection } from "@/components/settings/SettingsPage";
 import { DefinitionList } from "@/components/ui/definition-list";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ export interface RoleSettingsTabProps {
  * caller keys it by the saved values, so a save starts it afresh. Pure.
  */
 export function RoleSettingsTab({ role, canManage, saving, onSave }: RoleSettingsTabProps) {
+  const t = useTranslations("adminRoleDetail.settings");
   const [name, setName] = React.useState(role.name);
   const [description, setDescription] = React.useState(role.description ?? "");
   const [error, setError] = React.useState<string | null>(null);
@@ -39,15 +40,11 @@ export function RoleSettingsTab({ role, canManage, saving, onSave }: RoleSetting
       sections={[
         {
           id: "general",
-          title: "Name and description",
+          title: t("title"),
           content: (
             <SettingsSection
-              title="Name and description"
-              description={
-                locked
-                  ? "Built-in roles keep the name and description they ship with."
-                  : "What people see when they grant this role."
-              }
+              title={t("title")}
+              description={locked ? t("lockedDescription") : t("description")}
               dirty={!locked && dirty && Boolean(name.trim())}
               saving={saving}
               error={error}
@@ -61,7 +58,7 @@ export function RoleSettingsTab({ role, canManage, saving, onSave }: RoleSetting
               }}
             >
               <div className="flex min-w-0 flex-col gap-2">
-                <Label htmlFor="role-name">Name</Label>
+                <Label htmlFor="role-name">{t("name")}</Label>
                 <Input
                   id="role-name"
                   value={name}
@@ -71,12 +68,12 @@ export function RoleSettingsTab({ role, canManage, saving, onSave }: RoleSetting
                 />
               </div>
               <div className="flex min-w-0 flex-col gap-2">
-                <Label htmlFor="role-description">Description</Label>
+                <Label htmlFor="role-description">{t("descriptionLabel")}</Label>
                 <Textarea
                   id="role-description"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="What this role is for, in one sentence."
+                  placeholder={t("descriptionPlaceholder")}
                   rows={3}
                   disabled={locked}
                 />
@@ -84,18 +81,16 @@ export function RoleSettingsTab({ role, canManage, saving, onSave }: RoleSetting
               <DefinitionList
                 items={[
                   {
-                    term: "Slug",
+                    term: t("slug"),
                     description: (
                       <span className="font-mono [overflow-wrap:anywhere]">{role.slug}</span>
                     ),
                   },
                   {
-                    term: "Binds at",
-                    description: (
-                      <span>a {SCOPE_NOUN[role.scopeLevel]} or anything inside one</span>
-                    ),
+                    term: t("bindsAt"),
+                    description: <span>{t("bindsAtValue", { scope: role.scopeLevel })}</span>,
                   },
-                  { term: "Kind", description: role.isSystem ? "built-in" : "custom" },
+                  { term: t("kind"), description: role.isSystem ? t("builtIn") : t("custom") },
                 ]}
               />
             </SettingsSection>

@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { ShellHeader } from "@/components/shell/ShellHeader";
 
-import { PERMISSIONS_PAGES, type PermissionsPage, permissionsCrumbs } from "../access/admin-crumbs";
+import { type PermissionsPage, permissionsCrumbs } from "../access/admin-crumbs";
 
 export interface PermissionsScreenProps {
   /** `admin.permissions_enabled`; while false the screen says so and mounts nothing. */
@@ -26,6 +27,7 @@ export interface PermissionsScreenProps {
  * three share.
  */
 export function PermissionsScreen({ enabled, page, children }: PermissionsScreenProps) {
+  const t = useTranslations("adminPermissions");
   // Screen gate: Permissions ships behind `admin.permissions_enabled`
   // (#1206). The nav entry is filtered out while the flag is off, but the
   // route stays reachable, so this used to `return null` and a direct hit
@@ -37,19 +39,22 @@ export function PermissionsScreen({ enabled, page, children }: PermissionsScreen
   // gated.
   if (enabled) return <>{children}</>;
 
-  const title = PERMISSIONS_PAGES.find((p) => p.key === page)?.label ?? "Permissions";
+  const title = t(`pages.${page}`);
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6 p-6">
       <ShellHeader crumbs={permissionsCrumbs(page)} title={title} />
       <div className="text-muted-foreground max-w-prose rounded-md border border-dashed p-6 text-sm">
-        <p className="text-foreground font-medium">This console is turned off for this install.</p>
+        <p className="text-foreground font-medium">{t("off")}</p>
         <p className="mt-2">
-          Permissions ships behind the <code className="font-mono">admin.permissions_enabled</code>{" "}
-          flag. Turn it on under{" "}
-          <Link className="underline underline-offset-2" href="/administration/features">
-            Administration &rsaquo; Features
-          </Link>
-          .
+          {t.rich("offHint", {
+            flag: "admin.permissions_enabled",
+            code: (chunks) => <code className="font-mono">{chunks}</code>,
+            link: (chunks) => (
+              <Link className="underline underline-offset-2" href="/administration/features">
+                {chunks}
+              </Link>
+            ),
+          })}
         </p>
       </div>
     </div>

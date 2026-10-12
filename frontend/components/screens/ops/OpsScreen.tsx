@@ -15,6 +15,7 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useFormatter, useTranslations } from "next-intl";
 import type * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -47,19 +48,6 @@ const SEVERITY_TONE: Record<string, "ok" | "warn" | "error" | "muted"> = {
   error: "error",
 };
 
-function formatDuration(seconds: number | null | undefined): string {
-  if (seconds == null) return "—";
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  const m = Math.floor(seconds / 60);
-  const s = Math.round(seconds % 60);
-  return `${m}m ${s}s`;
-}
-
-function formatPct(rate: number | null | undefined): string {
-  if (rate == null) return "—";
-  return `${(rate * 100).toFixed(1)}%`;
-}
-
 /** Live operator view: cluster health, 24h rollouts, alerts, runs, audit. */
 export function OpsScreen({
   clusters: clusterList,
@@ -84,6 +72,21 @@ export function OpsScreen({
   onRetryRuns,
 }: OpsScreenProps) {
   const fmt = useFormatters();
+  const format = useFormatter();
+  const t = useTranslations("opsScreen");
+  const formatDuration = (seconds: number | null | undefined): string => {
+    if (seconds == null) return "—";
+    if (seconds < 60) return t("durationSeconds", { s: Math.round(seconds) });
+    return t("durationMinutes", { m: Math.floor(seconds / 60), s: Math.round(seconds % 60) });
+  };
+  const formatPct = (rate: number | null | undefined): string => {
+    if (rate == null) return "—";
+    return format.number(rate, {
+      style: "percent",
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    });
+  };
   // Active clusters with a recent capabilities probe count as "active";
   // those that have never been probed or were disabled are "degraded".
   const clusterTotal = clusterList.length;
@@ -92,54 +95,66 @@ export function OpsScreen({
   const clusterDisconnected = clusterList.filter((c) => !c.isActive).length;
 
   return (
-    <PageShell
-      title="Operations"
-      description="Live operator view — cluster health, rollouts in the last 24 hours, unresolved alerts, and the recent audit trail."
-    >
+    <PageShell title={t("title")} description={t("description")}>
       {/* ─── top KPI strip ─────────────────────────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiTile
           icon={LayersIcon}
-          label="Clusters"
+          label={t("clusters")}
+          errorTitle={t("clustersError")}
           error={clustersError}
           onRetry={onRetryClusters}
           value={clustersLoading ? null : clusterTotal}
           sub={
             clustersLoading
               ? null
-              : `${clusterActive} active · ${clusterDegraded} degraded · ${clusterDisconnected} disconnected`
+              : t("clustersSub", {
+                  active: clusterActive,
+                  degraded: clusterDegraded,
+                  disconnected: clusterDisconnected,
+                })
           }
           href="/clusters"
         />
         <KpiTile
           icon={RocketIcon}
-          label="Deploys · 24h"
+          label={t("deploys")}
+          errorTitle={t("deploysError")}
           error={metricsError}
           onRetry={onRetryMetrics}
           value={metricsLoading ? null : (m?.total ?? 0)}
           sub={
             metricsLoading
               ? null
-              : `${m?.succeeded ?? 0} ok · ${m?.failed ?? 0} failed · ${m?.inFlight ?? 0} in flight`
+              : t("deploysSub", {
+                  ok: m?.succeeded ?? 0,
+                  failed: m?.failed ?? 0,
+                  inFlight: m?.inFlight ?? 0,
+                })
           }
           href="/deployments"
         />
         <KpiTile
           icon={CheckCircle2Icon}
-          label="Success rate"
+          label={t("successRate")}
+          errorTitle={t("successRateError")}
           error={metricsError}
           onRetry={onRetryMetrics}
           value={metricsLoading ? null : formatPct(m?.successRate)}
           sub={
             metricsLoading
               ? null
-              : `p95 ${formatDuration(m?.p95DurationSeconds)} · mean ${formatDuration(m?.meanDurationSeconds)}`
+              : t("successRateSub", {
+                  p95: formatDuration(m?.p95DurationSeconds),
+                  mean: formatDuration(m?.meanDurationSeconds),
+                })
           }
           href="/deployments"
         />
         <KpiTile
           icon={BellIcon}
-          label="Unresolved alerts"
+          label={t("alerts")}
+          errorTitle={t("alertsError")}
           error={alertsError}
           onRetry={onRetryAlerts}
           value={alertsLoading ? null : alertList.length}
@@ -147,8 +162,10 @@ export function OpsScreen({
             alertsLoading
               ? null
               : alertList.length === 0
-                ? "All clear"
-                : `${alertList.filter((a) => SEVERITY_TONE[a.severity] === "error").length} critical`
+                ? t("allClear")
+                : t("critical", {
+                    count: alertList.filter((a) => SEVERITY_TONE[a.severity] === "error").length,
+                  })
           }
           href="/alerts"
           tone={alertList.length > 0 ? "warn" : undefined}
@@ -160,26 +177,20 @@ export function OpsScreen({
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
-              <LayersIcon className="size-4" /> Cluster fleet
+              <LayersIcon className="size-4" /> {t("fleet")}
             </CardTitle>
-            <CardDescription>
-              Tenant runtime clusters registered to this Astrolift install.
-            </CardDescription>
+            <CardDescription>{t("fleetDescription")}</CardDescription>
           </div>
           <Link
             href="/clusters"
             className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
           >
-            All clusters <ExternalLinkIcon className="size-3" />
+            {t("allClusters")} <ExternalLinkIcon className="size-3" />
           </Link>
         </CardHeader>
         <CardContent className="p-0">
           {clustersError ? (
-            <QueryError
-              title="Could not load cluster fleet"
-              error={clustersError}
-              onRetry={onRetryClusters}
-            />
+            <QueryError title={t("fleetError")} error={clustersError} onRetry={onRetryClusters} />
           ) : clustersLoading && clusterList.length === 0 ? (
             <div className="space-y-2 p-6">
               <Skeleton className="h-10 w-full" />
@@ -189,10 +200,10 @@ export function OpsScreen({
             <div className="p-6">
               <EmptyState
                 icon={<LayersIcon className="size-5" />}
-                title="No clusters registered"
-                description="Register a tenant runtime cluster to start receiving deploys."
+                title={t("noClusters")}
+                description={t("noClustersDescription")}
                 actionHref="/clusters"
-                actionLabel="Register cluster"
+                actionLabel={t("registerCluster")}
               />
             </div>
           ) : (
@@ -218,12 +229,16 @@ export function OpsScreen({
                     </Badge>
                     {!c.isActive ? (
                       <Badge variant="secondary" className="text-xs">
-                        disabled
+                        {t("clusterDisabled")}
                       </Badge>
                     ) : c.capabilitiesProbedAt ? (
-                      <Badge className="bg-success/15 text-success-fg text-xs">active</Badge>
+                      <Badge className="bg-success/15 text-success-fg text-xs">
+                        {t("clusterActive")}
+                      </Badge>
                     ) : (
-                      <Badge className="bg-warning/15 text-warning-fg text-xs">not probed</Badge>
+                      <Badge className="bg-warning/15 text-warning-fg text-xs">
+                        {t("clusterNotProbed")}
+                      </Badge>
                     )}
                   </div>
                 </li>
@@ -239,26 +254,20 @@ export function OpsScreen({
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <div>
               <CardTitle className="flex items-center gap-2 text-base">
-                <BellIcon className="size-4" /> Unresolved alerts
+                <BellIcon className="size-4" /> {t("alerts")}
               </CardTitle>
-              <CardDescription>
-                Alert events that haven&apos;t resolved or been acknowledged.
-              </CardDescription>
+              <CardDescription>{t("alertsDescription")}</CardDescription>
             </div>
             <Link
               href="/alerts"
               className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
             >
-              All alerts <ExternalLinkIcon className="size-3" />
+              {t("allAlerts")} <ExternalLinkIcon className="size-3" />
             </Link>
           </CardHeader>
           <CardContent className="p-0">
             {alertsError ? (
-              <QueryError
-                title="Could not load alerts"
-                error={alertsError}
-                onRetry={onRetryAlerts}
-              />
+              <QueryError title={t("alertsError")} error={alertsError} onRetry={onRetryAlerts} />
             ) : alertsLoading && alertList.length === 0 ? (
               <div className="space-y-2 p-6">
                 <Skeleton className="h-10 w-full" />
@@ -268,8 +277,8 @@ export function OpsScreen({
               <div className="p-6">
                 <EmptyState
                   icon={<CheckCircle2Icon className="size-5" />}
-                  title="All clear"
-                  description="No unresolved alerts firing right now."
+                  title={t("allClear")}
+                  description={t("allClearDescription")}
                 />
               </div>
             ) : (
@@ -281,15 +290,18 @@ export function OpsScreen({
                       <StatusDot status={tone} className="mt-1.5" />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-sm font-medium">{a.summary || "(no summary)"}</span>
+                          <span className="text-sm font-medium">{a.summary || t("noSummary")}</span>
                           <Badge variant="outline" className="text-xs uppercase">
                             {a.severity}
                           </Badge>
                         </div>
                         <div className="text-muted-foreground mt-0.5 text-xs">
-                          fired {fmt.formatDateTime(a.firedAt)}
+                          {t("fired", { at: fmt.formatDateTime(a.firedAt) })}
                           {a.acknowledgedAt && (
-                            <> · ack&apos;d {fmt.formatDateTime(a.acknowledgedAt)}</>
+                            <>
+                              {" "}
+                              · {t("acknowledged", { at: fmt.formatDateTime(a.acknowledgedAt) })}
+                            </>
                           )}
                         </div>
                       </div>
@@ -305,26 +317,20 @@ export function OpsScreen({
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
             <div>
               <CardTitle className="flex items-center gap-2 text-base">
-                <WorkflowIcon className="size-4" /> Recent workflow runs
+                <WorkflowIcon className="size-4" /> {t("runs")}
               </CardTitle>
-              <CardDescription>
-                Temporal workflows kicked off by deploys, previews, or jobs.
-              </CardDescription>
+              <CardDescription>{t("runsDescription")}</CardDescription>
             </div>
             <Link
               href="/workflows"
               className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
             >
-              All workflows <ExternalLinkIcon className="size-3" />
+              {t("allWorkflows")} <ExternalLinkIcon className="size-3" />
             </Link>
           </CardHeader>
           <CardContent className="p-0">
             {runsError ? (
-              <QueryError
-                title="Could not load workflow runs"
-                error={runsError}
-                onRetry={onRetryRuns}
-              />
+              <QueryError title={t("runsError")} error={runsError} onRetry={onRetryRuns} />
             ) : runsLoading && runList.length === 0 ? (
               <div className="space-y-2 p-6">
                 <Skeleton className="h-10 w-full" />
@@ -334,8 +340,8 @@ export function OpsScreen({
               <div className="p-6">
                 <EmptyState
                   icon={<WorkflowIcon className="size-5" />}
-                  title="No workflow runs"
-                  description="Workflow runs appear here as deploys, previews, and scheduled jobs execute."
+                  title={t("noRuns")}
+                  description={t("noRunsDescription")}
                 />
               </div>
             ) : (
@@ -347,17 +353,19 @@ export function OpsScreen({
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-sm font-medium">{r.workflowKind}</span>
                         <Badge variant="secondary" className="text-xs capitalize">
-                          {r.status.replace(/_/g, " ")}
+                          {t.has(`runStatus.${r.status}`)
+                            ? t(`runStatus.${r.status}`)
+                            : r.status.replace(/_/g, " ")}
                         </Badge>
                       </div>
                       <div className="text-muted-foreground mt-0.5 text-xs">
                         {r.startedAt && (
                           <span className="inline-flex items-center gap-1">
                             <ClockIcon className="size-3" />
-                            started {fmt.formatDateTime(r.startedAt)}
+                            {t("started", { at: fmt.formatDateTime(r.startedAt) })}
                           </span>
                         )}
-                        {r.endedAt && <> · ended {fmt.formatDateTime(r.endedAt)}</>}
+                        {r.endedAt && <> · {t("ended", { at: fmt.formatDateTime(r.endedAt) })}</>}
                       </div>
                       {r.failure != null && Object.keys(r.failure).length > 0 && (
                         <div className="text-destructive mt-1 truncate font-mono text-xs">
@@ -378,26 +386,20 @@ export function OpsScreen({
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
           <div>
             <CardTitle className="flex items-center gap-2 text-base">
-              <ScrollTextIcon className="size-4" /> Recent audit events
+              <ScrollTextIcon className="size-4" /> {t("audit")}
             </CardTitle>
-            <CardDescription>
-              Permission decisions and state-changing mutations, append-only.
-            </CardDescription>
+            <CardDescription>{t("auditDescription")}</CardDescription>
           </div>
           <Link
             href="/administration/audit"
             className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-xs"
           >
-            Full audit log <ExternalLinkIcon className="size-3" />
+            {t("fullAudit")} <ExternalLinkIcon className="size-3" />
           </Link>
         </CardHeader>
         <CardContent className="p-0">
           {auditError ? (
-            <QueryError
-              title="Could not load audit events"
-              error={auditError}
-              onRetry={onRetryAudit}
-            />
+            <QueryError title={t("auditError")} error={auditError} onRetry={onRetryAudit} />
           ) : auditLoading && auditList.length === 0 ? (
             <div className="space-y-2 p-6">
               <Skeleton className="h-10 w-full" />
@@ -407,8 +409,8 @@ export function OpsScreen({
             <div className="p-6">
               <EmptyState
                 icon={<ActivityIcon className="size-5" />}
-                title="No audit events yet"
-                description="Events appear here as soon as someone makes a mutation against the API."
+                title={t("noAudit")}
+                description={t("noAuditDescription")}
               />
             </div>
           ) : (
@@ -463,6 +465,7 @@ export function OpsScreen({
 interface KpiTileProps {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
+  errorTitle: string;
   value: React.ReactNode | null;
   sub: React.ReactNode | null;
   href: string;
@@ -471,16 +474,22 @@ interface KpiTileProps {
   onRetry?: () => void;
 }
 
-function KpiTile({ icon: Icon, label, value, sub, href, tone, error, onRetry }: KpiTileProps) {
+function KpiTile({
+  icon: Icon,
+  label,
+  errorTitle,
+  value,
+  sub,
+  href,
+  tone,
+  error,
+  onRetry,
+}: KpiTileProps) {
   if (error)
     return (
       <Card>
         <CardContent className="p-4">
-          <QueryError
-            title={`Could not load ${label.toLowerCase()}`}
-            error={error}
-            onRetry={onRetry}
-          />
+          <QueryError title={errorTitle} error={error} onRetry={onRetry} />
         </CardContent>
       </Card>
     );

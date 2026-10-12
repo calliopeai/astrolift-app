@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { UPDATE_MY_PROFILE } from "@/graphql/identity/identity.mutations";
@@ -30,6 +31,7 @@ const TIMEZONES: string[] = (() => {
 
 /** Settings › Profile › Timezone: the saved override and its update. */
 export function useProfileTimezone() {
+  const t = useTranslations("profileSettings.toasts");
   const { data } = useQuery<ProfileResp>(GET_MY_PROFILE);
   const [updateProfile, { loading: saving }] = useMutation<MutationResp>(UPDATE_MY_PROFILE, {
     refetchQueries: [{ query: GET_MY_PROFILE }],
@@ -56,10 +58,10 @@ export function useProfileTimezone() {
         const zone = picked || browserTz;
         document.cookie = `tz=${encodeURIComponent(zone)};path=/;max-age=31536000;SameSite=Lax`;
       }
-      toast.success("Timezone saved");
+      toast.success(t("timezoneSaved"));
       return true;
     }
-    toast.error(res?.updateMyProfile.errors[0]?.message ?? "Failed to save timezone");
+    toast.error(res?.updateMyProfile.errors[0]?.message ?? t("timezoneFailed"));
     return false;
   }
 

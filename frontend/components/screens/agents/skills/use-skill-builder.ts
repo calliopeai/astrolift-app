@@ -3,6 +3,7 @@
 import { useMutation } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
@@ -37,10 +38,13 @@ export const SKILL_FIELDS = ["name", "slug", "description", "content"] as const;
 export type SkillErrors = FieldErrors<(typeof SKILL_FIELDS)[number]>;
 
 /** Name and slug are required; checked before the save, beside their fields. */
-export function validateSkill(fields: Pick<SkillFields, "name" | "slug">): SkillErrors {
+export function validateSkill(
+  fields: Pick<SkillFields, "name" | "slug">,
+  t: (key: "skillName" | "slugRequired") => string
+): SkillErrors {
   const e: SkillErrors = {};
-  if (!fields.name.trim()) e.name = "Give the skill a name.";
-  if (!fields.slug.trim()) e.slug = "A slug is required.";
+  if (!fields.name.trim()) e.name = t("skillName");
+  if (!fields.slug.trim()) e.slug = t("slugRequired");
   return e;
 }
 
@@ -51,6 +55,8 @@ export function validateSkill(fields: Pick<SkillFields, "name" | "slug">): Skill
  */
 export function useSkillBuilder(id: string) {
   const router = useRouter();
+  const t = useTranslations("agentSkills.toasts");
+  const validation = useTranslations("agentSkills.validation");
   const [aiAssisting, setAiAssisting] = useState(false);
   const skill = useSkill(id);
   const tools = useSkillToolDefs(id);
@@ -66,7 +72,7 @@ export function useSkillBuilder(id: string) {
 
   /** Resolves the errors to show beside their fields; empty when it saved. */
   async function saveSkill(fields: SkillFields): Promise<SkillErrors> {
-    const invalid = validateSkill(fields);
+    const invalid = validateSkill(fields, validation);
     if (hasErrors(invalid)) return invalid;
     try {
       const { data } = await updateSkill({
@@ -82,11 +88,11 @@ export function useSkillBuilder(id: string) {
         },
       });
       if (data?.updateSkill?.ok) {
-        toast.success("Skill saved");
+        toast.success(t("skillSaved"));
         return {};
       }
       const errors = splitErrors(data?.updateSkill?.errors ?? [], SKILL_FIELDS);
-      return hasErrors(errors) ? errors : { form: "The skill was not saved." };
+      return hasErrors(errors) ? errors : { form: t("skillNotSaved") };
     } catch (err) {
       return { form: err instanceof Error ? err.message : String(err) };
     }
@@ -98,10 +104,10 @@ export function useSkillBuilder(id: string) {
   async function deleteSkill() {
     const { data } = await deleteSkillMutation({ variables: { id } });
     if (data?.deleteSkill?.ok) {
-      toast.success("Skill deleted");
+      toast.success(t("skillDeleted"));
       router.push("/agents/skills");
     } else {
-      throw new Error("Failed to delete skill");
+      throw new Error(t("skillDeleteFailed"));
     }
   }
 
@@ -112,7 +118,7 @@ export function useSkillBuilder(id: string) {
     content: string;
   }): Promise<string | null> {
     if (!fields.description.trim() && !fields.name.trim()) {
-      toast.error("Add a name or description first so the AI has context");
+      toast.error(t("aiNeedsContext"));
       return null;
     }
     setAiAssisting(true);
@@ -132,12 +138,12 @@ export function useSkillBuilder(id: string) {
       }
       const json = await res.json();
       if (json.content) {
-        toast.success("AI-generated content applied. Review before saving.");
+        toast.success(t("aiApplied"));
         return json.content as string;
       }
       return null;
     } catch (err) {
-      toast.error(`AI assist failed: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error(t("aiFailed", { error: err instanceof Error ? err.message : String(err) }));
       return null;
     } finally {
       setAiAssisting(false);

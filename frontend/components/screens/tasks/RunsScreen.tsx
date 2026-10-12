@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { Column, RowSelection } from "@/components/data-table";
@@ -29,7 +30,7 @@ import {
 import { useFormatters } from "@/lib/i18n/formatters";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 
-import { RUN_KIND_LABEL, type RunOutcome, type RunRow } from "./runs-list";
+import { type RunOutcome, type RunRow } from "./runs-list";
 
 export interface RunsScreenProps {
   /** List state: views, search, chips, cursor (see runs-list.ts). */
@@ -115,6 +116,7 @@ export function RunsScreen({
   onCancel,
   onRetryRuns,
 }: RunsScreenProps) {
+  const t = useTranslations("taskRuns");
   const fmt = useFormatters();
   const [toCancel, setToCancel] = React.useState<{ runs: RunRow[]; clear?: () => void } | null>(
     null
@@ -124,7 +126,7 @@ export function RunsScreen({
   const columns: Column<RunRow>[] = [
     {
       id: "run",
-      header: "Run",
+      header: t("run"),
       cellClassName: "max-w-48",
       cell: (r) =>
         r.upcoming ? (
@@ -132,12 +134,12 @@ export function RunsScreen({
             <span className="truncate font-mono text-xs" title={r.id}>
               {r.id}
             </span>
-            <span className="text-muted-foreground text-xs">Scheduled run</span>
+            <span className="text-muted-foreground text-xs">{t("scheduledRun")}</span>
           </div>
         ) : (
           <div className="flex min-w-0 flex-col">
             <Identifier value={r.id} kind="id" copyable={false} className="text-xs" />
-            <span className="text-muted-foreground text-xs">{RUN_KIND_LABEL[r.kind]}</span>
+            <span className="text-muted-foreground text-xs">{t(`kinds.${r.kind}`)}</span>
           </div>
         ),
     },
@@ -146,7 +148,7 @@ export function RunsScreen({
       : [
           {
             id: "subject",
-            header: "What",
+            header: t("what"),
             cellClassName: "max-w-72",
             cell: (r: RunRow) => (
               <div className="flex min-w-0 flex-col">
@@ -167,24 +169,24 @@ export function RunsScreen({
         ]),
     {
       id: "status",
-      header: "Status",
+      header: t("status"),
       cell: (r) => <RunOutcomeCell run={r} />,
     },
     {
       id: "took",
-      header: "Took",
+      header: t("took"),
       align: "right",
       cellClassName: "font-mono text-xs tabular-nums",
       cell: (r) => formatTook(r.durationSeconds),
     },
     {
       id: "trigger",
-      header: "Trigger",
+      header: t("trigger"),
       cellClassName: "max-w-48",
       cell: (r) => (
         <div className="flex min-w-0 flex-col">
           <span className="truncate font-mono text-xs" title={r.trigger || undefined}>
-            {r.trigger || <span className="text-muted-foreground">not recorded</span>}
+            {r.trigger || <span className="text-muted-foreground">{t("notRecorded")}</span>}
           </span>
           {r.startedBy && (
             <span className="text-muted-foreground truncate text-xs" title={r.startedBy}>
@@ -196,7 +198,7 @@ export function RunsScreen({
     },
     {
       id: "at",
-      header: upcomingView(list) ? "Fires" : "Started",
+      header: upcomingView(list) ? t("fires") : t("started"),
       sortKey: "at",
       cellClassName: "font-mono text-xs whitespace-nowrap",
       cell: (r) => (r.at ? fmt.formatDateTime(r.at) : "—"),
@@ -219,7 +221,7 @@ export function RunsScreen({
                   onClick={() => setToRetry({ runs: retryable, clear: selection.clear })}
                 >
                   <RotateCcwIcon className="size-4" />
-                  Retry{retryable.length > 0 ? ` ${retryable.length}` : ""}
+                  {t("retryCount", { count: retryable.length })}
                 </Button>
               )}
               {onCancel && (
@@ -230,7 +232,7 @@ export function RunsScreen({
                   onClick={() => setToCancel({ runs: cancellable, clear: selection.clear })}
                 >
                   <XCircleIcon className="size-4" />
-                  Cancel{cancellable.length > 0 ? ` ${cancellable.length}` : ""}
+                  {t("cancelCount", { count: cancellable.length })}
                 </Button>
               )}
             </>
@@ -241,13 +243,13 @@ export function RunsScreen({
   const rowActions = (r: RunRow) => (
     <>
       <DropdownMenuItem asChild>
-        <Link href={r.href}>{r.upcoming ? "Open agent" : "Open run"}</Link>
+        <Link href={r.href}>{r.upcoming ? t("openAgent") : t("openRun")}</Link>
       </DropdownMenuItem>
       {r.watchHref && (
         <DropdownMenuItem asChild>
           <Link href={r.watchHref} target="_blank" rel="noreferrer">
             <MonitorPlayIcon className="size-4" />
-            Watch live
+            {t("watchLive")}
             <ExternalLinkIcon className="size-3.5" />
           </Link>
         </DropdownMenuItem>
@@ -255,13 +257,13 @@ export function RunsScreen({
       {onRetryRuns && r.retry && (
         <DropdownMenuItem onSelect={() => setToRetry({ runs: [r] })}>
           <RotateCcwIcon className="size-4" />
-          Retry run
+          {t("retryRun")}
         </DropdownMenuItem>
       )}
       {onCancel && r.cancel && (
         <DropdownMenuItem onSelect={() => setToCancel({ runs: [r] })}>
           <XCircleIcon className="size-4" />
-          Cancel run
+          {t("cancelRun")}
         </DropdownMenuItem>
       )}
     </>
@@ -269,7 +271,7 @@ export function RunsScreen({
 
   const body = {
     list,
-    label: "Runs",
+    label: t("title"),
     columns,
     rows,
     getRowId: (r: RunRow) => r.key,
@@ -283,15 +285,15 @@ export function RunsScreen({
     empty: embedded
       ? {
           icon: <HistoryIcon className="size-5" />,
-          title: "No runs yet",
-          description: "This agent hasn't run yet. Run now starts one; it appears here live.",
+          title: t("emptyTitle"),
+          description: t("emptyEmbedded"),
         }
       : {
           icon: <HistoryIcon className="size-5" />,
-          title: "No runs yet",
-          description: "Agent runs, workflow runs and task runs appear here as they start.",
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
           actionHref: "/agents?tab=dispatch",
-          actionLabel: "Run an agent",
+          actionLabel: t("runAnAgent"),
         },
     totalCount,
     approximateCount,
@@ -306,20 +308,20 @@ export function RunsScreen({
       ) : (
         <ListPage<RunRow>
           header={{
-            crumbs: [areaSwitcher(NAV, "agents", "runs"), { label: "Runs" }],
-            title: "Runs",
+            crumbs: [areaSwitcher(NAV, "agents", "runs"), { label: t("title") }],
+            title: t("title"),
             primaryAction: (
               <Button asChild size="sm">
                 <Link href="/agents?tab=dispatch">
                   <PlayIcon className="size-4" />
-                  Run agent
+                  {t("runAgent")}
                 </Link>
               </Button>
             ),
             menu: (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" aria-label="More">
+                  <Button variant="ghost" size="icon" aria-label={t("more")}>
                     <MoreHorizontalIcon className="size-4" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -327,7 +329,7 @@ export function RunsScreen({
                   <DropdownMenuItem asChild>
                     <Link href="/tasks/templates">
                       <ClipboardListIcon className="size-4" />
-                      Task templates
+                      {t("taskTemplates")}
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -344,11 +346,11 @@ export function RunsScreen({
           onOpenChange={(open) => !open && setToRetry(null)}
           title={
             toRetry && toRetry.runs.length > 1
-              ? `Retry ${toRetry.runs.length} runs?`
-              : "Retry this run?"
+              ? t("retryManyTitle", { count: toRetry.runs.length })
+              : t("retryOneTitle")
           }
-          description="Each agent run starts again with the same brief, environment and inputs, as a new run you started. A run that could not start again says why."
-          confirmLabel="Retry runs"
+          description={t("retryDescription")}
+          confirmLabel={t("retryConfirm")}
           onConfirm={async () => {
             if (!toRetry) return;
             await onRetryRuns(toRetry.runs);
@@ -363,12 +365,12 @@ export function RunsScreen({
           onOpenChange={(open) => !open && setToCancel(null)}
           title={
             toCancel && toCancel.runs.length > 1
-              ? `Cancel ${toCancel.runs.length} runs?`
-              : "Cancel this run?"
+              ? t("cancelManyTitle", { count: toCancel.runs.length })
+              : t("cancelOneTitle")
           }
-          description="An agent run's Kubernetes Job and its per-task Secret are deleted; a workflow run gets a cooperative cancel and may clean up first. A run that could not be cancelled stays active and says why."
-          confirmLabel="Cancel runs"
-          cancelLabel="Keep running"
+          description={t("cancelDescription")}
+          confirmLabel={t("cancelConfirm")}
+          cancelLabel={t("keepRunning")}
           destructive
           onConfirm={async () => {
             if (!toCancel) return;

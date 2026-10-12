@@ -11,6 +11,7 @@ import {
   type NodeProps,
 } from "@xyflow/react";
 import { BotIcon, WrenchIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ const RADIUS_X = 190;
 const RADIUS_Y = 118;
 
 function AgentNode({ data }: NodeProps<Node<AgentNodeData>>) {
+  const t = useTranslations("obsAgentActivityGraph");
   return (
     <div className="relative">
       {data.active && (
@@ -60,7 +62,7 @@ function AgentNode({ data }: NodeProps<Node<AgentNodeData>>) {
         />
         <span className="max-w-[140px] truncate text-sm font-semibold">{data.label}</span>
         <span className="text-muted-foreground text-2xs tracking-wide uppercase">
-          {data.active ? `${data.runningCount} running` : "idle"}
+          {data.active ? t("running", { count: data.runningCount }) : t("idle")}
         </span>
       </div>
       {/* Source handles on every side so radial edges leave cleanly. */}
@@ -113,6 +115,7 @@ export function AgentActivityGraph({
   runningCount: number;
   className?: string;
 }) {
+  const t = useTranslations("obsAgentActivityGraph");
   const { nodes, edges } = React.useMemo(() => {
     const agentNode: Node<AgentNodeData> = {
       id: "__agent__",
@@ -179,7 +182,7 @@ export function AgentActivityGraph({
       </ReactFlow>
       {tools.length === 0 && (
         <div className="text-muted-foreground pointer-events-none absolute inset-x-0 bottom-3 text-center text-xs">
-          No tools bound yet — the graph fills in as skills &amp; tools are attached.
+          {t("noTools")}
         </div>
       )}
     </div>

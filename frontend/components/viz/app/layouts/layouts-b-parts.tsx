@@ -1,11 +1,13 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
 import type { AppNode } from "../../core/app-model";
-import { HEALTH_COLOR, HEALTH_LABEL, MOTION_CLASS } from "../../core/semantics";
+import { HEALTH_COLOR, MOTION_CLASS } from "../../core/semantics";
+import type { VizT } from "../../core/viz-t";
 
 import { FOCUS_RING, tint } from "./layout-parts";
 import { EVENT_WINDOW_MS, FLASH_MS, recency } from "./layouts-b";
@@ -16,12 +18,13 @@ import { EVENT_WINDOW_MS, FLASH_MS, recency } from "./layouts-b";
  */
 
 /** Utilisation 0..1 as a filled bar in the node's health colour. */
-export function LoadBar({ node, label = "load" }: { node: AppNode; label?: string }) {
+export function LoadBar({ node, label }: { node: AppNode; label?: string }) {
+  const t = useTranslations("vizRender");
   const pct = Math.round(node.load * 100);
   return (
     <span
       className="bg-muted/60 relative block h-1 w-full overflow-hidden rounded-sm"
-      title={`${label} ${pct}%`}
+      title={t("loadBar", { label: label ?? t("load"), pct })}
     >
       <span
         className="absolute inset-y-0 left-0 rounded-sm"
@@ -108,8 +111,8 @@ export const PhosphorDot = React.memo(function PhosphorDot({
   );
 });
 
-export function healthLabel(node: AppNode): string {
-  return HEALTH_LABEL[node.health];
+export function healthLabel(node: AppNode, t: VizT): string {
+  return t(`health.${node.health}`);
 }
 
 export function fmtRps(rps?: number): string {

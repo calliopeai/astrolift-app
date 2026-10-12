@@ -1,6 +1,7 @@
 "use client";
 
 import { BellIcon, BellOffIcon, CheckCheckIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Feed } from "@/components/feed/Feed";
 import { Badge } from "@/components/ui/badge";
@@ -35,29 +36,30 @@ export function NotificationsInbox({
   onMarkAll,
   more,
 }: NotificationsInboxProps) {
+  const t = useTranslations("notificationSettings");
   const fmt = useFormatters();
   const unread = notifications.filter((n) => !n.readAt);
 
   return (
-    <Section
-      title="Inbox"
-      description="Deploy approvals, failure alerts, invitations, quota warnings."
-    >
+    <Section title={t("inboxTitle")} description={t("inboxDescription")}>
       <div className="flex min-w-0 items-center justify-between gap-3">
         <Badge variant="outline" className="gap-1">
           <BellIcon className="size-3" />
-          <span className="font-mono">{unread.length}</span> unread
+          {t.rich("unread", {
+            count: unread.length,
+            num: (chunks) => <span className="font-mono">{chunks}</span>,
+          })}
         </Badge>
         {unread.length > 0 && (
           <Button size="sm" variant="outline" onClick={onMarkAll} disabled={markingAll}>
             <CheckCheckIcon className="size-4" />
-            Mark all as read
+            {t("markAll")}
           </Button>
         )}
       </div>
 
       <Feed<AstroliftNotification>
-        label="Notifications"
+        label={t("feedLabel")}
         items={notifications}
         loading={loading && notifications.length === 0}
         error={error}
@@ -68,9 +70,8 @@ export function NotificationsInbox({
         maxHeight="max-h-128"
         empty={{
           icon: <BellOffIcon className="size-5" />,
-          title: "Inbox empty",
-          description:
-            "Notifications appear here as deploys finish, invitations arrive, or quotas approach their limits.",
+          title: t("inboxEmptyTitle"),
+          description: t("inboxEmptyDescription"),
         }}
         renderItem={(n) => (
           <div
@@ -98,7 +99,7 @@ export function NotificationsInbox({
             </div>
             {!n.readAt && (
               <Button size="sm" variant="ghost" onClick={() => onMarkRead(n.id)} disabled={marking}>
-                Mark read
+                {t("markRead")}
               </Button>
             )}
           </div>

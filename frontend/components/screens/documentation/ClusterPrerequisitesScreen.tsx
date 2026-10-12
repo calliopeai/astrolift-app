@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -80,58 +82,69 @@ const verifyMetrics = `kubectl get apiservice v1beta1.metrics.k8s.io
 
 kubectl top nodes  # should return numbers, not an error`;
 
+const code = (chunks: ReactNode) => <code>{chunks}</code>;
+function docLink(href: string) {
+  return function DocLink(chunks: ReactNode) {
+    return (
+      <Link href={href} className="text-foreground underline-offset-2 hover:underline">
+        {chunks}
+      </Link>
+    );
+  };
+}
+function externalLink(href: string) {
+  return function ExternalLink(chunks: ReactNode) {
+    return (
+      <a
+        href={href}
+        className="text-foreground underline-offset-2 hover:underline"
+        target="_blank"
+        rel="noreferrer"
+      >
+        {chunks}
+      </a>
+    );
+  };
+}
+
 /** The static "Cluster prerequisites" documentation page. */
 export function ClusterPrerequisitesScreen() {
+  const t = useTranslations("docsClusterPrereqs");
   return (
     <article className="flex max-w-2xl flex-1 flex-col gap-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Cluster prerequisites</h1>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Everything a Kubernetes cluster needs to have installed before you register it with
-          Astrolift. Most clusters provisioned by <code>astrolift-opscode</code> already include
-          these — this guide is for operators bringing their own cluster.
-        </p>
+        <h1 className="text-2xl font-semibold">{t("title")}</h1>
+        <p className="text-muted-foreground mt-2 text-sm">{t.rich("intro", { code })}</p>
       </div>
 
       <div className="border-primary/30 bg-primary/5 rounded-md border p-4 text-sm">
-        <p className="font-medium">One-shot install via the CLI</p>
+        <p className="font-medium">{t("cliTitle")}</p>
         <p className="text-muted-foreground mt-1">
-          For a one-shot install of the prereqs below — driver-tuned for your provider — run{" "}
-          <code className="font-mono text-xs">
-            astro cluster bootstrap --cluster-slug &lt;slug&gt;
-          </code>{" "}
-          from your terminal. The CLI plants Flux + the platform&apos;s umbrella chart, then the
-          cluster detail page&apos;s bootstrap card lets you reconcile the selection over time.{" "}
-          <Link href="/downloads" className="text-primary underline-offset-4 hover:underline">
-            Install the CLI
-          </Link>
-          .
+          {t.rich("cliBody", {
+            command: "astro cluster bootstrap --cluster-slug <slug>",
+            cmd: (chunks) => <code className="font-mono text-xs">{chunks}</code>,
+            link: (chunks) => (
+              <Link href="/downloads" className="text-primary underline-offset-4 hover:underline">
+                {chunks}
+              </Link>
+            ),
+          })}
         </p>
       </div>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">When you need this</h2>
-        <p className="text-muted-foreground text-sm leading-relaxed">
-          Astrolift treats a tenant cluster as a runtime that hosts apps — it does not install or
-          own infrastructure components in the cluster itself. Custom-domain TLS, ingress routing,
-          and autoscaling are delegated to controllers that need to exist before Astrolift can use
-          them. The checks below confirm the cluster is wired correctly; if any are missing, the
-          matching features stay disabled and the control plane surfaces a remediation hint on the
-          cluster detail page.
-        </p>
+        <h2 className="text-lg font-medium">{t("whenTitle")}</h2>
+        <p className="text-muted-foreground text-sm leading-relaxed">{t("whenBody")}</p>
       </section>
 
       <Separator />
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-medium">Required</h2>
-          <Badge variant="secondary">must install</Badge>
+          <h2 className="text-lg font-medium">{t("requiredTitle")}</h2>
+          <Badge variant="secondary">{t("requiredBadge")}</Badge>
         </div>
-        <p className="text-muted-foreground text-sm leading-relaxed">
-          Without these, registration succeeds but app workloads cannot accept inbound traffic on a
-          custom hostname.
-        </p>
+        <p className="text-muted-foreground text-sm leading-relaxed">{t("requiredBody")}</p>
       </section>
 
       <section className="flex flex-col gap-3">
@@ -139,23 +152,16 @@ export function ClusterPrerequisitesScreen() {
           cert-manager <span className="text-muted-foreground">(v1.13+)</span>
         </h3>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Issues and renews TLS certificates for custom domains. Astrolift creates{" "}
-          <code>Certificate</code> resources on your behalf; cert-manager handles the ACME dance
-          with Let&apos;s Encrypt (or whichever <code>ClusterIssuer</code> you configure). Without
-          cert-manager the{" "}
-          <Link
-            href="/documentation/custom-domains"
-            className="text-foreground underline-offset-2 hover:underline"
-          >
-            custom-domains
-          </Link>{" "}
-          workflow refuses to bind hostnames.
+          {t.rich("certManagerBody", {
+            code,
+            link: docLink("/documentation/custom-domains"),
+          })}
         </p>
         <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
           <code>{certManagerInstall}</code>
         </pre>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Upstream:{" "}
+          {t("upstream")}{" "}
           <a
             href="https://cert-manager.io/docs/installation/"
             className="text-foreground underline-offset-2 hover:underline"
@@ -168,15 +174,13 @@ export function ClusterPrerequisitesScreen() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h3 className="text-base font-medium">An ingress controller</h3>
+        <h3 className="text-base font-medium">{t("ingressTitle")}</h3>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Astrolift renders one ingress resource per app whose <code>spec.ingressClassName</code>{" "}
-          matches an <code>IngressClass</code> that exists in the cluster. Any of the following
-          controllers is fine — pick the one your platform team already runs.
+          {t.rich("ingressBody", { code })}
         </p>
 
         <h4 className="text-sm font-medium">
-          ingress-nginx <Badge variant="outline">default</Badge>
+          ingress-nginx <Badge variant="outline">{t("defaultBadge")}</Badge>
         </h4>
         <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
           <code>{ingressNginxInstall}</code>
@@ -187,8 +191,7 @@ export function ClusterPrerequisitesScreen() {
           <code>{istioInstall}</code>
         </pre>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          When Astrolift detects Istio it emits <code>Gateway</code> + <code>VirtualService</code>{" "}
-          resources instead of <code>Ingress</code>.
+          {t.rich("istioNote", { code })}
         </p>
 
         <h4 className="text-sm font-medium">AWS Load Balancer Controller / GCP Gateway API</h4>
@@ -196,46 +199,26 @@ export function ClusterPrerequisitesScreen() {
           <code>{albInstall}</code>
         </pre>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          On EKS, the ALB controller exposes services through an <code>alb</code> IngressClass. On
-          GKE, the Gateway API controller ships with the cluster — install{" "}
-          <a
-            href="https://gateway-api.sigs.k8s.io/"
-            className="text-foreground underline-offset-2 hover:underline"
-            target="_blank"
-            rel="noreferrer"
-          >
-            gateway-api
-          </a>{" "}
-          CRDs to use it.
+          {t.rich("albBody", { code, link: externalLink("https://gateway-api.sigs.k8s.io/") })}
         </p>
       </section>
 
       <section className="flex flex-col gap-3">
         <h3 className="text-base font-medium">
-          external-dns{" "}
-          <span className="text-muted-foreground">(optional, strongly recommended)</span>
+          external-dns <span className="text-muted-foreground">{t("externalDnsQualifier")}</span>
         </h3>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Reads the hostnames from <code>Certificate.spec.dnsNames</code> / ingress resources and
-          creates the corresponding records at your DNS provider. Required when you want Astrolift
-          to fully self-serve custom-domain publication — otherwise an operator has to add CNAMEs by
-          hand.
+          {t.rich("externalDnsBody", { code })}
         </p>
         <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
           <code>{externalDnsInstall}</code>
         </pre>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Supported providers with controller-friendly APIs include AWS Route53, Google Cloud DNS,
-          Azure DNS, and Cloudflare. See{" "}
-          <a
-            href="https://kubernetes-sigs.github.io/external-dns/latest/#supported-providers"
-            className="text-foreground underline-offset-2 hover:underline"
-            target="_blank"
-            rel="noreferrer"
-          >
-            the upstream provider list
-          </a>{" "}
-          for the full set.
+          {t.rich("externalDnsProviders", {
+            link: externalLink(
+              "https://kubernetes-sigs.github.io/external-dns/latest/#supported-providers"
+            ),
+          })}
         </p>
       </section>
 
@@ -243,21 +226,16 @@ export function ClusterPrerequisitesScreen() {
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-medium">Recommended</h2>
-          <Badge variant="outline">nice to have</Badge>
+          <h2 className="text-lg font-medium">{t("recommendedTitle")}</h2>
+          <Badge variant="outline">{t("recommendedBadge")}</Badge>
         </div>
-        <p className="text-muted-foreground text-sm leading-relaxed">
-          Astrolift works without these, but specific features stay off until they are present.
-        </p>
+        <p className="text-muted-foreground text-sm leading-relaxed">{t("recommendedBody")}</p>
       </section>
 
       <section className="flex flex-col gap-3">
-        <h3 className="text-base font-medium">A default storage class</h3>
+        <h3 className="text-base font-medium">{t("storageTitle")}</h3>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Required for in-cluster managed services that claim <code>PersistentVolumeClaim</code>s —
-          for example the in-cluster Postgres operator, in-cluster Redis, or any app that mounts a
-          PVC directly. If every app you run uses an external RDS/Cloud SQL managed service, you can
-          skip this.
+          {t.rich("storageBody", { code })}
         </p>
         <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
           <code>{verifyStorage}</code>
@@ -267,10 +245,7 @@ export function ClusterPrerequisitesScreen() {
       <section className="flex flex-col gap-3">
         <h3 className="text-base font-medium">metrics-server</h3>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          The Kubernetes <code>HorizontalPodAutoscaler</code> reads CPU / memory from{" "}
-          <code>metrics.k8s.io</code>; without metrics-server autoscaling rules sit idle at the
-          current replica count. Astrolift falls back to manual replica counts but the autoscale tab
-          on app detail surfaces a banner explaining what&apos;s missing.
+          {t.rich("metricsBody", { code })}
         </p>
         <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
           <code>{metricsServerInstall}</code>
@@ -278,12 +253,8 @@ export function ClusterPrerequisitesScreen() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h3 className="text-base font-medium">In-cluster Prometheus</h3>
-        <p className="text-muted-foreground text-sm leading-relaxed">
-          When Astrolift detects a reachable Prometheus it points the app metrics panels at it.
-          Without one the panels render synthetic time-series so the UI stays useful in dev — but
-          real workload numbers require Prometheus or another Prometheus-compatible scraper.
-        </p>
+        <h3 className="text-base font-medium">{t("prometheusTitle")}</h3>
+        <p className="text-muted-foreground text-sm leading-relaxed">{t("prometheusBody")}</p>
         <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
           <code>{prometheusInstall}</code>
         </pre>
@@ -292,18 +263,15 @@ export function ClusterPrerequisitesScreen() {
       <Separator />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Verifying the install</h2>
-        <p className="text-muted-foreground text-sm leading-relaxed">
-          Run these from a workstation that can reach the cluster. If any check fails, the matching
-          feature stays disabled in Astrolift.
-        </p>
+        <h2 className="text-lg font-medium">{t("verifyTitle")}</h2>
+        <p className="text-muted-foreground text-sm leading-relaxed">{t("verifyBody")}</p>
 
         <h3 className="text-sm font-medium">cert-manager</h3>
         <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
           <code>{verifyCertManager}</code>
         </pre>
 
-        <h3 className="text-sm font-medium">Ingress class</h3>
+        <h3 className="text-sm font-medium">{t("ingressClassTitle")}</h3>
         <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
           <code>{verifyIngress}</code>
         </pre>
@@ -317,18 +285,18 @@ export function ClusterPrerequisitesScreen() {
       <Separator />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Troubleshooting</h2>
+        <h2 className="text-lg font-medium">{t("troubleshootingTitle")}</h2>
         <ul className="text-muted-foreground flex flex-col gap-3 text-sm">
           <li>
             <strong className="text-foreground">
-              cert-manager pending forever (Certificate stuck in
-              <code className="mx-1">Pending</code>).
+              {t.rich("troubleCertTitle", {
+                pending: (chunks) => <code className="mx-1">{chunks}</code>,
+              })}
             </strong>{" "}
-            Almost always an ACME challenge problem. For <code>dns-01</code>: the issuer has no
-            credentials to write the TXT record (check the <code>ClusterIssuer</code> spec, then the
-            controller pod logs for credential errors). For <code>http-01</code>: the validator pod
-            cannot reach <code>http://&lt;hostname&gt;/.well-known/acme-challenge/...</code> — make
-            sure the ingress controller is exposed publicly. Inspect with:
+            {t.rich("troubleCertBody", {
+              code,
+              url: "http://<hostname>/.well-known/acme-challenge/...",
+            })}
             <pre className="bg-muted mt-2 overflow-x-auto rounded-md p-3 text-xs leading-relaxed">
               <code>{`kubectl describe certificate <name> -n <namespace>
 kubectl describe challenge -A
@@ -336,28 +304,18 @@ kubectl logs -n cert-manager deploy/cert-manager`}</code>
             </pre>
           </li>
           <li>
-            <strong className="text-foreground">Ingress returns 503 with no backend.</strong> The
-            Service the ingress points at has zero ready endpoints. Most often: the app pods are
-            still pulling the image, the readiness probe is failing, or the Service{" "}
-            <code>selector</code> doesn&apos;t match the pod labels. Confirm with{" "}
-            <code>kubectl get endpoints &lt;svc&gt;</code>; if the address list is empty the ingress
-            has nothing to forward to.
+            <strong className="text-foreground">{t("troubleIngressTitle")}</strong>{" "}
+            {t.rich("troubleIngressBody", { code, command: "kubectl get endpoints <svc>" })}
           </li>
           <li>
-            <strong className="text-foreground">external-dns is not creating records.</strong> Two
-            common causes: (a) RBAC — the controller&apos;s service account needs{" "}
-            <code>list/watch</code> on <code>services</code>, <code>ingresses</code>, and the
-            provider&apos;s CRDs, plus IAM/credentials to call the DNS provider&apos;s API; (b)
-            ownership — external-dns refuses to modify a record it didn&apos;t create unless the TXT
-            owner-id marker matches. Check the controller logs for <code>skipping endpoint</code>{" "}
-            messages.
+            <strong className="text-foreground">{t("troubleDnsTitle")}</strong>{" "}
+            {t.rich("troubleDnsBody", { code })}
           </li>
           <li>
             <strong className="text-foreground">
-              HPA shows <code>&lt;unknown&gt;</code> for the target metric.
+              {t.rich("troubleHpaTitle", { code, unknown: "<unknown>" })}
             </strong>{" "}
-            metrics-server is not installed or not scraping. Run <code>kubectl top pods</code> — if
-            it errors with <code>Metrics API not available</code>, metrics-server is the fix.
+            {t.rich("troubleHpaBody", { code })}
           </li>
         </ul>
       </section>
@@ -365,26 +323,12 @@ kubectl logs -n cert-manager deploy/cert-manager`}</code>
       <Separator />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Related</h2>
+        <h2 className="text-lg font-medium">{t("relatedTitle")}</h2>
         <ul className="text-muted-foreground flex flex-col gap-1.5 text-sm">
           <li>
-            <Link
-              href="/documentation/custom-domains"
-              className="text-foreground underline-offset-2 hover:underline"
-            >
-              Custom domains
-            </Link>{" "}
-            — the feature that depends on cert-manager and an ingress controller being present.
+            {t.rich("relatedCustomDomains", { link: docLink("/documentation/custom-domains") })}
           </li>
-          <li>
-            <Link
-              href="/documentation/get-started"
-              className="text-foreground underline-offset-2 hover:underline"
-            >
-              Get started
-            </Link>{" "}
-            — bring up the Astrolift stack locally before pointing it at a tenant cluster.
-          </li>
+          <li>{t.rich("relatedGetStarted", { link: docLink("/documentation/get-started") })}</li>
         </ul>
       </section>
     </article>

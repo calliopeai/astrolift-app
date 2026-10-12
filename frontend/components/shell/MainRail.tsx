@@ -2,6 +2,7 @@
 
 import { ChevronDownIcon, ChevronsLeftIcon, ChevronsRightIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -41,9 +42,10 @@ export function MainRail({
   footer,
   className,
 }: MainRailProps) {
+  const t = useTranslations("mainRail");
   return (
     <nav
-      aria-label="Main"
+      aria-label={t("label")}
       data-collapsed={collapsed || undefined}
       className={cn(
         "bg-sidebar text-sidebar-foreground border-sidebar-border flex h-full shrink-0 flex-col border-r transition-[width] duration-200",
@@ -70,8 +72,8 @@ export function MainRail({
         <button
           type="button"
           onClick={() => onCollapsedChange(!collapsed)}
-          aria-label={collapsed ? "Expand the main rail" : "Collapse the main rail"}
-          title={collapsed ? "Expand  [" : "Collapse  ["}
+          aria-label={collapsed ? t("expand") : t("collapse")}
+          title={collapsed ? t("expandTitle") : t("collapseTitle")}
           className="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent focus-visible:ring-ring flex h-8 items-center justify-center rounded-md focus-visible:ring-2 focus-visible:outline-none"
         >
           {collapsed ? (

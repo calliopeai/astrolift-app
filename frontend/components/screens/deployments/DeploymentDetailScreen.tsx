@@ -57,12 +57,12 @@ import type { useDeploymentDetail } from "./use-deployment-detail";
 export type DeploymentDetailScreenProps = ReturnType<typeof useDeploymentDetail>;
 
 /** Deployments ▾ › storefront › deploy 4f2a9c1e (spec 44 §4.4). */
-function crumbs(d: AstroliftDeployment | null) {
-  if (!d) return appsDetailCrumbs("deployments", { label: "deploy …" });
+function crumbs(d: AstroliftDeployment | null, deployLabel: (sha: string) => string) {
+  if (!d) return appsDetailCrumbs("deployments", { label: deployLabel("…") });
   return appsDetailCrumbs(
     "deployments",
     { label: d.registeredAppSlug, href: `/apps/${d.registeredAppSlug}/deployments` },
-    { label: `deploy ${deploySha(d)}` }
+    { label: deployLabel(deploySha(d)) }
   );
 }
 
@@ -113,6 +113,8 @@ export function DeploymentDetailScreen({
   onDelete,
 }: DeploymentDetailScreenProps) {
   const t = useTranslations("lists.deploymentDetail");
+  const tx = useTranslations("deploymentDetailScreen");
+  const deployLabel = (sha: string) => tx("deployLabel", { sha });
   const actionLabel = useTranslations("lists.deployments.actions");
   const [confirmAbort, setConfirmAbort] = React.useState(false);
   const [confirmRollback, setConfirmRollback] = React.useState(false);
@@ -123,7 +125,7 @@ export function DeploymentDetailScreen({
   if (!d && loading) {
     return (
       <RunPage
-        crumbs={crumbs(null)}
+        crumbs={crumbs(null, deployLabel)}
         title={t("loadingTitle")}
         steps={[]}
         stepsLoading
@@ -135,7 +137,10 @@ export function DeploymentDetailScreen({
   if (!d) {
     return (
       <div className="flex min-w-0 flex-1 flex-col gap-4">
-        <ShellHeader crumbs={crumbs(null)} title={error ? t("loadingTitle") : t("notFoundTitle")} />
+        <ShellHeader
+          crumbs={crumbs(null, deployLabel)}
+          title={error ? t("loadingTitle") : t("notFoundTitle")}
+        />
         <PanelGrid>
           <Panel
             title={t("loadingTitle")}
@@ -150,7 +155,7 @@ export function DeploymentDetailScreen({
                     title: t("notFoundTitle"),
                     description: t("notFoundDescription"),
                     actionHref: "/deployments",
-                    actionLabel: "Open deployments",
+                    actionLabel: tx("openDeployments"),
                   }
             }
           />
@@ -268,8 +273,8 @@ export function DeploymentDetailScreen({
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6">
       <RunPage
-        crumbs={crumbs(d)}
-        title={`deploy ${deploySha(d)}`}
+        crumbs={crumbs(d, deployLabel)}
+        title={deployLabel(deploySha(d))}
         status={<DeploymentStatusPill status={d.status} />}
         durationMs={elapsedMs(d, now)}
         context={
@@ -320,7 +325,7 @@ export function DeploymentDetailScreen({
       />
 
       <PanelGrid className="items-start">
-        <Panel title="Details" icon={<InfoIcon className="size-4" />} span={6}>
+        <Panel title={tx("details")} icon={<InfoIcon className="size-4" />} span={6}>
           <DefinitionList
             items={[
               {
@@ -415,7 +420,7 @@ export function DeploymentDetailScreen({
         {/* #653: the approval trail when the deploy gated through quorum, else
             who or what triggered it. */}
         <Panel
-          title="Approvals"
+          title={tx("approvals")}
           icon={<ActivityIcon className="size-4" />}
           span={6}
           loading={approvalHistoryLoading}
@@ -433,9 +438,11 @@ export function DeploymentDetailScreen({
           {approvalHistory.length === 0 ? (
             <p className="text-muted-foreground text-sm [overflow-wrap:anywhere]">
               {d.triggeredByUserId
-                ? `Triggered by user ${d.triggeredByUserId} via ${d.triggerKind}.`
-                : `Triggered automatically via ${d.triggerKind}${d.ciProvider ? ` (${d.ciProvider})` : ""}.`}
-              {d.approvalsRequired === 0 && " No approvals required for this environment."}
+                ? tx("triggeredByUser", { user: d.triggeredByUserId, kind: d.triggerKind })
+                : d.ciProvider
+                  ? tx("triggeredAutoCi", { kind: d.triggerKind, ci: d.ciProvider })
+                  : tx("triggeredAuto", { kind: d.triggerKind })}
+              {d.approvalsRequired === 0 && ` ${tx("noApprovalsRequired")}`}
             </p>
           ) : (
             <ol className="flex min-w-0 flex-col divide-y text-sm">
@@ -478,7 +485,7 @@ export function DeploymentDetailScreen({
         {/* #657, #738: the PRs and commits since the previous good deploy,
             else the raw commit message. */}
         {(releaseNotes || d.commitMessage) && (
-          <Panel title="Release notes" icon={<NotebookTextIcon className="size-4" />} span={6}>
+          <Panel title={tx("releaseNotes")} icon={<NotebookTextIcon className="size-4" />} span={6}>
             {releaseNotes ? (
               <div className="flex min-w-0 flex-col gap-3 text-sm">
                 {releaseNotes.pullRequests.length > 0 && (
@@ -509,7 +516,10 @@ export function DeploymentDetailScreen({
                 {nonMerge.length > 0 && (
                   <details>
                     <summary className="text-muted-foreground cursor-pointer text-xs">
-                      <span className="font-mono">{nonMerge.length}</span> commits
+                      {tx.rich("commits", {
+                        count: nonMerge.length,
+                        mono: (chunks) => <span className="font-mono">{chunks}</span>,
+                      })}
                     </summary>
                     <ul className="mt-2 flex flex-col gap-1">
                       {nonMerge.map((c) => (
@@ -530,7 +540,7 @@ export function DeploymentDetailScreen({
                     rel="noreferrer"
                     className="text-muted-foreground text-xs hover:underline"
                   >
-                    View full diff
+                    {tx("viewDiff")}
                   </a>
                 )}
               </div>

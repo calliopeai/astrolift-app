@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -58,6 +59,7 @@ export interface CreateWebhookInput {
  * ConfirmDialog keeps itself open and toasts the message.
  */
 export function useWebhooks(appSlug?: string) {
+  const t = useTranslations("webhooksScreen.toasts");
   const handleVersionMismatch = useVersionMismatch();
   const [reveal, setReveal] = React.useState<AstroliftWebhookSecretReveal | null>(null);
   const [testResult, setTestResult] = React.useState<AstroliftWebhookTestResult | null>(null);
@@ -65,8 +67,7 @@ export function useWebhooks(appSlug?: string) {
   const [pendingRows, setPendingRows] = React.useState<ReadonlySet<string>>(new Set());
 
   async function runRowAction(id: string, action: () => Promise<void>) {
-    if (pendingRef.current.has(id))
-      throw new Error("An action is already running for this subscription");
+    if (pendingRef.current.has(id)) throw new Error(t("busy"));
     pendingRef.current.add(id);
     setPendingRows(new Set(pendingRef.current));
     try {
@@ -154,10 +155,10 @@ export function useWebhooks(appSlug?: string) {
         setReveal(data.createWebhookSubscription.data);
         return true;
       }
-      toast.error(data?.createWebhookSubscription.errors?.[0]?.message ?? "Create failed");
+      toast.error(data?.createWebhookSubscription.errors?.[0]?.message ?? t("createFailed"));
       return false;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Create failed");
+      toast.error(err instanceof Error ? err.message : t("createFailed"));
       return false;
     }
   }
@@ -166,9 +167,9 @@ export function useWebhooks(appSlug?: string) {
     return runRowAction(s.id, async () => {
       const { data } = await deleteWebhook({ variables: { input: { id: s.id } } });
       if (data?.deleteWebhookSubscription.ok) {
-        toast.success("Deleted");
+        toast.success(t("deleted"));
       } else {
-        throw new Error(data?.deleteWebhookSubscription.errors?.[0]?.message ?? "Delete failed");
+        throw new Error(data?.deleteWebhookSubscription.errors?.[0]?.message ?? t("deleteFailed"));
       }
     });
   }
@@ -181,7 +182,7 @@ export function useWebhooks(appSlug?: string) {
           variables: { input: { id: s.id, isActive: next, ifMatchVersion: s.version } },
         });
         if (data?.updateWebhookSubscription.ok) {
-          toast.success(next ? "Resumed" : "Paused");
+          toast.success(next ? t("resumed") : t("paused"));
         } else if (
           handleVersionMismatch(data?.updateWebhookSubscription, {
             label: "webhook subscription",
@@ -190,11 +191,11 @@ export function useWebhooks(appSlug?: string) {
         ) {
           // toast already raised by helper
         } else {
-          toast.error(data?.updateWebhookSubscription.errors?.[0]?.message ?? "Toggle failed");
+          toast.error(data?.updateWebhookSubscription.errors?.[0]?.message ?? t("toggleFailed"));
         }
       });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Update failed");
+      toast.error(err instanceof Error ? err.message : t("updateFailed"));
     }
   }
 
@@ -205,7 +206,7 @@ export function useWebhooks(appSlug?: string) {
           variables: { input: { id: s.id, format: next, ifMatchVersion: s.version } },
         });
         if (data?.updateWebhookSubscription.ok) {
-          toast.success(`Format set to ${next}`);
+          toast.success(t("formatSet", { format: next }));
         } else if (
           handleVersionMismatch(data?.updateWebhookSubscription, {
             label: "webhook subscription",
@@ -214,11 +215,11 @@ export function useWebhooks(appSlug?: string) {
         ) {
           // toast already raised by helper
         } else {
-          toast.error(data?.updateWebhookSubscription.errors?.[0]?.message ?? "Update failed");
+          toast.error(data?.updateWebhookSubscription.errors?.[0]?.message ?? t("updateFailed"));
         }
       });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Update failed");
+      toast.error(err instanceof Error ? err.message : t("updateFailed"));
     }
   }
 
@@ -227,10 +228,10 @@ export function useWebhooks(appSlug?: string) {
       const { data } = await rotateSecret({ variables: { input: { id: s.id } } });
       if (data?.rotateOutboundWebhookSecret.ok && data.rotateOutboundWebhookSecret.data) {
         setReveal(data.rotateOutboundWebhookSecret.data);
-        toast.success("Secret rotated — copy the new value now");
+        toast.success(t("rotated"));
       } else {
         throw new Error(
-          data?.rotateOutboundWebhookSecret.errors?.[0]?.message ?? "Rotation failed"
+          data?.rotateOutboundWebhookSecret.errors?.[0]?.message ?? t("rotationFailed")
         );
       }
     });
@@ -243,14 +244,18 @@ export function useWebhooks(appSlug?: string) {
         setTestResult(data.testWebhookSubscription.data);
         const code = data.testWebhookSubscription.data.statusCode;
         if (code && code >= 200 && code < 300) {
-          toast.success(`Delivered: HTTP ${code}`);
+          toast.success(t("delivered", { code }));
         } else if (code) {
-          toast.warning(`Subscriber returned HTTP ${code}`);
+          toast.warning(t("subscriberReturned", { code }));
         } else {
-          toast.error(`Transport failure: ${data.testWebhookSubscription.data.error || "unknown"}`);
+          toast.error(
+            t("transportFailure", {
+              error: data.testWebhookSubscription.data.error || t("unknown"),
+            })
+          );
         }
       } else {
-        throw new Error(data?.testWebhookSubscription.errors?.[0]?.message ?? "Test fire failed");
+        throw new Error(data?.testWebhookSubscription.errors?.[0]?.message ?? t("testFailed"));
       }
     });
   }
@@ -258,7 +263,7 @@ export function useWebhooks(appSlug?: string) {
   function copySecret() {
     if (!reveal) return;
     navigator.clipboard.writeText(reveal.plaintextSecret);
-    toast.success("Copied");
+    toast.success(t("copied"));
   }
 
   return {

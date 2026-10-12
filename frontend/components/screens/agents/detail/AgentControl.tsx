@@ -10,6 +10,7 @@ import {
   ServerIcon,
   WebhookIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -69,18 +70,21 @@ import type { useAgentControl } from "./use-agent-control";
 // app-deploy cron does (the backend re-validates via the platform cron parser).
 const CRON_FIELD = /^(\S+\s+){4}\S+$/;
 
-function naturalCronHint(expr: string): string {
+function naturalCronHint(
+  expr: string,
+  t: ReturnType<typeof useTranslations<"agentControl">>
+): string {
   // Lightweight read-back, not a real parser. Just translates a few
   // very common patterns so an operator can sanity-check before
   // submitting.
   const e = expr.trim();
-  if (!CRON_FIELD.test(e)) return "Five-field cron expression expected.";
-  if (e === "0 * * * *") return "Hourly, on the hour.";
-  if (e === "*/5 * * * *") return "Every 5 minutes.";
-  if (e === "0 3 * * *") return "Daily at 03:00.";
-  if (e === "0 0 * * 0") return "Weekly on Sunday at 00:00.";
-  if (e === "0 0 1 * *") return "Monthly on the 1st at 00:00.";
-  return "Custom schedule.";
+  if (!CRON_FIELD.test(e)) return t("cronHint.invalid");
+  if (e === "0 * * * *") return t("cronHint.hourly");
+  if (e === "*/5 * * * *") return t("cronHint.every5");
+  if (e === "0 3 * * *") return t("cronHint.daily");
+  if (e === "0 0 * * 0") return t("cronHint.weekly");
+  if (e === "0 0 1 * *") return t("cronHint.monthly");
+  return t("cronHint.custom");
 }
 
 /**
@@ -111,6 +115,7 @@ function CronField({
   errorMessage?: string;
   onChange: (next: string) => void;
 }) {
+  const t = useTranslations("agentControl");
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
@@ -127,7 +132,7 @@ function CronField({
         aria-invalid={invalid}
       />
       <p className="text-muted-foreground text-xs">
-        Five fields (minute hour day month weekday). {naturalCronHint(value)}
+        {t("cronFields", { hint: naturalCronHint(value, t) })}
       </p>
       {errorMessage && <p className="text-destructive text-xs">{errorMessage}</p>}
     </div>
@@ -170,34 +175,29 @@ const MAPPED_ERROR_FIELDS = new Set<string>([
 // none stay disabled — selecting any writes its run-spec via the Save below.
 type ModeOption = {
   value: AgentRunMode;
-  label: string;
-  description: string;
+  key: "once" | "schedule" | "loop" | "trigger";
   icon: typeof PlayIcon;
 };
 
 const TASK_MODES: ModeOption[] = [
   {
     value: "ONCE",
-    label: "Once",
-    description: "Runs only when dispatched manually from the Run tab.",
+    key: "once",
     icon: PlayIcon,
   },
   {
     value: "SCHEDULE",
-    label: "Schedule",
-    description: "Dispatches a run automatically on a cron schedule.",
+    key: "schedule",
     icon: ClockIcon,
   },
   {
     value: "LOOP",
-    label: "Loop",
-    description: "Re-dispatches continuously up to a concurrency cap.",
+    key: "loop",
     icon: RepeatIcon,
   },
   {
     value: "TRIGGER",
-    label: "Trigger",
-    description: "Dispatches when a bound webhook or event fires.",
+    key: "trigger",
     icon: WebhookIcon,
   },
 ];
@@ -240,6 +240,7 @@ export function AgentControlScreen({
   onSave,
   triggerEditor,
 }: AgentControlScreenProps) {
+  const t = useTranslations("agentControl");
   // --- Editor state, seeded from the resolved (lowercase) read row. --------
   const [family, setFamily] = React.useState<AgentRunFamily>(() => toFamily(agent.runFamily));
   const [mode, setMode] = React.useState<AgentRunMode>(() => toMode(agent.runMode));
@@ -432,13 +433,13 @@ export function AgentControlScreen({
           the editor never shows a Task mode under Service. */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Run family</CardTitle>
+          <CardTitle className="text-base">{t("runFamily")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-muted-foreground text-sm">
-            How this agent runs. A <span className="font-medium">Task</span> runs to completion as a
-            Kubernetes Job; a <span className="font-medium">Service</span> stays running as a
-            Deployment with N replicas.
+            {t.rich("runFamilyHelp", {
+              strong: (chunks) => <span className="font-medium">{chunks}</span>,
+            })}
           </p>
           <div className="grid gap-2 md:grid-cols-2">
             <OptionCard
@@ -452,8 +453,8 @@ export function AgentControlScreen({
                 setMode((m) => (m === "SCHEDULE" || m === "LOOP" ? m : "ONCE"));
               }}
               icon={PlayIcon}
-              label="Task"
-              description="Ephemeral — runs to completion, then exits (k8s Job)."
+              label={t("task")}
+              description={t("taskDescription")}
             />
             <OptionCard
               selected={family === "SERVICE"}
@@ -462,8 +463,8 @@ export function AgentControlScreen({
                 setFamily("SERVICE");
               }}
               icon={ServerIcon}
-              label="Service"
-              description="Always-on — stays running with N replicas (k8s Deployment)."
+              label={t("service")}
+              description={t("serviceDescription")}
             />
           </div>
         </CardContent>
@@ -473,12 +474,10 @@ export function AgentControlScreen({
       {family === "TASK" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Task mode</CardTitle>
+            <CardTitle className="text-base">{t("taskMode")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-muted-foreground text-sm">
-              What causes this agent to dispatch a run?
-            </p>
+            <p className="text-muted-foreground text-sm">{t("taskModeHelp")}</p>
             <div className="grid gap-2 md:grid-cols-2">
               {TASK_MODES.map((opt) => (
                 <OptionCard
@@ -489,8 +488,8 @@ export function AgentControlScreen({
                     setMode(opt.value);
                   }}
                   icon={opt.icon}
-                  label={opt.label}
-                  description={opt.description}
+                  label={t(`modes.${opt.key}.label`)}
+                  description={t(`modes.${opt.key}.description`)}
                 />
               ))}
             </div>
@@ -500,7 +499,7 @@ export function AgentControlScreen({
               <section className="rounded-md border p-4">
                 <CronField
                   id="run-cron"
-                  label="Cron expression"
+                  label={t("cronExpression")}
                   value={cron}
                   placeholder="0 */6 * * *"
                   invalid={
@@ -521,7 +520,7 @@ export function AgentControlScreen({
             {/* Loop config (PR-12) — the concurrency cap (`runMaxParallel`). */}
             {mode === "LOOP" && (
               <section className="space-y-2 rounded-md border p-4">
-                <Label htmlFor="run-max-parallel">Concurrency cap</Label>
+                <Label htmlFor="run-max-parallel">{t("concurrencyCap")}</Label>
                 <input
                   id="run-max-parallel"
                   type="number"
@@ -547,11 +546,10 @@ export function AgentControlScreen({
                   }
                 />
                 <p className="text-muted-foreground text-xs">
-                  How many runs may be in flight at once before the loop waits to re-dispatch.{" "}
-                  <span className="font-medium">Leave blank</span> or set{" "}
-                  <span className="font-mono">1</span> for serial (one run at a time).{" "}
-                  <span className="font-mono">0</span> soft-pauses the loop (no new runs) without
-                  changing the mode.
+                  {t.rich("concurrencyHelp", {
+                    strong: (chunks) => <span className="font-medium">{chunks}</span>,
+                    code: (chunks) => <span className="font-mono">{chunks}</span>,
+                  })}
                 </p>
                 {fieldError?.field === "runMaxParallel" && (
                   <p className="text-destructive text-xs">{fieldError.message}</p>
@@ -571,13 +569,10 @@ export function AgentControlScreen({
       {family === "SERVICE" && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Replicas</CardTitle>
+            <CardTitle className="text-base">{t("replicas")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-muted-foreground text-sm">
-              The baseline number of replicas the agent Deployment runs. The per-environment maximum
-              is applied when the Deployment is scaled.
-            </p>
+            <p className="text-muted-foreground text-sm">{t("replicasHelp")}</p>
             <div className="flex items-center gap-3">
               <span className="text-muted-foreground font-mono text-xs tabular-nums">
                 {REPLICA_MIN}
@@ -604,7 +599,7 @@ export function AgentControlScreen({
                   "[&::-moz-range-thumb]:border-0",
                   "[&::-moz-range-thumb]:bg-primary"
                 )}
-                aria-label="Replicas"
+                aria-label={t("replicas")}
               />
               <span className="text-muted-foreground font-mono text-xs tabular-nums">
                 {REPLICA_MAX}
@@ -632,11 +627,9 @@ export function AgentControlScreen({
                   }}
                 />
                 <span>
-                  <span className="font-medium">Scheduled scaling</span>
+                  <span className="font-medium">{t("scheduledScaling")}</span>
                   <span className="text-muted-foreground mt-1 block text-xs">
-                    Optional. Scale the Deployment up to a target replica count on one cron and back
-                    down to 0 on another (for example, run during business hours only). Leave off to
-                    run flat at the baseline replica count above.
+                    {t("scheduledScalingHelp")}
                   </span>
                 </span>
               </label>
@@ -647,7 +640,7 @@ export function AgentControlScreen({
                   <div className="space-y-2">
                     <CronField
                       id="scale-up-cron"
-                      label="Scale-up cron"
+                      label={t("scaleUpCron")}
                       value={scaleUpCron}
                       placeholder="0 8 * * 1-5"
                       invalid={
@@ -662,7 +655,7 @@ export function AgentControlScreen({
                         setScaleUpCron(next);
                       }}
                     />
-                    <Label htmlFor="scale-to">Scale up to (replicas)</Label>
+                    <Label htmlFor="scale-to">{t("scaleTo")}</Label>
                     <input
                       id="scale-to"
                       type="number"
@@ -687,10 +680,7 @@ export function AgentControlScreen({
                         fieldError?.field === "scheduledScaleTo"
                       }
                     />
-                    <p className="text-muted-foreground text-xs">
-                      The replica count the Deployment scales to when the scale-up cron fires (must
-                      be at least 1).
-                    </p>
+                    <p className="text-muted-foreground text-xs">{t("scaleToHelp")}</p>
                     {fieldError?.field === "scheduledScaleTo" && (
                       <p className="text-destructive text-xs">{fieldError.message}</p>
                     )}
@@ -700,7 +690,7 @@ export function AgentControlScreen({
                   <div className="space-y-2">
                     <CronField
                       id="scale-down-cron"
-                      label="Scale-down cron"
+                      label={t("scaleDownCron")}
                       value={scaleDownCron}
                       placeholder="0 18 * * 1-5"
                       invalid={
@@ -716,9 +706,9 @@ export function AgentControlScreen({
                       }}
                     />
                     <p className="text-muted-foreground text-xs">
-                      When this cron fires the Deployment scales{" "}
-                      <span className="font-medium">to 0</span> (fully stopped) until the next
-                      scale-up.
+                      {t.rich("scaleDownHelp", {
+                        strong: (chunks) => <span className="font-medium">{chunks}</span>,
+                      })}
                     </p>
                   </div>
                 </div>
@@ -732,7 +722,7 @@ export function AgentControlScreen({
           scheduled dispatch / holds the run-spec without losing its config. */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Pause</CardTitle>
+          <CardTitle className="text-base">{t("pause")}</CardTitle>
         </CardHeader>
         <CardContent>
           <label className="flex items-start gap-3 text-sm">
@@ -746,11 +736,8 @@ export function AgentControlScreen({
               }}
             />
             <span>
-              <span className="font-medium">Pause this agent</span>
-              <span className="text-muted-foreground mt-1 block text-xs">
-                Holds the run spec without discarding it. Scheduled dispatches and the Service
-                Deployment are suspended until you resume.
-              </span>
+              <span className="font-medium">{t("pauseAgent")}</span>
+              <span className="text-muted-foreground mt-1 block text-xs">{t("pauseHelp")}</span>
             </span>
           </label>
         </CardContent>
@@ -773,7 +760,7 @@ export function AgentControlScreen({
           ) : (
             <SaveIcon className="size-4" />
           )}
-          Save run spec
+          {t("save")}
         </Button>
       </div>
     </div>

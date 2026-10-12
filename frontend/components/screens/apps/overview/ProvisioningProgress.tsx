@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckCircle2Icon, CircleDashedIcon, LoaderCircleIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { cn } from "@/lib/utils";
 
@@ -9,13 +10,8 @@ import type { useProvisioningProgress } from "./use-provisioning-progress";
 
 export type ProvisioningProgressViewProps = ReturnType<typeof useProvisioningProgress>;
 
-const STEP_LABELS: Record<string, string> = {
-  registry: "Container registry",
-  namespace: "Kubernetes namespace",
-  identity: "Cloud identity (IRSA)",
-  managed_services: "Managed services",
-  ready: "Mark ready",
-};
+/** Steps with a label under `appOverviewCards.provisioning.steps`. */
+const STEP_KEYS = new Set(["registry", "namespace", "identity", "managed_services", "ready"]);
 
 function StepIcon({ state }: { state: "done" | "active" | "pending" }) {
   if (state === "done") return <CheckCircle2Icon className="text-success-fg size-3.5" />;
@@ -29,6 +25,7 @@ export function ProvisioningProgressView({
   isProvisioning,
   progress,
 }: ProvisioningProgressViewProps) {
+  const t = useTranslations("appOverviewCards.provisioning");
   if (!isProvisioning) return null;
 
   const completed = new Set(progress?.completed ?? []);
@@ -42,7 +39,7 @@ export function ProvisioningProgressView({
       tone="progress"
       icon={LoaderCircleIcon}
       spin
-      title="Provisioning infrastructure"
+      title={t("title")}
       description={<span className="font-mono">{currentStep}</span>}
     >
       <ol className="flex flex-wrap gap-x-4 gap-y-1.5">
@@ -55,9 +52,9 @@ export function ProvisioningProgressView({
               <span
                 className={cn(isDone || isActive ? "text-foreground" : "text-muted-foreground")}
               >
-                {STEP_LABELS[step] ?? step}
+                {STEP_KEYS.has(step) ? t(`steps.${step}`) : step}
               </span>
-              {isDone && <span className="sr-only">done</span>}
+              {isDone && <span className="sr-only">{t("done")}</span>}
             </li>
           );
         })}

@@ -65,9 +65,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import type { AstroliftAppLogLine, AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 
-import { METRICS_PANEL_LABELS, METRICS_PANELS, type MetricsPanel } from "./metrics-panels";
+import { METRICS_PANELS, type MetricsPanel } from "./metrics-panels";
 import type { AlertEvent, AlertRule, CreateAlertRuleInput } from "./use-alert-rules";
 import {
   HISTORICAL_RANGES,
@@ -228,6 +229,7 @@ export function ObservabilityScreen({
 }: ObservabilityScreenProps) {
   const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.observability");
+  const tPanels = useTranslations("appMetricsPanels");
 
   if (loading) {
     return (
@@ -360,7 +362,7 @@ export function ObservabilityScreen({
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                {METRICS_PANEL_LABELS[p]}
+                {tPanels(p)}
               </Link>
             </li>
           ))}
@@ -502,6 +504,7 @@ function ScopedLogs({
 }: ScopedLogsProps) {
   const t = useTranslations("apps.observability");
   const tViewer = useTranslations("apps.logViewer");
+  const tAlerts = useTranslations("appAlertRules");
   const [level, setLevel] = React.useState<LogLevelFilter>("all");
   const [query, setQuery] = React.useState("");
   const many = allReplicas || isHistorical;
@@ -553,7 +556,11 @@ function ScopedLogs({
             value={historicalRange}
             onValueChange={(v) => onHistoricalRangeChange(v as HistoricalRangeValue)}
           >
-            <SelectTrigger size="sm" className="font-mono text-xs" aria-label="Time range">
+            <SelectTrigger
+              size="sm"
+              className="font-mono text-xs"
+              aria-label={tAlerts("timeRange")}
+            >
               <HistoryIcon className="size-3.5" />
               <SelectValue />
             </SelectTrigger>
@@ -571,15 +578,13 @@ function ScopedLogs({
                 <button
                   type="button"
                   className="text-muted-foreground hover:text-foreground inline-flex size-7 items-center justify-center rounded-md"
-                  aria-label="Retention scope"
+                  aria-label={tAlerts("retentionScope")}
                 >
                   <InfoIcon className="size-3.5" />
                 </button>
               </TooltipTrigger>
               <TooltipContent side="bottom" className="max-w-sm">
-                Applies to logs, metrics, traces, and audit events. Data is stored in your cloud
-                account (CloudWatch, Cloud Logging, Log Analytics, or Loki depending on your
-                provider).
+                {tAlerts("retentionScopeBody")}
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
@@ -703,7 +708,6 @@ function ScopedLogs({
 const PREDICATE_PRESETS = [
   {
     value: "latency_p99",
-    label: "p99 latency > N ms",
     metric: "latency_p99",
     comparator: ">",
     unit: "ms",
@@ -711,7 +715,6 @@ const PREDICATE_PRESETS = [
   },
   {
     value: "error_rate_5min",
-    label: "5xx error rate (5m) > N %",
     metric: "error_rate_5min",
     comparator: ">",
     unit: "%",
@@ -719,7 +722,6 @@ const PREDICATE_PRESETS = [
   },
   {
     value: "cpu_pct",
-    label: "CPU saturation > N %",
     metric: "cpu_pct",
     comparator: ">",
     unit: "%",
@@ -727,7 +729,6 @@ const PREDICATE_PRESETS = [
   },
   {
     value: "memory_pct",
-    label: "Memory saturation > N %",
     metric: "memory_pct",
     comparator: ">",
     unit: "%",
@@ -737,16 +738,12 @@ const PREDICATE_PRESETS = [
 
 type PredicateValue = (typeof PREDICATE_PRESETS)[number]["value"];
 
-const SEVERITIES = [
-  { value: "critical", label: "Critical" },
-  { value: "warning", label: "Warning" },
-  { value: "info", label: "Info" },
-] as const;
+const SEVERITIES = ["critical", "warning", "info"] as const;
 
 const NOTIFY_CHANNELS = [
-  { kind: "in_app", label: "In-app" },
-  { kind: "email", label: "Email" },
-  { kind: "pagerduty", label: "PagerDuty" },
+  { kind: "in_app", labelKey: "inApp" },
+  { kind: "email", labelKey: "email" },
+  { kind: "pagerduty", labelKey: "pagerduty" },
 ] as const;
 
 type NotifyChannelKind = (typeof NOTIFY_CHANNELS)[number]["kind"];
@@ -780,9 +777,9 @@ function severityBadgeProps(severity: string): {
   }
 }
 
-function formatRemaining(iso: string, now: number): string {
+function formatRemaining(iso: string, now: number): string | null {
   const ms = new Date(iso).getTime() - now;
-  if (ms <= 0) return "expired";
+  if (ms <= 0) return null;
   const minutes = Math.floor(ms / 60000);
   if (minutes < 60) return `${minutes}m`;
   const hours = Math.floor(minutes / 60);
@@ -866,12 +863,14 @@ export function AlertRulesPanelView({
   const [muteTarget, setMuteTarget] = React.useState<AlertRule | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<AlertRule | null>(null);
   const now = useNow(rows.some((r) => Boolean(r.activeMute)));
+  const t = useTranslations("appAlertRules");
+  const { formatDate } = useFormatters();
   const picked = ruleList.find((r) => r.id === pickedRuleId) ?? null;
 
   const columns: Column<AlertRule>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("name"),
       sortKey: "name",
       cellClassName: "whitespace-normal",
       cell: (r) => (
@@ -885,47 +884,51 @@ export function AlertRulesPanelView({
     },
     {
       id: "severity",
-      header: "Severity",
+      header: t("severity"),
       sortKey: "severity",
       cell: (r) => {
         const sev = severityBadgeProps(r.severity);
         return (
           <Badge variant={sev.variant} className={sev.className}>
-            {sev.label}
+            {(SEVERITIES as readonly string[]).includes(sev.label)
+              ? t(`severities.${sev.label}`)
+              : sev.label}
           </Badge>
         );
       },
     },
     {
       id: "status",
-      header: "Status",
+      header: t("status"),
       cell: (r) =>
         r.activeMute ? (
           <Badge variant="outline" className="border-muted-foreground/30 text-muted-foreground">
-            Muted · {formatRemaining(r.activeMute.ttlUntil, now)}
+            {t("muted", {
+              remaining: formatRemaining(r.activeMute.ttlUntil, now) ?? t("expired"),
+            })}
           </Badge>
         ) : r.isActive ? (
           <span className="inline-flex items-center gap-1.5 text-xs">
             <StatusDot status="ok" />
-            Active
+            {t("active")}
           </span>
         ) : (
           <span className="inline-flex items-center gap-1.5 text-xs">
             <StatusDot status="muted" />
-            Inactive
+            {t("inactive")}
           </span>
         ),
     },
     {
       id: "created",
-      header: "Created",
+      header: t("created"),
       sortKey: "created",
       cellClassName: "text-muted-foreground font-mono text-xs",
-      cell: (r) => new Date(r.createdAt).toLocaleDateString(),
+      cell: (r) => formatDate(r.createdAt),
     },
     {
       id: "actions",
-      header: <span className="sr-only">Actions</span>,
+      header: <span className="sr-only">{t("actions")}</span>,
       align: "right",
       // Above the row's stretched link, so these act instead of picking the row.
       cellClassName: "relative z-10",
@@ -933,11 +936,11 @@ export function AlertRulesPanelView({
         <span className="inline-flex items-center gap-1">
           {r.activeMute ? (
             <Button variant="ghost" size="sm" onClick={() => void onUnmute(r)} disabled={busy}>
-              <Volume2Icon className="size-3.5" /> Unmute
+              <Volume2Icon className="size-3.5" /> {t("unmute")}
             </Button>
           ) : (
             <Button variant="ghost" size="sm" onClick={() => setMuteTarget(r)} disabled={busy}>
-              <BellOffIcon className="size-3.5" /> Mute
+              <BellOffIcon className="size-3.5" /> {t("mute")}
             </Button>
           )}
           <Button
@@ -945,7 +948,7 @@ export function AlertRulesPanelView({
             size="icon-sm"
             onClick={() => setDeleteTarget(r)}
             disabled={busy}
-            aria-label={`Delete ${r.name}`}
+            aria-label={t("deleteNamed", { name: r.name })}
           >
             <Trash2Icon className="size-3.5" />
           </Button>
@@ -958,18 +961,17 @@ export function AlertRulesPanelView({
     <>
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <p className="text-muted-foreground min-w-0 flex-1 text-sm">
-          Thresholds that page on-call when {appName} crosses them. Mute to silence without losing
-          the definition; delete to retire it.
+          {t("intro", { app: appName })}
         </p>
         <Button size="sm" onClick={() => setCreateOpen(true)} disabled={busy}>
-          <PlusIcon className="size-3.5" /> Add alert rule
+          <PlusIcon className="size-3.5" /> {t("add")}
         </Button>
       </div>
 
       <ListPage<AlertRule>
         embedded
         list={list}
-        label="Alert rules"
+        label={t("label")}
         columns={columns}
         rows={rows}
         getRowId={(r) => r.id}
@@ -981,16 +983,15 @@ export function AlertRulesPanelView({
         totalCount={totalCount}
         empty={{
           icon: <BellIcon className="size-5" />,
-          title: "No alert rules for this app",
-          description:
-            "Add a rule to page on-call when latency, error rate, or saturation crosses a threshold.",
+          title: t("emptyTitle"),
+          description: t("emptyBody"),
         }}
       />
 
       {picked ? (
         <PanelGrid>
           <Panel
-            title={`Events · ${picked.name}`}
+            title={t("events", { name: picked.name })}
             icon={<BellIcon className="size-4" />}
             description={predicateSummary(picked.predicate)}
           >
@@ -1029,9 +1030,9 @@ export function AlertRulesPanelView({
         onOpenChange={(next) => {
           if (!next) setDeleteTarget(null);
         }}
-        title={deleteTarget ? `Delete ${deleteTarget.name}?` : "Delete alert rule?"}
-        description="This removes the rule and stops future notifications. Existing alert events stay in history."
-        confirmLabel="Delete rule"
+        title={deleteTarget ? t("deleteTitleNamed", { name: deleteTarget.name }) : t("deleteTitle")}
+        description={t("deleteBody")}
+        confirmLabel={t("deleteConfirm")}
         destructive
         onConfirm={async () => {
           if (!deleteTarget) return;
@@ -1070,16 +1071,18 @@ export function AlertEventsListView({
   acking,
   onAck,
 }: AlertEventsListViewProps) {
+  const t = useTranslations("appAlertRules");
+  const { formatDateTime } = useFormatters();
   return (
     <Feed
-      label="Alert events"
+      label={t("eventsLabel")}
       items={eventList}
       keyOf={(e) => e.id}
       groupBy={{ day: (e) => e.firedAt }}
       loading={loading}
       error={error}
       onRetry={onRetry}
-      empty={{ icon: <BellIcon className="size-5" />, title: "No alert events yet for this rule" }}
+      empty={{ icon: <BellIcon className="size-5" />, title: t("eventsEmpty") }}
       hasMore={hasMore}
       loadingMore={loadingMore}
       onLoadMore={onLoadMore}
@@ -1090,13 +1093,13 @@ export function AlertEventsListView({
           <div className="min-w-0 flex-1 space-y-0.5">
             <p className="[overflow-wrap:anywhere]">{e.summary || "—"}</p>
             <p className="text-muted-foreground font-mono">
-              {new Date(e.firedAt).toLocaleString()}
-              {e.resolvedAt ? ` → resolved ${new Date(e.resolvedAt).toLocaleString()}` : ""}
+              {formatDateTime(e.firedAt)}
+              {e.resolvedAt ? ` → ${t("resolved", { time: formatDateTime(e.resolvedAt) })}` : ""}
             </p>
           </div>
           {e.acknowledgedAt ? (
             <span className="text-muted-foreground inline-flex shrink-0 items-center gap-1">
-              <CheckIcon className="size-3.5" /> Acked
+              <CheckIcon className="size-3.5" /> {t("acked")}
             </span>
           ) : (
             <Button
@@ -1106,7 +1109,7 @@ export function AlertEventsListView({
               onClick={() => void onAck(e)}
               disabled={acking}
             >
-              <CheckIcon className="size-3.5" /> Ack
+              <CheckIcon className="size-3.5" /> {t("ack")}
             </Button>
           )}
         </div>
@@ -1128,6 +1131,7 @@ function CreateAlertRuleSheet({
   busy: boolean;
   onSubmit: (input: CreateAlertRuleInput) => Promise<boolean>;
 }) {
+  const t = useTranslations("appAlertRules");
   const [name, setName] = React.useState("");
   const [severity, setSeverity] = React.useState<string>("warning");
   const [predicateKind, setPredicateKind] = React.useState<PredicateValue>("latency_p99");
@@ -1179,7 +1183,7 @@ function CreateAlertRuleSheet({
     const n = Number(threshold);
     if (!name.trim() || !Number.isFinite(n)) return;
     if (channelKinds.size === 0) {
-      toast.error("Pick at least one notification channel");
+      toast.error(t("pickChannel"));
       return;
     }
     const predicate = {
@@ -1207,41 +1211,38 @@ function CreateAlertRuleSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>New alert rule</SheetTitle>
-          <SheetDescription>
-            Pages on-call when the chosen metric crosses the threshold. Routing fan-out is taken
-            from the notify channels you select below.
-          </SheetDescription>
+          <SheetTitle>{t("newTitle")}</SheetTitle>
+          <SheetDescription>{t("newDescription")}</SheetDescription>
         </SheetHeader>
         <form onSubmit={submit} className="flex flex-1 flex-col gap-4 overflow-auto px-4 pb-4">
           <div className="space-y-2">
-            <Label htmlFor="ar-name">Name</Label>
+            <Label htmlFor="ar-name">{t("name")}</Label>
             <Input
               id="ar-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="High p99 latency"
+              placeholder={t("namePlaceholder")}
               required
               autoFocus
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ar-severity">Severity</Label>
+            <Label htmlFor="ar-severity">{t("severity")}</Label>
             <Select value={severity} onValueChange={setSeverity}>
               <SelectTrigger id="ar-severity">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {SEVERITIES.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>
-                    {s.label}
+                  <SelectItem key={s} value={s}>
+                    {t(`severities.${s}`)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ar-predicate">Condition</Label>
+            <Label htmlFor="ar-predicate">{t("condition")}</Label>
             <Select
               value={predicateKind}
               onValueChange={(v) => togglePredicate(v as PredicateValue)}
@@ -1252,14 +1253,14 @@ function CreateAlertRuleSheet({
               <SelectContent>
                 {PREDICATE_PRESETS.map((p) => (
                   <SelectItem key={p.value} value={p.value}>
-                    {p.label}
+                    {t(`presets.${p.value}`)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ar-threshold">Threshold ({currentPreset.unit})</Label>
+            <Label htmlFor="ar-threshold">{t("threshold", { unit: currentPreset.unit })}</Label>
             <Input
               id="ar-threshold"
               type="number"
@@ -1272,7 +1273,7 @@ function CreateAlertRuleSheet({
             />
           </div>
           <div className="space-y-2">
-            <Label>Notify channels</Label>
+            <Label>{t("channels")}</Label>
             <div className="grid gap-2">
               {NOTIFY_CHANNELS.map((c) => {
                 const enabled = channelKinds.has(c.kind);
@@ -1289,7 +1290,7 @@ function CreateAlertRuleSheet({
                         onChange={() => toggleChannel(c.kind)}
                         className="accent-primary size-4"
                       />
-                      <span>{c.label}</span>
+                      <span>{t(`channelKinds.${c.labelKey}`)}</span>
                     </label>
                     {enabled && needsAddress ? (
                       <Input
@@ -1297,9 +1298,7 @@ function CreateAlertRuleSheet({
                         onChange={(e) =>
                           setChannelAddresses((prev) => ({ ...prev, [c.kind]: e.target.value }))
                         }
-                        placeholder={
-                          c.kind === "email" ? "oncall@acme.com" : "pagerduty service key"
-                        }
+                        placeholder={c.kind === "email" ? "oncall@acme.com" : t("pagerdutyKey")}
                         className="font-mono text-xs"
                       />
                     ) : null}
@@ -1310,10 +1309,10 @@ function CreateAlertRuleSheet({
           </div>
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button type="submit" disabled={busy || !name.trim()}>
-              {busy ? "Creating…" : "Create rule"}
+              {busy ? t("creating") : t("create")}
             </Button>
           </SheetFooter>
         </form>
@@ -1333,6 +1332,7 @@ function MuteAlertRuleSheet({
   onSubmit: (durationSeconds: number, reason: string) => Promise<void>;
   busy: boolean;
 }) {
+  const t = useTranslations("appAlertRules");
   const [hours, setHours] = React.useState("2");
   const [reason, setReason] = React.useState("");
 
@@ -1340,11 +1340,10 @@ function MuteAlertRuleSheet({
     <Sheet open={target !== null} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>{target ? `Mute ${target.name}` : "Mute alert rule"}</SheetTitle>
-          <SheetDescription>
-            Silences notifications for the chosen window. The rule stays evaluated; only routing is
-            suppressed.
-          </SheetDescription>
+          <SheetTitle>
+            {target ? t("muteTitleNamed", { name: target.name }) : t("muteTitle")}
+          </SheetTitle>
+          <SheetDescription>{t("muteDescription")}</SheetDescription>
         </SheetHeader>
         <form
           onSubmit={async (e) => {
@@ -1357,7 +1356,7 @@ function MuteAlertRuleSheet({
           className="flex flex-1 flex-col gap-4 overflow-auto px-4 pb-4"
         >
           <div className="space-y-2">
-            <Label htmlFor="mute-hours">Duration (hours, 1–72)</Label>
+            <Label htmlFor="mute-hours">{t("muteDuration")}</Label>
             <Input
               id="mute-hours"
               type="number"
@@ -1370,25 +1369,23 @@ function MuteAlertRuleSheet({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="mute-reason">Reason</Label>
+            <Label htmlFor="mute-reason">{t("muteReason")}</Label>
             <Textarea
               id="mute-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Known noisy after deploy; revisit Friday."
+              placeholder={t("muteReasonPlaceholder")}
               rows={4}
               required
             />
-            <p className="text-muted-foreground text-xs">
-              Logged on the rule&apos;s audit trail so the next operator sees who muted it and why.
-            </p>
+            <p className="text-muted-foreground text-xs">{t("muteReasonHint")}</p>
           </div>
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button type="submit" disabled={busy || !reason.trim()}>
-              {busy ? "Muting…" : "Mute rule"}
+              {busy ? t("muting") : t("muteConfirm")}
             </Button>
           </SheetFooter>
         </form>

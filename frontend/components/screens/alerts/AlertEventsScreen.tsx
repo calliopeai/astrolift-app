@@ -34,6 +34,7 @@ export type AlertEventsScreenProps = ReturnType<typeof useAlertEvents>;
  */
 export function AlertEventsScreen({ view, events, busy, acknowledge }: AlertEventsScreenProps) {
   const t = useTranslations("lists.alerts");
+  const tx = useTranslations("alertDetail");
   const fmt = useFormatters();
 
   return (
@@ -47,18 +48,18 @@ export function AlertEventsScreen({ view, events, busy, acknowledge }: AlertEven
         title={t("events.title")}
         context={t("events.description")}
         tabs={[
-          { key: "all", label: "All", href: "/alerts/events", active: view === "all" },
+          { key: "all", label: tx("all"), href: "/alerts/events", active: view === "all" },
           {
             key: "firing",
-            label: "Firing",
+            label: tx("firing"),
             href: "/alerts/events?view=firing",
             active: view === "firing",
           },
         ]}
-        tabsAriaLabel="Views"
+        tabsAriaLabel={tx("views")}
       />
       <Feed<AlertEvent>
-        label="Alert events"
+        label={tx("eventsLabel")}
         {...events}
         keyOf={(e) => e.id}
         groupBy={{ day: (e) => e.firedAt }}

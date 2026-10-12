@@ -97,6 +97,7 @@ export function AppLogsScreen({
   const t = useTranslations("apps.logs");
   const tObs = useTranslations("apps.observability");
   const tViewer = useTranslations("apps.logViewer");
+  const tMisc = useTranslations("appDetailMisc");
 
   const [exportOpen, setExportOpen] = React.useState(false);
   const [level, setLevel] = React.useState<LogLevelFilter>("all");
@@ -117,8 +118,8 @@ export function AppLogsScreen({
 
   if (!a && appError) {
     return (
-      <PageShell title="App logs">
-        <QueryError title="Could not load app" error={appError} onRetry={onRetryApp} />
+      <PageShell title={tMisc("logsTitle")}>
+        <QueryError title={tMisc("loadAppError")} error={appError} onRetry={onRetryApp} />
       </PageShell>
     );
   }

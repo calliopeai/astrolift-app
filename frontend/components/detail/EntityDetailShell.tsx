@@ -2,6 +2,7 @@
 
 import { ChevronRightIcon, Loader2Icon, SearchXIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -147,6 +148,7 @@ export function EntityDetailShell({
   children,
   presentation,
 }: EntityDetailShellProps) {
+  const t = useTranslations("detailShell");
   if (loading && notFound) {
     return (
       <div className="flex flex-1 items-center justify-center p-6">
@@ -157,16 +159,17 @@ export function EntityDetailShell({
 
   if (notFound) {
     return (
-      <PageShell title={presentation?.notFoundTitle ?? `${titleCase(notFoundLabel)} not found`}>
+      <PageShell
+        title={presentation?.notFoundTitle ?? t("notFound", { label: titleCase(notFoundLabel) })}
+      >
         <EmptyState
           icon={<SearchXIcon className="size-5" />}
-          title={presentation?.notFoundTitle ?? `${titleCase(notFoundLabel)} not found`}
+          title={presentation?.notFoundTitle ?? t("notFound", { label: titleCase(notFoundLabel) })}
           description={
-            presentation?.notFoundDescription ??
-            `This ${notFoundLabel} may not exist, may have aged out of the recent list, or you may not have access to it.`
+            presentation?.notFoundDescription ?? t("notFoundDescription", { label: notFoundLabel })
           }
           actionHref={breadcrumb.href}
-          actionLabel={presentation?.back ?? `Back to ${breadcrumb.label}`}
+          actionLabel={presentation?.back ?? t("back", { label: breadcrumb.label })}
         />
       </PageShell>
     );
@@ -198,7 +201,7 @@ export function EntityDetailShell({
             ) : null}
             {createdAt ? (
               <span className="text-muted-foreground text-xs">
-                {presentation?.created ?? "created"}{" "}
+                {presentation?.created ?? t("created")}{" "}
                 <DetailTimestamp iso={createdAt} format={presentation?.formatTimestamp} />
               </span>
             ) : null}
@@ -210,7 +213,7 @@ export function EntityDetailShell({
       <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">{presentation?.overview ?? "Overview"}</CardTitle>
+            <CardTitle className="text-base">{presentation?.overview ?? t("overview")}</CardTitle>
           </CardHeader>
           <CardContent>
             <DefinitionList items={overview} />

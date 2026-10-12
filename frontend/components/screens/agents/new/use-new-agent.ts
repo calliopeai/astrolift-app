@@ -3,6 +3,7 @@
 import { useMutation } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { REGISTER_AGENT_REPO } from "@/graphql/agents/agents.mutations";
@@ -109,6 +110,7 @@ export function stepValid(
  * project. The data half of NewAgentPage.
  */
 export function useNewAgent() {
+  const t = useTranslations("agentWizard");
   const router = useRouter();
   const mounted = React.useRef(true);
   React.useEffect(() => {
@@ -173,7 +175,7 @@ export function useNewAgent() {
     }
     setSubmitting(true);
     setSubmitError(null);
-    setSideEffects([{ key: "register", label: "Register agents", status: "running" }]);
+    setSideEffects([{ key: "register", label: t("registerAgents"), status: "running" }]);
     const update = (patch: Partial<SideEffectStep>) =>
       setSideEffects((prev) => prev.map((s) => (s.key === "register" ? { ...s, ...patch } : s)));
 
@@ -196,7 +198,7 @@ export function useNewAgent() {
       if (!mounted.current) return;
       const result = data?.registerAgentRepo;
       if (!result?.ok || !result.data) {
-        const msg = result?.errors?.[0]?.message ?? "Registration failed";
+        const msg = result?.errors?.[0]?.message ?? t("registrationFailed");
         update({ status: "failed", error: msg });
         setSubmitError(msg);
         setSubmitting(false);
@@ -207,14 +209,11 @@ export function useNewAgent() {
       update({ status: "done" });
       const created = agents.filter((a) => a.created).length;
       const matched = agents.length - created;
-      toast.success(
-        `Registered ${created} new agent${created === 1 ? "" : "s"}` +
-          (matched > 0 ? ` (${matched} already existed)` : "")
-      );
+      toast.success(t("registered", { created, matched }));
       router.push(projectSlug ? `/agents?project=${encodeURIComponent(projectSlug)}` : "/agents");
     } catch (err) {
       if (!mounted.current) return;
-      const msg = err instanceof Error ? err.message : "Registration failed";
+      const msg = err instanceof Error ? err.message : t("registrationFailed");
       update({ status: "failed", error: msg });
       setSubmitError(msg);
       setSubmitting(false);
@@ -242,7 +241,12 @@ export function useNewAgent() {
     state,
     setState,
     setValid,
-    errors: partErrors(state.step, valid, attempted[state.step], hasRepo),
+    errors: Object.fromEntries(
+      Object.keys(partErrors(state.step, valid, attempted[state.step], hasRepo)).map((part) => [
+        part,
+        t(`partErrors.${part}`),
+      ])
+    ) as ReturnType<typeof partErrors>,
     hasRepo,
     projectLabel,
     submitting,
@@ -254,7 +258,7 @@ export function useNewAgent() {
       state.step > 1 && !submitting ? () => goTo((state.step - 1) as NewAgentStep) : undefined,
     onContinue,
     continueLabel:
-      state.step === 3 ? (submitting ? "Registering..." : "Register agents") : "Continue",
+      state.step === 3 ? (submitting ? t("registering") : t("registerAgents")) : t("continue"),
     onCancel: submitting ? undefined : onCancel,
     confirmCancel,
     setConfirmCancel,

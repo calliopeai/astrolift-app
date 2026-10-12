@@ -13,6 +13,7 @@
 // system prompt.
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 import { HelpCircle, Loader2, Send, X } from "lucide-react";
 
@@ -34,6 +35,7 @@ export interface WayfindingBubbleProps {
 
 /** Pure (Storybook first): the conversation comes from useWayfinding, wired by the shell. */
 export function WayfindingBubble({ turns, pending, error, onAsk }: WayfindingBubbleProps) {
+  const t = useTranslations("wayfinding");
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -77,7 +79,7 @@ export function WayfindingBubble({ turns, pending, error, onAsk }: WayfindingBub
       <Button
         type="button"
         size="icon"
-        aria-label="Open help and wayfinding"
+        aria-label={t("open")}
         onClick={() => setOpen(true)}
         className="fixed right-6 bottom-6 z-50 size-11 rounded-full shadow-lg"
       >
@@ -89,21 +91,19 @@ export function WayfindingBubble({ turns, pending, error, onAsk }: WayfindingBub
   return (
     <div
       role="dialog"
-      aria-label="Help and wayfinding"
+      aria-label={t("title")}
       className="bg-background fixed right-6 bottom-6 z-50 flex max-h-[32rem] w-[22rem] flex-col rounded-lg border shadow-xl"
     >
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div>
-          <p className="text-sm font-medium">Help &amp; wayfinding</p>
-          <p className="text-muted-foreground text-xs">
-            Finds screens and answers from the docs. It can&apos;t change anything.
-          </p>
+          <p className="text-sm font-medium">{t("title")}</p>
+          <p className="text-muted-foreground text-xs">{t("description")}</p>
         </div>
         <Button
           type="button"
           size="icon"
           variant="ghost"
-          aria-label="Close help and wayfinding"
+          aria-label={t("close")}
           onClick={() => setOpen(false)}
         >
           <X className="size-4" />
@@ -112,10 +112,7 @@ export function WayfindingBubble({ turns, pending, error, onAsk }: WayfindingBub
 
       <div ref={logRef} className="flex-1 overflow-y-auto px-4 py-3">
         {turns.length === 0 && !pending && !error ? (
-          <p className="text-muted-foreground text-sm">
-            Ask something like &ldquo;where do I add a custom domain?&rdquo; or &ldquo;how does cert
-            validation work?&rdquo;
-          </p>
+          <p className="text-muted-foreground text-sm">{t("empty")}</p>
         ) : null}
 
         <div className="flex flex-col gap-4">
@@ -146,7 +143,7 @@ export function WayfindingBubble({ turns, pending, error, onAsk }: WayfindingBub
         {pending ? (
           <p className="text-muted-foreground mt-4 flex items-center gap-2 text-sm">
             <Loader2 className="size-4 animate-spin" aria-hidden />
-            Looking&hellip;
+            {t("looking")}
           </p>
         ) : null}
 
@@ -162,12 +159,17 @@ export function WayfindingBubble({ turns, pending, error, onAsk }: WayfindingBub
           ref={inputRef}
           value={question}
           onChange={(event) => setQuestion(event.target.value)}
-          placeholder="Where do I…"
+          placeholder={t("placeholder")}
           maxLength={500}
-          aria-label="Your question"
+          aria-label={t("question")}
           disabled={pending}
         />
-        <Button type="submit" size="icon" aria-label="Ask" disabled={pending || !question.trim()}>
+        <Button
+          type="submit"
+          size="icon"
+          aria-label={t("ask")}
+          disabled={pending || !question.trim()}
+        >
           <Send className="size-4" />
         </Button>
       </form>

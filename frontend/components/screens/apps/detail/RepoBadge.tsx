@@ -1,6 +1,7 @@
 "use client";
 
 import { GitBranchIcon, GithubIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
 
@@ -22,6 +23,7 @@ export interface RepoBadgeProps {
  * recognisable for self-hosted Git providers.
  */
 export function RepoBadge({ sourceKind, sourceUrl, sourceRepo, branch }: RepoBadgeProps) {
+  const t = useTranslations("appDetailMisc");
   if (!sourceUrl) return null;
 
   const Icon = sourceKind === "github" ? GithubIcon : GitBranchIcon;
@@ -35,7 +37,7 @@ export function RepoBadge({ sourceKind, sourceUrl, sourceRepo, branch }: RepoBad
       target="_blank"
       rel="noreferrer"
       className="focus-visible:ring-ring/50 inline-flex max-w-full min-w-0 rounded-md outline-none focus-visible:ring-2"
-      aria-label={`Open ${displayRepo} repository in a new tab`}
+      aria-label={t("openRepo", { repo: displayRepo })}
     >
       <Badge
         variant="secondary"

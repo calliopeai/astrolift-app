@@ -1,6 +1,8 @@
+import { createTranslator } from "next-intl";
 import { describe, expect, it } from "vitest";
 
 import type { AstroliftRole, AstroliftRoleBinding } from "@/graphql/identity/identity.types";
+import en from "@/messages/en.json";
 
 import {
   ACCESS_LIST,
@@ -120,11 +122,18 @@ describe("a principal's access", () => {
   });
 
   it("summarises over every grant, not the filtered page", () => {
-    const summary = summarizeAccess(ROWS);
+    const summaryT = createTranslator({
+      locale: "en",
+      messages: en,
+      namespace: "adminPrincipalAccess.summary",
+    });
+    const t = (key: string, values?: Record<string, string | number>) =>
+      summaryT(key as never, values as never);
+    const summary = summarizeAccess(ROWS, t);
     expect(summary).toContain("3 roles across 5 grants");
     expect(summary).toContain("2 at apps");
     expect(summary).toContain("1 also granted wider");
-    expect(summarizeAccess([])).toBeNull();
+    expect(summarizeAccess([], t)).toBeNull();
   });
 });
 

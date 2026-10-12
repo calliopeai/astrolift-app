@@ -2,6 +2,7 @@
 
 import { HistoryIcon, InfoIcon, ScrollIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { DetailTimestamp } from "@/components/detail/EntityDetailShell";
 import { Identifier } from "@/components/Identifier";
@@ -27,8 +28,12 @@ import type { useJobRunDetail } from "./use-job-run-detail";
 export type JobRunDetailProps = ReturnType<typeof useJobRunDetail> & { id: string };
 
 /** Scheduled jobs ▾ › billing › nightly-report › run 4e1b0d8f (spec 44 §4.4). */
-function crumbs(id: string, run: AstroliftScheduledJobRun | null) {
-  const last = { label: `run ${id.slice(0, 8)}` };
+function crumbs(
+  id: string,
+  run: AstroliftScheduledJobRun | null,
+  t: ReturnType<typeof useTranslations<"runPages">>
+) {
+  const last = { label: t("runTitle", { id: id.slice(0, 8) }) };
   if (!run) return appsDetailCrumbs("jobs", last);
   return appsDetailCrumbs(
     "jobs",
@@ -53,31 +58,32 @@ export function JobRunDetail({
   now,
   onDownload,
 }: JobRunDetailProps) {
+  const t = useTranslations("runPages");
   if (!run && loading) {
     return (
       <RunPage
-        crumbs={crumbs(id, null)}
-        title={`run ${id.slice(0, 8)}`}
+        crumbs={crumbs(id, null, t)}
+        title={t("runTitle", { id: id.slice(0, 8) })}
         steps={[]}
         stepsLoading
-        log={{ lines: [], loading: true, title: "Output" }}
+        log={{ lines: [], loading: true, title: t("output") }}
       />
     );
   }
   if (!run) {
     return (
       <RunMissing
-        crumbs={crumbs(id, null)}
-        title="Job run"
+        crumbs={crumbs(id, null, t)}
+        title={t("jobRun")}
         icon={<HistoryIcon className="size-4" />}
         error={error}
         onRetry={onRetry}
         empty={{
           icon: <HistoryIcon className="size-5" />,
-          title: "Job run not found",
-          description: "No job run has this id, or you do not have permission to see it.",
+          title: t("jobRunNotFound"),
+          description: t("jobRunNotFoundDescription"),
           actionHref: "/jobs/runs",
-          actionLabel: "Open job runs",
+          actionLabel: t("openJobRuns"),
         }}
       />
     );
@@ -94,8 +100,8 @@ export function JobRunDetail({
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6">
       <RunPage
-        crumbs={crumbs(id, run)}
-        title={`run ${id.slice(0, 8)}`}
+        crumbs={crumbs(id, run, t)}
+        title={t("runTitle", { id: id.slice(0, 8) })}
         status={<RunStatusBadge status={status} exitCode={run.exitCode} />}
         durationMs={runElapsed(run, live, now)}
         context={<span className="font-mono">{run.environmentName || "—"}</span>}
@@ -103,7 +109,7 @@ export function JobRunDetail({
           <Button size="sm" variant="outline" asChild>
             <Link href={logsHref}>
               <ScrollIcon className="size-4" />
-              Open logs
+              {t("openLogs")}
             </Link>
           </Button>
         }
@@ -111,9 +117,9 @@ export function JobRunDetail({
           <RunMenu
             id={run.id}
             links={[
-              { label: "Open app", href: `/apps/${run.registeredAppSlug}` },
+              { label: t("openApp"), href: `/apps/${run.registeredAppSlug}` },
               {
-                label: "Open workload",
+                label: t("openWorkload"),
                 href: `/apps/${run.registeredAppSlug}/workloads/${run.workloadSlug}`,
               },
             ]}
@@ -124,24 +130,24 @@ export function JobRunDetail({
           status,
           run.k8sJobName || run.workloadSlug,
           now,
-          run.exitCode != null ? `exit ${run.exitCode}` : undefined
+          run.exitCode != null ? t("exit", { code: run.exitCode }) : undefined
         )}
         failure={runFailure(status, run.exitCode, output, run.logExcerpt ?? "")}
         log={{
-          title: "Output",
+          title: t("output"),
           lines: outputLines(output, run.startedAt ?? run.createdAt),
           onDownload: output ? onDownload : undefined,
-          emptyHint: live ? "No output yet." : "This run wrote no output.",
+          emptyHint: live ? t("noOutputYet") : t("runNoOutput"),
         }}
       />
 
       <PanelGrid>
-        <Panel title="Details" icon={<InfoIcon className="size-4" />} span={6}>
+        <Panel title={t("details")} icon={<InfoIcon className="size-4" />} span={6}>
           <DefinitionList
             items={[
-              { term: "Run ID", description: <Identifier value={run.id} form="full" /> },
+              { term: t("runId"), description: <Identifier value={run.id} form="full" /> },
               {
-                term: "App",
+                term: t("app"),
                 description: (
                   <Link href={`/apps/${run.registeredAppSlug}`} className="hover:underline">
                     {run.registeredAppSlug}
@@ -149,13 +155,13 @@ export function JobRunDetail({
                 ),
               },
               {
-                term: "Environment",
+                term: t("environment"),
                 description: (
                   <span className="font-mono text-xs">{run.environmentName || "—"}</span>
                 ),
               },
               {
-                term: "Workload",
+                term: t("workload"),
                 description: (
                   <Link
                     href={`/apps/${run.registeredAppSlug}/workloads/${run.workloadSlug}`}
@@ -166,7 +172,7 @@ export function JobRunDetail({
                 ),
               },
               {
-                term: "K8s job",
+                term: t("k8sJob"),
                 description: (
                   <span className="font-mono text-xs [overflow-wrap:anywhere]">
                     {run.k8sJobName || "—"}
@@ -174,12 +180,12 @@ export function JobRunDetail({
                 ),
               },
               {
-                term: "Exit code",
+                term: t("exitCode"),
                 description: <span className="font-mono">{run.exitCode ?? "—"}</span>,
               },
-              { term: "Created", description: <DetailTimestamp iso={run.createdAt} /> },
-              { term: "Started", description: <DetailTimestamp iso={run.startedAt} /> },
-              { term: "Ended", description: <DetailTimestamp iso={run.endedAt} /> },
+              { term: t("created"), description: <DetailTimestamp iso={run.createdAt} /> },
+              { term: t("started"), description: <DetailTimestamp iso={run.startedAt} /> },
+              { term: t("ended"), description: <DetailTimestamp iso={run.endedAt} /> },
             ]}
           />
         </Panel>

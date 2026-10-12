@@ -10,6 +10,7 @@
  * For table column headers that need sort arrows, use SortableHeader.
  */
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import {
   ArrowDownIcon,
@@ -47,10 +48,11 @@ interface ListControlsProps<T> {
 
 export function ListControls<T>({
   controls,
-  searchPlaceholder = "Search…",
+  searchPlaceholder,
   hideSearch = false,
   className,
 }: ListControlsProps<T>) {
+  const t = useTranslations("listControls");
   const {
     query,
     setQuery,
@@ -75,7 +77,7 @@ export function ListControls<T>({
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={searchPlaceholder}
+            placeholder={searchPlaceholder ?? t("search")}
             className="pl-8 h-8 text-sm"
           />
           {query && (
@@ -94,7 +96,7 @@ export function ListControls<T>({
 
       {/* Page size */}
       <div className="flex items-center gap-1.5">
-        <span className="text-xs text-muted-foreground whitespace-nowrap">Per page</span>
+        <span className="text-xs text-muted-foreground whitespace-nowrap">{t("perPage")}</span>
         <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
           <SelectTrigger className="h-8 w-16 text-xs">
             <SelectValue />
@@ -112,7 +114,7 @@ export function ListControls<T>({
       {/* Count */}
       {totalFiltered > 0 && (
         <span className="text-xs text-muted-foreground whitespace-nowrap">
-          {start}–{end} of {totalFiltered}
+          {t("range", { start, end, total: totalFiltered })}
         </span>
       )}
 

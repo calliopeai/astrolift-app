@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { DetailTimestamp, EntityDetailShell } from "@/components/detail/EntityDetailShell";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,25 +20,26 @@ export function WebhookDetailScreen({
   subscription: s,
   deliveries,
 }: WebhookDetailData) {
+  const t = useTranslations("webhooksScreen");
   return (
     <EntityDetailShell
       loading={loading}
       notFound={!s}
-      breadcrumb={{ label: "Webhooks", href: "/webhooks" }}
-      heading={s ? s.url : `Webhook ${id.slice(0, 8)}`}
-      status={s ? (s.isActive ? "active" : "paused") : undefined}
+      breadcrumb={{ label: t("title"), href: "/webhooks" }}
+      heading={s ? s.url : t("webhookHeading", { id: id.slice(0, 8) })}
+      status={s ? (s.isActive ? t("active") : t("paused")) : undefined}
       statusTone={s ? (s.isActive ? "ok" : "muted") : undefined}
       createdAt={s?.createdAt}
-      notFoundLabel="webhook"
+      notFoundLabel={t("webhookNoun")}
       overview={
         s
           ? [
               {
-                term: "URL",
+                term: t("columns.url"),
                 description: <span className="font-mono text-xs break-all">{s.url}</span>,
               },
               {
-                term: "Events",
+                term: t("columns.events"),
                 description: (
                   <span className="flex flex-wrap gap-1">
                     {s.events.length === 0 ? (
@@ -51,9 +54,12 @@ export function WebhookDetailScreen({
                   </span>
                 ),
               },
-              { term: "Format", description: <span className="capitalize">{s.format}</span> },
               {
-                term: "Failures",
+                term: t("columns.format"),
+                description: <span className="capitalize">{s.format}</span>,
+              },
+              {
+                term: t("columns.failures"),
                 description:
                   s.failureCount > 0 ? (
                     <span className="text-destructive">{s.failureCount}</span>
@@ -62,24 +68,30 @@ export function WebhookDetailScreen({
                   ),
               },
               {
-                term: "Last delivery",
+                term: t("columns.lastDelivery"),
                 description: s.lastDeliveryAt ? (
                   <span>
                     <DetailTimestamp iso={s.lastDeliveryAt} />
                     {s.lastResponseStatus != null ? (
-                      <span className="text-muted-foreground"> (HTTP {s.lastResponseStatus})</span>
+                      <span className="text-muted-foreground">
+                        {" "}
+                        {t("httpParen", { status: s.lastResponseStatus })}
+                      </span>
                     ) : null}
                   </span>
                 ) : (
-                  <span className="text-muted-foreground">never</span>
+                  <span className="text-muted-foreground">{t("never")}</span>
                 ),
               },
-              { term: "Secret rotated", description: <DetailTimestamp iso={s.secretRotatedAt} /> },
               {
-                term: "Version",
+                term: t("secretRotated"),
+                description: <DetailTimestamp iso={s.secretRotatedAt} />,
+              },
+              {
+                term: t("version"),
                 description: <span className="font-mono text-xs">{s.version}</span>,
               },
-              { term: "Created", description: <DetailTimestamp iso={s.createdAt} /> },
+              { term: t("created"), description: <DetailTimestamp iso={s.createdAt} /> },
             ]
           : []
       }
@@ -87,13 +99,13 @@ export function WebhookDetailScreen({
       {s ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Recent deliveries</CardTitle>
+            <CardTitle className="text-base">{t("recentDeliveries")}</CardTitle>
           </CardHeader>
           <CardContent>
             <DeliveriesFeed
               deliveries={deliveries}
               hrefOf={(d) => `/webhooks/${id}/deliveries/${d.id}`}
-              emptyHint="Use the Send test event action on the webhooks list to fire one."
+              emptyHint={t("emptyHintList")}
             />
           </CardContent>
         </Card>

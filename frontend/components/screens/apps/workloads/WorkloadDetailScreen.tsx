@@ -43,6 +43,7 @@ import type {
   ContainerKind,
 } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftContainer } from "@/graphql/registry/registry.types";
+import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 
 import type { useWorkloadDetail } from "./use-workload-detail";
@@ -144,8 +145,6 @@ function emptyOrValue(s: string | null | undefined): string {
  */
 type WorkloadSection = "overview" | "pods" | "containers" | "volumes" | "manifest";
 
-const NOT_PERSONAL = "Pods and volumes are the workload's, not a person's, so Mine is empty.";
-
 /** The client-side step's input, from a list's own state. */
 function pageOf(list: ListStateController) {
   return {
@@ -165,17 +164,25 @@ function optionsOf(values: string[]) {
  * Pods as an embedded list: the live pod list arrives whole, so search,
  * filters, sort and numbered pages run in the client.
  */
-function podsList(pods: AstroliftAppPod[], flappingLabel: string): ListDefinition {
+function podsList(
+  pods: AstroliftAppPod[],
+  flappingLabel: string,
+  t: (key: string) => string
+): ListDefinition {
   return {
     id: "apps.workload.pods",
     fields: [
-      { key: "status", label: "Status", options: optionsOf(pods.map((p) => p.status)) },
-      { key: "node", label: "Node", options: optionsOf(pods.map((p) => p.node ?? "")) },
-      { key: "flapping", label: "Flapping", options: [{ value: "yes", label: flappingLabel }] },
+      { key: "status", label: t("podStatusFilter"), options: optionsOf(pods.map((p) => p.status)) },
+      { key: "node", label: t("podNodeFilter"), options: optionsOf(pods.map((p) => p.node ?? "")) },
+      {
+        key: "flapping",
+        label: t("podFlappingFilter"),
+        options: [{ value: "yes", label: flappingLabel }],
+      },
     ],
-    searchPlaceholder: "Search pods, nodes…",
+    searchPlaceholder: t("podSearch"),
     defaultSort: [{ key: "order", dir: "asc" }],
-    views: standardViews({ owner: "me" }, [], { mineNote: NOT_PERSONAL }),
+    views: standardViews({ owner: "me" }, [], { mineNote: t("notPersonal") }),
     paging: "numbered",
     pageSizes: [25, 50, 100],
   };
@@ -224,15 +231,17 @@ export function WorkloadDetailScreen({
   manifest,
 }: WorkloadDetailScreenProps) {
   const t = useTranslations("apps.workloadDetail");
+  const tw = useTranslations("appWorkloadDetail");
+  const { formatDateTime } = useFormatters();
   const [section, setSection] = React.useState<WorkloadSection>("overview");
-  const pods = useLocalListState(podsList(podRows, t("pods.flapping")));
+  const pods = useLocalListState(podsList(podRows, t("pods.flapping"), tw));
 
   if (wlLoading && !w) {
     return (
       <PanelGrid>
-        <Panel title="Workload" icon={<BoxIcon className="size-4" />} loading />
-        <Panel title="Pod status" span={6} loading />
-        <Panel title="Pods" span={6} loading />
+        <Panel title={tw("workload")} icon={<BoxIcon className="size-4" />} loading />
+        <Panel title={tw("podStatus")} span={6} loading />
+        <Panel title={tw("pods")} span={6} loading />
       </PanelGrid>
     );
   }
@@ -241,14 +250,14 @@ export function WorkloadDetailScreen({
     return (
       <PanelGrid>
         <Panel
-          title="Workload"
+          title={tw("workload")}
           icon={<BoxIcon className="size-4" />}
           empty={{
             icon: <AlertTriangleIcon className="size-5" />,
-            title: "Workload not found",
-            description: "The workload doesn't exist or you don't have permission to view it.",
+            title: tw("notFoundTitle"),
+            description: tw("notFoundBody"),
             actionHref: appHref(basePath, appSlug, "workloads"),
-            actionLabel: "Back to workloads",
+            actionLabel: tw("backToWorkloads"),
           }}
         />
       </PanelGrid>
@@ -259,11 +268,11 @@ export function WorkloadDetailScreen({
     ? (w.volumes as VolumeDeclDict[]).filter((v) => v && typeof v === "object")
     : [];
   const sections: { id: WorkloadSection; label: string }[] = [
-    { id: "overview", label: "Overview" },
+    { id: "overview", label: tw("overview") },
     { id: "pods", label: t("pods.title") },
-    { id: "containers", label: "Containers" },
+    { id: "containers", label: tw("containers") },
     ...(volumeRows.length > 0 ? [{ id: "volumes" as const, label: t("volumes.title") }] : []),
-    ...(manifest ? [{ id: "manifest" as const, label: "Manifest" }] : []),
+    ...(manifest ? [{ id: "manifest" as const, label: tw("manifest") }] : []),
   ];
   const active = sections.some((x) => x.id === section) ? section : "overview";
   const showPods = (status: string) => {
@@ -275,7 +284,7 @@ export function WorkloadDetailScreen({
     <PanelGrid>
       <div
         role="tablist"
-        aria-label="Workload sections"
+        aria-label={tw("sections")}
         className="bg-muted/40 col-span-12 flex w-fit max-w-full flex-wrap gap-1 rounded-md border p-1"
       >
         {sections.map((x) => (
@@ -302,7 +311,7 @@ export function WorkloadDetailScreen({
           <Panel
             title={w.slug}
             icon={<BoxIcon className="size-4" />}
-            description={`${w.kind} workload from the manifest. ${w.replicas} replica${w.replicas === 1 ? "" : "s"}.`}
+            description={tw("description", { kind: w.kind, count: w.replicas })}
             actions={
               <>
                 <Badge variant="secondary" className="capitalize">
@@ -310,46 +319,46 @@ export function WorkloadDetailScreen({
                 </Badge>
                 {w.isPublic && (
                   <Badge variant="outline" className="gap-1">
-                    <GlobeIcon className="size-3" /> public
+                    <GlobeIcon className="size-3" /> {tw("public")}
                   </Badge>
                 )}
                 {w.schedule && (
                   <Badge variant="outline" className="font-mono">
-                    cron {w.schedule}
+                    {tw("cron", { schedule: w.schedule })}
                   </Badge>
                 )}
                 <Button variant="outline" size="sm" asChild>
                   <Link href={appHref(basePath, appSlug, "manifest")}>
                     <GitBranchIcon className="size-4" />
-                    Manifest preview
+                    {tw("manifestPreview")}
                   </Link>
                 </Button>
               </>
             }
           >
             <div className="grid min-w-0 grid-cols-2 gap-x-8 gap-y-3 text-sm sm:grid-cols-3">
-              <Field label="Replicas" mono value={w.replicas} />
+              <Field label={tw("replicas")} mono value={w.replicas} />
               <Field
                 label="HPA"
                 mono
                 value={
                   w.hpaMinReplicas && w.hpaMaxReplicas
                     ? `${w.hpaMinReplicas} - ${w.hpaMaxReplicas} @ ${w.hpaTargetCpuPct}% cpu`
-                    : "off"
+                    : tw("off")
                 }
               />
               <Field
-                label="CPU req/limit"
+                label={tw("cpuReqLimit")}
                 mono
                 value={`${w.cpuRequest || "—"} / ${w.cpuLimit || "—"}`}
               />
               <Field
-                label="Memory req/limit"
+                label={tw("memoryReqLimit")}
                 mono
                 value={`${w.memoryRequest || "—"} / ${w.memoryLimit || "—"}`}
               />
               <Field
-                label="Storage"
+                label={tw("storage")}
                 mono
                 value={
                   w.storageClass || w.storageSize
@@ -391,7 +400,7 @@ export function WorkloadDetailScreen({
 
           {isCronjob && (
             <Panel
-              title="Recent runs"
+              title={tw("recentRuns")}
               icon={<CalendarClockIcon className="size-4" />}
               actions={
                 <Badge variant="outline" className="font-mono">
@@ -403,7 +412,7 @@ export function WorkloadDetailScreen({
               flush={runs.length > 0}
             >
               {runs.length === 0 ? (
-                <p className="text-muted-foreground text-sm">No scheduled runs recorded yet.</p>
+                <p className="text-muted-foreground text-sm">{tw("noRuns")}</p>
               ) : (
                 <ul className="divide-y">
                   {runs.map((r) => (
@@ -421,10 +430,11 @@ export function WorkloadDetailScreen({
                           </span>
                         </div>
                         <div className="text-muted-foreground mt-0.5 text-xs">
-                          env <span className="font-mono">{r.environmentName}</span>
+                          {tw("runEnv")} <span className="font-mono">{r.environmentName}</span>
                           {r.startedAt && (
                             <>
-                              {" · "}started {new Date(r.startedAt).toLocaleString()}
+                              {" · "}
+                              {tw("runStarted", { time: formatDateTime(r.startedAt) })}
                             </>
                           )}
                           {r.durationSeconds != null && (
@@ -438,7 +448,7 @@ export function WorkloadDetailScreen({
                         </div>
                       </div>
                       <code className="text-muted-foreground font-mono text-xs">
-                        exit {r.exitCode ?? "—"}
+                        {tw("runExit", { code: r.exitCode ?? "—" })}
                       </code>
                     </li>
                   ))}
@@ -774,6 +784,7 @@ function ContainerSplitCard({
   loading: boolean;
   labels: ContainerSplitLabels;
 }) {
+  const tw = useTranslations("appWorkloadDetail");
   // Manifest containers carry image / declared probe info, live
   // containers carry kind + per-container resources. Merge by name
   // so we render one card per actual container — falling back to
@@ -809,7 +820,7 @@ function ContainerSplitCard({
   if (byName.size === 0) {
     return (
       <Panel
-        title="Containers"
+        title={tw("containers")}
         icon={<BoxIcon className="size-4" />}
         loading={loading}
         skeleton={<Skeleton className="h-24 w-full" />}
@@ -1121,21 +1132,21 @@ function volumeDetail(v: VolumeDeclDict): string {
 
 const volumeKey = (v: VolumeDeclDict, i: number) => `${v.name || "vol"}-${i}`;
 
-const VOLUMES_LIST: ListDefinition = {
+const volumesList = (t: (key: string) => string): ListDefinition => ({
   id: "apps.workload.volumes",
   fields: [
     {
       key: "kind",
-      label: "Kind",
+      label: t("volumeKindFilter"),
       options: Object.entries(VOLUME_KIND_LABEL).map(([value, label]) => ({ value, label })),
     },
   ],
-  searchPlaceholder: "Search volumes, mount paths…",
+  searchPlaceholder: t("volumeSearch"),
   defaultSort: [{ key: "name", dir: "asc" }],
-  views: standardViews({ owner: "me" }, [], { mineNote: NOT_PERSONAL }),
+  views: standardViews({ owner: "me" }, [], { mineNote: t("notPersonal") }),
   paging: "numbered",
   pageSizes: [25, 50, 100],
-};
+});
 
 type VolumeRow = VolumeDeclDict & { key: string };
 
@@ -1152,7 +1163,9 @@ const VOLUMES_SELECT: SelectRowsSpec<VolumeRow> = {
 
 /** The manifest's volumes (nested in the workload payload), as an embedded list. */
 function VolumesCard({ rows, labels }: { rows: VolumeDeclDict[]; labels: VolumesLabels }) {
-  const list = useLocalListState(VOLUMES_LIST);
+  const tw = useTranslations("appWorkloadDetail");
+  const [def] = React.useState(() => volumesList(tw));
+  const list = useLocalListState(def);
   const keyed: VolumeRow[] = rows.map((v, i) => ({ ...v, key: volumeKey(v, i) }));
   const page = selectRows(keyed, pageOf(list), VOLUMES_SELECT);
   const columns: Column<VolumeRow>[] = [
@@ -1317,6 +1330,7 @@ function ProbesCard({
   containers: AstroliftContainer[];
   labels: ProbesLabels;
 }) {
+  const tw = useTranslations("appWorkloadDetail");
   // Render probes for every manifest container that declares at least one.
   // Primary is the canonical case; init containers can also declare probes
   // (rare but legal in Kubernetes), so we don't hard-filter to primary.
@@ -1355,7 +1369,7 @@ function ProbesCard({
               <span className="font-mono">{c.name}</span>
               {c.isPrimary && (
                 <Badge variant="secondary" className="text-xs">
-                  primary
+                  {tw("primary")}
                 </Badge>
               )}
             </div>

@@ -34,6 +34,7 @@
  */
 
 import { ListTreeIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Panel, type PanelFailure, PanelGrid } from "@/components/panel/Panel";
@@ -83,6 +84,7 @@ export function RunPage({
   failure,
   log,
 }: RunPageProps) {
+  const t = useTranslations("runPage");
   const headerContext =
     durationMs != null || context ? (
       <>
@@ -108,7 +110,7 @@ export function RunPage({
       />
       <PanelGrid className="items-start">
         <Panel
-          title="Timeline"
+          title={t("timeline")}
           icon={<ListTreeIcon className="size-4" />}
           className="lg:col-span-4"
           failure={failure}
@@ -117,7 +119,7 @@ export function RunPage({
           onRetry={onRetrySteps}
           empty={
             !stepsLoading && !stepsError && steps.length === 0
-              ? { icon: <ListTreeIcon className="size-5" />, title: "No steps recorded" }
+              ? { icon: <ListTreeIcon className="size-5" />, title: t("noSteps") }
               : null
           }
         >

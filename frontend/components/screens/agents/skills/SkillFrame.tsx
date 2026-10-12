@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangleIcon, ServerCrashIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -15,9 +16,9 @@ import type { Skill } from "./use-skill";
 
 export type SkillTab = "builder" | "tools";
 
-const TABS: { key: SkillTab; label: string; segment: string }[] = [
-  { key: "builder", label: "Builder", segment: "" },
-  { key: "tools", label: "Tools", segment: "/tools" },
+const TABS: { key: SkillTab; labelKey: "tabBuilder" | "tabTools"; segment: string }[] = [
+  { key: "builder", labelKey: "tabBuilder", segment: "" },
+  { key: "tools", labelKey: "tabTools", segment: "/tools" },
 ];
 
 export function skillTabHref(id: string, tab: SkillTab): string {
@@ -53,9 +54,11 @@ export function SkillFrame({
   menu,
   children,
 }: SkillFrameProps) {
+  const tr = useTranslations("agentSkills.frame");
+  const common = useTranslations("agentSkills.common");
   const tabs = TABS.map((t) => ({
     key: t.key,
-    label: t.label,
+    label: tr(t.labelKey),
     href: skillTabHref(id, t.key),
     active: t.key === active,
   }));
@@ -65,10 +68,12 @@ export function SkillFrame({
     return (
       <div className="flex min-w-0 flex-1 flex-col gap-6">
         <ShellHeader
-          crumbs={agentsCrumbs("skills", { label: pending ? "Loading" : "Not found" })}
-          title={pending ? <Skeleton className="h-6 w-48" /> : "Skill not found"}
+          crumbs={agentsCrumbs("skills", {
+            label: pending ? common("loading") : common("notFound"),
+          })}
+          title={pending ? <Skeleton className="h-6 w-48" /> : tr("notFoundTitle")}
           tabs={pending ? tabs : undefined}
-          tabsAriaLabel="Skill sections"
+          tabsAriaLabel={tr("sections")}
         />
         {pending ? (
           <div className="grid min-w-0 grid-cols-12 gap-4" aria-busy>
@@ -83,24 +88,24 @@ export function SkillFrame({
           >
             <ServerCrashIcon className="text-danger size-5" aria-hidden />
             <div className="min-w-0 px-6">
-              <p className="font-medium">Couldn&apos;t load this skill</p>
+              <p className="font-medium">{tr("loadError")}</p>
               <p className="text-muted-foreground mt-1 max-w-md font-mono text-xs [overflow-wrap:anywhere]">
                 {error}
               </p>
             </div>
             {onRetry && (
               <Button size="sm" variant="outline" onClick={onRetry}>
-                Retry
+                {common("retry")}
               </Button>
             )}
           </div>
         ) : (
           <EmptyState
             icon={<AlertTriangleIcon className="size-5" />}
-            title="Skill not found"
-            description="This skill may have been deleted, or you may not have access to it."
+            title={tr("notFoundTitle")}
+            description={tr("notFoundDescription")}
             actionHref="/agents/skills"
-            actionLabel="Back to skills"
+            actionLabel={tr("backToSkills")}
           />
         )}
       </div>
@@ -116,9 +121,9 @@ export function SkillFrame({
           <span className="inline-flex shrink-0 items-center gap-2 text-sm">
             <span className="inline-flex items-center gap-1.5">
               <StatusDot status={skill.isActive ? "ok" : "muted"} />
-              {skill.isActive ? "Active" : "Inactive"}
+              {skill.isActive ? common("active") : common("inactive")}
             </span>
-            {skill.isGlobal && <Badge variant="outline">Global</Badge>}
+            {skill.isGlobal && <Badge variant="outline">{common("global")}</Badge>}
           </span>
         }
         context={
@@ -129,7 +134,7 @@ export function SkillFrame({
         primaryAction={primaryAction}
         menu={menu}
         tabs={tabs}
-        tabsAriaLabel="Skill sections"
+        tabsAriaLabel={tr("sections")}
       />
       {children}
     </div>

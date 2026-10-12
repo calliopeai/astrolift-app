@@ -98,6 +98,8 @@ export function ProjectResourcesScreen({
   section,
 }: ProjectResourcesScreenProps) {
   const resourceCopy = useTranslations("projectResources.reads");
+  const t = useTranslations("projectResourcesScreen");
+  const confirmation = useTranslations("shared.confirmation");
   const [resourceOpen, setResourceOpen] = React.useState(false);
   const [bundleOpen, setBundleOpen] = React.useState(false);
   const [resourceCatalogId, setResourceCatalogId] = React.useState("");
@@ -122,18 +124,18 @@ export function ProjectResourcesScreen({
 
   if (loading) {
     return (
-      <PageShell title="Project resources">
+      <PageShell title={resourceCopy("title")}>
         <Skeleton className="h-80" />
       </PageShell>
     );
   }
   if (!project) {
     return (
-      <PageShell title="Project not found">
+      <PageShell title={t("notFound")}>
         <EmptyState
           icon={<BoxIcon className="size-5" />}
-          title="Project not found"
-          description="This project is unavailable."
+          title={t("notFound")}
+          description={t("notFoundDescription")}
         />
       </PageShell>
     );
@@ -180,14 +182,14 @@ export function ProjectResourcesScreen({
 
   return (
     <PageShell
-      title="Project resources"
+      title={resourceCopy("title")}
       description={
         <span className="text-muted-foreground flex items-center gap-1 text-sm">
           <Link href={`/projects/${encodeURIComponent(slug)}`} className="hover:underline">
             {project.name}
           </Link>
           <ChevronRightIcon className="size-3" />
-          <span className="text-foreground">Resources</span>
+          <span className="text-foreground">{t("breadcrumb")}</span>
         </span>
       }
       actions={
@@ -198,10 +200,10 @@ export function ProjectResourcesScreen({
               onClick={() => setBundleOpen(true)}
               disabled={!canWriteSecrets}
             >
-              <KeyRoundIcon className="size-4" /> New secret bundle
+              <KeyRoundIcon className="size-4" /> {t("newBundle")}
             </Button>
             <Button onClick={() => setResourceOpen(true)}>
-              <PlusIcon className="size-4" /> Add resource
+              <PlusIcon className="size-4" /> {t("addResource")}
             </Button>
           </>
         ) : null
@@ -210,19 +212,19 @@ export function ProjectResourcesScreen({
       <div className="grid gap-4 sm:grid-cols-3">
         <StatTile
           icon={BoxIcon}
-          label="Managed resources"
+          label={t("managedResources")}
           value={resourceTable.totalCount ?? "—"}
           footer={resourceCopy("activeOnPage", { count: activeServices })}
         />
         <StatTile
           icon={KeyRoundIcon}
-          label="Shared secret bundles"
+          label={t("bundles")}
           value={bundles.length}
-          footer={`${bundles.reduce((sum, row) => sum + row.keyCount, 0)} keys`}
+          footer={t("keyCount", { count: bundles.reduce((sum, row) => sum + row.keyCount, 0) })}
         />
         <StatTile
           icon={RefreshCwIcon}
-          label="Needs attention"
+          label={t("needsAttention")}
           value={failedServices}
           footer={resourceCopy("failedOnPage")}
           className={failedServices ? "border-warning-border" : undefined}
@@ -234,15 +236,12 @@ export function ProjectResourcesScreen({
         sections={[
           {
             id: "infrastructure",
-            title: "Managed infrastructure",
+            title: t("infrastructure"),
             content: (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Managed infrastructure</CardTitle>
-                  <CardDescription>
-                    Project-owned databases, caches, indexes, buckets, and queues can be shared by
-                    multiple apps and workflow agents.
-                  </CardDescription>
+                  <CardTitle className="text-base">{t("infrastructure")}</CardTitle>
+                  <CardDescription>{t("infrastructureDescription")}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <ProjectManagedResourceList controller={resourceTable} onOpen={onOpenResource} />
@@ -252,20 +251,17 @@ export function ProjectResourcesScreen({
           },
           {
             id: "bundles",
-            title: "Shared secret bundles",
+            title: t("bundles"),
             content: (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Shared secret bundles</CardTitle>
-                  <CardDescription>
-                    Project-scoped credentials that can be attached to selected apps and agent
-                    environments. Values are stored only in the cluster secrets backend.
-                  </CardDescription>
+                  <CardTitle className="text-base">{t("bundles")}</CardTitle>
+                  <CardDescription>{t("bundlesDescription")}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {bundles.length === 0 ? (
                     <div className="text-muted-foreground rounded-lg border border-dashed p-8 text-center text-sm">
-                      No shared secret bundles yet.
+                      {t("noBundles")}
                     </div>
                   ) : (
                     bundles.map((bundle) => {
@@ -286,7 +282,7 @@ export function ProjectResourcesScreen({
                                   variant="outline"
                                   onClick={() => setConsumerBundle(bundle)}
                                 >
-                                  <UnplugIcon className="size-3" /> Consumers
+                                  <UnplugIcon className="size-3" /> {t("consumers")}
                                 </Button>
                                 <Button
                                   size="sm"
@@ -294,7 +290,7 @@ export function ProjectResourcesScreen({
                                   className="text-danger-fg"
                                   onClick={() => onDeleteBundle(bundle)}
                                 >
-                                  <Trash2Icon className="size-3" /> Delete
+                                  <Trash2Icon className="size-3" /> {t("delete")}
                                 </Button>
                               </div>
                             )}
@@ -338,7 +334,7 @@ export function ProjectResourcesScreen({
                               </div>
                             ))}
                             {bundle.keyNames.length === 0 && (
-                              <span className="text-muted-foreground text-xs">No keys yet</span>
+                              <span className="text-muted-foreground text-xs">{t("noKeys")}</span>
                             )}
                           </div>
                           {canWriteSecrets && (
@@ -355,7 +351,7 @@ export function ProjectResourcesScreen({
                               />
                               <Input
                                 type="password"
-                                placeholder="Secret value"
+                                placeholder={t("secretValue")}
                                 value={entry.value}
                                 onChange={(event) =>
                                   setKeyInputs((current) => ({
@@ -364,7 +360,7 @@ export function ProjectResourcesScreen({
                                   }))
                                 }
                               />
-                              <Button onClick={() => setBundleKey(bundle.id)}>Set key</Button>
+                              <Button onClick={() => setBundleKey(bundle.id)}>{t("setKey")}</Button>
                             </div>
                           )}
                         </section>
@@ -382,14 +378,11 @@ export function ProjectResourcesScreen({
         <DialogContent>
           <form onSubmit={submitResource} className="space-y-4">
             <DialogHeader>
-              <DialogTitle>Add project resource</DialogTitle>
-              <DialogDescription>
-                Provision shared infrastructure once, then attach it to selected app environments
-                and workflow agents in this project.
-              </DialogDescription>
+              <DialogTitle>{t("addTitle")}</DialogTitle>
+              <DialogDescription>{t("addDescription")}</DialogDescription>
             </DialogHeader>
             <div className="space-y-2">
-              <Label htmlFor="resource-kind">Provider resource</Label>
+              <Label htmlFor="resource-kind">{t("providerResource")}</Label>
               <select
                 id="resource-kind"
                 className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
@@ -402,7 +395,7 @@ export function ProjectResourcesScreen({
                   setResourceAdvancedConfig("{}");
                 }}
               >
-                {catalogEntries.length === 0 && <option value="">No catalogue entries</option>}
+                {catalogEntries.length === 0 && <option value="">{t("noCatalogEntries")}</option>}
                 {catalogEntries.map((entry) => (
                   <option key={entry.id} value={entry.id}>
                     {entry.kind.replaceAll("_", " ")} · {entry.displayName} · {entry.variant}
@@ -411,23 +404,20 @@ export function ProjectResourcesScreen({
                 ))}
               </select>
               {catalogLoading && (
-                <p className="text-muted-foreground text-xs">Loading cluster catalogue…</p>
+                <p className="text-muted-foreground text-xs">{t("catalogLoading")}</p>
               )}
-              {catalogError && (
-                <p className="text-danger-fg text-xs">The cluster catalogue could not be loaded.</p>
-              )}
+              {catalogError && <p className="text-danger-fg text-xs">{t("catalogError")}</p>}
               {selectedCatalogEntry && (
                 <div className="bg-muted/40 space-y-2 rounded-md border p-3 text-xs">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">{selectedCatalogEntry.providerPluginSlug}</Badge>
                     <Badge variant="secondary">{selectedCatalogEntry.status}</Badge>
-                    {selectedCatalogEntry.isDefaultForKind && <Badge>default</Badge>}
+                    {selectedCatalogEntry.isDefaultForKind && <Badge>{t("default")}</Badge>}
                   </div>
                   <p className="text-muted-foreground">{selectedCatalogEntry.description}</p>
                   {!selectedCatalogEntry.available && (
                     <p className="text-warning-fg">
-                      {selectedCatalogEntry.unavailableReason ||
-                        "This provider capability is not available yet."}
+                      {selectedCatalogEntry.unavailableReason || t("capabilityUnavailable")}
                     </p>
                   )}
                   {selectedCatalogEntry.issueUrl && (
@@ -437,19 +427,19 @@ export function ProjectResourcesScreen({
                       rel="noreferrer"
                       className="text-primary inline-flex underline-offset-4 hover:underline"
                     >
-                      View implementation issue
+                      {t("viewIssue")}
                     </a>
                   )}
                   {selectedCatalogEntry.bindingEnvs.length > 0 && (
                     <p className="text-muted-foreground">
-                      Bindings: {selectedCatalogEntry.bindingEnvs.join(", ")}
+                      {t("bindings", { envs: selectedCatalogEntry.bindingEnvs.join(", ") })}
                     </p>
                   )}
                 </div>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="resource-name">Name</Label>
+              <Label htmlFor="resource-name">{resourceCopy("name")}</Label>
               <Input
                 id="resource-name"
                 value={resourceName}
@@ -458,7 +448,7 @@ export function ProjectResourcesScreen({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="resource-cluster">Cluster</Label>
+              <Label htmlFor="resource-cluster">{resourceCopy("cluster")}</Label>
               <select
                 id="resource-cluster"
                 required
@@ -482,7 +472,7 @@ export function ProjectResourcesScreen({
             </div>
             {selectedCatalogEntry?.sizeOptions.length ? (
               <div className="space-y-2">
-                <Label htmlFor="resource-size">Size preset</Label>
+                <Label htmlFor="resource-size">{t("sizePreset")}</Label>
                 <select
                   id="resource-size"
                   className="border-input bg-background h-9 w-full rounded-md border px-3 text-sm"
@@ -499,7 +489,7 @@ export function ProjectResourcesScreen({
             ) : null}
             {selectedCatalogEntry && (
               <fieldset className="space-y-3 rounded-md border p-3">
-                <legend className="px-1 text-sm font-medium">Provider options</legend>
+                <legend className="px-1 text-sm font-medium">{t("providerOptions")}</legend>
                 {Object.entries(selectedCatalogEntry.configSchema.properties ?? {})
                   .filter(
                     ([key, schema]) =>
@@ -554,7 +544,7 @@ export function ProjectResourcesScreen({
                               });
                             }}
                           >
-                            <option value="">Provider default</option>
+                            <option value="">{t("providerDefault")}</option>
                             {schema.enum.map((option) => (
                               <option key={String(option)} value={String(option)}>
                                 {String(option)}
@@ -594,22 +584,19 @@ export function ProjectResourcesScreen({
                     );
                   })}
                 <div className="space-y-1">
-                  <Label htmlFor="resource-advanced-config">Advanced config JSON</Label>
+                  <Label htmlFor="resource-advanced-config">{t("advancedConfig")}</Label>
                   <Textarea
                     id="resource-advanced-config"
                     className="min-h-24 font-mono text-xs"
                     value={resourceAdvancedConfig}
                     onChange={(event) => setResourceAdvancedConfig(event.target.value)}
                   />
-                  <p className="text-muted-foreground text-xs">
-                    Arrays, nested objects, and provider-native overrides. Generated fields above
-                    win on conflicts.
-                  </p>
+                  <p className="text-muted-foreground text-xs">{t("advancedConfigHint")}</p>
                 </div>
               </fieldset>
             )}
             <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">Attach to agents</legend>
+              <legend className="text-sm font-medium">{t("attachAgents")}</legend>
               {agents.map((agent) => (
                 <label key={agent.id} className="flex items-center gap-2 text-sm">
                   <input
@@ -628,7 +615,7 @@ export function ProjectResourcesScreen({
               ))}
             </fieldset>
             <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">Attach to app environments</legend>
+              <legend className="text-sm font-medium">{t("attachAppEnvironments")}</legend>
               {projectAppEnvironments
                 .filter((env) => !effectiveClusterSlug || env.clusterSlug === effectiveClusterSlug)
                 .map((env) => (
@@ -650,13 +637,13 @@ export function ProjectResourcesScreen({
             </fieldset>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setResourceOpen(false)}>
-                Cancel
+                {confirmation("cancel")}
               </Button>
               <Button
                 type="submit"
                 disabled={!effectiveClusterId || !selectedCatalogEntry?.available || provisioning}
               >
-                Provision
+                {t("provision")}
               </Button>
             </DialogFooter>
           </form>
@@ -680,17 +667,17 @@ export function ProjectResourcesScreen({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Secret bundle consumers</DialogTitle>
+            <DialogTitle>{t("consumersTitle")}</DialogTitle>
             <DialogDescription>
-              Attach {consumerBundle?.name} to apps and agent recipes on its secrets cluster.
+              {t("consumersDescription", { name: consumerBundle?.name ?? "" })}
             </DialogDescription>
           </DialogHeader>
           {consumerBundle && (
             <div className="max-h-[65vh] space-y-5 overflow-y-auto pr-1">
               <div className="space-y-2">
-                <Label>Attached</Label>
+                <Label>{t("attached")}</Label>
                 {consumerBundle.consumers.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">No consumers attached.</p>
+                  <p className="text-muted-foreground text-sm">{t("noConsumers")}</p>
                 ) : (
                   consumerBundle.consumers.map((consumer) => (
                     <div
@@ -707,14 +694,14 @@ export function ProjectResourcesScreen({
                         disabled={detachingBundleConsumer}
                         onClick={() => onDetachBundleConsumer(consumerBundle.id, consumer)}
                       >
-                        <Trash2Icon className="size-3" /> Detach
+                        <Trash2Icon className="size-3" /> {resourceCopy("detach")}
                       </Button>
                     </div>
                   ))
                 )}
               </div>
               <div className="space-y-2">
-                <Label>Available agents</Label>
+                <Label>{t("availableAgents")}</Label>
                 {agents
                   .filter(
                     (agent) =>
@@ -734,13 +721,13 @@ export function ProjectResourcesScreen({
                         disabled={attachingAgentBundle}
                         onClick={() => onAttachBundleToAgent(consumerBundle, agent.slug)}
                       >
-                        Attach
+                        {resourceCopy("attach")}
                       </Button>
                     </div>
                   ))}
               </div>
               <div className="space-y-2">
-                <Label>Available app environments</Label>
+                <Label>{t("availableAppEnvironments")}</Label>
                 {projectAppEnvironments
                   .filter(
                     (env) =>
@@ -766,7 +753,7 @@ export function ProjectResourcesScreen({
                         disabled={attachingAppBundle}
                         onClick={() => onAttachBundleToApp(consumerBundle, env)}
                       >
-                        Attach
+                        {resourceCopy("attach")}
                       </Button>
                     </div>
                   ))}
@@ -775,7 +762,7 @@ export function ProjectResourcesScreen({
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setConsumerBundle(null)}>
-              Done
+              {t("done")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -785,13 +772,11 @@ export function ProjectResourcesScreen({
         <DialogContent>
           <form onSubmit={submitBundle} className="space-y-4">
             <DialogHeader>
-              <DialogTitle>New shared secret bundle</DialogTitle>
-              <DialogDescription>
-                Create a project-owned bundle in the selected cluster secrets backend.
-              </DialogDescription>
+              <DialogTitle>{t("newBundleTitle")}</DialogTitle>
+              <DialogDescription>{t("newBundleDescription")}</DialogDescription>
             </DialogHeader>
             <div className="space-y-2">
-              <Label htmlFor="bundle-name">Name</Label>
+              <Label htmlFor="bundle-name">{resourceCopy("name")}</Label>
               <Input
                 id="bundle-name"
                 required
@@ -809,7 +794,7 @@ export function ProjectResourcesScreen({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="bundle-slug">Slug</Label>
+              <Label htmlFor="bundle-slug">{t("slug")}</Label>
               <Input
                 id="bundle-slug"
                 required
@@ -821,7 +806,7 @@ export function ProjectResourcesScreen({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="bundle-cluster">Cluster</Label>
+              <Label htmlFor="bundle-cluster">{resourceCopy("cluster")}</Label>
               <select
                 id="bundle-cluster"
                 required
@@ -838,10 +823,10 @@ export function ProjectResourcesScreen({
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setBundleOpen(false)}>
-                Cancel
+                {confirmation("cancel")}
               </Button>
               <Button type="submit" disabled={!effectiveBundleClusterId || creatingBundle}>
-                Create bundle
+                {t("createBundle")}
               </Button>
             </DialogFooter>
           </form>

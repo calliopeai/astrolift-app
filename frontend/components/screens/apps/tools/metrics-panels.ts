@@ -20,13 +20,6 @@ import type { AlertRule } from "./use-alert-rules";
 export const METRICS_PANELS = ["signals", "pods", "alerts", "network"] as const;
 export type MetricsPanel = (typeof METRICS_PANELS)[number];
 
-export const METRICS_PANEL_LABELS: Record<MetricsPanel, string> = {
-  signals: "Signals",
-  pods: "Pods",
-  alerts: "Alert rules",
-  network: "DNS & TLS",
-};
-
 /** `?panel=` to a panel; anything else is Signals. */
 export function metricsPanel(raw: string | string[] | null | undefined): MetricsPanel {
   return (METRICS_PANELS as readonly string[]).includes(raw as string)

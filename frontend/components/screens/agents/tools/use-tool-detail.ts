@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
@@ -59,6 +60,8 @@ type DeleteToolDefData = {
  */
 export function useToolDetail(id: string) {
   const router = useRouter();
+  const t = useTranslations("agentSkills.toasts");
+  const validation = useTranslations("agentSkills.validation");
   // Reactive org id (#1022): the synchronous cookie read races the
   // post-render effect that sets it, leaving orgId "" on cold load.
   const { org } = useActiveOrg();
@@ -86,7 +89,7 @@ export function useToolDetail(id: string) {
 
   /** Resolves the errors to show beside their fields; empty when it saved. */
   async function save(values: ToolDetailFormValues): Promise<ToolErrors> {
-    const invalid = validateTool(values);
+    const invalid = validateTool(values, validation);
     if (hasErrors(invalid)) return invalid;
     const { name, slug, description, adapter, handlerRef } = values;
     try {
@@ -106,11 +109,11 @@ export function useToolDetail(id: string) {
         },
       });
       if (mutData?.updateToolDef?.ok) {
-        toast.success("Tool saved");
+        toast.success(t("toolSaved"));
         return {};
       }
       const errors = splitErrors(mutData?.updateToolDef?.errors ?? [], TOOL_FIELDS);
-      return hasErrors(errors) ? errors : { form: "The tool was not saved." };
+      return hasErrors(errors) ? errors : { form: t("toolNotSaved") };
     } catch (err) {
       return { form: err instanceof Error ? err.message : String(err) };
     }
@@ -121,10 +124,10 @@ export function useToolDetail(id: string) {
   async function remove() {
     const { data: mutData } = await deleteToolDef({ variables: { id } });
     if (mutData?.deleteToolDef?.ok) {
-      toast.success("Tool deleted");
+      toast.success(t("toolDeleted"));
       router.push("/agents/tools");
     } else {
-      throw new Error("Failed to delete tool");
+      throw new Error(t("toolDeleteFailed"));
     }
   }
 

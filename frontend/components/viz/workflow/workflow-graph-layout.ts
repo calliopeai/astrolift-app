@@ -1,4 +1,5 @@
 import type { Health } from "../core/semantics";
+import type { VizT } from "../core/viz-t";
 import type {
   BranchState,
   FanoutStation,
@@ -240,13 +241,6 @@ export const TRAIN_HEALTH: Record<TrainState, Health> = {
 
 const STATE_ORDER: TrainState[] = ["failed", "held", "moving", "done"];
 
-const STATE_LABEL: Record<TrainState, string> = {
-  moving: "running",
-  held: "held",
-  failed: "failed",
-  done: "finished",
-};
-
 /** What a gate's signal shows, from the runs around it. A run sent back from the gate was rejected. */
 export function gateState(trains: WorkflowTrain[], index: number): GateState | null {
   if (trains.some((t) => t.at === index && (t.state === "failed" || t.onLoopId))) return "denied";
@@ -311,17 +305,17 @@ export interface RunRound {
 }
 
 /** Which round a run is on, against the bound of the loop it is inside. */
-export function runRound(line: WorkflowLine, t: WorkflowTrain): RunRound | null {
+export function runRound(line: WorkflowLine, t: WorkflowTrain, vt: VizT): RunRound | null {
   const loop = relevantLoop(line, t);
   if (!loop) {
     const r = t.round ?? 1;
     return r > 1
-      ? { text: `round ${r}`, short: `r${r}`, n: r, max: null, near: false, loop }
+      ? { text: vt("run.round", { n: r }), short: `r${r}`, n: r, max: null, near: false, loop }
       : null;
   }
   const n = loopRound(t, loop);
   return {
-    text: roundLabel(t, loop),
+    text: roundLabel(t, loop, vt),
     short: `${loop.kind === "retry" ? "a" : "r"}${n}`,
     n,
     max: loop.maxRounds,
@@ -331,12 +325,17 @@ export function runRound(line: WorkflowLine, t: WorkflowTrain): RunRound | null 
 }
 
 /** Where a run on a loop goes next, in words: "going back to Code for round 3 of 5". */
-export function loopRunText(line: WorkflowLine, t: WorkflowTrain, loop: WorkflowLoop): string {
-  const from = line.stations[loop.from]?.name ?? "stage";
+export function loopRunText(
+  line: WorkflowLine,
+  t: WorkflowTrain,
+  loop: WorkflowLoop,
+  vt: VizT
+): string {
+  const from = line.stations[loop.from]?.name ?? vt("loop.stage");
   if (loop.kind === "retry")
-    return `retrying ${from}, attempt ${(t.attempt ?? 1) + 1} of ${loop.maxRounds}`;
-  const to = line.stations[loop.to]?.name ?? "stage";
-  return `sent back from ${from} to ${to} for round ${loopRound(t, loop) + 1} of ${loop.maxRounds}`;
+    return vt("graph.retrying", { stage: from, n: (t.attempt ?? 1) + 1, max: loop.maxRounds });
+  const to = line.stations[loop.to]?.name ?? vt("loop.stage");
+  return vt("graph.sentBack", { from, to, n: loopRound(t, loop) + 1, max: loop.maxRounds });
 }
 
 /** The point a fraction `f` (0..1) of the way along a polyline, by length. */
@@ -363,58 +362,63 @@ export function pointAlong(points: Point[], f: number): Point {
   return points[points.length - 1];
 }
 
-const TRIGGER_PAST: Record<WorkflowLoop["trigger"], string> = {
-  failed: "failed",
-  rejected: "rejected",
-  condition: "condition met",
-};
-
-function stateWord(station: WorkflowStation, here: WorkflowTrain[], backlog: number): string {
-  if (here.some((t) => t.state === "failed")) return "failed";
+function stateWord(
+  station: WorkflowStation,
+  here: WorkflowTrain[],
+  backlog: number,
+  vt: VizT
+): string {
+  if (here.some((t) => t.state === "failed")) return vt("graph.state.failed");
   if (here.some((t) => t.onLoopId && t.state === "moving"))
-    return station.kind === "gate" ? "rejected, sending work back" : "sending work back";
+    return station.kind === "gate" ? vt("graph.state.rejected") : vt("graph.state.sendingBack");
   const held = here.filter((t) => t.state === "held").length;
-  if (held && station.kind === "gate") return "waiting for approval";
+  if (held && station.kind === "gate") return vt("graph.state.waitingApproval");
   const moving = here.some((t) => t.state === "moving");
   // Runs held short of a busy fanout wait behind the one it is working for.
-  if (held) return moving ? `running, ${held} waiting` : "held";
-  if (backlog > BACKLOG_WARN) return `backed up, ${backlog} queued`;
-  if (moving) return "running";
-  if (here.some((t) => t.state === "done")) return "finished";
-  return "idle";
+  if (held) return moving ? vt("graph.state.runningWaiting", { held }) : vt("graph.state.held");
+  if (backlog > BACKLOG_WARN) return vt("graph.state.backedUp", { backlog });
+  if (moving) return vt("graph.state.running");
+  if (here.some((t) => t.state === "done")) return vt("graph.state.finished");
+  return vt("healthInline.idle");
 }
 
-const KIND_WORD: Partial<Record<WorkflowStation["kind"], string>> = {
-  gate: "gate",
-  fanout: "fan-out",
-  join: "join",
-  supervisor: "supervisor",
-  workflow: "nested workflow",
+/** Station kinds named in a node's label, under `vizRender.graph.kind`. */
+const KIND_WORD: Partial<Record<WorkflowStation["kind"], true>> = {
+  gate: true,
+  fanout: true,
+  join: true,
+  supervisor: true,
+  workflow: true,
 };
 
-function leadRound(line: WorkflowLine, here: WorkflowTrain[]): RunRound | null {
+function leadRound(line: WorkflowLine, here: WorkflowTrain[], vt: VizT): RunRound | null {
   let best: RunRound | null = null;
   for (const t of here) {
-    const r = runRound(line, t);
+    const r = runRound(line, t, vt);
     if (r && (!best || r.n > best.n)) best = r;
   }
   return best;
 }
 
-function groupLabel(line: WorkflowLine, state: TrainState, trains: WorkflowTrain[]): string {
+function groupLabel(
+  line: WorkflowLine,
+  state: TrainState,
+  trains: WorkflowTrain[],
+  vt: VizT
+): string {
   const runs = trains
     .map((t) => {
-      const r = runRound(line, t);
+      const r = runRound(line, t, vt);
       return r && r.n > 1 ? `${t.label} ${r.text}` : t.label;
     })
-    .join(", ");
-  return `${trains.length} ${STATE_LABEL[state]}: ${runs}`;
+    .join(vt("listSeparator"));
+  return vt(`graph.group.${state}`, { count: trains.length, runs });
 }
 
-function groupRound(line: WorkflowLine, trains: WorkflowTrain[]): TrainGroup["round"] {
-  const r = leadRound(line, trains);
+function groupRound(line: WorkflowLine, trains: WorkflowTrain[], vt: VizT): TrainGroup["round"] {
+  const r = leadRound(line, trains, vt);
   if (!r || (r.n <= 1 && !r.near)) return undefined;
-  return { short: r.short, near: trains.some((t) => runRound(line, t)?.near) };
+  return { short: r.short, near: trains.some((t) => runRound(line, t, vt)?.near) };
 }
 
 /** Bottom of a node at horizontal offset `dx` from its centre (a gate is a diamond). */
@@ -446,6 +450,7 @@ interface LaneOut {
 function layoutRow(
   line: WorkflowLine,
   snapshot: WorkflowSnapshot,
+  vt: VizT,
   out: LaneOut,
   {
     y,
@@ -483,10 +488,9 @@ function layoutRow(
     const x = cx(station.id);
     const incoming = segs.find((s) => s.from === index - 1)?.backlog ?? 0;
     const here = trains.filter((t) => t.at === index);
-    const round = leadRound(line, here);
+    const round = leadRound(line, here, vt);
     const parts = [station.name];
-    const kind = KIND_WORD[station.kind];
-    if (kind) parts.push(kind);
+    if (KIND_WORD[station.kind]) parts.push(vt(`graph.kind.${station.kind}`));
     if (round) parts.push(round.text);
     let detail: string | undefined;
 
@@ -498,8 +502,11 @@ function layoutRow(
       const j = box.join;
       parts.push(
         j.total
-          ? `${j.total} branches${station.dynamic ? " decided per run" : ""}, ${j.settled} of ${j.total} done${j.failed ? `, ${j.failed} failed` : ""}`
-          : "no branches yet"
+          ? vt(station.dynamic ? "graph.branchesDynamic" : "graph.branches", {
+              count: j.total,
+              settled: j.settled,
+            }) + (j.failed ? vt("graph.branchesFailed", { count: j.failed }) : "")
+          : vt("graph.noBranches")
       );
     }
     if (station.kind === "join") {
@@ -507,17 +514,24 @@ function layoutRow(
       if (fan?.kind === "fanout") {
         const j = joinReady(fan);
         parts.push(
-          j.total ? `waits on ${j.total} branches, ${j.settled} settled` : "waits on its fan-out"
+          j.total
+            ? vt("graph.waitsOn", { count: j.total, settled: j.settled })
+            : vt("graph.waitsOnFanout")
         );
       }
     }
     if (station.kind === "supervisor") {
       const busy = station.workers.filter((wk) => wk.busy).length;
       const lead = here.find((t) => t.subtasks);
-      parts.push(`${busy} of ${station.workers.length} workers busy`);
+      parts.push(vt("station.workersBusy", { busy, count: station.workers.length }));
       if (lead?.subtasks) {
-        detail = `${lead.subtasks.done}/${lead.subtasks.total} sub-tasks`;
-        parts.push(`${lead.subtasks.done} of ${lead.subtasks.total} sub-tasks done`);
+        detail = vt("graph.subtasksShort", {
+          done: lead.subtasks.done,
+          total: lead.subtasks.total,
+        });
+        parts.push(
+          vt("graph.subtasksDone", { done: lead.subtasks.done, total: lead.subtasks.total })
+        );
       }
       if (!child) {
         const n = station.workers.length;
@@ -531,7 +545,10 @@ function layoutRow(
           ry: SWARM_RY,
           workers: station.workers.map((wk, i) => ({
             id: wk.id,
-            label: `${wk.label}: ${wk.busy ? "busy" : "idle"}, ${Math.round(wk.load * 100)}% load`,
+            label: vt(wk.busy ? "graph.workerBusy" : "graph.workerIdle", {
+              label: wk.label,
+              load: Math.round(wk.load * 100),
+            }),
             busy: wk.busy,
             load: wk.load,
             phase: (i / Math.max(1, n)) * Math.PI * 2,
@@ -547,8 +564,8 @@ function layoutRow(
         .map((t) => (t.childRunId ? snapshot.trains.find((c) => c.id === t.childRunId) : undefined))
         .find(Boolean);
       if (childRun && childLine) {
-        const at = childLine.stations[childRun.at]?.name ?? "its first stage";
-        parts.push(`child run at ${at}`);
+        const at = childLine.stations[childRun.at]?.name ?? vt("graph.firstStage");
+        parts.push(vt("run.childAt", { stage: at }));
         detail = `${truncate(at, 10)} ${childRun.at + 1}/${childLine.stations.length}`;
       }
       if (childLine && !child) {
@@ -570,7 +587,7 @@ function layoutRow(
           toggle: { x: x + w / 2 - 7, y: y + h / 2 + 9 },
         });
         if (expanded) {
-          const inner = layoutRow(childLine, snapshot, out, {
+          const inner = layoutRow(childLine, snapshot, vt, out, {
             y: gy + 46,
             x0: gx + 8,
             col: CHILD_COL,
@@ -587,7 +604,7 @@ function layoutRow(
     }
 
     const health = stationHealth(trains, index, incoming);
-    parts.push(stateWord(station, here, incoming));
+    parts.push(stateWord(station, here, incoming, vt));
     const node: GraphNode = {
       lineId: line.id,
       station,
@@ -598,7 +615,7 @@ function layoutRow(
       h,
       health,
       gate: station.kind === "gate" ? gateState(trains, index) : null,
-      label: parts.join(", "),
+      label: parts.join(vt("listSeparator")),
       detail,
       child: child || undefined,
     };
@@ -619,8 +636,8 @@ function layoutRow(
         trains: ts,
         x: x + (k - (present.length - 1) / 2) * 30,
         y: y - (child ? 22 : 30),
-        label: groupLabel(line, state, ts),
-        round: groupRound(line, ts),
+        label: groupLabel(line, state, ts, vt),
+        round: groupRound(line, ts, vt),
       });
     });
   });
@@ -688,6 +705,7 @@ function fanoutBox(
 function layoutLoops(
   line: WorkflowLine,
   snapshot: WorkflowSnapshot,
+  vt: VizT,
   out: LaneOut,
   byIndex: GraphNode[],
   fans: Map<number, FanoutBox>,
@@ -698,7 +716,7 @@ function layoutLoops(
   const back = loops
     .filter((l) => l.kind === "back-edge" && l.to < l.from)
     .sort((a, b) => a.from - a.to - (b.from - b.to) || a.id.localeCompare(b.id));
-  const name = (i: number) => line.stations[i]?.name ?? "stage";
+  const name = (i: number) => line.stations[i]?.name ?? vt("loop.stage");
 
   const addRuns = (track: ReturnTrack) => {
     for (const t of trains) {
@@ -710,7 +728,10 @@ function layoutLoops(
         train: t,
         x: p.x,
         y: p.y,
-        label: `${t.label}, ${loopRunText(line, t, track.loop)}`,
+        label: vt("graph.loopRun", {
+          label: t.label,
+          text: loopRunText(line, t, track.loop, vt),
+        }),
         near: loopRound(t, track.loop) + 1 >= track.loop.maxRounds,
       });
     }
@@ -736,10 +757,10 @@ function layoutLoops(
       loop,
       points,
       short: truncate(
-        `${name(loop.from)} ${TRIGGER_PAST[loop.trigger]}, max ${loop.maxRounds} rounds`,
+        vt(`graph.trackShort.${loop.trigger}`, { stage: name(loop.from), max: loop.maxRounds }),
         Math.max(6, Math.floor((span - 16) / 5.4))
       ),
-      title: loopLabel(line, loop),
+      title: loopLabel(line, loop, vt),
       labelX: to.x - tdx + 8,
       labelY: ty,
       labelAnchor: "start",
@@ -764,8 +785,8 @@ function layoutLoops(
         { x: node.x - 14, y: b + 10 },
         { x: node.x - 14, y: b },
       ],
-      short: `max ${loop.maxRounds} attempts`,
-      title: loopLabel(line, loop),
+      short: vt("graph.maxAttempts", { max: loop.maxRounds }),
+      title: loopLabel(line, loop, vt),
       labelX: node.x,
       labelY: b + 21,
       labelAnchor: "middle",
@@ -780,6 +801,7 @@ function layoutLoops(
 
 export function layoutWorkflowGraph(
   snapshot: WorkflowSnapshot,
+  vt: VizT,
   { collapsed = new Set<string>() }: { collapsed?: ReadonlySet<string> } = {}
 ): GraphLayout {
   const lanes: GraphLane[] = [];
@@ -801,7 +823,7 @@ export function layoutWorkflowGraph(
     // A child line is drawn inside its parent's nested group, not as a lane.
     if (line.parent && lineById.has(line.parent.lineId)) continue;
     const y = top + NODE_Y;
-    const row = layoutRow(line, snapshot, out, {
+    const row = layoutRow(line, snapshot, vt, out, {
       y,
       x0: LABEL_W,
       col: COL_W,
@@ -814,7 +836,7 @@ export function layoutWorkflowGraph(
     // Siding labels need their own room under the stage.
     const hasRetry = (line.loops ?? []).some((l) => l.kind === "retry" || l.to === l.from);
     const below = Math.max(row.below, hasRetry ? NODE_H / 2 + 26 : 0);
-    const tracks = layoutLoops(line, snapshot, out, row.byIndex, row.fans, y + below + 8);
+    const tracks = layoutLoops(line, snapshot, vt, out, row.byIndex, row.fans, y + below + 8);
     const height = NODE_Y + below + (tracks ? 8 + tracks * TRACK_GAP : 0);
     lanes.push({ lineId: line.id, name: line.name, top, y, height });
     right = Math.max(right, row.right);
@@ -831,18 +853,18 @@ export function layoutWorkflowGraph(
 }
 
 /** The sentence a screen reader hears for the whole picture. */
-export function describeWorkflowGraph(snapshot: WorkflowSnapshot): string {
+export function describeWorkflowGraph(snapshot: WorkflowSnapshot, vt: VizT): string {
   const count = (s: TrainState) => snapshot.trains.filter((t) => t.state === s).length;
   const backedUp = snapshot.segments.filter((s) => s.backlog > BACKLOG_WARN).length;
   const lines = snapshot.lines.length;
   const parts = [
-    `${lines} workflow${lines === 1 ? "" : "s"}`,
-    `${count("moving")} running`,
-    `${count("held")} held at gates`,
-    `${count("failed")} failed`,
+    vt("graph.workflows", { count: lines }),
+    vt("trains.running", { count: count("moving") }),
+    vt("trains.heldAtGates", { count: count("held") }),
+    vt("trains.failed", { count: count("failed") }),
   ];
-  if (backedUp) parts.push(`${backedUp} backed-up stage${backedUp === 1 ? "" : "s"}`);
+  if (backedUp) parts.push(vt("graph.backedUpStages", { count: backedUp }));
   const sent = snapshot.trains.filter((t) => t.onLoopId).length;
-  if (sent) parts.push(`${sent} sent back along a loop`);
-  return parts.join(", ");
+  if (sent) parts.push(vt("trains.sentBackAlongLoop", { count: sent }));
+  return parts.join(vt("listSeparator"));
 }

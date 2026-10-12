@@ -29,16 +29,14 @@ export function NotificationsScreen({
   installAlertMail,
 }: NotificationsScreenProps) {
   const t = useTranslations("installAlertMail");
+  const tn = useTranslations("notificationSettings");
   return (
-    <PageShell
-      title="Notifications"
-      description="Your inbox: deploy approvals, failure alerts, invitations, quota warnings."
-    >
+    <PageShell title={tn("title")} description={tn("description")}>
       <SettingsPage
         single={section}
         sections={[
-          { id: "inbox", title: "Inbox", content: inbox },
-          { id: "alerts", title: "App alert subscriptions", content: alertSubscriptions },
+          { id: "inbox", title: tn("inboxTitle"), content: inbox },
+          { id: "alerts", title: tn("alerts.title"), content: alertSubscriptions },
           ...(installAlertMail
             ? [{ id: "install-email", title: t("title"), content: installAlertMail }]
             : []),

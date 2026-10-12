@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type * as React from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import type { AstroliftAgentListItem, AstroliftAgentTask } from "@/graphql/agents/agents.types";
 
@@ -23,6 +24,7 @@ import { StatTile } from "@/components/ui/stat-tile";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import {
   ACTIVE_TASK_STATUSES,
@@ -34,18 +36,6 @@ export type FleetOverviewScreenProps = ReturnType<typeof useFleetOverview> & {
   /** The live fleet topology map (FleetMapPanel with its data). */
   map: React.ReactNode;
 };
-
-function age(iso: string | null): string {
-  if (!iso) return "—";
-  const ms = Date.now() - Date.parse(iso);
-  if (!Number.isFinite(ms) || ms < 0) return "just now";
-  const minutes = Math.floor(ms / 60000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
 
 function statusTone(status: string): "default" | "secondary" | "destructive" | "outline" {
   if (status === "running") return "default";
@@ -80,71 +70,72 @@ export function FleetOverviewScreen({
   agentsError,
   map,
 }: FleetOverviewScreenProps) {
+  const copy = useTranslations("fleetOverview");
+  const taskStatus = useTranslations("agentActivity.statuses");
+  const fmt = useFormatters();
+  const age = (iso: string | null) => (iso ? fmt.formatRelativeTime(iso) : "—");
   return (
     <PageShell
-      title="Fleet overview"
-      description="A live command center for agents, runtimes, dispatch, and task health."
+      title={copy("title")}
+      description={copy("description")}
       actions={
         <>
           <Button variant="outline" size="sm" asChild>
-            <Link href="/fleet/map">Open fleet map</Link>
+            <Link href="/fleet/map">{copy("openMap")}</Link>
           </Button>
           <Button variant="outline" size="sm" onClick={refresh}>
-            <RefreshCwIcon className="mr-2 size-4" /> Refresh
+            <RefreshCwIcon className="mr-2 size-4" /> {copy("refresh")}
           </Button>
         </>
       }
     >
-      <Section title="At a glance" description="Current state reported by the Dispatch service.">
+      <Section title={copy("atAGlance")} description={copy("atAGlanceDescription")}>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatTile
-            label="Agents"
+            label={copy("agents")}
             value={agentCount}
             icon={BotIcon}
             loading={loading}
             href="/agents?tab=registry"
-            footer={`${runningAgentCount} active now`}
+            footer={copy("activeNow", { count: runningAgentCount })}
           />
           <StatTile
-            label="Runtimes"
+            label={copy("runtimes")}
             value={runtimeCount}
             icon={CpuIcon}
             loading={loading}
             href="/agents?tab=boxes"
-            footer="Available environment specs"
+            footer={copy("runtimesFooter")}
           />
           <StatTile
-            label="Active tasks"
+            label={copy("activeTasks")}
             value={activeTaskCount}
             icon={ListChecksIcon}
             loading={loading}
             href="/agents?tab=active"
-            footer="Queued, provisioning, or running"
+            footer={copy("activeTasksFooter")}
           />
           <StatTile
-            label="Incidents"
+            label={copy("incidents")}
             value={incidentCount}
             icon={AlertTriangleIcon}
             loading={loading}
             href="/agents?tab=history"
-            footer="Failed or timed out tasks"
+            footer={copy("incidentsFooter")}
           />
         </div>
       </Section>
 
-      <Section
-        title="Fleet topology"
-        description="Dispatchers route work through the live runtime fleet."
-      >
+      <Section title={copy("topology")} description={copy("topologyDescription")}>
         <Card className="overflow-hidden">{map}</Card>
       </Section>
 
       <PanelGrid>
         <ListSummary<AstroliftAgentTask>
           span={4}
-          title="Recent activity"
+          title={copy("recentActivity")}
           icon={<Clock3Icon className="size-4" />}
-          description="The latest task transitions from Dispatch."
+          description={copy("recentActivityDescription")}
           count={recentTasks.length}
           rows={recentTasks}
           keyOf={(t) => t.id}
@@ -155,18 +146,18 @@ export function FleetOverviewScreen({
           onRetry={refresh}
           empty={{
             icon: <Clock3Icon className="size-5" />,
-            title: "No task activity yet",
-            description: "Tasks dispatched through this organization will appear here.",
+            title: copy("noActivity"),
+            description: copy("noActivityDescription"),
             actionHref: "/agents?tab=dispatch",
-            actionLabel: "Open dispatch",
+            actionLabel: copy("openDispatch"),
           }}
           renderRow={(t) => (
             <span className="flex min-w-0 items-center gap-2">
               <span className="min-w-0 flex-1 truncate font-medium">
-                {t.agentName || t.agentSlug || "Agent task"}
+                {t.agentName || t.agentSlug || copy("agentTask")}
               </span>
               <Badge variant={statusTone(t.status)} className="shrink-0 capitalize">
-                {t.status.replace(/_/g, " ")}
+                {taskStatus.has(t.status) ? taskStatus(t.status) : t.status.replace(/_/g, " ")}
               </Badge>
               <span className="text-muted-foreground shrink-0 font-mono text-xs">
                 {age(t.createdAt)}
@@ -177,9 +168,9 @@ export function FleetOverviewScreen({
 
         <ListSummary<(typeof runtimes)[number]>
           span={4}
-          title="Runtime health"
+          title={copy("runtimeHealth")}
           icon={<RadioTowerIcon className="size-4" />}
-          description="Reusable environments currently available to the fleet."
+          description={copy("runtimeHealthDescription")}
           count={runtimes.length}
           rows={runtimes}
           keyOf={(r) => r.id}
@@ -189,10 +180,10 @@ export function FleetOverviewScreen({
           onRetry={refresh}
           empty={{
             icon: <CpuIcon className="size-5" />,
-            title: "No runtimes configured",
-            description: "Add an environment spec before dispatching an agent.",
+            title: copy("noRuntimes"),
+            description: copy("noRuntimesDescription"),
             actionHref: "/agents?tab=boxes",
-            actionLabel: "Manage runtimes",
+            actionLabel: copy("manageRuntimes"),
           }}
           renderRow={(r) => (
             <span className="flex min-w-0 items-center justify-between gap-3">
@@ -202,16 +193,19 @@ export function FleetOverviewScreen({
                   {r.runtime} · {r.agentType}
                 </span>
               </span>
-              <CircleDotIcon className="text-success size-4 shrink-0" aria-label="Available" />
+              <CircleDotIcon
+                className="text-success size-4 shrink-0"
+                aria-label={copy("available")}
+              />
             </span>
           )}
         />
 
         <ListSummary<AstroliftAgentListItem>
           span={4}
-          title="Agent roster"
+          title={copy("roster")}
           icon={<BotIcon className="size-4" />}
-          description="Registered agents and the runtime work they are carrying now."
+          description={copy("rosterDescription")}
           count={agents.length}
           rows={agents}
           keyOf={(a) => a.id}
@@ -222,10 +216,10 @@ export function FleetOverviewScreen({
           onRetry={refresh}
           empty={{
             icon: <BotIcon className="size-5" />,
-            title: "No agents registered",
-            description: "Register an agent repository before dispatching work.",
+            title: copy("noAgents"),
+            description: copy("noAgentsDescription"),
             actionHref: "/agents?tab=registry",
-            actionLabel: "Open agent registry",
+            actionLabel: copy("openRegistry"),
           }}
           renderRow={(a) => (
             <span className="flex min-w-0 items-center gap-2">
@@ -237,9 +231,9 @@ export function FleetOverviewScreen({
               </span>
               <Badge variant={a.runningCount > 0 ? "default" : "outline"} className="shrink-0">
                 {a.runningCount > 0 ? (
-                  <span className="font-mono">{a.runningCount} running</span>
+                  <span className="font-mono">{copy("running", { count: a.runningCount })}</span>
                 ) : (
-                  "Idle"
+                  copy("idle")
                 )}
               </Badge>
             </span>

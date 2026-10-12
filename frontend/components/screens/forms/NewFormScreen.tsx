@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useForm } from "react-hook-form";
+import { useTranslations } from "next-intl";
 import {
   Loader2Icon,
   PlusIcon,
@@ -38,6 +39,7 @@ const DEFAULT_SCHEMA = {
 
 /** Create a form: metadata, visual or JSON field builder, and a resizable live preview. */
 export function NewFormScreen({ onCreate }: NewFormScreenProps) {
+  const t = useTranslations("formScreens");
   const [mode, setMode] = useState<"visual" | "json">("visual");
   const [showPreview, setShowPreview] = useState(true);
   const [schema, setSchema] = useState<Record<string, unknown>>(DEFAULT_SCHEMA);
@@ -81,10 +83,8 @@ export function NewFormScreen({ onCreate }: NewFormScreenProps) {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-xl font-semibold">Create New Form</h1>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  Define fields, configure validation, see a live preview.
-                </p>
+                <h1 className="text-xl font-semibold">{t("newTitle")}</h1>
+                <p className="text-muted-foreground mt-1 text-sm">{t("newDescription")}</p>
               </div>
               <button
                 type="button"
@@ -92,7 +92,7 @@ export function NewFormScreen({ onCreate }: NewFormScreenProps) {
                 className={`flex items-center gap-1 rounded-md border px-3 py-1.5 text-sm ${showPreview ? "bg-primary text-primary-foreground" : ""}`}
               >
                 {showPreview ? <EyeOffIcon className="h-3 w-3" /> : <EyeIcon className="h-3 w-3" />}
-                {showPreview ? "Hide" : "Preview"}
+                {showPreview ? t("hide") : t("preview")}
               </button>
             </div>
             <Separator />
@@ -100,10 +100,10 @@ export function NewFormScreen({ onCreate }: NewFormScreenProps) {
             {/* Metadata */}
             <div className="grid gap-4">
               <div className="flex flex-col gap-1.5">
-                <Label>Form Name</Label>
+                <Label>{t("formName")}</Label>
                 <Input
-                  {...register("name", { required: "Name is required" })}
-                  placeholder="e.g. Expense Report"
+                  {...register("name", { required: t("nameRequired") })}
+                  placeholder={t("namePlaceholder")}
                   onChange={(e) => {
                     register("name").onChange(e);
                     autoSlug(e.target.value);
@@ -113,15 +113,15 @@ export function NewFormScreen({ onCreate }: NewFormScreenProps) {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <Label>Slug</Label>
+                  <Label>{t("slug")}</Label>
                   <Input
-                    {...register("slug", { required: "Slug is required" })}
+                    {...register("slug", { required: t("slugRequired") })}
                     placeholder="expense-report"
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label>Description</Label>
-                  <Input {...register("description")} placeholder="What is this form for?" />
+                  <Label>{t("description")}</Label>
+                  <Input {...register("description")} placeholder={t("descriptionPlaceholder")} />
                 </div>
               </div>
             </div>
@@ -130,7 +130,7 @@ export function NewFormScreen({ onCreate }: NewFormScreenProps) {
 
             {/* Mode toggle */}
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Form Fields</h2>
+              <h2 className="text-lg font-semibold">{t("formFields")}</h2>
               <div className="flex gap-1 rounded-lg border p-0.5">
                 <button
                   type="button"
@@ -146,7 +146,7 @@ export function NewFormScreen({ onCreate }: NewFormScreenProps) {
                   }}
                   className={`flex items-center gap-1 rounded-md px-3 py-1 text-sm ${mode === "visual" ? "bg-primary text-primary-foreground" : ""}`}
                 >
-                  <LayoutIcon className="h-3 w-3" /> Visual
+                  <LayoutIcon className="h-3 w-3" /> {t("visual")}
                 </button>
                 <button
                   type="button"
@@ -190,7 +190,7 @@ export function NewFormScreen({ onCreate }: NewFormScreenProps) {
               ) : (
                 <PlusIcon className="mr-2 h-4 w-4" />
               )}
-              Create Form
+              {t("createForm")}
             </Button>
           </form>
         </Panel>
@@ -203,10 +203,10 @@ export function NewFormScreen({ onCreate }: NewFormScreenProps) {
             </PanelResizeHandle>
             <Panel defaultSize={35} minSize={20}>
               <div className="bg-muted/30 h-full overflow-y-auto p-6">
-                <Section title="Live Preview">
+                <Section title={t("livePreview")}>
                   <Card>
                     <CardContent>
-                      <FormPreview schema={liveSchema} formName={nameValue || "Untitled Form"} />
+                      <FormPreview schema={liveSchema} formName={nameValue || t("untitled")} />
                     </CardContent>
                   </Card>
                 </Section>

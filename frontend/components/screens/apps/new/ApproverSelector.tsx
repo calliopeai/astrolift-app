@@ -67,6 +67,7 @@ export function ApproverSelectorView({
   onValidityChange,
 }: ApproverSelectorProps) {
   const t = useTranslations("apps.wizard.approval");
+  const copy = useTranslations("appWizard.approver");
 
   const [search, setSearch] = React.useState("");
   const filteredUsers = React.useMemo(() => {
@@ -228,7 +229,7 @@ export function ApproverSelectorView({
           ))}
           {orphanIds.map((id) => (
             <Badge key={id} variant="outline" className="flex items-center gap-1 pr-1 text-xs">
-              <span className="font-mono">user {id}</span>
+              <span className="font-mono">{copy("orphanUser", { id })}</span>
               <span className="text-muted-foreground text-2xs">{t("orphanSuffix")}</span>
               <button
                 type="button"

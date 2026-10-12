@@ -1,6 +1,7 @@
 "use client";
 
 import { HistoryIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import type { Column } from "@/components/data-table";
 import { Identifier } from "@/components/Identifier";
@@ -52,19 +53,21 @@ export function WorkflowRunsTab({
   coverage,
   live,
 }: WorkflowRunsTabProps) {
+  const t = useTranslations("taskRuns");
+  const tw = useTranslations("workflowRunsTab");
   const fmt = useFormatters();
 
   const columns: Column<RunRow>[] = [
     {
       id: "run",
-      header: "Run",
+      header: t("run"),
       cellClassName: "max-w-48",
       cell: (r) => <Identifier value={r.id} kind="id" copyable={false} className="text-xs" />,
     },
-    { id: "status", header: "Status", cell: (r) => <RunOutcomeCell run={r} /> },
+    { id: "status", header: t("status"), cell: (r) => <RunOutcomeCell run={r} /> },
     {
       id: "took",
-      header: "Took",
+      header: t("took"),
       align: "right",
       sortKey: "took",
       cellClassName: "font-mono text-xs tabular-nums",
@@ -72,17 +75,17 @@ export function WorkflowRunsTab({
     },
     {
       id: "trigger",
-      header: "Trigger",
+      header: t("trigger"),
       cellClassName: "max-w-48",
       cell: (r) => (
         <span className="block truncate font-mono text-xs" title={r.trigger || undefined}>
-          {r.trigger || <span className="text-muted-foreground">not recorded</span>}
+          {r.trigger || <span className="text-muted-foreground">{t("notRecorded")}</span>}
         </span>
       ),
     },
     {
       id: "at",
-      header: "Started",
+      header: t("started"),
       sortKey: "at",
       cellClassName: "font-mono text-xs whitespace-nowrap",
       cell: (r) => (r.at ? fmt.formatDateTime(r.at) : "—"),
@@ -94,14 +97,14 @@ export function WorkflowRunsTab({
       {live && (
         <WorkflowView
           snapshot={live}
-          title="Live"
-          description={`${live.trains.length} ${live.trains.length === 1 ? "run" : "runs"} in flight, placed where the engine reports them`}
+          title={tw("live")}
+          description={tw("liveDescription", { count: live.trains.length })}
         />
       )}
       <ListPage<RunRow>
         embedded
         list={list}
-        label="Runs"
+        label={t("title")}
         columns={columns}
         rows={rows}
         getRowId={(r) => r.key}
@@ -112,8 +115,8 @@ export function WorkflowRunsTab({
         onRetry={onRetry}
         empty={{
           icon: <HistoryIcon className="size-5" />,
-          title: "No runs yet",
-          description: "This workflow hasn't run yet. Run starts one; it appears here live.",
+          title: t("emptyTitle"),
+          description: tw("emptyDescription"),
         }}
         totalCount={totalCount}
         approximateCount={approximateCount}

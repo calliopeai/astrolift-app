@@ -3,6 +3,8 @@
  * their tabs, typed against each panel's props and selected the way the
  * hooks select, so a story cannot drift from them.
  */
+import { createTranslator } from "next-intl";
+
 import type { ListStateController } from "@/components/list/list-state";
 import type {
   AstroliftMember,
@@ -12,6 +14,7 @@ import type {
 import type { AstroliftAuditEvent } from "@/graphql/operations/operations.types";
 
 import { SCOPE_TREE } from "@/components/access/fixtures";
+import en from "@/messages/en.json";
 
 import { MEMBER, ROLE_BINDINGS } from "./fixtures";
 import type { AccessEntry } from "./entity-access";
@@ -22,6 +25,13 @@ import type { PersonTeamsPanelProps } from "./PersonTeamsPanel";
 import { buildAccessRows, roleRefOf, selectAccess, summarizeAccess } from "./principal-access";
 import type { PrincipalAccessPanelProps } from "./PrincipalAccessPanel";
 import { selectMemberships, type TeamMembershipRow } from "./use-person-teams";
+
+/** Stories read the summary in English, as the app does with the en catalog. */
+const SUMMARY = createTranslator({
+  locale: "en",
+  messages: en,
+  namespace: "adminPrincipalAccess.summary",
+});
 
 const noop = () => {};
 
@@ -84,7 +94,7 @@ export function accessProps(
   return {
     rows: selected.rows,
     totalCount: selected.totalCount,
-    summary: summarizeAccess(rows),
+    summary: summarizeAccess(rows, (key, values) => SUMMARY(key as never, values as never)),
     loading: false,
     error: null,
     onRetry: noop,

@@ -1,6 +1,7 @@
 "use client";
 
 import { Trash2Icon, UsersIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { principalOfBinding } from "@/components/access/access-model";
@@ -35,15 +36,22 @@ export function RoleHoldersTab({
   grantHref,
 }: RoleHoldersTabProps) {
   const fmt = useFormatters();
+  const t = useTranslations("adminBindings");
+  const scopes = useTranslations("shared.access.scope");
   const [target, setTarget] = React.useState<AstroliftRoleBinding | null>(null);
-  const columns = bindingColumns({ showRole: false, formatDate: fmt.formatDate });
+  const columns = bindingColumns({
+    showRole: false,
+    formatDate: fmt.formatDate,
+    t,
+    scopeNoun: (kind) => (scopes.has(kind) ? scopes(kind) : kind),
+  });
 
   return (
     <>
       <ListPage<AstroliftRoleBinding>
         embedded
         list={list}
-        label="Holders"
+        label={t("holders")}
         columns={columns}
         rows={page.rows}
         getRowId={(b) => b.id}
@@ -62,17 +70,17 @@ export function RoleHoldersTab({
                   onSelect={() => setTarget(b)}
                 >
                   <Trash2Icon className="size-4" />
-                  Revoke
+                  {t("revoke")}
                 </DropdownMenuItem>
               )
             : undefined
         }
         empty={{
           icon: <UsersIcon className="size-5" />,
-          title: "Nobody holds this role",
-          description: `Grant ${roleName} to a person or a group and they appear here, with where it applies.`,
+          title: t("holdersEmptyTitle"),
+          description: t("holdersEmptyDescription", { role: roleName }),
           actionHref: canManage ? grantHref : undefined,
-          actionLabel: canManage && grantHref ? "Grant access" : undefined,
+          actionLabel: canManage && grantHref ? t("grantAccess") : undefined,
         }}
       />
 
@@ -81,13 +89,13 @@ export function RoleHoldersTab({
         onOpenChange={(next) => {
           if (!next) setTarget(null);
         }}
-        title={target ? `Revoke ${roleName} from ${principalOfBinding(target).name}?` : "Revoke?"}
-        description={
-          target && !target.user
-            ? "Removes this group's mapping to the role. The group's members keep any access other bindings give them."
-            : "They lose what this role granted here. Other bindings they hold stay in effect."
+        title={
+          target
+            ? t("revokeFrom", { role: roleName, name: principalOfBinding(target).name })
+            : t("revokeFallback")
         }
-        confirmLabel="Revoke"
+        description={target && !target.user ? t("revokeGroup") : t("revokeHolder")}
+        confirmLabel={t("revoke")}
         destructive
         onConfirm={async () => {
           if (target) await onRevoke(target);

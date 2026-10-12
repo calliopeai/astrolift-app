@@ -1,13 +1,13 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { RadialGauge } from "@/components/viz/radial-gauge";
-import { TOPOLOGY_META } from "@/lib/topology";
 import { cn } from "@/lib/utils";
 
 import type { AppNode, AppSnapshot, AppViewProps } from "../../core/app-model";
-import { HEALTH_COLOR, HEALTH_LABEL, type Health } from "../../core/semantics";
+import { HEALTH_COLOR, type Health } from "../../core/semantics";
 import type { LegendItem } from "../../core/VizLegend";
 
 import {
@@ -40,29 +40,13 @@ import {
  */
 
 export const SERVICE_DATA_LAYOUT_LEGEND: LegendItem[] = [
-  { glyph: "dot", color: HEALTH_COLOR.ok, label: "Healthy" },
-  {
-    glyph: "dot",
-    color: HEALTH_COLOR.degraded,
-    label: "Degraded: over 1% errors or replicas missing",
-  },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Flicker: failing, over 5% errors" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Dark: no traffic" },
-  {
-    glyph: "flow",
-    color: HEALTH_COLOR.ok,
-    label: "Moving dash: calls to the store, faster when busier",
-  },
-  {
-    glyph: "ring",
-    color: HEALTH_COLOR.ok,
-    label: "Gauge: CPU for the service, connections for a store",
-  },
-  {
-    glyph: "bar",
-    color: HEALTH_COLOR.ok,
-    label: "Squares: replicas ready; a breathing outline is one not ready yet",
-  },
+  { glyph: "dot", color: HEALTH_COLOR.ok, labelKey: "healthy" },
+  { glyph: "dot", color: HEALTH_COLOR.degraded, labelKey: "degradedErrorsReplicas" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "flickerFailingErrors" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "darkNoTraffic" },
+  { glyph: "flow", color: HEALTH_COLOR.ok, labelKey: "sdDash" },
+  { glyph: "ring", color: HEALTH_COLOR.ok, labelKey: "sdGauge" },
+  { glyph: "bar", color: HEALTH_COLOR.ok, labelKey: "squaresReplicas" },
 ];
 
 export type ServiceDataLayoutProps = AppViewProps & { diagram: React.ReactNode };
@@ -82,6 +66,7 @@ function Store({
   flowParticles: boolean;
   onSelect?: (id: string) => void;
 }) {
+  const t = useTranslations("vizRender");
   const s = nodeStats(snapshot, node);
   const edge = snapshot.edges.find((e) => e.to === node.id && e.from === fromId);
   const rps = edge?.rps ?? s.inRps;
@@ -106,15 +91,15 @@ function Store({
               value={node.load}
               size={44}
               thickness={5}
-              ariaLabel={`${node.name} ${node.kind === "redis" ? "load" : "connections"}`}
+              ariaLabel={t(node.kind === "redis" ? "loadOf" : "connectionsOf", { name: node.name })}
             />
           </span>
           <span className="grid min-w-0 flex-1 grid-cols-2 gap-2">
             <Figure
-              label={node.kind === "redis" ? "load" : "connections"}
+              label={node.kind === "redis" ? t("load") : t("serviceData.connections")}
               value={fmtPct(node.load)}
             />
-            <Figure label="call errors" value={fmtPct(s.errorRate)} />
+            <Figure label={t("serviceData.callErrors")} value={fmtPct(s.errorRate)} />
           </span>
         </span>
       </NodeButton>
@@ -130,6 +115,7 @@ export function ServiceDataLayout({
   className,
   diagram,
 }: ServiceDataLayoutProps) {
+  const t = useTranslations("vizRender");
   const totals = appTotals(snapshot);
   const services = nodesWithRole(snapshot, "service");
   const stores = nodesWithRole(snapshot, "data");
@@ -149,13 +135,23 @@ export function ServiceDataLayout({
     .find((s) => s.health === "failing" || s.health === "degraded");
 
   const label =
-    `${snapshot.app.name}, ${TOPOLOGY_META[snapshot.topology].label.toLowerCase()}: ` +
-    `${HEALTH_LABEL[totals.health].toLowerCase()}, ${fmtRps(totals.rps)} requests per second, ` +
-    `${fmtPct(totals.errorRate)} errors, ${stores.length} data stores` +
+    t("serviceData.summary", {
+      head: t("trafficSummary", {
+        app: snapshot.app.name,
+        topology: t(`topology.${snapshot.topology}`),
+        health: t(`healthInline.${totals.health}`),
+        rps: fmtRps(totals.rps),
+        errors: fmtPct(totals.errorRate),
+      }),
+      count: stores.length,
+    }) +
     (worstStore
-      ? `, ${worstStore.node.name} ${HEALTH_LABEL[worstStore.health].toLowerCase()}`
+      ? t("serviceData.worstStore", {
+          name: worstStore.node.name,
+          health: t(`healthInline.${worstStore.health}`),
+        })
       : "") +
-    stores.map((n) => `, ${n.name} at ${fmtPct(n.load)}`).join("");
+    stores.map((n) => t("serviceData.storeAt", { name: n.name, load: fmtPct(n.load) })).join("");
 
   return (
     <div
@@ -166,25 +162,25 @@ export function ServiceDataLayout({
     >
       <div className="grid grid-cols-2 gap-3 @2xl:grid-cols-4">
         <Kpi
-          label="Requests/s"
+          label={t("kpi.requests")}
           value={fmtRps(totals.rps)}
           health={trafficHealth}
           series={series.rps}
         />
         <Kpi
-          label="p50 latency"
+          label={t("kpi.p50")}
           value={fmtMs(totals.p50)}
           health={trafficHealth}
           series={series.p50}
         />
         <Kpi
-          label="Error rate"
+          label={t("kpi.errorRate")}
           value={fmtPct(totals.errorRate)}
           health={errHealth}
           series={series.err}
         />
         <Kpi
-          label="Replicas ready"
+          label={t("kpi.replicas")}
           value={`${totals.replicas.ready}/${totals.replicas.desired}`}
           health={replicaHealth}
         />
@@ -202,11 +198,11 @@ export function ServiceDataLayout({
                       value={node.load}
                       size={44}
                       thickness={5}
-                      ariaLabel={`${node.name} CPU`}
+                      ariaLabel={t("cpuOf", { name: node.name })}
                     />
                   </span>
                   <span className="grid min-w-0 flex-1 grid-cols-2 gap-2">
-                    <Figure label="req/s" value={fmtRps(node.rps ?? s.inRps)} />
+                    <Figure label={t("reqPerSec")} value={fmtRps(node.rps ?? s.inRps)} />
                     <Figure label="p50" value={fmtMs(node.p50)} />
                   </span>
                 </span>

@@ -1,4 +1,5 @@
 import { ArrowDownIcon, ArrowRightIcon, ArrowUpIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -44,6 +45,7 @@ export function TrendStat({
   formatDelta = defaultFormatDelta,
   className,
 }: TrendStatProps) {
+  const t = useTranslations("vizRender");
   const hasDelta = delta !== null && delta !== undefined;
   const rising = hasDelta && delta! > 0;
   const falling = hasDelta && delta! < 0;
@@ -71,7 +73,12 @@ export function TrendStat({
         )}
       </div>
       {data && data.length > 0 && (
-        <Sparkline data={data} variant="area" className={cn("shrink-0", tone)} ariaLabel="Trend" />
+        <Sparkline
+          data={data}
+          variant="area"
+          className={cn("shrink-0", tone)}
+          ariaLabel={t("trend")}
+        />
       )}
     </div>
   );

@@ -18,7 +18,7 @@
 
 import { BrainCircuitIcon, ChartSplineIcon, DatabaseIcon, HardDriveIcon } from "lucide-react";
 import * as React from "react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import {
   CartesianGrid,
   Line,
@@ -46,88 +46,32 @@ import type { useManagedServiceMetrics } from "./use-managed-service-metrics";
  *  resolver. */
 export const SUPPORTED_KINDS = new Set(["postgres", "object_store", "model_endpoint"]);
 
-/** Per-metric display copy. Title + description are operator-facing;
- *  the metric ``name`` field on the wire matches a key here. */
-const METRIC_COPY: Record<string, { title: string; description: string }> = {
+/** Metrics with display copy (title + description) under
+ *  `obsManagedServiceMetrics.metric.<name>`; the metric ``name`` field on the
+ *  wire matches a key here. */
+const METRIC_NAMES = new Set([
   // Postgres
-  connections: {
-    title: "Connections",
-    description: "Active client connections to this database.",
-  },
-  cpu: {
-    title: "CPU",
-    description: "Exporter process CPU usage (proxy for engine load).",
-  },
-  iops: {
-    title: "IOPS",
-    description: "Block reads + cache hits per second.",
-  },
-  slow_queries: {
-    title: "Slow queries",
-    description: "Rate of queries exceeding 1s.",
-  },
-  replica_lag: {
-    title: "Replica lag",
-    description: "Highest replica lag across this cluster's replicas.",
-  },
+  "connections",
+  "cpu",
+  "iops",
+  "slow_queries",
+  "replica_lag",
   // Object store
-  bucket_size: {
-    title: "Bucket size",
-    description: "Total bytes stored in this bucket.",
-  },
-  request_count: {
-    title: "Requests",
-    description: "Total requests per second to the bucket.",
-  },
-  errors_4xx: {
-    title: "4xx errors",
-    description: "Client errors per second.",
-  },
-  errors_5xx: {
-    title: "5xx errors",
-    description: "Server errors per second.",
-  },
-  egress_bytes: {
-    title: "Egress",
-    description: "Bytes downloaded per second from this bucket.",
-  },
+  "bucket_size",
+  "request_count",
+  "errors_4xx",
+  "errors_5xx",
+  "egress_bytes",
   // Hosted model (vLLM, #2064)
-  tokens_per_second: {
-    title: "Tokens/sec",
-    description: "Generated tokens per second across replicas.",
-  },
-  requests_running: {
-    title: "Running",
-    description: "Requests being decoded right now.",
-  },
-  requests_waiting: {
-    title: "Waiting",
-    description: "Requests queued for a slot.",
-  },
-  ttft_p95: {
-    title: "Time to first token",
-    description: "95th percentile time to the first generated token.",
-  },
-  kv_cache_usage: {
-    title: "KV cache",
-    description: "Share of the GPU KV cache in use.",
-  },
-};
+  "tokens_per_second",
+  "requests_running",
+  "requests_waiting",
+  "ttft_p95",
+  "kv_cache_usage",
+]);
 
-const KIND_HEADER: Record<string, { label: string; description: string }> = {
-  postgres: {
-    label: "Database",
-    description: "Connections, IO, slow-query rate, and replica lag for this database.",
-  },
-  object_store: {
-    label: "Storage",
-    description: "Bucket size, request rate, error breakdown, and egress for this bucket.",
-  },
-  model_endpoint: {
-    label: "Model",
-    description: "Throughput, queue, time to first token and KV cache for this hosted model.",
-  },
-};
+/** Header copy lives under `obsManagedServiceMetrics.kind.<kind>`. */
+const KIND_HEADER_KEYS = new Set(["postgres", "object_store", "model_endpoint"]);
 
 export type ManagedServiceMetricsPanelProps = ReturnType<typeof useManagedServiceMetrics>;
 
@@ -145,6 +89,7 @@ export function ManagedServiceMetricsPanel({
   error,
 }: ManagedServiceMetricsPanelProps) {
   const copy = useTranslations("metrics");
+  const t = useTranslations("obsManagedServiceMetrics");
   if (error)
     return (
       <p role="alert" className="text-muted-foreground text-sm">
@@ -165,8 +110,8 @@ export function ManagedServiceMetricsPanel({
       : data?.kind === "model_endpoint"
         ? BrainCircuitIcon
         : HardDriveIcon;
-  const header = KIND_HEADER[data?.kind ?? ""] ?? KIND_HEADER.object_store;
-  const kindLabel = header.label;
+  const kind = KIND_HEADER_KEYS.has(data?.kind ?? "") ? data!.kind : "object_store";
+  const kindLabel = t(`kind.${kind}.label`);
 
   return (
     <Card>
@@ -178,7 +123,7 @@ export function ManagedServiceMetricsPanel({
               {kindLabel}
               <span className="text-muted-foreground font-mono text-xs">{data?.name ?? "—"}</span>
             </CardTitle>
-            <CardDescription>{header.description}</CardDescription>
+            <CardDescription>{t(`kind.${kind}.description`)}</CardDescription>
           </div>
           <RangePicker value={range} onChange={setRange} />
         </div>
@@ -238,13 +183,19 @@ export function ManagedServiceMetricsList({
 // ----------------------------------------------------------------------
 
 function MetricSeriesCard({ series }: { series: AstroliftManagedServiceMetricSeries }) {
-  const copy = METRIC_COPY[series.name] ?? {
-    title: series.name,
-    description: "",
+  const t = useTranslations("obsManagedServiceMetrics");
+  const format = useFormatter();
+  const known = METRIC_NAMES.has(series.name);
+  const copy = {
+    title: known ? t(`metric.${series.name}.title`) : series.name,
+    description: known ? t(`metric.${series.name}.description`) : "",
   };
   const samples = series.samples;
   const hasData = samples.length > 0;
-  const rows = React.useMemo(() => toRows(samples), [samples]);
+  const rows = React.useMemo(
+    () => toRows(samples, (d) => format.dateTime(d, TIME_OF_DAY)),
+    [samples, format]
+  );
   const formatter = pickFormatter(series.unit);
 
   return (
@@ -285,11 +236,13 @@ function MetricSeriesCard({ series }: { series: AstroliftManagedServiceMetricSer
           </ResponsiveContainer>
         ) : (
           <p className="text-muted-foreground flex h-full items-center justify-center text-xs">
-            No samples in this window.
+            {t("noSamples")}
           </p>
         )}
       </div>
-      <p className="text-muted-foreground text-2xs mt-2">source: {series.source}</p>
+      <p className="text-muted-foreground text-2xs mt-2">
+        {t("source", { source: series.source })}
+      </p>
     </div>
   );
 }
@@ -299,9 +252,11 @@ interface ChartRow {
   value: number;
 }
 
-function toRows(samples: AstroliftTimeSeriesPoint[]): ChartRow[] {
+const TIME_OF_DAY = { hour: "numeric", minute: "2-digit", second: "2-digit" } as const;
+
+function toRows(samples: AstroliftTimeSeriesPoint[], formatTime: (d: Date) => string): ChartRow[] {
   return samples.map((s) => ({
-    ts: new Date(s.ts).toLocaleTimeString(),
+    ts: formatTime(new Date(s.ts)),
     value: s.value,
   }));
 }
@@ -373,10 +328,6 @@ function RangePicker({
 // ----------------------------------------------------------------------
 
 function NoMetricsCallout() {
-  return (
-    <p className="text-muted-foreground py-8 text-center text-xs">
-      Metrics not yet flowing — either the cluster&apos;s Prometheus endpoint isn&apos;t configured,
-      or the exporter sidecar hasn&apos;t emitted samples for this service yet.
-    </p>
-  );
+  const t = useTranslations("obsManagedServiceMetrics");
+  return <p className="text-muted-foreground py-8 text-center text-xs">{t("notFlowing")}</p>;
 }

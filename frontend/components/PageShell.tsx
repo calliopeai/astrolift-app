@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronDownIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { useAppChrome } from "@/lib/app-chrome-context";
@@ -142,6 +143,7 @@ function CollapsibleHeaderShell({
   defaultOpen: boolean;
   children: React.ReactNode;
 }) {
+  const t = useTranslations("pageShell");
   const [open, setOpen] = React.useState(defaultOpen);
   React.useEffect(() => {
     setOpen(loadOpen(storageKey, defaultOpen));
@@ -163,9 +165,9 @@ function CollapsibleHeaderShell({
           {hasFoldable && (
             <CollapsibleTrigger
               className="group/hdr text-muted-foreground hover:text-foreground mt-1 -mr-1 inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs transition-colors"
-              aria-label={open ? "Collapse header" : "Expand header"}
+              aria-label={open ? t("collapseHeader") : t("expandHeader")}
             >
-              <span className="hidden sm:inline">{open ? "Collapse" : "Details"}</span>
+              <span className="hidden sm:inline">{open ? t("collapse") : t("details")}</span>
               <ChevronDownIcon className="size-4 transition-transform group-data-[state=closed]/hdr:-rotate-90" />
             </CollapsibleTrigger>
           )}

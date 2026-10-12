@@ -11,6 +11,7 @@ import {
   SlidersHorizontalIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import type { Column, EmptyStateSpec } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
@@ -24,16 +25,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { formatRelativeAge } from "@/lib/format";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import { AgentGlyph } from "./AgentGlyph";
 import {
-  AGENT_MODEL_LABEL,
   AGENT_STATUS_DOT,
-  AGENT_STATUS_LABEL,
+  type AgentModelKey,
   type AgentRow,
   agentsCrumbs,
-  formatRunMode,
   RUN_STATUS_DOT,
   titleCase,
 } from "./agents-list";
@@ -63,13 +62,48 @@ const agentHref = (a: Pick<AgentRow, "slug">, tail = "") =>
 // link in a cell has to sit above it to be reachable.
 const ABOVE_ROW_LINK = "relative z-10";
 
+const MODEL_KEY: Record<AgentModelKey, "managed" | "gateway" | "apiKey"> = {
+  managed: "managed",
+  gateway: "gateway",
+  "api-key": "apiKey",
+};
+
+const RUN_FAMILIES = new Set(["task", "service"]);
+const RUN_MODES = new Set(["once", "loop", "schedule", "trigger", "service"]);
+const RUN_STATUSES = new Set([
+  "running",
+  "queued",
+  "pending",
+  "completed",
+  "succeeded",
+  "failed",
+  "timed_out",
+  "cancelled",
+  "canceled",
+]);
+
+/** formatRunMode, read from the catalog: "Task · Schedule" or "Service". */
+function useRunModeLabel() {
+  const t = useTranslations("agentsList");
+  return (runFamily: string, runMode: string): string => {
+    const f = runFamily.toLowerCase();
+    const m = runMode.toLowerCase();
+    const family = RUN_FAMILIES.has(f) ? t(`family.${f}`) : titleCase(runFamily);
+    const mode = RUN_MODES.has(m) ? t(`mode.${m}`) : titleCase(runMode);
+    if (!mode || mode === family) return family || t("none");
+    return `${family} · ${mode}`;
+  };
+}
+
 function AgentStatus({ agent }: { agent: AgentRow }) {
+  const t = useTranslations("agentsList");
+  const fmt = useFormatters();
   const label =
     agent.status === "running" && agent.running > 0
-      ? `${agent.running} running`
+      ? t("runningCount", { count: agent.running })
       : agent.status === "scheduled" && agent.nextScheduledAt
-        ? `Next ${formatRelativeAge(agent.nextScheduledAt)}`
-        : AGENT_STATUS_LABEL[agent.status];
+        ? t("next", { age: fmt.formatRelativeTime(agent.nextScheduledAt) })
+        : t(`status.${agent.status}`);
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5 text-sm">
       <StatusDot status={AGENT_STATUS_DOT[agent.status]} />
@@ -81,21 +115,27 @@ function AgentStatus({ agent }: { agent: AgentRow }) {
 }
 
 function LastRun({ agent }: { agent: AgentRow }) {
+  const t = useTranslations("agentsList");
+  const statuses = useTranslations("agentOverview.statuses");
+  const fmt = useFormatters();
   if (!agent.lastRunStatus && !agent.lastRunAt) {
-    return <span className="text-muted-foreground text-xs">Never run</span>;
+    return <span className="text-muted-foreground text-xs">{t("neverRun")}</span>;
   }
+  const runStatus = (agent.lastRunStatus ?? "").toLowerCase();
   const dot = RUN_STATUS_DOT[(agent.lastRunStatus ?? "").toLowerCase()] ?? "muted";
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5 text-xs">
       {agent.lastRunStatus && (
         <>
           <StatusDot status={dot} />
-          <span className="truncate">{titleCase(agent.lastRunStatus)}</span>
+          <span className="truncate">
+            {RUN_STATUSES.has(runStatus) ? statuses(runStatus) : titleCase(agent.lastRunStatus)}
+          </span>
         </>
       )}
       {agent.lastRunAt && (
         <span className="text-muted-foreground shrink-0 font-mono" title={agent.lastRunAt}>
-          {formatRelativeAge(agent.lastRunAt)}
+          {fmt.formatRelativeTime(agent.lastRunAt)}
         </span>
       )}
     </span>
@@ -103,15 +143,18 @@ function LastRun({ agent }: { agent: AgentRow }) {
 }
 
 function Model({ agent }: { agent: AgentRow }) {
+  const t = useTranslations("agentsList");
   return agent.model ? (
-    <span className="text-sm">{AGENT_MODEL_LABEL[agent.model]}</span>
+    <span className="text-sm">{t(`model.${MODEL_KEY[agent.model]}`)}</span>
   ) : (
-    <span className="text-muted-foreground text-xs">Agent default</span>
+    <span className="text-muted-foreground text-xs">{t("agentDefault")}</span>
   );
 }
 
 function Clusters({ clusters }: { clusters: string[] }) {
-  if (clusters.length === 0) return <span className="text-muted-foreground text-xs">none</span>;
+  const t = useTranslations("agentsList");
+  if (clusters.length === 0)
+    return <span className="text-muted-foreground text-xs">{t("none")}</span>;
   return (
     <span className="flex min-w-0 items-center gap-1 font-mono text-xs">
       <span className="min-w-0 truncate" title={clusters.join(", ")}>
@@ -135,6 +178,8 @@ function Coordinates({ agent }: { agent: AgentRow }) {
 
 /** A card: the fleet glyph, name, status, model and last run. */
 function AgentCard({ agent }: { agent: AgentRow }) {
+  const t = useTranslations("agentsList");
+  const runModeLabel = useRunModeLabel();
   return (
     <div className="bg-card hover:bg-accent/30 flex h-full min-w-0 flex-col gap-3 rounded-md border p-4 transition-colors">
       <div className="flex min-w-0 items-start gap-3">
@@ -148,8 +193,8 @@ function AgentCard({ agent }: { agent: AgentRow }) {
       </div>
       <AgentStatus agent={agent} />
       <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs">
-        <Badge variant="outline">{formatRunMode(agent.runFamily, agent.runMode)}</Badge>
-        {agent.model && <Badge variant="secondary">{AGENT_MODEL_LABEL[agent.model]}</Badge>}
+        <Badge variant="outline">{runModeLabel(agent.runFamily, agent.runMode)}</Badge>
+        {agent.model && <Badge variant="secondary">{t(`model.${MODEL_KEY[agent.model]}`)}</Badge>}
         {agent.runtime && (
           <Badge variant="outline" className="max-w-full min-w-0 font-mono">
             <span className="min-w-0 truncate">{agent.runtime}</span>
@@ -165,10 +210,11 @@ function AgentCard({ agent }: { agent: AgentRow }) {
 
 /** The header's `⋯`: the Agents area's other ways in that used to be tabs here. */
 function HeaderMenu() {
+  const t = useTranslations("agentsList");
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="icon" className="size-8" aria-label="More agent actions">
+        <Button variant="outline" size="icon" className="size-8" aria-label={t("moreActions")}>
           <MoreHorizontalIcon className="size-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -176,13 +222,13 @@ function HeaderMenu() {
         <DropdownMenuItem asChild>
           <Link href="/agents/runs/new">
             <PlayIcon className="size-4" />
-            Run an agent
+            {t("runAnAgent")}
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/tasks">
             <ClipboardListIcon className="size-4" />
-            Agent runs
+            {t("agentRuns")}
           </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -211,19 +257,20 @@ export function AgentsListScreen({
   dispatching,
   onRun,
 }: AgentsListScreenProps) {
+  const t = useTranslations("agentsList");
+  const runModeLabel = useRunModeLabel();
   const empty: EmptyStateSpec = {
     icon: <BotIcon className="size-5" />,
-    title: "No agents registered",
-    description:
-      "Register an agent repo to scan it for agent manifests and add each one as an agent here. Agents share the same image build and deployment pipeline as your apps.",
-    ...(canCreate ? { actionHref: "/agents/new", actionLabel: "New agent" } : {}),
+    title: t("emptyTitle"),
+    description: t("emptyDescription"),
+    ...(canCreate ? { actionHref: "/agents/new", actionLabel: t("newAgent") } : {}),
     learnMoreHref: "https://github.com/calliopeai/astrolift-docs/blob/main/reference/agents.md",
   };
 
   const columns: Column<AgentRow>[] = [
     {
       id: "agent",
-      header: "Agent",
+      header: t("columns.agent"),
       sortKey: "name",
       cellClassName: "max-w-80",
       cell: (a) => (
@@ -238,29 +285,34 @@ export function AgentsListScreen({
         </span>
       ),
     },
-    { id: "status", header: "Status", sortKey: "status", cell: (a) => <AgentStatus agent={a} /> },
-    { id: "model", header: "Model", cell: (a) => <Model agent={a} /> },
+    {
+      id: "status",
+      header: t("columns.status"),
+      sortKey: "status",
+      cell: (a) => <AgentStatus agent={a} />,
+    },
+    { id: "model", header: t("columns.model"), cell: (a) => <Model agent={a} /> },
     {
       id: "runtime",
-      header: "Runtime",
+      header: t("columns.runtime"),
       cell: (a) => (
         <span className="block min-w-0">
-          <span className="block truncate font-mono text-xs">{a.runtime ?? "default"}</span>
+          <span className="block truncate font-mono text-xs">{a.runtime ?? t("default")}</span>
           <span className="text-muted-foreground block truncate text-xs">
-            {formatRunMode(a.runFamily, a.runMode)}
+            {runModeLabel(a.runFamily, a.runMode)}
           </span>
         </span>
       ),
     },
     {
       id: "cluster",
-      header: "Cluster",
+      header: t("columns.cluster"),
       cellClassName: "max-w-48",
       cell: (a) => <Clusters clusters={a.clusters} />,
     },
     {
       id: "repo",
-      header: "Repo",
+      header: t("columns.repo"),
       cellClassName: "max-w-56",
       cell: (a) =>
         a.sourceRepo ? (
@@ -281,29 +333,34 @@ export function AgentsListScreen({
             </span>
           )
         ) : (
-          <span className="text-muted-foreground text-xs">none</span>
+          <span className="text-muted-foreground text-xs">{t("none")}</span>
         ),
     },
-    { id: "lastRun", header: "Last run", sortKey: "lastRun", cell: (a) => <LastRun agent={a} /> },
+    {
+      id: "lastRun",
+      header: t("columns.lastRun"),
+      sortKey: "lastRun",
+      cell: (a) => <LastRun agent={a} />,
+    },
   ];
 
   return (
     <ListPage<AgentRow>
       header={{
         crumbs: agentsCrumbs(),
-        title: "Agents",
+        title: t("title"),
         primaryAction: canCreate ? (
           <Button size="sm" asChild>
             <Link href="/agents/new">
               <PlusIcon className="size-4" />
-              New agent
+              {t("newAgent")}
             </Link>
           </Button>
         ) : undefined,
         menu: <HeaderMenu />,
       }}
       list={list}
-      label="Agents"
+      label={t("title")}
       columns={columns}
       rows={rows}
       getRowId={(a) => a.id}
@@ -314,21 +371,21 @@ export function AgentsListScreen({
           {canRun && (
             <DropdownMenuItem disabled={dispatching} onSelect={() => void onRun(a)}>
               <PlayIcon className="size-4" />
-              Run now
+              {t("runNow")}
             </DropdownMenuItem>
           )}
           {canRun && (
             <DropdownMenuItem asChild>
               <Link href={`/agents/runs/new?agent=${encodeURIComponent(a.slug)}`}>
                 <SlidersHorizontalIcon className="size-4" />
-                Run with inputs
+                {t("runWithInputs")}
               </Link>
             </DropdownMenuItem>
           )}
           <DropdownMenuItem asChild>
             <Link href={agentHref(a, "/configuration?section=run-mode")}>
               <SettingsIcon className="size-4" />
-              Run mode and triggers
+              {t("runModeAndTriggers")}
             </Link>
           </DropdownMenuItem>
         </>

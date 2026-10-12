@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -9,7 +10,6 @@ import {
   flowDuration,
   HEALTH_COLOR,
   HEALTH_GLOWS,
-  HEALTH_LABEL,
   MOTION_CLASS,
   type Health,
 } from "../core/semantics";
@@ -51,18 +51,14 @@ import {
  */
 
 export const FLEET_GRAPH_LEGEND: LegendItem[] = [
-  { glyph: "glow", color: HEALTH_COLOR.ok, label: "Healthy; size is active runs" },
-  { glyph: "glow", color: HEALTH_COLOR.degraded, label: "Degraded (load over 85%)" },
-  { glyph: "flicker", color: HEALTH_COLOR.failing, label: "Failing" },
-  { glyph: "dot", color: HEALTH_COLOR.idle, label: "Idle, dark" },
-  { glyph: "flow", color: HEALTH_COLOR.ok, label: "Runs in progress; faster and wider is busier" },
-  {
-    glyph: "spark",
-    color: "var(--brand-primary)",
-    label: "Dispatch travels hub, cluster, agent (still: ringed agent)",
-  },
-  { glyph: "ring", color: HEALTH_COLOR.idle, label: "Runs queued" },
-  { glyph: "signal", color: "var(--muted-foreground)", label: "Pinned; double-click to release" },
+  { glyph: "glow", color: HEALTH_COLOR.ok, labelKey: "graphHealthy" },
+  { glyph: "glow", color: HEALTH_COLOR.degraded, labelKey: "degradedLoadOver85" },
+  { glyph: "flicker", color: HEALTH_COLOR.failing, labelKey: "failing" },
+  { glyph: "dot", color: HEALTH_COLOR.idle, labelKey: "idleDarkShort" },
+  { glyph: "flow", color: HEALTH_COLOR.ok, labelKey: "graphRunsFlow" },
+  { glyph: "spark", color: "var(--brand-primary)", labelKey: "graphDispatch" },
+  { glyph: "ring", color: HEALTH_COLOR.idle, labelKey: "graphQueued" },
+  { glyph: "signal", color: "var(--muted-foreground)", labelKey: "graphPinned" },
 ];
 
 /** A pulse takes this long to go hub -> cluster -> agent. */
@@ -308,6 +304,7 @@ export function FleetGraph({
   selectedAgentId,
   className,
 }: FleetViewProps) {
+  const t = useTranslations("vizRender");
   const { clusters, agents, events, now } = snapshot;
   const [engine] = React.useState(() => new GraphEngine());
   const [pinned, setPinned] = React.useState<ReadonlySet<string>>(() => new Set());
@@ -361,9 +358,13 @@ export function FleetGraph({
   const failing = agents.filter((a) => a.health === "failing").length;
   const busy = agents.filter((a) => a.activeRuns > 0).length;
   const queued = agents.reduce((n, a) => n + a.queued, 0);
-  const summary =
-    `${agents.length} agents across ${clusters.length} clusters, ` +
-    `${failing} failing, ${busy} busy, ${queued} runs queued`;
+  const summary = t("fleetGraph.summary", {
+    agents: agents.length,
+    clusters: clusters.length,
+    failing,
+    busy,
+    queued,
+  });
   const showAgentLabels = agents.length <= LABEL_LIMIT;
 
   const dragProps = (id: string) => ({
@@ -470,7 +471,7 @@ export function FleetGraph({
 
         <g>
           <g data-node={HUB_ID} className="cursor-grab" {...dragProps(HUB_ID)}>
-            <title>Organization hub</title>
+            <title>{t("fleetGraph.hub")}</title>
             <circle
               r={16}
               fill="var(--card)"
@@ -484,7 +485,7 @@ export function FleetGraph({
               fontSize={9}
               className="fill-muted-foreground font-mono"
             >
-              org
+              {t("fleetGraph.org")}
             </text>
             {pinMark(HUB_ID, 16)}
           </g>
@@ -502,7 +503,12 @@ export function FleetGraph({
                 key={id}
                 data-node={id}
                 tabIndex={0}
-                aria-label={`${a.name}: ${HEALTH_LABEL[a.health]}, ${a.activeRuns} active, ${a.queued} queued`}
+                aria-label={t("fleetGraph.agentLabel", {
+                  name: a.name,
+                  health: t(`health.${a.health}`),
+                  active: a.activeRuns,
+                  queued: a.queued,
+                })}
                 aria-pressed={selected}
                 className="group cursor-pointer outline-none"
                 {...dragProps(id)}
@@ -516,7 +522,15 @@ export function FleetGraph({
                   }
                 }}
               >
-                <title>{`${a.name}: ${HEALTH_LABEL[a.health]}, ${a.activeRuns} active, ${a.queued} queued, load ${Math.round(a.load * 100)}%`}</title>
+                <title>
+                  {t("fleetGraph.agentTitle", {
+                    name: a.name,
+                    health: t(`health.${a.health}`),
+                    active: a.activeRuns,
+                    queued: a.queued,
+                    load: Math.round(a.load * 100),
+                  })}
+                </title>
                 <circle
                   r={r + 6}
                   fill="none"
@@ -590,7 +604,11 @@ export function FleetGraph({
             return (
               <g key={id} data-node={id} className="cursor-grab" {...dragProps(id)}>
                 <title>
-                  {`${c.name}${c.region ? ` (${c.region})` : ""}: ${c.health === "offline" ? "Offline" : HEALTH_LABEL[h]}`}
+                  {t(c.region ? "fleetGraph.clusterRegionTitle" : "fleetGraph.clusterTitle", {
+                    name: c.name,
+                    region: c.region ?? "",
+                    health: c.health === "offline" ? t("offline") : t(`health.${h}`),
+                  })}
                 </title>
                 <rect
                   x={-s}

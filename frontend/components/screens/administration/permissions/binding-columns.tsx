@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { principalOfBinding, SCOPE_NOUN, sourceOfBinding } from "@/components/access/access-model";
+import { principalOfBinding, sourceOfBinding } from "@/components/access/access-model";
 import { GrantSource } from "@/components/access/GrantSource";
 import { PrincipalChip } from "@/components/access/PrincipalChip";
 import type { Column } from "@/components/data-table";
@@ -20,14 +20,20 @@ import { SCOPE_TONE } from "./scope-tone";
 export function bindingColumns({
   showRole = true,
   formatDate,
+  t,
+  scopeNoun,
 }: {
   showRole?: boolean;
   formatDate: (iso: string) => string;
+  /** The `adminBindings` translator. */
+  t: (key: string) => string;
+  /** The scope kind's noun (`shared.access.scope`), or the raw kind if unknown. */
+  scopeNoun: (kind: string) => string;
 }): Column<AstroliftRoleBinding>[] {
   const columns: Column<AstroliftRoleBinding>[] = [
     {
       id: "principal",
-      header: "Held by",
+      header: t("heldBy"),
       sortKey: "name",
       cellClassName: "max-w-72",
       cell: (b) => {
@@ -35,7 +41,7 @@ export function bindingColumns({
         return (
           <PrincipalChip
             principal={
-              p.kind === "group" ? { ...p, href: groupHref(p.id), detail: "IdP group" } : p
+              p.kind === "group" ? { ...p, href: groupHref(p.id), detail: t("idpGroup") } : p
             }
             variant="block"
           />
@@ -46,7 +52,7 @@ export function bindingColumns({
   if (showRole) {
     columns.push({
       id: "role",
-      header: "Role",
+      header: t("role"),
       sortKey: "role",
       cellClassName: "max-w-64",
       cell: (b) => (
@@ -70,13 +76,13 @@ export function bindingColumns({
   columns.push(
     {
       id: "scope",
-      header: "Where",
+      header: t("where"),
       sortKey: "scope",
       cellClassName: "max-w-64",
       cell: (b) => (
         <div className="flex min-w-0 flex-col items-start gap-1">
           <Badge className={`${SCOPE_TONE[b.scopeKind] ?? ""} font-mono`} variant="secondary">
-            {SCOPE_NOUN[b.scopeKind] ?? b.scopeKind}
+            {scopeNoun(b.scopeKind)}
           </Badge>
           <span
             className="text-muted-foreground block max-w-full truncate text-xs"
@@ -89,7 +95,7 @@ export function bindingColumns({
     },
     {
       id: "source",
-      header: "Source",
+      header: t("source"),
       cellClassName: "max-w-64",
       cell: (b) => {
         const source = sourceOfBinding(b);
@@ -102,17 +108,17 @@ export function bindingColumns({
     },
     {
       id: "granted",
-      header: "Granted",
+      header: t("granted"),
       sortKey: "created",
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (b) => formatDate(b.grantedAt),
     },
     {
       id: "expires",
-      header: "Expires",
+      header: t("expires"),
       sortKey: "expires",
       cellClassName: "text-muted-foreground font-mono text-xs",
-      cell: (b) => (b.expiresAt ? formatDate(b.expiresAt) : "never"),
+      cell: (b) => (b.expiresAt ? formatDate(b.expiresAt) : t("never")),
     }
   );
   return columns;

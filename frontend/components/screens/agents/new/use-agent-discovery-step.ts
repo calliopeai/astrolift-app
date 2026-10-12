@@ -2,6 +2,7 @@
 
 import { useLazyQuery } from "@apollo/client/react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { SCAN_AGENT_MANIFESTS } from "@/graphql/agents/agents.queries";
@@ -47,6 +48,7 @@ export function useAgentDiscoveryStep<S extends AgentDiscoveryFields>(
   setState: React.Dispatch<React.SetStateAction<S>>,
   setValid: (valid: boolean) => void
 ) {
+  const t = useTranslations("agentWizard.discovery.toasts");
   // Reactive org id (#1022): the synchronous cookie read races the
   // post-render effect that sets it, leaving orgId "" on cold load.
   const { org } = useActiveOrg();
@@ -106,23 +108,23 @@ export function useAgentDiscoveryStep<S extends AgentDiscoveryFields>(
         setFetchState("error");
         setFetchError(error.message);
         update((s) => ({ ...s, scanned: false, discoveredAgents: [], scanError: error.message }));
-        if (manual) toast.error(`Scan failed: ${error.message}`);
+        if (manual) toast.error(t("failed", { error: error.message }));
         return;
       }
       const result = data?.scanAgentManifests;
       if (!result) {
         setFetchState("error");
-        setFetchError("no response from server");
+        setFetchError(t("noResponse"));
         update((s) => ({ ...s, scanned: false, discoveredAgents: [], scanError: "no response" }));
-        if (manual) toast.error("Scan failed: no response from server.");
+        if (manual) toast.error(t("failed", { error: t("noResponse") }));
         return;
       }
       if (!result.ok) {
-        const msg = result.error ?? "scan failed";
+        const msg = result.error ?? t("scanFailed");
         setFetchState("error");
         setFetchError(msg);
         update((s) => ({ ...s, scanned: false, discoveredAgents: [], scanError: msg }));
-        if (manual) toast.error(`Scan failed: ${msg}`);
+        if (manual) toast.error(t("failed", { error: msg }));
         return;
       }
       const agents = result.agents;
@@ -141,15 +143,13 @@ export function useAgentDiscoveryStep<S extends AgentDiscoveryFields>(
       }));
       if (agents.length === 0) {
         setFetchState("empty");
-        if (manual) toast.message("No agent manifests found in this repo.");
+        if (manual) toast.message(t("noneFound"));
         return;
       }
       setFetchState("found");
       if (manual) {
         const newCount = agents.filter((a) => !a.alreadyRegistered).length;
-        toast.success(
-          `Found ${agents.length} agent${agents.length === 1 ? "" : "s"} (${newCount} new).`
-        );
+        toast.success(t("found", { count: agents.length, newCount }));
       }
     },
     [
@@ -161,6 +161,7 @@ export function useAgentDiscoveryStep<S extends AgentDiscoveryFields>(
       scanKey,
       scan,
       setState,
+      t,
     ]
   );
 

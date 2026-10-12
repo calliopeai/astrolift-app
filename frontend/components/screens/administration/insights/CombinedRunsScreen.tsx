@@ -1,6 +1,7 @@
 "use client";
 
 import { DownloadIcon, HistoryIcon, MoreHorizontalIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import type { Column } from "@/components/data-table";
@@ -17,7 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useFormatters } from "@/lib/i18n/formatters";
 
-import { type CombinedRun, RUN_KIND_LABEL, type RunOutcome } from "./combined-runs";
+import type { CombinedRun, RunOutcome } from "./combined-runs";
 import { adminCrumbs } from "./header";
 
 export interface CombinedRunsScreenProps {
@@ -74,22 +75,23 @@ export function CombinedRunsScreen({
   onExportCsv,
 }: CombinedRunsScreenProps) {
   const fmt = useFormatters();
+  const t = useTranslations("adminRuns");
 
   const columns: Column<CombinedRun>[] = [
     {
       id: "run",
-      header: "Run",
+      header: t("columns.run"),
       cellClassName: "max-w-48",
       cell: (r) => (
         <div className="flex min-w-0 flex-col">
-          <span className="text-muted-foreground text-xs">{RUN_KIND_LABEL[r.kind]}</span>
+          <span className="text-muted-foreground text-xs">{t(`kinds.${r.kind}`)}</span>
           <Identifier value={r.id} kind="id" copyable={false} className="text-xs" />
         </div>
       ),
     },
     {
       id: "subject",
-      header: "What",
+      header: t("columns.what"),
       cellClassName: "max-w-72",
       cell: (r) => (
         <div className="flex min-w-0 flex-col">
@@ -106,12 +108,12 @@ export function CombinedRunsScreen({
     },
     {
       id: "startedBy",
-      header: "Started by",
+      header: t("columns.startedBy"),
       cellClassName: "max-w-64",
       cell: (r) => (
         <div className="flex min-w-0 flex-col">
           <span className="truncate text-sm" title={r.startedBy || undefined}>
-            {r.startedBy || <span className="text-muted-foreground">not recorded</span>}
+            {r.startedBy || <span className="text-muted-foreground">{t("notRecorded")}</span>}
           </span>
           {r.trigger && (
             <span className="text-muted-foreground truncate font-mono text-xs" title={r.trigger}>
@@ -123,21 +125,21 @@ export function CombinedRunsScreen({
     },
     {
       id: "at",
-      header: "When",
+      header: t("columns.when"),
       sortKey: "at",
       cellClassName: "font-mono text-xs whitespace-nowrap",
       cell: (r) => (r.at ? fmt.formatDateTime(r.at) : "—"),
     },
     {
       id: "took",
-      header: "Took",
+      header: t("columns.took"),
       align: "right",
       cellClassName: "font-mono text-xs tabular-nums",
       cell: (r) => took(r.durationSeconds),
     },
     {
       id: "outcome",
-      header: "Outcome",
+      header: t("columns.outcome"),
       cell: (r) => (
         <span className="inline-flex min-w-0 items-center gap-1.5 font-mono text-xs">
           <StatusDot status={DOT[r.outcome]} />
@@ -155,9 +157,9 @@ export function CombinedRunsScreen({
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-3 p-6">
       <ListPage<CombinedRun>
-        header={{ crumbs: adminCrumbs("run-audit", "Runs"), title: "Runs" }}
+        header={{ crumbs: adminCrumbs("run-audit", t("title")), title: t("title") }}
         list={list}
-        label="Runs"
+        label={t("title")}
         columns={columns}
         rows={rows}
         getRowId={(r) => r.key}
@@ -168,9 +170,8 @@ export function CombinedRunsScreen({
         onRetry={onRetry}
         empty={{
           icon: <HistoryIcon className="size-5" />,
-          title: "No runs yet",
-          description:
-            "Agent runs, workflow runs, deployments, job runs and task runs appear here as they start.",
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
         }}
         totalCount={totalCount}
         nextCursor={nextCursor}
@@ -178,14 +179,14 @@ export function CombinedRunsScreen({
         menu={
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="More">
+              <Button variant="ghost" size="icon" aria-label={t("more")}>
                 <MoreHorizontalIcon className="size-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={onExportCsv} disabled={loading || rows.length === 0}>
                 <DownloadIcon className="size-4" />
-                Export CSV
+                {t("exportCsv")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

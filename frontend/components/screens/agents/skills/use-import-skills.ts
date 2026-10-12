@@ -2,6 +2,7 @@
 
 import { useMutation } from "@apollo/client/react";
 import { useState } from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { IMPORT_SKILLS_FROM_REPO } from "@/graphql/agents/agents.mutations";
@@ -35,6 +36,8 @@ export type ImportErrors = FieldErrors<ImportField>;
  * only toast is the outcome. The data half of ImportSkillsSheet.
  */
 export function useImportSkills() {
+  const t = useTranslations("agentSkills.toasts");
+  const validation = useTranslations("agentSkills.validation");
   const [result, setResult] = useState<ImportResult | null>(null);
 
   const [importMutation, { loading }] = useMutation<ImportSkillsData>(IMPORT_SKILLS_FROM_REPO, {
@@ -43,7 +46,7 @@ export function useImportSkills() {
 
   /** Resolves the errors to show; empty when the import went through. */
   async function importSkills(repoUrl: string, branch: string): Promise<ImportErrors> {
-    if (!repoUrl.trim()) return { repoUrl: "Enter the repository URL." };
+    if (!repoUrl.trim()) return { repoUrl: validation("repoUrl") };
     setResult(null);
     try {
       const { data } = await importMutation({
@@ -52,11 +55,11 @@ export function useImportSkills() {
       const payload = data?.importSkillsFromRepo;
       if (payload?.ok && payload.data) {
         setResult(payload.data);
-        toast.success(`Imported from ${payload.data.sourceRef}`);
+        toast.success(t("imported", { ref: payload.data.sourceRef }));
         return {};
       }
       const errors = splitErrors(payload?.errors ?? [], ["repoUrl", "branch"] as const);
-      return hasErrors(errors) ? errors : { form: "The import was refused." };
+      return hasErrors(errors) ? errors : { form: t("importRefused") };
     } catch (err) {
       return { form: err instanceof Error ? err.message : String(err) };
     }

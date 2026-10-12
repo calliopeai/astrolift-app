@@ -98,7 +98,7 @@ export function PlatformActivityPanelView({
       span={panel.span}
       actions={
         <Link href={panel.href} className="text-primary text-xs font-medium hover:underline">
-          Open
+          {t("open")}
         </Link>
       }
     >

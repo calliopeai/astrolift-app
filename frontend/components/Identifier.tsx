@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckIcon, CopyIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
@@ -80,6 +81,7 @@ export function Identifier({
   copyable = true,
   className,
 }: IdentifierProps) {
+  const t = useTranslations("identifier");
   const [copied, copy] = useCopyToClipboard(COPY_RESET_MS);
   const shown = form === "full" ? value : shortIdentifier(value, kind);
   const text = (
@@ -105,7 +107,7 @@ export function Identifier({
     <button
       type="button"
       title={value}
-      aria-label={`Copy ${value}`}
+      aria-label={t("copy", { value })}
       onClick={() => copy(value)}
       className={cn(
         "hover:text-foreground focus-visible:ring-ring inline-flex max-w-full min-w-0 items-center gap-1 rounded-sm text-left focus-visible:ring-2 focus-visible:outline-none",
@@ -116,7 +118,7 @@ export function Identifier({
       {text}
       <Icon aria-hidden className={cn("size-3 shrink-0 opacity-60", form === "full" && "mt-1")} />
       <span className="sr-only" aria-live="polite">
-        {copied ? "Copied" : ""}
+        {copied ? t("copied") : ""}
       </span>
     </button>
   );

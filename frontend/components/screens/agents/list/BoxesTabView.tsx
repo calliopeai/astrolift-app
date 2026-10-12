@@ -1,6 +1,7 @@
 "use client";
 
 import { BoxIcon, CopyIcon, Loader2Icon, PlusIcon, TerminalIcon, Trash2Icon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import type { Column } from "@/components/data-table";
@@ -25,7 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { AstroliftAgentBox } from "@/graphql/agents/agents.types";
-import { formatRelativeAge } from "@/lib/format";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import type { useAgentBoxes } from "./use-agent-boxes";
 
@@ -34,12 +35,12 @@ export type BoxesTabViewProps = ReturnType<typeof useAgentBoxes>;
 // The presets the dialog offers. A box that is never reaped is a node burning
 // indefinitely, so "Never" is a labelled choice at the bottom of the list
 // rather than a blank field that happens to mean forever.
-const IDLE_PRESETS: { value: string; label: string }[] = [
-  { value: "900", label: "15 minutes" },
-  { value: "3600", label: "1 hour" },
-  { value: "14400", label: "4 hours" },
-  { value: "86400", label: "1 day" },
-  { value: "0", label: "Never — holds the node until destroyed" },
+const IDLE_PRESETS: { value: string; labelKey: "m15" | "h1" | "h4" | "d1" | "never" }[] = [
+  { value: "900", labelKey: "m15" },
+  { value: "3600", labelKey: "h1" },
+  { value: "14400", labelKey: "h4" },
+  { value: "86400", labelKey: "d1" },
+  { value: "0", labelKey: "never" },
 ];
 
 const LIVE_STATUSES = new Set(["pending", "provisioning", "running"]);
@@ -51,12 +52,12 @@ function statusVariant(status: string): "default" | "secondary" | "outline" | "d
   return "outline";
 }
 
-function formatIdle(seconds: number): string {
-  if (seconds === 0) return "Never";
-  if (seconds % 86400 === 0) return `${seconds / 86400}d`;
-  if (seconds % 3600 === 0) return `${seconds / 3600}h`;
-  if (seconds % 60 === 0) return `${seconds / 60}m`;
-  return `${seconds}s`;
+function formatIdle(seconds: number, t: ReturnType<typeof useTranslations<"agentBoxes">>): string {
+  if (seconds === 0) return t("idle.never");
+  if (seconds % 86400 === 0) return t("idle.days", { n: seconds / 86400 });
+  if (seconds % 3600 === 0) return t("idle.hours", { n: seconds / 3600 });
+  if (seconds % 60 === 0) return t("idle.minutes", { n: seconds / 60 });
+  return t("idle.seconds", { n: seconds });
 }
 
 /** The command that lands an operator inside the box. */
@@ -65,6 +66,7 @@ function attachLine(box: AstroliftAgentBox): string {
 }
 
 function AttachCell({ box, onCopy }: { box: AstroliftAgentBox; onCopy: (line: string) => void }) {
+  const t = useTranslations("agentBoxes");
   if (!LIVE_STATUSES.has(box.status)) {
     return <span className="text-muted-foreground text-sm">—</span>;
   }
@@ -75,7 +77,7 @@ function AttachCell({ box, onCopy }: { box: AstroliftAgentBox; onCopy: (line: st
       <Button
         size="icon"
         variant="ghost"
-        aria-label={`Copy attach command for ${box.slug}`}
+        aria-label={t("copyAttachFor", { slug: box.slug })}
         className="size-6 shrink-0"
         onClick={() => onCopy(line)}
       >
@@ -107,6 +109,8 @@ export function BoxesTabView({
   destroyBox,
   copyAttach,
 }: BoxesTabViewProps) {
+  const t = useTranslations("agentBoxes");
+  const fmt = useFormatters();
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [specSlug, setSpecSlug] = React.useState("");
   const [idle, setIdle] = React.useState("3600");
@@ -122,7 +126,7 @@ export function BoxesTabView({
   const columns: Column<AstroliftAgentBox>[] = [
     {
       id: "box",
-      header: "Box",
+      header: t("columns.box"),
       sortKey: "name",
       cell: (box) => (
         <div>
@@ -133,7 +137,7 @@ export function BoxesTabView({
     },
     {
       id: "status",
-      header: "Status",
+      header: t("columns.status"),
       sortKey: "status",
       width: "w-40",
       cell: (box) => (
@@ -147,31 +151,31 @@ export function BoxesTabView({
     },
     {
       id: "agent",
-      header: "Agent",
+      header: t("columns.agent"),
       cell: (box) => (
         <span className="text-sm">{box.agentSlug || box.environmentSpecSlug || "—"}</span>
       ),
     },
     {
       id: "idle",
-      header: "Idle timeout",
+      header: t("columns.idle"),
       sortKey: "idle",
       width: "w-28",
-      cell: (box) => <span className="text-sm">{formatIdle(box.idleTimeoutSeconds)}</span>,
+      cell: (box) => <span className="text-sm">{formatIdle(box.idleTimeoutSeconds, t)}</span>,
     },
     {
       id: "attach",
-      header: "Attach",
+      header: t("columns.attach"),
       cell: (box) => <AttachCell box={box} onCopy={copyAttach} />,
     },
     {
       id: "started",
-      header: "Started",
+      header: t("columns.started"),
       sortKey: "started",
       width: "w-28",
       cell: (box) => (
         <span className="text-muted-foreground text-sm">
-          {box.startedAt ? formatRelativeAge(box.startedAt) : "—"}
+          {box.startedAt ? fmt.formatRelativeTime(box.startedAt) : "—"}
         </span>
       ),
     },
@@ -184,7 +188,7 @@ export function BoxesTabView({
         LIVE_STATUSES.has(box.status) ? (
           <Button size="sm" variant="outline" onClick={() => void destroyBox(box)}>
             <Trash2Icon className="size-4" />
-            Destroy
+            {t("destroy")}
           </Button>
         ) : null,
     },
@@ -194,22 +198,22 @@ export function BoxesTabView({
     <>
       <ListPage<AstroliftAgentBox>
         header={{
-          crumbs: agentsCrumbs("workloads", { label: "Agent boxes" }),
-          title: "Agent boxes",
+          crumbs: agentsCrumbs("workloads", { label: t("title") }),
+          title: t("title"),
           primaryAction: (
             <Button size="sm" onClick={() => setDialogOpen(true)}>
               <PlusIcon className="size-4" />
-              New agent box
+              {t("newBox")}
             </Button>
           ),
           menu: (
             <Button size="sm" variant="ghost" onClick={toggleIncludeEnded}>
-              {includeEnded ? "Live only" : "Show ended"}
+              {includeEnded ? t("liveOnly") : t("showEnded")}
             </Button>
           ),
         }}
         list={list}
-        label="Agent boxes"
+        label={t("title")}
         columns={columns}
         rows={rows}
         getRowId={(box) => box.id}
@@ -220,29 +224,24 @@ export function BoxesTabView({
         totalCount={totalCount}
         empty={{
           icon: <BoxIcon className="size-5" />,
-          title: "No agent boxes",
-          description:
-            "Start one to get a container running Claude Code, Codex, or the Calliope CLI that you can attach a terminal to. tmux holds the session open, so a dropped connection does not kill the agent.",
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
         }}
       />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New agent box</DialogTitle>
-            <DialogDescription>
-              Starts a container from an environment spec — its image and its secret packet
-              (ANTHROPIC_API_KEY and friends). Pressing this again for the same spec attaches to the
-              box you already have rather than starting a second one.
-            </DialogDescription>
+            <DialogTitle>{t("newBox")}</DialogTitle>
+            <DialogDescription>{t("dialogDescription")}</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="box-spec">Environment spec</Label>
+              <Label htmlFor="box-spec">{t("envSpec")}</Label>
               <Select value={specSlug} onValueChange={setSpecSlug}>
                 <SelectTrigger id="box-spec">
-                  <SelectValue placeholder="Pick an agent environment" />
+                  <SelectValue placeholder={t("pickEnv")} />
                 </SelectTrigger>
                 <SelectContent>
                   {specs.map((spec) => (
@@ -253,15 +252,12 @@ export function BoxesTabView({
                 </SelectContent>
               </Select>
               {specs.length === 0 && (
-                <p className="text-muted-foreground text-xs">
-                  No environment specs yet — create one first so the box knows which image to run
-                  and which secrets to carry.
-                </p>
+                <p className="text-muted-foreground text-xs">{t("noSpecs")}</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="box-idle">Idle timeout</Label>
+              <Label htmlFor="box-idle">{t("idleTimeout")}</Label>
               <Select value={idle} onValueChange={setIdle}>
                 <SelectTrigger id="box-idle">
                   <SelectValue />
@@ -269,23 +265,20 @@ export function BoxesTabView({
                 <SelectContent>
                   {IDLE_PRESETS.map((preset) => (
                     <SelectItem key={preset.value} value={preset.value}>
-                      {preset.label}
+                      {t(`presets.${preset.labelKey}`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-muted-foreground text-xs">
-                Measured from the last pane activity, not the last attach — an agent working while
-                you are away keeps its box.
-              </p>
+              <p className="text-muted-foreground text-xs">{t("idleHelp")}</p>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="box-name">Name (optional)</Label>
+              <Label htmlFor="box-name">{t("nameOptional")}</Label>
               <Input
                 id="box-name"
                 value={name}
-                placeholder="Leave blank to name it after the agent"
+                placeholder={t("namePlaceholder")}
                 onChange={(e) => setName(e.target.value)}
               />
             </div>
@@ -293,7 +286,7 @@ export function BoxesTabView({
 
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button disabled={!specSlug || starting} onClick={() => void handleStart()}>
               {starting ? (
@@ -301,7 +294,7 @@ export function BoxesTabView({
               ) : (
                 <TerminalIcon className="size-4" />
               )}
-              Start box
+              {t("start")}
             </Button>
           </div>
         </DialogContent>

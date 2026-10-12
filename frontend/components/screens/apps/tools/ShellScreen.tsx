@@ -105,6 +105,7 @@ export function ShellScreen({
   const tCommon = useTranslations("apps.common");
   const t = useTranslations("apps.shell");
   const tObs = useTranslations("apps.observability");
+  const tShortcuts = useTranslations("appShellShortcuts");
 
   // Operator opts into the WS exec connection — keeps an idle shell tab from
   // holding a kubelet exec socket open just because someone clicked through
@@ -136,17 +137,17 @@ export function ShellScreen({
       },
       {
         key: "djangoShell" as const,
-        label: "Open Django shell (Python)",
+        label: tShortcuts("djangoShell"),
         template: (s: string) => `astro exec --app=${s} -- python manage.py shell`,
       },
       {
         key: "dbShell" as const,
-        label: "Open psql against DATABASE_URL",
+        label: tShortcuts("dbShell"),
         template: (s: string) => `astro exec --app=${s} -- bash -lc 'psql "$DATABASE_URL"'`,
       },
       {
         key: "redisShell" as const,
-        label: "Open redis-cli against REDIS_URL",
+        label: tShortcuts("redisShell"),
         template: (s: string) => `astro exec --app=${s} -- bash -lc 'redis-cli -u "$REDIS_URL"'`,
       },
       // Migrations — Django and Flask/Alembic variants
@@ -157,12 +158,12 @@ export function ShellScreen({
       },
       {
         key: "djangoMigrate" as const,
-        label: "Run Django migrations",
+        label: tShortcuts("djangoMigrate"),
         template: (s: string) => `astro exec --app=${s} -- python manage.py migrate --noinput`,
       },
       {
         key: "flaskUpgrade" as const,
-        label: "Run Flask / Alembic upgrade",
+        label: tShortcuts("flaskUpgrade"),
         template: (s: string) => `astro exec --app=${s} -- flask db upgrade`,
       },
       // Observability — logs + recent deploys + env
@@ -173,27 +174,27 @@ export function ShellScreen({
       },
       {
         key: "recentLogs" as const,
-        label: "Last 200 log lines",
+        label: tShortcuts("recentLogs"),
         template: (s: string) => `astro logs --app=${s} --tail=200`,
       },
       {
         key: "envDump" as const,
-        label: "Dump pod environment (debug missing var)",
+        label: tShortcuts("envDump"),
         template: (s: string) => `astro exec --app=${s} -- bash -lc 'env | sort'`,
       },
       // Lifecycle — deploy + rollback
       {
         key: "deploy" as const,
-        label: "Trigger a deploy",
+        label: tShortcuts("deploy"),
         template: (s: string) => `astro deploy --app=${s}`,
       },
       {
         key: "rollback" as const,
-        label: "Rollback to previous deploy",
+        label: tShortcuts("rollback"),
         template: (s: string) => `astro deploy --app=${s} --rollback`,
       },
     ],
-    [t]
+    [t, tShortcuts]
   );
 
   if (loading) {

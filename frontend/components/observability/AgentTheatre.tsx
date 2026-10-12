@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { BotIcon, ExpandIcon, Loader2Icon, MonitorPlayIcon, RefreshCwIcon } from "lucide-react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -42,14 +43,17 @@ function shortId(id: string): string {
   return id.slice(0, 8);
 }
 
-function elapsedLabel(startedAt: string | null): string {
-  if (!startedAt) return "just now";
+function elapsedLabel(
+  startedAt: string | null,
+  t: (key: "justNow" | "seconds" | "minutes" | "hours", values?: Record<string, number>) => string
+): string {
+  if (!startedAt) return t("justNow");
   const secs = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
-  if (secs < 60) return `${Math.max(secs, 0)}s`;
+  if (secs < 60) return t("seconds", { s: Math.max(secs, 0) });
   const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m ${secs % 60}s`;
+  if (mins < 60) return t("minutes", { m: mins, s: secs % 60 });
   const hrs = Math.floor(mins / 60);
-  return `${hrs}h ${mins % 60}m`;
+  return t("hours", { h: hrs, m: mins % 60 });
 }
 
 /**
@@ -73,6 +77,7 @@ export function AgentTheatre({
   onRefresh,
   onRetry,
 }: AgentTheatreProps) {
+  const t = useTranslations("obsAgentTheatre");
   // The task whose live session is exploded into the theatre modal.
   const [watching, setWatching] = React.useState<GalleryTask | null>(null);
 
@@ -98,8 +103,8 @@ export function AgentTheatre({
     return (
       <EmptyState
         icon={<BotIcon className="size-5" />}
-        title="No active organization"
-        description="Pick an organization from the sidebar to watch its running agents."
+        title={t("noOrgTitle")}
+        description={t("noOrgDescription")}
       />
     );
   }
@@ -118,11 +123,11 @@ export function AgentTheatre({
     return (
       <div className="space-y-3">
         <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-4 text-sm">
-          Couldn&apos;t load the agent theatre: {error}
+          {t("loadError", { error })}
         </div>
         <Button variant="outline" size="sm" onClick={onRetry}>
           <RefreshCwIcon className="size-3.5" />
-          Retry
+          {t("retry")}
         </Button>
       </div>
     );
@@ -132,10 +137,10 @@ export function AgentTheatre({
     return (
       <EmptyState
         icon={<MonitorPlayIcon className="size-5" />}
-        title="No agents to watch"
-        description="Running agents launched on a VNC-capable environment appear here as live snapshot tiles you can explode into a full session. Dispatch a watchable agent to populate the theatre."
+        title={t("emptyTitle")}
+        description={t("emptyDescription")}
         actionHref="/agents"
-        actionLabel="Go to Agents"
+        actionLabel={t("goToAgents")}
       />
     );
   }
@@ -144,12 +149,11 @@ export function AgentTheatre({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-muted-foreground text-sm">
-          {tasks.length} live {tasks.length === 1 ? "agent" : "agents"} · snapshots refresh every{" "}
-          {GALLERY_POLL_MS / 1000}s
+          {t("summary", { count: tasks.length, seconds: GALLERY_POLL_MS / 1000 })}
         </p>
         <Button variant="outline" size="sm" onClick={onRefresh} disabled={refreshing}>
           <RefreshCwIcon className={cn("size-3.5", refreshing && "animate-spin")} />
-          Refresh
+          {t("refresh")}
         </Button>
       </div>
 
@@ -170,7 +174,7 @@ export function AgentTheatre({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MonitorPlayIcon className="size-4" />
-              Live agent session
+              {t("liveSession")}
             </DialogTitle>
             <DialogDescription className="flex items-center gap-2 font-mono text-xs">
               <span>{watching?.id}</span>
@@ -182,7 +186,7 @@ export function AgentTheatre({
                   className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 underline-offset-2 hover:underline"
                 >
                   <ExpandIcon className="size-3" />
-                  Pop out
+                  {t("popOut")}
                 </a>
               )}
             </DialogDescription>
@@ -191,8 +195,8 @@ export function AgentTheatre({
             <div className="flex flex-1 items-center justify-center">
               <EmptyState
                 icon={<BotIcon className="size-5" />}
-                title="Session ended"
-                description="This agent is no longer running, so its live session has closed."
+                title={t("endedTitle")}
+                description={t("endedDescription")}
               />
             </div>
           ) : (
@@ -210,6 +214,7 @@ export function AgentTheatre({
  * placeholder before the first frame arrives or if the snapshot 404s.
  */
 function SnapshotTile({ task, onWatch }: { task: GalleryTask; onWatch: () => void }) {
+  const t = useTranslations("obsAgentTheatre");
   // Track the specific snapshot URL that failed to load rather than a bare
   // boolean, so a freshly presigned URL on the next poll automatically
   // recovers (it differs from the errored one) without a state-reset effect.
@@ -224,21 +229,21 @@ function SnapshotTile({ task, onWatch }: { task: GalleryTask; onWatch: () => voi
         type="button"
         onClick={onWatch}
         className="group focus-visible:ring-ring relative block w-full text-left focus-visible:ring-2 focus-visible:outline-none"
-        aria-label={`Watch live session for agent ${shortId(task.id)}`}
+        aria-label={t("watchLabel", { id: shortId(task.id) })}
       >
         <div className="bg-muted relative aspect-video w-full overflow-hidden">
           {hasFrame ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={task.snapshotUrl as string}
-              alt={`Latest snapshot of agent ${shortId(task.id)}`}
+              alt={t("snapshotAlt", { id: shortId(task.id) })}
               className="h-full w-full object-cover"
               onError={() => setErroredUrl(task.snapshotUrl)}
             />
           ) : (
             <div className="text-muted-foreground flex h-full w-full flex-col items-center justify-center gap-2">
               <Loader2Icon className="size-5 animate-spin" />
-              <span className="text-xs">Waiting for first frame…</span>
+              <span className="text-xs">{t("waitingFrame")}</span>
             </div>
           )}
 
@@ -246,7 +251,7 @@ function SnapshotTile({ task, onWatch }: { task: GalleryTask; onWatch: () => voi
           <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">
             <span className="inline-flex items-center gap-1.5 rounded-md bg-black/70 px-3 py-1.5 text-sm font-medium text-white">
               <MonitorPlayIcon className="size-4" />
-              Watch live
+              {t("watchLive")}
             </span>
           </div>
 
@@ -269,12 +274,12 @@ function SnapshotTile({ task, onWatch }: { task: GalleryTask; onWatch: () => voi
             {shortId(task.id)}
           </p>
           <p className="text-muted-foreground text-xs">
-            running for {elapsedLabel(task.startedAt)}
+            {t("runningFor", { elapsed: elapsedLabel(task.startedAt, t) })}
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={onWatch}>
           <MonitorPlayIcon className="size-4" />
-          Watch
+          {t("watch")}
         </Button>
       </CardContent>
     </Card>

@@ -36,6 +36,7 @@ interface RunJobOnceResp {
  */
 export function useRunScheduledJob(appSlug: string) {
   const t = useTranslations("apps.settings.runJob");
+  const tToast = useTranslations("appSettingsToasts.runJob");
   const router = useRouter();
   const workloads = useQuery<WorkloadsResp>(LIST_WORKLOADS, {
     variables: { appSlug },
@@ -64,19 +65,19 @@ export function useRunScheduledJob(appSlug: string) {
       });
       const env = data?.runAstroliftJobOnce;
       if (!env) {
-        toast.error("Run failed: no response from backend.");
+        toast.error(tToast("noResponse"));
         return;
       }
       if (!env.ok) {
-        toast.error(env.errors?.[0]?.message ?? "Run failed.");
+        toast.error(env.errors?.[0]?.message ?? tToast("failed"));
         return;
       }
       const payload = env.data;
       if (!payload) {
-        toast.error("Run returned no payload.");
+        toast.error(tToast("noPayload"));
         return;
       }
-      const message = `Started job ${payload.runName} in ${payload.namespace}.`;
+      const message = tToast("started", { run: payload.runName, namespace: payload.namespace });
       const logsUrl = payload.logsUrl;
       if (logsUrl) {
         toast.success(message, {
@@ -90,7 +91,7 @@ export function useRunScheduledJob(appSlug: string) {
         toast.success(message);
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Run failed.");
+      toast.error(err instanceof Error ? err.message : tToast("failed"));
     }
   }
 

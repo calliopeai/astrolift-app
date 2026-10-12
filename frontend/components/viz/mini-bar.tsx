@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ export function MiniBar({
   className,
   ariaLabel,
 }: MiniBarProps) {
+  const t = useTranslations("vizRender");
   const n = data.length;
   const max = n ? Math.max(...data) : 0;
   const barW = n > 0 ? Math.max(1, (width - gap * (n - 1)) / n) : width;
@@ -42,7 +44,7 @@ export function MiniBar({
       viewBox={`0 0 ${width} ${height}`}
       className={cn("text-chart-1", className)}
       role="img"
-      aria-label={ariaLabel ?? "Distribution"}
+      aria-label={ariaLabel ?? t("distribution")}
     >
       {data.map((v, i) => {
         // A zero bar still shows a 1px sliver so gaps read as "empty", not missing.

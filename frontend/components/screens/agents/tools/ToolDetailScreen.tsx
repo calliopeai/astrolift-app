@@ -10,6 +10,7 @@ import {
   ServerCrashIcon,
   TrashIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -78,6 +79,9 @@ export function ToolDetailScreen({
   remove,
   initialErrors = {},
 }: ToolDetailScreenProps) {
+  const tr = useTranslations("agentSkills.toolDetail");
+  const common = useTranslations("agentSkills.common");
+  const adapters = useTranslations("agentToolRegistry");
   const [name, setName] = useState(tool?.name ?? "");
   const [slug, setSlug] = useState(tool?.slug ?? "");
   const [description, setDescription] = useState(tool?.description ?? "");
@@ -140,8 +144,10 @@ export function ToolDetailScreen({
     return (
       <div className="flex min-w-0 flex-1 flex-col gap-6">
         <ShellHeader
-          crumbs={agentsCrumbs("tools", { label: pending ? "Loading" : "Not found" })}
-          title={pending ? <Skeleton className="h-6 w-48" /> : "Tool not found"}
+          crumbs={agentsCrumbs("tools", {
+            label: pending ? common("loading") : common("notFound"),
+          })}
+          title={pending ? <Skeleton className="h-6 w-48" /> : tr("notFoundTitle")}
         />
         {pending ? (
           <div className="grid min-w-0 grid-cols-12 gap-4" aria-busy>
@@ -156,22 +162,22 @@ export function ToolDetailScreen({
           >
             <ServerCrashIcon className="text-danger size-5" aria-hidden />
             <div className="min-w-0 px-6">
-              <p className="font-medium">Couldn&apos;t load this tool</p>
+              <p className="font-medium">{tr("loadError")}</p>
               <p className="text-muted-foreground mt-1 max-w-md font-mono text-xs [overflow-wrap:anywhere]">
                 {error.message}
               </p>
             </div>
             <Button size="sm" variant="outline" onClick={onRetry}>
-              Retry
+              {common("retry")}
             </Button>
           </div>
         ) : (
           <EmptyState
             icon={<AlertTriangleIcon className="size-5" />}
-            title="Tool not found"
-            description="This tool may have been deleted, or you may not have access to it."
+            title={tr("notFoundTitle")}
+            description={tr("notFoundDescription")}
             actionHref="/agents/tools"
-            actionLabel="Back to tools"
+            actionLabel={tr("backToTools")}
           />
         )}
       </div>
@@ -190,7 +196,9 @@ export function ToolDetailScreen({
         title={<span title={tool.name}>{tool.name}</span>}
         status={
           <Badge variant="secondary" className="shrink-0">
-            {ADAPTER_LABEL[tool.adapter] ?? (tool.adapter || "unknown")}
+            {ADAPTER_LABEL[tool.adapter]
+              ? adapters(tool.adapter)
+              : tool.adapter || common("unknown")}
           </Badge>
         }
         context={
@@ -200,17 +208,24 @@ export function ToolDetailScreen({
         }
         primaryAction={
           <>
-            {dirty && <span className="text-muted-foreground text-xs">Unsaved changes</span>}
+            {dirty && (
+              <span className="text-muted-foreground text-xs">{common("unsavedChanges")}</span>
+            )}
             <Button type="submit" form={FORM_ID} size="sm" disabled={saving || !dirty}>
               {saving && <Loader2Icon className="size-4 animate-spin" />}
-              Save tool
+              {tr("save")}
             </Button>
           </>
         }
         menu={
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="icon" variant="ghost" className="size-8" aria-label="More actions">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-8"
+                aria-label={common("moreActions")}
+              >
                 <MoreHorizontalIcon className="size-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -221,7 +236,7 @@ export function ToolDetailScreen({
                 onSelect={() => setConfirmDelete(true)}
               >
                 <TrashIcon className="size-4" />
-                Delete tool
+                {tr("delete")}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -239,11 +254,11 @@ export function ToolDetailScreen({
           </div>
         )}
         <PanelGrid>
-          <Panel title="Identity" icon={<FileTextIcon className="size-4" />} span={6}>
+          <Panel title={tr("identity")} icon={<FileTextIcon className="size-4" />} span={6}>
             <div className="flex min-w-0 flex-col gap-4">
               <div className="grid min-w-0 gap-4 sm:grid-cols-2">
                 <Field data-invalid={invalid("name")} className="min-w-0">
-                  <FieldLabel htmlFor="tool-name">Name</FieldLabel>
+                  <FieldLabel htmlFor="tool-name">{common("name")}</FieldLabel>
                   <Input
                     id="tool-name"
                     value={name}
@@ -253,7 +268,7 @@ export function ToolDetailScreen({
                   {fieldError("name")}
                 </Field>
                 <Field data-invalid={invalid("slug")} className="min-w-0">
-                  <FieldLabel htmlFor="tool-slug">Slug</FieldLabel>
+                  <FieldLabel htmlFor="tool-slug">{common("slug")}</FieldLabel>
                   <Input
                     id="tool-slug"
                     value={slug}
@@ -266,11 +281,11 @@ export function ToolDetailScreen({
                 </Field>
               </div>
               <Field data-invalid={invalid("description")} className="min-w-0">
-                <FieldLabel htmlFor="tool-description">Description</FieldLabel>
+                <FieldLabel htmlFor="tool-description">{common("description")}</FieldLabel>
                 <Input
                   id="tool-description"
                   value={description}
-                  placeholder="What this tool does"
+                  placeholder={common("toolDescriptionPlaceholder")}
                   aria-invalid={invalid("description")}
                   onChange={(e) => edit(setDescription, "description")(e.target.value)}
                 />
@@ -279,10 +294,10 @@ export function ToolDetailScreen({
             </div>
           </Panel>
 
-          <Panel title="Handler" icon={<PlugIcon className="size-4" />} span={6}>
+          <Panel title={tr("handler")} icon={<PlugIcon className="size-4" />} span={6}>
             <div className="flex min-w-0 flex-col gap-4">
               <Field data-invalid={invalid("adapter")} className="min-w-0">
-                <FieldLabel htmlFor="tool-adapter">Adapter</FieldLabel>
+                <FieldLabel htmlFor="tool-adapter">{common("adapter")}</FieldLabel>
                 <Select
                   value={adapter}
                   onValueChange={(v) => edit(setAdapter, "adapter")(v as ToolAdapter)}
@@ -297,7 +312,7 @@ export function ToolDetailScreen({
                   <SelectContent>
                     {ADAPTERS.map((a) => (
                       <SelectItem key={a.value} value={a.value}>
-                        {a.label}
+                        {adapters(a.value)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -305,7 +320,7 @@ export function ToolDetailScreen({
                 {fieldError("adapter")}
               </Field>
               <Field data-invalid={invalid("handlerRef")} className="min-w-0">
-                <FieldLabel htmlFor="tool-handler">Handler ref</FieldLabel>
+                <FieldLabel htmlFor="tool-handler">{common("handlerRef")}</FieldLabel>
                 <Input
                   id="tool-handler"
                   value={handlerRef}
@@ -321,14 +336,14 @@ export function ToolDetailScreen({
           </Panel>
 
           <Panel
-            title="Input schema"
+            title={tr("inputSchema")}
             icon={<BracesIcon className="size-4" />}
-            description="JSON Schema for what the agent passes in."
+            description={tr("inputSchemaDescription")}
             span={6}
           >
             <Field data-invalid={invalid("inputSchema")} className="min-w-0">
               <FieldLabel htmlFor="tool-input" className="sr-only">
-                Input schema (JSON Schema)
+                {tr("inputSchemaLabel")}
               </FieldLabel>
               <Textarea
                 id="tool-input"
@@ -343,14 +358,14 @@ export function ToolDetailScreen({
           </Panel>
 
           <Panel
-            title="Output schema"
+            title={tr("outputSchema")}
             icon={<BracesIcon className="size-4" />}
-            description="JSON Schema for what the tool returns."
+            description={tr("outputSchemaDescription")}
             span={6}
           >
             <Field data-invalid={invalid("outputSchema")} className="min-w-0">
               <FieldLabel htmlFor="tool-output" className="sr-only">
-                Output schema (JSON Schema)
+                {tr("outputSchemaLabel")}
               </FieldLabel>
               <Textarea
                 id="tool-output"
@@ -369,9 +384,9 @@ export function ToolDetailScreen({
       <ConfirmDialog
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
-        title={`Delete tool "${tool.name}"?`}
-        description="This cannot be undone. Skills and agents that call this tool lose the capability on their next run."
-        confirmLabel="Delete tool"
+        title={tr("deleteTitle", { name: tool.name })}
+        description={tr("deleteDescription")}
+        confirmLabel={tr("delete")}
         destructive
         onConfirm={remove}
       />

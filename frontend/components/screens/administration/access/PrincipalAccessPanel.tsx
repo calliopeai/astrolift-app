@@ -2,9 +2,10 @@
 
 import { AlertTriangleIcon, ShieldIcon, Trash2Icon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { principalOfBinding, SCOPE_NOUN } from "@/components/access/access-model";
+import { principalOfBinding } from "@/components/access/access-model";
 import { GrantSource } from "@/components/access/GrantSource";
 import { PrincipalChip } from "@/components/access/PrincipalChip";
 import { RoleSummary } from "@/components/access/RoleSummary";
@@ -77,18 +78,20 @@ export function PrincipalAccessPanel({
   holderLabel,
 }: PrincipalAccessPanelProps) {
   const fmt = useFormatters();
+  const t = useTranslations("adminPrincipalAccess");
+  const scopes = useTranslations("shared.access.scope");
   const [target, setTarget] = React.useState<RemoveTarget | null>(null);
 
   const columns: Column<AccessRow>[] = [
     {
       id: "scope",
-      header: "Scope",
+      header: t("columns.scope"),
       sortKey: "scope",
       cellClassName: "max-w-64",
       cell: (row) => (
         <div className="flex min-w-0 items-center gap-1.5">
           <Badge variant="outline" className="text-2xs shrink-0 font-mono uppercase">
-            {SCOPE_NOUN[row.scope.kind]}
+            {scopes(row.scope.kind)}
           </Badge>
           {row.scope.href ? (
             <Link
@@ -110,7 +113,7 @@ export function PrincipalAccessPanel({
       ? [
           {
             id: "holder",
-            header: "Who",
+            header: t("columns.who"),
             sortKey: "principal",
             cellClassName: "max-w-56",
             cell: (row: AccessRow) => <PrincipalChip principal={principalOfBinding(row.binding)} />,
@@ -119,7 +122,7 @@ export function PrincipalAccessPanel({
       : []),
     {
       id: "role",
-      header: "Role",
+      header: t("columns.role"),
       sortKey: "role",
       cellClassName: "max-w-80",
       cell: (row) =>
@@ -136,15 +139,18 @@ export function PrincipalAccessPanel({
     },
     {
       id: "source",
-      header: "Source",
+      header: t("columns.source"),
       cellClassName: "relative z-10 max-w-64",
       cell: (row) => (
         <div className="flex min-w-0 flex-col items-start gap-1">
           <GrantSource source={row.source} />
           {row.coveredBy && (
             <span className="text-muted-foreground text-2xs [overflow-wrap:anywhere]">
-              also granted at {SCOPE_NOUN[row.coveredBy.kind]}{" "}
-              <span className="font-mono">{row.coveredBy.name}</span>
+              {t.rich("alsoGranted", {
+                kind: scopes(row.coveredBy.kind),
+                name: row.coveredBy.name,
+                mono: (chunks) => <span className="font-mono">{chunks}</span>,
+              })}
             </span>
           )}
         </div>
@@ -152,21 +158,21 @@ export function PrincipalAccessPanel({
     },
     {
       id: "expires",
-      header: "Expires",
+      header: t("columns.expires"),
       sortKey: "expires",
       cellClassName: "text-muted-foreground font-mono text-xs",
-      cell: (row) => (row.binding.expiresAt ? fmt.formatDate(row.binding.expiresAt) : "never"),
+      cell: (row) => (row.binding.expiresAt ? fmt.formatDate(row.binding.expiresAt) : t("never")),
     },
     {
       id: "granted",
-      header: "Granted",
+      header: t("columns.granted"),
       sortKey: "granted",
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (row) => fmt.formatDate(row.binding.grantedAt),
     },
   ];
 
-  const confirm = target ? describeRemove(target, holderLabel) : null;
+  const confirm = target ? describeRemove(target, holderLabel, t, (kind) => scopes(kind)) : null;
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
@@ -175,19 +181,14 @@ export function PrincipalAccessPanel({
           {summary && (
             <p className="text-muted-foreground text-xs [overflow-wrap:anywhere]">{summary}</p>
           )}
-          {truncated && (
-            <Note>
-              They hold more grants than one read returns, so this list shows the first 200. Narrow
-              it on Assignments, where every grant is paged on the server.
-            </Note>
-          )}
+          {truncated && <Note>{t("truncated", { count: 200 })}</Note>}
           {note && <Note>{note}</Note>}
         </div>
       )}
       <ListPage<AccessRow>
         embedded
         list={list}
-        label="Grants"
+        label={t("listLabel")}
         columns={columns}
         rows={rows}
         getRowId={(r) => r.id}
@@ -205,7 +206,7 @@ export function PrincipalAccessPanel({
                   onSelect={() => setTarget({ one: row })}
                 >
                   <Trash2Icon className="size-4" />
-                  Remove this grant
+                  {t("removeThis")}
                 </DropdownMenuItem>
               )
             : undefined
@@ -220,16 +221,18 @@ export function PrincipalAccessPanel({
                   onClick={() => setTarget({ many: selection })}
                 >
                   <Trash2Icon className="size-4" />
-                  Remove {selection.selectedCount}
+                  {t("removeCount", { count: selection.selectedCount })}
                 </Button>
               )
             : undefined
         }
         empty={{
           icon: <ShieldIcon className="size-5" />,
-          title: "No grants",
-          description: "Nothing is granted here yet.",
-          ...(grantHref && canManage ? { actionHref: grantHref, actionLabel: "Grant access" } : {}),
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
+          ...(grantHref && canManage
+            ? { actionHref: grantHref, actionLabel: t("grantAccess") }
+            : {}),
         }}
       />
       <ConfirmDialog
@@ -239,7 +242,7 @@ export function PrincipalAccessPanel({
         }}
         title={confirm?.title ?? ""}
         description={confirm?.description ?? ""}
-        confirmLabel={confirm?.confirmLabel ?? "Remove"}
+        confirmLabel={confirm?.confirmLabel ?? t("remove")}
         destructive
         onConfirm={async () => {
           if (!target) return;
@@ -257,25 +260,34 @@ export function PrincipalAccessPanel({
 
 function describeRemove(
   target: RemoveTarget,
-  holderLabel: (b: AstroliftRoleBinding) => string
+  holderLabel: (b: AstroliftRoleBinding) => string,
+  t: (key: string, values?: Record<string, string | number>) => string,
+  scopeNoun: (kind: string) => string
 ): { title: string; description: string; confirmLabel: string } {
   if ("many" in target) {
-    const n = target.many.selectedCount;
+    const count = target.many.selectedCount;
     return {
-      title: `Remove ${n} ${n === 1 ? "grant" : "grants"}?`,
-      description:
-        "Each holder loses what the removed grants gave at their scope and below. Grants held elsewhere, wider or narrower, stay in effect.",
-      confirmLabel: `Remove ${n}`,
+      title: t("removeManyTitle", { count }),
+      description: t("removeManyDescription"),
+      confirmLabel: t("removeCount", { count }),
     };
   }
   const { binding, scope, coveredBy } = target.one;
-  const where = `${SCOPE_NOUN[scope.kind]} ${scope.name}`;
+  const where = { kind: scopeNoun(scope.kind), name: scope.name };
   return {
-    title: `Remove ${binding.role.slug} at ${where}?`,
+    title: t("removeOneTitle", { role: binding.role.slug, ...where }),
     description: coveredBy
-      ? `${holderLabel(binding)} keeps it: the same role is also granted at ${SCOPE_NOUN[coveredBy.kind]} ${coveredBy.name}. Remove that grant too to take it away.`
-      : `${holderLabel(binding)} loses what ${binding.role.name} gives at ${where} and everything under it. Other grants stay in effect.`,
-    confirmLabel: "Remove grant",
+      ? t("removeCovered", {
+          holder: holderLabel(binding),
+          kind: scopeNoun(coveredBy.kind),
+          name: coveredBy.name,
+        })
+      : t("removeOneDescription", {
+          holder: holderLabel(binding),
+          role: binding.role.name,
+          ...where,
+        }),
+    confirmLabel: t("removeGrant"),
   };
 }
 

@@ -1,5 +1,7 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
+
+import { renderWithIntl } from "@/test/render-with-intl";
 
 import { makeWorkflows, type WorkflowSnapshot } from "../core/workflow-model";
 
@@ -17,7 +19,7 @@ const base = { label: "#5301", progress: 0, state: "moving" as const, startedAt:
 describe("WorkflowTransit", () => {
   it("names a station's round against its bound, in words", () => {
     const [test] = feature.loops!;
-    render(
+    renderWithIntl(
       <WorkflowTransit
         motion="reduced"
         snapshot={withTrains([
@@ -43,7 +45,7 @@ describe("WorkflowTransit", () => {
 
   it("says a run riding a return track is being sent back", () => {
     const [test] = feature.loops!;
-    render(
+    renderWithIntl(
       <WorkflowTransit
         motion="reduced"
         onSelectRun={() => {}}
@@ -60,7 +62,7 @@ describe("WorkflowTransit", () => {
   });
 
   it("opens a nested station's child line in place and closes it from the way back", () => {
-    render(<WorkflowTransit motion="reduced" snapshot={withTrains([])} />);
+    renderWithIntl(<WorkflowTransit motion="reduced" snapshot={withTrains([])} />);
     const nested = screen.getByRole("button", { name: /^Quarterly close: Reconcile/ });
     expect(nested).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("↳ Reconcile")).toBeNull();

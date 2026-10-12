@@ -2,6 +2,7 @@
 
 import { useMutation } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { CREATE_TOOL_DEF } from "@/graphql/agents/agents.mutations";
@@ -61,12 +62,15 @@ function parse(text: string): { ok: true; value: unknown } | { ok: false } {
 }
 
 /** The checks the page runs before it asks the server, beside their fields. */
-export function validateTool(fields: ToolDefFields): ToolErrors {
+export function validateTool(
+  fields: ToolDefFields,
+  t: (key: "toolName" | "slugRequired" | "inputSchemaInvalid" | "outputSchemaInvalid") => string
+): ToolErrors {
   const e: ToolErrors = {};
-  if (!fields.name.trim()) e.name = "Give the tool a name.";
-  if (!fields.slug.trim()) e.slug = "A slug is required.";
-  if (!parse(fields.inputSchemaText).ok) e.inputSchema = "Input schema is not valid JSON.";
-  if (!parse(fields.outputSchemaText).ok) e.outputSchema = "Output schema is not valid JSON.";
+  if (!fields.name.trim()) e.name = t("toolName");
+  if (!fields.slug.trim()) e.slug = t("slugRequired");
+  if (!parse(fields.inputSchemaText).ok) e.inputSchema = t("inputSchemaInvalid");
+  if (!parse(fields.outputSchemaText).ok) e.outputSchema = t("outputSchemaInvalid");
   return e;
 }
 
@@ -78,13 +82,15 @@ export function validateTool(fields: ToolDefFields): ToolErrors {
  */
 export function useAddTool(skillId: string) {
   const router = useRouter();
+  const t = useTranslations("agentSkills.toasts");
+  const validation = useTranslations("agentSkills.validation");
   const skill = useSkill(skillId);
   const [createToolDef, { loading }] = useMutation<CreateToolDefData>(CREATE_TOOL_DEF, {
     refetchQueries: ["ListToolDefs", "ListOrgToolDefs", "ToolDefsListPage"],
   });
 
   async function createTool(fields: ToolDefFields): Promise<ToolErrors> {
-    const invalid = validateTool(fields);
+    const invalid = validateTool(fields, validation);
     if (hasErrors(invalid)) return invalid;
     const input = parse(fields.inputSchemaText);
     const output = parse(fields.outputSchemaText);
@@ -105,12 +111,12 @@ export function useAddTool(skillId: string) {
         },
       });
       if (data?.createToolDef?.ok) {
-        toast.success("Tool registered");
+        toast.success(t("toolRegistered"));
         router.push(skillTabHref(skillId, "tools"));
         return {};
       }
       const errors = splitErrors(data?.createToolDef?.errors ?? [], TOOL_FIELDS);
-      return hasErrors(errors) ? errors : { form: "The tool was not registered." };
+      return hasErrors(errors) ? errors : { form: t("toolNotRegistered") };
     } catch (err) {
       return { form: err instanceof Error ? err.message : String(err) };
     }

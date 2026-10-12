@@ -59,7 +59,11 @@ vi.mock("next-intl", async (importOriginal) => {
   return {
     ...actual,
     useTranslations: (namespace?: string) =>
-      namespace?.startsWith("shared.") ? actual.useTranslations(namespace) : (key: string) => key,
+      namespace?.startsWith("shared.") ||
+      namespace === "formSubmissions" ||
+      namespace === "eventDetail"
+        ? actual.useTranslations(namespace)
+        : (key: string) => key,
   };
 });
 vi.mock("@/lib/permissions/use-my-permissions", () => ({
@@ -145,13 +149,13 @@ it("keeps task frames loading, shows a failure instead of no runs, and retries i
   const network = transport();
   const Home = () => <TaskHomeScreen {...useTaskRuns("app", "job")} name="Job" />;
   render(<Home />, { wrapper: network.wrapper });
-  expect(screen.queryByText("No runs yet")).not.toBeInTheDocument();
+  expect(screen.queryByText("emptyTitle")).not.toBeInTheDocument();
   await waitFor(() => expect(screen.getAllByRole("alert")).toHaveLength(2));
-  expect(screen.queryByText("No runs yet")).not.toBeInTheDocument();
-  expect(screen.queryByText(/No run recorded yet/)).not.toBeInTheDocument();
+  expect(screen.queryByText("emptyTitle")).not.toBeInTheDocument();
+  expect(screen.queryByText("noRunYet")).not.toBeInTheDocument();
   network.setPayload({ astroliftTaskRuns: [] });
   fireEvent.click(screen.getAllByRole("button", { name: "Retry" })[0]);
-  await screen.findByText("No runs yet");
+  await screen.findByText("emptyTitle");
   expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 });
 

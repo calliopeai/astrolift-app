@@ -10,6 +10,7 @@ import {
   PencilIcon,
   XIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -49,22 +50,19 @@ function PendingUrlBadge({
   isProvisioning: boolean;
   hasWorkload: boolean;
 }) {
+  const t = useTranslations("appOverviewCards.url");
   if (isProvisioning) {
     return (
       <span className="border-warning-border bg-warning/10 text-warning-fg inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium">
         <Loader2Icon className="size-3 animate-spin" />
-        <span>Provisioning · ~2 min</span>
+        <span>{t("provisioning")}</span>
       </span>
     );
   }
   return (
     <span className="border-border bg-muted text-muted-foreground inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium">
       <ClockIcon className="size-3" />
-      <span>
-        {hasWorkload
-          ? "URL not yet routable"
-          : "URL not yet assigned — first deploy will publish it"}
-      </span>
+      <span>{hasWorkload ? t("notRoutable") : t("notAssigned")}</span>
     </span>
   );
 }
@@ -101,6 +99,7 @@ export function UrlCardView({
   const [editing, setEditing] = React.useState(false);
   const [draft, setDraft] = React.useState(subdomain);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
+  const t = useTranslations("appOverviewCards.url");
 
   // Keep the draft in sync with the server value when the user is
   // not actively editing — e.g. another tab renames the subdomain
@@ -135,9 +134,9 @@ export function UrlCardView({
 
   return (
     <Panel
-      title="Public URL"
+      title={t("title")}
       icon={<GlobeIcon className="size-4" />}
-      description="The platform-issued host for this app. Edit the subdomain to rename it; DNS and certificates re-issue automatically."
+      description={t("description")}
       span={span}
     >
       <div className="min-w-0 space-y-4">
@@ -164,7 +163,7 @@ export function UrlCardView({
             onClick={onCopy}
           >
             <CopyIcon className="size-3.5" />
-            <span className="text-xs">Copy</span>
+            <span className="text-xs">{t("copy")}</span>
           </Button>
         </div>
 
@@ -172,15 +171,17 @@ export function UrlCardView({
           permission="app.update"
           fallback={
             <p className="text-muted-foreground text-xs italic">
-              You need the <span className="font-mono">app.update</span> permission to rename this
-              subdomain.
+              {t.rich("needsPermission", {
+                permission: "app.update",
+                mono: (chunks) => <span className="font-mono">{chunks}</span>,
+              })}
             </p>
           }
         >
           {editing ? (
             <div className="space-y-2">
               <Label htmlFor="subdomain-input" className="text-xs">
-                Subdomain
+                {t("subdomain")}
               </Label>
               <div className="flex flex-wrap items-stretch gap-2">
                 <Input
@@ -215,7 +216,7 @@ export function UrlCardView({
                     ) : (
                       <CheckIcon className="size-4" />
                     )}
-                    Save
+                    {t("save")}
                   </Button>
                   <Button
                     type="button"
@@ -226,27 +227,26 @@ export function UrlCardView({
                     className="gap-1"
                   >
                     <XIcon className="size-4" />
-                    Cancel
+                    {t("cancel")}
                   </Button>
                 </div>
               </div>
               {!isValid && draft.length > 0 ? (
-                <p className="text-destructive text-xs">
-                  Lowercase DNS host: letters, digits, hyphens, and dots. Each label must start and
-                  end with a letter or digit.
-                </p>
+                <p className="text-destructive text-xs">{t("invalid")}</p>
               ) : (
                 <p className="text-muted-foreground text-xs">
-                  Press <kbd className="bg-muted text-2xs rounded px-1 font-mono">Enter</kbd> to
-                  save or <kbd className="bg-muted text-2xs rounded px-1 font-mono">Esc</kbd> to
-                  cancel.
+                  {t.rich("keys", {
+                    kbd: (chunks) => (
+                      <kbd className="bg-muted text-2xs rounded px-1 font-mono">{chunks}</kbd>
+                    ),
+                  })}
                 </p>
               )}
             </div>
           ) : (
             <div className="flex min-w-0 items-center justify-between gap-2">
               <div className="min-w-0 space-y-0.5">
-                <p className="text-muted-foreground text-xs">Subdomain</p>
+                <p className="text-muted-foreground text-xs">{t("subdomain")}</p>
                 <Badge
                   variant="outline"
                   className="h-auto max-w-full gap-1 font-mono text-xs [overflow-wrap:anywhere] whitespace-normal"
@@ -262,7 +262,7 @@ export function UrlCardView({
                 className="gap-1"
               >
                 <PencilIcon className="size-3.5" />
-                Edit
+                {t("edit")}
               </Button>
             </div>
           )}

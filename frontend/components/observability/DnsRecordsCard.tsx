@@ -16,6 +16,7 @@
 
 import { GlobeIcon, RefreshCwIcon, RotateCcwIcon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Can } from "@/components/Can";
@@ -37,6 +38,7 @@ import type {
   DnsPropagationStatus,
 } from "@/graphql/lifecycle/lifecycle.types";
 
+import { localizeList } from "./localize-list";
 import { DNS_RECORDS_LIST, DNS_RECORDS_SELECT, dnsKey } from "./network-lists";
 
 export interface DnsRecordsCardData {
@@ -50,12 +52,6 @@ const PROPAGATION_DOT: Record<DnsPropagationStatus, "ok" | "warn" | "muted"> = {
   propagated: "ok",
   pending: "warn",
   unknown: "muted",
-};
-
-const PROPAGATION_LABEL: Record<DnsPropagationStatus, string> = {
-  propagated: "Propagated",
-  pending: "Pending",
-  unknown: "Unknown",
 };
 
 export interface DnsRecordsCardProps {
@@ -74,21 +70,27 @@ export function DnsRecordsCard({
   loading: boolean;
   onRefresh: () => void;
 }) {
+  const t = useTranslations("obsDnsRecords");
+  const reasonT = useTranslations("obsPanelReason");
+  const listT = useTranslations("obsLists");
   const records = data?.astroliftAppDnsRecords?.records ?? [];
   const reason = data?.astroliftAppDnsRecords?.reason;
   const isEmptyAfterLoad = !loading && records.length === 0;
-  const empty = panelEmptyState(reason ?? "NO_DATA_YET", {
-    thing: "DNS records",
-    notConfigured:
-      "No DNS provider is wired for this cluster. Set up a managed domain to publish records.",
-    provider: "this cloud",
-  });
+  const empty = panelEmptyState(
+    reason ?? "NO_DATA_YET",
+    {
+      noData: { title: t("noDataTitle"), description: t("noDataDescription") },
+      notConfigured: t("notConfigured"),
+    },
+    reasonT
+  );
   // A deep-link to fix it only makes sense when the operator can act
   // (not-configured / no-data). NOT_SUPPORTED is informational; ERROR
   // is transient.
   const showSetupAction = reason === "NOT_CONFIGURED" || reason === "NO_DATA_YET" || reason == null;
 
-  const list = useLocalListState(DNS_RECORDS_LIST);
+  const dnsList = React.useMemo(() => localizeList(DNS_RECORDS_LIST, "dnsRecords", listT), [listT]);
+  const list = useLocalListState(dnsList);
   const page = selectRows(
     records,
     {
@@ -103,7 +105,7 @@ export function DnsRecordsCard({
   const columns: Column<AstroliftAppDnsRecord>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("columns.name"),
       sortKey: "name",
       cellClassName: "max-w-72",
       cell: (r) => (
@@ -114,14 +116,14 @@ export function DnsRecordsCard({
     },
     {
       id: "type",
-      header: "Type",
+      header: t("columns.type"),
       sortKey: "type",
       cellClassName: "font-mono text-xs",
       cell: (r) => r.type,
     },
     {
       id: "value",
-      header: "Value",
+      header: t("columns.value"),
       cellClassName: "text-muted-foreground max-w-80",
       cell: (r) => (
         <span className="block truncate font-mono text-xs" title={r.value}>
@@ -131,7 +133,7 @@ export function DnsRecordsCard({
     },
     {
       id: "ttl",
-      header: "TTL",
+      header: t("columns.ttl"),
       sortKey: "ttl",
       align: "right",
       cellClassName: "font-mono text-xs",
@@ -139,11 +141,15 @@ export function DnsRecordsCard({
     },
     {
       id: "propagation",
-      header: "Propagation",
+      header: t("columns.propagation"),
       cell: (r) => (
         <span className="inline-flex items-center gap-2 text-xs">
           <StatusDot status={PROPAGATION_DOT[r.propagationStatus]} />
-          <span>{PROPAGATION_LABEL[r.propagationStatus]}</span>
+          <span>
+            {t.has(`propagation.${r.propagationStatus}`)
+              ? t(`propagation.${r.propagationStatus}`)
+              : r.propagationStatus}
+          </span>
         </span>
       ),
     },
@@ -154,11 +160,10 @@ export function DnsRecordsCard({
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 pb-3">
         <div>
           <CardTitle className="flex items-center gap-2 text-base">
-            <GlobeIcon className="size-4" /> DNS records
+            <GlobeIcon className="size-4" /> {t("title")}
           </CardTitle>
           <CardDescription>
-            Live records from the cluster&apos;s DNS driver. Propagation reflects the most recent
-            change set; use <code>dig</code> for per-vantage-point checks.
+            {t.rich("description", { code: (chunks) => <code>{chunks}</code> })}
           </CardDescription>
         </div>
         <div className="flex items-center gap-2">
@@ -170,7 +175,7 @@ export function DnsRecordsCard({
             }}
             disabled={loading}
           >
-            <RefreshCwIcon className="size-3" /> Refresh
+            <RefreshCwIcon className="size-3" /> {t("refresh")}
           </Button>
           <Can permission="app.update">
             <Button
@@ -183,13 +188,12 @@ export function DnsRecordsCard({
                 // domain-handshake side (#397); until that's wired into
                 // a generic "rebind DNS for app", this surfaces a toast
                 // pointing operators at the per-domain re-validate path.
-                toast.message("Force re-bind", {
-                  description:
-                    "Re-applying DNS records is per-domain — head to the Domains tab and click Re-validate on the affected hostname.",
+                toast.message(t("forceRebind"), {
+                  description: t("forceRebindDescription"),
                 });
               }}
             >
-              <RotateCcwIcon className="size-3" /> Force re-bind
+              <RotateCcwIcon className="size-3" /> {t("forceRebind")}
             </Button>
           </Can>
         </div>
@@ -207,11 +211,11 @@ export function DnsRecordsCard({
               title={empty.title}
               description={empty.description}
               actionHref={showSetupAction ? `/apps/${appSlug}/domains` : undefined}
-              actionLabel={showSetupAction ? "Set up DNS" : undefined}
+              actionLabel={showSetupAction ? t("setUpDns") : undefined}
               secondary={
                 reason === "ERROR" ? (
                   <Button size="sm" variant="outline" onClick={() => onRefresh()}>
-                    Try again
+                    {t("tryAgain")}
                   </Button>
                 ) : undefined
               }
@@ -222,7 +226,7 @@ export function DnsRecordsCard({
             <ListPage<AstroliftAppDnsRecord>
               embedded
               list={list}
-              label="DNS records"
+              label={t("title")}
               columns={columns}
               rows={page.rows}
               getRowId={dnsKey}
