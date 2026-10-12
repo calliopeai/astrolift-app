@@ -3,7 +3,7 @@ import { expect, within } from "storybook/test";
 
 import { VizLegend } from "@/components/viz/core/VizLegend";
 
-import { WORKFLOW_GLYPH_LEGEND, WorkflowGlyph } from "./WorkflowGlyph";
+import { useWorkflowGlyphLegend, WorkflowGlyph } from "./WorkflowGlyph";
 import { LONG_ROWS, WORKFLOW_ROWS } from "./workflows-list.fixtures";
 
 const meta: Meta = {
@@ -13,6 +13,10 @@ const meta: Meta = {
 export default meta;
 
 type Story = StoryObj;
+
+function Legend() {
+  return <VizLegend items={useWorkflowGlyphLegend()} motion="full" />;
+}
 
 /** Every shape the fixtures hold, each with its name and the shape in words. */
 export const Full: Story = {
@@ -24,7 +28,7 @@ export const Full: Story = {
           <span className="min-w-0 truncate text-sm">{row.name}</span>
         </div>
       ))}
-      <VizLegend items={WORKFLOW_GLYPH_LEGEND} motion="full" />
+      <Legend />
     </div>
   ),
 };

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch, type FieldValues } from "react-hook-form";
 import { Loader2Icon, SendIcon, CheckCircle2Icon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ export function DynamicForm({
   onSubmit: submit,
   onSuccess,
 }: DynamicFormProps) {
+  const t = useTranslations("dynamicForm");
   const [submitted, setSubmitted] = useState(false);
 
   const {
@@ -95,9 +97,7 @@ export function DynamicForm({
   if (error || !formDef) {
     return (
       <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-4 text-sm">
-        {error
-          ? `Error loading form: ${error}`
-          : `Form "${slug}" not found or not published.`}
+        {error ? t("loadFailed", { error }) : t("notFound", { slug })}
       </div>
     );
   }
@@ -106,10 +106,8 @@ export function DynamicForm({
     return (
       <Card className="flex flex-col items-center gap-4 p-8 text-center">
         <CheckCircle2Icon className="text-success-fg h-12 w-12" />
-        <h2 className="text-xl font-semibold">Submitted!</h2>
-        <p className="text-muted-foreground">
-          Your response to &quot;{formDef.name}&quot; has been recorded.
-        </p>
+        <h2 className="text-xl font-semibold">{t("submittedTitle")}</h2>
+        <p className="text-muted-foreground">{t("recorded", { name: formDef.name })}</p>
       </Card>
     );
   }
@@ -139,7 +137,7 @@ export function DynamicForm({
 
     if (result.ok) {
       setSubmitted(true);
-      toast.success("Form submitted", { description: formDef.name });
+      toast.success(t("submittedToast"), { description: formDef.name });
       if (result.submissionId && onSuccess) {
         onSuccess(result.submissionId);
       }
@@ -150,7 +148,7 @@ export function DynamicForm({
           message: err.message,
         });
       }
-      toast.error("Validation failed", { description: "Please fix the errors below." });
+      toast.error(t("validationFailed"), { description: t("fixErrors") });
     }
   };
 
@@ -219,7 +217,7 @@ export function DynamicForm({
         ) : (
           <SendIcon className="mr-2 h-4 w-4" />
         )}
-        Submit
+        {t("submit")}
       </Button>
     </form>
   );

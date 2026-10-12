@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import {
   DangerAction,
@@ -77,6 +78,7 @@ export function WorkflowSettingsView({
   onSave,
   onDelete,
 }: WorkflowSettingsViewProps) {
+  const t = useTranslations("workflowSettings");
   const [name, setName] = React.useState(general.name);
   const [description, setDescription] = React.useState(general.description);
   const dirty = name !== general.name || description !== general.description;
@@ -88,15 +90,15 @@ export function WorkflowSettingsView({
   const generalSection =
     kind === "configured" ? (
       <SettingsSection
-        title="General"
-        description="What this workflow is called and what it is for."
+        title={t("general")}
+        description={t("generalDescription")}
         dirty={dirty && name.trim() !== ""}
         saving={saving}
         error={saveError}
         onSave={onSave ? () => onSave({ name: name.trim(), description }) : undefined}
         onCancel={reset}
       >
-        <Field id="workflow-name" label="Name">
+        <Field id="workflow-name" label={t("name")}>
           <Input
             id="workflow-name"
             value={name}
@@ -104,7 +106,7 @@ export function WorkflowSettingsView({
             required
           />
         </Field>
-        <Field id="workflow-description" label="Description">
+        <Field id="workflow-description" label={t("description")}>
           <Textarea
             id="workflow-description"
             value={description}
@@ -113,51 +115,45 @@ export function WorkflowSettingsView({
           />
         </Field>
         <dl>
-          <ReadField label="Slug" value={general.slug} />
+          <ReadField label={t("slug")} value={general.slug} />
         </dl>
       </SettingsSection>
     ) : (
       <SettingsSection
-        title="General"
-        description={
-          source?.repo
-            ? "Declared in a repository; reconciliation keeps it in step, so it is read-only here."
-            : "A workflow definition. Edit its stages in the Builder."
-        }
+        title={t("general")}
+        description={source?.repo ? t("repoDescription") : t("definitionDescription")}
       >
         <dl className="grid min-w-0 gap-3 sm:grid-cols-2">
-          <ReadField label="Name" value={general.name} />
-          <ReadField label="Slug" value={general.slug} />
-          {general.description && <ReadField label="Description" value={general.description} />}
-          {source?.repo && <ReadField label="Repository" value={source.repo} />}
-          {source?.repo && <ReadField label="Manifest" value={source.path || "Built in"} />}
-          {source?.repo && <ReadField label="Reconciled ref" value={source.ref || "none"} />}
+          <ReadField label={t("name")} value={general.name} />
+          <ReadField label={t("slug")} value={general.slug} />
+          {general.description && (
+            <ReadField label={t("description")} value={general.description} />
+          )}
+          {source?.repo && <ReadField label={t("repository")} value={source.repo} />}
+          {source?.repo && <ReadField label={t("manifest")} value={source.path || t("builtIn")} />}
+          {source?.repo && <ReadField label={t("reconciledRef")} value={source.ref || t("none")} />}
         </dl>
       </SettingsSection>
     );
-
-  const noun = kind === "configured" ? "workflow" : "definition";
 
   return (
     <SettingsPage
       single={single}
       readOnly={readOnly}
-      sections={[{ id: "general", title: "General", content: generalSection }]}
+      sections={[{ id: "general", title: t("general"), content: generalSection }]}
       dangerZone={
         onDelete ? (
           <DangerAction
-            title={`Delete this ${noun}`}
+            title={kind === "configured" ? t("deleteWorkflowTitle") : t("deleteDefinitionTitle")}
             description={
               kind === "configured"
-                ? "Removes the configured workflow and its schedule. Its definition is not affected."
-                : "Permanently deletes the definition and its stages. This cannot be undone."
+                ? t("deleteWorkflowDescription")
+                : t("deleteDefinitionDescription")
             }
-            actionLabel={`Delete ${noun}`}
-            confirmTitle={`Delete ${general.name}?`}
+            actionLabel={kind === "configured" ? t("deleteWorkflow") : t("deleteDefinition")}
+            confirmTitle={t("confirmTitle", { name: general.name })}
             confirmDescription={
-              kind === "configured"
-                ? "It stops running on its trigger. This cannot be undone."
-                : "This cannot be undone."
+              kind === "configured" ? t("confirmWorkflowDescription") : t("cannotBeUndone")
             }
             onConfirm={() => onDelete()}
           />

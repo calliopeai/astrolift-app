@@ -1,7 +1,8 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { WorkflowStageExecution } from "@/graphql/workflows/tiered.types";
+import { renderWithIntl as render } from "@/test/render-with-intl";
 
 import { GateCardView, GateReviewView, upstreamResult } from "./GateReview";
 import { useGateReview } from "./use-gate-review";

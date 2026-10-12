@@ -2,6 +2,7 @@
 
 import { ClipboardListIcon, Loader2Icon, PlayIcon } from "lucide-react";
 import * as React from "react";
+import { useTranslations } from "next-intl";
 
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
@@ -44,10 +45,12 @@ export function TaskTemplatesScreen({
   mutationLoading,
   onRunNow,
 }: TaskTemplatesScreenProps) {
+  const t = useTranslations("taskTemplates");
+  const tr = useTranslations("taskRuns");
   const columns: Column<TaskWorkload>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("name"),
       cellClassName: "max-w-72",
       cell: (w) => (
         <span className="block truncate font-medium" title={w.name}>
@@ -57,7 +60,7 @@ export function TaskTemplatesScreen({
     },
     {
       id: "app",
-      header: "App",
+      header: t("app"),
       cellClassName: "max-w-56 font-mono text-xs",
       cell: (w) => (
         <span className="block truncate" title={w.registeredAppSlug}>
@@ -67,7 +70,7 @@ export function TaskTemplatesScreen({
     },
     {
       id: "slug",
-      header: "Slug",
+      header: t("slug"),
       cellClassName: "text-muted-foreground max-w-56 font-mono text-xs",
       cell: (w) => (
         <span className="block truncate" title={w.slug}>
@@ -77,8 +80,8 @@ export function TaskTemplatesScreen({
     },
     {
       id: "action",
-      header: <span className="sr-only">Run</span>,
-      label: "Run",
+      header: <span className="sr-only">{t("run")}</span>,
+      label: t("run"),
       align: "right",
       width: "w-28",
       // Above the row's stretched link, so the button runs instead of opening the row.
@@ -92,7 +95,7 @@ export function TaskTemplatesScreen({
             ) : (
               <PlayIcon className="size-3.5" />
             )}
-            Run now
+            {t("runNow")}
           </Button>
         );
       },
@@ -105,14 +108,14 @@ export function TaskTemplatesScreen({
         header={{
           crumbs: [
             areaSwitcher(NAV, "agents", "runs"),
-            { label: "Runs", href: "/tasks" },
-            { label: "Task templates" },
+            { label: tr("title"), href: "/tasks" },
+            { label: tr("taskTemplates") },
           ],
-          title: "Task templates",
-          context: "One-off container tasks: migrations, scripts and manual interventions.",
+          title: tr("taskTemplates"),
+          context: t("context"),
         }}
         list={list}
-        label="Task templates"
+        label={tr("taskTemplates")}
         columns={columns}
         rows={rows}
         getRowId={(w) => w.id}
@@ -125,11 +128,10 @@ export function TaskTemplatesScreen({
         onRetry={onRetry}
         empty={{
           icon: <ClipboardListIcon className="size-5" />,
-          title: "No task workloads",
-          description:
-            "Register a workload with kind=task on an app to create a named task template.",
+          title: t("emptyTitle"),
+          description: t("emptyDescription", { kind: "kind=task" }),
           actionHref: "/apps",
-          actionLabel: "Go to Apps",
+          actionLabel: t("goToApps"),
         }}
         nextCursor={nextCursor}
       />

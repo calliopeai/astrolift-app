@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
 
@@ -33,12 +34,15 @@ type JsonSchema = {
  * dump for shapes we don't have a renderer for, so an operator can
  * still see the field exists and gets caught in code review.
  */
+type FormScreensT = ReturnType<typeof useTranslations<"formScreens">>;
+
 export function FormPreviewTab({ schema }: { schema: Record<string, unknown> }) {
+  const t = useTranslations("formScreens");
   const root = schema as JsonSchema;
   if (!root || typeof root !== "object") {
     return (
       <div className="text-muted-foreground rounded-md border border-dashed p-6 text-center text-sm">
-        Form has no schema yet.
+        {t("noSchema")}
       </div>
     );
   }
@@ -49,7 +53,7 @@ export function FormPreviewTab({ schema }: { schema: Record<string, unknown> }) 
   if (entries.length === 0) {
     return (
       <div className="text-muted-foreground rounded-md border border-dashed p-6 text-center text-sm">
-        Schema has no fields defined.
+        {t("noFields")}
       </div>
     );
   }
@@ -69,14 +73,14 @@ export function FormPreviewTab({ schema }: { schema: Record<string, unknown> }) 
           className="bg-muted text-muted-foreground cursor-not-allowed rounded-md px-4 py-2 text-sm"
           disabled
         >
-          Cancel
+          {t("cancel")}
         </button>
         <button
           type="button"
           className="bg-primary text-primary-foreground cursor-not-allowed rounded-md px-4 py-2 text-sm opacity-80"
           disabled
         >
-          Submit (preview)
+          {t("submitPreview")}
         </button>
       </div>
     </div>
@@ -92,13 +96,14 @@ function FieldPreview({
   field: JsonSchema;
   required: boolean;
 }) {
+  const t = useTranslations("formScreens");
   const label = field.title ?? name;
   return (
     <label className="flex flex-col gap-1">
       <span className="flex items-center gap-2 text-sm font-medium">
         {label}
         {required && (
-          <span aria-label="required" className="text-destructive">
+          <span aria-label={t("required")} className="text-destructive">
             *
           </span>
         )}
@@ -107,19 +112,19 @@ function FieldPreview({
       {field.description && (
         <span className="text-muted-foreground text-xs">{field.description}</span>
       )}
-      {renderInput(field)}
+      {renderInput(field, t)}
     </label>
   );
 }
 
-function renderInput(field: JsonSchema): ReactNode {
+function renderInput(field: JsonSchema, t: FormScreensT): ReactNode {
   if (field.enum && Array.isArray(field.enum)) {
     return (
       <select
         disabled
         className="bg-muted border-input cursor-not-allowed rounded-md border px-3 py-1.5 text-sm"
       >
-        <option value="">Select…</option>
+        <option value="">{t("selectPlaceholder")}</option>
         {field.enum.map((v) => (
           <option key={String(v)} value={String(v)}>
             {String(v)}
@@ -131,7 +136,7 @@ function renderInput(field: JsonSchema): ReactNode {
   if (field.type === "boolean") {
     return (
       <span className="text-muted-foreground inline-flex items-center gap-2 text-xs">
-        <input type="checkbox" disabled className="cursor-not-allowed" /> Boolean field
+        <input type="checkbox" disabled className="cursor-not-allowed" /> {t("booleanField")}
       </span>
     );
   }
@@ -148,14 +153,14 @@ function renderInput(field: JsonSchema): ReactNode {
   if (field.type === "array") {
     return (
       <div className="bg-muted text-muted-foreground rounded-md border border-dashed px-3 py-2 text-xs">
-        Array of {field.items?.type ?? "item"}
+        {t("arrayOf", { type: field.items?.type ?? t("item") })}
       </div>
     );
   }
   if (field.type === "object") {
     return (
       <div className="bg-muted/40 rounded-md border border-dashed p-3">
-        <div className="text-muted-foreground mb-1 text-xs">Nested object</div>
+        <div className="text-muted-foreground mb-1 text-xs">{t("nestedObject")}</div>
         <div className="flex flex-col gap-2 pl-3">
           {Object.entries(field.properties ?? {}).map(([k, v]) => (
             <FieldPreview key={k} name={k} field={v} required={false} />
@@ -168,7 +173,7 @@ function renderInput(field: JsonSchema): ReactNode {
     return (
       <textarea
         disabled
-        placeholder="Text…"
+        placeholder={t("textPlaceholder")}
         rows={3}
         className="bg-muted border-input cursor-not-allowed rounded-md border px-3 py-1.5 text-sm"
       />
@@ -178,7 +183,7 @@ function renderInput(field: JsonSchema): ReactNode {
     <input
       type={field.format === "email" ? "email" : field.format === "url" ? "url" : "text"}
       disabled
-      placeholder="Text…"
+      placeholder={t("textPlaceholder")}
       className="bg-muted border-input cursor-not-allowed rounded-md border px-3 py-1.5 text-sm"
     />
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { Loader2Icon, PlusIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -18,19 +19,18 @@ export type FormsListScreenProps = {
 
 /** The form definitions list: status, visibility, version and submission count per form. */
 export function FormsListScreen({ forms, loading, error }: FormsListScreenProps) {
+  const t = useTranslations("formScreens");
   return (
     <div className="flex flex-1 flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">Forms</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Manage form definitions, view submissions, and publish forms.
-          </p>
+          <h1 className="text-xl font-semibold">{t("listTitle")}</h1>
+          <p className="text-muted-foreground mt-1 text-sm">{t("listDescription")}</p>
         </div>
         <Button asChild>
           <Link href="/forms/new">
             <PlusIcon className="mr-2 h-4 w-4" />
-            New Form
+            {t("newForm")}
           </Link>
         </Button>
       </div>
@@ -44,14 +44,12 @@ export function FormsListScreen({ forms, loading, error }: FormsListScreenProps)
 
       {error && (
         <div className="text-destructive bg-destructive/10 border-destructive/20 rounded-md border p-4 text-sm">
-          Error loading forms: {error.message}
+          {t("loadFailed", { message: error.message })}
         </div>
       )}
 
       {!loading && forms.length === 0 && (
-        <div className="text-muted-foreground py-12 text-center">
-          No forms yet. Create your first form to get started.
-        </div>
+        <div className="text-muted-foreground py-12 text-center">{t("empty")}</div>
       )}
 
       <div className="grid gap-4">
@@ -65,13 +63,13 @@ export function FormsListScreen({ forms, loading, error }: FormsListScreenProps)
               <div className="flex items-center gap-2">
                 <span className="font-medium">{form.name}</span>
                 <Badge {...formStatusBadgeProps(form.status)}>{form.status}</Badge>
-                {form.isPublic && <Badge variant="outline">Public</Badge>}
+                {form.isPublic && <Badge variant="outline">{t("public")}</Badge>}
               </div>
               <span className="text-muted-foreground text-sm">{form.description || form.slug}</span>
             </div>
             <div className="text-muted-foreground flex items-center gap-4 text-sm">
               <span>v{form.version}</span>
-              <span>{form.submissionCount} submissions</span>
+              <span>{t("submissionCount", { count: form.submissionCount })}</span>
             </div>
           </Link>
         ))}

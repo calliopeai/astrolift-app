@@ -1,6 +1,7 @@
 "use client";
 
 import { Loader2Icon, PlayIcon, PowerIcon, PowerOffIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
@@ -40,10 +41,11 @@ export function WorkflowTriggersView({
   togglingId,
   onToggle,
 }: WorkflowTriggersViewProps) {
+  const tr = useTranslations("workflowTriggers");
   const columns: Column<TriggerRow>[] = [
     {
       id: "kind",
-      header: "Trigger",
+      header: tr("trigger"),
       sortKey: "kind",
       cellClassName: "max-w-80",
       cell: (t) => (
@@ -54,22 +56,22 @@ export function WorkflowTriggersView({
     },
     {
       id: "schedule",
-      header: "Schedule",
+      header: tr("schedule"),
       cellClassName: "max-w-80",
       cell: (t) =>
         t.schedule ? (
           <span className="block font-mono text-xs [overflow-wrap:anywhere]">{t.schedule}</span>
         ) : (
-          <span className="text-muted-foreground text-xs">none</span>
+          <span className="text-muted-foreground text-xs">{tr("none")}</span>
         ),
     },
     {
       id: "status",
-      header: "Status",
+      header: tr("status"),
       sortKey: "status",
       cell: (t) => (
         <Badge variant={t.isEnabled ? "default" : "secondary"}>
-          {t.isEnabled ? "Enabled" : "Disabled"}
+          {t.isEnabled ? tr("enabled") : tr("disabled")}
         </Badge>
       ),
     },
@@ -78,8 +80,8 @@ export function WorkflowTriggersView({
   if (canManage) {
     columns.push({
       id: "toggle",
-      header: <span className="sr-only">Enable or disable</span>,
-      label: "Enable toggle",
+      header: <span className="sr-only">{tr("toggleHeader")}</span>,
+      label: tr("toggleLabel"),
       align: "right",
       cell: (t) => {
         const busy = togglingId === t.id;
@@ -92,7 +94,7 @@ export function WorkflowTriggersView({
             ) : (
               <PowerIcon className="size-4" />
             )}
-            {t.isEnabled ? "Disable" : "Enable"}
+            {t.isEnabled ? tr("disable") : tr("enable")}
           </Button>
         );
       },
@@ -103,18 +105,17 @@ export function WorkflowTriggersView({
     <ListPage<TriggerRow>
       embedded
       list={list}
-      label="Triggers"
+      label={tr("title")}
       columns={columns}
       rows={rows}
       getRowId={(t) => t.id}
       totalCount={totalCount}
       empty={{
         icon: <PlayIcon className="size-5" />,
-        title: "Runs on demand",
-        description:
-          "A workflow definition has no trigger of its own. Start it with Run, or configure a workflow over it to run on a schedule or a webhook.",
+        title: tr("emptyTitle"),
+        description: tr("emptyDescription"),
         actionHref: "/workflows/new",
-        actionLabel: "Configure a workflow",
+        actionLabel: tr("configure"),
       }}
     />
   );

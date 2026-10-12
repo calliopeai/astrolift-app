@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Workflows, runs, jobs and forms read in the viewer's language: the workflow list, builder, new and configure pages, run page, triggers, settings and gate review, Runs and task templates, scheduled job, command and task run pages, and the form builder, list, detail, preview, submissions and field widgets now take every label, placeholder, empty state, toast and confirmation from the message catalogs in all eight locales, and the cron preview's next-fire tooltip uses the app's date formatter (#2145).
+
 - A refused permission reads the same on every client: GraphQL errors raised by a permission check now carry `extensions.code = "PERMISSION_DENIED"` (the code mutation envelopes already use) with `extensions.reason` and `extensions.permission`; the message is unchanged. The CLI and web can tell a refusal from any other failure and show why (#1867).
 
 - Every tab inside an app or agent offers actions from that app's own permissions, not the account's: the header (deploy, archive, delete), Settings sections (resync, retention, environments, managed services, archive, the danger zone) and Access (tokens, security, edge). A grant held on another project no longer offers an action this app refuses. Account grants only bridge the first load (`useAppCan`, fed by the frame) (#1867).

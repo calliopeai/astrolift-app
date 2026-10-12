@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import { useForm, type FieldValues } from "react-hook-form";
 import { DynamicField } from "./field-registry";
 
@@ -9,6 +10,7 @@ type FormPreviewProps = {
 };
 
 export function FormPreview({ schema, formName }: FormPreviewProps) {
+  const t = useTranslations("dynamicForm");
   const {
     register,
     control,
@@ -25,7 +27,7 @@ export function FormPreview({ schema, formName }: FormPreviewProps) {
   if (fieldNames.length === 0) {
     return (
       <div className="text-muted-foreground flex h-full items-center justify-center p-8 text-sm">
-        Add fields to see a live preview
+        {t("addFieldsHint")}
       </div>
     );
   }
@@ -53,7 +55,7 @@ export function FormPreview({ schema, formName }: FormPreviewProps) {
         );
       })}
       <div className="bg-primary text-primary-foreground cursor-not-allowed rounded-md px-4 py-2 text-center text-sm opacity-50">
-        Submit (preview only)
+        {t("submitPreviewOnly")}
       </div>
     </div>
   );
