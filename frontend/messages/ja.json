@@ -8286,6 +8286,145 @@
     "certificateHostMismatch": "記録された証明書はこのゾーンを対象にしていません。再度プロビジョニングして対象の証明書を要求してください。",
     "certificateAccountChanged": "プロバイダーは、このゾーンをプロビジョニングした AWS アカウントとは別のアカウントから応答しています。"
   },
+  "detailShell": {
+    "notFound": "{label}が見つかりません",
+    "notFoundDescription": "この{label}は存在しないか、最近の一覧から外れたか、アクセス権がない可能性があります。",
+    "back": "{label}に戻る",
+    "created": "作成",
+    "overview": "概要"
+  },
+  "alertDetail": {
+    "alerts": "アラート",
+    "ruleHeading": "ルール {id}",
+    "ruleNoun": "アラートルール",
+    "eventHeading": "イベント {id}",
+    "eventNoun": "アラートイベント",
+    "state": "状態",
+    "muted": "ミュート中",
+    "active": "有効",
+    "inactive": "無効",
+    "target": "対象",
+    "severity": "重大度",
+    "managedService": "マネージドサービス",
+    "organization": "組織",
+    "created": "作成日時",
+    "updated": "更新日時",
+    "mutedUntil": "ミュート期限",
+    "muteReason": "ミュートの理由",
+    "mutedBy": "ミュートした人",
+    "loadError": "詳細を読み込めませんでした",
+    "predicate": "条件式",
+    "notifyChannels": "通知チャンネル",
+    "summary": "概要",
+    "rule": "ルール",
+    "fired": "発生",
+    "acknowledged": "確認済み",
+    "resolved": "解決済み",
+    "detail": "詳細",
+    "noDetail": "このイベントの詳細ペイロードは記録されていません。",
+    "all": "すべて",
+    "firing": "発生中",
+    "views": "ビュー",
+    "eventsLabel": "アラートイベント",
+    "rulesLabel": "アラートルール"
+  },
+  "deploymentDetailScreen": {
+    "deployLabel": "デプロイ {sha}",
+    "details": "詳細",
+    "approvals": "承認",
+    "releaseNotes": "リリースノート",
+    "commits": "<mono>{count}</mono> 件のコミット",
+    "openDeployments": "デプロイ一覧を開く",
+    "triggeredByUser": "ユーザー {user} が {kind} 経由でトリガーしました。",
+    "triggeredAuto": "{kind} 経由で自動的にトリガーされました。",
+    "triggeredAutoCi": "{kind} ({ci}) 経由で自動的にトリガーされました。",
+    "noApprovalsRequired": "この環境では承認は不要です。",
+    "confirm": "確認",
+    "viewDiff": "差分をすべて表示"
+  },
+  "eventDetail": {
+    "rateError": "イベントレートを読み込めませんでした",
+    "lastDays": "過去 {days} 日間",
+    "noEventsInWindow": "この期間にイベントはありません",
+    "rateAria": "過去 2 週間のイベントレート",
+    "eventType": "イベントタイプ",
+    "occurred": "発生日時",
+    "source": "ソース",
+    "app": "アプリ",
+    "organization": "組織",
+    "team": "チーム",
+    "project": "プロジェクト",
+    "events": "イベント",
+    "eventHeading": "イベント {id}",
+    "eventNoun": "イベント",
+    "loadError": "詳細を読み込めませんでした",
+    "payload": "ペイロード",
+    "noPayload": "このイベントにペイロードはありません。",
+    "agedOut": "これらのイベントは、このビューが読み込む期間を過ぎています。完全なペイロードは代表イベントを開いて確認してください。",
+    "openEvent": "イベント {type} を開く",
+    "bucketRange": "{first} から {last} までのイベント {count} 件",
+    "bucketSingle": "{at} のイベント 1 件",
+    "groupsLabel": "イベントグループ"
+  },
+  "repoPicker": {
+    "connection": "ソース接続",
+    "chooseConnection": "接続を選択",
+    "repository": "リポジトリ",
+    "search": "{count} 件のリポジトリを検索…",
+    "noMatches": "一致するリポジトリはありません。",
+    "alreadyRegistered": "{kind, select, agent {エージェント} other {アプリ}} {count} 件が登録済み",
+    "fork": "フォーク",
+    "archived": "アーカイブ済み",
+    "updated": "{when}に更新",
+    "noRepos": "この接続から見えるリポジトリはありません。<link></link> で表示範囲を調整してください。"
+  },
+  "wizardReview": {
+    "edit": "編集",
+    "editAria": "{title} を編集",
+    "running": "実行中",
+    "done": "完了",
+    "failed": "失敗",
+    "skipped": "スキップ",
+    "pending": "保留中"
+  },
+  "uiPrimitives": {
+    "breadcrumb": "パンくずリスト",
+    "more": "その他",
+    "close": "閉じる",
+    "sidebar": "サイドバー",
+    "sidebarDescription": "モバイル用サイドバーを表示します。",
+    "resizeSidebar": "サイドバーのサイズ変更 (ダブルクリックでリセット)",
+    "resizeSidebarTitle": "ドラッグでサイズ変更 · ダブルクリックでリセット",
+    "toggleSidebar": "サイドバーの表示切り替え"
+  },
+  "runPage": {
+    "timeline": "タイムライン",
+    "noSteps": "記録されたステップはありません"
+  },
+  "listControls": {
+    "search": "検索…",
+    "perPage": "表示件数",
+    "range": "{total} 件中 {start}–{end}"
+  },
+  "platformIncident": {
+    "activeIncidents": "進行中のプラットフォームインシデント {count} 件",
+    "viewStatus": "ステータスを表示",
+    "dismiss": "インシデントバナーを閉じる"
+  },
+  "identifier": {
+    "copied": "コピーしました",
+    "copy": "{value} をコピー"
+  },
+  "quorumChip": {
+    "email": "{name} にメール"
+  },
+  "authButtons": {
+    "logIn": "ログイン",
+    "logOut": "ログアウト"
+  },
+  "statusPageLink": {
+    "label": "プラットフォームの状態"
+  },
   "domainConnections": {
     "title": "DNS を接続",
     "description": "プロバイダーを選び、現在のゾーンとレコードを確認して読み取り専用の検索を登録または関連付けし、所有権を検証します。",

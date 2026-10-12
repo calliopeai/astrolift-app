@@ -8286,6 +8286,145 @@
     "certificateHostMismatch": "기록된 인증서가 이 영역을 포함하지 않습니다. 다시 프로비저닝하여 포함하는 인증서를 요청하세요.",
     "certificateAccountChanged": "공급자가 이 영역을 프로비저닝한 계정과 다른 AWS 계정에서 응답합니다."
   },
+  "detailShell": {
+    "notFound": "{label}을(를) 찾을 수 없습니다",
+    "notFoundDescription": "이 {label}은(는) 존재하지 않거나, 최근 목록에서 빠졌거나, 액세스 권한이 없을 수 있습니다.",
+    "back": "{label}(으)로 돌아가기",
+    "created": "생성",
+    "overview": "개요"
+  },
+  "alertDetail": {
+    "alerts": "알림",
+    "ruleHeading": "규칙 {id}",
+    "ruleNoun": "알림 규칙",
+    "eventHeading": "이벤트 {id}",
+    "eventNoun": "알림 이벤트",
+    "state": "상태",
+    "muted": "음소거됨",
+    "active": "활성",
+    "inactive": "비활성",
+    "target": "대상",
+    "severity": "심각도",
+    "managedService": "관리형 서비스",
+    "organization": "조직",
+    "created": "생성됨",
+    "updated": "업데이트됨",
+    "mutedUntil": "음소거 종료",
+    "muteReason": "음소거 사유",
+    "mutedBy": "음소거한 사용자",
+    "loadError": "세부 정보를 불러오지 못했습니다",
+    "predicate": "조건식",
+    "notifyChannels": "알림 채널",
+    "summary": "요약",
+    "rule": "규칙",
+    "fired": "발생",
+    "acknowledged": "확인됨",
+    "resolved": "해결됨",
+    "detail": "세부 정보",
+    "noDetail": "이 이벤트에 기록된 세부 페이로드가 없습니다.",
+    "all": "전체",
+    "firing": "발생 중",
+    "views": "보기",
+    "eventsLabel": "알림 이벤트",
+    "rulesLabel": "알림 규칙"
+  },
+  "deploymentDetailScreen": {
+    "deployLabel": "배포 {sha}",
+    "details": "세부 정보",
+    "approvals": "승인",
+    "releaseNotes": "릴리스 노트",
+    "commits": "커밋 <mono>{count}</mono>개",
+    "openDeployments": "배포 열기",
+    "triggeredByUser": "사용자 {user}이(가) {kind}(으)로 트리거했습니다.",
+    "triggeredAuto": "{kind}(으)로 자동 트리거되었습니다.",
+    "triggeredAutoCi": "{kind}({ci})(으)로 자동 트리거되었습니다.",
+    "noApprovalsRequired": "이 환경에는 승인이 필요하지 않습니다.",
+    "confirm": "확인",
+    "viewDiff": "전체 변경 내용 보기"
+  },
+  "eventDetail": {
+    "rateError": "이벤트 비율을 불러오지 못했습니다",
+    "lastDays": "최근 {days}일",
+    "noEventsInWindow": "이 기간에 이벤트가 없습니다",
+    "rateAria": "최근 2주간 이벤트 비율",
+    "eventType": "이벤트 유형",
+    "occurred": "발생 시각",
+    "source": "소스",
+    "app": "앱",
+    "organization": "조직",
+    "team": "팀",
+    "project": "프로젝트",
+    "events": "이벤트",
+    "eventHeading": "이벤트 {id}",
+    "eventNoun": "이벤트",
+    "loadError": "세부 정보를 불러오지 못했습니다",
+    "payload": "페이로드",
+    "noPayload": "이 이벤트에는 페이로드가 없습니다.",
+    "agedOut": "이 이벤트들은 이 보기가 읽는 기간을 지났습니다. 전체 페이로드는 대표 이벤트를 열어 확인하세요.",
+    "openEvent": "이벤트 {type} 열기",
+    "bucketRange": "{first}부터 {last}까지 이벤트 {count}개",
+    "bucketSingle": "{at}에 이벤트 1개",
+    "groupsLabel": "이벤트 그룹"
+  },
+  "repoPicker": {
+    "connection": "소스 연결",
+    "chooseConnection": "연결 선택",
+    "repository": "저장소",
+    "search": "저장소 {count}개 검색…",
+    "noMatches": "일치하는 저장소가 없습니다.",
+    "alreadyRegistered": "{kind, select, agent {에이전트} other {앱}} {count}개가 이미 등록됨",
+    "fork": "포크",
+    "archived": "보관됨",
+    "updated": "{when} 업데이트",
+    "noRepos": "이 연결에서 볼 수 있는 저장소가 없습니다. <link></link>에서 표시 범위를 조정하세요."
+  },
+  "wizardReview": {
+    "edit": "편집",
+    "editAria": "{title} 편집",
+    "running": "실행 중",
+    "done": "완료",
+    "failed": "실패",
+    "skipped": "건너뜀",
+    "pending": "대기 중"
+  },
+  "uiPrimitives": {
+    "breadcrumb": "탐색 경로",
+    "more": "더 보기",
+    "close": "닫기",
+    "sidebar": "사이드바",
+    "sidebarDescription": "모바일 사이드바를 표시합니다.",
+    "resizeSidebar": "사이드바 크기 조정(두 번 클릭하면 초기화)",
+    "resizeSidebarTitle": "드래그하여 크기 조정 · 두 번 클릭하여 초기화",
+    "toggleSidebar": "사이드바 전환"
+  },
+  "runPage": {
+    "timeline": "타임라인",
+    "noSteps": "기록된 단계가 없습니다"
+  },
+  "listControls": {
+    "search": "검색…",
+    "perPage": "페이지당",
+    "range": "{total}개 중 {start}–{end}"
+  },
+  "platformIncident": {
+    "activeIncidents": "진행 중인 플랫폼 인시던트 {count}건",
+    "viewStatus": "상태 보기",
+    "dismiss": "인시던트 배너 닫기"
+  },
+  "identifier": {
+    "copied": "복사됨",
+    "copy": "{value} 복사"
+  },
+  "quorumChip": {
+    "email": "{name}에게 이메일"
+  },
+  "authButtons": {
+    "logIn": "로그인",
+    "logOut": "로그아웃"
+  },
+  "statusPageLink": {
+    "label": "플랫폼 상태"
+  },
   "domainConnections": {
     "title": "DNS 연결",
     "description": "공급자를 선택하고 현재 영역과 레코드를 검토한 후 읽기 전용 조회를 등록하거나 연결하고 소유권을 검증합니다.",

@@ -8286,6 +8286,145 @@
     "certificateHostMismatch": "记录的证书不覆盖此区域。请重新预配以申请覆盖它的证书。",
     "certificateAccountChanged": "提供商现在从与预配此区域时不同的 AWS 账户返回结果。"
   },
+  "detailShell": {
+    "notFound": "未找到{label}",
+    "notFoundDescription": "此{label}可能不存在、已从最近列表中过期，或者您没有访问权限。",
+    "back": "返回{label}",
+    "created": "创建于",
+    "overview": "概览"
+  },
+  "alertDetail": {
+    "alerts": "告警",
+    "ruleHeading": "规则 {id}",
+    "ruleNoun": "告警规则",
+    "eventHeading": "事件 {id}",
+    "eventNoun": "告警事件",
+    "state": "状态",
+    "muted": "已静音",
+    "active": "活跃",
+    "inactive": "未激活",
+    "target": "目标",
+    "severity": "严重性",
+    "managedService": "托管服务",
+    "organization": "组织",
+    "created": "创建时间",
+    "updated": "更新时间",
+    "mutedUntil": "静音截止",
+    "muteReason": "静音原因",
+    "mutedBy": "静音操作人",
+    "loadError": "无法加载详情",
+    "predicate": "判定条件",
+    "notifyChannels": "通知渠道",
+    "summary": "摘要",
+    "rule": "规则",
+    "fired": "触发时间",
+    "acknowledged": "已确认",
+    "resolved": "已解决",
+    "detail": "详情",
+    "noDetail": "此事件未记录详情负载。",
+    "all": "全部",
+    "firing": "触发中",
+    "views": "视图",
+    "eventsLabel": "告警事件",
+    "rulesLabel": "告警规则"
+  },
+  "deploymentDetailScreen": {
+    "deployLabel": "部署 {sha}",
+    "details": "详情",
+    "approvals": "审批",
+    "releaseNotes": "发布说明",
+    "commits": "<mono>{count}</mono> 个提交",
+    "openDeployments": "打开部署列表",
+    "triggeredByUser": "由用户 {user} 通过 {kind} 触发。",
+    "triggeredAuto": "通过 {kind} 自动触发。",
+    "triggeredAutoCi": "通过 {kind}（{ci}）自动触发。",
+    "noApprovalsRequired": "此环境无需审批。",
+    "confirm": "确认",
+    "viewDiff": "查看完整差异"
+  },
+  "eventDetail": {
+    "rateError": "无法加载事件速率",
+    "lastDays": "最近 {days} 天",
+    "noEventsInWindow": "此时间段内没有事件",
+    "rateAria": "最近两周的事件速率",
+    "eventType": "事件类型",
+    "occurred": "发生时间",
+    "source": "来源",
+    "app": "应用",
+    "organization": "组织",
+    "team": "团队",
+    "project": "项目",
+    "events": "事件",
+    "eventHeading": "事件 {id}",
+    "eventNoun": "事件",
+    "loadError": "无法加载详情",
+    "payload": "负载",
+    "noPayload": "此事件没有负载。",
+    "agedOut": "这些事件已超出此视图读取的时间范围。请打开代表事件查看完整负载。",
+    "openEvent": "打开事件 {type}",
+    "bucketRange": "{first} 至 {last} 之间的 {count} 个事件",
+    "bucketSingle": "{at} 的 1 个事件",
+    "groupsLabel": "事件分组"
+  },
+  "repoPicker": {
+    "connection": "源代码连接",
+    "chooseConnection": "选择连接",
+    "repository": "仓库",
+    "search": "搜索 {count} 个仓库…",
+    "noMatches": "没有匹配的仓库。",
+    "alreadyRegistered": "已注册 {count} 个{kind, select, agent {智能体} other {应用}}",
+    "fork": "复刻",
+    "archived": "已归档",
+    "updated": "{when}更新",
+    "noRepos": "此连接看不到任何仓库。请在 <link></link> 上调整可见范围。"
+  },
+  "wizardReview": {
+    "edit": "编辑",
+    "editAria": "编辑 {title}",
+    "running": "运行中",
+    "done": "完成",
+    "failed": "失败",
+    "skipped": "已跳过",
+    "pending": "待处理"
+  },
+  "uiPrimitives": {
+    "breadcrumb": "面包屑导航",
+    "more": "更多",
+    "close": "关闭",
+    "sidebar": "侧边栏",
+    "sidebarDescription": "显示移动端侧边栏。",
+    "resizeSidebar": "调整侧边栏大小（双击重置）",
+    "resizeSidebarTitle": "拖动调整大小 · 双击重置",
+    "toggleSidebar": "切换侧边栏"
+  },
+  "runPage": {
+    "timeline": "时间线",
+    "noSteps": "未记录步骤"
+  },
+  "listControls": {
+    "search": "搜索…",
+    "perPage": "每页",
+    "range": "第 {start}–{end} 条，共 {total} 条"
+  },
+  "platformIncident": {
+    "activeIncidents": "{count} 个进行中的平台事件",
+    "viewStatus": "查看状态",
+    "dismiss": "关闭事件横幅"
+  },
+  "identifier": {
+    "copied": "已复制",
+    "copy": "复制 {value}"
+  },
+  "quorumChip": {
+    "email": "给 {name} 发邮件"
+  },
+  "authButtons": {
+    "logIn": "登录",
+    "logOut": "退出登录"
+  },
+  "statusPageLink": {
+    "label": "平台状态"
+  },
   "domainConnections": {
     "title": "连接 DNS",
     "description": "选择提供商，检查当前区域和记录，然后注册或关联只读查询并验证所有权。",

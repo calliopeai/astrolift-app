@@ -8289,6 +8289,145 @@
     "certificateHostMismatch": "El certificado registrado no cubre esta zona. Vuelva a aprovisionar para solicitar uno que sí la cubra.",
     "certificateAccountChanged": "El proveedor ahora responde desde una cuenta de AWS distinta de aquella en la que se aprovisionó esta zona."
   },
+  "detailShell": {
+    "notFound": "{label}: no encontrado",
+    "notFoundDescription": "Este elemento ({label}) puede no existir, haber salido de la lista reciente o no tener acceso a él.",
+    "back": "Volver a {label}",
+    "created": "creado",
+    "overview": "Resumen"
+  },
+  "alertDetail": {
+    "alerts": "Alertas",
+    "ruleHeading": "Regla {id}",
+    "ruleNoun": "regla de alerta",
+    "eventHeading": "Evento {id}",
+    "eventNoun": "evento de alerta",
+    "state": "Estado",
+    "muted": "Silenciada",
+    "active": "Activa",
+    "inactive": "Inactiva",
+    "target": "Destino",
+    "severity": "Gravedad",
+    "managedService": "Servicio gestionado",
+    "organization": "Organización",
+    "created": "Creada",
+    "updated": "Actualizada",
+    "mutedUntil": "Silenciada hasta",
+    "muteReason": "Motivo del silencio",
+    "mutedBy": "Silenciada por",
+    "loadError": "No se pudo cargar el detalle",
+    "predicate": "Predicado",
+    "notifyChannels": "Canales de notificación",
+    "summary": "Resumen",
+    "rule": "Regla",
+    "fired": "Disparada",
+    "acknowledged": "Reconocida",
+    "resolved": "Resuelta",
+    "detail": "Detalle",
+    "noDetail": "No se registró ningún detalle para este evento.",
+    "all": "Todas",
+    "firing": "Disparando",
+    "views": "Vistas",
+    "eventsLabel": "Eventos de alerta",
+    "rulesLabel": "Reglas de alerta"
+  },
+  "deploymentDetailScreen": {
+    "deployLabel": "despliegue {sha}",
+    "details": "Detalles",
+    "approvals": "Aprobaciones",
+    "releaseNotes": "Notas de la versión",
+    "commits": "<mono>{count}</mono> {count, plural, one {commit} other {commits}}",
+    "openDeployments": "Abrir despliegues",
+    "triggeredByUser": "Activado por el usuario {user} mediante {kind}.",
+    "triggeredAuto": "Activado automáticamente mediante {kind}.",
+    "triggeredAutoCi": "Activado automáticamente mediante {kind} ({ci}).",
+    "noApprovalsRequired": "Este entorno no requiere aprobaciones.",
+    "confirm": "Confirmar",
+    "viewDiff": "Ver diff completo"
+  },
+  "eventDetail": {
+    "rateError": "No se pudo cargar la tasa de eventos",
+    "lastDays": "Últimos {days} días",
+    "noEventsInWindow": "No hay eventos en este periodo",
+    "rateAria": "Tasa de eventos de las últimas dos semanas",
+    "eventType": "Tipo de evento",
+    "occurred": "Ocurrido",
+    "source": "Origen",
+    "app": "Aplicación",
+    "organization": "Organización",
+    "team": "Equipo",
+    "project": "Proyecto",
+    "events": "Eventos",
+    "eventHeading": "Evento {id}",
+    "eventNoun": "evento",
+    "loadError": "No se pudo cargar el detalle",
+    "payload": "Carga útil",
+    "noPayload": "Este evento no tiene carga útil.",
+    "agedOut": "Estos eventos ya salieron del periodo que lee esta vista. Abre el evento representativo para ver su carga útil completa.",
+    "openEvent": "Abrir evento {type}",
+    "bucketRange": "{count} eventos entre {first} y {last}",
+    "bucketSingle": "1 evento a las {at}",
+    "groupsLabel": "Grupos de eventos"
+  },
+  "repoPicker": {
+    "connection": "Conexión de origen",
+    "chooseConnection": "Elige una conexión",
+    "repository": "Repositorio",
+    "search": "Buscar en {count} {count, plural, one {repositorio} other {repositorios}}…",
+    "noMatches": "No hay repositorios que coincidan.",
+    "alreadyRegistered": "{count} {kind, select, agent {{count, plural, one {agente ya registrado} other {agentes ya registrados}}} other {{count, plural, one {aplicación ya registrada} other {aplicaciones ya registradas}}}}",
+    "fork": "fork",
+    "archived": "archivado",
+    "updated": "actualizado {when}",
+    "noRepos": "Esta conexión no ve ningún repositorio. Ajusta los alcances de visibilidad en <link></link>."
+  },
+  "wizardReview": {
+    "edit": "Editar",
+    "editAria": "Editar {title}",
+    "running": "En curso",
+    "done": "Hecho",
+    "failed": "Fallido",
+    "skipped": "Omitido",
+    "pending": "Pendiente"
+  },
+  "uiPrimitives": {
+    "breadcrumb": "ruta de navegación",
+    "more": "Más",
+    "close": "Cerrar",
+    "sidebar": "Barra lateral",
+    "sidebarDescription": "Muestra la barra lateral móvil.",
+    "resizeSidebar": "Cambiar tamaño de la barra lateral (doble clic para restablecer)",
+    "resizeSidebarTitle": "Arrastra para cambiar el tamaño · doble clic para restablecer",
+    "toggleSidebar": "Mostrar u ocultar la barra lateral"
+  },
+  "runPage": {
+    "timeline": "Cronología",
+    "noSteps": "No hay pasos registrados"
+  },
+  "listControls": {
+    "search": "Buscar…",
+    "perPage": "Por página",
+    "range": "{start}–{end} de {total}"
+  },
+  "platformIncident": {
+    "activeIncidents": "{count} incidentes activos en la plataforma",
+    "viewStatus": "Ver estado",
+    "dismiss": "Descartar el aviso de incidente"
+  },
+  "identifier": {
+    "copied": "Copiado",
+    "copy": "Copiar {value}"
+  },
+  "quorumChip": {
+    "email": "Enviar correo a {name}"
+  },
+  "authButtons": {
+    "logIn": "Iniciar sesión",
+    "logOut": "Cerrar sesión"
+  },
+  "statusPageLink": {
+    "label": "Estado de la plataforma"
+  },
   "domainConnections": {
     "title": "Conectar DNS",
     "description": "Elige un proveedor, revisa su zona y registros actuales, registra o vincula la consulta de solo lectura y verifica la propiedad.",

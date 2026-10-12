@@ -8366,6 +8366,145 @@
     "certificateHostMismatch": "The recorded certificate does not cover this zone. Provision again to request one that does.",
     "certificateAccountChanged": "The provider now answers from a different AWS account than the one this zone was provisioned in."
   },
+  "detailShell": {
+    "notFound": "{label} not found",
+    "notFoundDescription": "This {label} may not exist, may have aged out of the recent list, or you may not have access to it.",
+    "back": "Back to {label}",
+    "created": "created",
+    "overview": "Overview"
+  },
+  "alertDetail": {
+    "alerts": "Alerts",
+    "ruleHeading": "Rule {id}",
+    "ruleNoun": "alert rule",
+    "eventHeading": "Event {id}",
+    "eventNoun": "alert event",
+    "state": "State",
+    "muted": "Muted",
+    "active": "Active",
+    "inactive": "Inactive",
+    "target": "Target",
+    "severity": "Severity",
+    "managedService": "Managed service",
+    "organization": "Organization",
+    "created": "Created",
+    "updated": "Updated",
+    "mutedUntil": "Muted until",
+    "muteReason": "Mute reason",
+    "mutedBy": "Muted by",
+    "loadError": "Could not load detail",
+    "predicate": "Predicate",
+    "notifyChannels": "Notify channels",
+    "summary": "Summary",
+    "rule": "Rule",
+    "fired": "Fired",
+    "acknowledged": "Acknowledged",
+    "resolved": "Resolved",
+    "detail": "Detail",
+    "noDetail": "No detail payload recorded for this event.",
+    "all": "All",
+    "firing": "Firing",
+    "views": "Views",
+    "eventsLabel": "Alert events",
+    "rulesLabel": "Alert rules"
+  },
+  "deploymentDetailScreen": {
+    "deployLabel": "deploy {sha}",
+    "details": "Details",
+    "approvals": "Approvals",
+    "releaseNotes": "Release notes",
+    "commits": "<mono>{count}</mono> {count, plural, one {commit} other {commits}}",
+    "openDeployments": "Open deployments",
+    "triggeredByUser": "Triggered by user {user} via {kind}.",
+    "triggeredAuto": "Triggered automatically via {kind}.",
+    "triggeredAutoCi": "Triggered automatically via {kind} ({ci}).",
+    "noApprovalsRequired": "No approvals required for this environment.",
+    "confirm": "Confirm",
+    "viewDiff": "View full diff"
+  },
+  "eventDetail": {
+    "rateError": "Could not load event rate",
+    "lastDays": "Last {days} days",
+    "noEventsInWindow": "No events in this window",
+    "rateAria": "Event rate over the last two weeks",
+    "eventType": "Event type",
+    "occurred": "Occurred",
+    "source": "Source",
+    "app": "App",
+    "organization": "Organization",
+    "team": "Team",
+    "project": "Project",
+    "events": "Events",
+    "eventHeading": "Event {id}",
+    "eventNoun": "event",
+    "loadError": "Could not load detail",
+    "payload": "Payload",
+    "noPayload": "This event carries no payload.",
+    "agedOut": "These events have aged out of the window this view reads. Open the representative event for its full payload.",
+    "openEvent": "Open event {type}",
+    "bucketRange": "{count} events between {first} and {last}",
+    "bucketSingle": "1 event at {at}",
+    "groupsLabel": "Event groups"
+  },
+  "repoPicker": {
+    "connection": "Source connection",
+    "chooseConnection": "Choose a connection",
+    "repository": "Repository",
+    "search": "Search {count} {count, plural, one {repo} other {repos}}…",
+    "noMatches": "No matching repos.",
+    "alreadyRegistered": "{count} {kind, select, agent {{count, plural, one {agent} other {agents}}} other {{count, plural, one {app} other {apps}}}} already registered",
+    "fork": "fork",
+    "archived": "archived",
+    "updated": "updated {when}",
+    "noRepos": "No repos visible to this connection. Adjust visibility scopes on <link></link>."
+  },
+  "wizardReview": {
+    "edit": "Edit",
+    "editAria": "Edit {title}",
+    "running": "Running",
+    "done": "Done",
+    "failed": "Failed",
+    "skipped": "Skipped",
+    "pending": "Pending"
+  },
+  "uiPrimitives": {
+    "breadcrumb": "breadcrumb",
+    "more": "More",
+    "close": "Close",
+    "sidebar": "Sidebar",
+    "sidebarDescription": "Displays the mobile sidebar.",
+    "resizeSidebar": "Resize sidebar (double-click to reset)",
+    "resizeSidebarTitle": "Drag to resize · double-click to reset",
+    "toggleSidebar": "Toggle Sidebar"
+  },
+  "runPage": {
+    "timeline": "Timeline",
+    "noSteps": "No steps recorded"
+  },
+  "listControls": {
+    "search": "Search…",
+    "perPage": "Per page",
+    "range": "{start}–{end} of {total}"
+  },
+  "platformIncident": {
+    "activeIncidents": "{count} active platform incidents",
+    "viewStatus": "View status",
+    "dismiss": "Dismiss incident banner"
+  },
+  "identifier": {
+    "copied": "Copied",
+    "copy": "Copy {value}"
+  },
+  "quorumChip": {
+    "email": "Email {name}"
+  },
+  "authButtons": {
+    "logIn": "Log in",
+    "logOut": "Log out"
+  },
+  "statusPageLink": {
+    "label": "Platform status"
+  },
   "domainConnections": {
     "title": "Connect DNS",
     "description": "Choose a provider, review its current zone and records, then register or attach read-only discovery and verify ownership.",
