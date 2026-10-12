@@ -346,3 +346,34 @@ export const ACCESS_PRESETS_FIXTURE = [
     })),
   },
 ];
+
+/** Action safety (#2203): one gate off for the org, one re-enabled for an app. */
+export const ACTION_SAFETY_FIXTURE = [
+  {
+    action: "app.deregister",
+    label: "Deregister an app",
+    enabled: true,
+    confirmation: true,
+    verification: true,
+    allowSelfApproval: true,
+    sources: [],
+  },
+  {
+    action: "secret.reveal",
+    label: "Reveal a secret",
+    enabled: false,
+    confirmation: false,
+    verification: false,
+    allowSelfApproval: true,
+    sources: ["ORG"],
+  },
+  {
+    action: "secret.change",
+    label: "Change a secret",
+    enabled: true,
+    confirmation: true,
+    verification: true,
+    allowSelfApproval: false,
+    sources: ["ORG", "APP:12"],
+  },
+];

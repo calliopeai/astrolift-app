@@ -18878,6 +18878,13 @@ export type RunAuditQueryVariables = Exact<{
 
 export type RunAuditQuery = { astroliftRunAudit: { nextCursor?: string | null, totalCount?: number | null, items: Array<{ kind: string, id: string, subject: string, scope: string, agentSlug: string, workflowSlug: string, projectSlug: string, appSlug: string, environmentName: string, trigger: string, sourceTrigger: string, startedByKind: string, startedById?: string | null, startedByDisplay: string, startedByMe: boolean, at: string, startedAt?: string | null, endedAt?: string | null, durationSeconds?: number | null, status: string, outcome: string }> } };
 
+export type SetActionSafetyRuleMutationVariables = Exact<{
+  input: SetActionSafetyRuleInput;
+}>;
+
+
+export type SetActionSafetyRuleMutation = { setActionSafetyRule: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { action: string, scopeKind: string, enabled?: boolean | null, allowSelfApproval?: boolean | null } | null } };
+
 export type GetMyPermissionsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -18887,6 +18894,13 @@ export type AccessPresetsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type AccessPresetsQuery = { astroliftAccessPresets: Array<{ key: string, label: string, summary: string, roles: Array<{ scopeLevel: string, roleSlug: string, tasks: Array<{ key: string, label: string, granted: boolean }> }> }> };
+
+export type ActionSafetyQueryVariables = Exact<{
+  appSlug?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ActionSafetyQuery = { astroliftActionSafety: Array<{ action: string, label: string, enabled: boolean, confirmation: boolean, verification: boolean, allowSelfApproval: boolean, sources: Array<string> }> };
 
 export type CreatePipelineMutationVariables = Exact<{
   input: CreatePipelineInput;

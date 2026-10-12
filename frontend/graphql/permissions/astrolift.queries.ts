@@ -25,3 +25,18 @@ export const ACCESS_PRESETS = gql`
     }
   }
 `;
+
+/** What each gated action asks of the viewer (#2202, #2203). */
+export const ACTION_SAFETY = gql`
+  query ActionSafety($appSlug: String) {
+    astroliftActionSafety(appSlug: $appSlug) {
+      action
+      label
+      enabled
+      confirmation
+      verification
+      allowSelfApproval
+      sources
+    }
+  }
+`;
