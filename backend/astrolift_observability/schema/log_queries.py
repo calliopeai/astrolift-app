@@ -330,9 +330,40 @@ class LogHistoryQuery:
             return _empty_page(historical_available=False, reason=ObservabilityPanelReason.NOT_CONFIGURED)
 
         if page is None:
-            return _empty_page(
+            # No log backend on this cluster: answer from the pods that are
+            # running now (#2211), first page only, so the CLI and the web
+            # show recent lines instead of nothing. ``historicalAvailable``
+            # stays false: these are the kubelet's tail, not history.
+            recent = (
+                []
+                if cursor
+                else _recent_pod_lines(
+                    cluster=cluster,
+                    namespace=namespace,
+                    app_slug=app.slug,
+                    workload_slug=workload_slug,
+                    since=since,
+                    until=until,
+                    limit=bounded_limit,
+                    level=level,
+                    search=search,
+                )
+            )
+            if not placement_is_current(app, env, fingerprint):
+                return _empty_page(historical_available=False, reason=ObservabilityPanelReason.NOT_CONFIGURED)
+            if not recent:
+                return _empty_page(
+                    historical_available=False,
+                    reason=ObservabilityPanelReason.NOT_CONFIGURED,
+                    scope=_scope(app, env),
+                )
+            return AppLogPage(
+                items=recent,
+                next_cursor="",
+                reached_retention=False,
                 historical_available=False,
-                reason=ObservabilityPanelReason.NOT_CONFIGURED,
+                total_count=len(recent),
+                reason=ObservabilityPanelReason.OK,
                 scope=_scope(app, env),
             )
 
@@ -368,3 +399,62 @@ class LogHistoryQuery:
             reason=reason,
             scope=_scope(app, env),
         )
+
+
+def _recent_pod_lines(
+    *,
+    cluster,
+    namespace: str,
+    app_slug: str,
+    workload_slug: str | None,
+    since: dt.datetime,
+    until: dt.datetime,
+    limit: int,
+    level: str | None,
+    search: str | None,
+) -> list[AppLogLine]:
+    """The newest ``limit`` lines the app's current pods hold in ``[since,
+    until]``, through the same one-shot pod read the live tail uses."""
+    from asgiref.sync import async_to_sync
+
+    from core.cluster_observability import stream_app_logs_multi
+
+    async def collect():
+        lines = []
+        async for line in stream_app_logs_multi(
+            cluster=cluster,
+            namespace=namespace,
+            app_slug=app_slug,
+            workload_slug=workload_slug,
+            tail_lines=limit,
+            follow=False,
+        ):
+            lines.append(line)
+        return lines
+
+    try:
+        raw = async_to_sync(collect)()
+    except Exception:
+        logger.warning("astrolift_app_logs: pod log read failed")
+        return []
+    items: list[AppLogLine] = []
+    for line in sorted(raw, key=lambda row: row.timestamp):
+        stamp = line.timestamp if line.timestamp.tzinfo else line.timestamp.replace(tzinfo=dt.UTC)
+        if not since <= stamp <= until:
+            continue
+        classified = _classify_level(line.message, None)
+        if level and classified != level.strip().lower():
+            continue
+        if search and search.lower() not in line.message.lower():
+            continue
+        items.append(
+            AppLogLine(
+                pod_name=line.pod_name,
+                container=line.container,
+                timestamp=stamp.isoformat(),
+                message=line.message,
+                level=classified,
+                stream=getattr(line, "stream", "") or "stdout",
+            )
+        )
+    return items[-limit:]

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- App logs show something without a log backend: on a cluster with no log collector, `astroliftAppLogs` answers its first page from the app's current pods (the same one-shot read the live tail uses), windowed to `[since, until]` and filtered by level and search, with `historicalAvailable` still false. Before, `astro app logs` and the web history printed only the "live tail only" note and no lines on such an install, CONFLICT included (#2211).
+
 - A refused permission reads the same on every client: GraphQL errors raised by a permission check now carry `extensions.code = "PERMISSION_DENIED"` (the code mutation envelopes already use) with `extensions.reason` and `extensions.permission`; the message is unchanged. The CLI and web can tell a refusal from any other failure and show why (#1867).
 
 - Every tab inside an app or agent offers actions from that app's own permissions, not the account's: the header (deploy, archive, delete), Settings sections (resync, retention, environments, managed services, archive, the danger zone) and Access (tokens, security, edge). A grant held on another project no longer offers an action this app refuses. Account grants only bridge the first load (`useAppCan`, fed by the frame) (#1867).
