@@ -399,6 +399,18 @@ export const ACTION_SAFETY_FIXTURE = [
     sources: ["ORG"],
   },
   {
+    action: "deploy.production",
+    label: "Deploy to production",
+    enabled: true,
+    confirmation: true,
+    verification: true,
+    allowSelfApproval: true,
+    approvable: false,
+    approval: false,
+    minimumApprovals: 1,
+    sources: [],
+  },
+  {
     action: "secret.change",
     label: "Change a secret",
     enabled: true,

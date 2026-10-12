@@ -108,20 +108,22 @@ def test_env_slug_rejects_zero_or_negative():
         env_slug_for_preview(pr_number=-1)
 
 
-def test_hostname_under_preview_wildcard():
-    """Pairs with #70 wildcard SAN ``*.pr.<org>.<base_zone>``."""
+def test_hostname_under_the_zone_wildcard():
+    """One label below the zone, covered by ``*.<base_zone>`` (#2091)."""
     host = hostname_for_preview(
         pr_number=42,
+        app_slug="hello",
         base_zone="apps.platform.example",
         org_slug="acme",
     )
-    assert host == "pr-42.acme.apps.platform.example"
+    assert host == "pr-42-hello.apps.platform.example"
 
 
 def test_hostname_lowercases():
     """RFC 1035 — DNS labels are case-insensitive; canonicalize."""
     host = hostname_for_preview(
         pr_number=42,
+        app_slug="Hello",
         base_zone="APPS.PLATFORM.EXAMPLE",
         org_slug="ACME",
     )

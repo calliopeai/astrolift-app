@@ -90,9 +90,13 @@ def persist_imported_agent_package(*, project, package: dict, slug: str = "") ->
     timeout = int((package.get("execution") or {}).get("timeout_seconds") or 300)
     if timeout < 1 or timeout > 604800:
         raise ImportedAgentRegistrationError("execution.timeout_seconds must be between 1 and 604800")
+    from astrolift_agents.models import AgentEnvironmentSpec
+
+    # The imported agent's spec belongs to its project (#2102).
+    owner = AgentEnvironmentSpec(organization=organization, project=project, team_id=project.team_id)
     for ref in (package.get("environment") or {}).get("secret_refs") or []:
         try:
-            assert_org_scoped_secret_ref(ref["uri"], organization=organization)
+            assert_org_scoped_secret_ref(ref["uri"], organization=organization, spec=owner)
         except SecretRefNamespaceError as exc:
             raise ImportedAgentRegistrationError(str(exc)) from exc
 

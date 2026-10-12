@@ -230,6 +230,11 @@ def render_agent_box_job(
         # finds an agent task's pod, with no box-specific selector anywhere.
         "astrolift.dev/app": str(box.guid),
     }
+    if model_gateway is not None:
+        # Selected by the default-deny gateway fence (#1950).
+        from astrolift_dispatch.agent_network_fence import GATEWAY_LABEL
+
+        labels[GATEWAY_LABEL] = "true"
     job = {
         "apiVersion": "batch/v1",
         "kind": "Job",
@@ -482,7 +487,7 @@ def start_agent_box(box) -> None:
 
             shared = (
                 [model_wiring.service_account_manifest] if model_wiring else []
-            ) + agent_fence_manifests(cluster, namespace)
+            ) + agent_fence_manifests(cluster, namespace, gateway=gateway is not None)
             private = managed_manifests + ([secret_manifest] if secret_manifest else []) + [job]
             if managed_runtime is None:
                 result = driver.apply_manifests(ctx.slug, namespace, shared + private)

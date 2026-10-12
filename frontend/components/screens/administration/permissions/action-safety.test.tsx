@@ -63,6 +63,10 @@ describe("Action safety (#2203)", () => {
       screen.getByRole("checkbox", { name: "Admins may approve their own: Decommission a cluster" })
     ).toBeDisabled();
 
+    const deploy = screen.getByRole("row", { name: /Deploy to production/ });
+    expect(
+      within(deploy).getByText("Set per environment, under required approvals")
+    ).toBeInTheDocument();
     const change = screen.getByRole("row", { name: /Change a secret/ });
     expect(within(change).getByText("Set per app, under secret approval")).toBeInTheDocument();
     expect(within(change).getByText("Also set for a team, app or person")).toBeInTheDocument();
