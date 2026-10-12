@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type { CursorPage } from "@/components/data-table";
@@ -61,6 +62,7 @@ export interface UseTeamsCardArgs {
  * revoke / move mutations with their toasts.
  */
 export function useTeamsCard({ appSlug, appId, homeTeamSlug }: UseTeamsCardArgs) {
+  const t = useTranslations("appOverviewCards.teams");
   // The list's rows: one page of `astroliftAppTeamAccessesPage`.
   const grants = useCursorList<AstroliftAppTeamAccess>({
     query: LIST_APP_TEAM_ACCESSES_PAGE,
@@ -134,9 +136,9 @@ export function useTeamsCard({ appSlug, appId, homeTeamSlug }: UseTeamsCardArgs)
     });
     const result = data?.grantTeamAccessToApp;
     if (result?.ok) {
-      toast.success(`Updated ${access.teamSlug} to ${level}.`);
+      toast.success(t("toast.updated", { team: access.teamSlug, level: t(`levels.${level}`) }));
     } else {
-      toast.error(result?.errors?.[0]?.message ?? "Update failed.");
+      toast.error(result?.errors?.[0]?.message ?? t("toast.updateFailed"));
     }
   }
 
@@ -146,9 +148,9 @@ export function useTeamsCard({ appSlug, appId, homeTeamSlug }: UseTeamsCardArgs)
     });
     const result = data?.revokeTeamAccessFromApp;
     if (result?.ok) {
-      toast.success(`Revoked ${access.teamSlug}'s access.`);
+      toast.success(t("toast.revoked", { team: access.teamSlug }));
     } else {
-      toast.error(result?.errors?.[0]?.message ?? "Revoke failed.");
+      toast.error(result?.errors?.[0]?.message ?? t("toast.revokeFailed"));
     }
   }
 
@@ -159,10 +161,10 @@ export function useTeamsCard({ appSlug, appId, homeTeamSlug }: UseTeamsCardArgs)
     });
     const result = data?.moveAppToTeam;
     if (result?.ok) {
-      toast.success("App moved to the new home team.");
+      toast.success(t("toast.moved"));
       return true;
     }
-    toast.error(result?.errors?.[0]?.message ?? "Move failed.");
+    toast.error(result?.errors?.[0]?.message ?? t("toast.moveFailed"));
     return false;
   }
 
@@ -173,10 +175,10 @@ export function useTeamsCard({ appSlug, appId, homeTeamSlug }: UseTeamsCardArgs)
     });
     const result = data?.grantTeamAccessToApp;
     if (result?.ok) {
-      toast.success(`Granted access at level ${level}.`);
+      toast.success(t("toast.granted", { level: t(`levels.${level}`) }));
       return true;
     }
-    toast.error(result?.errors?.[0]?.message ?? "Grant failed.");
+    toast.error(result?.errors?.[0]?.message ?? t("toast.grantFailed"));
     return false;
   }
 

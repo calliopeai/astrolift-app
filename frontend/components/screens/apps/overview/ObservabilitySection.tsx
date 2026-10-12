@@ -2,11 +2,13 @@
 
 import { AlertTriangleIcon, ChartSplineIcon, ExternalLinkIcon } from "lucide-react";
 import Link from "next/link";
+import { useFormatter, useTranslations } from "next-intl";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, YAxis } from "recharts";
 
 import { Panel, type PanelSpan } from "@/components/panel/Panel";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useFormatters } from "@/lib/i18n/formatters";
 
 import type { ObservabilitySummary, SparkPoint } from "./use-observability-summary";
 
@@ -37,11 +39,13 @@ export function ObservabilitySectionView({
   alertsLoading,
   span = 6,
 }: ObservabilitySectionViewProps) {
+  const t = useTranslations("appOverviewCards.observability");
+  const fmt = useFormatters();
   return (
     <Panel
-      title="Observability"
+      title={t("title")}
       icon={<ChartSplineIcon className="size-4" />}
-      description={`Last ${days} days · deploy throughput, failure rate, unresolved alerts.`}
+      description={t("description", { days })}
       span={span}
       error={error}
       onRetry={onRetry}
@@ -51,14 +55,14 @@ export function ObservabilitySectionView({
             href={`/administration/metrics?app=${appSlug}`}
             className="text-primary inline-flex items-center gap-1 text-xs hover:underline"
           >
-            Metrics
+            {t("metrics")}
             <ExternalLinkIcon className="size-3" />
           </Link>
           <Link
             href={`/alerts/events?view=firing&app=${encodeURIComponent(appSlug)}`}
             className="text-primary inline-flex items-center gap-1 text-xs hover:underline"
           >
-            Alerts
+            {t("alerts")}
             <ExternalLinkIcon className="size-3" />
           </Link>
         </>
@@ -73,24 +77,24 @@ export function ObservabilitySectionView({
       ) : (
         <div className="grid min-w-0 gap-3 sm:grid-cols-3">
           <SparkCard
-            label="Deploys / day"
+            label={t("deploysPerDay")}
             value={totalDeploys}
-            sublabel={`across ${days} days`}
+            sublabel={t("acrossDays", { days })}
             color="var(--primary)"
             data={deploysSeries}
-            empty={totalDeploys === 0 ? "No deploys" : undefined}
+            empty={totalDeploys === 0 ? t("noDeploys") : undefined}
           />
           <SparkCard
-            label="Failures"
+            label={t("failures")}
             value={failedCount}
             sublabel={
               totalDeploys > 0
-                ? `${formatPct(failedCount / totalDeploys)} of rollouts`
-                : "no rollouts yet"
+                ? t("ofRollouts", { pct: fmt.formatPercent(failedCount / totalDeploys) })
+                : t("noRollouts")
             }
             color="var(--danger)"
             data={errorSeries}
-            empty={failedCount === 0 ? "No failures" : undefined}
+            empty={failedCount === 0 ? t("noFailures") : undefined}
           />
           <AlertSummaryCard
             unresolved={unresolvedCount}
@@ -119,6 +123,7 @@ function SparkCard({
   data: SparkPoint[];
   empty?: string;
 }) {
+  const format = useFormatter();
   return (
     <div className="flex min-w-0 flex-col rounded-md border p-3">
       <p className="text-muted-foreground text-2xs font-medium tracking-wide uppercase">{label}</p>
@@ -142,10 +147,7 @@ function SparkCard({
                     <div className="bg-background text-2xs rounded border px-2 py-1 shadow-sm">
                       <p className="font-mono">{p.value}</p>
                       <p className="text-muted-foreground">
-                        {new Date(p.ts).toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                        })}
+                        {format.dateTime(new Date(p.ts), { month: "short", day: "numeric" })}
                       </p>
                     </div>
                   );
@@ -179,6 +181,7 @@ function AlertSummaryCard({
   appSlug: string;
   loading: boolean;
 }) {
+  const t = useTranslations("appOverviewCards.observability");
   return (
     <Link
       href={`/alerts/events?view=firing&app=${encodeURIComponent(appSlug)}`}
@@ -186,30 +189,26 @@ function AlertSummaryCard({
     >
       <p className="text-muted-foreground text-2xs flex items-center gap-1 font-medium tracking-wide uppercase">
         <AlertTriangleIcon className="size-3" />
-        Unresolved alerts
+        {t("unresolvedAlerts")}
       </p>
       <p className="mt-0.5 font-mono text-2xl font-semibold">{loading ? "…" : unresolved}</p>
       <p className="text-muted-foreground text-2xs">
         {critical > 0 ? (
           <Badge variant="outline" className="border-danger-border text-danger-fg">
-            {critical} critical
+            {t("critical", { count: critical })}
           </Badge>
         ) : unresolved === 0 ? (
-          "All clear"
+          t("allClear")
         ) : (
-          `${unresolved} pending`
+          t("pending", { count: unresolved })
         )}
       </p>
       <div className="mt-auto flex items-center justify-end pt-3">
         <span className="text-muted-foreground text-2xs group-hover:text-primary inline-flex items-center gap-1">
-          Open
+          {t("open")}
           <ExternalLinkIcon className="size-3" />
         </span>
       </div>
     </Link>
   );
-}
-
-function formatPct(v: number): string {
-  return `${Math.round(v * 100)}%`;
 }

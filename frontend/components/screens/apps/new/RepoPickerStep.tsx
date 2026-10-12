@@ -2,6 +2,7 @@
 
 import { ChevronDownIcon, CogIcon, LinkIcon, PlugIcon, RocketIcon, ServerIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -54,6 +55,7 @@ export function RepoPickerStepView({
   repoToAppCount,
   scm,
 }: RepoPickerStepViewProps) {
+  const t = useTranslations("appWizard.repo");
   if (clusterLoading) {
     return (
       <div className="flex flex-col gap-2">
@@ -67,10 +69,10 @@ export function RepoPickerStepView({
     return (
       <EmptyState
         icon={<ServerIcon className="size-5" />}
-        title="No managed clusters yet"
-        description="Astrolift deploys apps to Kubernetes clusters that have been brought into management (#316). Connect a cluster, install prereqs, then click Bring into management."
+        title={t("noClusterTitle")}
+        description={t("noClusterDescription")}
         actionHref="/clusters"
-        actionLabel="Manage clusters"
+        actionLabel={t("manageClusters")}
       />
     );
   }
@@ -89,12 +91,9 @@ export function RepoPickerStepView({
       <div className="border-muted-foreground/30 bg-muted/30 flex flex-col items-start gap-3 rounded-md border border-dashed p-6">
         <div className="flex items-center gap-2">
           <LinkIcon className="text-muted-foreground size-5" />
-          <p className="font-medium">No source connections yet</p>
+          <p className="font-medium">{t("noConnectionsTitle")}</p>
         </div>
-        <p className="text-muted-foreground text-sm">
-          Connect a Git host (GitHub App, GitLab OAuth, or a personal-access token) so the platform
-          can list your repositories and watch them for pushes.
-        </p>
+        <p className="text-muted-foreground text-sm">{t("noConnectionsDescription")}</p>
         <ScmEmptyConnectAction scm={scm} />
       </div>
     );
@@ -116,9 +115,7 @@ export function RepoPickerStepView({
         onPickRepo={onPickRepo}
         repoCounts={repoToAppCount}
         registeredKind="app"
-        registeredNote={(count) =>
-          `This repo already hosts ${count} registered app${count === 1 ? "" : "s"} (different manifest path).`
-        }
+        registeredNote={(count) => t("registeredNote", { count })}
         scm={scm}
         missingHostLink={
           <Link
@@ -127,7 +124,7 @@ export function RepoPickerStepView({
             rel="noreferrer"
             className="text-primary text-xs underline-offset-4 hover:underline"
           >
-            Missing a host? Connect another source →
+            {t("missingHost")}
           </Link>
         }
         emptyReposLink={
@@ -138,8 +135,13 @@ export function RepoPickerStepView({
         pickedDetails={
           sourceRepo && (
             <p className="text-muted-foreground text-xs">
-              Picked <code className="bg-muted rounded px-1 py-0.5 font-mono">{sourceRepo}</code> on{" "}
-              <code className="bg-muted rounded px-1 py-0.5 font-mono">{defaultBranch}</code>.
+              {t.rich("picked", {
+                repo: sourceRepo,
+                branch: defaultBranch,
+                code: (chunks) => (
+                  <code className="bg-muted rounded px-1 py-0.5 font-mono">{chunks}</code>
+                ),
+              })}
             </p>
           )
         }
@@ -156,15 +158,13 @@ export function RepoPickerStepView({
  */
 function IntroCard() {
   const [open, setOpen] = React.useState(true);
+  const t = useTranslations("appWizard.repo");
   return (
     <Collapsible open={open} onOpenChange={setOpen} className="bg-muted/30 rounded-md border">
       <CollapsibleTrigger className="hover:bg-muted/50 flex w-full items-center justify-between gap-3 rounded-md px-4 py-3 text-left transition-colors">
         <div className="flex flex-col">
-          <span className="text-sm font-medium">How registration works</span>
-          <span className="text-muted-foreground text-xs">
-            Three steps: Source (the repo and its manifest), Run (the app and how it deploys), then
-            Review.
-          </span>
+          <span className="text-sm font-medium">{t("introTitle")}</span>
+          <span className="text-muted-foreground text-xs">{t("introDescription")}</span>
         </div>
         <ChevronDownIcon
           className={cn(
@@ -177,18 +177,14 @@ function IntroCard() {
         <div className="grid gap-3 px-4 pb-4 md:grid-cols-3">
           <IntroTile
             icon={PlugIcon}
-            title="1 Source"
-            description="Pick a source connection and repo; we load or scaffold its astrolift.toml manifest."
+            title={t("introSource")}
+            description={t("introSourceDescription")}
           />
-          <IntroTile
-            icon={CogIcon}
-            title="2 Run"
-            description="Name the app, pick its project, and choose a trigger: auto on push, cron, or manual."
-          />
+          <IntroTile icon={CogIcon} title={t("introRun")} description={t("introRunDescription")} />
           <IntroTile
             icon={RocketIcon}
-            title="3 Review"
-            description="See what will be created and what will deploy, then create the app."
+            title={t("introReview")}
+            description={t("introReviewDescription")}
           />
         </div>
       </CollapsibleContent>

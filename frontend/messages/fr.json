@@ -4901,6 +4901,531 @@
       "review": "Examiner"
     }
   },
+  "appControls": {
+    "deployToken": {
+      "title": "Jeton de déploiement",
+      "description": "Jeton machine limité à l’application. Utilisez-le comme <code>ASTROLIFT_DEPLOY_TOKEN</code> dans votre CI.",
+      "lastUsed": "dernière utilisation : {date}",
+      "neverUsed": "jamais utilisé",
+      "missing": "Aucun jeton : la CI ne peut pas lancer de déploiements tant qu’il n’en existe pas.",
+      "rotate": "Renouveler",
+      "revoke": "Révoquer",
+      "generate": "Générer un jeton",
+      "rotateTitle": "Renouveler le jeton de déploiement ?",
+      "rotateDescription": "L’ancienne valeur cesse de fonctionner immédiatement. Toute exécution CI utilisant encore l’ancien jeton échouera jusqu’à la mise à jour du secret côté CI.",
+      "rotateConfirm": "Renouveler le jeton",
+      "revokeTitle": "Révoquer le jeton de déploiement ?",
+      "revokeDescription": "Les exécutions CI utilisant ce jeton échoueront immédiatement. Créez ensuite un nouveau jeton et mettez à jour le secret de votre CI. Impossible d’annuler la révocation ; suppression logique uniquement.",
+      "revokeConfirm": "Révoquer le jeton",
+      "copied": "Copié dans le presse-papiers.",
+      "copyFailed": "Échec de la copie. Sélectionnez la valeur et copiez-la manuellement.",
+      "revealTitle": "Jeton de déploiement : copiez-le maintenant",
+      "revealWarning": "C’est la seule fois que le jeton est affiché. Si vous quittez la page sans le copier, renouvelez-le pour en obtenir un nouveau.",
+      "copiedLabel": "Copié",
+      "copy": "Copier",
+      "revealStore": "Enregistrez-le comme <code>ASTROLIFT_DEPLOY_TOKEN</code> dans les secrets de votre fournisseur CI.",
+      "saved": "Je l’ai enregistré",
+      "toast": {
+        "minted": "Jeton de déploiement créé.",
+        "createFailed": "Échec de la création.",
+        "rotated": "Jeton renouvelé. Copiez la nouvelle valeur maintenant.",
+        "rotateFailed": "Échec du renouvellement.",
+        "revoked": "Jeton révoqué.",
+        "revokeFailed": "Échec de la révocation."
+      }
+    },
+    "deploymentPanel": {
+      "emptyTitle": "Aucun déploiement pour l’instant",
+      "emptyDescription": "Lancez un déploiement depuis la CLI ou poussez sur la branche de déploiement pour voir l’état ici.",
+      "current": "Déploiement actuel",
+      "elapsed": "écoulé {duration}",
+      "took": "a pris {duration}",
+      "trigger": "déclencheur : <value>{kind}</value>",
+      "failed": "Échec du déploiement",
+      "openForLog": "Ouvrez le déploiement pour voir le journal complet.",
+      "rollbackTarget": "Le retour arrière cible {tag}.",
+      "confirmTitleGeneric": "Revenir en arrière ?",
+      "since": "depuis {time}",
+      "stage": {
+        "queued": "En file d’attente",
+        "rollingOut": "Déploiement en cours",
+        "redeploying": "Redéploiement",
+        "working": "En cours"
+      },
+      "toast": {
+        "started": "Retour arrière lancé.",
+        "failed": "Échec du retour arrière."
+      }
+    },
+    "pendingDeployments": {
+      "titleApprover": "En attente de votre approbation",
+      "title": "Approbation en attente",
+      "descriptionApprover": "Examinez chaque candidat avant de débloquer le déploiement.",
+      "description": "En attente d’un relecteur disposant de l’autorisation `{permission}`.",
+      "canApprove": "Vous pouvez approuver",
+      "readOnly": "Lecture seule",
+      "approvals": "{received}/{required} approbations",
+      "received": "Reçu {when}",
+      "reject": "Rejeter",
+      "approve": "Approuver et déployer",
+      "approveTitle": "Approuver {tag} ?",
+      "approveDescription": "Cela débloque le déploiement vers {environment}. Le workflow reprend immédiatement ; impossible de le remettre en pause avant la bascule du trafic.",
+      "approveDescriptionDefault": "Cela débloque le déploiement vers l’environnement cible. Le workflow reprend immédiatement ; impossible de le remettre en pause avant la bascule du trafic.",
+      "rejectReason": "Motif du rejet",
+      "rejectReasonPlaceholder": "Pourquoi ce déploiement est-il rejeté ? Enregistré dans le journal d’audit et le panneau d’historique.",
+      "rejectTitle": "Rejeter {tag} ?",
+      "rejectDescription": "Le déploiement en attente est annulé. La CI doit relancer pour créer un nouveau déploiement à examiner.",
+      "toast": {
+        "approved": "{tag} approuvé.",
+        "approveFailed": "Échec de l’approbation.",
+        "rejected": "Déploiement rejeté.",
+        "rejectFailed": "Échec du rejet."
+      }
+    }
+  },
+  "appWizard": {
+    "details": {
+      "name": "Nom",
+      "nameHelp": "Nom lisible affiché dans l’interface.",
+      "nameRequired": "Donnez un nom à l’application.",
+      "slug": "Slug",
+      "slugPlaceholder": "minuscules, tirets, 1-40 caractères",
+      "slugRequired": "Un slug est requis.",
+      "slugInvalid": "Minuscules, chiffres et tirets uniquement (40 caractères max.).",
+      "slugHelp": "Identifiant compatible URL. Dérivé du nom ; modifiez-le si besoin.",
+      "description": "Description",
+      "descriptionPlaceholder": "Que fait cette application ?",
+      "team": "Équipe (filtre)",
+      "allTeams": "Toutes les équipes",
+      "teamHelp": "Filtre facultatif. Les applications appartiennent à un projet (qui appartient à une équipe).",
+      "project": "Projet",
+      "noProjects": "Aucun projet dans ce périmètre",
+      "selectProject": "Sélectionnez un projet",
+      "noProjectsHelp": "Aucun projet dans ce périmètre. Choisissez une autre équipe ou créez d’abord un projet.",
+      "projectRequired": "Choisissez le projet auquel appartient cette application."
+    },
+    "repo": {
+      "noClusterTitle": "Aucun cluster géré pour l’instant",
+      "noClusterDescription": "Astrolift déploie les applications sur des clusters Kubernetes placés sous gestion (#316). Connectez un cluster, installez les prérequis, puis cliquez sur Placer sous gestion.",
+      "manageClusters": "Gérer les clusters",
+      "noConnectionsTitle": "Aucune connexion source pour l’instant",
+      "noConnectionsDescription": "Connectez un hôte Git (GitHub App, OAuth GitLab ou jeton d’accès personnel) pour que la plateforme puisse lister vos dépôts et surveiller leurs push.",
+      "registeredNote": "{count, plural, one {Ce dépôt héberge déjà # application enregistrée (autre chemin de manifeste).} other {Ce dépôt héberge déjà # applications enregistrées (autre chemin de manifeste).}}",
+      "missingHost": "Un hôte manque ? Connectez une autre source →",
+      "picked": "<code>{repo}</code> sélectionné sur <code>{branch}</code>.",
+      "introTitle": "Fonctionnement de l’enregistrement",
+      "introDescription": "Trois étapes : Source (le dépôt et son manifeste), Exécution (l’application et son déploiement), puis Vérification.",
+      "introSource": "1 Source",
+      "introSourceDescription": "Choisissez une connexion source et un dépôt ; nous chargeons son manifeste astrolift.toml ou en créons une ébauche.",
+      "introRun": "2 Exécution",
+      "introRunDescription": "Nommez l’application, choisissez son projet et un déclencheur : automatique au push, cron ou manuel.",
+      "introReview": "3 Vérification",
+      "introReviewDescription": "Voyez ce qui sera créé et déployé, puis créez l’application."
+    },
+    "title": "Nouvelle application",
+    "stepsLabel": "Étapes",
+    "done": "terminé",
+    "cancel": "Annuler",
+    "back": "Retour",
+    "continue": "Continuer",
+    "steps": {
+      "source": {
+        "label": "Source",
+        "description": "Le dépôt et le manifeste astrolift.toml qui décrit ce qu’il exécute."
+      },
+      "run": {
+        "label": "Exécution",
+        "description": "Le nom et le projet de l’application, puis comment et quand elle se déploie."
+      },
+      "review": {
+        "label": "Vérification",
+        "description": "Ce qui sera créé et déployé. Rien ne se passe tant que vous ne l’avez pas créé."
+      }
+    },
+    "shell": {
+      "title": "Enregistrer une application",
+      "description": "Connectez un dépôt Git. Nous récupérons le manifeste, enregistrons l’application et exécutons OnboardAppWorkflow.",
+      "cancel": "Annuler",
+      "stepLabel": "Étape {step} : {label}",
+      "heading": "Étape {step} sur {total} : {label}",
+      "back": "Retour",
+      "next": "Suivant"
+    },
+    "approver": {
+      "orphanUser": "utilisateur {id}"
+    },
+    "strategy": {
+      "timingTitle": "Quand cette application doit-elle être déployée ?",
+      "timingHelp": "Choisissez comment se fera le premier déploiement. Vous pourrez changer de stratégie plus tard depuis la page de l’application.",
+      "timing": {
+        "now": {
+          "label": "Déployer maintenant",
+          "description": "Choisissez un déclencheur et lancez le premier déploiement dès la fin de l’enregistrement."
+        },
+        "later": {
+          "label": "Configurer, déployer plus tard",
+          "description": "Fixez dès maintenant le déclencheur et les approbations ; le premier déploiement s’exécute au prochain événement."
+        },
+        "skip": {
+          "label": "Ignorer, configurer plus tard",
+          "description": "Enregistrez simplement l’application. Configurez déclencheurs, approbations et déploiements depuis la page de l’application."
+        }
+      },
+      "triggerTitle": "Mode de déclenchement",
+      "triggerHelp": "Quel événement lance un déploiement ?",
+      "modes": {
+        "auto_on_push": "Déploie dès qu’un commit arrive sur la branche choisie (via le webhook SCM).",
+        "cron": "Déploie selon une planification récurrente.",
+        "manual": "Les déploiements ne s’exécutent que lorsqu’une personne les déclenche explicitement."
+      },
+      "comingSoon": "Bientôt disponible",
+      "deployBranch": "Branche de déploiement",
+      "deployBranchHelp": "Les push sur cette branche déclenchent un déploiement. Par défaut, la branche par défaut du dépôt.",
+      "deployBranchRequired": "Indiquez la branche dont les push sont déployés.",
+      "cronLabel": "Expression cron",
+      "cronHelp": "Cinq champs (minute heure jour mois jour-de-la-semaine).",
+      "cronHint": {
+        "invalid": "Expression cron à cinq champs attendue.",
+        "hourly": "Toutes les heures, à l’heure pile.",
+        "every5": "Toutes les 5 minutes.",
+        "daily": "Tous les jours à 03:00.",
+        "weekly": "Toutes les semaines, le dimanche à 00:00.",
+        "monthly": "Tous les mois, le 1er à 00:00.",
+        "custom": "Planification personnalisée."
+      },
+      "skipped": "Le mode de déclenchement et les validations sont ignorés pour l’instant. Une fois l’enregistrement terminé, configurez-les dans l’onglet Paramètres de l’application."
+    },
+    "manifest": {
+      "pathLabel": "Chemin du manifeste",
+      "pathHelp": "Emplacement de <code>astrolift.toml</code> dans le dépôt. Par défaut, la racine du dépôt. Un monorepo peut héberger plusieurs apps ; faites pointer chaque enregistrement vers son propre chemin (p. ex. <code>services/api/astrolift.toml</code>).",
+      "branchLabel": "Branche par défaut",
+      "laterTitle": "Configurer le manifeste plus tard",
+      "laterHelp": "Enregistrez l’application maintenant, sans manifeste. Vous arriverez sur l’onglet <b>Manifeste</b> de l’application, où vous pourrez ajouter ou synchroniser <code>astrolift.toml</code> quand vous serez prêt. Utile pour un dépôt vide ou un dépôt de configuration d’agents dont le schéma n’est pas un manifeste d’application.",
+      "label": "Manifeste",
+      "edit": "Modifier",
+      "refetchTitle": "Tester la connexion et récupérer à nouveau le manifeste depuis le dépôt choisi",
+      "fetching": "Récupération…",
+      "refetch": "Tester et récupérer",
+      "placeholder": "Collez ici un manifeste astrolift.toml.",
+      "maskedEnv": "Les valeurs d’env sont masquées, car votre rôle ne peut pas révéler les secrets. L’enregistrement les lit depuis le dépôt. Si vous modifiez le manifeste ici, remplacez d’abord chaque valeur masquée.",
+      "agentConfigTitle": "Cela ressemble à un dépôt de configuration d’agents",
+      "agentConfigBody": "Il déclare <code>astrolift_version</code> avec des tables <code>[skills.*]</code>/<code>[tools.*]</code> et aucun <code>[[workloads]]</code> ; c’est le schéma de bibliothèque d’agents, pas un manifeste d’application. Intégrez-le plutôt comme flotte d’agents ou importez ses skills et outils :",
+      "onboardFleet": "Intégrer une flotte d’agents",
+      "importSkills": "Importer des skills / outils",
+      "agentConfigLater": "Ou cochez <b>Configurer le manifeste plus tard</b> ci-dessus pour enregistrer ce dépôt sans manifeste.",
+      "valid": "Le manifeste semble structurellement valide (<code>name</code> au premier niveau + au moins un bloc <code>[[workloads]]</code>).",
+      "skipped": "Étape du manifeste ignorée ; l’application est enregistrée sans manifeste. Ajoutez-le ou synchronisez-le dans l’onglet Manifeste de l’application après l’intégration.",
+      "loaded": "Manifeste chargé depuis le dépôt.",
+      "fromRepo": "du dépôt",
+      "missing": "Aucun manifeste à ce chemin. Nous avons inséré un modèle minimal ; modifiez-le ci-dessous ou collez le vôtre.",
+      "fetchFailed": "Impossible de récupérer le manifeste : {error}",
+      "retry": "Réessayer",
+      "noResponse": "aucune réponse du serveur",
+      "errors": {
+        "empty": "Le manifeste est vide.",
+        "name": "`name = \"...\"` est requis au premier niveau.",
+        "workloads": "Au moins un bloc `[[workloads]]` est requis."
+      }
+    },
+    "review": {
+      "source": "Source",
+      "repository": "Dépôt",
+      "defaultBranch": "Branche par défaut",
+      "sourceKind": "Type de source",
+      "manifestPath": "Chemin du manifeste",
+      "manifest": "Manifeste",
+      "manifestLater": "À configurer plus tard",
+      "manifestState": "{origin, select, repo {Chargé depuis le dépôt} other {Rédigé ici}}, {valid, select, yes {structure valide} other {non valide}}",
+      "run": "Exécution",
+      "name": "Nom",
+      "slug": "Slug",
+      "description": "Description",
+      "deployTiming": "Moment du déploiement",
+      "trigger": "Déclencheur",
+      "triggerLater": "Manuel (à configurer plus tard)",
+      "deployBranch": "Branche de déploiement",
+      "cron": "Cron",
+      "approvalGate": "Validation requise",
+      "timing": {
+        "now": "Déployer maintenant",
+        "later": "Configurer, déployer plus tard",
+        "skip": "Ignorer, configurer après l’intégration"
+      },
+      "approval": {
+        "notRequired": "Non requise",
+        "team": "Validation d’équipe, {count} requise(s)",
+        "users": "{min} sur {count, plural, one {# utilisateur sélectionné} other {# utilisateurs sélectionnés}}",
+        "none": "Requise, aucun approbateur sélectionné (à corriger dans Exécution)"
+      },
+      "sideEffectsTitle": "Ce qui se passe à l’envoi",
+      "sideEffectsHelp": "Activez les effets de bord souhaités. Les éléments qui dépendent d’un travail backend pas encore livré (installation du webhook pour les connexions PAT / OAuth-User) restent grisés.",
+      "register": "Enregistrer l’app",
+      "registerHelp": "Appelle <code>registerApp</code> ; le workflow d’intégration provisionne le namespace + le dépôt du registre.",
+      "webhook": "Installer le webhook SCM",
+      "webhookCovered": "Déjà couvert par votre installation de la GitHub App ; aucune action requise.",
+      "webhookPending": "Les installations de la GitHub App le gèrent automatiquement ; les connexions PAT/OAuth-User recevront un webhook par dépôt quand cette mutation sera disponible.",
+      "alreadyInstalled": "Déjà installé",
+      "comingSoon": "Bientôt disponible",
+      "pushWorkflow": "Pousser <code>{path}</code>",
+      "pushWorkflowHelp": "Commite un workflow de départ qui appelle astro app deploy à chaque push sur la branche de déploiement. Vous devrez définir ASTROLIFT_DEPLOY_TOKEN comme secret du dépôt.",
+      "pushWorkflowUnavailable": "Disponible pour les connexions OAuth utilisateur GitHub ou GitLab (et les installations de la GitHub App). La connexion sélectionnée ne peut pas pousser de commits.",
+      "firstDeploy": "Lancer le premier déploiement",
+      "firstDeployHelp": "Lance un premier déploiement dès que le workflow d’intégration passe l’application à <code>ready</code>.",
+      "submitFailed": "Échec de l’envoi",
+      "submitting": "Envoi…",
+      "willDeployTitle": "Ce qui sera déployé",
+      "willDeployFirst": "Un premier déploiement s’exécute dès que l’intégration place l’application en ready.",
+      "willDeployNothing": "Rien n’est encore déployé : enregistrement uniquement. Lancez un déploiement depuis la page de l’application.",
+      "noManifest": "Pas encore de manifeste : rien à déployer tant que vous n’en ajoutez pas un dans l’onglet Manifeste de l’application.",
+      "noWorkloads": "Le manifeste ne déclare aucune charge de travail lisible ici par Astrolift. Le serveur le valide à la création.",
+      "managedService": "Service géré"
+    }
+  },
+  "appHomes": {
+    "cronjob": {
+      "exitedWith": "Terminé avec le code {code}",
+      "noReason": "Aucun motif enregistré",
+      "customSchedule": "Planification personnalisée",
+      "dueNow": "maintenant",
+      "notStarted": "non démarré",
+      "noExitCode": "aucun code de sortie",
+      "exit": "sortie {code}",
+      "schedule": "Planification",
+      "lastRunFailed": "La dernière exécution a échoué",
+      "noScheduleShort": "Aucune planification",
+      "concurrency": "Concurrence : <mono>{policy}</mono>",
+      "nextRun": "Prochaine exécution",
+      "nextRunUnknown": "Impossible de calculer la prochaine exécution pour cette expression.",
+      "noSchedule": "Aucune planification.",
+      "runHistory": "Historique des exécutions",
+      "total": "{count} au total",
+      "emptyTitle": "Aucune exécution enregistrée pour l’instant",
+      "emptyDescription": "Chaque exécution planifiée apparaîtra ici dès son déclenchement."
+    },
+    "task": {
+      "stages": {
+        "queued": "En file d’attente",
+        "provisioning": "Provisionnement",
+        "running": "En cours",
+        "completed": "Terminé",
+        "failed": "Échec"
+      },
+      "latestRun": "Dernière exécution",
+      "execution": "Exécution",
+      "runStatus": "Exécution : {status}",
+      "exitedWith": "Terminé avec le code {code}",
+      "noReason": "Aucun motif enregistré",
+      "runStages": "Étapes de l’exécution",
+      "noRunYet": "Aucune exécution enregistrée pour l’instant. Une tâche ponctuelle passe par ces étapes à chaque exécution.",
+      "runHistory": "Historique des exécutions",
+      "emptyTitle": "Aucune exécution",
+      "emptyDescription": "Chaque exécution ponctuelle de cette tâche apparaît ici.",
+      "notStarted": "non démarré"
+    },
+    "bundle": {
+      "title": "Charges de travail de ce bundle",
+      "description": "{workloads, plural, one {# charge de travail} other {# charges de travail}} sur {kinds, plural, one {# type} other {# types}}. Ouvrez une charge de travail pour voir son déploiement, sa configuration et ses journaux.",
+      "emptyTitle": "Aucune charge de travail pour l’instant",
+      "emptyDescription": "Les charges de travail apparaissent ici dès que le manifeste les enregistre.",
+      "replicas": "{count, plural, one {<mono>#</mono> réplica} other {<mono>#</mono> réplicas}}",
+      "public": "public"
+    },
+    "function": {
+      "title": "Déclencheur",
+      "description": "S’exécute à l’invocation et redescend à zéro au repos.",
+      "httpEndpoint": "Point de terminaison HTTP",
+      "eventTriggered": "Déclenchée par événement (pas de point de terminaison HTTP public). Invoquée par la plateforme ou un producteur en amont."
+    },
+    "doctor": {
+      "title": "Diagnostic de l’application",
+      "description": "Vérifie chaque dépendance nécessaire à cette application et indique si elle est réellement utilisable. Effectue des sondes en direct, donc ne s’exécute qu’à la demande.",
+      "runAgain": "Relancer",
+      "runChecks": "Lancer les vérifications",
+      "notRun": "Rien n’a encore été exécuté. Lancez les vérifications pour sonder le manifeste, le registre, le rôle de push, le DNS et les déploiements.",
+      "healthy": "Tout ce dont cette application a besoin est en ordre.",
+      "unhealthy": "Certaines dépendances demandent votre attention ; voir ci-dessous.",
+      "nothingToReport": "Rien à signaler pour cette application.",
+      "checks": {
+        "manifest": "Manifeste",
+        "autowire": "Raccordement du dépôt",
+        "registry_repo": "Registre de conteneurs",
+        "push_role": "Rôle de push",
+        "dns": "DNS",
+        "identity": "Identité du pod",
+        "image": "Épinglage de l’image",
+        "deployments": "Déploiements",
+        "cronjob_runs": "Exécutions planifiées",
+        "managed_services": "Services gérés"
+      },
+      "status": {
+        "pass": "ok",
+        "fail": "en échec",
+        "warn": "avertissement",
+        "skip": "non applicable",
+        "unknown": "non vérifié"
+      },
+      "repairs": {
+        "nothingToDo": "Rien à faire",
+        "resync_manifest": {
+          "label": "Resynchroniser le manifeste",
+          "done": "Manifeste resynchronisé depuis le dépôt",
+          "failed": "Échec de la resynchronisation du manifeste"
+        },
+        "retry_autowire": {
+          "label": "Relancer l’autowire",
+          "done": "Autowire relancé",
+          "failed": "Échec de la relance de l’autowire"
+        },
+        "rerun_onboarding": {
+          "label": "Relancer l’intégration",
+          "done": "Relance de l’intégration envoyée",
+          "failed": "Échec de la relance de l’intégration"
+        },
+        "redeploy": {
+          "label": "Redéployer",
+          "done": "Déploiement lancé",
+          "failed": "Échec du redéploiement"
+        }
+      }
+    }
+  },
+  "appOverviewCards": {
+    "assignProject": {
+      "unassigned": "Non attribuée",
+      "title": "Affectation au projet",
+      "description": "Placez cette application dans un projet pour la regrouper dans la barre latérale et limiter les autorisations au niveau de l’équipe. Les applications sans projet apparaissent dans le groupe « Non attribuée » de l’équipe.",
+      "current": "Projet actuel",
+      "needsPermission": "Vous avez besoin de l’autorisation <mono>{permission}</mono> pour modifier cette affectation.",
+      "moveTo": "Déplacer vers le projet",
+      "noProjects": "Aucun projet auquel vous pouvez affecter",
+      "pickProject": "Choisissez un projet cible",
+      "save": "Enregistrer",
+      "unassign": "Retirer l’affectation",
+      "toast": {
+        "assignNoResponse": "Échec de l’affectation : aucune réponse du backend.",
+        "assignFailed": "Échec de l’affectation.",
+        "assignNoPayload": "L’affectation n’a renvoyé aucune donnée.",
+        "moved": "Déplacée vers {project} dans {team}.",
+        "unassignNoResponse": "Échec du retrait de l’affectation : aucune réponse du backend.",
+        "unassignFailed": "Échec du retrait de l’affectation.",
+        "unassigned": "L’application n’est plus affectée à un projet."
+      }
+    },
+    "observability": {
+      "title": "Observabilité",
+      "description": "{days} derniers jours · débit de déploiement, taux d’échec, alertes non résolues.",
+      "metrics": "Métriques",
+      "alerts": "Alertes",
+      "deploysPerDay": "Déploiements / jour",
+      "acrossDays": "sur {days} jours",
+      "noDeploys": "Aucun déploiement",
+      "failures": "Échecs",
+      "ofRollouts": "{pct} des déploiements",
+      "noRollouts": "aucun déploiement pour l’instant",
+      "noFailures": "Aucun échec",
+      "unresolvedAlerts": "Alertes non résolues",
+      "critical": "{count, plural, one {# critique} other {# critiques}}",
+      "allClear": "Tout est normal",
+      "pending": "{count, plural, one {# en attente} other {# en attente}}",
+      "open": "Ouvrir"
+    },
+    "githubConnect": {
+      "title": "Connectez votre GitHub pour gérer cette application",
+      "description": "Astrolift utilise votre identité GitHub personnelle pour parcourir le dépôt, synchroniser le manifeste et installer les webhooks. La configuration au niveau de l’organisation est déjà en place ; il s’agit seulement du lien par utilisateur.",
+      "connect": "Connecter GitHub"
+    },
+    "provisioning": {
+      "title": "Provisionnement de l’infrastructure",
+      "done": "terminé",
+      "steps": {
+        "registry": "Registre de conteneurs",
+        "namespace": "Namespace Kubernetes",
+        "identity": "Identité cloud (IRSA)",
+        "managed_services": "Services gérés",
+        "ready": "Marquer comme prête"
+      }
+    },
+    "teams": {
+      "title": "Équipes",
+      "description": "Équipes ayant accès à cette application. L’équipe d’origine possède l’application et hérite de l’accès OWNER ; d’autres équipes peuvent recevoir le rôle lecteur, déployeur ou propriétaire.",
+      "team": "Équipe",
+      "home": "Origine",
+      "accessLevel": "Niveau d’accès",
+      "actions": "Actions",
+      "levels": {
+        "viewer": "Lecteur",
+        "deployer": "Déployeur",
+        "owner": "Propriétaire"
+      },
+      "levelDescriptions": {
+        "viewer": "Lecture seule : peut voir cette application, sans droit de déployer ni de modifier.",
+        "deployer": "Lecture + déploiement : peut lancer des déploiements, renouveler les jetons et modifier le manifeste.",
+        "owner": "Contrôle total, y compris l’octroi d’accès à d’autres équipes."
+      },
+      "homeLevelFixed": "L’accès de l’équipe d’origine est fixé à OWNER. Déplacez l’application vers une autre équipe pour le modifier.",
+      "cannotRevokeHome": "Impossible de révoquer l’équipe d’origine. Déplacez d’abord l’application vers une autre équipe.",
+      "revokeAccess": "Révoquer l’accès",
+      "revoke": "Révoquer",
+      "moveHomeTeam": "Changer l’équipe d’origine",
+      "allTeamsHaveAccess": "Toutes les équipes de cette organisation ont déjà accès.",
+      "addTeam": "Ajouter une équipe",
+      "grantsLabel": "Accès accordés aux équipes",
+      "searchPlaceholder": "Rechercher des équipes par nom ou slug…",
+      "allView": "Tous",
+      "emptyTitle": "Aucun accès accordé aux équipes",
+      "emptyDescription": "Ajoutez une équipe pour lui donner de la visibilité et des droits opérationnels sur cette application.",
+      "revokeTitle": "Révoquer l’accès de {team} ?",
+      "revokeTitleGeneric": "Révoquer l’accès ?",
+      "revokeDescription": "L’équipe perd la visibilité et les droits opérationnels sur cette application. Suppression logique uniquement ; l’accès peut être rajouté à tout moment.",
+      "addTitle": "Ajouter un accès d’équipe",
+      "addDescription": "Choisissez une équipe de cette organisation et le niveau d’accès qu’elle aura sur cette application.",
+      "loadingTeams": "Chargement des équipes…",
+      "everyTeamHasAccess": "Toutes les équipes ont déjà accès",
+      "selectTeam": "Sélectionnez une équipe",
+      "cancel": "Annuler",
+      "granting": "Octroi…",
+      "grantAccess": "Accorder l’accès",
+      "moveDescription": "Changez l’équipe principale / d’origine de l’application. L’équipe cible obtient l’accès OWNER ; l’ancienne équipe d’origine passe à DEPLOYER (sans révocation). Le projet de l’application doit déjà appartenir à l’équipe cible ; sinon, rattachez d’abord le projet.",
+      "currentHomeTeam": "Équipe d’origine actuelle",
+      "moveToTeam": "Déplacer vers l’équipe",
+      "noOtherTeams": "Aucune autre équipe dans cette organisation",
+      "pickTargetTeam": "Choisissez une équipe cible",
+      "moving": "Déplacement…",
+      "moveApp": "Déplacer l’application",
+      "toast": {
+        "updated": "{team} passé à {level}.",
+        "updateFailed": "Échec de la mise à jour.",
+        "revoked": "Accès de {team} révoqué.",
+        "revokeFailed": "Échec de la révocation.",
+        "moved": "Application déplacée vers la nouvelle équipe d’origine.",
+        "moveFailed": "Échec du déplacement.",
+        "granted": "Accès accordé au niveau {level}.",
+        "grantFailed": "Échec de l’octroi."
+      }
+    },
+    "url": {
+      "provisioning": "Provisionnement · ~2 min",
+      "notRoutable": "URL pas encore routable",
+      "notAssigned": "URL pas encore attribuée ; le premier déploiement la publiera",
+      "title": "URL publique",
+      "description": "L’hôte attribué par la plateforme à cette application. Modifiez le sous-domaine pour le renommer ; DNS et certificats sont réémis automatiquement.",
+      "copy": "Copier",
+      "needsPermission": "Vous avez besoin de l’autorisation <mono>{permission}</mono> pour renommer ce sous-domaine.",
+      "subdomain": "Sous-domaine",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "invalid": "Hôte DNS en minuscules : lettres, chiffres, tirets et points. Chaque label doit commencer et finir par une lettre ou un chiffre.",
+      "keys": "Appuyez sur <kbd>Entrée</kbd> pour enregistrer ou <kbd>Échap</kbd> pour annuler.",
+      "edit": "Modifier",
+      "toast": {
+        "noResponse": "Échec du changement de sous-domaine : aucune réponse du backend.",
+        "failed": "Échec du changement de sous-domaine.",
+        "changed": "Sous-domaine changé en {subdomain}.",
+        "copied": "URL copiée dans le presse-papiers.",
+        "copyFailed": "Copie impossible : presse-papiers indisponible."
+      }
+    }
+  },
   "projectResources": {
     "operation": {
       "label": "Dernière opération :",

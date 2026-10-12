@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -53,6 +54,7 @@ interface RevokeResp {
  * last-4 digits. The data half of DeployTokenControlView.
  */
 export function useDeployToken(appSlug: string) {
+  const t = useTranslations("appControls.deployToken");
   const { data, loading, refetch } = useQuery<ListResp>(LIST_APP_DEPLOY_TOKENS, {
     variables: { appSlug },
     fetchPolicy: "cache-and-network",
@@ -89,12 +91,12 @@ export function useDeployToken(appSlug: string) {
       });
       if (data?.createDeployToken.ok && data.createDeployToken.data) {
         setReveal(data.createDeployToken.data.plaintextSecret);
-        toast.success("Deploy token minted.");
+        toast.success(t("toast.minted"));
       } else {
-        toast.error(data?.createDeployToken.errors?.[0]?.message ?? "Create failed.");
+        toast.error(data?.createDeployToken.errors?.[0]?.message ?? t("toast.createFailed"));
       }
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Create failed.");
+      toast.error(err instanceof Error ? err.message : t("toast.createFailed"));
     }
   }
 
@@ -107,9 +109,9 @@ export function useDeployToken(appSlug: string) {
     });
     if (data?.rotateDeployToken.ok && data.rotateDeployToken.data) {
       setReveal(data.rotateDeployToken.data.plaintextSecret);
-      toast.success("Token rotated — copy the new value now.");
+      toast.success(t("toast.rotated"));
     } else {
-      throw new Error(data?.rotateDeployToken.errors?.[0]?.message ?? "Rotate failed.");
+      throw new Error(data?.rotateDeployToken.errors?.[0]?.message ?? t("toast.rotateFailed"));
     }
   }
 
@@ -119,9 +121,9 @@ export function useDeployToken(appSlug: string) {
       variables: { input: { id: active.id } },
     });
     if (data?.revokeDeployToken.ok) {
-      toast.success("Token revoked.");
+      toast.success(t("toast.revoked"));
     } else {
-      throw new Error(data?.revokeDeployToken.errors?.[0]?.message ?? "Revoke failed.");
+      throw new Error(data?.revokeDeployToken.errors?.[0]?.message ?? t("toast.revokeFailed"));
     }
   }
 

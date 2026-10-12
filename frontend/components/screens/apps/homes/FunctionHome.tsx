@@ -1,6 +1,7 @@
 "use client";
 
 import { GlobeIcon, ZapIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import {
   GoldenSignalsPanel,
@@ -25,19 +26,20 @@ export interface FunctionHomeScreenProps {
  * scales to zero; no long-running deploy chrome.
  */
 export function FunctionHomeScreen({ workload, host, goldenSignals }: FunctionHomeScreenProps) {
+  const t = useTranslations("appHomes.function");
   const url = workload.isPublic && host ? `https://${host}` : null;
 
   return (
     <PanelGrid>
       <Panel
-        title="Trigger"
+        title={t("title")}
         icon={<ZapIcon className="size-4" />}
-        description="Runs on invoke and scales to zero when idle."
+        description={t("description")}
       >
         {url ? (
           <div className="min-w-0 space-y-1">
             <div className="text-muted-foreground text-xs tracking-wide uppercase">
-              HTTP endpoint
+              {t("httpEndpoint")}
             </div>
             <a
               href={url}
@@ -50,10 +52,7 @@ export function FunctionHomeScreen({ workload, host, goldenSignals }: FunctionHo
             </a>
           </div>
         ) : (
-          <p className="text-muted-foreground text-sm">
-            Event-triggered (no public HTTP endpoint). Invoked by the platform or an upstream
-            producer.
-          </p>
+          <p className="text-muted-foreground text-sm">{t("eventTriggered")}</p>
         )}
       </Panel>
 

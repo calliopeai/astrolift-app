@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useSubscription } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -23,6 +24,7 @@ interface RollbackResp {
  * (use-app-deploys) and follows the frame’s poll on every app tab.
  */
 export function useDeploymentPanel(appSlug: string) {
+  const t = useTranslations("appControls.deploymentPanel");
   const { deployments, loading, refetch } = useAppDeploys(appSlug);
 
   // Refetch on any lifecycle event for this app — the row deltas come
@@ -53,9 +55,9 @@ export function useDeploymentPanel(appSlug: string) {
     if (!lastGood) return;
     const { data } = await rollback({ variables: { input: { id: lastGood.id } } });
     if (data?.rollbackDeployment.ok) {
-      toast.success("Rollback started.");
+      toast.success(t("toast.started"));
     } else {
-      throw new Error(data?.rollbackDeployment.errors?.[0]?.message ?? "Rollback failed.");
+      throw new Error(data?.rollbackDeployment.errors?.[0]?.message ?? t("toast.failed"));
     }
   }
 

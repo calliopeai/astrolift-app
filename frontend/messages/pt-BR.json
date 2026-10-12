@@ -4898,6 +4898,531 @@
       "review": "Revisar"
     }
   },
+  "appControls": {
+    "deployToken": {
+      "title": "Token de implantação",
+      "description": "Token de máquina restrito ao aplicativo. Use como <code>ASTROLIFT_DEPLOY_TOKEN</code> na sua CI.",
+      "lastUsed": "último uso: {date}",
+      "neverUsed": "nunca usado",
+      "missing": "Sem token: a CI não consegue disparar implantações até que um seja gerado.",
+      "rotate": "Rotacionar",
+      "revoke": "Revogar",
+      "generate": "Gerar token",
+      "rotateTitle": "Rotacionar o token de implantação?",
+      "rotateDescription": "O valor anterior para de funcionar imediatamente. Qualquer execução de CI que ainda use o token antigo vai falhar até você atualizar o segredo na CI.",
+      "rotateConfirm": "Rotacionar token",
+      "revokeTitle": "Revogar o token de implantação?",
+      "revokeDescription": "Execuções de CI que usam este token começarão a falhar imediatamente. Depois, gere um novo token e atualize o segredo da sua CI. Não há como desfazer; é apenas uma exclusão lógica.",
+      "revokeConfirm": "Revogar token",
+      "copied": "Copiado para a área de transferência.",
+      "copyFailed": "Falha ao copiar. Selecione o valor e copie manualmente.",
+      "revealTitle": "Token de implantação: copie agora",
+      "revealWarning": "Esta é a única vez que o token é exibido. Se sair sem copiar, rotacione de novo para gerar um novo.",
+      "copiedLabel": "Copiado",
+      "copy": "Copiar",
+      "revealStore": "Armazene como <code>ASTROLIFT_DEPLOY_TOKEN</code> nos segredos do seu provedor de CI.",
+      "saved": "Já salvei",
+      "toast": {
+        "minted": "Token de implantação gerado.",
+        "createFailed": "Falha ao criar.",
+        "rotated": "Token rotacionado. Copie o novo valor agora.",
+        "rotateFailed": "Falha ao rotacionar.",
+        "revoked": "Token revogado.",
+        "revokeFailed": "Falha ao revogar."
+      }
+    },
+    "deploymentPanel": {
+      "emptyTitle": "Nenhuma implantação ainda",
+      "emptyDescription": "Dispare uma implantação pela CLI ou faça push na branch de implantação para ver o status aqui.",
+      "current": "Implantação atual",
+      "elapsed": "decorrido {duration}",
+      "took": "levou {duration}",
+      "trigger": "gatilho: <value>{kind}</value>",
+      "failed": "Falha na implantação",
+      "openForLog": "Abra a implantação para ver o log completo.",
+      "rollbackTarget": "A reversão tem como alvo {tag}.",
+      "confirmTitleGeneric": "Reverter?",
+      "since": "desde {time}",
+      "stage": {
+        "queued": "Na fila",
+        "rollingOut": "Em rollout",
+        "redeploying": "Reimplantando",
+        "working": "Em andamento"
+      },
+      "toast": {
+        "started": "Reversão iniciada.",
+        "failed": "Falha na reversão."
+      }
+    },
+    "pendingDeployments": {
+      "titleApprover": "Aguardando sua aprovação",
+      "title": "Aprovação pendente",
+      "descriptionApprover": "Revise cada candidato antes de liberar o rollout.",
+      "description": "Aguardando um revisor com a permissão `{permission}`.",
+      "canApprove": "Você pode aprovar",
+      "readOnly": "Somente leitura",
+      "approvals": "{received}/{required} aprovações",
+      "received": "Recebido {when}",
+      "reject": "Rejeitar",
+      "approve": "Aprovar e implantar",
+      "approveTitle": "Aprovar {tag}?",
+      "approveDescription": "Isso libera o rollout para {environment}. O workflow é retomado imediatamente; não há como pausá-lo de novo antes da troca de tráfego.",
+      "approveDescriptionDefault": "Isso libera o rollout para o ambiente de destino. O workflow é retomado imediatamente; não há como pausá-lo de novo antes da troca de tráfego.",
+      "rejectReason": "Motivo da rejeição",
+      "rejectReasonPlaceholder": "Por que esta implantação está sendo rejeitada? Fica salvo no log de auditoria e na barra lateral de histórico.",
+      "rejectTitle": "Rejeitar {tag}?",
+      "rejectDescription": "A implantação pendente é abortada. A CI precisa disparar de novo para criar uma nova implantação para revisão.",
+      "toast": {
+        "approved": "{tag} aprovado.",
+        "approveFailed": "Falha ao aprovar.",
+        "rejected": "Implantação rejeitada.",
+        "rejectFailed": "Falha ao rejeitar."
+      }
+    }
+  },
+  "appWizard": {
+    "details": {
+      "name": "Nome",
+      "nameHelp": "Nome legível exibido na interface.",
+      "nameRequired": "Dê um nome ao aplicativo.",
+      "slug": "Slug",
+      "slugPlaceholder": "minúsculas, hifens, 1-40 caracteres",
+      "slugRequired": "O slug é obrigatório.",
+      "slugInvalid": "Apenas letras minúsculas, dígitos e hifens (máx. 40 caracteres).",
+      "slugHelp": "Identificador seguro para URL. Derivado do nome; ajuste como quiser.",
+      "description": "Descrição",
+      "descriptionPlaceholder": "O que este aplicativo faz?",
+      "team": "Equipe (filtro)",
+      "allTeams": "Todas as equipes",
+      "teamHelp": "Filtro opcional. Aplicativos pertencem a um projeto (que pertence a uma equipe).",
+      "project": "Projeto",
+      "noProjects": "Nenhum projeto neste escopo",
+      "selectProject": "Selecione um projeto",
+      "noProjectsHelp": "Nenhum projeto neste escopo. Escolha outra equipe ou crie um projeto primeiro.",
+      "projectRequired": "Escolha o projeto ao qual este aplicativo pertence."
+    },
+    "repo": {
+      "noClusterTitle": "Nenhum cluster gerenciado ainda",
+      "noClusterDescription": "O Astrolift implanta aplicativos em clusters Kubernetes colocados sob gerenciamento (#316). Conecte um cluster, instale os pré-requisitos e clique em Colocar sob gerenciamento.",
+      "manageClusters": "Gerenciar clusters",
+      "noConnectionsTitle": "Nenhuma conexão de origem ainda",
+      "noConnectionsDescription": "Conecte um host Git (GitHub App, OAuth do GitLab ou um token de acesso pessoal) para que a plataforma possa listar seus repositórios e acompanhar os pushes.",
+      "registeredNote": "{count, plural, one {Este repositório já hospeda # aplicativo registrado (outro caminho de manifesto).} other {Este repositório já hospeda # aplicativos registrados (outro caminho de manifesto).}}",
+      "missingHost": "Falta um host? Conecte outra origem →",
+      "picked": "Selecionado <code>{repo}</code> em <code>{branch}</code>.",
+      "introTitle": "Como o registro funciona",
+      "introDescription": "Três etapas: Origem (o repositório e seu manifesto), Execução (o aplicativo e como ele é implantado) e Revisão.",
+      "introSource": "1 Origem",
+      "introSourceDescription": "Escolha uma conexão de origem e um repositório; carregamos o manifesto astrolift.toml ou criamos um esqueleto.",
+      "introRun": "2 Execução",
+      "introRunDescription": "Dê um nome ao aplicativo, escolha o projeto e um gatilho: automático no push, cron ou manual.",
+      "introReview": "3 Revisão",
+      "introReviewDescription": "Veja o que será criado e implantado e, em seguida, crie o aplicativo."
+    },
+    "title": "Novo aplicativo",
+    "stepsLabel": "Etapas",
+    "done": "concluído",
+    "cancel": "Cancelar",
+    "back": "Voltar",
+    "continue": "Continuar",
+    "steps": {
+      "source": {
+        "label": "Origem",
+        "description": "O repositório e o manifesto astrolift.toml que diz o que ele executa."
+      },
+      "run": {
+        "label": "Execução",
+        "description": "O nome e o projeto do aplicativo e, depois, como e quando ele é implantado."
+      },
+      "review": {
+        "label": "Revisão",
+        "description": "O que será criado e o que será implantado. Nada acontece até você criar."
+      }
+    },
+    "shell": {
+      "title": "Registrar aplicativo",
+      "description": "Conecte um repositório Git. Vamos buscar o manifesto, registrar o aplicativo e executar o OnboardAppWorkflow.",
+      "cancel": "Cancelar",
+      "stepLabel": "Etapa {step}: {label}",
+      "heading": "Etapa {step} de {total}: {label}",
+      "back": "Voltar",
+      "next": "Próximo"
+    },
+    "approver": {
+      "orphanUser": "usuário {id}"
+    },
+    "strategy": {
+      "timingTitle": "Quando este aplicativo deve ser implantado?",
+      "timingHelp": "Escolha o caminho da primeira implantação. Você pode mudar a estratégia depois na página do aplicativo.",
+      "timing": {
+        "now": {
+          "label": "Implantar agora",
+          "description": "Escolha um gatilho e inicie a primeira implantação assim que o registro terminar."
+        },
+        "later": {
+          "label": "Configurar e implantar depois",
+          "description": "Defina agora o gatilho e as aprovações; a primeira implantação roda no próximo evento."
+        },
+        "skip": {
+          "label": "Pular e configurar depois",
+          "description": "Apenas registre o aplicativo. Configure gatilhos, aprovações e implantações pela página do aplicativo."
+        }
+      },
+      "triggerTitle": "Modo de gatilho",
+      "triggerHelp": "Qual evento dispara uma implantação?",
+      "modes": {
+        "auto_on_push": "Implanta sempre que um commit chega à branch selecionada (via webhook do SCM).",
+        "cron": "Implanta em uma programação recorrente.",
+        "manual": "As implantações só rodam quando alguém as dispara explicitamente."
+      },
+      "comingSoon": "Em breve",
+      "deployBranch": "Branch de implantação",
+      "deployBranchHelp": "Pushes nesta branch disparam uma implantação. O padrão é a branch padrão do repositório.",
+      "deployBranchRequired": "Informe a branch cujos pushes são implantados.",
+      "cronLabel": "Expressão cron",
+      "cronHelp": "Cinco campos (minuto hora dia mês dia-da-semana).",
+      "cronHint": {
+        "invalid": "Esperada uma expressão cron de cinco campos.",
+        "hourly": "De hora em hora, na hora cheia.",
+        "every5": "A cada 5 minutos.",
+        "daily": "Diariamente às 03:00.",
+        "weekly": "Semanalmente, no domingo às 00:00.",
+        "monthly": "Mensalmente, no dia 1º às 00:00.",
+        "custom": "Programação personalizada."
+      },
+      "skipped": "O modo de gatilho e as etapas de aprovação ficam de fora por enquanto. Quando o registro terminar, configure-os na aba Configurações do aplicativo."
+    },
+    "manifest": {
+      "pathLabel": "Caminho do manifesto",
+      "pathHelp": "Onde <code>astrolift.toml</code> fica no repositório. O padrão é a raiz do repositório. Monorepos podem hospedar vários aplicativos; aponte cada registro para o próprio caminho (ex.: <code>services/api/astrolift.toml</code>).",
+      "branchLabel": "Branch padrão",
+      "laterTitle": "Configurar o manifesto depois",
+      "laterHelp": "Registre o aplicativo agora, sem manifesto. Você vai cair na aba <b>Manifesto</b> do aplicativo, onde pode adicionar ou sincronizar <code>astrolift.toml</code> quando quiser. Útil para um repositório vazio ou um repositório de configuração de agentes cujo esquema não é um manifesto de aplicativo.",
+      "label": "Manifesto",
+      "edit": "Editar",
+      "refetchTitle": "Testar a conexão e buscar de novo o manifesto do repositório escolhido",
+      "fetching": "Buscando…",
+      "refetch": "Testar e buscar de novo",
+      "placeholder": "Cole aqui um manifesto astrolift.toml.",
+      "maskedEnv": "Os valores de env estão mascarados porque sua função não pode revelar segredos. O registro os lê do repositório. Se você editar o manifesto aqui, substitua antes cada valor mascarado.",
+      "agentConfigTitle": "Parece um repositório de configuração de agentes",
+      "agentConfigBody": "Ele declara <code>astrolift_version</code> com tabelas <code>[skills.*]</code>/<code>[tools.*]</code> e nenhum <code>[[workloads]]</code>; esse é o esquema de biblioteca de agentes, não um manifesto de aplicativo. Integre-o como frota de agentes ou importe suas skills e ferramentas:",
+      "onboardFleet": "Integrar uma frota de agentes",
+      "importSkills": "Importar skills / ferramentas",
+      "agentConfigLater": "Ou marque <b>Configurar o manifesto depois</b> acima para registrar este repositório sem manifesto.",
+      "valid": "O manifesto parece estruturalmente válido (<code>name</code> no nível superior + pelo menos um bloco <code>[[workloads]]</code>).",
+      "skipped": "Etapa do manifesto ignorada; o aplicativo é registrado sem manifesto. Adicione ou sincronize-o na aba Manifesto do aplicativo depois da integração.",
+      "loaded": "Manifesto carregado do repositório.",
+      "fromRepo": "do repositório",
+      "missing": "Não há manifesto nesse caminho. Inserimos um modelo mínimo; edite-o abaixo ou cole o seu.",
+      "fetchFailed": "Não foi possível buscar o manifesto: {error}",
+      "retry": "Tentar novamente",
+      "noResponse": "sem resposta do servidor",
+      "errors": {
+        "empty": "O manifesto está vazio.",
+        "name": "`name = \"...\"` no nível superior é obrigatório.",
+        "workloads": "É necessário pelo menos um bloco `[[workloads]]`."
+      }
+    },
+    "review": {
+      "source": "Origem",
+      "repository": "Repositório",
+      "defaultBranch": "Branch padrão",
+      "sourceKind": "Tipo de origem",
+      "manifestPath": "Caminho do manifesto",
+      "manifest": "Manifesto",
+      "manifestLater": "Configurar depois",
+      "manifestState": "{origin, select, repo {Carregado do repositório} other {Rascunho feito aqui}}, {valid, select, yes {estrutura válida} other {inválido}}",
+      "run": "Execução",
+      "name": "Nome",
+      "slug": "Slug",
+      "description": "Descrição",
+      "deployTiming": "Momento da implantação",
+      "trigger": "Gatilho",
+      "triggerLater": "Manual (configurar depois)",
+      "deployBranch": "Branch de implantação",
+      "cron": "Cron",
+      "approvalGate": "Etapa de aprovação",
+      "timing": {
+        "now": "Implantar agora",
+        "later": "Configurar e implantar depois",
+        "skip": "Pular e configurar após a integração"
+      },
+      "approval": {
+        "notRequired": "Não exigida",
+        "team": "Aprovação da equipe, {count} exigida(s)",
+        "users": "{min} de {count, plural, one {# usuário selecionado} other {# usuários selecionados}}",
+        "none": "Exigida, nenhum aprovador selecionado (corrija em Execução)"
+      },
+      "sideEffectsTitle": "O que acontece ao enviar",
+      "sideEffectsHelp": "Ative os efeitos colaterais desejados. Itens que dependem de trabalho de backend ainda não lançado (instalação de webhook para conexões PAT / OAuth-User) ficam esmaecidos.",
+      "register": "Registrar o aplicativo",
+      "registerHelp": "Chama <code>registerApp</code>; o workflow de integração provisiona o namespace + o repositório do registry.",
+      "webhook": "Instalar webhook do SCM",
+      "webhookCovered": "Já coberto pela instalação do GitHub App; nenhuma ação necessária.",
+      "webhookPending": "Instalações do GitHub App cuidam disso automaticamente; conexões PAT/OAuth-User terão um webhook por repositório quando essa mutation chegar.",
+      "alreadyInstalled": "Já instalado",
+      "comingSoon": "Em breve",
+      "pushWorkflow": "Fazer push de <code>{path}</code>",
+      "pushWorkflowHelp": "Faz commit de um workflow inicial que chama astro app deploy a cada push na branch de implantação. Você precisará definir ASTROLIFT_DEPLOY_TOKEN como segredo do repositório.",
+      "pushWorkflowUnavailable": "Disponível para conexões OAuth de usuário do GitHub ou GitLab (e instalações do GitHub App). A conexão selecionada não pode fazer push de commits.",
+      "firstDeploy": "Disparar a primeira implantação",
+      "firstDeployHelp": "Inicia uma primeira implantação assim que o workflow de integração colocar o aplicativo em <code>ready</code>.",
+      "submitFailed": "Falha no envio",
+      "submitting": "Enviando…",
+      "willDeployTitle": "O que será implantado",
+      "willDeployFirst": "Uma primeira implantação roda assim que a integração deixar o aplicativo em ready.",
+      "willDeployNothing": "Nada é implantado ainda: apenas o registro. Inicie uma implantação pela página do aplicativo.",
+      "noManifest": "Ainda não há manifesto, então não há nada para implantar até você adicionar um na aba Manifesto do aplicativo.",
+      "noWorkloads": "O manifesto não declara cargas de trabalho que o Astrolift consiga ler aqui. O servidor o valida na criação.",
+      "managedService": "Serviço gerenciado"
+    }
+  },
+  "appHomes": {
+    "cronjob": {
+      "exitedWith": "Encerrado com o código {code}",
+      "noReason": "Nenhum motivo registrado",
+      "customSchedule": "Programação personalizada",
+      "dueNow": "agora",
+      "notStarted": "não iniciado",
+      "noExitCode": "sem código de saída",
+      "exit": "saída {code}",
+      "schedule": "Programação",
+      "lastRunFailed": "A última execução falhou",
+      "noScheduleShort": "Nenhuma programação definida",
+      "concurrency": "Concorrência: <mono>{policy}</mono>",
+      "nextRun": "Próxima execução",
+      "nextRunUnknown": "Não foi possível calcular a próxima execução para esta expressão.",
+      "noSchedule": "Nenhuma programação definida.",
+      "runHistory": "Histórico de execuções",
+      "total": "{count} no total",
+      "emptyTitle": "Nenhuma execução registrada ainda",
+      "emptyDescription": "Cada execução programada aparece aqui assim que for disparada."
+    },
+    "task": {
+      "stages": {
+        "queued": "Na fila",
+        "provisioning": "Provisionando",
+        "running": "Em execução",
+        "completed": "Concluído",
+        "failed": "Falhou"
+      },
+      "latestRun": "Última execução",
+      "execution": "Execução",
+      "runStatus": "Execução: {status}",
+      "exitedWith": "Encerrado com o código {code}",
+      "noReason": "Nenhum motivo registrado",
+      "runStages": "Etapas da execução",
+      "noRunYet": "Nenhuma execução registrada ainda. Uma tarefa avulsa passa por estas etapas a cada execução.",
+      "runHistory": "Histórico de execuções",
+      "emptyTitle": "Nenhuma execução ainda",
+      "emptyDescription": "Cada execução avulsa desta tarefa aparece aqui.",
+      "notStarted": "não iniciado"
+    },
+    "bundle": {
+      "title": "Cargas de trabalho neste pacote",
+      "description": "{workloads, plural, one {# carga de trabalho} other {# cargas de trabalho}} em {kinds, plural, one {# tipo} other {# tipos}}. Abra qualquer carga de trabalho para ver implantação, configuração e logs.",
+      "emptyTitle": "Nenhuma carga de trabalho ainda",
+      "emptyDescription": "As cargas de trabalho aparecem aqui assim que o manifesto as registrar.",
+      "replicas": "{count, plural, one {<mono>#</mono> réplica} other {<mono>#</mono> réplicas}}",
+      "public": "público"
+    },
+    "function": {
+      "title": "Gatilho",
+      "description": "Executa ao ser invocada e escala para zero quando ociosa.",
+      "httpEndpoint": "Endpoint HTTP",
+      "eventTriggered": "Acionada por eventos (sem endpoint HTTP público). Invocada pela plataforma ou por um produtor upstream."
+    },
+    "doctor": {
+      "title": "Diagnóstico do aplicativo",
+      "description": "Verifica cada dependência de que este aplicativo precisa e informa se ela é realmente utilizável. Faz sondagens ao vivo, então só roda quando você pede.",
+      "runAgain": "Executar de novo",
+      "runChecks": "Executar verificações",
+      "notRun": "Nada foi executado ainda. Execute as verificações para sondar o manifesto, o registry, o papel de push, o DNS e as implantações.",
+      "healthy": "Tudo de que este aplicativo precisa está em ordem.",
+      "unhealthy": "Algumas dependências precisam de atenção; veja abaixo.",
+      "nothingToReport": "Nada a relatar para este aplicativo.",
+      "checks": {
+        "manifest": "Manifesto",
+        "autowire": "Conexão do repositório",
+        "registry_repo": "Registry de contêineres",
+        "push_role": "Papel de push",
+        "dns": "DNS",
+        "identity": "Identidade do pod",
+        "image": "Fixação de imagem",
+        "deployments": "Implantações",
+        "cronjob_runs": "Execuções programadas",
+        "managed_services": "Serviços gerenciados"
+      },
+      "status": {
+        "pass": "ok",
+        "fail": "com falha",
+        "warn": "alerta",
+        "skip": "não se aplica",
+        "unknown": "não verificado"
+      },
+      "repairs": {
+        "nothingToDo": "Nada a fazer",
+        "resync_manifest": {
+          "label": "Ressincronizar manifesto",
+          "done": "Manifesto ressincronizado do repositório",
+          "failed": "Falha ao ressincronizar o manifesto"
+        },
+        "retry_autowire": {
+          "label": "Repetir autowire",
+          "done": "Autowire executado de novo",
+          "failed": "Falha ao repetir o autowire"
+        },
+        "rerun_onboarding": {
+          "label": "Executar a integração de novo",
+          "done": "Nova execução da integração enviada",
+          "failed": "Falha ao executar a integração de novo"
+        },
+        "redeploy": {
+          "label": "Implantar de novo",
+          "done": "Implantação disparada",
+          "failed": "Falha ao implantar de novo"
+        }
+      }
+    }
+  },
+  "appOverviewCards": {
+    "assignProject": {
+      "unassigned": "Não atribuído",
+      "title": "Atribuição de projeto",
+      "description": "Coloque este aplicativo em um projeto para agrupá-lo na barra lateral e delimitar as permissões da equipe. Aplicativos sem projeto aparecem no grupo \"Não atribuído\" da equipe.",
+      "current": "Projeto atual",
+      "needsPermission": "Você precisa da permissão <mono>{permission}</mono> para alterar esta atribuição.",
+      "moveTo": "Mover para o projeto",
+      "noProjects": "Nenhum projeto ao qual você possa atribuir",
+      "pickProject": "Escolha um projeto de destino",
+      "save": "Salvar",
+      "unassign": "Remover atribuição",
+      "toast": {
+        "assignNoResponse": "Falha na atribuição: sem resposta do backend.",
+        "assignFailed": "Falha na atribuição.",
+        "assignNoPayload": "A atribuição não retornou dados.",
+        "moved": "Movido para {project} em {team}.",
+        "unassignNoResponse": "Falha ao remover a atribuição: sem resposta do backend.",
+        "unassignFailed": "Falha ao remover a atribuição.",
+        "unassigned": "O aplicativo agora não está atribuído."
+      }
+    },
+    "observability": {
+      "title": "Observabilidade",
+      "description": "Últimos {days} dias · ritmo de implantação, taxa de falhas, alertas não resolvidos.",
+      "metrics": "Métricas",
+      "alerts": "Alertas",
+      "deploysPerDay": "Implantações / dia",
+      "acrossDays": "em {days} dias",
+      "noDeploys": "Nenhuma implantação",
+      "failures": "Falhas",
+      "ofRollouts": "{pct} dos rollouts",
+      "noRollouts": "nenhum rollout ainda",
+      "noFailures": "Nenhuma falha",
+      "unresolvedAlerts": "Alertas não resolvidos",
+      "critical": "{count, plural, one {# crítico} other {# críticos}}",
+      "allClear": "Tudo certo",
+      "pending": "{count, plural, one {# pendente} other {# pendentes}}",
+      "open": "Abrir"
+    },
+    "githubConnect": {
+      "title": "Conecte seu GitHub para gerenciar este aplicativo",
+      "description": "O Astrolift usa sua identidade pessoal do GitHub para navegar no repositório, sincronizar o manifesto e instalar webhooks. A configuração da organização já está pronta; isto é só o vínculo por usuário.",
+      "connect": "Conectar GitHub"
+    },
+    "provisioning": {
+      "title": "Provisionando infraestrutura",
+      "done": "concluído",
+      "steps": {
+        "registry": "Registry de contêineres",
+        "namespace": "Namespace do Kubernetes",
+        "identity": "Identidade na nuvem (IRSA)",
+        "managed_services": "Serviços gerenciados",
+        "ready": "Marcar como pronto"
+      }
+    },
+    "teams": {
+      "title": "Equipes",
+      "description": "Equipes com acesso a este aplicativo. A equipe principal é dona do aplicativo e herda o acesso OWNER; outras equipes podem receber os papéis de leitor, implantador ou proprietário.",
+      "team": "Equipe",
+      "home": "Principal",
+      "accessLevel": "Nível de acesso",
+      "actions": "Ações",
+      "levels": {
+        "viewer": "Leitor",
+        "deployer": "Implantador",
+        "owner": "Proprietário"
+      },
+      "levelDescriptions": {
+        "viewer": "Somente leitura: pode ver este aplicativo, sem permissão para implantar ou alterar.",
+        "deployer": "Leitura + implantação: pode disparar rollouts, rotacionar tokens e editar o manifesto.",
+        "owner": "Controle total, incluindo conceder acesso a outras equipes."
+      },
+      "homeLevelFixed": "O acesso da equipe principal é fixo em OWNER. Mova o aplicativo para outra equipe para alterar isso.",
+      "cannotRevokeHome": "Não é possível revogar a equipe principal. Mova o aplicativo para outra equipe primeiro.",
+      "revokeAccess": "Revogar acesso",
+      "revoke": "Revogar",
+      "moveHomeTeam": "Mover equipe principal",
+      "allTeamsHaveAccess": "Todas as equipes desta organização já têm acesso.",
+      "addTeam": "Adicionar equipe",
+      "grantsLabel": "Acessos concedidos a equipes",
+      "searchPlaceholder": "Buscar equipes por nome ou slug…",
+      "allView": "Todos",
+      "emptyTitle": "Nenhum acesso concedido a equipes",
+      "emptyDescription": "Adicione uma equipe para dar a ela visibilidade e direitos operacionais neste aplicativo.",
+      "revokeTitle": "Revogar o acesso de {team}?",
+      "revokeTitleGeneric": "Revogar acesso?",
+      "revokeDescription": "A equipe perde a visibilidade e os direitos operacionais neste aplicativo. É apenas uma exclusão lógica; o acesso pode ser adicionado de novo a qualquer momento.",
+      "addTitle": "Adicionar acesso de equipe",
+      "addDescription": "Escolha uma equipe desta organização e o nível de acesso que ela terá neste aplicativo.",
+      "loadingTeams": "Carregando equipes…",
+      "everyTeamHasAccess": "Todas as equipes já têm acesso",
+      "selectTeam": "Selecione uma equipe",
+      "cancel": "Cancelar",
+      "granting": "Concedendo…",
+      "grantAccess": "Conceder acesso",
+      "moveDescription": "Altere a equipe principal do aplicativo. A equipe de destino recebe acesso OWNER; a equipe principal anterior passa para DEPLOYER (não é revogada). O projeto do aplicativo já deve pertencer à equipe de destino; caso contrário, reancore o projeto primeiro.",
+      "currentHomeTeam": "Equipe principal atual",
+      "moveToTeam": "Mover para a equipe",
+      "noOtherTeams": "Nenhuma outra equipe nesta organização",
+      "pickTargetTeam": "Escolha uma equipe de destino",
+      "moving": "Movendo…",
+      "moveApp": "Mover aplicativo",
+      "toast": {
+        "updated": "{team} atualizado para {level}.",
+        "updateFailed": "Falha na atualização.",
+        "revoked": "Acesso de {team} revogado.",
+        "revokeFailed": "Falha ao revogar.",
+        "moved": "Aplicativo movido para a nova equipe principal.",
+        "moveFailed": "Falha ao mover.",
+        "granted": "Acesso concedido no nível {level}.",
+        "grantFailed": "Falha ao conceder."
+      }
+    },
+    "url": {
+      "provisioning": "Provisionando · ~2 min",
+      "notRoutable": "URL ainda não roteável",
+      "notAssigned": "URL ainda não atribuída; a primeira implantação vai publicá-la",
+      "title": "URL pública",
+      "description": "O host emitido pela plataforma para este aplicativo. Edite o subdomínio para renomeá-lo; DNS e certificados são reemitidos automaticamente.",
+      "copy": "Copiar",
+      "needsPermission": "Você precisa da permissão <mono>{permission}</mono> para renomear este subdomínio.",
+      "subdomain": "Subdomínio",
+      "save": "Salvar",
+      "cancel": "Cancelar",
+      "invalid": "Host DNS em minúsculas: letras, dígitos, hifens e pontos. Cada rótulo deve começar e terminar com letra ou dígito.",
+      "keys": "Pressione <kbd>Enter</kbd> para salvar ou <kbd>Esc</kbd> para cancelar.",
+      "edit": "Editar",
+      "toast": {
+        "noResponse": "Falha ao alterar o subdomínio: sem resposta do backend.",
+        "failed": "Falha ao alterar o subdomínio.",
+        "changed": "Subdomínio alterado para {subdomain}.",
+        "copied": "URL copiada para a área de transferência.",
+        "copyFailed": "Não foi possível copiar: área de transferência indisponível."
+      }
+    }
+  },
   "projectResources": {
     "operation": {
       "label": "Última operação:",

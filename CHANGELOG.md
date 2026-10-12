@@ -14,6 +14,8 @@
 
 - The Agents area speaks every supported language: the agents list, Run agent dispatch, agent boxes, the run-spec editor and trigger bindings, the New agent wizard, skills, tools, environment specs and the Zentinelle panel now read their labels, empty states, confirmations, validation messages and toasts from the message catalogs in all eight locales, and their relative times come from the locale formatters. The English copy loses its em-dashes and names the Calliope AI CLI (#2145).
 
+- The new-app wizard (Source, Run, Review), the app Overview cards (public URL, teams, project assignment, observability, provisioning, the GitHub connect prompt), the deploy controls (deploy token, current deployment, pending approvals) and the cronjob, task, bundle, function and App doctor homes now read every label, hint, empty state, confirm and toast from the message catalogs, in all eight locales; dates and percentages use the locale formatters (#2145).
+
 - A refused permission reads the same on every client: GraphQL errors raised by a permission check now carry `extensions.code = "PERMISSION_DENIED"` (the code mutation envelopes already use) with `extensions.reason` and `extensions.permission`; the message is unchanged. The CLI and web can tell a refusal from any other failure and show why (#1867).
 
 - Every tab inside an app or agent offers actions from that app's own permissions, not the account's: the header (deploy, archive, delete), Settings sections (resync, retention, environments, managed services, archive, the danger zone) and Access (tokens, security, edge). A grant held on another project no longer offers an action this app refuses. Account grants only bridge the first load (`useAppCan`, fed by the frame) (#1867).

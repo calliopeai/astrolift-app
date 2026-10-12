@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -65,6 +66,7 @@ export function useAssignProject({
   currentProjectName,
   currentTeamName,
 }: UseAssignProjectArgs) {
+  const t = useTranslations("appOverviewCards.assignProject");
   const projects = useQuery<AssignableProjectsResp>(LIST_ASSIGNABLE_PROJECTS, {
     fetchPolicy: "cache-and-network",
   });
@@ -114,20 +116,23 @@ export function useAssignProject({
     });
     const env = data?.assignAstroliftAppToProject;
     if (!env) {
-      toast.error("Assignment failed: no response from backend.");
+      toast.error(t("toast.assignNoResponse"));
       return;
     }
     if (!env.ok) {
-      toast.error(env.errors?.[0]?.message ?? "Assignment failed.");
+      toast.error(env.errors?.[0]?.message ?? t("toast.assignFailed"));
       return;
     }
     const payload = env.data;
     if (!payload) {
-      toast.error("Assignment returned no payload.");
+      toast.error(t("toast.assignNoPayload"));
       return;
     }
     toast.success(
-      `Moved to ${payload.projectName || payload.projectSlug} under ${payload.teamName || payload.teamSlug}.`
+      t("toast.moved", {
+        project: payload.projectName || payload.projectSlug,
+        team: payload.teamName || payload.teamSlug,
+      })
     );
   }
 
@@ -137,14 +142,14 @@ export function useAssignProject({
     });
     const env = data?.assignAstroliftAppToProject;
     if (!env) {
-      toast.error("Unassign failed: no response from backend.");
+      toast.error(t("toast.unassignNoResponse"));
       return;
     }
     if (!env.ok) {
-      toast.error(env.errors?.[0]?.message ?? "Unassign failed.");
+      toast.error(env.errors?.[0]?.message ?? t("toast.unassignFailed"));
       return;
     }
-    toast.success("App is now unassigned.");
+    toast.success(t("toast.unassigned"));
   }
 
   return {

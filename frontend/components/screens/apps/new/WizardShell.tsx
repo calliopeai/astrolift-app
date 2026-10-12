@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeftIcon, ArrowRightIcon, CheckIcon, XIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { PageShell } from "@/components/PageShell";
@@ -38,29 +39,30 @@ export interface WizardShellProps {
 export function WizardShell({
   step,
   steps,
-  title = "Register app",
-  description = "Connect a Git repository. We'll fetch the manifest, register the app, and run the OnboardAppWorkflow.",
+  title,
+  description,
   onStepClick,
   onBack,
   onNext,
   onCancel,
-  nextLabel = "Next",
+  nextLabel,
   nextDisabled = false,
   nextLoading = false,
   hideNext = false,
   children,
 }: WizardShellProps) {
+  const t = useTranslations("appWizard.shell");
   const current = steps[step - 1];
 
   return (
     <PageShell
-      title={title}
-      description={description}
+      title={title ?? t("title")}
+      description={description ?? t("description")}
       actions={
         onCancel ? (
           <Button variant="ghost" size="sm" onClick={onCancel}>
             <XIcon className="size-4" />
-            Cancel
+            {t("cancel")}
           </Button>
         ) : undefined
       }
@@ -85,7 +87,7 @@ export function WizardShell({
                   canJump && "cursor-pointer hover:opacity-80"
                 )}
                 aria-current={isActive ? "step" : undefined}
-                aria-label={`Step ${idx}: ${s.label}`}
+                aria-label={t("stepLabel", { step: idx, label: s.label })}
               >
                 {isDone ? <CheckIcon className="size-3.5" /> : idx}
               </button>
@@ -111,7 +113,7 @@ export function WizardShell({
         <CardContent className="flex flex-col gap-6 p-6">
           <div>
             <h2 className="text-lg font-semibold">
-              Step {step} of {steps.length} — {current?.label}
+              {t("heading", { step, total: steps.length, label: current?.label ?? "" })}
             </h2>
             {current?.description && (
               <p className="text-muted-foreground mt-1 text-sm">{current.description}</p>
@@ -124,11 +126,11 @@ export function WizardShell({
       <div className="flex items-center justify-between">
         <Button type="button" variant="ghost" onClick={onBack} disabled={!onBack}>
           <ArrowLeftIcon className="size-4" />
-          Back
+          {t("back")}
         </Button>
         {!hideNext && (
           <Button type="button" onClick={onNext} disabled={nextDisabled || nextLoading || !onNext}>
-            {nextLabel}
+            {nextLabel ?? t("next")}
             {nextLoading ? null : <ArrowRightIcon className="size-4" />}
           </Button>
         )}

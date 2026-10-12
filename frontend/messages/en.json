@@ -4984,6 +4984,531 @@
       "review": "Review"
     }
   },
+  "appControls": {
+    "deployToken": {
+      "title": "Deploy token",
+      "description": "App-scoped machine token. Use as <code>ASTROLIFT_DEPLOY_TOKEN</code> in your CI.",
+      "lastUsed": "last used {date}",
+      "neverUsed": "never used",
+      "missing": "No token: CI cannot trigger deployments until one is generated.",
+      "rotate": "Rotate",
+      "revoke": "Revoke",
+      "generate": "Generate token",
+      "rotateTitle": "Rotate deploy token?",
+      "rotateDescription": "The previous value stops working immediately. Any CI run still holding the old token will fail until you update the secret on the CI side.",
+      "rotateConfirm": "Rotate token",
+      "revokeTitle": "Revoke deploy token?",
+      "revokeDescription": "CI runs using this token will start failing immediately. Mint a new token afterwards and update your CI secret to recover. There is no way to un-revoke; soft delete only.",
+      "revokeConfirm": "Revoke token",
+      "copied": "Copied to clipboard.",
+      "copyFailed": "Copy failed. Select the value and copy it manually.",
+      "revealTitle": "Deploy token: copy it now",
+      "revealWarning": "This is the only time the token is shown. If you navigate away without copying, rotate again to mint a fresh one.",
+      "copiedLabel": "Copied",
+      "copy": "Copy",
+      "revealStore": "Store as <code>ASTROLIFT_DEPLOY_TOKEN</code> in your CI provider’s secrets.",
+      "saved": "I’ve saved it",
+      "toast": {
+        "minted": "Deploy token minted.",
+        "createFailed": "Create failed.",
+        "rotated": "Token rotated. Copy the new value now.",
+        "rotateFailed": "Rotate failed.",
+        "revoked": "Token revoked.",
+        "revokeFailed": "Revoke failed."
+      }
+    },
+    "deploymentPanel": {
+      "emptyTitle": "No deployments yet",
+      "emptyDescription": "Trigger a deploy from the CLI or push to the deploy branch to see status here.",
+      "current": "Current deployment",
+      "elapsed": "elapsed {duration}",
+      "took": "took {duration}",
+      "trigger": "trigger: <value>{kind}</value>",
+      "failed": "Deployment failed",
+      "openForLog": "Open the deployment for the full log.",
+      "rollbackTarget": "Rolling back targets {tag}.",
+      "confirmTitleGeneric": "Roll back?",
+      "since": "since {time}",
+      "stage": {
+        "queued": "Queued",
+        "rollingOut": "Rolling out",
+        "redeploying": "Redeploying",
+        "working": "Working"
+      },
+      "toast": {
+        "started": "Rollback started.",
+        "failed": "Rollback failed."
+      }
+    },
+    "pendingDeployments": {
+      "titleApprover": "Waiting on your approval",
+      "title": "Pending approval",
+      "descriptionApprover": "Review each candidate before unlocking the rollout.",
+      "description": "Waiting on a reviewer with the `{permission}` permission.",
+      "canApprove": "You can approve",
+      "readOnly": "Read-only",
+      "approvals": "{received}/{required} approvals",
+      "received": "Received {when}",
+      "reject": "Reject",
+      "approve": "Approve & deploy",
+      "approveTitle": "Approve {tag}?",
+      "approveDescription": "This unblocks the rollout to {environment}. The workflow resumes immediately; there is no way to pause it again before traffic shifts.",
+      "approveDescriptionDefault": "This unblocks the rollout to the target environment. The workflow resumes immediately; there is no way to pause it again before traffic shifts.",
+      "rejectReason": "Reason for rejection",
+      "rejectReasonPlaceholder": "Why is this deploy being rejected? Stored on the audit log + history sidebar.",
+      "rejectTitle": "Reject {tag}?",
+      "rejectDescription": "The pending deployment is aborted. CI must re-trigger to create a fresh deployment for review.",
+      "toast": {
+        "approved": "Approved {tag}.",
+        "approveFailed": "Approve failed.",
+        "rejected": "Deployment rejected.",
+        "rejectFailed": "Reject failed."
+      }
+    }
+  },
+  "appWizard": {
+    "details": {
+      "name": "Name",
+      "nameHelp": "Human-readable name shown in the UI.",
+      "nameRequired": "Give the app a name.",
+      "slug": "Slug",
+      "slugPlaceholder": "lowercase, hyphens, 1-40 chars",
+      "slugRequired": "A slug is required.",
+      "slugInvalid": "Lowercase letters, digits, and hyphens only (max 40 chars).",
+      "slugHelp": "URL-safe identifier. Auto-derived from the name; override to taste.",
+      "description": "Description",
+      "descriptionPlaceholder": "What does this app do?",
+      "team": "Team (filter)",
+      "allTeams": "All teams",
+      "teamHelp": "Optional filter. Apps belong to a project (which belongs to a team).",
+      "project": "Project",
+      "noProjects": "No projects in this scope",
+      "selectProject": "Select a project",
+      "noProjectsHelp": "No projects in this scope. Pick another team, or create a project first.",
+      "projectRequired": "Pick the project this app belongs to."
+    },
+    "repo": {
+      "noClusterTitle": "No managed clusters yet",
+      "noClusterDescription": "Astrolift deploys apps to Kubernetes clusters that have been brought into management (#316). Connect a cluster, install prereqs, then click Bring into management.",
+      "manageClusters": "Manage clusters",
+      "noConnectionsTitle": "No source connections yet",
+      "noConnectionsDescription": "Connect a Git host (GitHub App, GitLab OAuth, or a personal-access token) so the platform can list your repositories and watch them for pushes.",
+      "registeredNote": "{count, plural, one {This repo already hosts # registered app (different manifest path).} other {This repo already hosts # registered apps (different manifest path).}}",
+      "missingHost": "Missing a host? Connect another source →",
+      "picked": "Picked <code>{repo}</code> on <code>{branch}</code>.",
+      "introTitle": "How registration works",
+      "introDescription": "Three steps: Source (the repo and its manifest), Run (the app and how it deploys), then Review.",
+      "introSource": "1 Source",
+      "introSourceDescription": "Pick a source connection and repo; we load or scaffold its astrolift.toml manifest.",
+      "introRun": "2 Run",
+      "introRunDescription": "Name the app, pick its project, and choose a trigger: auto on push, cron, or manual.",
+      "introReview": "3 Review",
+      "introReviewDescription": "See what will be created and what will deploy, then create the app."
+    },
+    "title": "New app",
+    "stepsLabel": "Steps",
+    "done": "done",
+    "cancel": "Cancel",
+    "back": "Back",
+    "continue": "Continue",
+    "steps": {
+      "source": {
+        "label": "Source",
+        "description": "The repository, and the astrolift.toml manifest that says what it runs."
+      },
+      "run": {
+        "label": "Run",
+        "description": "The app's name and project, then how and when it deploys."
+      },
+      "review": {
+        "label": "Review",
+        "description": "What will be created and what will deploy. Nothing happens until you create it."
+      }
+    },
+    "shell": {
+      "title": "Register app",
+      "description": "Connect a Git repository. We'll fetch the manifest, register the app, and run the OnboardAppWorkflow.",
+      "cancel": "Cancel",
+      "stepLabel": "Step {step}: {label}",
+      "heading": "Step {step} of {total}: {label}",
+      "back": "Back",
+      "next": "Next"
+    },
+    "approver": {
+      "orphanUser": "user {id}"
+    },
+    "strategy": {
+      "timingTitle": "When should this app deploy?",
+      "timingHelp": "Pick a path for first deploy. You can change strategy later from the app page.",
+      "timing": {
+        "now": {
+          "label": "Deploy now",
+          "description": "Pick a trigger and kick off the first deploy as soon as registration completes."
+        },
+        "later": {
+          "label": "Configure, deploy later",
+          "description": "Lock in trigger and approval settings now; first deploy runs on the next event."
+        },
+        "skip": {
+          "label": "Skip, configure later",
+          "description": "Just register the app. Set up triggers, approvals, and deploys from the app page."
+        }
+      },
+      "triggerTitle": "Trigger mode",
+      "triggerHelp": "What event causes a deploy to run?",
+      "modes": {
+        "auto_on_push": "Deploy whenever a commit lands on the selected branch (via SCM webhook).",
+        "cron": "Deploy on a recurring schedule.",
+        "manual": "Deploys only run when someone explicitly triggers them."
+      },
+      "comingSoon": "Coming soon",
+      "deployBranch": "Deploy branch",
+      "deployBranchHelp": "Pushes to this branch will trigger a deploy. Defaults to the repo's default branch.",
+      "deployBranchRequired": "Name the branch whose pushes deploy.",
+      "cronLabel": "Cron expression",
+      "cronHelp": "Five fields (minute hour day month weekday).",
+      "cronHint": {
+        "invalid": "Five-field cron expression expected.",
+        "hourly": "Hourly, on the hour.",
+        "every5": "Every 5 minutes.",
+        "daily": "Daily at 03:00.",
+        "weekly": "Weekly on Sunday at 00:00.",
+        "monthly": "Monthly on the 1st at 00:00.",
+        "custom": "Custom schedule."
+      },
+      "skipped": "Trigger mode and approval gates are skipped for now. Once registration completes you can wire those up from the app's Settings tab."
+    },
+    "manifest": {
+      "pathLabel": "Manifest path",
+      "pathHelp": "Where <code>astrolift.toml</code> lives in the repo. Defaults to the repository root. Monorepos can host multiple apps; point each registration at its own path (e.g. <code>services/api/astrolift.toml</code>).",
+      "branchLabel": "Default branch",
+      "laterTitle": "Set up manifest later",
+      "laterHelp": "Register the app now without a manifest. We'll land you on the app's <b>Manifest</b> tab, where you can add or sync <code>astrolift.toml</code> when you're ready. Useful for an empty repo, or an agent config repo whose schema isn't an app manifest.",
+      "label": "Manifest",
+      "edit": "Edit",
+      "refetchTitle": "Test connection & re-fetch the manifest from the picked repo",
+      "fetching": "Fetching…",
+      "refetch": "Test & re-fetch",
+      "placeholder": "Paste an astrolift.toml manifest here.",
+      "maskedEnv": "Env values are masked because your role can't reveal secrets. Registration reads them from the repo. If you edit the manifest here, replace every masked value first.",
+      "agentConfigTitle": "This looks like an agent config repo",
+      "agentConfigBody": "It declares <code>astrolift_version</code> with <code>[skills.*]</code>/<code>[tools.*]</code> tables and no <code>[[workloads]]</code>; that's the agent library schema, not an app manifest. Onboard it as an agent fleet or import its skills and tools instead:",
+      "onboardFleet": "Onboard an agent fleet",
+      "importSkills": "Import skills / tools",
+      "agentConfigLater": "Or tick <b>Set up manifest later</b> above to register this repo without a manifest.",
+      "valid": "Manifest looks structurally valid (top-level <code>name</code> + at least one <code>[[workloads]]</code> block).",
+      "skipped": "Manifest step skipped; the app registers without a manifest. Add or sync it on the app's Manifest tab after onboarding.",
+      "loaded": "Loaded manifest from the repo.",
+      "fromRepo": "from repo",
+      "missing": "No manifest at that path. We've seeded a minimal template; edit it below or paste your own.",
+      "fetchFailed": "Couldn't fetch the manifest: {error}",
+      "retry": "Retry",
+      "noResponse": "no response from server",
+      "errors": {
+        "empty": "Manifest is empty.",
+        "name": "Top-level `name = \"...\"` is required.",
+        "workloads": "At least one `[[workloads]]` block is required."
+      }
+    },
+    "review": {
+      "source": "Source",
+      "repository": "Repository",
+      "defaultBranch": "Default branch",
+      "sourceKind": "Source kind",
+      "manifestPath": "Manifest path",
+      "manifest": "Manifest",
+      "manifestLater": "Set up later",
+      "manifestState": "{origin, select, repo {Loaded from repo} other {Drafted here}}, {valid, select, yes {valid shape} other {invalid}}",
+      "run": "Run",
+      "name": "Name",
+      "slug": "Slug",
+      "description": "Description",
+      "deployTiming": "Deploy timing",
+      "trigger": "Trigger",
+      "triggerLater": "Manual (configure later)",
+      "deployBranch": "Deploy branch",
+      "cron": "Cron",
+      "approvalGate": "Approval gate",
+      "timing": {
+        "now": "Deploy now",
+        "later": "Configure, deploy later",
+        "skip": "Skip, configure after onboarding"
+      },
+      "approval": {
+        "notRequired": "Not required",
+        "team": "Team approval, {count} required",
+        "users": "{min} of {count, plural, one {# selected user} other {# selected users}}",
+        "none": "Required, no approvers selected (fix on Run)"
+      },
+      "sideEffectsTitle": "What happens when you submit",
+      "sideEffectsHelp": "Toggle the side-effects you want. Items that depend on backend work that hasn't shipped yet (webhook install for PAT / OAuth-User connections) stay grayed out.",
+      "register": "Register the app",
+      "registerHelp": "Calls <code>registerApp</code>; the onboarding workflow provisions namespace + registry repo.",
+      "webhook": "Install SCM webhook",
+      "webhookCovered": "Already covered by your GitHub App install; no action needed.",
+      "webhookPending": "GitHub App installs handle this automatically; PAT/OAuth-User connections will get a per-repo webhook once that mutation lands.",
+      "alreadyInstalled": "Already installed",
+      "comingSoon": "Coming soon",
+      "pushWorkflow": "Push <code>{path}</code>",
+      "pushWorkflowHelp": "Commits a starter workflow that calls astro app deploy on every push to the deploy branch. You'll need to set ASTROLIFT_DEPLOY_TOKEN as a repo secret.",
+      "pushWorkflowUnavailable": "Available for GitHub or GitLab user-OAuth connections (and GitHub App installs). The selected connection can't push commits.",
+      "firstDeploy": "Trigger first deploy",
+      "firstDeployHelp": "Kick off an initial deploy once the onboarding workflow flips the app to <code>ready</code>.",
+      "submitFailed": "Submit failed",
+      "submitting": "Submitting…",
+      "willDeployTitle": "What will deploy",
+      "willDeployFirst": "A first deploy runs once onboarding lands the app in ready.",
+      "willDeployNothing": "Nothing deploys yet: registration only. Start a deploy from the app page.",
+      "noManifest": "No manifest yet, so there is nothing to deploy until you add one on the app's Manifest tab.",
+      "noWorkloads": "The manifest declares no workloads Astrolift can read here. The server validates it on create.",
+      "managedService": "Managed service"
+    }
+  },
+  "appHomes": {
+    "cronjob": {
+      "exitedWith": "Exited with code {code}",
+      "noReason": "No reason recorded",
+      "customSchedule": "Custom schedule",
+      "dueNow": "due now",
+      "notStarted": "not started",
+      "noExitCode": "no exit code",
+      "exit": "exit {code}",
+      "schedule": "Schedule",
+      "lastRunFailed": "Last run failed",
+      "noScheduleShort": "No schedule set",
+      "concurrency": "Concurrency: <mono>{policy}</mono>",
+      "nextRun": "Next run",
+      "nextRunUnknown": "Couldn't compute the next run for this expression.",
+      "noSchedule": "No schedule set.",
+      "runHistory": "Run history",
+      "total": "{count} total",
+      "emptyTitle": "No runs recorded yet",
+      "emptyDescription": "Each scheduled execution will appear here once it fires."
+    },
+    "task": {
+      "stages": {
+        "queued": "Queued",
+        "provisioning": "Provisioning",
+        "running": "Running",
+        "completed": "Completed",
+        "failed": "Failed"
+      },
+      "latestRun": "Latest run",
+      "execution": "Execution",
+      "runStatus": "Run {status}",
+      "exitedWith": "Exited with code {code}",
+      "noReason": "No reason recorded",
+      "runStages": "Run stages",
+      "noRunYet": "No run recorded yet. A one-off task moves through these stages each time it runs.",
+      "runHistory": "Run history",
+      "emptyTitle": "No runs yet",
+      "emptyDescription": "Each one-off execution of this task appears here.",
+      "notStarted": "not started"
+    },
+    "bundle": {
+      "title": "Workloads in this bundle",
+      "description": "{workloads, plural, one {# workload} other {# workloads}} across {kinds, plural, one {# kind} other {# kinds}}. Open any workload for its deploy, config and logs.",
+      "emptyTitle": "No workloads yet",
+      "emptyDescription": "Workloads appear here once the manifest registers them.",
+      "replicas": "{count, plural, one {<mono>#</mono> replica} other {<mono>#</mono> replicas}}",
+      "public": "public"
+    },
+    "function": {
+      "title": "Trigger",
+      "description": "Runs on invoke and scales to zero when idle.",
+      "httpEndpoint": "HTTP endpoint",
+      "eventTriggered": "Event-triggered (no public HTTP endpoint). Invoked by the platform or an upstream producer."
+    },
+    "doctor": {
+      "title": "App doctor",
+      "description": "Checks each dependency this app needs and reports whether it is actually usable. Runs live probes, so it only runs when you ask.",
+      "runAgain": "Run again",
+      "runChecks": "Run checks",
+      "notRun": "Nothing has run yet. Run checks to probe the manifest, registry, push role, DNS and deployments.",
+      "healthy": "Everything this app needs checks out.",
+      "unhealthy": "Some dependencies need attention; see below.",
+      "nothingToReport": "Nothing to report for this app.",
+      "checks": {
+        "manifest": "Manifest",
+        "autowire": "Repo wiring",
+        "registry_repo": "Container registry",
+        "push_role": "Push role",
+        "dns": "DNS",
+        "identity": "Pod identity",
+        "image": "Image pinning",
+        "deployments": "Deployments",
+        "cronjob_runs": "Scheduled runs",
+        "managed_services": "Managed services"
+      },
+      "status": {
+        "pass": "ok",
+        "fail": "failing",
+        "warn": "warning",
+        "skip": "not applicable",
+        "unknown": "unverified"
+      },
+      "repairs": {
+        "nothingToDo": "Nothing to do",
+        "resync_manifest": {
+          "label": "Resync manifest",
+          "done": "Manifest resynced from the repo",
+          "failed": "Resync manifest failed"
+        },
+        "retry_autowire": {
+          "label": "Retry autowire",
+          "done": "Autowire re-run",
+          "failed": "Retry autowire failed"
+        },
+        "rerun_onboarding": {
+          "label": "Re-run onboarding",
+          "done": "Onboarding re-run submitted",
+          "failed": "Re-run onboarding failed"
+        },
+        "redeploy": {
+          "label": "Deploy again",
+          "done": "Deploy dispatched",
+          "failed": "Deploy again failed"
+        }
+      }
+    }
+  },
+  "appOverviewCards": {
+    "assignProject": {
+      "unassigned": "Unassigned",
+      "title": "Project assignment",
+      "description": "Place this app under a project to group it in the sidebar and scope team-level permissions. Apps without a project surface in the team's \"Unassigned\" bucket.",
+      "current": "Current project",
+      "needsPermission": "You need the <mono>{permission}</mono> permission to change this assignment.",
+      "moveTo": "Move to project",
+      "noProjects": "No projects you can assign to",
+      "pickProject": "Pick a target project",
+      "save": "Save",
+      "unassign": "Unassign",
+      "toast": {
+        "assignNoResponse": "Assignment failed: no response from backend.",
+        "assignFailed": "Assignment failed.",
+        "assignNoPayload": "Assignment returned no payload.",
+        "moved": "Moved to {project} under {team}.",
+        "unassignNoResponse": "Unassign failed: no response from backend.",
+        "unassignFailed": "Unassign failed.",
+        "unassigned": "App is now unassigned."
+      }
+    },
+    "observability": {
+      "title": "Observability",
+      "description": "Last {days} days · deploy throughput, failure rate, unresolved alerts.",
+      "metrics": "Metrics",
+      "alerts": "Alerts",
+      "deploysPerDay": "Deploys / day",
+      "acrossDays": "across {days} days",
+      "noDeploys": "No deploys",
+      "failures": "Failures",
+      "ofRollouts": "{pct} of rollouts",
+      "noRollouts": "no rollouts yet",
+      "noFailures": "No failures",
+      "unresolvedAlerts": "Unresolved alerts",
+      "critical": "{count} critical",
+      "allClear": "All clear",
+      "pending": "{count} pending",
+      "open": "Open"
+    },
+    "githubConnect": {
+      "title": "Connect your GitHub to manage this app",
+      "description": "Astrolift uses your personal GitHub identity to browse the repo, sync the manifest, and install webhooks. Org-level setup is already in place; this is just the per-user link.",
+      "connect": "Connect GitHub"
+    },
+    "provisioning": {
+      "title": "Provisioning infrastructure",
+      "done": "done",
+      "steps": {
+        "registry": "Container registry",
+        "namespace": "Kubernetes namespace",
+        "identity": "Cloud identity (IRSA)",
+        "managed_services": "Managed services",
+        "ready": "Mark ready"
+      }
+    },
+    "teams": {
+      "title": "Teams",
+      "description": "Teams that can reach this app. The home team owns the app and inherits OWNER access; additional teams can be granted viewer, deployer, or owner roles.",
+      "team": "Team",
+      "home": "Home",
+      "accessLevel": "Access level",
+      "actions": "Actions",
+      "levels": {
+        "viewer": "Viewer",
+        "deployer": "Deployer",
+        "owner": "Owner"
+      },
+      "levelDescriptions": {
+        "viewer": "Read-only: can view this app, no deploy or mutate rights.",
+        "deployer": "Read + deploy: can trigger rollouts, rotate tokens, edit manifest.",
+        "owner": "Full control, including granting access to other teams."
+      },
+      "homeLevelFixed": "Home team access is fixed at OWNER. Move the app to a different team to change this.",
+      "cannotRevokeHome": "Cannot revoke the home team. Move the app to a different team first.",
+      "revokeAccess": "Revoke access",
+      "revoke": "Revoke",
+      "moveHomeTeam": "Move home team",
+      "allTeamsHaveAccess": "Every team in this org already has access.",
+      "addTeam": "Add team",
+      "grantsLabel": "Team access grants",
+      "searchPlaceholder": "Search teams by name or slug…",
+      "allView": "All",
+      "emptyTitle": "No team access grants",
+      "emptyDescription": "Add a team to give it visibility and operational rights on this app.",
+      "revokeTitle": "Revoke {team}'s access?",
+      "revokeTitleGeneric": "Revoke access?",
+      "revokeDescription": "The team loses visibility and operational rights on this app. Soft-delete only; the grant can be re-added at any time.",
+      "addTitle": "Add team access",
+      "addDescription": "Pick a team in this organization and the access level it should hold on this app.",
+      "loadingTeams": "Loading teams…",
+      "everyTeamHasAccess": "Every team already has access",
+      "selectTeam": "Select a team",
+      "cancel": "Cancel",
+      "granting": "Granting…",
+      "grantAccess": "Grant access",
+      "moveDescription": "Change the app's primary / home team. The target team gains OWNER access; the previous home team is downgraded to DEPLOYER (not revoked). The app's project must already belong to the target team; otherwise re-anchor the project first.",
+      "currentHomeTeam": "Current home team",
+      "moveToTeam": "Move to team",
+      "noOtherTeams": "No other teams in this org",
+      "pickTargetTeam": "Pick a target team",
+      "moving": "Moving…",
+      "moveApp": "Move app",
+      "toast": {
+        "updated": "Updated {team} to {level}.",
+        "updateFailed": "Update failed.",
+        "revoked": "Revoked {team}'s access.",
+        "revokeFailed": "Revoke failed.",
+        "moved": "App moved to the new home team.",
+        "moveFailed": "Move failed.",
+        "granted": "Granted access at level {level}.",
+        "grantFailed": "Grant failed."
+      }
+    },
+    "url": {
+      "provisioning": "Provisioning · ~2 min",
+      "notRoutable": "URL not yet routable",
+      "notAssigned": "URL not yet assigned; the first deploy will publish it",
+      "title": "Public URL",
+      "description": "The platform-issued host for this app. Edit the subdomain to rename it; DNS and certificates re-issue automatically.",
+      "copy": "Copy",
+      "needsPermission": "You need the <mono>{permission}</mono> permission to rename this subdomain.",
+      "subdomain": "Subdomain",
+      "save": "Save",
+      "cancel": "Cancel",
+      "invalid": "Lowercase DNS host: letters, digits, hyphens, and dots. Each label must start and end with a letter or digit.",
+      "keys": "Press <kbd>Enter</kbd> to save or <kbd>Esc</kbd> to cancel.",
+      "edit": "Edit",
+      "toast": {
+        "noResponse": "Subdomain change failed: no response from backend.",
+        "failed": "Subdomain change failed.",
+        "changed": "Subdomain changed to {subdomain}.",
+        "copied": "URL copied to clipboard.",
+        "copyFailed": "Couldn't copy: clipboard unavailable."
+      }
+    }
+  },
   "projectResources": {
     "operation": {
       "label": "Last operation:",

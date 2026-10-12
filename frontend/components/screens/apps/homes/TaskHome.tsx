@@ -1,6 +1,7 @@
 "use client";
 
 import { HistoryIcon, ListChecksIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { Timeline, type StepState, type TimelineStep } from "@/components/run/Timeline";
@@ -43,6 +44,15 @@ function isFailed(status: string): boolean {
   return ["failed", "error", "timed_out"].includes(status.toLowerCase());
 }
 
+/** Stage names (English, as `taskStages` emits them) to keys under `appHomes.task.stages`. */
+const STAGE_KEYS: Record<string, "queued" | "provisioning" | "running" | "completed" | "failed"> = {
+  Queued: "queued",
+  Provisioning: "provisioning",
+  Running: "running",
+  Completed: "completed",
+  Failed: "failed",
+};
+
 /** The latest run's lifecycle as the shared run Timeline's steps. */
 export function taskStages(latest: AstroliftTaskRun | null): TimelineStep[] {
   const reached = latest ? stageIndex(latest.status) : -1;
@@ -72,11 +82,13 @@ export function taskStages(latest: AstroliftTaskRun | null): TimelineStep[] {
 export function TaskHomeScreen({ runs, loading, error, onRetry }: TaskHomeScreenProps) {
   const latest = runs[0] ?? null;
   const failed = latest ? isFailed(latest.status) : false;
+  const t = useTranslations("appHomes.task");
+  const steps = taskStages(latest).map((s) => ({ ...s, name: t(`stages.${STAGE_KEYS[s.name]}`) }));
 
   return (
     <PanelGrid>
       <Panel
-        title={latest ? "Latest run" : "Execution"}
+        title={latest ? t("latestRun") : t("execution")}
         icon={<ListChecksIcon className="size-4" />}
         span={4}
         loading={loading && runs.length === 0}
@@ -85,25 +97,21 @@ export function TaskHomeScreen({ runs, loading, error, onRetry }: TaskHomeScreen
         failure={
           latest && failed
             ? {
-                title: `Run ${titleCaseStatus(latest.status).toLowerCase()}`,
+                title: t("runStatus", { status: titleCaseStatus(latest.status).toLowerCase() }),
                 reason:
                   latest.exitCode != null
-                    ? `Exited with code ${latest.exitCode}${latest.k8sJobName ? ` · ${latest.k8sJobName}` : ""}`
-                    : latest.k8sJobName || "No reason recorded",
+                    ? `${t("exitedWith", { code: latest.exitCode })}${latest.k8sJobName ? ` · ${latest.k8sJobName}` : ""}`
+                    : latest.k8sJobName || t("noReason"),
               }
             : null
         }
       >
-        <Timeline steps={taskStages(latest)} label="Run stages" />
-        {!latest && (
-          <p className="text-muted-foreground mt-3 text-xs">
-            No run recorded yet. A one-off task moves through these stages each time it runs.
-          </p>
-        )}
+        <Timeline steps={steps} label={t("runStages")} />
+        {!latest && <p className="text-muted-foreground mt-3 text-xs">{t("noRunYet")}</p>}
       </Panel>
 
       <Panel
-        title="Run history"
+        title={t("runHistory")}
         icon={<HistoryIcon className="size-4" />}
         span={8}
         loading={loading && runs.length === 0}
@@ -114,8 +122,8 @@ export function TaskHomeScreen({ runs, loading, error, onRetry }: TaskHomeScreen
           runs.length === 0
             ? {
                 icon: <ListChecksIcon className="size-5" />,
-                title: "No runs yet",
-                description: "Each one-off execution of this task appears here.",
+                title: t("emptyTitle"),
+                description: t("emptyDescription"),
               }
             : null
         }
@@ -126,7 +134,7 @@ export function TaskHomeScreen({ runs, loading, error, onRetry }: TaskHomeScreen
               <StatusDot status={runStatusDot(r.status)} />
               <span className="w-24 shrink-0">{titleCaseStatus(r.status)}</span>
               <span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">
-                {r.startedAt ? formatRelativeAge(r.startedAt) : "not started"}
+                {r.startedAt ? formatRelativeAge(r.startedAt) : t("notStarted")}
               </span>
               <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
                 {formatDuration(r.durationSeconds)}
