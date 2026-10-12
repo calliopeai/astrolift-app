@@ -1,9 +1,11 @@
 import { ApolloClient, ApolloLink, InMemoryCache, Observable } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AstroliftProject } from "@/graphql/identity/identity.types";
+import messages from "@/messages/en.json";
 import {
   useNewAgent,
   initialWizardState as agentState,
@@ -95,7 +97,9 @@ function source(initial: AstroliftProject[] = [own, foreign, deleted]) {
       rows = next;
     },
     wrapper: ({ children }: { children: ReactNode }) => (
-      <ApolloProvider client={client}>{children}</ApolloProvider>
+      <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
+        <ApolloProvider client={client}>{children}</ApolloProvider>
+      </NextIntlClientProvider>
     ),
   };
 }

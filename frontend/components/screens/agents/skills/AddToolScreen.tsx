@@ -2,6 +2,7 @@
 
 import { AlertTriangleIcon, ArrowLeftIcon, ArrowRightIcon, Loader2Icon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { ShellHeader } from "@/components/shell/ShellHeader";
@@ -36,8 +37,6 @@ export type AddToolScreenProps = AddToolState & {
   initialErrors?: ToolErrors;
 };
 
-const STEPS = [{ label: "Tool" }, { label: "Handler" }, { label: "Schemas" }];
-
 const slugify = (value: string) =>
   value
     .toLowerCase()
@@ -58,6 +57,15 @@ export function AddToolScreen({
   initialStep = 1,
   initialErrors = {},
 }: AddToolScreenProps) {
+  const tr = useTranslations("agentSkills.addTool");
+  const common = useTranslations("agentSkills.common");
+  const validation = useTranslations("agentSkills.validation");
+  const adapters = useTranslations("agentToolRegistry");
+  const steps = [
+    { label: tr("stepTool") },
+    { label: tr("stepHandler") },
+    { label: tr("stepSchemas") },
+  ];
   const [step, setStep] = React.useState<1 | 2 | 3>(initialStep);
   const [name, setName] = React.useState("");
   const [slug, setSlug] = React.useState("");
@@ -95,7 +103,7 @@ export function AddToolScreen({
     e.preventDefault();
     if (step < 3) {
       // Continue checks only the fields on the steps done so far.
-      const found = validateTool(fields);
+      const found = validateTool(fields, validation);
       const here = (Object.keys(found) as ToolField[]).filter((k) => TOOL_STEP[k] <= step);
       if (here.length > 0) {
         setErrors(Object.fromEntries(here.map((k) => [k, found[k]])));
@@ -134,11 +142,11 @@ export function AddToolScreen({
       <ShellHeader
         crumbs={agentsCrumbs(
           "skills",
-          { label: skill?.name ?? "Skill", href: skillTabHref(skillId, "builder") },
-          { label: "Register tool" }
+          { label: skill?.name ?? common("skill"), href: skillTabHref(skillId, "builder") },
+          { label: common("registerTool") }
         )}
-        title="Register tool"
-        context={<FlowSteps steps={STEPS} current={step} />}
+        title={common("registerTool")}
+        context={<FlowSteps steps={steps} current={step} />}
       />
 
       <form
@@ -162,11 +170,11 @@ export function AddToolScreen({
               {field(
                 "tool-name",
                 "name",
-                "Name",
+                common("name"),
                 <Input
                   id="tool-name"
                   value={name}
-                  placeholder="e.g. search_docs"
+                  placeholder={tr("namePlaceholder")}
                   aria-invalid={invalid("name")}
                   onChange={(e) => {
                     setName(e.target.value);
@@ -178,7 +186,7 @@ export function AddToolScreen({
               {field(
                 "tool-slug",
                 "slug",
-                "Slug",
+                common("slug"),
                 <Input
                   id="tool-slug"
                   value={slug}
@@ -197,11 +205,11 @@ export function AddToolScreen({
             {field(
               "tool-description",
               "description",
-              "Description",
+              common("description"),
               <Input
                 id="tool-description"
                 value={description}
-                placeholder="What this tool does"
+                placeholder={common("toolDescriptionPlaceholder")}
                 aria-invalid={invalid("description")}
                 onChange={(e) => {
                   setDescription(e.target.value);
@@ -217,7 +225,7 @@ export function AddToolScreen({
             {field(
               "tool-adapter",
               "adapter",
-              "Adapter",
+              tr("adapter"),
               <Select
                 value={adapter}
                 onValueChange={(v) => {
@@ -235,7 +243,7 @@ export function AddToolScreen({
                 <SelectContent>
                   {ADAPTERS.map((a) => (
                     <SelectItem key={a.value} value={a.value}>
-                      {a.label}
+                      {adapters(a.value)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -244,7 +252,7 @@ export function AddToolScreen({
             {field(
               "tool-handler",
               "handlerRef",
-              "Handler ref",
+              tr("handlerRef"),
               <Input
                 id="tool-handler"
                 value={handlerRef}
@@ -257,7 +265,7 @@ export function AddToolScreen({
                   clear("handlerRef");
                 }}
               />,
-              "A dotted Python path, an HTTP URL or an MCP server address, by adapter."
+              tr("handlerHelp")
             )}
           </div>
         )}
@@ -267,7 +275,7 @@ export function AddToolScreen({
             {field(
               "tool-input",
               "inputSchema",
-              "Input schema (JSON)",
+              tr("inputSchema"),
               <Textarea
                 id="tool-input"
                 value={inputSchemaText}
@@ -283,7 +291,7 @@ export function AddToolScreen({
             {field(
               "tool-output",
               "outputSchema",
-              "Output schema (JSON)",
+              tr("outputSchema"),
               <Textarea
                 id="tool-output"
                 value={outputSchemaText}
@@ -301,23 +309,23 @@ export function AddToolScreen({
 
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 border-t pt-4">
           <Button type="button" variant="ghost" asChild className="mr-auto">
-            <Link href={toolsHref}>Cancel</Link>
+            <Link href={toolsHref}>{common("cancel")}</Link>
           </Button>
           {step > 1 && (
             <Button type="button" variant="outline" onClick={() => setStep((step - 1) as 1 | 2)}>
               <ArrowLeftIcon className="size-4" />
-              Back
+              {common("back")}
             </Button>
           )}
           {step < 3 ? (
             <Button type="submit">
-              Continue
+              {common("continue")}
               <ArrowRightIcon className="size-4" />
             </Button>
           ) : (
             <Button type="submit" disabled={creating}>
               {creating && <Loader2Icon className="size-4 animate-spin" />}
-              {creating ? "Registering…" : "Register tool"}
+              {creating ? tr("registering") : common("registerTool")}
             </Button>
           )}
         </div>

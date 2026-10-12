@@ -10,6 +10,7 @@ import {
   TrashIcon,
   WrenchIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useRef, useState } from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -63,6 +64,9 @@ export function SkillBuilderScreen({
   aiAssist,
   initialErrors = {},
 }: SkillBuilderScreenProps) {
+  const tr = useTranslations("agentSkills.builder");
+  const common = useTranslations("agentSkills.common");
+  const adapters = useTranslations("agentToolRegistry");
   const [name, setName] = useState(skill?.name ?? "");
   const [slug, setSlug] = useState(skill?.slug ?? "");
   const [description, setDescription] = useState(skill?.description ?? "");
@@ -115,10 +119,10 @@ export function SkillBuilderScreen({
 
   const primaryAction = (
     <>
-      {dirty && <span className="text-muted-foreground text-xs">Unsaved changes</span>}
+      {dirty && <span className="text-muted-foreground text-xs">{common("unsavedChanges")}</span>}
       <Button type="submit" form={FORM_ID} size="sm" disabled={saving || !dirty}>
         {saving && <Loader2Icon className="size-4 animate-spin" />}
-        Save skill
+        {tr("save")}
       </Button>
     </>
   );
@@ -126,7 +130,7 @@ export function SkillBuilderScreen({
   const menu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button size="icon" variant="ghost" className="size-8" aria-label="More actions">
+        <Button size="icon" variant="ghost" className="size-8" aria-label={common("moreActions")}>
           <MoreHorizontalIcon className="size-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -137,7 +141,7 @@ export function SkillBuilderScreen({
           onSelect={() => setConfirmDelete(true)}
         >
           <TrashIcon className="size-4" />
-          Delete skill
+          {tr("delete")}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
@@ -165,11 +169,11 @@ export function SkillBuilderScreen({
           </div>
         )}
         <PanelGrid>
-          <Panel title="Details" icon={<FileTextIcon className="size-4" />} span={8}>
+          <Panel title={tr("details")} icon={<FileTextIcon className="size-4" />} span={8}>
             <div className="flex min-w-0 flex-col gap-4">
               <div className="grid min-w-0 gap-4 sm:grid-cols-2">
                 <Field data-invalid={Boolean(errors.name) || undefined} className="min-w-0">
-                  <FieldLabel htmlFor="skill-name">Name</FieldLabel>
+                  <FieldLabel htmlFor="skill-name">{common("name")}</FieldLabel>
                   <Input
                     id="skill-name"
                     value={name}
@@ -179,7 +183,7 @@ export function SkillBuilderScreen({
                   <FieldError className="[overflow-wrap:anywhere]">{errors.name}</FieldError>
                 </Field>
                 <Field data-invalid={Boolean(errors.slug) || undefined} className="min-w-0">
-                  <FieldLabel htmlFor="skill-slug">Slug</FieldLabel>
+                  <FieldLabel htmlFor="skill-slug">{common("slug")}</FieldLabel>
                   <Input
                     id="skill-slug"
                     value={slug}
@@ -192,11 +196,11 @@ export function SkillBuilderScreen({
                 </Field>
               </div>
               <Field data-invalid={Boolean(errors.description) || undefined} className="min-w-0">
-                <FieldLabel htmlFor="skill-description">Description</FieldLabel>
+                <FieldLabel htmlFor="skill-description">{common("description")}</FieldLabel>
                 <Input
                   id="skill-description"
                   value={description}
-                  placeholder="Short description shown in search and picker"
+                  placeholder={common("skillDescriptionPlaceholder")}
                   aria-invalid={Boolean(errors.description) || undefined}
                   onChange={(e) => edit(setDescription, "description")(e.target.value)}
                 />
@@ -206,7 +210,7 @@ export function SkillBuilderScreen({
           </Panel>
 
           <ListSummary
-            title="Tools"
+            title={common("tools")}
             icon={<WrenchIcon className="size-4" />}
             span={4}
             count={toolsLoading || toolsError ? null : tools.length}
@@ -218,7 +222,7 @@ export function SkillBuilderScreen({
                   {t.name}
                 </span>
                 <Badge variant="secondary" className="shrink-0 text-xs">
-                  {ADAPTER_LABEL[t.adapter] ?? t.adapter}
+                  {ADAPTER_LABEL[t.adapter] ? adapters(t.adapter) : t.adapter}
                 </Badge>
               </span>
             )}
@@ -231,20 +235,19 @@ export function SkillBuilderScreen({
               tools.length === 0
                 ? {
                     icon: <CodeIcon className="size-5" />,
-                    title: "No tool definitions",
-                    description:
-                      "Register tool definitions to give this skill executable capabilities.",
+                    title: common("noTools"),
+                    description: common("noToolsDescription"),
                     actionHref: `${skillTabHref(id, "tools")}/new`,
-                    actionLabel: "Register first tool",
+                    actionLabel: common("registerFirstTool"),
                   }
                 : null
             }
           />
 
           <Panel
-            title="Instructions"
+            title={tr("instructions")}
             icon={<SparklesIcon className="size-4" />}
-            description="Injected into the agent brief when this skill is active."
+            description={tr("instructionsDescription")}
             actions={
               <Button
                 type="button"
@@ -258,18 +261,18 @@ export function SkillBuilderScreen({
                 ) : (
                   <SparklesIcon className="size-3.5" />
                 )}
-                AI assist
+                {tr("aiAssist")}
               </Button>
             }
           >
             <Field data-invalid={Boolean(errors.content) || undefined} className="min-w-0">
               <FieldLabel htmlFor="skill-content" className="sr-only">
-                Instructions / content
+                {common("instructionsLabel")}
               </FieldLabel>
               <Textarea
                 id="skill-content"
                 value={content}
-                placeholder="System prompt / instructions injected into the agent brief when this skill is active"
+                placeholder={common("instructionsPlaceholder")}
                 rows={12}
                 className="max-h-96 font-mono text-sm"
                 aria-invalid={Boolean(errors.content) || undefined}
@@ -285,9 +288,9 @@ export function SkillBuilderScreen({
         <ConfirmDialog
           open={confirmDelete}
           onOpenChange={setConfirmDelete}
-          title={`Delete skill "${skill.name}"?`}
-          description="This cannot be undone. Agents that reference this skill lose it on their next run, and its tool definitions go with it."
-          confirmLabel="Delete skill"
+          title={tr("deleteTitle", { name: skill.name })}
+          description={tr("deleteDescription")}
+          confirmLabel={tr("delete")}
           destructive
           onConfirm={deleteSkill}
         />

@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Label } from "@/components/ui/label";
@@ -33,6 +34,7 @@ export function AgentProjectStepView<S extends AgentProjectFields>({
   allTeams,
   allProjects,
 }: AgentProjectStepViewProps<S>) {
+  const t = useTranslations("agentWizard.project");
   // Team selection is informational — it filters the project list. The
   // mutation takes a `projectId`, not a `teamId`.
   const [teamOverride, setTeamOverride] = React.useState<string | null>(null);
@@ -43,14 +45,11 @@ export function AgentProjectStepView<S extends AgentProjectFields>({
 
   return (
     <div className="flex flex-col gap-5">
-      <p className="text-muted-foreground text-sm">
-        Choose the project the discovered agents will be registered under. Each agent becomes a
-        workload on its own app within this project (which belongs to a team).
-      </p>
+      <p className="text-muted-foreground text-sm">{t("intro")}</p>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="team">Team (filter)</Label>
+          <Label htmlFor="team">{t("teamFilter")}</Label>
           <Select
             value={teamId || "__all__"}
             onValueChange={(v) => {
@@ -67,10 +66,10 @@ export function AgentProjectStepView<S extends AgentProjectFields>({
             }}
           >
             <SelectTrigger id="team">
-              <SelectValue placeholder="All teams" />
+              <SelectValue placeholder={t("allTeams")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">All teams</SelectItem>
+              <SelectItem value="__all__">{t("allTeams")}</SelectItem>
               {allTeams.map((t) => (
                 <SelectItem key={t.id} value={t.id}>
                   {t.slug} <span className="text-muted-foreground">— {t.name}</span>
@@ -78,13 +77,11 @@ export function AgentProjectStepView<S extends AgentProjectFields>({
               ))}
             </SelectContent>
           </Select>
-          <p className="text-muted-foreground text-xs">
-            Optional filter to narrow the project list.
-          </p>
+          <p className="text-muted-foreground text-xs">{t("teamHelp")}</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="project">
-            Project <span className="text-destructive">*</span>
+            {t("project")} <span className="text-destructive">*</span>
           </Label>
           <Select
             value={state.projectId}
@@ -92,9 +89,7 @@ export function AgentProjectStepView<S extends AgentProjectFields>({
           >
             <SelectTrigger id="project">
               <SelectValue
-                placeholder={
-                  filteredProjects.length === 0 ? "No projects in this scope" : "Select a project"
-                }
+                placeholder={filteredProjects.length === 0 ? t("noProjects") : t("selectProject")}
               />
             </SelectTrigger>
             <SelectContent>

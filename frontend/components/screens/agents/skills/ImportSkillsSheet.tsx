@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangleIcon, CheckCircle2Icon, GitBranchIcon, Loader2Icon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +41,8 @@ export function ImportSkillsSheet({
   clearResult,
   initialErrors = {},
 }: ImportSkillsSheetProps) {
+  const tr = useTranslations("agentSkills.import");
+  const common = useTranslations("agentSkills.common");
   const [repoUrl, setRepoUrl] = React.useState("");
   const [branch, setBranch] = React.useState("main");
   const [errors, setErrors] = React.useState<ImportErrors>(initialErrors);
@@ -63,26 +66,23 @@ export function ImportSkillsSheet({
     <Sheet open={open} onOpenChange={close}>
       <SheetContent className="flex flex-col overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Import skills from repo</SheetTitle>
-          <SheetDescription>
-            Fetch a GitHub repository&apos;s astrolift.toml and upsert the declared skills and tools
-            into this org.
-          </SheetDescription>
+          <SheetTitle>{tr("title")}</SheetTitle>
+          <SheetDescription>{tr("description")}</SheetDescription>
         </SheetHeader>
 
         {result ? (
           <div className="flex min-w-0 flex-1 flex-col gap-4 px-4">
             <div className="flex min-w-0 flex-wrap items-center gap-2">
               <CheckCircle2Icon className="text-success-fg size-4 shrink-0" aria-hidden />
-              <span className="text-sm font-medium">Import complete</span>
+              <span className="text-sm font-medium">{tr("complete")}</span>
               <Badge variant="outline" className="max-w-full min-w-0 font-mono text-xs">
                 <span className="min-w-0 truncate" title={result.sourceRef}>
                   {result.sourceRef}
                 </span>
               </Badge>
             </div>
-            <ImportedList title="Skills" items={result.importedSkills} />
-            <ImportedList title="Tools" items={result.importedTools} />
+            <ImportedList title={common("skills")} items={result.importedSkills} />
+            <ImportedList title={common("tools")} items={result.importedTools} />
             <SheetFooter className="px-0">
               <Button
                 variant="outline"
@@ -91,9 +91,9 @@ export function ImportSkillsSheet({
                   setRepoUrl("");
                 }}
               >
-                Import another
+                {tr("importAnother")}
               </Button>
-              <Button onClick={() => close(false)}>Done</Button>
+              <Button onClick={() => close(false)}>{tr("done")}</Button>
             </SheetFooter>
           </div>
         ) : (
@@ -112,7 +112,7 @@ export function ImportSkillsSheet({
               </div>
             )}
             <Field data-invalid={Boolean(errors.repoUrl) || undefined}>
-              <FieldLabel htmlFor="import-repo">Repository URL</FieldLabel>
+              <FieldLabel htmlFor="import-repo">{tr("repoUrl")}</FieldLabel>
               <Input
                 id="import-repo"
                 value={repoUrl}
@@ -128,12 +128,13 @@ export function ImportSkillsSheet({
               />
               <FieldError className="[overflow-wrap:anywhere]">{errors.repoUrl}</FieldError>
               <FieldDescription>
-                Must be a github.com repository. The repo must contain an
-                <span className="font-mono"> astrolift.toml</span> at its root.
+                {tr.rich("repoHelp", {
+                  code: (chunks) => <span className="font-mono">{chunks}</span>,
+                })}
               </FieldDescription>
             </Field>
             <Field data-invalid={Boolean(errors.branch) || undefined}>
-              <FieldLabel htmlFor="import-branch">Branch / ref</FieldLabel>
+              <FieldLabel htmlFor="import-branch">{tr("branchRef")}</FieldLabel>
               <Input
                 id="import-branch"
                 value={branch}
@@ -155,7 +156,7 @@ export function ImportSkillsSheet({
                 ) : (
                   <GitBranchIcon className="size-4" />
                 )}
-                {loading ? "Importing..." : "Import"}
+                {loading ? tr("importing") : tr("import")}
               </Button>
             </SheetFooter>
           </form>
@@ -166,13 +167,14 @@ export function ImportSkillsSheet({
 }
 
 function ImportedList({ title, items }: { title: string; items: string[] }) {
+  const common = useTranslations("agentSkills.common");
   return (
     <div className="min-w-0">
       <p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
         {title} (<span className="font-mono">{items.length}</span>)
       </p>
       {items.length === 0 ? (
-        <p className="text-muted-foreground text-xs italic">none</p>
+        <p className="text-muted-foreground text-xs italic">{common("none")}</p>
       ) : (
         <ul className="flex max-h-48 min-w-0 flex-col gap-0.5 overflow-y-auto">
           {items.map((s) => (

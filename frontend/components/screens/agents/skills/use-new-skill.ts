@@ -2,6 +2,7 @@
 
 import { useMutation } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { CREATE_SKILL } from "@/graphql/agents/agents.mutations";
@@ -34,6 +35,8 @@ export type NewSkillFields = SkillFields;
  */
 export function useNewSkill() {
   const router = useRouter();
+  const t = useTranslations("agentSkills.toasts");
+  const validation = useTranslations("agentSkills.validation");
   // Reactive org id (#1022): the synchronous cookie read races the
   // post-render effect that sets it, leaving orgId "" on cold load.
   const { org } = useActiveOrg();
@@ -44,7 +47,7 @@ export function useNewSkill() {
   });
 
   async function createSkill(fields: NewSkillFields): Promise<SkillErrors> {
-    const invalid = validateSkill(fields);
+    const invalid = validateSkill(fields, validation);
     if (hasErrors(invalid)) return invalid;
     try {
       const { data } = await createSkillMutation({
@@ -60,12 +63,12 @@ export function useNewSkill() {
         },
       });
       if (data?.createSkill?.ok && data.createSkill.data?.id) {
-        toast.success("Skill created");
+        toast.success(t("skillCreated"));
         router.push(`/agents/skills/${data.createSkill.data.id}`);
         return {};
       }
       const errors = splitErrors(data?.createSkill?.errors ?? [], SKILL_FIELDS);
-      return hasErrors(errors) ? errors : { form: "The skill was not created." };
+      return hasErrors(errors) ? errors : { form: t("skillNotCreated") };
     } catch (err) {
       return { form: err instanceof Error ? err.message : String(err) };
     }

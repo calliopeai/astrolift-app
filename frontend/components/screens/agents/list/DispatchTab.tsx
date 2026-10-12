@@ -14,6 +14,7 @@ import {
   ZapIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -44,7 +45,7 @@ import type {
   AstroliftAgentEnvironmentSpec,
   AstroliftAgentListItem,
 } from "@/graphql/agents/agents.types";
-import { formatRelativeAge } from "@/lib/format";
+import { useFormatters } from "@/lib/i18n/formatters";
 import { cn } from "@/lib/utils";
 
 import type { useDispatchTab } from "./use-dispatch-tab";
@@ -70,33 +71,28 @@ export type DispatchTabViewProps = ReturnType<typeof useDispatchTab> & {
 // pretending a Once-only mutation can fire it.
 type ModeMeta = {
   value: AgentRunMode;
-  label: string;
-  description: string;
+  key: "once" | "schedule" | "loop" | "trigger";
   icon: typeof ZapIcon;
 };
 const RUN_MODES: ModeMeta[] = [
   {
     value: "ONCE",
-    label: "Once",
-    description: "Dispatch a single run right now.",
+    key: "once",
     icon: ZapIcon,
   },
   {
     value: "SCHEDULE",
-    label: "Schedule",
-    description: "Run automatically on a cron cadence.",
+    key: "schedule",
     icon: ClockIcon,
   },
   {
     value: "LOOP",
-    label: "Loop",
-    description: "Re-dispatch continuously up to a concurrency cap.",
+    key: "loop",
     icon: RepeatIcon,
   },
   {
     value: "TRIGGER",
-    label: "Trigger",
-    description: "Run when a bound webhook or event fires.",
+    key: "trigger",
     icon: WebhookIcon,
   },
 ];
@@ -104,17 +100,22 @@ const RUN_MODES: ModeMeta[] = [
 // The agent's configured cadence, as a compact human label for the context
 // strip under the picker. Reads the lowercase stored run_family / run_mode off
 // the fleet row (the same values the Registry tab renders).
-function cadenceLabel(agent: AstroliftAgentListItem): string {
-  if ((agent.runFamily ?? "").toLowerCase() === "service") return "Service (always-on)";
+function cadenceLabel(
+  agent: AstroliftAgentListItem,
+  t: ReturnType<typeof useTranslations<"agentDispatch">>
+): string {
+  if ((agent.runFamily ?? "").toLowerCase() === "service") return t("cadence.service");
   switch ((agent.runMode ?? "").toLowerCase()) {
     case "schedule":
-      return agent.runCronExpression ? `Schedule · ${agent.runCronExpression}` : "Schedule";
+      return agent.runCronExpression
+        ? t("cadence.scheduleCron", { cron: agent.runCronExpression })
+        : t("cadence.schedule");
     case "loop":
-      return "Loop";
+      return t("cadence.loop");
     case "trigger":
-      return "Trigger";
+      return t("cadence.trigger");
     default:
-      return "Once (manual)";
+      return t("cadence.once");
   }
 }
 
@@ -162,6 +163,8 @@ export function DispatchTabView({
   /** Initial run mode (stories). */
   defaultRunMode?: AgentRunMode;
 }) {
+  const t = useTranslations("agentDispatch");
+  const fmt = useFormatters();
   const [selectedSlug, setSelectedSlug] = React.useState<string>(defaultAgentSlug);
   const [runMode, setRunMode] = React.useState<AgentRunMode>(defaultRunMode);
   const [payloadKind, setPayloadKind] = React.useState<"prompt" | "json">("prompt");
@@ -190,7 +193,7 @@ export function DispatchTabView({
       setJsonError(null);
       return true;
     } catch {
-      setJsonError("Invalid JSON — check syntax");
+      setJsonError(t("invalidJson"));
       return false;
     }
   }
@@ -230,7 +233,7 @@ export function DispatchTabView({
     try {
       payload = buildTriggerPayload();
     } catch {
-      setJsonError("Invalid JSON — check syntax");
+      setJsonError(t("invalidJson"));
       setConfirmOpen(false);
       return;
     }
@@ -246,16 +249,13 @@ export function DispatchTabView({
 
   // A short preview of the payload the confirm dialog echoes back.
   const payloadPreview =
-    payloadKind === "prompt" ? promptText.trim() || "None" : jsonText.trim() || "None";
+    payloadKind === "prompt" ? promptText.trim() || t("none") : jsonText.trim() || t("none");
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Dispatch a run</CardTitle>
-        <p className="text-muted-foreground text-sm">
-          Fire an on-demand run of any registered agent. The run appears in Runs and opens its own
-          detail view.
-        </p>
+        <CardTitle className="text-base">{t("title")}</CardTitle>
+        <p className="text-muted-foreground text-sm">{t("description")}</p>
       </CardHeader>
       <CardContent className="space-y-6">
         {fleetLoading && agents.length === 0 ? (
@@ -266,10 +266,10 @@ export function DispatchTabView({
         ) : agents.length === 0 ? (
           <EmptyState
             icon={<BotIcon className="size-5" />}
-            title="No agents registered"
-            description="Register an agent repo to scan it for agent manifests. Once an agent is registered you can dispatch runs of it here."
+            title={t("emptyTitle")}
+            description={t("emptyDescription")}
             actionHref="/agents/new"
-            actionLabel="Register an agent repo"
+            actionLabel={t("emptyAction")}
           />
         ) : (
           <>
@@ -277,12 +277,14 @@ export function DispatchTabView({
               <div className="border-success-fg/30 bg-success-fg/5 flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm">
                 <span className="inline-flex items-center gap-2">
                   <ZapIcon className="text-success-fg size-4" />
-                  Dispatched <span className="font-medium">{lastDispatched.name}</span>. It appears
-                  in Runs.
+                  {t.rich("dispatched", {
+                    name: lastDispatched.name,
+                    strong: (chunks) => <span className="font-medium">{chunks}</span>,
+                  })}
                 </span>
                 <Button asChild size="sm" variant="outline">
                   <Link href={`/agents/runs/${encodeURIComponent(lastDispatched.id)}`}>
-                    View run
+                    {t("viewRun")}
                   </Link>
                 </Button>
               </div>
@@ -290,10 +292,10 @@ export function DispatchTabView({
 
             {/* Agent picker + configured-cadence context strip. */}
             <div className="space-y-1.5">
-              <Label htmlFor="dispatch-agent">Agent</Label>
+              <Label htmlFor="dispatch-agent">{t("agent")}</Label>
               <Select value={selectedSlug} onValueChange={resetSelection}>
                 <SelectTrigger id="dispatch-agent" className="max-w-md">
-                  <SelectValue placeholder="Select a registered agent…" />
+                  <SelectValue placeholder={t("selectAgent")} />
                 </SelectTrigger>
                 <SelectContent>
                   {agents.map((a) => (
@@ -308,14 +310,14 @@ export function DispatchTabView({
               </Select>
               {selectedAgent && (
                 <div className="text-muted-foreground flex flex-wrap items-center gap-2 pt-1 text-xs">
-                  <span>Configured cadence:</span>
+                  <span>{t("configuredCadence")}</span>
                   <Badge variant="outline" className="font-normal">
-                    {cadenceLabel(selectedAgent)}
+                    {cadenceLabel(selectedAgent, t)}
                   </Badge>
-                  {selectedAgent.runPaused && <Badge variant="secondary">Paused</Badge>}
+                  {selectedAgent.runPaused && <Badge variant="secondary">{t("paused")}</Badge>}
                   {selectedAgent.lastRunAt && (
                     <span title={selectedAgent.lastRunAt}>
-                      Last run {formatRelativeAge(selectedAgent.lastRunAt)}
+                      {t("lastRun", { age: fmt.formatRelativeTime(selectedAgent.lastRunAt) })}
                       {selectedAgent.lastRunStatus
                         ? ` · ${titleCase(selectedAgent.lastRunStatus)}`
                         : ""}
@@ -329,7 +331,7 @@ export function DispatchTabView({
               <>
                 {/* Run-mode selector — the full matrix; only Once fires here. */}
                 <div className="space-y-2">
-                  <Label>Run mode</Label>
+                  <Label>{t("runMode")}</Label>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {RUN_MODES.map((m) => (
                       <ModeCard
@@ -385,37 +387,39 @@ export function DispatchTabView({
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Confirm dispatch</DialogTitle>
-            <DialogDescription>Fire a single run of this agent now.</DialogDescription>
+            <DialogTitle>{t("confirmTitle")}</DialogTitle>
+            <DialogDescription>{t("confirmDescription")}</DialogDescription>
           </DialogHeader>
           {selectedAgent && (
             <div className="space-y-2 text-sm">
-              <ConfirmRow label="Agent">
+              <ConfirmRow label={t("confirmAgent")}>
                 {selectedAgent.name}{" "}
                 <span className="text-muted-foreground font-mono text-xs">
                   {selectedAgent.slug}
                 </span>
               </ConfirmRow>
-              <ConfirmRow label="Mode">Once (immediate)</ConfirmRow>
-              <ConfirmRow label="Inputs">
+              <ConfirmRow label={t("confirmMode")}>{t("confirmModeOnce")}</ConfirmRow>
+              <ConfirmRow label={t("confirmInputs")}>
                 <span className="line-clamp-2 font-mono text-xs">{payloadPreview}</span>
               </ConfirmRow>
-              <ConfirmRow label="Environment">
-                {selectedSpec ? selectedSpec.name : "Agent default"}
+              <ConfirmRow label={t("confirmEnvironment")}>
+                {selectedSpec ? selectedSpec.name : t("agentDefault")}
               </ConfirmRow>
-              <ConfirmRow label="Timeout">
-                {parseTimeout(timeoutText) ? `${parseTimeout(timeoutText)}s` : "Default"}
+              <ConfirmRow label={t("confirmTimeout")}>
+                {parseTimeout(timeoutText)
+                  ? t("seconds", { seconds: parseTimeout(timeoutText) ?? 0 })
+                  : t("default")}
               </ConfirmRow>
             </div>
           )}
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button onClick={handleDispatch} disabled={dispatching}>
               {dispatching && <Loader2Icon className="size-4 animate-spin" />}
               <ZapIcon className="size-4" />
-              Confirm dispatch
+              {t("confirmDispatch")}
             </Button>
           </div>
         </DialogContent>
@@ -473,6 +477,7 @@ function OnceForm({
   onDispatch,
   renderSecretsDialog,
 }: OnceFormProps) {
+  const t = useTranslations("agentDispatch");
   // Sentinel for the "Agent default" option — the Select primitive can't hold
   // an empty-string value, so map it to "" in the parent's state.
   const ENV_DEFAULT = "__default__";
@@ -488,7 +493,7 @@ function OnceForm({
       {/* Inputs — a prompt string or a raw JSON object (trigger_payload). */}
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-2">
-          <Label htmlFor="dispatch-input">Inputs</Label>
+          <Label htmlFor="dispatch-input">{t("inputs")}</Label>
           <div className="inline-flex rounded-md border p-0.5 text-xs">
             <button
               type="button"
@@ -500,7 +505,7 @@ function OnceForm({
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              Prompt
+              {t("prompt")}
             </button>
             <button
               type="button"
@@ -520,14 +525,16 @@ function OnceForm({
           <>
             <Textarea
               id="dispatch-input"
-              placeholder="Describe what this run should do…"
+              placeholder={t("promptPlaceholder")}
               value={promptText}
               onChange={(e) => onPromptChange(e.target.value)}
               rows={4}
             />
             <p className="text-muted-foreground text-xs">
-              Sent to the agent as <span className="font-mono">{`{ "prompt": … }`}</span>. Leave
-              blank for no input.
+              {t.rich("promptHelp", {
+                example: `{ "prompt": … }`,
+                code: (chunks) => <span className="font-mono">{chunks}</span>,
+              })}
             </p>
           </>
         ) : (
@@ -544,9 +551,7 @@ function OnceForm({
             {jsonError ? (
               <p className="text-destructive text-xs">{jsonError}</p>
             ) : (
-              <p className="text-muted-foreground text-xs">
-                A JSON object of inputs, frozen on the run as its trigger payload.
-              </p>
+              <p className="text-muted-foreground text-xs">{t("jsonHelp")}</p>
             )}
           </>
         )}
@@ -557,7 +562,7 @@ function OnceForm({
         <CollapsibleTrigger asChild>
           <Button type="button" variant="ghost" size="sm" className="gap-1.5 px-2">
             <SettingsIcon className="size-4" />
-            Advanced
+            {t("advanced")}
             <ChevronDownIcon
               className={cn("size-4 transition-transform", advancedOpen && "rotate-180")}
             />
@@ -565,7 +570,7 @@ function OnceForm({
         </CollapsibleTrigger>
         <CollapsibleContent className="space-y-4 pt-3">
           <div className="space-y-1.5">
-            <Label htmlFor="dispatch-env-spec">Environment spec</Label>
+            <Label htmlFor="dispatch-env-spec">{t("envSpec")}</Label>
             <div className="flex items-center gap-2">
               <Select
                 value={envSpecId || ENV_DEFAULT}
@@ -575,7 +580,7 @@ function OnceForm({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ENV_DEFAULT}>Agent default</SelectItem>
+                  <SelectItem value={ENV_DEFAULT}>{t("agentDefault")}</SelectItem>
                   {envSpecs.map((s) => (
                     <SelectItem key={s.id} value={s.id}>
                       {s.name}{" "}
@@ -593,22 +598,21 @@ function OnceForm({
                 className="gap-1.5"
                 disabled={!selectedSpec}
                 onClick={() => setSecretsDialogOpen(true)}
-                title="Manage the secret values this spec's refs point at"
+                title={t("secretsTitle")}
               >
                 <KeyRoundIcon className="size-4" />
-                Secrets
-                {selectedSpecSecretCount > 0 ? ` (${selectedSpecSecretCount})` : ""}
+                {t("secretsButton", { count: selectedSpecSecretCount })}
               </Button>
             </div>
             <p className="text-muted-foreground text-xs">
-              Pins the container-environment recipe (image, runtime, tools, VNC) the run launches
-              into. Leave as <span className="font-medium">Agent default</span> to use the
-              agent&rsquo;s own image.
+              {t.rich("envSpecHelp", {
+                strong: (chunks) => <span className="font-medium">{chunks}</span>,
+              })}
             </p>
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="dispatch-timeout">Timeout (seconds)</Label>
+            <Label htmlFor="dispatch-timeout">{t("timeoutLabel")}</Label>
             <Input
               id="dispatch-timeout"
               type="number"
@@ -622,24 +626,15 @@ function OnceForm({
               aria-invalid={!timeoutValid}
             />
             {!timeoutValid ? (
-              <p className="text-destructive text-xs">
-                Enter a whole number of seconds above zero.
-              </p>
+              <p className="text-destructive text-xs">{t("timeoutInvalid")}</p>
             ) : (
-              <p className="text-muted-foreground text-xs">
-                How long the run may take before it&rsquo;s timed out. Blank uses the platform
-                default.
-              </p>
+              <p className="text-muted-foreground text-xs">{t("timeoutHelp")}</p>
             )}
           </div>
 
           <div className="bg-muted/30 text-muted-foreground flex items-start gap-2 rounded-md border border-dashed p-3 text-xs">
             <InfoIcon className="mt-0.5 size-4 shrink-0" />
-            <span>
-              Skills, container image, and CPU/memory come from the selected environment spec or the
-              agent&rsquo;s manifest — the dispatch action takes no ad-hoc sizing or skill
-              overrides.
-            </span>
+            <span>{t("advancedNote")}</span>
           </div>
         </CollapsibleContent>
       </Collapsible>
@@ -648,7 +643,7 @@ function OnceForm({
         <Button disabled={!canDispatch} onClick={onDispatch}>
           {dispatching && <Loader2Icon className="size-4 animate-spin" />}
           <ZapIcon className="size-4" />
-          Dispatch run
+          {t("dispatchRun")}
         </Button>
       </div>
 
@@ -671,6 +666,7 @@ function OnceForm({
 // ---------------------------------------------------------------------------
 
 function CadenceRedirect({ agent, mode }: { agent: AstroliftAgentListItem; mode: AgentRunMode }) {
+  const t = useTranslations("agentDispatch");
   const meta = RUN_MODES.find((m) => m.value === mode);
   const isScheduleConfigured =
     (agent.runMode ?? "").toLowerCase() === "schedule" && Boolean(agent.runCronExpression);
@@ -679,29 +675,32 @@ function CadenceRedirect({ agent, mode }: { agent: AstroliftAgentListItem; mode:
       <div className="flex items-start gap-2 text-sm">
         <InfoIcon className="text-muted-foreground mt-0.5 size-4 shrink-0" />
         <div className="space-y-1">
-          <p className="font-medium">{meta?.label} is a persistent cadence</p>
+          <p className="font-medium">
+            {t("redirectTitle", { mode: meta ? t(`modes.${meta.key}.label`) : "" })}
+          </p>
           <p className="text-muted-foreground text-xs leading-relaxed">
-            {meta?.description} It applies every time the platform auto-dispatches this agent, so
-            it&rsquo;s configured on the agent&rsquo;s Control tab. To run the agent one time right
-            now, pick <span className="font-medium">Once</span> above.
+            {t.rich("redirectBody", {
+              description: meta ? t(`modes.${meta.key}.description`) : "",
+              strong: (chunks) => <span className="font-medium">{chunks}</span>,
+            })}
           </p>
         </div>
       </div>
 
       {mode === "SCHEDULE" && (
         <p className="text-muted-foreground text-xs">
-          Current schedule:{" "}
+          {t("currentSchedule")}{" "}
           {isScheduleConfigured ? (
             <span className="text-foreground font-mono">{agent.runCronExpression}</span>
           ) : (
-            <span>not scheduled yet</span>
+            <span>{t("notScheduled")}</span>
           )}
         </p>
       )}
 
       <Button asChild variant="outline" size="sm">
         <Link href={`/agents/${encodeURIComponent(agent.slug)}/configuration?section=run-mode`}>
-          Configure run mode
+          {t("configureRunMode")}
           <ArrowRightIcon className="size-4" />
         </Link>
       </Button>
@@ -722,6 +721,7 @@ function ModeCard({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const t = useTranslations("agentDispatch");
   const Icon = meta.icon;
   return (
     <button
@@ -737,8 +737,10 @@ function ModeCard({
     >
       <Icon className={cn("size-5", selected ? "text-primary" : "text-muted-foreground")} />
       <div>
-        <p className="text-sm font-medium">{meta.label}</p>
-        <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">{meta.description}</p>
+        <p className="text-sm font-medium">{t(`modes.${meta.key}.label`)}</p>
+        <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
+          {t(`modes.${meta.key}.description`)}
+        </p>
       </div>
     </button>
   );

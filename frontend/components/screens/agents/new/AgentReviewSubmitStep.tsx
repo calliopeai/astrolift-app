@@ -2,6 +2,8 @@
 
 import { AlertCircleIcon, CheckCircle2Icon, Loader2Icon } from "lucide-react";
 
+import { useTranslations } from "next-intl";
+
 import { Badge } from "@/components/ui/badge";
 import type {
   AstroliftDiscoveredAgentManifest,
@@ -54,6 +56,7 @@ export function AgentReviewSubmitStepView({
   sideEffects,
   registeredAgents,
 }: AgentReviewSubmitStepViewProps) {
+  const t = useTranslations("agentWizard.review");
   const newAgents = state.discoveredAgents.filter((a) => !a.alreadyRegistered);
   const alreadyCount = state.discoveredAgents.length - newAgents.length;
 
@@ -62,39 +65,41 @@ export function AgentReviewSubmitStepView({
       <section className="grid gap-3 sm:grid-cols-2">
         <SummaryCard
           step={1}
-          title="Repository"
+          title={t("repository")}
           onJump={onJumpToStep}
           rows={[
-            { label: "Repository", value: state.sourceRepo, mono: true },
-            { label: "Branch / ref", value: state.ref || state.defaultBranch, mono: true },
-            { label: "Source kind", value: state.sourceKind },
+            { label: t("repository"), value: state.sourceRepo, mono: true },
+            { label: t("branchRef"), value: state.ref || state.defaultBranch, mono: true },
+            { label: t("sourceKind"), value: state.sourceKind },
           ]}
         />
         <SummaryCard
           step={1}
-          title="Agents found"
+          title={t("agentsFound")}
           onJump={onJumpToStep}
           rows={[
-            { label: "Discovered", value: `${state.discoveredAgents.length} agent(s)` },
-            { label: "New", value: `${newAgents.length}` },
-            { label: "Already registered", value: `${alreadyCount}` },
+            {
+              label: t("discovered"),
+              value: t("agentCount", { count: state.discoveredAgents.length }),
+            },
+            { label: t("new"), value: `${newAgents.length}` },
+            { label: t("alreadyRegistered"), value: `${alreadyCount}` },
           ]}
         />
         <SummaryCard
           step={2}
-          title="Project"
+          title={t("project")}
           onJump={onJumpToStep}
-          rows={[{ label: "Project", value: projectLabel || state.projectId, mono: !projectLabel }]}
+          rows={[
+            { label: t("project"), value: projectLabel || state.projectId, mono: !projectLabel },
+          ]}
         />
       </section>
 
       <section className="flex flex-col gap-3">
         <div>
-          <h3 className="font-medium">Agents to register</h3>
-          <p className="text-muted-foreground text-xs">
-            Registering the repo creates every new agent below. Already-registered agents are
-            matched (not duplicated). The backend registers per repo — there is no per-agent filter.
-          </p>
+          <h3 className="font-medium">{t("toRegister")}</h3>
+          <p className="text-muted-foreground text-xs">{t("toRegisterHelp")}</p>
         </div>
         <ul className="flex flex-col divide-y rounded-md border">
           {state.discoveredAgents.map((a) => {
@@ -113,20 +118,20 @@ export function AgentReviewSubmitStepView({
                 {outcome ? (
                   outcome.created ? (
                     <span className="text-success-fg inline-flex items-center gap-1 text-xs">
-                      <CheckCircle2Icon className="size-3.5" /> Created
+                      <CheckCircle2Icon className="size-3.5" /> {t("created")}
                     </span>
                   ) : (
                     <Badge variant="outline" className="text-2xs">
-                      Already existed
+                      {t("alreadyExisted")}
                     </Badge>
                   )
                 ) : a.alreadyRegistered ? (
                   <Badge variant="secondary" className="text-2xs">
-                    Already registered
+                    {t("alreadyRegistered")}
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="text-2xs">
-                    Will register
+                    {t("willRegister")}
                   </Badge>
                 )}
               </li>
@@ -137,11 +142,13 @@ export function AgentReviewSubmitStepView({
 
       <section className="flex flex-col gap-3">
         <div>
-          <h3 className="font-medium">What happens when you submit</h3>
+          <h3 className="font-medium">{t("whatHappens")}</h3>
           <p className="text-muted-foreground text-xs">
-            The register step calls{" "}
-            <code className="bg-muted rounded px-1 py-0.5 font-mono">registerAgentRepo</code>. Items
-            that depend on backend work that hasn&apos;t shipped yet stay grayed out.
+            {t.rich("whatHappensHelp", {
+              code: (chunks) => (
+                <code className="bg-muted rounded px-1 py-0.5 font-mono">{chunks}</code>
+              ),
+            })}
           </p>
         </div>
 
@@ -149,11 +156,13 @@ export function AgentReviewSubmitStepView({
           <li className="flex items-center gap-3 p-3">
             <CheckboxLocked checked disabled />
             <div className="flex min-w-0 flex-1 flex-col">
-              <span className="text-sm">Register the repo&apos;s agents</span>
+              <span className="text-sm">{t("registerItem")}</span>
               <span className="text-muted-foreground text-xs">
-                Calls{" "}
-                <code className="bg-muted rounded px-1 py-0.5 font-mono">registerAgentRepo</code>;
-                each agent manifest becomes an agent workload under its own app.
+                {t.rich("registerItemHelp", {
+                  code: (chunks) => (
+                    <code className="bg-muted rounded px-1 py-0.5 font-mono">{chunks}</code>
+                  ),
+                })}
               </span>
             </div>
             <StatusBadge
@@ -165,15 +174,11 @@ export function AgentReviewSubmitStepView({
           <li className="flex items-center gap-3 p-3 opacity-70">
             <CheckboxLocked checked={false} disabled />
             <div className="flex min-w-0 flex-1 flex-col">
-              <span className="text-sm">Push CI workflow</span>
-              <span className="text-muted-foreground text-xs">
-                Agents are dispatched on demand, not deployed on push, so the wizard doesn&apos;t
-                commit a deploy-on-push workflow. Configure CI per agent from its app page if
-                needed.
-              </span>
+              <span className="text-sm">{t("pushCi")}</span>
+              <span className="text-muted-foreground text-xs">{t("pushCiHelp")}</span>
             </div>
             <Badge variant="outline" className="text-2xs">
-              Not applicable
+              {t("notApplicable")}
             </Badge>
           </li>
         </ul>
@@ -183,7 +188,7 @@ export function AgentReviewSubmitStepView({
         <div className="border-destructive/40 bg-destructive/10 rounded-md border p-3 text-sm">
           <p className="text-destructive font-medium">
             <AlertCircleIcon className="mr-1 inline size-4" />
-            Submit failed
+            {t("submitFailed")}
           </p>
           <p className="text-destructive/80 mt-1 text-xs">{submitError}</p>
         </div>
@@ -192,7 +197,7 @@ export function AgentReviewSubmitStepView({
       {submitting && sideEffects.length === 0 && (
         <p className="text-muted-foreground inline-flex items-center gap-2 text-xs">
           <Loader2Icon className="size-3.5 animate-spin" />
-          Submitting…
+          {t("submitting")}
         </p>
       )}
     </div>

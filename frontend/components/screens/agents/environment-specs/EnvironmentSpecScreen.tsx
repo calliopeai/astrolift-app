@@ -1,6 +1,7 @@
 "use client";
 
 import { BoxesIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { EmptyState } from "@/components/EmptyState";
 import { Panel, PanelGrid } from "@/components/panel/Panel";
@@ -9,7 +10,7 @@ import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { agentsCrumbs } from "../skills/catalog";
-import { type EnvironmentSpec, specOwner } from "./environment-specs";
+import type { EnvironmentSpec } from "./environment-specs";
 
 export interface EnvironmentSpecScreenProps {
   spec: EnvironmentSpec | null;
@@ -24,13 +25,9 @@ export function EnvironmentSpecScreen({
   error,
   onRetry,
 }: EnvironmentSpecScreenProps) {
+  const t = useTranslations("agentEnvSpecs");
   const title =
-    spec?.name ??
-    (loading && !error
-      ? "Loading environment spec"
-      : error
-        ? "Environment spec"
-        : "Environment spec not found");
+    spec?.name ?? (loading && !error ? t("loading") : error ? t("envSpec") : t("notFound"));
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6">
       <ShellHeader
@@ -38,29 +35,32 @@ export function EnvironmentSpecScreen({
         title={title}
         context={spec?.slug}
       />
-      <QueryError title="Couldn't load this environment spec" error={error} onRetry={onRetry} />
+      <QueryError title={t("loadError")} error={error} onRetry={onRetry} />
       {!spec ? (
         loading && !error ? (
-          <Skeleton className="h-48 w-full" aria-label="Loading environment spec" />
+          <Skeleton className="h-48 w-full" aria-label={t("loading")} />
         ) : !error ? (
           <EmptyState
             icon={<BoxesIcon className="size-5" />}
-            title="Environment spec not found"
-            description="This recipe is unavailable or outside your access."
+            title={t("notFound")}
+            description={t("notFoundDescription")}
             actionHref="/agents/environment-specs"
-            actionLabel="Back to environment specs"
+            actionLabel={t("back")}
           />
         ) : null
       ) : (
         <PanelGrid>
-          <Panel title="Container environment" span={6}>
+          <Panel title={t("container")} span={6}>
             <dl className="grid min-w-0 gap-3 text-sm">
               {[
-                ["Runtime", spec.runtime || "Workload default"],
-                ["Image override", spec.imageTag || "Runtime catalog"],
-                ["Agent type", spec.agentType],
-                ["Tool preset", spec.toolPreset || "Image defaults"],
-                ["Owner", specOwner(spec)],
+                [t("runtime"), spec.runtime || t("workloadDefault")],
+                [t("imageOverride"), spec.imageTag || t("runtimeCatalog")],
+                [t("agentType"), spec.agentType],
+                [t("toolPreset"), spec.toolPreset || t("imageDefaults")],
+                [
+                  t("owner"),
+                  t(`owners.${spec.projectId ? "project" : spec.teamId ? "team" : "org"}`),
+                ],
               ].map(([label, value]) => (
                 <div key={label} className="min-w-0">
                   <dt className="text-muted-foreground text-xs">{label}</dt>
@@ -69,28 +69,28 @@ export function EnvironmentSpecScreen({
               ))}
             </dl>
           </Panel>
-          <Panel title="Capabilities" span={6}>
+          <Panel title={t("capabilities")} span={6}>
             <dl className="grid gap-3 text-sm">
               {[
-                ["VNC", spec.vncEnabled],
-                ["Managed model", spec.managedModel],
-                ["Model gateway", spec.modelGateway],
-                ["Run as non-root", spec.runAsNonRoot],
-                ["Allow tool installation", spec.allowInstall],
+                [t("vnc"), spec.vncEnabled],
+                [t("managedModel"), spec.managedModel],
+                [t("modelGateway"), spec.modelGateway],
+                [t("nonRoot"), spec.runAsNonRoot],
+                [t("allowInstall"), spec.allowInstall],
               ].map(([label, value]) => (
                 <div key={String(label)} className="flex justify-between gap-4">
                   <dt>{String(label)}</dt>
-                  <dd>{value ? "Enabled" : "Disabled"}</dd>
+                  <dd>{value ? t("enabled") : t("disabled")}</dd>
                 </div>
               ))}
             </dl>
           </Panel>
-          <Panel title="Manifest source" span={12}>
+          <Panel title={t("manifestSource")} span={12}>
             <dl className="grid min-w-0 gap-3 text-sm">
               {[
-                ["Repository", spec.configRepo || "No repository recorded"],
-                ["Branch", spec.configBranch],
-                ["Manifest path", spec.configManifestPath || "Repository root"],
+                [t("repository"), spec.configRepo || t("noRepository")],
+                [t("branch"), spec.configBranch],
+                [t("manifestPath"), spec.configManifestPath || t("repositoryRoot")],
               ].map(([label, value]) => (
                 <div key={label} className="min-w-0">
                   <dt className="text-muted-foreground text-xs">{label}</dt>
@@ -99,11 +99,7 @@ export function EnvironmentSpecScreen({
               ))}
             </dl>
           </Panel>
-          <Panel
-            title="Secret references"
-            description="Reference bindings only. Secret values are resolved when the agent launches."
-            span={12}
-          >
+          <Panel title={t("secretRefs")} description={t("secretRefsDescription")} span={12}>
             <pre className="max-h-96 overflow-auto font-mono text-xs [overflow-wrap:anywhere] whitespace-pre-wrap">
               {JSON.stringify(spec.secretRefs, null, 2)}
             </pre>

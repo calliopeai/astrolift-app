@@ -2,16 +2,12 @@
 
 import { ExternalLinkIcon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-const CAPABILITIES = [
-  "Policy enforcement — PII, toxicity, and jailbreak detection; model allowlists; token budgets.",
-  "Risk register, anomaly detection, and alerts on agent behavior drift.",
-  "SOC 2 / GDPR / HIPAA / EU AI Act control mappings with audit-ready evidence.",
-  "Full interaction audit — prompts, responses, and tool calls.",
-];
+const CAPABILITIES = ["policy", "risk", "compliance", "audit"] as const;
 
 /**
  * Secure tab content for an agent (spec 33 PR-9).
@@ -24,6 +20,7 @@ const CAPABILITIES = [
  * data Astrolift doesn't own.
  */
 export function AgentSecureScreen({ agentName }: { agentName: string }) {
+  const t = useTranslations("agentSecure");
   return (
     <Card>
       <CardContent className="flex flex-col gap-6 p-8">
@@ -32,18 +29,16 @@ export function AgentSecureScreen({ agentName }: { agentName: string }) {
             <ShieldCheckIcon className="text-primary size-6" />
           </div>
           <div>
-            <p className="text-lg font-semibold">Governed by Zentinelle</p>
-            <p className="text-muted-foreground text-sm">
-              AI Agent GRC — the Secure pillar of the BROCS stack
-            </p>
+            <p className="text-lg font-semibold">{t("title")}</p>
+            <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
           </div>
         </div>
 
         <p className="text-muted-foreground max-w-2xl text-sm leading-relaxed">
-          Policy enforcement, content scanning, compliance mappings, and the full interaction audit
-          trail for <span className="text-foreground font-medium">{agentName}</span> are provided by
-          Zentinelle, which runs alongside Astrolift. Astrolift owns the runtime layer; Zentinelle
-          owns the AI behavior layer.
+          {t.rich("body", {
+            agent: agentName,
+            strong: (chunks) => <span className="text-foreground font-medium">{chunks}</span>,
+          })}
         </p>
 
         {/* Deferred-integration gate. */}
@@ -52,11 +47,9 @@ export function AgentSecureScreen({ agentName }: { agentName: string }) {
             <div className="bg-warning size-1.5 rounded-full" />
           </div>
           <div>
-            <p className="text-sm font-medium">Integration under design</p>
+            <p className="text-sm font-medium">{t("pendingTitle")}</p>
             <p className="text-muted-foreground mt-0.5 text-xs leading-relaxed">
-              The auth handshake and tenant delegation between Astrolift and Zentinelle is being
-              designed. Once it ships, per-agent governance, risk, and compliance surfaces appear
-              here. Until then this pillar is a placeholder.
+              {t("pendingBody")}
             </p>
           </div>
         </div>
@@ -65,7 +58,7 @@ export function AgentSecureScreen({ agentName }: { agentName: string }) {
           {CAPABILITIES.map((cap) => (
             <li key={cap} className="text-muted-foreground flex gap-2 text-xs leading-relaxed">
               <ShieldCheckIcon className="text-primary mt-0.5 size-3.5 shrink-0" />
-              <span>{cap}</span>
+              <span>{t(`capabilities.${cap}`)}</span>
             </li>
           ))}
         </ul>
@@ -73,7 +66,7 @@ export function AgentSecureScreen({ agentName }: { agentName: string }) {
         <div className="flex flex-wrap gap-3">
           <Button asChild variant="outline">
             <Link href="/secure/zentinelle">
-              Learn about Zentinelle
+              {t("learnMore")}
               <ExternalLinkIcon className="ml-2 size-4" />
             </Link>
           </Button>
