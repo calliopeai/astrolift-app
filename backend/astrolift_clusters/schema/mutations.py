@@ -1230,7 +1230,9 @@ class ClustersMutation:
             # Action-safety gate (#2202): fresh verification, on by default.
             from astrolift_identity.action_safety import gate as _safety_gate
 
-            deny = _safety_gate(info, "cluster.decommission", app=None, resolver_name="decommission_cluster")
+            deny = _safety_gate(
+                info, "cluster.decommission", target=cluster, resolver_name="decommission_cluster"
+            )
             if deny is not None:
                 return deny
             if cluster.lifecycle in (
@@ -1506,6 +1508,14 @@ class ClustersMutation:
             )
 
             recheck_cluster_authority(cluster, Permission.CLUSTER_UNREGISTER)
+            # Action-safety gate (#2202): fresh verification, on by default.
+            from astrolift_identity.action_safety import gate as _safety_gate
+
+            deny = _safety_gate(
+                info, "cluster.decommission", target=cluster, resolver_name="unregister_tenant_cluster"
+            )
+            if deny is not None:
+                return deny
 
             if has_cluster_owned_models(cluster.pk):
                 return gql_failure(ErrorCode.PRECONDITION.value, MODEL_CLEANUP_REQUIRED)

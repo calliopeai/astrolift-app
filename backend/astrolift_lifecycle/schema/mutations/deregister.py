@@ -111,7 +111,9 @@ class DeregisterMutations:
         # Action-safety gate (#2202): fresh verification, on by default.
         from astrolift_identity.action_safety import gate as _safety_gate
 
-        deny = _safety_gate(info, "app.deregister", app=app, resolver_name="deregister_astrolift_app")
+        deny = _safety_gate(
+            info, "app.deregister", app=app, target=app, resolver_name="deregister_astrolift_app"
+        )
         if deny is not None:
             return deny
 

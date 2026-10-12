@@ -2471,7 +2471,8 @@
         "expand": "Expand to full screen",
         "collapse": "Exit full screen (Esc)",
         "popOut": "Open in a separate window",
-        "resizeHandle": "Drag to resize the terminal"
+        "resizeHandle": "Drag to resize the terminal",
+        "stepUpRequired": "ここでコンソールを開くには、もう一度サインインしてください。"
       },
       "shortcuts": {
         "title": "CLI shortcuts",

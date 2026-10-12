@@ -17,7 +17,7 @@ import { TerminalEmulator } from "./TerminalEmulator";
  * What *is* checkable is the sizing contract and the session lifecycle.
  */
 
-const counts = vi.hoisted(() => ({ terminals: 0, sockets: 0 }));
+const counts = vi.hoisted(() => ({ terminals: 0, sockets: 0, last: null as unknown }));
 
 const term = vi.hoisted(() => ({
   open: vi.fn(),
@@ -71,10 +71,11 @@ vi.stubGlobal(
     readyState = 1;
     onopen: (() => void) | null = null;
     onmessage: (() => void) | null = null;
-    onclose: (() => void) | null = null;
+    onclose: ((event: { code: number }) => void) | null = null;
     onerror: (() => void) | null = null;
     constructor() {
       counts.sockets += 1;
+      counts.last = this;
     }
     addEventListener() {}
     send() {}
@@ -265,5 +266,27 @@ describe("TerminalEmulator pop-out (#1246)", () => {
   it("does not pin a height when standalone — the window sets it", () => {
     const { wrapper } = renderLive({ standalone: true, className: "flex-1" });
     expect(wrapper.className).not.toMatch(/(^|\s)h-96(\s|$)/);
+  });
+});
+
+describe("TerminalEmulator step-up (#2202)", () => {
+  it("asks for a fresh sign-in on 4428 and attaches again once it succeeds", async () => {
+    const asked: string[] = [];
+    const listener = (event: Event) => asked.push((event as CustomEvent).detail.operationName);
+    window.addEventListener("astrolift:step-up-required", listener);
+    renderLive();
+    expect(counts.sockets).toBe(1);
+
+    await act(async () => {
+      (counts.last as { onclose: (event: { code: number }) => void }).onclose({ code: 4428 });
+    });
+    expect(asked).toEqual(["exec.attach"]);
+    expect(counts.sockets).toBe(1);
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("astrolift:elevated", { detail: {} }));
+    });
+    expect(counts.sockets).toBe(2);
+    window.removeEventListener("astrolift:step-up-required", listener);
   });
 });

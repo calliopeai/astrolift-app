@@ -1,3 +1,4 @@
+from astrolift_identity.models.action_approval import ActionApprovalDecision, ActionApprovalRequest
 from astrolift_identity.models.action_safety_rule import ActionSafetyRule
 from astrolift_identity.models.api_token import ApiToken
 from astrolift_identity.models.attestation_challenge import AttestationChallenge
@@ -33,6 +34,8 @@ from astrolift_identity.models.team import Team
 from astrolift_identity.models.team_membership_action import TeamMembershipAction
 
 __all__ = [
+    "ActionApprovalDecision",
+    "ActionApprovalRequest",
     "ActionSafetyRule",
     "DEFAULT_MAX_SESSIONS_PER_CLIENT_KIND",
     "DEFAULT_STALE_SESSION_TTL_SECONDS",

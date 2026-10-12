@@ -11,6 +11,9 @@ import {
   STEP_UP_EVENT,
   type StepUpEventDetail,
 } from "@/lib/auth/step-up-events";
+import { toast } from "sonner";
+
+const ACTION_SAFETY_PATH = "/administration/permissions/safety";
 
 const authLink = setContext(async (_, { headers }) => {
   const token = await getClientToken();
@@ -90,7 +93,7 @@ function buildWsLink(): GraphQLWsLink | null {
 // the modal to render the right copy + offer a retry, and forwards
 // the original response so the caller's loading state resolves
 // (otherwise we'd leave every mutation hanging behind the modal).
-const stepUpLink = new ApolloLink((operation, forward) => {
+export const stepUpLink = new ApolloLink((operation, forward) => {
   return new Observable((observer) => {
     const sub = forward(operation).subscribe({
       next: (result) => {
@@ -141,6 +144,18 @@ const stepUpLink = new ApolloLink((operation, forward) => {
                   window.dispatchEvent(
                     new CustomEvent(STEP_UP_EVENT, { detail }),
                   );
+                }
+                // #2202 — an action-safety rule asked for approval: the
+                // server recorded a request and did nothing else. Say so
+                // wherever the action was started, and where to follow it.
+                const approval = errs.find((e) => e.code === "APPROVAL_REQUIRED");
+                if (approval && typeof window !== "undefined") {
+                  toast.info(approval.message || "Approval requested.", {
+                    action: {
+                      label: "View requests",
+                      onClick: () => window.location.assign(ACTION_SAFETY_PATH),
+                    },
+                  });
                 }
               }
             }

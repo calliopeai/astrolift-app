@@ -37,6 +37,7 @@ def failure(
     current_version: int | None = None,
     requested_version: int | None = None,
     supported_methods: list[str] | None = None,
+    approval_request_id: str | None = None,
 ) -> MutationResultType[None]:
     return MutationResultType(
         ok=False,
@@ -50,6 +51,7 @@ def failure(
                 current_version=current_version,
                 requested_version=requested_version,
                 supported_methods=supported_methods,
+                approval_request_id=approval_request_id,
             )
         ],
     )

@@ -37,6 +37,9 @@ Misses close with the right WS code:
 
   4401 — unauthenticated
   4403 — the caller lacks the grant for this target's kind
+  4428 — the action-safety gate (#2202) wants a fresh step-up first; the
+         console's terminal opens the step-up prompt and reconnects. Only
+         a browser session gets this; an API bearer passes, as for step-up.
   4404 — nothing to exec into: the path is not a valid
          /app/exec/<target>/<workload>, or no app and no box in the
          caller's tenant answers to <target>
@@ -200,6 +203,18 @@ def get_exec_backend() -> ExecBackend:
 # before it can pick a grant, an audit event type, or a cluster.
 TARGET_APP = "app"
 TARGET_BOX = "box"
+
+
+def _exec_needs_step_up(org_id, actor_user_id, slug, target, session_data) -> bool:
+    from astrolift_identity.action_safety import session_needs_step_up
+    from astrolift_registry.models import RegisteredApp
+
+    app = (
+        RegisteredApp.objects.filter(organization_id=org_id, slug=slug, deleted_at__isnull=True).first()
+        if target == TARGET_APP
+        else None
+    )
+    return session_needs_step_up(org_id, "exec.attach", session=session_data, app=app, user_id=actor_user_id)
 
 
 @sync_to_async
@@ -501,6 +516,7 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
     bearer = _bearer_from_scope(scope)
     tenant = None
     api_token = None
+    session_data = None
     if bearer:
         user, tenant, api_token = await sync_to_async(_resolve_bearer_identity)(
             bearer, _header_from_scope(scope, "x-astrolift-organization")
@@ -557,6 +573,16 @@ async def exec_ws_application(scope: dict, receive, send) -> None:
     if not granted:
         await send({"type": "websocket.close", "code": 4403})
         return
+
+    # Action-safety gate (#2202): on by default, a browser session opens a
+    # console only after a fresh step-up. 4428 has the terminal prompt for it.
+    if api_token is None and org_id is not None:
+        needs = await sync_to_async(_exec_needs_step_up)(
+            org_id, actor_user_id, app_slug, target, session_data
+        )
+        if needs:
+            await send({"type": "websocket.close", "code": 4428})
+            return
 
     await send({"type": "websocket.accept"})
     session_id = str(uuid4())

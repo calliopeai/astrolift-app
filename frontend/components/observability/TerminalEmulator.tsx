@@ -9,6 +9,7 @@ import * as React from "react";
 
 import "@xterm/xterm/css/xterm.css";
 
+import { STEP_UP_EVENT, waitForElevation } from "@/lib/auth/step-up-events";
 import { cn } from "@/lib/utils";
 import { admitsReviewedSession, type ReviewedExecTarget } from "@/lib/exec-session";
 
@@ -262,6 +263,7 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
   const commandKey = JSON.stringify(command ?? []);
   const authExpiredLabel = t("authExpired");
   const targetGoneLabel = t("targetGone");
+  const stepUpLabel = t("stepUpRequired");
 
   const buildWsUrl = React.useCallback((): string => {
     const wsOrigin = process.env.NEXT_PUBLIC_WS_ORIGIN;
@@ -275,6 +277,9 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
     return `${proto}//${window.location.host}${path}`;
   }, [appSlug, podName, target]);
 
+  // The 4428 handler attaches again after a step-up; a ref, because it runs
+  // inside ``connect`` itself.
+  const reconnectRef = React.useRef<() => void>(() => {});
   const connect = React.useCallback(() => {
     if (disposedRef.current) return;
     const term = termRef.current;
@@ -406,6 +411,21 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
         setState("denied");
         return;
       }
+      // 4428 = the action-safety gate (#2202) wants a fresh sign-in first.
+      // The app-wide step-up prompt takes it; once it succeeds, attach again.
+      if (event.code === 4428) {
+        setState("denied");
+        setErrorMessage(stepUpLabel);
+        window.dispatchEvent(
+          new CustomEvent(STEP_UP_EVENT, {
+            detail: { operationName: "exec.attach", message: stepUpLabel },
+          })
+        );
+        void waitForElevation().then((elevated) => {
+          if (elevated && !disposedRef.current) reconnectRef.current();
+        });
+        return;
+      }
       if (event.code === 4401) {
         setState("denied");
         setErrorMessage(authExpiredLabel);
@@ -422,7 +442,10 @@ export function TerminalEmulator(props: TerminalEmulatorProps) {
       // an explicit new attach, never a reconnect or input replay.
       setState((previous) => (previous === "error" ? "error" : "closed"));
     };
-  }, [buildWsUrl, container, command, target, authExpiredLabel, targetGoneLabel]);
+  }, [buildWsUrl, container, command, target, authExpiredLabel, targetGoneLabel, stepUpLabel]);
+  React.useEffect(() => {
+    reconnectRef.current = connect;
+  }, [connect]);
 
   // A target change closes the old connection. Re-runs when the
   // target pod / container / command tuple changes.

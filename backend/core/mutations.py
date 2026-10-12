@@ -62,6 +62,10 @@ class ErrorCode(enum.StrEnum):
     # can refetch the latest state and rebuild the form. The mutation
     # is a no-op when this code fires.
     VERSION_MISMATCH = "VERSION_MISMATCH"
+    # #2202 — an action-safety rule asks for approval. The mutation recorded
+    # (or found) an approval request, named in ``approvalRequestId``, and did
+    # nothing else; the caller runs it again once the request is approved.
+    APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
 
 
 @dataclasses.dataclass(slots=True)
@@ -163,6 +167,7 @@ _REFUSAL_CODES = frozenset(
         "PERMISSION_DENIED",
         "STEP_UP_REQUIRED",
         "SECRET_APPROVAL_REQUIRED",
+        "APPROVAL_REQUIRED",
         "ATTESTATION_REQUIRED",
     }
 )

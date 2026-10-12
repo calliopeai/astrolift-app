@@ -126,6 +126,9 @@ def _patch_relay(
     monkeypatch.setattr(mod, "_check_box_attach_permission", _attach_perm)
     monkeypatch.setattr(mod, "_record_box_attach", _record)
     monkeypatch.setattr(mod, "_audit_exec_open", _audit)
+    # The action-safety gate (#2202) is tested in test_exec_ws; a session here
+    # is taken as freshly stepped up.
+    monkeypatch.setattr(mod, "_exec_needs_step_up", lambda *_a: False)
 
 
 async def _run(path: str, frames: list[dict]) -> list[dict]:

@@ -865,6 +865,17 @@ class ManagedServiceMutations:
         svc = _project_service_for_caller(input.id)
         if svc is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project managed service not found")
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
+
+        deny = _safety_gate(
+            info,
+            "managed_service.deprovision",
+            target=svc,
+            resolver_name="deprovision_project_managed_service",
+        )
+        if deny is not None:
+            return deny
         _require_model_host_operator(info, svc.kind, svc.effective_cluster)
         svc.status = ManagedService.Status.DEPROVISIONING
         svc.save(update_fields=["status", "updated_at", "version"])
@@ -1228,6 +1239,7 @@ class ManagedServiceMutations:
             info,
             "managed_service.deprovision",
             app=getattr(svc, "registered_app", None),
+            target=svc,
             resolver_name="deprovision_managed_service",
         )
         if deny is not None:

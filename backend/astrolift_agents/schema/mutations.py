@@ -1354,6 +1354,12 @@ class AgentsMutation:
         refused = _refuse_ref_value_access(spec, env_var)
         if refused is not None:
             return refused
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
+
+        deny = _safety_gate(info, "secret.change", resolver_name="set_agent_secret_value")
+        if deny is not None:
+            return deny
         if value == "":
             return gql_failure(
                 ErrorCode.VALIDATION.value,
@@ -1394,6 +1400,12 @@ class AgentsMutation:
         refused = _refuse_ref_value_access(spec, env_var)
         if refused is not None:
             return refused
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
+
+        deny = _safety_gate(info, "secret.change", resolver_name="delete_agent_secret_value")
+        if deny is not None:
+            return deny
         backend, berr = _agent_secrets_backend(spec)
         if berr is not None:
             return berr
@@ -1533,6 +1545,12 @@ class AgentsMutation:
         refused = _refuse_ref_value_access(spec, env_var)
         if refused is not None:
             return refused
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
+
+        deny = _safety_gate(info, "secret.reveal", resolver_name="reveal_agent_secret_value")
+        if deny is not None:
+            return deny
         backend, berr = _agent_secrets_backend(spec)
         if berr is not None:
             return berr
@@ -1868,6 +1886,12 @@ class AgentsMutation:
         refused = _refuse_unscoped_bundle(spec, bundle)
         if refused is not None:
             return refused
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
+
+        deny = _safety_gate(info, "secret.change", resolver_name="set_agent_bundle_secret_value")
+        if deny is not None:
+            return deny
         key = (key or "").strip()
         if not valid_agent_env_var(key):
             return gql_failure(
@@ -1931,6 +1955,12 @@ class AgentsMutation:
         refused = _refuse_unscoped_bundle(spec, bundle)
         if refused is not None:
             return refused
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
+
+        deny = _safety_gate(info, "secret.change", resolver_name="delete_agent_bundle_secret_value")
+        if deny is not None:
+            return deny
         backend, store_err = _agent_secrets_backend(spec)
         if store_err is not None:
             return store_err
@@ -1974,6 +2004,12 @@ class AgentsMutation:
         refused = _refuse_unscoped_bundle(spec, bundle)
         if refused is not None:
             return refused
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
+
+        deny = _safety_gate(info, "secret.reveal", resolver_name="reveal_agent_bundle_secret_value")
+        if deny is not None:
+            return deny
         backend, store_err = _agent_secrets_backend(spec)
         if store_err is not None:
             return store_err

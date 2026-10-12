@@ -202,6 +202,12 @@ class SecretMutations:
         app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
+
+        deny = _safety_gate(info, "secret.change", app=app, resolver_name="rotate_app_secret")
+        if deny is not None:
+            return deny
         mismatch = _check_version_match(app, if_match_version=input.if_match_version, kind="App")
         if mismatch is not None:
             return mismatch
@@ -482,6 +488,12 @@ class SecretMutations:
         app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
+
+        deny = _safety_gate(info, "secret.change", app=app, resolver_name="bulk_import_app_secrets")
+        if deny is not None:
+            return deny
         kvs = parse_dotenv(input.dotenv_text or "")
         if not kvs:
             return gql_failure(

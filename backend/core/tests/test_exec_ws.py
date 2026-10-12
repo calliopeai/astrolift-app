@@ -205,6 +205,7 @@ async def test_dispatcher_routes_frames_to_backend(
     monkeypatch.setattr(mod, "_check_app_in_tenant", _ok_app)
     monkeypatch.setattr(mod, "_check_exec_permission", _ok_perm)
     monkeypatch.setattr(mod, "_audit_exec_open", _noop_audit)
+    monkeypatch.setattr(mod, "_exec_needs_step_up", lambda *_a: False)
 
     incoming: list[dict] = [
         {
@@ -360,6 +361,9 @@ def _patch_authed(monkeypatch, *, perm_ok: bool, audit_sink: list | None = None)
     monkeypatch.setattr(mod, "_check_app_in_tenant", _ok_app)
     monkeypatch.setattr(mod, "_check_exec_permission", _perm)
     monkeypatch.setattr(mod, "_audit_exec_open", _audit)
+    # The action-safety gate (#2202) has its own tests below; here a session
+    # is taken as freshly stepped up.
+    monkeypatch.setattr(mod, "_exec_needs_step_up", lambda *_a: False)
 
 
 @pytest.mark.asyncio
@@ -554,3 +558,26 @@ def test_bearer_from_scope_extracts_token() -> None:
     # No header / wrong scheme → empty.
     assert _bearer_from_scope({"headers": []}) == ""
     assert _bearer_from_scope({"headers": [(b"authorization", b"Basic abc")]}) == ""
+
+
+@pytest.mark.asyncio
+async def test_a_session_that_has_not_stepped_up_is_closed_4428_before_any_open(monkeypatch) -> None:
+    """#2202: the console's terminal turns 4428 into the step-up prompt."""
+    from core.schema import exec_ws as mod
+
+    _patch_authed(monkeypatch, perm_ok=True)
+    monkeypatch.setattr(mod, "_exec_needs_step_up", lambda *_a: True)
+    backend = _RecordingBackend()
+    set_exec_backend(backend)
+    sent: list[dict] = []
+
+    async def receive() -> dict:
+        return {"type": "websocket.disconnect"}
+
+    async def send(message: dict) -> None:
+        sent.append(message)
+
+    scope = {"type": "websocket", "path": "/app/exec/acme/web", "headers": [(b"cookie", b"sessionid=fake")]}
+    await mod.exec_ws_application(scope, receive, send)
+    assert sent[-1] == {"type": "websocket.close", "code": 4428}
+    assert backend.opens == []
