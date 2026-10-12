@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Turning `ZENTINELLE_GATEWAY_ENABLED` on or off reconciles every registered cluster: on deploys the gateway where it is wanted and not running, including clusters registered while the switch was off; off removes each running gateway's Deployment and Service, keeping the registration, credential Secret and per-cluster setting so turning it back on restores them. It runs after the change commits, off the request, one cluster's failure reported without stopping the rest; `manage.py reconcile_zentinelle_gateways` does the same on demand (#1905).
+
 - A refused permission reads the same on every client: GraphQL errors raised by a permission check now carry `extensions.code = "PERMISSION_DENIED"` (the code mutation envelopes already use) with `extensions.reason` and `extensions.permission`; the message is unchanged. The CLI and web can tell a refusal from any other failure and show why (#1867).
 
 - Every tab inside an app or agent offers actions from that app's own permissions, not the account's: the header (deploy, archive, delete), Settings sections (resync, retention, environments, managed services, archive, the danger zone) and Access (tokens, security, edge). A grant held on another project no longer offers an action this app refuses. Account grants only bridge the first load (`useAppCan`, fed by the frame) (#1867).

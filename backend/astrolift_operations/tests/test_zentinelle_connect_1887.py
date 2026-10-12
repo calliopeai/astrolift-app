@@ -909,3 +909,41 @@ def test_the_gateway_runs_non_root_read_only_with_probes_and_limits():
         "ZENTINELLE_CLUSTER_ID": "c-1",
         "ZENTINELLE_GATEWAY_CREDENTIAL_FILE": "/var/run/zentinelle/gateway-credential",
     }
+
+
+def test_flipping_the_install_switch_reconciles_every_registered_gateway(
+    org, cluster, admin, zentinelle, driver
+):
+    """Clusters registered while the switch was off get their gateway when it
+    turns on, and lose it (registration kept) when it turns off (#1905)."""
+    from astrolift_operations.zentinelle_connect import GatewayReconcile, reconcile_gateways
+
+    assert _connect(org).ok
+    assert _register(org, cluster).ok  # switch off: Secret only
+    assert reconcile_gateways() == [GatewayReconcile(cluster.slug, "unchanged")]
+
+    with override_config(ZENTINELLE_GATEWAY_ENABLED=True, ZENTINELLE_GATEWAY_IMAGE=IMAGE):
+        assert reconcile_gateways() == [GatewayReconcile(cluster.slug, "deployed")]
+        assert driver.kinds()[-2:] == ["Deployment", "Service"]
+        assert reconcile_gateways() == [GatewayReconcile(cluster.slug, "unchanged")]
+
+    assert reconcile_gateways() == [GatewayReconcile(cluster.slug, "removed")]
+    assert driver.deleted == [
+        ("astrolift-system", "Deployment", "zentinelle-gateway"),
+        ("astrolift-system", "Service", "zentinelle-gateway"),
+    ]
+    gateway = ZentinelleClusterGateway.objects.get(cluster=cluster)
+    assert gateway.gateway_enabled is True and gateway.gateway_deployed is False
+
+
+def test_a_failed_cluster_is_reported_and_the_rest_continue(org, cluster, plugin, admin, zentinelle, driver):
+    from astrolift_operations.zentinelle_connect import reconcile_gateways
+
+    second = _make_cluster(plugin, org, "second-1905")
+    assert _connect(org).ok
+    assert _register(org, cluster).ok and _register(org, second).ok
+    driver.fail["Deployment"] = "boom"
+    with override_config(ZENTINELLE_GATEWAY_ENABLED=True, ZENTINELLE_GATEWAY_IMAGE=IMAGE):
+        results = {row.cluster_slug: row.outcome for row in reconcile_gateways()}
+    assert set(results) == {cluster.slug, second.slug}
+    assert all(outcome.startswith("failed: ") for outcome in results.values())
