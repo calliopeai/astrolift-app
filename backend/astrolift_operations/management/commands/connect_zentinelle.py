@@ -6,7 +6,9 @@ Zentinelle with the bootstrap secret, then runs
 
     python manage.py connect_zentinelle --org <slug> --url <zentinelle url> --code-env <ENV NAME>
 
-with the code in that environment variable. The code is never an argument,
+with the code in that environment variable. ``--gateway-url`` points the
+cluster gateways at a private, in-cluster Zentinelle address (#1905); it is
+applied to an existing connection too. The code is never an argument,
 so it is not in the task's command line, its logs or a process listing.
 
 The exchange is the org-admin ``connectZentinelle`` mutation's
@@ -45,6 +47,11 @@ class Command(BaseCommand):
             required=True,
             help="Name of the environment variable holding the one-time enrollment code.",
         )
+        parser.add_argument(
+            "--gateway-url",
+            default=None,
+            help="Where cluster gateways reach Zentinelle, when not at --url (an in-cluster Service).",
+        )
 
     def handle(self, *args, **options):
         from astrolift_identity.models import Organization
@@ -59,6 +66,7 @@ class Command(BaseCommand):
             raise CommandError(f"no organization {options['org']!r}")
         try:
             url = zentinelle_connect.normalize_base_url(options["url"])
+            gateway_url = zentinelle_connect.normalize_gateway_url(options["gateway_url"])
         except zentinelle_connect.ZentinelleConnectError as exc:
             raise CommandError(exc.message) from None
 
@@ -76,6 +84,13 @@ class Command(BaseCommand):
             if not live:
                 existing.refresh_from_db()
         if existing is not None and existing.status == ZentinelleConnection.Status.CONNECTED:
+            if options["gateway_url"] is not None and gateway_url != existing.gateway_url:
+                try:
+                    for result in zentinelle_connect.set_gateway_url(connection=existing, url=gateway_url):
+                        self.stdout.write(f"{result.cluster_slug}: {result.outcome}")
+                except zentinelle_connect.ZentinelleConnectError as exc:
+                    raise CommandError(exc.message) from None
+                self.stdout.write(f"cluster gateways now reach Zentinelle at {gateway_url or url}")
             self._enable_flags()
             self.stdout.write(f"organization {organization.slug} already connected to {url}; nothing to do")
             return
@@ -95,6 +110,7 @@ class Command(BaseCommand):
                 url=url,
                 code=code,
                 install_url=zentinelle_connect.install_base_url(),
+                gateway_url=gateway_url,
             )
         except zentinelle_connect.ZentinelleConnectError as exc:
             raise CommandError(exc.message) from None

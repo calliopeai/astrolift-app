@@ -42,6 +42,13 @@ class ZentinelleConnection(BaseCoreModel):
         on_delete=models.CASCADE,
     )
     base_url = models.URLField(max_length=500)
+    gateway_url = models.CharField(
+        max_length=500,
+        blank=True,
+        default="",
+        help_text="Where cluster gateways reach Zentinelle, when not at base_url: a private, "
+        "in-cluster address (#1905). Empty means base_url.",
+    )
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.CONNECTED)
     zentinelle_install_id = models.CharField(
         max_length=64,

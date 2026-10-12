@@ -209,3 +209,31 @@ def test_an_unknown_org_or_a_bad_url_is_refused(org, zentinelle, monkeypatch):
     with pytest.raises(CommandError, match="https"):
         _run(org.slug, url="ftp://zentinelle.test")
     assert zentinelle.calls == []
+
+
+@override_config(ZENTINELLE_ENABLED=False, ZENTINELLE_GATEWAY_ENABLED=False)
+def test_a_gateway_url_is_stored_at_connect_and_applied_to_a_live_connection(
+    org, zentinelle, monkeypatch, settings
+):
+    settings.DEBUG = False
+    in_cluster = "http://zentinelle.zentinelle.svc.cluster.local:8000"
+    monkeypatch.setenv(ENV, CODE)
+    out = io.StringIO()
+    call_command(
+        "connect_zentinelle", org=org.slug, url=BASE, code_env=ENV, gateway_url=in_cluster, stdout=out
+    )
+    assert ZentinelleConnection.objects.get(organization=org).gateway_url == in_cluster
+
+    monkeypatch.delenv(ENV)
+    call_command("connect_zentinelle", org=org.slug, url=BASE, code_env=ENV, gateway_url="", stdout=out)
+    assert ZentinelleConnection.objects.get(organization=org).gateway_url == ""
+
+    with pytest.raises(CommandError, match="gatewayUrl must use https"):
+        call_command(
+            "connect_zentinelle",
+            org=org.slug,
+            url=BASE,
+            code_env=ENV,
+            gateway_url="http://z.example",
+            stdout=out,
+        )

@@ -38,6 +38,7 @@ from astrolift_operations.schema.mutations import (
     OperationsMutation,
     RotateZentinelleGatewayCredentialInput,
     SetZentinelleGatewayEnabledInput,
+    SetZentinelleGatewayUrlInput,
     ZentinelleClusterInput,
 )
 from astrolift_operations.schema.queries import OperationsQuery
@@ -418,6 +419,7 @@ def test_every_zentinelle_mutation_is_listed_as_step_up_gated():
         "disconnect_zentinelle",
         "register_zentinelle_cluster",
         "set_zentinelle_gateway_enabled",
+        "set_zentinelle_gateway_url",
         "rotate_zentinelle_gateway_credential",
         "unregister_zentinelle_cluster",
     } <= gated
@@ -947,3 +949,111 @@ def test_a_failed_cluster_is_reported_and_the_rest_continue(org, cluster, plugin
         results = {row.cluster_slug: row.outcome for row in reconcile_gateways()}
     assert set(results) == {cluster.slug, second.slug}
     assert all(outcome.startswith("failed: ") for outcome in results.values())
+
+
+# ---- in-cluster gateway URL (#1905) -------------------------------------
+
+IN_CLUSTER = "http://zentinelle.zentinelle.svc.cluster.local:8000"
+
+
+def _gateway_env(driver) -> dict[str, str]:
+    container = driver.last("Deployment")["spec"]["template"]["spec"]["containers"][0]
+    return {item["name"]: item["value"] for item in container["env"]}
+
+
+def _set_gateway_url(organization, url):
+    with _as(organization):
+        return OperationsMutation().set_zentinelle_gateway_url(
+            _info(), input=SetZentinelleGatewayUrlInput(gateway_url=url)
+        )
+
+
+@override_config(ZENTINELLE_GATEWAY_ENABLED=True, ZENTINELLE_GATEWAY_IMAGE=IMAGE)
+def test_gateways_reach_zentinelle_at_the_in_cluster_url_given_at_connect(
+    org, cluster, admin, zentinelle, driver, settings
+):
+    settings.DEBUG = False
+    with _as(org):
+        result = OperationsMutation().connect_zentinelle(
+            _info(),
+            input=ConnectZentinelleInput(url=BASE, enrollment_code=CODE, gateway_url=IN_CLUSTER + "/"),
+        )
+    assert result.ok, result.errors
+    assert result.data.gateway_url == IN_CLUSTER
+
+    assert _register(org, cluster).ok
+
+    assert _gateway_env(driver)["ZENTINELLE_URL"] == IN_CLUSTER
+    # Astrolift itself still talks to Zentinelle at the connection's URL.
+    assert all(call.url.startswith(BASE) for call in zentinelle.calls)
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "http://zentinelle.internal:8000",
+        "http://svc.cluster.local.evil.test",
+        "https://user:pw@zentinelle.zentinelle.svc",
+        "ftp://zentinelle.zentinelle.svc",
+    ],
+)
+def test_a_plain_http_gateway_url_must_name_an_in_cluster_service(org, admin, zentinelle, url, settings):
+    settings.DEBUG = False
+    with _as(org):
+        result = OperationsMutation().connect_zentinelle(
+            _info(), input=ConnectZentinelleInput(url=BASE, enrollment_code=CODE, gateway_url=url)
+        )
+
+    assert result.ok is False and _code(result) == "VALIDATION"
+    assert result.errors[0].field == "gatewayUrl"
+    assert zentinelle.calls == []
+
+
+@override_config(ZENTINELLE_GATEWAY_ENABLED=True, ZENTINELLE_GATEWAY_IMAGE=IMAGE)
+def test_changing_the_gateway_url_redeploys_running_gateways_and_clearing_it_reverts(
+    org, cluster, admin, zentinelle, driver, settings
+):
+    settings.DEBUG = False
+    assert _connect(org).ok
+    assert _register(org, cluster).ok
+    applied = len(driver.applied)
+
+    result = _set_gateway_url(org, IN_CLUSTER)
+
+    assert result.ok, result.errors
+    assert result.data.gateway_url == IN_CLUSTER
+    assert _gateway_env(driver)["ZENTINELLE_URL"] == IN_CLUSTER
+    assert len(driver.applied) > applied
+
+    applied = len(driver.applied)
+    assert _set_gateway_url(org, IN_CLUSTER).ok
+    assert len(driver.applied) == applied  # unchanged: nothing redeployed
+
+    assert _set_gateway_url(org, None).data.gateway_url == ""
+    assert _gateway_env(driver)["ZENTINELLE_URL"] == BASE
+
+
+@override_config(ZENTINELLE_GATEWAY_ENABLED=True, ZENTINELLE_GATEWAY_IMAGE=IMAGE)
+def test_a_gateway_that_cannot_be_redeployed_keeps_the_reason(
+    org, cluster, admin, zentinelle, driver, settings
+):
+    settings.DEBUG = False
+    assert _connect(org).ok
+    assert _register(org, cluster).ok
+    driver.fail["Deployment"] = "boom"
+
+    result = _set_gateway_url(org, IN_CLUSTER)
+
+    assert result.ok, result.errors
+    assert result.data.gateway_url == IN_CLUSTER
+    assert "boom" in result.data.clusters[0].last_error
+
+
+def test_setting_the_gateway_url_needs_connect_and_a_connection(org, permission_resolver, zentinelle):
+    permission_resolver.grant(Permission.ZENTINELLE_GATEWAY_MANAGE)
+    result = _set_gateway_url(org, IN_CLUSTER)
+    assert result.ok is False and _code(result) == "PERMISSION_DENIED"
+
+    permission_resolver.grant(Permission.ZENTINELLE_CONNECT)
+    result = _set_gateway_url(org, IN_CLUSTER)
+    assert result.ok is False and _code(result) == "NOT_FOUND"
