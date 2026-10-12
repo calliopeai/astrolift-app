@@ -4499,6 +4499,682 @@
       }
     }
   },
+  "sourceProviders": {
+    "title": "Source providers",
+    "description": "Connect Astrolift to a code-hosting service so it can clone your repos and watch for pushes. Use OAuth Apps / GitHub Apps for org-wide access, PATs for self-hosted GitLab or Gitea, and SSH deploy keys for direct git access to any host.",
+    "hostsTitle": "Hosts",
+    "keysTitle": "SSH deploy keys",
+    "kind": {
+      "github_oauth_app": "GitHub OAuth App",
+      "github_oauth_user": "GitHub (OAuth user token)",
+      "github_app_install": "GitHub App install",
+      "github_pat": "GitHub PAT",
+      "gitlab_oauth_app": "GitLab OAuth App",
+      "gitlab_oauth_user": "GitLab (OAuth user token)",
+      "gitlab_pat": "GitLab PAT",
+      "bitbucket_oauth_app": "Bitbucket OAuth App",
+      "bitbucket_oauth_user": "Bitbucket (OAuth user token)",
+      "bitbucket_pat": "Bitbucket PAT",
+      "gitea_oauth_app": "Gitea OAuth App",
+      "gitea_oauth_user": "Gitea (OAuth user token)",
+      "gitea_pat": "Gitea PAT"
+    },
+    "scope": {
+      "private_org": "private org repos",
+      "public_org": "public org repos",
+      "user_repos": "user repos",
+      "public_non_org": "public non-org repos"
+    },
+    "hosts": {
+      "regionLabel": "Source connections",
+      "description": "One-click GitHub App registration via the manifest flow, or a guided GitLab Group OAuth wizard. Personal Access Tokens and pre-registered OAuth apps remain available under <em>Advanced</em>.",
+      "setupGuide": "Setup guide",
+      "connectGithub": "Connect to GitHub",
+      "connectGitlab": "Connect to GitLab",
+      "walkthrough": "one-click GitHub flow + GitLab wizard: full walkthrough",
+      "downloadLogo": "download Astrolift logo for your new App",
+      "optionalTitle": "Optional: enable \"Connect my GitHub\" repo browsing",
+      "optionalBody": "{count, plural, one {This GitHub App connection is} other {These # GitHub App connections are}} ready to use; cloning, autowiring and deploys run on the App installation token. Adding an OAuth Client ID is optional; it turns on the user-to-server \"Connect my GitHub\" flow so people can browse their own repositories. The Client ID looks like <code>Iv23l…</code> for new GitHub Apps.",
+      "addClientIdFor": "Add Client ID for {name}",
+      "listLabel": "Connections",
+      "emptyTitle": "No hosts connected yet",
+      "emptyDescription": "Click 'Connect to GitHub' to register an Astrolift GitHub App on github.com in one step, no client_id / secret paste required. For GitLab, the wizard walks you through creating a Group OAuth Application with copy-friendly callback URLs.",
+      "advancedToggle": "Advanced: paste a Personal Access Token or pre-registered OAuth app",
+      "pasteCredentials": "Paste credentials…",
+      "pasteHint": "Use this if you already have a registered OAuth App or want to connect via a PAT.",
+      "columns": {
+        "connection": "Connection",
+        "kind": "Kind",
+        "account": "Account",
+        "scopes": "Scopes",
+        "status": "Status"
+      },
+      "oauthAppConfig": "OAuth-app config",
+      "personal": "personal",
+      "noScopeRestriction": "(no scope restriction)",
+      "active": "active",
+      "disabled": "disabled",
+      "addClientId": "Add Client ID",
+      "connectMyGithub": "Connect my GitHub",
+      "connectMyGitlab": "Connect my GitLab",
+      "webhookSecret": "Webhook secret",
+      "disconnect": "Disconnect",
+      "disconnectTitle": "Disconnect {name}?",
+      "disconnectTitleGeneric": "Disconnect?",
+      "disconnectDescription": "Apps using this connection lose access until you reconnect. Webhooks signed with the old secret will fail until the integration is set up again.",
+      "rotateTitle": "Rotate webhook secret for {name}?",
+      "rotateTitleGeneric": "Rotate webhook secret?",
+      "rotateDescription": "Generates a fresh secret and shows it once. Webhook deliveries signed with the old secret start failing immediately. Paste the new value into the SCM host's webhook config before any pushes happen, or expect a short window where deploy triggers are rejected with a 401.",
+      "rotateConfirm": "Rotate secret"
+    },
+    "keys": {
+      "description": "ed25519 keypairs for direct git-over-SSH access. The public key is shown for you to paste into the repo's deploy-key settings; the private key stays encrypted in the platform secrets backend.",
+      "generate": "Generate key",
+      "columns": {
+        "name": "Name",
+        "scope": "Scope",
+        "fingerprint": "Fingerprint",
+        "publicKey": "Public key"
+      },
+      "appScope": "app: {slug}",
+      "orgScoped": "org-scoped",
+      "delete": "Delete",
+      "emptyTitle": "No SSH deploy keys yet",
+      "emptyDescription": "Generate a key to let Astrolift clone over SSH. Org-scoped keys cover every app; per-app keys offer tighter blast-radius.",
+      "deleteTitle": "Delete SSH key {name}?",
+      "deleteTitleGeneric": "Delete SSH key?",
+      "deleteDescription": "Remove the matching public key from any repo deploy-key lists first, otherwise git operations will fail abruptly. The private key is erased from the secrets backend.",
+      "deleteConfirm": "Delete key",
+      "publicKeyCopied": "Public key copied",
+      "copyFailedPaste": "Couldn't copy. Paste manually below.",
+      "copy": "copy",
+      "copied": "copied"
+    },
+    "reveal": {
+      "title": "Webhook secret generated",
+      "description": "Paste these into the SCM host's webhook config <strong>now</strong>; the plaintext secret is shown exactly once, then encrypted at rest.",
+      "webhookUrl": "Webhook URL",
+      "copyUrl": "Copy URL",
+      "urlCopied": "URL copied",
+      "secret": "Secret",
+      "copySecret": "Copy secret",
+      "secretCopied": "Secret copied",
+      "copyFailed": "Couldn't copy. Select the text and copy manually.",
+      "help": "GitHub: <code>Settings → Webhooks → Add webhook</code>. Set <code>Content type: application/json</code>, paste the URL + secret, choose <code>Just the push event</code>. GitLab: <code>Settings → Webhooks</code>, paste both, tick <code>Push events</code>.",
+      "done": "Done"
+    },
+    "connect": {
+      "title": "Connect a source host",
+      "description": "Tokens and OAuth client secrets are encrypted at rest via the platform secrets backend (default: local Fernet derived from <code>SECRET_KEY</code>; switch to AWS Secrets Manager / GCP Secret Manager / Azure Key Vault per install). <guide>Source-provider setup guide</guide>.",
+      "kind": "Kind",
+      "kinds": {
+        "github_oauth_app": {
+          "label": "GitHub OAuth App config",
+          "hint": "Operator-registered OAuth app. Holds client_id + client_secret. Per-user tokens get stored as separate connections after the OAuth dance (phase 2)."
+        },
+        "github_app_install": {
+          "label": "GitHub App installation",
+          "hint": "Per-org App installation. Secret holds the App's private-key PEM; we mint per-installation tokens at deploy time."
+        },
+        "github_pat": {
+          "label": "GitHub PAT",
+          "hint": "Paste a Personal Access Token (fine-grained or classic). Simplest path; tied to the user that minted it."
+        },
+        "gitlab_oauth_app": {
+          "label": "GitLab OAuth App config",
+          "hint": "GitLab OAuth Application. SaaS gitlab.com or self-hosted (set api_base_url)."
+        },
+        "gitlab_pat": {
+          "label": "GitLab PAT",
+          "hint": "GitLab personal or project access token. Self-hosted: set api_base_url."
+        },
+        "bitbucket_oauth_app": {
+          "label": "Bitbucket OAuth Consumer",
+          "hint": "Bitbucket OAuth 2.0 Consumer."
+        },
+        "bitbucket_pat": {
+          "label": "Bitbucket app password",
+          "hint": "Bitbucket app password (workspace-scoped)."
+        },
+        "gitea_oauth_app": {
+          "label": "Gitea OAuth App",
+          "hint": "Self-hosted Gitea instance."
+        },
+        "gitea_pat": {
+          "label": "Gitea token",
+          "hint": "Self-hosted Gitea API token."
+        }
+      },
+      "scopes": {
+        "private_org": "private repos in connected org",
+        "public_org": "public repos in connected org",
+        "user_repos": "user repos",
+        "public_non_org": "public repos outside the org"
+      },
+      "displayName": "Display name (optional)",
+      "displayNamePlaceholder": "e.g. Production GitHub, Acme corp GitLab",
+      "account": "Account / org login",
+      "accountPlaceholder": "acme-org or alice",
+      "installationId": "Installation ID",
+      "apiBaseUrl": "API base URL (self-hosted)",
+      "githubAppId": "GitHub App ID (numeric, for webhook payload lookups)",
+      "oauthClientId": "OAuth Client ID",
+      "githubAppIdHelp": "The numeric App ID GitHub shows on your App settings page. Used for webhook-payload App lookups; the user-to-server OAuth Client ID is separate (below).",
+      "redirectUri": "OAuth redirect URI",
+      "redirectUriHelp": "Must match the redirect URI registered on the OAuth application at the host side ({host}).",
+      "appClientId": "GitHub App Client ID",
+      "appClientIdHelp": "Find this on your GitHub App settings page; it looks like <code>Iv23l...</code> for new GitHub Apps or a 20-char hex string for legacy OAuth Apps. <link>Open GitHub App settings →</link>",
+      "appClientIdInvalid": "Doesn't look like a GitHub App Client ID. Expected <code>Iv…</code> or a 20-char hex string.",
+      "secretOauth": "OAuth Client Secret",
+      "secretPem": "GitHub App private-key PEM",
+      "secretToken": "Personal Access Token / app password",
+      "secretHelp": "Stored encrypted at rest. Never logged. Rotate by editing this connection later.",
+      "visibility": "Repo visibility scopes",
+      "visibilityHelp": "Constrain what repos this connection is allowed to surface when listing queries call the {host} API. No selections = no scope restriction.",
+      "cancel": "Cancel",
+      "connecting": "Connecting…",
+      "connect": "Connect"
+    },
+    "github": {
+      "titleByo": "Connect an existing GitHub App",
+      "title": "Connect to GitHub",
+      "descriptionByo": "Adopt a GitHub App you already created. Paste its App ID and private key; Astrolift verifies the credentials against GitHub before saving them.",
+      "description": "Create a brand-new App on your account in one click, or connect an App you already made.",
+      "createTitle": "Create a new GitHub App",
+      "createBody": "Recommended. Astrolift asks GitHub to register a private App on your account, with no client_id / secret / PEM to paste. GitHub shows you the name and permissions first.",
+      "byoTitle": "Connect an existing GitHub App",
+      "byoBody": "Bring your own App, one you already created on GitHub. Paste its App ID and private-key PEM. Good for GitHub Enterprise or an App shared across tools.",
+      "orgLabel": "Where should the App live?",
+      "orgPlaceholder": "acme-corp (leave blank for your personal account)",
+      "orgHelp": "GitHub org slug. Leave blank to install on your personal account. You'll be able to switch the install target on the next screen if you change your mind.",
+      "orgInvalid": "GitHub org slugs are alphanumeric + hyphen, max 39 characters.",
+      "permsTitle": "Permissions Astrolift will request",
+      "perms": {
+        "contents": "clone your repos",
+        "metadata": "read repo metadata",
+        "pullRequests": "post deploy / preview comments on PRs",
+        "checks": "write commit statuses for deploys"
+      },
+      "permsFooter": "Plus push + pull_request webhooks. You can broaden later by editing the App on GitHub.",
+      "back": "← Back",
+      "continue": "Continue on GitHub →",
+      "appId": "App ID",
+      "appIdHelp": "The numeric App ID from your GitHub App's settings page (not the Client ID).",
+      "appIdInvalid": "The App ID is the numeric id, e.g. 3705068.",
+      "pem": "Private key (PEM)",
+      "pemHelp": "Generate a private key on your GitHub App page and paste the whole <code>.pem</code> here. It is encrypted at rest and never shown again.",
+      "clientId": "Client ID",
+      "optional": "(optional)",
+      "clientIdHelp": "Needed only for the user-to-server \"Connect my GitHub\" dance.",
+      "clientSecret": "Client secret",
+      "webhookSecret": "Webhook secret",
+      "orgLogin": "GitHub org / user login",
+      "orgLoginHelp": "Only needed if the App is installed on more than one account; Astrolift uses it to pick the right installation.",
+      "apiBaseUrl": "API base URL",
+      "apiBaseUrlHelp": "For GitHub Enterprise Server. Leave blank for github.com.",
+      "verifying": "Verifying…",
+      "connectApp": "Connect App"
+    },
+    "gitlab": {
+      "title": "Connect to GitLab",
+      "description": "GitLab doesn't support one-click App registration like GitHub, so we walk you through creating a Group OAuth Application by hand. Step 1: tell us your GitLab group + instance. Step 2: click the link to GitLab and paste the callback URL we generate. Step 3: paste the resulting Application ID + Secret back here.",
+      "step1": "Where does your GitLab live?",
+      "group": "GitLab group (optional)",
+      "groupPlaceholder": "acme-corp (leave blank to use a user-level App)",
+      "groupHelp": "Group OAuth Apps are shared by everyone in the group; user-level Apps are tied to a single user.",
+      "instance": "GitLab instance URL (self-hosted)",
+      "instancePlaceholder": "https://gitlab.acme.example (leave blank for SaaS gitlab.com)",
+      "step2": "Create the Application on GitLab",
+      "openApps": "Open GitLab Applications",
+      "callbackLabel": "Paste this Callback URL on GitLab",
+      "copied": "Copied",
+      "copy": "Copy",
+      "scopes": "Required GitLab scopes: <code>read_api</code>, <code>read_repository</code>, <code>read_user</code>. Leave <em>Confidential</em> checked.",
+      "step3": "Paste the result back here",
+      "applicationId": "Application ID",
+      "secret": "Secret",
+      "secretHelp": "Stored encrypted at rest. GitLab shows the Secret exactly once; copy it before clicking away.",
+      "cancel": "Cancel",
+      "connecting": "Connecting…",
+      "save": "Save & connect"
+    },
+    "generateKey": {
+      "title": "Generate SSH deploy key",
+      "description": "ed25519 keypair. Public key is shown for you to paste into the repo's deploy-key settings; the private key stays encrypted in the platform secrets backend and is never shown.",
+      "fingerprint": "Fingerprint",
+      "publicKey": "Public key (paste into the repo's deploy keys)",
+      "copyPublicKey": "Copy public key",
+      "copied": "Public key copied",
+      "copyFailed": "Couldn't copy. Select text and copy manually.",
+      "help": "GitHub: <code>Settings → Deploy keys → Add deploy key</code>. Tick \"Allow write access\" only if Astrolift needs to push (e.g. for tag-based releases). GitLab: <code>Settings → Repository → Deploy Keys</code>.",
+      "done": "Done",
+      "name": "Name",
+      "appSlug": "App slug (optional)",
+      "appSlugPlaceholder": "leave blank for org-scoped key",
+      "appSlugHelp": "Leave blank for an org-scoped key (reusable across every app). Set an app slug for a per-app key, with a tighter blast radius if a single repo is compromised.",
+      "cancel": "Cancel",
+      "generating": "Generating…",
+      "generate": "Generate"
+    },
+    "clientId": {
+      "title": "Add an OAuth Client ID",
+      "description": "Optional; nothing here is broken. Cloning, autowiring and deploys already run on this connection's App installation token. Adding the GitHub App's OAuth Client ID additionally enables the user-to-server \"Connect my GitHub\" flow, letting people browse their own repositories. The Client ID is distinct from the numeric App ID; find it on your GitHub App settings page (looks like <code>Iv23l…</code> for new GitHub Apps).",
+      "connection": "Connection",
+      "account": "Account",
+      "existingAppId": "App ID (existing)",
+      "label": "GitHub App Client ID",
+      "help": "<link>Open GitHub App settings →</link> The Client ID is shown in the <em>About</em> section of your App page, separately from the numeric App ID.",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "save": "Save Client ID"
+    },
+    "toasts": {
+      "rotationFailed": "Rotation failed",
+      "disconnected": "Disconnected {name}",
+      "disconnectFailed": "Disconnect failed",
+      "keyDeleted": "Deleted {name}",
+      "deleteFailed": "Delete failed",
+      "clientIdSaved": "Client ID saved for {name}",
+      "saveFailed": "Save failed",
+      "keyGenerated": "Key generated; copy the public key into your repo",
+      "generationFailed": "Generation failed",
+      "connected": "Connected {name}",
+      "connectFailed": "Connect failed",
+      "githubConnected": "Connected GitHub App: {name}",
+      "githubConnectFailed": "Couldn't connect the GitHub App",
+      "callbackCopied": "Callback URL copied",
+      "copyFailed": "Couldn't copy. Select the text and copy manually.",
+      "gitlabConnected": "Connected {name}. Use \"Connect my GitLab\" to sign in."
+    }
+  },
+  "identityProviders": {
+    "kinds": {
+      "oidc": "Generic OIDC",
+      "saml": "SAML 2.0",
+      "cognito": "Amazon Cognito",
+      "auth0": "Auth0",
+      "okta": "Okta",
+      "azure_ad": "Azure AD / Entra ID",
+      "google": "Google Workspace",
+      "github": "GitHub OAuth",
+      "local": "Local accounts"
+    },
+    "hints": {
+      "oidc": "discovery URL + client_id + client_secret_ref",
+      "cognito": "user pool + region + OIDC fields",
+      "auth0": "tenant URL + client_id + client_secret_ref",
+      "okta": "discovery URL + client_id + client_secret_ref",
+      "azure_ad": "discovery URL + client_id + client_secret_ref",
+      "google": "discovery URL + client_id",
+      "github": "OAuth app client_id + client_secret_ref",
+      "saml": "metadata URL or XML upload",
+      "local": "username + password (Django auth, dev/fallback)"
+    },
+    "create": {
+      "title": "New identity provider",
+      "description": "Configure how users sign in. Multiple providers can coexist; one is active at a time. Secrets are stored as references into the platform secrets backend, never plaintext in this row.",
+      "kind": "Kind",
+      "displayName": "Display name (optional)",
+      "displayNamePlaceholder": "e.g. Auth0 prod, Cognito staging",
+      "displayNameHelp": "Shown on the login screen and in audit logs. Defaults to the kind name when blank.",
+      "discovery": "OIDC discovery URL",
+      "clientId": "Client ID",
+      "secretRef": "Secret reference",
+      "secretRefHelp": "Path into the platform secrets backend; the value never lives in this row.",
+      "metadataUrl": "SAML metadata URL",
+      "config": "Kind-specific config (JSON)",
+      "invalidJson": "invalid JSON",
+      "cognitoKeys": "Required keys for Cognito: <code>user_pool_id</code>, <code>region</code>.",
+      "setActive": "Make this the active provider for the organization",
+      "cancel": "Cancel",
+      "saving": "Saving…",
+      "save": "Save provider"
+    },
+    "list": {
+      "title": "Identity providers",
+      "description": "Sign-in methods configured for the organization. Auth0, generic OIDC, Cognito, Okta, Azure AD, Google, GitHub, SAML, or local accounts. Exactly one is active at a time.",
+      "learnMore": "Learn more",
+      "newProvider": "New provider",
+      "columns": {
+        "provider": "Provider",
+        "kind": "Kind",
+        "endpoint": "Endpoint",
+        "status": "Status"
+      },
+      "client": "client {id}",
+      "active": "active",
+      "configured": "configured",
+      "activeSince": "Active since {date}",
+      "by": "by {name}",
+      "makeActive": "Make active",
+      "delete": "Delete",
+      "emptyTitle": "No identity providers configured",
+      "emptyDescription": "Configure at least one provider so users can sign in. Local accounts are useful for first-run; production installs typically wire OIDC or Cognito.",
+      "switchTitle": "Switch active provider to {name}?",
+      "switchTitleGeneric": "Switch active provider?",
+      "switchDescription": "Users already signed in keep their sessions. The next sign-in routes through the new provider. If users only exist in the old provider, they'll be unable to log in until provisioned here.",
+      "switchConfirm": "Switch provider",
+      "deleteTitle": "Delete {name}?",
+      "deleteTitleGeneric": "Delete identity provider?",
+      "deleteDescription": "Soft-deletes the IdP record. Users whose identity exists only in this provider can no longer sign in; provision them in the active provider first if they need continued access.",
+      "deleteConfirm": "Delete provider"
+    },
+    "toasts": {
+      "configured": "Configured {name}",
+      "failed": "Failed",
+      "activeProvider": "Active provider: {name}",
+      "deleted": "Deleted {name}"
+    }
+  },
+  "appearanceSettings": {
+    "locked": "Your organization has locked the theme. These controls are read-only.",
+    "themeTitle": "Theme",
+    "themeDescription": "Ground and accent. Picking a light theme switches the app to light mode.",
+    "themeHints": {
+      "orbit": "Black · green",
+      "forge": "Black · copper",
+      "console": "Charcoal · ice",
+      "dusk": "Charcoal · periwinkle",
+      "graphite": "Graphite · green",
+      "field": "Emerald · green",
+      "daylight": "Mist · green",
+      "workshop": "Paper · copper"
+    },
+    "accent": "Accent",
+    "ground": "Ground",
+    "accents": {
+      "green": "Green",
+      "copper": "Copper",
+      "ice": "Ice",
+      "periwinkle": "Periwinkle",
+      "amber": "Amber"
+    },
+    "grounds": {
+      "black": "Black",
+      "charcoal": "Charcoal",
+      "graphite": "Graphite",
+      "emerald": "Emerald",
+      "paper": "Paper",
+      "mist": "Mist"
+    },
+    "modes": {
+      "dark": "dark",
+      "light": "light"
+    },
+    "layoutTitle": "Layout",
+    "layoutDescription": "How much room lists and panels take, and how sharp their corners are.",
+    "density": "Density",
+    "densities": {
+      "compact": {
+        "label": "Compact",
+        "hint": "Dense rows with hairline dividers"
+      },
+      "cards": {
+        "label": "Cards",
+        "hint": "Boxed items that flow into columns"
+      }
+    },
+    "corners": "Corners",
+    "cornerSquare": "Square",
+    "cornerRounded": "Rounded",
+    "restrictedTitle": "Settings you can't change",
+    "restrictedDescription": "On settings pages, parts you don't have the permission to change.",
+    "restricted": {
+      "show": {
+        "label": "Show read-only",
+        "blurb": "See settings you can't change, disabled, with the permission that would allow it"
+      },
+      "hide": {
+        "label": "Hide",
+        "blurb": "Only show settings you can change"
+      }
+    },
+    "followingDefault": "Following your organization's default: <strong>{setting}</strong>.",
+    "orgDefault": "Your organization's default: <strong>{setting}</strong>.",
+    "useOrgDefault": "Use the organization's default",
+    "reset": "Reset to defaults",
+    "customAccent": {
+      "helpEmpty": "Any colour, as long as it reads against the ground. Status colours never change.",
+      "helpInvalid": "Use a hex colour, like <mono>#2f9e52</mono>.",
+      "helpOk": "<mono>{ratio}:1</mono> on {ground}. Status colours never change.",
+      "helpTooFaintLighter": "Too faint on {ground}: <mono>{ratio}:1</mono>, it needs <mono>{min}:1</mono>. Pick a lighter colour.",
+      "helpTooFaintDarker": "Too faint on {ground}: <mono>{ratio}:1</mono>, it needs <mono>{min}:1</mono>. Pick a darker colour.",
+      "helpFaintEverywhere": "Too faint on every ground; it needs <mono>{min}:1</mono>.",
+      "helpReadsEverywhere": "Reads on every ground. Status colours never change.",
+      "helpFaintSome": "Too faint on {grounds}: people on {count, plural, one {that ground} other {those grounds}} keep the default accent.",
+      "label": "Custom accent",
+      "pick": "Pick a custom accent",
+      "inUse": "In use"
+    }
+  },
+  "profileSettings": {
+    "identity": {
+      "title": "Identity",
+      "loading": "Loading…",
+      "signIn": "Sign in to edit your profile.",
+      "description": "Your name and email shown across the platform. Fields locked by your identity provider can't be edited locally; they sync from the IdP.",
+      "editingDisabled": "Profile editing is disabled by your organization administrator. Ask your admin to flip <code>allowUserProfileEdit</code> on <code>/administration/organization</code>.",
+      "username": "Username",
+      "usernameHelp": "Username is the auth identifier; it never changes.",
+      "firstName": "First name",
+      "lastName": "Last name",
+      "email": "Email",
+      "saving": "Saving…",
+      "save": "Save",
+      "idpManagedTitle": "Managed by your identity provider; local edits would be overwritten on next sign-in",
+      "idpManaged": "IdP-managed"
+    },
+    "language": {
+      "title": "Language",
+      "description": "Surface language. Falls back to en when a translation is missing."
+    },
+    "timezone": {
+      "title": "Timezone",
+      "description": "Override the browser-detected timezone for all timestamps in the dashboard. Leave blank to use the zone your browser reports (<mono>{tz}</mono>).",
+      "label": "Timezone",
+      "placeholder": "{tz} (browser-detected)",
+      "noOverride": "{tz} (browser-detected, no override)",
+      "saving": "Saving…",
+      "save": "Save"
+    },
+    "toasts": {
+      "timezoneSaved": "Timezone saved",
+      "timezoneFailed": "Failed to save timezone",
+      "profileUpdated": "Profile updated",
+      "updateFailed": "Update failed"
+    }
+  },
+  "visualizationSettings": {
+    "preview": "Preview",
+    "fleetTitle": "Fleet view",
+    "fleetDescription": "How agent fleets are drawn. Every style shows the same agents and the same health.",
+    "workflowTitle": "Workflow view",
+    "workflowDescription": "How workflows and their runs are drawn.",
+    "appTitle": "App view",
+    "appDescription": "How an app's dashboard is drawn. Auto lays it out for the app's shape.",
+    "motionTitle": "Motion",
+    "motionDescription": "Every animation stands for real state. Reduced motion draws still pictures that carry the same information.",
+    "particlesTitle": "Flow particles",
+    "fleet": {
+      "orbit": {
+        "label": "Orbit",
+        "blurb": "Clusters as planets, agents as satellites"
+      },
+      "heartbeat": {
+        "label": "Heartbeat",
+        "blurb": "A fading phosphor dot per event"
+      },
+      "hive": {
+        "label": "Hive",
+        "blurb": "A tile per agent, for large fleets"
+      },
+      "manifest": {
+        "label": "Manifest",
+        "blurb": "The run queue as a departures board"
+      },
+      "isometric": {
+        "label": "Isometric",
+        "blurb": "Clusters as platforms, load as height"
+      },
+      "graph": {
+        "label": "Graph",
+        "blurb": "A live force graph with dispatch pulses"
+      },
+      "swarm": {
+        "label": "Swarm",
+        "blurb": "Agents swarming their clusters on tendrils"
+      },
+      "list": {
+        "label": "List",
+        "blurb": "A plain table"
+      }
+    },
+    "workflow": {
+      "transit": {
+        "label": "Transit",
+        "blurb": "Workflows as lines, runs as trains"
+      },
+      "isometric": {
+        "label": "Isometric",
+        "blurb": "Stages as an assembly line"
+      },
+      "graph": {
+        "label": "Graph",
+        "blurb": "An animated stage graph"
+      },
+      "list": {
+        "label": "List",
+        "blurb": "A plain table"
+      }
+    },
+    "app": {
+      "auto": {
+        "label": "Auto",
+        "blurb": "Laid out for the app's topology"
+      },
+      "isometric": {
+        "label": "Isometric",
+        "blurb": "Workloads as blocks on a platform"
+      },
+      "graph": {
+        "label": "Graph",
+        "blurb": "Workloads and traffic as a live graph"
+      },
+      "classic": {
+        "label": "Classic",
+        "blurb": "Cards only, no diagram"
+      }
+    },
+    "motion": {
+      "system": {
+        "label": "Follow system",
+        "blurb": "Reduce motion when the OS asks"
+      },
+      "full": {
+        "label": "Full",
+        "blurb": "Every animation"
+      },
+      "reduced": {
+        "label": "Reduced",
+        "blurb": "Static pictures, same information"
+      }
+    },
+    "particles": {
+      "on": {
+        "label": "On",
+        "blurb": "Particles along edges show throughput"
+      },
+      "off": {
+        "label": "Off",
+        "blurb": "Edges only, with counts"
+      }
+    }
+  },
+  "notificationSettings": {
+    "title": "Notifications",
+    "description": "Your inbox: deploy approvals, failure alerts, invitations, quota warnings.",
+    "inboxTitle": "Inbox",
+    "inboxDescription": "Deploy approvals, failure alerts, invitations, quota warnings.",
+    "unread": "<num>{count}</num> unread",
+    "markAll": "Mark all as read",
+    "feedLabel": "Notifications",
+    "inboxEmptyTitle": "Inbox empty",
+    "inboxEmptyDescription": "Notifications appear here as deploys finish, invitations arrive, or quotas approach their limits.",
+    "markRead": "Mark read",
+    "alerts": {
+      "title": "App alert subscriptions",
+      "description": "Choose which apps and event types to receive alerts for.",
+      "app": "App",
+      "bulk": "Bulk",
+      "kinds": {
+        "deploy_success": "Deploy success",
+        "deploy_failure": "Deploy failure",
+        "error_spike": "Error spike",
+        "preview_created": "Preview created",
+        "preview_destroyed": "Preview destroyed"
+      },
+      "toggleLabel": "{kind} for {app}",
+      "unsubscribeAll": "Unsubscribe all",
+      "subscribeAll": "Subscribe all",
+      "emptyTitle": "No apps registered",
+      "emptyDescription": "Register an app to start configuring alerts for it.",
+      "inAppChannel": "In-app channel",
+      "otherChannels": "Email/Slack channels surface here once the user-channel preferences are configured.",
+      "unsubscribeTitle": "Unsubscribe from every alert on {app}?",
+      "unsubscribeTitleGeneric": "Unsubscribe from every alert?",
+      "unsubscribeDescription": "Clears all {count} alert kinds for this app on the in-app channel. You stop hearing about failed deploys and error spikes until you subscribe again."
+    },
+    "toasts": {
+      "cleared": "Cleared {count}",
+      "markAllFailed": "Could not mark notifications as read",
+      "markFailed": "Could not mark notification as read",
+      "saveFailed": "Save failed",
+      "subscribedAll": "Subscribed to all on {app}",
+      "subscribeFailed": "Subscribe failed",
+      "unsubscribed": "Unsubscribed from {app}",
+      "unsubscribeFailed": "Unsubscribe failed"
+    }
+  },
+  "securitySettings": {
+    "title": "Security",
+    "description": "Active sessions and bearer credentials issued for your account.",
+    "apiTokens": "API tokens",
+    "apiTokensDescription": "Long-lived credentials for CLIs, CI runs, and scripts.",
+    "manageTokens": "Manage tokens",
+    "mfa": "Multi-factor authentication",
+    "mfaDescription": "Configured at the IdP layer. Astrolift sees the assertion via OIDC.",
+    "mfaBody": "Set up MFA in your identity provider (Auth0 / Okta / Azure AD / Google Workspace). The platform enforces session-freshness for high-risk actions via ABAC policies.",
+    "subnav": {
+      "label": "Settings sub-navigation",
+      "profile": "Profile",
+      "security": "Security",
+      "notifications": "Notifications",
+      "appearance": "Appearance",
+      "visualizations": "Visualizations",
+      "home": "Home"
+    },
+    "connected": {
+      "title": "Connected accounts",
+      "notConnected": "Not connected",
+      "reauthorize": "Re-authorize",
+      "connected": "Connected",
+      "connect": "Connect",
+      "disconnect": "Disconnect",
+      "refetchHint": "Refetch on focus by reloading the page; connection state updates after the OAuth dance completes on the host.",
+      "disconnectTitle": "Disconnect {provider}?",
+      "thisAccount": "this account",
+      "theLinkedAccount": "the linked account",
+      "disconnectBody": "Astrolift will lose access to <mono>{account}</mono> on {provider}. Any deploys that flow through your identity will fail until you reconnect.",
+      "typeToConfirm": "Type <mono>{account}</mono> to confirm.",
+      "toasts": {
+        "connectFailed": "Connect failed",
+        "oauthStartFailed": "Could not start the OAuth flow",
+        "disconnected": "Disconnected {account}",
+        "accountFallback": "account",
+        "disconnectFailed": "Could not disconnect this account"
+      }
+    }
+  },
   "settingsIndex": {
     "title": "Settings",
     "description": "Configure the platform's identity, security, and surfaces.",

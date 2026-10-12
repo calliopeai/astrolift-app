@@ -7,13 +7,15 @@ import {
   UserIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
 interface SubnavLink {
   href: string;
-  label: string;
+  /** A securitySettings.subnav message. */
+  labelKey: "profile" | "security" | "notifications" | "appearance" | "visualizations" | "home";
   icon: React.ReactNode;
 }
 
@@ -21,27 +23,36 @@ interface SubnavLink {
 // (organization, policies, permissions) moved to the Admin control
 // plane at /administration/* — the old /settings/* paths redirect.
 const LINKS: SubnavLink[] = [
-  { href: "/settings/profile", label: "Profile", icon: <UserIcon className="size-4" /> },
-  { href: "/settings/security", label: "Security", icon: <ShieldCheckIcon className="size-4" /> },
+  { href: "/settings/profile", labelKey: "profile", icon: <UserIcon className="size-4" /> },
+  {
+    href: "/settings/security",
+    labelKey: "security",
+    icon: <ShieldCheckIcon className="size-4" />,
+  },
   {
     href: "/settings/notifications",
-    label: "Notifications",
+    labelKey: "notifications",
     icon: <BellIcon className="size-4" />,
   },
-  { href: "/settings/appearance", label: "Appearance", icon: <PaletteIcon className="size-4" /> },
+  {
+    href: "/settings/appearance",
+    labelKey: "appearance",
+    icon: <PaletteIcon className="size-4" />,
+  },
   {
     href: "/settings/visualizations",
-    label: "Visualizations",
+    labelKey: "visualizations",
     icon: <OrbitIcon className="size-4" />,
   },
-  { href: "/settings/home", label: "Home", icon: <HomeIcon className="size-4" /> },
+  { href: "/settings/home", labelKey: "home", icon: <HomeIcon className="size-4" /> },
 ];
 
 /** The Settings sub-navigation. Pure: the current path comes from the container. */
 export function SettingsSubnavView({ pathname }: { pathname: string }) {
+  const t = useTranslations("securitySettings.subnav");
   return (
     <nav
-      aria-label="Settings sub-navigation"
+      aria-label={t("label")}
       className="border-border bg-muted/30 sticky top-0 z-10 flex flex-wrap items-center gap-1 border-b px-4 py-2 backdrop-blur"
     >
       {LINKS.map((link) => {
@@ -59,7 +70,7 @@ export function SettingsSubnavView({ pathname }: { pathname: string }) {
             aria-current={active ? "page" : undefined}
           >
             {link.icon}
-            <span>{link.label}</span>
+            <span>{t(link.labelKey)}</span>
           </Link>
         );
       })}

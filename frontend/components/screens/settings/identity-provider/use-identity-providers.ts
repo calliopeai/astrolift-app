@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { useLocalListState } from "@/components/list/use-list-state";
@@ -25,6 +26,7 @@ interface Resp {
  * IdentityProvidersScreen.
  */
 export function useIdentityProviders() {
+  const t = useTranslations("identityProviders.toasts");
   // In memory: the Providers page keeps its tab in the hash and owns the query string.
   const list = useLocalListState(IDENTITY_PROVIDERS_LIST);
   const { can } = useMyPermissions();
@@ -49,9 +51,9 @@ export function useIdentityProviders() {
   async function onSetActive(idp: AstroliftIdentityProvider): Promise<void> {
     const { data } = await setActive({ variables: { input: { id: idp.id } } });
     if (data?.setActiveIdentityProvider.ok) {
-      toast.success(`Active provider: ${idp.name}`);
+      toast.success(t("activeProvider", { name: idp.name }));
     } else {
-      throw new Error(data?.setActiveIdentityProvider.errors?.[0]?.message ?? "Failed");
+      throw new Error(data?.setActiveIdentityProvider.errors?.[0]?.message ?? t("failed"));
     }
   }
 
@@ -59,9 +61,9 @@ export function useIdentityProviders() {
   async function onDelete(idp: AstroliftIdentityProvider): Promise<void> {
     const { data } = await softDelete({ variables: { input: { id: idp.id } } });
     if (data?.softDeleteIdentityProvider.ok) {
-      toast.success(`Deleted ${idp.name}`);
+      toast.success(t("deleted", { name: idp.name }));
     } else {
-      throw new Error(data?.softDeleteIdentityProvider.errors?.[0]?.message ?? "Failed");
+      throw new Error(data?.softDeleteIdentityProvider.errors?.[0]?.message ?? t("failed"));
     }
   }
 

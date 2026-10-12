@@ -1,3 +1,4 @@
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { PageShell } from "@/components/PageShell";
@@ -13,11 +14,9 @@ export function SecurityScreen({
   sessions: React.ReactNode;
   pairDevice: React.ReactNode;
 }) {
+  const t = useTranslations("securitySettings");
   return (
-    <PageShell
-      title="Security"
-      description="Active sessions and bearer credentials issued for your account."
-    >
+    <PageShell title={t("title")} description={t("description")}>
       <div className="grid gap-4">
         {sessions}
         {pairDevice}

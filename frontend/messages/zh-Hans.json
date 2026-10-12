@@ -3556,6 +3556,682 @@
       }
     }
   },
+  "sourceProviders": {
+    "title": "源代码提供方",
+    "description": "将 Astrolift 连接到代码托管服务，以便克隆你的仓库并监听推送。组织范围的访问使用 OAuth App / GitHub App，自托管的 GitLab 或 Gitea 使用 PAT，直接以 git 访问任意主机使用 SSH 部署密钥。",
+    "hostsTitle": "主机",
+    "keysTitle": "SSH 部署密钥",
+    "kind": {
+      "github_oauth_app": "GitHub OAuth App",
+      "github_oauth_user": "GitHub（OAuth 用户令牌）",
+      "github_app_install": "GitHub App 安装",
+      "github_pat": "GitHub PAT",
+      "gitlab_oauth_app": "GitLab OAuth App",
+      "gitlab_oauth_user": "GitLab（OAuth 用户令牌）",
+      "gitlab_pat": "GitLab PAT",
+      "bitbucket_oauth_app": "Bitbucket OAuth App",
+      "bitbucket_oauth_user": "Bitbucket（OAuth 用户令牌）",
+      "bitbucket_pat": "Bitbucket PAT",
+      "gitea_oauth_app": "Gitea OAuth App",
+      "gitea_oauth_user": "Gitea（OAuth 用户令牌）",
+      "gitea_pat": "Gitea PAT"
+    },
+    "scope": {
+      "private_org": "组织私有仓库",
+      "public_org": "组织公开仓库",
+      "user_repos": "用户仓库",
+      "public_non_org": "非组织公开仓库"
+    },
+    "hosts": {
+      "regionLabel": "源代码连接",
+      "description": "通过清单流程一键注册 GitHub App，或使用引导式 GitLab 群组 OAuth 向导。个人访问令牌和预先注册的 OAuth 应用仍可在<em>高级</em>中使用。",
+      "setupGuide": "设置指南",
+      "connectGithub": "连接到 GitHub",
+      "connectGitlab": "连接到 GitLab",
+      "walkthrough": "一键 GitHub 流程 + GitLab 向导：完整指南",
+      "downloadLogo": "下载用于新 App 的 Astrolift 徽标",
+      "optionalTitle": "可选：启用“连接我的 GitHub”仓库浏览",
+      "optionalBody": "{count, plural, other {这 # 个 GitHub App 连接}}已可使用；克隆、自动关联和部署均使用 App 安装令牌。添加 OAuth Client ID 是可选的；它会开启 user-to-server 的“连接我的 GitHub”流程，让用户浏览自己的仓库。新 GitHub App 的 Client ID 形如 <code>Iv23l…</code>。",
+      "addClientIdFor": "为 {name} 添加 Client ID",
+      "listLabel": "连接",
+      "emptyTitle": "尚未连接任何主机",
+      "emptyDescription": "点击“连接到 GitHub”，即可一步在 github.com 上注册 Astrolift GitHub App，无需粘贴 client_id 或密钥。对于 GitLab，向导会引导你创建群组 OAuth 应用，回调 URL 便于复制。",
+      "advancedToggle": "高级：粘贴个人访问令牌或预先注册的 OAuth 应用",
+      "pasteCredentials": "粘贴凭据…",
+      "pasteHint": "如果你已有注册的 OAuth App，或想通过 PAT 连接，请使用此选项。",
+      "columns": {
+        "connection": "连接",
+        "kind": "类型",
+        "account": "账号",
+        "scopes": "范围",
+        "status": "状态"
+      },
+      "oauthAppConfig": "OAuth 应用配置",
+      "personal": "个人",
+      "noScopeRestriction": "（无范围限制）",
+      "active": "已启用",
+      "disabled": "已停用",
+      "addClientId": "添加 Client ID",
+      "connectMyGithub": "连接我的 GitHub",
+      "connectMyGitlab": "连接我的 GitLab",
+      "webhookSecret": "Webhook 密钥",
+      "disconnect": "断开连接",
+      "disconnectTitle": "断开 {name} 的连接？",
+      "disconnectTitleGeneric": "断开连接？",
+      "disconnectDescription": "使用此连接的应用在重新连接前将失去访问权限。使用旧密钥签名的 Webhook 在重新设置集成前都会失败。",
+      "rotateTitle": "轮换 {name} 的 Webhook 密钥？",
+      "rotateTitleGeneric": "轮换 Webhook 密钥？",
+      "rotateDescription": "生成新的密钥并仅显示一次。使用旧密钥签名的 Webhook 投递会立即开始失败。请在发生任何推送前将新值粘贴到 SCM 主机的 Webhook 配置中，否则部署触发器会在短时间内被 401 拒绝。",
+      "rotateConfirm": "轮换密钥"
+    },
+    "keys": {
+      "description": "用于通过 SSH 直接访问 git 的 ed25519 密钥对。公钥会显示出来，供你粘贴到仓库的部署密钥设置中；私钥始终加密保存在平台的密钥后端。",
+      "generate": "生成密钥",
+      "columns": {
+        "name": "名称",
+        "scope": "范围",
+        "fingerprint": "指纹",
+        "publicKey": "公钥"
+      },
+      "appScope": "应用：{slug}",
+      "orgScoped": "组织范围",
+      "delete": "删除",
+      "emptyTitle": "尚无 SSH 部署密钥",
+      "emptyDescription": "生成密钥后，Astrolift 即可通过 SSH 克隆。组织范围的密钥适用于所有应用；按应用的密钥可将影响范围控制得更小。",
+      "deleteTitle": "删除 SSH 密钥 {name}？",
+      "deleteTitleGeneric": "删除 SSH 密钥？",
+      "deleteDescription": "请先从所有仓库的部署密钥列表中移除对应的公钥，否则 git 操作会突然失败。私钥将从密钥后端中清除。",
+      "deleteConfirm": "删除密钥",
+      "publicKeyCopied": "已复制公钥",
+      "copyFailedPaste": "无法复制。请在下方手动粘贴。",
+      "copy": "复制",
+      "copied": "已复制"
+    },
+    "reveal": {
+      "title": "已生成 Webhook 密钥",
+      "description": "请<strong>立即</strong>将这些内容粘贴到 SCM 主机的 Webhook 配置中；明文密钥仅显示一次，之后会加密存储。",
+      "webhookUrl": "Webhook URL",
+      "copyUrl": "复制 URL",
+      "urlCopied": "已复制 URL",
+      "secret": "密钥",
+      "copySecret": "复制密钥",
+      "secretCopied": "已复制密钥",
+      "copyFailed": "无法复制。请选中文本并手动复制。",
+      "help": "GitHub：<code>Settings → Webhooks → Add webhook</code>。设置 <code>Content type: application/json</code>，粘贴 URL 和密钥，选择 <code>Just the push event</code>。GitLab：<code>Settings → Webhooks</code>，粘贴两者并勾选 <code>Push events</code>。",
+      "done": "完成"
+    },
+    "connect": {
+      "title": "连接源代码主机",
+      "description": "令牌和 OAuth 客户端密钥通过平台密钥后端加密存储（默认：由 <code>SECRET_KEY</code> 派生的本地 Fernet；可按安装切换到 AWS Secrets Manager / GCP Secret Manager / Azure Key Vault）。<guide>源代码提供方设置指南</guide>。",
+      "kind": "类型",
+      "kinds": {
+        "github_oauth_app": {
+          "label": "GitHub OAuth App 配置",
+          "hint": "由运维人员注册的 OAuth 应用。保存 client_id 和 client_secret。每个用户的令牌会在 OAuth 流程后作为单独的连接存储（第 2 阶段）。"
+        },
+        "github_app_install": {
+          "label": "GitHub App 安装",
+          "hint": "按组织的 App 安装。密钥中保存 App 的私钥 PEM；部署时按安装签发令牌。"
+        },
+        "github_pat": {
+          "label": "GitHub PAT",
+          "hint": "粘贴个人访问令牌（细粒度或经典）。最简单的方式；与创建它的用户绑定。"
+        },
+        "gitlab_oauth_app": {
+          "label": "GitLab OAuth App 配置",
+          "hint": "GitLab OAuth 应用。SaaS gitlab.com 或自托管（设置 api_base_url）。"
+        },
+        "gitlab_pat": {
+          "label": "GitLab PAT",
+          "hint": "GitLab 个人或项目访问令牌。自托管：设置 api_base_url。"
+        },
+        "bitbucket_oauth_app": {
+          "label": "Bitbucket OAuth 使用方",
+          "hint": "Bitbucket OAuth 2.0 使用方。"
+        },
+        "bitbucket_pat": {
+          "label": "Bitbucket 应用密码",
+          "hint": "Bitbucket 应用密码（工作区范围）。"
+        },
+        "gitea_oauth_app": {
+          "label": "Gitea OAuth App",
+          "hint": "自托管 Gitea 实例。"
+        },
+        "gitea_pat": {
+          "label": "Gitea 令牌",
+          "hint": "自托管 Gitea API 令牌。"
+        }
+      },
+      "scopes": {
+        "private_org": "已连接组织中的私有仓库",
+        "public_org": "已连接组织中的公开仓库",
+        "user_repos": "用户仓库",
+        "public_non_org": "组织外的公开仓库"
+      },
+      "displayName": "显示名称（可选）",
+      "displayNamePlaceholder": "例如：生产 GitHub、Acme corp GitLab",
+      "account": "账号 / 组织登录名",
+      "accountPlaceholder": "acme-org 或 alice",
+      "installationId": "安装 ID",
+      "apiBaseUrl": "API 基础 URL（自托管）",
+      "githubAppId": "GitHub App ID（数字，用于 Webhook 负载查找）",
+      "oauthClientId": "OAuth Client ID",
+      "githubAppIdHelp": "GitHub 在 App 设置页面上显示的数字 App ID。用于从 Webhook 负载中查找 App；user-to-server 的 OAuth Client ID 是单独的（见下方）。",
+      "redirectUri": "OAuth 重定向 URI",
+      "redirectUriHelp": "必须与主机端（{host}）OAuth 应用中注册的重定向 URI 一致。",
+      "appClientId": "GitHub App Client ID",
+      "appClientIdHelp": "可在 GitHub App 设置页面找到；新 GitHub App 的格式类似 <code>Iv23l...</code>，旧版 OAuth App 则是 20 位十六进制字符串。<link>打开 GitHub App 设置 →</link>",
+      "appClientIdInvalid": "这看起来不像 GitHub App Client ID。应为 <code>Iv…</code> 或 20 位十六进制字符串。",
+      "secretOauth": "OAuth 客户端密钥",
+      "secretPem": "GitHub App 私钥 PEM",
+      "secretToken": "个人访问令牌 / 应用密码",
+      "secretHelp": "加密存储，绝不记录到日志。之后可编辑此连接进行轮换。",
+      "visibility": "仓库可见性范围",
+      "visibilityHelp": "限制列表查询调用 {host} API 时此连接可显示的仓库。未选择 = 无范围限制。",
+      "cancel": "取消",
+      "connecting": "正在连接…",
+      "connect": "连接"
+    },
+    "github": {
+      "titleByo": "连接现有的 GitHub App",
+      "title": "连接到 GitHub",
+      "descriptionByo": "接入你已创建的 GitHub App。粘贴其 App ID 和私钥；Astrolift 会在保存前向 GitHub 验证凭据。",
+      "description": "一键在你的账号上创建全新 App，或连接已有的 App。",
+      "createTitle": "创建新的 GitHub App",
+      "createBody": "推荐。Astrolift 会请 GitHub 在你的账号上注册私有 App，无需粘贴 client_id / 密钥 / PEM。GitHub 会先向你展示名称和权限。",
+      "byoTitle": "连接现有的 GitHub App",
+      "byoBody": "使用你已在 GitHub 上创建的自有 App。粘贴其 App ID 和私钥 PEM。适合 GitHub Enterprise 或在多个工具间共享的 App。",
+      "orgLabel": "App 应放在哪里？",
+      "orgPlaceholder": "acme-corp（个人账号请留空）",
+      "orgHelp": "GitHub 组织 slug。留空则安装到你的个人账号。如果改变主意，可在下一个界面切换安装目标。",
+      "orgInvalid": "GitHub 组织 slug 由字母数字和连字符组成，最多 39 个字符。",
+      "permsTitle": "Astrolift 将请求的权限",
+      "perms": {
+        "contents": "克隆你的仓库",
+        "metadata": "读取仓库元数据",
+        "pullRequests": "在 PR 上发布部署 / 预览评论",
+        "checks": "为部署写入提交状态"
+      },
+      "permsFooter": "另外还有 push 和 pull_request Webhook。之后可在 GitHub 上编辑 App 来扩大权限。",
+      "back": "← 返回",
+      "continue": "在 GitHub 上继续 →",
+      "appId": "App ID",
+      "appIdHelp": "GitHub App 设置页面上的数字 App ID（不是 Client ID）。",
+      "appIdInvalid": "App ID 是数字 ID，例如 3705068。",
+      "pem": "私钥（PEM）",
+      "pemHelp": "在 GitHub App 页面生成私钥，并将完整的 <code>.pem</code> 粘贴到此处。它会加密存储，且不会再次显示。",
+      "clientId": "Client ID",
+      "optional": "（可选）",
+      "clientIdHelp": "仅 user-to-server 的“连接我的 GitHub”流程需要。",
+      "clientSecret": "客户端密钥",
+      "webhookSecret": "Webhook 密钥",
+      "orgLogin": "GitHub 组织 / 用户登录名",
+      "orgLoginHelp": "仅当 App 安装在多个账号上时需要；Astrolift 用它来选择正确的安装。",
+      "apiBaseUrl": "API 基础 URL",
+      "apiBaseUrlHelp": "用于 GitHub Enterprise Server。github.com 请留空。",
+      "verifying": "正在验证…",
+      "connectApp": "连接 App"
+    },
+    "gitlab": {
+      "title": "连接到 GitLab",
+      "description": "GitLab 不支持像 GitHub 那样一键注册 App，因此我们会引导你手动创建群组 OAuth 应用。第 1 步：告诉我们你的 GitLab 群组和实例。第 2 步：打开 GitLab 链接并粘贴我们生成的回调 URL。第 3 步：将得到的 Application ID 和 Secret 粘贴回此处。",
+      "step1": "你的 GitLab 在哪里？",
+      "group": "GitLab 群组（可选）",
+      "groupPlaceholder": "acme-corp（使用用户级 App 请留空）",
+      "groupHelp": "群组 OAuth 应用由群组中的所有人共享；用户级 App 仅绑定到单个用户。",
+      "instance": "GitLab 实例 URL（自托管）",
+      "instancePlaceholder": "https://gitlab.acme.example（SaaS gitlab.com 请留空）",
+      "step2": "在 GitLab 上创建应用",
+      "openApps": "打开 GitLab 应用",
+      "callbackLabel": "将此回调 URL 粘贴到 GitLab",
+      "copied": "已复制",
+      "copy": "复制",
+      "scopes": "所需的 GitLab 范围：<code>read_api</code>、<code>read_repository</code>、<code>read_user</code>。保持勾选 <em>Confidential</em>。",
+      "step3": "将结果粘贴回此处",
+      "applicationId": "Application ID",
+      "secret": "Secret",
+      "secretHelp": "加密存储。GitLab 仅显示一次 Secret，离开页面前请先复制。",
+      "cancel": "取消",
+      "connecting": "正在连接…",
+      "save": "保存并连接"
+    },
+    "generateKey": {
+      "title": "生成 SSH 部署密钥",
+      "description": "ed25519 密钥对。公钥会显示出来，供你粘贴到仓库的部署密钥设置中；私钥加密保存在平台密钥后端，永不显示。",
+      "fingerprint": "指纹",
+      "publicKey": "公钥（粘贴到仓库的部署密钥中）",
+      "copyPublicKey": "复制公钥",
+      "copied": "已复制公钥",
+      "copyFailed": "无法复制。请选中文本并手动复制。",
+      "help": "GitHub：<code>Settings → Deploy keys → Add deploy key</code>。仅当 Astrolift 需要推送时（例如基于标签的发布）才勾选“Allow write access”。GitLab：<code>Settings → Repository → Deploy Keys</code>。",
+      "done": "完成",
+      "name": "名称",
+      "appSlug": "应用 slug（可选）",
+      "appSlugPlaceholder": "组织范围密钥请留空",
+      "appSlugHelp": "留空则为组织范围的密钥（可在所有应用中复用）。设置应用 slug 则为按应用的密钥，单个仓库被入侵时影响范围更小。",
+      "cancel": "取消",
+      "generating": "正在生成…",
+      "generate": "生成"
+    },
+    "clientId": {
+      "title": "添加 OAuth Client ID",
+      "description": "可选；这里没有任何故障。克隆、自动关联和部署已在使用此连接的 App 安装令牌。添加 GitHub App 的 OAuth Client ID 还会启用 user-to-server 的“连接我的 GitHub”流程，让用户浏览自己的仓库。Client ID 与数字 App ID 不同；可在 GitHub App 设置页面找到（新 GitHub App 的格式类似 <code>Iv23l…</code>）。",
+      "connection": "连接",
+      "account": "账号",
+      "existingAppId": "App ID（现有）",
+      "label": "GitHub App Client ID",
+      "help": "<link>打开 GitHub App 设置 →</link> Client ID 显示在 App 页面的 <em>About</em> 部分，与数字 App ID 分开。",
+      "cancel": "取消",
+      "saving": "正在保存…",
+      "save": "保存 Client ID"
+    },
+    "toasts": {
+      "rotationFailed": "轮换失败",
+      "disconnected": "已断开 {name}",
+      "disconnectFailed": "断开连接失败",
+      "keyDeleted": "已删除 {name}",
+      "deleteFailed": "删除失败",
+      "clientIdSaved": "已为 {name} 保存 Client ID",
+      "saveFailed": "保存失败",
+      "keyGenerated": "密钥已生成；请将公钥复制到你的仓库",
+      "generationFailed": "生成失败",
+      "connected": "已连接 {name}",
+      "connectFailed": "连接失败",
+      "githubConnected": "已连接 GitHub App：{name}",
+      "githubConnectFailed": "无法连接 GitHub App",
+      "callbackCopied": "已复制回调 URL",
+      "copyFailed": "无法复制。请选中文本并手动复制。",
+      "gitlabConnected": "已连接 {name}。请使用“连接我的 GitLab”登录。"
+    }
+  },
+  "identityProviders": {
+    "kinds": {
+      "oidc": "通用 OIDC",
+      "saml": "SAML 2.0",
+      "cognito": "Amazon Cognito",
+      "auth0": "Auth0",
+      "okta": "Okta",
+      "azure_ad": "Azure AD / Entra ID",
+      "google": "Google Workspace",
+      "github": "GitHub OAuth",
+      "local": "本地账号"
+    },
+    "hints": {
+      "oidc": "发现 URL + client_id + client_secret_ref",
+      "cognito": "用户池 + 区域 + OIDC 字段",
+      "auth0": "租户 URL + client_id + client_secret_ref",
+      "okta": "发现 URL + client_id + client_secret_ref",
+      "azure_ad": "发现 URL + client_id + client_secret_ref",
+      "google": "发现 URL + client_id",
+      "github": "OAuth 应用 client_id + client_secret_ref",
+      "saml": "元数据 URL 或上传 XML",
+      "local": "用户名 + 密码（Django 认证，开发/备用）"
+    },
+    "create": {
+      "title": "新建身份提供方",
+      "description": "配置用户的登录方式。可同时存在多个提供方，但同一时间只有一个处于启用状态。密钥以对平台密钥后端的引用形式存储，绝不以明文保存在此记录中。",
+      "kind": "类型",
+      "displayName": "显示名称（可选）",
+      "displayNamePlaceholder": "例如：Auth0 生产、Cognito 预发布",
+      "displayNameHelp": "显示在登录界面和审计日志中。留空时默认使用类型名称。",
+      "discovery": "OIDC 发现 URL",
+      "clientId": "Client ID",
+      "secretRef": "密钥引用",
+      "secretRefHelp": "平台密钥后端中的路径；值绝不保存在此记录中。",
+      "metadataUrl": "SAML 元数据 URL",
+      "config": "类型专属配置（JSON）",
+      "invalidJson": "无效的 JSON",
+      "cognitoKeys": "Cognito 必需的键：<code>user_pool_id</code>、<code>region</code>。",
+      "setActive": "设为组织的启用提供方",
+      "cancel": "取消",
+      "saving": "正在保存…",
+      "save": "保存提供方"
+    },
+    "list": {
+      "title": "身份提供方",
+      "description": "为组织配置的登录方式：Auth0、通用 OIDC、Cognito、Okta、Azure AD、Google、GitHub、SAML 或本地账号。同一时间仅有一个处于启用状态。",
+      "learnMore": "了解更多",
+      "newProvider": "新建提供方",
+      "columns": {
+        "provider": "提供方",
+        "kind": "类型",
+        "endpoint": "端点",
+        "status": "状态"
+      },
+      "client": "客户端 {id}",
+      "active": "已启用",
+      "configured": "已配置",
+      "activeSince": "自 {date} 起启用",
+      "by": "由 {name} 切换",
+      "makeActive": "设为启用",
+      "delete": "删除",
+      "emptyTitle": "未配置身份提供方",
+      "emptyDescription": "请至少配置一个提供方，以便用户登录。本地账号适合首次运行；生产安装通常接入 OIDC 或 Cognito。",
+      "switchTitle": "将启用的提供方切换为 {name}？",
+      "switchTitleGeneric": "切换启用的提供方？",
+      "switchDescription": "已登录的用户会保留会话。下一次登录将通过新的提供方。仅存在于旧提供方中的用户，在此处完成配置前将无法登录。",
+      "switchConfirm": "切换提供方",
+      "deleteTitle": "删除 {name}？",
+      "deleteTitleGeneric": "删除身份提供方？",
+      "deleteDescription": "软删除该 IdP 记录。身份仅存在于此提供方的用户将无法再登录；如需继续访问，请先在启用的提供方中为其配置。",
+      "deleteConfirm": "删除提供方"
+    },
+    "toasts": {
+      "configured": "已配置 {name}",
+      "failed": "失败",
+      "activeProvider": "启用的提供方：{name}",
+      "deleted": "已删除 {name}"
+    }
+  },
+  "appearanceSettings": {
+    "locked": "你的组织已锁定主题。这些控件为只读。",
+    "themeTitle": "主题",
+    "themeDescription": "背景与强调色。选择浅色主题会将应用切换为浅色模式。",
+    "themeHints": {
+      "orbit": "黑 · 绿",
+      "forge": "黑 · 铜",
+      "console": "炭灰 · 冰蓝",
+      "dusk": "炭灰 · 长春花蓝",
+      "graphite": "石墨 · 绿",
+      "field": "翡翠 · 绿",
+      "daylight": "雾白 · 绿",
+      "workshop": "纸白 · 铜"
+    },
+    "accent": "强调色",
+    "ground": "背景",
+    "accents": {
+      "green": "绿",
+      "copper": "铜",
+      "ice": "冰蓝",
+      "periwinkle": "长春花蓝",
+      "amber": "琥珀"
+    },
+    "grounds": {
+      "black": "黑",
+      "charcoal": "炭灰",
+      "graphite": "石墨",
+      "emerald": "翡翠",
+      "paper": "纸白",
+      "mist": "雾白"
+    },
+    "modes": {
+      "dark": "深色",
+      "light": "浅色"
+    },
+    "layoutTitle": "布局",
+    "layoutDescription": "列表和面板占用的空间，以及边角的锐利程度。",
+    "density": "密度",
+    "densities": {
+      "compact": {
+        "label": "紧凑",
+        "hint": "带细分隔线的紧凑行"
+      },
+      "cards": {
+        "label": "卡片",
+        "hint": "分列排布的方框项"
+      }
+    },
+    "corners": "边角",
+    "cornerSquare": "直角",
+    "cornerRounded": "圆角",
+    "restrictedTitle": "你无法更改的设置",
+    "restrictedDescription": "设置页面中你无权更改的部分。",
+    "restricted": {
+      "show": {
+        "label": "以只读方式显示",
+        "blurb": "显示你无法更改的设置（已停用），并注明所需权限"
+      },
+      "hide": {
+        "label": "隐藏",
+        "blurb": "仅显示你可以更改的设置"
+      }
+    },
+    "followingDefault": "正在沿用组织默认值：<strong>{setting}</strong>。",
+    "orgDefault": "组织默认值：<strong>{setting}</strong>。",
+    "useOrgDefault": "使用组织默认值",
+    "reset": "恢复默认设置",
+    "customAccent": {
+      "helpEmpty": "任何颜色均可，只要在背景上清晰可读。状态颜色不会改变。",
+      "helpInvalid": "请使用十六进制颜色，例如 <mono>#2f9e52</mono>。",
+      "helpOk": "在{ground}上为 <mono>{ratio}:1</mono>。状态颜色不会改变。",
+      "helpTooFaintLighter": "在{ground}上太淡：<mono>{ratio}:1</mono>，至少需要 <mono>{min}:1</mono>。请选择更浅的颜色。",
+      "helpTooFaintDarker": "在{ground}上太淡：<mono>{ratio}:1</mono>，至少需要 <mono>{min}:1</mono>。请选择更深的颜色。",
+      "helpFaintEverywhere": "在所有背景上都太淡；至少需要 <mono>{min}:1</mono>。",
+      "helpReadsEverywhere": "在所有背景上都清晰可读。状态颜色不会改变。",
+      "helpFaintSome": "在{grounds}上太淡：使用{count, plural, other {这些背景}}的用户将保留默认强调色。",
+      "label": "自定义强调色",
+      "pick": "选择自定义强调色",
+      "inUse": "使用中"
+    }
+  },
+  "profileSettings": {
+    "identity": {
+      "title": "身份",
+      "loading": "正在加载…",
+      "signIn": "登录后即可编辑个人资料。",
+      "description": "在整个平台上显示的姓名和邮箱。被身份提供方锁定的字段无法在此编辑；它们从 IdP 同步。",
+      "editingDisabled": "你的组织管理员已停用个人资料编辑。请让管理员在 <code>/administration/organization</code> 中开启 <code>allowUserProfileEdit</code>。",
+      "username": "用户名",
+      "usernameHelp": "用户名是认证标识符，永不更改。",
+      "firstName": "名",
+      "lastName": "姓",
+      "email": "邮箱",
+      "saving": "正在保存…",
+      "save": "保存",
+      "idpManagedTitle": "由身份提供方管理；本地修改会在下次登录时被覆盖",
+      "idpManaged": "由 IdP 管理"
+    },
+    "language": {
+      "title": "语言",
+      "description": "界面语言。缺少翻译时回退为 en。"
+    },
+    "timezone": {
+      "title": "时区",
+      "description": "为仪表板中的所有时间戳覆盖浏览器检测到的时区。留空则使用浏览器报告的时区（<mono>{tz}</mono>）。",
+      "label": "时区",
+      "placeholder": "{tz}（浏览器检测）",
+      "noOverride": "{tz}（浏览器检测，不覆盖）",
+      "saving": "正在保存…",
+      "save": "保存"
+    },
+    "toasts": {
+      "timezoneSaved": "已保存时区",
+      "timezoneFailed": "保存时区失败",
+      "profileUpdated": "个人资料已更新",
+      "updateFailed": "更新失败"
+    }
+  },
+  "visualizationSettings": {
+    "preview": "预览",
+    "fleetTitle": "集群视图",
+    "fleetDescription": "代理集群的绘制方式。每种样式都显示相同的代理和相同的健康状态。",
+    "workflowTitle": "工作流视图",
+    "workflowDescription": "工作流及其运行的绘制方式。",
+    "appTitle": "应用视图",
+    "appDescription": "应用仪表板的绘制方式。自动会按应用的结构布局。",
+    "motionTitle": "动效",
+    "motionDescription": "每个动画都代表真实状态。减少动效会绘制承载相同信息的静态图像。",
+    "particlesTitle": "流动粒子",
+    "fleet": {
+      "orbit": {
+        "label": "轨道",
+        "blurb": "集群为行星，代理为卫星"
+      },
+      "heartbeat": {
+        "label": "心跳",
+        "blurb": "每个事件一个渐隐的荧光点"
+      },
+      "hive": {
+        "label": "蜂巢",
+        "blurb": "每个代理一个图块，适合大型集群"
+      },
+      "manifest": {
+        "label": "清单",
+        "blurb": "以发车信息板展示运行队列"
+      },
+      "isometric": {
+        "label": "等距",
+        "blurb": "集群为平台，负载为高度"
+      },
+      "graph": {
+        "label": "图",
+        "blurb": "带调度脉冲的实时力导向图"
+      },
+      "swarm": {
+        "label": "群集",
+        "blurb": "代理通过触须簇拥在集群周围"
+      },
+      "list": {
+        "label": "列表",
+        "blurb": "普通表格"
+      }
+    },
+    "workflow": {
+      "transit": {
+        "label": "线路图",
+        "blurb": "工作流为线路，运行为列车"
+      },
+      "isometric": {
+        "label": "等距",
+        "blurb": "阶段为装配线"
+      },
+      "graph": {
+        "label": "图",
+        "blurb": "动态阶段图"
+      },
+      "list": {
+        "label": "列表",
+        "blurb": "普通表格"
+      }
+    },
+    "app": {
+      "auto": {
+        "label": "自动",
+        "blurb": "按应用拓扑布局"
+      },
+      "isometric": {
+        "label": "等距",
+        "blurb": "工作负载为平台上的方块"
+      },
+      "graph": {
+        "label": "图",
+        "blurb": "工作负载与流量的实时图"
+      },
+      "classic": {
+        "label": "经典",
+        "blurb": "仅卡片，无图表"
+      }
+    },
+    "motion": {
+      "system": {
+        "label": "跟随系统",
+        "blurb": "在操作系统要求时减少动效"
+      },
+      "full": {
+        "label": "完整",
+        "blurb": "所有动画"
+      },
+      "reduced": {
+        "label": "减少",
+        "blurb": "静态图像，信息不变"
+      }
+    },
+    "particles": {
+      "on": {
+        "label": "开",
+        "blurb": "沿边流动的粒子显示吞吐量"
+      },
+      "off": {
+        "label": "关",
+        "blurb": "仅显示边和计数"
+      }
+    }
+  },
+  "notificationSettings": {
+    "title": "通知",
+    "description": "你的收件箱：部署审批、故障告警、邀请、配额警告。",
+    "inboxTitle": "收件箱",
+    "inboxDescription": "部署审批、故障告警、邀请、配额警告。",
+    "unread": "<num>{count}</num> 条未读",
+    "markAll": "全部标为已读",
+    "feedLabel": "通知",
+    "inboxEmptyTitle": "收件箱为空",
+    "inboxEmptyDescription": "部署完成、收到邀请或配额接近上限时，通知会显示在这里。",
+    "markRead": "标为已读",
+    "alerts": {
+      "title": "应用告警订阅",
+      "description": "选择要接收告警的应用和事件类型。",
+      "app": "应用",
+      "bulk": "批量",
+      "kinds": {
+        "deploy_success": "部署成功",
+        "deploy_failure": "部署失败",
+        "error_spike": "错误激增",
+        "preview_created": "预览已创建",
+        "preview_destroyed": "预览已销毁"
+      },
+      "toggleLabel": "{app} 的{kind}",
+      "unsubscribeAll": "全部取消订阅",
+      "subscribeAll": "全部订阅",
+      "emptyTitle": "尚未注册应用",
+      "emptyDescription": "注册应用后即可为其配置告警。",
+      "inAppChannel": "应用内渠道",
+      "otherChannels": "配置用户渠道偏好后，邮件/Slack 渠道会显示在这里。",
+      "unsubscribeTitle": "取消订阅 {app} 的所有告警？",
+      "unsubscribeTitleGeneric": "取消订阅所有告警？",
+      "unsubscribeDescription": "清除此应用在应用内渠道上的全部 {count} 类告警。在重新订阅前，你将不会收到部署失败和错误激增的通知。"
+    },
+    "toasts": {
+      "cleared": "已清除 {count} 条",
+      "markAllFailed": "无法将通知标为已读",
+      "markFailed": "无法将该通知标为已读",
+      "saveFailed": "保存失败",
+      "subscribedAll": "已订阅 {app} 的所有告警",
+      "subscribeFailed": "订阅失败",
+      "unsubscribed": "已取消订阅 {app}",
+      "unsubscribeFailed": "取消订阅失败"
+    }
+  },
+  "securitySettings": {
+    "title": "安全",
+    "description": "你账号的活动会话和已签发的持有者凭据。",
+    "apiTokens": "API 令牌",
+    "apiTokensDescription": "用于 CLI、CI 运行和脚本的长期凭据。",
+    "manageTokens": "管理令牌",
+    "mfa": "多重身份验证",
+    "mfaDescription": "在 IdP 层配置。Astrolift 通过 OIDC 获取断言。",
+    "mfaBody": "请在你的身份提供方（Auth0 / Okta / Azure AD / Google Workspace）中设置 MFA。平台通过 ABAC 策略对高风险操作强制要求会话新鲜度。",
+    "subnav": {
+      "label": "设置子导航",
+      "profile": "个人资料",
+      "security": "安全",
+      "notifications": "通知",
+      "appearance": "外观",
+      "visualizations": "可视化",
+      "home": "主页"
+    },
+    "connected": {
+      "title": "已关联账号",
+      "notConnected": "未连接",
+      "reauthorize": "重新授权",
+      "connected": "已连接",
+      "connect": "连接",
+      "disconnect": "断开连接",
+      "refetchHint": "重新加载页面即可刷新；主机上的 OAuth 流程完成后，连接状态会更新。",
+      "disconnectTitle": "断开 {provider} 的连接？",
+      "thisAccount": "此账号",
+      "theLinkedAccount": "关联的账号",
+      "disconnectBody": "Astrolift 将无法访问 {provider} 上的 <mono>{account}</mono>。通过你的身份进行的部署在重新连接前都会失败。",
+      "typeToConfirm": "输入 <mono>{account}</mono> 以确认。",
+      "toasts": {
+        "connectFailed": "连接失败",
+        "oauthStartFailed": "无法启动 OAuth 流程",
+        "disconnected": "已断开 {account}",
+        "accountFallback": "账号",
+        "disconnectFailed": "无法断开此账号的连接"
+      }
+    }
+  },
   "settingsIndex": {
     "title": "Settings",
     "description": "Configure the platform's identity, security, and surfaces.",

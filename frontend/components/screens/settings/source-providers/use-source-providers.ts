@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { useLocalListState } from "@/components/list/use-list-state";
@@ -89,6 +90,7 @@ export function useSourceSection(): SectionSelection {
  * ConfirmDialog keeps itself open and toasts the message.
  */
 export function useSourceHosts() {
+  const t = useTranslations("sourceProviders.toasts");
   // OAuth-callback outcome toasts live in a layout-level component (#759,
   // `components/ScmCallbackToast`) so they surface regardless of where
   // `return_to` lands; the page query cache-and-network-fetches on mount,
@@ -132,13 +134,13 @@ export function useSourceHosts() {
     if (data?.rotateWebhookSecret.ok && data.rotateWebhookSecret.data) {
       return data.rotateWebhookSecret.data;
     }
-    throw new Error(data?.rotateWebhookSecret.errors?.[0]?.message ?? "Rotation failed");
+    throw new Error(data?.rotateWebhookSecret.errors?.[0]?.message ?? t("rotationFailed"));
   }
 
   async function handleDisconnect(c: AstroliftSourceConnection) {
     const { data } = await disconnect({ variables: { input: { id: c.id } } });
-    if (data?.disconnectSource.ok) toast.success(`Disconnected ${c.name}`);
-    else throw new Error(data?.disconnectSource.errors?.[0]?.message ?? "Disconnect failed");
+    if (data?.disconnectSource.ok) toast.success(t("disconnected", { name: c.name }));
+    else throw new Error(data?.disconnectSource.errors?.[0]?.message ?? t("disconnectFailed"));
   }
 
   const refetch = () => {
@@ -175,6 +177,7 @@ export type SourceHostsData = ReturnType<typeof useSourceHosts>;
  * memory) and the delete mutation. The data half of DeployKeysView.
  */
 export function useDeployKeys() {
+  const t = useTranslations("sourceProviders.toasts");
   const list = useLocalListState(DEPLOY_KEYS_LIST);
   const page = useQuery<KeysPageResp>(LIST_SSH_DEPLOY_KEYS_PAGE, {
     variables: keysVariables(list.filters, list.state),
@@ -194,8 +197,8 @@ export function useDeployKeys() {
 
   async function handleDeleteKey(k: AstroliftSshDeployKey) {
     const { data } = await deleteKey({ variables: { input: { id: k.id } } });
-    if (data?.deleteSshDeployKey.ok) toast.success(`Deleted ${k.name}`);
-    else throw new Error(data?.deleteSshDeployKey.errors?.[0]?.message ?? "Delete failed");
+    if (data?.deleteSshDeployKey.ok) toast.success(t("keyDeleted", { name: k.name }));
+    else throw new Error(data?.deleteSshDeployKey.errors?.[0]?.message ?? t("deleteFailed"));
   }
 
   const refetch = () => {
@@ -231,6 +234,7 @@ interface UpdateResp {
  * (#525 recovery flow). The data half of AddClientIdSheet.
  */
 export function useAddClientId() {
+  const t = useTranslations("sourceProviders.toasts");
   const [update, { loading }] = useMutation<UpdateResp>(UPDATE_SOURCE_CONNECTION, {
     refetchQueries: [{ query: LIST_SOURCE_CONNECTIONS }, REFETCH_CONNECTIONS],
     awaitRefetchQueries: true,
@@ -247,10 +251,10 @@ export function useAddClientId() {
       },
     });
     if (data?.updateSourceConnection.ok) {
-      toast.success(`Client ID saved for ${connection.name}`);
+      toast.success(t("clientIdSaved", { name: connection.name }));
       return true;
     }
-    toast.error(data?.updateSourceConnection.errors?.[0]?.message ?? "Save failed");
+    toast.error(data?.updateSourceConnection.errors?.[0]?.message ?? t("saveFailed"));
     return false;
   }
 
@@ -268,6 +272,7 @@ interface GenerateResp {
  * data half of GenerateSshKeySheet.
  */
 export function useGenerateSshKey() {
+  const t = useTranslations("sourceProviders.toasts");
   const [generate, { loading }] = useMutation<GenerateResp>(GENERATE_SSH_DEPLOY_KEY, {
     refetchQueries: [REFETCH_KEYS],
     awaitRefetchQueries: true,
@@ -287,10 +292,10 @@ export function useGenerateSshKey() {
       },
     });
     if (data?.generateSshDeployKey.ok && data.generateSshDeployKey.data?.key) {
-      toast.success("Key generated — copy the public key into your repo");
+      toast.success(t("keyGenerated"));
       return data.generateSshDeployKey.data.key;
     }
-    toast.error(data?.generateSshDeployKey.errors?.[0]?.message ?? "Generation failed");
+    toast.error(data?.generateSshDeployKey.errors?.[0]?.message ?? t("generationFailed"));
     return null;
   }
 

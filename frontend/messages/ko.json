@@ -3556,6 +3556,682 @@
       }
     }
   },
+  "sourceProviders": {
+    "title": "소스 공급자",
+    "description": "Astrolift를 코드 호스팅 서비스에 연결하면 저장소를 클론하고 푸시를 감시할 수 있습니다. 조직 전체 접근에는 OAuth App / GitHub App, 자체 호스팅 GitLab 또는 Gitea에는 PAT, 모든 호스트에 대한 직접 git 접근에는 SSH 배포 키를 사용하세요.",
+    "hostsTitle": "호스트",
+    "keysTitle": "SSH 배포 키",
+    "kind": {
+      "github_oauth_app": "GitHub OAuth App",
+      "github_oauth_user": "GitHub (OAuth 사용자 토큰)",
+      "github_app_install": "GitHub App 설치",
+      "github_pat": "GitHub PAT",
+      "gitlab_oauth_app": "GitLab OAuth App",
+      "gitlab_oauth_user": "GitLab (OAuth 사용자 토큰)",
+      "gitlab_pat": "GitLab PAT",
+      "bitbucket_oauth_app": "Bitbucket OAuth App",
+      "bitbucket_oauth_user": "Bitbucket (OAuth 사용자 토큰)",
+      "bitbucket_pat": "Bitbucket PAT",
+      "gitea_oauth_app": "Gitea OAuth App",
+      "gitea_oauth_user": "Gitea (OAuth 사용자 토큰)",
+      "gitea_pat": "Gitea PAT"
+    },
+    "scope": {
+      "private_org": "조직 비공개 저장소",
+      "public_org": "조직 공개 저장소",
+      "user_repos": "사용자 저장소",
+      "public_non_org": "조직 외 공개 저장소"
+    },
+    "hosts": {
+      "regionLabel": "소스 연결",
+      "description": "매니페스트 흐름을 통한 원클릭 GitHub App 등록 또는 안내형 GitLab 그룹 OAuth 마법사를 사용하세요. Personal Access Token과 사전 등록된 OAuth 앱은 <em>고급</em>에서 계속 사용할 수 있습니다.",
+      "setupGuide": "설정 가이드",
+      "connectGithub": "GitHub에 연결",
+      "connectGitlab": "GitLab에 연결",
+      "walkthrough": "원클릭 GitHub 흐름 + GitLab 마법사: 전체 안내",
+      "downloadLogo": "새 App용 Astrolift 로고 다운로드",
+      "optionalTitle": "선택 사항: \"내 GitHub 연결\" 저장소 탐색 사용",
+      "optionalBody": "{count, plural, other {이 GitHub App 연결 #개는}} 바로 사용할 수 있습니다. 클론, 자동 연결, 배포는 App 설치 토큰으로 실행됩니다. OAuth 클라이언트 ID 추가는 선택 사항이며, 추가하면 사용자가 자신의 저장소를 탐색할 수 있는 user-to-server \"내 GitHub 연결\" 흐름이 켜집니다. 새 GitHub App의 클라이언트 ID는 <code>Iv23l…</code> 형식입니다.",
+      "addClientIdFor": "{name}의 클라이언트 ID 추가",
+      "listLabel": "연결",
+      "emptyTitle": "아직 연결된 호스트가 없습니다",
+      "emptyDescription": "\"GitHub에 연결\"을 클릭하면 client_id나 시크릿을 붙여넣지 않고 github.com에 Astrolift GitHub App을 한 번에 등록할 수 있습니다. GitLab의 경우 마법사가 복사하기 쉬운 콜백 URL로 그룹 OAuth 애플리케이션을 만드는 과정을 안내합니다.",
+      "advancedToggle": "고급: Personal Access Token 또는 사전 등록된 OAuth 앱 붙여넣기",
+      "pasteCredentials": "자격 증명 붙여넣기…",
+      "pasteHint": "이미 등록된 OAuth App이 있거나 PAT로 연결하려는 경우 사용하세요.",
+      "columns": {
+        "connection": "연결",
+        "kind": "종류",
+        "account": "계정",
+        "scopes": "범위",
+        "status": "상태"
+      },
+      "oauthAppConfig": "OAuth 앱 구성",
+      "personal": "개인",
+      "noScopeRestriction": "(범위 제한 없음)",
+      "active": "활성",
+      "disabled": "비활성",
+      "addClientId": "클라이언트 ID 추가",
+      "connectMyGithub": "내 GitHub 연결",
+      "connectMyGitlab": "내 GitLab 연결",
+      "webhookSecret": "웹훅 시크릿",
+      "disconnect": "연결 해제",
+      "disconnectTitle": "{name} 연결을 해제할까요?",
+      "disconnectTitleGeneric": "연결을 해제할까요?",
+      "disconnectDescription": "이 연결을 사용하는 앱은 다시 연결할 때까지 접근할 수 없습니다. 이전 시크릿으로 서명된 웹훅은 통합을 다시 설정할 때까지 실패합니다.",
+      "rotateTitle": "{name}의 웹훅 시크릿을 교체할까요?",
+      "rotateTitleGeneric": "웹훅 시크릿을 교체할까요?",
+      "rotateDescription": "새 시크릿을 생성하고 한 번만 표시합니다. 이전 시크릿으로 서명된 웹훅 전송은 즉시 실패하기 시작합니다. 푸시가 발생하기 전에 새 값을 SCM 호스트의 웹훅 구성에 붙여넣으세요. 그렇지 않으면 배포 트리거가 잠시 401로 거부됩니다.",
+      "rotateConfirm": "시크릿 교체"
+    },
+    "keys": {
+      "description": "SSH를 통한 직접 git 접근용 ed25519 키 쌍입니다. 공개 키는 저장소의 배포 키 설정에 붙여넣을 수 있도록 표시되며, 비공개 키는 플랫폼 시크릿 백엔드에 암호화된 상태로 보관됩니다.",
+      "generate": "키 생성",
+      "columns": {
+        "name": "이름",
+        "scope": "범위",
+        "fingerprint": "지문",
+        "publicKey": "공개 키"
+      },
+      "appScope": "앱: {slug}",
+      "orgScoped": "조직 범위",
+      "delete": "삭제",
+      "emptyTitle": "아직 SSH 배포 키가 없습니다",
+      "emptyDescription": "키를 생성하면 Astrolift가 SSH로 클론할 수 있습니다. 조직 범위 키는 모든 앱에 적용되고, 앱별 키는 영향 범위를 더 좁게 제한합니다.",
+      "deleteTitle": "SSH 키 {name}을(를) 삭제할까요?",
+      "deleteTitleGeneric": "SSH 키를 삭제할까요?",
+      "deleteDescription": "먼저 저장소 배포 키 목록에서 해당 공개 키를 제거하세요. 그렇지 않으면 git 작업이 갑자기 실패합니다. 비공개 키는 시크릿 백엔드에서 삭제됩니다.",
+      "deleteConfirm": "키 삭제",
+      "publicKeyCopied": "공개 키를 복사했습니다",
+      "copyFailedPaste": "복사하지 못했습니다. 아래에서 직접 붙여넣으세요.",
+      "copy": "복사",
+      "copied": "복사됨"
+    },
+    "reveal": {
+      "title": "웹훅 시크릿이 생성되었습니다",
+      "description": "이 값들을 <strong>지금</strong> SCM 호스트의 웹훅 구성에 붙여넣으세요. 평문 시크릿은 한 번만 표시되고 이후 암호화되어 저장됩니다.",
+      "webhookUrl": "웹훅 URL",
+      "copyUrl": "URL 복사",
+      "urlCopied": "URL을 복사했습니다",
+      "secret": "시크릿",
+      "copySecret": "시크릿 복사",
+      "secretCopied": "시크릿을 복사했습니다",
+      "copyFailed": "복사하지 못했습니다. 텍스트를 선택해 직접 복사하세요.",
+      "help": "GitHub: <code>Settings → Webhooks → Add webhook</code>. <code>Content type: application/json</code>을 설정하고 URL과 시크릿을 붙여넣은 뒤 <code>Just the push event</code>를 선택하세요. GitLab: <code>Settings → Webhooks</code>에서 둘 다 붙여넣고 <code>Push events</code>를 선택하세요.",
+      "done": "완료"
+    },
+    "connect": {
+      "title": "소스 호스트 연결",
+      "description": "토큰과 OAuth 클라이언트 시크릿은 플랫폼 시크릿 백엔드를 통해 암호화되어 저장됩니다 (기본값: <code>SECRET_KEY</code>에서 파생된 로컬 Fernet, 설치별로 AWS Secrets Manager / GCP Secret Manager / Azure Key Vault로 전환 가능). <guide>소스 공급자 설정 가이드</guide>.",
+      "kind": "종류",
+      "kinds": {
+        "github_oauth_app": {
+          "label": "GitHub OAuth App 구성",
+          "hint": "운영자가 등록한 OAuth 앱입니다. client_id와 client_secret을 보관합니다. 사용자별 토큰은 OAuth 흐름 후 별도 연결로 저장됩니다 (2단계)."
+        },
+        "github_app_install": {
+          "label": "GitHub App 설치",
+          "hint": "조직별 App 설치입니다. 시크릿에는 App의 비공개 키 PEM이 들어 있으며, 배포 시 설치별 토큰을 발급합니다."
+        },
+        "github_pat": {
+          "label": "GitHub PAT",
+          "hint": "Personal Access Token (세분화 또는 클래식)을 붙여넣으세요. 가장 간단한 방법이며, 발급한 사용자에 연결됩니다."
+        },
+        "gitlab_oauth_app": {
+          "label": "GitLab OAuth App 구성",
+          "hint": "GitLab OAuth 애플리케이션입니다. SaaS gitlab.com 또는 자체 호스팅 (api_base_url 설정)."
+        },
+        "gitlab_pat": {
+          "label": "GitLab PAT",
+          "hint": "GitLab 개인 또는 프로젝트 액세스 토큰입니다. 자체 호스팅: api_base_url을 설정하세요."
+        },
+        "bitbucket_oauth_app": {
+          "label": "Bitbucket OAuth 컨슈머",
+          "hint": "Bitbucket OAuth 2.0 컨슈머입니다."
+        },
+        "bitbucket_pat": {
+          "label": "Bitbucket 앱 비밀번호",
+          "hint": "Bitbucket 앱 비밀번호 (워크스페이스 범위)."
+        },
+        "gitea_oauth_app": {
+          "label": "Gitea OAuth App",
+          "hint": "자체 호스팅 Gitea 인스턴스입니다."
+        },
+        "gitea_pat": {
+          "label": "Gitea 토큰",
+          "hint": "자체 호스팅 Gitea API 토큰입니다."
+        }
+      },
+      "scopes": {
+        "private_org": "연결된 조직의 비공개 저장소",
+        "public_org": "연결된 조직의 공개 저장소",
+        "user_repos": "사용자 저장소",
+        "public_non_org": "조직 외부의 공개 저장소"
+      },
+      "displayName": "표시 이름 (선택 사항)",
+      "displayNamePlaceholder": "예: 프로덕션 GitHub, Acme corp GitLab",
+      "account": "계정 / 조직 로그인",
+      "accountPlaceholder": "acme-org 또는 alice",
+      "installationId": "설치 ID",
+      "apiBaseUrl": "API 기본 URL (자체 호스팅)",
+      "githubAppId": "GitHub App ID (숫자, 웹훅 페이로드 조회용)",
+      "oauthClientId": "OAuth 클라이언트 ID",
+      "githubAppIdHelp": "GitHub의 App 설정 페이지에 표시되는 숫자 App ID입니다. 웹훅 페이로드의 App 조회에 사용되며, user-to-server OAuth 클라이언트 ID는 별도 항목입니다 (아래).",
+      "redirectUri": "OAuth 리디렉션 URI",
+      "redirectUriHelp": "호스트 측({host}) OAuth 애플리케이션에 등록된 리디렉션 URI와 일치해야 합니다.",
+      "appClientId": "GitHub App 클라이언트 ID",
+      "appClientIdHelp": "GitHub App 설정 페이지에서 확인할 수 있습니다. 새 GitHub App은 <code>Iv23l...</code> 형식이고, 기존 OAuth App은 20자리 16진수 문자열입니다. <link>GitHub App 설정 열기 →</link>",
+      "appClientIdInvalid": "GitHub App 클라이언트 ID 형식이 아닙니다. <code>Iv…</code> 또는 20자리 16진수 문자열이어야 합니다.",
+      "secretOauth": "OAuth 클라이언트 시크릿",
+      "secretPem": "GitHub App 비공개 키 PEM",
+      "secretToken": "Personal Access Token / 앱 비밀번호",
+      "secretHelp": "암호화되어 저장되며 로그에 기록되지 않습니다. 나중에 이 연결을 편집해 교체할 수 있습니다.",
+      "visibility": "저장소 공개 범위",
+      "visibilityHelp": "목록 조회가 {host} API를 호출할 때 이 연결이 표시할 수 있는 저장소를 제한합니다. 선택하지 않으면 범위 제한이 없습니다.",
+      "cancel": "취소",
+      "connecting": "연결 중…",
+      "connect": "연결"
+    },
+    "github": {
+      "titleByo": "기존 GitHub App 연결",
+      "title": "GitHub에 연결",
+      "descriptionByo": "이미 만든 GitHub App을 가져옵니다. App ID와 비공개 키를 붙여넣으면 Astrolift가 저장하기 전에 GitHub에서 자격 증명을 확인합니다.",
+      "description": "클릭 한 번으로 계정에 새 App을 만들거나 이미 만든 App을 연결하세요.",
+      "createTitle": "새 GitHub App 만들기",
+      "createBody": "권장. Astrolift가 GitHub에 계정의 비공개 App 등록을 요청하므로 client_id / 시크릿 / PEM을 붙여넣을 필요가 없습니다. GitHub가 먼저 이름과 권한을 보여줍니다.",
+      "byoTitle": "기존 GitHub App 연결",
+      "byoBody": "GitHub에서 이미 만든 자체 App을 사용합니다. App ID와 비공개 키 PEM을 붙여넣으세요. GitHub Enterprise나 여러 도구에서 공유하는 App에 적합합니다.",
+      "orgLabel": "App을 어디에 둘까요?",
+      "orgPlaceholder": "acme-corp (개인 계정은 비워 두세요)",
+      "orgHelp": "GitHub 조직 슬러그입니다. 개인 계정에 설치하려면 비워 두세요. 마음이 바뀌면 다음 화면에서 설치 대상을 바꿀 수 있습니다.",
+      "orgInvalid": "GitHub 조직 슬러그는 영숫자와 하이픈으로 최대 39자입니다.",
+      "permsTitle": "Astrolift가 요청할 권한",
+      "perms": {
+        "contents": "저장소 클론",
+        "metadata": "저장소 메타데이터 읽기",
+        "pullRequests": "PR에 배포 / 미리보기 댓글 게시",
+        "checks": "배포의 커밋 상태 기록"
+      },
+      "permsFooter": "push 및 pull_request 웹훅도 포함됩니다. 나중에 GitHub에서 App을 편집해 범위를 넓힐 수 있습니다.",
+      "back": "← 뒤로",
+      "continue": "GitHub에서 계속 →",
+      "appId": "App ID",
+      "appIdHelp": "GitHub App 설정 페이지의 숫자 App ID입니다 (클라이언트 ID 아님).",
+      "appIdInvalid": "App ID는 숫자 ID입니다 (예: 3705068).",
+      "pem": "비공개 키 (PEM)",
+      "pemHelp": "GitHub App 페이지에서 비공개 키를 생성하고 <code>.pem</code> 전체를 여기에 붙여넣으세요. 암호화되어 저장되며 다시 표시되지 않습니다.",
+      "clientId": "클라이언트 ID",
+      "optional": "(선택 사항)",
+      "clientIdHelp": "user-to-server \"내 GitHub 연결\" 흐름에만 필요합니다.",
+      "clientSecret": "클라이언트 시크릿",
+      "webhookSecret": "웹훅 시크릿",
+      "orgLogin": "GitHub 조직 / 사용자 로그인",
+      "orgLoginHelp": "App이 여러 계정에 설치된 경우에만 필요합니다. Astrolift가 올바른 설치를 선택하는 데 사용합니다.",
+      "apiBaseUrl": "API 기본 URL",
+      "apiBaseUrlHelp": "GitHub Enterprise Server용입니다. github.com은 비워 두세요.",
+      "verifying": "확인 중…",
+      "connectApp": "App 연결"
+    },
+    "gitlab": {
+      "title": "GitLab에 연결",
+      "description": "GitLab은 GitHub처럼 원클릭 App 등록을 지원하지 않으므로 그룹 OAuth 애플리케이션을 직접 만드는 과정을 안내합니다. 1단계: GitLab 그룹과 인스턴스를 입력하세요. 2단계: GitLab 링크를 열고 생성된 콜백 URL을 붙여넣으세요. 3단계: 발급된 Application ID와 Secret을 여기에 붙여넣으세요.",
+      "step1": "GitLab은 어디에 있나요?",
+      "group": "GitLab 그룹 (선택 사항)",
+      "groupPlaceholder": "acme-corp (사용자 수준 App을 쓰려면 비워 두세요)",
+      "groupHelp": "그룹 OAuth 앱은 그룹 전체가 공유하고, 사용자 수준 앱은 한 사용자에게 연결됩니다.",
+      "instance": "GitLab 인스턴스 URL (자체 호스팅)",
+      "instancePlaceholder": "https://gitlab.acme.example (SaaS gitlab.com은 비워 두세요)",
+      "step2": "GitLab에서 애플리케이션 만들기",
+      "openApps": "GitLab 애플리케이션 열기",
+      "callbackLabel": "이 콜백 URL을 GitLab에 붙여넣으세요",
+      "copied": "복사됨",
+      "copy": "복사",
+      "scopes": "필요한 GitLab 스코프: <code>read_api</code>, <code>read_repository</code>, <code>read_user</code>. <em>Confidential</em>은 선택된 상태로 두세요.",
+      "step3": "결과를 여기에 붙여넣으세요",
+      "applicationId": "Application ID",
+      "secret": "Secret",
+      "secretHelp": "암호화되어 저장됩니다. GitLab은 Secret을 한 번만 표시하므로 페이지를 벗어나기 전에 복사하세요.",
+      "cancel": "취소",
+      "connecting": "연결 중…",
+      "save": "저장 후 연결"
+    },
+    "generateKey": {
+      "title": "SSH 배포 키 생성",
+      "description": "ed25519 키 쌍입니다. 공개 키는 저장소의 배포 키 설정에 붙여넣을 수 있도록 표시되며, 비공개 키는 플랫폼 시크릿 백엔드에 암호화된 상태로 보관되고 표시되지 않습니다.",
+      "fingerprint": "지문",
+      "publicKey": "공개 키 (저장소의 배포 키에 붙여넣기)",
+      "copyPublicKey": "공개 키 복사",
+      "copied": "공개 키를 복사했습니다",
+      "copyFailed": "복사하지 못했습니다. 텍스트를 선택해 직접 복사하세요.",
+      "help": "GitHub: <code>Settings → Deploy keys → Add deploy key</code>. \"Allow write access\"는 Astrolift가 푸시해야 하는 경우(예: 태그 기반 릴리스)에만 선택하세요. GitLab: <code>Settings → Repository → Deploy Keys</code>.",
+      "done": "완료",
+      "name": "이름",
+      "appSlug": "앱 슬러그 (선택 사항)",
+      "appSlugPlaceholder": "조직 범위 키는 비워 두세요",
+      "appSlugHelp": "비워 두면 조직 범위 키(모든 앱에서 재사용 가능)가 됩니다. 앱 슬러그를 지정하면 앱별 키가 되어 저장소 하나가 침해되었을 때 영향 범위가 더 좁아집니다.",
+      "cancel": "취소",
+      "generating": "생성 중…",
+      "generate": "생성"
+    },
+    "clientId": {
+      "title": "OAuth 클라이언트 ID 추가",
+      "description": "선택 사항이며 문제가 있는 것은 아닙니다. 클론, 자동 연결, 배포는 이미 이 연결의 App 설치 토큰으로 실행됩니다. GitHub App의 OAuth 클라이언트 ID를 추가하면 user-to-server \"내 GitHub 연결\" 흐름도 켜져 사용자가 자신의 저장소를 탐색할 수 있습니다. 클라이언트 ID는 숫자 App ID와 다르며, GitHub App 설정 페이지에서 확인할 수 있습니다 (새 GitHub App은 <code>Iv23l…</code> 형식).",
+      "connection": "연결",
+      "account": "계정",
+      "existingAppId": "App ID (기존)",
+      "label": "GitHub App 클라이언트 ID",
+      "help": "<link>GitHub App 설정 열기 →</link> 클라이언트 ID는 App 페이지의 <em>About</em> 섹션에 숫자 App ID와 별도로 표시됩니다.",
+      "cancel": "취소",
+      "saving": "저장 중…",
+      "save": "클라이언트 ID 저장"
+    },
+    "toasts": {
+      "rotationFailed": "교체하지 못했습니다",
+      "disconnected": "{name} 연결을 해제했습니다",
+      "disconnectFailed": "연결을 해제하지 못했습니다",
+      "keyDeleted": "{name}을(를) 삭제했습니다",
+      "deleteFailed": "삭제하지 못했습니다",
+      "clientIdSaved": "{name}의 클라이언트 ID를 저장했습니다",
+      "saveFailed": "저장하지 못했습니다",
+      "keyGenerated": "키를 생성했습니다. 공개 키를 저장소에 복사하세요",
+      "generationFailed": "생성하지 못했습니다",
+      "connected": "{name}을(를) 연결했습니다",
+      "connectFailed": "연결하지 못했습니다",
+      "githubConnected": "GitHub App 연결됨: {name}",
+      "githubConnectFailed": "GitHub App을 연결하지 못했습니다",
+      "callbackCopied": "콜백 URL을 복사했습니다",
+      "copyFailed": "복사하지 못했습니다. 텍스트를 선택해 직접 복사하세요.",
+      "gitlabConnected": "{name}을(를) 연결했습니다. \"내 GitLab 연결\"로 로그인하세요."
+    }
+  },
+  "identityProviders": {
+    "kinds": {
+      "oidc": "일반 OIDC",
+      "saml": "SAML 2.0",
+      "cognito": "Amazon Cognito",
+      "auth0": "Auth0",
+      "okta": "Okta",
+      "azure_ad": "Azure AD / Entra ID",
+      "google": "Google Workspace",
+      "github": "GitHub OAuth",
+      "local": "로컬 계정"
+    },
+    "hints": {
+      "oidc": "디스커버리 URL + client_id + client_secret_ref",
+      "cognito": "사용자 풀 + 리전 + OIDC 필드",
+      "auth0": "테넌트 URL + client_id + client_secret_ref",
+      "okta": "디스커버리 URL + client_id + client_secret_ref",
+      "azure_ad": "디스커버리 URL + client_id + client_secret_ref",
+      "google": "디스커버리 URL + client_id",
+      "github": "OAuth 앱 client_id + client_secret_ref",
+      "saml": "메타데이터 URL 또는 XML 업로드",
+      "local": "사용자 이름 + 비밀번호 (Django 인증, 개발/대체용)"
+    },
+    "create": {
+      "title": "새 ID 공급자",
+      "description": "사용자의 로그인 방식을 구성합니다. 여러 공급자를 함께 둘 수 있지만 한 번에 하나만 활성화됩니다. 시크릿은 플랫폼 시크릿 백엔드에 대한 참조로 저장되며, 이 항목에 평문으로 저장되지 않습니다.",
+      "kind": "종류",
+      "displayName": "표시 이름 (선택 사항)",
+      "displayNamePlaceholder": "예: Auth0 프로덕션, Cognito 스테이징",
+      "displayNameHelp": "로그인 화면과 감사 로그에 표시됩니다. 비워 두면 종류 이름이 사용됩니다.",
+      "discovery": "OIDC 디스커버리 URL",
+      "clientId": "클라이언트 ID",
+      "secretRef": "시크릿 참조",
+      "secretRefHelp": "플랫폼 시크릿 백엔드 내 경로이며, 값은 이 항목에 저장되지 않습니다.",
+      "metadataUrl": "SAML 메타데이터 URL",
+      "config": "종류별 구성 (JSON)",
+      "invalidJson": "잘못된 JSON",
+      "cognitoKeys": "Cognito 필수 키: <code>user_pool_id</code>, <code>region</code>.",
+      "setActive": "조직의 활성 공급자로 설정",
+      "cancel": "취소",
+      "saving": "저장 중…",
+      "save": "공급자 저장"
+    },
+    "list": {
+      "title": "ID 공급자",
+      "description": "조직에 구성된 로그인 방식입니다. Auth0, 일반 OIDC, Cognito, Okta, Azure AD, Google, GitHub, SAML 또는 로컬 계정을 사용할 수 있으며, 항상 하나만 활성화됩니다.",
+      "learnMore": "자세히 알아보기",
+      "newProvider": "새 공급자",
+      "columns": {
+        "provider": "공급자",
+        "kind": "종류",
+        "endpoint": "엔드포인트",
+        "status": "상태"
+      },
+      "client": "클라이언트 {id}",
+      "active": "활성",
+      "configured": "구성됨",
+      "activeSince": "{date}부터 활성",
+      "by": "{name} 님이 변경",
+      "makeActive": "활성화",
+      "delete": "삭제",
+      "emptyTitle": "구성된 ID 공급자가 없습니다",
+      "emptyDescription": "사용자가 로그인할 수 있도록 공급자를 하나 이상 구성하세요. 로컬 계정은 첫 실행에 유용하며, 프로덕션 설치에서는 보통 OIDC나 Cognito를 연결합니다.",
+      "switchTitle": "활성 공급자를 {name}(으)로 전환할까요?",
+      "switchTitleGeneric": "활성 공급자를 전환할까요?",
+      "switchDescription": "이미 로그인한 사용자는 세션이 유지됩니다. 다음 로그인부터 새 공급자를 거칩니다. 이전 공급자에만 있는 사용자는 여기에서 프로비저닝될 때까지 로그인할 수 없습니다.",
+      "switchConfirm": "공급자 전환",
+      "deleteTitle": "{name}을(를) 삭제할까요?",
+      "deleteTitleGeneric": "ID 공급자를 삭제할까요?",
+      "deleteDescription": "IdP 항목을 소프트 삭제합니다. 이 공급자에만 ID가 있는 사용자는 더 이상 로그인할 수 없으므로, 계속 접근해야 한다면 먼저 활성 공급자에 프로비저닝하세요.",
+      "deleteConfirm": "공급자 삭제"
+    },
+    "toasts": {
+      "configured": "{name}을(를) 구성했습니다",
+      "failed": "실패했습니다",
+      "activeProvider": "활성 공급자: {name}",
+      "deleted": "{name}을(를) 삭제했습니다"
+    }
+  },
+  "appearanceSettings": {
+    "locked": "조직에서 테마를 잠갔습니다. 이 설정은 읽기 전용입니다.",
+    "themeTitle": "테마",
+    "themeDescription": "바탕과 강조 색상입니다. 밝은 테마를 고르면 앱이 라이트 모드로 바뀝니다.",
+    "themeHints": {
+      "orbit": "블랙 · 그린",
+      "forge": "블랙 · 코퍼",
+      "console": "차콜 · 아이스",
+      "dusk": "차콜 · 페리윙클",
+      "graphite": "그래파이트 · 그린",
+      "field": "에메랄드 · 그린",
+      "daylight": "미스트 · 그린",
+      "workshop": "페이퍼 · 코퍼"
+    },
+    "accent": "강조 색상",
+    "ground": "바탕",
+    "accents": {
+      "green": "그린",
+      "copper": "코퍼",
+      "ice": "아이스",
+      "periwinkle": "페리윙클",
+      "amber": "앰버"
+    },
+    "grounds": {
+      "black": "블랙",
+      "charcoal": "차콜",
+      "graphite": "그래파이트",
+      "emerald": "에메랄드",
+      "paper": "페이퍼",
+      "mist": "미스트"
+    },
+    "modes": {
+      "dark": "다크",
+      "light": "라이트"
+    },
+    "layoutTitle": "레이아웃",
+    "layoutDescription": "목록과 패널이 차지하는 공간과 모서리 모양을 정합니다.",
+    "density": "밀도",
+    "densities": {
+      "compact": {
+        "label": "컴팩트",
+        "hint": "가는 구분선이 있는 촘촘한 행"
+      },
+      "cards": {
+        "label": "카드",
+        "hint": "열로 배치되는 상자형 항목"
+      }
+    },
+    "corners": "모서리",
+    "cornerSquare": "각진",
+    "cornerRounded": "둥근",
+    "restrictedTitle": "변경할 수 없는 설정",
+    "restrictedDescription": "설정 페이지에서 변경 권한이 없는 부분입니다.",
+    "restricted": {
+      "show": {
+        "label": "읽기 전용으로 표시",
+        "blurb": "변경할 수 없는 설정을 비활성 상태로, 변경에 필요한 권한과 함께 표시합니다"
+      },
+      "hide": {
+        "label": "숨기기",
+        "blurb": "변경할 수 있는 설정만 표시합니다"
+      }
+    },
+    "followingDefault": "조직 기본값을 따르는 중: <strong>{setting}</strong>.",
+    "orgDefault": "조직 기본값: <strong>{setting}</strong>.",
+    "useOrgDefault": "조직 기본값 사용",
+    "reset": "기본값으로 재설정",
+    "customAccent": {
+      "helpEmpty": "바탕에서 잘 보이는 색이면 무엇이든 됩니다. 상태 색상은 바뀌지 않습니다.",
+      "helpInvalid": "<mono>#2f9e52</mono> 같은 16진수 색상을 사용하세요.",
+      "helpOk": "{ground}에서 <mono>{ratio}:1</mono>. 상태 색상은 바뀌지 않습니다.",
+      "helpTooFaintLighter": "{ground}에서 너무 흐립니다: <mono>{ratio}:1</mono>, <mono>{min}:1</mono> 이상이어야 합니다. 더 밝은 색을 고르세요.",
+      "helpTooFaintDarker": "{ground}에서 너무 흐립니다: <mono>{ratio}:1</mono>, <mono>{min}:1</mono> 이상이어야 합니다. 더 어두운 색을 고르세요.",
+      "helpFaintEverywhere": "모든 바탕에서 너무 흐립니다. <mono>{min}:1</mono> 이상이어야 합니다.",
+      "helpReadsEverywhere": "모든 바탕에서 잘 보입니다. 상태 색상은 바뀌지 않습니다.",
+      "helpFaintSome": "{grounds}에서 너무 흐립니다. {count, plural, other {해당 바탕}}을 쓰는 사용자는 기본 강조 색상을 유지합니다.",
+      "label": "사용자 지정 강조 색상",
+      "pick": "사용자 지정 강조 색상 선택",
+      "inUse": "사용 중"
+    }
+  },
+  "profileSettings": {
+    "identity": {
+      "title": "신원",
+      "loading": "불러오는 중…",
+      "signIn": "프로필을 편집하려면 로그인하세요.",
+      "description": "플랫폼 전체에 표시되는 이름과 이메일입니다. ID 공급자가 잠근 필드는 여기서 편집할 수 없으며 IdP에서 동기화됩니다.",
+      "editingDisabled": "조직 관리자가 프로필 편집을 비활성화했습니다. 관리자에게 <code>/administration/organization</code>에서 <code>allowUserProfileEdit</code>를 켜 달라고 요청하세요.",
+      "username": "사용자 이름",
+      "usernameHelp": "사용자 이름은 인증 식별자이며 바뀌지 않습니다.",
+      "firstName": "이름",
+      "lastName": "성",
+      "email": "이메일",
+      "saving": "저장 중…",
+      "save": "저장",
+      "idpManagedTitle": "ID 공급자가 관리합니다. 로컬에서 수정해도 다음 로그인 시 덮어쓰입니다",
+      "idpManaged": "IdP 관리"
+    },
+    "language": {
+      "title": "언어",
+      "description": "화면 언어입니다. 번역이 없으면 en으로 표시됩니다."
+    },
+    "timezone": {
+      "title": "시간대",
+      "description": "대시보드의 모든 타임스탬프에 대해 브라우저가 감지한 시간대를 재정의합니다. 비워 두면 브라우저가 알려 주는 시간대(<mono>{tz}</mono>)를 사용합니다.",
+      "label": "시간대",
+      "placeholder": "{tz} (브라우저 감지)",
+      "noOverride": "{tz} (브라우저 감지, 재정의 없음)",
+      "saving": "저장 중…",
+      "save": "저장"
+    },
+    "toasts": {
+      "timezoneSaved": "시간대를 저장했습니다",
+      "timezoneFailed": "시간대를 저장하지 못했습니다",
+      "profileUpdated": "프로필을 업데이트했습니다",
+      "updateFailed": "업데이트하지 못했습니다"
+    }
+  },
+  "visualizationSettings": {
+    "preview": "미리보기",
+    "fleetTitle": "플릿 보기",
+    "fleetDescription": "에이전트 플릿을 그리는 방식입니다. 모든 스타일이 같은 에이전트와 같은 상태를 보여 줍니다.",
+    "workflowTitle": "워크플로 보기",
+    "workflowDescription": "워크플로와 실행을 그리는 방식입니다.",
+    "appTitle": "앱 보기",
+    "appDescription": "앱 대시보드를 그리는 방식입니다. 자동은 앱 구조에 맞춰 배치합니다.",
+    "motionTitle": "모션",
+    "motionDescription": "모든 애니메이션은 실제 상태를 나타냅니다. 모션 줄이기는 같은 정보를 담은 정지 화면을 그립니다.",
+    "particlesTitle": "흐름 파티클",
+    "fleet": {
+      "orbit": {
+        "label": "오비트",
+        "blurb": "클러스터는 행성, 에이전트는 위성"
+      },
+      "heartbeat": {
+        "label": "하트비트",
+        "blurb": "이벤트마다 서서히 사라지는 형광 점"
+      },
+      "hive": {
+        "label": "하이브",
+        "blurb": "에이전트마다 타일 하나, 대규모 플릿용"
+      },
+      "manifest": {
+        "label": "매니페스트",
+        "blurb": "실행 대기열을 출발 안내판처럼"
+      },
+      "isometric": {
+        "label": "아이소메트릭",
+        "blurb": "클러스터는 플랫폼, 부하는 높이"
+      },
+      "graph": {
+        "label": "그래프",
+        "blurb": "디스패치 펄스가 흐르는 실시간 포스 그래프"
+      },
+      "swarm": {
+        "label": "스웜",
+        "blurb": "덩굴로 이어져 클러스터 주위를 도는 에이전트"
+      },
+      "list": {
+        "label": "목록",
+        "blurb": "단순한 표"
+      }
+    },
+    "workflow": {
+      "transit": {
+        "label": "노선도",
+        "blurb": "워크플로는 노선, 실행은 열차"
+      },
+      "isometric": {
+        "label": "아이소메트릭",
+        "blurb": "단계를 조립 라인처럼"
+      },
+      "graph": {
+        "label": "그래프",
+        "blurb": "애니메이션 단계 그래프"
+      },
+      "list": {
+        "label": "목록",
+        "blurb": "단순한 표"
+      }
+    },
+    "app": {
+      "auto": {
+        "label": "자동",
+        "blurb": "앱 토폴로지에 맞춰 배치"
+      },
+      "isometric": {
+        "label": "아이소메트릭",
+        "blurb": "워크로드를 플랫폼 위 블록으로"
+      },
+      "graph": {
+        "label": "그래프",
+        "blurb": "워크로드와 트래픽을 실시간 그래프로"
+      },
+      "classic": {
+        "label": "클래식",
+        "blurb": "카드만, 다이어그램 없음"
+      }
+    },
+    "motion": {
+      "system": {
+        "label": "시스템 설정 따르기",
+        "blurb": "OS가 요청하면 모션 줄이기"
+      },
+      "full": {
+        "label": "전체",
+        "blurb": "모든 애니메이션"
+      },
+      "reduced": {
+        "label": "줄임",
+        "blurb": "정지 화면, 같은 정보"
+      }
+    },
+    "particles": {
+      "on": {
+        "label": "켜기",
+        "blurb": "엣지를 따라 흐르는 파티클로 처리량 표시"
+      },
+      "off": {
+        "label": "끄기",
+        "blurb": "엣지와 개수만"
+      }
+    }
+  },
+  "notificationSettings": {
+    "title": "알림",
+    "description": "받은 편지함: 배포 승인, 실패 알림, 초대, 할당량 경고.",
+    "inboxTitle": "받은 편지함",
+    "inboxDescription": "배포 승인, 실패 알림, 초대, 할당량 경고.",
+    "unread": "읽지 않음 <num>{count}</num>",
+    "markAll": "모두 읽음으로 표시",
+    "feedLabel": "알림",
+    "inboxEmptyTitle": "받은 편지함이 비어 있습니다",
+    "inboxEmptyDescription": "배포가 끝나거나 초대가 오거나 할당량이 한도에 가까워지면 여기에 알림이 표시됩니다.",
+    "markRead": "읽음으로 표시",
+    "alerts": {
+      "title": "앱 알림 구독",
+      "description": "알림을 받을 앱과 이벤트 유형을 선택하세요.",
+      "app": "앱",
+      "bulk": "일괄",
+      "kinds": {
+        "deploy_success": "배포 성공",
+        "deploy_failure": "배포 실패",
+        "error_spike": "오류 급증",
+        "preview_created": "미리보기 생성",
+        "preview_destroyed": "미리보기 삭제"
+      },
+      "toggleLabel": "{app}의 {kind}",
+      "unsubscribeAll": "모두 구독 해제",
+      "subscribeAll": "모두 구독",
+      "emptyTitle": "등록된 앱이 없습니다",
+      "emptyDescription": "앱을 등록하면 알림을 구성할 수 있습니다.",
+      "inAppChannel": "앱 내 채널",
+      "otherChannels": "사용자 채널 환경설정이 구성되면 이메일/Slack 채널이 여기에 표시됩니다.",
+      "unsubscribeTitle": "{app}의 모든 알림 구독을 해제할까요?",
+      "unsubscribeTitleGeneric": "모든 알림 구독을 해제할까요?",
+      "unsubscribeDescription": "이 앱의 앱 내 채널에서 {count}가지 알림 유형을 모두 해제합니다. 다시 구독할 때까지 배포 실패와 오류 급증 알림을 받지 않습니다."
+    },
+    "toasts": {
+      "cleared": "{count}개를 지웠습니다",
+      "markAllFailed": "알림을 읽음으로 표시하지 못했습니다",
+      "markFailed": "알림을 읽음으로 표시하지 못했습니다",
+      "saveFailed": "저장하지 못했습니다",
+      "subscribedAll": "{app}의 모든 알림을 구독했습니다",
+      "subscribeFailed": "구독하지 못했습니다",
+      "unsubscribed": "{app} 구독을 해제했습니다",
+      "unsubscribeFailed": "구독을 해제하지 못했습니다"
+    }
+  },
+  "securitySettings": {
+    "title": "보안",
+    "description": "계정의 활성 세션과 발급된 베어러 자격 증명입니다.",
+    "apiTokens": "API 토큰",
+    "apiTokensDescription": "CLI, CI 실행, 스크립트용 장기 자격 증명입니다.",
+    "manageTokens": "토큰 관리",
+    "mfa": "다단계 인증",
+    "mfaDescription": "IdP 계층에서 구성합니다. Astrolift는 OIDC를 통해 어설션을 받습니다.",
+    "mfaBody": "ID 공급자(Auth0 / Okta / Azure AD / Google Workspace)에서 MFA를 설정하세요. 플랫폼은 ABAC 정책으로 고위험 작업에 최근 인증된 세션을 요구합니다.",
+    "subnav": {
+      "label": "설정 하위 탐색",
+      "profile": "프로필",
+      "security": "보안",
+      "notifications": "알림",
+      "appearance": "모양",
+      "visualizations": "시각화",
+      "home": "홈"
+    },
+    "connected": {
+      "title": "연결된 계정",
+      "notConnected": "연결 안 됨",
+      "reauthorize": "다시 승인",
+      "connected": "연결됨",
+      "connect": "연결",
+      "disconnect": "연결 해제",
+      "refetchHint": "페이지를 새로고침하면 다시 불러옵니다. 연결 상태는 호스트에서 OAuth 흐름이 완료된 후 갱신됩니다.",
+      "disconnectTitle": "{provider} 연결을 해제할까요?",
+      "thisAccount": "이 계정",
+      "theLinkedAccount": "연결된 계정",
+      "disconnectBody": "Astrolift가 {provider}의 <mono>{account}</mono>에 접근할 수 없게 됩니다. 내 ID를 거치는 배포는 다시 연결할 때까지 실패합니다.",
+      "typeToConfirm": "확인하려면 <mono>{account}</mono>을(를) 입력하세요.",
+      "toasts": {
+        "connectFailed": "연결하지 못했습니다",
+        "oauthStartFailed": "OAuth 흐름을 시작하지 못했습니다",
+        "disconnected": "{account} 연결을 해제했습니다",
+        "accountFallback": "계정",
+        "disconnectFailed": "이 계정 연결을 해제하지 못했습니다"
+      }
+    }
+  },
   "settingsIndex": {
     "title": "Settings",
     "description": "Configure the platform's identity, security, and surfaces.",

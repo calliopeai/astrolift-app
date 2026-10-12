@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
@@ -25,6 +26,7 @@ interface Resp {
  * NotificationsInbox.
  */
 export function useNotifications() {
+  const t = useTranslations("notificationSettings.toasts");
   const grow = useGrowingLimit(100);
   const { data, loading, error, refetch } = useQuery<Resp>(LIST_MY_NOTIFICATIONS, {
     variables: { unreadOnly: false, limit: grow.limit },
@@ -53,21 +55,21 @@ export function useNotifications() {
     try {
       const { data } = await markAll();
       if (data?.markAllNotificationsRead.ok) {
-        toast.success(`Cleared ${data.markAllNotificationsRead.data?.marked ?? 0}`);
+        toast.success(t("cleared", { count: data.markAllNotificationsRead.data?.marked ?? 0 }));
       } else {
-        toast.error("Could not mark notifications as read");
+        toast.error(t("markAllFailed"));
       }
     } catch {
-      toast.error("Could not mark notifications as read");
+      toast.error(t("markAllFailed"));
     }
   }
 
   async function onMarkRead(id: string) {
     try {
       const result = await markRead({ variables: { input: { id } } });
-      if (!result.data?.markNotificationRead.ok) toast.error("Could not mark notification as read");
+      if (!result.data?.markNotificationRead.ok) toast.error(t("markFailed"));
     } catch {
-      toast.error("Could not mark notification as read");
+      toast.error(t("markFailed"));
     }
   }
 

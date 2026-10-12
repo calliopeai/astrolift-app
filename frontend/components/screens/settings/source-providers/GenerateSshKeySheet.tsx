@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -32,6 +33,7 @@ export function GenerateSshKeySheet({
   generate,
   initialKey = null,
 }: GenerateSshKeySheetProps) {
+  const t = useTranslations("sourceProviders.generateKey");
   const [name, setName] = React.useState("");
   const [appSlug, setAppSlug] = React.useState("");
   const [pasted, setPasted] = React.useState<AstroliftSshDeployKeyCreated["key"] | null>(
@@ -56,9 +58,9 @@ export function GenerateSshKeySheet({
   async function copyPublicKey(value: string) {
     try {
       await navigator.clipboard.writeText(value);
-      toast.success("Public key copied");
+      toast.success(t("copied"));
     } catch {
-      toast.error("Couldn't copy — select text and copy manually");
+      toast.error(t("copyFailed"));
     }
   }
 
@@ -66,23 +68,19 @@ export function GenerateSshKeySheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col">
         <SheetHeader>
-          <SheetTitle>Generate SSH deploy key</SheetTitle>
-          <SheetDescription>
-            ed25519 keypair. Public key is shown for you to paste into the repo&apos;s deploy-key
-            settings; the private key stays encrypted in the platform secrets backend and is never
-            shown.
-          </SheetDescription>
+          <SheetTitle>{t("title")}</SheetTitle>
+          <SheetDescription>{t("description")}</SheetDescription>
         </SheetHeader>
         {pasted ? (
           <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
             <div className="space-y-2">
-              <Label>Fingerprint</Label>
+              <Label>{t("fingerprint")}</Label>
               <div className="font-mono text-xs [overflow-wrap:anywhere]">
                 {pasted.fingerprintSha256}
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Public key (paste into the repo&apos;s deploy keys)</Label>
+              <Label>{t("publicKey")}</Label>
               <textarea
                 readOnly
                 rows={4}
@@ -91,24 +89,22 @@ export function GenerateSshKeySheet({
                 onClick={(e) => (e.target as HTMLTextAreaElement).select()}
               />
               <Button size="sm" variant="outline" onClick={() => copyPublicKey(pasted.publicKey)}>
-                Copy public key
+                {t("copyPublicKey")}
               </Button>
             </div>
             <p className="text-muted-foreground text-xs">
-              GitHub: <code>Settings → Deploy keys → Add deploy key</code>. Tick &ldquo;Allow write
-              access&rdquo; only if Astrolift needs to push (e.g. for tag-based releases). GitLab:
-              <code> Settings → Repository → Deploy Keys</code>.
+              {t.rich("help", { code: (chunks) => <code>{chunks}</code> })}
             </p>
             <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
               <Button type="button" onClick={() => onOpenChange(false)}>
-                Done
+                {t("done")}
               </Button>
             </SheetFooter>
           </div>
         ) : (
           <form onSubmit={submit} className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
             <div className="space-y-2">
-              <Label htmlFor="key-name">Name</Label>
+              <Label htmlFor="key-name">{t("name")}</Label>
               <Input
                 id="key-name"
                 value={name}
@@ -118,25 +114,22 @@ export function GenerateSshKeySheet({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="app-slug">App slug (optional)</Label>
+              <Label htmlFor="app-slug">{t("appSlug")}</Label>
               <Input
                 id="app-slug"
                 value={appSlug}
                 onChange={(e) => setAppSlug(e.target.value)}
-                placeholder="leave blank for org-scoped key"
+                placeholder={t("appSlugPlaceholder")}
                 className="font-mono text-xs"
               />
-              <p className="text-muted-foreground text-xs">
-                Leave blank for an org-scoped key (reusable across every app). Set an app slug for a
-                per-app key — tighter blast radius if a single repo is compromised.
-              </p>
+              <p className="text-muted-foreground text-xs">{t("appSlugHelp")}</p>
             </div>
             <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
+                {t("cancel")}
               </Button>
               <Button type="submit" disabled={generating || !name.trim()}>
-                {generating ? "Generating…" : "Generate"}
+                {generating ? t("generating") : t("generate")}
               </Button>
             </SheetFooter>
           </form>

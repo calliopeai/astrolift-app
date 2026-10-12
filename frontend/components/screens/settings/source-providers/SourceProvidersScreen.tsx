@@ -15,6 +15,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -52,28 +53,25 @@ import type { DeployKeysData, SourceHostsData } from "./use-source-providers";
 // the form they were just in.
 const ADVANCED_OPEN_STORAGE_KEY = "astrolift.settings.source-providers.advancedOpen";
 
-const KIND_LABEL: Record<string, string> = {
-  github_oauth_app: "GitHub OAuth App",
-  github_oauth_user: "GitHub (OAuth user token)",
-  github_app_install: "GitHub App install",
-  github_pat: "GitHub PAT",
-  gitlab_oauth_app: "GitLab OAuth App",
-  gitlab_oauth_user: "GitLab (OAuth user token)",
-  gitlab_pat: "GitLab PAT",
-  bitbucket_oauth_app: "Bitbucket OAuth App",
-  bitbucket_oauth_user: "Bitbucket (OAuth user token)",
-  bitbucket_pat: "Bitbucket PAT",
-  gitea_oauth_app: "Gitea OAuth App",
-  gitea_oauth_user: "Gitea (OAuth user token)",
-  gitea_pat: "Gitea PAT",
-};
+// Kinds and scopes with a label under sourceProviders.kind / .scope; any
+// other value renders as the raw API value.
+const KIND_LABEL_KEYS = new Set([
+  "github_oauth_app",
+  "github_oauth_user",
+  "github_app_install",
+  "github_pat",
+  "gitlab_oauth_app",
+  "gitlab_oauth_user",
+  "gitlab_pat",
+  "bitbucket_oauth_app",
+  "bitbucket_oauth_user",
+  "bitbucket_pat",
+  "gitea_oauth_app",
+  "gitea_oauth_user",
+  "gitea_pat",
+]);
 
-const SCOPE_LABEL: Record<string, string> = {
-  private_org: "private org repos",
-  public_org: "public org repos",
-  user_repos: "user repos",
-  public_non_org: "public non-org repos",
-};
+const SCOPE_LABEL_KEYS = new Set(["private_org", "public_org", "user_repos", "public_non_org"]);
 
 type DialogSlot = (open: boolean, onOpenChange: (next: boolean) => void) => React.ReactNode;
 
@@ -92,23 +90,18 @@ export interface SourceProvidersScreenProps {
  * section on screen. Pure.
  */
 export function SourceProvidersScreen({ section, hosts, keys }: SourceProvidersScreenProps) {
+  const t = useTranslations("sourceProviders");
   return (
     <Section
-      title="Source providers"
-      description={
-        <span className="block max-w-2xl">
-          Connect Astrolift to a code-hosting service so it can clone your repos and watch for
-          pushes. Use OAuth Apps / GitHub Apps for org-wide access, PATs for self-hosted GitLab or
-          Gitea, and SSH deploy keys for direct git access to any host.
-        </span>
-      }
+      title={t("title")}
+      description={<span className="block max-w-2xl">{t("description")}</span>}
       className="gap-6"
     >
       <SettingsPage
         single={section}
         sections={[
-          { id: "hosts", title: "Hosts", content: hosts },
-          { id: "keys", title: "SSH deploy keys", content: keys },
+          { id: "hosts", title: t("hostsTitle"), content: hosts },
+          { id: "keys", title: t("keysTitle"), content: keys },
         ]}
       />
     </Section>
@@ -151,6 +144,7 @@ export function SourceHostsView({
   renderConnectSource,
   renderAddClientId,
 }: SourceHostsViewProps) {
+  const t = useTranslations("sourceProviders");
   const hostsRegion = React.useRef<HTMLElement | null>(null);
   const [openConnect, setOpenConnect] = React.useState(false);
   const [openConnectGithub, setOpenConnectGithub] = React.useState(false);
@@ -179,7 +173,7 @@ export function SourceHostsView({
   const connectionColumns: Column<AstroliftSourceConnection>[] = [
     {
       id: "connection",
-      header: "Connection",
+      header: t("hosts.columns.connection"),
       cellClassName: "max-w-72",
       cell: (c) => (
         <span className="block min-w-0">
@@ -199,13 +193,15 @@ export function SourceHostsView({
     },
     {
       id: "kind",
-      header: "Kind",
+      header: t("hosts.columns.kind"),
       cell: (c) => (
         <span className="flex min-w-0 flex-wrap gap-1">
-          <Badge variant="outline">{KIND_LABEL[c.kind] ?? c.kind}</Badge>
+          <Badge variant="outline">
+            {KIND_LABEL_KEYS.has(c.kind) ? t(`kind.${c.kind}`) : c.kind}
+          </Badge>
           {c.isOauthAppConfig && (
             <Badge variant="secondary" className="text-2xs gap-1">
-              OAuth-app config
+              {t("hosts.oauthAppConfig")}
             </Badge>
           )}
           {c.isPersonal && (
@@ -213,7 +209,7 @@ export function SourceHostsView({
               variant="secondary"
               className="bg-info/15 text-info-fg text-2xs max-w-full gap-1 truncate"
             >
-              personal {c.userUsername ? `· ${c.userUsername}` : ""}
+              {t("hosts.personal")} {c.userUsername ? `· ${c.userUsername}` : ""}
             </Badge>
           )}
         </span>
@@ -221,7 +217,7 @@ export function SourceHostsView({
     },
     {
       id: "account",
-      header: "Account",
+      header: t("hosts.columns.account"),
       cellClassName: "max-w-48",
       cell: (c) => (
         <span className="block truncate font-mono text-xs" title={c.accountLogin || undefined}>
@@ -231,15 +227,15 @@ export function SourceHostsView({
     },
     {
       id: "scopes",
-      header: "Scopes",
+      header: t("hosts.columns.scopes"),
       cell: (c) =>
         c.repoVisibilityScopes.length === 0 ? (
-          <span className="text-muted-foreground text-xs">— no scope restriction —</span>
+          <span className="text-muted-foreground text-xs">{t("hosts.noScopeRestriction")}</span>
         ) : (
           <div className="flex flex-wrap gap-1">
             {c.repoVisibilityScopes.map((s) => (
               <Badge key={s} variant="secondary" className="text-2xs">
-                {SCOPE_LABEL[s] ?? s}
+                {SCOPE_LABEL_KEYS.has(s) ? t(`scope.${s}`) : s}
               </Badge>
             ))}
           </div>
@@ -247,15 +243,15 @@ export function SourceHostsView({
     },
     {
       id: "status",
-      header: "Status",
+      header: t("hosts.columns.status"),
       cell: (c) =>
         c.isActive ? (
           <Badge className="bg-success/15 text-success-fg gap-1" variant="secondary">
             <CheckCircle2Icon className="size-3" />
-            active
+            {t("hosts.active")}
           </Badge>
         ) : (
-          <Badge variant="outline">disabled</Badge>
+          <Badge variant="outline">{t("hosts.disabled")}</Badge>
         ),
     },
   ];
@@ -275,7 +271,7 @@ export function SourceHostsView({
             <Can permission="scm.connect">
               <DropdownMenuItem onSelect={() => setClientIdTarget(c)}>
                 <PlusIcon className="size-4" />
-                Add Client ID
+                {t("hosts.addClientId")}
               </DropdownMenuItem>
             </Can>
           ) : (
@@ -284,7 +280,7 @@ export function SourceHostsView({
                 href={`/app/auth1/scm/github/start?config_id=${encodeURIComponent(c.id)}&return_to=/providers%23source`}
               >
                 <GithubIcon className="size-4" />
-                Connect my GitHub
+                {t("hosts.connectMyGithub")}
               </a>
             </DropdownMenuItem>
           ))}
@@ -294,7 +290,7 @@ export function SourceHostsView({
               href={`/app/auth1/scm/gitlab/start?config_id=${encodeURIComponent(c.id)}&return_to=/providers%23source`}
             >
               <GitlabIcon className="size-4" />
-              Connect my GitLab
+              {t("hosts.connectMyGitlab")}
             </a>
           </DropdownMenuItem>
         )}
@@ -302,7 +298,7 @@ export function SourceHostsView({
           <Can permission="scm.connect">
             <DropdownMenuItem disabled={rotatingSecret} onSelect={() => setRotateSecretTarget(c)}>
               <RotateCwIcon className="size-4" />
-              Webhook secret
+              {t("hosts.webhookSecret")}
             </DropdownMenuItem>
           </Can>
         )}
@@ -314,7 +310,7 @@ export function SourceHostsView({
             onSelect={() => setDisconnectTarget(c)}
           >
             <Trash2Icon className="size-4" />
-            Disconnect
+            {t("hosts.disconnect")}
           </DropdownMenuItem>
         </Can>
       </>
@@ -325,19 +321,17 @@ export function SourceHostsView({
     <Section
       ref={hostsRegion}
       tabIndex={-1}
-      aria-label="Source connections"
+      aria-label={t("hosts.regionLabel")}
       headingLevel="h3"
       title={
         <span className="flex items-center gap-2">
           <GitBranchIcon className="size-4" />
-          Hosts
+          {t("hostsTitle")}
         </span>
       }
       description={
         <span className="block max-w-2xl">
-          One-click GitHub App registration via the manifest flow, or a guided GitLab Group OAuth
-          wizard. Personal Access Tokens and pre-registered OAuth apps remain available under{" "}
-          <em>Advanced</em>.
+          {t.rich("hosts.description", { em: (chunks) => <em>{chunks}</em> })}
         </span>
       }
       action={
@@ -346,17 +340,17 @@ export function SourceHostsView({
             <Button asChild size="sm" variant="outline">
               <Link href={DOC_LINKS.sourceProviders}>
                 <BookOpenIcon className="size-4" />
-                Setup guide
+                {t("hosts.setupGuide")}
               </Link>
             </Button>
             <Can permission="scm.connect">
               <Button size="sm" onClick={() => setOpenConnectGithub(true)}>
                 <GithubIcon className="size-4" />
-                Connect to GitHub
+                {t("hosts.connectGithub")}
               </Button>
               <Button size="sm" variant="secondary" onClick={() => setOpenConnectGitlab(true)}>
                 <GitlabIcon className="size-4" />
-                Connect to GitLab
+                {t("hosts.connectGitlab")}
               </Button>
             </Can>
           </div>
@@ -364,7 +358,7 @@ export function SourceHostsView({
             href={DOC_LINKS.sourceProviders}
             className="text-muted-foreground text-2xs underline"
           >
-            one-click GitHub flow + GitLab wizard — full walkthrough
+            {t("hosts.walkthrough")}
           </Link>
           {/* #760 — GitHub's manifest API can't set the App's logo, so
               the App lands with a placeholder. Surface the platform's
@@ -375,7 +369,7 @@ export function SourceHostsView({
             download="astrolift-app-icon.png"
             className="text-muted-foreground text-2xs underline"
           >
-            download Astrolift logo for your new App
+            {t("hosts.downloadLogo")}
           </a>
         </div>
       }
@@ -394,17 +388,12 @@ export function SourceHostsView({
         <div className="text-muted-foreground bg-muted/40 flex items-start gap-3 rounded-md border p-3 text-xs">
           <InfoIcon className="mt-0.5 size-4 shrink-0" />
           <div className="min-w-0 flex-1 space-y-2">
-            <p className="text-foreground font-medium">
-              Optional: enable &quot;Connect my GitHub&quot; repo browsing
-            </p>
+            <p className="text-foreground font-medium">{t("hosts.optionalTitle")}</p>
             <p>
-              {incompleteClientIdConnections.length === 1
-                ? "This GitHub App connection is"
-                : `These ${incompleteClientIdConnections.length} GitHub App connections are`}{" "}
-              ready to use — cloning, autowiring and deploys run on the App installation token.
-              Adding an OAuth Client ID is optional; it turns on the user-to-server &quot;Connect my
-              GitHub&quot; flow so people can browse their own repositories. The Client ID looks
-              like <code className="font-mono">Iv23l…</code> for new GitHub Apps.
+              {t.rich("hosts.optionalBody", {
+                count: incompleteClientIdConnections.length,
+                code: (chunks) => <code className="font-mono">{chunks}</code>,
+              })}
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
               {incompleteClientIdConnections.map((c) => (
@@ -413,10 +402,12 @@ export function SourceHostsView({
                   size="sm"
                   variant="outline"
                   className="max-w-full min-w-0"
-                  title={`Add Client ID for ${c.name}`}
+                  title={t("hosts.addClientIdFor", { name: c.name })}
                   onClick={() => setClientIdTarget(c)}
                 >
-                  <span className="min-w-0 truncate">Add Client ID for {c.name}</span>
+                  <span className="min-w-0 truncate">
+                    {t("hosts.addClientIdFor", { name: c.name })}
+                  </span>
                 </Button>
               ))}
             </div>
@@ -426,7 +417,7 @@ export function SourceHostsView({
       <ListPage<AstroliftSourceConnection>
         embedded
         list={list}
-        label="Connections"
+        label={t("hosts.listLabel")}
         columns={connectionColumns}
         rows={rows}
         getRowId={(c) => c.id}
@@ -438,9 +429,8 @@ export function SourceHostsView({
         nextCursor={nextCursor}
         empty={{
           icon: <GitBranchIcon className="size-5" />,
-          title: "No hosts connected yet",
-          description:
-            "Click 'Connect to GitHub' to register an Astrolift GitHub App on github.com in one step — no client_id / secret paste required. For GitLab, the wizard walks you through creating a Group OAuth Application with copy-friendly callback URLs.",
+          title: t("hosts.emptyTitle"),
+          description: t("hosts.emptyDescription"),
         }}
       />
 
@@ -457,17 +447,15 @@ export function SourceHostsView({
             ) : (
               <ChevronRightIcon className="size-3.5" />
             )}
-            Advanced: paste a Personal Access Token or pre-registered OAuth app
+            {t("hosts.advancedToggle")}
           </button>
           {showAdvanced && (
             <div className="mt-2 flex items-center gap-2">
               <Button size="sm" variant="outline" onClick={() => setOpenConnect(true)}>
                 <PlusIcon className="size-4" />
-                Paste credentials…
+                {t("hosts.pasteCredentials")}
               </Button>
-              <span className="text-muted-foreground text-xs">
-                Use this if you already have a registered OAuth App or want to connect via a PAT.
-              </span>
+              <span className="text-muted-foreground text-xs">{t("hosts.pasteHint")}</span>
             </div>
           )}
         </div>
@@ -514,9 +502,13 @@ export function SourceHostsView({
         onOpenChange={(next) => {
           if (!next) setDisconnectTarget(null);
         }}
-        title={disconnectTarget ? `Disconnect ${disconnectTarget.name}?` : "Disconnect?"}
-        description="Apps using this connection lose access until you reconnect. Webhooks signed with the old secret will fail until the integration is set up again."
-        confirmLabel="Disconnect"
+        title={
+          disconnectTarget
+            ? t("hosts.disconnectTitle", { name: disconnectTarget.name })
+            : t("hosts.disconnectTitleGeneric")
+        }
+        description={t("hosts.disconnectDescription")}
+        confirmLabel={t("hosts.disconnect")}
         destructive
         onConfirm={async () => {
           if (disconnectTarget) await disconnect(disconnectTarget);
@@ -530,11 +522,11 @@ export function SourceHostsView({
         }}
         title={
           rotateSecretTarget
-            ? `Rotate webhook secret for ${rotateSecretTarget.name}?`
-            : "Rotate webhook secret?"
+            ? t("hosts.rotateTitle", { name: rotateSecretTarget.name })
+            : t("hosts.rotateTitleGeneric")
         }
-        description="Generates a fresh secret and shows it once. Webhook deliveries signed with the old secret start failing immediately — paste the new value into the SCM host's webhook config before any pushes happen, or expect a short window where deploy triggers are rejected with a 401."
-        confirmLabel="Rotate secret"
+        description={t("hosts.rotateDescription")}
+        confirmLabel={t("hosts.rotateConfirm")}
         destructive
         onConfirm={async () => {
           if (rotateSecretTarget) setRevealedSecret(await rotateSecret(rotateSecretTarget));
@@ -567,13 +559,14 @@ export function DeployKeysView({
   refreshKeys,
   renderGenerateKey,
 }: DeployKeysViewProps) {
+  const t = useTranslations("sourceProviders");
   const [openGenerateKey, setOpenGenerateKey] = React.useState(false);
   const [deleteKeyTarget, setDeleteKeyTarget] = React.useState<AstroliftSshDeployKey | null>(null);
 
   const keyColumns: Column<AstroliftSshDeployKey>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("keys.columns.name"),
       cellClassName: "max-w-64",
       cell: (k) => (
         <span className="block truncate font-medium" title={k.name}>
@@ -583,20 +576,20 @@ export function DeployKeysView({
     },
     {
       id: "scope",
-      header: "Scope",
+      header: t("keys.columns.scope"),
       cellClassName: "max-w-56",
       cell: (k) =>
         k.registeredAppSlug ? (
           <Badge variant="secondary" className="max-w-full truncate">
-            app: {k.registeredAppSlug}
+            {t("keys.appScope", { slug: k.registeredAppSlug })}
           </Badge>
         ) : (
-          <Badge variant="outline">org-scoped</Badge>
+          <Badge variant="outline">{t("keys.orgScoped")}</Badge>
         ),
     },
     {
       id: "fingerprint",
-      header: "Fingerprint",
+      header: t("keys.columns.fingerprint"),
       cellClassName: "max-w-64",
       cell: (k) => (
         <span className="text-2xs block truncate font-mono" title={k.fingerprintSha256}>
@@ -606,7 +599,7 @@ export function DeployKeysView({
     },
     {
       id: "publicKey",
-      header: "Public key",
+      header: t("keys.columns.publicKey"),
       cell: (k) => <PublicKeyCell value={k.publicKey} />,
     },
   ];
@@ -617,21 +610,15 @@ export function DeployKeysView({
       title={
         <span className="flex items-center gap-2">
           <KeyRoundIcon className="size-4" />
-          SSH deploy keys
+          {t("keysTitle")}
         </span>
       }
-      description={
-        <span className="block max-w-2xl">
-          ed25519 keypairs for direct git-over-SSH access. The public key is shown for you to paste
-          into the repo&apos;s deploy-key settings; the private key stays encrypted in the platform
-          secrets backend.
-        </span>
-      }
+      description={<span className="block max-w-2xl">{t("keys.description")}</span>}
       action={
         <Can permission="scm.key_create">
           <Button size="sm" onClick={() => setOpenGenerateKey(true)}>
             <PlusIcon className="size-4" />
-            Generate key
+            {t("keys.generate")}
           </Button>
         </Can>
       }
@@ -639,7 +626,7 @@ export function DeployKeysView({
       <ListPage<AstroliftSshDeployKey>
         embedded
         list={list}
-        label="SSH deploy keys"
+        label={t("keysTitle")}
         columns={keyColumns}
         rows={rows}
         getRowId={(k) => k.id}
@@ -651,7 +638,7 @@ export function DeployKeysView({
               onSelect={() => setDeleteKeyTarget(k)}
             >
               <Trash2Icon className="size-4" />
-              Delete
+              {t("keys.delete")}
             </DropdownMenuItem>
           </Can>
         )}
@@ -662,9 +649,8 @@ export function DeployKeysView({
         nextCursor={nextCursor}
         empty={{
           icon: <KeyRoundIcon className="size-5" />,
-          title: "No SSH deploy keys yet",
-          description:
-            "Generate a key to let Astrolift clone over SSH. Org-scoped keys cover every app; per-app keys offer tighter blast-radius.",
+          title: t("keys.emptyTitle"),
+          description: t("keys.emptyDescription"),
         }}
       />
 
@@ -678,9 +664,13 @@ export function DeployKeysView({
         onOpenChange={(next) => {
           if (!next) setDeleteKeyTarget(null);
         }}
-        title={deleteKeyTarget ? `Delete SSH key ${deleteKeyTarget.name}?` : "Delete SSH key?"}
-        description="Remove the matching public key from any repo deploy-key lists first, otherwise git operations will fail abruptly. The private key is erased from the secrets backend."
-        confirmLabel="Delete key"
+        title={
+          deleteKeyTarget
+            ? t("keys.deleteTitle", { name: deleteKeyTarget.name })
+            : t("keys.deleteTitleGeneric")
+        }
+        description={t("keys.deleteDescription")}
+        confirmLabel={t("keys.deleteConfirm")}
         destructive
         onConfirm={async () => {
           if (deleteKeyTarget) await deleteKey(deleteKeyTarget);
@@ -700,17 +690,18 @@ export function WebhookSecretReveal({
   onClose: () => void;
   returnFocusRef?: React.RefObject<HTMLElement | null>;
 }) {
+  const t = useTranslations("sourceProviders.reveal");
   const previousFocus = React.useRef<HTMLElement | null>(null);
   const fullUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}${reveal.webhookUrlPath}`
       : reveal.webhookUrlPath;
-  async function copy(value: string, label: string) {
+  async function copy(value: string, copiedMessage: string) {
     try {
       await navigator.clipboard.writeText(value);
-      toast.success(`${label} copied`);
+      toast.success(copiedMessage);
     } catch {
-      toast.error("Couldn't copy — select the text and copy manually");
+      toast.error(t("copyFailed"));
     }
   }
   return (
@@ -735,30 +726,30 @@ export function WebhookSecretReveal({
         }}
       >
         <DialogHeader>
-          <DialogTitle>Webhook secret generated</DialogTitle>
+          <DialogTitle>{t("title")}</DialogTitle>
           <DialogDescription>
-            Paste these into the SCM host&apos;s webhook config{" "}
-            <span className="font-medium">now</span> — the plaintext secret is shown exactly once,
-            then encrypted at rest.
+            {t.rich("description", {
+              strong: (chunks) => <span className="font-medium">{chunks}</span>,
+            })}
           </DialogDescription>
         </DialogHeader>
         <div className="mt-4 space-y-3">
           <div>
             <span className="text-muted-foreground block text-xs tracking-wide uppercase">
-              Webhook URL
+              {t("webhookUrl")}
             </span>
             <div className="mt-1 flex items-center gap-2">
               <code className="bg-muted text-2xs flex-1 rounded px-2 py-1 font-mono break-all">
                 {fullUrl}
               </code>
-              <Button size="sm" variant="outline" onClick={() => copy(fullUrl, "URL")}>
-                Copy URL
+              <Button size="sm" variant="outline" onClick={() => copy(fullUrl, t("urlCopied"))}>
+                {t("copyUrl")}
               </Button>
             </div>
           </div>
           <div>
             <span className="text-muted-foreground block text-xs tracking-wide uppercase">
-              Secret
+              {t("secret")}
             </span>
             <div className="mt-1 flex items-center gap-2">
               <code className="bg-muted text-2xs flex-1 rounded px-2 py-1 font-mono break-all">
@@ -767,21 +758,18 @@ export function WebhookSecretReveal({
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => copy(reveal.plaintextSecret, "Secret")}
+                onClick={() => copy(reveal.plaintextSecret, t("secretCopied"))}
               >
-                Copy secret
+                {t("copySecret")}
               </Button>
             </div>
           </div>
           <p className="text-muted-foreground text-xs">
-            GitHub: <code>Settings → Webhooks → Add webhook</code>. Set
-            <code> Content type: application/json</code>, paste the URL + secret, choose{" "}
-            <code>Just the push event</code>. GitLab: <code>Settings → Webhooks</code>, paste both,
-            tick <code>Push events</code>.
+            {t.rich("help", { code: (chunks) => <code>{chunks}</code> })}
           </p>
         </div>
         <DialogFooter>
-          <Button onClick={onClose}>Done</Button>
+          <Button onClick={onClose}>{t("done")}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -789,23 +777,24 @@ export function WebhookSecretReveal({
 }
 
 function PublicKeyCell({ value }: { value: string }) {
+  const t = useTranslations("sourceProviders.keys");
   const [copied, setCopied] = React.useState(false);
   const onCopy = React.useCallback(async () => {
     try {
       await navigator.clipboard.writeText(value);
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
-      toast.success("Public key copied");
+      toast.success(t("publicKeyCopied"));
     } catch {
-      toast.error("Couldn't copy — paste manually below");
+      toast.error(t("copyFailedPaste"));
     }
-  }, [value]);
+  }, [t, value]);
   const truncated = value.length > 60 ? `${value.slice(0, 60)}…` : value;
   return (
     <div className="flex items-center gap-2">
       <code className="text-2xs font-mono">{truncated}</code>
       <Button size="sm" variant="ghost" onClick={onCopy}>
-        {copied ? "copied" : "copy"}
+        {copied ? t("copied") : t("copy")}
       </Button>
     </div>
   );

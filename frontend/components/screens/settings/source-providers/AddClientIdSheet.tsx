@@ -1,6 +1,7 @@
 "use client";
 
 import { GithubIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,8 @@ function looksLikeClientId(value: string): boolean {
  * GitHub" button re-appears.
  */
 export function AddClientIdSheet({ connection, onClose, saving, save }: AddClientIdSheetProps) {
+  const t = useTranslations("sourceProviders.clientId");
+  const tConnect = useTranslations("sourceProviders.connect");
   const [clientId, setClientId] = React.useState("");
 
   React.useEffect(() => {
@@ -70,15 +73,10 @@ export function AddClientIdSheet({ connection, onClose, saving, save }: AddClien
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <GithubIcon className="size-4" />
-            Add an OAuth Client ID
+            {t("title")}
           </SheetTitle>
           <SheetDescription>
-            Optional — nothing here is broken. Cloning, autowiring and deploys already run on this
-            connection&apos;s App installation token. Adding the GitHub App&apos;s OAuth Client ID
-            additionally enables the user-to-server &quot;Connect my GitHub&quot; flow, letting
-            people browse their own repositories. The Client ID is distinct from the numeric App ID
-            — find it on your GitHub App settings page (looks like <code>Iv23l…</code> for new
-            GitHub Apps).
+            {t.rich("description", { code: (chunks) => <code>{chunks}</code> })}
           </SheetDescription>
         </SheetHeader>
 
@@ -87,11 +85,11 @@ export function AddClientIdSheet({ connection, onClose, saving, save }: AddClien
             <DefinitionList
               className="text-xs"
               items={[
-                { term: "Connection", description: connection.name },
+                { term: t("connection"), description: connection.name },
                 ...(connection.accountLogin
                   ? [
                       {
-                        term: "Account",
+                        term: t("account"),
                         description: <code className="font-mono">{connection.accountLogin}</code>,
                       },
                     ]
@@ -99,7 +97,7 @@ export function AddClientIdSheet({ connection, onClose, saving, save }: AddClien
                 ...(connection.oauthClientId
                   ? [
                       {
-                        term: "App ID (existing)",
+                        term: t("existingAppId"),
                         description: <code className="font-mono">{connection.oauthClientId}</code>,
                       },
                     ]
@@ -109,7 +107,7 @@ export function AddClientIdSheet({ connection, onClose, saving, save }: AddClien
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="client-id-input">GitHub App Client ID</Label>
+            <Label htmlFor="client-id-input">{t("label")}</Label>
             <Input
               id="client-id-input"
               value={clientId}
@@ -121,31 +119,33 @@ export function AddClientIdSheet({ connection, onClose, saving, save }: AddClien
               required
             />
             <p className="text-muted-foreground text-xs">
-              <a
-                href="https://github.com/settings/apps"
-                target="_blank"
-                rel="noreferrer noopener"
-                className="underline"
-              >
-                Open GitHub App settings →
-              </a>{" "}
-              The Client ID is shown in the <em>About</em> section of your App page, separately from
-              the numeric App ID.
+              {t.rich("help", {
+                link: (chunks) => (
+                  <a
+                    href="https://github.com/settings/apps"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="underline"
+                  >
+                    {chunks}
+                  </a>
+                ),
+                em: (chunks) => <em>{chunks}</em>,
+              })}
             </p>
             {value !== "" && !looksOk && (
               <p className="text-destructive text-xs">
-                Doesn&apos;t look like a GitHub App Client ID — expected <code>Iv…</code> or a
-                20-char hex string.
+                {tConnect.rich("appClientIdInvalid", { code: (chunks) => <code>{chunks}</code> })}
               </p>
             )}
           </div>
 
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button type="submit" disabled={!canSubmit}>
-              {saving ? "Saving…" : "Save Client ID"}
+              {saving ? t("saving") : t("save")}
             </Button>
           </SheetFooter>
         </form>

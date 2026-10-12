@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type { ConnectSourceInput } from "@/graphql/__generated__/schema";
@@ -18,6 +19,7 @@ interface MutationResp {
  * half of ConnectGitLabDialogView; the view owns the form.
  */
 export function useConnectGitLab() {
+  const t = useTranslations("sourceProviders.toasts");
   const callbackUrl =
     typeof window !== "undefined"
       ? `${window.location.origin}/app/auth1/scm/gitlab/callback`
@@ -32,10 +34,10 @@ export function useConnectGitLab() {
   async function copyCallback(): Promise<boolean> {
     try {
       await navigator.clipboard.writeText(callbackUrl);
-      toast.success("Callback URL copied");
+      toast.success(t("callbackCopied"));
       return true;
     } catch {
-      toast.error("Couldn't copy — select the text and copy manually");
+      toast.error(t("copyFailed"));
       return false;
     }
   }
@@ -44,12 +46,10 @@ export function useConnectGitLab() {
   async function onConnect(input: Omit<ConnectSourceInput, "appClientId">): Promise<boolean> {
     const { data } = await connect({ variables: { input } });
     if (data?.connectSource.ok) {
-      toast.success(
-        `Connected ${data.connectSource.data?.name ?? "GitLab"} — use "Connect my GitLab" to sign in.`
-      );
+      toast.success(t("gitlabConnected", { name: data.connectSource.data?.name ?? "GitLab" }));
       return true;
     }
-    toast.error(data?.connectSource.errors?.[0]?.message ?? "Connect failed");
+    toast.error(data?.connectSource.errors?.[0]?.message ?? t("connectFailed"));
     return false;
   }
 

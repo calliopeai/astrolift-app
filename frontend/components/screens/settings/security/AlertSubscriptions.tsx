@@ -1,6 +1,7 @@
 "use client";
 
 import { BellRingIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -35,12 +36,13 @@ export function AlertSubscriptionsView({
   onSubscribeAll,
   onUnsubscribeAll,
 }: AlertSubscriptionsViewProps) {
+  const t = useTranslations("notificationSettings.alerts");
   const [unsubscribeTarget, setUnsubscribeTarget] = React.useState<string | null>(null);
 
   const columns: Column<AstroliftRegisteredApp>[] = [
     {
       id: "app",
-      header: "App",
+      header: t("app"),
       width: "min-w-40",
       cellClassName: "max-w-64",
       cell: (a) => (
@@ -57,7 +59,7 @@ export function AlertSubscriptionsView({
     ...ALERT_KINDS.map(
       (k): Column<AstroliftRegisteredApp> => ({
         id: k.value,
-        header: k.label,
+        header: t(`kinds.${k.value}`),
         align: "center",
         headClassName: "text-xs",
         cell: (a) => {
@@ -71,7 +73,7 @@ export function AlertSubscriptionsView({
                 onChange={async (e) => {
                   await onToggle(a.slug, k.value, e.target.checked);
                 }}
-                aria-label={`${k.label} for ${a.slug}`}
+                aria-label={t("toggleLabel", { kind: t(`kinds.${k.value}`), app: a.slug })}
                 className="size-4"
               />
             </label>
@@ -81,7 +83,7 @@ export function AlertSubscriptionsView({
     ),
     {
       id: "bulk",
-      header: "Bulk",
+      header: t("bulk"),
       align: "right",
       width: "w-40",
       cell: (a) => {
@@ -98,7 +100,7 @@ export function AlertSubscriptionsView({
             }}
             disabled={busy}
           >
-            {allOn ? "Unsubscribe all" : "Subscribe all"}
+            {allOn ? t("unsubscribeAll") : t("subscribeAll")}
           </Button>
         );
       },
@@ -109,15 +111,15 @@ export function AlertSubscriptionsView({
     <Section
       title={
         <span className="flex items-center gap-2">
-          <BellRingIcon className="size-4" /> App alert subscriptions
+          <BellRingIcon className="size-4" /> {t("title")}
         </span>
       }
-      description="Choose which apps and event types to receive alerts for."
+      description={t("description")}
     >
       <ListPage<AstroliftRegisteredApp>
         embedded
         list={list}
-        label="App alert subscriptions"
+        label={t("title")}
         columns={columns}
         rows={rows}
         getRowId={(a) => a.id}
@@ -128,18 +130,16 @@ export function AlertSubscriptionsView({
         nextCursor={nextCursor}
         empty={{
           icon: <BellRingIcon className="size-5" />,
-          title: "No apps registered",
-          description: "Register an app to start configuring alerts for it.",
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
         }}
       />
 
       <div className="text-muted-foreground flex items-center gap-2 text-xs">
         <Badge variant="outline" className="text-2xs">
-          In-app channel
+          {t("inAppChannel")}
         </Badge>
-        <span>
-          Email/Slack channels surface here once the user-channel preferences are configured.
-        </span>
+        <span>{t("otherChannels")}</span>
       </div>
 
       <ConfirmDialog
@@ -149,11 +149,11 @@ export function AlertSubscriptionsView({
         }}
         title={
           unsubscribeTarget
-            ? `Unsubscribe from every alert on ${unsubscribeTarget}?`
-            : "Unsubscribe from every alert?"
+            ? t("unsubscribeTitle", { app: unsubscribeTarget })
+            : t("unsubscribeTitleGeneric")
         }
-        description={`Clears all ${ALERT_KINDS.length} alert kinds for this app on the in-app channel. You stop hearing about failed deploys and error spikes until you subscribe again.`}
-        confirmLabel="Unsubscribe all"
+        description={t("unsubscribeDescription", { count: ALERT_KINDS.length })}
+        confirmLabel={t("unsubscribeAll")}
         destructive
         onConfirm={async () => {
           if (unsubscribeTarget) await onUnsubscribeAll(unsubscribeTarget);

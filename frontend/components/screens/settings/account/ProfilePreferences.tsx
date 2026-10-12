@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
@@ -27,16 +28,15 @@ export function ProfilePreferences({
   localeSwitch: React.ComponentProps<typeof LanguageSwitcher>;
   timezone: ReturnType<typeof useProfileTimezone>;
 }) {
+  const t = useTranslations("profileSettings.language");
   // Theme moved to Settings → Appearance (the full style page); this
   // page keeps the profile-scoped cards only.
   return (
     <div className="grid gap-4 md:grid-cols-2">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Language</CardTitle>
-          <CardDescription>
-            Surface language. Falls back to en when a translation is missing.
-          </CardDescription>
+          <CardTitle className="text-base">{t("title")}</CardTitle>
+          <CardDescription>{t("description")}</CardDescription>
         </CardHeader>
         <CardContent>
           <LanguageSwitcher {...localeSwitch} />
@@ -60,6 +60,7 @@ function TimezoneCard({
   saving,
   save,
 }: ReturnType<typeof useProfileTimezone>) {
+  const t = useTranslations("profileSettings.timezone");
   // Local picker state: initialised from server value, falls back to
   // browser-detected zone as the visible default (but we store empty
   // string to clear, not the browser zone itself).
@@ -80,28 +81,27 @@ function TimezoneCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Timezone</CardTitle>
+        <CardTitle className="text-base">{t("title")}</CardTitle>
         <CardDescription>
-          Override the browser-detected timezone for all timestamps in the dashboard. Leave blank to
-          use the zone your browser reports (<span className="text-2xs font-mono">{browserTz}</span>
-          ).
+          {t.rich("description", {
+            tz: browserTz,
+            mono: (chunks) => <span className="text-2xs font-mono">{chunks}</span>,
+          })}
         </CardDescription>
       </CardHeader>
       <CardContent className="max-w-sm space-y-3">
         <div className="space-y-2">
-          <Label htmlFor="timezone">Timezone</Label>
+          <Label htmlFor="timezone">{t("label")}</Label>
           <Select
             value={picked || NO_TZ_OVERRIDE}
             onValueChange={(v) => setPicked(v === NO_TZ_OVERRIDE ? "" : v)}
           >
             <SelectTrigger id="timezone">
-              <SelectValue placeholder={`${browserTz} (browser-detected)`} />
+              <SelectValue placeholder={t("placeholder", { tz: browserTz })} />
             </SelectTrigger>
             <SelectContent className="max-h-72">
               <SelectItem value={NO_TZ_OVERRIDE}>
-                <span className="text-muted-foreground">
-                  {browserTz} (browser-detected, no override)
-                </span>
+                <span className="text-muted-foreground">{t("noOverride", { tz: browserTz })}</span>
               </SelectItem>
               {timezones.map((tz) => (
                 <SelectItem key={tz} value={tz}>
@@ -112,7 +112,7 @@ function TimezoneCard({
           </Select>
         </div>
         <Button size="sm" disabled={!dirty || saving} onClick={onSave}>
-          {saving ? "Saving…" : "Save"}
+          {saving ? t("saving") : t("save")}
         </Button>
       </CardContent>
     </Card>

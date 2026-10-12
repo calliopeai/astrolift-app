@@ -3556,6 +3556,682 @@
       }
     }
   },
+  "sourceProviders": {
+    "title": "ソースプロバイダー",
+    "description": "Astrolift をコードホスティングサービスに接続すると、リポジトリのクローンとプッシュの監視ができるようになります。組織全体のアクセスには OAuth App / GitHub App、セルフホストの GitLab や Gitea には PAT、任意のホストへの直接の git アクセスには SSH デプロイキーを使用します。",
+    "hostsTitle": "ホスト",
+    "keysTitle": "SSH デプロイキー",
+    "kind": {
+      "github_oauth_app": "GitHub OAuth App",
+      "github_oauth_user": "GitHub (OAuth ユーザートークン)",
+      "github_app_install": "GitHub App インストール",
+      "github_pat": "GitHub PAT",
+      "gitlab_oauth_app": "GitLab OAuth App",
+      "gitlab_oauth_user": "GitLab (OAuth ユーザートークン)",
+      "gitlab_pat": "GitLab PAT",
+      "bitbucket_oauth_app": "Bitbucket OAuth App",
+      "bitbucket_oauth_user": "Bitbucket (OAuth ユーザートークン)",
+      "bitbucket_pat": "Bitbucket PAT",
+      "gitea_oauth_app": "Gitea OAuth App",
+      "gitea_oauth_user": "Gitea (OAuth ユーザートークン)",
+      "gitea_pat": "Gitea PAT"
+    },
+    "scope": {
+      "private_org": "組織のプライベートリポジトリ",
+      "public_org": "組織のパブリックリポジトリ",
+      "user_repos": "ユーザーリポジトリ",
+      "public_non_org": "組織外のパブリックリポジトリ"
+    },
+    "hosts": {
+      "regionLabel": "ソース接続",
+      "description": "マニフェストフローによるワンクリックの GitHub App 登録、またはガイド付きの GitLab グループ OAuth ウィザードを使えます。Personal Access Token と登録済みの OAuth App は<em>詳細設定</em>から引き続き利用できます。",
+      "setupGuide": "セットアップガイド",
+      "connectGithub": "GitHub に接続",
+      "connectGitlab": "GitLab に接続",
+      "walkthrough": "ワンクリックの GitHub フロー + GitLab ウィザード: 詳しい手順",
+      "downloadLogo": "新しい App 用の Astrolift ロゴをダウンロード",
+      "optionalTitle": "任意: 「自分の GitHub を接続」によるリポジトリ閲覧を有効にする",
+      "optionalBody": "{count, plural, other {この # 件の GitHub App 接続}}はすぐに使用できます。クローン、自動連携、デプロイは App のインストールトークンで実行されます。OAuth クライアント ID の追加は任意です。追加すると、ユーザーが自分のリポジトリを閲覧できる user-to-server の「自分の GitHub を接続」フローが有効になります。新しい GitHub App のクライアント ID は <code>Iv23l…</code> のような形式です。",
+      "addClientIdFor": "{name} のクライアント ID を追加",
+      "listLabel": "接続",
+      "emptyTitle": "接続済みのホストはまだありません",
+      "emptyDescription": "「GitHub に接続」をクリックすると、client_id やシークレットを貼り付けることなく、github.com に Astrolift GitHub App を一度で登録できます。GitLab では、コピーしやすいコールバック URL を使ってグループ OAuth アプリケーションを作成する手順をウィザードが案内します。",
+      "advancedToggle": "詳細設定: Personal Access Token または登録済みの OAuth App を貼り付け",
+      "pasteCredentials": "認証情報を貼り付け…",
+      "pasteHint": "登録済みの OAuth App がある場合や、PAT で接続する場合に使用します。",
+      "columns": {
+        "connection": "接続",
+        "kind": "種類",
+        "account": "アカウント",
+        "scopes": "スコープ",
+        "status": "ステータス"
+      },
+      "oauthAppConfig": "OAuth App 設定",
+      "personal": "個人",
+      "noScopeRestriction": "(スコープ制限なし)",
+      "active": "有効",
+      "disabled": "無効",
+      "addClientId": "クライアント ID を追加",
+      "connectMyGithub": "自分の GitHub を接続",
+      "connectMyGitlab": "自分の GitLab を接続",
+      "webhookSecret": "Webhook シークレット",
+      "disconnect": "切断",
+      "disconnectTitle": "{name} を切断しますか?",
+      "disconnectTitleGeneric": "切断しますか?",
+      "disconnectDescription": "この接続を使用しているアプリは、再接続するまでアクセスできなくなります。古いシークレットで署名された Webhook は、連携を再設定するまで失敗します。",
+      "rotateTitle": "{name} の Webhook シークレットを更新しますか?",
+      "rotateTitleGeneric": "Webhook シークレットを更新しますか?",
+      "rotateDescription": "新しいシークレットを生成し、一度だけ表示します。古いシークレットで署名された Webhook の配信はすぐに失敗し始めます。プッシュが発生する前に新しい値を SCM ホストの Webhook 設定に貼り付けてください。そうしないと、デプロイトリガーが 401 で拒否される時間が短時間発生します。",
+      "rotateConfirm": "シークレットを更新"
+    },
+    "keys": {
+      "description": "SSH 経由で直接 git アクセスするための ed25519 キーペアです。公開鍵はリポジトリのデプロイキー設定に貼り付けられるよう表示されます。秘密鍵はプラットフォームのシークレットバックエンドに暗号化されたまま保存されます。",
+      "generate": "キーを生成",
+      "columns": {
+        "name": "名前",
+        "scope": "スコープ",
+        "fingerprint": "フィンガープリント",
+        "publicKey": "公開鍵"
+      },
+      "appScope": "アプリ: {slug}",
+      "orgScoped": "組織スコープ",
+      "delete": "削除",
+      "emptyTitle": "SSH デプロイキーはまだありません",
+      "emptyDescription": "キーを生成すると、Astrolift が SSH でクローンできるようになります。組織スコープのキーはすべてのアプリに適用され、アプリ単位のキーは影響範囲をより狭く抑えます。",
+      "deleteTitle": "SSH キー {name} を削除しますか?",
+      "deleteTitleGeneric": "SSH キーを削除しますか?",
+      "deleteDescription": "先に、各リポジトリのデプロイキー一覧から対応する公開鍵を削除してください。削除しないと git 操作が突然失敗します。秘密鍵はシークレットバックエンドから消去されます。",
+      "deleteConfirm": "キーを削除",
+      "publicKeyCopied": "公開鍵をコピーしました",
+      "copyFailedPaste": "コピーできませんでした。下で手動で貼り付けてください。",
+      "copy": "コピー",
+      "copied": "コピー済み"
+    },
+    "reveal": {
+      "title": "Webhook シークレットを生成しました",
+      "description": "これらを<strong>今すぐ</strong> SCM ホストの Webhook 設定に貼り付けてください。平文のシークレットは一度だけ表示され、その後は暗号化して保存されます。",
+      "webhookUrl": "Webhook URL",
+      "copyUrl": "URL をコピー",
+      "urlCopied": "URL をコピーしました",
+      "secret": "シークレット",
+      "copySecret": "シークレットをコピー",
+      "secretCopied": "シークレットをコピーしました",
+      "copyFailed": "コピーできませんでした。テキストを選択して手動でコピーしてください。",
+      "help": "GitHub: <code>Settings → Webhooks → Add webhook</code>。<code>Content type: application/json</code> を設定し、URL とシークレットを貼り付けて <code>Just the push event</code> を選択します。GitLab: <code>Settings → Webhooks</code> で両方を貼り付け、<code>Push events</code> にチェックを入れます。",
+      "done": "完了"
+    },
+    "connect": {
+      "title": "ソースホストを接続",
+      "description": "トークンと OAuth クライアントシークレットは、プラットフォームのシークレットバックエンドで暗号化して保存されます (既定: <code>SECRET_KEY</code> から派生したローカル Fernet。インストールごとに AWS Secrets Manager / GCP Secret Manager / Azure Key Vault に切り替え可能)。<guide>ソースプロバイダーのセットアップガイド</guide>。",
+      "kind": "種類",
+      "kinds": {
+        "github_oauth_app": {
+          "label": "GitHub OAuth App 設定",
+          "hint": "オペレーターが登録した OAuth App です。client_id と client_secret を保持します。ユーザーごとのトークンは OAuth フロー後に個別の接続として保存されます (フェーズ 2)。"
+        },
+        "github_app_install": {
+          "label": "GitHub App インストール",
+          "hint": "組織ごとの App インストールです。シークレットには App の秘密鍵 PEM を保持し、デプロイ時にインストールごとのトークンを発行します。"
+        },
+        "github_pat": {
+          "label": "GitHub PAT",
+          "hint": "Personal Access Token (fine-grained またはクラシック) を貼り付けます。最も簡単な方法で、発行したユーザーに紐づきます。"
+        },
+        "gitlab_oauth_app": {
+          "label": "GitLab OAuth App 設定",
+          "hint": "GitLab OAuth アプリケーションです。SaaS の gitlab.com またはセルフホスト (api_base_url を設定)。"
+        },
+        "gitlab_pat": {
+          "label": "GitLab PAT",
+          "hint": "GitLab の個人またはプロジェクトのアクセストークンです。セルフホストの場合は api_base_url を設定します。"
+        },
+        "bitbucket_oauth_app": {
+          "label": "Bitbucket OAuth コンシューマー",
+          "hint": "Bitbucket OAuth 2.0 コンシューマーです。"
+        },
+        "bitbucket_pat": {
+          "label": "Bitbucket アプリパスワード",
+          "hint": "Bitbucket アプリパスワード (ワークスペース単位)。"
+        },
+        "gitea_oauth_app": {
+          "label": "Gitea OAuth App",
+          "hint": "セルフホストの Gitea インスタンスです。"
+        },
+        "gitea_pat": {
+          "label": "Gitea トークン",
+          "hint": "セルフホスト Gitea の API トークンです。"
+        }
+      },
+      "scopes": {
+        "private_org": "接続した組織のプライベートリポジトリ",
+        "public_org": "接続した組織のパブリックリポジトリ",
+        "user_repos": "ユーザーリポジトリ",
+        "public_non_org": "組織外のパブリックリポジトリ"
+      },
+      "displayName": "表示名 (任意)",
+      "displayNamePlaceholder": "例: 本番 GitHub、Acme corp GitLab",
+      "account": "アカウント / 組織のログイン名",
+      "accountPlaceholder": "acme-org または alice",
+      "installationId": "インストール ID",
+      "apiBaseUrl": "API ベース URL (セルフホスト)",
+      "githubAppId": "GitHub App ID (数値、Webhook ペイロードの照合用)",
+      "oauthClientId": "OAuth クライアント ID",
+      "githubAppIdHelp": "GitHub の App 設定ページに表示される数値の App ID です。Webhook ペイロードからの App 照合に使用します。user-to-server の OAuth クライアント ID は別の項目です (下記)。",
+      "redirectUri": "OAuth リダイレクト URI",
+      "redirectUriHelp": "ホスト側 ({host}) の OAuth アプリケーションに登録したリダイレクト URI と一致する必要があります。",
+      "appClientId": "GitHub App クライアント ID",
+      "appClientIdHelp": "GitHub App の設定ページで確認できます。新しい GitHub App では <code>Iv23l...</code> のような形式、従来の OAuth App では 20 文字の 16 進文字列です。<link>GitHub App の設定を開く →</link>",
+      "appClientIdInvalid": "GitHub App クライアント ID の形式ではありません。<code>Iv…</code> または 20 文字の 16 進文字列を入力してください。",
+      "secretOauth": "OAuth クライアントシークレット",
+      "secretPem": "GitHub App の秘密鍵 PEM",
+      "secretToken": "Personal Access Token / アプリパスワード",
+      "secretHelp": "暗号化して保存され、ログには記録されません。後でこの接続を編集して更新できます。",
+      "visibility": "リポジトリの公開範囲スコープ",
+      "visibilityHelp": "一覧クエリが {host} API を呼び出す際に、この接続で表示できるリポジトリを制限します。未選択の場合はスコープ制限なしです。",
+      "cancel": "キャンセル",
+      "connecting": "接続中…",
+      "connect": "接続"
+    },
+    "github": {
+      "titleByo": "既存の GitHub App を接続",
+      "title": "GitHub に接続",
+      "descriptionByo": "作成済みの GitHub App を取り込みます。App ID と秘密鍵を貼り付けてください。Astrolift は保存前に GitHub で認証情報を検証します。",
+      "description": "ワンクリックでアカウントに新しい App を作成するか、作成済みの App を接続します。",
+      "createTitle": "新しい GitHub App を作成",
+      "createBody": "推奨。Astrolift が GitHub にプライベート App の登録を依頼するため、client_id / シークレット / PEM を貼り付ける必要はありません。GitHub が先に名前と権限を表示します。",
+      "byoTitle": "既存の GitHub App を接続",
+      "byoBody": "GitHub で作成済みの独自の App を使用します。App ID と秘密鍵 PEM を貼り付けてください。GitHub Enterprise や複数のツールで共有する App に適しています。",
+      "orgLabel": "App をどこに作成しますか?",
+      "orgPlaceholder": "acme-corp (個人アカウントの場合は空欄)",
+      "orgHelp": "GitHub 組織のスラッグです。個人アカウントにインストールする場合は空欄にします。気が変わったら次の画面でインストール先を切り替えられます。",
+      "orgInvalid": "GitHub 組織のスラッグは英数字とハイフンで、最大 39 文字です。",
+      "permsTitle": "Astrolift が要求する権限",
+      "perms": {
+        "contents": "リポジトリをクローン",
+        "metadata": "リポジトリのメタデータを読み取り",
+        "pullRequests": "PR にデプロイ / プレビューのコメントを投稿",
+        "checks": "デプロイのコミットステータスを書き込み"
+      },
+      "permsFooter": "加えて push と pull_request の Webhook。後で GitHub 上の App を編集して範囲を広げられます。",
+      "back": "← 戻る",
+      "continue": "GitHub で続行 →",
+      "appId": "App ID",
+      "appIdHelp": "GitHub App の設定ページにある数値の App ID です (クライアント ID ではありません)。",
+      "appIdInvalid": "App ID は数値の ID です (例: 3705068)。",
+      "pem": "秘密鍵 (PEM)",
+      "pemHelp": "GitHub App のページで秘密鍵を生成し、<code>.pem</code> 全体をここに貼り付けてください。暗号化して保存され、再表示されることはありません。",
+      "clientId": "クライアント ID",
+      "optional": "(任意)",
+      "clientIdHelp": "user-to-server の「自分の GitHub を接続」フローにのみ必要です。",
+      "clientSecret": "クライアントシークレット",
+      "webhookSecret": "Webhook シークレット",
+      "orgLogin": "GitHub の組織 / ユーザーのログイン名",
+      "orgLoginHelp": "App が複数のアカウントにインストールされている場合にのみ必要です。Astrolift はこれを使って正しいインストールを選択します。",
+      "apiBaseUrl": "API ベース URL",
+      "apiBaseUrlHelp": "GitHub Enterprise Server 用です。github.com の場合は空欄にします。",
+      "verifying": "検証中…",
+      "connectApp": "App を接続"
+    },
+    "gitlab": {
+      "title": "GitLab に接続",
+      "description": "GitLab は GitHub のようなワンクリックの App 登録に対応していないため、グループ OAuth アプリケーションを手動で作成する手順を案内します。ステップ 1: GitLab のグループとインスタンスを入力します。ステップ 2: GitLab へのリンクを開き、生成されたコールバック URL を貼り付けます。ステップ 3: 発行された Application ID と Secret をここに貼り付けます。",
+      "step1": "GitLab はどこにありますか?",
+      "group": "GitLab グループ (任意)",
+      "groupPlaceholder": "acme-corp (ユーザーレベルの App を使う場合は空欄)",
+      "groupHelp": "グループの OAuth App はグループ全員で共有され、ユーザーレベルの App は 1 人のユーザーに紐づきます。",
+      "instance": "GitLab インスタンス URL (セルフホスト)",
+      "instancePlaceholder": "https://gitlab.acme.example (SaaS の gitlab.com の場合は空欄)",
+      "step2": "GitLab でアプリケーションを作成",
+      "openApps": "GitLab のアプリケーションを開く",
+      "callbackLabel": "このコールバック URL を GitLab に貼り付け",
+      "copied": "コピー済み",
+      "copy": "コピー",
+      "scopes": "必要な GitLab スコープ: <code>read_api</code>、<code>read_repository</code>、<code>read_user</code>。<em>Confidential</em> はオンのままにしてください。",
+      "step3": "結果をここに貼り付け",
+      "applicationId": "Application ID",
+      "secret": "Secret",
+      "secretHelp": "暗号化して保存されます。GitLab は Secret を一度しか表示しないため、ページを離れる前にコピーしてください。",
+      "cancel": "キャンセル",
+      "connecting": "接続中…",
+      "save": "保存して接続"
+    },
+    "generateKey": {
+      "title": "SSH デプロイキーを生成",
+      "description": "ed25519 キーペアです。公開鍵はリポジトリのデプロイキー設定に貼り付けられるよう表示されます。秘密鍵はプラットフォームのシークレットバックエンドに暗号化されたまま保存され、表示されることはありません。",
+      "fingerprint": "フィンガープリント",
+      "publicKey": "公開鍵 (リポジトリのデプロイキーに貼り付け)",
+      "copyPublicKey": "公開鍵をコピー",
+      "copied": "公開鍵をコピーしました",
+      "copyFailed": "コピーできませんでした。テキストを選択して手動でコピーしてください。",
+      "help": "GitHub: <code>Settings → Deploy keys → Add deploy key</code>。「Allow write access」は Astrolift がプッシュする必要がある場合 (タグベースのリリースなど) にのみチェックします。GitLab: <code>Settings → Repository → Deploy Keys</code>。",
+      "done": "完了",
+      "name": "名前",
+      "appSlug": "アプリのスラッグ (任意)",
+      "appSlugPlaceholder": "組織スコープのキーにする場合は空欄",
+      "appSlugHelp": "空欄にすると組織スコープのキー (すべてのアプリで再利用可能) になります。アプリのスラッグを指定するとアプリ単位のキーになり、1 つのリポジトリが侵害されたときの影響範囲を狭められます。",
+      "cancel": "キャンセル",
+      "generating": "生成中…",
+      "generate": "生成"
+    },
+    "clientId": {
+      "title": "OAuth クライアント ID を追加",
+      "description": "任意の設定で、不具合はありません。クローン、自動連携、デプロイはこの接続の App インストールトークンですでに動作しています。GitHub App の OAuth クライアント ID を追加すると、user-to-server の「自分の GitHub を接続」フローも有効になり、ユーザーが自分のリポジトリを閲覧できます。クライアント ID は数値の App ID とは別のもので、GitHub App の設定ページで確認できます (新しい GitHub App では <code>Iv23l…</code> のような形式)。",
+      "connection": "接続",
+      "account": "アカウント",
+      "existingAppId": "App ID (既存)",
+      "label": "GitHub App クライアント ID",
+      "help": "<link>GitHub App の設定を開く →</link> クライアント ID は App ページの <em>About</em> セクションに、数値の App ID とは別に表示されています。",
+      "cancel": "キャンセル",
+      "saving": "保存中…",
+      "save": "クライアント ID を保存"
+    },
+    "toasts": {
+      "rotationFailed": "更新に失敗しました",
+      "disconnected": "{name} を切断しました",
+      "disconnectFailed": "切断に失敗しました",
+      "keyDeleted": "{name} を削除しました",
+      "deleteFailed": "削除に失敗しました",
+      "clientIdSaved": "{name} のクライアント ID を保存しました",
+      "saveFailed": "保存に失敗しました",
+      "keyGenerated": "キーを生成しました。公開鍵をリポジトリにコピーしてください",
+      "generationFailed": "生成に失敗しました",
+      "connected": "{name} を接続しました",
+      "connectFailed": "接続に失敗しました",
+      "githubConnected": "GitHub App を接続しました: {name}",
+      "githubConnectFailed": "GitHub App を接続できませんでした",
+      "callbackCopied": "コールバック URL をコピーしました",
+      "copyFailed": "コピーできませんでした。テキストを選択して手動でコピーしてください。",
+      "gitlabConnected": "{name} を接続しました。「自分の GitLab を接続」からサインインしてください。"
+    }
+  },
+  "identityProviders": {
+    "kinds": {
+      "oidc": "汎用 OIDC",
+      "saml": "SAML 2.0",
+      "cognito": "Amazon Cognito",
+      "auth0": "Auth0",
+      "okta": "Okta",
+      "azure_ad": "Azure AD / Entra ID",
+      "google": "Google Workspace",
+      "github": "GitHub OAuth",
+      "local": "ローカルアカウント"
+    },
+    "hints": {
+      "oidc": "ディスカバリー URL + client_id + client_secret_ref",
+      "cognito": "ユーザープール + リージョン + OIDC 項目",
+      "auth0": "テナント URL + client_id + client_secret_ref",
+      "okta": "ディスカバリー URL + client_id + client_secret_ref",
+      "azure_ad": "ディスカバリー URL + client_id + client_secret_ref",
+      "google": "ディスカバリー URL + client_id",
+      "github": "OAuth App の client_id + client_secret_ref",
+      "saml": "メタデータ URL または XML アップロード",
+      "local": "ユーザー名 + パスワード (Django 認証、開発用/フォールバック)"
+    },
+    "create": {
+      "title": "新しい ID プロバイダー",
+      "description": "ユーザーのサインイン方法を設定します。複数のプロバイダーを共存させられますが、有効なのは一度に 1 つです。シークレットはプラットフォームのシークレットバックエンドへの参照として保存され、このレコードに平文で保存されることはありません。",
+      "kind": "種類",
+      "displayName": "表示名 (任意)",
+      "displayNamePlaceholder": "例: Auth0 本番、Cognito ステージング",
+      "displayNameHelp": "ログイン画面と監査ログに表示されます。空欄の場合は種類の名前が使われます。",
+      "discovery": "OIDC ディスカバリー URL",
+      "clientId": "クライアント ID",
+      "secretRef": "シークレット参照",
+      "secretRefHelp": "プラットフォームのシークレットバックエンド内のパスです。値がこのレコードに保存されることはありません。",
+      "metadataUrl": "SAML メタデータ URL",
+      "config": "種類別の設定 (JSON)",
+      "invalidJson": "無効な JSON",
+      "cognitoKeys": "Cognito に必要なキー: <code>user_pool_id</code>、<code>region</code>。",
+      "setActive": "組織の有効なプロバイダーにする",
+      "cancel": "キャンセル",
+      "saving": "保存中…",
+      "save": "プロバイダーを保存"
+    },
+    "list": {
+      "title": "ID プロバイダー",
+      "description": "組織に設定されたサインイン方法です。Auth0、汎用 OIDC、Cognito、Okta、Azure AD、Google、GitHub、SAML、ローカルアカウントに対応し、有効なのは常に 1 つだけです。",
+      "learnMore": "詳細",
+      "newProvider": "新しいプロバイダー",
+      "columns": {
+        "provider": "プロバイダー",
+        "kind": "種類",
+        "endpoint": "エンドポイント",
+        "status": "ステータス"
+      },
+      "client": "クライアント {id}",
+      "active": "有効",
+      "configured": "設定済み",
+      "activeSince": "{date} から有効",
+      "by": "{name} による変更",
+      "makeActive": "有効にする",
+      "delete": "削除",
+      "emptyTitle": "ID プロバイダーが設定されていません",
+      "emptyDescription": "ユーザーがサインインできるよう、少なくとも 1 つのプロバイダーを設定してください。ローカルアカウントは初回起動に便利で、本番環境では通常 OIDC か Cognito を連携します。",
+      "switchTitle": "有効なプロバイダーを {name} に切り替えますか?",
+      "switchTitleGeneric": "有効なプロバイダーを切り替えますか?",
+      "switchDescription": "サインイン済みのユーザーはセッションを維持します。次回のサインインから新しいプロバイダーを経由します。古いプロバイダーにしか存在しないユーザーは、ここでプロビジョニングされるまでログインできません。",
+      "switchConfirm": "プロバイダーを切り替え",
+      "deleteTitle": "{name} を削除しますか?",
+      "deleteTitleGeneric": "ID プロバイダーを削除しますか?",
+      "deleteDescription": "IdP のレコードを論理削除します。このプロバイダーにしか ID がないユーザーはサインインできなくなります。引き続きアクセスが必要な場合は、先に有効なプロバイダーでプロビジョニングしてください。",
+      "deleteConfirm": "プロバイダーを削除"
+    },
+    "toasts": {
+      "configured": "{name} を設定しました",
+      "failed": "失敗しました",
+      "activeProvider": "有効なプロバイダー: {name}",
+      "deleted": "{name} を削除しました"
+    }
+  },
+  "appearanceSettings": {
+    "locked": "組織がテーマをロックしています。これらの設定は読み取り専用です。",
+    "themeTitle": "テーマ",
+    "themeDescription": "背景とアクセントカラー。ライトテーマを選ぶとアプリがライトモードに切り替わります。",
+    "themeHints": {
+      "orbit": "ブラック · グリーン",
+      "forge": "ブラック · カッパー",
+      "console": "チャコール · アイス",
+      "dusk": "チャコール · ペリウィンクル",
+      "graphite": "グラファイト · グリーン",
+      "field": "エメラルド · グリーン",
+      "daylight": "ミスト · グリーン",
+      "workshop": "ペーパー · カッパー"
+    },
+    "accent": "アクセント",
+    "ground": "背景",
+    "accents": {
+      "green": "グリーン",
+      "copper": "カッパー",
+      "ice": "アイス",
+      "periwinkle": "ペリウィンクル",
+      "amber": "アンバー"
+    },
+    "grounds": {
+      "black": "ブラック",
+      "charcoal": "チャコール",
+      "graphite": "グラファイト",
+      "emerald": "エメラルド",
+      "paper": "ペーパー",
+      "mist": "ミスト"
+    },
+    "modes": {
+      "dark": "ダーク",
+      "light": "ライト"
+    },
+    "layoutTitle": "レイアウト",
+    "layoutDescription": "リストやパネルの占める広さと、角の丸みを設定します。",
+    "density": "密度",
+    "densities": {
+      "compact": {
+        "label": "コンパクト",
+        "hint": "細い区切り線の詰まった行"
+      },
+      "cards": {
+        "label": "カード",
+        "hint": "列に並ぶ枠付きの項目"
+      }
+    },
+    "corners": "角",
+    "cornerSquare": "角型",
+    "cornerRounded": "丸型",
+    "restrictedTitle": "変更できない設定",
+    "restrictedDescription": "設定ページで、変更する権限がない部分の表示方法です。",
+    "restricted": {
+      "show": {
+        "label": "読み取り専用で表示",
+        "blurb": "変更できない設定を無効状態で表示し、変更に必要な権限も示します"
+      },
+      "hide": {
+        "label": "非表示",
+        "blurb": "変更できる設定だけを表示します"
+      }
+    },
+    "followingDefault": "組織の既定に従っています: <strong>{setting}</strong>。",
+    "orgDefault": "組織の既定: <strong>{setting}</strong>。",
+    "useOrgDefault": "組織の既定を使用",
+    "reset": "既定に戻す",
+    "customAccent": {
+      "helpEmpty": "背景に対して読み取れる色なら何でも使えます。ステータスの色は変わりません。",
+      "helpInvalid": "<mono>#2f9e52</mono> のような 16 進カラーを入力してください。",
+      "helpOk": "{ground} 上で <mono>{ratio}:1</mono>。ステータスの色は変わりません。",
+      "helpTooFaintLighter": "{ground} 上では薄すぎます: <mono>{ratio}:1</mono>、<mono>{min}:1</mono> 以上が必要です。より明るい色を選んでください。",
+      "helpTooFaintDarker": "{ground} 上では薄すぎます: <mono>{ratio}:1</mono>、<mono>{min}:1</mono> 以上が必要です。より暗い色を選んでください。",
+      "helpFaintEverywhere": "どの背景でも薄すぎます。<mono>{min}:1</mono> 以上が必要です。",
+      "helpReadsEverywhere": "すべての背景で読み取れます。ステータスの色は変わりません。",
+      "helpFaintSome": "{grounds} では薄すぎます。{count, plural, other {その背景}}を使う人には既定のアクセントが適用されます。",
+      "label": "カスタムアクセント",
+      "pick": "カスタムアクセントを選択",
+      "inUse": "使用中"
+    }
+  },
+  "profileSettings": {
+    "identity": {
+      "title": "ID 情報",
+      "loading": "読み込み中…",
+      "signIn": "プロフィールを編集するにはサインインしてください。",
+      "description": "プラットフォーム全体に表示される名前とメールアドレスです。ID プロバイダーがロックしている項目はここでは編集できず、IdP から同期されます。",
+      "editingDisabled": "組織の管理者がプロフィールの編集を無効にしています。<code>/administration/organization</code> で <code>allowUserProfileEdit</code> を有効にするよう管理者に依頼してください。",
+      "username": "ユーザー名",
+      "usernameHelp": "ユーザー名は認証用の識別子で、変更されることはありません。",
+      "firstName": "名",
+      "lastName": "姓",
+      "email": "メールアドレス",
+      "saving": "保存中…",
+      "save": "保存",
+      "idpManagedTitle": "ID プロバイダーが管理しています。ローカルで編集しても次回サインイン時に上書きされます",
+      "idpManaged": "IdP 管理"
+    },
+    "language": {
+      "title": "言語",
+      "description": "画面の表示言語です。翻訳がない場合は en で表示されます。"
+    },
+    "timezone": {
+      "title": "タイムゾーン",
+      "description": "ダッシュボードのすべてのタイムスタンプで、ブラウザが検出したタイムゾーンを上書きします。空欄にするとブラウザのタイムゾーン (<mono>{tz}</mono>) を使用します。",
+      "label": "タイムゾーン",
+      "placeholder": "{tz} (ブラウザで検出)",
+      "noOverride": "{tz} (ブラウザで検出、上書きなし)",
+      "saving": "保存中…",
+      "save": "保存"
+    },
+    "toasts": {
+      "timezoneSaved": "タイムゾーンを保存しました",
+      "timezoneFailed": "タイムゾーンを保存できませんでした",
+      "profileUpdated": "プロフィールを更新しました",
+      "updateFailed": "更新に失敗しました"
+    }
+  },
+  "visualizationSettings": {
+    "preview": "プレビュー",
+    "fleetTitle": "フリートビュー",
+    "fleetDescription": "エージェントのフリートの描き方です。どのスタイルでも同じエージェントと同じヘルス状態を表示します。",
+    "workflowTitle": "ワークフロービュー",
+    "workflowDescription": "ワークフローとその実行の描き方です。",
+    "appTitle": "アプリビュー",
+    "appDescription": "アプリのダッシュボードの描き方です。自動ではアプリの構成に合わせて配置します。",
+    "motionTitle": "モーション",
+    "motionDescription": "すべてのアニメーションは実際の状態を表します。モーションを減らすと、同じ情報を持つ静止画で表示します。",
+    "particlesTitle": "フローパーティクル",
+    "fleet": {
+      "orbit": {
+        "label": "オービット",
+        "blurb": "クラスターを惑星、エージェントを衛星として表示"
+      },
+      "heartbeat": {
+        "label": "ハートビート",
+        "blurb": "イベントごとに消えていく蛍光の点"
+      },
+      "hive": {
+        "label": "ハイブ",
+        "blurb": "エージェントごとに 1 タイル、大規模フリート向け"
+      },
+      "manifest": {
+        "label": "マニフェスト",
+        "blurb": "実行キューを出発案内板として表示"
+      },
+      "isometric": {
+        "label": "アイソメトリック",
+        "blurb": "クラスターを台座、負荷を高さとして表示"
+      },
+      "graph": {
+        "label": "グラフ",
+        "blurb": "ディスパッチのパルスが流れるライブのフォースグラフ"
+      },
+      "swarm": {
+        "label": "スウォーム",
+        "blurb": "触手でつながりクラスターに群がるエージェント"
+      },
+      "list": {
+        "label": "リスト",
+        "blurb": "シンプルな表"
+      }
+    },
+    "workflow": {
+      "transit": {
+        "label": "路線図",
+        "blurb": "ワークフローを路線、実行を列車として表示"
+      },
+      "isometric": {
+        "label": "アイソメトリック",
+        "blurb": "ステージを組み立てラインとして表示"
+      },
+      "graph": {
+        "label": "グラフ",
+        "blurb": "アニメーションするステージグラフ"
+      },
+      "list": {
+        "label": "リスト",
+        "blurb": "シンプルな表"
+      }
+    },
+    "app": {
+      "auto": {
+        "label": "自動",
+        "blurb": "アプリのトポロジーに合わせて配置"
+      },
+      "isometric": {
+        "label": "アイソメトリック",
+        "blurb": "ワークロードを台座上のブロックとして表示"
+      },
+      "graph": {
+        "label": "グラフ",
+        "blurb": "ワークロードとトラフィックをライブグラフで表示"
+      },
+      "classic": {
+        "label": "クラシック",
+        "blurb": "カードのみ、図なし"
+      }
+    },
+    "motion": {
+      "system": {
+        "label": "システムに従う",
+        "blurb": "OS が求めるときにモーションを減らす"
+      },
+      "full": {
+        "label": "フル",
+        "blurb": "すべてのアニメーション"
+      },
+      "reduced": {
+        "label": "最小限",
+        "blurb": "静止画、同じ情報"
+      }
+    },
+    "particles": {
+      "on": {
+        "label": "オン",
+        "blurb": "エッジ上のパーティクルでスループットを表示"
+      },
+      "off": {
+        "label": "オフ",
+        "blurb": "エッジと件数のみ"
+      }
+    }
+  },
+  "notificationSettings": {
+    "title": "通知",
+    "description": "受信トレイ: デプロイの承認、障害アラート、招待、クォータの警告。",
+    "inboxTitle": "受信トレイ",
+    "inboxDescription": "デプロイの承認、障害アラート、招待、クォータの警告。",
+    "unread": "未読 <num>{count}</num> 件",
+    "markAll": "すべて既読にする",
+    "feedLabel": "通知",
+    "inboxEmptyTitle": "受信トレイは空です",
+    "inboxEmptyDescription": "デプロイの完了、招待の受信、クォータの上限接近などがあると、ここに通知が表示されます。",
+    "markRead": "既読にする",
+    "alerts": {
+      "title": "アプリのアラート購読",
+      "description": "アラートを受け取るアプリとイベントの種類を選びます。",
+      "app": "アプリ",
+      "bulk": "一括",
+      "kinds": {
+        "deploy_success": "デプロイ成功",
+        "deploy_failure": "デプロイ失敗",
+        "error_spike": "エラー急増",
+        "preview_created": "プレビュー作成",
+        "preview_destroyed": "プレビュー削除"
+      },
+      "toggleLabel": "{app} の{kind}",
+      "unsubscribeAll": "すべて購読解除",
+      "subscribeAll": "すべて購読",
+      "emptyTitle": "登録済みのアプリはありません",
+      "emptyDescription": "アプリを登録すると、そのアラートを設定できます。",
+      "inAppChannel": "アプリ内チャネル",
+      "otherChannels": "ユーザーのチャネル設定が構成されると、メール / Slack チャネルがここに表示されます。",
+      "unsubscribeTitle": "{app} のすべてのアラートの購読を解除しますか?",
+      "unsubscribeTitleGeneric": "すべてのアラートの購読を解除しますか?",
+      "unsubscribeDescription": "このアプリのアプリ内チャネルにある {count} 種類のアラートをすべて解除します。再度購読するまで、デプロイの失敗やエラー急増の通知は届きません。"
+    },
+    "toasts": {
+      "cleared": "{count} 件をクリアしました",
+      "markAllFailed": "通知を既読にできませんでした",
+      "markFailed": "通知を既読にできませんでした",
+      "saveFailed": "保存に失敗しました",
+      "subscribedAll": "{app} のすべてのアラートを購読しました",
+      "subscribeFailed": "購読に失敗しました",
+      "unsubscribed": "{app} の購読を解除しました",
+      "unsubscribeFailed": "購読解除に失敗しました"
+    }
+  },
+  "securitySettings": {
+    "title": "セキュリティ",
+    "description": "アカウントのアクティブなセッションと発行済みのベアラー認証情報です。",
+    "apiTokens": "API トークン",
+    "apiTokensDescription": "CLI、CI の実行、スクリプト用の長期間有効な認証情報です。",
+    "manageTokens": "トークンを管理",
+    "mfa": "多要素認証",
+    "mfaDescription": "IdP 側で設定します。Astrolift は OIDC 経由でアサーションを受け取ります。",
+    "mfaBody": "ID プロバイダー (Auth0 / Okta / Azure AD / Google Workspace) で MFA を設定してください。プラットフォームは ABAC ポリシーにより、高リスクの操作でセッションの鮮度を求めます。",
+    "subnav": {
+      "label": "設定のサブナビゲーション",
+      "profile": "プロフィール",
+      "security": "セキュリティ",
+      "notifications": "通知",
+      "appearance": "外観",
+      "visualizations": "可視化",
+      "home": "ホーム"
+    },
+    "connected": {
+      "title": "接続済みアカウント",
+      "notConnected": "未接続",
+      "reauthorize": "再認可",
+      "connected": "接続済み",
+      "connect": "接続",
+      "disconnect": "切断",
+      "refetchHint": "ページを再読み込みすると最新の状態を取得します。接続状態はホストでの OAuth フローの完了後に更新されます。",
+      "disconnectTitle": "{provider} を切断しますか?",
+      "thisAccount": "このアカウント",
+      "theLinkedAccount": "リンクされたアカウント",
+      "disconnectBody": "Astrolift は {provider} 上の <mono>{account}</mono> にアクセスできなくなります。あなたの ID を経由するデプロイは、再接続するまで失敗します。",
+      "typeToConfirm": "確認のため <mono>{account}</mono> と入力してください。",
+      "toasts": {
+        "connectFailed": "接続に失敗しました",
+        "oauthStartFailed": "OAuth フローを開始できませんでした",
+        "disconnected": "{account} を切断しました",
+        "accountFallback": "アカウント",
+        "disconnectFailed": "このアカウントを切断できませんでした"
+      }
+    }
+  },
   "settingsIndex": {
     "title": "Settings",
     "description": "Configure the platform's identity, security, and surfaces.",

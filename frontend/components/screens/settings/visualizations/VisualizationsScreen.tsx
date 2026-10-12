@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,20 +26,24 @@ import {
 
 import type { useVisualizations } from "./use-visualizations";
 
-type Option = { label: string; blurb: string };
+/** The visualizationSettings group holding each option's label and blurb. */
+type OptionGroup = "fleet" | "workflow" | "app" | "motion" | "particles";
 
 /** A row of choices, each with its blurb; the chosen one is pressed. */
 function Options<K extends string>({
   label,
+  group,
   options,
   value,
   onChange,
 }: {
   label: string;
-  options: Record<K, Option>;
+  group: OptionGroup;
+  options: Record<K, unknown>;
   value: K;
   onChange: (key: K) => void;
 }) {
+  const t = useTranslations("visualizationSettings");
   return (
     <div role="group" aria-label={label} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
       {(Object.keys(options) as K[]).map((key) => (
@@ -52,8 +57,12 @@ function Options<K extends string>({
             value === key && "border-primary ring-primary ring-1"
           )}
         >
-          <span className="block text-sm font-semibold">{options[key].label}</span>
-          <span className="text-muted-foreground block text-xs">{options[key].blurb}</span>
+          <span className="block text-sm font-semibold">
+            {t(`${group}.${key as string}.label`)}
+          </span>
+          <span className="text-muted-foreground block text-xs">
+            {t(`${group}.${key as string}.blurb`)}
+          </span>
         </button>
       ))}
     </div>
@@ -66,10 +75,11 @@ function Options<K extends string>({
  * motion, matching what the real views do.
  */
 function Preview({ children }: { children: React.ReactNode }) {
+  const t = useTranslations("visualizationSettings");
   return (
     <div className="mt-3">
       <p className="text-muted-foreground text-2xs mb-1.5 font-semibold tracking-[0.08em] uppercase">
-        Preview
+        {t("preview")}
       </p>
       <div inert className="bg-background max-h-72 overflow-hidden rounded-md border p-3">
         {children}
@@ -125,18 +135,18 @@ export type VisualizationsScreenProps = ReturnType<typeof useVisualizations>;
  * motion they resolve to on this device come from useVisualizations.
  */
 export function VisualizationsScreen({ value, onChange, motion }: VisualizationsScreenProps) {
+  const t = useTranslations("visualizationSettings");
   return (
     <div className="flex flex-col gap-4">
       <Card>
         <CardHeader>
-          <CardTitle>Fleet view</CardTitle>
-          <CardDescription>
-            How agent fleets are drawn. Every style shows the same agents and the same health.
-          </CardDescription>
+          <CardTitle>{t("fleetTitle")}</CardTitle>
+          <CardDescription>{t("fleetDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Options
-            label="Fleet view"
+            label={t("fleetTitle")}
+            group="fleet"
             options={FLEET_VIEWS}
             value={value.fleetView}
             onChange={(fleetView) => onChange({ fleetView })}
@@ -149,12 +159,13 @@ export function VisualizationsScreen({ value, onChange, motion }: Visualizations
 
       <Card>
         <CardHeader>
-          <CardTitle>Workflow view</CardTitle>
-          <CardDescription>How workflows and their runs are drawn.</CardDescription>
+          <CardTitle>{t("workflowTitle")}</CardTitle>
+          <CardDescription>{t("workflowDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Options
-            label="Workflow view"
+            label={t("workflowTitle")}
+            group="workflow"
             options={WORKFLOW_VIEWS}
             value={value.workflowView}
             onChange={(workflowView) => onChange({ workflowView })}
@@ -171,14 +182,13 @@ export function VisualizationsScreen({ value, onChange, motion }: Visualizations
 
       <Card>
         <CardHeader>
-          <CardTitle>App view</CardTitle>
-          <CardDescription>
-            How an app&apos;s dashboard is drawn. Auto lays it out for the app&apos;s shape.
-          </CardDescription>
+          <CardTitle>{t("appTitle")}</CardTitle>
+          <CardDescription>{t("appDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <Options
-            label="App view"
+            label={t("appTitle")}
+            group="app"
             options={APP_VIEWS}
             value={value.appView}
             onChange={(appView) => onChange({ appView })}
@@ -191,29 +201,25 @@ export function VisualizationsScreen({ value, onChange, motion }: Visualizations
 
       <Card>
         <CardHeader>
-          <CardTitle>Motion</CardTitle>
-          <CardDescription>
-            Every animation stands for real state. Reduced motion draws still pictures that carry
-            the same information.
-          </CardDescription>
+          <CardTitle>{t("motionTitle")}</CardTitle>
+          <CardDescription>{t("motionDescription")}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <Options
-            label="Motion"
+            label={t("motionTitle")}
+            group="motion"
             options={MOTION_MODES}
             value={value.motion}
             onChange={(m) => onChange({ motion: m })}
           />
           <div>
             <p className="text-muted-foreground text-2xs mb-2 font-semibold tracking-[0.08em] uppercase">
-              Flow particles
+              {t("particlesTitle")}
             </p>
             <Options
-              label="Flow particles"
-              options={{
-                on: { label: "On", blurb: "Particles along edges show throughput" },
-                off: { label: "Off", blurb: "Edges only, with counts" },
-              }}
+              label={t("particlesTitle")}
+              group="particles"
+              options={{ on: true, off: true }}
               value={value.flowParticles ? "on" : "off"}
               onChange={(v) => onChange({ flowParticles: v === "on" })}
             />

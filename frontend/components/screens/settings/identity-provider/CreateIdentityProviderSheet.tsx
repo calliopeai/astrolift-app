@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -30,24 +31,17 @@ export type CreateIdentityProviderSheetProps = ReturnType<typeof useCreateIdenti
   onOpenChange: (open: boolean) => void;
 };
 
-const KINDS: { value: IdpKind; label: string; hint: string }[] = [
-  { value: "oidc", label: "Generic OIDC", hint: "discovery URL + client_id + client_secret_ref" },
-  { value: "cognito", label: "Amazon Cognito", hint: "user pool + region + OIDC fields" },
-  { value: "auth0", label: "Auth0", hint: "tenant URL + client_id + client_secret_ref" },
-  { value: "okta", label: "Okta", hint: "discovery URL + client_id + client_secret_ref" },
-  {
-    value: "azure_ad",
-    label: "Azure AD / Entra ID",
-    hint: "discovery URL + client_id + client_secret_ref",
-  },
-  { value: "google", label: "Google Workspace", hint: "discovery URL + client_id" },
-  { value: "github", label: "GitHub OAuth", hint: "OAuth app client_id + client_secret_ref" },
-  { value: "saml", label: "SAML 2.0", hint: "metadata URL or XML upload" },
-  {
-    value: "local",
-    label: "Local accounts",
-    hint: "username + password (Django auth, dev/fallback)",
-  },
+// Labels and hints live under identityProviders.kinds / .hints.
+const KINDS: IdpKind[] = [
+  "oidc",
+  "cognito",
+  "auth0",
+  "okta",
+  "azure_ad",
+  "google",
+  "github",
+  "saml",
+  "local",
 ];
 
 const COGNITO_TEMPLATE = `{
@@ -61,6 +55,7 @@ export function CreateIdentityProviderSheet({
   onCreate,
   creating,
 }: CreateIdentityProviderSheetProps) {
+  const t = useTranslations("identityProviders");
   const [kind, setKind] = React.useState<IdpKind>("oidc");
   const [displayName, setDisplayName] = React.useState("");
   const [oidcDiscoveryUrl, setOidcDiscoveryUrl] = React.useState("");
@@ -98,7 +93,7 @@ export function CreateIdentityProviderSheet({
     try {
       parsedConfig = JSON.parse(configText.trim() || "{}");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "invalid JSON");
+      setError(err instanceof Error ? err.message : t("create.invalidJson"));
       return;
     }
 
@@ -125,50 +120,42 @@ export function CreateIdentityProviderSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col">
         <SheetHeader>
-          <SheetTitle>New identity provider</SheetTitle>
-          <SheetDescription>
-            Configure how users sign in. Multiple providers can coexist; one is active at a time.
-            Secrets are stored as references into the platform secrets backend, never plaintext in
-            this row.
-          </SheetDescription>
+          <SheetTitle>{t("create.title")}</SheetTitle>
+          <SheetDescription>{t("create.description")}</SheetDescription>
         </SheetHeader>
         <form onSubmit={submit} className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
           <div className="space-y-2">
-            <Label htmlFor="kind">Kind</Label>
+            <Label htmlFor="kind">{t("create.kind")}</Label>
             <Select value={kind} onValueChange={(v) => setKind(v as IdpKind)}>
               <SelectTrigger id="kind">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {KINDS.map((k) => (
-                  <SelectItem key={k.value} value={k.value}>
-                    {k.label}
+                  <SelectItem key={k} value={k}>
+                    {t(`kinds.${k}`)}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-muted-foreground text-xs">
-              {KINDS.find((k) => k.value === kind)?.hint}
-            </p>
+            <p className="text-muted-foreground text-xs">{t(`hints.${kind}`)}</p>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="display-name">Display name (optional)</Label>
+            <Label htmlFor="display-name">{t("create.displayName")}</Label>
             <Input
               id="display-name"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="e.g. Auth0 prod, Cognito staging"
+              placeholder={t("create.displayNamePlaceholder")}
             />
-            <p className="text-muted-foreground text-xs">
-              Shown on the login screen and in audit logs. Defaults to the kind name when blank.
-            </p>
+            <p className="text-muted-foreground text-xs">{t("create.displayNameHelp")}</p>
           </div>
 
           {showOidc && (
             <>
               <div className="space-y-2">
-                <Label htmlFor="discovery">OIDC discovery URL</Label>
+                <Label htmlFor="discovery">{t("create.discovery")}</Label>
                 <Input
                   id="discovery"
                   value={oidcDiscoveryUrl}
@@ -180,7 +167,7 @@ export function CreateIdentityProviderSheet({
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="client-id">Client ID</Label>
+                  <Label htmlFor="client-id">{t("create.clientId")}</Label>
                   <Input
                     id="client-id"
                     value={clientId}
@@ -190,7 +177,7 @@ export function CreateIdentityProviderSheet({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="client-secret-ref">Secret reference</Label>
+                  <Label htmlFor="client-secret-ref">{t("create.secretRef")}</Label>
                   <Input
                     id="client-secret-ref"
                     value={clientSecretRef}
@@ -198,9 +185,7 @@ export function CreateIdentityProviderSheet({
                     placeholder="secrets-backend-path/oidc/client-secret"
                     className="font-mono text-xs"
                   />
-                  <p className="text-muted-foreground text-2xs">
-                    Path into the platform secrets backend; the value never lives in this row.
-                  </p>
+                  <p className="text-muted-foreground text-2xs">{t("create.secretRefHelp")}</p>
                 </div>
               </div>
             </>
@@ -208,7 +193,7 @@ export function CreateIdentityProviderSheet({
 
           {showSaml && (
             <div className="space-y-2">
-              <Label htmlFor="metadata-url">SAML metadata URL</Label>
+              <Label htmlFor="metadata-url">{t("create.metadataUrl")}</Label>
               <Input
                 id="metadata-url"
                 value={metadataUrl}
@@ -223,7 +208,7 @@ export function CreateIdentityProviderSheet({
 
           {!isLocal && (
             <div className="space-y-2">
-              <Label htmlFor="config">Kind-specific config (JSON)</Label>
+              <Label htmlFor="config">{t("create.config")}</Label>
               <Textarea
                 id="config"
                 value={configText}
@@ -234,7 +219,7 @@ export function CreateIdentityProviderSheet({
               {error && <p className="text-destructive text-xs">{error}</p>}
               {kind === "cognito" && (
                 <p className="text-muted-foreground text-xs">
-                  Required keys for Cognito: <code>user_pool_id</code>, <code>region</code>.
+                  {t.rich("create.cognitoKeys", { code: (chunks) => <code>{chunks}</code> })}
                 </p>
               )}
             </div>
@@ -246,15 +231,15 @@ export function CreateIdentityProviderSheet({
               checked={setActive}
               onChange={(e) => setSetActive(e.target.checked)}
             />
-            Make this the active provider for the organization
+            {t("create.setActive")}
           </label>
 
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("create.cancel")}
             </Button>
             <Button type="submit" disabled={creating}>
-              {creating ? "Saving…" : "Save provider"}
+              {creating ? t("create.saving") : t("create.save")}
             </Button>
           </SheetFooter>
         </form>

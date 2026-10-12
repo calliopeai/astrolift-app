@@ -1,6 +1,7 @@
 "use client";
 
 import { GithubIcon, KeyRoundIcon, PlusCircleIcon, ShieldCheckIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,8 @@ export function ConnectGitHubDialogView({
   startManifestFlow,
   onConnectExisting,
 }: ConnectGitHubDialogViewProps) {
+  const t = useTranslations("sourceProviders.github");
+  const tConnect = useTranslations("sourceProviders.connect");
   const [method, setMethod] = React.useState<Method>("choose");
 
   // ---- Bootstrap (manifest create) state --------------------------------
@@ -122,12 +125,10 @@ export function ConnectGitHubDialogView({
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             <GithubIcon className="size-5" />
-            {method === "byo" ? "Connect an existing GitHub App" : "Connect to GitHub"}
+            {method === "byo" ? t("titleByo") : t("title")}
           </SheetTitle>
           <SheetDescription>
-            {method === "byo"
-              ? "Adopt a GitHub App you already created. Paste its App ID and private key — Astrolift verifies the credentials against GitHub before saving them."
-              : "Create a brand-new App on your account in one click, or connect an App you already made."}
+            {method === "byo" ? t("descriptionByo") : t("description")}
           </SheetDescription>
         </SheetHeader>
 
@@ -141,12 +142,8 @@ export function ConnectGitHubDialogView({
             >
               <PlusCircleIcon className="text-primary mt-0.5 size-5 shrink-0" />
               <span className="space-y-1">
-                <span className="block font-medium">Create a new GitHub App</span>
-                <span className="text-muted-foreground block text-xs">
-                  Recommended. Astrolift asks GitHub to register a private App on your account — no
-                  client_id / secret / PEM to paste. GitHub shows you the name and permissions
-                  first.
-                </span>
+                <span className="block font-medium">{t("createTitle")}</span>
+                <span className="text-muted-foreground block text-xs">{t("createBody")}</span>
               </span>
             </button>
             <button
@@ -156,11 +153,8 @@ export function ConnectGitHubDialogView({
             >
               <KeyRoundIcon className="text-primary mt-0.5 size-5 shrink-0" />
               <span className="space-y-1">
-                <span className="block font-medium">Connect an existing GitHub App</span>
-                <span className="text-muted-foreground block text-xs">
-                  Bring your own App — one you already created on GitHub. Paste its App ID and
-                  private-key PEM. Good for GitHub Enterprise or an App shared across tools.
-                </span>
+                <span className="block font-medium">{t("byoTitle")}</span>
+                <span className="text-muted-foreground block text-xs">{t("byoBody")}</span>
               </span>
             </button>
           </div>
@@ -176,60 +170,49 @@ export function ConnectGitHubDialogView({
             className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4"
           >
             <div className="space-y-2">
-              <Label htmlFor="gh-org">Where should the App live?</Label>
+              <Label htmlFor="gh-org">{t("orgLabel")}</Label>
               <Input
                 id="gh-org"
                 value={ghOrg}
                 onChange={(e) => setGhOrg(e.target.value)}
-                placeholder="acme-corp (leave blank for your personal account)"
+                placeholder={t("orgPlaceholder")}
                 className="font-mono text-xs"
                 autoComplete="off"
                 autoFocus
               />
-              <p className="text-muted-foreground text-xs">
-                GitHub org slug. Leave blank to install on your personal account. You&apos;ll be
-                able to switch the install target on the next screen if you change your mind.
-              </p>
-              {!looksValidOrg && (
-                <p className="text-destructive text-xs">
-                  GitHub org slugs are alphanumeric + hyphen, max 39 characters.
-                </p>
-              )}
+              <p className="text-muted-foreground text-xs">{t("orgHelp")}</p>
+              {!looksValidOrg && <p className="text-destructive text-xs">{t("orgInvalid")}</p>}
             </div>
 
             <div className="border-success-border bg-success/5 text-success-fg rounded-md border p-3 text-xs">
               <p className="flex items-center gap-2 font-medium">
                 <ShieldCheckIcon className="size-4" />
-                Permissions Astrolift will request
+                {t("permsTitle")}
               </p>
               <ul className="mt-2 space-y-1 pl-6 [&>li]:list-disc">
                 <li>
-                  <span className="font-mono">contents: read</span> — clone your repos
+                  <span className="font-mono">contents: read</span> ({t("perms.contents")})
                 </li>
                 <li>
-                  <span className="font-mono">metadata: read</span> — read repo metadata
+                  <span className="font-mono">metadata: read</span> ({t("perms.metadata")})
                 </li>
                 <li>
-                  <span className="font-mono">pull_requests: write</span> — post deploy / preview
-                  comments on PRs
+                  <span className="font-mono">pull_requests: write</span> ({t("perms.pullRequests")}
+                  )
                 </li>
                 <li>
-                  <span className="font-mono">checks: write</span> — write commit statuses for
-                  deploys
+                  <span className="font-mono">checks: write</span> ({t("perms.checks")})
                 </li>
               </ul>
-              <p className="mt-2">
-                Plus push + pull_request webhooks. You can broaden later by editing the App on
-                GitHub.
-              </p>
+              <p className="mt-2">{t("permsFooter")}</p>
             </div>
 
             <SheetFooter className="mt-auto flex-row justify-between gap-2 px-0">
               <Button type="button" variant="ghost" onClick={() => setMethod("choose")}>
-                ← Back
+                {t("back")}
               </Button>
               <Button type="submit" disabled={!looksValidOrg}>
-                Continue on GitHub →
+                {t("continue")}
               </Button>
             </SheetFooter>
           </form>
@@ -242,7 +225,7 @@ export function ConnectGitHubDialogView({
             className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4"
           >
             <div className="space-y-2">
-              <Label htmlFor="byo-app-id">App ID</Label>
+              <Label htmlFor="byo-app-id">{t("appId")}</Label>
               <Input
                 id="byo-app-id"
                 value={appId}
@@ -254,18 +237,14 @@ export function ConnectGitHubDialogView({
                 autoFocus
                 required
               />
-              <p className="text-muted-foreground text-xs">
-                The numeric App ID from your GitHub App&apos;s settings page (not the Client ID).
-              </p>
+              <p className="text-muted-foreground text-xs">{t("appIdHelp")}</p>
               {appId.trim() !== "" && !appIdOk && (
-                <p className="text-destructive text-xs">
-                  The App ID is the numeric id, e.g. 3705068.
-                </p>
+                <p className="text-destructive text-xs">{t("appIdInvalid")}</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="byo-pem">Private key (PEM)</Label>
+              <Label htmlFor="byo-pem">{t("pem")}</Label>
               <Textarea
                 id="byo-pem"
                 value={pem}
@@ -277,15 +256,15 @@ export function ConnectGitHubDialogView({
                 required
               />
               <p className="text-muted-foreground text-xs">
-                Generate a private key on your GitHub App page and paste the whole{" "}
-                <code className="font-mono">.pem</code> here. It is encrypted at rest and never
-                shown again.
+                {t.rich("pemHelp", {
+                  code: (chunks) => <code className="font-mono">{chunks}</code>,
+                })}
               </p>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="byo-client-id">
-                Client ID <span className="text-muted-foreground">(optional)</span>
+                {t("clientId")} <span className="text-muted-foreground">{t("optional")}</span>
               </Label>
               <Input
                 id="byo-client-id"
@@ -295,20 +274,17 @@ export function ConnectGitHubDialogView({
                 className="font-mono text-xs"
                 autoComplete="off"
               />
-              <p className="text-muted-foreground text-xs">
-                Needed only for the user-to-server &quot;Connect my GitHub&quot; dance.
-              </p>
+              <p className="text-muted-foreground text-xs">{t("clientIdHelp")}</p>
               {!clientIdOk && (
                 <p className="text-destructive text-xs">
-                  Doesn&apos;t look like a GitHub App Client ID — expected <code>Iv…</code> or a
-                  20-char hex string.
+                  {tConnect.rich("appClientIdInvalid", { code: (chunks) => <code>{chunks}</code> })}
                 </p>
               )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="byo-client-secret">
-                Client secret <span className="text-muted-foreground">(optional)</span>
+                {t("clientSecret")} <span className="text-muted-foreground">{t("optional")}</span>
               </Label>
               <Input
                 id="byo-client-secret"
@@ -322,7 +298,7 @@ export function ConnectGitHubDialogView({
 
             <div className="space-y-2">
               <Label htmlFor="byo-webhook-secret">
-                Webhook secret <span className="text-muted-foreground">(optional)</span>
+                {t("webhookSecret")} <span className="text-muted-foreground">{t("optional")}</span>
               </Label>
               <Input
                 id="byo-webhook-secret"
@@ -336,7 +312,7 @@ export function ConnectGitHubDialogView({
 
             <div className="space-y-2">
               <Label htmlFor="byo-org-login">
-                GitHub org / user login <span className="text-muted-foreground">(optional)</span>
+                {t("orgLogin")} <span className="text-muted-foreground">{t("optional")}</span>
               </Label>
               <Input
                 id="byo-org-login"
@@ -346,15 +322,12 @@ export function ConnectGitHubDialogView({
                 className="font-mono text-xs"
                 autoComplete="off"
               />
-              <p className="text-muted-foreground text-xs">
-                Only needed if the App is installed on more than one account — Astrolift uses it to
-                pick the right installation.
-              </p>
+              <p className="text-muted-foreground text-xs">{t("orgLoginHelp")}</p>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="byo-api-base">
-                API base URL <span className="text-muted-foreground">(optional)</span>
+                {t("apiBaseUrl")} <span className="text-muted-foreground">{t("optional")}</span>
               </Label>
               <Input
                 id="byo-api-base"
@@ -364,17 +337,15 @@ export function ConnectGitHubDialogView({
                 className="font-mono text-xs"
                 autoComplete="off"
               />
-              <p className="text-muted-foreground text-xs">
-                For GitHub Enterprise Server. Leave blank for github.com.
-              </p>
+              <p className="text-muted-foreground text-xs">{t("apiBaseUrlHelp")}</p>
             </div>
 
             <SheetFooter className="mt-auto flex-row justify-between gap-2 px-0">
               <Button type="button" variant="ghost" onClick={() => setMethod("choose")}>
-                ← Back
+                {t("back")}
               </Button>
               <Button type="submit" disabled={!canSubmitByo}>
-                {loading ? "Verifying…" : "Connect App"}
+                {loading ? t("verifying") : t("connectApp")}
               </Button>
             </SheetFooter>
           </form>
