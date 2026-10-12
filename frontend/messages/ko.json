@@ -2471,7 +2471,8 @@
         "expand": "Expand to full screen",
         "collapse": "Exit full screen (Esc)",
         "popOut": "Open in a separate window",
-        "resizeHandle": "Drag to resize the terminal"
+        "resizeHandle": "Drag to resize the terminal",
+        "stepUpRequired": "여기에서 콘솔을 열려면 다시 로그인하세요."
       },
       "shortcuts": {
         "title": "CLI shortcuts",

@@ -8,9 +8,13 @@ Decisions (Leo, 2026-10-11):
 * The organization can turn a gate off, or self-approval off. Team, app and
   user rules can only add: the **strictest** requirement from any applicable
   scope wins, so a narrower scope never weakens an inherited one.
-* First cut: destructive deletes and secret reveal and change. Exec/console
-  attach runs over a WebSocket and joins with the approval routing in the
-  next slice; ``allow_self_approval`` is resolved now so it is ready for it.
+* First cut: destructive deletes, exec/console attach, and secret reveal and
+  change. Approval routing is the next slice; ``allow_self_approval`` is
+  resolved now so it is ready for it.
+
+Exec attach is a WebSocket, which has no envelope to carry a refusal: the
+relay closes with 4428 and the console's terminal opens the same step-up
+prompt, then reconnects (``core.schema.exec_ws``).
 
 Enforcement is server-side: ``gate`` returns the same ``STEP_UP_REQUIRED``
 envelope ``@requires_elevation`` does, which the web console already turns
@@ -33,6 +37,7 @@ ACTIONS: dict[str, str] = {
     "app.deregister": "Deregister an app",
     "cluster.decommission": "Decommission a cluster",
     "managed_service.deprovision": "Deprovision a managed service",
+    "exec.attach": "Open a console in a workload",
     "secret.reveal": "Reveal a secret",
     "secret.change": "Change a secret",
 }
@@ -101,6 +106,28 @@ def effective(
         allow_self_approval=self_approval,
         sources=tuple(sources),
     )
+
+
+def session_needs_step_up(
+    organization_id: int,
+    action: str,
+    *,
+    session: Any,
+    app: Any = None,
+    user_id: int | None = None,
+) -> bool:
+    """For a path with no GraphQL envelope (the exec WebSocket): True when
+    ``action`` asks for verification here and ``session`` is not freshly elevated."""
+    from astrolift_identity.session_elevation import get_status
+
+    requirements = effective(
+        organization_id,
+        action,
+        team_id=getattr(app, "team_id", None),
+        app_id=getattr(app, "pk", None),
+        user_id=user_id,
+    )
+    return requirements.verification and not get_status(session).elevated
 
 
 def gate(info: Any, action: str, *, app: Any = None, resolver_name: str = "") -> Any | None:

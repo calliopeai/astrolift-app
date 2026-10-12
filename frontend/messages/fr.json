@@ -2471,7 +2471,8 @@
         "expand": "Expand to full screen",
         "collapse": "Exit full screen (Esc)",
         "popOut": "Open in a separate window",
-        "resizeHandle": "Drag to resize the terminal"
+        "resizeHandle": "Drag to resize the terminal",
+        "stepUpRequired": "Reconnectez-vous pour ouvrir une console ici."
       },
       "shortcuts": {
         "title": "CLI shortcuts",

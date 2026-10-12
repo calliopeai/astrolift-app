@@ -140,3 +140,20 @@ def test_rules_api_refuses_a_narrower_scope_turning_a_gate_off_and_reports_what_
     assert (
         by_action["app.deregister"]["enabled"] is True and by_action["app.deregister"]["verification"] is True
     )
+
+
+def test_exec_attach_needs_a_fresh_step_up_unless_the_org_turned_it_off(world):
+    import datetime as dt
+
+    from django.utils import timezone
+
+    from astrolift_identity.action_safety import session_needs_step_up
+    from astrolift_identity.session_elevation import SESSION_KEY_ELEVATED_UNTIL
+
+    stale = {}
+    fresh = {SESSION_KEY_ELEVATED_UNTIL: (timezone.now() + dt.timedelta(minutes=5)).isoformat()}
+    org = world.org.pk
+    assert session_needs_step_up(org, "exec.attach", session=stale, app=world.medops_app) is True
+    assert session_needs_step_up(org, "exec.attach", session=fresh, app=world.medops_app) is False
+    rule(world, "ORG", None, action="exec.attach", enabled=False)
+    assert session_needs_step_up(org, "exec.attach", session=stale, app=world.medops_app) is False
