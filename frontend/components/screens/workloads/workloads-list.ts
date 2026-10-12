@@ -20,12 +20,6 @@ import type { AstroliftWorkload, WorkloadKind } from "@/graphql/registry/registr
 /** The kinds the Agents area owns (§10.2). */
 export const AREA_KINDS: readonly WorkloadKind[] = ["agent", "workflow", "function"];
 
-export const KIND_LABEL: Record<string, string> = {
-  agent: "Agent",
-  workflow: "Workflow",
-  function: "Function",
-};
-
 /** `2`, `1–4` (autoscaled), or `0–4` for a function that scales to zero. */
 export function scaleLabel(w: AstroliftWorkload): string {
   if (w.hpaMaxReplicas != null) return `${w.hpaMinReplicas ?? 0}–${w.hpaMaxReplicas}`;

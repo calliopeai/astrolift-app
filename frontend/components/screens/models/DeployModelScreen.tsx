@@ -4,6 +4,7 @@ import { QueryError } from "@/components/QueryError";
 
 import { AlertTriangleIcon, ArrowLeftIcon, ArrowRightIcon, Loader2Icon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { agentsCrumbs } from "@/components/screens/agents/skills/catalog";
@@ -29,7 +30,7 @@ import type { DeployModelState } from "./use-deploy-model";
 const CUSTOM = "__custom__";
 const INSTALL_DEFAULT = "__default__";
 
-const STEPS = [{ label: "Where" }, { label: "Model" }, { label: "Review" }];
+const STEPS = ["where", "model", "review"] as const;
 
 export type DeployModelScreenProps = DeployModelState & {
   /** Start on a step; stories use it. */
@@ -40,18 +41,27 @@ export type DeployModelScreenProps = DeployModelState & {
   initialError?: string | null;
 };
 
-function fitLine(fit: Fit, paramsB: number, gpus: number, hasEnv: boolean): string {
+function fitLine(
+  t: ReturnType<typeof useTranslations>,
+  fit: Fit,
+  paramsB: number,
+  gpus: number,
+  hasEnv: boolean
+): string {
   switch (fit.kind) {
     case "fits":
-      return `Fits: needs about ${neededGiB(paramsB)} GB across ${gpus} GPU(s) of ${fit.perGpuGiB} GB.`;
+      return t("fit.fits", { need: neededGiB(paramsB), gpus, perGpu: fit.perGpuGiB });
     case "tooSmall":
-      return `Needs about ${fit.needGiB} GB but ${gpus} GPU(s) of ${fit.perGpuGiB} GB hold ${fit.perGpuGiB * gpus} GB. Add GPUs or pick a smaller model.`;
+      return t("fit.tooSmall", {
+        need: fit.needGiB,
+        gpus,
+        perGpu: fit.perGpuGiB,
+        total: fit.perGpuGiB * gpus,
+      });
     case "noNode":
-      return `No node of this cluster has ${gpus} GPUs; the most on one node is ${fit.most}.`;
+      return t("fit.noNode", { gpus, most: fit.most });
     case "unknown":
-      return hasEnv
-        ? "GPU memory unknown for this cluster; the deploy is checked when it schedules."
-        : "";
+      return hasEnv ? t("fit.unknown") : "";
   }
 }
 
@@ -77,6 +87,7 @@ export function DeployModelScreen({
   initialEnvId = "",
   initialError = null,
 }: DeployModelScreenProps) {
+  const t = useTranslations("modelDeploy");
   const [step, setStep] = React.useState<1 | 2 | 3>(initialStep);
   const [envId, setEnvId] = React.useState(initialEnvId);
   const [catalogId, setCatalogId] = React.useState(MODEL_CATALOG[0].id);
@@ -99,7 +110,7 @@ export function DeployModelScreen({
   const fit: Fit =
     env && paramsB ? gpuFit(capabilities, gpus, neededGiB(paramsB)) : { kind: "unknown" };
   const blocked = fit.kind === "noNode" || fit.kind === "tooSmall";
-  const line = fitLine(fit, paramsB, gpus, Boolean(env));
+  const line = fitLine(t, fit, paramsB, gpus, Boolean(env));
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -107,7 +118,7 @@ export function DeployModelScreen({
     setFormError(null);
     if (step === 1) {
       if (!env) {
-        setEnvError("Choose the app environment the model runs in.");
+        setEnvError(t("errors.chooseEnv"));
         return;
       }
       setStep(2);
@@ -115,7 +126,7 @@ export function DeployModelScreen({
     }
     if (step === 2) {
       if (!modelId) {
-        setModelError("Enter the Hugging Face model id, as org/model.");
+        setModelError(t("errors.enterModel"));
         return;
       }
       setStep(3);
@@ -131,29 +142,20 @@ export function DeployModelScreen({
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-6">
       <ShellHeader
-        crumbs={agentsCrumbs("models", { label: "Deploy model" })}
-        title="Deploy model"
-        context={<FlowSteps steps={STEPS} current={step} />}
+        crumbs={agentsCrumbs("models", { label: t("title") })}
+        title={t("title")}
+        context={
+          <FlowSteps steps={STEPS.map((k) => ({ label: t(`steps.${k}`) }))} current={step} />
+        }
       />
 
-      <p className="text-muted-foreground max-w-2xl text-sm">
-        Hosts an open-weight model with vLLM on the environment&apos;s cluster. The app binds to it
-        through MODEL_ENDPOINT_URL, MODEL_API_KEY and MODEL_DEPLOYMENT_NAME.
-      </p>
+      <p className="text-muted-foreground max-w-2xl text-sm">{t("intro")}</p>
 
-      <QueryError
-        title="Could not load deploy targets"
-        error={envsError}
-        onRetry={onRetryTargets}
-      />
-      <QueryError
-        title="Could not load cluster GPU capabilities"
-        error={clustersError}
-        onRetry={onRetryClusters}
-      />
+      <QueryError title={t("errors.targets")} error={envsError} onRetry={onRetryTargets} />
+      <QueryError title={t("errors.clusters")} error={clustersError} onRetry={onRetryClusters} />
       {clustersLoading && (
         <p role="status" className="text-muted-foreground text-sm">
-          Loading cluster GPU capabilities…
+          {t("loadingClusters")}
         </p>
       )}
       <form
@@ -173,7 +175,7 @@ export function DeployModelScreen({
 
         {step === 1 && (
           <Field data-invalid={Boolean(envError) || undefined} className="min-w-0">
-            <FieldLabel htmlFor="model-env">App environment</FieldLabel>
+            <FieldLabel htmlFor="model-env">{t("appEnvironment")}</FieldLabel>
             {envsLoading ? (
               <Skeleton className="h-9 w-full" />
             ) : (
@@ -187,17 +189,17 @@ export function DeployModelScreen({
               >
                 <SelectTrigger
                   id="model-env"
-                  aria-label="App environment"
+                  aria-label={t("appEnvironment")}
                   className="w-full min-w-0"
                   aria-invalid={Boolean(envError) || undefined}
                 >
                   <SelectValue
                     placeholder={
                       envsError
-                        ? "App environments unavailable"
+                        ? t("envsUnavailable")
                         : envs.length === 0
-                          ? "No app environments yet"
-                          : "Choose where it runs"
+                          ? t("noEnvs")
+                          : t("chooseWhere")
                     }
                   />
                 </SelectTrigger>
@@ -212,16 +214,14 @@ export function DeployModelScreen({
               </Select>
             )}
             <FieldError className="[overflow-wrap:anywhere]">{envError}</FieldError>
-            <FieldDescription>
-              The model runs on this environment&apos;s cluster and is owned by its app.
-            </FieldDescription>
+            <FieldDescription>{t("envHelp")}</FieldDescription>
           </Field>
         )}
 
         {step === 2 && (
           <>
             <Field data-invalid={Boolean(modelError) || undefined} className="min-w-0">
-              <FieldLabel htmlFor="model-id">Model</FieldLabel>
+              <FieldLabel htmlFor="model-id">{t("model")}</FieldLabel>
               <Select
                 value={catalogId}
                 onValueChange={(v) => {
@@ -229,22 +229,22 @@ export function DeployModelScreen({
                   setModelError(null);
                 }}
               >
-                <SelectTrigger id="model-id" aria-label="Model" className="w-full min-w-0">
+                <SelectTrigger id="model-id" aria-label={t("model")} className="w-full min-w-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {MODEL_CATALOG.map((m) => (
                     <SelectItem key={m.id} value={m.id}>
-                      {m.label} · {neededGiB(m.paramsB)} GB
+                      {m.label} · {t("gb", { n: neededGiB(m.paramsB) })}
                     </SelectItem>
                   ))}
-                  <SelectItem value={CUSTOM}>Custom Hugging Face id</SelectItem>
+                  <SelectItem value={CUSTOM}>{t("customId")}</SelectItem>
                 </SelectContent>
               </Select>
               {custom && (
                 <div className="grid min-w-0 grid-cols-3 gap-2">
                   <Input
-                    aria-label="Hugging Face model id"
+                    aria-label={t("hfModelId")}
                     placeholder="org/model"
                     className="col-span-2 min-w-0 font-mono"
                     spellCheck={false}
@@ -256,8 +256,8 @@ export function DeployModelScreen({
                     }}
                   />
                   <Input
-                    aria-label="Parameters (billions)"
-                    placeholder="params, B"
+                    aria-label={t("paramsLabel")}
+                    placeholder={t("paramsPlaceholder")}
                     inputMode="decimal"
                     className="min-w-0 font-mono"
                     value={customParams}
@@ -270,7 +270,7 @@ export function DeployModelScreen({
 
             <div className="grid min-w-0 gap-4 sm:grid-cols-2">
               <Field className="min-w-0">
-                <FieldLabel htmlFor="model-gpus">GPUs</FieldLabel>
+                <FieldLabel htmlFor="model-gpus">{t("gpus")}</FieldLabel>
                 <Input
                   id="model-gpus"
                   type="number"
@@ -282,17 +282,17 @@ export function DeployModelScreen({
                 />
               </Field>
               <Field className="min-w-0">
-                <FieldLabel htmlFor="model-frontend">vLLM frontend</FieldLabel>
+                <FieldLabel htmlFor="model-frontend">{t("frontend")}</FieldLabel>
                 <Select value={frontend} onValueChange={setFrontend}>
                   <SelectTrigger
                     id="model-frontend"
-                    aria-label="vLLM frontend"
+                    aria-label={t("frontend")}
                     className="w-full min-w-0"
                   >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={INSTALL_DEFAULT}>Cluster default</SelectItem>
+                    <SelectItem value={INSTALL_DEFAULT}>{t("clusterDefault")}</SelectItem>
                     <SelectItem value="rust">Rust</SelectItem>
                     <SelectItem value="python">Python</SelectItem>
                   </SelectContent>
@@ -301,7 +301,7 @@ export function DeployModelScreen({
             </div>
 
             <Field className="min-w-0">
-              <FieldLabel htmlFor="model-hf">Hugging Face token (secret ref, optional)</FieldLabel>
+              <FieldLabel htmlFor="model-hf">{t("hfTokenLabel")}</FieldLabel>
               <Input
                 id="model-hf"
                 placeholder="services/<org>/<owner>/hf#token"
@@ -321,7 +321,7 @@ export function DeployModelScreen({
             <DefinitionList
               items={[
                 {
-                  term: "Environment",
+                  term: t("review.environment"),
                   description: (
                     <span className="min-w-0 font-mono text-xs [overflow-wrap:anywhere]">
                       {env.registeredAppSlug} · {env.name}
@@ -329,21 +329,21 @@ export function DeployModelScreen({
                   ),
                 },
                 {
-                  term: "Cluster",
+                  term: t("review.cluster"),
                   description: (
                     <span className="font-mono text-xs [overflow-wrap:anywhere]">
-                      {env.clusterSlug ?? "none"}
+                      {env.clusterSlug ?? t("none")}
                     </span>
                   ),
                 },
                 {
-                  term: "Model",
+                  term: t("model"),
                   description: (
                     <span className="font-mono text-xs [overflow-wrap:anywhere]">{modelId}</span>
                   ),
                 },
                 {
-                  term: "Service name",
+                  term: t("review.serviceName"),
                   description: (
                     <span className="font-mono text-xs [overflow-wrap:anywhere]">
                       {serviceNameFor(modelId)}
@@ -351,18 +351,18 @@ export function DeployModelScreen({
                   ),
                 },
                 {
-                  term: "GPUs",
+                  term: t("gpus"),
                   description: <span className="font-mono text-xs">{gpus}</span>,
                 },
                 {
-                  term: "Frontend",
-                  description: frontend === INSTALL_DEFAULT ? "Cluster default" : frontend,
+                  term: t("review.frontend"),
+                  description: frontend === INSTALL_DEFAULT ? t("clusterDefault") : frontend,
                 },
                 {
-                  term: "Hugging Face token",
+                  term: t("review.hfToken"),
                   description: (
                     <span className="font-mono text-xs [overflow-wrap:anywhere]">
-                      {hfRef.trim() || "none"}
+                      {hfRef.trim() || t("none")}
                     </span>
                   ),
                 },
@@ -374,7 +374,7 @@ export function DeployModelScreen({
 
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 border-t pt-4">
           <Button type="button" variant="ghost" asChild className="mr-auto">
-            <Link href="/models">Cancel</Link>
+            <Link href="/models">{t("cancel")}</Link>
           </Button>
           {step > 1 && (
             <Button
@@ -386,7 +386,7 @@ export function DeployModelScreen({
               }}
             >
               <ArrowLeftIcon className="size-4" />
-              Back
+              {t("back")}
             </Button>
           )}
           {step < 3 ? (
@@ -398,7 +398,7 @@ export function DeployModelScreen({
                 (step === 1 && envsLoading)
               }
             >
-              Continue
+              {t("continue")}
               <ArrowRightIcon className="size-4" />
             </Button>
           ) : (
@@ -414,7 +414,7 @@ export function DeployModelScreen({
               }
             >
               {loading && <Loader2Icon className="size-4 animate-spin" />}
-              {loading ? "Deploying..." : "Deploy"}
+              {loading ? t("deploying") : t("deploy")}
             </Button>
           )}
         </div>

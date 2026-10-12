@@ -8115,6 +8115,347 @@
     },
     "backToResults": "Volver a los resultados de trazas"
   },
+  "webhooksScreen": {
+    "title": "Webhooks",
+    "webhook": "Webhook",
+    "webhookNoun": "webhook",
+    "webhookHeading": "Webhook {id}",
+    "deliveryNoun": "entrega",
+    "deliveryHeading": "Entrega {id}",
+    "columns": {
+      "url": "URL",
+      "events": "Eventos",
+      "format": "Formato",
+      "lastDelivery": "Última entrega",
+      "failures": "Fallos",
+      "status": "Estado"
+    },
+    "formats": {
+      "generic": {
+        "label": "Genérico (sobre de Astrolift)",
+        "hint": "JSON del evento sin procesar, ideal para recolectores y servicios propios."
+      },
+      "slack": {
+        "label": "Webhook entrante de Slack",
+        "hint": "Se adapta al formato de texto y adjuntos de Slack para que los mensajes se muestren en el canal."
+      },
+      "discord": {
+        "label": "Webhook de Discord",
+        "hint": "Se adapta al formato de contenido y embeds de Discord."
+      }
+    },
+    "never": "nunca",
+    "active": "activo",
+    "paused": "en pausa",
+    "deliveries": "Entregas",
+    "pause": "Pausar",
+    "resume": "Reanudar",
+    "sendTestEvent": "Enviar evento de prueba",
+    "rotateSecret": "Rotar secreto",
+    "delete": "Eliminar",
+    "appDescription": "Entrega HTTP saliente del flujo de eventos de <mono>{app}</mono>. El secreto de cada suscripción firma con HMAC cada carga útil.",
+    "platformDescription": "Entrega HTTP saliente del registro de eventos de la plataforma. El secreto de cada suscripción firma con HMAC cada carga útil.",
+    "learnMore": "Más información",
+    "newWebhook": "Nuevo webhook",
+    "secretReady": "Secreto de <mono>{url}</mono> listo",
+    "secretRevealHelp": "Guarda el secreto HMAC de abajo; no se volverá a mostrar. Solo almacenamos su SHA-256. El secreto anterior sigue siendo válido durante el periodo de gracia de la rotación.",
+    "copy": "Copiar",
+    "dismiss": "Descartar",
+    "listLabel": "Suscripciones de webhook",
+    "empty": {
+      "title": "No hay suscripciones de webhook",
+      "description": "Suscribe un sistema externo (Zentinelle, relé de Slack, recolector propio) a los eventos de la plataforma."
+    },
+    "deliveriesDescription": "Cada intento para esta suscripción, los más recientes primero. Los anteriores se cargan al desplazarte.",
+    "createDescription": "El secreto HMAC se muestra una vez al crearlo; solo almacenamos el SHA-256. Úsalo para verificar el encabezado X-Astrolift-Signature de las entregas entrantes.",
+    "eventsHelp": "Uno por línea, o separados por comas o espacios. <code>*</code> coincide con todos los eventos.",
+    "cancel": "Cancelar",
+    "creating": "Creando…",
+    "createWebhook": "Crear webhook",
+    "deleteDialog": {
+      "title": "¿Eliminar webhook?",
+      "description": "{url} dejará de recibir eventos de inmediato. Las entregas anteriores permanecen en el registro de auditoría.",
+      "confirm": "Eliminar webhook"
+    },
+    "rotateDialog": {
+      "title": "¿Rotar el secreto del webhook?",
+      "description": "Genera un nuevo secreto HMAC para {url}. El secreto anterior sigue siendo válido durante el periodo de gracia configurado para que los suscriptores lo implanten sin perder entregas. El nuevo texto plano se muestra una sola vez."
+    },
+    "testDialog": {
+      "title": "¿Enviar un evento de prueba?",
+      "description": "Envía por POST un evento sintético webhook.test a {url}. Sin reintentos ni registro para la desactivación automática; la respuesta se muestra en línea.",
+      "confirm": "Enviar prueba"
+    },
+    "testDeliveryTo": "Entrega de prueba a <mono>{url}</mono>",
+    "latency": "Latencia",
+    "ms": "{ms} ms",
+    "deliveryId": "ID de entrega",
+    "snippetCopied": "Fragmento copiado",
+    "showSnippet": "Mostrar fragmento de verificación",
+    "snippetHelp": "Rechaza entregas de más de 5 minutos (protección contra repetición) y compara en tiempo constante. Tras la rotación, verifica con el nuevo secreto; el anterior sigue siendo válido durante el periodo de gracia.",
+    "noDeliveries": "Aún no hay entregas",
+    "testBadge": "prueba",
+    "attempt": "Intento",
+    "delivered": "entregado",
+    "failed": "fallido",
+    "event": "Evento",
+    "httpStatus": "Estado HTTP",
+    "test": "Prueba",
+    "yes": "Sí",
+    "no": "No",
+    "deliveredAt": "Entregado",
+    "error": "Error",
+    "requestPayload": "Carga útil de la solicitud",
+    "noRequestPayload": "No se registró carga útil de la solicitud.",
+    "responseBody": "Cuerpo de la respuesta",
+    "noResponseBody": "No se registró cuerpo de respuesta.",
+    "httpParen": "(HTTP {status})",
+    "secretRotated": "Secreto rotado",
+    "version": "Versión",
+    "created": "Creado",
+    "recentDeliveries": "Entregas recientes",
+    "emptyHintList": "Usa la acción Enviar evento de prueba en la lista de webhooks para lanzar una.",
+    "emptyHintSheet": "Usa la acción Enviar evento de prueba para lanzar una.",
+    "lastStatus": "Último estado",
+    "failureCount": "Número de fallos",
+    "toasts": {
+      "busy": "Ya hay una acción en curso para esta suscripción",
+      "createFailed": "Error al crear",
+      "deleted": "Eliminado",
+      "deleteFailed": "Error al eliminar",
+      "resumed": "Reanudado",
+      "paused": "En pausa",
+      "toggleFailed": "Error al cambiar el estado",
+      "updateFailed": "Error al actualizar",
+      "formatSet": "Formato cambiado a {format}",
+      "rotated": "Secreto rotado; copia ahora el nuevo valor",
+      "rotationFailed": "Error en la rotación",
+      "delivered": "Entregado: HTTP {code}",
+      "subscriberReturned": "El suscriptor devolvió HTTP {code}",
+      "transportFailure": "Fallo de transporte: {error}",
+      "unknown": "desconocido",
+      "testFailed": "Error al lanzar la prueba",
+      "copied": "Copiado"
+    }
+  },
+  "zentinelleScreen": {
+    "title": "Secure · Zentinelle",
+    "description": "GRC de agentes de IA: gobernanza, riesgo y cumplimiento para cada workload de agente en Astrolift.",
+    "tagline": "Licencia MIT · Autoalojable · Producto complementario de Calliope AI",
+    "intro": "Zentinelle es el pilar <strong>Control + Secure</strong> del stack BROCS. Se ejecuta junto a Astrolift y aporta la capa específica de IA que Astrolift deliberadamente no asume: aplicación de políticas, análisis de contenido, marcos de cumplimiento y el registro de auditoría completo de interacciones que exigen las normativas de gobernanza de IA.",
+    "statusTitle": "Integración en diseño",
+    "statusBody": "Se está diseñando el handshake de autenticación y la delegación de tenants entre Astrolift y Zentinelle. Las opciones incluyen Zentinelle como app Django integrada que delega la autenticación en Astrolift, o un servicio separado con intercambio de tokens. Cuando se decida la forma, esta página será la interfaz de gestión de la conexión.",
+    "github": "Zentinelle en GitHub",
+    "docs": "Documentación de integración",
+    "addsTitle": "Qué aporta Zentinelle a Astrolift",
+    "capabilities": {
+      "governance": {
+        "title": "Gobernanza",
+        "description": "Motor de políticas: reglas de contenido (PII, toxicidad, detección de jailbreak), listas de modelos permitidos, aplicación de presupuestos de tokens y biblioteca versionada de prompts de sistema."
+      },
+      "risk": {
+        "title": "Riesgo",
+        "description": "Registro de riesgos 5×5, análisis FMEA, seguimiento de incidentes, detección de anomalías y alertas automáticas ante desviaciones en el comportamiento del agente."
+      },
+      "compliance": {
+        "title": "Cumplimiento",
+        "description": "Mapeo de controles de SOC 2, RGPD, HIPAA, Ley de IA de la UE y NIST RMF. Recopilación de evidencias, análisis de brechas e informes listos para auditoría."
+      },
+      "observability": {
+        "title": "Observabilidad",
+        "description": "Auditoría completa de interacciones (prompts, respuestas y llamadas a herramientas), resultados del análisis de contenido, registros de evaluación de políticas y medición del uso de tokens por workload."
+      }
+    },
+    "division": "<label>Reparto de responsabilidades:</label> Astrolift se encarga de la <em>capa de ejecución</em>: orquestación de contenedores, despliegues, salud de los pods y observabilidad de la infraestructura. Zentinelle se encarga de la <em>capa de comportamiento de la IA</em>: lo que el agente dice y hace, si cumple las políticas y el registro de auditoría que exigen los reguladores. En <strong>OBSERVE › Agents</strong>, las pestañas marcadas con <code>Astrolift</code> ya están activas; las de <code>Zentinelle</code> se activarán cuando se publique la integración."
+  },
+  "modelDeploy": {
+    "title": "Desplegar modelo",
+    "steps": {
+      "where": "Dónde",
+      "model": "Modelo",
+      "review": "Revisar"
+    },
+    "fit": {
+      "fits": "Cabe: necesita unos {need} GB en {gpus} GPU de {perGpu} GB.",
+      "tooSmall": "Necesita unos {need} GB, pero {gpus} GPU de {perGpu} GB suman {total} GB. Añade GPU o elige un modelo más pequeño.",
+      "noNode": "Ningún nodo de este clúster tiene {gpus} GPU; el máximo en un nodo es {most}.",
+      "unknown": "Memoria de GPU desconocida para este clúster; el despliegue se comprueba al programarse."
+    },
+    "errors": {
+      "chooseEnv": "Elige el entorno de la aplicación donde se ejecuta el modelo.",
+      "enterModel": "Introduce el id del modelo de Hugging Face, como org/model.",
+      "targets": "No se pudieron cargar los destinos de despliegue",
+      "clusters": "No se pudieron cargar las capacidades de GPU del clúster",
+      "deployFailed": "Error en el despliegue"
+    },
+    "intro": "Aloja un modelo de pesos abiertos con vLLM en el clúster del entorno. La aplicación se conecta a él mediante MODEL_ENDPOINT_URL, MODEL_API_KEY y MODEL_DEPLOYMENT_NAME.",
+    "loadingClusters": "Cargando capacidades de GPU del clúster…",
+    "appEnvironment": "Entorno de la aplicación",
+    "envsUnavailable": "Entornos de aplicación no disponibles",
+    "noEnvs": "Aún no hay entornos de aplicación",
+    "chooseWhere": "Elige dónde se ejecuta",
+    "envHelp": "El modelo se ejecuta en el clúster de este entorno y pertenece a su aplicación.",
+    "model": "Modelo",
+    "gb": "{n} GB",
+    "customId": "Id personalizado de Hugging Face",
+    "hfModelId": "Id del modelo de Hugging Face",
+    "paramsLabel": "Parámetros (miles de millones)",
+    "paramsPlaceholder": "parám., B",
+    "gpus": "GPU",
+    "frontend": "Frontend de vLLM",
+    "clusterDefault": "Predeterminado del clúster",
+    "hfTokenLabel": "Token de Hugging Face (referencia a secreto, opcional)",
+    "review": {
+      "environment": "Entorno",
+      "cluster": "Clúster",
+      "serviceName": "Nombre del servicio",
+      "frontend": "Frontend",
+      "hfToken": "Token de Hugging Face"
+    },
+    "none": "ninguno",
+    "cancel": "Cancelar",
+    "back": "Atrás",
+    "continue": "Continuar",
+    "deploying": "Desplegando...",
+    "deploy": "Desplegar",
+    "toastDeploying": "Desplegando {model} en {app} · {env}"
+  },
+  "modelTest": {
+    "test": "Probar",
+    "title": "Probar {name}",
+    "description": "Envía un prompt acotado a través del agente keep-alive del clúster; el plano de control nunca accede directamente al modelo.",
+    "prompt": "Prompt",
+    "placeholder": "Saluda al modelo...",
+    "waiting": "Esperando al agente del clúster...",
+    "latency": "{ms} ms",
+    "tokens": "{prompt} + {completion} = {total} tokens",
+    "timedOut": "El clúster no tiene ningún agente conectado o no respondió a tiempo.",
+    "modelError": "El modelo devolvió un error.",
+    "sending": "Enviando...",
+    "send": "Enviar",
+    "failed": "Error en la prueba"
+  },
+  "modelReplicas": {
+    "scaleDown": "Reducir {name}",
+    "scaleUp": "Ampliar {name}",
+    "replicas": "Réplicas de {name}",
+    "start": "Iniciar",
+    "stop": "Detener",
+    "stopping": "Deteniendo {name}",
+    "scaling": "Escalando {name} a {count}",
+    "updateFailed": "Error al actualizar"
+  },
+  "modelDetail": {
+    "loading": "Cargando",
+    "notFound": "No encontrado",
+    "notFoundTitle": "Modelo no encontrado",
+    "loadError": "No se pudo cargar este modelo",
+    "retry": "Reintentar",
+    "notFoundDescription": "Puede que se haya eliminado de su aplicación o proyecto, o que no tengas acceso.",
+    "backToModels": "Volver a modelos",
+    "endpoint": "Endpoint",
+    "endpointFailed": "Error en el endpoint",
+    "model": "Modelo",
+    "none": "ninguno",
+    "serving": "Servicio",
+    "hardware": "Hardware",
+    "owner": "Propietario",
+    "cluster": "Clúster",
+    "binding": "Vinculación",
+    "replicas": "Réplicas",
+    "replicasDescription": "Detén, inicia y escala en el sitio; el modelo nunca se vuelve a aprovisionar.",
+    "kserveScales": "KServe escala este modelo por sí mismo; aquí no hay nada que configurar.",
+    "providerScales": "El proveedor de nube escala este endpoint; aquí no hay nada que configurar."
+  },
+  "cloudProviders": {
+    "title": "Proveedores de nube",
+    "description": "Paquetes de drivers conectados a esta organización. Un proveedor aparece como configurado cuando respalda un clúster registrado (ClusterDriver, IngressDriver, DnsDriver, etc.). Registra un clúster en una nueva nube para activarlo.",
+    "loadError": "No se pudieron cargar los proveedores de nube",
+    "empty": {
+      "title": "No hay proveedores de nube configurados",
+      "description": "Registra un clúster para vincular un plugin de proveedor a esta organización. El proveedor que lo respalda (aws, gcp, azure o un endpoint de Kubernetes autogestionado) aparecerá aquí con sus capacidades conectadas."
+    },
+    "showAvailable": "Mostrar {count} {count, plural, one {proveedor disponible} other {proveedores disponibles}}",
+    "hideAvailable": "Ocultar {count} {count, plural, one {proveedor disponible} other {proveedores disponibles}}",
+    "configured": "configurado",
+    "available": "disponible",
+    "clusters": "{count} {count, plural, one {clúster} other {clústeres}}",
+    "drivers": "{count} {count, plural, one {driver} other {drivers}}"
+  },
+  "providersScreen": {
+    "title": "Proveedores",
+    "description": "Integraciones externas que conecta esta organización: paquetes de drivers de nube, alojamientos de código fuente y proveedores de identidad. Cada sección muestra lo conectado y cómo conectar más.",
+    "categories": "Categorías de proveedores",
+    "tabs": {
+      "cloud": "Nube",
+      "source": "Código fuente",
+      "identity": "Identidad"
+    }
+  },
+  "loginScreen": {
+    "redirectingDev": "Redirigiendo al inicio de sesión de desarrollo…",
+    "apiUnreachable": "No se pudo conectar con la API",
+    "detecting": "Detectando el proveedor de identidad…",
+    "noIdp": "No hay proveedor de identidad configurado",
+    "noIdpHint": "Un operador debe configurar un IdP antes de que los usuarios puedan iniciar sesión.",
+    "continueWith": "Continuar con {provider}",
+    "yourProvider": "tu proveedor",
+    "title": "Inicia sesión en Astrolift",
+    "via": "mediante {provider}",
+    "localSubtitle": "Usuario y contraseña locales",
+    "username": "Usuario o correo electrónico",
+    "password": "Contraseña",
+    "signingIn": "Iniciando sesión…",
+    "signIn": "Iniciar sesión"
+  },
+  "invitationAccept": {
+    "title": "Aceptar invitación",
+    "successTitle": "Ya estás dentro",
+    "successBody": "Te damos la bienvenida. Tu cuenta ya es miembro de esta organización.",
+    "goToDashboard": "Ir al panel",
+    "errorTitle": "No se pudo aceptar",
+    "continue": "Continuar a Astrolift",
+    "intro": "Te invitaron a unirte a una organización de Astrolift. Al aceptar, se crea un registro de miembro en tu cuenta y se aplica el rol que eligió quien te invitó.",
+    "tokenHelp": "El token de invitación es de un solo uso. Para aceptar, tu correo con sesión iniciada debe coincidir con la dirección invitada; si no coincide, verás un error y no se creará ningún registro.",
+    "failed": "No se pudo aceptar la invitación"
+  },
+  "workloadsScreen": {
+    "columns": {
+      "workload": "Workload",
+      "kind": "Tipo",
+      "app": "Aplicación",
+      "replicas": "Réplicas",
+      "schedule": "Programación"
+    },
+    "kinds": {
+      "agent": "Agente",
+      "workflow": "Flujo de trabajo",
+      "function": "Función"
+    },
+    "none": "ninguno",
+    "title": "Workloads",
+    "context": "Los deployments, jobs y cron jobs de una aplicación permanecen en su pestaña Workloads.",
+    "empty": {
+      "title": "No hay workloads de agentes, flujos de trabajo ni funciones",
+      "description": "Las aplicaciones con kind: agent, workflow o function en su manifiesto aparecen aquí una vez registradas.",
+      "action": "Ir a agentes"
+    }
+  },
+  "functionsScreen": {
+    "columns": {
+      "function": "Función",
+      "app": "Aplicación",
+      "minScale": "Escala mínima",
+      "maxScale": "Escala máxima"
+    },
+    "none": "ninguna",
+    "title": "Funciones",
+    "context": "Escalan a cero y se activan por HTTP, colas o webhooks. El rendimiento, los errores, la latencia y los registros llegarán con el runtime de funciones.",
+    "empty": {
+      "title": "No hay workloads de funciones",
+      "description": "Las aplicaciones con kind: function en su manifiesto aparecerán aquí. Las funciones escalan a cero y se activan por HTTP, colas o eventos."
+    }
+  },
   "managedDomains": {
     "title": "Dominios administrados",
     "overview": "Resumen",

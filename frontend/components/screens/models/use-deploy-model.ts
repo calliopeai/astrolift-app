@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type {
@@ -36,6 +37,7 @@ export interface DeployModelInput {
  */
 export function useDeployModel() {
   const router = useRouter();
+  const t = useTranslations("modelDeploy");
   const targets = useQuery<ListModelTargetsQuery>(LIST_MODEL_TARGETS, {
     fetchPolicy: "cache-and-network",
   });
@@ -61,11 +63,13 @@ export function useDeployModel() {
       });
       const result = data?.provisionManagedService;
       if (result?.ok) {
-        toast.success(`Deploying ${modelId} to ${env.registeredAppSlug} · ${env.name}`);
+        toast.success(
+          t("toastDeploying", { model: modelId, app: env.registeredAppSlug, env: env.name })
+        );
         router.push("/models");
         return null;
       }
-      return result?.errors?.[0]?.message ?? "Deploy failed";
+      return result?.errors?.[0]?.message ?? t("errors.deployFailed");
     } catch (err) {
       return err instanceof Error ? err.message : String(err);
     }

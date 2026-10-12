@@ -8192,6 +8192,347 @@
     },
     "backToResults": "Back to trace results"
   },
+  "webhooksScreen": {
+    "title": "Webhooks",
+    "webhook": "Webhook",
+    "webhookNoun": "webhook",
+    "webhookHeading": "Webhook {id}",
+    "deliveryNoun": "delivery",
+    "deliveryHeading": "Delivery {id}",
+    "columns": {
+      "url": "URL",
+      "events": "Events",
+      "format": "Format",
+      "lastDelivery": "Last delivery",
+      "failures": "Failures",
+      "status": "Status"
+    },
+    "formats": {
+      "generic": {
+        "label": "Generic (Astrolift envelope)",
+        "hint": "Raw event JSON, best for collectors and your own services."
+      },
+      "slack": {
+        "label": "Slack incoming webhook",
+        "hint": "Adapts to Slack's text + attachments shape so messages render in-channel."
+      },
+      "discord": {
+        "label": "Discord webhook",
+        "hint": "Adapts to Discord's content + embeds shape."
+      }
+    },
+    "never": "never",
+    "active": "active",
+    "paused": "paused",
+    "deliveries": "Deliveries",
+    "pause": "Pause",
+    "resume": "Resume",
+    "sendTestEvent": "Send test event",
+    "rotateSecret": "Rotate secret",
+    "delete": "Delete",
+    "appDescription": "Outbound HTTP delivery for <mono>{app}</mono>'s event stream. Each subscription's secret is used to HMAC-sign every payload.",
+    "platformDescription": "Outbound HTTP delivery for the platform's event log. Each subscription's secret is used to HMAC-sign every payload.",
+    "learnMore": "Learn more",
+    "newWebhook": "New webhook",
+    "secretReady": "Secret for <mono>{url}</mono> ready",
+    "secretRevealHelp": "Save the HMAC secret below; it is never shown again. We store only its SHA-256. The previous secret stays valid for the rotation grace window.",
+    "copy": "Copy",
+    "dismiss": "Dismiss",
+    "listLabel": "Webhook subscriptions",
+    "empty": {
+      "title": "No webhook subscriptions",
+      "description": "Subscribe an external system (Zentinelle, Slack relay, custom collector) to platform events."
+    },
+    "deliveriesDescription": "Every attempt to this subscription, newest first. Older attempts load as you scroll.",
+    "createDescription": "The HMAC secret is shown once at creation; we store only the SHA-256. Use it to verify the X-Astrolift-Signature header on incoming deliveries.",
+    "eventsHelp": "One per line, or comma/space separated. <code>*</code> matches all events.",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "createWebhook": "Create webhook",
+    "deleteDialog": {
+      "title": "Delete webhook?",
+      "description": "{url} will stop receiving events immediately. Past deliveries stay in the audit log.",
+      "confirm": "Delete webhook"
+    },
+    "rotateDialog": {
+      "title": "Rotate webhook secret?",
+      "description": "Generate a new HMAC secret for {url}. The previous secret stays valid for the configured grace window so subscribers can roll out without dropping deliveries. The new plaintext is shown exactly once."
+    },
+    "testDialog": {
+      "title": "Send a test event?",
+      "description": "POST a synthetic webhook.test event to {url}. No retries, no auto-disable bookkeeping; the response is shown inline.",
+      "confirm": "Send test"
+    },
+    "testDeliveryTo": "Test delivery to <mono>{url}</mono>",
+    "latency": "Latency",
+    "ms": "{ms}ms",
+    "deliveryId": "Delivery ID",
+    "snippetCopied": "Snippet copied",
+    "showSnippet": "Show verification snippet",
+    "snippetHelp": "Rejects deliveries older than 5 minutes (replay protection) and uses constant-time comparison. Verify against the new secret after rotation; the previous secret stays valid for the rotation grace window.",
+    "noDeliveries": "No deliveries yet",
+    "testBadge": "test",
+    "attempt": "Attempt",
+    "delivered": "delivered",
+    "failed": "failed",
+    "event": "Event",
+    "httpStatus": "HTTP status",
+    "test": "Test",
+    "yes": "Yes",
+    "no": "No",
+    "deliveredAt": "Delivered",
+    "error": "Error",
+    "requestPayload": "Request payload",
+    "noRequestPayload": "No request payload recorded.",
+    "responseBody": "Response body",
+    "noResponseBody": "No response body recorded.",
+    "httpParen": "(HTTP {status})",
+    "secretRotated": "Secret rotated",
+    "version": "Version",
+    "created": "Created",
+    "recentDeliveries": "Recent deliveries",
+    "emptyHintList": "Use the Send test event action on the webhooks list to fire one.",
+    "emptyHintSheet": "Use the Send test event action to fire one.",
+    "lastStatus": "Last status",
+    "failureCount": "Failure count",
+    "toasts": {
+      "busy": "An action is already running for this subscription",
+      "createFailed": "Create failed",
+      "deleted": "Deleted",
+      "deleteFailed": "Delete failed",
+      "resumed": "Resumed",
+      "paused": "Paused",
+      "toggleFailed": "Toggle failed",
+      "updateFailed": "Update failed",
+      "formatSet": "Format set to {format}",
+      "rotated": "Secret rotated; copy the new value now",
+      "rotationFailed": "Rotation failed",
+      "delivered": "Delivered: HTTP {code}",
+      "subscriberReturned": "Subscriber returned HTTP {code}",
+      "transportFailure": "Transport failure: {error}",
+      "unknown": "unknown",
+      "testFailed": "Test fire failed",
+      "copied": "Copied"
+    }
+  },
+  "zentinelleScreen": {
+    "title": "Secure · Zentinelle",
+    "description": "AI Agent GRC: Governance, Risk, and Compliance for every agent workload running on Astrolift.",
+    "tagline": "MIT-licensed · Self-hostable · Calliope AI companion product",
+    "intro": "Zentinelle is the <strong>Control + Secure</strong> pillar of the BROCS stack. It runs alongside Astrolift and provides the AI-specific layer that Astrolift deliberately does not own: policy enforcement, content scanning, compliance frameworks, and the full interaction audit trail that AI governance regulations require.",
+    "statusTitle": "Integration under design",
+    "statusBody": "The auth handshake and tenant delegation between Astrolift and Zentinelle is being designed. Options include Zentinelle as an embedded Django app delegating auth to Astrolift, or a separate service with a token exchange. Once the shape is decided, this page becomes the connection management UI.",
+    "github": "Zentinelle on GitHub",
+    "docs": "Integration docs",
+    "addsTitle": "What Zentinelle adds to Astrolift",
+    "capabilities": {
+      "governance": {
+        "title": "Governance",
+        "description": "Policy engine: content rules (PII, toxicity, jailbreak detection), model allowlists, token budget enforcement, and versioned system prompt library."
+      },
+      "risk": {
+        "title": "Risk",
+        "description": "5×5 risk register, FMEA analysis, incident tracking, anomaly detection, and automated alerts on agent behavior drift."
+      },
+      "compliance": {
+        "title": "Compliance",
+        "description": "SOC 2, GDPR, HIPAA, EU AI Act, and NIST RMF control mappings. Evidence collection, gap analysis, and audit-ready reports."
+      },
+      "observability": {
+        "title": "Observability",
+        "description": "Full interaction audit (prompts + responses + tool calls), content scan results, policy evaluation logs, and per-workload token usage metering."
+      }
+    },
+    "division": "<label>Division of responsibility:</label> Astrolift owns the <em>runtime layer</em>: container orchestration, deployments, pod health, and infrastructure observability. Zentinelle owns the <em>AI behavior layer</em>: what the agent says and does, whether it complies with policy, and the audit trail regulators require. In <strong>OBSERVE › Agents</strong>, tabs marked <code>Astrolift</code> are live today; <code>Zentinelle</code> tabs activate once the integration ships."
+  },
+  "modelDeploy": {
+    "title": "Deploy model",
+    "steps": {
+      "where": "Where",
+      "model": "Model",
+      "review": "Review"
+    },
+    "fit": {
+      "fits": "Fits: needs about {need} GB across {gpus} GPU(s) of {perGpu} GB.",
+      "tooSmall": "Needs about {need} GB but {gpus} GPU(s) of {perGpu} GB hold {total} GB. Add GPUs or pick a smaller model.",
+      "noNode": "No node of this cluster has {gpus} GPUs; the most on one node is {most}.",
+      "unknown": "GPU memory unknown for this cluster; the deploy is checked when it schedules."
+    },
+    "errors": {
+      "chooseEnv": "Choose the app environment the model runs in.",
+      "enterModel": "Enter the Hugging Face model id, as org/model.",
+      "targets": "Could not load deploy targets",
+      "clusters": "Could not load cluster GPU capabilities",
+      "deployFailed": "Deploy failed"
+    },
+    "intro": "Hosts an open-weight model with vLLM on the environment's cluster. The app binds to it through MODEL_ENDPOINT_URL, MODEL_API_KEY and MODEL_DEPLOYMENT_NAME.",
+    "loadingClusters": "Loading cluster GPU capabilities…",
+    "appEnvironment": "App environment",
+    "envsUnavailable": "App environments unavailable",
+    "noEnvs": "No app environments yet",
+    "chooseWhere": "Choose where it runs",
+    "envHelp": "The model runs on this environment's cluster and is owned by its app.",
+    "model": "Model",
+    "gb": "{n} GB",
+    "customId": "Custom Hugging Face id",
+    "hfModelId": "Hugging Face model id",
+    "paramsLabel": "Parameters (billions)",
+    "paramsPlaceholder": "params, B",
+    "gpus": "GPUs",
+    "frontend": "vLLM frontend",
+    "clusterDefault": "Cluster default",
+    "hfTokenLabel": "Hugging Face token (secret ref, optional)",
+    "review": {
+      "environment": "Environment",
+      "cluster": "Cluster",
+      "serviceName": "Service name",
+      "frontend": "Frontend",
+      "hfToken": "Hugging Face token"
+    },
+    "none": "none",
+    "cancel": "Cancel",
+    "back": "Back",
+    "continue": "Continue",
+    "deploying": "Deploying...",
+    "deploy": "Deploy",
+    "toastDeploying": "Deploying {model} to {app} · {env}"
+  },
+  "modelTest": {
+    "test": "Test",
+    "title": "Test {name}",
+    "description": "Sends one bounded prompt through the cluster's keep-alive agent; the control plane never reaches the model directly.",
+    "prompt": "Prompt",
+    "placeholder": "Say hello to the model...",
+    "waiting": "Waiting for the cluster agent...",
+    "latency": "{ms} ms",
+    "tokens": "{prompt} + {completion} = {total} tokens",
+    "timedOut": "The cluster has no agent connected, or it did not respond in time.",
+    "modelError": "The model returned an error.",
+    "sending": "Sending...",
+    "send": "Send",
+    "failed": "Test failed"
+  },
+  "modelReplicas": {
+    "scaleDown": "Scale {name} down",
+    "scaleUp": "Scale {name} up",
+    "replicas": "{name} replicas",
+    "start": "Start",
+    "stop": "Stop",
+    "stopping": "Stopping {name}",
+    "scaling": "Scaling {name} to {count}",
+    "updateFailed": "Update failed"
+  },
+  "modelDetail": {
+    "loading": "Loading",
+    "notFound": "Not found",
+    "notFoundTitle": "Model not found",
+    "loadError": "Could not load this model",
+    "retry": "Retry",
+    "notFoundDescription": "It may have been removed from its app or project, or you may not have access to it.",
+    "backToModels": "Back to models",
+    "endpoint": "Endpoint",
+    "endpointFailed": "Endpoint failed",
+    "model": "Model",
+    "none": "none",
+    "serving": "Serving",
+    "hardware": "Hardware",
+    "owner": "Owner",
+    "cluster": "Cluster",
+    "binding": "Binding",
+    "replicas": "Replicas",
+    "replicasDescription": "Stop, start and scale in place; the model is never reprovisioned.",
+    "kserveScales": "KServe scales this model itself; there is nothing to set here.",
+    "providerScales": "The cloud provider scales this endpoint; there is nothing to set here."
+  },
+  "cloudProviders": {
+    "title": "Cloud providers",
+    "description": "Driver bundles wired to this organization. A provider shows as configured once it backs a registered cluster (ClusterDriver, IngressDriver, DnsDriver, and so on). Register a cluster on a new cloud to light one up.",
+    "loadError": "Could not load cloud providers",
+    "empty": {
+      "title": "No cloud providers configured",
+      "description": "Register a cluster to bind a provider plugin to this org. The provider that backs it (aws, gcp, azure, or a self-managed Kubernetes endpoint) then shows up here with its wired capabilities."
+    },
+    "showAvailable": "Show {count} available {count, plural, one {provider} other {providers}}",
+    "hideAvailable": "Hide {count} available {count, plural, one {provider} other {providers}}",
+    "configured": "configured",
+    "available": "available",
+    "clusters": "{count} {count, plural, one {cluster} other {clusters}}",
+    "drivers": "{count} {count, plural, one {driver} other {drivers}}"
+  },
+  "providersScreen": {
+    "title": "Providers",
+    "description": "External integrations this organization connects: cloud driver bundles, source-code hosts, and identity providers. Each section shows what's wired plus how to connect more.",
+    "categories": "Provider categories",
+    "tabs": {
+      "cloud": "Cloud",
+      "source": "Source",
+      "identity": "Identity"
+    }
+  },
+  "loginScreen": {
+    "redirectingDev": "Redirecting to dev login…",
+    "apiUnreachable": "Couldn't reach the API",
+    "detecting": "Detecting identity provider…",
+    "noIdp": "No identity provider configured",
+    "noIdpHint": "An operator must configure an IdP before users can log in.",
+    "continueWith": "Continue with {provider}",
+    "yourProvider": "your provider",
+    "title": "Sign in to Astrolift",
+    "via": "via {provider}",
+    "localSubtitle": "Local username + password",
+    "username": "Username or email",
+    "password": "Password",
+    "signingIn": "Signing in…",
+    "signIn": "Sign in"
+  },
+  "invitationAccept": {
+    "title": "Accept invitation",
+    "successTitle": "You're in",
+    "successBody": "Welcome aboard. Your account now has membership in this organization.",
+    "goToDashboard": "Go to dashboard",
+    "errorTitle": "Could not accept",
+    "continue": "Continue to Astrolift",
+    "intro": "You were invited to join an Astrolift organization. Accepting creates a member record on your account and applies the role the inviter selected.",
+    "tokenHelp": "The invitation token is single-use. Acceptance requires your signed-in email to match the invited address; if it doesn't, you'll see an error and no record is created.",
+    "failed": "Could not accept invitation"
+  },
+  "workloadsScreen": {
+    "columns": {
+      "workload": "Workload",
+      "kind": "Kind",
+      "app": "App",
+      "replicas": "Replicas",
+      "schedule": "Schedule"
+    },
+    "kinds": {
+      "agent": "Agent",
+      "workflow": "Workflow",
+      "function": "Function"
+    },
+    "none": "none",
+    "title": "Workloads",
+    "context": "An app's deployments, jobs and cron jobs stay on that app's Workloads tab.",
+    "empty": {
+      "title": "No agent, workflow or function workloads",
+      "description": "Apps with kind: agent, workflow or function in their manifest appear here once registered.",
+      "action": "Go to agents"
+    }
+  },
+  "functionsScreen": {
+    "columns": {
+      "function": "Function",
+      "app": "App",
+      "minScale": "Min scale",
+      "maxScale": "Max scale"
+    },
+    "none": "none",
+    "title": "Functions",
+    "context": "Scale to zero and trigger on HTTP, queues or webhooks. Throughput, errors, latency and logs arrive with the function runtime.",
+    "empty": {
+      "title": "No function workloads",
+      "description": "Apps with kind: function in their manifest will appear here. Functions scale to zero and trigger on HTTP, queues, or events."
+    }
+  },
   "managedDomains": {
     "title": "Managed domains",
     "overview": "Overview",

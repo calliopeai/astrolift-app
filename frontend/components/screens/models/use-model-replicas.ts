@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { UPDATE_MANAGED_SERVICE } from "@/graphql/services/services.mutations";
@@ -33,6 +34,7 @@ export function useModelReplicas({
   config: Record<string, unknown>;
   onChanged: () => void;
 }) {
+  const t = useTranslations("modelReplicas");
   const [update, { loading }] = useMutation<UpdateResult>(UPDATE_MANAGED_SERVICE);
 
   async function setReplicas(next: number) {
@@ -41,10 +43,10 @@ export function useModelReplicas({
     });
     const result = data?.updateManagedService;
     if (result?.ok) {
-      toast.success(next === 0 ? `Stopping ${name}` : `Scaling ${name} to ${next}`);
+      toast.success(next === 0 ? t("stopping", { name }) : t("scaling", { name, count: next }));
       onChanged();
     } else {
-      toast.error(result?.errors?.[0]?.message ?? "Update failed");
+      toast.error(result?.errors?.[0]?.message ?? t("updateFailed"));
     }
   }
 

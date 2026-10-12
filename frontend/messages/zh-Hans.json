@@ -8112,6 +8112,347 @@
     },
     "backToResults": "返回追踪搜索结果"
   },
+  "webhooksScreen": {
+    "title": "Webhook",
+    "webhook": "Webhook",
+    "webhookNoun": "Webhook",
+    "webhookHeading": "Webhook {id}",
+    "deliveryNoun": "投递",
+    "deliveryHeading": "投递 {id}",
+    "columns": {
+      "url": "URL",
+      "events": "事件",
+      "format": "格式",
+      "lastDelivery": "上次投递",
+      "failures": "失败次数",
+      "status": "状态"
+    },
+    "formats": {
+      "generic": {
+        "label": "通用 (Astrolift 信封)",
+        "hint": "原始事件 JSON，最适合采集器和自有服务。"
+      },
+      "slack": {
+        "label": "Slack 传入 Webhook",
+        "hint": "适配 Slack 的文本 + 附件格式，使消息在频道内正常显示。"
+      },
+      "discord": {
+        "label": "Discord Webhook",
+        "hint": "适配 Discord 的内容 + 嵌入格式。"
+      }
+    },
+    "never": "从未",
+    "active": "活跃",
+    "paused": "已暂停",
+    "deliveries": "投递记录",
+    "pause": "暂停",
+    "resume": "恢复",
+    "sendTestEvent": "发送测试事件",
+    "rotateSecret": "轮换密钥",
+    "delete": "删除",
+    "appDescription": "<mono>{app}</mono> 事件流的出站 HTTP 投递。每个订阅的密钥用于对每个负载进行 HMAC 签名。",
+    "platformDescription": "平台事件日志的出站 HTTP 投递。每个订阅的密钥用于对每个负载进行 HMAC 签名。",
+    "learnMore": "了解更多",
+    "newWebhook": "新建 Webhook",
+    "secretReady": "<mono>{url}</mono> 的密钥已就绪",
+    "secretRevealHelp": "请保存下方的 HMAC 密钥，它不会再次显示。我们只存储其 SHA-256。旧密钥在轮换宽限期内仍然有效。",
+    "copy": "复制",
+    "dismiss": "关闭",
+    "listLabel": "Webhook 订阅",
+    "empty": {
+      "title": "暂无 Webhook 订阅",
+      "description": "让外部系统（Zentinelle、Slack 中继、自定义采集器）订阅平台事件。"
+    },
+    "deliveriesDescription": "此订阅的每次尝试，最新的在前。滚动时加载更早的尝试。",
+    "createDescription": "HMAC 密钥仅在创建时显示一次；我们只存储 SHA-256。用它来验证传入投递的 X-Astrolift-Signature 请求头。",
+    "eventsHelp": "每行一个，或用逗号/空格分隔。<code>*</code> 匹配所有事件。",
+    "cancel": "取消",
+    "creating": "正在创建…",
+    "createWebhook": "创建 Webhook",
+    "deleteDialog": {
+      "title": "删除 Webhook？",
+      "description": "{url} 将立即停止接收事件。以往的投递记录保留在审计日志中。",
+      "confirm": "删除 Webhook"
+    },
+    "rotateDialog": {
+      "title": "轮换 Webhook 密钥？",
+      "description": "为 {url} 生成新的 HMAC 密钥。旧密钥在配置的宽限期内仍然有效，订阅方可以在不丢失投递的情况下完成切换。新的明文只显示一次。"
+    },
+    "testDialog": {
+      "title": "发送测试事件？",
+      "description": "向 {url} POST 一个合成的 webhook.test 事件。不重试，也不计入自动停用；响应直接显示。",
+      "confirm": "发送测试"
+    },
+    "testDeliveryTo": "向 <mono>{url}</mono> 的测试投递",
+    "latency": "延迟",
+    "ms": "{ms} 毫秒",
+    "deliveryId": "投递 ID",
+    "snippetCopied": "代码片段已复制",
+    "showSnippet": "显示验证代码片段",
+    "snippetHelp": "拒绝超过 5 分钟的投递（防重放），并使用恒定时间比较。轮换后请使用新密钥验证；旧密钥在宽限期内仍然有效。",
+    "noDeliveries": "暂无投递",
+    "testBadge": "测试",
+    "attempt": "尝试次数",
+    "delivered": "已投递",
+    "failed": "失败",
+    "event": "事件",
+    "httpStatus": "HTTP 状态",
+    "test": "测试",
+    "yes": "是",
+    "no": "否",
+    "deliveredAt": "投递时间",
+    "error": "错误",
+    "requestPayload": "请求负载",
+    "noRequestPayload": "未记录请求负载。",
+    "responseBody": "响应正文",
+    "noResponseBody": "未记录响应正文。",
+    "httpParen": "(HTTP {status})",
+    "secretRotated": "密钥轮换时间",
+    "version": "版本",
+    "created": "创建时间",
+    "recentDeliveries": "最近的投递",
+    "emptyHintList": "在 Webhook 列表中使用“发送测试事件”操作来触发一次。",
+    "emptyHintSheet": "使用“发送测试事件”操作来触发一次。",
+    "lastStatus": "上次状态",
+    "failureCount": "失败次数",
+    "toasts": {
+      "busy": "此订阅已有操作正在运行",
+      "createFailed": "创建失败",
+      "deleted": "已删除",
+      "deleteFailed": "删除失败",
+      "resumed": "已恢复",
+      "paused": "已暂停",
+      "toggleFailed": "切换失败",
+      "updateFailed": "更新失败",
+      "formatSet": "格式已设为 {format}",
+      "rotated": "密钥已轮换；请立即复制新值",
+      "rotationFailed": "轮换失败",
+      "delivered": "已投递：HTTP {code}",
+      "subscriberReturned": "订阅方返回 HTTP {code}",
+      "transportFailure": "传输失败：{error}",
+      "unknown": "未知",
+      "testFailed": "测试触发失败",
+      "copied": "已复制"
+    }
+  },
+  "zentinelleScreen": {
+    "title": "Secure · Zentinelle",
+    "description": "AI 智能体 GRC：为 Astrolift 上运行的每个智能体工作负载提供治理、风险与合规。",
+    "tagline": "MIT 许可 · 可自托管 · Calliope AI 配套产品",
+    "intro": "Zentinelle 是 BROCS 技术栈中的 <strong>Control + Secure</strong> 支柱。它与 Astrolift 并行运行，提供 Astrolift 有意不承担的 AI 专属层：策略执行、内容扫描、合规框架，以及 AI 治理法规要求的完整交互审计记录。",
+    "statusTitle": "集成方案设计中",
+    "statusBody": "Astrolift 与 Zentinelle 之间的认证握手和租户委派正在设计中。可选方案包括：将 Zentinelle 作为嵌入式 Django 应用并把认证委托给 Astrolift，或作为通过令牌交换对接的独立服务。方案确定后，此页面将成为连接管理界面。",
+    "github": "GitHub 上的 Zentinelle",
+    "docs": "集成文档",
+    "addsTitle": "Zentinelle 为 Astrolift 带来的能力",
+    "capabilities": {
+      "governance": {
+        "title": "治理",
+        "description": "策略引擎：内容规则（PII、有害内容、越狱检测）、模型允许列表、令牌预算执行，以及带版本管理的系统提示词库。"
+      },
+      "risk": {
+        "title": "风险",
+        "description": "5×5 风险登记册、FMEA 分析、事件跟踪、异常检测，以及针对智能体行为漂移的自动告警。"
+      },
+      "compliance": {
+        "title": "合规",
+        "description": "SOC 2、GDPR、HIPAA、欧盟 AI 法案和 NIST RMF 控制映射。证据收集、差距分析和可直接用于审计的报告。"
+      },
+      "observability": {
+        "title": "可观测性",
+        "description": "完整的交互审计（提示词、响应和工具调用）、内容扫描结果、策略评估日志，以及按工作负载计量的令牌用量。"
+      }
+    },
+    "division": "<label>职责划分：</label>Astrolift 负责<em>运行时层</em>：容器编排、部署、Pod 健康状况和基础设施可观测性。Zentinelle 负责<em>AI 行为层</em>：智能体说了什么、做了什么，是否符合策略，以及监管机构要求的审计记录。在 <strong>OBSERVE › Agents</strong> 中，标有 <code>Astrolift</code> 的标签页现已可用；<code>Zentinelle</code> 标签页将在集成发布后启用。"
+  },
+  "modelDeploy": {
+    "title": "部署模型",
+    "steps": {
+      "where": "位置",
+      "model": "模型",
+      "review": "确认"
+    },
+    "fit": {
+      "fits": "可容纳：需要约 {need} GB，分布在 {gpus} 块 {perGpu} GB 的 GPU 上。",
+      "tooSmall": "需要约 {need} GB，但 {gpus} 块 {perGpu} GB 的 GPU 只有 {total} GB。请增加 GPU 或选择更小的模型。",
+      "noNode": "此集群没有拥有 {gpus} 块 GPU 的节点；单个节点最多 {most} 块。",
+      "unknown": "此集群的 GPU 显存未知；部署将在调度时检查。"
+    },
+    "errors": {
+      "chooseEnv": "请选择运行该模型的应用环境。",
+      "enterModel": "请输入 Hugging Face 模型 ID，格式为 org/model。",
+      "targets": "无法加载部署目标",
+      "clusters": "无法加载集群 GPU 能力",
+      "deployFailed": "部署失败"
+    },
+    "intro": "在环境所在集群上使用 vLLM 托管开放权重模型。应用通过 MODEL_ENDPOINT_URL、MODEL_API_KEY 和 MODEL_DEPLOYMENT_NAME 绑定到它。",
+    "loadingClusters": "正在加载集群 GPU 能力…",
+    "appEnvironment": "应用环境",
+    "envsUnavailable": "应用环境不可用",
+    "noEnvs": "暂无应用环境",
+    "chooseWhere": "选择运行位置",
+    "envHelp": "模型运行在此环境的集群上，归其应用所有。",
+    "model": "模型",
+    "gb": "{n} GB",
+    "customId": "自定义 Hugging Face ID",
+    "hfModelId": "Hugging Face 模型 ID",
+    "paramsLabel": "参数量（十亿）",
+    "paramsPlaceholder": "参数, B",
+    "gpus": "GPU",
+    "frontend": "vLLM 前端",
+    "clusterDefault": "集群默认值",
+    "hfTokenLabel": "Hugging Face 令牌（密钥引用，可选）",
+    "review": {
+      "environment": "环境",
+      "cluster": "集群",
+      "serviceName": "服务名称",
+      "frontend": "前端",
+      "hfToken": "Hugging Face 令牌"
+    },
+    "none": "无",
+    "cancel": "取消",
+    "back": "上一步",
+    "continue": "继续",
+    "deploying": "正在部署...",
+    "deploy": "部署",
+    "toastDeploying": "正在将 {model} 部署到 {app} · {env}"
+  },
+  "modelTest": {
+    "test": "测试",
+    "title": "测试 {name}",
+    "description": "通过集群的保活代理发送一条受限提示词；控制平面从不直接访问模型。",
+    "prompt": "提示词",
+    "placeholder": "向模型打个招呼...",
+    "waiting": "正在等待集群代理...",
+    "latency": "{ms} 毫秒",
+    "tokens": "{prompt} + {completion} = {total} 个令牌",
+    "timedOut": "集群未连接代理，或代理未及时响应。",
+    "modelError": "模型返回了错误。",
+    "sending": "正在发送...",
+    "send": "发送",
+    "failed": "测试失败"
+  },
+  "modelReplicas": {
+    "scaleDown": "缩容 {name}",
+    "scaleUp": "扩容 {name}",
+    "replicas": "{name} 副本数",
+    "start": "启动",
+    "stop": "停止",
+    "stopping": "正在停止 {name}",
+    "scaling": "正在将 {name} 扩缩到 {count}",
+    "updateFailed": "更新失败"
+  },
+  "modelDetail": {
+    "loading": "加载中",
+    "notFound": "未找到",
+    "notFoundTitle": "未找到模型",
+    "loadError": "无法加载此模型",
+    "retry": "重试",
+    "notFoundDescription": "它可能已从所属应用或项目中移除，或者您没有访问权限。",
+    "backToModels": "返回模型列表",
+    "endpoint": "端点",
+    "endpointFailed": "端点失败",
+    "model": "模型",
+    "none": "无",
+    "serving": "推理服务",
+    "hardware": "硬件",
+    "owner": "所有者",
+    "cluster": "集群",
+    "binding": "绑定",
+    "replicas": "副本",
+    "replicasDescription": "可就地停止、启动和扩缩容；模型永远不会重新预配。",
+    "kserveScales": "KServe 会自行扩缩此模型；此处无需设置。",
+    "providerScales": "云服务商负责扩缩此端点；此处无需设置。"
+  },
+  "cloudProviders": {
+    "title": "云服务商",
+    "description": "已接入此组织的驱动包。服务商在支撑某个已注册集群后即显示为已配置（ClusterDriver、IngressDriver、DnsDriver 等）。在新的云上注册集群即可启用。",
+    "loadError": "无法加载云服务商",
+    "empty": {
+      "title": "未配置云服务商",
+      "description": "注册集群即可将服务商插件绑定到此组织。支撑它的服务商（aws、gcp、azure 或自管理的 Kubernetes 端点）随后会连同其已接入的能力显示在这里。"
+    },
+    "showAvailable": "显示 {count} 个可用服务商",
+    "hideAvailable": "隐藏 {count} 个可用服务商",
+    "configured": "已配置",
+    "available": "可用",
+    "clusters": "{count} 个集群",
+    "drivers": "{count} 个驱动"
+  },
+  "providersScreen": {
+    "title": "服务商",
+    "description": "此组织连接的外部集成：云驱动包、源代码托管平台和身份提供商。每个部分都会显示已接入的内容以及如何接入更多。",
+    "categories": "服务商类别",
+    "tabs": {
+      "cloud": "云",
+      "source": "源代码",
+      "identity": "身份"
+    }
+  },
+  "loginScreen": {
+    "redirectingDev": "正在跳转到开发登录…",
+    "apiUnreachable": "无法连接 API",
+    "detecting": "正在检测身份提供商…",
+    "noIdp": "未配置身份提供商",
+    "noIdpHint": "运维人员需要先配置 IdP，用户才能登录。",
+    "continueWith": "使用 {provider} 继续",
+    "yourProvider": "您的提供商",
+    "title": "登录 Astrolift",
+    "via": "通过 {provider}",
+    "localSubtitle": "本地用户名 + 密码",
+    "username": "用户名或邮箱",
+    "password": "密码",
+    "signingIn": "正在登录…",
+    "signIn": "登录"
+  },
+  "invitationAccept": {
+    "title": "接受邀请",
+    "successTitle": "已加入",
+    "successBody": "欢迎加入。您的账户现已成为此组织的成员。",
+    "goToDashboard": "前往仪表板",
+    "errorTitle": "无法接受",
+    "continue": "继续前往 Astrolift",
+    "intro": "您受邀加入一个 Astrolift 组织。接受后，系统会在您的账户上创建成员记录，并应用邀请人选择的角色。",
+    "tokenHelp": "邀请令牌只能使用一次。接受邀请时，您登录的邮箱必须与受邀地址一致；否则会显示错误，且不会创建记录。",
+    "failed": "无法接受邀请"
+  },
+  "workloadsScreen": {
+    "columns": {
+      "workload": "工作负载",
+      "kind": "类型",
+      "app": "应用",
+      "replicas": "副本",
+      "schedule": "计划"
+    },
+    "kinds": {
+      "agent": "智能体",
+      "workflow": "工作流",
+      "function": "函数"
+    },
+    "none": "无",
+    "title": "工作负载",
+    "context": "应用的 Deployment、Job 和 CronJob 保留在该应用的“工作负载”标签页中。",
+    "empty": {
+      "title": "暂无智能体、工作流或函数工作负载",
+      "description": "清单中 kind 为 agent、workflow 或 function 的应用注册后会显示在这里。",
+      "action": "前往智能体"
+    }
+  },
+  "functionsScreen": {
+    "columns": {
+      "function": "函数",
+      "app": "应用",
+      "minScale": "最小规模",
+      "maxScale": "最大规模"
+    },
+    "none": "无",
+    "title": "函数",
+    "context": "可缩容至零，并由 HTTP、队列或 Webhook 触发。吞吐量、错误、延迟和日志将随函数运行时提供。",
+    "empty": {
+      "title": "暂无函数工作负载",
+      "description": "清单中 kind 为 function 的应用将显示在这里。函数可缩容至零，并由 HTTP、队列或事件触发。"
+    }
+  },
   "managedDomains": {
     "title": "托管域名",
     "overview": "概览",

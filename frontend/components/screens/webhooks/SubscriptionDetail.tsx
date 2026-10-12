@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { DefinitionList } from "@/components/ui/definition-list";
 import type { AstroliftWebhookSubscription } from "@/graphql/operations/operations.types";
 import { useFormatters } from "@/lib/i18n/formatters";
@@ -19,6 +21,7 @@ export type SubscriptionDetailViewProps = SubscriptionDeliveriesData & {
  */
 export function SubscriptionDetailView({ subscription, deliveries }: SubscriptionDetailViewProps) {
   const fmt = useFormatters();
+  const t = useTranslations("webhooksScreen");
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -29,25 +32,25 @@ export function SubscriptionDetailView({ subscription, deliveries }: Subscriptio
         className="grid grid-cols-2 gap-3"
         items={[
           {
-            term: "Secret rotated",
+            term: t("secretRotated"),
             description: subscription.secretRotatedAt
               ? fmt.formatDateTime(subscription.secretRotatedAt)
-              : "never",
+              : t("never"),
           },
           {
-            term: "Last delivery",
+            term: t("columns.lastDelivery"),
             description: subscription.lastDeliveryAt
               ? fmt.formatDateTime(subscription.lastDeliveryAt)
-              : "never",
+              : t("never"),
           },
           {
-            term: "Last status",
+            term: t("lastStatus"),
             description: (
               <span className="font-mono">{subscription.lastResponseStatus ?? "—"}</span>
             ),
           },
           {
-            term: "Failure count",
+            term: t("failureCount"),
             description: <span className="font-mono">{subscription.failureCount}</span>,
           },
         ]}
@@ -55,11 +58,11 @@ export function SubscriptionDetailView({ subscription, deliveries }: Subscriptio
 
       <div className="min-w-0 space-y-2">
         <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
-          Deliveries
+          {t("deliveries")}
         </p>
         <DeliveriesFeed
           deliveries={deliveries}
-          emptyHint="Use the Send test event action to fire one."
+          emptyHint={t("emptyHintSheet")}
           maxHeight="max-h-128"
         />
       </div>

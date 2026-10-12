@@ -8112,6 +8112,347 @@
     },
     "backToResults": "トレースの検索結果に戻る"
   },
+  "webhooksScreen": {
+    "title": "Webhook",
+    "webhook": "Webhook",
+    "webhookNoun": "Webhook",
+    "webhookHeading": "Webhook {id}",
+    "deliveryNoun": "配信",
+    "deliveryHeading": "配信 {id}",
+    "columns": {
+      "url": "URL",
+      "events": "イベント",
+      "format": "形式",
+      "lastDelivery": "最終配信",
+      "failures": "失敗",
+      "status": "状態"
+    },
+    "formats": {
+      "generic": {
+        "label": "汎用 (Astrolift エンベロープ)",
+        "hint": "生のイベント JSON。コレクターや独自サービス向けです。"
+      },
+      "slack": {
+        "label": "Slack Incoming Webhook",
+        "hint": "Slack のテキストと添付ファイルの形式に合わせ、チャンネル内でメッセージを表示します。"
+      },
+      "discord": {
+        "label": "Discord Webhook",
+        "hint": "Discord のコンテンツと埋め込みの形式に合わせます。"
+      }
+    },
+    "never": "なし",
+    "active": "有効",
+    "paused": "一時停止中",
+    "deliveries": "配信",
+    "pause": "一時停止",
+    "resume": "再開",
+    "sendTestEvent": "テストイベントを送信",
+    "rotateSecret": "シークレットをローテーション",
+    "delete": "削除",
+    "appDescription": "<mono>{app}</mono> のイベントストリームを HTTP で外部へ配信します。各サブスクリプションのシークレットで、すべてのペイロードに HMAC 署名します。",
+    "platformDescription": "プラットフォームのイベントログを HTTP で外部へ配信します。各サブスクリプションのシークレットで、すべてのペイロードに HMAC 署名します。",
+    "learnMore": "詳しく見る",
+    "newWebhook": "新しい Webhook",
+    "secretReady": "<mono>{url}</mono> のシークレットを用意しました",
+    "secretRevealHelp": "以下の HMAC シークレットを保存してください。再表示されません。保存されるのは SHA-256 のみです。以前のシークレットはローテーションの猶予期間中は有効です。",
+    "copy": "コピー",
+    "dismiss": "閉じる",
+    "listLabel": "Webhook サブスクリプション",
+    "empty": {
+      "title": "Webhook サブスクリプションはありません",
+      "description": "外部システム (Zentinelle、Slack リレー、独自コレクター) をプラットフォームイベントにサブスクライブします。"
+    },
+    "deliveriesDescription": "このサブスクリプションへのすべての試行を新しい順に表示します。古い試行はスクロールすると読み込まれます。",
+    "createDescription": "HMAC シークレットは作成時に一度だけ表示され、保存されるのは SHA-256 のみです。受信した配信の X-Astrolift-Signature ヘッダーの検証に使用します。",
+    "eventsHelp": "1 行に 1 つ、またはカンマ/スペース区切りで入力します。<code>*</code> はすべてのイベントに一致します。",
+    "cancel": "キャンセル",
+    "creating": "作成中…",
+    "createWebhook": "Webhook を作成",
+    "deleteDialog": {
+      "title": "Webhook を削除しますか?",
+      "description": "{url} は直ちにイベントの受信を停止します。過去の配信は監査ログに残ります。",
+      "confirm": "Webhook を削除"
+    },
+    "rotateDialog": {
+      "title": "Webhook シークレットをローテーションしますか?",
+      "description": "{url} の新しい HMAC シークレットを生成します。以前のシークレットは設定された猶予期間中は有効なので、サブスクライバーは配信を失わずに切り替えられます。新しい平文は一度だけ表示されます。"
+    },
+    "testDialog": {
+      "title": "テストイベントを送信しますか?",
+      "description": "合成の webhook.test イベントを {url} に POST します。再試行や自動無効化のカウントは行わず、レスポンスはその場に表示されます。",
+      "confirm": "テストを送信"
+    },
+    "testDeliveryTo": "<mono>{url}</mono> へのテスト配信",
+    "latency": "レイテンシ",
+    "ms": "{ms}ms",
+    "deliveryId": "配信 ID",
+    "snippetCopied": "スニペットをコピーしました",
+    "showSnippet": "検証スニペットを表示",
+    "snippetHelp": "5 分以上前の配信を拒否し (リプレイ保護)、定数時間で比較します。ローテーション後は新しいシークレットで検証してください。以前のシークレットは猶予期間中は有効です。",
+    "noDeliveries": "まだ配信はありません",
+    "testBadge": "テスト",
+    "attempt": "試行",
+    "delivered": "配信済み",
+    "failed": "失敗",
+    "event": "イベント",
+    "httpStatus": "HTTP ステータス",
+    "test": "テスト",
+    "yes": "はい",
+    "no": "いいえ",
+    "deliveredAt": "配信日時",
+    "error": "エラー",
+    "requestPayload": "リクエストペイロード",
+    "noRequestPayload": "リクエストペイロードは記録されていません。",
+    "responseBody": "レスポンス本文",
+    "noResponseBody": "レスポンス本文は記録されていません。",
+    "httpParen": "(HTTP {status})",
+    "secretRotated": "シークレットのローテーション",
+    "version": "バージョン",
+    "created": "作成日時",
+    "recentDeliveries": "最近の配信",
+    "emptyHintList": "Webhook 一覧の「テストイベントを送信」アクションで送信できます。",
+    "emptyHintSheet": "「テストイベントを送信」アクションで送信できます。",
+    "lastStatus": "最終ステータス",
+    "failureCount": "失敗回数",
+    "toasts": {
+      "busy": "このサブスクリプションでは既に操作が実行中です",
+      "createFailed": "作成に失敗しました",
+      "deleted": "削除しました",
+      "deleteFailed": "削除に失敗しました",
+      "resumed": "再開しました",
+      "paused": "一時停止しました",
+      "toggleFailed": "切り替えに失敗しました",
+      "updateFailed": "更新に失敗しました",
+      "formatSet": "形式を {format} に設定しました",
+      "rotated": "シークレットをローテーションしました。新しい値を今すぐコピーしてください",
+      "rotationFailed": "ローテーションに失敗しました",
+      "delivered": "配信済み: HTTP {code}",
+      "subscriberReturned": "サブスクライバーが HTTP {code} を返しました",
+      "transportFailure": "転送エラー: {error}",
+      "unknown": "不明",
+      "testFailed": "テスト送信に失敗しました",
+      "copied": "コピーしました"
+    }
+  },
+  "zentinelleScreen": {
+    "title": "Secure · Zentinelle",
+    "description": "AI エージェント GRC: Astrolift 上で動くすべてのエージェントワークロードのガバナンス、リスク、コンプライアンス。",
+    "tagline": "MIT ライセンス · セルフホスト可能 · Calliope AI のコンパニオン製品",
+    "intro": "Zentinelle は BROCS スタックの <strong>Control + Secure</strong> を担う柱です。Astrolift と並行して動作し、Astrolift があえて担わない AI 固有のレイヤーを提供します。ポリシーの適用、コンテンツスキャン、コンプライアンスフレームワーク、そして AI ガバナンス規制が求める完全なインタラクション監査証跡です。",
+    "statusTitle": "連携は設計中",
+    "statusBody": "Astrolift と Zentinelle の間の認証ハンドシェイクとテナント委任は設計中です。Zentinelle を Astrolift に認証を委任する組み込み Django アプリにする案と、トークン交換を行う独立サービスにする案があります。方式が決まると、このページは接続管理 UI になります。",
+    "github": "GitHub の Zentinelle",
+    "docs": "連携ドキュメント",
+    "addsTitle": "Zentinelle が Astrolift に加えるもの",
+    "capabilities": {
+      "governance": {
+        "title": "ガバナンス",
+        "description": "ポリシーエンジン: コンテンツルール (PII、有害性、ジェイルブレイク検出)、モデル許可リスト、トークン予算の適用、バージョン管理されたシステムプロンプトライブラリ。"
+      },
+      "risk": {
+        "title": "リスク",
+        "description": "5×5 リスク登録簿、FMEA 分析、インシデント追跡、異常検知、エージェントの挙動ドリフトに対する自動アラート。"
+      },
+      "compliance": {
+        "title": "コンプライアンス",
+        "description": "SOC 2、GDPR、HIPAA、EU AI 法、NIST RMF のコントロールマッピング。証跡の収集、ギャップ分析、監査対応レポート。"
+      },
+      "observability": {
+        "title": "オブザーバビリティ",
+        "description": "完全なインタラクション監査 (プロンプト、レスポンス、ツール呼び出し)、コンテンツスキャン結果、ポリシー評価ログ、ワークロードごとのトークン使用量の計測。"
+      }
+    },
+    "division": "<label>責任の分担:</label> Astrolift は<em>ランタイムレイヤー</em>を担います。コンテナのオーケストレーション、デプロイ、Pod の健全性、インフラのオブザーバビリティです。Zentinelle は<em>AI の振る舞いレイヤー</em>を担います。エージェントの発言と行動、ポリシーへの準拠、規制当局が求める監査証跡です。<strong>OBSERVE › Agents</strong> では、<code>Astrolift</code> と表示されたタブは現在利用でき、<code>Zentinelle</code> のタブは連携の提供後に有効になります。"
+  },
+  "modelDeploy": {
+    "title": "モデルをデプロイ",
+    "steps": {
+      "where": "場所",
+      "model": "モデル",
+      "review": "確認"
+    },
+    "fit": {
+      "fits": "収まります: {perGpu} GB の GPU {gpus} 基で約 {need} GB が必要です。",
+      "tooSmall": "約 {need} GB が必要ですが、{perGpu} GB の GPU {gpus} 基では {total} GB です。GPU を追加するか、より小さいモデルを選んでください。",
+      "noNode": "このクラスターに GPU を {gpus} 基持つノードはありません。1 ノードの最大は {most} 基です。",
+      "unknown": "このクラスターの GPU メモリは不明です。デプロイはスケジュール時に確認されます。"
+    },
+    "errors": {
+      "chooseEnv": "モデルを実行するアプリ環境を選択してください。",
+      "enterModel": "Hugging Face のモデル ID を org/model の形式で入力してください。",
+      "targets": "デプロイ先を読み込めませんでした",
+      "clusters": "クラスターの GPU 機能を読み込めませんでした",
+      "deployFailed": "デプロイに失敗しました"
+    },
+    "intro": "環境のクラスター上で vLLM を使ってオープンウェイトモデルをホストします。アプリは MODEL_ENDPOINT_URL、MODEL_API_KEY、MODEL_DEPLOYMENT_NAME で接続します。",
+    "loadingClusters": "クラスターの GPU 機能を読み込み中…",
+    "appEnvironment": "アプリ環境",
+    "envsUnavailable": "アプリ環境を利用できません",
+    "noEnvs": "アプリ環境はまだありません",
+    "chooseWhere": "実行場所を選択",
+    "envHelp": "モデルはこの環境のクラスターで実行され、そのアプリが所有します。",
+    "model": "モデル",
+    "gb": "{n} GB",
+    "customId": "カスタム Hugging Face ID",
+    "hfModelId": "Hugging Face モデル ID",
+    "paramsLabel": "パラメータ数 (10 億単位)",
+    "paramsPlaceholder": "パラメータ, B",
+    "gpus": "GPU",
+    "frontend": "vLLM フロントエンド",
+    "clusterDefault": "クラスターの既定",
+    "hfTokenLabel": "Hugging Face トークン (シークレット参照、任意)",
+    "review": {
+      "environment": "環境",
+      "cluster": "クラスター",
+      "serviceName": "サービス名",
+      "frontend": "フロントエンド",
+      "hfToken": "Hugging Face トークン"
+    },
+    "none": "なし",
+    "cancel": "キャンセル",
+    "back": "戻る",
+    "continue": "次へ",
+    "deploying": "デプロイ中...",
+    "deploy": "デプロイ",
+    "toastDeploying": "{model} を {app} · {env} にデプロイしています"
+  },
+  "modelTest": {
+    "test": "テスト",
+    "title": "{name} をテスト",
+    "description": "クラスターのキープアライブエージェント経由で、制限付きのプロンプトを 1 件送信します。コントロールプレーンがモデルに直接アクセスすることはありません。",
+    "prompt": "プロンプト",
+    "placeholder": "モデルに挨拶してみましょう...",
+    "waiting": "クラスターエージェントを待っています...",
+    "latency": "{ms} ms",
+    "tokens": "{prompt} + {completion} = {total} トークン",
+    "timedOut": "クラスターにエージェントが接続されていないか、時間内に応答しませんでした。",
+    "modelError": "モデルがエラーを返しました。",
+    "sending": "送信中...",
+    "send": "送信",
+    "failed": "テストに失敗しました"
+  },
+  "modelReplicas": {
+    "scaleDown": "{name} をスケールダウン",
+    "scaleUp": "{name} をスケールアップ",
+    "replicas": "{name} のレプリカ数",
+    "start": "開始",
+    "stop": "停止",
+    "stopping": "{name} を停止しています",
+    "scaling": "{name} を {count} にスケールしています",
+    "updateFailed": "更新に失敗しました"
+  },
+  "modelDetail": {
+    "loading": "読み込み中",
+    "notFound": "見つかりません",
+    "notFoundTitle": "モデルが見つかりません",
+    "loadError": "このモデルを読み込めませんでした",
+    "retry": "再試行",
+    "notFoundDescription": "アプリまたはプロジェクトから削除されたか、アクセス権がない可能性があります。",
+    "backToModels": "モデル一覧に戻る",
+    "endpoint": "エンドポイント",
+    "endpointFailed": "エンドポイントが失敗しました",
+    "model": "モデル",
+    "none": "なし",
+    "serving": "サービング",
+    "hardware": "ハードウェア",
+    "owner": "所有者",
+    "cluster": "クラスター",
+    "binding": "バインディング",
+    "replicas": "レプリカ",
+    "replicasDescription": "その場で停止、開始、スケールできます。モデルが再プロビジョニングされることはありません。",
+    "kserveScales": "KServe がこのモデルを自動でスケールするため、ここで設定する項目はありません。",
+    "providerScales": "クラウドプロバイダーがこのエンドポイントをスケールするため、ここで設定する項目はありません。"
+  },
+  "cloudProviders": {
+    "title": "クラウドプロバイダー",
+    "description": "この組織に接続されたドライバーバンドルです。プロバイダーは登録済みクラスターを支えると構成済みとして表示されます (ClusterDriver、IngressDriver、DnsDriver など)。新しいクラウドでクラスターを登録すると有効になります。",
+    "loadError": "クラウドプロバイダーを読み込めませんでした",
+    "empty": {
+      "title": "構成済みのクラウドプロバイダーはありません",
+      "description": "クラスターを登録すると、プロバイダープラグインがこの組織にバインドされます。それを支えるプロバイダー (aws、gcp、azure、またはセルフマネージドの Kubernetes エンドポイント) が、接続済みの機能とともにここに表示されます。"
+    },
+    "showAvailable": "利用可能なプロバイダー {count} 件を表示",
+    "hideAvailable": "利用可能なプロバイダー {count} 件を非表示",
+    "configured": "構成済み",
+    "available": "利用可能",
+    "clusters": "{count} クラスター",
+    "drivers": "{count} ドライバー"
+  },
+  "providersScreen": {
+    "title": "プロバイダー",
+    "description": "この組織が接続する外部連携です。クラウドドライバーバンドル、ソースコードホスト、ID プロバイダーがあります。各セクションに接続済みの内容と追加の接続方法を表示します。",
+    "categories": "プロバイダーのカテゴリ",
+    "tabs": {
+      "cloud": "クラウド",
+      "source": "ソース",
+      "identity": "ID"
+    }
+  },
+  "loginScreen": {
+    "redirectingDev": "開発用ログインへリダイレクトしています…",
+    "apiUnreachable": "API に接続できませんでした",
+    "detecting": "ID プロバイダーを検出しています…",
+    "noIdp": "ID プロバイダーが構成されていません",
+    "noIdpHint": "ユーザーがログインするには、オペレーターが IdP を構成する必要があります。",
+    "continueWith": "{provider} で続行",
+    "yourProvider": "ご利用のプロバイダー",
+    "title": "Astrolift にサインイン",
+    "via": "{provider} 経由",
+    "localSubtitle": "ローカルのユーザー名とパスワード",
+    "username": "ユーザー名またはメールアドレス",
+    "password": "パスワード",
+    "signingIn": "サインインしています…",
+    "signIn": "サインイン"
+  },
+  "invitationAccept": {
+    "title": "招待を承諾",
+    "successTitle": "参加しました",
+    "successBody": "ようこそ。あなたのアカウントはこの組織のメンバーになりました。",
+    "goToDashboard": "ダッシュボードへ",
+    "errorTitle": "承諾できませんでした",
+    "continue": "Astrolift へ進む",
+    "intro": "Astrolift の組織への参加に招待されました。承諾するとアカウントにメンバー記録が作成され、招待者が選んだロールが適用されます。",
+    "tokenHelp": "招待トークンは 1 回限り有効です。承諾するには、サインイン中のメールアドレスが招待先のアドレスと一致している必要があります。一致しない場合はエラーになり、記録は作成されません。",
+    "failed": "招待を承諾できませんでした"
+  },
+  "workloadsScreen": {
+    "columns": {
+      "workload": "ワークロード",
+      "kind": "種類",
+      "app": "アプリ",
+      "replicas": "レプリカ",
+      "schedule": "スケジュール"
+    },
+    "kinds": {
+      "agent": "エージェント",
+      "workflow": "ワークフロー",
+      "function": "関数"
+    },
+    "none": "なし",
+    "title": "ワークロード",
+    "context": "アプリのデプロイメント、ジョブ、cron ジョブは、そのアプリの「ワークロード」タブに表示されます。",
+    "empty": {
+      "title": "エージェント、ワークフロー、関数のワークロードはありません",
+      "description": "マニフェストに kind: agent、workflow、function を持つアプリは、登録されるとここに表示されます。",
+      "action": "エージェントへ"
+    }
+  },
+  "functionsScreen": {
+    "columns": {
+      "function": "関数",
+      "app": "アプリ",
+      "minScale": "最小スケール",
+      "maxScale": "最大スケール"
+    },
+    "none": "なし",
+    "title": "関数",
+    "context": "ゼロまでスケールし、HTTP、キュー、Webhook でトリガーされます。スループット、エラー、レイテンシ、ログは関数ランタイムの提供時に利用できます。",
+    "empty": {
+      "title": "関数のワークロードはありません",
+      "description": "マニフェストに kind: function を持つアプリがここに表示されます。関数はゼロまでスケールし、HTTP、キュー、イベントでトリガーされます。"
+    }
+  },
   "managedDomains": {
     "title": "管理対象ドメイン",
     "overview": "概要",

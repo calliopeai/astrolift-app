@@ -8112,6 +8112,347 @@
     },
     "backToResults": "트레이스 검색 결과로 돌아가기"
   },
+  "webhooksScreen": {
+    "title": "웹훅",
+    "webhook": "웹훅",
+    "webhookNoun": "웹훅",
+    "webhookHeading": "웹훅 {id}",
+    "deliveryNoun": "전송",
+    "deliveryHeading": "전송 {id}",
+    "columns": {
+      "url": "URL",
+      "events": "이벤트",
+      "format": "형식",
+      "lastDelivery": "마지막 전송",
+      "failures": "실패",
+      "status": "상태"
+    },
+    "formats": {
+      "generic": {
+        "label": "일반 (Astrolift 엔벨로프)",
+        "hint": "원시 이벤트 JSON. 수집기와 자체 서비스에 적합합니다."
+      },
+      "slack": {
+        "label": "Slack 수신 웹훅",
+        "hint": "Slack의 텍스트 + 첨부 형식에 맞춰 채널에 메시지가 표시됩니다."
+      },
+      "discord": {
+        "label": "Discord 웹훅",
+        "hint": "Discord의 콘텐츠 + 임베드 형식에 맞춥니다."
+      }
+    },
+    "never": "없음",
+    "active": "활성",
+    "paused": "일시 중지됨",
+    "deliveries": "전송",
+    "pause": "일시 중지",
+    "resume": "재개",
+    "sendTestEvent": "테스트 이벤트 보내기",
+    "rotateSecret": "시크릿 교체",
+    "delete": "삭제",
+    "appDescription": "<mono>{app}</mono> 이벤트 스트림의 아웃바운드 HTTP 전송입니다. 각 구독의 시크릿으로 모든 페이로드에 HMAC 서명을 합니다.",
+    "platformDescription": "플랫폼 이벤트 로그의 아웃바운드 HTTP 전송입니다. 각 구독의 시크릿으로 모든 페이로드에 HMAC 서명을 합니다.",
+    "learnMore": "자세히 알아보기",
+    "newWebhook": "새 웹훅",
+    "secretReady": "<mono>{url}</mono>의 시크릿이 준비되었습니다",
+    "secretRevealHelp": "아래 HMAC 시크릿을 저장하세요. 다시 표시되지 않습니다. 저장되는 것은 SHA-256뿐입니다. 이전 시크릿은 교체 유예 기간 동안 유효합니다.",
+    "copy": "복사",
+    "dismiss": "닫기",
+    "listLabel": "웹훅 구독",
+    "empty": {
+      "title": "웹훅 구독이 없습니다",
+      "description": "외부 시스템(Zentinelle, Slack 릴레이, 사용자 지정 수집기)이 플랫폼 이벤트를 구독하도록 설정합니다."
+    },
+    "deliveriesDescription": "이 구독에 대한 모든 시도를 최신순으로 표시합니다. 이전 시도는 스크롤하면 불러옵니다.",
+    "createDescription": "HMAC 시크릿은 생성 시 한 번만 표시되며 SHA-256만 저장됩니다. 수신 전송의 X-Astrolift-Signature 헤더를 검증하는 데 사용하세요.",
+    "eventsHelp": "한 줄에 하나씩, 또는 쉼표/공백으로 구분합니다. <code>*</code>는 모든 이벤트와 일치합니다.",
+    "cancel": "취소",
+    "creating": "생성 중…",
+    "createWebhook": "웹훅 만들기",
+    "deleteDialog": {
+      "title": "웹훅을 삭제할까요?",
+      "description": "{url}은(는) 즉시 이벤트 수신을 중단합니다. 이전 전송은 감사 로그에 남습니다.",
+      "confirm": "웹훅 삭제"
+    },
+    "rotateDialog": {
+      "title": "웹훅 시크릿을 교체할까요?",
+      "description": "{url}에 대한 새 HMAC 시크릿을 생성합니다. 이전 시크릿은 설정된 유예 기간 동안 유효하므로 구독자가 전송 손실 없이 전환할 수 있습니다. 새 평문은 단 한 번만 표시됩니다."
+    },
+    "testDialog": {
+      "title": "테스트 이벤트를 보낼까요?",
+      "description": "합성 webhook.test 이벤트를 {url}(으)로 POST합니다. 재시도나 자동 비활성화 집계는 없으며 응답은 바로 표시됩니다.",
+      "confirm": "테스트 보내기"
+    },
+    "testDeliveryTo": "<mono>{url}</mono>(으)로 테스트 전송",
+    "latency": "지연 시간",
+    "ms": "{ms}ms",
+    "deliveryId": "전송 ID",
+    "snippetCopied": "스니펫을 복사했습니다",
+    "showSnippet": "검증 스니펫 표시",
+    "snippetHelp": "5분이 지난 전송은 거부하고(재전송 방지) 상수 시간 비교를 사용합니다. 교체 후에는 새 시크릿으로 검증하세요. 이전 시크릿은 유예 기간 동안 유효합니다.",
+    "noDeliveries": "아직 전송이 없습니다",
+    "testBadge": "테스트",
+    "attempt": "시도",
+    "delivered": "전송됨",
+    "failed": "실패",
+    "event": "이벤트",
+    "httpStatus": "HTTP 상태",
+    "test": "테스트",
+    "yes": "예",
+    "no": "아니요",
+    "deliveredAt": "전송 시각",
+    "error": "오류",
+    "requestPayload": "요청 페이로드",
+    "noRequestPayload": "기록된 요청 페이로드가 없습니다.",
+    "responseBody": "응답 본문",
+    "noResponseBody": "기록된 응답 본문이 없습니다.",
+    "httpParen": "(HTTP {status})",
+    "secretRotated": "시크릿 교체",
+    "version": "버전",
+    "created": "생성됨",
+    "recentDeliveries": "최근 전송",
+    "emptyHintList": "웹훅 목록의 테스트 이벤트 보내기 작업으로 하나를 보낼 수 있습니다.",
+    "emptyHintSheet": "테스트 이벤트 보내기 작업으로 하나를 보낼 수 있습니다.",
+    "lastStatus": "마지막 상태",
+    "failureCount": "실패 횟수",
+    "toasts": {
+      "busy": "이 구독에 대해 이미 작업이 실행 중입니다",
+      "createFailed": "생성하지 못했습니다",
+      "deleted": "삭제했습니다",
+      "deleteFailed": "삭제하지 못했습니다",
+      "resumed": "재개했습니다",
+      "paused": "일시 중지했습니다",
+      "toggleFailed": "전환하지 못했습니다",
+      "updateFailed": "업데이트하지 못했습니다",
+      "formatSet": "형식을 {format}(으)로 설정했습니다",
+      "rotated": "시크릿을 교체했습니다. 지금 새 값을 복사하세요",
+      "rotationFailed": "교체하지 못했습니다",
+      "delivered": "전송됨: HTTP {code}",
+      "subscriberReturned": "구독자가 HTTP {code}을(를) 반환했습니다",
+      "transportFailure": "전송 실패: {error}",
+      "unknown": "알 수 없음",
+      "testFailed": "테스트 전송에 실패했습니다",
+      "copied": "복사했습니다"
+    }
+  },
+  "zentinelleScreen": {
+    "title": "Secure · Zentinelle",
+    "description": "AI 에이전트 GRC: Astrolift에서 실행되는 모든 에이전트 워크로드를 위한 거버넌스, 리스크, 컴플라이언스.",
+    "tagline": "MIT 라이선스 · 셀프 호스팅 가능 · Calliope AI 동반 제품",
+    "intro": "Zentinelle은 BROCS 스택의 <strong>Control + Secure</strong> 축입니다. Astrolift와 함께 실행되며 Astrolift가 의도적으로 맡지 않는 AI 전용 계층을 제공합니다. 정책 적용, 콘텐츠 스캔, 컴플라이언스 프레임워크, 그리고 AI 거버넌스 규정이 요구하는 전체 상호작용 감사 추적입니다.",
+    "statusTitle": "통합 설계 중",
+    "statusBody": "Astrolift와 Zentinelle 간 인증 핸드셰이크 및 테넌트 위임을 설계하고 있습니다. Zentinelle을 Astrolift에 인증을 위임하는 내장 Django 앱으로 두거나, 토큰 교환을 하는 별도 서비스로 두는 방안이 있습니다. 방식이 정해지면 이 페이지가 연결 관리 UI가 됩니다.",
+    "github": "GitHub의 Zentinelle",
+    "docs": "통합 문서",
+    "addsTitle": "Zentinelle이 Astrolift에 더하는 것",
+    "capabilities": {
+      "governance": {
+        "title": "거버넌스",
+        "description": "정책 엔진: 콘텐츠 규칙(PII, 유해성, 탈옥 탐지), 모델 허용 목록, 토큰 예산 적용, 버전 관리되는 시스템 프롬프트 라이브러리."
+      },
+      "risk": {
+        "title": "리스크",
+        "description": "5×5 리스크 등록부, FMEA 분석, 인시던트 추적, 이상 탐지, 에이전트 행동 변화에 대한 자동 알림."
+      },
+      "compliance": {
+        "title": "컴플라이언스",
+        "description": "SOC 2, GDPR, HIPAA, EU AI 법, NIST RMF 통제 매핑. 증거 수집, 격차 분석, 감사 대응 보고서."
+      },
+      "observability": {
+        "title": "관측성",
+        "description": "전체 상호작용 감사(프롬프트, 응답, 도구 호출), 콘텐츠 스캔 결과, 정책 평가 로그, 워크로드별 토큰 사용량 측정."
+      }
+    },
+    "division": "<label>책임 분담:</label> Astrolift는 <em>런타임 계층</em>을 담당합니다. 컨테이너 오케스트레이션, 배포, Pod 상태, 인프라 관측성입니다. Zentinelle은 <em>AI 행동 계층</em>을 담당합니다. 에이전트가 무엇을 말하고 하는지, 정책을 준수하는지, 규제 기관이 요구하는 감사 추적입니다. <strong>OBSERVE › Agents</strong>에서 <code>Astrolift</code> 표시 탭은 지금 사용할 수 있고, <code>Zentinelle</code> 탭은 통합이 출시되면 활성화됩니다."
+  },
+  "modelDeploy": {
+    "title": "모델 배포",
+    "steps": {
+      "where": "위치",
+      "model": "모델",
+      "review": "검토"
+    },
+    "fit": {
+      "fits": "적합: {perGpu}GB GPU {gpus}개에 걸쳐 약 {need}GB가 필요합니다.",
+      "tooSmall": "약 {need}GB가 필요하지만 {perGpu}GB GPU {gpus}개는 {total}GB입니다. GPU를 추가하거나 더 작은 모델을 선택하세요.",
+      "noNode": "이 클러스터에는 GPU가 {gpus}개인 노드가 없습니다. 한 노드의 최대 개수는 {most}개입니다.",
+      "unknown": "이 클러스터의 GPU 메모리를 알 수 없습니다. 배포는 스케줄링될 때 확인됩니다."
+    },
+    "errors": {
+      "chooseEnv": "모델을 실행할 앱 환경을 선택하세요.",
+      "enterModel": "Hugging Face 모델 ID를 org/model 형식으로 입력하세요.",
+      "targets": "배포 대상을 불러오지 못했습니다",
+      "clusters": "클러스터 GPU 기능을 불러오지 못했습니다",
+      "deployFailed": "배포하지 못했습니다"
+    },
+    "intro": "환경의 클러스터에서 vLLM으로 오픈 가중치 모델을 호스팅합니다. 앱은 MODEL_ENDPOINT_URL, MODEL_API_KEY, MODEL_DEPLOYMENT_NAME으로 연결됩니다.",
+    "loadingClusters": "클러스터 GPU 기능을 불러오는 중…",
+    "appEnvironment": "앱 환경",
+    "envsUnavailable": "앱 환경을 사용할 수 없습니다",
+    "noEnvs": "아직 앱 환경이 없습니다",
+    "chooseWhere": "실행 위치 선택",
+    "envHelp": "모델은 이 환경의 클러스터에서 실행되며 해당 앱이 소유합니다.",
+    "model": "모델",
+    "gb": "{n}GB",
+    "customId": "사용자 지정 Hugging Face ID",
+    "hfModelId": "Hugging Face 모델 ID",
+    "paramsLabel": "매개변수(10억 단위)",
+    "paramsPlaceholder": "매개변수, B",
+    "gpus": "GPU",
+    "frontend": "vLLM 프런트엔드",
+    "clusterDefault": "클러스터 기본값",
+    "hfTokenLabel": "Hugging Face 토큰(시크릿 참조, 선택 사항)",
+    "review": {
+      "environment": "환경",
+      "cluster": "클러스터",
+      "serviceName": "서비스 이름",
+      "frontend": "프런트엔드",
+      "hfToken": "Hugging Face 토큰"
+    },
+    "none": "없음",
+    "cancel": "취소",
+    "back": "뒤로",
+    "continue": "계속",
+    "deploying": "배포 중...",
+    "deploy": "배포",
+    "toastDeploying": "{model}을(를) {app} · {env}에 배포하는 중"
+  },
+  "modelTest": {
+    "test": "테스트",
+    "title": "{name} 테스트",
+    "description": "클러스터의 keep-alive 에이전트를 통해 제한된 프롬프트 하나를 보냅니다. 컨트롤 플레인은 모델에 직접 접근하지 않습니다.",
+    "prompt": "프롬프트",
+    "placeholder": "모델에게 인사해 보세요...",
+    "waiting": "클러스터 에이전트를 기다리는 중...",
+    "latency": "{ms}ms",
+    "tokens": "{prompt} + {completion} = {total} 토큰",
+    "timedOut": "클러스터에 연결된 에이전트가 없거나 제시간에 응답하지 않았습니다.",
+    "modelError": "모델이 오류를 반환했습니다.",
+    "sending": "보내는 중...",
+    "send": "보내기",
+    "failed": "테스트에 실패했습니다"
+  },
+  "modelReplicas": {
+    "scaleDown": "{name} 축소",
+    "scaleUp": "{name} 확장",
+    "replicas": "{name} 복제본",
+    "start": "시작",
+    "stop": "중지",
+    "stopping": "{name} 중지 중",
+    "scaling": "{name}을(를) {count}(으)로 조정하는 중",
+    "updateFailed": "업데이트하지 못했습니다"
+  },
+  "modelDetail": {
+    "loading": "불러오는 중",
+    "notFound": "찾을 수 없음",
+    "notFoundTitle": "모델을 찾을 수 없습니다",
+    "loadError": "이 모델을 불러오지 못했습니다",
+    "retry": "다시 시도",
+    "notFoundDescription": "앱이나 프로젝트에서 제거되었거나 액세스 권한이 없을 수 있습니다.",
+    "backToModels": "모델로 돌아가기",
+    "endpoint": "엔드포인트",
+    "endpointFailed": "엔드포인트 실패",
+    "model": "모델",
+    "none": "없음",
+    "serving": "서빙",
+    "hardware": "하드웨어",
+    "owner": "소유자",
+    "cluster": "클러스터",
+    "binding": "바인딩",
+    "replicas": "복제본",
+    "replicasDescription": "그 자리에서 중지, 시작, 확장할 수 있으며 모델은 다시 프로비저닝되지 않습니다.",
+    "kserveScales": "KServe가 이 모델을 직접 확장하므로 여기서 설정할 항목이 없습니다.",
+    "providerScales": "클라우드 제공업체가 이 엔드포인트를 확장하므로 여기서 설정할 항목이 없습니다."
+  },
+  "cloudProviders": {
+    "title": "클라우드 제공업체",
+    "description": "이 조직에 연결된 드라이버 번들입니다. 제공업체는 등록된 클러스터를 지원하면 구성됨으로 표시됩니다(ClusterDriver, IngressDriver, DnsDriver 등). 새 클라우드에 클러스터를 등록하면 활성화됩니다.",
+    "loadError": "클라우드 제공업체를 불러오지 못했습니다",
+    "empty": {
+      "title": "구성된 클라우드 제공업체가 없습니다",
+      "description": "클러스터를 등록하면 제공업체 플러그인이 이 조직에 바인딩됩니다. 이를 지원하는 제공업체(aws, gcp, azure 또는 자체 관리 Kubernetes 엔드포인트)가 연결된 기능과 함께 여기에 표시됩니다."
+    },
+    "showAvailable": "사용 가능한 제공업체 {count}개 표시",
+    "hideAvailable": "사용 가능한 제공업체 {count}개 숨기기",
+    "configured": "구성됨",
+    "available": "사용 가능",
+    "clusters": "클러스터 {count}개",
+    "drivers": "드라이버 {count}개"
+  },
+  "providersScreen": {
+    "title": "제공업체",
+    "description": "이 조직이 연결한 외부 통합입니다. 클라우드 드라이버 번들, 소스 코드 호스트, ID 제공업체가 있습니다. 각 섹션에서 연결된 항목과 추가 연결 방법을 볼 수 있습니다.",
+    "categories": "제공업체 범주",
+    "tabs": {
+      "cloud": "클라우드",
+      "source": "소스",
+      "identity": "ID"
+    }
+  },
+  "loginScreen": {
+    "redirectingDev": "개발용 로그인으로 이동하는 중…",
+    "apiUnreachable": "API에 연결할 수 없습니다",
+    "detecting": "ID 제공업체를 감지하는 중…",
+    "noIdp": "구성된 ID 제공업체가 없습니다",
+    "noIdpHint": "사용자가 로그인하려면 운영자가 IdP를 구성해야 합니다.",
+    "continueWith": "{provider}(으)로 계속",
+    "yourProvider": "사용 중인 제공업체",
+    "title": "Astrolift에 로그인",
+    "via": "{provider} 사용",
+    "localSubtitle": "로컬 사용자 이름 + 비밀번호",
+    "username": "사용자 이름 또는 이메일",
+    "password": "비밀번호",
+    "signingIn": "로그인하는 중…",
+    "signIn": "로그인"
+  },
+  "invitationAccept": {
+    "title": "초대 수락",
+    "successTitle": "참여 완료",
+    "successBody": "환영합니다. 이제 계정이 이 조직의 멤버입니다.",
+    "goToDashboard": "대시보드로 이동",
+    "errorTitle": "수락할 수 없습니다",
+    "continue": "Astrolift로 계속",
+    "intro": "Astrolift 조직에 초대되었습니다. 수락하면 계정에 멤버 기록이 생성되고 초대한 사람이 선택한 역할이 적용됩니다.",
+    "tokenHelp": "초대 토큰은 한 번만 사용할 수 있습니다. 수락하려면 로그인한 이메일이 초대된 주소와 일치해야 하며, 일치하지 않으면 오류가 표시되고 기록이 생성되지 않습니다.",
+    "failed": "초대를 수락할 수 없습니다"
+  },
+  "workloadsScreen": {
+    "columns": {
+      "workload": "워크로드",
+      "kind": "종류",
+      "app": "앱",
+      "replicas": "복제본",
+      "schedule": "일정"
+    },
+    "kinds": {
+      "agent": "에이전트",
+      "workflow": "워크플로",
+      "function": "함수"
+    },
+    "none": "없음",
+    "title": "워크로드",
+    "context": "앱의 디플로이먼트, 잡, 크론 잡은 해당 앱의 워크로드 탭에 남아 있습니다.",
+    "empty": {
+      "title": "에이전트, 워크플로, 함수 워크로드가 없습니다",
+      "description": "매니페스트에 kind: agent, workflow 또는 function이 있는 앱은 등록되면 여기에 표시됩니다.",
+      "action": "에이전트로 이동"
+    }
+  },
+  "functionsScreen": {
+    "columns": {
+      "function": "함수",
+      "app": "앱",
+      "minScale": "최소 규모",
+      "maxScale": "최대 규모"
+    },
+    "none": "없음",
+    "title": "함수",
+    "context": "0까지 축소되며 HTTP, 큐, 웹훅으로 트리거됩니다. 처리량, 오류, 지연 시간, 로그는 함수 런타임과 함께 제공됩니다.",
+    "empty": {
+      "title": "함수 워크로드가 없습니다",
+      "description": "매니페스트에 kind: function이 있는 앱이 여기에 표시됩니다. 함수는 0까지 축소되며 HTTP, 큐, 이벤트로 트리거됩니다."
+    }
+  },
   "managedDomains": {
     "title": "관리 도메인",
     "overview": "개요",

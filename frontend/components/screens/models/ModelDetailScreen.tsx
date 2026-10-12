@@ -2,6 +2,7 @@
 
 import { AlertTriangleIcon, BrainCircuitIcon, LayersIcon, ServerCrashIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import type * as React from "react";
 
 import { EmptyState } from "@/components/EmptyState";
@@ -53,13 +54,14 @@ export function ModelDetailScreen({
   replicas,
   test,
 }: ModelDetailScreenProps) {
+  const t = useTranslations("modelDetail");
   if (!model) {
     const pending = loading && !error;
     return (
       <div className="flex min-w-0 flex-1 flex-col gap-6">
         <ShellHeader
-          crumbs={agentsCrumbs("models", { label: pending ? "Loading" : "Not found" })}
-          title={pending ? <Skeleton className="h-6 w-48" /> : "Model not found"}
+          crumbs={agentsCrumbs("models", { label: pending ? t("loading") : t("notFound") })}
+          title={pending ? <Skeleton className="h-6 w-48" /> : t("notFoundTitle")}
         />
         {pending ? (
           <div className="grid min-w-0 grid-cols-12 gap-4" aria-busy>
@@ -73,22 +75,22 @@ export function ModelDetailScreen({
           >
             <ServerCrashIcon className="text-danger size-5" aria-hidden />
             <div className="min-w-0 px-6">
-              <p className="font-medium">Could not load this model</p>
+              <p className="font-medium">{t("loadError")}</p>
               <p className="text-muted-foreground mt-1 max-w-md font-mono text-xs [overflow-wrap:anywhere]">
                 {error.message}
               </p>
             </div>
             <Button size="sm" variant="outline" onClick={onRetry}>
-              Retry
+              {t("retry")}
             </Button>
           </div>
         ) : (
           <EmptyState
             icon={<AlertTriangleIcon className="size-5" />}
-            title="Model not found"
-            description="It may have been removed from its app or project, or you may not have access to it."
+            title={t("notFoundTitle")}
+            description={t("notFoundDescription")}
             actionHref="/models"
-            actionLabel="Back to models"
+            actionLabel={t("backToModels")}
           />
         )}
       </div>
@@ -118,25 +120,25 @@ export function ModelDetailScreen({
 
       <PanelGrid>
         <Panel
-          title="Endpoint"
+          title={t("endpoint")}
           icon={<BrainCircuitIcon className="size-4" />}
           span={8}
           failure={
-            model.statusError ? { title: "Endpoint failed", reason: model.statusError } : null
+            model.statusError ? { title: t("endpointFailed"), reason: model.statusError } : null
           }
         >
           <DefinitionList
             items={[
-              { term: "Model", description: mono(modelId(model) || "none") },
+              { term: t("model"), description: mono(modelId(model) || t("none")) },
               {
-                term: "Serving",
+                term: t("serving"),
                 description: (
                   <Badge variant={isHosted(model) ? "default" : "secondary"}>{model.variant}</Badge>
                 ),
               },
-              { term: "Hardware", description: mono(gpuLabel(model)) },
+              { term: t("hardware"), description: mono(gpuLabel(model)) },
               {
-                term: "Owner",
+                term: t("owner"),
                 description: (
                   <Link
                     href={ownerHref(model)}
@@ -147,7 +149,7 @@ export function ModelDetailScreen({
                 ),
               },
               {
-                term: "Cluster",
+                term: t("cluster"),
                 description: model.clusterSlug ? (
                   <Link
                     href={`/clusters/${model.clusterSlug}`}
@@ -156,11 +158,11 @@ export function ModelDetailScreen({
                     {model.clusterSlug}
                   </Link>
                 ) : (
-                  mono("none")
+                  mono(t("none"))
                 ),
               },
               {
-                term: "Binding",
+                term: t("binding"),
                 description: mono("MODEL_ENDPOINT_URL · MODEL_API_KEY · MODEL_DEPLOYMENT_NAME"),
               },
             ]}
@@ -168,20 +170,16 @@ export function ModelDetailScreen({
         </Panel>
 
         <Panel
-          title="Replicas"
+          title={t("replicas")}
           icon={<LayersIcon className="size-4" />}
           span={4}
-          description={
-            vllm ? "Stop, start and scale in place; the model is never reprovisioned." : undefined
-          }
+          description={vllm ? t("replicasDescription") : undefined}
         >
           {vllm ? (
             replicas
           ) : (
             <p className="text-muted-foreground text-sm">
-              {isHosted(model)
-                ? "KServe scales this model itself; there is nothing to set here."
-                : "The cloud provider scales this endpoint; there is nothing to set here."}
+              {isHosted(model) ? t("kserveScales") : t("providerScales")}
             </p>
           )}
         </Panel>

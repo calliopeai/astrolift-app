@@ -17,6 +17,7 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -69,22 +70,10 @@ const SUGGESTED_EVENTS = [
   "PREVIEW_TORN_DOWN",
 ];
 
-const FORMAT_OPTIONS: { value: WebhookFormat; label: string; hint: string }[] = [
-  {
-    value: "generic",
-    label: "Generic (Astrolift envelope)",
-    hint: "Raw event JSON — best for collectors and your own services.",
-  },
-  {
-    value: "slack",
-    label: "Slack incoming webhook",
-    hint: "Adapts to Slack's text + attachments shape so messages render in-channel.",
-  },
-  {
-    value: "discord",
-    label: "Discord webhook",
-    hint: "Adapts to Discord's content + embeds shape.",
-  },
+const FORMAT_OPTIONS: { value: WebhookFormat }[] = [
+  { value: "generic" },
+  { value: "slack" },
+  { value: "discord" },
 ];
 
 export type WebhooksScreenProps = WebhooksData & {
@@ -130,6 +119,7 @@ export function WebhooksScreen({
   onTestFire,
 }: WebhooksScreenProps) {
   const fmt = useFormatters();
+  const t = useTranslations("webhooksScreen");
   const [open, setOpen] = React.useState(false);
   const [rotateTarget, setRotateTarget] = React.useState<AstroliftWebhookSubscription | null>(null);
   const [testTarget, setTestTarget] = React.useState<AstroliftWebhookSubscription | null>(null);
@@ -157,7 +147,7 @@ export function WebhooksScreen({
   const columns: Column<AstroliftWebhookSubscription>[] = [
     {
       id: "url",
-      header: "URL",
+      header: t("columns.url"),
       cellClassName: "max-w-xs",
       cell: (s) => (
         <span className="block truncate font-mono text-xs" title={s.url}>
@@ -167,7 +157,7 @@ export function WebhooksScreen({
     },
     {
       id: "events",
-      header: "Events",
+      header: t("columns.events"),
       cell: (s) => (
         <div className="flex flex-wrap gap-1">
           {s.events.slice(0, 3).map((e) => (
@@ -185,7 +175,7 @@ export function WebhooksScreen({
     },
     {
       id: "format",
-      header: "Format",
+      header: t("columns.format"),
       cell: (s) => (
         <Can
           permission="webhook.update"
@@ -203,7 +193,7 @@ export function WebhooksScreen({
             <SelectContent>
               {FORMAT_OPTIONS.map((o) => (
                 <SelectItem key={o.value} value={o.value}>
-                  {o.label}
+                  {t(`formats.${o.value}.label`)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -213,16 +203,16 @@ export function WebhooksScreen({
     },
     {
       id: "lastDelivery",
-      header: "Last delivery",
+      header: t("columns.lastDelivery"),
       cellClassName: "text-muted-foreground text-sm",
       cell: (s) =>
         s.lastDeliveryAt
           ? `${fmt.formatDateTime(s.lastDeliveryAt)} (${s.lastResponseStatus ?? "?"})`
-          : "never",
+          : t("never"),
     },
     {
       id: "failures",
-      header: "Failures",
+      header: t("columns.failures"),
       cellClassName: "font-mono text-xs",
       cell: (s) =>
         s.failureCount > 0 ? (
@@ -236,10 +226,10 @@ export function WebhooksScreen({
     },
     {
       id: "status",
-      header: "Status",
+      header: t("columns.status"),
       cell: (s) => (
         <Badge variant={s.isActive ? "secondary" : "outline"}>
-          {s.isActive ? "active" : "paused"}
+          {s.isActive ? t("active") : t("paused")}
         </Badge>
       ),
     },
@@ -251,20 +241,20 @@ export function WebhooksScreen({
       <>
         <DropdownMenuItem onSelect={() => setExpandedId(s.id)}>
           <HistoryIcon className="size-4" />
-          Deliveries
+          {t("deliveries")}
         </DropdownMenuItem>
         <Can permission="webhook.update">
           <DropdownMenuItem disabled={busy} onSelect={() => void onToggleActive(s)}>
             {s.isActive ? <PauseIcon className="size-4" /> : <PlayIcon className="size-4" />}
-            {s.isActive ? "Pause" : "Resume"}
+            {s.isActive ? t("pause") : t("resume")}
           </DropdownMenuItem>
           <DropdownMenuItem disabled={busy || !s.isActive} onSelect={() => setTestTarget(s)}>
             <SendIcon className="size-4" />
-            Send test event
+            {t("sendTestEvent")}
           </DropdownMenuItem>
           <DropdownMenuItem disabled={busy} onSelect={() => setRotateTarget(s)}>
             <KeyRoundIcon className="size-4" />
-            Rotate secret
+            {t("rotateSecret")}
           </DropdownMenuItem>
         </Can>
         <Can permission="webhook.delete">
@@ -275,34 +265,32 @@ export function WebhooksScreen({
             onSelect={() => setDeleteTarget(s)}
           >
             <Trash2Icon className="size-4" />
-            Delete
+            {t("delete")}
           </DropdownMenuItem>
         </Can>
       </>
     );
   }
 
-  const description = appSlug ? (
-    <>
-      Outbound HTTP delivery for <span className="font-mono">{appSlug}</span>&apos;s event stream.
-      Each subscription&apos;s secret is used to HMAC-sign every payload.
-    </>
-  ) : (
-    "Outbound HTTP delivery for the platform's event log. Each subscription's secret is used to HMAC-sign every payload."
-  );
+  const description = appSlug
+    ? t.rich("appDescription", {
+        app: appSlug,
+        mono: (chunks) => <span className="font-mono">{chunks}</span>,
+      })
+    : t("platformDescription");
 
   const actions = (
     <>
       <Button asChild size="sm" variant="outline">
         <Link href={DOC_LINKS.webhooks}>
           <BookOpenIcon className="size-4" />
-          Learn more
+          {t("learnMore")}
         </Link>
       </Button>
       <Can permission="webhook.create">
         <Button onClick={() => setOpen(true)}>
           <PlusIcon className="size-4" />
-          New webhook
+          {t("newWebhook")}
         </Button>
       </Can>
     </>
@@ -317,25 +305,25 @@ export function WebhooksScreen({
               <div className="flex min-w-0 items-center gap-2">
                 <CheckCircle2Icon className="text-success-fg size-4 shrink-0" />
                 <p className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">
-                  Secret for <span className="font-mono">{reveal.subscription.url}</span> ready
+                  {t.rich("secretReady", {
+                    url: reveal.subscription.url,
+                    mono: (chunks) => <span className="font-mono">{chunks}</span>,
+                  })}
                 </p>
               </div>
-              <p className="text-muted-foreground text-xs">
-                Save the HMAC secret below — it&apos;s never shown again. We store only its SHA-256.
-                The previous secret stays valid for the rotation grace window.
-              </p>
+              <p className="text-muted-foreground text-xs">{t("secretRevealHelp")}</p>
               <div className="flex min-w-0 items-center gap-2">
                 <code className="bg-background min-w-0 flex-1 rounded-md border px-3 py-2 font-mono text-xs break-all">
                   {reveal.plaintextSecret}
                 </code>
                 <Button size="sm" variant="outline" onClick={copySecret}>
                   <CopyIcon className="size-4" />
-                  Copy
+                  {t("copy")}
                 </Button>
               </div>
               <div className="flex justify-end">
                 <Button size="sm" variant="ghost" onClick={dismissReveal}>
-                  Dismiss
+                  {t("dismiss")}
                 </Button>
               </div>
             </CardContent>
@@ -347,7 +335,7 @@ export function WebhooksScreen({
 
   const body = {
     list,
-    label: "Webhook subscriptions",
+    label: t("listLabel"),
     columns,
     rows,
     getRowId: (s: AstroliftWebhookSubscription) => s.id,
@@ -362,9 +350,8 @@ export function WebhooksScreen({
     notice,
     empty: {
       icon: <WebhookIcon className="size-5" />,
-      title: "No webhook subscriptions",
-      description:
-        "Subscribe an external system (Zentinelle, Slack relay, custom collector) to platform events.",
+      title: t("empty.title"),
+      description: t("empty.description"),
     },
   };
 
@@ -382,8 +369,8 @@ export function WebhooksScreen({
       ) : (
         <ListPage<AstroliftWebhookSubscription>
           header={{
-            crumbs: adminCrumbs("webhooks", "Webhooks"),
-            title: "Webhooks",
+            crumbs: adminCrumbs("webhooks", t("title")),
+            title: t("title"),
             context: description,
             primaryAction: <div className="flex items-center gap-2">{actions}</div>,
           }}
@@ -400,10 +387,8 @@ export function WebhooksScreen({
       >
         <SheetContent className="flex w-full flex-col sm:max-w-xl">
           <SheetHeader>
-            <SheetTitle>Deliveries</SheetTitle>
-            <SheetDescription>
-              Every attempt to this subscription, newest first. Older attempts load as you scroll.
-            </SheetDescription>
+            <SheetTitle>{t("deliveries")}</SheetTitle>
+            <SheetDescription>{t("deliveriesDescription")}</SheetDescription>
           </SheetHeader>
           <div className="min-w-0 flex-1 overflow-y-auto px-4 pb-4">
             {expanded && (
@@ -418,15 +403,12 @@ export function WebhooksScreen({
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="flex flex-col">
           <SheetHeader>
-            <SheetTitle>New webhook</SheetTitle>
-            <SheetDescription>
-              The HMAC secret is shown once at creation; we store only the SHA-256. Use it to verify
-              the X-Astrolift-Signature header on incoming deliveries.
-            </SheetDescription>
+            <SheetTitle>{t("newWebhook")}</SheetTitle>
+            <SheetDescription>{t("createDescription")}</SheetDescription>
           </SheetHeader>
           <form onSubmit={submit} className="flex flex-1 flex-col gap-4 px-4 pb-4">
             <div className="space-y-2">
-              <Label htmlFor="webhook-url">URL</Label>
+              <Label htmlFor="webhook-url">{t("columns.url")}</Label>
               <Input
                 id="webhook-url"
                 value={url}
@@ -438,7 +420,7 @@ export function WebhooksScreen({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="webhook-format">Format</Label>
+              <Label htmlFor="webhook-format">{t("columns.format")}</Label>
               <Select value={format} onValueChange={(v) => setFormat(v as WebhookFormat)}>
                 <SelectTrigger id="webhook-format">
                   <SelectValue />
@@ -446,17 +428,15 @@ export function WebhooksScreen({
                 <SelectContent>
                   {FORMAT_OPTIONS.map((o) => (
                     <SelectItem key={o.value} value={o.value}>
-                      {o.label}
+                      {t(`formats.${o.value}.label`)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-muted-foreground text-xs">
-                {FORMAT_OPTIONS.find((o) => o.value === format)?.hint}
-              </p>
+              <p className="text-muted-foreground text-xs">{t(`formats.${format}.hint`)}</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="events">Events</Label>
+              <Label htmlFor="events">{t("columns.events")}</Label>
               <Textarea
                 id="events"
                 value={eventsRaw}
@@ -465,16 +445,16 @@ export function WebhooksScreen({
                 className="font-mono text-xs"
               />
               <p className="text-muted-foreground text-xs">
-                One per line, or comma/space separated. <code>*</code> matches all events.
+                {t.rich("eventsHelp", { code: (chunks) => <code>{chunks}</code> })}
               </p>
             </div>
             <VerificationSnippetDisclosure />
             <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-                Cancel
+                {t("cancel")}
               </Button>
               <Button type="submit" disabled={creating || !url}>
-                {creating ? "Creating…" : "Create webhook"}
+                {creating ? t("creating") : t("createWebhook")}
               </Button>
             </SheetFooter>
           </form>
@@ -486,13 +466,11 @@ export function WebhooksScreen({
         onOpenChange={(next) => {
           if (!next) setDeleteTarget(null);
         }}
-        title="Delete webhook?"
+        title={t("deleteDialog.title")}
         description={
-          deleteTarget
-            ? `${deleteTarget.url} will stop receiving events immediately. Past deliveries stay in the audit log.`
-            : undefined
+          deleteTarget ? t("deleteDialog.description", { url: deleteTarget.url }) : undefined
         }
-        confirmLabel="Delete webhook"
+        confirmLabel={t("deleteDialog.confirm")}
         destructive
         onConfirm={async () => {
           if (deleteTarget) await onDelete(deleteTarget);
@@ -504,13 +482,11 @@ export function WebhooksScreen({
         onOpenChange={(next) => {
           if (!next) setRotateTarget(null);
         }}
-        title="Rotate webhook secret?"
+        title={t("rotateDialog.title")}
         description={
-          rotateTarget
-            ? `Generate a new HMAC secret for ${rotateTarget.url}. The previous secret stays valid for the configured grace window so subscribers can roll out without dropping deliveries. The new plaintext is shown exactly once.`
-            : undefined
+          rotateTarget ? t("rotateDialog.description", { url: rotateTarget.url }) : undefined
         }
-        confirmLabel="Rotate secret"
+        confirmLabel={t("rotateSecret")}
         onConfirm={async () => {
           if (rotateTarget) await onRotate(rotateTarget);
         }}
@@ -521,13 +497,9 @@ export function WebhooksScreen({
         onOpenChange={(next) => {
           if (!next) setTestTarget(null);
         }}
-        title="Send a test event?"
-        description={
-          testTarget
-            ? `POST a synthetic webhook.test event to ${testTarget.url}. No retries, no auto-disable bookkeeping — the response is shown inline.`
-            : undefined
-        }
-        confirmLabel="Send test"
+        title={t("testDialog.title")}
+        description={testTarget ? t("testDialog.description", { url: testTarget.url }) : undefined}
+        confirmLabel={t("testDialog.confirm")}
         onConfirm={async () => {
           if (testTarget) await onTestFire(testTarget);
         }}
@@ -543,6 +515,7 @@ function TestResultCard({
   result: AstroliftWebhookTestResult;
   onDismiss: () => void;
 }) {
+  const t = useTranslations("webhooksScreen");
   const ok =
     result.delivered && result.statusCode && result.statusCode >= 200 && result.statusCode < 300;
   const border = ok ? "border-success-border bg-success/5" : "border-warning-border bg-warning/5";
@@ -556,20 +529,23 @@ function TestResultCard({
             ) : (
               <XCircleIcon className="text-warning-fg size-4" />
             )}
-            Test delivery to <span className="font-mono">{result.url}</span>
+            {t.rich("testDeliveryTo", {
+              url: result.url,
+              mono: (chunks) => <span className="font-mono">{chunks}</span>,
+            })}
           </div>
           <Button size="sm" variant="ghost" onClick={onDismiss}>
-            Dismiss
+            {t("dismiss")}
           </Button>
         </div>
         <DefinitionList
           orientation="stack"
           className="grid grid-cols-3 gap-3 text-xs"
           items={[
-            { term: "Status", description: result.statusCode ?? "—" },
-            { term: "Latency", description: `${result.durationMs}ms` },
+            { term: t("columns.status"), description: result.statusCode ?? "—" },
+            { term: t("latency"), description: t("ms", { ms: result.durationMs }) },
             {
-              term: "Delivery ID",
+              term: t("deliveryId"),
               description: <span className="font-mono">{result.deliveryId || "—"}</span>,
             },
           ]}
@@ -590,12 +566,13 @@ function TestResultCard({
 }
 
 function VerificationSnippetDisclosure() {
+  const t = useTranslations("webhooksScreen");
   const [lang, setLang] = React.useState<SnippetLanguage>("node");
   const langs: SnippetLanguage[] = ["node", "python", "go"];
 
   function copy() {
     navigator.clipboard.writeText(SNIPPETS[lang]);
-    toast.success("Snippet copied");
+    toast.success(t("snippetCopied"));
   }
 
   return (
@@ -603,7 +580,7 @@ function VerificationSnippetDisclosure() {
       <CollapsibleTrigger asChild>
         <Button variant="outline" size="sm" type="button" className="w-full justify-start">
           <ChevronRightIcon className="size-4" />
-          Show verification snippet
+          {t("showSnippet")}
         </Button>
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-2 pt-2">
@@ -626,17 +603,13 @@ function VerificationSnippetDisclosure() {
           </div>
           <Button size="sm" variant="ghost" type="button" onClick={copy} className="ml-auto">
             <CopyIcon className="size-3" />
-            Copy
+            {t("copy")}
           </Button>
         </div>
         <pre className="bg-background text-2xs max-h-72 overflow-auto rounded border p-3 font-mono leading-snug">
           {SNIPPETS[lang]}
         </pre>
-        <p className="text-muted-foreground text-xs">
-          Rejects deliveries older than 5 minutes (replay protection) and uses constant-time
-          comparison. Verify against the new secret after rotation; the previous secret stays valid
-          for the rotation grace window.
-        </p>
+        <p className="text-muted-foreground text-xs">{t("snippetHelp")}</p>
       </CollapsibleContent>
     </Collapsible>
   );

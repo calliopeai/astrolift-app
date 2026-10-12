@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { TEST_MODEL_ENDPOINT } from "@/graphql/services/services.mutations";
@@ -45,6 +46,7 @@ export type ModelTestOutcome =
  * keep-alive agent. The data half of ModelTestDialogView.
  */
 export function useModelTest({ id, name }: { id: string; name: string }) {
+  const t = useTranslations("modelTest");
   const [outcome, setOutcome] = React.useState<ModelTestOutcome | null>(null);
   const [test, { loading }] = useMutation<TestModelEndpointResult>(TEST_MODEL_ENDPOINT);
 
@@ -53,7 +55,7 @@ export function useModelTest({ id, name }: { id: string; name: string }) {
     const { data } = await test({ variables: { input: { managedServiceId: id, prompt } } });
     const result = data?.testModelEndpoint;
     if (!result?.ok) {
-      setOutcome({ kind: "error", message: result?.errors?.[0]?.message ?? "Test failed" });
+      setOutcome({ kind: "error", message: result?.errors?.[0]?.message ?? t("failed") });
       return;
     }
     if (result.data) {

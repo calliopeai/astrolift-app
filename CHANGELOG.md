@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Webhooks, Secure › Zentinelle, model deploy, test and detail, Providers, sign-in and invitation acceptance, and the Agents › Workloads and Functions lists now render every label, empty state, dialog and toast through next-intl in all eight locales (new namespaces `webhooksScreen`, `zentinelleScreen`, `modelDeploy`, `modelTest`, `modelReplicas`, `modelDetail`, `cloudProviders`, `providersScreen`, `loginScreen`, `invitationAccept`, `workloadsScreen`, `functionsScreen`) (#2145).
+
 - A refused permission reads the same on every client: GraphQL errors raised by a permission check now carry `extensions.code = "PERMISSION_DENIED"` (the code mutation envelopes already use) with `extensions.reason` and `extensions.permission`; the message is unchanged. The CLI and web can tell a refusal from any other failure and show why (#1867).
 
 - Every tab inside an app or agent offers actions from that app's own permissions, not the account's: the header (deploy, archive, delete), Settings sections (resync, retention, environments, managed services, archive, the danger zone) and Access (tokens, security, edge). A grant held on another project no longer offers an action this app refuses. Account grants only bridge the first load (`useAppCan`, fed by the frame) (#1867).
