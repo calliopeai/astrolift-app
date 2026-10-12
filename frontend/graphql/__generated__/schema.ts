@@ -5682,6 +5682,8 @@ export type AstroliftTenantCluster = {
   region: Scalars['String']['output'];
   secretsBackendProvisionedAt?: Maybe<Scalars['DateTime']['output']>;
   slug: Scalars['String']['output'];
+  /** The cluster permissions the viewer holds on this cluster (#1867), from the checker the mutations use; a shared cluster's writes are the platform operator's. Advisory: offer only these, the mutation still decides. */
+  viewerPermissions: Array<Scalars['String']['output']>;
 };
 
 

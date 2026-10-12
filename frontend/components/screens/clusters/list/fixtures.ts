@@ -17,6 +17,7 @@ export function cluster(slug: string, patch: Partial<ClusterRow> = {}): ClusterR
     id: `cl-${slug}`,
     slug,
     name: slug,
+    viewerPermissions: ["cluster.read"],
     isActive: true,
     lifecycle: "managed",
     lastManagementError: "",
