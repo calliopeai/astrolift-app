@@ -10,6 +10,8 @@
 
 - An app's managed services, email service sheet, workloads, alert rules, command runner and shell shortcuts speak every supported language: their labels, empty states, confirmations, toasts and list filters come from the message catalogs in all eight locales, and their dates and numbers follow the reader's locale. English log history on Logs & metrics no longer shows raw message keys (#2145).
 
+- The in-app documentation reads in every supported language: the docs nav and index, Introduction, Local development setup, Cluster prerequisites, Custom domains, Source providers, Identity providers, ABAC policies, Configuration, Webhook events, Driver reference, Get help, Changelog and the tutorial chrome now go through next-intl in all 8 locales. Code samples, env var names, API fields, the env var reference rows, webhook payload field descriptions and tutorial bodies stay as written (#2145).
+
 - A refused permission reads the same on every client: GraphQL errors raised by a permission check now carry `extensions.code = "PERMISSION_DENIED"` (the code mutation envelopes already use) with `extensions.reason` and `extensions.permission`; the message is unchanged. The CLI and web can tell a refusal from any other failure and show why (#1867).
 
 - Every tab inside an app or agent offers actions from that app's own permissions, not the account's: the header (deploy, archive, delete), Settings sections (resync, retention, environments, managed services, archive, the danger zone) and Access (tokens, security, edge). A grant held on another project no longer offers an action this app refuses. Account grants only bridge the first load (`useAppCan`, fed by the frame) (#1867).

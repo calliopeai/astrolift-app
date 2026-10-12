@@ -300,6 +300,598 @@
       }
     }
   },
+  "docsClusterPrereqs": {
+    "title": "クラスターの前提条件",
+    "intro": "Kubernetes クラスターを Astrolift に登録する前にインストールしておく必要があるものの一覧です。<code>astrolift-opscode</code> でプロビジョニングしたクラスターの多くには既に含まれています。このガイドは独自のクラスターを持ち込むオペレーター向けです。",
+    "cliTitle": "CLI による一括インストール",
+    "cliBody": "以下の前提条件をプロバイダーのドライバーに合わせて一括インストールするには、ターミナルで <cmd>{command}</cmd> を実行します。CLI が Flux とプラットフォームのアンブレラチャートを導入し、その後はクラスター詳細ページのブートストラップカードで選択内容を継続的に調整できます。<link>CLI をインストール</link>。",
+    "whenTitle": "これが必要になる場面",
+    "whenBody": "Astrolift はテナントクラスターをアプリをホストするランタイムとして扱い、クラスター内のインフラコンポーネントを自らインストールしたり所有したりはしません。カスタムドメインの TLS、Ingress ルーティング、オートスケーリングはコントローラーに委任されており、Astrolift が利用する前にそれらが存在している必要があります。以下のチェックでクラスターが正しく構成されていることを確認します。不足があると対応する機能は無効のままとなり、コントロールプレーンがクラスター詳細ページに対処のヒントを表示します。",
+    "requiredTitle": "必須",
+    "requiredBadge": "要インストール",
+    "requiredBody": "これらがなくても登録は成功しますが、アプリのワークロードはカスタムホスト名での受信トラフィックを受け付けられません。",
+    "certManagerBody": "カスタムドメインの TLS 証明書を発行・更新します。Astrolift がユーザーに代わって <code>Certificate</code> リソースを作成し、cert-manager が Let's Encrypt (または設定した <code>ClusterIssuer</code>) との ACME のやり取りを処理します。cert-manager がないと、<link>カスタムドメイン</link>のワークフローはホスト名のバインドを拒否します。",
+    "upstream": "アップストリーム:",
+    "ingressTitle": "Ingress コントローラー",
+    "ingressBody": "Astrolift はアプリごとに 1 つの Ingress リソースを生成し、その <code>spec.ingressClassName</code> はクラスター内に存在する <code>IngressClass</code> と一致します。以下のどのコントローラーでも構いません。プラットフォームチームが既に運用しているものを選んでください。",
+    "defaultBadge": "デフォルト",
+    "istioNote": "Astrolift は Istio を検出すると、<code>Ingress</code> の代わりに <code>Gateway</code> + <code>VirtualService</code> リソースを出力します。",
+    "albBody": "EKS では、ALB コントローラーが <code>alb</code> IngressClass を通じてサービスを公開します。GKE では Gateway API コントローラーがクラスターに同梱されています。利用するには <link>gateway-api</link> の CRD をインストールしてください。",
+    "externalDnsQualifier": "(任意、強く推奨)",
+    "externalDnsBody": "<code>Certificate.spec.dnsNames</code> や Ingress リソースからホスト名を読み取り、DNS プロバイダーに対応するレコードを作成します。Astrolift でカスタムドメインの公開を完全にセルフサービス化したい場合に必要です。ない場合はオペレーターが CNAME を手動で追加する必要があります。",
+    "externalDnsProviders": "コントローラーから扱いやすい API を持つ対応プロバイダーには、AWS Route53、Google Cloud DNS、Azure DNS、Cloudflare などがあります。全一覧は<link>アップストリームのプロバイダー一覧</link>を参照してください。",
+    "recommendedTitle": "推奨",
+    "recommendedBadge": "あると便利",
+    "recommendedBody": "これらがなくても Astrolift は動作しますが、特定の機能はそれらが揃うまで無効のままです。",
+    "storageTitle": "デフォルトのストレージクラス",
+    "storageBody": "<code>PersistentVolumeClaim</code> を要求するクラスター内マネージドサービス (クラスター内 Postgres オペレーター、クラスター内 Redis、PVC を直接マウントするアプリなど) に必要です。実行するすべてのアプリが外部の RDS/Cloud SQL マネージドサービスを使う場合は省略できます。",
+    "metricsBody": "Kubernetes の <code>HorizontalPodAutoscaler</code> は <code>metrics.k8s.io</code> から CPU とメモリを読み取ります。metrics-server がないとオートスケーリングのルールは現在のレプリカ数のまま動作しません。Astrolift は手動のレプリカ数にフォールバックしますが、アプリ詳細のオートスケールタブに不足しているものを説明するバナーが表示されます。",
+    "prometheusTitle": "クラスター内 Prometheus",
+    "prometheusBody": "到達可能な Prometheus を検出すると、Astrolift はアプリのメトリクスパネルの参照先をそこに向けます。ない場合は開発中でも UI が役立つようパネルに合成の時系列を表示しますが、実際のワークロードの数値には Prometheus または Prometheus 互換のスクレイパーが必要です。",
+    "verifyTitle": "インストールの確認",
+    "verifyBody": "クラスターに到達できるワークステーションから実行してください。いずれかのチェックが失敗すると、対応する機能は Astrolift で無効のままになります。",
+    "ingressClassTitle": "Ingress クラス",
+    "troubleshootingTitle": "トラブルシューティング",
+    "troubleCertTitle": "cert-manager がいつまでも保留になる (Certificate が <pending>Pending</pending> のまま)。",
+    "troubleCertBody": "ほとんどの場合、ACME チャレンジの問題です。<code>dns-01</code> の場合: Issuer に TXT レコードを書き込む認証情報がありません (<code>ClusterIssuer</code> の spec を確認し、次にコントローラー Pod のログで認証情報のエラーを確認します)。<code>http-01</code> の場合: 検証用 Pod が <code>{url}</code> に到達できません。Ingress コントローラーが公開されていることを確認してください。次のコマンドで調べます:",
+    "troubleIngressTitle": "Ingress がバックエンドなしで 503 を返す。",
+    "troubleIngressBody": "Ingress の転送先の Service に準備完了のエンドポイントがありません。よくある原因: アプリの Pod がまだイメージを取得中、Readiness Probe が失敗している、または Service の <code>selector</code> が Pod のラベルと一致していない。<code>{command}</code> で確認し、アドレス一覧が空なら Ingress の転送先はありません。",
+    "troubleDnsTitle": "external-dns がレコードを作成しない。",
+    "troubleDnsBody": "よくある原因は 2 つです。(a) RBAC: コントローラーのサービスアカウントには <code>services</code>、<code>ingresses</code>、プロバイダーの CRD に対する <code>list/watch</code> と、DNS プロバイダーの API を呼び出す IAM/認証情報が必要です。(b) 所有権: TXT の owner-id マーカーが一致しない限り、external-dns は自分が作成していないレコードを変更しません。コントローラーのログで <code>skipping endpoint</code> メッセージを確認してください。",
+    "troubleHpaTitle": "HPA のターゲットメトリクスが <code>{unknown}</code> と表示される。",
+    "troubleHpaBody": "metrics-server がインストールされていないか、スクレイプしていません。<code>kubectl top pods</code> を実行し、<code>Metrics API not available</code> エラーになる場合は metrics-server を導入すれば解決します。",
+    "relatedTitle": "関連項目",
+    "relatedCustomDomains": "<link>カスタムドメイン</link>: cert-manager と Ingress コントローラーが存在することを前提とする機能です。",
+    "relatedGetStarted": "<link>はじめに</link>: テナントクラスターに向ける前に、ローカルで Astrolift スタックを起動します。"
+  },
+  "docsSourceProviders": {
+    "title": "ソースプロバイダー",
+    "intro": "Astrolift を GitHub または GitLab に接続すると、<code>git push</code> でデプロイが始まります。",
+    "whenTitle": "これが必要になる場面",
+    "whenBody": "ホスト型 Git プロバイダーにソースがあるアプリを登録し、Astrolift にブランチ (またはプルリクエスト) を監視させて、マージやプッシュを自動的にデプロイにしたい場合です。ソースプロバイダーを接続しなくてもマニフェストやレジストリのイメージからアプリをデプロイできますが、プッシュでデプロイする仕組みは使えません。",
+    "prerequisitesTitle": "前提条件",
+    "prereqPermission": "<strong>権限。</strong><code>scm.connect</code> を含むオペレーターロール (Owner と Admin にはデフォルトで含まれます)。",
+    "prereqAdmin": "<strong>GitHub Organization または GitLab グループへの管理者アクセス。</strong>Astrolift App は個々のユーザーではなく Organization/グループ単位でインストールされるため、Organization のオーナーの承認が必要です。",
+    "prereqUrl": "<strong>インストールの公開 URL。</strong>GitHub と GitLab は Webhook を配信するために Astrolift に到達できる必要があります。バックエンドはこれを <code>APP_BASE_URL</code> から読み取ります。プライベート IP ではなく、ユーザーがアクセスする公開ホスト名を指していることを確認してください。",
+    "recommendedBadge": "推奨",
+    "githubIntro": "最も早い方法です。Astrolift がユーザーに代わって GitHub App のマニフェストを送信するので、権限を承認し、App から見えるリポジトリを選ぶだけです。",
+    "stepHeading": "ステップ {n}: {title}",
+    "openProvidersTitle": "ソースプロバイダーを開く",
+    "openProvidersGitHub": "<link>設定 · ソースプロバイダー</link> を開き、<strong>GitHub に接続</strong> をクリックします。",
+    "githubOrgTitle": "GitHub Organization のスラッグを入力",
+    "githubOrgBody": "Organization のスラッグ (URL の <code>github.com/</code> 以降の部分) を入力し、<strong>GitHub で続行</strong> をクリックします。Astrolift は App 名、コールバック URL、Webhook URL、要求する権限を含む使い切りのマニフェストを送信します。",
+    "githubApproveTitle": "GitHub で App を承認",
+    "githubApproveBody": "GitHub に Astrolift App が必要とする権限が表示されます:",
+    "permContents": "<code>contents: read</code>: デプロイ時にソースをクローン",
+    "permMetadata": "<code>metadata: read</code>: リポジトリとブランチを一覧表示",
+    "permPullRequests": "<code>pull_requests: write</code>: プレビュー URL をコメント",
+    "permChecks": "<code>checks: write</code>: コミットにビルド/デプロイのステータスを報告",
+    "githubCreate": "<strong>{button}</strong> をクリックします。GitHub が App を作成して Organization にインストールし、Astrolift にリダイレクトします。",
+    "githubReposTitle": "オンボーディング中にリポジトリを選択",
+    "githubReposBody": "接続は <strong>Hosts</strong> に表示されるようになります。<link>アプリ · アプリを登録</link> から新しいアプリを登録すると、オンボーディングウィザードが App にアクセスを許可したリポジトリを一覧表示します。対象を広げたり絞ったりするには、GitHub でインストールを編集します (<code>{url}</code>)。",
+    "guidedManualBadge": "手動 (ガイド付き)",
+    "gitlabIntro": "GitLab には GitHub Apps に相当するマニフェスト API がないため、この手順は少し手間が増えます。GitLab で OAuth アプリケーションを登録し、その認証情報を Astrolift に貼り付けます。",
+    "openProvidersGitLab": "<link>設定 · ソースプロバイダー</link> を開き、<strong>GitLab に接続</strong> をクリックします。",
+    "gitlabGroupTitle": "グループとインスタンス URL を入力",
+    "gitlabGroupBody": "GitLab グループのスラッグを入力します。インスタンス URL のデフォルトは <code>https://gitlab.com</code> です。セルフマネージドのインスタンスを運用している場合は変更してください。",
+    "gitlabRegisterTitle": "GitLab で Astrolift アプリケーションを登録",
+    "gitlabRegisterBody": "<strong>GitLab アプリケーションを開く</strong> をクリックします。新しいタブで、次の設定でグループ所有のアプリケーションを作成します:",
+    "gitlabSaveBody": "保存します。GitLab は <strong>Application ID</strong> と <strong>Secret</strong> を一度だけ表示します。",
+    "gitlabPasteTitle": "認証情報を貼り付ける",
+    "gitlabPasteBody": "Astrolift に戻り、ダイアログに Application ID と Secret を貼り付けて保存します。接続が <strong>Hosts</strong> に表示され、グループ内の任意のプロジェクトからアプリを登録できるようになります。",
+    "troubleshootingTitle": "トラブルシューティング",
+    "troubleHookBody": "GitHub または GitLab がコールバックに到達できません。これはオペレーター側の問題です。バックエンド環境の <code>APP_BASE_URL</code> をインストールの公開 URL (ユーザーがアクセスするのと同じホスト名) に設定し、接続手順をやり直してください。",
+    "troubleReposTitle": "オンボーディングウィザードに Organization のプライベートリポジトリが表示されない。",
+    "troubleReposBody": "GitHub App のインストール範囲が一部のリポジトリに限定されています。<code>{url}</code> を開いて Astrolift App を選び、必要なリポジトリを選択するか <strong>All repositories</strong> を選んでください。",
+    "troublePushTitle": "プッシュしてもデプロイが始まらない。",
+    "troublePushBody": "アプリの <strong>Webhooks</strong> タブを開きます。受信した SCM Webhook は、レスポンスのステータスと本文とともに最近の配信一覧に表示されます。401 は署名シークレットが一致しなくなったことを意味します。<link>ソースプロバイダー</link> から再ローテーションしてください。",
+    "relatedTitle": "関連項目",
+    "relatedWebhooks": "<link>Webhooks</link>: ビルドやデプロイの完了時に送信される通知。",
+    "relatedCustomDomains": "<link>カスタムドメイン</link>: 接続したアプリに独自のホスト名を割り当てます。"
+  },
+  "docsPolicies": {
+    "title": "ABAC ポリシー",
+    "intro": "ロールバインディングの上に重ねるきめ細かなアクセスルールです。ポリシーがロールを超えて<strong>権限を付与することはありません</strong>。追加の<em>許可</em>または<em>拒否</em>の条件を定めるだけです。",
+    "whenTitle": "これが必要になる場面",
+    "whenBody": "Astrolift の組み込みロールでほとんどのチームに対応できます。ロールカタログで表現できないことが必要なときにポリシーを使います。例:",
+    "exampleSenior": "<code>prod-*</code> という名前のアプリにデプロイできるのはシニアエンジニアだけ。",
+    "exampleNight": "呼び出しを受けていない限り、UTC 22:00 から 06:00 の間は誰もシークレットを書き込めない。",
+    "exampleMfa": "本番前環境へのデプロイには、60 分以内に行った MFA 認証が必要。",
+    "exampleContractors": "外部委託者はプロジェクト内のすべてを閲覧できるが、請求に関わるものは変更できない。",
+    "prerequisitesTitle": "前提条件",
+    "prereqPermission": "<strong>権限。</strong><code>policy.create</code> (Owner と Admin が保有)。",
+    "prereqModel": "<strong>ABAC と RBAC の考え方。</strong>RBAC は「このユーザーのロールにこの権限が含まれているか」を問います。ABAC は「このリクエストの属性 (誰が、何を、いつ、どこで) を踏まえて、<em>拒否</em>とするポリシーがあるか」を問います。リクエストが成功するのは、RBAC が許可し、かつどのポリシーも拒否しない場合だけです。",
+    "createTitle": "ポリシーを作成",
+    "createBody": "<link>設定 · ポリシー</link> を開き、<strong>新規ポリシー</strong> をクリックします。各ポリシーには次のフィールドがあります:",
+    "fieldScope": "1. スコープレベル",
+    "fieldScopeBody": "ポリシーの適用範囲です。ORG ポリシーはすべてのリクエストで評価され、APP ポリシーはリクエストがその特定のアプリを対象とする場合にのみ評価されます。範囲が狭いほど評価コストが下がり、把握しやすくなります。",
+    "fieldEffect": "2. 効果",
+    "fieldEffectBody": "ポリシーが一致したときの動作です。常に DENY が優先されます。いずれかのスコープでどれかのポリシーが拒否すれば、より狭いスコープの ALLOW が一致していてもリクエストは失敗します。",
+    "fieldAction": "3. アクションパターン",
+    "fieldActionBody": "権限スラッグに対する glob です。<code>app.deploy</code> は 1 つのスラッグに完全一致し、<code>app.*</code> はアプリリソースのすべてのアクションに、<code>*</code> はすべてに一致します。",
+    "fieldResource": "4. リソースパターン",
+    "fieldResourceBody": "リソース識別子に対する glob です。<code>app:prod-*</code> はスラッグが <code>prod-</code> で始まるアプリに、<code>project:billing/*</code> は billing プロジェクト内のすべてに一致します。",
+    "fieldActor": "5. アクターパターン (JSON)",
+    "fieldActorBody": "ポリシーの適用対象です。ユーザー ID、ロールスラッグ、またはその両方で照合します。空の <code>{empty}</code> はすべてのアクターに一致します。",
+    "fieldConditions": "6. 条件 (JSON)",
+    "fieldConditionsBody": "リクエスト時に評価される追加の条件式です。使用できるキー: <code>time_of_day</code>、<code>day_of_week</code>、<code>ip_cidr</code>、<code>mfa_max_age_seconds</code>、<code>env</code>。",
+    "exampleSeniorTitle": "例: 本番はシニア限定",
+    "exampleSeniorBody": "スラッグが <code>prod-</code> で始まるアプリをデプロイできるのは、<code>senior-eng</code> ロールのメンバーだけです。",
+    "exampleSeniorOutcome": "シニアエンジニアのデプロイはロールチェックを通過します (<code>role_slug_not_in</code> が false を返す → ポリシーは一致しない → 拒否なし)。それ以外のユーザーは拒否に該当し、デプロイは権限エラーで失敗します。",
+    "exampleFreezeTitle": "例: 夜間のシークレット凍結",
+    "exampleFreezeBody": "UTC 22:00 から 06:00 の間は誰もシークレットを書き込めません。インシデント対応期間や変更凍結期間に使います。",
+    "troubleshootingTitle": "トラブルシューティング",
+    "troubleEffectTitle": "ポリシーが反映されない。",
+    "troubleEffectBody": "常に DENY が優先されます。より広いスコープ (ORG レベル) の DENY が既にそのリクエストを対象にしていないか確認してください。ポリシー表に一致の順序が表示されるので、スコープで並べ替えます。",
+    "troubleButtonTitle": "ユーザーに表示されるべきでないボタンが見えている。",
+    "troubleButtonBody": "UI は ABAC ではなく RBAC に基づいてコントロールを隠します。ロールが形式上そのアクションを許可しているためボタンは表示されたままですが、ABAC が拒否するとリクエストはリゾルバーで失敗します。ロールバインディングを厳しくするか、<link>権限の診断</link>で ABAC の結果を UI に表示してください。",
+    "troubleJsonTitle": "条件の JSON が解析できない。",
+    "troubleJsonBody": "ダイアログは保存時に検証し、具体的なエラーを返します (「unknown key <code>time_of_the_day</code>, did you mean <code>time_of_day</code>?」)。保存された値はポリシーを開き直すと確認できます。",
+    "relatedTitle": "関連項目",
+    "relatedIdentityProviders": "<link>ID プロバイダー</link>: 誰がサインインできるか。サインイン後に何ができるかはポリシーが決めます。",
+    "relatedDiagnostic": "<link>権限の診断</link>: 特定のユーザーが特定のリソースに対して持つ実効権限をデバッグします。"
+  },
+  "docsCustomDomains": {
+    "title": "カスタムドメイン",
+    "intro": "独自のホスト名 (例: <code>app.acme.com</code>) を使い、TLS は cert-manager 経由で Astrolift に任せます。",
+    "prereqNote": "<strong>クラスターの前提条件。</strong>このガイドは、テナントクラスターで cert-manager と Ingress コントローラーが既に稼働していることを前提としています。独自のクラスターを持ち込む場合は、先に<link>クラスターの前提条件</link>を済ませてください。",
+    "whenTitle": "これが必要になる場面",
+    "whenBody": "すべてのアプリにはデフォルトで生成された <code>*.astrolift.app</code> サブドメインが割り当てられます。このガイドが必要なのは、<code>app.acme.com</code> や <code>checkout.acme.com</code> のような独自のホスト名をワークロードの前に置き、テナントクラスター内の cert-manager が管理する自動 TLS を使いたい場合だけです。",
+    "prerequisitesTitle": "前提条件",
+    "prereqCluster": "<strong>接続済みのクラスター。</strong>アプリが cert-manager と Ingress コントローラーをインストール済みのテナントクラスターにデプロイされていること (opscode でプロビジョニングしたクラスターではこれがデフォルトです)。",
+    "prereqDns": "<strong>編集できる DNS。</strong>CNAME (または TXT) レコードを追加できるよう、親ゾーンを管理する DNS プロバイダーへのアクセスが必要です。",
+    "prereqPermission": "<strong>権限。</strong><code>app.update</code> を含むオペレーターロール。Owner、Admin、Deployer にはデフォルトで含まれます。",
+    "stepHeading": "ステップ {n}: {title}",
+    "step1Title": "ドメインタブを開く",
+    "step1Body": "アプリを開き、<strong>ドメイン</strong> タブをクリックします。アプリに既にバインドされているホスト名と、新しいホスト名を追加するボタンが表示されます。",
+    "step2Title": "FQDN と検証方法を入力",
+    "step2Body": "完全なホスト名を入力します。検証方法のデフォルトは <badge>dns-01</badge> で、Apex レコードとワイルドカードレコードのどちらでも使え、発行前にホスト名が公開されている必要もありません。プラットフォームのデフォルトを使う場合は空欄のままにします。",
+    "step3Title": "Astrolift が公開するレコードを返す",
+    "step3Body": "保存すると、証明書の状態が <badge>pending_validation</badge> の行が検証トークンとともに表示されます。<code>dns-01</code> の場合は <code>_acme-challenge.app.acme.com</code> の TXT レコード、<code>http-01</code> の場合はクラスターの Ingress を指す CNAME です。トークンをクリックするとコピーできます。",
+    "step4Title": "DNS プロバイダーでレコードを公開",
+    "step4Body": "レコードをそのまま追加します。ほとんどのプロバイダーでは 1、2 分で反映されますが、TTL は目安にすぎません。トラブルシューティングに進む前に最大 10 分ほど待ってください。",
+    "step5Title": "有効化を待つ",
+    "step5Body": "Astrolift は約 30 秒ごとにポーリングします。リゾルバーからレコードが見えるようになると cert-manager が証明書を発行し、行の状態が <pending>pending_validation</pending> → <validated>validated</validated> → <active>active</active> と遷移します。行の <strong>再確認</strong> ボタンですぐにポーリングさせることもできます。",
+    "authTitle": "カスタムドメインでの認証",
+    "authBody": "クラスターにエッジのログインゲートがある場合、それが保護するのはアプリのプラットフォームサブドメインであり、カスタムドメインではありません。ゲートのセッション Cookie はクラスターの認証ホストが発行し、プラットフォーム自身のゾーンに限定されます。また、あるドメインからのレスポンスは無関係なドメインの Cookie を設定できません。そのためカスタムドメインは構造上ゲートの外にあり、どの設定でも変えられません。",
+    "authMarker": "ドメインタブではこのような行に <badge>{label}</badge> と表示され、Ingress には <code>astrolift.dev/edge-auth=ungated</code> が付くため <code>kubectl</code> からも確認できます。カスタムドメインは公開された入口として扱ってください。背後のアプリに認証が必要な場合は、アプリ自身で認証を行う必要があります。",
+    "troubleshootingTitle": "トラブルシューティング",
+    "troublePendingTitle": "証明書が pending_validation のままになる。",
+    "troublePendingBody": "DNS が発行側のリゾルバーにまだ反映されていない可能性があります。外部ネットワークから確認してください:",
+    "troubleValidationTitle": "検証が失敗する。",
+    "troubleValidationBody": "TXT レコードの値はトークンと完全に一致している必要があります。前後の引用符、末尾の空白、スマートクォートは不可です (ドキュメントからではなくターミナルからコピー＆ペーストしてください)。",
+    "troubleCaaTitle": "CAA が発行をブロックしている。",
+    "troubleCaaBody": "親ゾーンに <code>letsencrypt.org</code> を含まない CAA レコードがあると、ACME は発行できません。Let's Encrypt を許可する CAA エントリを追加するか、制限しているレコードを削除してください。",
+    "troubleExpiredTitle": "証明書が期限切れになり、ローテーションされなかった。",
+    "troubleExpiredBody": "cert-manager は有効期限の約 30 日前に自動更新します。更新されていない場合、オペレーターはテナントクラスターで cert-manager のログを確認できます。ローテーションのワークフローは次の定期実行で自動的に回復します。",
+    "relatedTitle": "関連項目",
+    "relatedSourceProviders": "<link>ソースプロバイダー</link>: GitHub または GitLab を接続し、プッシュでアプリのデプロイが始まるようにします。",
+    "relatedIdentityProviders": "<link>ID プロバイダー</link>: ユーザーのサインイン元となる SSO ドメインを登録します。"
+  },
+  "docsNav": {
+    "sections": {
+      "gettingStarted": "はじめに",
+      "operatorGuides": "オペレーターガイド",
+      "runbooks": "ランブック",
+      "reference": "リファレンス",
+      "publicReference": "公開リファレンス"
+    },
+    "links": {
+      "introduction": "概要",
+      "quickstart": "クイックスタート",
+      "localDev": "ローカル開発環境",
+      "tutorials": "チュートリアル",
+      "clusterPrerequisites": "クラスターの前提条件",
+      "customDomains": "カスタムドメイン",
+      "sourceProviders": "ソースプロバイダー",
+      "identityProviders": "ID プロバイダー",
+      "policies": "ABAC ポリシー",
+      "webhooks": "Webhook",
+      "allRunbooks": "すべてのランブック",
+      "configuration": "構成",
+      "manifest": "マニフェストリファレンス",
+      "drivers": "ドライバーリファレンス",
+      "webhookEvents": "Webhook イベント",
+      "changelog": "変更履歴",
+      "help": "ヘルプ"
+    }
+  },
+  "docsIndex": {
+    "title": "ドキュメント",
+    "intro": "Astrolift の仕組み、インストール方法、設定が必要な機能のオペレーター向けランブックをまとめています。",
+    "readGuide": "ガイドを読む",
+    "readPublicDocs": "公開ドキュメントを読む",
+    "cards": {
+      "introduction": {
+        "title": "概要",
+        "description": "Astrolift とは何か、最初に出会う概念を説明します。"
+      },
+      "quickstart": {
+        "title": "クイックスタート",
+        "description": "クラスターとソースを接続し、マニフェストを登録して、イメージをデプロイします。"
+      },
+      "localDev": {
+        "title": "ローカル開発環境",
+        "description": "Docker Compose でフルスタックをローカルに起動します。"
+      },
+      "tutorials": {
+        "title": "チュートリアル",
+        "description": "よくあるビルド手順をステップごとに解説します。"
+      },
+      "clusterPrerequisites": {
+        "title": "クラスターの前提条件",
+        "description": "Astrolift が利用する前にテナントクラスターに必要なもの (cert-manager、Ingress、external-dns)。"
+      },
+      "customDomains": {
+        "title": "カスタムドメイン",
+        "description": "cert-manager による自動管理の TLS で app.acme.com をアプリにバインドします。"
+      },
+      "sourceProviders": {
+        "title": "ソースプロバイダー",
+        "description": "リポジトリへのアクセス、マネージド CI、ソース Webhook のために GitHub または GitLab を接続します。"
+      },
+      "identityProviders": {
+        "title": "ID プロバイダー",
+        "description": "サインインを OIDC、SAML、Cognito、Auth0、Okta、Azure AD、Google、GitHub 経由にします。"
+      },
+      "policies": {
+        "title": "ABAC ポリシー",
+        "description": "ロールバインディングの上に、きめ細かな許可/拒否ルールを作成します。"
+      },
+      "webhooks": {
+        "title": "Webhook",
+        "description": "送信イベントのサブスクリプション、可用性、HMAC 受信側の取り決めを確認します。"
+      },
+      "runbooks": {
+        "title": "オペレーター向けランブック",
+        "description": "デプロイの流れ、ロールバック、クラスター管理、エージェントのディスパッチ、インシデント対応。"
+      },
+      "configuration": {
+        "title": "構成",
+        "description": "Astrolift が読み取るすべての環境変数: 用途、デフォルト値、設定する人。"
+      },
+      "webhookEvents": {
+        "title": "Webhook イベント",
+        "description": "すべての送信 Webhook イベントのペイロードスキーマと JSON の例。"
+      },
+      "changelog": {
+        "title": "変更履歴",
+        "description": "新機能と修正。新しい順に表示します。"
+      },
+      "manifest": {
+        "title": "astrolift.toml マニフェスト",
+        "description": "アプリごとのマニフェストの完全なスキーマ: セクション、フィールド、検証、例。"
+      },
+      "cli": {
+        "title": "CLI リファレンス",
+        "description": "認証、アプリとエージェントの操作、CI、ポータブルドキュメント、man ページ。"
+      },
+      "api": {
+        "title": "コントロール API",
+        "description": "GraphQL、用途を絞った REST ルート、Bearer 認証、テナンシー、エラー。"
+      },
+      "mcp": {
+        "title": "MCP リファレンス",
+        "description": "認証付きのリモートでのエージェント確認、ディスパッチ、キャンセル、ソースの照合。"
+      },
+      "agentPackages": {
+        "title": "エージェントパッケージ",
+        "description": "ブリーフ、スキル、ツール、ソーススライス、モノレポ、フェデレーション、インポート形式。"
+      },
+      "workflowToml": {
+        "title": "ワークフロー TOML",
+        "description": "順序付きのエージェントステージ、環境レシピ、スキルオーバーレイ、名前付き出力、リポジトリ同期。"
+      },
+      "pluginSdk": {
+        "title": "プロバイダープラグイン SDK",
+        "description": "現在のドライバー契約に沿ってプロバイダー拡張をビルド・テストします。"
+      },
+      "demoScenarios": {
+        "title": "デモシナリオ",
+        "description": "アプリ、エージェント、ワークフロー、運用検証の実例シナリオ。"
+      },
+      "install": {
+        "title": "Astrolift をインストール",
+        "description": "クラウドと Kubernetes へのインストール方法、前提条件、標準のランブック。"
+      }
+    }
+  },
+  "docsIdentityProviders": {
+    "title": "ID プロバイダー",
+    "intro": "サインインを社内の IdP 経由にします: OIDC、SAML、Cognito、Auth0、Okta、Azure AD、Google Workspace、GitHub、またはローカルアカウント。",
+    "whenTitle": "これが必要になる場面",
+    "whenBody": "ユーザーに Astrolift 専用のパスワードではなく既存の社内 ID でサインインさせ、アクセスできる人を一元管理したい場合です (IdP で無効化すればここでもアクセスできなくなります)。同時に有効になるプロバイダーは常に 1 つだけで、残りは待機状態です。",
+    "prerequisitesTitle": "前提条件",
+    "prereqPermission": "<strong>権限。</strong><code>org.update</code> を持つオペレーターロール (Owner と Admin が保有)。",
+    "prereqAdmin": "<strong>IdP の管理者アクセス。</strong>そこで新しい OIDC または SAML クライアントを登録します。",
+    "prereqRedirect": "<strong>Astrolift のリダイレクト URI。</strong><bold>新しいプロバイダー</bold> ダイアログに表示されます。形式は <code>{uri}</code> です。どの IdP でも、許可するコールバックの一覧にこの値をそのまま登録する必要があります。",
+    "configureTitle": "プロバイダーの種類別に設定",
+    "configureBody": "該当するサブセクションを選んでください。どの種類も最後は Astrolift で同じ操作になります: <link>設定 · ID プロバイダー</link> → <strong>新しいプロバイダー</strong> → 種類を選択 → 認証情報を貼り付け → <strong>有効にする</strong>。",
+    "allowlistTitle": "ドメイン許可リスト (自動サインアップ)",
+    "allowlistBody": "デフォルトでは、SSO サインインが成功するのは Astrolift にそのユーザーのアカウントが既にある場合だけです。新しいユーザーが自分で参加できるようにするには、そのメールドメインを信頼済みにします。",
+    "allowlistStep1": "<link>管理 · 組織</link> を開きます。",
+    "allowlistStep2": "<strong>信頼済みメールドメイン</strong> カードまでスクロールし、<code>corp.com</code> を追加します (<code>@</code> は不要)。",
+    "allowlistStep3": "保存します。<code>@corp.com</code> のメールで SSO サインインしたユーザーは、デフォルトのメンバーロールで組織に自動的に参加します。",
+    "troubleshootingTitle": "トラブルシューティング",
+    "troubleNoIdpBody": "インストールの <code>bootstrap_idp</code> 環境変数が設定されていません。<link>設定 · ID プロバイダー</link> でプロバイダーを設定し、有効にしてください。",
+    "troubleRedirectTitle": "ログインが誤ったホストにリダイレクトされる (または redirect_uri_mismatch が返る)。",
+    "troubleRedirectBody": "バックエンドの <code>APP_BASE_URL</code> と IdP に登録したリダイレクト URI は、プロトコル、ホスト、パス、末尾のスラッシュまで完全に一致している必要があります。",
+    "troubleSignupTitle": "自動サインアップが行われない。",
+    "troubleSignupBody": "ユーザーのメールドメインが信頼済みリストにありません。上の<link>ドメイン許可リスト</link>を参照してください。",
+    "troubleSamlTitle": "SAML 署名の検証が失敗する。",
+    "troubleSamlBody": "IdP が署名証明書をローテーションしました。メタデータ URL を貼り直すか、新しい XML をアップロードしてください。Astrolift は保存時にトラストストアを更新します。",
+    "kinds": {
+      "oidc": {
+        "title": "汎用 OIDC",
+        "intro": "最も柔軟な選択肢です。OpenID Connect のディスカバリードキュメントを公開しているプロバイダーなら何でも使えます。",
+        "steps": {
+          "s1": "IdP で新しい OIDC クライアントを登録します。Astrolift のダイアログに表示されるリダイレクト URI (/app/auth1/callback で終わる) を貼り付けます。",
+          "s2": "client_id、client_secret、ディスカバリー URL (.well-known/openid-configuration エンドポイント) をコピーします。",
+          "s3": "Astrolift で 設定 · ID プロバイダー · 新しいプロバイダー を開き、OIDC を選んで値を貼り付け、有効にします。"
+        }
+      },
+      "cognito": {
+        "title": "Amazon Cognito",
+        "intro": "Cognito ユーザープールは OIDC に対応しています。インストールが AWS 上にあり、既にプールでユーザーを管理している場合に使います。",
+        "steps": {
+          "s1": "AWS コンソールでユーザープール · App integration · Create an app client を開きます。機密クライアントを選び、Astrolift のリダイレクト URI を追加します。",
+          "s2": "User Pool ID、App client ID、App client secret を控えておきます。ディスカバリー URL は {url} です。",
+          "s3": "Astrolift で 新しいプロバイダー · Cognito を選び、3 つの値を貼り付けて有効にします。"
+        }
+      },
+      "auth0": {
+        "title": "Auth0",
+        "intro": "Auth0 は Calliope AI がホストするインストールのデフォルトです。MFA、パスワードレス、ソーシャルログインを自前で運用せずにホスト型で使いたい場合に選びます。",
+        "steps": {
+          "s1": "Auth0 で Applications · Create Application · Regular Web App を選びます。Allowed Callback URLs に Astrolift のダイアログのリダイレクト URI を設定します。",
+          "s2": "Domain、Client ID、Client Secret をコピーします。ディスカバリー URL は {url} です。",
+          "s3": "Astrolift で 新しいプロバイダー · Auth0 を選び、値を貼り付けて有効にします。"
+        }
+      },
+      "okta": {
+        "title": "Okta",
+        "intro": "Okta は企業で最も一般的な選択肢です。SAML アプリではなく Okta の OIDC を使ってください。OIDC は Astrolift のセッションモデルとすっきり統合できます。",
+        "steps": {
+          "s1": "Okta の管理画面で Applications · Create App Integration · OIDC · Web Application を選びます。Sign-in redirect URIs に Astrolift のリダイレクト URI を追加します。",
+          "s2": "Client ID、Client Secret、Issuer URL (General · OpenID Connect ID Token に表示) をコピーします。",
+          "s3": "Astrolift で 新しいプロバイダー · Okta を選び、値を貼り付けて有効にします。"
+        }
+      },
+      "azureAd": {
+        "title": "Azure AD / Entra ID",
+        "intro": "組織が Microsoft 365 を使っているなら Entra (旧 Azure AD) が適しています。",
+        "steps": {
+          "s1": "Azure ポータルで App registrations · New registration を選びます。リダイレクト URI に Astrolift の値を設定し、プラットフォームを Web にします。",
+          "s2": "Certificates & secrets でクライアントシークレットを作成し、その値をコピーします。Application (client) ID と Directory (tenant) ID を控えておきます。",
+          "s3": "ディスカバリー URL は {url} です。これとクライアント ID、シークレットを Astrolift に貼り付けて有効にします。"
+        }
+      },
+      "google": {
+        "title": "Google Workspace",
+        "intro": "Google Workspace の OIDC は、Astrolift のオペレーター全員が Workspace アカウントを持っている場合に使えます。",
+        "steps": {
+          "s1": "Google Cloud コンソールで APIs & Services · Credentials · Create OAuth client ID · Web application を選び、Astrolift のリダイレクト URI を追加します。",
+          "s2": "Client ID と Client Secret をコピーします。ディスカバリー URL は {url} です。",
+          "s3": "Astrolift で 新しいプロバイダー · Google を選び、値を貼り付けて有効にします。下のドメイン許可リストと組み合わせると、サインインを自分の Workspace に限定できます。"
+        }
+      },
+      "github": {
+        "title": "GitHub OAuth",
+        "intro": "サインイン専用の GitHub です (ソースプロバイダーの SCM 接続とは別)。既に GitHub Organization を持つ小規模チームに便利です。",
+        "steps": {
+          "s1": "GitHub で Settings · Developer settings · OAuth Apps · New OAuth App を選びます。コールバック URL に Astrolift の値を設定します。",
+          "s2": "Client ID をコピーし、Client Secret を生成します。",
+          "s3": "Astrolift で 新しいプロバイダー · GitHub OAuth を選び、値を貼り付けて有効にします。"
+        }
+      },
+      "saml": {
+        "title": "SAML 2.0",
+        "intro": "SAML にしか対応していない IdP 向けです (古い企業向けインストールや一部のフェデレーション構成)。",
+        "steps": {
+          "s1": "IdP で新しい SAML アプリケーションを登録します。ACS URL と Entity ID に Astrolift のダイアログに表示される値を設定します。",
+          "s2": "IdP のメタデータ XML をダウンロードするか、その URL をコピーします。",
+          "s3": "Astrolift で 新しいプロバイダー · SAML を選び、メタデータ URL を貼り付けて (または XML をアップロードして) 有効にします。"
+        }
+      },
+      "local": {
+        "title": "ローカルアカウント",
+        "badge": "ローカル",
+        "intro": "初回起動時またはフォールバック専用です。ローカルアカウントでは、Astrolift のデータベースに保存されたユーザー名とパスワードでオペレーターがログインします。SSO プロバイダーを設定している間だけ使い、その後は無効にしてください。",
+        "steps": {
+          "s1": "新規インストールではローカルアカウントがデフォルトで有効です。ブートストラップ管理者はデータベースにあります。作成方法はインストールのランブックを参照してください。",
+          "s2": "SSO の設定と確認が済んだら SSO プロバイダーを有効にし、ローカルのエントリを削除するか、ポリシーでパスワードによるサインインをブロックします。"
+        }
+      }
+    },
+    "troubleNoIdpTitle": "「IdP が設定されていません。」"
+  },
+  "docsConfiguration": {
+    "title": "構成",
+    "intro": "Astrolift が実行時に読み取るすべての環境変数です。ソース = <outline>{operator}</outline> はオペレーターが設定するもの、<outline>{image}</outline> はコンテナイメージにデフォルト値が組み込まれているもの、<secondary>{platform}</secondary> はデプロイ時に Astrolift がワークロードに書き込むものを表します。",
+    "source": {
+      "operator": "オペレーター",
+      "image": "イメージ",
+      "platform": "プラットフォームが注入"
+    },
+    "conventionsTitle": "規約",
+    "conventionBoolean": "真偽値には <code>{values}</code> を使えます (大文字と小文字は区別しません)。",
+    "conventionRequired": "<strong>必須</strong> とマークされた変数は、デフォルト値がないか、ローカル開発でのみ安全なデフォルト値 (例: <code>not-a-secret</code>) を持ちます。",
+    "conventionUnlisted": "ここに載っていないものは Astrolift は読み取りません。設定しても何も通知されずに無視されます。",
+    "groupsTitle": "グループ",
+    "variablesTitle": "変数",
+    "filters": {
+      "group": "グループ",
+      "source": "ソース",
+      "required": "必須"
+    },
+    "yes": "はい",
+    "no": "いいえ",
+    "searchPlaceholder": "変数、用途、デフォルト値を検索…",
+    "mineNote": "リファレンスは全員共通なので、自分の項目は空です。",
+    "columns": {
+      "variable": "変数",
+      "purpose": "用途",
+      "group": "グループ",
+      "default": "デフォルト",
+      "required": "必須",
+      "source": "ソース"
+    },
+    "noDefault": "なし",
+    "emptyTitle": "記載された変数はありません",
+    "inspectTitle": "設定内容を確認する方法",
+    "inspectBody": "Django の管理コマンド <code>features</code> は現在の機能フラグの状態を表示し、<code>python manage.py diffsettings</code> はすべての Django 設定をデフォルト値と比較して表示します。コントロールプレーンがシークレットの値を出力することはなく、機密とマークされた設定は <code>***</code> と表示されます。",
+    "relatedTitle": "関連項目",
+    "relatedGetStarted": "<link>はじめに</link>: スタックをローカルで起動します。そこでの環境変数のデフォルトは docker-compose のサービス名です。",
+    "relatedIdentityProviders": "<link>ID プロバイダー</link>: AUTH0_* / ASTROLIFT_IDP_* 変数を詳しく説明しています。",
+    "relatedClusterPrerequisites": "<link>クラスターの前提条件</link>: これらの環境変数とは別にテナントクラスターに必要なもの。"
+  },
+  "docsWebhookEvents": {
+    "title": "Webhook イベント",
+    "intro": "Astrolift が送信 Webhook で発行するすべてのイベントタイプと、それぞれのペイロードスキーマ、実際に近い JSON の例です。設定と署名の検証については<link>Webhook ガイド</link>を参照してください。",
+    "envelopeTitle": "エンベロープの形式",
+    "envelopeBody": "すべての配信は同じ外側のエンベロープを共有します。イベント固有のフィールドは <code>payload</code> の下にあります。省略可能なエンベロープのフィールドは空文字列の場合があり、受信側は欠落または空を値なしとして扱ってください。",
+    "eventIdNote": "<code>event_id</code> は ULID で、グローバルに一意かつ時刻順に並べ替えられます。受信側での冪等キーとして使ってください。",
+    "deliveryIdNote": "<code>delivery_id</code> は試行ごとに一意です。再試行では同じ <plain>event_id</plain> に新しい <plain>delivery_id</plain> が付きます。",
+    "schemaVersionNote": "<code>schema_version</code> はセマンティックバージョニングに従います。ペイロードの互換性を壊す変更ではメジャーバージョンが上がります。",
+    "onThisPage": "このページの内容",
+    "payloadFields": "ペイロードのフィールド",
+    "example": "例",
+    "signatureTitle": "署名の検証",
+    "signatureBody": "すべての配信は <badge>X-Astrolift-Signature</badge> ヘッダーで署名されます (<code>{signed}</code> の HMAC-SHA256 を 16 進エンコードし、<code>sha256=</code> を前置したもの)。Python、Node、Go での検証方法は<link>Webhook ガイド</link>で説明しています。JSON を解析する前に生のボディを読み取り、定数時間で比較してください。",
+    "subscribingTitle": "サブスクライブ",
+    "subscribingBody": "受信側をこれらのイベントの 1 つ以上にサブスクライブするには、<link>サブスクリプションを作成</link>の手順を参照してください。イベントタイプのフィールドには正確なスラッグ (例: <code>deployment.failed</code>) かワイルドカードを指定できます:",
+    "wildcardAll": "<code>*</code>: すべてのイベント。",
+    "wildcardCategory": "<code>deployment.*</code>: デプロイカテゴリのすべてのイベント。",
+    "wildcardList": "<code>deployment.failed,alert.fired</code>: カンマ区切りのリスト (空白も使えます)。",
+    "relatedTitle": "関連項目",
+    "relatedWebhooks": "<link>Webhook</link>: サブスクリプションの作成、署名の検証、配信のトラブルシューティング。",
+    "relatedPolicies": "<link>ABAC ポリシー</link>: 組織内で Webhook サブスクリプションを作成できる人を制限します。"
+  },
+  "docsDrivers": {
+    "title": "ドライバーリファレンス",
+    "description": "プロバイダープラグインと、それぞれが機能ごとに提供するドライバー実装です。下のマトリクスは登録済みの ProviderPlugin マニフェストから作成されます。有効なプラグインがない場合は、既知のプロバイダーの静的な一覧を表示します。",
+    "loadError": "ドライバーリファレンスを読み込めませんでした",
+    "staticTitle": "静的リファレンス",
+    "staticBody": "このインストールにはまだプロバイダープラグインが登録されていません。下の表は、サポートされている各プロバイダーの標準的な機能を示しています。プラグインが読み込まれると、ライブのマニフェストに切り替わります。",
+    "matrixLabel": "マトリクス",
+    "matrices": {
+      "capabilities": "機能マトリクス",
+      "managed": "プロバイダー別のマネージドサービス"
+    },
+    "capabilitiesBody": "各行がプロバイダー、各列がそのプロバイダーに含まれるドライバーの種類です。チェックはそのドライバーを実装していることを示します。",
+    "managedBody": "各プロバイダーがプロビジョニングできるマネージドサービスの種類です。アプリのマニフェストの <code>[[managed_services]]</code> で宣言するバインディングは、ここに挙げた種類のいずれかと一致する必要があります。",
+    "filters": {
+      "driver": "ドライバー",
+      "service": "マネージドサービス",
+      "clusters": "クラスター",
+      "bound": "クラスターあり",
+      "none": "クラスターなし"
+    },
+    "searchPlaceholder": "プロバイダーを検索…",
+    "mineNote": "プロバイダープラグインは個人ではなくインストールに属するため、自分の項目は空です。",
+    "providerColumn": "プロバイダー",
+    "clustersBound": "{count, plural, other {# 個のクラスターに紐付け}}",
+    "noClusters": "クラスターなし",
+    "supported": "対応",
+    "notSupported": "非対応",
+    "yes": "はい",
+    "no": "いいえ",
+    "providersLabel": "プロバイダー",
+    "emptyTitle": "プロバイダーはありません",
+    "matrixFootnote": "マトリクスはマニフェストの宣言を反映します · 最終確認時刻はクラスターごとに異なります ·",
+    "seeLive": "ライブの機能を見る →",
+    "capabilities": {
+      "cluster": "クラスター",
+      "ingress": "Ingress",
+      "dns": "DNS",
+      "tls": "TLS",
+      "secrets": "シークレット",
+      "identity": "ID",
+      "registry": "レジストリ"
+    }
+  },
+  "docsIntroduction": {
+    "title": "概要",
+    "tagline": "Astrolift でビルド、デプロイ、運用を。",
+    "whatTitle": "Astrolift とは",
+    "whatBody": "Astrolift は、Kubernetes 上で動くアプリケーションとエージェントのためのコントロールプレーンです。クラスターとソースリポジトリを接続し、Astrolift マニフェストを登録して、デプロイ、環境の構成、マネージドサービスを 1 つのダッシュボードまたは CLI から管理できます。",
+    "whatBody2": "コントロールプレーンは望ましい構成とデプロイ履歴を記録します。クラスターエージェントは観測した実行時の状態を報告し、観測できない状態は正常なワークロードや失敗したワークロードとは区別されます。",
+    "conceptsTitle": "主要な概念",
+    "conceptOrgs": "<strong>組織、チーム、プロジェクト</strong> は、アプリ、クラスター、共有リソースの所有権とアクセスを整理します。",
+    "conceptApps": "<strong>アプリケーションとマニフェスト</strong> は、ワークロード、構成、サービスのバインディングを記述します。登録済みのアプリはその定義をソースリポジトリに結び付けます。",
+    "conceptEnvironments": "<strong>環境</strong> は、アプリの実行場所と環境固有の構成を決めます。",
+    "conceptDeployments": "<strong>デプロイ</strong> は、環境ごとのイメージのバージョン、承認要件、実行状況、履歴を追跡します。",
+    "conceptRoles": "<strong>ロール、ポリシー、認証情報</strong> は、許可される操作とリソースの範囲を制御します。トークンが保有者のアクセス範囲を広げることはできません。",
+    "runtimeTitle": "コントロールプレーンとランタイム",
+    "runtimeBody": "ダッシュボードと CLI は Django と Strawberry GraphQL によるコントロールプレーンを呼び出します。PostgreSQL がプラットフォームのレコードを保存し、Redis がキャッシュを担い、Temporal が長時間実行されるライフサイクル処理を調整します。アプリケーションはダッシュボードのプロセス内ではなく、接続された Kubernetes クラスター上で動作します。",
+    "startTitle": "どこから始めるか",
+    "startQuickstart": "<link>クイックスタート</link> では、クラスターとソースの接続、アプリの登録、デプロイまでを順に説明します。",
+    "startPrerequisites": "<link>クラスターの前提条件</link> では、クラスターに必要なランタイムサービスを説明します。",
+    "startLocalDev": "<link>ローカル開発環境</link> では、コントリビューターがコントロールプレーンをローカルで動かす方法を説明します。"
+  },
+  "docsGetStarted": {
+    "title": "ローカル開発環境",
+    "intro": "astrolift-app のチェックアウトから Astrolift のコントロールプレーンを実行します。",
+    "note": "初めてアプリケーションをデプロイする場合は<quickstart>クイックスタート</quickstart>に従ってください。ここの手順は、ローカルでコントロールプレーンを動かすコントリビューター向けです。Docker Desktop、または Compose v2 付きの Docker Engine が必要です。スタックを起動する前に<configuration>構成リファレンス</configuration>とローカルの環境ファイルを確認してください。",
+    "prepareTitle": "スタックの準備と起動",
+    "prepareBody": "リポジトリのルートでこれらのコマンドを実行します。Bootstrap は Docker を確認し、足りないローカルの環境ファイルをサンプルから作成します。Compose のサービスを起動する前に必須の構成値を入力してください。スタックには API と UI、PostgreSQL、Redis、Temporal、ローカルのストレージとメールのサービスが含まれます。",
+    "migrateTitle": "マイグレーションとローカル ID の投入",
+    "migrateBody": "API コンテナーが起動したら、データベースのマイグレーションを適用し、開発用 ID のシードを実行します。これで、ローカルのサインインで使う組織、チーム、プロジェクト、開発用アカウントが作成されます。",
+    "exploreTitle": "確認と調査",
+    "exploreBody": "デフォルトの UI は {ui}、GraphQL API は {api}、Temporal UI は {temporal} です。ホストのポートを変更する場合は Compose の構成を確認してください。実行中のコンテナーやログの確認にはコマンドラッパーを使います。",
+    "checksTitle": "チェックの実行",
+    "checksBody": "バックエンドのテストはローカルスタック経由で実際の PostgreSQL と Temporal に対して実行されます。Ruff はバックエンドのフォーマットと lint をチェックし、フロントエンドには TypeScript、ESLint、React のテストがあります。GraphQL の契約を変更したら、スキーマとフロントエンドの型をまとめて再生成してください。"
+  },
+  "docsHelp": {
+    "title": "ヘルプ",
+    "description": "Astrolift チームに連絡できます。チケットを作成するときは、下の診断情報を含めてください。切り分けが早くなります。",
+    "channelsTitle": "サポート窓口",
+    "channelsDescription": "必要なサポートの種類に合った窓口を選んでください。",
+    "links": {
+      "discord": {
+        "label": "コミュニティ Discord",
+        "description": "Astrolift チームや他のオペレーターとリアルタイムでチャットできます。"
+      },
+      "github": {
+        "label": "GitHub Issues",
+        "description": "バグの報告、機能のリクエスト、astrolift-app の未完了の作業の閲覧ができます。"
+      },
+      "email": {
+        "label": "サポートメール",
+        "description": "アカウントに関する問題は運用チームに直接連絡できます。"
+      }
+    },
+    "open": "開く",
+    "diagnosticsTitle": "診断情報",
+    "diagnosticsDescription": "環境を特定できるよう、これをチケットに貼り付けてください。",
+    "platformVersion": "プラットフォームのバージョン",
+    "organization": "組織",
+    "copied": "コピーしました",
+    "copy": "診断情報をコピー",
+    "includes": "プラットフォームのバージョン、ブラウザーのユーザーエージェント、組織のスラッグ、現在の URL が含まれます。"
+  },
+  "docsChangelog": {
+    "title": "変更履歴",
+    "intro": "リリースノートとプロジェクトの変更履歴。",
+    "unavailable": "バージョンごとのリリースノートはこのダッシュボードでは確認できません。",
+    "repository": "プロジェクトの変更は<link>リポジトリの変更履歴</link>で管理しています。",
+    "types": {
+      "feature": "機能",
+      "fix": "修正"
+    }
+  },
+  "docsTutorials": {
+    "title": "チュートリアル",
+    "intro": "プラットフォームで構築するためのステップごとのガイドです。",
+    "read": "チュートリアルを読む",
+    "back": "チュートリアル一覧に戻る",
+    "step": "ステップ {n}.",
+    "levels": {
+      "beginner": "初級",
+      "intermediate": "中級",
+      "advanced": "上級"
+    }
+  },
   "hooks": {
     "title": "Hooks",
     "description": "Interactive demos for the built-in utility hooks.",

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -19,29 +20,32 @@ export interface ChangelogScreenProps {
 
 /** Release notes, most recent first. */
 export function ChangelogScreen({ entries = [] }: ChangelogScreenProps) {
+  const t = useTranslations("docsChangelog");
+  const typeLabel = (type: string) =>
+    type === "feature" || type === "fix" ? t(`types.${type}`) : type;
   return (
     <article className="flex max-w-2xl flex-1 flex-col gap-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Changelog</h1>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Release notes and project change history.
-        </p>
+        <h1 className="text-2xl font-semibold">{t("title")}</h1>
+        <p className="text-muted-foreground mt-2 text-sm">{t("intro")}</p>
       </div>
 
       {entries.length === 0 && (
         <div className="text-muted-foreground space-y-3 text-sm">
-          <p>Versioned release notes are not available in this dashboard.</p>
+          <p>{t("unavailable")}</p>
           <p>
-            Project changes are maintained in the{" "}
-            <Link
-              href="https://github.com/calliopeai/astrolift-app/blob/main/CHANGELOG.md"
-              target="_blank"
-              rel="noreferrer"
-              className="text-foreground underline"
-            >
-              repository changelog
-            </Link>
-            .
+            {t.rich("repository", {
+              link: (chunks) => (
+                <Link
+                  href="https://github.com/calliopeai/astrolift-app/blob/main/CHANGELOG.md"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-foreground underline"
+                >
+                  {chunks}
+                </Link>
+              ),
+            })}
           </p>
         </div>
       )}
@@ -51,7 +55,7 @@ export function ChangelogScreen({ entries = [] }: ChangelogScreenProps) {
             {i > 0 && <Separator className="mb-8" />}
             <div className="mb-3 flex items-center gap-3">
               <span className="text-base font-semibold">v{entry.version}</span>
-              <Badge variant={typeVariant(entry.type)}>{entry.type}</Badge>
+              <Badge variant={typeVariant(entry.type)}>{typeLabel(entry.type)}</Badge>
               <span className="text-muted-foreground ml-auto text-xs">{entry.date}</span>
             </div>
             <ul className="flex flex-col gap-1.5">
