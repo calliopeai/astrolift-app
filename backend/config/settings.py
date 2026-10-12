@@ -526,6 +526,14 @@ CONSTANCE_CONFIG = {
         "write its HOME and every non-root pod fails. Change only with matching images.",
         "posix_id",
     ),
+    "AGENT_GATEWAY_EGRESS_ALLOW_CIDRS": (
+        "",
+        "Comma-separated CIDRs a gateway-mode agent pod may reach besides cluster DNS and "
+        "the Zentinelle gateway (#1950): git hosts, package mirrors. Everything else, model "
+        "providers included, is denied whatever AGENT_NETWORK_FENCE says. Needs a "
+        "NetworkPolicy-capable CNI.",
+        str,
+    ),
     "AGENT_NETWORK_FENCE": (
         False,
         "Apply a NetworkPolicy to agent task and box pods: no inbound pod traffic; outbound "
@@ -845,6 +853,7 @@ CONSTANCE_CONFIG_FIELDSETS = {
             "AGENT_POD_GID",
             "AGENT_NETWORK_FENCE",
             "AGENT_EGRESS_ALLOW_CIDRS",
+            "AGENT_GATEWAY_EGRESS_ALLOW_CIDRS",
         ),
         "collapse": False,
     },

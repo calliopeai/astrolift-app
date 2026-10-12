@@ -196,7 +196,9 @@ export function ActionSafetyView({
                         <span className="text-muted-foreground text-xs">
                           {row.action === "secret.change"
                             ? "Set per app, under secret approval"
-                            : "Not available"}
+                            : row.action.endsWith(".production")
+                              ? "Set per environment, under required approvals"
+                              : "Not available"}
                         </span>
                       )}
                     </td>
