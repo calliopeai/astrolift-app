@@ -1,6 +1,7 @@
 "use client";
 
 import { GithubIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 
@@ -27,6 +28,7 @@ export function GithubConnectCalloutView({
   loading,
   connections,
 }: GithubConnectCalloutViewProps) {
+  const t = useTranslations("appOverviewCards.githubConnect");
   if (sourceKind !== "github") return null;
   if (loading) return null;
 
@@ -47,11 +49,11 @@ export function GithubConnectCalloutView({
     <Notice
       tone="info"
       icon={GithubIcon}
-      title="Connect your GitHub to manage this app"
-      description="Astrolift uses your personal GitHub identity to browse the repo, sync the manifest, and install webhooks. Org-level setup is already in place; this is just the per-user link."
+      title={t("title")}
+      description={t("description")}
       actions={
         <Button asChild size="sm" variant="outline">
-          <a href={href}>Connect GitHub</a>
+          <a href={href}>{t("connect")}</a>
         </Button>
       }
     />

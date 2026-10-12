@@ -1,6 +1,7 @@
 "use client";
 
 import { useLazyQuery } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { GET_SOURCE_FILE } from "@/graphql/scm/scm.queries";
@@ -34,6 +35,7 @@ port = 8080
  * is a regex-grade check that the manifest looks structurally
  * reasonable. The backend validator is authoritative; this just
  * blocks "obvious nonsense" before we let the operator advance.
+ * Errors are keys the step labels under `appWizard.manifest.errors`.
  */
 function validateManifest(raw: string): {
   ok: boolean;
@@ -42,18 +44,18 @@ function validateManifest(raw: string): {
   const errors: string[] = [];
   const trimmed = raw.trim();
   if (!trimmed) {
-    errors.push("Manifest is empty.");
+    errors.push("empty");
     return { ok: false, errors };
   }
   // Top-level `name = "..."` (single or double quotes, anywhere before any
   // `[section]` marker)
   const beforeFirstSection = trimmed.split(/\n\[/)[0];
   if (!/^name\s*=\s*["'][^"'\n]+["']/m.test(beforeFirstSection)) {
-    errors.push('Top-level `name = "..."` is required.');
+    errors.push("name");
   }
   // At least one [[workloads]] block
   if (!/^\s*\[\[\s*workloads\s*\]\]/m.test(trimmed)) {
-    errors.push("At least one `[[workloads]]` block is required.");
+    errors.push("workloads");
   }
   return { ok: errors.length === 0, errors };
 }
@@ -78,6 +80,7 @@ export function useManifestPreviewStep<S extends ManifestPreviewLogicFields>(
 ) {
   const [fetchState, setFetchState] = React.useState<ManifestFetchState>("idle");
   const [fetchError, setFetchError] = React.useState<string>("");
+  const t = useTranslations("appWizard.manifest");
   const [editing, setEditing] = React.useState(false);
   const [fetchManifest] = useLazyQuery<SourceFileResp>(GET_SOURCE_FILE, {
     fetchPolicy: "network-only",
@@ -105,7 +108,7 @@ export function useManifestPreviewStep<S extends ManifestPreviewLogicFields>(
     const f = data?.astroliftSourceFile;
     if (!f) {
       setFetchState("error");
-      setFetchError("no response from server");
+      setFetchError(t("noResponse"));
       return;
     }
     if (f.errorCode) {
@@ -139,6 +142,7 @@ export function useManifestPreviewStep<S extends ManifestPreviewLogicFields>(
     state.defaultBranch,
     fetchManifest,
     setState,
+    t,
   ]);
 
   // Auto-fetch when entering the step the first time (or whenever the

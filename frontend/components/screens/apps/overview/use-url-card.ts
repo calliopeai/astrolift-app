@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type { MutationResult } from "@/graphql/identity/identity.types";
@@ -44,6 +45,7 @@ export function useUrlCard({
   primaryWorkloadSlug,
   provisioningStatus,
 }: UseUrlCardArgs) {
+  const t = useTranslations("appOverviewCards.url");
   const [mutate, { loading: saving }] = useMutation<SetSubdomainResp>(SET_APP_SUBDOMAIN, {
     refetchQueries: [{ query: GET_APP, variables: { slug: appSlug } }],
     awaitRefetchQueries: true,
@@ -77,23 +79,23 @@ export function useUrlCard({
     });
     const env = data?.setAppSubdomain;
     if (!env) {
-      toast.error("Subdomain change failed: no response from backend.");
+      toast.error(t("toast.noResponse"));
       return false;
     }
     if (!env.ok) {
-      toast.error(env.errors?.[0]?.message ?? "Subdomain change failed.");
+      toast.error(env.errors?.[0]?.message ?? t("toast.failed"));
       return false;
     }
-    toast.success(`Subdomain changed to ${next}.`);
+    toast.success(t("toast.changed", { subdomain: next }));
     return true;
   }
 
   async function onCopy() {
     try {
       await navigator.clipboard.writeText(`https://${fullHost}`);
-      toast.success("URL copied to clipboard.");
+      toast.success(t("toast.copied"));
     } catch {
-      toast.error("Couldn't copy — clipboard unavailable.");
+      toast.error(t("toast.copyFailed"));
     }
   }
 

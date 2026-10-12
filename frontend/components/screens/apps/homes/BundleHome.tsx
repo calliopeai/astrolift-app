@@ -2,6 +2,7 @@
 
 import { BoxIcon, ChevronRightIcon, LayersIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Panel, PanelGrid } from "@/components/panel/Panel";
@@ -25,21 +26,22 @@ export interface BundleHomeScreenProps {
  * workload's detail.
  */
 export function BundleHomeScreen({ workloads, workloadHref }: BundleHomeScreenProps) {
+  const t = useTranslations("appHomes.bundle");
   const kinds = React.useMemo(() => Array.from(new Set(workloads.map((w) => w.kind))), [workloads]);
 
   return (
     <PanelGrid>
       <Panel
-        title="Workloads in this bundle"
+        title={t("title")}
         icon={<LayersIcon className="size-4" />}
-        description={`${workloads.length} workload${workloads.length === 1 ? "" : "s"} across ${kinds.length} kind${kinds.length === 1 ? "" : "s"}. Open any workload for its deploy, config and logs.`}
+        description={t("description", { workloads: workloads.length, kinds: kinds.length })}
         flush
         empty={
           workloads.length === 0
             ? {
                 icon: <BoxIcon className="size-5" />,
-                title: "No workloads yet",
-                description: "Workloads appear here once the manifest registers them.",
+                title: t("emptyTitle"),
+                description: t("emptyDescription"),
               }
             : null
         }
@@ -67,11 +69,13 @@ export function BundleHomeScreen({ workloads, workloadHref }: BundleHomeScreenPr
                       {(w.kind === "deployment" || w.kind === "statefulset") &&
                       w.replicas != null ? (
                         <span>
-                          <span className="font-mono">{w.replicas}</span> replica
-                          {w.replicas === 1 ? "" : "s"}
+                          {t.rich("replicas", {
+                            count: w.replicas,
+                            mono: (chunks) => <span className="font-mono">{chunks}</span>,
+                          })}
                         </span>
                       ) : null}
-                      {w.isPublic ? <span className="text-info-fg">public</span> : null}
+                      {w.isPublic ? <span className="text-info-fg">{t("public")}</span> : null}
                     </span>
                   </span>
                   <ChevronRightIcon

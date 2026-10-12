@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { ABORT_DEPLOYMENT, APPROVE_DEPLOYMENT } from "@/graphql/lifecycle/lifecycle.mutations";
@@ -27,6 +28,7 @@ export function shortDeploymentTag(deployment: AstroliftDeployment): string {
  * reason; either way the queue refetches afterwards.
  */
 export function usePendingDeployments(appSlug: string, { live = false }: { live?: boolean } = {}) {
+  const t = useTranslations("appControls.pendingDeployments");
   const { can } = useMyPermissions();
   const canApprove = can("app.approve_deploy");
 
@@ -44,9 +46,9 @@ export function usePendingDeployments(appSlug: string, { live = false }: { live?
         variables: { input: { id: deployment.id } },
       });
       if (data?.approveDeployment?.ok) {
-        toast.success(`Approved ${shortDeploymentTag(deployment)}.`);
+        toast.success(t("toast.approved", { tag: shortDeploymentTag(deployment) }));
       } else {
-        throw new Error(data?.approveDeployment?.errors?.[0]?.message ?? "Approve failed.");
+        throw new Error(data?.approveDeployment?.errors?.[0]?.message ?? t("toast.approveFailed"));
       }
     } finally {
       void refetch();
@@ -59,9 +61,9 @@ export function usePendingDeployments(appSlug: string, { live = false }: { live?
         variables: { input: { id: deployment.id, reason } },
       });
       if (data?.abortDeployment?.ok) {
-        toast.success("Deployment rejected.");
+        toast.success(t("toast.rejected"));
       } else {
-        throw new Error(data?.abortDeployment?.errors?.[0]?.message ?? "Reject failed.");
+        throw new Error(data?.abortDeployment?.errors?.[0]?.message ?? t("toast.rejectFailed"));
       }
     } finally {
       void refetch();

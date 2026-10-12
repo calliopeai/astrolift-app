@@ -4306,6 +4306,531 @@
       "review": "审核"
     }
   },
+  "appControls": {
+    "deployToken": {
+      "title": "部署令牌",
+      "description": "应用范围的机器令牌。在 CI 中用作 <code>ASTROLIFT_DEPLOY_TOKEN</code>。",
+      "lastUsed": "上次使用：{date}",
+      "neverUsed": "从未使用",
+      "missing": "没有令牌：生成令牌之前，CI 无法触发部署。",
+      "rotate": "轮换",
+      "revoke": "撤销",
+      "generate": "生成令牌",
+      "rotateTitle": "轮换部署令牌？",
+      "rotateDescription": "旧值将立即失效。任何仍使用旧令牌的 CI 运行都会失败，直到你在 CI 端更新密钥。",
+      "rotateConfirm": "轮换令牌",
+      "revokeTitle": "撤销部署令牌？",
+      "revokeDescription": "使用此令牌的 CI 运行将立即开始失败。之后请生成新令牌并更新 CI 密钥以恢复。撤销无法还原；仅为软删除。",
+      "revokeConfirm": "撤销令牌",
+      "copied": "已复制到剪贴板。",
+      "copyFailed": "复制失败。请选中该值并手动复制。",
+      "revealTitle": "部署令牌：请立即复制",
+      "revealWarning": "令牌仅显示这一次。如果未复制就离开，请再次轮换以生成新令牌。",
+      "copiedLabel": "已复制",
+      "copy": "复制",
+      "revealStore": "在 CI 提供方的密钥中保存为 <code>ASTROLIFT_DEPLOY_TOKEN</code>。",
+      "saved": "我已保存",
+      "toast": {
+        "minted": "已生成部署令牌。",
+        "createFailed": "创建失败。",
+        "rotated": "令牌已轮换。请立即复制新值。",
+        "rotateFailed": "轮换失败。",
+        "revoked": "令牌已撤销。",
+        "revokeFailed": "撤销失败。"
+      }
+    },
+    "deploymentPanel": {
+      "emptyTitle": "尚无部署",
+      "emptyDescription": "从 CLI 触发部署或推送到部署分支，即可在此查看状态。",
+      "current": "当前部署",
+      "elapsed": "已用时 {duration}",
+      "took": "耗时 {duration}",
+      "trigger": "触发方式：<value>{kind}</value>",
+      "failed": "部署失败",
+      "openForLog": "打开该部署查看完整日志。",
+      "rollbackTarget": "回滚目标为 {tag}。",
+      "confirmTitleGeneric": "回滚？",
+      "since": "自 {time} 起",
+      "stage": {
+        "queued": "排队中",
+        "rollingOut": "正在发布",
+        "redeploying": "正在重新部署",
+        "working": "处理中"
+      },
+      "toast": {
+        "started": "已开始回滚。",
+        "failed": "回滚失败。"
+      }
+    },
+    "pendingDeployments": {
+      "titleApprover": "等待你的审批",
+      "title": "待审批",
+      "descriptionApprover": "在放行发布之前，请审核每个候选项。",
+      "description": "正在等待拥有 `{permission}` 权限的审核人。",
+      "canApprove": "你可以审批",
+      "readOnly": "只读",
+      "approvals": "{received}/{required} 个审批",
+      "received": "接收于 {when}",
+      "reject": "拒绝",
+      "approve": "批准并部署",
+      "approveTitle": "批准 {tag}？",
+      "approveDescription": "这将放行到 {environment} 的发布。工作流会立即恢复；在流量切换前无法再次暂停。",
+      "approveDescriptionDefault": "这将放行到目标环境的发布。工作流会立即恢复；在流量切换前无法再次暂停。",
+      "rejectReason": "拒绝原因",
+      "rejectReasonPlaceholder": "为什么拒绝此部署？将保存在审计日志和历史侧栏中。",
+      "rejectTitle": "拒绝 {tag}？",
+      "rejectDescription": "待处理的部署将被中止。CI 需要重新触发，才能创建新的部署供审核。",
+      "toast": {
+        "approved": "已批准 {tag}。",
+        "approveFailed": "批准失败。",
+        "rejected": "已拒绝部署。",
+        "rejectFailed": "拒绝失败。"
+      }
+    }
+  },
+  "appWizard": {
+    "details": {
+      "name": "名称",
+      "nameHelp": "在界面中显示的易读名称。",
+      "nameRequired": "请为应用命名。",
+      "slug": "Slug",
+      "slugPlaceholder": "小写字母、连字符，1-40 个字符",
+      "slugRequired": "Slug 为必填项。",
+      "slugInvalid": "仅限小写字母、数字和连字符（最多 40 个字符）。",
+      "slugHelp": "URL 安全的标识符。根据名称自动生成，可按需修改。",
+      "description": "描述",
+      "descriptionPlaceholder": "此应用是做什么的？",
+      "team": "团队（筛选）",
+      "allTeams": "所有团队",
+      "teamHelp": "可选筛选。应用属于项目（项目属于团队）。",
+      "project": "项目",
+      "noProjects": "此范围内没有项目",
+      "selectProject": "选择项目",
+      "noProjectsHelp": "此范围内没有项目。请选择其他团队，或先创建项目。",
+      "projectRequired": "请选择此应用所属的项目。"
+    },
+    "repo": {
+      "noClusterTitle": "尚无托管集群",
+      "noClusterDescription": "Astrolift 会将应用部署到已纳入管理的 Kubernetes 集群（#316）。请连接集群、安装前置组件，然后点击“纳入管理”。",
+      "manageClusters": "管理集群",
+      "noConnectionsTitle": "尚无源连接",
+      "noConnectionsDescription": "连接 Git 托管服务（GitHub App、GitLab OAuth 或个人访问令牌），平台即可列出你的仓库并监听推送。",
+      "registeredNote": "{count, plural, other {此仓库已托管 # 个已注册应用（清单路径不同）。}}",
+      "missingHost": "缺少托管服务？连接其他来源 →",
+      "picked": "已选择 <code>{repo}</code> 的 <code>{branch}</code>。",
+      "introTitle": "注册流程",
+      "introDescription": "三个步骤：来源（仓库及其清单）、运行（应用及其部署方式），然后审核。",
+      "introSource": "1 来源",
+      "introSourceDescription": "选择源连接和仓库；我们会加载其 astrolift.toml 清单或生成脚手架。",
+      "introRun": "2 运行",
+      "introRunDescription": "为应用命名、选择所属项目，并选择触发方式：推送时自动、cron 或手动。",
+      "introReview": "3 审核",
+      "introReviewDescription": "查看将要创建和部署的内容，然后创建应用。"
+    },
+    "title": "新建应用",
+    "stepsLabel": "步骤",
+    "done": "已完成",
+    "cancel": "取消",
+    "back": "上一步",
+    "continue": "继续",
+    "steps": {
+      "source": {
+        "label": "来源",
+        "description": "仓库，以及说明其运行内容的 astrolift.toml 清单。"
+      },
+      "run": {
+        "label": "运行",
+        "description": "应用的名称和项目，以及部署方式和时机。"
+      },
+      "review": {
+        "label": "审核",
+        "description": "将要创建和部署的内容。在你创建之前不会执行任何操作。"
+      }
+    },
+    "shell": {
+      "title": "注册应用",
+      "description": "连接 Git 仓库。我们会获取清单、注册应用并运行 OnboardAppWorkflow。",
+      "cancel": "取消",
+      "stepLabel": "第 {step} 步：{label}",
+      "heading": "第 {step} 步，共 {total} 步：{label}",
+      "back": "上一步",
+      "next": "下一步"
+    },
+    "approver": {
+      "orphanUser": "用户 {id}"
+    },
+    "strategy": {
+      "timingTitle": "此应用何时部署？",
+      "timingHelp": "选择首次部署的方式。之后可以在应用页面更改策略。",
+      "timing": {
+        "now": {
+          "label": "立即部署",
+          "description": "选择触发方式，注册完成后立即开始首次部署。"
+        },
+        "later": {
+          "label": "先配置，稍后部署",
+          "description": "现在确定触发方式和审批设置；首次部署将在下一个事件时运行。"
+        },
+        "skip": {
+          "label": "跳过，稍后配置",
+          "description": "仅注册应用。触发方式、审批和部署可在应用页面中设置。"
+        }
+      },
+      "triggerTitle": "触发模式",
+      "triggerHelp": "什么事件会触发部署？",
+      "modes": {
+        "auto_on_push": "每当有提交进入所选分支时部署（通过 SCM Webhook）。",
+        "cron": "按周期性计划部署。",
+        "manual": "仅在有人明确触发时才运行部署。"
+      },
+      "comingSoon": "即将推出",
+      "deployBranch": "部署分支",
+      "deployBranchHelp": "推送到此分支将触发部署。默认为仓库的默认分支。",
+      "deployBranchRequired": "请填写推送后要部署的分支。",
+      "cronLabel": "Cron 表达式",
+      "cronHelp": "五个字段（分 时 日 月 星期）。",
+      "cronHint": {
+        "invalid": "应为五字段 cron 表达式。",
+        "hourly": "每小时整点。",
+        "every5": "每 5 分钟。",
+        "daily": "每天 03:00。",
+        "weekly": "每周日 00:00。",
+        "monthly": "每月 1 日 00:00。",
+        "custom": "自定义计划。"
+      },
+      "skipped": "触发模式和审批关卡暂时跳过。注册完成后，可在应用的设置标签页中配置。"
+    },
+    "manifest": {
+      "pathLabel": "清单路径",
+      "pathHelp": "<code>astrolift.toml</code> 在仓库中的位置。默认为仓库根目录。Monorepo 可以托管多个应用；请让每个注册指向各自的路径（例如 <code>services/api/astrolift.toml</code>）。",
+      "branchLabel": "默认分支",
+      "laterTitle": "稍后设置清单",
+      "laterHelp": "现在注册应用，暂不提供清单。注册后将进入应用的<b>清单</b>标签页，准备好后可在那里添加或同步 <code>astrolift.toml</code>。适用于空仓库，或架构不是应用清单的智能体配置仓库。",
+      "label": "清单",
+      "edit": "编辑",
+      "refetchTitle": "测试连接并从所选仓库重新获取清单",
+      "fetching": "正在获取…",
+      "refetch": "测试并重新获取",
+      "placeholder": "在此粘贴 astrolift.toml 清单。",
+      "maskedEnv": "由于你的角色无法查看密钥，环境变量值已被遮盖。注册时会从仓库读取这些值。如果在此编辑清单，请先替换每个被遮盖的值。",
+      "agentConfigTitle": "这看起来是智能体配置仓库",
+      "agentConfigBody": "它声明了 <code>astrolift_version</code> 以及 <code>[skills.*]</code>/<code>[tools.*]</code> 表，但没有 <code>[[workloads]]</code>；这是智能体库的架构，而不是应用清单。请改为将其作为智能体集群接入，或导入其技能和工具：",
+      "onboardFleet": "接入智能体集群",
+      "importSkills": "导入技能 / 工具",
+      "agentConfigLater": "或勾选上方的<b>稍后设置清单</b>，在没有清单的情况下注册此仓库。",
+      "valid": "清单结构看起来有效（顶层 <code>name</code> + 至少一个 <code>[[workloads]]</code> 块）。",
+      "skipped": "已跳过清单步骤；应用将在没有清单的情况下注册。接入完成后，请在应用的清单标签页中添加或同步。",
+      "loaded": "已从仓库加载清单。",
+      "fromRepo": "来自仓库",
+      "missing": "该路径下没有清单。我们已填入一个最简模板；请在下方编辑，或粘贴你自己的清单。",
+      "fetchFailed": "无法获取清单：{error}",
+      "retry": "重试",
+      "noResponse": "服务器无响应",
+      "errors": {
+        "empty": "清单为空。",
+        "name": "必须提供顶层 `name = \"...\"`。",
+        "workloads": "至少需要一个 `[[workloads]]` 块。"
+      }
+    },
+    "review": {
+      "source": "来源",
+      "repository": "仓库",
+      "defaultBranch": "默认分支",
+      "sourceKind": "来源类型",
+      "manifestPath": "清单路径",
+      "manifest": "清单",
+      "manifestLater": "稍后设置",
+      "manifestState": "{origin, select, repo {从仓库加载} other {在此起草}}，{valid, select, yes {结构有效} other {无效}}",
+      "run": "运行",
+      "name": "名称",
+      "slug": "Slug",
+      "description": "描述",
+      "deployTiming": "部署时机",
+      "trigger": "触发方式",
+      "triggerLater": "手动（稍后配置）",
+      "deployBranch": "部署分支",
+      "cron": "Cron",
+      "approvalGate": "审批关卡",
+      "timing": {
+        "now": "立即部署",
+        "later": "先配置，稍后部署",
+        "skip": "跳过，接入后再配置"
+      },
+      "approval": {
+        "notRequired": "无需审批",
+        "team": "团队审批，需要 {count} 人",
+        "users": "已选 {count, plural, other {# 位用户}}中的 {min} 位",
+        "none": "必需，但未选择审批人（请在“运行”中修正）"
+      },
+      "sideEffectsTitle": "提交后会发生什么",
+      "sideEffectsHelp": "勾选你需要的附带操作。依赖尚未发布的后端功能的项目（PAT / OAuth-User 连接的 Webhook 安装）保持灰色。",
+      "register": "注册应用",
+      "registerHelp": "调用 <code>registerApp</code>；接入工作流会预配命名空间 + 镜像仓库。",
+      "webhook": "安装 SCM Webhook",
+      "webhookCovered": "已由你的 GitHub App 安装覆盖；无需操作。",
+      "webhookPending": "GitHub App 安装会自动处理此项；PAT/OAuth-User 连接将在该 mutation 上线后获得按仓库配置的 Webhook。",
+      "alreadyInstalled": "已安装",
+      "comingSoon": "即将推出",
+      "pushWorkflow": "推送 <code>{path}</code>",
+      "pushWorkflowHelp": "提交一个入门工作流，在每次推送到部署分支时调用 astro app deploy。你需要将 ASTROLIFT_DEPLOY_TOKEN 设置为仓库密钥。",
+      "pushWorkflowUnavailable": "适用于 GitHub 或 GitLab 用户 OAuth 连接（以及 GitHub App 安装）。所选连接无法推送提交。",
+      "firstDeploy": "触发首次部署",
+      "firstDeployHelp": "接入工作流将应用切换为 <code>ready</code> 后，启动首次部署。",
+      "submitFailed": "提交失败",
+      "submitting": "正在提交…",
+      "willDeployTitle": "将部署的内容",
+      "willDeployFirst": "接入完成、应用进入 ready 状态后将运行首次部署。",
+      "willDeployNothing": "暂不部署任何内容：仅注册。请从应用页面启动部署。",
+      "noManifest": "尚无清单，因此在应用的清单标签页中添加清单之前没有可部署的内容。",
+      "noWorkloads": "清单中没有声明 Astrolift 能在此读取的工作负载。服务器会在创建时进行验证。",
+      "managedService": "托管服务"
+    }
+  },
+  "appHomes": {
+    "cronjob": {
+      "exitedWith": "以代码 {code} 退出",
+      "noReason": "未记录原因",
+      "customSchedule": "自定义计划",
+      "dueNow": "即将运行",
+      "notStarted": "未开始",
+      "noExitCode": "无退出码",
+      "exit": "退出 {code}",
+      "schedule": "计划",
+      "lastRunFailed": "上次运行失败",
+      "noScheduleShort": "未设置计划",
+      "concurrency": "并发策略：<mono>{policy}</mono>",
+      "nextRun": "下次运行",
+      "nextRunUnknown": "无法根据此表达式计算下次运行时间。",
+      "noSchedule": "未设置计划。",
+      "runHistory": "运行历史",
+      "total": "共 {count} 个",
+      "emptyTitle": "尚无运行记录",
+      "emptyDescription": "每次计划执行触发后都会显示在这里。"
+    },
+    "task": {
+      "stages": {
+        "queued": "排队中",
+        "provisioning": "预配中",
+        "running": "运行中",
+        "completed": "已完成",
+        "failed": "失败"
+      },
+      "latestRun": "最近一次运行",
+      "execution": "执行",
+      "runStatus": "运行：{status}",
+      "exitedWith": "以代码 {code} 退出",
+      "noReason": "未记录原因",
+      "runStages": "运行阶段",
+      "noRunYet": "尚无运行记录。一次性任务每次运行都会经历这些阶段。",
+      "runHistory": "运行历史",
+      "emptyTitle": "尚无运行",
+      "emptyDescription": "此任务的每次一次性执行都会显示在这里。",
+      "notStarted": "未开始"
+    },
+    "bundle": {
+      "title": "此捆绑包中的工作负载",
+      "description": "{workloads, plural, other {# 个工作负载}}，涵盖 {kinds, plural, other {# 种类型}}。打开任一工作负载可查看其部署、配置和日志。",
+      "emptyTitle": "尚无工作负载",
+      "emptyDescription": "清单注册工作负载后，它们会显示在这里。",
+      "replicas": "{count, plural, other {<mono>#</mono> 个副本}}",
+      "public": "公开"
+    },
+    "function": {
+      "title": "触发方式",
+      "description": "调用时运行，空闲时缩容到零。",
+      "httpEndpoint": "HTTP 端点",
+      "eventTriggered": "事件触发（无公开 HTTP 端点）。由平台或上游生产者调用。"
+    },
+    "doctor": {
+      "title": "应用诊断",
+      "description": "检查此应用所需的每个依赖项，并报告其是否真正可用。由于执行实时探测，仅在你请求时运行。",
+      "runAgain": "再次运行",
+      "runChecks": "运行检查",
+      "notRun": "尚未运行。运行检查以探测清单、镜像仓库、推送角色、DNS 和部署。",
+      "healthy": "此应用所需的一切均正常。",
+      "unhealthy": "部分依赖项需要处理；见下文。",
+      "nothingToReport": "此应用没有需要报告的内容。",
+      "checks": {
+        "manifest": "清单",
+        "autowire": "仓库连接",
+        "registry_repo": "容器镜像仓库",
+        "push_role": "推送角色",
+        "dns": "DNS",
+        "identity": "Pod 身份",
+        "image": "镜像固定",
+        "deployments": "部署",
+        "cronjob_runs": "计划运行",
+        "managed_services": "托管服务"
+      },
+      "status": {
+        "pass": "正常",
+        "fail": "失败",
+        "warn": "警告",
+        "skip": "不适用",
+        "unknown": "未验证"
+      },
+      "repairs": {
+        "nothingToDo": "无需操作",
+        "resync_manifest": {
+          "label": "重新同步清单",
+          "done": "已从仓库重新同步清单",
+          "failed": "重新同步清单失败"
+        },
+        "retry_autowire": {
+          "label": "重试 autowire",
+          "done": "已重新运行 autowire",
+          "failed": "重试 autowire 失败"
+        },
+        "rerun_onboarding": {
+          "label": "重新运行接入",
+          "done": "已提交重新运行接入",
+          "failed": "重新运行接入失败"
+        },
+        "redeploy": {
+          "label": "再次部署",
+          "done": "已派发部署",
+          "failed": "再次部署失败"
+        }
+      }
+    }
+  },
+  "appOverviewCards": {
+    "assignProject": {
+      "unassigned": "未分配",
+      "title": "项目分配",
+      "description": "将此应用放入项目中，即可在侧栏中分组并限定团队级权限范围。没有项目的应用会显示在团队的“未分配”分组中。",
+      "current": "当前项目",
+      "needsPermission": "需要 <mono>{permission}</mono> 权限才能更改此分配。",
+      "moveTo": "移至项目",
+      "noProjects": "没有你可分配的项目",
+      "pickProject": "选择目标项目",
+      "save": "保存",
+      "unassign": "取消分配",
+      "toast": {
+        "assignNoResponse": "分配失败：后端无响应。",
+        "assignFailed": "分配失败。",
+        "assignNoPayload": "分配未返回数据。",
+        "moved": "已移至 {team} 下的 {project}。",
+        "unassignNoResponse": "取消分配失败：后端无响应。",
+        "unassignFailed": "取消分配失败。",
+        "unassigned": "应用现已取消分配。"
+      }
+    },
+    "observability": {
+      "title": "可观测性",
+      "description": "最近 {days} 天 · 部署吞吐量、失败率、未解决告警。",
+      "metrics": "指标",
+      "alerts": "告警",
+      "deploysPerDay": "部署 / 天",
+      "acrossDays": "{days} 天内",
+      "noDeploys": "无部署",
+      "failures": "失败",
+      "ofRollouts": "占发布的 {pct}",
+      "noRollouts": "尚无发布",
+      "noFailures": "无失败",
+      "unresolvedAlerts": "未解决告警",
+      "critical": "{count} 个严重",
+      "allClear": "一切正常",
+      "pending": "{count} 个待处理",
+      "open": "打开"
+    },
+    "githubConnect": {
+      "title": "连接你的 GitHub 以管理此应用",
+      "description": "Astrolift 使用你的个人 GitHub 身份浏览仓库、同步清单并安装 Webhook。组织级设置已完成；这只是按用户的关联。",
+      "connect": "连接 GitHub"
+    },
+    "provisioning": {
+      "title": "正在预配基础设施",
+      "done": "已完成",
+      "steps": {
+        "registry": "容器镜像仓库",
+        "namespace": "Kubernetes 命名空间",
+        "identity": "云身份（IRSA）",
+        "managed_services": "托管服务",
+        "ready": "标记为就绪"
+      }
+    },
+    "teams": {
+      "title": "团队",
+      "description": "可以访问此应用的团队。主团队拥有该应用并继承 OWNER 访问权限；其他团队可被授予查看者、部署者或所有者角色。",
+      "team": "团队",
+      "home": "主团队",
+      "accessLevel": "访问级别",
+      "actions": "操作",
+      "levels": {
+        "viewer": "查看者",
+        "deployer": "部署者",
+        "owner": "所有者"
+      },
+      "levelDescriptions": {
+        "viewer": "只读：可以查看此应用，没有部署或修改权限。",
+        "deployer": "读取 + 部署：可以触发发布、轮换令牌、编辑清单。",
+        "owner": "完全控制，包括向其他团队授予访问权限。"
+      },
+      "homeLevelFixed": "主团队的访问权限固定为 OWNER。要更改，请将应用移至其他团队。",
+      "cannotRevokeHome": "无法撤销主团队。请先将应用移至其他团队。",
+      "revokeAccess": "撤销访问权限",
+      "revoke": "撤销",
+      "moveHomeTeam": "移动主团队",
+      "allTeamsHaveAccess": "此组织中的所有团队都已拥有访问权限。",
+      "addTeam": "添加团队",
+      "grantsLabel": "团队访问授权",
+      "searchPlaceholder": "按名称或 slug 搜索团队…",
+      "allView": "全部",
+      "emptyTitle": "没有团队访问授权",
+      "emptyDescription": "添加团队以授予其对此应用的可见性和操作权限。",
+      "revokeTitle": "撤销 {team} 的访问权限？",
+      "revokeTitleGeneric": "撤销访问权限？",
+      "revokeDescription": "该团队将失去对此应用的可见性和操作权限。仅为软删除；可随时重新添加授权。",
+      "addTitle": "添加团队访问权限",
+      "addDescription": "选择此组织中的一个团队，以及它在此应用上应拥有的访问级别。",
+      "loadingTeams": "正在加载团队…",
+      "everyTeamHasAccess": "所有团队都已拥有访问权限",
+      "selectTeam": "选择团队",
+      "cancel": "取消",
+      "granting": "正在授予…",
+      "grantAccess": "授予访问权限",
+      "moveDescription": "更改应用的主团队。目标团队获得 OWNER 访问权限；原主团队降级为 DEPLOYER（不会被撤销）。应用所属项目必须已属于目标团队；否则请先重新挂靠该项目。",
+      "currentHomeTeam": "当前主团队",
+      "moveToTeam": "移至团队",
+      "noOtherTeams": "此组织中没有其他团队",
+      "pickTargetTeam": "选择目标团队",
+      "moving": "正在移动…",
+      "moveApp": "移动应用",
+      "toast": {
+        "updated": "已将 {team} 更新为 {level}。",
+        "updateFailed": "更新失败。",
+        "revoked": "已撤销 {team} 的访问权限。",
+        "revokeFailed": "撤销失败。",
+        "moved": "应用已移至新的主团队。",
+        "moveFailed": "移动失败。",
+        "granted": "已按 {level} 级别授予访问权限。",
+        "grantFailed": "授予失败。"
+      }
+    },
+    "url": {
+      "provisioning": "正在预配 · 约 2 分钟",
+      "notRoutable": "URL 尚不可路由",
+      "notAssigned": "URL 尚未分配；首次部署时将发布",
+      "title": "公开 URL",
+      "description": "平台为此应用分配的主机。编辑子域名即可重命名；DNS 和证书会自动重新签发。",
+      "copy": "复制",
+      "needsPermission": "需要 <mono>{permission}</mono> 权限才能重命名此子域名。",
+      "subdomain": "子域名",
+      "save": "保存",
+      "cancel": "取消",
+      "invalid": "小写 DNS 主机名：字母、数字、连字符和点。每个标签必须以字母或数字开头和结尾。",
+      "keys": "按 <kbd>Enter</kbd> 保存，或按 <kbd>Esc</kbd> 取消。",
+      "edit": "编辑",
+      "toast": {
+        "noResponse": "子域名更改失败：后端无响应。",
+        "failed": "子域名更改失败。",
+        "changed": "子域名已更改为 {subdomain}。",
+        "copied": "URL 已复制到剪贴板。",
+        "copyFailed": "无法复制：剪贴板不可用。"
+      }
+    }
+  },
   "projectResources": {
     "operation": {
       "label": "最近的操作：",

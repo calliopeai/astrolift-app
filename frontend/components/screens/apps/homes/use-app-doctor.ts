@@ -1,6 +1,7 @@
 "use client";
 
 import { useLazyQuery, useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -48,40 +49,12 @@ interface DoctorResp {
  * Nothing in this table is destructive, so none of it confirms. A repair
  * that needed a confirm would be a sign it was mapped to the wrong mutation.
  */
-export const REPAIRS: Record<
-  string,
-  {
-    label: string;
-    permission: PermissionCheck;
-    /** Present-tense progress + success wording for the toast. */
-    pending: string;
-    done: string;
-  }
-> = {
-  resync_manifest: {
-    label: "Resync manifest",
-    permission: "app.update",
-    pending: "Pulling the manifest from the repo",
-    done: "Manifest resynced from the repo",
-  },
-  retry_autowire: {
-    label: "Retry autowire",
-    permission: "app.update",
-    pending: "Re-running the autowire chain",
-    done: "Autowire re-run",
-  },
-  rerun_onboarding: {
-    label: "Re-run onboarding",
-    permission: { allOf: ["app.update", "app.create"] },
-    pending: "Re-running provisioning",
-    done: "Onboarding re-run submitted",
-  },
-  redeploy: {
-    label: "Deploy again",
-    permission: "app.deploy",
-    pending: "Dispatching a deploy",
-    done: "Deploy dispatched",
-  },
+// Labels and toast wording live under `appHomes.doctor.repairs.<verb>`.
+export const REPAIRS: Record<string, { permission: PermissionCheck }> = {
+  resync_manifest: { permission: "app.update" },
+  retry_autowire: { permission: "app.update" },
+  rerun_onboarding: { permission: { allOf: ["app.update", "app.create"] } },
+  redeploy: { permission: "app.deploy" },
 };
 
 /**
@@ -103,6 +76,7 @@ function useRepair(appSlug: string, onDone: () => void) {
   const [rerunOnboarding] = useMutation(RERUN_ONBOARDING);
   const [triggerDeploy] = useMutation(TRIGGER_DEPLOY_WORKFLOW);
   const [running, setRunning] = React.useState<string | null>(null);
+  const t = useTranslations("appHomes.doctor.repairs");
 
   const run = React.useCallback(
     async (verb: string) => {
@@ -130,16 +104,16 @@ function useRepair(appSlug: string, onDone: () => void) {
         )[0];
 
         if (!payload?.ok) {
-          toast.error(payload?.errors?.[0]?.message ?? `${repair.label} failed`);
+          toast.error(payload?.errors?.[0]?.message ?? t(`${verb}.failed`));
           return;
         }
         if (payload.data?.started === false) {
-          toast.info(payload.data.detail ?? "Nothing to do");
+          toast.info(payload.data.detail ?? t("nothingToDo"));
           return;
         }
-        toast.success(repair.done);
+        toast.success(t(`${verb}.done`));
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : `${repair.label} failed`);
+        toast.error(err instanceof Error ? err.message : t(`${verb}.failed`));
       } finally {
         setRunning(null);
         // Re-probe either way. A repair that failed still moves the report
@@ -148,7 +122,7 @@ function useRepair(appSlug: string, onDone: () => void) {
         onDone();
       }
     },
-    [appSlug, onDone, rerunOnboarding, resyncManifest, retryAutowire, triggerDeploy]
+    [appSlug, onDone, rerunOnboarding, resyncManifest, retryAutowire, triggerDeploy, t]
   );
 
   return { run, running };

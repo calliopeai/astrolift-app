@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Input } from "@/components/ui/input";
@@ -46,6 +47,7 @@ export function AppDetailsStepView<S extends AppDetailsFields>({
   // it from the currently-picked project rather than tracking it as
   // independent state synced via an effect.
   const [teamOverride, setTeamOverride] = React.useState<string | null>(null);
+  const copy = useTranslations("appWizard.details");
   const pickedProject = allProjects.find((p) => p.id === state.projectId);
   const teamId = teamOverride !== null ? teamOverride : (pickedProject?.team.id ?? "");
 
@@ -56,7 +58,7 @@ export function AppDetailsStepView<S extends AppDetailsFields>({
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="name">
-            Name <span className="text-destructive">*</span>
+            {copy("name")} <span className="text-destructive">*</span>
           </Label>
           <Input
             id="name"
@@ -77,18 +79,18 @@ export function AppDetailsStepView<S extends AppDetailsFields>({
           />
           {state.name.trim() ? (
             <p id="name-help" className="text-muted-foreground text-xs">
-              Human-readable name shown in the UI.
+              {copy("nameHelp")}
             </p>
           ) : (
             <p id="name-help" role="alert" className="text-destructive text-xs">
-              Give the app a name.
+              {copy("nameRequired")}
             </p>
           )}
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="slug">
-            Slug <span className="text-destructive">*</span>
+            {copy("slug")} <span className="text-destructive">*</span>
           </Label>
           <Input
             id="slug"
@@ -100,7 +102,7 @@ export function AppDetailsStepView<S extends AppDetailsFields>({
                 slugTouched: true,
               }))
             }
-            placeholder="lowercase, hyphens, 1-40 chars"
+            placeholder={copy("slugPlaceholder")}
             className="font-mono text-xs"
             maxLength={40}
             required
@@ -109,16 +111,14 @@ export function AppDetailsStepView<S extends AppDetailsFields>({
           <div className="flex items-start justify-between gap-2">
             {!state.slug ? (
               <p role="alert" className="text-destructive text-xs">
-                A slug is required.
+                {copy("slugRequired")}
               </p>
             ) : !slugValid ? (
               <p role="alert" className="text-destructive text-xs">
-                Lowercase letters, digits, and hyphens only (max 40 chars).
+                {copy("slugInvalid")}
               </p>
             ) : (
-              <p className="text-muted-foreground text-xs">
-                URL-safe identifier. Auto-derived from the name — override to taste.
-              </p>
+              <p className="text-muted-foreground text-xs">{copy("slugHelp")}</p>
             )}
             <span
               className={cn(
@@ -137,19 +137,19 @@ export function AppDetailsStepView<S extends AppDetailsFields>({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="description">Description</Label>
+        <Label htmlFor="description">{copy("description")}</Label>
         <Textarea
           id="description"
           value={state.description}
           onChange={(e) => setState((s) => ({ ...s, description: e.target.value }))}
-          placeholder="What does this app do?"
+          placeholder={copy("descriptionPlaceholder")}
           rows={3}
         />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="team">Team (filter)</Label>
+          <Label htmlFor="team">{copy("team")}</Label>
           <Select
             value={teamId || "__all__"}
             onValueChange={(v) => {
@@ -166,10 +166,10 @@ export function AppDetailsStepView<S extends AppDetailsFields>({
             }}
           >
             <SelectTrigger id="team">
-              <SelectValue placeholder="All teams" />
+              <SelectValue placeholder={copy("allTeams")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__all__">All teams</SelectItem>
+              <SelectItem value="__all__">{copy("allTeams")}</SelectItem>
               {allTeams.map((t) => (
                 <SelectItem key={t.id} value={t.id}>
                   {t.slug} <span className="text-muted-foreground">— {t.name}</span>
@@ -177,13 +177,11 @@ export function AppDetailsStepView<S extends AppDetailsFields>({
               ))}
             </SelectContent>
           </Select>
-          <p className="text-muted-foreground text-xs">
-            Optional filter. Apps belong to a project (which belongs to a team).
-          </p>
+          <p className="text-muted-foreground text-xs">{copy("teamHelp")}</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="project">
-            Project <span className="text-destructive">*</span>
+            {copy("project")} <span className="text-destructive">*</span>
           </Label>
           <Select
             value={state.projectId}
@@ -192,7 +190,7 @@ export function AppDetailsStepView<S extends AppDetailsFields>({
             <SelectTrigger id="project">
               <SelectValue
                 placeholder={
-                  filteredProjects.length === 0 ? "No projects in this scope" : "Select a project"
+                  filteredProjects.length === 0 ? copy("noProjects") : copy("selectProject")
                 }
               />
             </SelectTrigger>
@@ -209,9 +207,7 @@ export function AppDetailsStepView<S extends AppDetailsFields>({
           </Select>
           {!state.projectId && !projectsLoading && (
             <p role="alert" className="text-destructive text-xs">
-              {filteredProjects.length === 0
-                ? "No projects in this scope. Pick another team, or create a project first."
-                : "Pick the project this app belongs to."}
+              {filteredProjects.length === 0 ? copy("noProjectsHelp") : copy("projectRequired")}
             </p>
           )}
         </div>

@@ -4306,6 +4306,531 @@
       "review": "レビュー"
     }
   },
+  "appControls": {
+    "deployToken": {
+      "title": "デプロイトークン",
+      "description": "アプリ単位のマシントークンです。CI で <code>ASTROLIFT_DEPLOY_TOKEN</code> として使用します。",
+      "lastUsed": "最終使用: {date}",
+      "neverUsed": "未使用",
+      "missing": "トークンがありません。生成するまで CI からデプロイを開始できません。",
+      "rotate": "ローテーション",
+      "revoke": "取り消す",
+      "generate": "トークンを生成",
+      "rotateTitle": "デプロイトークンをローテーションしますか？",
+      "rotateDescription": "以前の値はすぐに無効になります。古いトークンを使っている CI の実行は、CI 側のシークレットを更新するまで失敗します。",
+      "rotateConfirm": "トークンをローテーション",
+      "revokeTitle": "デプロイトークンを取り消しますか？",
+      "revokeDescription": "このトークンを使う CI の実行はすぐに失敗し始めます。復旧するには新しいトークンを発行し、CI のシークレットを更新してください。取り消しは元に戻せません（論理削除のみ）。",
+      "revokeConfirm": "トークンを取り消す",
+      "copied": "クリップボードにコピーしました。",
+      "copyFailed": "コピーに失敗しました。値を選択して手動でコピーしてください。",
+      "revealTitle": "デプロイトークン: 今すぐコピーしてください",
+      "revealWarning": "トークンが表示されるのはこの 1 回だけです。コピーせずに移動した場合は、もう一度ローテーションして新しいトークンを発行してください。",
+      "copiedLabel": "コピー済み",
+      "copy": "コピー",
+      "revealStore": "CI プロバイダーのシークレットに <code>ASTROLIFT_DEPLOY_TOKEN</code> として保存してください。",
+      "saved": "保存しました",
+      "toast": {
+        "minted": "デプロイトークンを発行しました。",
+        "createFailed": "作成に失敗しました。",
+        "rotated": "トークンをローテーションしました。新しい値を今すぐコピーしてください。",
+        "rotateFailed": "ローテーションに失敗しました。",
+        "revoked": "トークンを取り消しました。",
+        "revokeFailed": "取り消しに失敗しました。"
+      }
+    },
+    "deploymentPanel": {
+      "emptyTitle": "まだデプロイはありません",
+      "emptyDescription": "CLI からデプロイを実行するか、デプロイブランチにプッシュすると、ここに状態が表示されます。",
+      "current": "現在のデプロイ",
+      "elapsed": "経過 {duration}",
+      "took": "所要 {duration}",
+      "trigger": "トリガー: <value>{kind}</value>",
+      "failed": "デプロイに失敗しました",
+      "openForLog": "完全なログはデプロイを開いて確認してください。",
+      "rollbackTarget": "ロールバック先は {tag} です。",
+      "confirmTitleGeneric": "ロールバックしますか？",
+      "since": "{time} から",
+      "stage": {
+        "queued": "キュー待ち",
+        "rollingOut": "ロールアウト中",
+        "redeploying": "再デプロイ中",
+        "working": "処理中"
+      },
+      "toast": {
+        "started": "ロールバックを開始しました。",
+        "failed": "ロールバックに失敗しました。"
+      }
+    },
+    "pendingDeployments": {
+      "titleApprover": "あなたの承認待ち",
+      "title": "承認待ち",
+      "descriptionApprover": "ロールアウトを解除する前に、各候補を確認してください。",
+      "description": "`{permission}` 権限を持つレビュー担当者を待っています。",
+      "canApprove": "承認できます",
+      "readOnly": "読み取り専用",
+      "approvals": "承認 {received}/{required}",
+      "received": "受信 {when}",
+      "reject": "却下",
+      "approve": "承認してデプロイ",
+      "approveTitle": "{tag} を承認しますか？",
+      "approveDescription": "{environment} へのロールアウトのブロックを解除します。ワークフローはすぐに再開され、トラフィックが切り替わる前に再び一時停止することはできません。",
+      "approveDescriptionDefault": "対象環境へのロールアウトのブロックを解除します。ワークフローはすぐに再開され、トラフィックが切り替わる前に再び一時停止することはできません。",
+      "rejectReason": "却下の理由",
+      "rejectReasonPlaceholder": "このデプロイを却下する理由は？監査ログと履歴サイドバーに保存されます。",
+      "rejectTitle": "{tag} を却下しますか？",
+      "rejectDescription": "保留中のデプロイは中止されます。レビュー用の新しいデプロイを作成するには、CI から再実行する必要があります。",
+      "toast": {
+        "approved": "{tag} を承認しました。",
+        "approveFailed": "承認に失敗しました。",
+        "rejected": "デプロイを却下しました。",
+        "rejectFailed": "却下に失敗しました。"
+      }
+    }
+  },
+  "appWizard": {
+    "details": {
+      "name": "名前",
+      "nameHelp": "UI に表示されるわかりやすい名前です。",
+      "nameRequired": "アプリに名前を付けてください。",
+      "slug": "スラッグ",
+      "slugPlaceholder": "小文字とハイフン、1〜40 文字",
+      "slugRequired": "スラッグは必須です。",
+      "slugInvalid": "小文字、数字、ハイフンのみ（最大 40 文字）。",
+      "slugHelp": "URL で使える識別子です。名前から自動生成されますが、自由に変更できます。",
+      "description": "説明",
+      "descriptionPlaceholder": "このアプリは何をしますか？",
+      "team": "チーム（フィルター）",
+      "allTeams": "すべてのチーム",
+      "teamHelp": "任意のフィルターです。アプリはプロジェクトに属し、プロジェクトはチームに属します。",
+      "project": "プロジェクト",
+      "noProjects": "この範囲にプロジェクトはありません",
+      "selectProject": "プロジェクトを選択",
+      "noProjectsHelp": "この範囲にプロジェクトはありません。別のチームを選ぶか、先にプロジェクトを作成してください。",
+      "projectRequired": "このアプリが属するプロジェクトを選択してください。"
+    },
+    "repo": {
+      "noClusterTitle": "管理対象のクラスターはまだありません",
+      "noClusterDescription": "Astrolift は、管理下に置かれた Kubernetes クラスターにアプリをデプロイします（#316）。クラスターを接続して前提条件をインストールし、「管理下に置く」をクリックしてください。",
+      "manageClusters": "クラスターを管理",
+      "noConnectionsTitle": "ソース接続はまだありません",
+      "noConnectionsDescription": "Git ホスト（GitHub App、GitLab OAuth、または個人アクセストークン）を接続すると、プラットフォームがリポジトリを一覧表示し、プッシュを監視できます。",
+      "registeredNote": "{count, plural, other {このリポジトリには登録済みのアプリがすでに # 件あります（マニフェストのパスが異なります）。}}",
+      "missingHost": "ホストが見つかりませんか？別のソースを接続 →",
+      "picked": "<code>{repo}</code> の <code>{branch}</code> を選択しました。",
+      "introTitle": "登録の流れ",
+      "introDescription": "3 つのステップ: ソース（リポジトリとマニフェスト）、実行（アプリとデプロイ方法）、確認。",
+      "introSource": "1 ソース",
+      "introSourceDescription": "ソース接続とリポジトリを選ぶと、astrolift.toml マニフェストを読み込むか雛形を作成します。",
+      "introRun": "2 実行",
+      "introRunDescription": "アプリに名前を付け、プロジェクトとトリガー（プッシュ時に自動、cron、手動）を選びます。",
+      "introReview": "3 確認",
+      "introReviewDescription": "作成されるものとデプロイされるものを確認してから、アプリを作成します。"
+    },
+    "title": "新しいアプリ",
+    "stepsLabel": "ステップ",
+    "done": "完了",
+    "cancel": "キャンセル",
+    "back": "戻る",
+    "continue": "続行",
+    "steps": {
+      "source": {
+        "label": "ソース",
+        "description": "リポジトリと、何を実行するかを示す astrolift.toml マニフェストです。"
+      },
+      "run": {
+        "label": "実行",
+        "description": "アプリの名前とプロジェクト、そしてデプロイの方法とタイミングです。"
+      },
+      "review": {
+        "label": "確認",
+        "description": "作成されるものとデプロイされるものです。作成するまで何も実行されません。"
+      }
+    },
+    "shell": {
+      "title": "アプリを登録",
+      "description": "Git リポジトリを接続してください。マニフェストを取得し、アプリを登録して OnboardAppWorkflow を実行します。",
+      "cancel": "キャンセル",
+      "stepLabel": "ステップ {step}: {label}",
+      "heading": "ステップ {step}/{total}: {label}",
+      "back": "戻る",
+      "next": "次へ"
+    },
+    "approver": {
+      "orphanUser": "ユーザー {id}"
+    },
+    "strategy": {
+      "timingTitle": "このアプリをいつデプロイしますか？",
+      "timingHelp": "最初のデプロイの進め方を選びます。戦略は後でアプリのページから変更できます。",
+      "timing": {
+        "now": {
+          "label": "今すぐデプロイ",
+          "description": "トリガーを選び、登録が完了したらすぐに最初のデプロイを開始します。"
+        },
+        "later": {
+          "label": "設定して後でデプロイ",
+          "description": "トリガーと承認の設定を今決めておき、最初のデプロイは次のイベントで実行します。"
+        },
+        "skip": {
+          "label": "スキップして後で設定",
+          "description": "アプリを登録するだけです。トリガー、承認、デプロイはアプリのページで設定します。"
+        }
+      },
+      "triggerTitle": "トリガーモード",
+      "triggerHelp": "どのイベントでデプロイを実行しますか？",
+      "modes": {
+        "auto_on_push": "選択したブランチにコミットが入るたびにデプロイします（SCM Webhook 経由）。",
+        "cron": "定期スケジュールでデプロイします。",
+        "manual": "デプロイは誰かが明示的に実行したときだけ行われます。"
+      },
+      "comingSoon": "近日提供",
+      "deployBranch": "デプロイブランチ",
+      "deployBranchHelp": "このブランチへのプッシュでデプロイが実行されます。既定はリポジトリのデフォルトブランチです。",
+      "deployBranchRequired": "プッシュでデプロイするブランチ名を入力してください。",
+      "cronLabel": "Cron 式",
+      "cronHelp": "5 つのフィールド（分 時 日 月 曜日）。",
+      "cronHint": {
+        "invalid": "5 フィールドの cron 式を入力してください。",
+        "hourly": "毎時 0 分。",
+        "every5": "5 分ごと。",
+        "daily": "毎日 03:00。",
+        "weekly": "毎週日曜日 00:00。",
+        "monthly": "毎月 1 日 00:00。",
+        "custom": "カスタムスケジュール。"
+      },
+      "skipped": "トリガーモードと承認ゲートは今はスキップされます。登録完了後、アプリの設定タブで設定できます。"
+    },
+    "manifest": {
+      "pathLabel": "マニフェストのパス",
+      "pathHelp": "リポジトリ内の <code>astrolift.toml</code> の場所です。既定はリポジトリのルートです。モノレポには複数のアプリを置けます。登録ごとに専用のパスを指定してください（例: <code>services/api/astrolift.toml</code>）。",
+      "branchLabel": "デフォルトブランチ",
+      "laterTitle": "マニフェストを後で設定",
+      "laterHelp": "マニフェストなしで今すぐアプリを登録します。登録後はアプリの <b>マニフェスト</b> タブに移動し、準備ができたら <code>astrolift.toml</code> を追加または同期できます。空のリポジトリや、スキーマがアプリのマニフェストではないエージェント設定リポジトリに便利です。",
+      "label": "マニフェスト",
+      "edit": "編集",
+      "refetchTitle": "接続をテストし、選択したリポジトリからマニフェストを再取得",
+      "fetching": "取得中…",
+      "refetch": "テストして再取得",
+      "placeholder": "ここに astrolift.toml マニフェストを貼り付けます。",
+      "maskedEnv": "あなたのロールではシークレットを表示できないため、環境変数の値はマスクされています。登録時にはリポジトリから読み取られます。ここでマニフェストを編集する場合は、先にマスクされた値をすべて置き換えてください。",
+      "agentConfigTitle": "エージェント設定リポジトリのようです",
+      "agentConfigBody": "<code>[skills.*]</code>/<code>[tools.*]</code> テーブルを持つ <code>astrolift_version</code> を宣言し、<code>[[workloads]]</code> がありません。これはアプリのマニフェストではなく、エージェントライブラリのスキーマです。代わりにエージェントフリートとしてオンボードするか、スキルとツールをインポートしてください:",
+      "onboardFleet": "エージェントフリートをオンボード",
+      "importSkills": "スキル / ツールをインポート",
+      "agentConfigLater": "または上の <b>マニフェストを後で設定</b> をオンにして、このリポジトリをマニフェストなしで登録します。",
+      "valid": "マニフェストの構造は有効なようです（トップレベルの <code>name</code> と 1 つ以上の <code>[[workloads]]</code> ブロック）。",
+      "skipped": "マニフェストの手順をスキップしました。アプリはマニフェストなしで登録されます。オンボーディング後、アプリのマニフェストタブで追加または同期してください。",
+      "loaded": "リポジトリからマニフェストを読み込みました。",
+      "fromRepo": "リポジトリから",
+      "missing": "そのパスにマニフェストがありません。最小限のテンプレートを用意しました。下で編集するか、独自のものを貼り付けてください。",
+      "fetchFailed": "マニフェストを取得できませんでした: {error}",
+      "retry": "再試行",
+      "noResponse": "サーバーから応答がありません",
+      "errors": {
+        "empty": "マニフェストが空です。",
+        "name": "トップレベルの `name = \"...\"` が必要です。",
+        "workloads": "`[[workloads]]` ブロックが 1 つ以上必要です。"
+      }
+    },
+    "review": {
+      "source": "ソース",
+      "repository": "リポジトリ",
+      "defaultBranch": "デフォルトブランチ",
+      "sourceKind": "ソースの種類",
+      "manifestPath": "マニフェストのパス",
+      "manifest": "マニフェスト",
+      "manifestLater": "後で設定",
+      "manifestState": "{origin, select, repo {リポジトリから読み込み} other {ここで作成}}、{valid, select, yes {構造は有効} other {無効}}",
+      "run": "実行",
+      "name": "名前",
+      "slug": "スラッグ",
+      "description": "説明",
+      "deployTiming": "デプロイのタイミング",
+      "trigger": "トリガー",
+      "triggerLater": "手動（後で設定）",
+      "deployBranch": "デプロイブランチ",
+      "cron": "Cron",
+      "approvalGate": "承認ゲート",
+      "timing": {
+        "now": "今すぐデプロイ",
+        "later": "設定して後でデプロイ",
+        "skip": "スキップしてオンボーディング後に設定"
+      },
+      "approval": {
+        "notRequired": "不要",
+        "team": "チーム承認（{count} 件必要）",
+        "users": "選択した {count, plural, other {# 人}}のうち {min} 人",
+        "none": "必須ですが承認者が選択されていません（実行で修正）"
+      },
+      "sideEffectsTitle": "送信すると行われること",
+      "sideEffectsHelp": "必要な副作用をオンにしてください。まだリリースされていないバックエンド機能に依存する項目（PAT / OAuth-User 接続用の Webhook インストール）はグレー表示のままです。",
+      "register": "アプリを登録",
+      "registerHelp": "<code>registerApp</code> を呼び出します。オンボーディングワークフローが名前空間とレジストリリポジトリをプロビジョニングします。",
+      "webhook": "SCM Webhook をインストール",
+      "webhookCovered": "GitHub App のインストールで対応済みです。操作は不要です。",
+      "webhookPending": "GitHub App のインストールでは自動で処理されます。PAT/OAuth-User 接続には、そのミューテーションが提供され次第リポジトリごとの Webhook が設定されます。",
+      "alreadyInstalled": "インストール済み",
+      "comingSoon": "近日提供",
+      "pushWorkflow": "<code>{path}</code> をプッシュ",
+      "pushWorkflowHelp": "デプロイブランチへのプッシュごとに astro app deploy を呼び出すスターターワークフローをコミットします。ASTROLIFT_DEPLOY_TOKEN をリポジトリのシークレットとして設定する必要があります。",
+      "pushWorkflowUnavailable": "GitHub または GitLab のユーザー OAuth 接続（および GitHub App のインストール）で利用できます。選択した接続ではコミットをプッシュできません。",
+      "firstDeploy": "最初のデプロイを開始",
+      "firstDeployHelp": "オンボーディングワークフローがアプリを <code>ready</code> にした時点で、最初のデプロイを開始します。",
+      "submitFailed": "送信に失敗しました",
+      "submitting": "送信中…",
+      "willDeployTitle": "デプロイされる内容",
+      "willDeployFirst": "オンボーディングでアプリが ready になると、最初のデプロイが実行されます。",
+      "willDeployNothing": "まだ何もデプロイされません（登録のみ）。アプリのページからデプロイを開始してください。",
+      "noManifest": "マニフェストがまだないため、アプリのマニフェストタブで追加するまでデプロイ対象はありません。",
+      "noWorkloads": "マニフェストに、Astrolift がここで読み取れるワークロードが宣言されていません。作成時にサーバーが検証します。",
+      "managedService": "マネージドサービス"
+    }
+  },
+  "appHomes": {
+    "cronjob": {
+      "exitedWith": "終了コード {code} で終了",
+      "noReason": "理由は記録されていません",
+      "customSchedule": "カスタムスケジュール",
+      "dueNow": "まもなく実行",
+      "notStarted": "未開始",
+      "noExitCode": "終了コードなし",
+      "exit": "終了 {code}",
+      "schedule": "スケジュール",
+      "lastRunFailed": "前回の実行に失敗しました",
+      "noScheduleShort": "スケジュール未設定",
+      "concurrency": "同時実行: <mono>{policy}</mono>",
+      "nextRun": "次回の実行",
+      "nextRunUnknown": "この式の次回実行時刻を計算できませんでした。",
+      "noSchedule": "スケジュールが設定されていません。",
+      "runHistory": "実行履歴",
+      "total": "合計 {count}",
+      "emptyTitle": "まだ実行の記録はありません",
+      "emptyDescription": "スケジュールされた実行は、開始されるとここに表示されます。"
+    },
+    "task": {
+      "stages": {
+        "queued": "キュー待ち",
+        "provisioning": "プロビジョニング",
+        "running": "実行中",
+        "completed": "完了",
+        "failed": "失敗"
+      },
+      "latestRun": "最新の実行",
+      "execution": "実行",
+      "runStatus": "実行: {status}",
+      "exitedWith": "終了コード {code} で終了",
+      "noReason": "理由は記録されていません",
+      "runStages": "実行のステージ",
+      "noRunYet": "まだ実行の記録はありません。単発タスクは実行のたびにこれらのステージを進みます。",
+      "runHistory": "実行履歴",
+      "emptyTitle": "まだ実行はありません",
+      "emptyDescription": "このタスクの単発実行はここに表示されます。",
+      "notStarted": "未開始"
+    },
+    "bundle": {
+      "title": "このバンドルのワークロード",
+      "description": "{kinds, plural, other {# 種類}}にわたる{workloads, plural, other {# 個のワークロード}}。ワークロードを開くと、デプロイ、構成、ログを確認できます。",
+      "emptyTitle": "まだワークロードはありません",
+      "emptyDescription": "マニフェストがワークロードを登録すると、ここに表示されます。",
+      "replicas": "{count, plural, other {レプリカ <mono>#</mono>}}",
+      "public": "公開"
+    },
+    "function": {
+      "title": "トリガー",
+      "description": "呼び出し時に実行され、アイドル時はゼロまでスケールします。",
+      "httpEndpoint": "HTTP エンドポイント",
+      "eventTriggered": "イベントトリガー（公開 HTTP エンドポイントなし）。プラットフォームまたは上流のプロデューサーから呼び出されます。"
+    },
+    "doctor": {
+      "title": "アプリ診断",
+      "description": "このアプリが必要とする各依存関係を確認し、実際に使えるかを報告します。ライブで調べるため、指示したときだけ実行されます。",
+      "runAgain": "再実行",
+      "runChecks": "チェックを実行",
+      "notRun": "まだ何も実行されていません。チェックを実行して、マニフェスト、レジストリ、プッシュロール、DNS、デプロイを調べます。",
+      "healthy": "このアプリに必要なものはすべて問題ありません。",
+      "unhealthy": "対応が必要な依存関係があります。以下を確認してください。",
+      "nothingToReport": "このアプリについて報告する内容はありません。",
+      "checks": {
+        "manifest": "マニフェスト",
+        "autowire": "リポジトリ連携",
+        "registry_repo": "コンテナレジストリ",
+        "push_role": "プッシュロール",
+        "dns": "DNS",
+        "identity": "Pod ID",
+        "image": "イメージの固定",
+        "deployments": "デプロイ",
+        "cronjob_runs": "スケジュール実行",
+        "managed_services": "マネージドサービス"
+      },
+      "status": {
+        "pass": "OK",
+        "fail": "失敗",
+        "warn": "警告",
+        "skip": "該当なし",
+        "unknown": "未検証"
+      },
+      "repairs": {
+        "nothingToDo": "対応不要です",
+        "resync_manifest": {
+          "label": "マニフェストを再同期",
+          "done": "リポジトリからマニフェストを再同期しました",
+          "failed": "マニフェストの再同期に失敗しました"
+        },
+        "retry_autowire": {
+          "label": "autowire を再試行",
+          "done": "autowire を再実行しました",
+          "failed": "autowire の再試行に失敗しました"
+        },
+        "rerun_onboarding": {
+          "label": "オンボーディングを再実行",
+          "done": "オンボーディングの再実行を送信しました",
+          "failed": "オンボーディングの再実行に失敗しました"
+        },
+        "redeploy": {
+          "label": "再デプロイ",
+          "done": "デプロイを送信しました",
+          "failed": "再デプロイに失敗しました"
+        }
+      }
+    }
+  },
+  "appOverviewCards": {
+    "assignProject": {
+      "unassigned": "未割り当て",
+      "title": "プロジェクトの割り当て",
+      "description": "このアプリをプロジェクトに配置すると、サイドバーでグループ化され、チーム単位の権限の範囲が決まります。プロジェクトのないアプリは、チームの「未割り当て」に表示されます。",
+      "current": "現在のプロジェクト",
+      "needsPermission": "この割り当てを変更するには <mono>{permission}</mono> 権限が必要です。",
+      "moveTo": "移動先のプロジェクト",
+      "noProjects": "割り当て可能なプロジェクトはありません",
+      "pickProject": "移動先のプロジェクトを選択",
+      "save": "保存",
+      "unassign": "割り当てを解除",
+      "toast": {
+        "assignNoResponse": "割り当てに失敗しました: バックエンドから応答がありません。",
+        "assignFailed": "割り当てに失敗しました。",
+        "assignNoPayload": "割り当てからデータが返されませんでした。",
+        "moved": "{team} の {project} に移動しました。",
+        "unassignNoResponse": "割り当ての解除に失敗しました: バックエンドから応答がありません。",
+        "unassignFailed": "割り当ての解除に失敗しました。",
+        "unassigned": "アプリの割り当てを解除しました。"
+      }
+    },
+    "observability": {
+      "title": "可観測性",
+      "description": "過去 {days} 日間 · デプロイのスループット、失敗率、未解決のアラート。",
+      "metrics": "メトリクス",
+      "alerts": "アラート",
+      "deploysPerDay": "デプロイ / 日",
+      "acrossDays": "{days} 日間",
+      "noDeploys": "デプロイなし",
+      "failures": "失敗",
+      "ofRollouts": "ロールアウトの {pct}",
+      "noRollouts": "まだロールアウトはありません",
+      "noFailures": "失敗なし",
+      "unresolvedAlerts": "未解決のアラート",
+      "critical": "重大 {count} 件",
+      "allClear": "問題なし",
+      "pending": "保留中 {count} 件",
+      "open": "開く"
+    },
+    "githubConnect": {
+      "title": "このアプリを管理するには GitHub を接続してください",
+      "description": "Astrolift は、リポジトリの閲覧、マニフェストの同期、Webhook のインストールに、あなた個人の GitHub ID を使用します。組織レベルの設定は完了済みで、これはユーザーごとの連携です。",
+      "connect": "GitHub を接続"
+    },
+    "provisioning": {
+      "title": "インフラをプロビジョニング中",
+      "done": "完了",
+      "steps": {
+        "registry": "コンテナレジストリ",
+        "namespace": "Kubernetes 名前空間",
+        "identity": "クラウド ID（IRSA）",
+        "managed_services": "マネージドサービス",
+        "ready": "準備完了にする"
+      }
+    },
+    "teams": {
+      "title": "チーム",
+      "description": "このアプリにアクセスできるチームです。ホームチームがアプリを所有し、OWNER アクセスを継承します。他のチームには閲覧者、デプロイ担当、オーナーのロールを付与できます。",
+      "team": "チーム",
+      "home": "ホーム",
+      "accessLevel": "アクセスレベル",
+      "actions": "操作",
+      "levels": {
+        "viewer": "閲覧者",
+        "deployer": "デプロイ担当",
+        "owner": "オーナー"
+      },
+      "levelDescriptions": {
+        "viewer": "読み取り専用: このアプリを閲覧できますが、デプロイや変更の権限はありません。",
+        "deployer": "読み取り + デプロイ: ロールアウトの開始、トークンのローテーション、マニフェストの編集ができます。",
+        "owner": "他のチームへのアクセス付与を含む完全な管理権限です。"
+      },
+      "homeLevelFixed": "ホームチームのアクセスは OWNER に固定されています。変更するにはアプリを別のチームに移動してください。",
+      "cannotRevokeHome": "ホームチームは取り消せません。先にアプリを別のチームに移動してください。",
+      "revokeAccess": "アクセスを取り消す",
+      "revoke": "取り消す",
+      "moveHomeTeam": "ホームチームを移動",
+      "allTeamsHaveAccess": "この組織のすべてのチームがすでにアクセス権を持っています。",
+      "addTeam": "チームを追加",
+      "grantsLabel": "チームへのアクセス付与",
+      "searchPlaceholder": "名前またはスラッグでチームを検索…",
+      "allView": "すべて",
+      "emptyTitle": "チームへのアクセス付与はありません",
+      "emptyDescription": "チームを追加すると、このアプリの閲覧権限と運用権限を付与できます。",
+      "revokeTitle": "{team} のアクセスを取り消しますか？",
+      "revokeTitleGeneric": "アクセスを取り消しますか？",
+      "revokeDescription": "チームはこのアプリの閲覧権限と運用権限を失います。論理削除のみのため、付与はいつでも再追加できます。",
+      "addTitle": "チームのアクセスを追加",
+      "addDescription": "この組織のチームと、そのチームがこのアプリで持つアクセスレベルを選択してください。",
+      "loadingTeams": "チームを読み込み中…",
+      "everyTeamHasAccess": "すべてのチームがすでにアクセス権を持っています",
+      "selectTeam": "チームを選択",
+      "cancel": "キャンセル",
+      "granting": "付与中…",
+      "grantAccess": "アクセスを付与",
+      "moveDescription": "アプリのプライマリ / ホームチームを変更します。移動先のチームは OWNER アクセスを得て、以前のホームチームは DEPLOYER に降格されます（取り消しはされません）。アプリのプロジェクトはすでに移動先チームに属している必要があります。そうでない場合は、先にプロジェクトの所属を変更してください。",
+      "currentHomeTeam": "現在のホームチーム",
+      "moveToTeam": "移動先のチーム",
+      "noOtherTeams": "この組織に他のチームはありません",
+      "pickTargetTeam": "移動先のチームを選択",
+      "moving": "移動中…",
+      "moveApp": "アプリを移動",
+      "toast": {
+        "updated": "{team} を {level} に更新しました。",
+        "updateFailed": "更新に失敗しました。",
+        "revoked": "{team} のアクセスを取り消しました。",
+        "revokeFailed": "取り消しに失敗しました。",
+        "moved": "アプリを新しいホームチームに移動しました。",
+        "moveFailed": "移動に失敗しました。",
+        "granted": "{level} レベルでアクセスを付与しました。",
+        "grantFailed": "付与に失敗しました。"
+      }
+    },
+    "url": {
+      "provisioning": "プロビジョニング中 · 約 2 分",
+      "notRoutable": "URL はまだルーティングできません",
+      "notAssigned": "URL はまだ割り当てられていません。最初のデプロイで公開されます",
+      "title": "公開 URL",
+      "description": "プラットフォームがこのアプリに発行したホストです。サブドメインを編集すると名前を変更でき、DNS と証明書は自動で再発行されます。",
+      "copy": "コピー",
+      "needsPermission": "このサブドメインの名前を変更するには <mono>{permission}</mono> 権限が必要です。",
+      "subdomain": "サブドメイン",
+      "save": "保存",
+      "cancel": "キャンセル",
+      "invalid": "小文字の DNS ホスト: 英字、数字、ハイフン、ドットのみ。各ラベルは英字か数字で始まり、終わる必要があります。",
+      "keys": "<kbd>Enter</kbd> で保存、<kbd>Esc</kbd> でキャンセルします。",
+      "edit": "編集",
+      "toast": {
+        "noResponse": "サブドメインの変更に失敗しました: バックエンドから応答がありません。",
+        "failed": "サブドメインの変更に失敗しました。",
+        "changed": "サブドメインを {subdomain} に変更しました。",
+        "copied": "URL をクリップボードにコピーしました。",
+        "copyFailed": "コピーできません: クリップボードを利用できません。"
+      }
+    }
+  },
   "projectResources": {
     "operation": {
       "label": "直近の操作：",
