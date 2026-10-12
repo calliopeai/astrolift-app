@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preview hostnames are one label below the zone, so the zone's `*.<zone>` wildcard certificate covers them on ALB, CloudFront and cert-manager alike: `pr-<n>-<app>.<zone>` for a pull request, `preview-<branch>-<app>.<zone>` for a manual preview (a first label over 63 characters is shortened with a stable digest). The four schemes in the code (`pr-<n>.<app>.<org>.<zone>`, `preview-<branch>.<app>.<org>.<zone>` and two unused helpers) now share one builder. An app label starting `pr-<n>-` or `preview-` is refused, since it could collide with a preview. Existing previews keep their stored hostname until they are recreated (#2091).
+
 - A refused permission reads the same on every client: GraphQL errors raised by a permission check now carry `extensions.code = "PERMISSION_DENIED"` (the code mutation envelopes already use) with `extensions.reason` and `extensions.permission`; the message is unchanged. The CLI and web can tell a refusal from any other failure and show why (#1867).
 
 - Every tab inside an app or agent offers actions from that app's own permissions, not the account's: the header (deploy, archive, delete), Settings sections (resync, retention, environments, managed services, archive, the danger zone) and Access (tokens, security, edge). A grant held on another project no longer offers an action this app refuses. Account grants only bridge the first load (`useAppCan`, fed by the frame) (#1867).

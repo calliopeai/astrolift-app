@@ -138,18 +138,19 @@ def env_slug_for_preview(*, pr_number: int) -> str:
 def hostname_for_preview(
     *,
     pr_number: int,
+    app_slug: str,
     base_zone: str,
     org_slug: str,
 ) -> str:
-    """Hostname under the platform's preview wildcard:
-    ``pr-<n>.<org>.<base_zone>``. Pairs with the wildcard cert
-    SAN ``*.pr.<org>.<base_zone>`` from #70.
-    """
+    """``pr-<n>-<app>.<base_zone>``, the one preview scheme (#2091), covered
+    by the zone's ``*.<base_zone>`` wildcard."""
+    from astrolift_manifest.hostname import preview_hostname
+
     if not base_zone or not org_slug:
         raise PreviewBuildError("hostname_for_preview requires base_zone and org_slug")
     if pr_number <= 0:
         raise PreviewBuildError(f"pr_number must be positive, got {pr_number}")
-    return f"pr-{pr_number}.{org_slug}.{base_zone}".lower()
+    return preview_hostname(label=f"pr-{pr_number}", app_slug=app_slug, zone=base_zone, org_slug=org_slug)
 
 
 # ---- cost containment ----------------------------------------------
