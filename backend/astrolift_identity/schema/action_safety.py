@@ -267,11 +267,11 @@ class ActionSafetyMutations:
                     field="enabled",
                 )
         if input.require_approval and input.action not in APPROVABLE:
-            hint = (
-                "; secret changes have their own approval setting on the app"
-                if input.action == "secret.change"
-                else ""
-            )
+            hint = {
+                "secret.change": "; secret changes have their own approval setting on the app",
+                "deploy.production": "; deploys use the environment's required approvals",
+                "rollback.production": "; deploys use the environment's required approvals",
+            }.get(input.action, "")
             return gql_failure(
                 ErrorCode.VALIDATION.value,
                 f"approval cannot be added to {input.action!r}{hint}",

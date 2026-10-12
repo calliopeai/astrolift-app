@@ -1224,6 +1224,10 @@ def _upsert_agent_environment_spec(
     # A new spec belongs to the agent's project; an existing one is written
     # only when this agent may run with it (#1866).
     spec = spec_for_registration(organization=app.organization, slug=workload_slug, app=app)
+    # Once owner enforcement is on, the refs must also sit in this spec owner's
+    # namespace (#2102); raise like the org check above to roll back.
+    for ref in secret_refs:
+        assert_org_scoped_secret_ref(ref["uri"], organization=app.organization, spec=spec)
     spec.name = spec.name or f"{workload.name} runtime"
     spec.agent_type = agent_type
     spec.image_tag = image

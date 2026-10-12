@@ -421,3 +421,29 @@ def test_approvers_with_the_authority_are_notified_and_the_requester_hears_the_o
     assert inbox(alice) == [
         (f"Approved: Deregister an app {world.medops_app.name}", "/administration/permissions/safety")
     ]
+
+
+def test_deploying_or_rolling_back_production_asks_for_a_fresh_sign_in_and_other_environments_do_not(world):
+    from django.contrib.sessions.backends.db import SessionStore
+
+    from astrolift_lifecycle.schema.mutations.deployments import _production_gate
+
+    info = _info(SessionStore())
+    with tenant_context(TenantContext(organization_id=world.org.pk, actor_user_id=world.user.pk)):
+        for name, action in (("production", "deploy.production"), ("Prod", "rollback.production")):
+            deny = _production_gate(
+                info, action, world.medops_app, SimpleNamespace(name=name), "start_deployment"
+            )
+            assert deny is not None and deny.errors[0].code == "STEP_UP_REQUIRED"
+        for name in ("staging", "preview-pr-3"):
+            assert (
+                _production_gate(info, "deploy.production", world.medops_app, SimpleNamespace(name=name), "x")
+                is None
+            )
+        rule(world, "ORG", None, action="deploy.production", enabled=False)
+        assert (
+            _production_gate(
+                info, "deploy.production", world.medops_app, SimpleNamespace(name="production"), "x"
+            )
+            is None
+        )

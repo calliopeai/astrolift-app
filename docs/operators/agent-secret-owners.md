@@ -11,7 +11,7 @@ on startup or dispatch.
 |---|---|
 | Compatible maintenance | Explicit reviewed migration command; existing runtime continues to accept org-scoped refs. |
 | Compatible readiness (this leaf) | Metadata inventory, optional strict readiness failure, and sanitized namespace-audit output; shared organization-owned model services included. |
-| Held future owner enforcement | Coordinated web/worker runtime change, only after actual operator migration, source review and clean strict readiness/audit. |
+| Owner enforcement (switch) | Ships off. `AGENT_SECRET_OWNER_ENFORCEMENT` (Constance, Agent pods) holds every typed ref to its spec owner's prefix on every write and at dispatch. Turn it on per install only after actual operator migration, source review and clean strict readiness/audit. |
 
 Readiness is deploy-compatible tooling, **not completion of #2102**. The held
 future enforcement commits must not be deployed with this staging leaf. Until
@@ -127,9 +127,11 @@ or automatic startup task. No schema migration is added by this change.
 
 5. Only after the actual reviewed plan has been applied, current source repositories
    and imported packages have been reviewed/updated, and both metadata audits are
-   clean, authorize the held owner-enforcement image for coordinated web/worker
-   rollout. A local test proof or `metadata_ready=true` does not authorize this
-   production cutover. No production migration or cutover was performed by this leaf.
+   clean, set `AGENT_SECRET_OWNER_ENFORCEMENT` to on for the install. Web and worker
+   read it at each check, so no rollout is needed. A local test proof or
+   `metadata_ready=true` does not authorize this production cutover. Turning the
+   switch off again is the rollback: it restores the organization-compatible check
+   and with it the sibling-secret exposure.
 
 ## Rollback boundary
 

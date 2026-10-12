@@ -2,7 +2,7 @@
 ledger that makes the *rendered* form unique too (#2012).
 
 Hostnames in a managed zone carry no org (``<label>.<zone>``, previews
-``pr-<n>-<slug>.pr.<zone>``), and every org without a zone of its own
+``pr-<n>-<slug>.<zone>``), and every org without a zone of its own
 resolves to the same shared (org NULL) zone. So another org's app with the
 same label would get the same hostname: its Ingress host, its CDN CNAME.
 A new label is refused when a live app of another org already claims it in
@@ -60,6 +60,12 @@ def hostname_label_refusal(label: str, *, organization, managed_domain=None) -> 
     label = (label or "").strip().lower()
     if not label or organization is None:
         return None
+    from astrolift_manifest.hostname import PREVIEW_LABEL_RE
+
+    if PREVIEW_LABEL_RE.match(label):
+        # A preview's hostname starts this way (#2091); an app taking it could
+        # collide with some app's preview in the same zone.
+        return f"{label!r} starts like a preview hostname (pr-<n>- or preview-); pick another label"
     purposes = {False: managed_domain} if managed_domain is not None else {}
     for preview in (False, True):
         purposes.setdefault(preview, resolve_managed_domain(organization, for_preview=preview))
@@ -128,8 +134,8 @@ def _desired_claims(app, manifest, *, subdomain: str | None = None):
     exactly what ``compute_hostnames`` would put on the wire.
 
     Excludes preview environments (``previewed_environment`` set): a preview
-    renders its own hostname scheme (``pr-<n>-<app>.pr.<zone>`` or the manual
-    ``preview-<branch>.<app>.<org>.<zone>`` form), never ``compute_hostnames``,
+    renders its own hostname scheme (``pr-<n>-<app>.<zone>`` or the manual
+    ``preview-<branch>-<app>.<zone>`` form), never ``compute_hostnames``,
     so claiming what this function computes for one would ledger a hostname
     nothing actually serves.
     """
