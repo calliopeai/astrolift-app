@@ -6,6 +6,7 @@ import {
   MailIcon,
   MessageSquareIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { PageShell } from "@/components/PageShell";
 import { Badge } from "@/components/ui/badge";
@@ -27,42 +28,32 @@ export interface HelpScreenProps {
 const SUPPORT_LINKS = [
   {
     key: "discord",
-    label: "Community Discord",
-    description: "Real-time chat with the Astrolift team and other operators.",
     href: "https://discord.com/invite/Z9bbbE6hJv",
     icon: MessageSquareIcon,
   },
   {
     key: "github",
-    label: "GitHub Issues",
-    description: "File a bug, request a feature, or browse open work on astrolift-app.",
     href: "https://github.com/calliopeai/astrolift-app/issues",
     icon: GithubIcon,
   },
   {
     key: "email",
-    label: "Support email",
-    description: "Reach the operations team directly for account-level issues.",
     href: "mailto:support@calliope.ai",
     icon: MailIcon,
   },
 ] as const;
 
 export function HelpScreen({ platformVersion, org, copied, copyDiagnostics }: HelpScreenProps) {
+  const t = useTranslations("docsHelp");
   return (
-    <PageShell
-      title="Get help"
-      description="Reach the Astrolift team. When you file a ticket, include the diagnostic info below — it speeds up triage."
-    >
+    <PageShell title={t("title")} description={t("description")}>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <LifeBuoyIcon className="size-4" />
-            Support channels
+            {t("channelsTitle")}
           </CardTitle>
-          <CardDescription>
-            Pick the channel that matches the kind of help you need.
-          </CardDescription>
+          <CardDescription>{t("channelsDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           <ul className="divide-border divide-y">
@@ -78,14 +69,16 @@ export function HelpScreen({ platformVersion, org, copied, copyDiagnostics }: He
                       <Icon className="size-4" />
                     </div>
                     <div>
-                      <div className="text-sm font-medium">{link.label}</div>
-                      <p className="text-muted-foreground text-xs">{link.description}</p>
+                      <div className="text-sm font-medium">{t(`links.${link.key}.label`)}</div>
+                      <p className="text-muted-foreground text-xs">
+                        {t(`links.${link.key}.description`)}
+                      </p>
                     </div>
                   </div>
                   <Button asChild size="sm" variant="outline">
                     <a href={link.href} target="_blank" rel="noreferrer">
                       <ExternalLinkIcon className="size-3.5" />
-                      Open
+                      {t("open")}
                     </a>
                   </Button>
                 </li>
@@ -97,16 +90,14 @@ export function HelpScreen({ platformVersion, org, copied, copyDiagnostics }: He
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Diagnostic info</CardTitle>
-          <CardDescription>
-            Paste this into your ticket so we can match your environment.
-          </CardDescription>
+          <CardTitle className="text-base">{t("diagnosticsTitle")}</CardTitle>
+          <CardDescription>{t("diagnosticsDescription")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <dl className="grid gap-3 sm:grid-cols-2">
             <div>
               <dt className="text-muted-foreground text-xs tracking-wide uppercase">
-                Platform version
+                {t("platformVersion")}
               </dt>
               <dd className="mt-1 font-mono text-sm">
                 <Badge variant="outline" className="font-mono">
@@ -116,7 +107,7 @@ export function HelpScreen({ platformVersion, org, copied, copyDiagnostics }: He
             </div>
             <div>
               <dt className="text-muted-foreground text-xs tracking-wide uppercase">
-                Organization
+                {t("organization")}
               </dt>
               <dd className="mt-1 font-mono text-sm">
                 {org ? (
@@ -132,11 +123,9 @@ export function HelpScreen({ platformVersion, org, copied, copyDiagnostics }: He
 
           <Button type="button" onClick={copyDiagnostics} variant="secondary" size="sm">
             <ClipboardCopyIcon className="size-3.5" />
-            {copied ? "Copied!" : "Copy diagnostic info"}
+            {copied ? t("copied") : t("copy")}
           </Button>
-          <p className="text-muted-foreground text-xs">
-            Includes platform version, browser user agent, your org slug, and the current URL.
-          </p>
+          <p className="text-muted-foreground text-xs">{t("includes")}</p>
         </CardContent>
       </Card>
     </PageShell>

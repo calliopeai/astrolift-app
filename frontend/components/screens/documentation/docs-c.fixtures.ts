@@ -1,8 +1,6 @@
-import { IDENTITY_PROVIDER_KINDS, type IdentityProviderKind } from "./identity-provider-kinds";
+import type { IdentityProviderKind } from "./identity-provider-kinds";
 
 /** Hand-typed fixtures for the docs-c group (custom domains, identity providers). */
-
-export const DOCS_C_KINDS_FULL: IdentityProviderKind[] = IDENTITY_PROVIDER_KINDS;
 
 export const DOCS_C_KINDS_EMPTY: IdentityProviderKind[] = [];
 

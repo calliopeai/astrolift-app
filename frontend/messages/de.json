@@ -300,6 +300,598 @@
       }
     }
   },
+  "docsClusterPrereqs": {
+    "title": "Cluster-Voraussetzungen",
+    "intro": "Alles, was in einem Kubernetes-Cluster installiert sein muss, bevor Sie ihn bei Astrolift registrieren. Die meisten mit <code>astrolift-opscode</code> bereitgestellten Cluster enthalten dies bereits; diese Anleitung richtet sich an Betreiber, die einen eigenen Cluster mitbringen.",
+    "cliTitle": "Installation in einem Schritt über die CLI",
+    "cliBody": "Um die folgenden Voraussetzungen in einem Schritt und passend zum Treiber Ihres Anbieters zu installieren, führen Sie <cmd>{command}</cmd> in Ihrem Terminal aus. Die CLI richtet Flux und das Umbrella-Chart der Plattform ein; anschließend können Sie die Auswahl über die Bootstrap-Karte auf der Cluster-Detailseite laufend abgleichen. <link>CLI installieren</link>.",
+    "whenTitle": "Wann Sie dies brauchen",
+    "whenBody": "Astrolift behandelt einen Tenant-Cluster als Laufzeitumgebung für Apps; es installiert oder besitzt selbst keine Infrastrukturkomponenten im Cluster. TLS für eigene Domains, Ingress-Routing und Autoscaling werden an Controller delegiert, die vorhanden sein müssen, bevor Astrolift sie nutzen kann. Die folgenden Prüfungen bestätigen, dass der Cluster korrekt eingerichtet ist; fehlt etwas, bleiben die zugehörigen Funktionen deaktiviert und die Steuerungsebene zeigt auf der Cluster-Detailseite einen Behebungshinweis.",
+    "requiredTitle": "Erforderlich",
+    "requiredBadge": "muss installiert sein",
+    "requiredBody": "Ohne diese Komponenten gelingt die Registrierung, aber App-Workloads können keinen eingehenden Traffic auf einem eigenen Hostnamen annehmen.",
+    "certManagerBody": "Stellt TLS-Zertifikate für eigene Domains aus und erneuert sie. Astrolift erstellt <code>Certificate</code>-Ressourcen in Ihrem Auftrag; cert-manager übernimmt den ACME-Ablauf mit Let's Encrypt (oder dem von Ihnen konfigurierten <code>ClusterIssuer</code>). Ohne cert-manager verweigert der Ablauf für <link>eigene Domains</link> das Binden von Hostnamen.",
+    "upstream": "Upstream:",
+    "ingressTitle": "Ein Ingress-Controller",
+    "ingressBody": "Astrolift rendert pro App eine Ingress-Ressource, deren <code>spec.ingressClassName</code> zu einer im Cluster vorhandenen <code>IngressClass</code> passt. Jeder der folgenden Controller ist geeignet; wählen Sie den, den Ihr Plattformteam bereits betreibt.",
+    "defaultBadge": "Standard",
+    "istioNote": "Erkennt Astrolift Istio, erzeugt es statt <code>Ingress</code> die Ressourcen <code>Gateway</code> + <code>VirtualService</code>.",
+    "albBody": "Auf EKS stellt der ALB-Controller Services über eine <code>alb</code>-IngressClass bereit. Auf GKE ist der Gateway-API-Controller im Cluster enthalten; installieren Sie die <link>gateway-api</link>-CRDs, um ihn zu nutzen.",
+    "externalDnsQualifier": "(optional, dringend empfohlen)",
+    "externalDnsBody": "Liest die Hostnamen aus <code>Certificate.spec.dnsNames</code> bzw. Ingress-Ressourcen und legt die passenden Einträge bei Ihrem DNS-Anbieter an. Erforderlich, wenn Astrolift eigene Domains vollständig selbst veröffentlichen soll; sonst muss ein Betreiber CNAMEs von Hand anlegen.",
+    "externalDnsProviders": "Zu den unterstützten Anbietern mit Controller-freundlichen APIs gehören AWS Route53, Google Cloud DNS, Azure DNS und Cloudflare. Die vollständige Übersicht finden Sie in der <link>Upstream-Anbieterliste</link>.",
+    "recommendedTitle": "Empfohlen",
+    "recommendedBadge": "optional",
+    "recommendedBody": "Astrolift funktioniert ohne diese Komponenten, aber bestimmte Funktionen bleiben deaktiviert, bis sie vorhanden sind.",
+    "storageTitle": "Eine Standard-StorageClass",
+    "storageBody": "Erforderlich für clusterinterne verwaltete Dienste, die <code>PersistentVolumeClaim</code>-Ressourcen anfordern, etwa den clusterinternen Postgres-Operator, clusterinternes Redis oder jede App, die direkt ein PVC einbindet. Nutzen alle Ihre Apps einen externen verwalteten Dienst wie RDS/Cloud SQL, können Sie dies überspringen.",
+    "metricsBody": "Der Kubernetes-<code>HorizontalPodAutoscaler</code> liest CPU und Arbeitsspeicher aus <code>metrics.k8s.io</code>; ohne metrics-server bleiben Autoscaling-Regeln wirkungslos bei der aktuellen Replikatzahl. Astrolift greift auf manuelle Replikatzahlen zurück, und der Autoscale-Tab in den App-Details zeigt ein Banner, das erklärt, was fehlt.",
+    "prometheusTitle": "Clusterinternes Prometheus",
+    "prometheusBody": "Erkennt Astrolift ein erreichbares Prometheus, verwenden die App-Metrikpanels es als Quelle. Ohne Prometheus zeigen die Panels synthetische Zeitreihen, damit die Oberfläche in der Entwicklung nützlich bleibt; echte Workload-Werte erfordern jedoch Prometheus oder einen anderen Prometheus-kompatiblen Scraper.",
+    "verifyTitle": "Installation prüfen",
+    "verifyBody": "Führen Sie diese Befehle auf einem Rechner aus, der den Cluster erreicht. Schlägt eine Prüfung fehl, bleibt die zugehörige Funktion in Astrolift deaktiviert.",
+    "ingressClassTitle": "Ingress-Klasse",
+    "troubleshootingTitle": "Fehlerbehebung",
+    "troubleCertTitle": "cert-manager hängt dauerhaft (Certificate bleibt in <pending>Pending</pending>).",
+    "troubleCertBody": "Fast immer ein Problem mit der ACME-Challenge. Bei <code>dns-01</code>: Der Issuer hat keine Anmeldedaten, um den TXT-Eintrag zu schreiben (prüfen Sie die <code>ClusterIssuer</code>-Spezifikation und dann die Logs des Controller-Pods auf Anmeldefehler). Bei <code>http-01</code>: Der Validierungs-Pod erreicht <code>{url}</code> nicht; stellen Sie sicher, dass der Ingress-Controller öffentlich erreichbar ist. Prüfen mit:",
+    "troubleIngressTitle": "Ingress liefert 503 ohne Backend.",
+    "troubleIngressBody": "Der Service, auf den der Ingress zeigt, hat keine bereiten Endpunkte. Meist ziehen die App-Pods noch das Image, die Readiness-Probe schlägt fehl oder der <code>selector</code> des Service passt nicht zu den Pod-Labels. Prüfen Sie mit <code>{command}</code>; ist die Adressliste leer, hat der Ingress kein Weiterleitungsziel.",
+    "troubleDnsTitle": "external-dns legt keine Einträge an.",
+    "troubleDnsBody": "Zwei häufige Ursachen: (a) RBAC: Das Service-Konto des Controllers braucht <code>list/watch</code> auf <code>services</code>, <code>ingresses</code> und die CRDs des Anbieters sowie IAM-Rechte bzw. Anmeldedaten für die API des DNS-Anbieters; (b) Besitz: external-dns ändert keinen Eintrag, den es nicht selbst angelegt hat, außer die TXT-Owner-ID-Markierung stimmt überein. Suchen Sie in den Controller-Logs nach <code>skipping endpoint</code>-Meldungen.",
+    "troubleHpaTitle": "HPA zeigt <code>{unknown}</code> für die Zielmetrik.",
+    "troubleHpaBody": "metrics-server ist nicht installiert oder erfasst keine Daten. Führen Sie <code>kubectl top pods</code> aus; schlägt das mit <code>Metrics API not available</code> fehl, löst metrics-server das Problem.",
+    "relatedTitle": "Verwandte Themen",
+    "relatedCustomDomains": "<link>Eigene Domains</link>: die Funktion, die cert-manager und einen Ingress-Controller voraussetzt.",
+    "relatedGetStarted": "<link>Loslegen</link>: den Astrolift-Stack lokal starten, bevor Sie ihn auf einen Tenant-Cluster richten."
+  },
+  "docsSourceProviders": {
+    "title": "Quellanbieter",
+    "intro": "Verbinden Sie Astrolift mit GitHub oder GitLab, damit ein <code>git push</code> ein Deployment auslöst.",
+    "whenTitle": "Wann Sie dies brauchen",
+    "whenBody": "Sie möchten eine App registrieren, deren Quellcode bei einem gehosteten Git-Anbieter liegt, und Astrolift soll einen Branch (oder Pull Requests) beobachten, damit Merges und Pushes automatisch zu Deployments werden. Ohne verbundenen Quellanbieter lassen sich Apps weiterhin aus Manifesten und Registry-Images bereitstellen, aber der Push-to-Deploy-Ablauf ist nicht verfügbar.",
+    "prerequisitesTitle": "Voraussetzungen",
+    "prereqPermission": "<strong>Berechtigung.</strong> Eine Betreiberrolle mit <code>scm.connect</code> (Owner und Admin haben sie standardmäßig).",
+    "prereqAdmin": "<strong>Admin-Zugriff auf die GitHub-Organisation oder GitLab-Gruppe.</strong> Die Astrolift App wird auf Organisations- bzw. Gruppenebene installiert, nicht für einzelne Benutzer, daher muss ein Organisationsinhaber sie genehmigen.",
+    "prereqUrl": "<strong>Die öffentliche URL Ihrer Installation.</strong> GitHub und GitLab müssen Astrolift erreichen, um Webhooks zuzustellen. Das Backend liest sie aus <code>APP_BASE_URL</code>; prüfen Sie, dass sie auf den öffentlichen Hostnamen zeigt, den Benutzer aufrufen, nicht auf eine private IP.",
+    "recommendedBadge": "empfohlen",
+    "githubIntro": "Der schnellste Weg. Astrolift reicht in Ihrem Auftrag ein GitHub-App-Manifest ein; Sie müssen nur die Berechtigungen genehmigen und auswählen, welche Repositorys die App sehen darf.",
+    "stepHeading": "Schritt {n}: {title}",
+    "openProvidersTitle": "Quellanbieter öffnen",
+    "openProvidersGitHub": "Öffnen Sie <link>Einstellungen · Quellanbieter</link> und klicken Sie auf <strong>Mit GitHub verbinden</strong>.",
+    "githubOrgTitle": "GitHub-Organisationskürzel eingeben",
+    "githubOrgBody": "Geben Sie das Organisationskürzel ein (der Teil der URL nach <code>github.com/</code>) und klicken Sie auf <strong>Weiter auf GitHub</strong>. Astrolift reicht ein einmaliges Manifest mit App-Namen, Callback-URLs, Webhook-URL und den angeforderten Berechtigungen ein.",
+    "githubApproveTitle": "App auf GitHub genehmigen",
+    "githubApproveBody": "GitHub zeigt die Berechtigungen, die die Astrolift App benötigt:",
+    "permContents": "<code>contents: read</code>: Quellcode beim Deployment klonen",
+    "permMetadata": "<code>metadata: read</code>: Repositorys und Branches auflisten",
+    "permPullRequests": "<code>pull_requests: write</code>: mit Vorschau-URLs kommentieren",
+    "permChecks": "<code>checks: write</code>: Build- und Deployment-Status an Commits melden",
+    "githubCreate": "Klicken Sie auf <strong>{button}</strong>. GitHub erstellt die App, installiert sie in der Organisation und leitet Sie zurück zu Astrolift.",
+    "githubReposTitle": "Repositorys beim Onboarding auswählen",
+    "githubReposBody": "Die Verbindung erscheint jetzt unter <strong>Hosts</strong>. Wenn Sie über <link>Apps · App registrieren</link> eine neue App registrieren, durchsucht der Onboarding-Assistent die Repositorys, auf die die App Zugriff hat. Um diese Auswahl zu erweitern oder einzuschränken, bearbeiten Sie die Installation auf GitHub (<code>{url}</code>).",
+    "guidedManualBadge": "geführt, manuell",
+    "gitlabIntro": "GitLab hat keine Manifest-API wie GitHub Apps, daher braucht dieser Ablauf ein paar Klicks mehr: Registrieren Sie eine OAuth-Anwendung in GitLab und fügen Sie die Zugangsdaten anschließend in Astrolift ein.",
+    "openProvidersGitLab": "Öffnen Sie <link>Einstellungen · Quellanbieter</link> und klicken Sie auf <strong>Mit GitLab verbinden</strong>.",
+    "gitlabGroupTitle": "Gruppe und Instanz-URL eingeben",
+    "gitlabGroupBody": "Geben Sie das Kürzel Ihrer GitLab-Gruppe ein. Die Instanz-URL ist standardmäßig <code>https://gitlab.com</code>; ändern Sie sie, wenn Sie eine selbstverwaltete Instanz betreiben.",
+    "gitlabRegisterTitle": "Astrolift-Anwendung in GitLab registrieren",
+    "gitlabRegisterBody": "Klicken Sie auf <strong>GitLab-Anwendungen öffnen</strong>. Erstellen Sie im neuen Tab eine gruppeneigene Anwendung mit diesen Einstellungen:",
+    "gitlabSaveBody": "Speichern. GitLab zeigt die <strong>Application ID</strong> und das <strong>Secret</strong> genau einmal an.",
+    "gitlabPasteTitle": "Zugangsdaten einfügen",
+    "gitlabPasteBody": "Kehren Sie zu Astrolift zurück, fügen Sie Application ID und Secret in den Dialog ein und speichern Sie. Die Verbindung erscheint unter <strong>Hosts</strong>, und Sie können Apps aus jedem Projekt der Gruppe registrieren.",
+    "troubleshootingTitle": "Fehlerbehebung",
+    "troubleHookBody": "GitHub oder GitLab erreicht den Callback nicht. Das ist auf Betreiberseite zu lösen: Setzen Sie <code>APP_BASE_URL</code> in der Backend-Umgebung auf die öffentliche URL Ihrer Installation (denselben Hostnamen, den Benutzer aufrufen), und starten Sie den Verbindungsablauf erneut.",
+    "troubleReposTitle": "Private Organisations-Repositorys fehlen im Onboarding-Assistenten.",
+    "troubleReposBody": "Die Installation der GitHub App wurde auf einen Teil der Repositorys beschränkt. Öffnen Sie <code>{url}</code>, wählen Sie die Astrolift App und markieren Sie entweder die benötigten Repositorys oder <strong>All repositories</strong>.",
+    "troublePushTitle": "Pushes lösen keine Deployments aus.",
+    "troublePushBody": "Öffnen Sie den Tab <strong>Webhooks</strong> der App; eingehende SCM-Webhooks erscheinen in der Liste der letzten Zustellungen mit Antwortstatus und -inhalt. Ein 401 bedeutet, dass das Signaturgeheimnis abweicht; rotieren Sie es erneut unter <link>Quellanbieter</link>.",
+    "relatedTitle": "Verwandte Themen",
+    "relatedWebhooks": "<link>Webhooks</link>: ausgehende Benachrichtigungen, wenn Builds und Deployments abgeschlossen sind.",
+    "relatedCustomDomains": "<link>Eigene Domains</link>: einen eigenen Hostnamen auf die gerade verbundene App richten."
+  },
+  "docsPolicies": {
+    "title": "ABAC-Richtlinien",
+    "intro": "Feingranulare Zugriffsregeln, die auf Rollenbindungen aufsetzen. Richtlinien <strong>gewähren nie</strong> mehr als eine Rolle; sie legen nur zusätzliche <em>Erlauben</em>- oder <em>Verweigern</em>-Bedingungen fest.",
+    "whenTitle": "Wann Sie dies brauchen",
+    "whenBody": "Die integrierten Rollen von Astrolift decken die meisten Teams ab. Greifen Sie zu Richtlinien, wenn Sie etwas brauchen, das der Rollenkatalog nicht abbilden kann. Zum Beispiel:",
+    "exampleSenior": "Nur Senior Engineers dürfen Apps mit dem Namen <code>prod-*</code> bereitstellen.",
+    "exampleNight": "Niemand darf zwischen 22:00 und 06:00 UTC Secrets schreiben, außer bei einer Alarmierung.",
+    "exampleMfa": "Deployments in Vorproduktionsumgebungen erfordern einen MFA-Faktor, der jünger als 60 Minuten ist.",
+    "exampleContractors": "Externe Mitarbeitende dürfen alles in einem Projekt lesen, aber nichts ändern, was die Abrechnung betrifft.",
+    "prerequisitesTitle": "Voraussetzungen",
+    "prereqPermission": "<strong>Berechtigung.</strong> <code>policy.create</code> (Owner und Admin haben sie).",
+    "prereqModel": "<strong>Denkmodell ABAC vs. RBAC.</strong> RBAC fragt: „Enthält die Rolle dieses Benutzers diese Berechtigung?“ ABAC fragt: „Sagt angesichts der Attribute dieser Anfrage (wer, was, wann, wo) irgendeine Richtlinie <em>verweigern</em>?“ Eine Anfrage gelingt nur, wenn RBAC sie erlaubt und keine Richtlinie sie verweigert.",
+    "createTitle": "Richtlinie erstellen",
+    "createBody": "Öffnen Sie <link>Einstellungen · Richtlinien</link> und klicken Sie auf <strong>Neue Richtlinie</strong>. Jede Richtlinie hat die folgenden Felder:",
+    "fieldScope": "1. Geltungsbereich",
+    "fieldScopeBody": "Die Reichweite der Richtlinie. ORG-Richtlinien werden bei jeder Anfrage ausgewertet; APP-Richtlinien nur, wenn die Anfrage genau diese App betrifft. Engerer Bereich = weniger Auswertungsaufwand und leichter nachvollziehbar.",
+    "fieldEffect": "2. Wirkung",
+    "fieldEffectBody": "Was passiert, wenn die Richtlinie zutrifft. DENY gewinnt immer: Verweigert irgendeine Richtlinie in irgendeinem Bereich, schlägt die Anfrage fehl, auch wenn zusätzlich ein ALLOW mit engerem Bereich zutrifft.",
+    "fieldAction": "3. Aktionsmuster",
+    "fieldActionBody": "Glob über Berechtigungs-Slugs. <code>app.deploy</code> trifft genau einen Slug; <code>app.*</code> trifft jede Aktion auf der App-Ressource; <code>*</code> trifft alles.",
+    "fieldResource": "4. Ressourcenmuster",
+    "fieldResourceBody": "Glob über Ressourcenkennungen. <code>app:prod-*</code> trifft Apps, deren Slug mit <code>prod-</code> beginnt; <code>project:billing/*</code> trifft alles im Projekt billing.",
+    "fieldActor": "5. Akteurmuster (JSON)",
+    "fieldActorBody": "Für wen die Richtlinie gilt. Abgleich nach Benutzer-ID, Rollen-Slug oder beidem. Ein leeres <code>{empty}</code> trifft jeden Akteur.",
+    "fieldConditions": "6. Bedingungen (JSON)",
+    "fieldConditionsBody": "Zusätzliche Prädikate, die zur Anfragezeit ausgewertet werden. Verfügbare Schlüssel: <code>time_of_day</code>, <code>day_of_week</code>, <code>ip_cidr</code>, <code>mfa_max_age_seconds</code>, <code>env</code>.",
+    "exampleSeniorTitle": "Beispiel: Produktion nur für Senior Engineers",
+    "exampleSeniorBody": "Nur Mitglieder der Rolle <code>senior-eng</code> dürfen Apps bereitstellen, deren Slug mit <code>prod-</code> beginnt.",
+    "exampleSeniorOutcome": "Das Deployment eines Senior Engineers besteht die Rollenprüfung (<code>role_slug_not_in</code> liefert false → Richtlinie trifft nicht zu → keine Verweigerung). Bei allen anderen greift die Verweigerung, und das Deployment schlägt mit einem Berechtigungsfehler fehl.",
+    "exampleFreezeTitle": "Beispiel: nächtliche Secret-Sperre",
+    "exampleFreezeBody": "Niemand darf zwischen 22:00 und 06:00 UTC Secrets schreiben; genutzt während Incident-Fenstern oder Änderungssperren.",
+    "troubleshootingTitle": "Fehlerbehebung",
+    "troubleEffectTitle": "Die Richtlinie greift nicht.",
+    "troubleEffectBody": "DENY gewinnt immer. Prüfen Sie, ob ein DENY mit breiterem Bereich (ORG-Ebene) die Anfrage bereits abdeckt. Die Richtlinientabelle zeigt die Abgleichsreihenfolge; sortieren Sie nach Bereich.",
+    "troubleButtonTitle": "Ein Benutzer sieht eine Schaltfläche, die er nicht sehen sollte.",
+    "troubleButtonBody": "Die Oberfläche blendet Steuerelemente anhand von RBAC aus, nicht von ABAC; die Schaltfläche bleibt sichtbar, weil die Rolle die Aktion formal gewährt, aber die Anfrage scheitert im Resolver, wenn ABAC verweigert. Verschärfen Sie entweder die Rollenbindung oder machen Sie das ABAC-Ergebnis über die <link>Berechtigungsdiagnose</link> sichtbar.",
+    "troubleJsonTitle": "Bedingungs-JSON wird nicht geparst.",
+    "troubleJsonBody": "Der Dialog prüft beim Speichern und liefert einen genauen Fehler („unknown key <code>time_of_the_day</code>, did you mean <code>time_of_day</code>?“). Öffnen Sie die Richtlinie erneut, um den gespeicherten Wert zu sehen.",
+    "relatedTitle": "Verwandte Themen",
+    "relatedIdentityProviders": "<link>Identitätsanbieter</link>: wer sich anmelden kann. Richtlinien entscheiden, was angemeldete Benutzer tun dürfen.",
+    "relatedDiagnostic": "<link>Berechtigungsdiagnose</link>: die effektiven Berechtigungen eines bestimmten Benutzers auf einer bestimmten Ressource untersuchen."
+  },
+  "docsCustomDomains": {
+    "title": "Eigene Domains",
+    "intro": "Bringen Sie Ihren eigenen Hostnamen mit (zum Beispiel <code>app.acme.com</code>) und überlassen Sie TLS über cert-manager Astrolift.",
+    "prereqNote": "<strong>Cluster-Voraussetzungen.</strong> Diese Anleitung setzt voraus, dass im Tenant-Cluster bereits cert-manager und ein Ingress-Controller laufen. Wenn Sie einen eigenen Cluster mitbringen, arbeiten Sie zuerst die <link>Cluster-Voraussetzungen</link> durch.",
+    "whenTitle": "Wann Sie dies brauchen",
+    "whenBody": "Jede App erhält standardmäßig eine generierte <code>*.astrolift.app</code>-Subdomain. Diese Anleitung brauchen Sie nur, wenn vor Ihrem Workload ein eigener Hostname wie <code>app.acme.com</code> oder <code>checkout.acme.com</code> stehen soll, mit automatischem TLS, das cert-manager im Tenant-Cluster verwaltet.",
+    "prerequisitesTitle": "Voraussetzungen",
+    "prereqCluster": "<strong>Ein verbundener Cluster.</strong> Die App ist in einem Tenant-Cluster bereitgestellt, in dem cert-manager und der Ingress-Controller installiert sind (Standard für mit opscode bereitgestellte Cluster).",
+    "prereqDns": "<strong>Bearbeitbares DNS.</strong> Sie brauchen Zugriff auf den DNS-Anbieter der übergeordneten Zone, um einen CNAME- (oder TXT-)Eintrag anzulegen.",
+    "prereqPermission": "<strong>Berechtigung.</strong> Eine Betreiberrolle mit <code>app.update</code>; Owner, Admin und Deployer haben sie standardmäßig.",
+    "stepHeading": "Schritt {n}: {title}",
+    "step1Title": "Tab Domains öffnen",
+    "step1Body": "Öffnen Sie Ihre App und klicken Sie auf den Tab <strong>Domains</strong>. Dort sehen Sie alle bereits gebundenen Hostnamen und eine Schaltfläche, um einen neuen hinzuzufügen.",
+    "step2Title": "FQDN und Validierungsmethode eingeben",
+    "step2Body": "Geben Sie den vollständigen Hostnamen ein. Die Validierungsmethode ist standardmäßig <badge>dns-01</badge>; sie funktioniert für Apex- und Wildcard-Einträge und verlangt nicht, dass der Hostname vor der Ausstellung öffentlich erreichbar ist. Lassen Sie das Feld leer, um den Plattformstandard zu übernehmen.",
+    "step3Title": "Astrolift liefert den zu veröffentlichenden Eintrag",
+    "step3Body": "Nach dem Speichern erscheint die Zeile mit dem Zertifikatsstatus <badge>pending_validation</badge> und einem Validierungstoken. Bei <code>dns-01</code> ist das ein TXT-Eintrag unter <code>_acme-challenge.app.acme.com</code>; bei <code>http-01</code> ein CNAME, der auf den Ingress des Clusters zeigt. Klicken Sie auf das Token, um es zu kopieren.",
+    "step4Title": "Eintrag beim DNS-Anbieter veröffentlichen",
+    "step4Body": "Legen Sie den Eintrag exakt so an. Die meisten Anbieter verteilen Änderungen innerhalb von ein bis zwei Minuten, aber TTLs sind nur Richtwerte; warten Sie bis zu ~10 Minuten, bevor Sie mit der Fehlersuche beginnen.",
+    "step5Title": "Auf die Aktivierung warten",
+    "step5Body": "Astrolift fragt etwa alle 30 Sekunden ab. Sobald der Eintrag für seine Resolver sichtbar ist, stellt cert-manager das Zertifikat aus, und die Zeile wechselt <pending>pending_validation</pending> → <validated>validated</validated> → <active>active</active>. Mit der Schaltfläche <strong>Erneut prüfen</strong> in der Zeile erzwingen Sie eine sofortige Abfrage.",
+    "authTitle": "Authentifizierung auf einer eigenen Domain",
+    "authBody": "Hat Ihr Cluster ein Edge-Login-Gate, schützt es die Plattform-Subdomain der App, nicht Ihre eigene Domain. Das Sitzungscookie des Gates stellt der Auth-Host des Clusters aus, beschränkt auf die eigene Zone der Plattform, und eine Antwort einer Domain kann kein Cookie für eine fremde Domain setzen. Eine eigene Domain liegt daher grundsätzlich außerhalb des Gates, und keine Einstellung ändert das.",
+    "authMarker": "Der Tab Domains kennzeichnet jede solche Zeile mit <badge>{label}</badge>, und der Ingress trägt <code>astrolift.dev/edge-auth=ungated</code>, sodass es auch über <code>kubectl</code> sichtbar ist. Behandeln Sie eine eigene Domain als öffentlichen Zugang: Braucht die App dahinter Authentifizierung, muss sie diese selbst durchsetzen.",
+    "troubleshootingTitle": "Fehlerbehebung",
+    "troublePendingTitle": "Zertifikat bleibt in pending_validation.",
+    "troublePendingBody": "Vermutlich ist der DNS-Eintrag noch nicht bei den ausstellenden Resolvern angekommen. Prüfen Sie von einem externen Netzwerk aus:",
+    "troubleValidationTitle": "Validierung schlägt fehl.",
+    "troubleValidationBody": "Der Wert des TXT-Eintrags muss exakt dem Token entsprechen: keine umgebenden Anführungszeichen, keine Leerzeichen am Ende, keine typografischen Anführungszeichen (aus einem Terminal kopieren, nicht aus einem Dokument).",
+    "troubleCaaTitle": "CAA verhindert die Ausstellung.",
+    "troubleCaaBody": "Hat die übergeordnete Zone einen CAA-Eintrag ohne <code>letsencrypt.org</code>, kann ACME nicht ausstellen. Fügen Sie einen CAA-Eintrag hinzu, der Let's Encrypt erlaubt, oder entfernen Sie den einschränkenden Eintrag.",
+    "troubleExpiredTitle": "Zertifikat abgelaufen und nicht erneuert.",
+    "troubleExpiredBody": "cert-manager erneuert automatisch etwa 30 Tage vor Ablauf. Ist das nicht geschehen, kann ein Betreiber die cert-manager-Logs im Tenant-Cluster prüfen; der Rotations-Workflow repariert sich beim nächsten periodischen Lauf selbst.",
+    "relatedTitle": "Verwandte Themen",
+    "relatedSourceProviders": "<link>Quellanbieter</link>: GitHub oder GitLab verbinden, damit ein Push Deployments Ihrer App auslöst.",
+    "relatedIdentityProviders": "<link>Identitätsanbieter</link>: die SSO-Domains registrieren, über die sich Ihre Benutzer anmelden."
+  },
+  "docsNav": {
+    "sections": {
+      "gettingStarted": "Erste Schritte",
+      "operatorGuides": "Betreiberhandbücher",
+      "runbooks": "Runbooks",
+      "reference": "Referenz",
+      "publicReference": "Öffentliche Referenz"
+    },
+    "links": {
+      "introduction": "Einführung",
+      "quickstart": "Schnellstart",
+      "localDev": "Lokale Entwicklungsumgebung",
+      "tutorials": "Tutorials",
+      "clusterPrerequisites": "Cluster-Voraussetzungen",
+      "customDomains": "Eigene Domains",
+      "sourceProviders": "Quellanbieter",
+      "identityProviders": "Identitätsanbieter",
+      "policies": "ABAC-Richtlinien",
+      "webhooks": "Webhooks",
+      "allRunbooks": "Alle Runbooks",
+      "configuration": "Konfiguration",
+      "manifest": "Manifest-Referenz",
+      "drivers": "Treiber-Referenz",
+      "webhookEvents": "Webhook-Ereignisse",
+      "changelog": "Änderungsprotokoll",
+      "help": "Hilfe erhalten"
+    }
+  },
+  "docsIndex": {
+    "title": "Dokumentation",
+    "intro": "Wie Astrolift funktioniert, wie Sie es installieren, und die Betreiber-Runbooks für die Bereiche, die Konfiguration brauchen.",
+    "readGuide": "Anleitung lesen",
+    "readPublicDocs": "Öffentliche Dokumentation lesen",
+    "cards": {
+      "introduction": {
+        "title": "Einführung",
+        "description": "Was Astrolift ist und welche Konzepte Ihnen zuerst begegnen."
+      },
+      "quickstart": {
+        "title": "Schnellstart",
+        "description": "Cluster und Quelle verbinden, ein Manifest registrieren und ein Image bereitstellen."
+      },
+      "localDev": {
+        "title": "Lokale Entwicklungsumgebung",
+        "description": "Den kompletten Stack lokal mit Docker Compose starten."
+      },
+      "tutorials": {
+        "title": "Tutorials",
+        "description": "Schritt-für-Schritt-Anleitungen für die häufigsten Build-Pfade."
+      },
+      "clusterPrerequisites": {
+        "title": "Cluster-Voraussetzungen",
+        "description": "Was ein Tenant-Cluster braucht (cert-manager, Ingress, external-dns), bevor Astrolift ihn nutzen kann."
+      },
+      "customDomains": {
+        "title": "Eigene Domains",
+        "description": "app.acme.com an eine App binden, mit automatisch verwaltetem TLS über cert-manager."
+      },
+      "sourceProviders": {
+        "title": "Quellanbieter",
+        "description": "GitHub oder GitLab für Repository-Zugriff, verwaltete CI und Quell-Webhooks verbinden."
+      },
+      "identityProviders": {
+        "title": "Identitätsanbieter",
+        "description": "Die Anmeldung über OIDC, SAML, Cognito, Auth0, Okta, Azure AD, Google oder GitHub leiten."
+      },
+      "policies": {
+        "title": "ABAC-Richtlinien",
+        "description": "Feingranulare Erlauben/Verweigern-Regeln zusätzlich zu Rollenbindungen verfassen."
+      },
+      "webhooks": {
+        "title": "Webhooks",
+        "description": "Ausgehende Ereignisabonnements, Verfügbarkeit und den HMAC-Empfängervertrag prüfen."
+      },
+      "runbooks": {
+        "title": "Betreiber-Runbooks",
+        "description": "Deployment-Ablauf, Rollback, Cluster-Verwaltung, Agent-Dispatch und Incident Response."
+      },
+      "configuration": {
+        "title": "Konfiguration",
+        "description": "Jede Umgebungsvariable, die Astrolift liest: Zweck, Standardwerte und wer sie setzt."
+      },
+      "webhookEvents": {
+        "title": "Webhook-Ereignisse",
+        "description": "Payload-Schema und JSON-Beispiele für jedes ausgehende Webhook-Ereignis."
+      },
+      "changelog": {
+        "title": "Änderungsprotokoll",
+        "description": "Neue Funktionen und Fehlerbehebungen, die neuesten zuerst."
+      },
+      "manifest": {
+        "title": "astrolift.toml-Manifest",
+        "description": "Vollständiges Schema des Manifests pro App: Abschnitte, Felder, Validierung, Beispiele."
+      },
+      "cli": {
+        "title": "CLI-Referenz",
+        "description": "Authentifizierung, App- und Agent-Operationen, CI, portable Dokumentation und Manpages."
+      },
+      "api": {
+        "title": "Control API",
+        "description": "GraphQL, gezielte REST-Routen, Bearer-Authentifizierung, Mandantenfähigkeit und Fehler."
+      },
+      "mcp": {
+        "title": "MCP-Referenz",
+        "description": "Authentifizierte Remote-Prüfung, -Dispatch und -Abbruch von Agents sowie Quellabgleich."
+      },
+      "agentPackages": {
+        "title": "Agent-Pakete",
+        "description": "Briefings, Skills, Tools, Quellausschnitte, Monorepos, Föderation und importierte Formate."
+      },
+      "workflowToml": {
+        "title": "Workflow-TOML",
+        "description": "Geordnete Agent-Phasen, Umgebungsrezepte, Skill-Overlays, benannte Ausgaben und Repo-Synchronisierung."
+      },
+      "pluginSdk": {
+        "title": "Provider-Plugin-SDK",
+        "description": "Provider-Erweiterungen gegen die aktuellen Treiberverträge bauen und testen."
+      },
+      "demoScenarios": {
+        "title": "Demo-Szenarien",
+        "description": "Ausgearbeitete Szenarien für Apps, Agents, Workflows und betriebliche Validierung."
+      },
+      "install": {
+        "title": "Astrolift installieren",
+        "description": "Installationswege für Cloud und Kubernetes, Voraussetzungen und maßgebliche Runbooks."
+      }
+    }
+  },
+  "docsIdentityProviders": {
+    "title": "Identitätsanbieter",
+    "intro": "Leiten Sie die Anmeldung über den IdP Ihres Unternehmens: OIDC, SAML, Cognito, Auth0, Okta, Azure AD, Google Workspace, GitHub oder lokale Konten.",
+    "whenTitle": "Wann Sie dies brauchen",
+    "whenBody": "Benutzer sollen sich mit ihrer bestehenden Unternehmensidentität statt mit einem eigenen Astrolift-Passwort anmelden, und Sie möchten zentral steuern, wer Zugriff hat (im IdP entzogen, hier kein Zugriff mehr). Es ist immer genau ein Anbieter aktiv; die übrigen sind in Bereitschaft.",
+    "prerequisitesTitle": "Voraussetzungen",
+    "prereqPermission": "<strong>Berechtigung.</strong> Eine Betreiberrolle mit <code>org.update</code> (Owner und Admin haben sie).",
+    "prereqAdmin": "<strong>Admin-Zugriff auf den IdP.</strong> Dort registrieren Sie einen neuen OIDC- oder SAML-Client.",
+    "prereqRedirect": "<strong>Die Redirect-URI von Astrolift.</strong> Sichtbar im Dialog <bold>Neuer Anbieter</bold>. Format: <code>{uri}</code>. Jeder IdP braucht genau diesen Wert in seiner Liste erlaubter Callbacks.",
+    "configureTitle": "Nach Anbieterart konfigurieren",
+    "configureBody": "Wählen Sie den passenden Abschnitt. Jede Art endet mit denselben Klicks in Astrolift: <link>Einstellungen · Identitätsanbieter</link> → <strong>Neuer Anbieter</strong> → Art wählen → Zugangsdaten einfügen → <strong>Aktivieren</strong>.",
+    "allowlistTitle": "Domain-Allowlist (automatische Registrierung)",
+    "allowlistBody": "Standardmäßig gelingt eine SSO-Anmeldung nur, wenn Astrolift bereits ein Konto für diesen Benutzer hat. Damit sich neue Benutzer selbst registrieren können, markieren Sie ihre E-Mail-Domains als vertrauenswürdig.",
+    "allowlistStep1": "Öffnen Sie <link>Administration · Organisation</link>.",
+    "allowlistStep2": "Scrollen Sie zur Karte <strong>Vertrauenswürdige E-Mail-Domains</strong> und fügen Sie <code>corp.com</code> hinzu (ohne <code>@</code>).",
+    "allowlistStep3": "Speichern. Wer sich per SSO mit einer <code>@corp.com</code>-E-Mail anmeldet, wird automatisch mit der Standard-Mitgliedsrolle in die Organisation aufgenommen.",
+    "troubleshootingTitle": "Fehlerbehebung",
+    "troubleNoIdpBody": "Die Umgebungsvariablen <code>bootstrap_idp</code> der Installation wurden nicht gesetzt. Konfigurieren Sie einen Anbieter unter <link>Einstellungen · Identitätsanbieter</link> und aktivieren Sie ihn.",
+    "troubleRedirectTitle": "Die Anmeldung leitet zum falschen Host weiter (oder liefert redirect_uri_mismatch).",
+    "troubleRedirectBody": "<code>APP_BASE_URL</code> im Backend und die beim IdP registrierte Redirect-URI müssen exakt übereinstimmen: Protokoll, Host, Pfad und abschließender Schrägstrich.",
+    "troubleSignupTitle": "Automatische Registrierung findet nicht statt.",
+    "troubleSignupBody": "Die E-Mail-Domain des Benutzers steht nicht in der vertrauenswürdigen Liste. Siehe <link>Domain-Allowlist</link> oben.",
+    "troubleSamlTitle": "SAML-Signaturprüfung schlägt fehl.",
+    "troubleSamlBody": "Der IdP hat sein Signaturzertifikat erneuert. Fügen Sie die Metadaten-URL erneut ein (oder laden Sie das neue XML hoch); Astrolift aktualisiert den Trust Store beim Speichern.",
+    "kinds": {
+      "oidc": {
+        "title": "Generisches OIDC",
+        "intro": "Die flexibelste Option. Funktioniert mit jedem Anbieter, der ein OpenID-Connect-Discovery-Dokument veröffentlicht.",
+        "steps": {
+          "s1": "Registrieren Sie beim IdP einen neuen OIDC-Client. Fügen Sie die im Astrolift-Dialog angezeigte Redirect-URI ein (sie endet auf /app/auth1/callback).",
+          "s2": "Kopieren Sie client_id, client_secret und die Discovery-URL (den Endpunkt .well-known/openid-configuration).",
+          "s3": "Öffnen Sie in Astrolift Einstellungen · Identitätsanbieter · Neuer Anbieter, wählen Sie OIDC, fügen Sie die Werte ein und aktivieren Sie den Anbieter."
+        }
+      },
+      "cognito": {
+        "title": "Amazon Cognito",
+        "intro": "Cognito-Benutzerpools sprechen OIDC. Nutzen Sie dies, wenn Ihre Installation in AWS läuft und Sie Benutzer bereits in einem Pool verwalten.",
+        "steps": {
+          "s1": "Öffnen Sie in der AWS-Konsole den Benutzerpool · App integration · Create an app client. Wählen Sie einen vertraulichen Client und fügen Sie die Astrolift-Redirect-URI hinzu.",
+          "s2": "Notieren Sie User Pool ID, App client ID und App client secret. Die Discovery-URL lautet {url}.",
+          "s3": "In Astrolift: Neuer Anbieter · Cognito, die drei Werte einfügen, aktivieren."
+        }
+      },
+      "auth0": {
+        "title": "Auth0",
+        "intro": "Auth0 ist der Standard für von Calliope AI gehostete Installationen. Nutzen Sie Auth0, wenn Sie gehostete MFA, passwortlose oder Social Logins wollen, ohne sie selbst zu betreiben.",
+        "steps": {
+          "s1": "In Auth0: Applications · Create Application · Regular Web App. Setzen Sie Allowed Callback URLs auf die Redirect-URI aus dem Astrolift-Dialog.",
+          "s2": "Kopieren Sie Domain, Client ID und Client Secret. Die Discovery-URL lautet {url}.",
+          "s3": "In Astrolift: Neuer Anbieter · Auth0, die Werte einfügen, aktivieren."
+        }
+      },
+      "okta": {
+        "title": "Okta",
+        "intro": "Okta ist die häufigste Wahl in Unternehmen. Verwenden Sie Oktas OIDC, nicht die SAML-App; OIDC fügt sich sauber in das Sitzungsmodell von Astrolift ein.",
+        "steps": {
+          "s1": "In der Okta-Administration: Applications · Create App Integration · OIDC · Web Application. Fügen Sie die Astrolift-Redirect-URI unter Sign-in redirect URIs hinzu.",
+          "s2": "Kopieren Sie Client ID, Client Secret und die Issuer-URL (sichtbar unter General · OpenID Connect ID Token).",
+          "s3": "In Astrolift: Neuer Anbieter · Okta, die Werte einfügen, aktivieren."
+        }
+      },
+      "azureAd": {
+        "title": "Azure AD / Entra ID",
+        "intro": "Entra (früher Azure AD) ist die richtige Wahl, wenn Ihre Organisation Microsoft 365 nutzt.",
+        "steps": {
+          "s1": "Im Azure-Portal: App registrations · New registration. Setzen Sie die Redirect-URI auf den Wert aus Astrolift und die Plattform auf Web.",
+          "s2": "Erstellen Sie unter Certificates & secrets ein Client-Secret und kopieren Sie dessen Wert. Notieren Sie Application (client) ID und Directory (tenant) ID.",
+          "s3": "Die Discovery-URL lautet {url}. Fügen Sie sie zusammen mit Client-ID und Secret in Astrolift ein und aktivieren Sie den Anbieter."
+        }
+      },
+      "google": {
+        "title": "Google Workspace",
+        "intro": "Google-Workspace-OIDC funktioniert, wenn jeder Astrolift-Betreiber ein Workspace-Konto hat.",
+        "steps": {
+          "s1": "In der Google Cloud Console: APIs & Services · Credentials · Create OAuth client ID · Web application. Fügen Sie die Astrolift-Redirect-URI hinzu.",
+          "s2": "Kopieren Sie Client ID und Client Secret. Die Discovery-URL lautet {url}.",
+          "s3": "In Astrolift: Neuer Anbieter · Google, die Werte einfügen, aktivieren. Kombinieren Sie dies mit der Domain-Allowlist unten, um die Anmeldung auf Ihren Workspace zu beschränken."
+        }
+      },
+      "github": {
+        "title": "GitHub OAuth",
+        "intro": "GitHub nur für die Anmeldung (unabhängig von der SCM-Verbindung unter Quellanbieter). Praktisch für kleine Teams, die bereits eine GitHub-Organisation haben.",
+        "steps": {
+          "s1": "In GitHub: Settings · Developer settings · OAuth Apps · New OAuth App. Setzen Sie die Callback-URL auf den Wert aus Astrolift.",
+          "s2": "Kopieren Sie die Client ID und erzeugen Sie ein Client Secret.",
+          "s3": "In Astrolift: Neuer Anbieter · GitHub OAuth, die Werte einfügen, aktivieren."
+        }
+      },
+      "saml": {
+        "title": "SAML 2.0",
+        "intro": "Für IdPs, die nur SAML sprechen (ältere Unternehmensinstallationen, manche föderierte Setups).",
+        "steps": {
+          "s1": "Registrieren Sie beim IdP eine neue SAML-Anwendung. Setzen Sie ACS-URL und Entity ID auf die im Astrolift-Dialog angezeigten Werte.",
+          "s2": "Laden Sie das Metadaten-XML des IdP herunter oder kopieren Sie dessen URL.",
+          "s3": "In Astrolift: Neuer Anbieter · SAML, die Metadaten-URL einfügen (oder das XML hochladen), aktivieren."
+        }
+      },
+      "local": {
+        "title": "Lokale Konten",
+        "badge": "Lokal",
+        "intro": "Nur für die Ersteinrichtung oder als Rückfallebene. Mit lokalen Konten meldet sich ein Betreiber mit Benutzername und Passwort aus der Astrolift-Datenbank an. Nutzen Sie sie, während Sie einen SSO-Anbieter einrichten, und deaktivieren Sie sie danach.",
+        "steps": {
+          "s1": "Auf einer neuen Installation sind lokale Konten standardmäßig aktiviert. Der Bootstrap-Admin liegt in der Datenbank; wie er angelegt wird, steht im Installations-Runbook.",
+          "s2": "Sobald SSO konfiguriert und geprüft ist, aktivieren Sie den SSO-Anbieter und löschen Sie entweder den lokalen Eintrag oder sperren Sie die Passwortanmeldung per Richtlinie."
+        }
+      }
+    },
+    "troubleNoIdpTitle": "„Kein IdP konfiguriert.“"
+  },
+  "docsConfiguration": {
+    "title": "Konfiguration",
+    "intro": "Jede Umgebungsvariable, die Astrolift zur Laufzeit liest. Quelle = <outline>{operator}</outline> bedeutet, der Betreiber setzt sie, <outline>{image}</outline> bedeutet, das Container-Image bringt einen Standardwert mit, und <secondary>{platform}</secondary> bedeutet, Astrolift schreibt sie beim Deployment in den Workload.",
+    "source": {
+      "operator": "Betreiber",
+      "image": "Image",
+      "platform": "von der Plattform injiziert"
+    },
+    "conventionsTitle": "Konventionen",
+    "conventionBoolean": "Boolesche Werte akzeptieren <code>{values}</code> (ohne Beachtung der Groß-/Kleinschreibung).",
+    "conventionRequired": "Als <strong>erforderlich</strong> markierte Variablen haben entweder keinen Standardwert oder einen, der nur für die lokale Entwicklung sicher ist (z. B. <code>not-a-secret</code>).",
+    "conventionUnlisted": "Alles, was hier nicht aufgeführt ist, liest Astrolift nicht; gesetzte Werte werden stillschweigend ignoriert.",
+    "groupsTitle": "Gruppen",
+    "variablesTitle": "Variablen",
+    "filters": {
+      "group": "Gruppe",
+      "source": "Quelle",
+      "required": "Erforderlich"
+    },
+    "yes": "ja",
+    "no": "nein",
+    "searchPlaceholder": "Variablen, Zwecke, Standardwerte suchen…",
+    "mineNote": "Die Referenz ist für alle gleich, daher ist Meine leer.",
+    "columns": {
+      "variable": "Variable",
+      "purpose": "Zweck",
+      "group": "Gruppe",
+      "default": "Standardwert",
+      "required": "Erforderlich",
+      "source": "Quelle"
+    },
+    "noDefault": "keiner",
+    "emptyTitle": "Keine Variablen dokumentiert",
+    "inspectTitle": "So prüfen Sie, was gesetzt ist",
+    "inspectBody": "Der Django-Verwaltungsbefehl <code>features</code> gibt den aktuellen Stand der Feature-Flags aus, und <code>python manage.py diffsettings</code> zeigt jede Django-Einstellung im Vergleich zu ihrem Standardwert. Die Steuerungsebene gibt nie geheime Werte aus; als sensibel markierte Einstellungen erscheinen als <code>***</code>.",
+    "relatedTitle": "Verwandte Themen",
+    "relatedGetStarted": "<link>Loslegen</link>: den Stack lokal starten; die Umgebungsvariablen verweisen dort standardmäßig auf die Servicenamen aus docker-compose.",
+    "relatedIdentityProviders": "<link>Identitätsanbieter</link>: die Variablen AUTH0_* / ASTROLIFT_IDP_* im Detail.",
+    "relatedClusterPrerequisites": "<link>Cluster-Voraussetzungen</link>: was der Tenant-Cluster unabhängig von diesen Umgebungsvariablen braucht."
+  },
+  "docsWebhookEvents": {
+    "title": "Webhook-Ereignisse",
+    "intro": "Jeder Ereignistyp, den Astrolift über ausgehende Webhooks sendet, jeweils mit Payload-Schema und realistischem JSON-Beispiel. Einrichtung und Signaturprüfung beschreibt die <link>Webhook-Anleitung</link>.",
+    "envelopeTitle": "Aufbau des Umschlags",
+    "envelopeBody": "Jede Zustellung hat denselben äußeren Umschlag. Die ereignisspezifischen Felder liegen unter <code>payload</code>. Optionale Umschlagfelder können leere Strings sein; Empfänger sollten fehlend bzw. leer als nicht vorhandenen Wert behandeln.",
+    "eventIdNote": "<code>event_id</code> ist eine ULID: global eindeutig und zeitlich sortierbar. Verwenden Sie sie auf Ihrer Seite als Idempotenzschlüssel.",
+    "deliveryIdNote": "<code>delivery_id</code> ist pro Versuch eindeutig; Wiederholungen verwenden dieselbe <plain>event_id</plain> mit einer neuen <plain>delivery_id</plain>.",
+    "schemaVersionNote": "<code>schema_version</code> folgt SemVer; Änderungen, die den Payload brechen, erhöhen die Hauptversion.",
+    "onThisPage": "Auf dieser Seite",
+    "payloadFields": "Payload-Felder",
+    "example": "Beispiel",
+    "signatureTitle": "Signaturprüfung",
+    "signatureBody": "Jede Zustellung ist mit einem <badge>X-Astrolift-Signature</badge>-Header signiert (HMAC-SHA256 über <code>{signed}</code>, hexkodiert, mit dem Präfix <code>sha256=</code>). Die <link>Webhook-Anleitung</link> beschreibt die Prüfung in Python, Node und Go: Lesen Sie den Rohinhalt vor jedem JSON-Parsing und verwenden Sie einen Vergleich in konstanter Zeit.",
+    "subscribingTitle": "Abonnieren",
+    "subscribingBody": "Wie Sie einen Empfänger für eines oder mehrere dieser Ereignisse abonnieren, steht in den Schritten unter <link>Abonnement erstellen</link>. Das Feld für den Ereignistyp akzeptiert entweder den exakten Slug (z. B. <code>deployment.failed</code>) oder einen Platzhalter:",
+    "wildcardAll": "<code>*</code>: jedes Ereignis.",
+    "wildcardCategory": "<code>deployment.*</code>: jedes Ereignis der Kategorie Deployments.",
+    "wildcardList": "<code>deployment.failed,alert.fired</code>: kommagetrennte Liste (Leerzeichen sind ebenfalls erlaubt).",
+    "relatedTitle": "Verwandte Themen",
+    "relatedWebhooks": "<link>Webhooks</link>: Abonnement erstellen, Signaturen prüfen, Zustellprobleme beheben.",
+    "relatedPolicies": "<link>ABAC-Richtlinien</link>: einschränken, wer in Ihrer Organisation Webhook-Abonnements anlegen darf."
+  },
+  "docsDrivers": {
+    "title": "Treiber-Referenz",
+    "description": "Provider-Plugins und die Treiberimplementierungen, die sie je Fähigkeit anbieten. Die Matrix unten stammt aus den registrierten ProviderPlugin-Manifesten; ist kein Plugin aktiv, wird eine statische Liste bekannter Provider angezeigt.",
+    "loadError": "Treiber-Referenz konnte nicht geladen werden",
+    "staticTitle": "Statische Referenz",
+    "staticBody": "Auf dieser Installation sind noch keine Provider-Plugins registriert. Die Tabelle unten zeigt den kanonischen Funktionsumfang jedes unterstützten Providers. Sobald Plugins geladen sind, wechselt die Ansicht zum Live-Manifest.",
+    "matrixLabel": "Matrix",
+    "matrices": {
+      "capabilities": "Fähigkeitsmatrix",
+      "managed": "Verwaltete Dienste pro Provider"
+    },
+    "capabilitiesBody": "Jede Zeile ist ein Provider; die Spalten sind die Treiberarten, die er mitbringt. Ein Häkchen bedeutet, dass der Provider diesen Treiber implementiert.",
+    "managedBody": "Welche Arten verwalteter Dienste jeder Provider bereitstellen kann. In <code>[[managed_services]]</code> im App-Manifest deklarierte Bindungen müssen einer der hier aufgeführten Arten entsprechen.",
+    "filters": {
+      "driver": "Treiber",
+      "service": "Verwalteter Dienst",
+      "clusters": "Cluster",
+      "bound": "Cluster gebunden",
+      "none": "keine Cluster"
+    },
+    "searchPlaceholder": "Provider suchen…",
+    "mineNote": "Provider-Plugins gehören zur Installation, nicht zu einer Person, daher ist Meine leer.",
+    "providerColumn": "Provider",
+    "clustersBound": "{count, plural, one {# Cluster gebunden} other {# Cluster gebunden}}",
+    "noClusters": "Keine Cluster",
+    "supported": "unterstützt",
+    "notSupported": "nicht unterstützt",
+    "yes": "ja",
+    "no": "nein",
+    "providersLabel": "Provider",
+    "emptyTitle": "Keine Provider",
+    "matrixFootnote": "Die Matrix spiegelt die Manifest-Deklarationen wider · letzter Test je nach Cluster unterschiedlich ·",
+    "seeLive": "Live-Fähigkeiten ansehen →",
+    "capabilities": {
+      "cluster": "Cluster",
+      "ingress": "Ingress",
+      "dns": "DNS",
+      "tls": "TLS",
+      "secrets": "Secrets",
+      "identity": "Identität",
+      "registry": "Registry"
+    }
+  },
+  "docsIntroduction": {
+    "title": "Einführung",
+    "tagline": "Mit Astrolift entwickeln, bereitstellen und betreiben.",
+    "whatTitle": "Was ist Astrolift?",
+    "whatBody": "Astrolift ist eine Steuerungsebene für Anwendungen und Agents auf Kubernetes. Verbinden Sie Ihre Cluster und Quell-Repositorys, registrieren Sie ein Astrolift-Manifest und verwalten Sie Deployments, Umgebungskonfiguration und verwaltete Dienste über ein Dashboard oder die CLI.",
+    "whatBody2": "Die Steuerungsebene speichert die gewünschte Konfiguration und den Deployment-Verlauf. Cluster-Agents melden den beobachteten Laufzeitzustand; fehlende Beobachtungen bleiben von gesunden oder fehlgeschlagenen Workloads unterscheidbar.",
+    "conceptsTitle": "Wichtige Konzepte",
+    "conceptOrgs": "<strong>Organisationen, Teams und Projekte</strong> regeln Zuständigkeit und Zugriff auf Apps, Cluster und gemeinsame Ressourcen.",
+    "conceptApps": "<strong>Anwendungen und Manifeste</strong> beschreiben Workloads, Konfiguration und Dienstbindungen. Eine registrierte App verknüpft diese Definition mit ihrem Quell-Repository.",
+    "conceptEnvironments": "<strong>Umgebungen</strong> legen den Ausführungsort und die umgebungsspezifische Konfiguration einer App fest.",
+    "conceptDeployments": "<strong>Deployments</strong> erfassen Image-Versionen, Freigabeanforderungen, Ausführung und Verlauf einer Umgebung.",
+    "conceptRoles": "<strong>Rollen, Richtlinien und Zugangsdaten</strong> steuern erlaubte Operationen und den Ressourcenumfang. Ein Token kann den Zugriff seines Inhabers nicht erweitern.",
+    "runtimeTitle": "Steuerungsebene und Laufzeit",
+    "runtimeBody": "Dashboard und CLI rufen die Steuerungsebene aus Django und Strawberry GraphQL auf. PostgreSQL speichert die Plattformdaten, Redis dient dem Caching und Temporal koordiniert langlaufende Lebenszyklusaufgaben. Anwendungen laufen auf verbundenen Kubernetes-Clustern, nicht im Dashboard-Prozess.",
+    "startTitle": "Wo Sie anfangen",
+    "startQuickstart": "<link>Schnellstart</link> führt durch das Verbinden von Cluster und Quelle, das Registrieren einer App und ihr Deployment.",
+    "startPrerequisites": "<link>Cluster-Voraussetzungen</link> beschreibt die Laufzeitdienste, die Ihr Cluster braucht.",
+    "startLocalDev": "<link>Lokale Entwicklungsumgebung</link> erklärt, wie Mitwirkende die Steuerungsebene lokal ausführen."
+  },
+  "docsGetStarted": {
+    "title": "Lokale Entwicklungsumgebung",
+    "intro": "Die Astrolift-Steuerungsebene aus einem astrolift-app-Checkout ausführen.",
+    "note": "Für Ihr erstes Anwendungs-Deployment folgen Sie dem <quickstart>Schnellstart</quickstart>. Die Schritte hier richten sich an Mitwirkende, die die Steuerungsebene lokal betreiben. Sie benötigen Docker Desktop oder Docker Engine mit Compose v2. Prüfen Sie vor dem Start des Stacks die <configuration>Konfigurationsreferenz</configuration> und Ihre lokalen Umgebungsdateien.",
+    "prepareTitle": "Stack vorbereiten und starten",
+    "prepareBody": "Führen Sie diese Befehle im Stammverzeichnis des Repositorys aus. Bootstrap prüft Docker und legt fehlende lokale Umgebungsdateien aus den Beispielen an. Tragen Sie die erforderlichen Konfigurationswerte ein, bevor Sie die Compose-Dienste starten. Der Stack umfasst API und Oberfläche, PostgreSQL, Redis, Temporal sowie lokale Speicher- und E-Mail-Dienste.",
+    "migrateTitle": "Migrieren und lokale Identität anlegen",
+    "migrateBody": "Sobald der API-Container läuft, wenden Sie die Datenbankmigrationen an und führen den Seed für die Entwicklungsidentität aus. Dadurch entstehen die lokale Organisation, das Team, das Projekt und das Entwicklungskonto für die lokale Anmeldung.",
+    "exploreTitle": "Erkunden und prüfen",
+    "exploreBody": "Die Oberfläche läuft standardmäßig unter {ui}, die GraphQL-API unter {api} und die Temporal-Oberfläche unter {temporal}. Prüfen Sie Ihre Compose-Konfiguration, wenn Sie Host-Ports überschreiben. Mit dem Befehls-Wrapper untersuchen Sie laufende Container und Logs.",
+    "checksTitle": "Prüfungen ausführen",
+    "checksBody": "Backend-Tests laufen über den lokalen Stack gegen echtes PostgreSQL und Temporal. Ruff prüft Formatierung und Lint im Backend; das Frontend hat TypeScript, ESLint und React-Tests. Wenn Sie den GraphQL-Vertrag ändern, erzeugen Sie Schema und Frontend-Typen gemeinsam neu."
+  },
+  "docsHelp": {
+    "title": "Hilfe erhalten",
+    "description": "Kontaktieren Sie das Astrolift-Team. Fügen Sie einem Ticket die Diagnoseinformationen unten bei; das beschleunigt die Einordnung.",
+    "channelsTitle": "Support-Kanäle",
+    "channelsDescription": "Wählen Sie den Kanal, der zu Ihrem Anliegen passt.",
+    "links": {
+      "discord": {
+        "label": "Community-Discord",
+        "description": "Echtzeit-Chat mit dem Astrolift-Team und anderen Betreibern."
+      },
+      "github": {
+        "label": "GitHub Issues",
+        "description": "Fehler melden, Funktionen anfragen oder offene Arbeit an astrolift-app ansehen."
+      },
+      "email": {
+        "label": "Support-E-Mail",
+        "description": "Wenden Sie sich bei Kontoproblemen direkt an das Betriebsteam."
+      }
+    },
+    "open": "Öffnen",
+    "diagnosticsTitle": "Diagnoseinformationen",
+    "diagnosticsDescription": "Fügen Sie dies in Ihr Ticket ein, damit wir Ihre Umgebung zuordnen können.",
+    "platformVersion": "Plattformversion",
+    "organization": "Organisation",
+    "copied": "Kopiert!",
+    "copy": "Diagnoseinformationen kopieren",
+    "includes": "Enthält Plattformversion, User-Agent des Browsers, das Kürzel Ihrer Organisation und die aktuelle URL."
+  },
+  "docsChangelog": {
+    "title": "Änderungsprotokoll",
+    "intro": "Versionshinweise und Änderungsverlauf des Projekts.",
+    "unavailable": "Versionierte Versionshinweise sind in diesem Dashboard nicht verfügbar.",
+    "repository": "Projektänderungen werden im <link>Änderungsprotokoll des Repositorys</link> gepflegt.",
+    "types": {
+      "feature": "Funktion",
+      "fix": "Korrektur"
+    }
+  },
+  "docsTutorials": {
+    "title": "Tutorials",
+    "intro": "Schritt-für-Schritt-Anleitungen für die Arbeit mit der Plattform.",
+    "read": "Tutorial lesen",
+    "back": "Zurück zu den Tutorials",
+    "step": "Schritt {n}.",
+    "levels": {
+      "beginner": "Einsteiger",
+      "intermediate": "Fortgeschritten",
+      "advanced": "Experte"
+    }
+  },
   "hooks": {
     "title": "Hooks",
     "description": "Interaktive Demos für die eingebauten Utility-Hooks.",

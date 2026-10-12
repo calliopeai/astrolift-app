@@ -1,69 +1,65 @@
 import Link from "next/link";
+import { useTranslations } from "next-intl";
+import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
+const code = (chunks: ReactNode) => <code>{chunks}</code>;
+const strong = (chunks: ReactNode) => <strong>{chunks}</strong>;
+const strongTerm = (chunks: ReactNode) => <strong className="text-foreground">{chunks}</strong>;
+const statusBadge = (chunks: ReactNode) => <Badge variant="secondary">{chunks}</Badge>;
+function docLink(href: string) {
+  return function DocLink(chunks: ReactNode) {
+    return (
+      <Link href={href} className="text-foreground underline-offset-2 hover:underline">
+        {chunks}
+      </Link>
+    );
+  };
+}
+
 /** Static "Custom domains" documentation page. */
 export function CustomDomainsDoc() {
+  const t = useTranslations("docsCustomDomains");
+  const cert = useTranslations("apps.domains.cert");
+  const step = (n: number, title: string) => t("stepHeading", { n, title });
   return (
     <article className="flex max-w-2xl flex-1 flex-col gap-6 p-6">
       <div>
-        <h1 className="text-2xl font-semibold">Custom domains</h1>
-        <p className="text-muted-foreground mt-2 text-sm">
-          Bring your own hostname (for example <code>app.acme.com</code>) and let Astrolift handle
-          TLS via cert-manager.
-        </p>
+        <h1 className="text-2xl font-semibold">{t("title")}</h1>
+        <p className="text-muted-foreground mt-2 text-sm">{t.rich("intro", { code })}</p>
       </div>
 
       <div className="bg-muted/40 text-muted-foreground rounded-md border p-4 text-sm leading-relaxed">
-        <strong className="text-foreground">Cluster prerequisites.</strong> This guide assumes the
-        tenant cluster already runs cert-manager and an ingress controller. If you&apos;re bringing
-        your own cluster, work through{" "}
-        <Link
-          href="/documentation/cluster-prerequisites"
-          className="text-foreground underline-offset-2 hover:underline"
-        >
-          Cluster prerequisites
-        </Link>{" "}
-        first.
+        {t.rich("prereqNote", {
+          strong: strongTerm,
+          link: docLink("/documentation/cluster-prerequisites"),
+        })}
       </div>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">When you need this</h2>
+        <h2 className="text-lg font-medium">{t("whenTitle")}</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Every app gets a generated <code>*.astrolift.app</code> subdomain by default. You only
-          need this guide when you want a branded hostname like <code>app.acme.com</code> or{" "}
-          <code>checkout.acme.com</code> in front of your workload — with automatic TLS managed by
-          cert-manager inside the tenant cluster.
+          {t.rich("whenBody", { code })}
         </p>
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Prerequisites</h2>
+        <h2 className="text-lg font-medium">{t("prerequisitesTitle")}</h2>
         <ul className="text-muted-foreground flex flex-col gap-2 text-sm">
-          <li>
-            <strong className="text-foreground">A connected cluster.</strong> The app is deployed to
-            a tenant cluster that has cert-manager and the ingress controller installed (this is the
-            default for clusters provisioned by opscode).
-          </li>
-          <li>
-            <strong className="text-foreground">DNS you can edit.</strong> You need access to the
-            DNS provider that holds the parent zone so you can add a CNAME (or TXT) record.
-          </li>
-          <li>
-            <strong className="text-foreground">Permission.</strong> An operator role that includes{" "}
-            <code>app.update</code> — Owner, Admin, and Deployer have this by default.
-          </li>
+          <li>{t.rich("prereqCluster", { strong: strongTerm })}</li>
+          <li>{t.rich("prereqDns", { strong: strongTerm })}</li>
+          <li>{t.rich("prereqPermission", { code, strong: strongTerm })}</li>
         </ul>
       </section>
 
       <Separator />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Step 1 — Open the Domains tab</h2>
+        <h2 className="text-lg font-medium">{step(1, t("step1Title"))}</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Navigate to your app, then click the <strong>Domains</strong> tab. You will see any
-          hostnames already bound to the app and a button to add a new one.
+          {t.rich("step1Body", { strong })}
         </p>
         <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
           <code>{`/apps/<your-app>/domains  →  Add domain`}</code>
@@ -71,14 +67,15 @@ export function CustomDomainsDoc() {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Step 2 — Enter the FQDN and validation method</h2>
+        <h2 className="text-lg font-medium">{step(2, t("step2Title"))}</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Type the full hostname. The validation method defaults to{" "}
-          <Badge variant="outline" className="mx-0.5 font-mono">
-            dns-01
-          </Badge>{" "}
-          which works for both apex and wildcard records and does not require the hostname to be
-          publicly reachable before issuance. Leave it blank to accept the platform default.
+          {t.rich("step2Body", {
+            badge: (chunks) => (
+              <Badge variant="outline" className="mx-0.5 font-mono">
+                {chunks}
+              </Badge>
+            ),
+          })}
         </p>
         <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
           <code>{`Hostname:           app.acme.com
@@ -87,13 +84,9 @@ Validation method:  dns-01   (default)`}</code>
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Step 3 — Astrolift returns the record to publish</h2>
+        <h2 className="text-lg font-medium">{step(3, t("step3Title"))}</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          After you save, the row appears with a{" "}
-          <Badge variant="secondary">pending_validation</Badge> cert state and a validation token.
-          For <code>dns-01</code> this is a TXT record at <code>_acme-challenge.app.acme.com</code>;
-          for <code>http-01</code> it is a CNAME pointing at the cluster ingress. Click the token to
-          copy it.
+          {t.rich("step3Body", { code, badge: statusBadge })}
         </p>
         <pre className="bg-muted overflow-x-auto rounded-md p-4 text-xs leading-relaxed">
           <code>{`# dns-01
@@ -110,24 +103,23 @@ Value:  ingress.<cluster>.astrolift.app`}</code>
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Step 4 — Publish the record at your DNS provider</h2>
-        <p className="text-muted-foreground text-sm leading-relaxed">
-          Add the record verbatim. Most providers propagate within a minute or two, but TTLs are
-          advisory — give it up to ~10 minutes before you escalate to troubleshooting.
-        </p>
+        <h2 className="text-lg font-medium">{step(4, t("step4Title"))}</h2>
+        <p className="text-muted-foreground text-sm leading-relaxed">{t("step4Body")}</p>
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Step 5 — Wait for activation</h2>
+        <h2 className="text-lg font-medium">{step(5, t("step5Title"))}</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Astrolift polls every ~30 seconds. Once the record is visible from its resolvers,
-          cert-manager issues the certificate and the row transitions{" "}
-          <Badge variant="secondary">pending_validation</Badge> →{" "}
-          <Badge variant="secondary">validated</Badge> →{" "}
-          <Badge className="bg-success/15 text-success-fg" variant="secondary">
-            active
-          </Badge>
-          . You can force an immediate poll with the <strong>Recheck</strong> button on the row.
+          {t.rich("step5Body", {
+            strong,
+            pending: statusBadge,
+            validated: statusBadge,
+            active: (chunks) => (
+              <Badge className="bg-success/15 text-success-fg" variant="secondary">
+                {chunks}
+              </Badge>
+            ),
+          })}
         </p>
       </section>
 
@@ -138,53 +130,48 @@ Value:  ingress.<cluster>.astrolift.app`}</code>
           and an operator should read that here rather than discover it by
           opening the URL. */}
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Authentication on a custom domain</h2>
+        <h2 className="text-lg font-medium">{t("authTitle")}</h2>
+        <p className="text-muted-foreground text-sm leading-relaxed">{t("authBody")}</p>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          If your cluster has an edge login gate, it covers the app&apos;s platform subdomain — not
-          your custom domain. The gate&apos;s session cookie is issued by the cluster&apos;s auth
-          host and scoped to the platform&apos;s own zone, and a response from one domain cannot set
-          a cookie for an unrelated one. A custom domain is therefore outside the gate by
-          construction, and no setting changes that.
-        </p>
-        <p className="text-muted-foreground text-sm leading-relaxed">
-          The Domains tab marks any such row{" "}
-          <Badge className="border-warning-border bg-warning/10 text-warning-fg" variant="outline">
-            No login required
-          </Badge>
-          , and the Ingress carries <code>astrolift.dev/edge-auth=ungated</code> so it is visible
-          from <code>kubectl</code> too. Treat a custom domain as a public entrance: if the app
-          behind it needs authentication, it has to enforce that itself.
+          {t.rich("authMarker", {
+            code,
+            label: cert("edgeAuthUngated"),
+            badge: (chunks) => (
+              <Badge
+                className="border-warning-border bg-warning/10 text-warning-fg"
+                variant="outline"
+              >
+                {chunks}
+              </Badge>
+            ),
+          })}
         </p>
       </section>
 
       <Separator />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Troubleshooting</h2>
+        <h2 className="text-lg font-medium">{t("troubleshootingTitle")}</h2>
         <ul className="text-muted-foreground flex flex-col gap-3 text-sm">
           <li>
-            <strong className="text-foreground">Cert stays in pending_validation.</strong> DNS
-            likely has not propagated to the issuing resolvers. Check from an outside network:
+            <strong className="text-foreground">{t("troublePendingTitle")}</strong>{" "}
+            {t("troublePendingBody")}
             <pre className="bg-muted mt-2 overflow-x-auto rounded-md p-3 text-xs leading-relaxed">
               <code>{`dig +short TXT _acme-challenge.app.acme.com
 # expected: the validation token from the Domains tab`}</code>
             </pre>
           </li>
           <li>
-            <strong className="text-foreground">Validation failing.</strong> The TXT record value
-            must match the token verbatim — no surrounding quotes, no trailing whitespace, no
-            smart-quoted characters (copy/paste from a terminal, not from a doc).
+            <strong className="text-foreground">{t("troubleValidationTitle")}</strong>{" "}
+            {t("troubleValidationBody")}
           </li>
           <li>
-            <strong className="text-foreground">CAA blocks issuance.</strong> If the parent zone has
-            a CAA record that does not list <code>letsencrypt.org</code>, ACME cannot issue. Add a
-            CAA entry allowing Let&apos;s Encrypt, or remove the restrictive record.
+            <strong className="text-foreground">{t("troubleCaaTitle")}</strong>{" "}
+            {t.rich("troubleCaaBody", { code })}
           </li>
           <li>
-            <strong className="text-foreground">Cert expired and was not rotated.</strong>{" "}
-            cert-manager auto-renews ~30 days before expiry. If it has not, an operator can inspect
-            the cert-manager logs in the tenant cluster — the rotation Workflow re-heals on the next
-            periodic tick.
+            <strong className="text-foreground">{t("troubleExpiredTitle")}</strong>{" "}
+            {t("troubleExpiredBody")}
           </li>
         </ul>
       </section>
@@ -192,25 +179,15 @@ Value:  ingress.<cluster>.astrolift.app`}</code>
       <Separator />
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Related</h2>
+        <h2 className="text-lg font-medium">{t("relatedTitle")}</h2>
         <ul className="text-muted-foreground flex flex-col gap-1.5 text-sm">
           <li>
-            <Link
-              href="/documentation/source-providers"
-              className="text-foreground underline-offset-2 hover:underline"
-            >
-              Source providers
-            </Link>{" "}
-            — connect GitHub or GitLab so push triggers deploys to your app.
+            {t.rich("relatedSourceProviders", { link: docLink("/documentation/source-providers") })}
           </li>
           <li>
-            <Link
-              href="/documentation/identity-providers"
-              className="text-foreground underline-offset-2 hover:underline"
-            >
-              Identity providers
-            </Link>{" "}
-            — register the SSO domains your users sign in from.
+            {t.rich("relatedIdentityProviders", {
+              link: docLink("/documentation/identity-providers"),
+            })}
           </li>
         </ul>
       </section>

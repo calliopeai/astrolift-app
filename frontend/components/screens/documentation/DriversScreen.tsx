@@ -4,6 +4,7 @@ import { QueryError } from "@/components/QueryError";
 
 import { CheckIcon, MinusIcon, PlugIcon } from "lucide-react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import type { Column } from "@/components/data-table";
@@ -27,38 +28,37 @@ export type DriversScreenProps = ReturnType<typeof useDrivers>;
 /** The one list of providers, read as either of its two matrices. */
 type Matrix = "capabilities" | "managed";
 
-const MATRICES: { value: Matrix; label: string }[] = [
-  { value: "capabilities", label: "Capability matrix" },
-  { value: "managed", label: "Managed services per provider" },
-];
+const MATRICES: Matrix[] = ["capabilities", "managed"];
 
-function driversList(managedKinds: string[]): ListDefinition {
+type Translate = (key: string) => string;
+
+function driversList(managedKinds: string[], t: Translate): ListDefinition {
   return {
     id: "documentation.drivers",
     fields: [
       {
         key: "driver",
-        label: "Driver",
-        options: CAPABILITIES.map((c) => ({ value: c.key, label: c.label })),
+        label: t("filters.driver"),
+        options: CAPABILITIES.map((c) => ({ value: c.key, label: t(`capabilities.${c.key}`) })),
       },
       {
         key: "service",
-        label: "Managed service",
+        label: t("filters.service"),
         options: managedKinds.map((k) => ({ value: k, label: k })),
       },
       {
         key: "bound",
-        label: "Clusters",
+        label: t("filters.clusters"),
         options: [
-          { value: "bound", label: "clusters bound" },
-          { value: "none", label: "no clusters" },
+          { value: "bound", label: t("filters.bound") },
+          { value: "none", label: t("filters.none") },
         ],
       },
     ],
-    searchPlaceholder: "Search providers…",
+    searchPlaceholder: t("searchPlaceholder"),
     defaultSort: [{ key: "order", dir: "asc" }],
     views: standardViews({ owner: "me" }, [], {
-      mineNote: "Provider plugins belong to the install, not a person, so Mine is empty.",
+      mineNote: t("mineNote"),
     }),
     paging: "numbered",
     pageSizes: [25, 50, 100],
@@ -97,8 +97,9 @@ export function DriversScreen({
   managedKindColumns,
   usingFallback,
 }: DriversScreenProps) {
+  const t = useTranslations("docsDrivers");
   const [matrix, setMatrix] = React.useState<Matrix>("capabilities");
-  const def = React.useMemo(() => driversList(managedKindColumns), [managedKindColumns]);
+  const def = React.useMemo(() => driversList(managedKindColumns, t), [managedKindColumns, t]);
   const list = useLocalListState(def);
   const page = selectRows(
     rows,
@@ -114,7 +115,7 @@ export function DriversScreen({
 
   const provider: Column<DriverRow> = {
     id: "provider",
-    header: "Provider",
+    header: t("providerColumn"),
     sortKey: "name",
     width: matrix === "capabilities" ? "w-[260px]" : "w-[200px]",
     cell: (row) => {
@@ -130,11 +131,11 @@ export function DriversScreen({
           {boundCount > 0 ? (
             <Link href="/clusters" className="inline-flex w-fit">
               <Badge variant="secondary" className="text-2xs">
-                {boundCount} {boundCount === 1 ? "cluster bound" : "clusters bound"}
+                {t("clustersBound", { count: boundCount })}
               </Badge>
             </Link>
           ) : (
-            <span className="text-muted-foreground text-2xs">No clusters</span>
+            <span className="text-muted-foreground text-2xs">{t("noClusters")}</span>
           )}
         </div>
       );
@@ -148,15 +149,18 @@ export function DriversScreen({
           ...CAPABILITIES.map(
             (cap): Column<DriverRow> => ({
               id: cap.key,
-              header: cap.label,
+              header: t(`capabilities.${cap.key}`),
               align: "center",
               cell: (row) =>
                 row.capabilities[cap.key] ? (
-                  <CheckIcon className="text-success-fg mx-auto size-4" aria-label="supported" />
+                  <CheckIcon
+                    className="text-success-fg mx-auto size-4"
+                    aria-label={t("supported")}
+                  />
                 ) : (
                   <MinusIcon
                     className="text-muted-foreground mx-auto size-4"
-                    aria-label="not supported"
+                    aria-label={t("notSupported")}
                   />
                 ),
             })
@@ -171,21 +175,18 @@ export function DriversScreen({
               align: "center",
               cell: (row) =>
                 row.managedServices.includes(kind) ? (
-                  <Badge className="text-2xs">yes</Badge>
+                  <Badge className="text-2xs">{t("yes")}</Badge>
                 ) : (
-                  <span className="text-muted-foreground text-xs">no</span>
+                  <span className="text-muted-foreground text-xs">{t("no")}</span>
                 ),
             })
           ),
         ];
 
   return (
-    <PageShell
-      title="Driver reference"
-      description="Provider plugins and the per-capability driver implementations they advertise. The matrix below is sourced from the registered ProviderPlugin manifests; when no plugins are live, a static known-provider list is shown."
-    >
+    <PageShell title={t("title")} description={t("description")}>
       {error ? (
-        <QueryError title="Could not load driver reference" error={error} onRetry={onRetry} />
+        <QueryError title={t("loadError")} error={error} onRetry={onRetry} />
       ) : loading ? (
         <Card>
           <CardContent className="p-6">
@@ -197,12 +198,8 @@ export function DriversScreen({
           {usingFallback && (
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Static reference</CardTitle>
-                <CardDescription>
-                  No provider plugins are registered on this install yet. The table below shows the
-                  canonical capability surface for each supported provider. Once plugins load, this
-                  surface switches to the live manifest.
-                </CardDescription>
+                <CardTitle className="text-base">{t("staticTitle")}</CardTitle>
+                <CardDescription>{t("staticBody")}</CardDescription>
               </CardHeader>
             </Card>
           )}
@@ -212,37 +209,32 @@ export function DriversScreen({
               <div
                 className="bg-muted/40 inline-flex w-fit max-w-full flex-wrap rounded-md border p-1"
                 role="tablist"
-                aria-label="Matrix"
+                aria-label={t("matrixLabel")}
               >
                 {MATRICES.map((m) => (
                   <button
-                    key={m.value}
+                    key={m}
                     type="button"
                     role="tab"
-                    aria-selected={matrix === m.value}
-                    onClick={() => setMatrix(m.value)}
+                    aria-selected={matrix === m}
+                    onClick={() => setMatrix(m)}
                     className={cn(
                       "inline-flex items-center gap-1.5 rounded px-3 py-1 text-sm font-medium transition",
-                      matrix === m.value
+                      matrix === m
                         ? "bg-background text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
                     )}
                   >
-                    {m.value === "capabilities" && <PlugIcon className="size-4" />}
-                    {m.label}
+                    {m === "capabilities" && <PlugIcon className="size-4" />}
+                    {t(`matrices.${m}`)}
                   </button>
                 ))}
               </div>
               {matrix === "capabilities" ? (
-                <CardDescription>
-                  Each row is a provider; columns are the driver kinds it bundles. A check means the
-                  provider implements that driver.
-                </CardDescription>
+                <CardDescription>{t("capabilitiesBody")}</CardDescription>
               ) : (
                 <CardDescription>
-                  Which managed-service kinds each provider can provision. Bindings declared in{" "}
-                  <code>[[managed_services]]</code> on the app manifest must match one of the kinds
-                  listed here.
+                  {t.rich("managedBody", { code: (chunks) => <code>{chunks}</code> })}
                 </CardDescription>
               )}
             </CardHeader>
@@ -250,18 +242,18 @@ export function DriversScreen({
               <ListPage<DriverRow>
                 embedded
                 list={list}
-                label="Providers"
+                label={t("providersLabel")}
                 columns={columns}
                 rows={page.rows}
                 getRowId={(r) => r.slug}
                 totalCount={page.totalCount}
-                empty={{ icon: <PlugIcon className="size-5" />, title: "No providers" }}
+                empty={{ icon: <PlugIcon className="size-5" />, title: t("emptyTitle") }}
               />
               {matrix === "capabilities" && (
                 <p className="text-muted-foreground mt-4 text-xs">
-                  Matrix reflects manifest declarations · last probed varies by cluster ·{" "}
+                  {t("matrixFootnote")}{" "}
                   <Link href="/clusters" className="text-primary hover:underline">
-                    See live capabilities →
+                    {t("seeLive")}
                   </Link>
                 </p>
               )}

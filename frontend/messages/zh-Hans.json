@@ -300,6 +300,598 @@
       }
     }
   },
+  "docsClusterPrereqs": {
+    "title": "集群先决条件",
+    "intro": "在将 Kubernetes 集群注册到 Astrolift 之前需要安装的全部组件。大多数由 <code>astrolift-opscode</code> 预配的集群已包含这些组件；本指南面向自带集群的运维人员。",
+    "cliTitle": "通过 CLI 一键安装",
+    "cliBody": "如需按提供商驱动一键安装以下先决条件，请在终端运行 <cmd>{command}</cmd>。CLI 会部署 Flux 和平台的伞形 Chart，之后可在集群详情页的引导卡片中持续调整所选组件。<link>安装 CLI</link>。",
+    "whenTitle": "何时需要",
+    "whenBody": "Astrolift 将租户集群视为托管应用的运行时，不会在集群内安装或拥有基础设施组件。自定义域名 TLS、Ingress 路由和自动扩缩都委托给控制器处理，这些控制器必须先存在，Astrolift 才能使用。以下检查用于确认集群配置正确；如有缺失，对应功能将保持禁用，控制平面会在集群详情页给出修复提示。",
+    "requiredTitle": "必需",
+    "requiredBadge": "必须安装",
+    "requiredBody": "缺少这些组件时注册仍会成功，但应用工作负载无法在自定义主机名上接收入站流量。",
+    "certManagerBody": "为自定义域名签发和续期 TLS 证书。Astrolift 会代你创建 <code>Certificate</code> 资源，cert-manager 负责与 Let's Encrypt(或你配置的 <code>ClusterIssuer</code>)完成 ACME 流程。没有 cert-manager 时，<link>自定义域名</link>流程会拒绝绑定主机名。",
+    "upstream": "上游:",
+    "ingressTitle": "Ingress 控制器",
+    "ingressBody": "Astrolift 为每个应用生成一个 Ingress 资源，其 <code>spec.ingressClassName</code> 与集群中已有的 <code>IngressClass</code> 匹配。以下任一控制器都可以，选择平台团队已在运行的那个即可。",
+    "defaultBadge": "默认",
+    "istioNote": "Astrolift 检测到 Istio 时，会生成 <code>Gateway</code> + <code>VirtualService</code> 资源，而不是 <code>Ingress</code>。",
+    "albBody": "在 EKS 上，ALB 控制器通过 <code>alb</code> IngressClass 暴露服务。在 GKE 上，集群自带 Gateway API 控制器；安装 <link>gateway-api</link> CRD 即可使用。",
+    "externalDnsQualifier": "(可选，强烈推荐)",
+    "externalDnsBody": "从 <code>Certificate.spec.dnsNames</code> 和 Ingress 资源中读取主机名，并在 DNS 提供商处创建对应记录。如果希望 Astrolift 完全自助发布自定义域名，则需要它；否则运维人员必须手动添加 CNAME。",
+    "externalDnsProviders": "支持控制器友好 API 的提供商包括 AWS Route53、Google Cloud DNS、Azure DNS 和 Cloudflare。完整列表见<link>上游提供商列表</link>。",
+    "recommendedTitle": "推荐",
+    "recommendedBadge": "建议安装",
+    "recommendedBody": "没有这些组件 Astrolift 也能运行，但特定功能在它们就绪前会保持关闭。",
+    "storageTitle": "默认存储类",
+    "storageBody": "申领 <code>PersistentVolumeClaim</code> 的集群内托管服务需要它，例如集群内 Postgres Operator、集群内 Redis，或直接挂载 PVC 的任何应用。如果你运行的所有应用都使用外部 RDS/Cloud SQL 托管服务，可以跳过此项。",
+    "metricsBody": "Kubernetes 的 <code>HorizontalPodAutoscaler</code> 从 <code>metrics.k8s.io</code> 读取 CPU 和内存；没有 metrics-server 时，自动扩缩规则会停留在当前副本数而不生效。Astrolift 会回退到手动副本数，但应用详情的自动扩缩标签页会显示横幅，说明缺少什么。",
+    "prometheusTitle": "集群内 Prometheus",
+    "prometheusBody": "Astrolift 检测到可访问的 Prometheus 时，会将应用指标面板指向它。没有时，面板会显示合成时间序列，以便开发时界面仍然可用；但真实的工作负载数据需要 Prometheus 或其他兼容 Prometheus 的采集器。",
+    "verifyTitle": "验证安装",
+    "verifyBody": "请在能够访问集群的工作站上运行这些命令。任一检查失败时，对应功能在 Astrolift 中将保持禁用。",
+    "ingressClassTitle": "Ingress 类",
+    "troubleshootingTitle": "故障排除",
+    "troubleCertTitle": "cert-manager 一直处于等待状态(Certificate 卡在 <pending>Pending</pending>)。",
+    "troubleCertBody": "几乎都是 ACME 质询的问题。对于 <code>dns-01</code>：签发者没有写入 TXT 记录的凭据(先检查 <code>ClusterIssuer</code> 的 spec，再查看控制器 Pod 日志中的凭据错误)。对于 <code>http-01</code>：验证 Pod 无法访问 <code>{url}</code>；请确保 Ingress 控制器已公开暴露。使用以下命令排查：",
+    "troubleIngressTitle": "Ingress 返回 503，无后端。",
+    "troubleIngressBody": "Ingress 指向的 Service 没有就绪的端点。最常见的原因：应用 Pod 仍在拉取镜像、就绪探针失败，或 Service 的 <code>selector</code> 与 Pod 标签不匹配。用 <code>{command}</code> 确认；如果地址列表为空，Ingress 就没有可转发的目标。",
+    "troubleDnsTitle": "external-dns 未创建记录。",
+    "troubleDnsBody": "两个常见原因：(a) RBAC：控制器的服务账号需要对 <code>services</code>、<code>ingresses</code> 和提供商 CRD 拥有 <code>list/watch</code> 权限，并具备调用 DNS 提供商 API 的 IAM 权限或凭据；(b) 所有权：除非 TXT owner-id 标记匹配，external-dns 不会修改并非由它创建的记录。请在控制器日志中查找 <code>skipping endpoint</code> 消息。",
+    "troubleHpaTitle": "HPA 的目标指标显示为 <code>{unknown}</code>。",
+    "troubleHpaBody": "metrics-server 未安装或未采集数据。运行 <code>kubectl top pods</code>；如果报错 <code>Metrics API not available</code>，安装 metrics-server 即可解决。",
+    "relatedTitle": "相关内容",
+    "relatedCustomDomains": "<link>自定义域名</link>：依赖 cert-manager 和 Ingress 控制器存在的功能。",
+    "relatedGetStarted": "<link>快速开始</link>：在指向租户集群之前，先在本地启动 Astrolift 技术栈。"
+  },
+  "docsSourceProviders": {
+    "title": "源代码提供商",
+    "intro": "将 Astrolift 连接到 GitHub 或 GitLab，让 <code>git push</code> 触发部署。",
+    "whenTitle": "何时需要",
+    "whenBody": "你希望注册一个源代码托管在 Git 服务上的应用，并让 Astrolift 监视某个分支(或拉取请求)，使合并和推送自动变成部署。未连接源代码提供商时，仍可通过清单和镜像仓库中的镜像部署应用，但无法使用推送即部署的流程。",
+    "prerequisitesTitle": "先决条件",
+    "prereqPermission": "<strong>权限。</strong>包含 <code>scm.connect</code> 的运维角色(Owner 和 Admin 默认拥有)。",
+    "prereqAdmin": "<strong>对 GitHub 组织或 GitLab 群组的管理员权限。</strong>Astrolift App 安装在组织/群组级别，而不是单个用户上，因此需要组织所有者批准。",
+    "prereqUrl": "<strong>安装实例的公网 URL。</strong>GitHub 和 GitLab 需要访问 Astrolift 才能投递 Webhook。后端从 <code>APP_BASE_URL</code> 读取该值；请确认它指向用户访问的公网主机名，而不是私有 IP。",
+    "recommendedBadge": "推荐",
+    "githubIntro": "最快的方式。Astrolift 会代你提交 GitHub App 清单；你只需批准权限并选择该 App 可以访问的仓库。",
+    "stepHeading": "第 {n} 步：{title}",
+    "openProvidersTitle": "打开源代码提供商",
+    "openProvidersGitHub": "前往<link>设置 · 源代码提供商</link>，点击<strong>连接到 GitHub</strong>。",
+    "githubOrgTitle": "输入 GitHub 组织标识",
+    "githubOrgBody": "输入组织标识(URL 中 <code>github.com/</code> 之后的部分)，然后点击<strong>在 GitHub 上继续</strong>。Astrolift 会提交一次性清单，其中包含 App 名称、回调 URL、Webhook URL 以及所请求的权限。",
+    "githubApproveTitle": "在 GitHub 上批准 App",
+    "githubApproveBody": "GitHub 会显示 Astrolift App 所需的权限：",
+    "permContents": "<code>contents: read</code>：部署时克隆源代码",
+    "permMetadata": "<code>metadata: read</code>：列出仓库和分支",
+    "permPullRequests": "<code>pull_requests: write</code>：评论预览 URL",
+    "permChecks": "<code>checks: write</code>：在提交上报告构建/部署状态",
+    "githubCreate": "点击<strong>{button}</strong>。GitHub 会创建该 App、将其安装到组织，并将你重定向回 Astrolift。",
+    "githubReposTitle": "在接入过程中选择仓库",
+    "githubReposBody": "该连接现在会显示在 <strong>Hosts</strong> 下。从<link>应用 · 注册应用</link>注册新应用时，接入向导会浏览该 App 获准访问的仓库。如需扩大或缩小范围，请在 GitHub 上编辑安装(<code>{url}</code>)。",
+    "guidedManualBadge": "引导式手动配置",
+    "gitlabIntro": "GitLab 没有与 GitHub Apps 等效的清单 API，因此这个流程需要多点几步：先在 GitLab 上注册 OAuth 应用，再把凭据粘贴回 Astrolift。",
+    "openProvidersGitLab": "前往<link>设置 · 源代码提供商</link>，点击<strong>连接到 GitLab</strong>。",
+    "gitlabGroupTitle": "输入群组和实例 URL",
+    "gitlabGroupBody": "输入 GitLab 群组标识。实例 URL 默认为 <code>https://gitlab.com</code>；如果你运行的是自管理实例，请修改它。",
+    "gitlabRegisterTitle": "在 GitLab 上注册 Astrolift 应用",
+    "gitlabRegisterBody": "点击<strong>打开 GitLab 应用</strong>。在新标签页中，按以下设置创建一个群组所有的应用：",
+    "gitlabSaveBody": "保存。GitLab 只会显示一次 <strong>Application ID</strong> 和 <strong>Secret</strong>。",
+    "gitlabPasteTitle": "粘贴凭据",
+    "gitlabPasteBody": "返回 Astrolift，将 Application ID 和 Secret 粘贴到对话框中并保存。连接会显示在 <strong>Hosts</strong> 下，你可以从该群组的任何项目注册应用。",
+    "troubleshootingTitle": "故障排除",
+    "troubleHookBody": "GitHub 或 GitLab 无法访问回调地址。这需要运维侧处理：在后端环境中将 <code>APP_BASE_URL</code> 设置为安装实例的公网 URL(与用户访问的主机名相同)，然后重新执行连接流程。",
+    "troubleReposTitle": "接入向导中看不到组织的私有仓库。",
+    "troubleReposBody": "GitHub App 的安装范围仅限部分仓库。访问 <code>{url}</code>，打开 Astrolift App，然后选择所需的仓库或选择 <strong>All repositories</strong>。",
+    "troublePushTitle": "推送没有触发部署。",
+    "troublePushBody": "打开应用的 <strong>Webhooks</strong> 标签页；收到的 SCM Webhook 会连同响应状态和正文显示在最近投递列表中。401 表示签名密钥已不一致；请在<link>源代码提供商</link>中重新轮换。",
+    "relatedTitle": "相关内容",
+    "relatedWebhooks": "<link>Webhooks</link>：构建和部署完成时发出的通知。",
+    "relatedCustomDomains": "<link>自定义域名</link>：将品牌主机名指向刚连接的应用。"
+  },
+  "docsPolicies": {
+    "title": "ABAC 策略",
+    "intro": "叠加在角色绑定之上的细粒度访问规则。策略<strong>从不授予</strong>超出角色范围的权限，只会额外划定<em>允许</em>或<em>拒绝</em>条件。",
+    "whenTitle": "何时需要",
+    "whenBody": "Astrolift 的内置角色可满足大多数团队。当你需要角色目录无法表达的规则时，再使用策略。例如：",
+    "exampleSenior": "只有高级工程师可以部署名为 <code>prod-*</code> 的应用。",
+    "exampleNight": "除非被告警呼叫，否则 UTC 22:00 至 06:00 之间任何人都不能写入密钥。",
+    "exampleMfa": "预生产部署要求 60 分钟内完成的 MFA 验证。",
+    "exampleContractors": "外包人员可以读取项目中的所有内容，但不能修改任何涉及计费的内容。",
+    "prerequisitesTitle": "先决条件",
+    "prereqPermission": "<strong>权限。</strong><code>policy.create</code>(Owner 和 Admin 拥有)。",
+    "prereqModel": "<strong>理解 ABAC 与 RBAC。</strong>RBAC 问的是“该用户的角色是否包含此权限？”ABAC 问的是“根据此请求的属性(谁、做什么、何时、何地)，是否有任何策略判定为<em>拒绝</em>？”只有 RBAC 允许且没有策略拒绝时，请求才会成功。",
+    "createTitle": "创建策略",
+    "createBody": "打开<link>设置 · 策略</link>，点击<strong>新建策略</strong>。每条策略包含以下字段：",
+    "fieldScope": "1. 作用域级别",
+    "fieldScopeBody": "策略的作用范围。ORG 策略对每个请求都会评估；APP 策略只在请求针对该应用时评估。范围越窄，评估开销越小，也越容易理解。",
+    "fieldEffect": "2. 效果",
+    "fieldEffectBody": "策略匹配时会发生什么。DENY 始终优先：只要任一作用域的任一策略拒绝，请求就会失败，即使同时匹配了更窄作用域的 ALLOW。",
+    "fieldAction": "3. 操作模式",
+    "fieldActionBody": "针对权限标识的通配匹配。<code>app.deploy</code> 精确匹配一个标识；<code>app.*</code> 匹配应用资源上的所有操作；<code>*</code> 匹配全部。",
+    "fieldResource": "4. 资源模式",
+    "fieldResourceBody": "针对资源标识符的通配匹配。<code>app:prod-*</code> 匹配标识以 <code>prod-</code> 开头的应用；<code>project:billing/*</code> 匹配 billing 项目中的所有内容。",
+    "fieldActor": "5. 操作者模式(JSON)",
+    "fieldActorBody": "策略适用的对象。可按用户 ID、角色标识或两者匹配。空的 <code>{empty}</code> 匹配所有操作者。",
+    "fieldConditions": "6. 条件(JSON)",
+    "fieldConditionsBody": "在请求时评估的附加条件。可用键：<code>time_of_day</code>、<code>day_of_week</code>、<code>ip_cidr</code>、<code>mfa_max_age_seconds</code>、<code>env</code>。",
+    "exampleSeniorTitle": "示例：生产环境仅限高级工程师",
+    "exampleSeniorBody": "只有 <code>senior-eng</code> 角色的成员可以部署标识以 <code>prod-</code> 开头的应用。",
+    "exampleSeniorOutcome": "高级工程师的部署能通过角色检查(<code>role_slug_not_in</code> 返回 false → 策略不匹配 → 不拒绝)。其他人会触发拒绝，部署因权限错误而失败。",
+    "exampleFreezeTitle": "示例：夜间冻结密钥",
+    "exampleFreezeBody": "UTC 22:00 至 06:00 之间任何人都不能写入密钥；用于事故处理窗口或变更冻结期。",
+    "troubleshootingTitle": "故障排除",
+    "troubleEffectTitle": "策略未生效。",
+    "troubleEffectBody": "DENY 始终优先。检查是否已有更宽作用域(ORG 级)的 DENY 覆盖了该请求。策略表会显示匹配顺序；按作用域排序即可。",
+    "troubleButtonTitle": "用户看到了不该看到的按钮。",
+    "troubleButtonBody": "界面依据 RBAC 而非 ABAC 隐藏控件；由于角色在形式上授予了该操作，按钮仍然可见，但 ABAC 拒绝时请求会在解析器处失败。可以收紧角色绑定，或通过<link>权限诊断</link>在界面中显示 ABAC 结果。",
+    "troubleJsonTitle": "条件 JSON 无法解析。",
+    "troubleJsonBody": "对话框在保存时校验并返回精确的错误(“unknown key <code>time_of_the_day</code>, did you mean <code>time_of_day</code>?”)。重新打开策略即可查看已保存的值。",
+    "relatedTitle": "相关内容",
+    "relatedIdentityProviders": "<link>身份提供商</link>：决定谁可以登录。登录后能做什么由策略决定。",
+    "relatedDiagnostic": "<link>权限诊断</link>：调试特定用户在特定资源上的有效权限。"
+  },
+  "docsCustomDomains": {
+    "title": "自定义域名",
+    "intro": "使用你自己的主机名(例如 <code>app.acme.com</code>)，由 Astrolift 通过 cert-manager 处理 TLS。",
+    "prereqNote": "<strong>集群先决条件。</strong>本指南假定租户集群已运行 cert-manager 和 Ingress 控制器。如果你使用自带集群，请先完成<link>集群先决条件</link>。",
+    "whenTitle": "何时需要",
+    "whenBody": "每个应用默认都会获得一个自动生成的 <code>*.astrolift.app</code> 子域名。只有当你希望在工作负载前使用 <code>app.acme.com</code> 或 <code>checkout.acme.com</code> 这样的品牌主机名，并由租户集群内的 cert-manager 自动管理 TLS 时，才需要本指南。",
+    "prerequisitesTitle": "先决条件",
+    "prereqCluster": "<strong>已连接的集群。</strong>应用部署在已安装 cert-manager 和 Ingress 控制器的租户集群上(由 opscode 预配的集群默认如此)。",
+    "prereqDns": "<strong>可编辑的 DNS。</strong>你需要能访问托管父区域的 DNS 提供商，以便添加 CNAME(或 TXT)记录。",
+    "prereqPermission": "<strong>权限。</strong>包含 <code>app.update</code> 的运维角色；Owner、Admin 和 Deployer 默认拥有。",
+    "stepHeading": "第 {n} 步：{title}",
+    "step1Title": "打开域名标签页",
+    "step1Body": "进入你的应用，点击<strong>域名</strong>标签页。你会看到已绑定到该应用的主机名，以及添加新主机名的按钮。",
+    "step2Title": "输入 FQDN 和验证方式",
+    "step2Body": "输入完整的主机名。验证方式默认为 <badge>dns-01</badge>，它同时适用于顶级域和通配符记录，且签发前不要求主机名可公开访问。留空即采用平台默认值。",
+    "step3Title": "Astrolift 返回需要发布的记录",
+    "step3Body": "保存后，该行会显示证书状态 <badge>pending_validation</badge> 和一个验证令牌。对于 <code>dns-01</code>，这是 <code>_acme-challenge.app.acme.com</code> 上的 TXT 记录；对于 <code>http-01</code>，这是指向集群 Ingress 的 CNAME。点击令牌即可复制。",
+    "step4Title": "在 DNS 提供商处发布记录",
+    "step4Body": "按原样添加记录。大多数提供商会在一两分钟内完成传播，但 TTL 只是参考值；进入故障排除之前，最多等待约 10 分钟。",
+    "step5Title": "等待激活",
+    "step5Body": "Astrolift 大约每 30 秒轮询一次。一旦其解析器能看到该记录，cert-manager 就会签发证书，该行状态依次变为 <pending>pending_validation</pending> → <validated>validated</validated> → <active>active</active>。可以点击该行的<strong>重新检查</strong>按钮立即轮询。",
+    "authTitle": "自定义域名上的身份验证",
+    "authBody": "如果集群设有边缘登录网关，它保护的是应用的平台子域名，而不是你的自定义域名。网关的会话 Cookie 由集群的认证主机签发，作用域限于平台自身的区域，而一个域名的响应无法为不相关的域名设置 Cookie。因此自定义域名天然位于网关之外，任何设置都无法改变这一点。",
+    "authMarker": "域名标签页会为此类行标记 <badge>{label}</badge>，Ingress 上也会带有 <code>astrolift.dev/edge-auth=ungated</code>，因此通过 <code>kubectl</code> 同样可见。请把自定义域名视为公开入口：如果背后的应用需要身份验证，必须由应用自行实施。",
+    "troubleshootingTitle": "故障排除",
+    "troublePendingTitle": "证书一直停留在 pending_validation。",
+    "troublePendingBody": "DNS 很可能尚未传播到签发方的解析器。请从外部网络检查：",
+    "troubleValidationTitle": "验证失败。",
+    "troubleValidationBody": "TXT 记录的值必须与令牌完全一致：不能有外围引号、末尾空格或智能引号(请从终端而不是文档中复制粘贴)。",
+    "troubleCaaTitle": "CAA 阻止签发。",
+    "troubleCaaBody": "如果父区域的 CAA 记录未列出 <code>letsencrypt.org</code>，ACME 就无法签发。请添加允许 Let's Encrypt 的 CAA 条目，或删除该限制性记录。",
+    "troubleExpiredTitle": "证书已过期且未轮换。",
+    "troubleExpiredBody": "cert-manager 会在到期前约 30 天自动续期。如果没有续期，运维人员可以查看租户集群中的 cert-manager 日志；轮换工作流会在下一次定期运行时自动恢复。",
+    "relatedTitle": "相关内容",
+    "relatedSourceProviders": "<link>源代码提供商</link>：连接 GitHub 或 GitLab，让推送触发应用部署。",
+    "relatedIdentityProviders": "<link>身份提供商</link>：注册用户登录所用的 SSO 域名。"
+  },
+  "docsNav": {
+    "sections": {
+      "gettingStarted": "入门",
+      "operatorGuides": "运维指南",
+      "runbooks": "运行手册",
+      "reference": "参考",
+      "publicReference": "公开参考"
+    },
+    "links": {
+      "introduction": "简介",
+      "quickstart": "快速入门",
+      "localDev": "本地开发环境",
+      "tutorials": "教程",
+      "clusterPrerequisites": "集群先决条件",
+      "customDomains": "自定义域名",
+      "sourceProviders": "源代码提供商",
+      "identityProviders": "身份提供商",
+      "policies": "ABAC 策略",
+      "webhooks": "Webhook",
+      "allRunbooks": "全部运行手册",
+      "configuration": "配置",
+      "manifest": "清单参考",
+      "drivers": "驱动参考",
+      "webhookEvents": "Webhook 事件",
+      "changelog": "更新日志",
+      "help": "获取帮助"
+    }
+  },
+  "docsIndex": {
+    "title": "文档",
+    "intro": "介绍 Astrolift 的工作原理、安装方法，以及需要配置的功能的运维手册。",
+    "readGuide": "阅读指南",
+    "readPublicDocs": "阅读公开文档",
+    "cards": {
+      "introduction": {
+        "title": "简介",
+        "description": "Astrolift 是什么，以及你最先会接触到的概念。"
+      },
+      "quickstart": {
+        "title": "快速入门",
+        "description": "连接集群和源代码，注册清单，然后部署镜像。"
+      },
+      "localDev": {
+        "title": "本地开发环境",
+        "description": "使用 Docker Compose 在本地启动完整技术栈。"
+      },
+      "tutorials": {
+        "title": "教程",
+        "description": "最常见构建路径的分步演练。"
+      },
+      "clusterPrerequisites": {
+        "title": "集群先决条件",
+        "description": "租户集群在 Astrolift 使用之前需要具备的组件(cert-manager、Ingress、external-dns)。"
+      },
+      "customDomains": {
+        "title": "自定义域名",
+        "description": "将 app.acme.com 绑定到应用，并由 cert-manager 自动管理 TLS。"
+      },
+      "sourceProviders": {
+        "title": "源代码提供商",
+        "description": "连接 GitHub 或 GitLab，用于仓库访问、托管 CI 和源代码 Webhook。"
+      },
+      "identityProviders": {
+        "title": "身份提供商",
+        "description": "通过 OIDC、SAML、Cognito、Auth0、Okta、Azure AD、Google 或 GitHub 进行登录。"
+      },
+      "policies": {
+        "title": "ABAC 策略",
+        "description": "在角色绑定之上编写细粒度的允许/拒绝规则。"
+      },
+      "webhooks": {
+        "title": "Webhook",
+        "description": "查看出站事件订阅、可用性和 HMAC 接收方约定。"
+      },
+      "runbooks": {
+        "title": "运维手册",
+        "description": "部署流程、回滚、集群管理、代理分派和事件响应。"
+      },
+      "configuration": {
+        "title": "配置",
+        "description": "Astrolift 读取的每个环境变量：用途、默认值以及由谁设置。"
+      },
+      "webhookEvents": {
+        "title": "Webhook 事件",
+        "description": "每个出站 Webhook 事件的负载结构和 JSON 示例。"
+      },
+      "changelog": {
+        "title": "更新日志",
+        "description": "新功能和修复，按时间倒序排列。"
+      },
+      "manifest": {
+        "title": "astrolift.toml 清单",
+        "description": "每个应用清单的完整结构：节、字段、校验和示例。"
+      },
+      "cli": {
+        "title": "CLI 参考",
+        "description": "身份验证、应用和代理操作、CI、便携文档和 man 手册页。"
+      },
+      "api": {
+        "title": "控制 API",
+        "description": "GraphQL、专用 REST 路由、Bearer 身份验证、租户隔离和错误。"
+      },
+      "mcp": {
+        "title": "MCP 参考",
+        "description": "经过身份验证的远程代理检查、分派、取消和源代码协调。"
+      },
+      "agentPackages": {
+        "title": "代理包",
+        "description": "简报、技能、工具、源代码切片、单仓库、联合和导入格式。"
+      },
+      "workflowToml": {
+        "title": "工作流 TOML",
+        "description": "有序的代理阶段、环境配方、技能叠加、命名输出和仓库同步。"
+      },
+      "pluginSdk": {
+        "title": "提供商插件 SDK",
+        "description": "基于当前驱动约定构建和测试提供商扩展。"
+      },
+      "demoScenarios": {
+        "title": "演示场景",
+        "description": "应用、代理、工作流和运维验证的完整示例场景。"
+      },
+      "install": {
+        "title": "安装 Astrolift",
+        "description": "云端和 Kubernetes 的安装路径、先决条件和标准运维手册。"
+      }
+    }
+  },
+  "docsIdentityProviders": {
+    "title": "身份提供商",
+    "intro": "通过企业 IdP 进行登录：OIDC、SAML、Cognito、Auth0、Okta、Azure AD、Google Workspace、GitHub 或本地账号。",
+    "whenTitle": "何时需要",
+    "whenBody": "你希望用户使用现有的企业身份登录，而不是单独的 Astrolift 密码，并集中控制谁有访问权限(在 IdP 中停用，此处也随之失去访问权限)。同一时间只有一个提供商处于活动状态，其余均为备用。",
+    "prerequisitesTitle": "先决条件",
+    "prereqPermission": "<strong>权限。</strong>具有 <code>org.update</code> 的运维角色(Owner 和 Admin 拥有)。",
+    "prereqAdmin": "<strong>IdP 的管理员权限。</strong>你需要在其中注册一个新的 OIDC 或 SAML 客户端。",
+    "prereqRedirect": "<strong>Astrolift 的重定向 URI。</strong>可在<bold>新建提供商</bold>对话框中看到。格式为 <code>{uri}</code>。每个 IdP 的允许回调列表中都必须填入这个确切的值。",
+    "configureTitle": "按提供商类型配置",
+    "configureBody": "选择对应的小节。每种类型最后都在 Astrolift 中执行相同的操作：<link>设置 · 身份提供商</link> → <strong>新建提供商</strong> → 选择类型 → 粘贴凭据 → <strong>设为活动</strong>。",
+    "allowlistTitle": "域名允许列表(自动注册)",
+    "allowlistBody": "默认情况下，只有当 Astrolift 已有该用户的账号时，SSO 登录才会成功。要让新用户自助加入，请将其邮箱域名标记为受信任。",
+    "allowlistStep1": "打开<link>管理 · 组织</link>。",
+    "allowlistStep2": "滚动到<strong>受信任的邮箱域名</strong>卡片，添加 <code>corp.com</code>(不带 <code>@</code>)。",
+    "allowlistStep3": "保存。任何使用 <code>@corp.com</code> 邮箱通过 SSO 登录的用户都会以默认成员角色自动加入组织。",
+    "troubleshootingTitle": "故障排除",
+    "troubleNoIdpBody": "安装实例未设置 <code>bootstrap_idp</code> 环境变量。请在<link>设置 · 身份提供商</link>中配置一个提供商并将其设为活动。",
+    "troubleRedirectTitle": "登录重定向到错误的主机(或返回 redirect_uri_mismatch)。",
+    "troubleRedirectBody": "后端的 <code>APP_BASE_URL</code> 与在 IdP 注册的重定向 URI 必须完全一致：协议、主机、路径以及末尾斜杠。",
+    "troubleSignupTitle": "自动注册没有发生。",
+    "troubleSignupBody": "该用户的邮箱域名不在受信任列表中。请参阅上文的<link>域名允许列表</link>。",
+    "troubleSamlTitle": "SAML 签名验证失败。",
+    "troubleSamlBody": "IdP 轮换了签名证书。请重新粘贴元数据 URL(或上传新的 XML)；Astrolift 会在保存时刷新信任存储。",
+    "kinds": {
+      "oidc": {
+        "title": "通用 OIDC",
+        "intro": "最灵活的选项。适用于任何发布 OpenID Connect 发现文档的提供商。",
+        "steps": {
+          "s1": "在 IdP 中注册新的 OIDC 客户端。粘贴 Astrolift 对话框中显示的重定向 URI(以 /app/auth1/callback 结尾)。",
+          "s2": "复制 client_id、client_secret 和发现 URL(.well-known/openid-configuration 端点)。",
+          "s3": "在 Astrolift 中打开 设置 · 身份提供商 · 新建提供商，选择 OIDC，粘贴这些值，然后设为活动。"
+        }
+      },
+      "cognito": {
+        "title": "Amazon Cognito",
+        "intro": "Cognito 用户池支持 OIDC。如果你的安装实例位于 AWS，且已在用户池中管理用户，请使用此方式。",
+        "steps": {
+          "s1": "在 AWS 控制台中打开用户池 · App integration · Create an app client。选择机密客户端并添加 Astrolift 重定向 URI。",
+          "s2": "记下 User Pool ID、App client ID 和 App client secret。发现 URL 为 {url}。",
+          "s3": "在 Astrolift 中选择 新建提供商 · Cognito，粘贴这三个值，然后设为活动。"
+        }
+      },
+      "auth0": {
+        "title": "Auth0",
+        "intro": "Auth0 是 Calliope AI 托管安装的默认选项。如果你想使用托管的 MFA、无密码登录或社交登录而无需自行运维，请选择 Auth0。",
+        "steps": {
+          "s1": "在 Auth0 中选择 Applications · Create Application · Regular Web App。将 Allowed Callback URLs 设置为 Astrolift 对话框中的重定向 URI。",
+          "s2": "复制 Domain、Client ID 和 Client Secret。发现 URL 为 {url}。",
+          "s3": "在 Astrolift 中选择 新建提供商 · Auth0，粘贴这些值，然后设为活动。"
+        }
+      },
+      "okta": {
+        "title": "Okta",
+        "intro": "Okta 是最常见的企业选择。请使用 Okta 的 OIDC，而不是 SAML 应用；OIDC 能与 Astrolift 的会话模型顺畅集成。",
+        "steps": {
+          "s1": "在 Okta 管理后台选择 Applications · Create App Integration · OIDC · Web Application。在 Sign-in redirect URIs 下添加 Astrolift 重定向 URI。",
+          "s2": "复制 Client ID、Client Secret 和 Issuer URL(可在 General · OpenID Connect ID Token 下看到)。",
+          "s3": "在 Astrolift 中选择 新建提供商 · Okta，粘贴这些值，然后设为活动。"
+        }
+      },
+      "azureAd": {
+        "title": "Azure AD / Entra ID",
+        "intro": "如果你的组织使用 Microsoft 365，Entra(原 Azure AD)是合适的选择。",
+        "steps": {
+          "s1": "在 Azure 门户中选择 App registrations · New registration。将重定向 URI 设置为 Astrolift 提供的值，平台设为 Web。",
+          "s2": "在 Certificates & secrets 下创建客户端密钥并复制其值。记下 Application (client) ID 和 Directory (tenant) ID。",
+          "s3": "发现 URL 为 {url}。将它连同客户端 ID 和密钥粘贴到 Astrolift 中，然后设为活动。"
+        }
+      },
+      "google": {
+        "title": "Google Workspace",
+        "intro": "当每位 Astrolift 运维人员都有 Workspace 账号时，可使用 Google Workspace OIDC。",
+        "steps": {
+          "s1": "在 Google Cloud 控制台中选择 APIs & Services · Credentials · Create OAuth client ID · Web application，添加 Astrolift 重定向 URI。",
+          "s2": "复制 Client ID 和 Client Secret。发现 URL 为 {url}。",
+          "s3": "在 Astrolift 中选择 新建提供商 · Google，粘贴这些值，然后设为活动。结合下方的域名允许列表，可将登录限制在你的 Workspace 内。"
+        }
+      },
+      "github": {
+        "title": "GitHub OAuth",
+        "intro": "仅用于登录的 GitHub(与源代码提供商中的 SCM 连接相互独立)。适合已有 GitHub 组织的小团队。",
+        "steps": {
+          "s1": "在 GitHub 中选择 Settings · Developer settings · OAuth Apps · New OAuth App。将回调 URL 设置为 Astrolift 提供的值。",
+          "s2": "复制 Client ID 并生成 Client Secret。",
+          "s3": "在 Astrolift 中选择 新建提供商 · GitHub OAuth，粘贴这些值，然后设为活动。"
+        }
+      },
+      "saml": {
+        "title": "SAML 2.0",
+        "intro": "适用于只支持 SAML 的 IdP(较旧的企业部署、部分联合配置)。",
+        "steps": {
+          "s1": "在 IdP 中注册新的 SAML 应用。将 ACS URL 和 Entity ID 设置为 Astrolift 对话框中显示的值。",
+          "s2": "下载 IdP 元数据 XML，或复制其 URL。",
+          "s3": "在 Astrolift 中选择 新建提供商 · SAML，粘贴元数据 URL(或上传 XML)，然后设为活动。"
+        }
+      },
+      "local": {
+        "title": "本地账号",
+        "badge": "本地",
+        "intro": "仅用于首次运行或作为后备。本地账号允许运维人员使用存储在 Astrolift 数据库中的用户名和密码登录。在接入 SSO 提供商期间使用，完成后将其关闭。",
+        "steps": {
+          "s1": "全新安装时默认启用本地账号。引导管理员存储在数据库中；其创建方式请参阅安装运行手册。",
+          "s2": "SSO 配置并验证完成后，将 SSO 提供商设为活动，然后删除本地条目，或通过策略禁止密码登录。"
+        }
+      }
+    },
+    "troubleNoIdpTitle": "“未配置 IdP。”"
+  },
+  "docsConfiguration": {
+    "title": "配置",
+    "intro": "Astrolift 在运行时读取的所有环境变量。来源 = <outline>{operator}</outline> 表示由运维人员设置，<outline>{image}</outline> 表示容器镜像内置了默认值，<secondary>{platform}</secondary> 表示 Astrolift 在部署时将其写入工作负载。",
+    "source": {
+      "operator": "运维人员",
+      "image": "镜像",
+      "platform": "平台注入"
+    },
+    "conventionsTitle": "约定",
+    "conventionBoolean": "布尔值可接受 <code>{values}</code>(不区分大小写)。",
+    "conventionRequired": "标记为<strong>必需</strong>的变量要么没有默认值，要么其默认值只适用于本地开发(例如 <code>not-a-secret</code>)。",
+    "conventionUnlisted": "未在此列出的变量 Astrolift 都不会读取；即使设置了也会被静默忽略。",
+    "groupsTitle": "分组",
+    "variablesTitle": "变量",
+    "filters": {
+      "group": "分组",
+      "source": "来源",
+      "required": "必需"
+    },
+    "yes": "是",
+    "no": "否",
+    "searchPlaceholder": "搜索变量、用途、默认值…",
+    "mineNote": "参考内容对所有人相同，因此“我的”为空。",
+    "columns": {
+      "variable": "变量",
+      "purpose": "用途",
+      "group": "分组",
+      "default": "默认值",
+      "required": "必需",
+      "source": "来源"
+    },
+    "noDefault": "无",
+    "emptyTitle": "没有记录任何变量",
+    "inspectTitle": "如何查看已设置的内容",
+    "inspectBody": "Django 管理命令 <code>features</code> 会输出当前功能开关的状态，<code>python manage.py diffsettings</code> 会将每项 Django 设置与其默认值对比显示。控制平面从不回显密钥值；标记为敏感的设置显示为 <code>***</code>。",
+    "relatedTitle": "相关内容",
+    "relatedGetStarted": "<link>快速开始</link>：在本地启动技术栈；其中的环境变量默认指向 docker-compose 的服务名称。",
+    "relatedIdentityProviders": "<link>身份提供商</link>：详细说明 AUTH0_* / ASTROLIFT_IDP_* 变量。",
+    "relatedClusterPrerequisites": "<link>集群先决条件</link>：除这些环境变量外，租户集群还需要的组件。"
+  },
+  "docsWebhookEvents": {
+    "title": "Webhook 事件",
+    "intro": "Astrolift 通过出站 Webhook 发出的所有事件类型，每种都附有负载结构和贴近实际的 JSON 示例。有关设置和签名验证，请参阅<link>Webhook 指南</link>。",
+    "envelopeTitle": "信封结构",
+    "envelopeBody": "每次投递都使用相同的外层信封。事件特有的字段位于 <code>payload</code> 下。可选的信封字段可能是空字符串；接收方应将缺失或空值视为没有值。",
+    "eventIdNote": "<code>event_id</code> 是 ULID：全局唯一且可按时间排序。请在你这一侧用作幂等键。",
+    "deliveryIdNote": "<code>delivery_id</code> 在每次尝试中唯一；重试会沿用相同的 <plain>event_id</plain>，并使用新的 <plain>delivery_id</plain>。",
+    "schemaVersionNote": "<code>schema_version</code> 遵循语义化版本；破坏负载兼容性的变更会提升主版本号。",
+    "onThisPage": "本页内容",
+    "payloadFields": "负载字段",
+    "example": "示例",
+    "signatureTitle": "签名验证",
+    "signatureBody": "每次投递都使用 <badge>X-Astrolift-Signature</badge> 请求头签名(对 <code>{signed}</code> 做 HMAC-SHA256，十六进制编码，前缀为 <code>sha256=</code>)。<link>Webhook 指南</link>介绍了在 Python、Node 和 Go 中的验证方法：在解析 JSON 之前读取原始正文，并使用恒定时间比较。",
+    "subscribingTitle": "订阅",
+    "subscribingBody": "要让接收方订阅其中一个或多个事件，请参阅<link>创建订阅</link>的步骤。事件类型字段可接受精确标识(例如 <code>deployment.failed</code>)或通配符：",
+    "wildcardAll": "<code>*</code>：所有事件。",
+    "wildcardCategory": "<code>deployment.*</code>：部署类别中的所有事件。",
+    "wildcardList": "<code>deployment.failed,alert.fired</code>：逗号分隔的列表(也接受空白字符)。",
+    "relatedTitle": "相关内容",
+    "relatedWebhooks": "<link>Webhook</link>：创建订阅、验证签名、排查投递问题。",
+    "relatedPolicies": "<link>ABAC 策略</link>：限制组织中谁可以创建 Webhook 订阅。"
+  },
+  "docsDrivers": {
+    "title": "驱动参考",
+    "description": "提供商插件及其按能力声明的驱动实现。下方矩阵来自已注册的 ProviderPlugin 清单；没有活动插件时，会显示已知提供商的静态列表。",
+    "loadError": "无法加载驱动参考",
+    "staticTitle": "静态参考",
+    "staticBody": "此安装实例尚未注册任何提供商插件。下表显示每个受支持提供商的标准能力范围。插件加载后，将切换为实时清单。",
+    "matrixLabel": "矩阵",
+    "matrices": {
+      "capabilities": "能力矩阵",
+      "managed": "各提供商的托管服务"
+    },
+    "capabilitiesBody": "每一行是一个提供商，每一列是它包含的驱动类型。打勾表示该提供商实现了这个驱动。",
+    "managedBody": "每个提供商可以预配的托管服务类型。在应用清单的 <code>[[managed_services]]</code> 中声明的绑定必须与此处列出的某种类型匹配。",
+    "filters": {
+      "driver": "驱动",
+      "service": "托管服务",
+      "clusters": "集群",
+      "bound": "已绑定集群",
+      "none": "无集群"
+    },
+    "searchPlaceholder": "搜索提供商…",
+    "mineNote": "提供商插件属于安装实例而非个人，因此“我的”为空。",
+    "providerColumn": "提供商",
+    "clustersBound": "{count, plural, other {已绑定 # 个集群}}",
+    "noClusters": "无集群",
+    "supported": "支持",
+    "notSupported": "不支持",
+    "yes": "是",
+    "no": "否",
+    "providersLabel": "提供商",
+    "emptyTitle": "没有提供商",
+    "matrixFootnote": "矩阵反映清单中的声明 · 最近探测时间因集群而异 ·",
+    "seeLive": "查看实时能力 →",
+    "capabilities": {
+      "cluster": "集群",
+      "ingress": "Ingress",
+      "dns": "DNS",
+      "tls": "TLS",
+      "secrets": "密钥",
+      "identity": "身份",
+      "registry": "镜像仓库"
+    }
+  },
+  "docsIntroduction": {
+    "title": "简介",
+    "tagline": "使用 Astrolift 构建、部署和运维。",
+    "whatTitle": "什么是 Astrolift？",
+    "whatBody": "Astrolift 是面向 Kubernetes 上运行的应用和代理的控制平面。连接集群和源代码仓库，注册 Astrolift 清单，即可在同一个控制台或 CLI 中管理部署、环境配置和托管服务。",
+    "whatBody2": "控制平面记录期望的配置和部署历史。集群代理上报观测到的运行时状态；无法观测的状态与健康或失败的工作负载保持区分。",
+    "conceptsTitle": "核心概念",
+    "conceptOrgs": "<strong>组织、团队和项目</strong>用于划分应用、集群和共享资源的归属与访问权限。",
+    "conceptApps": "<strong>应用和清单</strong>描述工作负载、配置和服务绑定。已注册的应用会将该定义关联到其源代码仓库。",
+    "conceptEnvironments": "<strong>环境</strong>决定应用的运行位置和环境专属配置。",
+    "conceptDeployments": "<strong>部署</strong>记录某个环境的镜像版本、审批要求、执行情况和历史。",
+    "conceptRoles": "<strong>角色、策略和凭据</strong>控制允许的操作和资源范围。令牌无法扩大其持有者的访问权限。",
+    "runtimeTitle": "控制平面与运行时",
+    "runtimeBody": "控制台和 CLI 调用基于 Django 和 Strawberry GraphQL 的控制平面。PostgreSQL 存储平台记录，Redis 提供缓存，Temporal 协调长时间运行的生命周期任务。应用运行在已连接的 Kubernetes 集群上，而不是控制台进程内。",
+    "startTitle": "从哪里开始",
+    "startQuickstart": "<link>快速入门</link>逐步介绍如何连接集群和源代码、注册应用并完成部署。",
+    "startPrerequisites": "<link>集群先决条件</link>介绍集群所需的运行时服务。",
+    "startLocalDev": "<link>本地开发环境</link>说明贡献者如何在本地运行控制平面。"
+  },
+  "docsGetStarted": {
+    "title": "本地开发环境",
+    "intro": "从 astrolift-app 的检出副本运行 Astrolift 控制平面。",
+    "note": "首次部署应用请参阅<quickstart>快速入门</quickstart>。此处的步骤面向在本地运行控制平面的贡献者，需要 Docker Desktop 或带 Compose v2 的 Docker Engine。启动技术栈前，请先查看<configuration>配置参考</configuration>和本地环境文件。",
+    "prepareTitle": "准备并启动技术栈",
+    "prepareBody": "在仓库根目录运行以下命令。Bootstrap 会检查 Docker，并根据示例创建缺失的本地环境文件。启动 Compose 服务前，请填写必需的配置值。该技术栈包括 API 和界面、PostgreSQL、Redis、Temporal，以及本地存储和邮件服务。",
+    "migrateTitle": "迁移并初始化本地身份",
+    "migrateBody": "API 容器运行后，应用数据库迁移并执行开发身份初始化。这会创建本地登录流程使用的本地组织、团队、项目和开发账号。",
+    "exploreTitle": "浏览与检查",
+    "exploreBody": "默认界面位于 {ui}，GraphQL API 位于 {api}，Temporal 界面位于 {temporal}。如果你修改了主机端口，请检查 Compose 配置。使用命令封装脚本查看运行中的容器和日志。",
+    "checksTitle": "运行检查",
+    "checksBody": "后端测试通过本地技术栈在真实的 PostgreSQL 和 Temporal 上运行。Ruff 检查后端格式和 lint；前端有 TypeScript、ESLint 和 React 测试。修改 GraphQL 契约时，请同时重新生成其 schema 和前端类型。"
+  },
+  "docsHelp": {
+    "title": "获取帮助",
+    "description": "联系 Astrolift 团队。提交工单时请附上下方的诊断信息，以便加快分诊。",
+    "channelsTitle": "支持渠道",
+    "channelsDescription": "根据所需帮助的类型选择相应渠道。",
+    "links": {
+      "discord": {
+        "label": "社区 Discord",
+        "description": "与 Astrolift 团队和其他运维人员实时交流。"
+      },
+      "github": {
+        "label": "GitHub Issues",
+        "description": "提交缺陷、申请功能，或浏览 astrolift-app 上进行中的工作。"
+      },
+      "email": {
+        "label": "支持邮箱",
+        "description": "账号层面的问题可直接联系运维团队。"
+      }
+    },
+    "open": "打开",
+    "diagnosticsTitle": "诊断信息",
+    "diagnosticsDescription": "请将此信息粘贴到工单中，便于我们确认你的环境。",
+    "platformVersion": "平台版本",
+    "organization": "组织",
+    "copied": "已复制！",
+    "copy": "复制诊断信息",
+    "includes": "包含平台版本、浏览器用户代理、组织标识和当前 URL。"
+  },
+  "docsChangelog": {
+    "title": "更新日志",
+    "intro": "版本说明和项目变更历史。",
+    "unavailable": "此控制台不提供按版本划分的版本说明。",
+    "repository": "项目变更记录在<link>仓库更新日志</link>中。",
+    "types": {
+      "feature": "功能",
+      "fix": "修复"
+    }
+  },
+  "docsTutorials": {
+    "title": "教程",
+    "intro": "帮助你使用平台进行构建的分步指南。",
+    "read": "阅读教程",
+    "back": "返回教程列表",
+    "step": "第 {n} 步。",
+    "levels": {
+      "beginner": "入门",
+      "intermediate": "中级",
+      "advanced": "高级"
+    }
+  },
   "hooks": {
     "title": "Hooks",
     "description": "Interactive demos for the built-in utility hooks.",
