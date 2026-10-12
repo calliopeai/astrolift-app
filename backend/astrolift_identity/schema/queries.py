@@ -60,6 +60,7 @@ from astrolift_identity.schema.access_ux import (
     PrincipalType,
     condition_catalog,
 )
+from astrolift_identity.schema.action_safety import ActionSafetyRequirementType, requirements_for_viewer
 from astrolift_identity.schema.identity_csv import (
     IdentityCsvExport,
     bindings_csv,
@@ -1306,6 +1307,19 @@ class IdentityQuery:
         lists.invitation_activity(result.rows, _tenant_ids()[0])
         userinfo_by_user_id = _userinfo_by_inviter_id(result.rows)
         return result.map(lambda r: invitation_to_type(r, userinfo_by_user_id=userinfo_by_user_id))
+
+    @strawberry.field(
+        description=(
+            "What each gated action asks of the viewer (#2202), optionally on one app: "
+            "confirmation, fresh verification and whether an admin may approve their own."
+        )
+    )
+    @require_permission(Permission.ORG_READ, scope=identity_organization_scope(Permission.ORG_READ))
+    @tenant_scoped()
+    def astrolift_action_safety(
+        self, info: Info, app_slug: str | None = None
+    ) -> list[ActionSafetyRequirementType]:
+        return requirements_for_viewer(app_slug)
 
     @strawberry.field(
         description=(

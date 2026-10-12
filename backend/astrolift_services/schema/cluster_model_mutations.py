@@ -788,6 +788,14 @@ class ClusterModelMutations:
     def deprovision_cluster_model(
         self, info: Info, input: DeprovisionClusterModelInput
     ) -> MutationResultType[ClusterModelDeploymentType]:
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
+
+        deny = _safety_gate(
+            info, "managed_service.deprovision", app=None, resolver_name="deprovision_cluster_model"
+        )
+        if deny is not None:
+            return deny
         try:
             with transaction.atomic():
                 service = _locked_model(input)

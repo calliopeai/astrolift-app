@@ -1221,6 +1221,17 @@ class ManagedServiceMutations:
                 ErrorCode.NOT_FOUND.value,
                 "managed service not found",
             )
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
+
+        deny = _safety_gate(
+            info,
+            "managed_service.deprovision",
+            app=getattr(svc, "registered_app", None),
+            resolver_name="deprovision_managed_service",
+        )
+        if deny is not None:
+            return deny
 
         # Flip to DEPROVISIONING so the UI shows the in-flight state
         # immediately. The workflow re-asserts on entry; the platform

@@ -96,6 +96,12 @@ class SecretMutations:
         app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
+
+        deny = _safety_gate(info, "secret.change", app=app, resolver_name="set_app_secret")
+        if deny is not None:
+            return deny
         # #497 — optimistic-concurrency gate. Refuse to apply the
         # secret write when the caller's cached version is stale; the
         # FE refetches and re-prompts the operator instead of silently
@@ -261,6 +267,12 @@ class SecretMutations:
         app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
+
+        deny = _safety_gate(info, "secret.change", app=app, resolver_name="delete_app_secret")
+        if deny is not None:
+            return deny
         source = app.manifest_raw_staged or app.manifest_raw or ""
         # Validate the key exists BEFORE creating a proposal — no point
         # gating a delete-of-nothing through review.
@@ -590,6 +602,12 @@ class SecretMutations:
         app = RegisteredApp.objects.filter(slug=input.app_slug, organization_id=_caller_org_id()).first()
         if app is None or app.deleted_at is not None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
+        # Action-safety gate (#2202): fresh verification, on by default.
+        from astrolift_identity.action_safety import gate as _safety_gate
+
+        deny = _safety_gate(info, "secret.reveal", app=app, resolver_name="reveal_app_secret")
+        if deny is not None:
+            return deny
         env_exists = AppEnvironment.objects.filter(
             registered_app=app,
             name=env_name,

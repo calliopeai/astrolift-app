@@ -1227,6 +1227,12 @@ class ClustersMutation:
             from astrolift_services.cluster_retirement import recheck_cluster_authority
 
             recheck_cluster_authority(cluster, Permission.CLUSTER_UNREGISTER)
+            # Action-safety gate (#2202): fresh verification, on by default.
+            from astrolift_identity.action_safety import gate as _safety_gate
+
+            deny = _safety_gate(info, "cluster.decommission", app=None, resolver_name="decommission_cluster")
+            if deny is not None:
+                return deny
             if cluster.lifecycle in (
                 TenantCluster.Lifecycle.DECOMMISSIONED.value,
                 TenantCluster.Lifecycle.DECOMMISSIONING.value,
