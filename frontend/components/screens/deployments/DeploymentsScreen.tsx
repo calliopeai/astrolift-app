@@ -100,6 +100,7 @@ export function DeploymentsScreen({
   startHref,
 }: DeploymentsScreenProps) {
   const t = useTranslations("lists.deployments");
+  const tx = useTranslations("deploymentDetailScreen");
   const fmt = useFormatters();
   const [pendingAction, setPendingAction] = React.useState<PendingAction | null>(null);
   const [pendingBulk, setPendingBulk] = React.useState<BulkAction | null>(null);
@@ -342,7 +343,7 @@ export function DeploymentsScreen({
           ),
         }}
         list={list}
-        label="Deployments"
+        label={t("title")}
         columns={columns}
         rows={rows}
         getRowId={(d) => d.id}
@@ -376,7 +377,7 @@ export function DeploymentsScreen({
         description={
           confirmable ? ACTION_COPY[confirmable.kind].description(confirmable.deployment) : ""
         }
-        confirmLabel={confirmable ? ACTION_COPY[confirmable.kind].confirmLabel : "Confirm"}
+        confirmLabel={confirmable ? ACTION_COPY[confirmable.kind].confirmLabel : tx("confirm")}
         onConfirm={async () => {
           if (confirmable) await runAction(confirmable.kind, confirmable.deployment);
         }}

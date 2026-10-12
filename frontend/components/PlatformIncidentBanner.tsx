@@ -7,6 +7,7 @@
  */
 
 import { AlertTriangleIcon, ExternalLinkIcon, XIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
@@ -29,6 +30,7 @@ export function PlatformIncidentBanner({
   incidents: StatusIncident[];
   onDismiss: () => void;
 }) {
+  const t = useTranslations("platformIncident");
   if (!statusPageUrl) return null;
   if (incidents.length === 0) return null;
 
@@ -39,7 +41,7 @@ export function PlatformIncidentBanner({
       : "border-warning-border bg-warning/10 text-warning-fg";
 
   const headline =
-    incidents.length === 1 ? incidents[0]!.name : `${incidents.length} active platform incidents`;
+    incidents.length === 1 ? incidents[0]!.name : t("activeIncidents", { count: incidents.length });
 
   return (
     <div
@@ -55,13 +57,13 @@ export function PlatformIncidentBanner({
         rel="noopener noreferrer"
         className="inline-flex shrink-0 items-center gap-1 underline-offset-2 hover:underline"
       >
-        View status
+        {t("viewStatus")}
         <ExternalLinkIcon className="size-3" aria-hidden />
       </a>
       <button
         type="button"
         onClick={onDismiss}
-        aria-label="Dismiss incident banner"
+        aria-label={t("dismiss")}
         className="inline-flex shrink-0 items-center justify-center rounded p-1 hover:bg-black/5 dark:hover:bg-white/10"
       >
         <XIcon className="size-4" aria-hidden />

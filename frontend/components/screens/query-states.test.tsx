@@ -59,7 +59,9 @@ vi.mock("next-intl", async (importOriginal) => {
   return {
     ...actual,
     useTranslations: (namespace?: string) =>
-      namespace?.startsWith("shared.") || namespace === "formSubmissions"
+      namespace?.startsWith("shared.") ||
+      namespace === "formSubmissions" ||
+      namespace === "eventDetail"
         ? actual.useTranslations(namespace)
         : (key: string) => key,
   };

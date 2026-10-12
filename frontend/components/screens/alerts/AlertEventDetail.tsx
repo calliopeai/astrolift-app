@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import Link from "next/link";
 
 import {
@@ -20,6 +21,7 @@ export type AlertEventDetailProps = Omit<
 
 /** Alert event detail (#1106) — the payload/timeline behind a fired alert. */
 export function AlertEventDetail({ id, event: e, loading, error, onRetry }: AlertEventDetailProps) {
+  const t = useTranslations("alertDetail");
   const state = e
     ? e.resolvedAt
       ? "resolved"
@@ -40,18 +42,21 @@ export function AlertEventDetail({ id, event: e, loading, error, onRetry }: Aler
     <EntityDetailShell
       loading={loading}
       notFound={!e && !error}
-      breadcrumb={{ label: "Alerts", href: "/alerts" }}
-      heading={e ? `Event ${e.id.slice(0, 8)}` : `Event ${id.slice(0, 8)}`}
+      breadcrumb={{ label: t("alerts"), href: "/alerts" }}
+      heading={t("eventHeading", { id: (e ? e.id : id).slice(0, 8) })}
       status={state}
       statusTone={stateTone}
-      notFoundLabel="alert event"
+      notFoundLabel={t("eventNoun")}
       overview={
         e
           ? [
-              { term: "Summary", description: e.summary || "—" },
-              { term: "Severity", description: <span className="capitalize">{e.severity}</span> },
+              { term: t("summary"), description: e.summary || "—" },
               {
-                term: "Rule",
+                term: t("severity"),
+                description: <span className="capitalize">{e.severity}</span>,
+              },
+              {
+                term: t("rule"),
                 description: (
                   <Link
                     href={`/alerts/rules/${e.ruleId}`}
@@ -61,18 +66,18 @@ export function AlertEventDetail({ id, event: e, loading, error, onRetry }: Aler
                   </Link>
                 ),
               },
-              { term: "Fired", description: <DetailTimestamp iso={e.firedAt} /> },
-              { term: "Acknowledged", description: <DetailTimestamp iso={e.acknowledgedAt} /> },
-              { term: "Resolved", description: <DetailTimestamp iso={e.resolvedAt} /> },
+              { term: t("fired"), description: <DetailTimestamp iso={e.firedAt} /> },
+              { term: t("acknowledged"), description: <DetailTimestamp iso={e.acknowledgedAt} /> },
+              { term: t("resolved"), description: <DetailTimestamp iso={e.resolvedAt} /> },
             ]
           : []
       }
     >
-      {error ? <QueryError title="Could not load detail" error={error} onRetry={onRetry} /> : null}
+      {error ? <QueryError title={t("loadError")} error={error} onRetry={onRetry} /> : null}
       {e ? (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Detail</CardTitle>
+            <CardTitle className="text-base">{t("detail")}</CardTitle>
           </CardHeader>
           <CardContent>
             {Object.keys(e.detail ?? {}).length > 0 ? (
@@ -80,9 +85,7 @@ export function AlertEventDetail({ id, event: e, loading, error, onRetry }: Aler
                 {prettyJson(e.detail)}
               </pre>
             ) : (
-              <p className="text-muted-foreground text-sm">
-                No detail payload recorded for this event.
-              </p>
+              <p className="text-muted-foreground text-sm">{t("noDetail")}</p>
             )}
           </CardContent>
         </Card>

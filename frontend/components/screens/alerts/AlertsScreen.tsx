@@ -55,6 +55,7 @@ export function AlertsScreen({
   unmute,
 }: AlertsScreenProps) {
   const t = useTranslations("lists.alerts");
+  const tx = useTranslations("alertDetail");
   const fmt = useFormatters();
   const now = useNow(rows.some((r) => Boolean(r.activeMute)));
   const [createOpen, setCreateOpen] = React.useState(false);
@@ -214,7 +215,7 @@ export function AlertsScreen({
         }}
         notice={counts}
         list={list}
-        label="Alert rules"
+        label={tx("rulesLabel")}
         columns={ruleColumns}
         rows={rows}
         getRowId={(r) => r.id}

@@ -16,6 +16,7 @@
  */
 
 import { ActivityIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export function StatusPageLink({
   url = process.env.NEXT_PUBLIC_STATUS_PAGE_URL,
@@ -23,6 +24,7 @@ export function StatusPageLink({
   /** Defaults to the build's NEXT_PUBLIC_STATUS_PAGE_URL; passed in by stories. */
   url?: string;
 } = {}) {
+  const t = useTranslations("statusPageLink");
   if (!url) return null;
   return (
     <a
@@ -32,7 +34,7 @@ export function StatusPageLink({
       className="text-muted-foreground hover:text-foreground flex items-center gap-2 px-2 py-1 text-xs"
     >
       <ActivityIcon className="size-3.5 shrink-0" aria-hidden />
-      <span>Platform status</span>
+      <span>{t("label")}</span>
     </a>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { GitBranchIcon, LockIcon, UnlockIcon } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { ScmReauthAction } from "@/components/ScmConnectPrompt";
 import type { UseScmConnect } from "@/components/use-scm-connect";
@@ -66,13 +67,15 @@ export function SourceRepositoryPicker({
   emptyReposLink,
   pickedDetails,
 }: SourceRepositoryPickerProps) {
+  const t = useTranslations("repoPicker");
+  const format = useFormatter();
   const pickedConnection = usable.find((connection) => connection.id === connectionId);
   return (
     <>
       <div className="space-y-2">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Label htmlFor="connection">Source connection</Label>
+            <Label htmlFor="connection">{t("connection")}</Label>
             {pickedConnection && (
               <Badge variant="outline" className="text-2xs font-normal">
                 {connectionKindLabel(pickedConnection.kind as ScmConnectionKind)}
@@ -83,7 +86,7 @@ export function SourceRepositoryPicker({
         </div>
         <Select value={connectionId} onValueChange={(v) => onConnectionChange(v)}>
           <SelectTrigger id="connection">
-            <SelectValue placeholder="Choose a connection" />
+            <SelectValue placeholder={t("chooseConnection")} />
           </SelectTrigger>
           <SelectContent>
             {usable.map((c) => (
@@ -100,7 +103,7 @@ export function SourceRepositoryPicker({
 
       {connectionId && (
         <div className="space-y-2">
-          <Label htmlFor="repo-picker">Repository</Label>
+          <Label htmlFor="repo-picker">{t("repository")}</Label>
           {reposLoading ? (
             <Skeleton className="h-10 w-full" />
           ) : repoList?.errorCode ? (
@@ -128,13 +131,9 @@ export function SourceRepositoryPicker({
                 inputValue={search}
                 onInputValueChange={(v) => onSearchChange(v ?? "")}
               >
-                <ComboboxInput
-                  placeholder={`Search ${repoList.repos.length} repo${
-                    repoList.repos.length === 1 ? "" : "s"
-                  }…`}
-                />
+                <ComboboxInput placeholder={t("search", { count: repoList.repos.length })} />
                 <ComboboxContent>
-                  <ComboboxEmpty>No matching repos.</ComboboxEmpty>
+                  <ComboboxEmpty>{t("noMatches")}</ComboboxEmpty>
                   <ComboboxList>
                     {(item) => {
                       const r = item as {
@@ -158,7 +157,10 @@ export function SourceRepositoryPicker({
                                   className="text-2xs shrink-0 gap-1 px-1 py-0"
                                   title={registeredNote(existingCount)}
                                 >
-                                  {`${existingCount} ${registeredKind}${existingCount === 1 ? "" : "s"} already registered`}
+                                  {t("alreadyRegistered", {
+                                    count: existingCount,
+                                    kind: registeredKind,
+                                  })}
                                 </Badge>
                               )}
                             </div>
@@ -170,9 +172,15 @@ export function SourceRepositoryPicker({
                                   {r.defaultBranch}
                                 </span>
                               )}
-                              {r.isFork && <span>fork</span>}
-                              {r.isArchived && <span>archived</span>}
-                              {r.pushedAt && <span>updated {formatRelative(r.pushedAt)}</span>}
+                              {r.isFork && <span>{t("fork")}</span>}
+                              {r.isArchived && <span>{t("archived")}</span>}
+                              {r.pushedAt && (
+                                <span>
+                                  {t("updated", {
+                                    when: format.relativeTime(new Date(r.pushedAt), new Date()),
+                                  })}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </ComboboxItem>
@@ -185,7 +193,7 @@ export function SourceRepositoryPicker({
             </>
           ) : (
             <p className="text-muted-foreground text-xs">
-              No repos visible to this connection. Adjust visibility scopes on {emptyReposLink}.
+              {t.rich("noRepos", { link: () => emptyReposLink })}
             </p>
           )}
         </div>
@@ -232,14 +240,4 @@ function VisibilityBadge({ visibility }: { visibility: string }) {
       <UnlockIcon className="size-2.5" /> {visibility}
     </Badge>
   );
-}
-
-function formatRelative(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  if (days === 0) return "today";
-  if (days === 1) return "yesterday";
-  if (days < 30) return `${days}d ago`;
-  if (days < 365) return `${Math.floor(days / 30)}mo ago`;
-  return `${Math.floor(days / 365)}y ago`;
 }

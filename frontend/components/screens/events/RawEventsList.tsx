@@ -21,11 +21,12 @@ export type RawEventsListProps = ReturnType<typeof useRawEvents>;
  */
 export function RawEventsList({ events }: RawEventsListProps) {
   const t = useTranslations("lists.events");
+  const tx = useTranslations("eventDetail");
   const fmt = useFormatters();
 
   return (
     <Feed<AstroliftEvent>
-      label="Events"
+      label={tx("events")}
       {...events}
       keyOf={(e) => e.id}
       groupBy={{ day: (e) => e.occurredAt }}

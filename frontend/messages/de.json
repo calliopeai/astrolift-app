@@ -15104,6 +15104,145 @@
     "certificateHostMismatch": "Das hinterlegte Zertifikat deckt diese Zone nicht ab. Stellen Sie erneut bereit, um ein passendes anzufordern.",
     "certificateAccountChanged": "Der Anbieter antwortet jetzt aus einem anderen AWS-Konto als dem, in dem diese Zone bereitgestellt wurde."
   },
+  "detailShell": {
+    "notFound": "{label} nicht gefunden",
+    "notFoundDescription": "Dieses Element ({label}) existiert möglicherweise nicht, ist aus der Liste der letzten Einträge herausgefallen, oder Sie haben keinen Zugriff darauf.",
+    "back": "Zurück zu {label}",
+    "created": "erstellt",
+    "overview": "Übersicht"
+  },
+  "alertDetail": {
+    "alerts": "Warnungen",
+    "ruleHeading": "Regel {id}",
+    "ruleNoun": "Warnregel",
+    "eventHeading": "Ereignis {id}",
+    "eventNoun": "Warnereignis",
+    "state": "Zustand",
+    "muted": "Stummgeschaltet",
+    "active": "Aktiv",
+    "inactive": "Inaktiv",
+    "target": "Ziel",
+    "severity": "Schweregrad",
+    "managedService": "Verwalteter Dienst",
+    "organization": "Organisation",
+    "created": "Erstellt",
+    "updated": "Aktualisiert",
+    "mutedUntil": "Stumm bis",
+    "muteReason": "Grund der Stummschaltung",
+    "mutedBy": "Stummgeschaltet von",
+    "loadError": "Details konnten nicht geladen werden",
+    "predicate": "Prädikat",
+    "notifyChannels": "Benachrichtigungskanäle",
+    "summary": "Zusammenfassung",
+    "rule": "Regel",
+    "fired": "Ausgelöst",
+    "acknowledged": "Bestätigt",
+    "resolved": "Behoben",
+    "detail": "Details",
+    "noDetail": "Für dieses Ereignis wurden keine Details aufgezeichnet.",
+    "all": "Alle",
+    "firing": "Aktiv",
+    "views": "Ansichten",
+    "eventsLabel": "Warnereignisse",
+    "rulesLabel": "Warnregeln"
+  },
+  "deploymentDetailScreen": {
+    "deployLabel": "Deploy {sha}",
+    "details": "Details",
+    "approvals": "Genehmigungen",
+    "releaseNotes": "Versionshinweise",
+    "commits": "<mono>{count}</mono> {count, plural, one {Commit} other {Commits}}",
+    "openDeployments": "Deployments öffnen",
+    "triggeredByUser": "Ausgelöst von Benutzer {user} über {kind}.",
+    "triggeredAuto": "Automatisch ausgelöst über {kind}.",
+    "triggeredAutoCi": "Automatisch ausgelöst über {kind} ({ci}).",
+    "noApprovalsRequired": "Für diese Umgebung sind keine Genehmigungen erforderlich.",
+    "confirm": "Bestätigen",
+    "viewDiff": "Vollständigen Diff anzeigen"
+  },
+  "eventDetail": {
+    "rateError": "Ereignisrate konnte nicht geladen werden",
+    "lastDays": "Letzte {days} Tage",
+    "noEventsInWindow": "Keine Ereignisse in diesem Zeitraum",
+    "rateAria": "Ereignisrate der letzten zwei Wochen",
+    "eventType": "Ereignistyp",
+    "occurred": "Aufgetreten",
+    "source": "Quelle",
+    "app": "App",
+    "organization": "Organisation",
+    "team": "Team",
+    "project": "Projekt",
+    "events": "Ereignisse",
+    "eventHeading": "Ereignis {id}",
+    "eventNoun": "Ereignis",
+    "loadError": "Details konnten nicht geladen werden",
+    "payload": "Nutzlast",
+    "noPayload": "Dieses Ereignis hat keine Nutzlast.",
+    "agedOut": "Diese Ereignisse liegen außerhalb des Zeitraums, den diese Ansicht liest. Öffnen Sie das repräsentative Ereignis für die vollständige Nutzlast.",
+    "openEvent": "Ereignis {type} öffnen",
+    "bucketRange": "{count} Ereignisse zwischen {first} und {last}",
+    "bucketSingle": "1 Ereignis um {at}",
+    "groupsLabel": "Ereignisgruppen"
+  },
+  "repoPicker": {
+    "connection": "Quellverbindung",
+    "chooseConnection": "Verbindung wählen",
+    "repository": "Repository",
+    "search": "{count} {count, plural, one {Repository} other {Repositorys}} durchsuchen…",
+    "noMatches": "Keine passenden Repositorys.",
+    "alreadyRegistered": "{count} {kind, select, agent {{count, plural, one {Agent} other {Agenten}}} other {{count, plural, one {App} other {Apps}}}} bereits registriert",
+    "fork": "Fork",
+    "archived": "archiviert",
+    "updated": "aktualisiert {when}",
+    "noRepos": "Für diese Verbindung sind keine Repositorys sichtbar. Passen Sie die Sichtbarkeitsbereiche unter <link></link> an."
+  },
+  "wizardReview": {
+    "edit": "Bearbeiten",
+    "editAria": "{title} bearbeiten",
+    "running": "Läuft",
+    "done": "Fertig",
+    "failed": "Fehlgeschlagen",
+    "skipped": "Übersprungen",
+    "pending": "Ausstehend"
+  },
+  "uiPrimitives": {
+    "breadcrumb": "Brotkrümelnavigation",
+    "more": "Mehr",
+    "close": "Schließen",
+    "sidebar": "Seitenleiste",
+    "sidebarDescription": "Zeigt die mobile Seitenleiste an.",
+    "resizeSidebar": "Seitenleiste anpassen (Doppelklick zum Zurücksetzen)",
+    "resizeSidebarTitle": "Ziehen zum Anpassen · Doppelklick zum Zurücksetzen",
+    "toggleSidebar": "Seitenleiste umschalten"
+  },
+  "runPage": {
+    "timeline": "Zeitachse",
+    "noSteps": "Keine Schritte aufgezeichnet"
+  },
+  "listControls": {
+    "search": "Suchen…",
+    "perPage": "Pro Seite",
+    "range": "{start}–{end} von {total}"
+  },
+  "platformIncident": {
+    "activeIncidents": "{count} aktive Plattformvorfälle",
+    "viewStatus": "Status anzeigen",
+    "dismiss": "Vorfallbanner schließen"
+  },
+  "identifier": {
+    "copied": "Kopiert",
+    "copy": "{value} kopieren"
+  },
+  "quorumChip": {
+    "email": "E-Mail an {name}"
+  },
+  "authButtons": {
+    "logIn": "Anmelden",
+    "logOut": "Abmelden"
+  },
+  "statusPageLink": {
+    "label": "Plattformstatus"
+  },
   "domainConnections": {
     "title": "DNS verbinden",
     "description": "Wähle einen Anbieter, prüfe seine aktuelle Zone und Einträge, registriere oder verknüpfe den Lesezugriff und bestätige die Eigentümerschaft.",
