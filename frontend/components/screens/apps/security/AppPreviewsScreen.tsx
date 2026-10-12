@@ -195,6 +195,7 @@ export function AppPreviewsScreen({
   configHref,
 }: AppPreviewsScreenProps) {
   const t = useTranslations("apps.previews");
+  const tMisc = useTranslations("appDetailMisc");
   const fmt = useFormatters();
   const viewLabels: Record<string, string> = {
     all: t("list.views.all"),
@@ -272,7 +273,7 @@ export function AppPreviewsScreen({
               )}
             </span>
             <span className="text-muted-foreground truncate font-mono text-xs" title={p.namespace}>
-              ns {p.namespace}
+              {tMisc("namespace", { namespace: p.namespace })}
               {p.commitSha && <> · {p.commitSha.slice(0, 7)}</>}
             </span>
           </div>

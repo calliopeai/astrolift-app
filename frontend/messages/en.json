@@ -1232,7 +1232,13 @@
           "1h": "Last 1 hour",
           "6h": "Last 6 hours",
           "24h": "Last 24 hours"
-        }
+        },
+        "historicalDescription": "Showing log lines from the last {range}.",
+        "historicalNoResults": "No log lines in this window.",
+        "historicalUnavailableEmpty": "Historical log queries aren't available on this cluster. Switch to Live to follow in real time.",
+        "historicalUnavailableHint": "This cluster has no log aggregator backend configured (Loki / CloudWatch / Stackdriver / Azure Monitor). Switch to Live to follow in real time.",
+        "historicalUnavailableTitle": "Historical logs aren't available on this cluster",
+        "refreshHistorical": "Refresh"
       },
       "events": {
         "title": "Recent platform events",
@@ -4536,6 +4542,538 @@
         "latency_p99": "Latency p99",
         "latency_p95": "Latency p95"
       }
+    }
+  },
+  "appEmailService": {
+    "sections": {
+      "health": "Health",
+      "sending": "Identity & sending",
+      "suppressions": "Suppressions",
+      "alerts": "Alert rules",
+      "messages": "Messages",
+      "templates": "Templates"
+    },
+    "title": "Email service: {name}",
+    "description": "Deliverability health, identity verification, and suppression list for this bound email backend.",
+    "sectionsLabel": "Email service sections",
+    "notesFrom": "Notes from {plugin}",
+    "unavailable": "Email detail unavailable. This managed service may have been deprovisioned, or the cloud driver isn't reachable.",
+    "close": "Close",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "notPersonal": "These belong to the email service, not a person, so Mine is empty.",
+    "outcome": {
+      "healthy": "Healthy",
+      "suboptimal": "Suboptimal",
+      "broken": "Broken",
+      "unknown": "Unknown"
+    },
+    "copied": {
+      "token": "Token copied",
+      "cname": "CNAME copied",
+      "topicArn": "Topic ARN copied",
+      "messageId": "Message ID copied"
+    },
+    "copyFailed": "Copy failed",
+    "reputation": {
+      "title": "Sender reputation",
+      "unsupported": "The backend doesn't expose reputation / sandbox status.",
+      "productionAccess": "Production access",
+      "sandbox": "Sandbox",
+      "reputation": "Reputation",
+      "bounceRate": "Bounce rate (7d)",
+      "bounceThrottle": "SES throttles at ~10%",
+      "complaintRate": "Complaint rate (7d)",
+      "complaintThrottle": "SES throttles at ~0.5%",
+      "sandboxNote": "Sandbox mode: this identity can only send to verified recipients + verified domains. Request production access from AWS Support before shipping to end users."
+    },
+    "quota": {
+      "title": "Send quota",
+      "unsupported": "The backend doesn't expose send-rate quota.",
+      "maxSendRate": "Max send rate",
+      "perSecond": "{rate} /sec",
+      "sentToday": "Sent today",
+      "ofQuota": "{pct}% of 24h quota",
+      "nearCeiling": "{pct}% of 24h quota, close to the daily ceiling"
+    },
+    "cost": {
+      "title": "Cost",
+      "empty": "No cost data attributed to this service yet. Costs appear after the cost driver runs its next reconciliation pass.",
+      "thisMonth": "This month",
+      "monthToDate": "Month-to-date",
+      "last30": "Last 30 days",
+      "trailing30": "Trailing 30-day spend"
+    },
+    "identity": {
+      "title": "Identity verification",
+      "unsupported": "The backend doesn't expose identity-verification details.",
+      "domainIdentity": "domain identity",
+      "emailIdentity": "email identity",
+      "dnsWithheld": "Astrolift publishes no verification records on this install; publish them in the identity's DNS zone.",
+      "txtChallenge": "TXT verification challenge:",
+      "dkimCnames": "DKIM CNAMEs to publish"
+    },
+    "dns": {
+      "unsupported": "The backend doesn't expose DNS auth probing for this identity.",
+      "probed": "Probed {time}",
+      "records": "{count, plural, one {# record} other {# records}}"
+    },
+    "suppression": {
+      "title": "Suppression list",
+      "unsupported": "The backend doesn't expose an account-level suppression list.",
+      "reason": "Reason",
+      "search": "Search addresses…",
+      "address": "Address",
+      "date": "Date",
+      "remove": "Remove",
+      "removeSr": "Remove from suppression",
+      "unsuppressTooltip": "Un-suppress (allow sends again)",
+      "addManual": "Add manual entry",
+      "note": "Note (audit trail)",
+      "notePlaceholder": "e.g. support ticket #4567",
+      "suppress": "Suppress address",
+      "empty": "No suppressed addresses.",
+      "listLabel": "Suppressed addresses",
+      "confirmTitle": "Un-suppress {address}?",
+      "confirmBody": "Removes this address from the SES account-level suppression list. SES will accept future sends to this recipient. If the original suppression was a legitimate hard bounce, re-suppressing after another failure may damage sender reputation.",
+      "unsuppress": "Un-suppress"
+    },
+    "sender": {
+      "title": "Sender config",
+      "notSet": "not set",
+      "fields": {
+        "fromName": {
+          "label": "From / display name",
+          "hint": "Shown in recipients' inboxes alongside the From address."
+        },
+        "replyTo": {
+          "label": "Reply-to address",
+          "hint": "Where replies land if it differs from the From address."
+        },
+        "returnPath": {
+          "label": "Return-path (bounce handling)",
+          "hint": "Envelope sender; bounce notifications return here."
+        },
+        "productionFrom": {
+          "label": "Production sender",
+          "hint": "Used when an app is deployed to the production environment."
+        },
+        "previewFrom": {
+          "label": "Preview sender",
+          "hint": "Used in preview envs so test mail can't impersonate production."
+        }
+      }
+    },
+    "sns": {
+      "title": "SES event publishing",
+      "active": "Active",
+      "notConfigured": "Not configured",
+      "activeBody": "SES is publishing send / delivery / bounce / complaint / open / click events to the platform's ingester via SNS. The recent-message log and engagement metrics below stay live.",
+      "configSet": "Configuration set: <code>{name}</code>",
+      "missing": "SNS event publishing is not configured for this identity. Without it the platform can't render the per-message log, bounce drill-in, or open/click engagement.",
+      "howTo": "Set <code>{env}</code> in the install's environment config and re-provision this managed service to wire the SES configuration set, SNS topic, and platform subscription."
+    },
+    "alerts": {
+      "kinds": {
+        "bounce": {
+          "label": "Bounce rate >",
+          "hint": "SES throttles at ~10%. Warn early so you have time to react."
+        },
+        "complaint": {
+          "label": "Complaint rate >",
+          "hint": "SES throttles at ~0.5%. The ceiling is unforgiving here."
+        }
+      },
+      "severities": {
+        "critical": "Critical",
+        "warning": "Warning",
+        "info": "Info"
+      },
+      "severity": "Severity",
+      "status": "Status",
+      "active": "Active",
+      "inactive": "Inactive",
+      "search": "Search rules, conditions…",
+      "name": "Name",
+      "condition": "Condition",
+      "deleteSr": "Delete alert rule",
+      "emptyBody": "No alert rules wired up. Add one below; defaults match SES enforcement headroom so you hear before the throttle.",
+      "emptyTitle": "No alert rules",
+      "add": "Add alert",
+      "threshold": "Threshold (%)",
+      "nameOptional": "Name (optional)",
+      "create": "Create alert rule"
+    },
+    "engagement": {
+      "title": "Engagement metrics",
+      "lastDays": "Last {days}d",
+      "notConfigured": "Engagement counts come from SES event publishing. Configure the SNS topic above to start collecting opens, clicks, bounces, and complaints; the tiles will populate from the next batch.",
+      "empty": "No engagement data in the last 30 days.",
+      "openRate": "Open rate",
+      "clickRate": "Click rate",
+      "bounceRate": "Bounce rate",
+      "complaintRate": "Complaint rate",
+      "ofDeliveries": "{count} of {total} deliveries",
+      "ofSends": "{count} of {total} sends",
+      "summary": "{sends} sends · {delivered} delivered · last {days}d"
+    },
+    "messages": {
+      "events": {
+        "delivery": "Delivered",
+        "bounce": "Bounced",
+        "complaint": "Complaints",
+        "open": "Opens",
+        "click": "Clicks",
+        "send": "Sends",
+        "reject": "Rejected"
+      },
+      "event": "Event",
+      "recipient": "Recipient",
+      "search": "Search recipients, subjects…",
+      "detailsFor": "Message details for {recipient}",
+      "subject": "Subject",
+      "noSubject": "(no subject)",
+      "when": "When",
+      "title": "Recent messages",
+      "refresh": "Refresh",
+      "emptyTitle": "No messages",
+      "emptyBody": "Either nothing has been sent in the retention window or SNS event publishing isn't configured.",
+      "copyId": "Copy message ID",
+      "rawMetadata": "Raw metadata"
+    },
+    "templates": {
+      "search": "Search templates, subjects…",
+      "name": "Name",
+      "subject": "Subject",
+      "created": "Created",
+      "unknown": "unknown",
+      "actions": "Actions",
+      "toggleStats": "Toggle 14d send stats",
+      "stats": "Stats",
+      "new": "New template",
+      "editing": "Editing {name}",
+      "nameFixed": "Name is the template identifier and can't be changed.",
+      "htmlBody": "HTML body",
+      "textBody": "Text body",
+      "create": "Create",
+      "saveChanges": "Save changes",
+      "emptyBody": "No templates yet. Create one above to start sending templated email.",
+      "emptyTitle": "No templates",
+      "deleteTitle": "Delete template {name}?",
+      "deleteBody": "Removes the SES template from the cloud account. Workloads that send via this template will fail until you recreate it or update the app to use a different template.",
+      "deleteConfirm": "Delete template"
+    },
+    "stats": {
+      "noActivity": "No send activity for {name} in the last 14 days.",
+      "day": "{sends} sends · {delivered} delivered",
+      "bounces": "{count} bounces",
+      "complaints": "{count} complaints",
+      "summary": "14d · {sends} sends · {delivered} delivered · {bounces} bounces · {complaints} complaints"
+    },
+    "toasts": {
+      "noResponse": "No response from server",
+      "suppressAddFailed": "Suppression add failed",
+      "suppressed": "Suppressed {address}",
+      "suppressRemoveFailed": "Suppression remove failed",
+      "unsuppressed": "Removed {address} from suppression list",
+      "alreadyRemoved": "{address} was already removed",
+      "updateFailed": "Update failed",
+      "senderSaved": "Sender config saved",
+      "thresholdInvalid": "Threshold must be a positive number",
+      "createAlertFailed": "Create alert failed",
+      "created": "Created {name}",
+      "deleteAlertFailed": "Delete alert failed",
+      "deleted": "Deleted {name}",
+      "templateNameRequired": "Template name required",
+      "subjectRequired": "Subject required",
+      "createTemplateFailed": "Create template failed",
+      "templateCreated": "Created template {name}",
+      "updateTemplateFailed": "Update template failed",
+      "templateUpdated": "Updated template {name}",
+      "saveFailed": "Save failed",
+      "deleteFailed": "Delete failed"
+    }
+  },
+  "appAlertRules": {
+    "timeRange": "Time range",
+    "retentionScope": "Retention scope",
+    "retentionScopeBody": "Applies to logs, metrics, traces, and audit events. Data is stored in your cloud account (CloudWatch, Cloud Logging, Log Analytics, or Loki depending on your provider).",
+    "presets": {
+      "latency_p99": "p99 latency > N ms",
+      "error_rate_5min": "5xx error rate (5m) > N %",
+      "cpu_pct": "CPU saturation > N %",
+      "memory_pct": "Memory saturation > N %"
+    },
+    "severities": {
+      "critical": "Critical",
+      "warning": "Warning",
+      "info": "Info"
+    },
+    "channelKinds": {
+      "inApp": "In-app",
+      "email": "Email",
+      "pagerduty": "PagerDuty"
+    },
+    "name": "Name",
+    "severity": "Severity",
+    "status": "Status",
+    "muted": "Muted · {remaining}",
+    "expired": "expired",
+    "active": "Active",
+    "inactive": "Inactive",
+    "created": "Created",
+    "actions": "Actions",
+    "unmute": "Unmute",
+    "mute": "Mute",
+    "deleteNamed": "Delete {name}",
+    "intro": "Thresholds that page on-call when {app} crosses them. Mute to silence without losing the definition; delete to retire it.",
+    "add": "Add alert rule",
+    "label": "Alert rules",
+    "emptyTitle": "No alert rules for this app",
+    "emptyBody": "Add a rule to page on-call when latency, error rate, or saturation crosses a threshold.",
+    "events": "Events · {name}",
+    "deleteTitleNamed": "Delete {name}?",
+    "deleteTitle": "Delete alert rule?",
+    "deleteBody": "This removes the rule and stops future notifications. Existing alert events stay in history.",
+    "deleteConfirm": "Delete rule",
+    "eventsLabel": "Alert events",
+    "eventsEmpty": "No alert events yet for this rule",
+    "resolved": "resolved {time}",
+    "acked": "Acked",
+    "ack": "Ack",
+    "pickChannel": "Pick at least one notification channel",
+    "newTitle": "New alert rule",
+    "newDescription": "Pages on-call when the chosen metric crosses the threshold. Routing fan-out is taken from the notify channels you select below.",
+    "namePlaceholder": "High p99 latency",
+    "condition": "Condition",
+    "threshold": "Threshold ({unit})",
+    "channels": "Notify channels",
+    "pagerdutyKey": "pagerduty service key",
+    "cancel": "Cancel",
+    "creating": "Creating…",
+    "create": "Create rule",
+    "muteTitleNamed": "Mute {name}",
+    "muteTitle": "Mute alert rule",
+    "muteDescription": "Silences notifications for the chosen window. The rule stays evaluated; only routing is suppressed.",
+    "muteDuration": "Duration (hours, 1–72)",
+    "muteReason": "Reason",
+    "muteReasonPlaceholder": "Known noisy after deploy; revisit Friday.",
+    "muteReasonHint": "Logged on the rule's audit trail so the next operator sees who muted it and why.",
+    "muting": "Muting…",
+    "muteConfirm": "Mute rule",
+    "toasts": {
+      "unmuted": "Unmuted {name}",
+      "unmuteFailed": "Unmute failed",
+      "created": "Created {name}",
+      "createFailed": "Create failed",
+      "muted": "Muted {name}",
+      "muteFailed": "Mute failed",
+      "deleteFailed": "Delete failed",
+      "deleted": "Deleted {name}",
+      "ackFailed": "Ack failed"
+    }
+  },
+  "appMetricsPanels": {
+    "signals": "Signals",
+    "pods": "Pods",
+    "alerts": "Alert rules",
+    "network": "DNS & TLS"
+  },
+  "appManagedServices": {
+    "dkimVerified": "DKIM verified",
+    "dkimPending": "DKIM pending",
+    "backupsEnabled": "Backups enabled",
+    "noBackupPolicy": "No backup policy",
+    "publicBlocked": "Public access blocked",
+    "publicOpen": "Public access open",
+    "error": "Error",
+    "columns": {
+      "name": "Name",
+      "kind": "Kind",
+      "variant": "Variant",
+      "env": "Env",
+      "status": "Status"
+    },
+    "emailDetailsTitle": "Email deliverability details",
+    "emailDetails": "Email details",
+    "serviceDetailsTitle": "Service details",
+    "details": "Details",
+    "deprovision": "Deprovision",
+    "intro": "Databases, caches, queues attached to <mono>{slug}</mono>. Provisioned via the platform's driver registry; the workflow loop watches DB-side status and drives the upstream lifecycle.",
+    "provision": "Provision",
+    "label": "Managed services",
+    "emptyTitle": "No managed services",
+    "emptyBody": "Provision a database, cache, queue or bucket and Astrolift wires its credentials into this app.",
+    "deprovisionTitleNamed": "Deprovision {target}?",
+    "deprovisionTitle": "Deprovision managed service?",
+    "deprovisionBodyEnv": "Tears down the backing resource in {env} via the cloud's driver and soft-deletes the platform row. The workflow surfaces the in-flight state until the cloud confirms deletion.",
+    "deprovisionBody": "Tears down the backing resource and soft-deletes the platform row.",
+    "deleteData": "Delete persistent data.",
+    "deleteDataHint": "Skip the final snapshot / retained-backup path; empty buckets, purge queues, drop databases. Unchecked (default), the driver keeps a restorable artifact alongside the resource teardown.",
+    "forceDestroy": "Force destroy (--atomic).",
+    "forceDestroyHint": "Bypass cloud-side safety guards: suspend bucket versioning, ignore deletion-protection flags, terminate active sessions, ignore lingering bindings. Equivalent to Terraform's <code>{setting}</code>.",
+    "cancel": "Cancel",
+    "confirmForceDelete": "Force destroy + delete data",
+    "confirmDelete": "Deprovision + delete data",
+    "confirmForce": "Force deprovision",
+    "sheetTitle": "Provision managed service",
+    "sheetDescription": "Picks a kind + variant; the workflow loop creates the upstream resource (RDS, ElastiCache, etc.) and surfaces the connection envelope keys here once active.",
+    "environment": "Environment",
+    "selectEnvironment": "Select environment",
+    "inClusterHint": "Set the variant to <code>{variant}</code> to run it on the cluster.",
+    "nameOptional": "Name (optional)",
+    "nameDefault": "Defaults to <code>{kind}</code> when blank.",
+    "variantOptional": "Variant (optional)",
+    "provisioning": "Provisioning…",
+    "toasts": {
+      "provisioning": "Provisioning {kind}",
+      "provisionFailed": "Provision failed",
+      "forceDeleting": "Force-deprovisioning + deleting data for {name}",
+      "deleting": "Deprovisioning + deleting data for {name}",
+      "forceDeprovisioning": "Force-deprovisioning {name}",
+      "deprovisioning": "Deprovisioning {name}",
+      "deprovisionFailed": "Deprovision failed"
+    }
+  },
+  "appWorkloadDetail": {
+    "notPersonal": "Pods and volumes are the workload's, not a person's, so Mine is empty.",
+    "podStatusFilter": "Status",
+    "podNodeFilter": "Node",
+    "podFlappingFilter": "Flapping",
+    "podSearch": "Search pods, nodes…",
+    "workload": "Workload",
+    "podStatus": "Pod status",
+    "pods": "Pods",
+    "notFoundTitle": "Workload not found",
+    "notFoundBody": "The workload doesn't exist or you don't have permission to view it.",
+    "backToWorkloads": "Back to workloads",
+    "overview": "Overview",
+    "containers": "Containers",
+    "manifest": "Manifest",
+    "sections": "Workload sections",
+    "description": "{kind} workload from the manifest. {count, plural, one {# replica} other {# replicas}}.",
+    "public": "public",
+    "cron": "cron {schedule}",
+    "manifestPreview": "Manifest preview",
+    "replicas": "Replicas",
+    "off": "off",
+    "cpuReqLimit": "CPU req/limit",
+    "memoryReqLimit": "Memory req/limit",
+    "storage": "Storage",
+    "recentRuns": "Recent runs",
+    "noRuns": "No scheduled runs recorded yet.",
+    "runEnv": "env",
+    "runStarted": "started {time}",
+    "runExit": "exit {code}",
+    "primary": "primary",
+    "volumeKindFilter": "Kind",
+    "volumeSearch": "Search volumes, mount paths…"
+  },
+  "appWorkloads": {
+    "name": "Name",
+    "kind": "Kind",
+    "readyDesired": "Ready / desired",
+    "ready": "Ready {ready}/{desired}",
+    "hpa": "HPA {min}–{max} @ {cpu}% CPU",
+    "restarts": "Restarts",
+    "public": "Public",
+    "publicBadge": "public",
+    "internal": "internal",
+    "resources": "Resources",
+    "schedule": "Schedule",
+    "label": "Workloads",
+    "emptyTitle": "No workloads declared",
+    "emptyBody": "Workloads are parsed from this app's manifest. Add a workload section to astrolift.yaml and push to repopulate this view.",
+    "openManifest": "Open manifest",
+    "scale": {
+      "title": "Scale {name}",
+      "button": "Scale",
+      "apply": "Apply",
+      "current": "Current: {count}.",
+      "invalid": "Replicas must be a number between 0 and 50",
+      "scaled": "{name} → {count, plural, one {# replica} other {# replicas}}",
+      "failed": "Scale failed"
+    },
+    "rowActions": {
+      "openLogs": "Open logs",
+      "noEnvironments": "Run now: no environments yet",
+      "runIn": "Run now in <mono>{env}</mono>"
+    }
+  },
+  "appManifestCard": {
+    "env": "env",
+    "namespace": "ns",
+    "image": "image",
+    "previous": "prev: {tag}",
+    "resources": "{count, plural, one {# resource} other {# resources}}",
+    "errorPath": "path: <mono>{path}</mono>",
+    "errorLine": ", line <mono>{line}</mono>",
+    "errorColumn": ", col <mono>{column}</mono>"
+  },
+  "appCommandRunner": {
+    "title": "Run command",
+    "description": "Open a one-shot exec session against a container in {slug}. Each invocation runs sh -c {cmd} in the chosen container; stdout + stderr stream live below.",
+    "command": "Command",
+    "workload": "Workload",
+    "selectWorkload": "Select workload",
+    "container": "Container",
+    "selectContainer": "Select container",
+    "primary": "primary",
+    "stop": "Stop",
+    "run": "Run",
+    "history": "History",
+    "clear": "clear",
+    "output": "Output",
+    "empty": "No output yet. Pick a workload + container, type a command, and Run.",
+    "conn": {
+      "idle": "idle",
+      "connecting": "connecting",
+      "open": "open",
+      "closed": "closed"
+    },
+    "exit": "exit {code}"
+  },
+  "appShellShortcuts": {
+    "djangoShell": "Open Django shell (Python)",
+    "dbShell": "Open psql against DATABASE_URL",
+    "redisShell": "Open redis-cli against REDIS_URL",
+    "djangoMigrate": "Run Django migrations",
+    "flaskUpgrade": "Run Flask / Alembic upgrade",
+    "recentLogs": "Last 200 log lines",
+    "envDump": "Dump pod environment (debug missing var)",
+    "deploy": "Trigger a deploy",
+    "rollback": "Rollback to previous deploy"
+  },
+  "appDetailMisc": {
+    "logsTitle": "App logs",
+    "loadAppError": "Could not load app",
+    "openRepo": "Open {repo} repository in a new tab",
+    "namespace": "ns {namespace}"
+  },
+  "appSettingsToasts": {
+    "ingress": {
+      "resumed": "Ingress resumed for {env}.",
+      "resumeFailed": "Resume failed.",
+      "paused": "Ingress paused for {env}.",
+      "pauseFailed": "Pause failed."
+    },
+    "runJob": {
+      "noResponse": "Run failed: no response from backend.",
+      "failed": "Run failed.",
+      "noPayload": "Run returned no payload.",
+      "started": "Started job {run} in {namespace}."
+    },
+    "forceRedeploy": {
+      "noResponse": "Force redeploy failed: no response from backend.",
+      "failed": "Force redeploy failed.",
+      "noPayload": "Force redeploy returned no payload.",
+      "counts": "Cancelled {deploys, plural, one {# deploy} other {# deploys}}, deleted {objects, plural, one {# k8s object} other {# k8s objects}}.",
+      "dispatched": "Workflow dispatched.",
+      "watchRun": "Watch run: {url}",
+      "dispatchFailed": "Workflow dispatch failed: {message}",
+      "unknownError": "unknown error"
     }
   },
   "playground": {

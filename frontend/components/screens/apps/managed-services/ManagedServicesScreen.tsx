@@ -1,6 +1,7 @@
 "use client";
 
 import { DatabaseIcon, InfoIcon, MailIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Can } from "@/components/Can";
@@ -67,6 +68,7 @@ const AMBER_BADGE = "border-warning-border bg-warning/15 text-warning-fg";
 const RED_BADGE = "border-destructive/40 bg-destructive/15 text-destructive";
 
 function ValidationBadges({ service }: { service: ManagedService }) {
+  const t = useTranslations("appManagedServices");
   const cfg = service.config ?? {};
   const items: React.ReactNode[] = [];
 
@@ -76,13 +78,13 @@ function ValidationBadges({ service }: { service: ManagedService }) {
         const verified = cfg.dkim_verified === true;
         items.push(
           <Badge key="dkim" variant="outline" className={verified ? GREEN_BADGE : AMBER_BADGE}>
-            {verified ? "DKIM verified" : "DKIM pending"}
+            {verified ? t("dkimVerified") : t("dkimPending")}
           </Badge>
         );
       } else {
         items.push(
           <Badge key="dkim" variant="outline" className={AMBER_BADGE}>
-            DKIM pending
+            {t("dkimPending")}
           </Badge>
         );
       }
@@ -101,7 +103,7 @@ function ValidationBadges({ service }: { service: ManagedService }) {
         const enabled = cfg.backup_enabled === true;
         items.push(
           <Badge key="backup" variant="outline" className={enabled ? GREEN_BADGE : AMBER_BADGE}>
-            {enabled ? "Backups enabled" : "No backup policy"}
+            {enabled ? t("backupsEnabled") : t("noBackupPolicy")}
           </Badge>
         );
       }
@@ -119,7 +121,7 @@ function ValidationBadges({ service }: { service: ManagedService }) {
         const blocked = cfg.public_access_blocked === true;
         items.push(
           <Badge key="public" variant="outline" className={blocked ? GREEN_BADGE : RED_BADGE}>
-            {blocked ? "Public access blocked" : "Public access open"}
+            {blocked ? t("publicBlocked") : t("publicOpen")}
           </Badge>
         );
       }
@@ -135,7 +137,7 @@ function ValidationBadges({ service }: { service: ManagedService }) {
         <Tooltip>
           <TooltipTrigger asChild>
             <Badge variant="outline" className={`${RED_BADGE} cursor-help`}>
-              Error
+              {t("error")}
             </Badge>
           </TooltipTrigger>
           <TooltipContent className="max-w-sm">
@@ -204,6 +206,7 @@ export function ManagedServicesScreen({
   const [forceDestroy, setForceDestroy] = React.useState(false);
   const [emailDetailTarget, setEmailDetailTarget] = React.useState<ManagedService | null>(null);
   const [serviceDetailTarget, setServiceDetailTarget] = React.useState<ManagedService | null>(null);
+  const t = useTranslations("appManagedServices");
   React.useEffect(() => {
     if (deprovisionTarget === null) {
       setDeleteData(false);
@@ -214,7 +217,7 @@ export function ManagedServicesScreen({
   const columns: Column<ManagedService>[] = [
     {
       id: "name",
-      header: "Name",
+      header: t("columns.name"),
       cellClassName: "font-mono text-xs whitespace-normal",
       cell: (svc) => (
         <span className="flex min-w-0 items-center gap-2">
@@ -225,18 +228,18 @@ export function ManagedServicesScreen({
     },
     {
       id: "kind",
-      header: "Kind",
+      header: t("columns.kind"),
       cell: (svc) => <Badge variant="secondary">{svc.kind}</Badge>,
     },
     {
       id: "variant",
-      header: "Variant",
+      header: t("columns.variant"),
       cellClassName: "text-muted-foreground font-mono text-xs",
       cell: (svc) => svc.variant || "—",
     },
     {
       id: "env",
-      header: "Env",
+      header: t("columns.env"),
       cell: (svc) => (
         <Badge variant="outline" className="text-2xs font-mono">
           {svc.environmentName}
@@ -245,7 +248,7 @@ export function ManagedServicesScreen({
     },
     {
       id: "status",
-      header: "Status",
+      header: t("columns.status"),
       cell: (svc) => (
         <div className="flex flex-wrap items-center gap-1">
           <span className="capitalize">{svc.status}</span>
@@ -272,10 +275,10 @@ export function ManagedServicesScreen({
                 size="icon"
                 className="size-8"
                 onClick={() => setEmailDetailTarget(svc)}
-                title="Email deliverability details"
+                title={t("emailDetailsTitle")}
               >
                 <MailIcon className="size-4" />
-                <span className="sr-only">Email details</span>
+                <span className="sr-only">{t("emailDetails")}</span>
               </Button>
             ) : null}
             {!isEmail && isActive ? (
@@ -284,10 +287,10 @@ export function ManagedServicesScreen({
                 size="icon"
                 className="size-8"
                 onClick={() => setServiceDetailTarget(svc)}
-                title="Service details"
+                title={t("serviceDetailsTitle")}
               >
                 <InfoIcon className="size-4" />
-                <span className="sr-only">Details</span>
+                <span className="sr-only">{t("details")}</span>
               </Button>
             ) : null}
             {isActive && (
@@ -300,7 +303,7 @@ export function ManagedServicesScreen({
                   disabled={busy}
                 >
                   <Trash2Icon className="size-4" />
-                  <span className="sr-only">Deprovision</span>
+                  <span className="sr-only">{t("deprovision")}</span>
                 </Button>
               </Can>
             )}
@@ -314,21 +317,22 @@ export function ManagedServicesScreen({
     <div className="min-w-0 space-y-3">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
         <p className="text-muted-foreground min-w-0 flex-1 text-sm">
-          Databases, caches, queues attached to <span className="font-mono">{slug}</span>.
-          Provisioned via the platform&apos;s driver registry; the workflow loop watches DB-side
-          status and drives the upstream lifecycle.
+          {t.rich("intro", {
+            slug,
+            mono: (chunks) => <span className="font-mono">{chunks}</span>,
+          })}
         </p>
         <Can permission="app.deploy">
           <Button size="sm" onClick={() => setOpen(true)}>
             <PlusIcon className="size-4" />
-            Provision
+            {t("provision")}
           </Button>
         </Can>
       </div>
       <ListPage<ManagedService>
         embedded
         list={list}
-        label="Managed services"
+        label={t("label")}
         columns={columns}
         rows={rows}
         getRowId={(svc) => svc.id}
@@ -340,9 +344,8 @@ export function ManagedServicesScreen({
         totalCount={totalCount}
         empty={{
           icon: <DatabaseIcon className="size-5" />,
-          title: "No managed services",
-          description:
-            "Provision a database, cache, queue or bucket and Astrolift wires its credentials into this app.",
+          title: t("emptyTitle"),
+          description: t("emptyBody"),
         }}
       />
 
@@ -369,13 +372,15 @@ export function ManagedServicesScreen({
           <AlertDialogHeader>
             <AlertDialogTitle>
               {deprovisionTarget
-                ? `Deprovision ${deprovisionTarget.kind}/${deprovisionTarget.name}?`
-                : "Deprovision managed service?"}
+                ? t("deprovisionTitleNamed", {
+                    target: `${deprovisionTarget.kind}/${deprovisionTarget.name}`,
+                  })
+                : t("deprovisionTitle")}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {deprovisionTarget
-                ? `Tears down the backing resource in ${deprovisionTarget.environmentName} via the cloud's driver and soft-deletes the platform row. The workflow surfaces the in-flight state until the cloud confirms deletion.`
-                : "Tears down the backing resource and soft-deletes the platform row."}
+                ? t("deprovisionBodyEnv", { env: deprovisionTarget.environmentName })
+                : t("deprovisionBody")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="my-4 space-y-3">
@@ -388,12 +393,8 @@ export function ManagedServicesScreen({
                   className="border-destructive/50 accent-destructive mt-0.5 size-4 cursor-pointer rounded"
                 />
                 <span>
-                  <strong className="text-destructive">Delete persistent data.</strong>{" "}
-                  <span className="text-muted-foreground">
-                    Skip the final snapshot / retained-backup path; empty buckets, purge queues,
-                    drop databases. Unchecked (default), the driver keeps a restorable artifact
-                    alongside the resource teardown.
-                  </span>
+                  <strong className="text-destructive">{t("deleteData")}</strong>{" "}
+                  <span className="text-muted-foreground">{t("deleteDataHint")}</span>
                 </span>
               </label>
             </div>
@@ -406,19 +407,19 @@ export function ManagedServicesScreen({
                   className="border-destructive/50 accent-destructive mt-0.5 size-4 cursor-pointer rounded"
                 />
                 <span>
-                  <strong className="text-destructive">Force destroy (--atomic).</strong>{" "}
+                  <strong className="text-destructive">{t("forceDestroy")}</strong>{" "}
                   <span className="text-muted-foreground">
-                    Bypass cloud-side safety guards: suspend bucket versioning, ignore
-                    deletion-protection flags, terminate active sessions, ignore lingering bindings.
-                    Equivalent to Terraform&apos;s{" "}
-                    <code className="font-mono text-xs">force_destroy = true</code>.
+                    {t.rich("forceDestroyHint", {
+                      setting: "force_destroy = true",
+                      code: (chunks) => <code className="font-mono text-xs">{chunks}</code>,
+                    })}
                   </span>
                 </span>
               </label>
             </div>
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               variant="destructive"
               disabled={deprovisioning}
@@ -431,12 +432,12 @@ export function ManagedServicesScreen({
               }}
             >
               {deleteData && forceDestroy
-                ? "Force destroy + delete data"
+                ? t("confirmForceDelete")
                 : deleteData
-                  ? "Deprovision + delete data"
+                  ? t("confirmDelete")
                   : forceDestroy
-                    ? "Force deprovision"
-                    : "Deprovision"}
+                    ? t("confirmForce")
+                    : t("deprovision")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -477,6 +478,7 @@ export function ProvisionSheet({
   busy,
   databaseRestriction,
 }: ProvisionSheetProps) {
+  const t = useTranslations("appManagedServices");
   const [envName, setEnvName] = React.useState("");
   const [kind, setKind] = React.useState("postgres");
   const [name, setName] = React.useState("");
@@ -497,11 +499,8 @@ export function ProvisionSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col">
         <SheetHeader>
-          <SheetTitle>Provision managed service</SheetTitle>
-          <SheetDescription>
-            Picks a kind + variant; the workflow loop creates the upstream resource (RDS,
-            ElastiCache, etc.) and surfaces the connection envelope keys here once active.
-          </SheetDescription>
+          <SheetTitle>{t("sheetTitle")}</SheetTitle>
+          <SheetDescription>{t("sheetDescription")}</SheetDescription>
         </SheetHeader>
         <form
           onSubmit={async (e) => {
@@ -517,10 +516,10 @@ export function ProvisionSheet({
           className="flex flex-1 flex-col gap-4 px-4 pb-4"
         >
           <div className="space-y-2">
-            <Label htmlFor="ms-env">Environment</Label>
+            <Label htmlFor="ms-env">{t("environment")}</Label>
             <Select value={envName} onValueChange={setEnvName}>
               <SelectTrigger id="ms-env">
-                <SelectValue placeholder="Select environment" />
+                <SelectValue placeholder={t("selectEnvironment")} />
               </SelectTrigger>
               <SelectContent>
                 {envs.map((e) => (
@@ -532,7 +531,7 @@ export function ProvisionSheet({
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ms-kind">Kind</Label>
+            <Label htmlFor="ms-kind">{t("columns.kind")}</Label>
             <Select value={kind} onValueChange={setKind}>
               <SelectTrigger id="ms-kind">
                 <SelectValue />
@@ -547,13 +546,16 @@ export function ProvisionSheet({
             </Select>
             {databaseRestriction && inCluster && (
               <p id="ms-withheld" className="text-warning-fg text-xs">
-                {databaseRestriction} Set the variant to <code>{inCluster}</code> to run it on the
-                cluster.
+                {databaseRestriction}{" "}
+                {t.rich("inClusterHint", {
+                  variant: inCluster,
+                  code: (chunks) => <code>{chunks}</code>,
+                })}
               </p>
             )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ms-name">Name (optional)</Label>
+            <Label htmlFor="ms-name">{t("nameOptional")}</Label>
             <Input
               id="ms-name"
               value={name}
@@ -563,11 +565,11 @@ export function ProvisionSheet({
               className="font-mono"
             />
             <p className="text-muted-foreground text-xs">
-              Defaults to <code>{kind}</code> when blank.
+              {t.rich("nameDefault", { kind, code: (chunks) => <code>{chunks}</code> })}
             </p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="ms-variant">Variant (optional)</Label>
+            <Label htmlFor="ms-variant">{t("variantOptional")}</Label>
             <Input
               id="ms-variant"
               value={variant}
@@ -579,14 +581,14 @@ export function ProvisionSheet({
           </div>
           <SheetFooter className="mt-auto flex-row justify-end gap-2 px-0">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              {t("cancel")}
             </Button>
             <Button
               type="submit"
               disabled={busy || !envName || !kind || withheld}
               aria-describedby={withheld ? "ms-withheld" : undefined}
             >
-              {busy ? "Provisioning…" : "Provision"}
+              {busy ? t("provisioning") : t("provision")}
             </Button>
           </SheetFooter>
         </form>

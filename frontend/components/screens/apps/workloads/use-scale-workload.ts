@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation } from "@apollo/client/react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type { MutationResult } from "@/graphql/identity/identity.types";
@@ -17,6 +18,7 @@ import { SCALE_WORKLOAD } from "@/graphql/lifecycle/lifecycle.mutations";
  * The data half of ScalePopoverView.
  */
 export function useScaleWorkload(workload: AstroliftWorkload, currentDesired: number) {
+  const t = useTranslations("appWorkloads.scale");
   const feedback = useWorkloadActionPermission(workload.viewerCan?.scale, workload.version);
   const [scale, { loading }] = useMutation<{
     scaleAstroliftWorkload: MutationResult<unknown>;
@@ -26,7 +28,7 @@ export function useScaleWorkload(workload: AstroliftWorkload, currentDesired: nu
     if (feedback.blocked()) return false;
     const next = Number.parseInt(value, 10);
     if (Number.isNaN(next) || next < 0 || next > 50) {
-      toast.error("Replicas must be a number between 0 and 50");
+      toast.error(t("invalid"));
       return false;
     }
     if (next === currentDesired) {
@@ -40,10 +42,10 @@ export function useScaleWorkload(workload: AstroliftWorkload, currentDesired: nu
         },
       });
       if (data?.scaleAstroliftWorkload.ok) {
-        toast.success(`${workload.name} → ${next} replicas`);
+        toast.success(t("scaled", { name: workload.name, count: next }));
         return true;
       }
-      return feedback.reject(data?.scaleAstroliftWorkload, "Scale failed");
+      return feedback.reject(data?.scaleAstroliftWorkload, t("failed"));
     } catch (err) {
       toast.error((err as Error).message);
       return false;

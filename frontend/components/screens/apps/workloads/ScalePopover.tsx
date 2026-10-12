@@ -28,6 +28,7 @@ export function ScalePopoverView({
   defaultOpen = false,
 }: ScalePopoverViewProps) {
   const t = useTranslations("apps.workloadActions");
+  const ts = useTranslations("appWorkloads.scale");
   const [open, setOpen] = React.useState(defaultOpen);
   const [value, setValue] = React.useState(String(currentDesired));
   function onOpenChange(next: boolean) {
@@ -46,11 +47,15 @@ export function ScalePopoverView({
           variant="ghost"
           size="icon"
           className="size-6"
-          title={permission.allowed ? `Scale ${workloadName} · ${t("primary")}` : permission.reason}
+          title={
+            permission.allowed
+              ? `${ts("title", { name: workloadName })} · ${t("primary")}`
+              : permission.reason
+          }
           disabled={!permission.allowed || loading}
         >
           <ScalingIcon className="size-3" />
-          <span className="sr-only">Scale</span>
+          <span className="sr-only">{ts("button")}</span>
         </Button>
       </PopoverTrigger>
       {!permission.allowed && (
@@ -59,7 +64,7 @@ export function ScalePopoverView({
         </span>
       )}
       <PopoverContent className="w-56 p-3" align="start">
-        <p className="mb-2 text-xs font-medium">Scale {workloadName}</p>
+        <p className="mb-2 text-xs font-medium">{ts("title", { name: workloadName })}</p>
         <div className="flex items-center gap-2">
           <Input
             type="number"
@@ -76,11 +81,11 @@ export function ScalePopoverView({
             autoFocus
           />
           <Button size="sm" onClick={() => void apply()} disabled={loading || !permission.allowed}>
-            {loading ? <Loader2Icon className="size-3 animate-spin" /> : "Apply"}
+            {loading ? <Loader2Icon className="size-3 animate-spin" /> : ts("apply")}
           </Button>
         </div>
         <p className="text-muted-foreground text-2xs mt-2">
-          Current: {currentDesired}. {t("primary")}. {t("advisory")}
+          {ts("current", { count: currentDesired })} {t("primary")}. {t("advisory")}
         </p>
         {!permission.allowed && (
           <p role="status" className="text-muted-foreground mt-2 text-xs">
