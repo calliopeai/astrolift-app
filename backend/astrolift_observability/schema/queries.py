@@ -71,6 +71,10 @@ from core.tenancy import get_current_tenant
 
 log = logging.getLogger(__name__)
 
+# The live resource gauges read the last five minutes: long enough for a CPU rate,
+# short enough that one late scrape does not blank the card for an hour.
+_RESOURCE_USAGE_SECONDS = 300
+
 # Internal metric catalogs must not become Strawberry root fields (#2111).
 _POSTGRES_METRICS: tuple[tuple[str, str], ...] = (
     ("connections", "count"),
@@ -341,81 +345,6 @@ def _classify_status_code(code: str) -> str:
     return "other"
 
 
-def _instant_resource_gauge(
-    *,
-    endpoint: str,
-    app_slug: str,
-    environment_name: str | None,
-    workload_slug: str,
-    resource: str,
-    unit: str,
-) -> WorkloadResourceGauge | None:
-    """Run usage/request/limit instant queries for one resource and
-    fold into a gauge.
-
-    Returns ``None`` when **every** of the three queries errored —
-    that's the "Prometheus is dark" signal the caller uses to pick
-    the empty-state. A single-query error is swallowed and surfaced
-    as 0.0 on that field; the FE is robust to a missing denominator.
-    """
-
-    builders = {
-        "usage": (
-            prom_queries.build_workload_cpu_usage_query
-            if resource == "cpu"
-            else prom_queries.build_workload_memory_usage_query
-        ),
-        "request": prom_queries.build_workload_resource_request_query,
-        "limit": prom_queries.build_workload_resource_limit_query,
-    }
-    plans = {
-        "usage": builders["usage"](
-            app_slug=app_slug,
-            environment_name=environment_name,
-            workload_slug=workload_slug,
-        ),
-        "request": builders["request"](
-            app_slug=app_slug,
-            environment_name=environment_name,
-            workload_slug=workload_slug,
-            resource=resource,
-        ),
-        "limit": builders["limit"](
-            app_slug=app_slug,
-            environment_name=environment_name,
-            workload_slug=workload_slug,
-            resource=resource,
-        ),
-    }
-    values: dict[str, float] = {}
-    error_count = 0
-    for key, plan in plans.items():
-        try:
-            values[key] = float(
-                prometheus_client.query_instant(
-                    endpoint=endpoint,
-                    query=plan.promql,
-                )
-            )
-        except PrometheusError:
-            values[key] = 0.0
-            error_count += 1
-    if error_count == len(plans):
-        return None
-
-    current = values["usage"]
-    request = values["request"]
-    limit = values["limit"]
-    return WorkloadResourceGauge(
-        unit=unit,
-        current=current,
-        request=request,
-        limit=limit,
-        percent_of_request=(current / request * 100.0) if request > 0 else 0.0,
-        percent_of_limit=(current / limit * 100.0) if limit > 0 else 0.0,
-    )
-
-
 @strawberry.type
 class GoldenSignalsQuery:
     @strawberry.field
@@ -623,18 +552,11 @@ class GoldenSignalsQuery:
             promql=plan.promql,
         )
 
-    # -- Per-workload live resource usage (#430) ---------------------
+    # -- Per-workload live resource usage (#430, #2263) --------------
     #
     # Drives the two gauges (CPU + memory) at the top of the workload
-    # detail page. Returns ``None`` (rather than an empty list) when
-    # Prometheus is unreachable so the FE can render the "metrics not
-    # yet flowing" callout instead of a stale-looking gauge at 0%.
-    #
-    # The resolver issues four instant queries per call (usage +
-    # request + limit for each of CPU and memory). They share the
-    # same TTL cache the operations client uses, so the 5s FE poll
-    # mostly hits cache and Prometheus sees a roughly 30s effective
-    # cadence under sustained load.
+    # detail page, from the same verified measurement as the golden
+    # signals. ``None`` means "metrics not yet flowing", never 0%.
 
     @strawberry.field
     @require_permission(
@@ -650,18 +572,18 @@ class GoldenSignalsQuery:
     ) -> WorkloadResourceUsage | None:
         """Live CPU + memory usage vs. request/limit for one workload.
 
-        Sources four instant PromQL queries per resource against the
-        environment's Prometheus endpoint:
+        Read from the verified saturation measurement the golden signals
+        use (#2263): the workload's own pods, proven by their identity
+        labels and owner chain, joined to cAdvisor usage and
+        kube-state-metrics limits by namespace, pod, uid and container.
+        cAdvisor and kube-state-metrics series carry no ``app`` label, so
+        the label-matched queries this used before selected nothing and
+        reported every workload at 0.
 
-        * usage — ``sum(rate(container_cpu_usage_seconds_total[1m]))``
-          (cores) or ``sum(container_memory_working_set_bytes)`` (bytes)
-        * request — ``sum(kube_pod_container_resource_requests{resource=...})``
-        * limit — ``sum(kube_pod_container_resource_limits{resource=...})``
-
-        Returns ``None`` when the app is unknown to the tenant, the
-        environment's cluster has no Prometheus endpoint configured,
-        or every query errored — the FE treats null as the empty-state
-        signal.
+        Returns ``None`` when either resource cannot be measured (no
+        Prometheus, unverified ownership, no pods yet, partial data):
+        the FE shows its "metrics not yet flowing" state rather than a
+        gauge at 0%.
         """
         tenant = get_current_tenant()
         app = (
@@ -670,64 +592,60 @@ class GoldenSignalsQuery:
                 organization_id=tenant.organization_id,
                 deleted_at__isnull=True,
             )
-            .only("id", "slug")
+            .select_related("organization")
             .first()
         )
         if app is None:
             return None
 
+        from astrolift_observability.golden_signals import golden_signals_for_app
+        from astrolift_observability.workload_resources import request_total
+
+        result = golden_signals_for_app(
+            app=app,
+            environment_name=environment_name,
+            workload_slug=workload_slug,
+            seconds=_RESOURCE_USAGE_SECONDS,
+            now=_now_utc(),
+            cloudwatch_fallback=_backfill_from_cloudwatch,
+        )
+        measured = {
+            signal.name: signal.measurement
+            for signal in result.signals
+            if signal.name in (GoldenSignalKind.SATURATION_CPU, GoldenSignalKind.SATURATION_MEMORY)
+        }
+        if len(measured) != 2 or not all(
+            m is not None and m.available and m.usage_samples and m.limit_samples for m in measured.values()
+        ):
+            return None
         endpoint = prom_client.resolve_prometheus_endpoint(app=app, environment_name=environment_name)
-        if endpoint is None:
-            return None
-
-        cpu_gauge = _instant_resource_gauge(
-            endpoint=endpoint,
-            app_slug=app.slug,
-            environment_name=environment_name,
-            workload_slug=workload_slug,
-            resource="cpu",
-            unit="cores",
-        )
-        memory_gauge = _instant_resource_gauge(
-            endpoint=endpoint,
-            app_slug=app.slug,
-            environment_name=environment_name,
-            workload_slug=workload_slug,
-            resource="memory",
-            unit="bytes",
-        )
-        # Both gauges failing = Prometheus is down / mis-scoped; treat
-        # the same as no endpoint so the FE shows one consistent empty
-        # state instead of two flavours.
-        if cpu_gauge is None and memory_gauge is None:
-            return None
-        # Mixed-state: one source dark, the other live. Synthesize a
-        # zero gauge for the dark side so the FE can still render the
-        # half that works (rather than dropping the whole card).
-        if cpu_gauge is None:
-            cpu_gauge = WorkloadResourceGauge(
-                unit="cores",
-                current=0.0,
-                request=0.0,
-                limit=0.0,
-                percent_of_request=0.0,
-                percent_of_limit=0.0,
+        gauges = {}
+        for kind, resource, unit in (
+            (GoldenSignalKind.SATURATION_CPU, "cpu", "cores"),
+            (GoldenSignalKind.SATURATION_MEMORY, "memory", "bytes"),
+        ):
+            measurement = measured[kind]
+            current = measurement.usage_samples[-1].value
+            limit = measurement.limit_samples[-1].value
+            request = (
+                request_total(
+                    endpoint=endpoint,
+                    namespace=measurement.target.namespace,
+                    members=measurement.containers,
+                    resource=resource,
+                )
+                if endpoint
+                else 0.0
             )
-        if memory_gauge is None:
-            memory_gauge = WorkloadResourceGauge(
-                unit="bytes",
-                current=0.0,
-                request=0.0,
-                limit=0.0,
-                percent_of_request=0.0,
-                percent_of_limit=0.0,
+            gauges[resource] = WorkloadResourceGauge(
+                unit=unit,
+                current=current,
+                request=request,
+                limit=limit,
+                percent_of_request=(current / request * 100.0) if request > 0 else 0.0,
+                percent_of_limit=(current / limit * 100.0) if limit > 0 else 0.0,
             )
-
-        return WorkloadResourceUsage(
-            cpu=cpu_gauge,
-            memory=memory_gauge,
-            sourced_at=_now_utc(),
-        )
+        return WorkloadResourceUsage(cpu=gauges["cpu"], memory=gauges["memory"], sourced_at=_now_utc())
 
     # -- URL health probe (#406) -------------------------------------
     #

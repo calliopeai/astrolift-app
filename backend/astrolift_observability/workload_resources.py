@@ -36,8 +36,18 @@ def _selector(member, namespace, *, resource=None):
     return "{" + ",".join(parts) + "}"
 
 
-def resource_queries(members, namespace, resource, range_seconds):
+def rate_window(range_seconds):
+    """The CPU rate window: the panel's, but never under 2m. cAdvisor is
+    scraped every 30s with jitter (25-37s seen on CONFLICT), so a 1m window
+    often holds one sample, the rate has no value at that step, and the
+    measurement reads as PARTIAL_DATA (#2263). Prometheus wants at least four
+    scrape intervals."""
     window = pick_rate_window(range_seconds)
+    return "2m" if window == "1m" else window
+
+
+def resource_queries(members, namespace, resource, range_seconds):
+    window = rate_window(range_seconds)
     usages, limits = [], []
     for member in members:
         selector = _selector(member, namespace)
@@ -87,7 +97,7 @@ def _series(rows, members, namespace, *, limits, resource):
 def measure_resource(
     *, endpoint, namespace, members, resource, range_seconds, start_unix, end_unix, step_seconds
 ):
-    window = pick_rate_window(range_seconds)
+    window = rate_window(range_seconds)
     window_seconds = int(window[:-1]) * {"m": 60, "h": 3600}[window[-1]] if resource == "cpu" else 0
     start = max(start_unix, math.ceil(max(member.started_at for member in members)) + window_seconds)
     if start >= end_unix:
@@ -152,3 +162,22 @@ def measure_resource(
         f"sum({usage_query}) / (sum({limits_query}) > 0)",
         start,
     )
+
+
+def request_total(*, endpoint, namespace, members, resource):
+    """Sum of the containers' ``resource`` requests from kube-state-metrics, 0.0
+    when none is set or the read fails. Matched by namespace, pod, uid,
+    container and resource, as the limits are."""
+    query = (
+        "sum("
+        + " or ".join(
+            f"kube_pod_container_resource_requests{_selector(member, namespace, resource=resource)}"
+            for member in members
+        )
+        + ")"
+    )
+    try:
+        value = prometheus_client.query_instant(endpoint=endpoint, query=query)
+    except PrometheusError:
+        return 0.0
+    return value if math.isfinite(value) and value > 0 else 0.0

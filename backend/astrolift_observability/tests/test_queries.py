@@ -527,39 +527,61 @@ def test_workload_resource_usage_no_prometheus_endpoint_returns_null(permission_
     assert result is None
 
 
-def test_workload_resource_usage_happy_path(permission_resolver):
-    """Six instant queries (usage+request+limit × CPU+memory) → gauge
-    pair with percent fields filled."""
-    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
-    permission_resolver.grant(Permission.APP_READ)
+def _saturation(kind, *, available=True, usage=(0.5,), limit=(2.0,), reason=None):
+    from types import SimpleNamespace
 
-    # Return values keyed by the substring of the PromQL — keeps the
-    # stub readable without re-parsing.
-    def fake_query_instant(*, endpoint, query, timeout=5.0):
-        if "container_cpu_usage_seconds_total" in query:
-            return 0.5  # 0.5 cores used
-        if "container_memory_working_set_bytes" in query:
-            return 256.0 * 1024 * 1024  # 256 MiB used
-        if "kube_pod_container_resource_requests" in query and 'resource="cpu"' in query:
-            return 1.0
-        if "kube_pod_container_resource_limits" in query and 'resource="cpu"' in query:
-            return 2.0
-        if "kube_pod_container_resource_requests" in query and 'resource="memory"' in query:
-            return 512.0 * 1024 * 1024
-        if "kube_pod_container_resource_limits" in query and 'resource="memory"' in query:
-            return 1024.0 * 1024 * 1024
-        raise AssertionError(f"unexpected query {query!r}")
+    member = SimpleNamespace(
+        pod_name="api-7d9f-x1", pod_uid="uid-1", container_name="api", container_id="abc123"
+    )
+    return SimpleNamespace(
+        name=kind,
+        measurement=SimpleNamespace(
+            available=available,
+            unavailable_reason=reason,
+            usage_samples=[SimpleNamespace(value=v) for v in usage],
+            limit_samples=[SimpleNamespace(value=v) for v in limit],
+            containers=[member] if available else [],
+            target=SimpleNamespace(namespace="acme-api"),
+        ),
+    )
 
+
+def _golden(*signals):
+    from types import SimpleNamespace
+
+    return lambda **kwargs: SimpleNamespace(signals=list(signals))
+
+
+def test_workload_resource_usage_reads_the_verified_measurement(permission_resolver):
+    """Usage and limit come from the verified saturation measurement (#2263);
+    requests from kube-state-metrics for the same pods, matched by uid."""
+    from astrolift_observability import golden_signals
+    from astrolift_observability.schema.types import GoldenSignalKind
     from astrolift_operations import prometheus_client as ops_client
 
-    with patch.object(ops_client, "query_instant", side_effect=fake_query_instant):
-        with _tenant(org):
-            result = GoldenSignalsQuery().astrolift_workload_resource_usage(
-                _info(),
-                app_slug=app.slug,
-                workload_slug="api",
-                environment_name="prod",
-            )
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    permission_resolver.grant(Permission.APP_READ)
+    queries = []
+
+    def fake_query_instant(*, endpoint, query, timeout=5.0):
+        queries.append(query)
+        assert 'pod="api-7d9f-x1"' in query and 'uid="uid-1"' in query and 'namespace="acme-api"' in query
+        return 1.0 if 'resource="cpu"' in query else 512.0 * 1024 * 1024
+
+    golden = _golden(
+        _saturation(GoldenSignalKind.SATURATION_CPU, usage=(0.4, 0.5), limit=(2.0, 2.0)),
+        _saturation(
+            GoldenSignalKind.SATURATION_MEMORY, usage=(256.0 * 1024 * 1024,), limit=(1024.0 * 1024 * 1024,)
+        ),
+    )
+    with (
+        patch.object(golden_signals, "golden_signals_for_app", side_effect=golden),
+        patch.object(ops_client, "query_instant", side_effect=fake_query_instant),
+        _tenant(org),
+    ):
+        result = GoldenSignalsQuery().astrolift_workload_resource_usage(
+            _info(), app_slug=app.slug, workload_slug="api", environment_name="prod"
+        )
 
     assert result is not None
     assert result.cpu.current == pytest.approx(0.5)
@@ -568,59 +590,59 @@ def test_workload_resource_usage_happy_path(permission_resolver):
     assert result.cpu.percent_of_request == pytest.approx(50.0)
     assert result.cpu.percent_of_limit == pytest.approx(25.0)
     assert result.cpu.unit == "cores"
-    assert result.memory.current == pytest.approx(256.0 * 1024 * 1024)
     assert result.memory.percent_of_request == pytest.approx(50.0)
     assert result.memory.percent_of_limit == pytest.approx(25.0)
     assert result.memory.unit == "bytes"
+    assert all("kube_pod_container_resource_requests" in q for q in queries)
 
 
-def test_workload_resource_usage_all_errors_returns_null(permission_resolver):
-    """Every prom call failing on both resources → null (the
-    Prometheus-is-dark signal)."""
+@pytest.mark.parametrize("reason", ["OWNERSHIP_UNVERIFIED", "PARTIAL_DATA", "NO_PODS"])
+def test_workload_resource_usage_is_null_not_zero_when_unmeasured(permission_resolver, reason):
+    """Either resource unmeasured → null, never a gauge at 0% (#2263)."""
+    from astrolift_observability import golden_signals
+    from astrolift_observability.schema.types import GoldenSignalKind
+
     org, app = _scaffold(prometheus_endpoint="http://prom:9090")
     permission_resolver.grant(Permission.APP_READ)
+    golden = _golden(
+        _saturation(GoldenSignalKind.SATURATION_CPU, available=False, usage=(), limit=(), reason=reason),
+        _saturation(GoldenSignalKind.SATURATION_MEMORY),
+    )
+    with patch.object(golden_signals, "golden_signals_for_app", side_effect=golden), _tenant(org):
+        result = GoldenSignalsQuery().astrolift_workload_resource_usage(
+            _info(), app_slug=app.slug, workload_slug="api"
+        )
+    assert result is None
+
+
+def test_workload_resource_usage_without_requests_still_reports_against_limits(permission_resolver):
+    """A failed or empty requests read is 0.0; the percent of limit stands."""
+    from astrolift_observability import golden_signals
+    from astrolift_observability.schema.types import GoldenSignalKind
+    from astrolift_operations import prometheus_client as ops_client
+
+    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
+    permission_resolver.grant(Permission.APP_READ)
+    golden = _golden(
+        _saturation(GoldenSignalKind.SATURATION_CPU),
+        _saturation(GoldenSignalKind.SATURATION_MEMORY, usage=(100.0,), limit=(400.0,)),
+    )
 
     def fake_raise(**kwargs):
         raise PrometheusUnavailable("connection refused")
 
-    from astrolift_operations import prometheus_client as ops_client
-
-    with patch.object(ops_client, "query_instant", side_effect=fake_raise):
-        with _tenant(org):
-            result = GoldenSignalsQuery().astrolift_workload_resource_usage(
-                _info(),
-                app_slug=app.slug,
-                workload_slug="api",
-            )
-    assert result is None
-
-
-def test_workload_resource_usage_partial_errors_zero_denominator(permission_resolver):
-    """A single failed call → field is 0.0, percent collapses safely."""
-    org, app = _scaffold(prometheus_endpoint="http://prom:9090")
-    permission_resolver.grant(Permission.APP_READ)
-
-    def fake_query_instant(*, endpoint, query, timeout=5.0):
-        if "container_cpu_usage_seconds_total" in query:
-            return 0.5
-        if "container_memory_working_set_bytes" in query:
-            return 0.0
-        # All request/limit calls succeed with 0 → percent must be 0,
-        # not a ZeroDivisionError.
-        return 0.0
-
-    from astrolift_operations import prometheus_client as ops_client
-
-    with patch.object(ops_client, "query_instant", side_effect=fake_query_instant):
-        with _tenant(org):
-            result = GoldenSignalsQuery().astrolift_workload_resource_usage(
-                _info(),
-                app_slug=app.slug,
-                workload_slug="api",
-            )
+    with (
+        patch.object(golden_signals, "golden_signals_for_app", side_effect=golden),
+        patch.object(ops_client, "query_instant", side_effect=fake_raise),
+        _tenant(org),
+    ):
+        result = GoldenSignalsQuery().astrolift_workload_resource_usage(
+            _info(), app_slug=app.slug, workload_slug="api"
+        )
     assert result is not None
-    assert result.cpu.percent_of_request == 0.0
-    assert result.cpu.percent_of_limit == 0.0
+    assert result.cpu.request == 0.0 and result.cpu.percent_of_request == 0.0
+    assert result.cpu.percent_of_limit == pytest.approx(25.0)
+    assert result.memory.percent_of_limit == pytest.approx(25.0)
 
 
 def test_workload_resource_usage_permission_denied_raises(permission_resolver):

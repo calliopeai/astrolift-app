@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Workload CPU and memory read true on a live cluster (#2263). The workload page's gauges asked cAdvisor and kube-state-metrics for an `app` label they never carry, so every workload showed 0%. They now come from the verified saturation measurement the golden signals use (the workload's own pods, matched by namespace, pod, uid and container), with requests from kube-state-metrics for the same pods, and read as "metrics not yet flowing" rather than 0% when the measurement cannot be made. CPU saturation used a 1m rate over 30s jittery scrapes, which left steps without a value and reported PARTIAL_DATA; its window is now at least 2m. Pods deployed before the identity labels existed refuse as OWNERSHIP_UNVERIFIED until redeployed, which is what CONFLICT's quake-dash hit.
+
 - A push deploys only what the platform builds: an `auto_on_push` app whose image comes from CI (`ci_pushed`) or is supplied directly (`none`) is no longer deployed by the push webhook with the commit SHA as its tag. CI deploys it after pushing the image (the managed workflow's notify step); the webhook reports `CI_DEPLOYS_AFTER_PUSHING_THE_IMAGE`. On CONFLICT the webhook had rolled out a tag no one built for both BDR apps on 2026-09-27, and every BDR job had failed to pull its image since.
 
 - A rollout is healthy only when the new revision is: a Deployment counts as ready only pods on its current template, and none until the controller has observed it, as `kubectl rollout status` does. The old ReplicaSet's pods had made a revision whose pods could not pull their image read as rolled out, so those deployments showed `running`.
