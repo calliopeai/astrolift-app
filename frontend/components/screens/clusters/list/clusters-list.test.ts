@@ -61,7 +61,7 @@ describe("clusterCrumbs", () => {
     expect(admin.label).toBe("Admin");
     expect(admin.switcher?.find((o) => o.active)?.href).toBe("/clusters");
     expect(admin.switcher?.some((o) => o.href === "/administration/access")).toBe(true);
-    expect(clusters).toEqual({ label: "Clusters", href: "/clusters" });
+    expect(clusters).toEqual({ label: "Clusters", href: "/clusters", navFunction: "clusters" });
     expect(name).toEqual({ label: "prd" });
   });
 

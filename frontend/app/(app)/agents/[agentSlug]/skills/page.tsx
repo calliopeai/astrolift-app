@@ -3,10 +3,11 @@ import {
   type SearchParams,
 } from "@/components/screens/agents/detail/agent-tabs-model";
 import { AgentTabSections } from "@/components/screens/agents/detail/AgentTabSections";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { SkillsContent, ToolsContent } from "../components/skills-content";
 
-export const metadata = { title: "Skills & tools · Agent · Astrolift" };
+export const generateMetadata = routeTitle("skillsAndTools", "agent");
 
 /**
  * The Skills & tools tab (spec 44 §5.2): the skills bound to the agent, and

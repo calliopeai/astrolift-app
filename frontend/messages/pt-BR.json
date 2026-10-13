@@ -1,26 +1,9 @@
 {
-  "nav": {
-    "section": "Platform",
-    "playground": "Playground",
-    "documentation": "Documentation",
-    "settings": "Settings",
-    "history": "History",
-    "starred": "Starred",
-    "introduction": "Introduction",
-    "getStarted": "Get Started",
-    "tutorials": "Tutorials",
-    "changelog": "Changelog",
-    "general": "General",
-    "team": "Team",
-    "billing": "Billing",
-    "limits": "Limits",
-    "hooks": "Hooks"
-  },
   "user": {
-    "account": "Account",
-    "notifications": "Notifications",
+    "account": "Conta",
+    "notifications": "Notificações",
     "rerunOnboarding": "Reexecutar a integração",
-    "logout": "Log out",
+    "logout": "Sair",
     "profile": "Perfil",
     "documentation": "Documentação",
     "downloads": "Downloads",
@@ -159,7 +142,7 @@
     },
     "runMode": {
       "once": "Uma vez",
-      "loop": "Loop",
+      "loop": "Repetição",
       "schedule": "Agendamento",
       "trigger": "Gatilho",
       "service": "Serviço"
@@ -418,7 +401,7 @@
       "deployments": "Implantações",
       "previews": "Prévias",
       "clusters": "Clusters",
-      "jobs": "Jobs",
+      "jobs": "Tarefas",
       "teams": "Equipes",
       "settings": "Configurações"
     },
@@ -432,7 +415,7 @@
     }
   },
   "deploymentStatusPill": {
-    "label": "Status: {status}"
+    "label": "Estado: {status}"
   },
   "staleManifest": {
     "registrationTitle": "Este aplicativo foi registrado sem suas cargas de trabalho",
@@ -491,7 +474,8 @@
     "goToDashboard": "Ir para o painel",
     "notFound": "Página não encontrada",
     "notFoundDescription": "A página que você procura não existe ou foi movida.",
-    "goHome": "Ir para o início"
+    "goHome": "Ir para o início",
+    "critical": "Ocorreu um erro crítico. Atualize a página."
   },
   "mainRail": {
     "label": "Principal",
@@ -526,7 +510,7 @@
       "kind": "Tipo",
       "label": "Rótulo",
       "lastSeen": "Última atividade",
-      "status": "Status"
+      "status": "Estado"
     },
     "confirmRevoke": {
       "confirm": "Revogar",
@@ -575,15 +559,15 @@
     }
   },
   "language": {
-    "label": "Language",
-    "en": "English",
-    "es": "Spanish",
-    "fr": "French",
-    "de": "German",
-    "ja": "Japanese",
-    "ko": "Korean",
-    "zh-Hans": "Chinese (Simplified)",
-    "pt-BR": "Portuguese (Brazil)"
+    "label": "Idioma",
+    "en": "Inglês",
+    "es": "Espanhol",
+    "fr": "Francês",
+    "de": "Alemão",
+    "ja": "Japonês",
+    "ko": "Coreano",
+    "zh-Hans": "Chinês (simplificado)",
+    "pt-BR": "Português (Brasil)"
   },
   "pageShell": {
     "collapseHeader": "Recolher cabeçalho",
@@ -592,69 +576,13 @@
     "details": "Detalhes"
   },
   "a11y": {
-    "skipToContent": "Skip to main content"
-  },
-  "dashboard": {
-    "stats": {
-      "revenue": "Total revenue",
-      "orders": "Orders",
-      "customers": "Customers",
-      "products": "Products",
-      "fromLastMonth": "from last month"
-    },
-    "revenue": {
-      "title": "Revenue",
-      "description": "Monthly revenue for the last 12 months",
-      "label": "Revenue"
-    },
-    "channels": {
-      "title": "Channels",
-      "description": "Sales by acquisition channel",
-      "organic": "Organic",
-      "direct": "Direct",
-      "referral": "Referral",
-      "paid": "Paid"
-    },
-    "sales": {
-      "title": "Sales by category",
-      "description": "Units sold per product category this quarter",
-      "label": "Units sold",
-      "electronics": "Electronics",
-      "clothing": "Clothing",
-      "accessories": "Accessories",
-      "footwear": "Footwear",
-      "sports": "Sports"
-    }
+    "skipToContent": "Pular para o conteúdo principal"
   },
   "overview": {
     "title": "Visão geral",
     "description": "Dados de identidade, registro e ciclo de vida desta instalação do Astrolift.",
     "errorBanner": {
       "title": "Não foi possível carregar alguns dados"
-    },
-    "tiles": {
-      "teams": {
-        "label": "Times",
-        "emptyCta": "Crie seu primeiro time"
-      },
-      "projects": {
-        "label": "Projetos",
-        "emptyCta": "Crie um projeto"
-      },
-      "apps": {
-        "label": "Apps registrados",
-        "emptyCta": "Registre seu primeiro app"
-      },
-      "deployments": {
-        "label": "Deploys ativos",
-        "emptyCta": "Inicie um deploy"
-      },
-      "costMtd": {
-        "label": "Custo (MTD)",
-        "emptyCta": "Aguardando dados de custo",
-        "vsPrevMonth": "vs mês ant.",
-        "noPrevMonth": "sem mês ant."
-      }
     },
     "fleetHealth": {
       "title": "Saúde da frota",
@@ -695,134 +623,109 @@
     }
   },
   "onboarding": {
-    "title": "Welcome to Astrolift",
-    "description": "Four quick steps to land your first app on the platform.",
-    "skipCta": "Skip for now",
-    "backCta": "Back",
-    "nextCta": "Next",
-    "finishCta": "Finish setup",
+    "title": "Boas-vindas ao Astrolift",
+    "description": "Quatro passos rápidos para colocar seu primeiro aplicativo na plataforma.",
+    "skipCta": "Pular por enquanto",
+    "backCta": "Voltar",
+    "nextCta": "Próximo",
+    "finishCta": "Concluir configuração",
     "a11y": {
-      "steps": "Onboarding progress"
+      "steps": "Progresso da integração"
     },
     "toast": {
-      "success": "Onboarding complete — you're all set.",
-      "skipFailed": "Couldn't save your skip. Try again.",
-      "teamFailed": "Couldn't create the team. Pick a different name or slug.",
-      "projectFailed": "Couldn't create the project. Pick a different name or slug.",
-      "appWarning": "Team and project created, but the app couldn't be registered. You can add it later from the apps page.",
-      "submitFailed": "Something went wrong while finishing setup."
+      "success": "Integração concluída. Está tudo pronto.",
+      "skipFailed": "Não foi possível salvar sua escolha de pular. Tente novamente.",
+      "teamFailed": "Não foi possível criar a equipe. Escolha outro nome ou slug.",
+      "projectFailed": "Não foi possível criar o projeto. Escolha outro nome ou slug.",
+      "appWarning": "Equipe e projeto criados, mas não foi possível registrar o aplicativo. Você pode adicioná-lo depois na página de aplicativos.",
+      "submitFailed": "Algo deu errado ao concluir a configuração."
     },
     "welcome": {
-      "greeting": "Let's start with a team.",
-      "description": "Teams own projects and apps. You'll add more later from the Teams page.",
-      "teamNameLabel": "Team name",
-      "teamNamePlaceholder": "e.g. Platform engineering",
-      "teamSlugLabel": "Team slug",
-      "teamSlugPlaceholder": "e.g. platform-eng",
-      "teamSlugHelp": "Lowercase letters, digits, and hyphens. Used in URLs and the CLI."
+      "greeting": "Vamos começar com uma equipe.",
+      "description": "Projetos e aplicativos pertencem a equipes. Você pode adicionar outras depois na página Equipes.",
+      "teamNameLabel": "Nome da equipe",
+      "teamNamePlaceholder": "ex.: Engenharia de plataforma",
+      "teamSlugLabel": "Slug da equipe",
+      "teamSlugPlaceholder": "ex.: eng-plataforma",
+      "teamSlugHelp": "Letras minúsculas, dígitos e hifens. Usado em URLs e na CLI."
     },
     "project": {
-      "greeting": "Add a project under {team}.",
-      "description": "Projects group related apps inside a team.",
-      "projectNameLabel": "Project name",
-      "projectNamePlaceholder": "e.g. Web platform",
-      "projectSlugLabel": "Project slug",
-      "projectSlugPlaceholder": "e.g. web-platform",
-      "projectDescriptionLabel": "Description (optional)",
-      "projectDescriptionPlaceholder": "What does this project do?"
+      "greeting": "Adicione um projeto em {team}.",
+      "description": "Projetos agrupam aplicativos relacionados dentro de uma equipe.",
+      "projectNameLabel": "Nome do projeto",
+      "projectNamePlaceholder": "ex.: Plataforma web",
+      "projectSlugLabel": "Slug do projeto",
+      "projectSlugPlaceholder": "ex.: plataforma-web",
+      "projectDescriptionLabel": "Descrição (opcional)",
+      "projectDescriptionPlaceholder": "O que este projeto faz?"
     },
     "repo": {
-      "greeting": "Connect a Git repository.",
-      "description": "Pick a repo to register as the first app in this project. You can skip this and add an app later.",
-      "connectionLabel": "Source connection",
-      "connectionPlaceholder": "Pick a connection",
-      "repoLabel": "Repository",
-      "repoPlaceholder": "Pick a repository",
-      "repoHelp": "Only repositories you have access to via this connection are listed.",
-      "repoFetchError": "Couldn't load repositories ({code}). You can skip this step.",
-      "archivedSuffix": "archived",
-      "defaultBranchLabel": "Default branch",
-      "optionalNote": "This step is optional. Skip to create the team and project without registering an app.",
-      "noConnectionsTitle": "No source providers configured yet.",
-      "noConnectionsDescription": "Connect GitHub, GitLab, or another provider to register apps from this wizard.",
-      "connectCta": "Connect a provider",
-      "skipNote": "You can also skip this and configure a source provider later."
+      "greeting": "Conecte um repositório Git.",
+      "description": "Escolha um repositório para registrar como o primeiro aplicativo deste projeto. Você pode pular esta etapa e adicionar um aplicativo depois.",
+      "connectionLabel": "Conexão de origem",
+      "connectionPlaceholder": "Escolha uma conexão",
+      "repoLabel": "Repositório",
+      "repoPlaceholder": "Escolha um repositório",
+      "repoHelp": "Somente os repositórios aos quais você tem acesso por esta conexão são listados.",
+      "repoFetchError": "Não foi possível carregar os repositórios ({code}). Você pode pular esta etapa.",
+      "archivedSuffix": "arquivado",
+      "defaultBranchLabel": "Branch padrão",
+      "optionalNote": "Esta etapa é opcional. Pule para criar a equipe e o projeto sem registrar um aplicativo.",
+      "noConnectionsTitle": "Ainda não há provedores de código-fonte configurados.",
+      "noConnectionsDescription": "Conecte o GitHub, o GitLab ou outro provedor para registrar aplicativos por este assistente.",
+      "connectCta": "Conectar um provedor",
+      "skipNote": "Você também pode pular esta etapa e configurar um provedor de código-fonte depois."
     },
     "strategy": {
-      "title": "Pick a deploy strategy",
-      "description": "How should new versions roll out by default? You can tune this per-environment later.",
-      "summaryTitle": "Review",
+      "title": "Escolha uma estratégia de implantação",
+      "description": "Como as novas versões devem ser implantadas por padrão? Você pode ajustar isso por ambiente depois.",
+      "summaryTitle": "Revisão",
       "summary": {
-        "team": "Team",
-        "project": "Project",
-        "repo": "Repository",
-        "repoSkipped": "Skipped — add later",
-        "strategy": "Strategy"
+        "team": "Equipe",
+        "project": "Projeto",
+        "repo": "Repositório",
+        "repoSkipped": "Ignorado (adicione depois)",
+        "strategy": "Estratégia"
       },
-      "intentNote": "This sets the default for new apps in this project. The astrolift.toml manifest is the source of truth — you can edit it from the app's config page.",
+      "intentNote": "Isso define o padrão para novos aplicativos neste projeto. O manifesto astrolift.toml é a fonte da verdade; você pode editá-lo na página de configuração do aplicativo.",
       "options": {
         "rolling": {
-          "label": "Rolling",
-          "description": "Replace pods one by one. Lowest risk for stateless services."
+          "label": "Gradual",
+          "description": "Substitui os pods um a um. Menor risco para serviços sem estado."
         },
         "blue-green": {
-          "label": "Blue / green",
-          "description": "Stand up the new version alongside the old, then flip traffic."
+          "label": "Azul / verde",
+          "description": "Cria a nova versão ao lado da antiga e depois alterna o tráfego."
         },
         "canary": {
-          "label": "Canary",
-          "description": "Send a small slice of traffic to the new version, then expand."
+          "label": "Canário",
+          "description": "Envia uma pequena parcela do tráfego para a nova versão e depois amplia."
         }
       }
     },
     "tour": {
-      "progress": "Step {current} of {total}",
-      "dontShowAgain": "Don't show again",
-      "skipCta": "Skip",
-      "nextCta": "Next",
-      "finishCta": "Got it",
+      "progress": "Etapa {current} de {total}",
+      "dontShowAgain": "Não mostrar novamente",
+      "skipCta": "Pular",
+      "nextCta": "Próximo",
+      "finishCta": "Entendi",
       "steps": {
         "apps-tile": {
-          "title": "Your apps live here",
-          "description": "This tile counts every app registered on the platform. Click through to see the full list."
+          "title": "Seus aplicativos ficam aqui",
+          "description": "Este bloco contabiliza todos os aplicativos registrados na plataforma. Clique nele para ver a lista completa."
         },
         "apps-nav": {
-          "title": "Register apps to start deploying",
-          "description": "Connect a Git repo to register a new app and roll your first deployment."
+          "title": "Registre aplicativos para começar a implantar",
+          "description": "Conecte um repositório Git para registrar um novo aplicativo e fazer sua primeira implantação."
         },
         "clusters-nav": {
-          "title": "Add a cluster to deploy to",
-          "description": "Apps deploy to clusters you've onboarded. Bring in your first cluster from this page."
+          "title": "Adicione um cluster para receber implantações",
+          "description": "Os aplicativos são implantados nos clusters que você integrou. Adicione seu primeiro cluster nesta página."
         }
       }
     }
   },
   "settings": {
-    "title": "Settings",
-    "description": "Manage your application preferences.",
-    "language": {
-      "title": "Language",
-      "description": "Choose the language used throughout the interface."
-    },
-    "theme": {
-      "title": "Appearance",
-      "description": "Choose your preferred color scheme.",
-      "light": "Light",
-      "dark": "Dark",
-      "system": "System"
-    },
-    "nav": {
-      "ariaLabel": "Seções de configurações",
-      "openMobileNav": "Abrir menu de configurações",
-      "openMobileNavLabel": "Seções",
-      "mobileTitle": "Seções de configurações",
-      "mobileDescription": "Vá direto para qualquer área de configurações.",
-      "groups": {
-        "organization": "Organização",
-        "personal": "Pessoal",
-        "tokens": "Tokens"
-      }
-    },
     "breadcrumb": {
       "root": "Configurações"
     },
@@ -1298,7 +1201,9 @@
     "relatedTitle": "Relacionados",
     "relatedGetStarted": "<link>Começar</link>: suba o stack localmente; ali as variáveis de ambiente apontam por padrão para os nomes de serviço do docker-compose.",
     "relatedIdentityProviders": "<link>Provedores de identidade</link>: as variáveis AUTH0_* / ASTROLIFT_IDP_* descritas em detalhes.",
-    "relatedClusterPrerequisites": "<link>Pré-requisitos do cluster</link>: o que o cluster de tenant precisa além destas variáveis de ambiente."
+    "relatedClusterPrerequisites": "<link>Pré-requisitos do cluster</link>: o que o cluster de tenant precisa além destas variáveis de ambiente.",
+    "allView": "Todas",
+    "mineView": "Minhas"
   },
   "docsWebhookEvents": {
     "title": "Eventos de webhook",
@@ -1363,7 +1268,9 @@
       "secrets": "Segredos",
       "identity": "Identidade",
       "registry": "Registro"
-    }
+    },
+    "allView": "Todos",
+    "mineView": "Meus"
   },
   "docsIntroduction": {
     "title": "Introdução",
@@ -1408,7 +1315,7 @@
         "description": "Chat em tempo real com a equipe do Astrolift e outros operadores."
       },
       "github": {
-        "label": "GitHub Issues",
+        "label": "Issues do GitHub",
         "description": "Relate um bug, peça um recurso ou veja o trabalho em aberto no astrolift-app."
       },
       "email": {
@@ -1445,43 +1352,6 @@
       "beginner": "Iniciante",
       "intermediate": "Intermediário",
       "advanced": "Avançado"
-    }
-  },
-  "hooks": {
-    "title": "Hooks",
-    "description": "Interactive demos for the built-in utility hooks.",
-    "debounce": {
-      "title": "useDebounce",
-      "description": "Value updates only after typing has stopped for 300 ms.",
-      "label": "Search input",
-      "placeholder": "Type something…",
-      "raw": "Raw value",
-      "debounced": "Debounced value"
-    },
-    "localStorage": {
-      "title": "useLocalStorage",
-      "description": "Counter persisted to localStorage — survives page refresh.",
-      "label": "Count",
-      "increment": "Increment",
-      "reset": "Reset"
-    },
-    "clipboard": {
-      "title": "useCopyToClipboard",
-      "description": "Copies text to the clipboard; button resets after 2 seconds.",
-      "label": "Text to copy",
-      "copy": "Copy",
-      "copied": "Copied!"
-    },
-    "confirm": {
-      "title": "useConfirm",
-      "description": "Awaits a Promise from an AlertDialog — no local dialog state required.",
-      "trigger": "Delete item",
-      "dialogTitle": "Delete this item?",
-      "dialogDescription": "This action cannot be undone.",
-      "confirmLabel": "Delete",
-      "cancelLabel": "Cancel",
-      "resultConfirmed": "Confirmed — item deleted.",
-      "resultCancelled": "Cancelled."
     }
   },
   "apps": {
@@ -1545,7 +1415,7 @@
       "noWorkloads": "Ainda sem cargas de trabalho",
       "columns": {
         "app": "Aplicativo",
-        "status": "Status",
+        "status": "Estado",
         "kind": "Tipo",
         "cluster": "Cluster",
         "lastDeploy": "Última implantação",
@@ -1630,121 +1500,121 @@
     },
     "workloadDetail": {
       "resourceUsage": {
-        "title": "Live resource usage",
+        "title": "Uso de recursos ao vivo",
         "cpuTitle": "CPU",
-        "memoryTitle": "Memory",
-        "ofRequest": "of request",
-        "ofLimit": "of limit",
-        "currentLabel": "Current",
-        "requestLabel": "Request",
-        "limitLabel": "Limit",
-        "empty": "Live metrics are not flowing for this workload yet. Configure a Prometheus endpoint on the cluster, or wait a minute after the first deploy for the scrape to land.",
-        "sourcedAt": "sampled"
+        "memoryTitle": "Memória",
+        "ofRequest": "da solicitação",
+        "ofLimit": "do limite",
+        "currentLabel": "Atual",
+        "requestLabel": "Solicitação",
+        "limitLabel": "Limite",
+        "empty": "As métricas ao vivo ainda não estão chegando para esta carga de trabalho. Configure um endpoint do Prometheus no cluster ou aguarde um minuto após a primeira implantação até que a coleta chegue.",
+        "sourcedAt": "amostrado"
       },
       "scaling": {
-        "title": "Scaling",
-        "manualHeading": "Manual replicas",
-        "manualDescription": "Set the desired replica count. The platform will issue a single patch against the workload's Deployment; the rollout controller drives the rest.",
-        "currentReplicas": "Current",
-        "desiredReplicas": "Desired",
-        "readyReplicas": "Ready",
+        "title": "Escalonamento",
+        "manualHeading": "Réplicas manuais",
+        "manualDescription": "Defina a quantidade desejada de réplicas. A plataforma aplicará um único patch ao Deployment da carga de trabalho; o controlador de implantação cuida do resto.",
+        "currentReplicas": "Atuais",
+        "desiredReplicas": "Desejadas",
+        "readyReplicas": "Prontas",
         "hpaHeading": "HPA",
-        "hpaEnabledLabel": "auto-scaling on",
-        "hpaDisabledLabel": "auto-scaling off",
-        "hpaDescription": "When the HPA is enabled the platform won't override its decisions — manual scales are still applied but the controller may reconcile them back inside seconds. Disable the HPA in the manifest to pin the count.",
-        "hpaMin": "Min",
-        "hpaMax": "Max",
-        "hpaTarget": "Target CPU",
-        "hpaCurrent": "Current",
-        "hpaLastScaleAt": "Last scale event",
-        "scalingUp": "Scaling up…",
-        "scalingDown": "Scaling down…",
-        "applyButton": "Apply",
-        "applyingButton": "Applying…",
-        "successToast": "Scale applied — {replicas} replicas requested",
-        "errorToast": "Couldn't apply scale: {message}",
-        "permissionDenied": "You need app.deploy to scale this workload.",
+        "hpaEnabledLabel": "escalonamento automático ativado",
+        "hpaDisabledLabel": "escalonamento automático desativado",
+        "hpaDescription": "Quando o HPA está ativado, a plataforma não substitui as decisões dele: ajustes manuais de escala ainda são aplicados, mas o controlador pode revertê-los em segundos. Desative o HPA no manifesto para fixar a quantidade.",
+        "hpaMin": "Mín.",
+        "hpaMax": "Máx.",
+        "hpaTarget": "CPU alvo",
+        "hpaCurrent": "Atuais",
+        "hpaLastScaleAt": "Último evento de escala",
+        "scalingUp": "Aumentando a escala…",
+        "scalingDown": "Reduzindo a escala…",
+        "applyButton": "Aplicar",
+        "applyingButton": "Aplicando…",
+        "successToast": "Escala aplicada: {replicas} réplicas solicitadas",
+        "errorToast": "Não foi possível aplicar a escala: {message}",
+        "permissionDenied": "Você precisa de app.deploy para escalar esta carga de trabalho.",
         "unknownError": "Erro desconhecido"
       },
       "manifest": {
-        "title": "Manifest",
-        "description": "Kubernetes resources the platform would apply for this workload. Toggle Diff to compare against the previously deployed image tag.",
-        "viewToggleManifest": "Manifest",
-        "viewToggleDiff": "Diff",
-        "noResources": "No resources rendered for this workload — the manifest may not declare it yet.",
-        "errorTitle": "Manifest error",
-        "diffEmpty": "No diff — the rendered manifest matches the previously deployed revision byte-for-byte.",
-        "diffPreviousLabel": "Previously deployed",
-        "diffCurrentLabel": "Current",
-        "diffNoHistory": "No prior deployment to diff against. The first deploy lands the baseline."
+        "title": "Manifesto",
+        "description": "Recursos do Kubernetes que a plataforma aplicaria para esta carga de trabalho. Selecione Diferenças para comparar com a tag de imagem implantada anteriormente.",
+        "viewToggleManifest": "Manifesto",
+        "viewToggleDiff": "Diferenças",
+        "noResources": "Nenhum recurso renderizado para esta carga de trabalho; talvez o manifesto ainda não a declare.",
+        "errorTitle": "Erro no manifesto",
+        "diffEmpty": "Sem diferenças: o manifesto renderizado corresponde byte a byte à revisão implantada anteriormente.",
+        "diffPreviousLabel": "Implantado anteriormente",
+        "diffCurrentLabel": "Atual",
+        "diffNoHistory": "Não há implantação anterior para comparar. A primeira implantação define a linha de base."
       },
       "podStatus": {
-        "title": "Pod status",
-        "headerStatus": "Status",
-        "headerCount": "Count",
-        "headerPercent": "% of total",
-        "empty": "No live pods reported. Either the workload hasn't been deployed yet, the runtime cluster is unreachable, or the manifest declared zero replicas.",
+        "title": "Status dos pods",
+        "headerStatus": "Estado",
+        "headerCount": "Quantidade",
+        "headerPercent": "% do total",
+        "empty": "Nenhum pod ativo informado. Talvez a carga de trabalho ainda não tenha sido implantada, o cluster de execução esteja inacessível ou o manifesto tenha declarado zero réplicas.",
         "podsCount": "{count} pods",
-        "bucketEmpty": "No pod names returned for this bucket.",
-        "notReady": "not ready"
+        "bucketEmpty": "Nenhum nome de pod retornado para este grupo.",
+        "notReady": "não pronto"
       },
       "pods": {
         "title": "Pods",
-        "empty": "No pods reported for this workload yet.",
-        "columnName": "Name",
-        "columnStatus": "Status",
-        "columnRestarts": "Restarts",
-        "columnNode": "Node",
-        "columnAge": "Age",
-        "flapping": "flapping",
-        "restartReasonsHeading": "Last restart reasons"
+        "empty": "Nenhum pod informado para esta carga de trabalho ainda.",
+        "columnName": "Nome",
+        "columnStatus": "Estado",
+        "columnRestarts": "Reinícios",
+        "columnNode": "Nó",
+        "columnAge": "Idade",
+        "flapping": "instável",
+        "restartReasonsHeading": "Motivos dos últimos reinícios"
       },
       "containers": {
         "init": {
-          "title": "Init containers",
-          "description": "Run to completion before the primary starts. Resource budget excluded from steady-state accounting.",
-          "empty": "No init containers declared."
+          "title": "Contêineres de inicialização",
+          "description": "São executados até a conclusão antes de o contêiner principal iniciar. O orçamento de recursos deles fica fora da contabilização em regime estável.",
+          "empty": "Nenhum contêiner de inicialização declarado."
         },
         "primary": {
-          "title": "Primary",
-          "description": "The workload's main container — the row whose name matches the workload slug.",
-          "empty": "No primary container detected. Check the workload's container names."
+          "title": "Principal",
+          "description": "O contêiner principal da carga de trabalho: a linha cujo nome corresponde ao slug da carga de trabalho.",
+          "empty": "Nenhum contêiner principal detectado. Verifique os nomes dos contêineres da carga de trabalho."
         },
         "sidecars": {
           "title": "Sidecars",
-          "description": "Auxiliary containers (service meshes, log shippers). Their resources don't roll into the primary's budget.",
-          "empty": "No sidecars detected."
+          "description": "Contêineres auxiliares (malhas de serviço, encaminhadores de logs). Os recursos deles não entram no orçamento do contêiner principal.",
+          "empty": "Nenhum sidecar detectado."
         },
-        "image": "Image",
-        "cpuReqLimit": "CPU req/limit",
-        "memReqLimit": "Memory req/limit",
-        "restarts": "Restarts",
-        "empty": "This workload has no containers declared in the manifest and no live pods reporting either."
+        "image": "Imagem",
+        "cpuReqLimit": "Solicitação/limite de CPU",
+        "memReqLimit": "Solicitação/limite de memória",
+        "restarts": "Reinícios",
+        "empty": "Esta carga de trabalho não tem contêineres declarados no manifesto nem pods ativos informando contêineres."
       },
       "fqdn": {
-        "label": "In-cluster service",
-        "copyTitle": "Click to copy",
-        "copyToast": "Copied service FQDN to clipboard",
-        "copyError": "Couldn't copy — select the text and copy manually",
-        "unavailable": "FQDN unavailable — the app row is missing an organization."
+        "label": "Serviço no cluster",
+        "copyTitle": "Clique para copiar",
+        "copyToast": "FQDN do serviço copiado para a área de transferência",
+        "copyError": "Não foi possível copiar: selecione o texto e copie manualmente",
+        "unavailable": "FQDN indisponível: o registro do aplicativo não tem uma organização."
       },
       "probes": {
-        "title": "Health probes",
-        "description": "Startup, readiness, and liveness probes declared in the manifest. Read-only — edit in astrolift.toml.",
-        "startup": "Startup",
-        "readiness": "Readiness",
-        "liveness": "Liveness",
-        "notConfigured": "not configured",
-        "container": "Container",
-        "empty": "No probes declared in the manifest. The workload runs without explicit startup/readiness/liveness gates."
+        "title": "Sondas de integridade",
+        "description": "Sondas de inicialização, prontidão e atividade declaradas no manifesto. Somente leitura: edite no astrolift.toml.",
+        "startup": "Inicialização",
+        "readiness": "Prontidão",
+        "liveness": "Atividade",
+        "notConfigured": "não configurada",
+        "container": "Contêiner",
+        "empty": "Nenhuma sonda declarada no manifesto. A carga de trabalho é executada sem verificações explícitas de inicialização/prontidão/atividade."
       },
       "volumes": {
         "title": "Volumes",
-        "description": "Persistent and ephemeral volumes declared in the manifest, plus their mount paths.",
-        "columnName": "Name",
-        "columnKind": "Kind",
-        "columnMount": "Mount path",
-        "columnDetail": "Detail"
+        "description": "Volumes persistentes e efêmeros declarados no manifesto, com seus caminhos de montagem.",
+        "columnName": "Nome",
+        "columnKind": "Tipo",
+        "columnMount": "Caminho de montagem",
+        "columnDetail": "Detalhe"
       }
     },
     "previews": {
@@ -1773,11 +1643,11 @@
       "groupSummary": "{running} em execução · {failed} com falha · {tornDown} removidas",
       "columns": {
         "pr": "PR / branch",
-        "hostname": "Hostname",
+        "hostname": "Nome do host",
         "ttl": "TTL",
         "footprint": "Recursos",
         "lastDeploy": "Última implantação",
-        "status": "Status",
+        "status": "Estado",
         "actions": "Ações",
         "prBranch": "PR / branch"
       },
@@ -1872,7 +1742,7 @@
       "scope": {
         "title": "Escopo das métricas",
         "environment": "Ambiente",
-        "workload": "Workload",
+        "workload": "Carga de trabalho",
         "allWorkloads": "Todos os workloads",
         "environmentPlaceholder": "Selecione um ambiente",
         "workloadPlaceholder": "Selecione um workload"
@@ -1906,14 +1776,14 @@
         "warningBadgeLabel": "Aviso",
         "collapse": "Recolher",
         "expand": "Expandir",
-        "title": "Recent platform events",
-        "description": "App-scoped slice of the platform event stream — deploy lifecycle, scaling decisions, alert transitions.",
-        "all": "All events",
-        "emptyTitle": "No events for this app yet",
-        "emptyDescription": "Platform events appear here as deploys, scale changes, and alerts fire."
+        "title": "Eventos recentes da plataforma",
+        "description": "Recorte do fluxo de eventos da plataforma restrito ao aplicativo: ciclo de vida das implantações, decisões de escalonamento e transições de alertas.",
+        "all": "Todos os eventos",
+        "emptyTitle": "Ainda não há eventos para este aplicativo",
+        "emptyDescription": "Os eventos da plataforma aparecem aqui conforme ocorrem implantações, mudanças de escala e disparos de alertas."
       },
       "logs": {
-        "pressStreamAll": "Pressione “Stream” para acompanhar todas as réplicas.",
+        "pressStreamAll": "Pressione “Transmitir” para acompanhar todas as réplicas.",
         "allReplicas": "Todas as réplicas",
         "allReplicasDescription": "Transmitindo de todas as réplicas deste app — cada linha tem o pod de origem marcado.",
         "historicalDescription": "Mostrando linhas de log dos últimos {range}.",
@@ -1929,37 +1799,37 @@
           "6h": "Últimas 6 horas",
           "24h": "Últimas 24 horas"
         },
-        "title": "Live logs",
-        "streaming": "Streaming",
-        "fromCluster": "from the runtime cluster.",
-        "selectPrompt": "Select a pod above to tail its log stream.",
-        "clear": "Clear",
-        "pause": "Pause",
-        "stream": "Stream",
-        "waiting": "Waiting for the first line…",
-        "pressStream": "Press \"Stream\" to start tailing.",
-        "pickPod": "Pick a pod above first.",
-        "bufferCap": "Buffer is capped at {limit} lines. Use the CLI for a true tail without the buffer cap:",
-        "installCli": "Install the CLI",
+        "title": "Logs ao vivo",
+        "streaming": "Transmitindo",
+        "fromCluster": "do cluster de execução.",
+        "selectPrompt": "Selecione um pod acima para acompanhar seu fluxo de logs.",
+        "clear": "Limpar",
+        "pause": "Pausar",
+        "stream": "Transmitir",
+        "waiting": "Aguardando a primeira linha…",
+        "pressStream": "Pressione \"Transmitir\" para começar a acompanhar os logs.",
+        "pickPod": "Escolha um pod acima primeiro.",
+        "bufferCap": "O buffer é limitado a {limit} linhas. Use a CLI para acompanhar os logs continuamente, sem o limite do buffer:",
+        "installCli": "Instalar a CLI",
         "export": "Exportar registros",
         "exportTitle": "Exportar registros em buffer para um arquivo para download"
       },
-      "title": "{name} · Observability",
-      "description": "{slug} · pod state and log stream from the runtime cluster",
+      "title": "{name} · Observabilidade",
+      "description": "{slug} · estado dos pods e fluxo de logs do cluster de execução",
       "pods": {
         "title": "Pods",
-        "description": "Live pod state from the tenant cluster, refreshed every {seconds}s. Click a row to tail its logs below.",
-        "emptyTitle": "No pods running for this app",
-        "emptyDescription": "Once a deployment has rolled out and the cluster reports pods, they appear here. If you expected pods, check the deployment log.",
-        "emptyAction": "View deployment history",
+        "description": "Estado ao vivo dos pods no cluster do locatário, atualizado a cada {seconds}s. Clique em uma linha para acompanhar os logs do pod abaixo.",
+        "emptyTitle": "Nenhum pod em execução para este aplicativo",
+        "emptyDescription": "Depois que uma implantação for concluída e o cluster informar os pods, eles aparecerão aqui. Se você esperava pods, verifique o log da implantação.",
+        "emptyAction": "Ver histórico de implantações",
         "columns": {
           "pod": "Pod",
-          "workload": "Workload",
-          "status": "Status",
-          "ready": "Ready",
-          "restarts": "Restarts",
-          "age": "Age",
-          "node": "Node"
+          "workload": "Carga de trabalho",
+          "status": "Estado",
+          "ready": "Prontos",
+          "restarts": "Reinícios",
+          "age": "Idade",
+          "node": "Nó"
         }
       },
       "signalMeasurement": {
@@ -1968,7 +1838,7 @@
         "source": "Fonte: {source}",
         "since": "Contêineres atuais medidos desde {timestamp}",
         "identities": "Identidades canônicas",
-        "app": "App",
+        "app": "Aplicativo",
         "environment": "Ambiente",
         "cluster": "Cluster",
         "workload": "Carga de trabalho",
@@ -2101,7 +1971,7 @@
         },
         "title": "Adicionar domínio personalizado",
         "description": "A plataforma emite um certificado via Let's Encrypt após configurar o registro DNS de validação.",
-        "hostname": "Hostname",
+        "hostname": "Nome do host",
         "validationMethod": "Método de validação (opcional)",
         "submit": "Adicionar domínio",
         "submitting": "Adicionando…",
@@ -2202,7 +2072,7 @@
       },
       "listTitle": "Domínios",
       "columns": {
-        "hostname": "Hostname",
+        "hostname": "Nome do host",
         "status": "DNS",
         "certificate": "Certificado",
         "lastChecked": "Última verificação",
@@ -2257,7 +2127,7 @@
       },
       "list": {
         "search": "Buscar hostnames…",
-        "status": "Status",
+        "status": "Estado",
         "kind": "Tipo",
         "exact": "Host exato",
         "all": "Todos",
@@ -2629,7 +2499,7 @@
         "openAll": "Abrir todos",
         "viewDetail": "Ver detalhes",
         "actionsLabel": "Ações rápidas",
-        "statusTooltip": "{kind} · status: {status}",
+        "statusTooltip": "{kind} · estado: {status}",
         "statusFailed": "falhou",
         "lastAction": "{action} · {when}",
         "actionLabels": {
@@ -2769,34 +2639,34 @@
       "cancel": "Cancelar"
     },
     "logViewer": {
-      "searchPlaceholder": "Search log buffer…  (press / to focus)",
-      "searchAriaLabel": "Search log buffer",
-      "clearSearch": "Clear search",
-      "regexToggle": "Toggle regex",
-      "regexInvalid": "Invalid regex",
-      "matchCount": "{current} of {total}",
-      "matchNone": "0 matches",
-      "prevMatch": "Previous match (Shift+Enter)",
-      "nextMatch": "Next match (Enter)",
-      "containerLabel": "Container",
-      "containerAll": "All containers",
-      "copyAll": "Copy",
-      "copied": "Copied {count, plural, one {# line} other {# lines}} to clipboard",
-      "copyEmpty": "Nothing to copy — the buffer is empty.",
-      "copyFailed": "Couldn't copy — clipboard access blocked.",
-      "download": "Download",
-      "downloadEmpty": "Nothing to download — the buffer is empty.",
-      "downloadStarted": "Downloading {filename}",
-      "paneAriaLabel": "Log buffer",
-      "levelGroupLabel": "Filter by log level",
-      "bufferFootnote": "Showing {shown} of {buffered} buffered lines (cap {limit}).",
+      "searchPlaceholder": "Buscar no buffer de logs…  (pressione / para focar)",
+      "searchAriaLabel": "Buscar no buffer de logs",
+      "clearSearch": "Limpar busca",
+      "regexToggle": "Alternar regex",
+      "regexInvalid": "Regex inválida",
+      "matchCount": "{current} de {total}",
+      "matchNone": "0 resultados",
+      "prevMatch": "Resultado anterior (Shift+Enter)",
+      "nextMatch": "Próximo resultado (Enter)",
+      "containerLabel": "Contêiner",
+      "containerAll": "Todos os contêineres",
+      "copyAll": "Copiar",
+      "copied": "{count, plural, one {# linha copiada} other {# linhas copiadas}} para a área de transferência",
+      "copyEmpty": "Nada para copiar: o buffer está vazio.",
+      "copyFailed": "Não foi possível copiar: o acesso à área de transferência está bloqueado.",
+      "download": "Baixar",
+      "downloadEmpty": "Nada para baixar: o buffer está vazio.",
+      "downloadStarted": "Baixando {filename}",
+      "paneAriaLabel": "Buffer de logs",
+      "levelGroupLabel": "Filtrar por nível de log",
+      "bufferFootnote": "Exibindo {shown} de {buffered} linhas em buffer (limite de {limit}).",
       "level": {
-        "all": "All",
-        "error": "Error",
-        "warn": "Warn",
-        "info": "Info",
-        "debug": "Debug",
-        "other": "Other"
+        "all": "Todos",
+        "error": "Erro",
+        "warn": "Aviso",
+        "info": "Informação",
+        "debug": "Depuração",
+        "other": "Outros"
       },
       "filterPlaceholder": "Filtrar linhas…",
       "filteredEmpty": "Nenhuma linha corresponde aos filtros de nível e texto."
@@ -2813,29 +2683,29 @@
     },
     "wizard": {
       "approval": {
-        "toggleLabel": "Require approval before deploying",
-        "safer": "Safer",
-        "toggleHint": "Triggered deploys land in \"pending approval\" until an approver signs off. Pick a team OR a specific set of users — approvers can't self-approve a deploy they pushed.",
-        "teamLabel": "Approver team",
-        "teamPlaceholder": "No team selected",
-        "teamNoneOption": "No team — pick users instead",
-        "teamHint": "Any active member of this team may approve. Mutually exclusive with the user picker.",
-        "minimumLabel": "Required approver count",
-        "minimumHintUsers": "1–{max} based on your user selection.",
-        "minimumHintTeam": "Number of distinct approvers required. At least 1.",
-        "usersLabel": "Approver users",
-        "usersPlaceholderTeam": "Team mode selected — clear the team picker to add users.",
-        "usersPlaceholderEmpty": "No users selected yet.",
-        "userRemove": "Remove {label}",
-        "orphanRemove": "Remove orphaned approver {id}",
-        "orphanSuffix": "(no longer a member)",
-        "search": "Search org members by name or email…",
-        "loading": "Loading org members…",
-        "noMembers": "No active org members yet — invite someone first.",
-        "noMatch": "No members match the search.",
-        "errorPickAny": "Pick at least one approver — a team or one or more users.",
-        "errorBoth": "Pick a team OR specific users, not both.",
-        "errorMinTooHigh": "Minimum approvals cannot exceed the number of selected users."
+        "toggleLabel": "Exigir aprovação antes de implantar",
+        "safer": "Mais seguro",
+        "toggleHint": "As implantações disparadas ficam em \"aguardando aprovação\" até que um aprovador as aprove. Escolha uma equipe OU um conjunto específico de usuários; os aprovadores não podem aprovar uma implantação que eles mesmos enviaram.",
+        "teamLabel": "Equipe aprovadora",
+        "teamPlaceholder": "Nenhuma equipe selecionada",
+        "teamNoneOption": "Nenhuma equipe (escolher usuários)",
+        "teamHint": "Qualquer membro ativo desta equipe pode aprovar. Mutuamente exclusivo com o seletor de usuários.",
+        "minimumLabel": "Número de aprovadores exigido",
+        "minimumHintUsers": "1–{max} com base nos usuários selecionados.",
+        "minimumHintTeam": "Número de aprovadores distintos exigido. No mínimo 1.",
+        "usersLabel": "Usuários aprovadores",
+        "usersPlaceholderTeam": "Modo equipe selecionado: limpe o seletor de equipe para adicionar usuários.",
+        "usersPlaceholderEmpty": "Nenhum usuário selecionado ainda.",
+        "userRemove": "Remover {label}",
+        "orphanRemove": "Remover aprovador órfão {id}",
+        "orphanSuffix": "(não é mais membro)",
+        "search": "Buscar membros da organização por nome ou e-mail…",
+        "loading": "Carregando membros da organização…",
+        "noMembers": "Ainda não há membros ativos na organização; convide alguém primeiro.",
+        "noMatch": "Nenhum membro corresponde à busca.",
+        "errorPickAny": "Escolha pelo menos um aprovador: uma equipe ou um ou mais usuários.",
+        "errorBoth": "Escolha uma equipe OU usuários específicos, não ambos.",
+        "errorMinTooHigh": "O mínimo de aprovações não pode exceder o número de usuários selecionados."
       }
     },
     "deployments": {
@@ -2852,7 +2722,7 @@
         "env": "Ambiente",
         "imageCommit": "Imagem / commit",
         "trigger": "Gatilho",
-        "status": "Status",
+        "status": "Estado",
         "duration": "Duração",
         "ci": "CI"
       },
@@ -2889,7 +2759,7 @@
       "emptyCurrentDescription": "Este aplicativo ainda não foi implantado. Implante pelo cabeçalho ou inicie uma implantação a partir de um ambiente.",
       "columns": {
         "deployment": "Implantação",
-        "status": "Status",
+        "status": "Estado",
         "environment": "Ambiente",
         "commit": "Commit",
         "trigger": "Gatilho",
@@ -3360,7 +3230,7 @@
         "code": "Código"
       },
       "builder": {
-        "appSection": "App",
+        "appSection": "Aplicativo",
         "appHint": "Identidade do manifesto no nível superior.",
         "appName": "Nome do app",
         "environment": "Ambiente",
@@ -3584,69 +3454,69 @@
     },
     "logs": {
       "title": "{name} · Logs",
-      "description": "{slug} · live output from the running workloads",
+      "description": "{slug} · saída ao vivo das cargas de trabalho em execução",
       "logs": {
-        "title": "Live logs",
-        "selectPrompt": "Pick a pod to start tailing — sidecars surface under the container picker once a pod is selected.",
+        "title": "Logs ao vivo",
+        "selectPrompt": "Escolha um pod para começar a acompanhar os logs; os sidecars aparecem no seletor de contêineres depois que um pod é selecionado.",
         "podLabel": "Pod",
-        "podPlaceholder": "Pick a pod…"
+        "podPlaceholder": "Escolha um pod…"
       }
     },
     "shell": {
-      "title": "{name} · Shell",
-      "description": "{slug} · interactive shell into the running workloads",
+      "title": "{name} · Terminal",
+      "description": "{slug} · terminal interativo nas cargas de trabalho em execução",
       "podLabel": "Pod",
-      "podPlaceholder": "Pick a pod…",
-      "containerLabel": "Container",
-      "containerPlaceholder": "Pick a container…",
+      "podPlaceholder": "Escolha um pod…",
+      "containerLabel": "Contêiner",
+      "containerPlaceholder": "Escolha um contêiner…",
       "terminal": {
-        "title": "In-browser terminal",
-        "description": "Attach a PTY to a chosen pod and container — same backend protocol the CLI uses, no context switch.",
-        "open": "Open shell",
-        "close": "Close shell",
-        "targetDescription": "Ready to attach to {container} in {pod}.",
-        "pickTarget": "Pick a pod + container above to open a shell.",
-        "readyHint": "Click Open shell to attach the terminal.",
-        "ariaLabel": "Interactive pod terminal",
-        "statusConnecting": "Connecting to pod…",
+        "title": "Terminal no navegador",
+        "description": "Conecte um PTY a um pod e um contêiner escolhidos, com o mesmo protocolo de backend usado pela CLI e sem trocar de contexto.",
+        "open": "Abrir terminal",
+        "close": "Fechar terminal",
+        "targetDescription": "Pronto para se conectar a {container} em {pod}.",
+        "pickTarget": "Escolha um pod e um contêiner acima para abrir um terminal.",
+        "readyHint": "Clique em Abrir terminal para conectar o terminal.",
+        "ariaLabel": "Terminal interativo do pod",
+        "statusConnecting": "Conectando ao pod…",
         "statusClosed": "A sessão terminou. Abra um novo terminal. O resultado da entrada enviada logo antes da desconexão pode ser desconhecido; ela não será reenviada.",
-        "statusDenied": "Permission denied — your role does not include app.exec_pod.",
-        "statusError": "Terminal error — see the log line above for details.",
+        "statusDenied": "Permissão negada: sua função não inclui app.exec_pod.",
+        "statusError": "Erro no terminal: veja a linha de log acima para mais detalhes.",
         "authExpired": "A sessão expirou. Entre novamente e abra um novo terminal.",
-        "targetGone": "That target no longer exists — it may have been removed.",
-        "untilThen": "Or run {cli} locally — the CLI uses the same backend protocol.",
-        "install": "Install the CLI",
-        "manageTokens": "Manage deploy tokens",
-        "expand": "Expand to full screen",
-        "collapse": "Exit full screen (Esc)",
-        "popOut": "Open in a separate window",
-        "resizeHandle": "Drag to resize the terminal",
+        "targetGone": "Esse destino não existe mais; ele pode ter sido removido.",
+        "untilThen": "Ou execute {cli} localmente; a CLI usa o mesmo protocolo de backend.",
+        "install": "Instalar a CLI",
+        "manageTokens": "Gerenciar tokens de implantação",
+        "expand": "Expandir para tela cheia",
+        "collapse": "Sair da tela cheia (Esc)",
+        "popOut": "Abrir em outra janela",
+        "resizeHandle": "Arraste para redimensionar o terminal",
         "stepUpRequired": "Entre novamente para abrir um console aqui."
       },
       "shortcuts": {
-        "title": "CLI shortcuts",
-        "description": "Common commands you'd run against this app. Each one authenticates with your local {login} session.",
-        "openShell": "Open an interactive shell",
-        "djangoCmd": "Run a Django management command",
-        "tailLogs": "Tail logs from the primary workload"
+        "title": "Atalhos da CLI",
+        "description": "Comandos comuns que você executaria neste aplicativo. Cada um se autentica com sua sessão local do {login}.",
+        "openShell": "Abrir um terminal interativo",
+        "djangoCmd": "Executar um comando de gerenciamento do Django",
+        "tailLogs": "Acompanhar os logs da carga de trabalho principal"
       },
-      "copy": "Copy command",
-      "copied": "Copied to clipboard",
-      "copyFailed": "Couldn't copy — clipboard access blocked",
+      "copy": "Copiar comando",
+      "copied": "Copiado para a área de transferência",
+      "copyFailed": "Não foi possível copiar: o acesso à área de transferência está bloqueado",
       "upload": {
-        "title": "Upload script",
-        "description": "Drop a .py / .sql / .sh / .ts / .js / .rb / .go file. We mint a pre-signed URL, push the bytes, and hand you a paste-ready curl + run pair.",
-        "pick": "Upload script",
-        "uploading": "Uploading…",
-        "clear": "Clear uploaded file",
-        "empty": "No file uploaded yet — the command palette below runs unchanged.",
-        "path": "Will land at {path}",
-        "runLabel": "Run command",
-        "fetchLabel": "Fetch into the pod first",
-        "note": "The pre-signed URL is scoped to this upload. Run the fetch command inside the pod before the run command; the bytes are fetched over HTTPS and dropped at /tmp.",
-        "success": "Uploaded {name}",
-        "failed": "Upload failed: {error}",
-        "noUrl": "no pre-signed URL returned"
+        "title": "Enviar script",
+        "description": "Envie um arquivo .py / .sql / .sh / .ts / .js / .rb / .go. Geramos uma URL pré-assinada, transferimos os bytes e entregamos a você um par de comandos curl + execução pronto para colar.",
+        "pick": "Enviar script",
+        "uploading": "Enviando…",
+        "clear": "Remover arquivo enviado",
+        "empty": "Nenhum arquivo enviado ainda; a paleta de comandos abaixo é executada sem alterações.",
+        "path": "Será salvo em {path}",
+        "runLabel": "Comando de execução",
+        "fetchLabel": "Primeiro, baixe para o pod",
+        "note": "A URL pré-assinada é restrita a este envio. Execute o comando de download dentro do pod antes do comando de execução; os bytes são baixados via HTTPS e salvos em /tmp.",
+        "success": "{name} enviado",
+        "failed": "Falha no envio: {error}",
+        "noUrl": "nenhuma URL pré-assinada retornada"
       }
     },
     "workloadActions": {
@@ -3764,7 +3634,7 @@
       "ci": {
         "title": "Configuração de CI",
         "manage": "Gerenciar",
-        "workflow": "Workflow",
+        "workflow": "Fluxo de trabalho",
         "webhook": "Webhook",
         "secret": "Segredo de implantação",
         "installed": "instalado {when}",
@@ -4120,11 +3990,11 @@
       "graphDescription": "Clique em um nó para ver detalhes. Os nós são coloridos por status.",
       "graphTitle": "Componentes provisionados",
       "legend": {
-        "ingress": "Ingress",
+        "ingress": "Entrada",
         "ingressBody": "O ponto de entrada público gerenciado pela plataforma; DNS e TLS terminam aqui.",
         "service": "Serviço",
         "serviceBody": "ClusterIP do Kubernetes na frente dos pods de uma carga de trabalho.",
-        "status": "Status",
+        "status": "Estado",
         "statusBody": "Verde = em execução, âmbar = provisionando, vermelho = com falha.",
         "workload": "Carga de trabalho",
         "workloadBody": "Um processo ou implantação do aplicativo; gerencia réplicas e escalonamento."
@@ -4182,7 +4052,7 @@
         "kind": "Tipo",
         "account": "Conta",
         "scopes": "Escopos",
-        "status": "Status"
+        "status": "Estado"
       },
       "oauthAppConfig": "configuração de OAuth App",
       "personal": "pessoal",
@@ -4211,7 +4081,7 @@
         "fingerprint": "Impressão digital",
         "publicKey": "Chave pública"
       },
-      "appScope": "app: {slug}",
+      "appScope": "aplicativo: {slug}",
       "orgScoped": "da organização",
       "delete": "Excluir",
       "emptyTitle": "Nenhuma chave SSH de deploy ainda",
@@ -4333,7 +4203,7 @@
       "permsFooter": "Além de webhooks de push e pull_request. Você pode ampliar depois editando o App no GitHub.",
       "back": "← Voltar",
       "continue": "Continuar no GitHub →",
-      "appId": "App ID",
+      "appId": "ID do App",
       "appIdHelp": "O App ID numérico da página de configurações do seu GitHub App (não o Client ID).",
       "appIdInvalid": "O App ID é o id numérico, ex.: 3705068.",
       "pem": "Chave privada (PEM)",
@@ -4366,8 +4236,8 @@
       "copy": "Copiar",
       "scopes": "Escopos do GitLab necessários: <code>read_api</code>, <code>read_repository</code>, <code>read_user</code>. Deixe <em>Confidential</em> marcado.",
       "step3": "Cole o resultado aqui",
-      "applicationId": "Application ID",
-      "secret": "Secret",
+      "applicationId": "ID da aplicação",
+      "secret": "Segredo",
       "secretHelp": "Armazenado criptografado em repouso. O GitLab mostra o Secret uma única vez; copie-o antes de sair da página.",
       "cancel": "Cancelar",
       "connecting": "Conectando…",
@@ -4453,7 +4323,7 @@
       "displayNamePlaceholder": "ex.: Auth0 produção, Cognito staging",
       "displayNameHelp": "Exibido na tela de login e nos logs de auditoria. Em branco, usa o nome do tipo.",
       "discovery": "URL de descoberta OIDC",
-      "clientId": "Client ID",
+      "clientId": "ID do cliente",
       "secretRef": "Referência do segredo",
       "secretRefHelp": "Caminho no backend de segredos da plataforma; o valor nunca fica neste registro.",
       "metadataUrl": "URL de metadados SAML",
@@ -4474,7 +4344,7 @@
         "provider": "Provedor",
         "kind": "Tipo",
         "endpoint": "Endpoint",
-        "status": "Status"
+        "status": "Estado"
       },
       "client": "cliente {id}",
       "active": "ativo",
@@ -4739,7 +4609,7 @@
     "alerts": {
       "title": "Inscrições em alertas de apps",
       "description": "Escolha de quais apps e tipos de evento receber alertas.",
-      "app": "App",
+      "app": "Aplicativo",
       "bulk": "Em massa",
       "kinds": {
         "deploy_success": "Deploy bem-sucedido",
@@ -4810,138 +4680,7 @@
       }
     }
   },
-  "settingsIndex": {
-    "title": "Configurações",
-    "description": "Configure a identidade, segurança e superfícies da plataforma.",
-    "cardMeta": {
-      "modified": "Modificado {when}"
-    },
-    "sections": {
-      "organization": {
-        "title": "Organização",
-        "description": "Nome de exibição, site, padrões de retenção."
-      },
-      "identityProvider": {
-        "title": "Provedor de identidade",
-        "description": "Configuração OIDC / SAML + provisionamento SCIM."
-      },
-      "sourceProviders": {
-        "title": "Provedores de código-fonte",
-        "description": "Conecte GitHub / GitLab / Gitea + gerencie chaves SSH de deploy."
-      },
-      "managedDomains": {
-        "title": "Domínios gerenciados",
-        "description": "Zonas DNS gerenciadas pela plataforma para apps de tenants e ambientes de preview."
-      },
-      "policies": {
-        "title": "Políticas ABAC",
-        "description": "Predicados de runtime sobre o RBAC."
-      },
-      "permissions": {
-        "title": "Permissões",
-        "description": "Inspecione cada permissão resolvida para o usuário atual."
-      },
-      "profile": {
-        "title": "Perfil",
-        "description": "Tema + idioma."
-      },
-      "security": {
-        "title": "Segurança",
-        "description": "Sessões ativas, MFA, elevação de admin."
-      },
-      "notifications": {
-        "title": "Notificações",
-        "description": "Caixa de entrada de aprovações, alertas e convites."
-      },
-      "apiTokens": {
-        "title": "Tokens de API",
-        "description": "Tokens de portador de longa duração para CLIs e bots."
-      },
-      "members": {
-        "title": "Members",
-        "description": "Org members, invitations, and role bindings."
-      },
-      "teams": {
-        "title": "Teams",
-        "description": "Group members for shared ownership of apps and projects."
-      },
-      "projects": {
-        "title": "Projects",
-        "description": "Logical groupings of apps owned by teams."
-      }
-    }
-  },
   "lists": {
-    "cost": {
-      "title": "Cost",
-      "description": "Currency-denominated platform spend, rolled up from CostSnapshot rows. Pick a time range; the trend chart marks anomalies (> 2σ day-over-day jumps); the per-resource panel attributes spend to specific managed-service bindings.",
-      "tabsLabel": "Time range",
-      "tab24h": "24h",
-      "tab7d": "7d",
-      "tab30d": "30d",
-      "tabMtd": "MTD",
-      "kpis": {
-        "projectedMonthly": "Projected monthly",
-        "budgets": "Budgets",
-        "window": {
-          "h24": "Last 24 hours",
-          "d7": "Last 7 days",
-          "d30": "Last 30 days",
-          "mtd": "Month to date"
-        }
-      },
-      "forecast": {
-        "vsPreviousMonth": "vs prev month",
-        "mtdLine": "MTD {mtd} · prev month {previous}",
-        "insufficientData": "Not enough daily cost data yet for a confident projection.",
-        "confidence": {
-          "low": "low confidence",
-          "medium": "med confidence",
-          "high": "high confidence"
-        }
-      },
-      "trend": {
-        "title": "Daily trend",
-        "description": "Per-day platform spend over the selected range. Marked points exceed the day-over-day rolling 2σ.",
-        "tooltipDailyTotal": "Daily total",
-        "anomaliesBadge": "{count} anomaly",
-        "emptyTitle": "No cost data in this window",
-        "emptyDescription": "The daily cost collector hasn't written snapshots for the selected range yet, or the cloud-side billing API hasn't reported usage. Live pricing data only — nothing is estimated client-side."
-      },
-      "budgets": {
-        "title": "Budgets",
-        "description": "Budgets fire alerts as you cross each percentage threshold.",
-        "emptyTitle": "No budgets configured",
-        "emptyDescription": "Budgets can be set per organization, team, or project.",
-        "columns": {
-          "scope": "Scope",
-          "period": "Period",
-          "spend": "Spend",
-          "budget": "Budget",
-          "alerts": "Alerts"
-        }
-      },
-      "byCategory": {
-        "title": "By category",
-        "description": "Spend split across workload / managed-service / egress / storage / other.",
-        "empty": "No cost data yet."
-      },
-      "attribution": {
-        "title": "Per-resource attribution",
-        "description": "Spend broken out by managed-service binding (e.g. main_db, events_queue, uploads_bucket). Untagged rows roll up under \"shared / untagged\" — usually shared egress or providers that don't yet apply the platform binding tag.",
-        "coverage": "Attribution coverage: {pct}% ({attributed} of {total})",
-        "unattributedRow": "Shared / untagged",
-        "emptyTitle": "No attributed cost rows",
-        "emptyDescription": "Bindings are visible only after the cloud-side cost driver tags resources with astrolift.io/binding at provision time. Track #432 from:backend for the provider-side rollout.",
-        "columns": {
-          "resource": "Resource",
-          "kind": "Kind",
-          "app": "App",
-          "category": "Category",
-          "amount": "Amount"
-        }
-      }
-    },
     "audit": {
       "title": "Log de auditoria",
       "description": "Todas as decisões de permissão e operações que alteram o estado são acrescentadas sem modificar registros anteriores. O isolamento por organização é aplicado no banco de dados.",
@@ -5037,72 +4776,72 @@
         "awaitingLabel": "Aguardando",
         "awaitingEmpty": "Sem aprovadores elegíveis — verifique a política do app."
       },
-      "title": "Approve deployment",
-      "loading": "Loading…",
-      "notFoundTitle": "Deployment not found",
-      "notFoundDescription": "The deployment doesn't exist or you don't have permission to view it.",
-      "expired": "The approval link may have expired, or the deployment was deleted. Return to the",
-      "deploymentsList": "deployments list",
+      "title": "Aprovar implantação",
+      "loading": "Carregando…",
+      "notFoundTitle": "Implantação não encontrada",
+      "notFoundDescription": "A implantação não existe ou você não tem permissão para vê-la.",
+      "expired": "O link de aprovação pode ter expirado, ou a implantação foi excluída. Volte para a",
+      "deploymentsList": "lista de implantações",
       "fields": {
-        "imageTag": "Image tag",
-        "imageDigest": "Image digest",
-        "clusterRevision": "Cluster revision",
-        "workload": "Workload",
-        "created": "Created",
-        "started": "Started"
+        "imageTag": "Tag da imagem",
+        "imageDigest": "Digest da imagem",
+        "clusterRevision": "Revisão do cluster",
+        "workload": "Carga de trabalho",
+        "created": "Criação",
+        "started": "Início"
       },
-      "approvalsCount": "{received} / {required} approvals",
-      "awaiting": "Awaiting approval",
-      "awaitingDesc": "{remaining} more approval(s) required before this deployment proceeds. Self-approval is rejected by the backend.",
-      "approve": "Approve",
-      "reject": "Reject",
-      "missingPermission": "You don't have app.approve_deploy; ask an org admin to approve.",
-      "viewDetail": "View full detail",
-      "viewDetailShort": "View detail",
-      "alreadyApproved": "Already approved",
-      "alreadyApprovedDesc": "The deployment moved past the approval gate. Status: {status}.",
-      "failed": "Deployment failed",
-      "failedDesc": "Approval no longer applies. Inspect the lifecycle log on the detail page.",
-      "noAction": "No approval action available in current state {status}.",
-      "selfTriggerBadge": "Pushed by you",
-      "selfTriggerHelp": "This deployment was triggered by you. Another approver is required (separation of duties).",
-      "rejectedReasonLabel": "Rejection reason",
+      "approvalsCount": "{received} / {required} aprovações",
+      "awaiting": "Aguardando aprovação",
+      "awaitingDesc": "Aprovações ainda necessárias para esta implantação prosseguir: {remaining}. O backend rejeita a autoaprovação.",
+      "approve": "Aprovar",
+      "reject": "Rejeitar",
+      "missingPermission": "Você não tem a permissão app.approve_deploy; peça a um administrador da organização para aprovar.",
+      "viewDetail": "Ver todos os detalhes",
+      "viewDetailShort": "Ver detalhes",
+      "alreadyApproved": "Já aprovada",
+      "alreadyApprovedDesc": "A implantação já passou da etapa de aprovação. Estado: {status}.",
+      "failed": "Falha na implantação",
+      "failedDesc": "A aprovação não se aplica mais. Consulte o log do ciclo de vida na página de detalhes.",
+      "noAction": "Nenhuma ação de aprovação disponível no estado atual: {status}.",
+      "selfTriggerBadge": "Enviada por você",
+      "selfTriggerHelp": "Esta implantação foi disparada por você. É necessário outro aprovador (segregação de funções).",
+      "rejectedReasonLabel": "Motivo da rejeição",
       "commit": {
-        "viewDiff": "View commit",
-        "noMessage": "No commit message recorded for this deploy.",
-        "expand": "Show {hidden} more lines",
-        "collapse": "Collapse"
+        "viewDiff": "Ver commit",
+        "noMessage": "Nenhuma mensagem de commit registrada para esta implantação.",
+        "expand": "Mostrar mais {hidden} linhas",
+        "collapse": "Recolher"
       },
       "toasts": {
-        "approved": "Approved — status now {status}",
-        "approveFailed": "Approve failed",
-        "rejected": "Deployment rejected",
-        "rejectFailed": "Reject failed"
+        "approved": "Aprovada. Estado atual: {status}",
+        "approveFailed": "Falha ao aprovar",
+        "rejected": "Implantação rejeitada",
+        "rejectFailed": "Falha ao rejeitar"
       },
       "history": {
-        "title": "Approval history",
-        "empty": "No approval events recorded yet.",
-        "actorUnknown": "unknown actor",
+        "title": "Histórico de aprovações",
+        "empty": "Nenhum evento de aprovação registrado ainda.",
+        "actorUnknown": "autor desconhecido",
         "action": {
-          "started": "Deploy started",
-          "approved": "Approved",
-          "rejected": "Rejected",
-          "aborted": "Aborted",
-          "other": "Lifecycle event"
+          "started": "Implantação iniciada",
+          "approved": "Aprovada",
+          "rejected": "Rejeitada",
+          "aborted": "Abortada",
+          "other": "Evento do ciclo de vida"
         }
       },
       "confirm": {
-        "title": "Approve deploy of {tag}?",
-        "description": "Unblocks the rollout to {app}/{env}. The workflow resumes immediately and traffic shifts according to the configured strategy. Self-approval on a deploy you triggered is rejected by the backend.",
-        "confirm": "Approve deployment"
+        "title": "Aprovar a implantação de {tag}?",
+        "description": "Libera a implantação em {app}/{env}. O fluxo é retomado imediatamente e o tráfego é transferido conforme a estratégia configurada. O backend rejeita a autoaprovação de uma implantação que você disparou.",
+        "confirm": "Aprovar implantação"
       },
       "confirmReject": {
-        "title": "Reject deploy of {tag}?",
-        "description": "Marks the deployment failed for {app}/{env}. CI must re-trigger to create a fresh deployment for review.",
-        "reasonLabel": "Reason for rejection",
-        "reasonPlaceholder": "Why is this deploy being rejected? Persists on the audit log + history sidebar.",
-        "reasonRequired": "Reason required",
-        "confirm": "Reject deployment"
+        "title": "Rejeitar a implantação de {tag}?",
+        "description": "Marca a implantação de {app}/{env} como falha. A CI precisa disparar de novo para criar uma nova implantação para revisão.",
+        "reasonLabel": "Motivo da rejeição",
+        "reasonPlaceholder": "Por que esta implantação está sendo rejeitada? Fica salvo no log de auditoria e na barra lateral de histórico.",
+        "reasonRequired": "Informe um motivo",
+        "confirm": "Rejeitar implantação"
       }
     },
     "approvalsQueue": {
@@ -5153,173 +4892,104 @@
       }
     },
     "events": {
-      "title": "Events",
-      "description": "Append-only platform fact log: every state change of interest to dashboards, webhooks, and event-driven workflows.",
-      "filterPlaceholder": "Filter by event type (e.g. app.deployed)",
-      "aggregateToggle": "Group repeats",
-      "aggregateBadge": "×{count} similar",
-      "expandLabel": "Expand",
-      "collapseLabel": "Collapse",
-      "sourceLabel": "Source",
-      "emptyTitle": "Quiet feed",
-      "emptyDescription": "No events match the current filter. Try clearing it, or trigger a mutation to see one land."
-    },
-    "quotas": {
-      "title": "Quotas",
-      "description": "Resource limits per scope. Soft limits trigger alerts; hard limits block the next admission attempt.",
-      "emptyTitle": "No quotas configured",
-      "emptyDescription": "Quotas can be set per organization, team, or project. The default install ships with sensible org-level caps.",
-      "columns": {
-        "scope": "Scope",
-        "resource": "Resource",
-        "usage": "Usage",
-        "bar": "Bar",
-        "limits": "Soft / Hard",
-        "actions": "Actions"
-      },
-      "request": {
-        "buttonRequest": "Request bump",
-        "buttonPending": "Pending request",
-        "title": "Request quota bump",
-        "description": "Asks an org admin to raise the hard limit. They get an in-app notification + an email. Pending status surfaces on this row until decided.",
-        "factorLabel": "Multiplier",
-        "factor1_5x": "1.5x",
-        "factor2x": "2x",
-        "factor3x": "3x",
-        "factor5x": "5x",
-        "factor10x": "10x",
-        "reasonLabel": "Reason",
-        "reasonPlaceholder": "Onboarding the prod team next quarter; current cap blocks the migration.",
-        "reasonHint": "Required. Shows up in the admin notification.",
-        "submit": "Submit request",
-        "submitting": "Submitting…",
-        "cancel": "Cancel",
-        "toastSubmitted": "Quota bump requested",
-        "toastFailed": "Failed to submit request",
-        "pendingBadge": "Pending {factor}x — {reason}"
-      },
-      "overviewTitle": "Utilization",
-      "overviewDescription": "Current usage against hard limits, most-utilized first.",
-      "history": {
-        "button": "History",
-        "title": "{resource} usage history",
-        "description": "Point-in-time usage captured daily, plotted against the soft and hard limits.",
-        "windowLabel": "Window",
-        "windowOption": "Last {days} days",
-        "usedTrend": "Used over time",
-        "latestUsed": "Latest used",
-        "peakUsed": "Peak used",
-        "softLimit": "Soft limit",
-        "hardLimit": "Hard limit",
-        "emptyTitle": "No usage history yet",
-        "emptyDescription": "Usage snapshots are captured once a day. Check back after the collector has run at least once."
-      }
+      "title": "Eventos",
+      "description": "Log de fatos da plataforma, somente de acréscimo: toda mudança de estado relevante para painéis, webhooks e fluxos de trabalho orientados a eventos.",
+      "filterPlaceholder": "Filtrar por tipo de evento (ex.: app.deployed)",
+      "aggregateToggle": "Agrupar repetições",
+      "aggregateBadge": "×{count} semelhantes",
+      "expandLabel": "Expandir",
+      "collapseLabel": "Recolher",
+      "sourceLabel": "Origem",
+      "emptyTitle": "Feed tranquilo",
+      "emptyDescription": "Nenhum evento corresponde ao filtro atual. Tente limpá-lo ou dispare uma mutação para ver um evento chegar."
     },
     "alerts": {
       "mute": {
-        "menuLabel": "Mute",
-        "preset1h": "Mute for 1 hour",
-        "preset4h": "Mute for 4 hours",
-        "preset24h": "Mute for 24 hours",
-        "presetCustom": "Mute for custom duration…",
-        "unmute": "Unmute now",
-        "badge": "Muted ({remaining} left)",
-        "badgeExpired": "Muted",
-        "showMuted": "Show muted",
-        "hideMuted": "Hide muted",
-        "toastMuted": "Muted {name} for {duration}",
-        "toastUnmuted": "Unmuted {name}",
-        "toastMuteFailed": "Failed to mute rule",
-        "toastUnmuteFailed": "Failed to unmute rule",
-        "customTitle": "Mute {name}",
-        "customDescription": "Silence channel fan-out until the TTL expires. The rule keeps producing AlertEvent rows so the incident timeline stays intact. Mute is capped at 7 days.",
-        "durationLabel": "Duration (hours)",
-        "reasonLabel": "Reason",
-        "reasonPlaceholder": "Known outage — DB migration in progress",
-        "reasonHint": "Surfaces on the audit log + on the muted-rule badge.",
-        "submit": "Mute rule",
-        "cancel": "Cancel"
+        "menuLabel": "Silenciar",
+        "preset1h": "Silenciar por 1 hora",
+        "preset4h": "Silenciar por 4 horas",
+        "preset24h": "Silenciar por 24 horas",
+        "presetCustom": "Silenciar por um período personalizado…",
+        "unmute": "Reativar agora",
+        "badge": "Silenciada (restam {remaining})",
+        "badgeExpired": "Silenciada",
+        "showMuted": "Mostrar silenciadas",
+        "hideMuted": "Ocultar silenciadas",
+        "toastMuted": "{name} silenciada por {duration}",
+        "toastUnmuted": "{name} reativada",
+        "toastMuteFailed": "Falha ao silenciar a regra",
+        "toastUnmuteFailed": "Falha ao reativar a regra",
+        "customTitle": "Silenciar {name}",
+        "customDescription": "Silencia a distribuição para os canais até o TTL expirar. A regra continua gerando linhas de AlertEvent para manter intacta a linha do tempo do incidente. O silenciamento tem limite de 7 dias.",
+        "durationLabel": "Duração (horas)",
+        "reasonLabel": "Motivo",
+        "reasonPlaceholder": "Interrupção conhecida: migração do banco de dados em andamento",
+        "reasonHint": "Aparece no log de auditoria e no selo da regra silenciada.",
+        "submit": "Silenciar regra",
+        "cancel": "Cancelar"
       },
-      "title": "Alerts",
-      "description": "Org-wide alert rules + the firing events they produce. Rules target apps, environments, workloads, or the org globally; firing events surface in the bottom panel.",
-      "newRule": "New rule",
+      "title": "Alertas",
+      "description": "Regras de alerta de toda a organização e os eventos disparados que elas geram. As regras têm como alvo aplicativos, ambientes, cargas de trabalho ou a organização inteira; os eventos disparados têm um feed próprio.",
+      "newRule": "Nova regra",
       "stats": {
-        "rules": "Rules",
-        "active": "{count} active",
-        "unresolved": "Unresolved",
-        "inWindow": "in current window",
-        "total": "Total events",
-        "latest": "latest 100"
+        "rules": "Regras",
+        "active": "Ativas: {count}",
+        "unresolved": "Não resolvidos",
+        "inWindow": "no período atual",
+        "total": "Total de eventos",
+        "latest": "últimos 100"
       },
       "rules": {
-        "title": "Rules",
-        "description": "Predicates fire events when matching telemetry crosses a threshold.",
-        "emptyTitle": "No alert rules yet",
-        "emptyDescription": "Create a rule to start surfacing platform events as alerts.",
+        "title": "Regras",
+        "description": "Os predicados disparam eventos quando a telemetria correspondente ultrapassa um limite.",
+        "emptyTitle": "Ainda não há regras de alerta",
+        "emptyDescription": "Crie uma regra para começar a exibir eventos da plataforma como alertas.",
         "columns": {
-          "name": "Name",
-          "target": "Target",
-          "severity": "Severity",
-          "created": "Created"
+          "name": "Nome",
+          "target": "Alvo",
+          "severity": "Gravidade",
+          "created": "Criada"
         }
       },
       "events": {
-        "title": "Recent events",
-        "description": "Firing instances from the rules above. Acknowledge to silence while the underlying issue is being worked.",
-        "emptyTitle": "No events yet",
-        "emptyDescription": "Events appear here when an active rule's predicate matches incoming telemetry.",
+        "title": "Eventos",
+        "description": "Eventos disparados pelas suas regras de alerta. Reconheça um evento para silenciá-lo enquanto o problema subjacente estiver sendo tratado.",
+        "emptyTitle": "Ainda não há eventos",
+        "emptyDescription": "Os eventos aparecem aqui quando o predicado de uma regra ativa corresponde à telemetria recebida.",
         "columns": {
-          "summary": "Summary",
-          "severity": "Severity",
-          "fired": "Fired",
-          "state": "State"
+          "summary": "Resumo",
+          "severity": "Gravidade",
+          "fired": "Disparado",
+          "state": "Estado"
         },
-        "resolved": "resolved",
-        "acknowledged": "acknowledged",
-        "firing": "firing",
-        "ack": "Ack"
+        "resolved": "resolvido",
+        "acknowledged": "reconhecido",
+        "firing": "disparando",
+        "ack": "Reconhecer"
       },
       "delete": {
-        "title": "Delete rule \"{name}\"?",
-        "fallbackTitle": "Delete rule?",
-        "description": "Soft-deletes the rule. Events that already fired stay in the log and remain reachable from the event panel — only future evaluations stop. Re-create the rule with the same target to resume coverage.",
-        "confirm": "Delete rule"
+        "title": "Excluir a regra \"{name}\"?",
+        "fallbackTitle": "Excluir a regra?",
+        "description": "Faz a exclusão lógica da regra. Os eventos já disparados permanecem no log e continuam acessíveis pelo painel de eventos; apenas as avaliações futuras são interrompidas. Recrie a regra com o mesmo alvo para retomar a cobertura.",
+        "confirm": "Excluir regra"
       },
       "create": {
-        "title": "New alert rule",
-        "description": "Predicate matches against the platform event stream. Notify channels describe where firing events go (Slack, email, webhook).",
-        "nameLabel": "Name",
-        "namePlaceholder": "failed-deploy",
-        "targetLabel": "Target",
-        "severityLabel": "Severity",
-        "targetIdLabel": "Target ID",
-        "targetIdGlobal": "(blank for global)",
-        "targetIdPlaceholder": "app slug, env name, or workload slug",
-        "targetIdGlobalHint": "Global rules ignore targetId — backend rejects non-empty values.",
-        "targetIdHint": "App slug for app target; env name for env target; etc.",
-        "predicateLabel": "Predicate (JSON)",
-        "channelsLabel": "Notify channels (JSON)",
-        "cancel": "Cancel",
-        "submit": "Create rule",
-        "submitting": "Creating…"
-      }
-    },
-    "membersBulk": {
-      "selectAllLabel": "Select all role bindings",
-      "selectRowLabel": "Select binding {role} on {subject}",
-      "selected": "{count, plural, =1 {1 binding selected} other {# bindings selected}}",
-      "clear": "Clear",
-      "revokeButton": "Revoke {count}",
-      "permissionHint": "You don't have permission to manage members.",
-      "confirm": {
-        "title": "Revoke {count} role binding(s)?",
-        "description": "Each subject loses the permissions these roles granted. Other bindings, if any, remain in effect. The operation is per-binding — if one fails, the others still apply.",
-        "confirmLabel": "Revoke {count}"
-      },
-      "toasts": {
-        "allOk": "Revoked {count} role binding(s).",
-        "partial": "Revoked {revoked}, {failed} failed.",
-        "allFailed": "Bulk revoke failed: {message}"
+        "title": "Nova regra de alerta",
+        "description": "O predicado é comparado com o fluxo de eventos da plataforma. Os canais de notificação definem para onde vão os eventos disparados (Slack, e-mail, webhook).",
+        "nameLabel": "Nome",
+        "namePlaceholder": "falha-na-implantacao",
+        "targetLabel": "Alvo",
+        "severityLabel": "Gravidade",
+        "targetIdLabel": "ID do alvo",
+        "targetIdGlobal": "(em branco para global)",
+        "targetIdPlaceholder": "slug do aplicativo, nome do ambiente ou slug da carga de trabalho",
+        "targetIdGlobalHint": "Regras globais ignoram targetId; o backend rejeita valores não vazios.",
+        "targetIdHint": "Slug do aplicativo para o alvo app; nome do ambiente para o alvo env; etc.",
+        "predicateLabel": "Predicado (JSON)",
+        "channelsLabel": "Canais de notificação (JSON)",
+        "cancel": "Cancelar",
+        "submit": "Criar regra",
+        "submitting": "Criando…"
       }
     },
     "teamMembersBulk": {
@@ -5435,31 +5105,31 @@
       }
     },
     "deployments": {
-      "title": "Deployments",
-      "description": "Every rollout attempt across every app and environment. Click a row to see the workflow timeline, rendered manifests, and logs.",
-      "start": "Start deployment",
-      "filterApp": "Filter by app slug…",
-      "counts": "{filtered} of {total}",
-      "emptyTitle": "No deployments yet",
-      "emptyDescription": "Register an app and roll a deployment from /apps/[slug]/deploy. Deployments land here as soon as the workflow starts.",
-      "openApps": "Open apps",
-      "approvalsCount": "{received}/{required} approvals",
+      "title": "Implantações",
+      "description": "Todas as tentativas de implantação em todos os aplicativos e ambientes. Clique em uma linha para ver a linha do tempo do fluxo, os manifestos renderizados e os logs.",
+      "start": "Iniciar implantação",
+      "filterApp": "Filtrar por slug do aplicativo…",
+      "counts": "{filtered} de {total}",
+      "emptyTitle": "Ainda não há implantações",
+      "emptyDescription": "Registre um aplicativo e inicie uma implantação em /apps/[slug]/deploy. As implantações aparecem aqui assim que o fluxo começa.",
+      "openApps": "Abrir aplicativos",
+      "approvalsCount": "{received}/{required} aprovações",
       "columns": {
-        "appEnv": "App / Env",
-        "image": "Image",
-        "trigger": "Trigger",
-        "status": "Status",
-        "duration": "Duration",
-        "started": "Started",
-        "actions": "Actions"
+        "appEnv": "Aplicativo / Ambiente",
+        "image": "Imagem",
+        "trigger": "Gatilho",
+        "status": "Estado",
+        "duration": "Duração",
+        "started": "Início",
+        "actions": "Ações"
       },
-      "rowAriaLabel": "Deployment {app} → {env}. Press Enter to open.",
+      "rowAriaLabel": "Implantação {app} → {env}. Pressione Enter para abrir.",
       "tabs": {
-        "ariaLabel": "Deployment views",
-        "active": "Active",
-        "previews": "Previews",
-        "pending": "Pending",
-        "history": "History"
+        "ariaLabel": "Visualizações de implantações",
+        "active": "Ativas",
+        "previews": "Prévias",
+        "pending": "Pendentes",
+        "history": "Histórico"
       },
       "actions": {
         "label": "Ações",
@@ -5475,63 +5145,63 @@
         "copyFail": "Não foi possível copiar para a área de transferência."
       },
       "bulk": {
-        "selectAllLabel": "Select all visible deployments",
-        "selectRowLabel": "Select {app} / {env}",
-        "selected": "{count, plural, =1 {1 deployment selected} other {# deployments selected}}",
-        "summary": "In {envs}.",
-        "mixedWarning": "Selection mixes in-flight and terminal states — bulk actions are disabled until the set is uniform.",
-        "clear": "Clear",
-        "cancelButton": "Cancel {count}",
-        "redeployButton": "Redeploy {count}",
+        "selectAllLabel": "Selecionar todas as implantações visíveis",
+        "selectRowLabel": "Selecionar {app} / {env}",
+        "selected": "{count, plural, =1 {1 implantação selecionada} other {# implantações selecionadas}}",
+        "summary": "Em {envs}.",
+        "mixedWarning": "A seleção mistura estados em andamento e finais; as ações em massa ficam desativadas até que o conjunto seja uniforme.",
+        "clear": "Limpar",
+        "cancelButton": "Cancelar {count}",
+        "redeployButton": "Reimplantar {count}",
         "confirmCancel": {
-          "title": "Cancel {count} in-flight deployments?",
-          "description": "Signals each Temporal workflow to cancel. Marks all selected deployments failed. Cluster state already applied stays in place. Affects {envs}.",
-          "reasonLabel": "Reason for cancel",
-          "reasonPlaceholder": "Why are these deploys being cancelled? Persists on the audit log + history sidebar.",
-          "confirm": "Cancel deployments"
+          "title": "Cancelar {count} implantações em andamento?",
+          "description": "Envia um sinal de cancelamento a cada fluxo do Temporal. Marca todas as implantações selecionadas como falha. O estado já aplicado ao cluster permanece. Afeta {envs}.",
+          "reasonLabel": "Motivo do cancelamento",
+          "reasonPlaceholder": "Por que estas implantações estão sendo canceladas? Fica salvo no log de auditoria e na barra lateral de histórico.",
+          "confirm": "Cancelar implantações"
         },
         "confirmRedeploy": {
-          "title": "Redeploy {count} deployments?",
-          "description": "Spawns a fresh deployment for each selected row with the same image tag. Affects {envs}.",
-          "confirm": "Redeploy all"
+          "title": "Reimplantar {count} implantações?",
+          "description": "Inicia uma nova implantação para cada linha selecionada com a mesma tag de imagem. Afeta {envs}.",
+          "confirm": "Reimplantar todas"
         },
         "toasts": {
-          "abortLabel": "Cancel",
-          "redeployLabel": "Redeploy",
-          "allOk": "{label} succeeded for {count} deployments.",
-          "allFailed": "{label} failed for {count} deployments: {message}",
-          "partial": "{label}: {succeeded} succeeded, {failed} failed."
+          "abortLabel": "Cancelar",
+          "redeployLabel": "Reimplantar",
+          "allOk": "A ação “{label}” foi concluída em {count} implantações.",
+          "allFailed": "A ação “{label}” falhou em {count} implantações: {message}",
+          "partial": "{label}: {succeeded} com sucesso, {failed} com falha."
         }
       },
       "statusOptions": {
-        "all": "All statuses",
-        "pending_approval": "Pending approval",
-        "pending": "Pending",
-        "deploying": "Deploying",
-        "redeploying": "Redeploying",
-        "running": "Running",
-        "failed": "Failed",
-        "rolled_back": "Rolled back",
-        "superseded": "Superseded"
+        "all": "Todos os estados",
+        "pending_approval": "Aguardando aprovação",
+        "pending": "Pendente",
+        "deploying": "Implantando",
+        "redeploying": "Reimplantando",
+        "running": "Em execução",
+        "failed": "Falhou",
+        "rolled_back": "Revertida",
+        "superseded": "Substituída"
       },
-      "envWorkload": "env {env} · workload {workload}",
-      "envOnly": "env {env}",
+      "envWorkload": "ambiente {env} · carga de trabalho {workload}",
+      "envOnly": "ambiente {env}",
       "confirm": {
-        "approveTitle": "Approve deploy of {tag}?",
-        "approveDescription": "Unblocks the rollout to {app}/{env}. The workflow resumes immediately.",
-        "approveConfirm": "Approve",
-        "abortTitle": "Abort in-flight deploy of {app}/{env}?",
-        "abortDescription": "Signals the Temporal workflow to cancel. The deployment is marked failed. Whatever changes already shipped to the cluster stay — Astrolift doesn't auto-rollback on abort.",
-        "abortConfirm": "Abort deploy",
-        "abortReasonLabel": "Reason for abort",
-        "abortReasonPlaceholder": "Why is this deploy being aborted? Persists on the audit log + history sidebar.",
-        "reasonRequired": "Reason required",
-        "rollbackTitle": "Rollback {app}/{env} to the previous revision?",
-        "rollbackDescription": "Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded.",
-        "rollbackConfirm": "Rollback",
-        "redeployTitle": "Redeploy {tag} to {app}/{env}?",
-        "redeployDescription": "Spawns a fresh deployment with the same image. Useful to retry after a transient failure or pick up an updated config.",
-        "redeployConfirm": "Redeploy"
+        "approveTitle": "Aprovar a implantação de {tag}?",
+        "approveDescription": "Libera a implantação em {app}/{env}. O fluxo é retomado imediatamente.",
+        "approveConfirm": "Aprovar",
+        "abortTitle": "Abortar a implantação em andamento de {app}/{env}?",
+        "abortDescription": "Envia um sinal de cancelamento ao fluxo do Temporal. A implantação é marcada como falha. As alterações já enviadas ao cluster permanecem; o Astrolift não reverte automaticamente ao abortar.",
+        "abortConfirm": "Abortar implantação",
+        "abortReasonLabel": "Motivo da interrupção",
+        "abortReasonPlaceholder": "Por que esta implantação está sendo abortada? Fica salvo no log de auditoria e na barra lateral de histórico.",
+        "reasonRequired": "Informe um motivo",
+        "rollbackTitle": "Reverter {app}/{env} para a revisão anterior?",
+        "rollbackDescription": "Cria uma nova implantação de reversão que aponta para a revisão anterior que estava em execução. A revisão atual é marcada como substituída.",
+        "rollbackConfirm": "Reverter",
+        "redeployTitle": "Reimplantar {tag} em {app}/{env}?",
+        "redeployDescription": "Inicia uma nova implantação com a mesma imagem. Útil para tentar novamente após uma falha temporária ou aplicar uma configuração atualizada.",
+        "redeployConfirm": "Reimplantar"
       },
       "startSheet": {
         "title": "Iniciar implantação",
@@ -5572,58 +5242,58 @@
       }
     },
     "deploymentDetail": {
-      "olderLog": "Load older run log",
-      "olderLogFailed": "Could not load older run log",
-      "downloadFailed": "Run log download failed",
+      "olderLog": "Carregar entradas anteriores do log da execução",
+      "olderLogFailed": "Não foi possível carregar as entradas anteriores do log da execução",
+      "downloadFailed": "Falha ao baixar o log da execução",
       "title": "{app} → {env}",
-      "subtitle": "Deployment {id}",
-      "loadingTitle": "Deployment",
-      "loading": "Loading…",
-      "notFoundTitle": "Deployment not found",
-      "notFoundDescription": "The deployment doesn't exist or you don't have permission to view it.",
-      "returnLink": "Try returning to the",
-      "deploymentsList": "deployments list",
-      "approve": "Approve",
-      "abort": "Abort",
-      "rollback": "Rollback",
-      "redeploy": "Redeploy",
+      "subtitle": "Implantação {id}",
+      "loadingTitle": "Implantação",
+      "loading": "Carregando…",
+      "notFoundTitle": "Implantação não encontrada",
+      "notFoundDescription": "A implantação não existe ou você não tem permissão para vê-la.",
+      "returnLink": "Tente voltar para a",
+      "deploymentsList": "lista de implantações",
+      "approve": "Aprovar",
+      "abort": "Abortar",
+      "rollback": "Reverter",
+      "redeploy": "Reimplantar",
       "redeployFailed": "Falha na reimplantação",
-      "approvalsCount": "{received}/{required} approvals",
+      "approvalsCount": "{received}/{required} aprovações",
       "fields": {
-        "imageTag": "Image tag",
-        "imageDigest": "Image digest",
-        "clusterRevision": "Cluster revision",
-        "workload": "Workload",
-        "created": "Created",
-        "started": "Started",
-        "succeeded": "Succeeded",
-        "failed": "Failed",
-        "duration": "Duration",
+        "imageTag": "Tag da imagem",
+        "imageDigest": "Digest da imagem",
+        "clusterRevision": "Revisão do cluster",
+        "workload": "Carga de trabalho",
+        "created": "Criação",
+        "started": "Início",
+        "succeeded": "Sucesso",
+        "failed": "Falha",
+        "duration": "Duração",
         "commit": "Commit",
         "branch": "Branch",
-        "ciActor": "CI actor",
-        "ciProvider": "CI provider",
-        "ciRun": "CI run"
+        "ciActor": "Autor da CI",
+        "ciProvider": "Provedor de CI",
+        "ciRun": "Execução de CI"
       },
-      "lifecycle": "Lifecycle log",
-      "noLog": "No log entries yet.",
-      "manifests": "Rendered manifests",
-      "renderFailed": "Render failed",
-      "noManifests": "No manifests rendered yet.",
-      "events": "Recent events",
-      "noEvents": "No platform events for this app yet.",
+      "lifecycle": "Log do ciclo de vida",
+      "noLog": "Ainda não há entradas de log.",
+      "manifests": "Manifestos renderizados",
+      "renderFailed": "Falha na renderização",
+      "noManifests": "Ainda não há manifestos renderizados.",
+      "events": "Eventos recentes",
+      "noEvents": "Ainda não há eventos da plataforma para este aplicativo.",
       "confirmAbort": {
-        "title": "Abort deploy of {app}/{env}?",
-        "description": "Signals the Temporal workflow to cancel and marks the deployment failed. Changes already applied to the cluster stay in place — Astrolift doesn't auto-rollback on abort. Use Rollback after if needed.",
-        "reasonLabel": "Reason for abort",
-        "reasonPlaceholder": "Why is this deploy being aborted? Persists on the audit log + history sidebar.",
-        "reasonRequired": "Reason required",
-        "confirm": "Abort deploy"
+        "title": "Abortar a implantação de {app}/{env}?",
+        "description": "Envia um sinal de cancelamento ao fluxo do Temporal e marca a implantação como falha. As alterações já aplicadas ao cluster permanecem; o Astrolift não reverte automaticamente ao abortar. Se necessário, use Reverter depois.",
+        "reasonLabel": "Motivo da interrupção",
+        "reasonPlaceholder": "Por que esta implantação está sendo abortada? Fica salvo no log de auditoria e na barra lateral de histórico.",
+        "reasonRequired": "Informe um motivo",
+        "confirm": "Abortar implantação"
       },
       "confirmRollback": {
-        "title": "Rollback {app}/{env}?",
-        "description": "Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded.",
-        "confirm": "Rollback"
+        "title": "Reverter {app}/{env}?",
+        "description": "Cria uma nova implantação de reversão que aponta para a revisão anterior que estava em execução. A revisão atual é marcada como substituída.",
+        "confirm": "Reverter"
       },
       "delete": "Excluir",
       "retire": "Aposentar",
@@ -5648,7 +5318,7 @@
         "url": "URL",
         "cluster": "Cluster",
         "approvals": "Aprovações",
-        "status": "Status",
+        "status": "Estado",
         "actions": "Ações",
         "app": "Aplicativo"
       },
@@ -5710,7 +5380,7 @@
         "branch": "Branch",
         "hostname": "Nome do host",
         "lastDeploy": "Última implantação",
-        "status": "Status",
+        "status": "Estado",
         "actions": "Ações"
       },
       "emptyTitle": "Sem ambientes de prévia",
@@ -5814,12 +5484,12 @@
       "emptyDescription": "Workloads cronjob aparecem aqui assim que o agendador disparar a primeira execução.",
       "emptyExampleCaption": "Adicione uma entrada [[jobs]] ao seu astrolift.toml para declarar um workload cronjob:",
       "emptyLearnMore": "Ver a referência de jobs do astrolift.toml",
-      "envLabel": "env",
-      "workloadLabel": "workload",
+      "envLabel": "ambiente",
+      "workloadLabel": "carga de trabalho",
       "columns": {
-        "app": "App / Env / Workload",
-        "k8sJob": "K8s job",
-        "status": "Status",
+        "app": "Aplicativo / Ambiente / Carga de trabalho",
+        "k8sJob": "Job do K8s",
+        "status": "Estado",
         "duration": "Duração",
         "started": "Iniciado"
       }
@@ -5827,11 +5497,11 @@
     "commands": {
       "emptyTitle": "Ainda sem execuções de comando",
       "emptyDescription": "Comandos ad-hoc invocados contra um workload aparecem aqui. Rode um pela CLI com `astro app run …`.",
-      "workloadLabel": "workload",
+      "workloadLabel": "carga de trabalho",
       "columns": {
-        "app": "App / Workload",
+        "app": "Aplicativo / Carga de trabalho",
         "command": "Comando",
-        "status": "Status",
+        "status": "Estado",
         "invokedBy": "Invocado por",
         "started": "Iniciado"
       }
@@ -6096,7 +5766,7 @@
       "forKind": "para {kind}",
       "kinds": {
         "TEAM": "Time",
-        "APP": "App",
+        "APP": "Aplicativo",
         "USER": "Pessoa"
       },
       "remove": "Remover",
@@ -6110,7 +5780,7 @@
       "pickTeam": "Escolha um time",
       "pickApp": "Escolha um app",
       "teams": "Times",
-      "apps": "Apps",
+      "apps": "Aplicativos",
       "askBefore": "Perguntar antes (confirmar e fazer login de novo)",
       "requireApproval": "Exigir aprovação",
       "approversNeeded": "Aprovadores necessários",
@@ -6236,7 +5906,7 @@
           "ORG": "organização",
           "TEAM": "time",
           "PROJECT": "projeto",
-          "APP": "app"
+          "APP": "aplicativo"
         },
         "builtin": {
           "yes": "integrada",
@@ -6263,7 +5933,7 @@
           "ORG": "organização",
           "TEAM": "time",
           "PROJECT": "projeto",
-          "APP": "app"
+          "APP": "aplicativo"
         },
         "kind": {
           "user": "usuário",
@@ -6287,7 +5957,7 @@
           "ORG": "organização",
           "TEAM": "time",
           "PROJECT": "projeto",
-          "APP": "app"
+          "APP": "aplicativo"
         },
         "kind": {
           "user": "usuário",
@@ -6392,7 +6062,7 @@
       "ORG": "Organização",
       "TEAM": "Time",
       "PROJECT": "Projeto",
-      "APP": "App"
+      "APP": "Aplicativo"
     },
     "grantAt": "Conceder {preset} no nível {scope}",
     "grant": "Conceder",
@@ -6432,7 +6102,7 @@
         "trigger": "Gatilho",
         "startedBy": "Iniciada por",
         "project": "Projeto",
-        "app": "App",
+        "app": "Aplicativo",
         "since": "Desde"
       },
       "options": {
@@ -6654,7 +6324,7 @@
           "ORG": "organização",
           "TEAM": "time",
           "PROJECT": "projeto",
-          "APP": "app"
+          "APP": "aplicativo"
         }
       },
       "views": {
@@ -6801,7 +6471,7 @@
           "ORG": "Organização",
           "TEAM": "Times",
           "PROJECT": "Projetos",
-          "APP": "Apps"
+          "APP": "Aplicativos"
         }
       },
       "views": {
@@ -7301,7 +6971,17 @@
       "emptyTitle": "Nenhuma carga de trabalho ainda",
       "emptyDescription": "As cargas de trabalho aparecem aqui assim que o manifesto as registrar.",
       "replicas": "{count, plural, one {<mono>#</mono> réplica} other {<mono>#</mono> réplicas}}",
-      "public": "público"
+      "public": "público",
+      "kinds": {
+        "deployment": "Deployment",
+        "statefulset": "StatefulSet",
+        "job": "Job",
+        "cronjob": "Cronjob",
+        "task": "Tarefa",
+        "agent": "Agente",
+        "workflow": "Fluxo de trabalho",
+        "function": "Função"
+      }
     },
     "function": {
       "title": "Gatilho",
@@ -7510,7 +7190,7 @@
       "name": "Nome",
       "kind": "Tipo",
       "cluster": "Cluster",
-      "status": "Status",
+      "status": "Estado",
       "search": "Buscar recursos",
       "empty": "Nenhum recurso do projeto",
       "emptyDescription": "A infraestrutura do projeto aparece aqui após o provisionamento.",
@@ -7796,10 +7476,10 @@
       "severities": {
         "critical": "Crítica",
         "warning": "Aviso",
-        "info": "Info"
+        "info": "Informação"
       },
       "severity": "Gravidade",
-      "status": "Status",
+      "status": "Estado",
       "active": "Ativa",
       "inactive": "Inativa",
       "search": "Pesquisar regras, condições…",
@@ -7901,7 +7581,9 @@
       "templateUpdated": "Modelo {name} atualizado",
       "saveFailed": "Falha ao salvar",
       "deleteFailed": "Falha ao excluir"
-    }
+    },
+    "allView": "Todos",
+    "mineView": "Meus"
   },
   "appAlertRules": {
     "timeRange": "Intervalo de tempo",
@@ -7916,7 +7598,7 @@
     "severities": {
       "critical": "Crítica",
       "warning": "Aviso",
-      "info": "Info"
+      "info": "Informação"
     },
     "channelKinds": {
       "inApp": "No app",
@@ -7925,7 +7607,7 @@
     },
     "name": "Nome",
     "severity": "Gravidade",
-    "status": "Status",
+    "status": "Estado",
     "muted": "Silenciada · {remaining}",
     "expired": "expirado",
     "active": "Ativa",
@@ -8001,7 +7683,7 @@
       "kind": "Tipo",
       "variant": "Variante",
       "env": "Ambiente",
-      "status": "Status"
+      "status": "Estado"
     },
     "emailDetailsTitle": "Detalhes de entregabilidade de e-mail",
     "emailDetails": "Detalhes do e-mail",
@@ -8046,7 +7728,7 @@
   },
   "appWorkloadDetail": {
     "notPersonal": "Pods e volumes pertencem à carga de trabalho, não a uma pessoa, então Meus está vazio.",
-    "podStatusFilter": "Status",
+    "podStatusFilter": "Estado",
     "podNodeFilter": "Nó",
     "podFlappingFilter": "Instável",
     "podSearch": "Pesquisar pods, nós…",
@@ -8076,14 +7758,16 @@
     "runExit": "saída {code}",
     "primary": "principal",
     "volumeKindFilter": "Tipo",
-    "volumeSearch": "Pesquisar volumes, caminhos de montagem…"
+    "volumeSearch": "Pesquisar volumes, caminhos de montagem…",
+    "allView": "Todos",
+    "mineView": "Meus"
   },
   "appWorkloads": {
     "name": "Nome",
     "kind": "Tipo",
     "readyDesired": "Prontas / desejadas",
     "ready": "Prontas {ready}/{desired}",
-    "hpa": "HPA {min}–{max} @ {cpu}% CPU",
+    "hpa": "HPA {min}–{max} @ {cpu}% de CPU",
     "restarts": "Reinicializações",
     "public": "Pública",
     "publicBadge": "pública",
@@ -8872,7 +8556,7 @@
       "variable": "Variável",
       "providerUri": "URI do provedor",
       "provider": "Provedor",
-      "status": "Status",
+      "status": "Estado",
       "value": "Valor",
       "state": {
         "set": "Definido",
@@ -9151,7 +8835,7 @@
         "compute": "Modo de computação",
         "cpu": "CPU",
         "gpu": "GPU",
-        "status": "Status",
+        "status": "Estado",
         "readiness": "Confirmação da reconciliação",
         "confirmed": "Última reconciliação confirmada",
         "unconfirmed": "Sem confirmação atual",
@@ -10106,7 +9790,7 @@
       "task": "Execução de tarefa"
     },
     "what": "O quê",
-    "status": "Status",
+    "status": "Estado",
     "took": "Duração",
     "trigger": "Gatilho",
     "notRecorded": "não registrado",
@@ -10305,7 +9989,7 @@
     "trigger": "Gatilho",
     "schedule": "Agendamento",
     "none": "nenhum",
-    "status": "Status",
+    "status": "Estado",
     "enabled": "Ativado",
     "disabled": "Desativado",
     "toggleHeader": "Ativar ou desativar",
@@ -10342,7 +10026,7 @@
     "viewingVerb": "Visualizar instâncias da plataforma",
     "instance": "Instância",
     "type": "Tipo",
-    "status": "Status",
+    "status": "Estado",
     "started": "Iniciada",
     "notStarted": "não iniciada",
     "took": "Duração",
@@ -10389,7 +10073,7 @@
   },
   "taskTemplates": {
     "name": "Nome",
-    "app": "App",
+    "app": "Aplicativo",
     "slug": "Slug",
     "run": "Executar",
     "runNow": "Executar agora",
@@ -10423,7 +10107,7 @@
     "taskOutputHint": "A saída da execução da tarefa fica armazenada no pod. <link>Abra o console do app</link> para ver o final completo do log.",
     "details": "Detalhes",
     "runId": "ID da execução",
-    "app": "App",
+    "app": "Aplicativo",
     "workload": "Carga de trabalho",
     "command": "Comando",
     "commandFallback": "comando",
@@ -10445,7 +10129,7 @@
     "copyId": "Copiar ID da execução"
   },
   "jobsList": {
-    "job": "Job",
+    "job": "Tarefa",
     "schedule": "Agendamento",
     "concurrency": "Concorrência",
     "lastRun": "Última execução",
@@ -10465,7 +10149,7 @@
     "empty": "Ainda não há envios. Eles aparecem aqui quando o formulário for publicado e preenchido.",
     "submitted": "Enviado",
     "version": "Versão",
-    "status": "Status",
+    "status": "Estado",
     "preview": "Prévia",
     "emptySummary": "(vazio)",
     "pageOf": "Página {page} de {pages} · {total} no total",
@@ -10573,7 +10257,7 @@
     "open": "Abrir",
     "layouts": {
       "apps": {
-        "title": "Apps",
+        "title": "Aplicativos",
         "description": "Para executar aplicações: implantações com falha, seus apps e o tráfego deles."
       },
       "agents": {
@@ -10677,7 +10361,7 @@
       "spendAgainstBudget": "{panel}: gastos em relação ao orçamento",
       "spendBudgetValue": "{spent} de {budget}",
       "last24Hours": "Últimas 24 horas",
-      "app": "App",
+      "app": "Aplicativo",
       "pickApp": "Escolha um app",
       "trafficAppsDescription": "O tráfego de apps nos quais você tem uma função aparece aqui.",
       "openApp": "Abrir o app",
@@ -10927,7 +10611,7 @@
       "emptyDescription": "Conceda a alguém um papel no escopo desta equipe para adicioná-lo.",
       "search": "Buscar membros…",
       "all": "Todos",
-      "status": "Status",
+      "status": "Estado",
       "active": "Ativo",
       "invited": "Convidado",
       "suspended": "Suspenso",
@@ -11199,7 +10883,7 @@
       "withheld": "retido pela instalação"
     },
     "bootstrapHistory": {
-      "status": "Status",
+      "status": "Estado",
       "succeeded": "Concluído",
       "failed": "Falhou",
       "search": "Buscar nos charts e operadores retornados…",
@@ -11705,7 +11389,7 @@
       "searchPlaceholder": "Pesquisar serviços, operações, ids de trace…",
       "fields": {
         "status": {
-          "label": "Status"
+          "label": "Estado"
         }
       },
       "mineNote": "Os traces são do app, não de uma pessoa, então Meus fica vazio."
@@ -11769,9 +11453,9 @@
       "service": "Serviço raiz",
       "spans": "Spans",
       "duration": "Duração",
-      "status": "Status"
+      "status": "Estado"
     },
-    "title": "Traces",
+    "title": "Rastreamentos",
     "description": "Traces distribuídos recentes da última hora. Clique em uma operação para expandir os spans.",
     "emptyTitle": "Nenhum trace",
     "emptyDescription": "O backend de tracing não está configurado.",
@@ -11817,7 +11501,7 @@
     "noDataDescription": "Nada para mostrar neste intervalo. Os certificados TLS aparecerão aqui quando houver atividade.",
     "notConfigured": "Este app não tem hostname público nem driver de TLS conectado. Configure um domínio gerenciado para emitir um certificado.",
     "columns": {
-      "hostname": "Hostname",
+      "hostname": "Nome do host",
       "issuer": "Emissor",
       "notAfter": "Válido até",
       "expires": "Expira em",
@@ -11854,9 +11538,9 @@
     "configure": "Configurar identidade de carga de trabalho",
     "kind": "Tipo",
     "kinds": {
-      "irsa": "IAM Roles for Service Accounts (AWS)",
-      "workload_identity": "GKE Workload Identity (GCP)",
-      "federated": "AKS Federated Credentials (Azure)",
+      "irsa": "Funções do IAM para contas de serviço (AWS)",
+      "workload_identity": "Identidade de carga de trabalho do GKE (GCP)",
+      "federated": "Credenciais federadas do AKS (Azure)",
       "unknown": "Vínculo desconhecido"
     },
     "lastUsed": "Último uso",
@@ -11913,7 +11597,7 @@
     "label": "Commits do repositório de configuração",
     "empty": "Ainda não há commits no repositório de configuração.",
     "run": "execução {id}…",
-    "diff": "Diff",
+    "diff": "Diferenças",
     "source": "Origem"
   },
   "clusters": {
@@ -11935,26 +11619,6 @@
         "health": "Integridade",
         "activity": "Atividade",
         "settings": "Configurações"
-      },
-      "functions": {
-        "organization": "Organização",
-        "access": "Acesso",
-        "projects": "Projetos",
-        "clusters": "Clusters",
-        "domains": "Domínios",
-        "providers": "Provedores",
-        "webhooks": "Webhooks",
-        "metrics": "Métricas",
-        "tokens": "Chaves de API",
-        "audit": "Auditoria",
-        "run-audit": "Execuções",
-        "features": "Funcionalidades",
-        "activity": "Atividade da plataforma",
-        "alerts": "Alertas",
-        "events": "Eventos",
-        "logs": "Logs",
-        "traces": "Rastreamentos",
-        "operations": "Operações"
       }
     },
     "unregister": {
@@ -12016,7 +11680,7 @@
     "list": {
       "columns": {
         "cluster": "Cluster",
-        "status": "Status",
+        "status": "Estado",
         "provider": "Provedor",
         "region": "Região",
         "ingress": "Entrada",
@@ -12098,7 +11762,7 @@
       "viewStyle": "Estilo de visualização",
       "fleetTitle": "Frota de agentes",
       "fleetDescription": "{agents, plural, one {# agente} other {# agentes}} em {clusters, plural, one {# cluster} other {# clusters}}",
-      "workflowsTitle": "Workflows",
+      "workflowsTitle": "Fluxos de trabalho",
       "workflowsDescription": "{workflows, plural, one {# workflow} other {# workflows}}, {runs, plural, one {# execução} other {# execuções}}"
     },
     "styles": {
@@ -12183,7 +11847,7 @@
       "functions": "Funções",
       "scheduled": "Agendado",
       "task": "Tarefa",
-      "workflow": "Workflow",
+      "workflow": "Fluxo de trabalho",
       "mixed": "Mista"
     },
     "legend": {
@@ -12221,7 +11885,7 @@
       "orbitIdle": "Ocioso, estacionado",
       "orbitLaunch": "Execução iniciada (lançamento)",
       "clusterDegraded": "Cluster degradado",
-      "clusterOffline": "Cluster offline",
+      "clusterOffline": "Cluster sem conexão",
       "heartbeatRun": "Execução iniciada ou concluída",
       "heartbeatRunFailed": "Execução falhou",
       "heartbeatDispatched": "Execução despachada",
@@ -12357,7 +12021,7 @@
     },
     "listSeparator": ", ",
     "unknown": "desconhecido",
-    "offline": "Offline",
+    "offline": "Sem conexão",
     "selectedAgent": ", agente selecionado",
     "agentSummary": "{name}: {health}, {load}% de carga, {running} em execução, {queued} na fila",
     "counts": {
@@ -12415,7 +12079,7 @@
         "run": "Execução",
         "agent": "Agente",
         "cluster": "Cluster",
-        "status": "Status"
+        "status": "Estado"
       },
       "empty": "Nenhuma execução no painel"
     },
@@ -12488,7 +12152,7 @@
       "traffic": "Tráfego",
       "services": "Serviços",
       "functions": "Funções",
-      "jobs": "Jobs",
+      "jobs": "Tarefas",
       "agents": "Agentes",
       "queues": "Filas",
       "data": "Dados",
@@ -12513,7 +12177,7 @@
     "nameHealth": "{name}, {health}",
     "readyReplicas": "{ready}/{desired} prontas",
     "reqPerSec": "req/s",
-    "jobsPerSec": "jobs/s",
+    "jobsPerSec": "tarefas/s",
     "errors": "erros",
     "distribution": "Distribuição",
     "trend": "Tendência",
@@ -12550,7 +12214,7 @@
     },
     "serviceAgent": {
       "summary": "{app}: {workloads}; {agents}; {actions} ações de agentes nos últimos 12s",
-      "app": "App",
+      "app": "Aplicativo",
       "doing": "O que o agente está fazendo",
       "quiet": "Tranquilo: nenhuma ação de agente nos últimos 12s",
       "agent": "Agente",
@@ -12578,7 +12242,7 @@
       "queue": "Fila",
       "noQueue": "Nenhuma fila neste app.",
       "workers": "Workers",
-      "workersHeading": "Workers · {rps} jobs/s"
+      "workersHeading": "Workers · {rps} tarefas/s"
     },
     "service": {
       "summary": "{app}, {topology}: {health}, {rps} requisições por segundo, p50 {p50}, {errors} de erros, {ready} de {desired} réplicas prontas"
@@ -12679,7 +12343,7 @@
         "condition": "{stage} condição atendida, máx. {max} rodadas"
       },
       "maxAttempts": "máx. {max} tentativas",
-      "workflows": "{count, plural, one {# workflow} other {# workflows}}",
+      "workflows": "{count, plural, one {# fluxo de trabalho} other {# fluxos de trabalho}}",
       "backedUpStages": "{count, plural, one {# etapa acumulada} other {# etapas acumuladas}}"
     },
     "loop": {
@@ -12857,7 +12521,7 @@
       "attempt": "tentativa {n}",
       "columns": {
         "stage": "Etapa",
-        "workflow": "Workflow",
+        "workflow": "Fluxo de trabalho",
         "kind": "Tipo",
         "state": "Estado",
         "round": "Rodada",
@@ -13034,6 +12698,19 @@
       },
       "approve": "Aprovar",
       "deny": "Negar"
+    },
+    "topologyBlurbs": {
+      "service": "Um único serviço de longa duração",
+      "service-data": "Um serviço com seu banco de dados, cache ou bucket",
+      "service-worker": "Um serviço com workers em segundo plano",
+      "microservices": "Vários serviços que fazem chamadas entre si",
+      "service-agent": "Serviços com um agente trabalhando em conjunto",
+      "agent": "Um ou mais agentes",
+      "functions": "Funções acionadas por eventos",
+      "scheduled": "Jobs executados por agendamento",
+      "task": "Execuções avulsas",
+      "workflow": "Um pipeline de várias etapas",
+      "mixed": "Vários tipos de carga de trabalho"
     }
   },
   "clusterConnection": {
@@ -13142,7 +12819,7 @@
     "podHealth": "Saúde dos pods",
     "podsRunning": "Pods em execução",
     "deploymentsReady": "Deployments prontos",
-    "latency": "Apiserver p99",
+    "latency": "p99 do apiserver",
     "network": "Recebimento de rede",
     "restartRate": "Reinicializações / min",
     "noEndpointTitle": "Sem endpoint do Prometheus",
@@ -13318,7 +12995,7 @@
     "copyAttachFor": "Copiar o comando de conexão de {slug}",
     "columns": {
       "box": "Caixa",
-      "status": "Status",
+      "status": "Estado",
       "agent": "Agente",
       "idle": "Tempo limite de inatividade",
       "attach": "Conectar",
@@ -13529,7 +13206,7 @@
     "newAgent": "Novo agente",
     "columns": {
       "agent": "Agente",
-      "status": "Status",
+      "status": "Estado",
       "model": "Modelo",
       "runtime": "Ambiente de execução",
       "cluster": "Cluster",
@@ -13546,7 +13223,7 @@
     "slug": "Slug",
     "version": "Versão",
     "tools": "Ferramentas",
-    "status": "Status",
+    "status": "Estado",
     "global": "Global",
     "active": "Ativa",
     "inactive": "Inativa",
@@ -13685,7 +13362,7 @@
       "emptyTitle": "Nenhuma habilidade definida",
       "emptyDescription": "Habilidades reúnem instruções e ferramentas que os agentes usam ao executar tarefas.",
       "newSkill": "Nova habilidade",
-      "status": "Status",
+      "status": "Estado",
       "scope": "Escopo",
       "version": "Versão",
       "updated": "Atualizada",
@@ -13717,7 +13394,7 @@
       "done": "Concluído",
       "repoUrl": "URL do repositório",
       "repoHelp": "Deve ser um repositório do github.com. O repositório deve conter um <code>astrolift.toml</code> na raiz.",
-      "branchRef": "Branch / ref",
+      "branchRef": "Branch / referência",
       "importing": "Importando...",
       "import": "Importar"
     },
@@ -13913,7 +13590,7 @@
     },
     "review": {
       "repository": "Repositório",
-      "branchRef": "Branch / ref",
+      "branchRef": "Branch / referência",
       "sourceKind": "Tipo de origem",
       "agentsFound": "Agentes encontrados",
       "discovered": "Descobertos",
@@ -14146,7 +13823,7 @@
   "agentNavigation": {
     "sectionsLabel": "Seções",
     "sections": {
-      "build": "Build",
+      "build": "Compilação",
       "run-mode": "Modo de execução e gatilhos",
       "config": "Editor de configuração",
       "manifest": "Manifesto",
@@ -14268,7 +13945,7 @@
   },
   "agentRunTab": {
     "run": "Execução",
-    "status": "Status",
+    "status": "Estado",
     "started": "Início",
     "finished": "Fim",
     "took": "Duração",
@@ -14303,7 +13980,7 @@
   "agentBuild": {
     "source": "Código-fonte",
     "repository": "Repositório",
-    "app": "App",
+    "app": "Aplicativo",
     "image": "Imagem",
     "imageRef": "Referência da imagem",
     "dockerfile": "Dockerfile",
@@ -14347,7 +14024,7 @@
     "defaultBranch": "Branch padrão",
     "tomlPath": "Caminho TOML",
     "run": "Execução",
-    "statusLabel": "Status",
+    "statusLabel": "Estado",
     "triggerLabel": "Gatilho",
     "ref": "Referência",
     "actor": "Autor",
@@ -14517,13 +14194,13 @@
     "mcp_server": "Servidor MCP",
     "fleet": "Frota",
     "approvals": "Aprovações",
-    "workflows": "Workflows",
+    "workflows": "Fluxos de trabalho",
     "runs": "Execuções",
     "functions": "Funções",
     "skills": "Habilidades",
     "environment-specs": "Especificações de ambiente",
     "models": "Modelos",
-    "workloads": "Workloads",
+    "workloads": "Cargas de trabalho",
     "unknownDate": "Data desconhecida"
   },
   "TelemetryExplorer": {
@@ -14532,8 +14209,8 @@
     "logsDescription": "Pesquise logs históricos de um app e ambiente ou abra os logs ao vivo.",
     "tracesDescription": "Inspecione spans atribuídos a um app e ambiente.",
     "identityLoading": "Carregando conta e organização…",
-    "apps": "Apps",
-    "app": "App",
+    "apps": "Aplicativos",
+    "app": "Aplicativo",
     "slug": "Slug",
     "searchApps": "Pesquisar apps",
     "noApps": "Nenhum app encontrado",
@@ -14553,7 +14230,7 @@
     "range21600": "6 horas",
     "range86400": "24 horas",
     "level": "Nível",
-    "status": "Status",
+    "status": "Estado",
     "refresh": "Atualizar",
     "liveLogs": "Abrir logs ao vivo do app",
     "searchLogs": "Pesquisar mensagens de log",
@@ -14608,7 +14285,7 @@
       "format": "Formato",
       "lastDelivery": "Última entrega",
       "failures": "Falhas",
-      "status": "Status"
+      "status": "Estado"
     },
     "formats": {
       "generic": {
@@ -14719,7 +14396,7 @@
     }
   },
   "zentinelleScreen": {
-    "title": "Secure · Zentinelle",
+    "title": "Proteger · Zentinelle",
     "description": "GRC de agentes de IA: governança, risco e conformidade para cada workload de agente no Astrolift.",
     "tagline": "Licença MIT · Auto-hospedável · Produto complementar da Calliope AI",
     "intro": "Zentinelle é o pilar <strong>Control + Secure</strong> do stack BROCS. Ele roda ao lado do Astrolift e fornece a camada específica de IA que o Astrolift deliberadamente não assume: aplicação de políticas, varredura de conteúdo, frameworks de conformidade e a trilha de auditoria completa de interações exigida pelas regulamentações de governança de IA.",
@@ -14901,7 +14578,7 @@
   },
   "workloadsScreen": {
     "columns": {
-      "workload": "Workload",
+      "workload": "Carga de trabalho",
       "kind": "Tipo",
       "app": "Aplicativo",
       "replicas": "Réplicas",
@@ -14913,7 +14590,7 @@
       "function": "Função"
     },
     "none": "nenhum",
-    "title": "Workloads",
+    "title": "Cargas de trabalho",
     "context": "Os deployments, jobs e cron jobs de um aplicativo ficam na aba Workloads dele.",
     "empty": {
       "title": "Nenhum workload de agente, fluxo de trabalho ou função",
@@ -15115,7 +14792,44 @@
     "notFoundDescription": "Este item ({label}) pode não existir, ter saído da lista recente ou você pode não ter acesso a ele.",
     "back": "Voltar para {label}",
     "created": "criado",
-    "overview": "Visão geral"
+    "overview": "Visão geral",
+    "statuses": {
+      "running": "Em execução",
+      "in_progress": "Em andamento",
+      "provisioning": "Provisionando",
+      "building": "Compilando",
+      "deploying": "Implantando",
+      "queued": "Na fila",
+      "pending": "Pendente",
+      "active": "Ativo",
+      "ready": "Pronto",
+      "completed": "Concluída",
+      "succeeded": "Bem-sucedida",
+      "healthy": "Saudável",
+      "failed": "Falhou",
+      "errored": "Com erro",
+      "timed_out": "Tempo esgotado",
+      "superseded": "Substituída",
+      "cancelled": "Cancelada",
+      "canceled": "Cancelada",
+      "torn_down": "Removida",
+      "expired": "Expirada",
+      "unknown": "Desconhecido",
+      "invited": "Convidado",
+      "pending_invite": "Convite pendente",
+      "pending_first_login": "Primeiro acesso pendente",
+      "suspended": "Suspenso",
+      "deactivated": "Desativado",
+      "anonymized": "Anonimizado",
+      "info": "Informação",
+      "warn": "Aviso",
+      "warning": "Aviso",
+      "critical": "Crítica",
+      "error": "Erro",
+      "firing": "Disparando",
+      "acknowledged": "Reconhecido",
+      "resolved": "Resolvido"
+    }
   },
   "alertDetail": {
     "alerts": "Alertas",
@@ -15197,7 +14911,7 @@
     "search": "Pesquisar {count} {count, plural, one {repositório} other {repositórios}}…",
     "noMatches": "Nenhum repositório correspondente.",
     "alreadyRegistered": "{count} {kind, select, agent {{count, plural, one {agente já registrado} other {agentes já registrados}}} other {{count, plural, one {aplicativo já registrado} other {aplicativos já registrados}}}}",
-    "fork": "fork",
+    "fork": "bifurcação",
     "archived": "arquivado",
     "updated": "atualizado {when}",
     "noRepos": "Nenhum repositório visível para esta conexão. Ajuste os escopos de visibilidade em <link></link>."
@@ -15568,5 +15282,947 @@
     "manageAccess": "Gerenciar acesso",
     "emptyTitle": "Nenhuma camada semântica",
     "emptyDescription": "Apps declarados com [app] kind = \"mimwell\" que você pode ler aparecem aqui."
+  },
+  "navModel": {
+    "functions": {
+      "organization": "Organização",
+      "access": "Acesso",
+      "projects": "Projetos",
+      "clusters": "Clusters",
+      "domains": "Domínios",
+      "providers": "Provedores",
+      "webhooks": "Webhooks",
+      "metrics": "Métricas",
+      "tokens": "Chaves de API",
+      "audit": "Auditoria",
+      "run-audit": "Execuções",
+      "features": "Recursos",
+      "activity": "Atividade da plataforma",
+      "alerts": "Alertas",
+      "events": "Eventos",
+      "logs": "Logs",
+      "traces": "Rastreamentos",
+      "operations": "Operações",
+      "home": "Início",
+      "agents": "Agentes",
+      "fleet": "Frota",
+      "approvals": "Aprovações",
+      "workflows": "Fluxos de trabalho",
+      "runs": "Execuções",
+      "functions": "Funções",
+      "skills": "Habilidades",
+      "tools": "Ferramentas",
+      "environment-specs": "Especificações de ambiente",
+      "models": "Modelos",
+      "workloads": "Cargas de trabalho",
+      "apps": "Aplicativos",
+      "brains": "Camadas semânticas",
+      "pipelines": "Pipelines",
+      "deployments": "Implantações",
+      "deployment-approvals": "Aprovações de implantação",
+      "jobs": "Jobs agendados",
+      "environments": "Ambientes",
+      "previews": "Prévias"
+    },
+    "areas": {
+      "home": "Início",
+      "agents": "Agentes",
+      "apps": "Aplicativos",
+      "admin": "Administração"
+    },
+    "groups": {
+      "organization": "Organização",
+      "infrastructure": "Infraestrutura",
+      "governance": "Uso e governança",
+      "signals": "Sinais da plataforma"
+    }
+  },
+  "relativeAge": {
+    "justNow": "agora mesmo",
+    "minutes": "há {count} min",
+    "hours": "há {count} h",
+    "days": "há {count} d"
+  },
+  "routeTitles": {
+    "acceptInvitation": "Aceitar convite",
+    "access": "Acesso",
+    "actionSafety": "Segurança de ações",
+    "activity": "Atividade",
+    "administration": "Administração",
+    "agent": "Agente",
+    "agentRun": "Execução do agente",
+    "agents": "Agentes",
+    "alertEvent": "Evento de alerta",
+    "alertEvents": "Eventos de alerta",
+    "alertRule": "Regra de alerta",
+    "alerts": "Alertas",
+    "apiKeys": "Chaves de API",
+    "apiToken": "Token de API",
+    "app": "Aplicativo",
+    "appearance": "Aparência",
+    "approvals": "Aprovações",
+    "approvalsQueue": "Fila de aprovações",
+    "approveDeployment": "Aprovar implantação",
+    "apps": "Aplicativos",
+    "assignRoles": "Atribuir funções",
+    "assignments": "Atribuições",
+    "audit": "Auditoria",
+    "builder": "Construtor",
+    "checkAccess": "Verificar acesso",
+    "cluster": "Cluster",
+    "clusterActivity": "Atividade do cluster",
+    "clusterHealth": "Integridade do cluster",
+    "clusterPrerequisites": "Pré-requisitos do cluster",
+    "clusterSettings": "Configurações do cluster",
+    "clusterStatus": "Estado do cluster",
+    "clusters": "Clusters",
+    "commandRun": "Execução de comando",
+    "commandRuns": "Execuções de comandos",
+    "configuration": "Configuração",
+    "customDomains": "Domínios personalizados",
+    "deployment": "Implantação",
+    "deployments": "Implantações",
+    "documentation": "Documentação",
+    "domains": "Domínios",
+    "downloads": "Downloads",
+    "driverReference": "Referência de drivers",
+    "easySetup": "Configuração fácil",
+    "emailDelivery": "Entrega de e-mail",
+    "environment": "Ambiente",
+    "environments": "Ambientes",
+    "event": "Evento",
+    "events": "Eventos",
+    "features": "Recursos",
+    "fleetMap": "Mapa da frota",
+    "functions": "Funções",
+    "getHelp": "Obter ajuda",
+    "getStarted": "Primeiros passos",
+    "grantAccess": "Conceder acesso",
+    "holders": "Titulares",
+    "home": "Início",
+    "identityProviders": "Provedores de identidade",
+    "jobRun": "Execução de job",
+    "jobRuns": "Execuções de jobs",
+    "liveAgentSession": "Sessão ao vivo do agente",
+    "logs": "Logs",
+    "logsAndMetrics": "Logs e métricas",
+    "managedDomain": "Domínio gerenciado",
+    "managedDomains": "Domínios gerenciados",
+    "member": "Membro",
+    "members": "Membros",
+    "metrics": "Métricas",
+    "models": "Modelos",
+    "newAgent": "Novo agente",
+    "newApp": "Novo aplicativo",
+    "newPipeline": "Novo pipeline",
+    "newPolicy": "Nova política",
+    "newRole": "Nova função",
+    "newWorkflow": "Novo fluxo",
+    "notifications": "Notificações",
+    "operations": "Operações",
+    "organization": "Organização",
+    "overview": "Visão geral",
+    "pendingGates": "Aprovações pendentes",
+    "people": "Pessoas",
+    "permissions": "Permissões",
+    "permissionsDiagnostics": "Diagnóstico de permissões",
+    "person": "Pessoa",
+    "pipeline": "Pipeline",
+    "pipelineSecrets": "Segredos do pipeline",
+    "platformActivity": "Atividade da plataforma",
+    "platformInstances": "Instâncias da plataforma",
+    "policies": "Políticas",
+    "policy": "Política",
+    "preview": "Prévia",
+    "previewEnvironments": "Ambientes de prévia",
+    "profile": "Perfil",
+    "project": "Projeto",
+    "projectResources": "Recursos do projeto",
+    "projects": "Projetos",
+    "providers": "Provedores",
+    "registerCluster": "Registrar cluster",
+    "resources": "Recursos",
+    "role": "Função",
+    "roles": "Funções",
+    "run": "Execução",
+    "runAgent": "Executar agente",
+    "runs": "Execuções",
+    "scheduledJobs": "Jobs agendados",
+    "secretProposal": "Proposta de segredo",
+    "secretProposals": "Propostas de segredo",
+    "secrets": "Segredos",
+    "secure": "Proteger",
+    "security": "Segurança",
+    "semanticLayers": "Camadas semânticas",
+    "settings": "Configurações",
+    "shell": "Terminal",
+    "skillsAndTools": "Habilidades e ferramentas",
+    "sourceProviders": "Provedores de código-fonte",
+    "startDeployment": "Iniciar implantação",
+    "taskRun": "Execução de tarefa",
+    "taskTemplates": "Modelos de tarefa",
+    "team": "Equipe",
+    "teams": "Equipes",
+    "traces": "Rastreamentos",
+    "triggers": "Gatilhos",
+    "visualizations": "Visualizações",
+    "webhook": "Webhook",
+    "webhookDelivery": "Entrega de webhook",
+    "webhookEvents": "Eventos de webhook",
+    "webhooks": "Webhooks",
+    "workflow": "Fluxo",
+    "workflows": "Fluxos",
+    "workload": "Carga de trabalho",
+    "workloads": "Cargas de trabalho",
+    "zentinelle": "Zentinelle"
+  },
+  "listDefinitions": {
+    "agentBoxes": {
+      "search": "Buscar caixas, slugs, agentes…",
+      "fields": {
+        "status": "Estado"
+      },
+      "options": {
+        "status": {
+          "pending": "pendente",
+          "provisioning": "provisionando",
+          "running": "em execução",
+          "stopped": "parada",
+          "expired": "expirada",
+          "failed": "falhou"
+        }
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas"
+      },
+      "notes": {
+        "mine": "As caixas de agente ainda não informam se foi você quem as iniciou, então Minhas fica vazia. Cada caixa aparece em Todas."
+      }
+    },
+    "agentRuns": {
+      "search": "Buscar execuções, IDs…",
+      "fields": {
+        "status": "Estado",
+        "trigger": "Gatilho"
+      },
+      "options": {
+        "status": {
+          "running": "em execução",
+          "waiting": "aguardando",
+          "succeeded": "bem-sucedida",
+          "failed": "falhou",
+          "cancelled": "cancelada"
+        },
+        "trigger": {
+          "manual": "manual",
+          "api": "API",
+          "schedule": "agendamento",
+          "webhook": "webhook",
+          "parent": "execução pai"
+        }
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas",
+        "running": "Em execução",
+        "failed": "Com falha",
+        "waiting": "Aguardando"
+      },
+      "notes": {
+        "mine": "Minhas mostra as execuções deste agente que você iniciou. As execuções iniciadas antes de o Astrolift passar a registrar quem as inicia aparecem apenas em Todas."
+      }
+    },
+    "agentSkills": {
+      "search": "Buscar habilidades, slugs…",
+      "fields": {
+        "status": "Estado",
+        "scope": "Escopo"
+      },
+      "options": {
+        "status": {
+          "active": "Ativa",
+          "inactive": "Inativa"
+        },
+        "scope": {
+          "global": "Global",
+          "org": "Organização"
+        }
+      },
+      "views": {
+        "all": "Todas"
+      },
+      "notes": {
+        "all": "Filtrado, ordenado e paginado no navegador: a leitura do agente retorna todos os vínculos de uma vez."
+      }
+    },
+    "agentTools": {
+      "search": "Buscar ferramentas, habilidades, handlers…",
+      "fields": {
+        "adapter": "Adaptador"
+      },
+      "options": {
+        "adapter": {
+          "python_fn": "Função Python",
+          "http_endpoint": "Endpoint HTTP",
+          "mcp_server": "Servidor MCP"
+        }
+      },
+      "views": {
+        "all": "Todas"
+      },
+      "notes": {
+        "all": "Filtrado, ordenado e paginado no navegador: a leitura do agente retorna todos os vínculos de uma vez."
+      }
+    },
+    "agents": {
+      "search": "Buscar agentes, slugs, repositórios...",
+      "fields": {
+        "project": "Projeto",
+        "status": "Estado",
+        "model": "Modelo",
+        "runtime": "Ambiente de execução",
+        "cluster": "Cluster"
+      },
+      "options": {
+        "status": {
+          "running": "em execução",
+          "failing": "última execução falhou",
+          "scheduled": "agendado",
+          "idle": "ocioso"
+        },
+        "model": {
+          "managed": "Modelo gerenciado",
+          "gateway": "Gateway de modelos",
+          "api-key": "Chave de API"
+        }
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Meus",
+        "paused": "Pausados"
+      },
+      "notes": {
+        "mine": "Meus mostra os agentes que você registrou. Os agentes registrados antes de o Astrolift passar a guardar quem os registra não têm proprietário e aparecem apenas em Todos."
+      }
+    },
+    "alertRules": {
+      "search": "Buscar regras, alvos…",
+      "fields": {
+        "target": "Alvo",
+        "targetId": "ID do alvo",
+        "severity": "Gravidade",
+        "state": "Estado"
+      },
+      "options": {
+        "target": {
+          "global": "global",
+          "app": "aplicativo",
+          "environment": "ambiente",
+          "workload": "carga de trabalho",
+          "managed_service": "serviço gerenciado"
+        },
+        "severity": {
+          "info": "informação",
+          "warn": "aviso",
+          "critical": "crítica"
+        },
+        "state": {
+          "active": "ativa",
+          "muted": "silenciada",
+          "inactive": "inativa"
+        }
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas",
+        "active": "Ativas",
+        "muted": "Silenciadas"
+      },
+      "notes": {
+        "mine": "As regras de alerta ainda não registram quem as criou, então Minhas fica vazia.",
+        "muted": "Mostra as regras silenciadas entre as 100 mais recentes, até a consulta de regras aceitar um filtro de silenciamento."
+      }
+    },
+    "alertSubscriptions": {
+      "search": "Buscar aplicativos, slugs…",
+      "fields": {
+        "team": "Equipe",
+        "project": "Projeto",
+        "alerts": "Alertas"
+      },
+      "options": {
+        "alerts": {
+          "on": "com inscrição",
+          "off": "sem inscrição"
+        }
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Meus"
+      },
+      "notes": {
+        "mine": "Meus mostra, entre os 100 mais recentes, os aplicativos dos quais você recebe pelo menos um alerta."
+      }
+    },
+    "appAlertRules": {
+      "search": "Buscar regras de alerta…",
+      "fields": {
+        "severity": "Gravidade",
+        "state": "Estado"
+      },
+      "options": {
+        "severity": {
+          "critical": "Crítica",
+          "warning": "Aviso",
+          "info": "Informação"
+        },
+        "state": {
+          "active": "Ativa",
+          "muted": "Silenciada",
+          "inactive": "Inativa"
+        }
+      },
+      "views": {
+        "all": "Todas"
+      },
+      "notes": {
+        "all": "Filtrado, ordenado e paginado no navegador: o campo do backend desta lista retorna todas as linhas de uma vez."
+      }
+    },
+    "appManagedServices": {
+      "search": "Buscar por nome, tipo, variante ou ambiente…",
+      "views": {
+        "all": "Todos"
+      }
+    },
+    "appPods": {
+      "search": "Buscar pods, cargas de trabalho, nós…",
+      "fields": {
+        "status": "Estado"
+      },
+      "views": {
+        "all": "Todos"
+      },
+      "notes": {
+        "all": "Filtrado, ordenado e paginado no navegador: o campo do backend desta lista retorna todas as linhas de uma vez."
+      }
+    },
+    "appWorkloads": {
+      "search": "Buscar cargas de trabalho, slugs, tipos…",
+      "fields": {
+        "kind": "Tipo",
+        "exposure": "Exposição"
+      },
+      "options": {
+        "exposure": {
+          "public": "Pública",
+          "internal": "Interna"
+        }
+      },
+      "views": {
+        "all": "Todas"
+      }
+    },
+    "brains": {
+      "search": "Buscar nomes e slugs…",
+      "views": {
+        "all": "Todas"
+      }
+    },
+    "commandRuns": {
+      "search": "Buscar comandos, aplicativos, operadores…",
+      "fields": {
+        "app": "Aplicativo"
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas"
+      }
+    },
+    "deployKeys": {
+      "search": "Buscar chaves, impressões digitais, aplicativos…",
+      "fields": {
+        "scope": "Escopo",
+        "app": "Aplicativo"
+      },
+      "options": {
+        "scope": {
+          "org": "da organização"
+        }
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas"
+      },
+      "notes": {
+        "mine": "As chaves de deploy ainda não registram quem as gerou, então Minhas fica vazia."
+      }
+    },
+    "deployments": {
+      "search": "Buscar aplicativos, branches, tags, commits…",
+      "fields": {
+        "app": "Aplicativo",
+        "environment": "Ambiente",
+        "status": "Estado",
+        "trigger": "Gatilho",
+        "since": "Desde"
+      },
+      "options": {
+        "status": {
+          "pending_approval": "aguardando aprovação",
+          "pending": "pendente",
+          "deploying": "implantando",
+          "redeploying": "reimplantando",
+          "running": "em execução",
+          "failed": "falhou",
+          "rolled_back": "revertida",
+          "superseded": "substituída"
+        },
+        "trigger": {
+          "push": "push",
+          "manual": "manual",
+          "ci": "ci",
+          "scheduled": "agendado",
+          "rollback": "reversão",
+          "promotion": "promoção"
+        },
+        "since": {
+          "today": "Hoje",
+          "1h": "Última hora",
+          "24h": "Últimas 24 horas",
+          "7d": "Últimos 7 dias",
+          "30d": "Últimos 30 dias",
+          "90d": "Últimos 90 dias"
+        }
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas",
+        "waiting": "Aguardando aprovação",
+        "failed": "Com falha",
+        "today": "Hoje"
+      }
+    },
+    "environmentSpecs": {
+      "search": "Buscar nomes, slugs, imagens, ambientes de execução, repositórios…",
+      "fields": {
+        "agentType": "Tipo de agente"
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas"
+      },
+      "notes": {
+        "mine": "Minhas mostra as receitas que você criou. Receitas mais antigas, sem criador registrado, aparecem em Todas."
+      }
+    },
+    "functions": {
+      "search": "Buscar funções, slugs, aplicativos…",
+      "fields": {
+        "app": "Aplicativo"
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas"
+      },
+      "notes": {
+        "mine": "Minhas mostra as cargas de trabalho que você criou ou que estão em aplicativos criados por você. As cargas de trabalho criadas antes de o Astrolift passar a registrar quem as cria aparecem apenas em Todas."
+      }
+    },
+    "identityProviders": {
+      "search": "Buscar provedores, endpoints, IDs de cliente…",
+      "fields": {
+        "kind": "Tipo",
+        "status": "Estado"
+      },
+      "options": {
+        "status": {
+          "active": "ativo",
+          "configured": "configurado"
+        }
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Meus"
+      },
+      "notes": {
+        "mine": "Os provedores de identidade ainda não registram quem os configurou, então Meus fica vazio."
+      }
+    },
+    "jobRuns": {
+      "search": "Buscar execuções, tarefas, nomes de Job…",
+      "fields": {
+        "app": "Aplicativo",
+        "workload": "Tarefa",
+        "environment": "Ambiente",
+        "status": "Estado"
+      },
+      "options": {
+        "status": {
+          "running": "em execução",
+          "succeeded": "sucesso",
+          "failed": "falhou",
+          "superseded": "substituída"
+        }
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas",
+        "failed": "Com falha"
+      }
+    },
+    "jobs": {
+      "search": "Buscar tarefas, aplicativos…",
+      "fields": {
+        "app": "Aplicativo"
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas",
+        "failing": "Com falha",
+        "paused": "Pausadas"
+      },
+      "notes": {
+        "failing": "Com falha mostra, em cada página, as tarefas cuja execução mais recente falhou, até a consulta de tarefas poder filtrar pela última execução.",
+        "paused": "O Astrolift ainda não registra agendamentos pausados, então nenhuma tarefa aparece aqui."
+      }
+    },
+    "projects": {
+      "search": "Buscar projetos, slugs, equipes…",
+      "fields": {
+        "team": "Equipe"
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Meus"
+      },
+      "notes": {
+        "mine": "Os projetos ainda não registram seu proprietário, então Meus fica vazio."
+      }
+    },
+    "runs": {
+      "search": "Buscar execuções, agentes, fluxos, IDs…",
+      "fields": {
+        "kind": "Tipo",
+        "status": "Estado",
+        "agent": "Agente",
+        "workflow": "Fluxo de trabalho",
+        "project": "Projeto",
+        "trigger": "Gatilho",
+        "since": "Desde"
+      },
+      "options": {
+        "kind": {
+          "agent": "Execução de agente",
+          "workflow": "Execução de fluxo",
+          "task": "Execução de tarefa"
+        },
+        "status": {
+          "running": "em execução",
+          "waiting": "aguardando",
+          "succeeded": "bem-sucedida",
+          "failed": "falhou",
+          "cancelled": "cancelada"
+        },
+        "trigger": {
+          "manual": "manual",
+          "api": "API",
+          "schedule": "agendamento",
+          "webhook": "webhook",
+          "parent": "execução pai"
+        },
+        "since": {
+          "1h": "Última hora",
+          "24h": "Últimas 24 horas",
+          "7d": "Últimos 7 dias",
+          "30d": "Últimos 30 dias",
+          "90d": "Últimos 90 dias"
+        }
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas",
+        "running": "Em execução",
+        "failed": "Com falha",
+        "waiting": "Aguardando",
+        "scheduled": "Agendadas"
+      },
+      "notes": {
+        "mine": "Minhas mostra as execuções que você iniciou. As execuções iniciadas antes de o Astrolift passar a registrar quem as inicia aparecem apenas em Todas.",
+        "scheduled": "Os próximos disparos dos agentes agendados, do mais próximo ao mais distante. As execuções já iniciadas por um agendamento ficam em Todas, com o gatilho agendamento."
+      }
+    },
+    "sessions": {
+      "search": "Buscar sessões, rótulos…",
+      "fields": {
+        "kind": "Tipo",
+        "status": "Estado"
+      },
+      "options": {
+        "kind": {
+          "web": "web",
+          "cli": "CLI",
+          "mobile": "celular",
+          "browser_extension": "extensão de navegador",
+          "api_token": "token de API"
+        },
+        "status": {
+          "current": "esta sessão",
+          "other": "outra"
+        }
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas"
+      },
+      "notes": {
+        "mine": "Todas as sessões aqui são suas, então Minhas tem as mesmas sessões que Todas."
+      }
+    },
+    "skillTools": {
+      "search": "Buscar ferramentas, slugs, handlers…",
+      "fields": {
+        "adapter": "Adaptador"
+      },
+      "options": {
+        "adapter": {
+          "python_fn": "Função Python",
+          "http_endpoint": "Endpoint HTTP",
+          "mcp_server": "Servidor MCP"
+        }
+      },
+      "views": {
+        "all": "Todas"
+      }
+    },
+    "skills": {
+      "search": "Buscar habilidades, slugs, repositórios…",
+      "fields": {
+        "status": "Estado",
+        "scope": "Escopo"
+      },
+      "options": {
+        "status": {
+          "active": "Ativa",
+          "inactive": "Inativa"
+        },
+        "scope": {
+          "org": "Organização",
+          "global": "Global"
+        }
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas",
+        "imported": "Importadas"
+      },
+      "notes": {
+        "mine": "Minhas mostra as habilidades que você escreveu ou importou. As habilidades escritas antes de o Astrolift passar a registrar quem as escreve aparecem apenas em Todas."
+      }
+    },
+    "sourceHosts": {
+      "search": "Buscar conexões, contas, URLs…",
+      "fields": {
+        "host": "Host",
+        "status": "Estado"
+      },
+      "options": {
+        "status": {
+          "active": "ativa",
+          "disabled": "desativada"
+        }
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas"
+      },
+      "notes": {
+        "mine": "Minhas mostra suas conexões pessoais entre as 100 mais recentes."
+      }
+    },
+    "taskTemplates": {
+      "search": "Buscar modelos de tarefa…",
+      "fields": {
+        "app": "Aplicativo"
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Meus"
+      },
+      "notes": {
+        "mine": "Os modelos de tarefa ainda não registram um proprietário, então Meus continua vazio até que passem a registrar."
+      }
+    },
+    "webhooks": {
+      "search": "Buscar URLs de entrega…",
+      "fields": {
+        "status": "Estado",
+        "format": "Formato",
+        "failing": "Com falha"
+      },
+      "options": {
+        "status": {
+          "active": "ativo",
+          "paused": "pausado"
+        },
+        "format": {
+          "generic": "genérico"
+        },
+        "failing": {
+          "yes": "tem falhas"
+        }
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Meus",
+        "failing": "Com falha",
+        "paused": "Pausados"
+      },
+      "notes": {
+        "mine": "As assinaturas de webhook ainda não registram quem as criou, então Meus fica vazio.",
+        "failing": "Mostra as assinaturas correspondentes entre as 100 mais recentes, até a consulta de webhooks aceitar filtros.",
+        "paused": "Mostra as assinaturas correspondentes entre as 100 mais recentes, até a consulta de webhooks aceitar filtros."
+      }
+    },
+    "workflowInstances": {
+      "fields": {
+        "type": "Tipo",
+        "status": "Estado"
+      },
+      "options": {
+        "status": {
+          "running": "em execução",
+          "completed": "concluída",
+          "failed": "falhou",
+          "canceled": "cancelada",
+          "terminated": "encerrada",
+          "timed_out": "tempo esgotado"
+        }
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas",
+        "running": "Em execução",
+        "failed": "Com falha"
+      },
+      "notes": {
+        "all": "O Temporal pagina as instâncias da mais recente para a mais antiga. Os filtros Tipo e Estado são aplicados no servidor. Mesmo que uma página esteja vazia, pode haver mais instâncias autorizadas nas páginas mais antigas.",
+        "mine": "As instâncias registram quem as iniciou como um nome, não como uma conta, então Minhas fica vazia até que passem a registrar a conta. O Temporal pagina as instâncias da mais recente para a mais antiga. Os filtros Tipo e Estado são aplicados no servidor. Mesmo que uma página esteja vazia, pode haver mais instâncias autorizadas nas páginas mais antigas.",
+        "running": "O Temporal pagina as instâncias da mais recente para a mais antiga. Os filtros Tipo e Estado são aplicados no servidor. Mesmo que uma página esteja vazia, pode haver mais instâncias autorizadas nas páginas mais antigas.",
+        "failed": "O Temporal pagina as instâncias da mais recente para a mais antiga. Os filtros Tipo e Estado são aplicados no servidor. Mesmo que uma página esteja vazia, pode haver mais instâncias autorizadas nas páginas mais antigas."
+      }
+    },
+    "workflowRuns": {
+      "search": "Buscar execuções, IDs…",
+      "fields": {
+        "status": "Estado",
+        "trigger": "Gatilho"
+      },
+      "options": {
+        "status": {
+          "running": "em execução",
+          "waiting": "aguardando",
+          "succeeded": "bem-sucedida",
+          "failed": "falhou",
+          "cancelled": "cancelada"
+        },
+        "trigger": {
+          "manual": "manual",
+          "api": "API",
+          "schedule": "agendamento",
+          "webhook": "webhook",
+          "parent": "execução pai"
+        }
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas",
+        "running": "Em execução",
+        "failed": "Com falha",
+        "waiting": "Aguardando"
+      },
+      "notes": {
+        "mine": "As execuções de fluxo ainda não registram quem as iniciou, então Minhas continua vazia até que passem a registrar."
+      }
+    },
+    "workflowTriggers": {
+      "search": "Buscar gatilhos, agendamentos…",
+      "fields": {
+        "kind": "Tipo",
+        "status": "Estado"
+      },
+      "options": {
+        "kind": {
+          "schedule": "Agendamento",
+          "webhook": "Webhook",
+          "manual": "Manual"
+        },
+        "status": {
+          "enabled": "ativado",
+          "disabled": "desativado"
+        }
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Meus",
+        "enabled": "Ativados",
+        "disabled": "Desativados"
+      },
+      "notes": {
+        "all": "Por enquanto, um fluxo tem um único gatilho, então esta lista mostra esse gatilho.",
+        "mine": "Os gatilhos ainda não registram quem os configurou, então Meus fica vazio até que passem a registrar."
+      }
+    },
+    "workflows": {
+      "search": "Buscar fluxos, slugs, definições...",
+      "fields": {
+        "pattern": "Padrão",
+        "project": "Projeto",
+        "status": "Última execução"
+      },
+      "options": {
+        "pattern": {
+          "single": "Simples",
+          "chained": "Encadeado",
+          "fan_out": "Distribuição",
+          "supervisor_worker": "Supervisor / worker",
+          "review_loop": "Ciclo de revisão",
+          "advisor": "Consultor"
+        },
+        "status": {
+          "running": "em execução",
+          "succeeded": "bem-sucedida",
+          "failed": "falhou",
+          "cancelled": "cancelada",
+          "never": "nunca executado"
+        }
+      },
+      "views": {
+        "all": "Todos",
+        "mine": "Meus",
+        "templates": "Modelos"
+      },
+      "notes": {
+        "mine": "Os fluxos ainda não registram quem os criou, então Meus fica vazio até que passem a registrar.",
+        "templates": "Os modelos da plataforma são somente leitura: crie um fluxo a partir de um deles ou clone-o para editar."
+      }
+    },
+    "workloads": {
+      "search": "Buscar cargas de trabalho, slugs, aplicativos…",
+      "fields": {
+        "app": "Aplicativo"
+      },
+      "views": {
+        "all": "Todas",
+        "mine": "Minhas",
+        "agents": "Agentes",
+        "workflows": "Fluxos de trabalho",
+        "functions": "Funções"
+      },
+      "notes": {
+        "mine": "Minhas mostra as cargas de trabalho que você criou ou que estão em aplicativos criados por você. As cargas de trabalho criadas antes de o Astrolift passar a registrar quem as cria aparecem apenas em Todas."
+      }
+    }
   }
 }

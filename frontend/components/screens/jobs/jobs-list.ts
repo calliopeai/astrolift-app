@@ -20,7 +20,7 @@ import { commandRunStatus, type RunStatus } from "@/components/jobs/RunStatusBad
 import type { PanelFailure } from "@/components/panel/Panel";
 import type { LogLine } from "@/components/run/LogView";
 import type { TimelineStep } from "@/components/run/Timeline";
-import { formatSort, type ListDefinition, standardViews } from "@/components/list/list-state";
+import { formatSort, type CopiedListDefinition, standardViews } from "@/components/list/list-state";
 import { spanMs } from "@/components/screens/deployments/run-support";
 import type { AstroliftCommandRun } from "@/graphql/lifecycle/lifecycle.types";
 
@@ -51,8 +51,9 @@ export interface JobRow extends CronWorkload {
   lastRun: JobRunPulse | null;
 }
 
-export const JOBS_LIST: ListDefinition = {
+export const JOBS_LIST: CopiedListDefinition = {
   id: "apps.jobs",
+  copy: "jobs",
   fields: [{ key: "app", label: "App" }],
   searchPlaceholder: "Search jobs, apps…",
   defaultSort: [{ key: "name", dir: "asc" }],
@@ -131,8 +132,9 @@ export function jobRunsHref(app: string, workload?: string): string {
 
 const RUN_STATUSES = ["running", "succeeded", "failed", "superseded"];
 
-export const JOB_RUNS_LIST: ListDefinition = {
+export const JOB_RUNS_LIST: CopiedListDefinition = {
   id: "apps.jobs.runs",
+  copy: "jobRuns",
   fields: [
     { key: "app", label: "App" },
     { key: "workload", label: "Job" },
@@ -182,8 +184,9 @@ export function jobRunsVariables(
 // Command runs
 // ---------------------------------------------------------------------------
 
-export const COMMAND_RUNS_LIST: ListDefinition = {
+export const COMMAND_RUNS_LIST: CopiedListDefinition = {
   id: "apps.jobs.commands",
+  copy: "commandRuns",
   fields: [{ key: "app", label: "App" }],
   // The server matches app, workload, the operator who invoked it and the Job name.
   searchPlaceholder: "Search commands, apps, operators…",

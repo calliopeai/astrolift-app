@@ -1,11 +1,12 @@
 import { PageShell } from "@/components/PageShell";
 import { GET_MY_PROFILE } from "@/graphql/identity/identity.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { AppearanceClient, ConnectedAccountsClient } from "./profile-client";
 import { ProfileIdentityClient } from "./identity-client";
 
-export const metadata = { title: "Profile · Settings · Astrolift" };
+export const generateMetadata = routeTitle("profile", "settings");
 
 export default function ProfileSettingsPage() {
   return (

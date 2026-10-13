@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import type { AstroliftScheduledJobRun } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftWorkload } from "@/graphql/registry/registry.types";
 import { nextCronRun } from "@/lib/cron";
-import { formatRelativeAge } from "@/lib/format";
+import { useRelativeAge } from "@/lib/format";
 
 import { formatDuration, runStatusDot, titleCaseStatus } from "./run-status";
 import type { useCronjobRuns } from "./use-cronjob-runs";
@@ -58,6 +58,7 @@ function formatCountdown(ms: number, t: HomeT): string {
 /** One run in the history feed: status, when, how long, and its exit code. */
 function RunLine({ run }: { run: AstroliftScheduledJobRun }) {
   const t = useTranslations("appHomes.cronjob");
+  const relativeAge = useRelativeAge();
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-sm">
       <Badge
@@ -68,7 +69,7 @@ function RunLine({ run }: { run: AstroliftScheduledJobRun }) {
         {titleCaseStatus(run.status)}
       </Badge>
       <span className="text-muted-foreground font-mono text-xs" title={run.startedAt ?? undefined}>
-        {run.startedAt ? formatRelativeAge(run.startedAt) : t("notStarted")}
+        {run.startedAt ? relativeAge(run.startedAt) : t("notStarted")}
       </span>
       <span className="text-muted-foreground font-mono text-xs tabular-nums">
         {formatDuration(run.durationSeconds)}

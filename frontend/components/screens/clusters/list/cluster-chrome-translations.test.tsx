@@ -185,6 +185,7 @@ describe.each(locales)("Cluster chrome in %s", (locale) => {
   });
   it("uses keyboard navigation with identical breadcrumb hrefs, tab IDs and active matching", async () => {
     const t = tFor(locale),
+      nav = tFor(locale, "navModel"),
       shell = tFor(locale, "shared.shellHeader");
     render(tree(locale, <ClusterHeader slug={cluster.slug} cluster={cluster} />));
     const trigger = screen.getByRole("button", { name: shell("switch", { label: t("admin") }) });
@@ -193,7 +194,7 @@ describe.each(locales)("Cluster chrome in %s", (locale) => {
     for (const item of NAV.find((area) => area.key === "admin")!.groups.flatMap(
       (group) => group.functions
     )) {
-      const link = screen.getByRole("menuitem", { name: t(`functions.${item.key}`) });
+      const link = screen.getByRole("menuitem", { name: nav(`functions.${item.key}`) });
       expect(link).toHaveAttribute("href", item.href);
       expect(link.getAttribute("aria-current")).toBe(item.key === "clusters" ? "page" : null);
     }
@@ -241,6 +242,7 @@ describe.each(locales)("Cluster chrome in %s", (locale) => {
         label: item.label,
         href: item.href,
         active: false,
+        navFunction: item.key,
       });
       expect(clusterCrumbs()[0].label).toBe("Admin");
       expect(clusterCrumbs()[1].label).toBe("Clusters");
@@ -330,7 +332,7 @@ describe.each(locales)("Cluster chrome in %s", (locale) => {
     const english = flat(catalogs.en.clusters.chrome),
       copy = flat(catalogs[locale].clusters.chrome);
     expect(Object.keys(copy)).toEqual(Object.keys(english));
-    expect(Object.keys(copy)).toHaveLength(32);
+    expect(Object.keys(copy)).toHaveLength(14);
     for (const [key, message] of Object.entries(copy)) {
       expect(parseMessage(message).every((node) => node.type === 0)).toBe(true);
       expect(tFor(locale)(key)).toBe(message);

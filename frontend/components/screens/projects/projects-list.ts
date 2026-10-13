@@ -6,13 +6,14 @@
  * (`NARROW_LIMIT`) in the client. Projects record no owner, so Mine is empty
  * until they do.
  */
-import { type ListDefinition, standardViews } from "@/components/list/list-state";
+import { type CopiedListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftProject } from "@/graphql/identity/identity.types";
 
 export const NARROW_LIMIT = 100;
 
-export const PROJECTS_LIST: ListDefinition = {
+export const PROJECTS_LIST: CopiedListDefinition = {
   id: "admin.projects",
+  copy: "projects",
   // `team` is also what the nav tree's "Add project" link sends (?team=<slug>&new=1).
   fields: [{ key: "team", label: "Team" }],
   // The server matches project name, slug and description, plus the owning team.

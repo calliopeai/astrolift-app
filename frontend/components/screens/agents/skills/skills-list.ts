@@ -7,7 +7,7 @@
  * is the skills that came from a repo. Nothing is filtered, sorted or paged
  * in the browser. Pure.
  */
-import { type ListDefinition, standardViews } from "@/components/list/list-state";
+import { type CopiedListDefinition, standardViews } from "@/components/list/list-state";
 
 import { type NumberedListQuery, numberedPageVariables } from "./catalog";
 
@@ -29,8 +29,9 @@ export type SkillListItem = {
   isImported: boolean;
 };
 
-export const SKILLS_LIST: ListDefinition = {
+export const SKILLS_LIST: CopiedListDefinition = {
   id: "agents.skills",
+  copy: "skills",
   fields: [
     {
       key: "status",

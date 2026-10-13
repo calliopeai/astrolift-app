@@ -1,9 +1,10 @@
 import { PreloadQuery } from "@/lib/apollo";
 import { GET_SCHEDULED_JOB_RUN } from "@/graphql/lifecycle/lifecycle.queries";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { JobRunDetailClient } from "./job-run-detail-client";
 
-export const metadata = { title: "Job run · Astrolift" };
+export const generateMetadata = routeTitle("jobRun");
 
 /**
  * Scheduled job run detail (#1106) — drill-in target for a /jobs Runs row.

@@ -6,6 +6,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { useListState, useLocalListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import { RUN_JOB_ONCE } from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
@@ -70,8 +71,9 @@ interface CronJobsResp {
  * mutation.
  */
 export function useJobs(appSlug?: string) {
-  const routed = useListState(JOBS_LIST);
-  const local = useLocalListState(JOBS_LIST);
+  const definition = useLocalizedList(JOBS_LIST);
+  const routed = useListState(definition);
+  const local = useLocalListState(definition);
   const list = appSlug ? local : routed;
   const { state } = list;
   const scope = appSlug ?? null;

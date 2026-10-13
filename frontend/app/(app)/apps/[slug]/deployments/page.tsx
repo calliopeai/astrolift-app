@@ -7,13 +7,12 @@ import { GET_APP } from "@/graphql/registry/registry.queries";
 import { activeSection, type SearchParams } from "@/components/screens/apps/detail/app-tabs-model";
 import { APP_DEPLOYMENTS_PAGE } from "@/components/screens/apps/deployments/app-deployments-query";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { AppPreviewsClient } from "../previews/previews-client";
 import { AppDeploymentsClient } from "./deployments-client";
 
-export const metadata = {
-  title: "Deployments · Astrolift",
-};
+export const generateMetadata = routeTitle("deployments");
 
 /**
  * The Deployments tab: the app's deployments on the embedded list, whose

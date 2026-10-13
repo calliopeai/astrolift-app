@@ -5,10 +5,11 @@ import {
 } from "@/components/screens/administration/insights/combined-runs";
 import { RUN_AUDIT } from "@/graphql/operations/run-audit.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { RunsClient } from "./runs-client";
 
-export const metadata = { title: "Runs · Astrolift" };
+export const generateMetadata = routeTitle("runs");
 
 /**
  * The variables `useCombinedRuns` sends for the default list state. The

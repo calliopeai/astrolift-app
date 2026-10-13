@@ -12,7 +12,11 @@
  */
 import type { SortState } from "@/components/data-table";
 import type { Crumb } from "@/components/shell/ShellHeader";
-import { type ListDefinition, type ListView, standardViews } from "@/components/list/list-state";
+import {
+  type CopiedListDefinition,
+  type ListView,
+  standardViews,
+} from "@/components/list/list-state";
 import { SINCE_OPTIONS, sinceToIso } from "@/components/screens/administration/insights/audit-list";
 import type { AstroliftAgentTask, AstroliftAgentUpcomingRun } from "@/graphql/agents/agents.types";
 import type {
@@ -83,7 +87,11 @@ export interface RunRow {
  * then the run. At most four crumbs.
  */
 export function runCrumbs(...rest: Crumb[]): Crumb[] {
-  return [areaSwitcher(NAV, "agents", "runs"), { label: "Runs", href: "/tasks" }, ...rest];
+  return [
+    areaSwitcher(NAV, "agents", "runs"),
+    { label: "Runs", href: "/tasks", navFunction: "runs" },
+    ...rest,
+  ];
 }
 
 /** An agent run page's crumbs: `Agents ▾ › Runs › <agent> › run a1b2c3d4`. */
@@ -178,8 +186,9 @@ const sinceField = { key: "since", label: "Since", options: SINCE_OPTIONS };
 export const UPCOMING = "upcoming";
 
 /** The Runs page: every kind, with the agent, workflow and project filters. */
-export const RUNS_LIST: ListDefinition = {
+export const RUNS_LIST: CopiedListDefinition = {
   id: "agents.runs",
+  copy: "runs",
   fields: [
     {
       key: "kind",
@@ -216,8 +225,9 @@ export const RUNS_LIST: ListDefinition = {
 };
 
 /** An agent's Runs tab: the same list, one agent, so no kind or agent filter. */
-export const AGENT_RUNS_LIST: ListDefinition = {
+export const AGENT_RUNS_LIST: CopiedListDefinition = {
   id: "agents.agent-runs",
+  copy: "agentRuns",
   fields: [statusField, triggerField],
   ...common,
   searchPlaceholder: "Search runs, ids…",

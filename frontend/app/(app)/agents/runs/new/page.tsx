@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { RunAgentClient } from "./run-agent-client";
 
-export const metadata = { title: "Run agent · Astrolift" };
+export const generateMetadata = routeTitle("runAgent");
 
 /**
  * Agents › Runs › Run agent: one run of any agent with inputs (the old

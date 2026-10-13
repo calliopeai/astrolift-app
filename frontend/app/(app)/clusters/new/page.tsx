@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { RegisterClusterClient } from "./register-cluster-client";
 
-export const metadata = { title: "Register cluster · Astrolift" };
+export const generateMetadata = routeTitle("registerCluster");
 
 /**
  * Register cluster: a page, not a sheet, since it asks for more than three

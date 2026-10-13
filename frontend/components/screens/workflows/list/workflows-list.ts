@@ -18,7 +18,7 @@
  * `list.filters`, `sort` and `page` instead and this step goes away.
  */
 import type { SortState } from "@/components/data-table";
-import { type ListDefinition, standardViews } from "@/components/list/list-state";
+import { type CopiedListDefinition, standardViews } from "@/components/list/list-state";
 import type { Crumb } from "@/components/shell/ShellHeader";
 import type { WorkflowLine } from "@/components/viz/core/workflow-model";
 import {
@@ -88,8 +88,9 @@ const LAST_RUN_ORDER: LastRunKey[] = [
 // Declaration
 // ---------------------------------------------------------------------------
 
-export const WORKFLOWS_LIST: ListDefinition = {
+export const WORKFLOWS_LIST: CopiedListDefinition = {
   id: "workflows",
+  copy: "workflows",
   fields: [
     {
       key: "pattern",
@@ -130,7 +131,9 @@ export const WORKFLOWS_LIST: ListDefinition = {
 export function workflowsCrumbs(...tail: Crumb[]): Crumb[] {
   const area = areaSwitcher(NAV, "agents", "workflows");
   const self: Crumb =
-    tail.length > 0 ? { label: "Workflows", href: "/workflows" } : { label: "Workflows" };
+    tail.length > 0
+      ? { label: "Workflows", href: "/workflows", navFunction: "workflows" }
+      : { label: "Workflows", navFunction: "workflows" };
   return [area, self, ...tail];
 }
 

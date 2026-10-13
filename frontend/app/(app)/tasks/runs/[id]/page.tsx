@@ -1,9 +1,10 @@
 import { PreloadQuery } from "@/lib/apollo";
 import { GET_TASK_RUN } from "@/graphql/lifecycle/lifecycle.queries";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { TaskRunDetailClient } from "./task-run-detail-client";
 
-export const metadata = { title: "Task run · Astrolift" };
+export const generateMetadata = routeTitle("taskRun");
 
 /**
  * Task run detail (#1106, #1118): a container task run on the run page, the

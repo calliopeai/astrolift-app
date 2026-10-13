@@ -1,26 +1,9 @@
 {
-  "nav": {
-    "section": "Platform",
-    "playground": "Playground",
-    "documentation": "Documentation",
-    "settings": "Settings",
-    "history": "History",
-    "starred": "Starred",
-    "introduction": "Introduction",
-    "getStarted": "Get Started",
-    "tutorials": "Tutorials",
-    "changelog": "Changelog",
-    "general": "General",
-    "team": "Team",
-    "billing": "Billing",
-    "limits": "Limits",
-    "hooks": "Hooks"
-  },
   "user": {
-    "account": "Account",
-    "notifications": "Notifications",
+    "account": "账户",
+    "notifications": "通知",
     "rerunOnboarding": "重新运行引导",
-    "logout": "Log out",
+    "logout": "退出登录",
     "profile": "个人资料",
     "documentation": "文档",
     "downloads": "下载",
@@ -374,7 +357,7 @@
     },
     "hints": {
       "wizard": "向导",
-      "githubGitlab": "github / gitlab",
+      "githubGitlab": "GitHub / GitLab",
       "apiKeys": "API 密钥"
     },
     "entries": {
@@ -491,7 +474,8 @@
     "goToDashboard": "前往仪表板",
     "notFound": "未找到页面",
     "notFoundDescription": "您要查找的页面不存在或已被移动。",
-    "goHome": "返回首页"
+    "goHome": "返回首页",
+    "critical": "发生严重错误，请刷新页面。"
   },
   "mainRail": {
     "label": "主导航",
@@ -575,15 +559,15 @@
     }
   },
   "language": {
-    "label": "Language",
-    "en": "English",
-    "es": "Spanish",
-    "fr": "French",
-    "de": "German",
-    "ja": "Japanese",
-    "ko": "Korean",
-    "zh-Hans": "Chinese (Simplified)",
-    "pt-BR": "Portuguese (Brazil)"
+    "label": "语言",
+    "en": "英语",
+    "es": "西班牙语",
+    "fr": "法语",
+    "de": "德语",
+    "ja": "日语",
+    "ko": "韩语",
+    "zh-Hans": "简体中文",
+    "pt-BR": "葡萄牙语（巴西）"
   },
   "pageShell": {
     "collapseHeader": "收起标题区",
@@ -592,69 +576,13 @@
     "details": "详情"
   },
   "a11y": {
-    "skipToContent": "Skip to main content"
-  },
-  "dashboard": {
-    "stats": {
-      "revenue": "Total revenue",
-      "orders": "Orders",
-      "customers": "Customers",
-      "products": "Products",
-      "fromLastMonth": "from last month"
-    },
-    "revenue": {
-      "title": "Revenue",
-      "description": "Monthly revenue for the last 12 months",
-      "label": "Revenue"
-    },
-    "channels": {
-      "title": "Channels",
-      "description": "Sales by acquisition channel",
-      "organic": "Organic",
-      "direct": "Direct",
-      "referral": "Referral",
-      "paid": "Paid"
-    },
-    "sales": {
-      "title": "Sales by category",
-      "description": "Units sold per product category this quarter",
-      "label": "Units sold",
-      "electronics": "Electronics",
-      "clothing": "Clothing",
-      "accessories": "Accessories",
-      "footwear": "Footwear",
-      "sports": "Sports"
-    }
+    "skipToContent": "跳至主要内容"
   },
   "overview": {
     "title": "概览",
     "description": "此 Astrolift 安装的身份、注册表与生命周期数据。",
     "errorBanner": {
       "title": "无法加载部分数据"
-    },
-    "tiles": {
-      "teams": {
-        "label": "团队",
-        "emptyCta": "创建你的第一个团队"
-      },
-      "projects": {
-        "label": "项目",
-        "emptyCta": "创建项目"
-      },
-      "apps": {
-        "label": "已注册应用",
-        "emptyCta": "注册你的第一个应用"
-      },
-      "deployments": {
-        "label": "进行中的部署",
-        "emptyCta": "触发部署"
-      },
-      "costMtd": {
-        "label": "成本(月初至今)",
-        "emptyCta": "等待成本数据",
-        "vsPrevMonth": "环比上月",
-        "noPrevMonth": "无上月数据"
-      }
     },
     "fleetHealth": {
       "title": "舰队健康度",
@@ -695,134 +623,109 @@
     }
   },
   "onboarding": {
-    "title": "Welcome to Astrolift",
-    "description": "Four quick steps to land your first app on the platform.",
-    "skipCta": "Skip for now",
-    "backCta": "Back",
-    "nextCta": "Next",
-    "finishCta": "Finish setup",
+    "title": "欢迎使用 Astrolift",
+    "description": "只需四个快速步骤，即可将你的第一个应用部署到平台上。",
+    "skipCta": "暂时跳过",
+    "backCta": "上一步",
+    "nextCta": "下一步",
+    "finishCta": "完成设置",
     "a11y": {
-      "steps": "Onboarding progress"
+      "steps": "引导进度"
     },
     "toast": {
-      "success": "Onboarding complete — you're all set.",
-      "skipFailed": "Couldn't save your skip. Try again.",
-      "teamFailed": "Couldn't create the team. Pick a different name or slug.",
-      "projectFailed": "Couldn't create the project. Pick a different name or slug.",
-      "appWarning": "Team and project created, but the app couldn't be registered. You can add it later from the apps page.",
-      "submitFailed": "Something went wrong while finishing setup."
+      "success": "引导已完成，一切准备就绪。",
+      "skipFailed": "无法保存你的跳过选择。请重试。",
+      "teamFailed": "无法创建团队。请选择其他名称或标识符。",
+      "projectFailed": "无法创建项目。请选择其他名称或标识符。",
+      "appWarning": "团队和项目已创建，但无法注册应用。你可以稍后在应用页面中添加。",
+      "submitFailed": "完成设置时出错。"
     },
     "welcome": {
-      "greeting": "Let's start with a team.",
-      "description": "Teams own projects and apps. You'll add more later from the Teams page.",
-      "teamNameLabel": "Team name",
-      "teamNamePlaceholder": "e.g. Platform engineering",
-      "teamSlugLabel": "Team slug",
-      "teamSlugPlaceholder": "e.g. platform-eng",
-      "teamSlugHelp": "Lowercase letters, digits, and hyphens. Used in URLs and the CLI."
+      "greeting": "先从团队开始吧。",
+      "description": "团队拥有项目和应用。之后你可以在“团队”页面添加更多团队。",
+      "teamNameLabel": "团队名称",
+      "teamNamePlaceholder": "例如：平台工程",
+      "teamSlugLabel": "团队标识符",
+      "teamSlugPlaceholder": "例如：platform-eng",
+      "teamSlugHelp": "小写字母、数字和连字符。用于 URL 和 CLI。"
     },
     "project": {
-      "greeting": "Add a project under {team}.",
-      "description": "Projects group related apps inside a team.",
-      "projectNameLabel": "Project name",
-      "projectNamePlaceholder": "e.g. Web platform",
-      "projectSlugLabel": "Project slug",
-      "projectSlugPlaceholder": "e.g. web-platform",
-      "projectDescriptionLabel": "Description (optional)",
-      "projectDescriptionPlaceholder": "What does this project do?"
+      "greeting": "在 {team} 下添加一个项目。",
+      "description": "项目用于在团队内对相关应用进行分组。",
+      "projectNameLabel": "项目名称",
+      "projectNamePlaceholder": "例如：Web 平台",
+      "projectSlugLabel": "项目标识符",
+      "projectSlugPlaceholder": "例如：web-platform",
+      "projectDescriptionLabel": "描述（可选）",
+      "projectDescriptionPlaceholder": "此项目是做什么的？"
     },
     "repo": {
-      "greeting": "Connect a Git repository.",
-      "description": "Pick a repo to register as the first app in this project. You can skip this and add an app later.",
-      "connectionLabel": "Source connection",
-      "connectionPlaceholder": "Pick a connection",
-      "repoLabel": "Repository",
-      "repoPlaceholder": "Pick a repository",
-      "repoHelp": "Only repositories you have access to via this connection are listed.",
-      "repoFetchError": "Couldn't load repositories ({code}). You can skip this step.",
-      "archivedSuffix": "archived",
-      "defaultBranchLabel": "Default branch",
-      "optionalNote": "This step is optional. Skip to create the team and project without registering an app.",
-      "noConnectionsTitle": "No source providers configured yet.",
-      "noConnectionsDescription": "Connect GitHub, GitLab, or another provider to register apps from this wizard.",
-      "connectCta": "Connect a provider",
-      "skipNote": "You can also skip this and configure a source provider later."
+      "greeting": "连接 Git 仓库。",
+      "description": "选择一个仓库，将其注册为此项目中的第一个应用。你也可以跳过此步骤，稍后再添加应用。",
+      "connectionLabel": "源代码连接",
+      "connectionPlaceholder": "选择连接",
+      "repoLabel": "仓库",
+      "repoPlaceholder": "选择仓库",
+      "repoHelp": "仅列出你可通过此连接访问的仓库。",
+      "repoFetchError": "无法加载仓库（{code}）。你可以跳过此步骤。",
+      "archivedSuffix": "已归档",
+      "defaultBranchLabel": "默认分支",
+      "optionalNote": "此步骤为可选项。跳过后将只创建团队和项目，而不注册应用。",
+      "noConnectionsTitle": "尚未配置源代码提供商。",
+      "noConnectionsDescription": "连接 GitHub、GitLab 或其他提供商，即可通过此向导注册应用。",
+      "connectCta": "连接提供商",
+      "skipNote": "你也可以跳过此步骤，稍后再配置源代码提供商。"
     },
     "strategy": {
-      "title": "Pick a deploy strategy",
-      "description": "How should new versions roll out by default? You can tune this per-environment later.",
-      "summaryTitle": "Review",
+      "title": "选择部署策略",
+      "description": "新版本默认应如何发布？之后你可以按环境分别调整。",
+      "summaryTitle": "确认",
       "summary": {
-        "team": "Team",
-        "project": "Project",
-        "repo": "Repository",
-        "repoSkipped": "Skipped — add later",
-        "strategy": "Strategy"
+        "team": "团队",
+        "project": "项目",
+        "repo": "仓库",
+        "repoSkipped": "已跳过，稍后添加",
+        "strategy": "策略"
       },
-      "intentNote": "This sets the default for new apps in this project. The astrolift.toml manifest is the source of truth — you can edit it from the app's config page.",
+      "intentNote": "这会为此项目中的新应用设置默认值。astrolift.toml 清单是唯一可信来源，你可以在应用的配置页面中编辑它。",
       "options": {
         "rolling": {
-          "label": "Rolling",
-          "description": "Replace pods one by one. Lowest risk for stateless services."
+          "label": "滚动更新",
+          "description": "逐个替换 Pod。对于无状态服务风险最低。"
         },
         "blue-green": {
-          "label": "Blue / green",
-          "description": "Stand up the new version alongside the old, then flip traffic."
+          "label": "蓝绿部署",
+          "description": "在旧版本旁边启动新版本，然后切换流量。"
         },
         "canary": {
-          "label": "Canary",
-          "description": "Send a small slice of traffic to the new version, then expand."
+          "label": "金丝雀发布",
+          "description": "先将一小部分流量发送到新版本，然后逐步扩大。"
         }
       }
     },
     "tour": {
-      "progress": "Step {current} of {total}",
-      "dontShowAgain": "Don't show again",
-      "skipCta": "Skip",
-      "nextCta": "Next",
-      "finishCta": "Got it",
+      "progress": "第 {current} 步，共 {total} 步",
+      "dontShowAgain": "不再显示",
+      "skipCta": "跳过",
+      "nextCta": "下一步",
+      "finishCta": "知道了",
       "steps": {
         "apps-tile": {
-          "title": "Your apps live here",
-          "description": "This tile counts every app registered on the platform. Click through to see the full list."
+          "title": "你的应用都在这里",
+          "description": "此卡片统计平台上已注册的所有应用。点击即可查看完整列表。"
         },
         "apps-nav": {
-          "title": "Register apps to start deploying",
-          "description": "Connect a Git repo to register a new app and roll your first deployment."
+          "title": "注册应用，开始部署",
+          "description": "连接 Git 仓库以注册新应用，并发起你的第一次部署。"
         },
         "clusters-nav": {
-          "title": "Add a cluster to deploy to",
-          "description": "Apps deploy to clusters you've onboarded. Bring in your first cluster from this page."
+          "title": "添加用于部署的集群",
+          "description": "应用会部署到你已接入的集群。在此页面接入你的第一个集群。"
         }
       }
     }
   },
   "settings": {
-    "title": "Settings",
-    "description": "Manage your application preferences.",
-    "language": {
-      "title": "Language",
-      "description": "Choose the language used throughout the interface."
-    },
-    "theme": {
-      "title": "Appearance",
-      "description": "Choose your preferred color scheme.",
-      "light": "Light",
-      "dark": "Dark",
-      "system": "System"
-    },
-    "nav": {
-      "ariaLabel": "设置分区",
-      "openMobileNav": "打开设置菜单",
-      "openMobileNavLabel": "分区",
-      "mobileTitle": "设置分区",
-      "mobileDescription": "跳转到任意设置区域。",
-      "groups": {
-        "organization": "组织",
-        "personal": "个人",
-        "tokens": "令牌"
-      }
-    },
     "breadcrumb": {
       "root": "设置"
     },
@@ -1159,16 +1062,16 @@
     "prerequisitesTitle": "先决条件",
     "prereqPermission": "<strong>权限。</strong>具有 <code>org.update</code> 的运维角色(Owner 和 Admin 拥有)。",
     "prereqAdmin": "<strong>IdP 的管理员权限。</strong>你需要在其中注册一个新的 OIDC 或 SAML 客户端。",
-    "prereqRedirect": "<strong>Astrolift 的重定向 URI。</strong>可在<bold>新建提供商</bold>对话框中看到。格式为 <code>{uri}</code>。每个 IdP 的允许回调列表中都必须填入这个确切的值。",
+    "prereqRedirect": "<strong>Astrolift 的重定向 URI。</strong>可在<bold>新建提供方</bold>对话框中看到。格式为 <code>{uri}</code>。每个 IdP 的允许回调列表中都必须填入这个确切的值。",
     "configureTitle": "按提供商类型配置",
-    "configureBody": "选择对应的小节。每种类型最后都在 Astrolift 中执行相同的操作：<link>设置 · 身份提供商</link> → <strong>新建提供商</strong> → 选择类型 → 粘贴凭据 → <strong>设为活动</strong>。",
+    "configureBody": "选择对应的小节。每种类型最后都在 Astrolift 中执行相同的操作：<link>设置 · 身份提供方</link> → <strong>新建提供方</strong> → 选择类型 → 粘贴凭据 → <strong>设为启用</strong>。",
     "allowlistTitle": "域名允许列表(自动注册)",
     "allowlistBody": "默认情况下，只有当 Astrolift 已有该用户的账号时，SSO 登录才会成功。要让新用户自助加入，请将其邮箱域名标记为受信任。",
     "allowlistStep1": "打开<link>管理 · 组织</link>。",
     "allowlistStep2": "滚动到<strong>受信任的邮箱域名</strong>卡片，添加 <code>corp.com</code>(不带 <code>@</code>)。",
     "allowlistStep3": "保存。任何使用 <code>@corp.com</code> 邮箱通过 SSO 登录的用户都会以默认成员角色自动加入组织。",
     "troubleshootingTitle": "故障排除",
-    "troubleNoIdpBody": "安装实例未设置 <code>bootstrap_idp</code> 环境变量。请在<link>设置 · 身份提供商</link>中配置一个提供商并将其设为活动。",
+    "troubleNoIdpBody": "安装实例未设置 <code>bootstrap_idp</code> 环境变量。请在<link>设置 · 身份提供方</link>中配置一个提供商并将其设为启用。",
     "troubleRedirectTitle": "登录重定向到错误的主机(或返回 redirect_uri_mismatch)。",
     "troubleRedirectBody": "后端的 <code>APP_BASE_URL</code> 与在 IdP 注册的重定向 URI 必须完全一致：协议、主机、路径以及末尾斜杠。",
     "troubleSignupTitle": "自动注册没有发生。",
@@ -1182,7 +1085,7 @@
         "steps": {
           "s1": "在 IdP 中注册新的 OIDC 客户端。粘贴 Astrolift 对话框中显示的重定向 URI(以 /app/auth1/callback 结尾)。",
           "s2": "复制 client_id、client_secret 和发现 URL(.well-known/openid-configuration 端点)。",
-          "s3": "在 Astrolift 中打开 设置 · 身份提供商 · 新建提供商，选择 OIDC，粘贴这些值，然后设为活动。"
+          "s3": "在 Astrolift 中打开 设置 · 身份提供方 · 新建提供方，选择 OIDC，粘贴这些值，然后设为启用。"
         }
       },
       "cognito": {
@@ -1191,7 +1094,7 @@
         "steps": {
           "s1": "在 AWS 控制台中打开用户池 · App integration · Create an app client。选择机密客户端并添加 Astrolift 重定向 URI。",
           "s2": "记下 User Pool ID、App client ID 和 App client secret。发现 URL 为 {url}。",
-          "s3": "在 Astrolift 中选择 新建提供商 · Cognito，粘贴这三个值，然后设为活动。"
+          "s3": "在 Astrolift 中选择 新建提供方 · Cognito，粘贴这三个值，然后设为启用。"
         }
       },
       "auth0": {
@@ -1200,7 +1103,7 @@
         "steps": {
           "s1": "在 Auth0 中选择 Applications · Create Application · Regular Web App。将 Allowed Callback URLs 设置为 Astrolift 对话框中的重定向 URI。",
           "s2": "复制 Domain、Client ID 和 Client Secret。发现 URL 为 {url}。",
-          "s3": "在 Astrolift 中选择 新建提供商 · Auth0，粘贴这些值，然后设为活动。"
+          "s3": "在 Astrolift 中选择 新建提供方 · Auth0，粘贴这些值，然后设为启用。"
         }
       },
       "okta": {
@@ -1209,7 +1112,7 @@
         "steps": {
           "s1": "在 Okta 管理后台选择 Applications · Create App Integration · OIDC · Web Application。在 Sign-in redirect URIs 下添加 Astrolift 重定向 URI。",
           "s2": "复制 Client ID、Client Secret 和 Issuer URL(可在 General · OpenID Connect ID Token 下看到)。",
-          "s3": "在 Astrolift 中选择 新建提供商 · Okta，粘贴这些值，然后设为活动。"
+          "s3": "在 Astrolift 中选择 新建提供方 · Okta，粘贴这些值，然后设为启用。"
         }
       },
       "azureAd": {
@@ -1218,7 +1121,7 @@
         "steps": {
           "s1": "在 Azure 门户中选择 App registrations · New registration。将重定向 URI 设置为 Astrolift 提供的值，平台设为 Web。",
           "s2": "在 Certificates & secrets 下创建客户端密钥并复制其值。记下 Application (client) ID 和 Directory (tenant) ID。",
-          "s3": "发现 URL 为 {url}。将它连同客户端 ID 和密钥粘贴到 Astrolift 中，然后设为活动。"
+          "s3": "发现 URL 为 {url}。将它连同客户端 ID 和密钥粘贴到 Astrolift 中，然后设为启用。"
         }
       },
       "google": {
@@ -1227,7 +1130,7 @@
         "steps": {
           "s1": "在 Google Cloud 控制台中选择 APIs & Services · Credentials · Create OAuth client ID · Web application，添加 Astrolift 重定向 URI。",
           "s2": "复制 Client ID 和 Client Secret。发现 URL 为 {url}。",
-          "s3": "在 Astrolift 中选择 新建提供商 · Google，粘贴这些值，然后设为活动。结合下方的域名允许列表，可将登录限制在你的 Workspace 内。"
+          "s3": "在 Astrolift 中选择 新建提供方 · Google，粘贴这些值，然后设为启用。结合下方的域名允许列表，可将登录限制在你的 Workspace 内。"
         }
       },
       "github": {
@@ -1236,7 +1139,7 @@
         "steps": {
           "s1": "在 GitHub 中选择 Settings · Developer settings · OAuth Apps · New OAuth App。将回调 URL 设置为 Astrolift 提供的值。",
           "s2": "复制 Client ID 并生成 Client Secret。",
-          "s3": "在 Astrolift 中选择 新建提供商 · GitHub OAuth，粘贴这些值，然后设为活动。"
+          "s3": "在 Astrolift 中选择 新建提供方 · GitHub OAuth，粘贴这些值，然后设为启用。"
         }
       },
       "saml": {
@@ -1245,7 +1148,7 @@
         "steps": {
           "s1": "在 IdP 中注册新的 SAML 应用。将 ACS URL 和 Entity ID 设置为 Astrolift 对话框中显示的值。",
           "s2": "下载 IdP 元数据 XML，或复制其 URL。",
-          "s3": "在 Astrolift 中选择 新建提供商 · SAML，粘贴元数据 URL(或上传 XML)，然后设为活动。"
+          "s3": "在 Astrolift 中选择 新建提供方 · SAML，粘贴元数据 URL(或上传 XML)，然后设为启用。"
         }
       },
       "local": {
@@ -1254,7 +1157,7 @@
         "intro": "仅用于首次运行或作为后备。本地账号允许运维人员使用存储在 Astrolift 数据库中的用户名和密码登录。在接入 SSO 提供商期间使用，完成后将其关闭。",
         "steps": {
           "s1": "全新安装时默认启用本地账号。引导管理员存储在数据库中；其创建方式请参阅安装运行手册。",
-          "s2": "SSO 配置并验证完成后，将 SSO 提供商设为活动，然后删除本地条目，或通过策略禁止密码登录。"
+          "s2": "SSO 配置并验证完成后，将 SSO 提供商设为启用，然后删除本地条目，或通过策略禁止密码登录。"
         }
       }
     },
@@ -1298,7 +1201,9 @@
     "relatedTitle": "相关内容",
     "relatedGetStarted": "<link>快速开始</link>：在本地启动技术栈；其中的环境变量默认指向 docker-compose 的服务名称。",
     "relatedIdentityProviders": "<link>身份提供商</link>：详细说明 AUTH0_* / ASTROLIFT_IDP_* 变量。",
-    "relatedClusterPrerequisites": "<link>集群先决条件</link>：除这些环境变量外，租户集群还需要的组件。"
+    "relatedClusterPrerequisites": "<link>集群先决条件</link>：除这些环境变量外，租户集群还需要的组件。",
+    "allView": "全部",
+    "mineView": "我的"
   },
   "docsWebhookEvents": {
     "title": "Webhook 事件",
@@ -1363,7 +1268,9 @@
       "secrets": "密钥",
       "identity": "身份",
       "registry": "镜像仓库"
-    }
+    },
+    "allView": "全部",
+    "mineView": "我的"
   },
   "docsIntroduction": {
     "title": "简介",
@@ -1445,43 +1352,6 @@
       "beginner": "入门",
       "intermediate": "中级",
       "advanced": "高级"
-    }
-  },
-  "hooks": {
-    "title": "Hooks",
-    "description": "Interactive demos for the built-in utility hooks.",
-    "debounce": {
-      "title": "useDebounce",
-      "description": "Value updates only after typing has stopped for 300 ms.",
-      "label": "Search input",
-      "placeholder": "Type something…",
-      "raw": "Raw value",
-      "debounced": "Debounced value"
-    },
-    "localStorage": {
-      "title": "useLocalStorage",
-      "description": "Counter persisted to localStorage — survives page refresh.",
-      "label": "Count",
-      "increment": "Increment",
-      "reset": "Reset"
-    },
-    "clipboard": {
-      "title": "useCopyToClipboard",
-      "description": "Copies text to the clipboard; button resets after 2 seconds.",
-      "label": "Text to copy",
-      "copy": "Copy",
-      "copied": "Copied!"
-    },
-    "confirm": {
-      "title": "useConfirm",
-      "description": "Awaits a Promise from an AlertDialog — no local dialog state required.",
-      "trigger": "Delete item",
-      "dialogTitle": "Delete this item?",
-      "dialogDescription": "This action cannot be undone.",
-      "confirmLabel": "Delete",
-      "cancelLabel": "Cancel",
-      "resultConfirmed": "Confirmed — item deleted.",
-      "resultCancelled": "Cancelled."
     }
   },
   "apps": {
@@ -1630,121 +1500,121 @@
     },
     "workloadDetail": {
       "resourceUsage": {
-        "title": "Live resource usage",
+        "title": "实时资源使用情况",
         "cpuTitle": "CPU",
-        "memoryTitle": "Memory",
-        "ofRequest": "of request",
-        "ofLimit": "of limit",
-        "currentLabel": "Current",
-        "requestLabel": "Request",
-        "limitLabel": "Limit",
-        "empty": "Live metrics are not flowing for this workload yet. Configure a Prometheus endpoint on the cluster, or wait a minute after the first deploy for the scrape to land.",
-        "sourcedAt": "sampled"
+        "memoryTitle": "内存",
+        "ofRequest": "占请求量",
+        "ofLimit": "占上限",
+        "currentLabel": "当前",
+        "requestLabel": "请求量",
+        "limitLabel": "上限",
+        "empty": "此工作负载的实时指标尚未上报。请在集群上配置 Prometheus 端点，或在首次部署后等待一分钟，待采集数据到达。",
+        "sourcedAt": "采样时间"
       },
       "scaling": {
-        "title": "Scaling",
-        "manualHeading": "Manual replicas",
-        "manualDescription": "Set the desired replica count. The platform will issue a single patch against the workload's Deployment; the rollout controller drives the rest.",
-        "currentReplicas": "Current",
-        "desiredReplicas": "Desired",
-        "readyReplicas": "Ready",
+        "title": "扩缩容",
+        "manualHeading": "手动副本数",
+        "manualDescription": "设置期望的副本数。平台会对该工作负载的 Deployment 发出一次 PATCH 请求，其余由发布控制器完成。",
+        "currentReplicas": "当前",
+        "desiredReplicas": "期望",
+        "readyReplicas": "就绪",
         "hpaHeading": "HPA",
-        "hpaEnabledLabel": "auto-scaling on",
-        "hpaDisabledLabel": "auto-scaling off",
-        "hpaDescription": "When the HPA is enabled the platform won't override its decisions — manual scales are still applied but the controller may reconcile them back inside seconds. Disable the HPA in the manifest to pin the count.",
-        "hpaMin": "Min",
-        "hpaMax": "Max",
-        "hpaTarget": "Target CPU",
-        "hpaCurrent": "Current",
-        "hpaLastScaleAt": "Last scale event",
-        "scalingUp": "Scaling up…",
-        "scalingDown": "Scaling down…",
-        "applyButton": "Apply",
-        "applyingButton": "Applying…",
-        "successToast": "Scale applied — {replicas} replicas requested",
-        "errorToast": "Couldn't apply scale: {message}",
-        "permissionDenied": "You need app.deploy to scale this workload.",
+        "hpaEnabledLabel": "自动扩缩容已开启",
+        "hpaDisabledLabel": "自动扩缩容已关闭",
+        "hpaDescription": "启用 HPA 后，平台不会覆盖其决策。手动扩缩容仍会生效，但控制器可能在数秒内将其调回。如需固定副本数，请在清单中禁用 HPA。",
+        "hpaMin": "最小值",
+        "hpaMax": "最大值",
+        "hpaTarget": "目标 CPU",
+        "hpaCurrent": "当前",
+        "hpaLastScaleAt": "最近一次扩缩容事件",
+        "scalingUp": "正在扩容…",
+        "scalingDown": "正在缩容…",
+        "applyButton": "应用",
+        "applyingButton": "正在应用…",
+        "successToast": "已应用扩缩容：请求 {replicas} 个副本",
+        "errorToast": "无法应用扩缩容：{message}",
+        "permissionDenied": "你需要 app.deploy 权限才能对此工作负载进行扩缩容。",
         "unknownError": "未知错误"
       },
       "manifest": {
-        "title": "Manifest",
-        "description": "Kubernetes resources the platform would apply for this workload. Toggle Diff to compare against the previously deployed image tag.",
-        "viewToggleManifest": "Manifest",
-        "viewToggleDiff": "Diff",
-        "noResources": "No resources rendered for this workload — the manifest may not declare it yet.",
-        "errorTitle": "Manifest error",
-        "diffEmpty": "No diff — the rendered manifest matches the previously deployed revision byte-for-byte.",
-        "diffPreviousLabel": "Previously deployed",
-        "diffCurrentLabel": "Current",
-        "diffNoHistory": "No prior deployment to diff against. The first deploy lands the baseline."
+        "title": "清单",
+        "description": "平台将为此工作负载应用的 Kubernetes 资源。切换到“差异”可与上次部署的镜像标签进行比较。",
+        "viewToggleManifest": "清单",
+        "viewToggleDiff": "差异",
+        "noResources": "未为此工作负载渲染任何资源，清单中可能尚未声明该工作负载。",
+        "errorTitle": "清单错误",
+        "diffEmpty": "无差异：渲染出的清单与上次部署的修订版本逐字节一致。",
+        "diffPreviousLabel": "上次部署",
+        "diffCurrentLabel": "当前",
+        "diffNoHistory": "没有可供比较的先前部署。首次部署将建立基准。"
       },
       "podStatus": {
-        "title": "Pod status",
-        "headerStatus": "Status",
-        "headerCount": "Count",
-        "headerPercent": "% of total",
-        "empty": "No live pods reported. Either the workload hasn't been deployed yet, the runtime cluster is unreachable, or the manifest declared zero replicas.",
-        "podsCount": "{count} pods",
-        "bucketEmpty": "No pod names returned for this bucket.",
-        "notReady": "not ready"
+        "title": "Pod 状态",
+        "headerStatus": "状态",
+        "headerCount": "数量",
+        "headerPercent": "占总数百分比",
+        "empty": "未上报运行中的 Pod。可能是工作负载尚未部署、运行时集群无法访问，或清单声明的副本数为零。",
+        "podsCount": "{count} 个 Pod",
+        "bucketEmpty": "此分组未返回任何 Pod 名称。",
+        "notReady": "未就绪"
       },
       "pods": {
-        "title": "Pods",
-        "empty": "No pods reported for this workload yet.",
-        "columnName": "Name",
-        "columnStatus": "Status",
-        "columnRestarts": "Restarts",
-        "columnNode": "Node",
-        "columnAge": "Age",
-        "flapping": "flapping",
-        "restartReasonsHeading": "Last restart reasons"
+        "title": "Pod",
+        "empty": "此工作负载尚未上报任何 Pod。",
+        "columnName": "名称",
+        "columnStatus": "状态",
+        "columnRestarts": "重启次数",
+        "columnNode": "节点",
+        "columnAge": "存在时长",
+        "flapping": "频繁重启",
+        "restartReasonsHeading": "最近的重启原因"
       },
       "containers": {
         "init": {
-          "title": "Init containers",
-          "description": "Run to completion before the primary starts. Resource budget excluded from steady-state accounting.",
-          "empty": "No init containers declared."
+          "title": "Init 容器",
+          "description": "在主容器启动前运行至完成。其资源预算不计入稳态核算。",
+          "empty": "未声明 Init 容器。"
         },
         "primary": {
-          "title": "Primary",
-          "description": "The workload's main container — the row whose name matches the workload slug.",
-          "empty": "No primary container detected. Check the workload's container names."
+          "title": "主容器",
+          "description": "工作负载的主容器，即名称与工作负载标识符一致的那一行。",
+          "empty": "未检测到主容器。请检查工作负载的容器名称。"
         },
         "sidecars": {
-          "title": "Sidecars",
-          "description": "Auxiliary containers (service meshes, log shippers). Their resources don't roll into the primary's budget.",
-          "empty": "No sidecars detected."
+          "title": "Sidecar 容器",
+          "description": "辅助容器（服务网格、日志转发器）。其资源不计入主容器的预算。",
+          "empty": "未检测到 Sidecar 容器。"
         },
-        "image": "Image",
-        "cpuReqLimit": "CPU req/limit",
-        "memReqLimit": "Memory req/limit",
-        "restarts": "Restarts",
-        "empty": "This workload has no containers declared in the manifest and no live pods reporting either."
+        "image": "镜像",
+        "cpuReqLimit": "CPU 请求/上限",
+        "memReqLimit": "内存请求/上限",
+        "restarts": "重启次数",
+        "empty": "此工作负载在清单中没有声明容器，也没有正在上报的运行中 Pod。"
       },
       "fqdn": {
-        "label": "In-cluster service",
-        "copyTitle": "Click to copy",
-        "copyToast": "Copied service FQDN to clipboard",
-        "copyError": "Couldn't copy — select the text and copy manually",
-        "unavailable": "FQDN unavailable — the app row is missing an organization."
+        "label": "集群内服务",
+        "copyTitle": "点击复制",
+        "copyToast": "已将服务 FQDN 复制到剪贴板",
+        "copyError": "无法复制：请选中文本并手动复制",
+        "unavailable": "FQDN 不可用：应用记录缺少所属组织。"
       },
       "probes": {
-        "title": "Health probes",
-        "description": "Startup, readiness, and liveness probes declared in the manifest. Read-only — edit in astrolift.toml.",
-        "startup": "Startup",
-        "readiness": "Readiness",
-        "liveness": "Liveness",
-        "notConfigured": "not configured",
-        "container": "Container",
-        "empty": "No probes declared in the manifest. The workload runs without explicit startup/readiness/liveness gates."
+        "title": "健康探针",
+        "description": "清单中声明的启动、就绪和存活探针。只读，请在 astrolift.toml 中编辑。",
+        "startup": "启动探针",
+        "readiness": "就绪探针",
+        "liveness": "存活探针",
+        "notConfigured": "未配置",
+        "container": "容器",
+        "empty": "清单中未声明探针。工作负载运行时没有显式的启动/就绪/存活检查。"
       },
       "volumes": {
-        "title": "Volumes",
-        "description": "Persistent and ephemeral volumes declared in the manifest, plus their mount paths.",
-        "columnName": "Name",
-        "columnKind": "Kind",
-        "columnMount": "Mount path",
-        "columnDetail": "Detail"
+        "title": "卷",
+        "description": "清单中声明的持久卷和临时卷及其挂载路径。",
+        "columnName": "名称",
+        "columnKind": "类型",
+        "columnMount": "挂载路径",
+        "columnDetail": "详情"
       }
     },
     "previews": {
@@ -1906,14 +1776,14 @@
         "warningBadgeLabel": "警告",
         "collapse": "折叠",
         "expand": "展开",
-        "title": "Recent platform events",
-        "description": "App-scoped slice of the platform event stream — deploy lifecycle, scaling decisions, alert transitions.",
-        "all": "All events",
-        "emptyTitle": "No events for this app yet",
-        "emptyDescription": "Platform events appear here as deploys, scale changes, and alerts fire."
+        "title": "最近的平台事件",
+        "description": "平台事件流中与此应用相关的部分：部署生命周期、扩缩容决策和告警状态变化。",
+        "all": "所有事件",
+        "emptyTitle": "此应用暂无事件",
+        "emptyDescription": "发生部署、扩缩容变更或告警触发时，平台事件会显示在这里。"
       },
       "logs": {
-        "pressStreamAll": "按下「Stream」开始追踪所有副本。",
+        "pressStreamAll": "按下“流式传输”开始实时查看所有副本。",
         "allReplicas": "所有副本",
         "allReplicasDescription": "正在从此应用的每个副本流式传输 — 每行都标记了源 Pod。",
         "historicalDescription": "正在显示过去 {range} 的日志行。",
@@ -1929,37 +1799,37 @@
           "6h": "最近 6 小时",
           "24h": "最近 24 小时"
         },
-        "title": "Live logs",
-        "streaming": "Streaming",
-        "fromCluster": "from the runtime cluster.",
-        "selectPrompt": "Select a pod above to tail its log stream.",
-        "clear": "Clear",
-        "pause": "Pause",
-        "stream": "Stream",
-        "waiting": "Waiting for the first line…",
-        "pressStream": "Press \"Stream\" to start tailing.",
-        "pickPod": "Pick a pod above first.",
-        "bufferCap": "Buffer is capped at {limit} lines. Use the CLI for a true tail without the buffer cap:",
-        "installCli": "Install the CLI",
+        "title": "实时日志",
+        "streaming": "正在流式传输",
+        "fromCluster": "的日志，来自运行时集群。",
+        "selectPrompt": "在上方选择一个 Pod，即可实时查看其日志流。",
+        "clear": "清除",
+        "pause": "暂停",
+        "stream": "流式传输",
+        "waiting": "正在等待第一行日志…",
+        "pressStream": "按下“流式传输”开始实时查看。",
+        "pickPod": "请先在上方选择一个 Pod。",
+        "bufferCap": "缓冲区上限为 {limit} 行。如需不受此上限限制的完整实时日志，请使用 CLI：",
+        "installCli": "安装 CLI",
         "export": "导出日志",
         "exportTitle": "将缓冲日志导出为可下载文件"
       },
-      "title": "{name} · Observability",
-      "description": "{slug} · pod state and log stream from the runtime cluster",
+      "title": "{name} · 可观测性",
+      "description": "{slug} · 来自运行时集群的 Pod 状态和日志流",
       "pods": {
-        "title": "Pods",
-        "description": "Live pod state from the tenant cluster, refreshed every {seconds}s. Click a row to tail its logs below.",
-        "emptyTitle": "No pods running for this app",
-        "emptyDescription": "Once a deployment has rolled out and the cluster reports pods, they appear here. If you expected pods, check the deployment log.",
-        "emptyAction": "View deployment history",
+        "title": "Pod",
+        "description": "来自租户集群的实时 Pod 状态，每 {seconds} 秒刷新一次。点击某一行即可在下方实时查看其日志。",
+        "emptyTitle": "此应用没有运行中的 Pod",
+        "emptyDescription": "部署发布完成且集群上报 Pod 后，Pod 会显示在这里。如果你预期会有 Pod，请检查部署日志。",
+        "emptyAction": "查看部署历史",
         "columns": {
           "pod": "Pod",
-          "workload": "Workload",
-          "status": "Status",
-          "ready": "Ready",
-          "restarts": "Restarts",
-          "age": "Age",
-          "node": "Node"
+          "workload": "工作负载",
+          "status": "状态",
+          "ready": "就绪",
+          "restarts": "重启次数",
+          "age": "存在时长",
+          "node": "节点"
         }
       },
       "signalMeasurement": {
@@ -2769,34 +2639,34 @@
       "cancel": "取消"
     },
     "logViewer": {
-      "searchPlaceholder": "Search log buffer…  (press / to focus)",
-      "searchAriaLabel": "Search log buffer",
-      "clearSearch": "Clear search",
-      "regexToggle": "Toggle regex",
-      "regexInvalid": "Invalid regex",
-      "matchCount": "{current} of {total}",
-      "matchNone": "0 matches",
-      "prevMatch": "Previous match (Shift+Enter)",
-      "nextMatch": "Next match (Enter)",
-      "containerLabel": "Container",
-      "containerAll": "All containers",
-      "copyAll": "Copy",
-      "copied": "Copied {count, plural, one {# line} other {# lines}} to clipboard",
-      "copyEmpty": "Nothing to copy — the buffer is empty.",
-      "copyFailed": "Couldn't copy — clipboard access blocked.",
-      "download": "Download",
-      "downloadEmpty": "Nothing to download — the buffer is empty.",
-      "downloadStarted": "Downloading {filename}",
-      "paneAriaLabel": "Log buffer",
-      "levelGroupLabel": "Filter by log level",
-      "bufferFootnote": "Showing {shown} of {buffered} buffered lines (cap {limit}).",
+      "searchPlaceholder": "搜索日志缓冲区…（按 / 键聚焦）",
+      "searchAriaLabel": "搜索日志缓冲区",
+      "clearSearch": "清除搜索",
+      "regexToggle": "切换正则表达式模式",
+      "regexInvalid": "无效的正则表达式",
+      "matchCount": "第 {current} 项，共 {total} 项",
+      "matchNone": "0 个匹配项",
+      "prevMatch": "上一个匹配项（Shift+Enter）",
+      "nextMatch": "下一个匹配项（Enter）",
+      "containerLabel": "容器",
+      "containerAll": "所有容器",
+      "copyAll": "复制",
+      "copied": "已将 {count, plural, one {# 行} other {# 行}}复制到剪贴板",
+      "copyEmpty": "没有可复制的内容：缓冲区为空。",
+      "copyFailed": "无法复制：剪贴板访问被阻止。",
+      "download": "下载",
+      "downloadEmpty": "没有可下载的内容：缓冲区为空。",
+      "downloadStarted": "正在下载 {filename}",
+      "paneAriaLabel": "日志缓冲区",
+      "levelGroupLabel": "按日志级别筛选",
+      "bufferFootnote": "显示 {buffered} 行缓冲日志中的 {shown} 行（上限 {limit} 行）。",
       "level": {
-        "all": "All",
-        "error": "Error",
-        "warn": "Warn",
-        "info": "Info",
-        "debug": "Debug",
-        "other": "Other"
+        "all": "全部",
+        "error": "错误",
+        "warn": "警告",
+        "info": "信息",
+        "debug": "调试",
+        "other": "其他"
       },
       "filterPlaceholder": "筛选行…",
       "filteredEmpty": "没有与级别和文本筛选条件匹配的行。"
@@ -2813,29 +2683,29 @@
     },
     "wizard": {
       "approval": {
-        "toggleLabel": "Require approval before deploying",
-        "safer": "Safer",
-        "toggleHint": "Triggered deploys land in \"pending approval\" until an approver signs off. Pick a team OR a specific set of users — approvers can't self-approve a deploy they pushed.",
-        "teamLabel": "Approver team",
-        "teamPlaceholder": "No team selected",
-        "teamNoneOption": "No team — pick users instead",
-        "teamHint": "Any active member of this team may approve. Mutually exclusive with the user picker.",
-        "minimumLabel": "Required approver count",
-        "minimumHintUsers": "1–{max} based on your user selection.",
-        "minimumHintTeam": "Number of distinct approvers required. At least 1.",
-        "usersLabel": "Approver users",
-        "usersPlaceholderTeam": "Team mode selected — clear the team picker to add users.",
-        "usersPlaceholderEmpty": "No users selected yet.",
-        "userRemove": "Remove {label}",
-        "orphanRemove": "Remove orphaned approver {id}",
-        "orphanSuffix": "(no longer a member)",
-        "search": "Search org members by name or email…",
-        "loading": "Loading org members…",
-        "noMembers": "No active org members yet — invite someone first.",
-        "noMatch": "No members match the search.",
-        "errorPickAny": "Pick at least one approver — a team or one or more users.",
-        "errorBoth": "Pick a team OR specific users, not both.",
-        "errorMinTooHigh": "Minimum approvals cannot exceed the number of selected users."
+        "toggleLabel": "部署前需要审批",
+        "safer": "更安全",
+        "toggleHint": "触发的部署将处于“等待批准”状态，直到审批人批准。请选择一个团队或一组指定用户；审批人不能批准自己推送的部署。",
+        "teamLabel": "审批团队",
+        "teamPlaceholder": "未选择团队",
+        "teamNoneOption": "不选择团队，改为选择用户",
+        "teamHint": "此团队的任何活跃成员均可批准。与用户选择器互斥。",
+        "minimumLabel": "所需审批人数",
+        "minimumHintUsers": "根据你选择的用户，可设为 1–{max}。",
+        "minimumHintTeam": "所需的不同审批人数量，至少为 1。",
+        "usersLabel": "审批用户",
+        "usersPlaceholderTeam": "已选择团队模式。请先清除团队选择，再添加用户。",
+        "usersPlaceholderEmpty": "尚未选择用户。",
+        "userRemove": "移除 {label}",
+        "orphanRemove": "移除已失效的审批人 {id}",
+        "orphanSuffix": "（已不再是成员）",
+        "search": "按姓名或邮箱搜索组织成员…",
+        "loading": "正在加载组织成员…",
+        "noMembers": "暂无活跃的组织成员，请先邀请成员。",
+        "noMatch": "没有与搜索匹配的成员。",
+        "errorPickAny": "请至少选择一位审批人：一个团队，或一位或多位用户。",
+        "errorBoth": "请选择一个团队或指定用户，不能同时选择两者。",
+        "errorMinTooHigh": "最少批准数不能超过所选用户数。"
       }
     },
     "deployments": {
@@ -2879,7 +2749,7 @@
         "all": "所有触发方式",
         "push": "推送",
         "manual": "手动",
-        "ci": "ci",
+        "ci": "CI",
         "scheduled": "定时",
         "rollback": "回滚",
         "promotion": "提升"
@@ -3437,7 +3307,7 @@
         "noSkills": "暂无技能",
         "noSkillsHint": "请至少添加一项技能，以定义此智能体掌握的知识。",
         "removeSkill": "移除技能",
-        "slug": "Slug",
+        "slug": "标识符",
         "skillName": "名称",
         "description": "描述",
         "content": "内容",
@@ -3583,70 +3453,70 @@
       }
     },
     "logs": {
-      "title": "{name} · Logs",
-      "description": "{slug} · live output from the running workloads",
+      "title": "{name} · 日志",
+      "description": "{slug} · 运行中工作负载的实时输出",
       "logs": {
-        "title": "Live logs",
-        "selectPrompt": "Pick a pod to start tailing — sidecars surface under the container picker once a pod is selected.",
+        "title": "实时日志",
+        "selectPrompt": "选择一个 Pod 开始实时查看日志。选中 Pod 后，Sidecar 容器会显示在容器选择器中。",
         "podLabel": "Pod",
-        "podPlaceholder": "Pick a pod…"
+        "podPlaceholder": "选择 Pod…"
       }
     },
     "shell": {
-      "title": "{name} · Shell",
-      "description": "{slug} · interactive shell into the running workloads",
+      "title": "{name} · 终端",
+      "description": "{slug} · 连接到运行中工作负载的交互式终端",
       "podLabel": "Pod",
-      "podPlaceholder": "Pick a pod…",
-      "containerLabel": "Container",
-      "containerPlaceholder": "Pick a container…",
+      "podPlaceholder": "选择 Pod…",
+      "containerLabel": "容器",
+      "containerPlaceholder": "选择容器…",
       "terminal": {
-        "title": "In-browser terminal",
-        "description": "Attach a PTY to a chosen pod and container — same backend protocol the CLI uses, no context switch.",
-        "open": "Open shell",
-        "close": "Close shell",
-        "targetDescription": "Ready to attach to {container} in {pod}.",
-        "pickTarget": "Pick a pod + container above to open a shell.",
-        "readyHint": "Click Open shell to attach the terminal.",
-        "ariaLabel": "Interactive pod terminal",
-        "statusConnecting": "Connecting to pod…",
+        "title": "浏览器内终端",
+        "description": "将 PTY 连接到所选的 Pod 和容器，与 CLI 使用相同的后端协议，无需切换上下文。",
+        "open": "打开终端",
+        "close": "关闭终端",
+        "targetDescription": "已准备好连接到 {pod} 中的 {container}。",
+        "pickTarget": "请在上方选择 Pod 和容器以打开终端。",
+        "readyHint": "点击“打开终端”以连接终端。",
+        "ariaLabel": "交互式 Pod 终端",
+        "statusConnecting": "正在连接 Pod…",
         "statusClosed": "会话已结束。请打开新的终端。断开连接前刚发送的输入可能结果未知，且不会重新发送。",
-        "statusDenied": "Permission denied — your role does not include app.exec_pod.",
-        "statusError": "Terminal error — see the log line above for details.",
+        "statusDenied": "权限被拒绝：你的角色不包含 app.exec_pod。",
+        "statusError": "终端错误：详情请查看上方的日志行。",
         "authExpired": "会话已过期。请重新登录并打开新的终端。",
-        "targetGone": "That target no longer exists — it may have been removed.",
-        "untilThen": "Or run {cli} locally — the CLI uses the same backend protocol.",
-        "install": "Install the CLI",
-        "manageTokens": "Manage deploy tokens",
-        "expand": "Expand to full screen",
-        "collapse": "Exit full screen (Esc)",
-        "popOut": "Open in a separate window",
-        "resizeHandle": "Drag to resize the terminal",
+        "targetGone": "该目标已不存在，可能已被移除。",
+        "untilThen": "也可以在本地运行 {cli}，CLI 使用相同的后端协议。",
+        "install": "安装 CLI",
+        "manageTokens": "管理部署令牌",
+        "expand": "展开为全屏",
+        "collapse": "退出全屏（Esc）",
+        "popOut": "在单独的窗口中打开",
+        "resizeHandle": "拖动以调整终端大小",
         "stepUpRequired": "请重新登录以在此打开控制台。"
       },
       "shortcuts": {
-        "title": "CLI shortcuts",
-        "description": "Common commands you'd run against this app. Each one authenticates with your local {login} session.",
-        "openShell": "Open an interactive shell",
-        "djangoCmd": "Run a Django management command",
-        "tailLogs": "Tail logs from the primary workload"
+        "title": "CLI 快捷命令",
+        "description": "针对此应用的常用命令。每条命令都使用你本地的 {login} 会话进行身份验证。",
+        "openShell": "打开交互式终端",
+        "djangoCmd": "运行 Django 管理命令",
+        "tailLogs": "实时查看主工作负载的日志"
       },
-      "copy": "Copy command",
-      "copied": "Copied to clipboard",
-      "copyFailed": "Couldn't copy — clipboard access blocked",
+      "copy": "复制命令",
+      "copied": "已复制到剪贴板",
+      "copyFailed": "无法复制：剪贴板访问被阻止",
       "upload": {
-        "title": "Upload script",
-        "description": "Drop a .py / .sql / .sh / .ts / .js / .rb / .go file. We mint a pre-signed URL, push the bytes, and hand you a paste-ready curl + run pair.",
-        "pick": "Upload script",
-        "uploading": "Uploading…",
-        "clear": "Clear uploaded file",
-        "empty": "No file uploaded yet — the command palette below runs unchanged.",
-        "path": "Will land at {path}",
-        "runLabel": "Run command",
-        "fetchLabel": "Fetch into the pod first",
-        "note": "The pre-signed URL is scoped to this upload. Run the fetch command inside the pod before the run command; the bytes are fetched over HTTPS and dropped at /tmp.",
-        "success": "Uploaded {name}",
-        "failed": "Upload failed: {error}",
-        "noUrl": "no pre-signed URL returned"
+        "title": "上传脚本",
+        "description": "拖放一个 .py / .sql / .sh / .ts / .js / .rb / .go 文件。我们会生成预签名 URL、上传文件内容，并为你提供可直接粘贴的 curl 命令和运行命令。",
+        "pick": "上传脚本",
+        "uploading": "正在上传…",
+        "clear": "清除已上传的文件",
+        "empty": "尚未上传文件，下方的命令面板将照常运行。",
+        "path": "将存放到 {path}",
+        "runLabel": "运行命令",
+        "fetchLabel": "先拉取到 Pod 中",
+        "note": "预签名 URL 仅适用于此次上传。请先在 Pod 内执行拉取命令，再执行运行命令；文件内容会通过 HTTPS 拉取并存放到 /tmp。",
+        "success": "已上传 {name}",
+        "failed": "上传失败：{error}",
+        "noUrl": "未返回预签名 URL"
       }
     },
     "workloadActions": {
@@ -4140,17 +4010,17 @@
     "hostsTitle": "主机",
     "keysTitle": "SSH 部署密钥",
     "kind": {
-      "github_oauth_app": "GitHub OAuth App",
+      "github_oauth_app": "GitHub OAuth 应用",
       "github_oauth_user": "GitHub（OAuth 用户令牌）",
       "github_app_install": "GitHub App 安装",
       "github_pat": "GitHub PAT",
-      "gitlab_oauth_app": "GitLab OAuth App",
+      "gitlab_oauth_app": "GitLab OAuth 应用",
       "gitlab_oauth_user": "GitLab（OAuth 用户令牌）",
       "gitlab_pat": "GitLab PAT",
-      "bitbucket_oauth_app": "Bitbucket OAuth App",
+      "bitbucket_oauth_app": "Bitbucket OAuth 应用",
       "bitbucket_oauth_user": "Bitbucket（OAuth 用户令牌）",
       "bitbucket_pat": "Bitbucket PAT",
-      "gitea_oauth_app": "Gitea OAuth App",
+      "gitea_oauth_app": "Gitea OAuth 应用",
       "gitea_oauth_user": "Gitea（OAuth 用户令牌）",
       "gitea_pat": "Gitea PAT"
     },
@@ -4272,7 +4142,7 @@
           "hint": "Bitbucket 应用密码（工作区范围）。"
         },
         "gitea_oauth_app": {
-          "label": "Gitea OAuth App",
+          "label": "Gitea OAuth 应用",
           "hint": "自托管 Gitea 实例。"
         },
         "gitea_pat": {
@@ -4293,11 +4163,11 @@
       "installationId": "安装 ID",
       "apiBaseUrl": "API 基础 URL（自托管）",
       "githubAppId": "GitHub App ID（数字，用于 Webhook 负载查找）",
-      "oauthClientId": "OAuth Client ID",
+      "oauthClientId": "OAuth 客户端 ID",
       "githubAppIdHelp": "GitHub 在 App 设置页面上显示的数字 App ID。用于从 Webhook 负载中查找 App；user-to-server 的 OAuth Client ID 是单独的（见下方）。",
       "redirectUri": "OAuth 重定向 URI",
       "redirectUriHelp": "必须与主机端（{host}）OAuth 应用中注册的重定向 URI 一致。",
-      "appClientId": "GitHub App Client ID",
+      "appClientId": "GitHub App 客户端 ID",
       "appClientIdHelp": "可在 GitHub App 设置页面找到；新 GitHub App 的格式类似 <code>Iv23l...</code>，旧版 OAuth App 则是 20 位十六进制字符串。<link>打开 GitHub App 设置 →</link>",
       "appClientIdInvalid": "这看起来不像 GitHub App Client ID。应为 <code>Iv…</code> 或 20 位十六进制字符串。",
       "secretOauth": "OAuth 客户端密钥",
@@ -4338,7 +4208,7 @@
       "appIdInvalid": "App ID 是数字 ID，例如 3705068。",
       "pem": "私钥（PEM）",
       "pemHelp": "在 GitHub App 页面生成私钥，并将完整的 <code>.pem</code> 粘贴到此处。它会加密存储，且不会再次显示。",
-      "clientId": "Client ID",
+      "clientId": "客户端 ID",
       "optional": "（可选）",
       "clientIdHelp": "仅 user-to-server 的“连接我的 GitHub”流程需要。",
       "clientSecret": "客户端密钥",
@@ -4366,8 +4236,8 @@
       "copy": "复制",
       "scopes": "所需的 GitLab 范围：<code>read_api</code>、<code>read_repository</code>、<code>read_user</code>。保持勾选 <em>Confidential</em>。",
       "step3": "将结果粘贴回此处",
-      "applicationId": "Application ID",
-      "secret": "Secret",
+      "applicationId": "应用程序 ID",
+      "secret": "密钥",
       "secretHelp": "加密存储。GitLab 仅显示一次 Secret，离开页面前请先复制。",
       "cancel": "取消",
       "connecting": "正在连接…",
@@ -4397,7 +4267,7 @@
       "connection": "连接",
       "account": "账号",
       "existingAppId": "App ID（现有）",
-      "label": "GitHub App Client ID",
+      "label": "GitHub App 客户端 ID",
       "help": "<link>打开 GitHub App 设置 →</link> Client ID 显示在 App 页面的 <em>About</em> 部分，与数字 App ID 分开。",
       "cancel": "取消",
       "saving": "正在保存…",
@@ -4453,7 +4323,7 @@
       "displayNamePlaceholder": "例如：Auth0 生产、Cognito 预发布",
       "displayNameHelp": "显示在登录界面和审计日志中。留空时默认使用类型名称。",
       "discovery": "OIDC 发现 URL",
-      "clientId": "Client ID",
+      "clientId": "客户端 ID",
       "secretRef": "密钥引用",
       "secretRefHelp": "平台密钥后端中的路径；值绝不保存在此记录中。",
       "metadataUrl": "SAML 元数据 URL",
@@ -4810,138 +4680,7 @@
       }
     }
   },
-  "settingsIndex": {
-    "title": "Settings",
-    "description": "Configure the platform's identity, security, and surfaces.",
-    "cardMeta": {
-      "modified": "Modified {when}"
-    },
-    "sections": {
-      "organization": {
-        "title": "Organization",
-        "description": "Display name, website, retention defaults."
-      },
-      "identityProvider": {
-        "title": "Identity provider",
-        "description": "OIDC / SAML config + SCIM provisioning."
-      },
-      "sourceProviders": {
-        "title": "Source providers",
-        "description": "Connect GitHub / GitLab / Gitea + manage SSH deploy keys."
-      },
-      "managedDomains": {
-        "title": "Managed domains",
-        "description": "DNS zones the platform manages for tenant apps and previews."
-      },
-      "policies": {
-        "title": "ABAC policies",
-        "description": "Runtime predicates layered on top of RBAC."
-      },
-      "permissions": {
-        "title": "Permissions",
-        "description": "Inspect every grant resolved for the current user."
-      },
-      "profile": {
-        "title": "Profile",
-        "description": "Theme + locale."
-      },
-      "security": {
-        "title": "Security",
-        "description": "Active sessions, MFA, admin elevation."
-      },
-      "notifications": {
-        "title": "Notifications",
-        "description": "Inbox of approvals, alerts, invitations."
-      },
-      "apiTokens": {
-        "title": "API tokens",
-        "description": "Long-lived bearer tokens for CLIs and bots."
-      },
-      "members": {
-        "title": "Members",
-        "description": "Org members, invitations, and role bindings."
-      },
-      "teams": {
-        "title": "Teams",
-        "description": "Group members for shared ownership of apps and projects."
-      },
-      "projects": {
-        "title": "Projects",
-        "description": "Logical groupings of apps owned by teams."
-      }
-    }
-  },
   "lists": {
-    "cost": {
-      "title": "Cost",
-      "description": "Currency-denominated platform spend, rolled up from CostSnapshot rows. Pick a time range; the trend chart marks anomalies (> 2σ day-over-day jumps); the per-resource panel attributes spend to specific managed-service bindings.",
-      "tabsLabel": "Time range",
-      "tab24h": "24h",
-      "tab7d": "7d",
-      "tab30d": "30d",
-      "tabMtd": "MTD",
-      "kpis": {
-        "projectedMonthly": "Projected monthly",
-        "budgets": "Budgets",
-        "window": {
-          "h24": "Last 24 hours",
-          "d7": "Last 7 days",
-          "d30": "Last 30 days",
-          "mtd": "Month to date"
-        }
-      },
-      "forecast": {
-        "vsPreviousMonth": "vs prev month",
-        "mtdLine": "MTD {mtd} · prev month {previous}",
-        "insufficientData": "Not enough daily cost data yet for a confident projection.",
-        "confidence": {
-          "low": "low confidence",
-          "medium": "med confidence",
-          "high": "high confidence"
-        }
-      },
-      "trend": {
-        "title": "Daily trend",
-        "description": "Per-day platform spend over the selected range. Marked points exceed the day-over-day rolling 2σ.",
-        "tooltipDailyTotal": "Daily total",
-        "anomaliesBadge": "{count} anomaly",
-        "emptyTitle": "No cost data in this window",
-        "emptyDescription": "The daily cost collector hasn't written snapshots for the selected range yet, or the cloud-side billing API hasn't reported usage. Live pricing data only — nothing is estimated client-side."
-      },
-      "budgets": {
-        "title": "Budgets",
-        "description": "Budgets fire alerts as you cross each percentage threshold.",
-        "emptyTitle": "No budgets configured",
-        "emptyDescription": "Budgets can be set per organization, team, or project.",
-        "columns": {
-          "scope": "Scope",
-          "period": "Period",
-          "spend": "Spend",
-          "budget": "Budget",
-          "alerts": "Alerts"
-        }
-      },
-      "byCategory": {
-        "title": "By category",
-        "description": "Spend split across workload / managed-service / egress / storage / other.",
-        "empty": "No cost data yet."
-      },
-      "attribution": {
-        "title": "Per-resource attribution",
-        "description": "Spend broken out by managed-service binding (e.g. main_db, events_queue, uploads_bucket). Untagged rows roll up under \"shared / untagged\" — usually shared egress or providers that don't yet apply the platform binding tag.",
-        "coverage": "Attribution coverage: {pct}% ({attributed} of {total})",
-        "unattributedRow": "Shared / untagged",
-        "emptyTitle": "No attributed cost rows",
-        "emptyDescription": "Bindings are visible only after the cloud-side cost driver tags resources with astrolift.io/binding at provision time. Track #432 from:backend for the provider-side rollout.",
-        "columns": {
-          "resource": "Resource",
-          "kind": "Kind",
-          "app": "App",
-          "category": "Category",
-          "amount": "Amount"
-        }
-      }
-    },
     "audit": {
       "title": "审计日志",
       "description": "所有权限判定和状态变更操作只追加记录，不修改已有条目。数据库层面按组织隔离。",
@@ -5037,72 +4776,72 @@
         "awaitingLabel": "待审批",
         "awaitingEmpty": "未找到符合条件的审批人，请检查应用策略。"
       },
-      "title": "Approve deployment",
-      "loading": "Loading…",
-      "notFoundTitle": "Deployment not found",
-      "notFoundDescription": "The deployment doesn't exist or you don't have permission to view it.",
-      "expired": "The approval link may have expired, or the deployment was deleted. Return to the",
-      "deploymentsList": "deployments list",
+      "title": "批准部署",
+      "loading": "正在加载…",
+      "notFoundTitle": "未找到部署",
+      "notFoundDescription": "该部署不存在，或你没有查看权限。",
+      "expired": "审批链接可能已过期，或该部署已被删除。请返回",
+      "deploymentsList": "部署列表",
       "fields": {
-        "imageTag": "Image tag",
-        "imageDigest": "Image digest",
-        "clusterRevision": "Cluster revision",
-        "workload": "Workload",
-        "created": "Created",
-        "started": "Started"
+        "imageTag": "镜像标签",
+        "imageDigest": "镜像摘要",
+        "clusterRevision": "集群修订版本",
+        "workload": "工作负载",
+        "created": "创建时间",
+        "started": "开始时间"
       },
-      "approvalsCount": "{received} / {required} approvals",
-      "awaiting": "Awaiting approval",
-      "awaitingDesc": "{remaining} more approval(s) required before this deployment proceeds. Self-approval is rejected by the backend.",
-      "approve": "Approve",
-      "reject": "Reject",
-      "missingPermission": "You don't have app.approve_deploy; ask an org admin to approve.",
-      "viewDetail": "View full detail",
-      "viewDetailShort": "View detail",
-      "alreadyApproved": "Already approved",
-      "alreadyApprovedDesc": "The deployment moved past the approval gate. Status: {status}.",
-      "failed": "Deployment failed",
-      "failedDesc": "Approval no longer applies. Inspect the lifecycle log on the detail page.",
-      "noAction": "No approval action available in current state {status}.",
-      "selfTriggerBadge": "Pushed by you",
-      "selfTriggerHelp": "This deployment was triggered by you. Another approver is required (separation of duties).",
-      "rejectedReasonLabel": "Rejection reason",
+      "approvalsCount": "{received} / {required} 已审批",
+      "awaiting": "等待审批",
+      "awaitingDesc": "此部署还需 {remaining} 项审批才能继续。后端会拒绝自我审批。",
+      "approve": "批准",
+      "reject": "拒绝",
+      "missingPermission": "你没有 app.approve_deploy 权限；请让组织管理员来批准。",
+      "viewDetail": "查看完整详情",
+      "viewDetailShort": "查看详情",
+      "alreadyApproved": "已批准",
+      "alreadyApprovedDesc": "该部署已通过审批关卡。状态：{status}。",
+      "failed": "部署失败",
+      "failedDesc": "审批已不再适用。请在详情页查看生命周期日志。",
+      "noAction": "当前状态 {status} 下没有可用的审批操作。",
+      "selfTriggerBadge": "由你推送",
+      "selfTriggerHelp": "此部署由你触发，需要另一位审批人批准（职责分离）。",
+      "rejectedReasonLabel": "拒绝原因",
       "commit": {
-        "viewDiff": "View commit",
-        "noMessage": "No commit message recorded for this deploy.",
-        "expand": "Show {hidden} more lines",
-        "collapse": "Collapse"
+        "viewDiff": "查看提交",
+        "noMessage": "此部署未记录提交信息。",
+        "expand": "显示其余 {hidden} 行",
+        "collapse": "收起"
       },
       "toasts": {
-        "approved": "Approved — status now {status}",
-        "approveFailed": "Approve failed",
-        "rejected": "Deployment rejected",
-        "rejectFailed": "Reject failed"
+        "approved": "已批准，当前状态：{status}",
+        "approveFailed": "批准失败",
+        "rejected": "已拒绝部署",
+        "rejectFailed": "拒绝失败"
       },
       "history": {
-        "title": "Approval history",
-        "empty": "No approval events recorded yet.",
-        "actorUnknown": "unknown actor",
+        "title": "审批历史",
+        "empty": "尚未记录任何审批事件。",
+        "actorUnknown": "未知执行者",
         "action": {
-          "started": "Deploy started",
-          "approved": "Approved",
-          "rejected": "Rejected",
-          "aborted": "Aborted",
-          "other": "Lifecycle event"
+          "started": "部署已开始",
+          "approved": "已批准",
+          "rejected": "已拒绝",
+          "aborted": "已中止",
+          "other": "生命周期事件"
         }
       },
       "confirm": {
-        "title": "Approve deploy of {tag}?",
-        "description": "Unblocks the rollout to {app}/{env}. The workflow resumes immediately and traffic shifts according to the configured strategy. Self-approval on a deploy you triggered is rejected by the backend.",
-        "confirm": "Approve deployment"
+        "title": "批准 {tag} 的部署？",
+        "description": "这将放行到 {app}/{env} 的发布。工作流会立即恢复，流量将按照配置的策略切换。后端会拒绝你对自己触发的部署进行自我审批。",
+        "confirm": "批准部署"
       },
       "confirmReject": {
-        "title": "Reject deploy of {tag}?",
-        "description": "Marks the deployment failed for {app}/{env}. CI must re-trigger to create a fresh deployment for review.",
-        "reasonLabel": "Reason for rejection",
-        "reasonPlaceholder": "Why is this deploy being rejected? Persists on the audit log + history sidebar.",
-        "reasonRequired": "Reason required",
-        "confirm": "Reject deployment"
+        "title": "拒绝 {tag} 的部署？",
+        "description": "将 {app}/{env} 的部署标记为失败。CI 需要重新触发，才能创建新的部署供审核。",
+        "reasonLabel": "拒绝原因",
+        "reasonPlaceholder": "为什么拒绝此部署？将保存在审计日志和历史侧栏中。",
+        "reasonRequired": "请填写原因",
+        "confirm": "拒绝部署"
       }
     },
     "approvalsQueue": {
@@ -5153,173 +4892,104 @@
       }
     },
     "events": {
-      "title": "Events",
-      "description": "Append-only platform fact log: every state change of interest to dashboards, webhooks, and event-driven workflows.",
-      "filterPlaceholder": "Filter by event type (e.g. app.deployed)",
-      "aggregateToggle": "Group repeats",
-      "aggregateBadge": "×{count} similar",
-      "expandLabel": "Expand",
-      "collapseLabel": "Collapse",
-      "sourceLabel": "Source",
-      "emptyTitle": "Quiet feed",
-      "emptyDescription": "No events match the current filter. Try clearing it, or trigger a mutation to see one land."
-    },
-    "quotas": {
-      "title": "Quotas",
-      "description": "Resource limits per scope. Soft limits trigger alerts; hard limits block the next admission attempt.",
-      "emptyTitle": "No quotas configured",
-      "emptyDescription": "Quotas can be set per organization, team, or project. The default install ships with sensible org-level caps.",
-      "columns": {
-        "scope": "Scope",
-        "resource": "Resource",
-        "usage": "Usage",
-        "bar": "Bar",
-        "limits": "Soft / Hard",
-        "actions": "Actions"
-      },
-      "request": {
-        "buttonRequest": "Request bump",
-        "buttonPending": "Pending request",
-        "title": "Request quota bump",
-        "description": "Asks an org admin to raise the hard limit. They get an in-app notification + an email. Pending status surfaces on this row until decided.",
-        "factorLabel": "Multiplier",
-        "factor1_5x": "1.5x",
-        "factor2x": "2x",
-        "factor3x": "3x",
-        "factor5x": "5x",
-        "factor10x": "10x",
-        "reasonLabel": "Reason",
-        "reasonPlaceholder": "Onboarding the prod team next quarter; current cap blocks the migration.",
-        "reasonHint": "Required. Shows up in the admin notification.",
-        "submit": "Submit request",
-        "submitting": "Submitting…",
-        "cancel": "Cancel",
-        "toastSubmitted": "Quota bump requested",
-        "toastFailed": "Failed to submit request",
-        "pendingBadge": "Pending {factor}x — {reason}"
-      },
-      "overviewTitle": "Utilization",
-      "overviewDescription": "Current usage against hard limits, most-utilized first.",
-      "history": {
-        "button": "History",
-        "title": "{resource} usage history",
-        "description": "Point-in-time usage captured daily, plotted against the soft and hard limits.",
-        "windowLabel": "Window",
-        "windowOption": "Last {days} days",
-        "usedTrend": "Used over time",
-        "latestUsed": "Latest used",
-        "peakUsed": "Peak used",
-        "softLimit": "Soft limit",
-        "hardLimit": "Hard limit",
-        "emptyTitle": "No usage history yet",
-        "emptyDescription": "Usage snapshots are captured once a day. Check back after the collector has run at least once."
-      }
+      "title": "事件",
+      "description": "仅追加的平台事实日志：记录仪表板、Webhook 和事件驱动工作流所关注的每一次状态变更。",
+      "filterPlaceholder": "按事件类型筛选（例如 app.deployed）",
+      "aggregateToggle": "合并重复项",
+      "aggregateBadge": "相似 ×{count}",
+      "expandLabel": "展开",
+      "collapseLabel": "收起",
+      "sourceLabel": "来源",
+      "emptyTitle": "事件流很安静",
+      "emptyDescription": "没有与当前筛选条件匹配的事件。请尝试清除筛选条件，或触发一次变更，即可看到新事件出现。"
     },
     "alerts": {
       "mute": {
-        "menuLabel": "Mute",
-        "preset1h": "Mute for 1 hour",
-        "preset4h": "Mute for 4 hours",
-        "preset24h": "Mute for 24 hours",
-        "presetCustom": "Mute for custom duration…",
-        "unmute": "Unmute now",
-        "badge": "Muted ({remaining} left)",
-        "badgeExpired": "Muted",
-        "showMuted": "Show muted",
-        "hideMuted": "Hide muted",
-        "toastMuted": "Muted {name} for {duration}",
-        "toastUnmuted": "Unmuted {name}",
-        "toastMuteFailed": "Failed to mute rule",
-        "toastUnmuteFailed": "Failed to unmute rule",
-        "customTitle": "Mute {name}",
-        "customDescription": "Silence channel fan-out until the TTL expires. The rule keeps producing AlertEvent rows so the incident timeline stays intact. Mute is capped at 7 days.",
-        "durationLabel": "Duration (hours)",
-        "reasonLabel": "Reason",
-        "reasonPlaceholder": "Known outage — DB migration in progress",
-        "reasonHint": "Surfaces on the audit log + on the muted-rule badge.",
-        "submit": "Mute rule",
-        "cancel": "Cancel"
+        "menuLabel": "静音",
+        "preset1h": "静音 1 小时",
+        "preset4h": "静音 4 小时",
+        "preset24h": "静音 24 小时",
+        "presetCustom": "自定义静音时长…",
+        "unmute": "立即取消静音",
+        "badge": "已静音（剩余 {remaining}）",
+        "badgeExpired": "已静音",
+        "showMuted": "显示已静音",
+        "hideMuted": "隐藏已静音",
+        "toastMuted": "已将 {name} 静音 {duration}",
+        "toastUnmuted": "已取消静音 {name}",
+        "toastMuteFailed": "静音规则失败",
+        "toastUnmuteFailed": "取消静音规则失败",
+        "customTitle": "静音 {name}",
+        "customDescription": "在 TTL 到期前暂停向各通知渠道分发。规则会继续生成 AlertEvent 记录，以保持事故时间线完整。静音最长 7 天。",
+        "durationLabel": "时长（小时）",
+        "reasonLabel": "原因",
+        "reasonPlaceholder": "已知故障：数据库迁移进行中",
+        "reasonHint": "会显示在审计日志和已静音规则的徽章上。",
+        "submit": "静音规则",
+        "cancel": "取消"
       },
-      "title": "Alerts",
-      "description": "Org-wide alert rules + the firing events they produce. Rules target apps, environments, workloads, or the org globally; firing events surface in the bottom panel.",
-      "newRule": "New rule",
+      "title": "告警",
+      "description": "组织级告警规则，以及这些规则触发的事件。规则的目标可以是应用、环境、工作负载，或全局作用于整个组织；触发的事件有单独的事件流。",
+      "newRule": "新建规则",
       "stats": {
-        "rules": "Rules",
-        "active": "{count} active",
-        "unresolved": "Unresolved",
-        "inWindow": "in current window",
-        "total": "Total events",
-        "latest": "latest 100"
+        "rules": "规则",
+        "active": "{count} 条已启用",
+        "unresolved": "未解决",
+        "inWindow": "当前时间窗口内",
+        "total": "事件总数",
+        "latest": "最近 100 条"
       },
       "rules": {
-        "title": "Rules",
-        "description": "Predicates fire events when matching telemetry crosses a threshold.",
-        "emptyTitle": "No alert rules yet",
-        "emptyDescription": "Create a rule to start surfacing platform events as alerts.",
+        "title": "规则",
+        "description": "当匹配的遥测数据超过阈值时，判定条件会触发事件。",
+        "emptyTitle": "暂无告警规则",
+        "emptyDescription": "创建规则，即可开始将平台事件显示为告警。",
         "columns": {
-          "name": "Name",
-          "target": "Target",
-          "severity": "Severity",
-          "created": "Created"
+          "name": "名称",
+          "target": "目标",
+          "severity": "严重程度",
+          "created": "创建时间"
         }
       },
       "events": {
-        "title": "Recent events",
-        "description": "Firing instances from the rules above. Acknowledge to silence while the underlying issue is being worked.",
-        "emptyTitle": "No events yet",
-        "emptyDescription": "Events appear here when an active rule's predicate matches incoming telemetry.",
+        "title": "事件",
+        "description": "你的告警规则的触发实例。在处理根本问题期间，确认后即可将其静音。",
+        "emptyTitle": "暂无事件",
+        "emptyDescription": "当已启用规则的判定条件与传入的遥测数据匹配时，事件会显示在这里。",
         "columns": {
-          "summary": "Summary",
-          "severity": "Severity",
-          "fired": "Fired",
-          "state": "State"
+          "summary": "摘要",
+          "severity": "严重程度",
+          "fired": "触发时间",
+          "state": "状态"
         },
-        "resolved": "resolved",
-        "acknowledged": "acknowledged",
-        "firing": "firing",
-        "ack": "Ack"
+        "resolved": "已解决",
+        "acknowledged": "已确认",
+        "firing": "触发中",
+        "ack": "确认"
       },
       "delete": {
-        "title": "Delete rule \"{name}\"?",
-        "fallbackTitle": "Delete rule?",
-        "description": "Soft-deletes the rule. Events that already fired stay in the log and remain reachable from the event panel — only future evaluations stop. Re-create the rule with the same target to resume coverage.",
-        "confirm": "Delete rule"
+        "title": "删除规则“{name}”？",
+        "fallbackTitle": "删除规则？",
+        "description": "软删除该规则。已触发的事件会保留在日志中，仍可从事件面板访问；仅停止后续评估。使用相同目标重新创建规则即可恢复覆盖。",
+        "confirm": "删除规则"
       },
       "create": {
-        "title": "New alert rule",
-        "description": "Predicate matches against the platform event stream. Notify channels describe where firing events go (Slack, email, webhook).",
-        "nameLabel": "Name",
+        "title": "新建告警规则",
+        "description": "判定条件会与平台事件流进行匹配。通知渠道用于指定触发的事件发往何处（Slack、邮件、Webhook）。",
+        "nameLabel": "名称",
         "namePlaceholder": "failed-deploy",
-        "targetLabel": "Target",
-        "severityLabel": "Severity",
-        "targetIdLabel": "Target ID",
-        "targetIdGlobal": "(blank for global)",
-        "targetIdPlaceholder": "app slug, env name, or workload slug",
-        "targetIdGlobalHint": "Global rules ignore targetId — backend rejects non-empty values.",
-        "targetIdHint": "App slug for app target; env name for env target; etc.",
-        "predicateLabel": "Predicate (JSON)",
-        "channelsLabel": "Notify channels (JSON)",
-        "cancel": "Cancel",
-        "submit": "Create rule",
-        "submitting": "Creating…"
-      }
-    },
-    "membersBulk": {
-      "selectAllLabel": "Select all role bindings",
-      "selectRowLabel": "Select binding {role} on {subject}",
-      "selected": "{count, plural, =1 {1 binding selected} other {# bindings selected}}",
-      "clear": "Clear",
-      "revokeButton": "Revoke {count}",
-      "permissionHint": "You don't have permission to manage members.",
-      "confirm": {
-        "title": "Revoke {count} role binding(s)?",
-        "description": "Each subject loses the permissions these roles granted. Other bindings, if any, remain in effect. The operation is per-binding — if one fails, the others still apply.",
-        "confirmLabel": "Revoke {count}"
-      },
-      "toasts": {
-        "allOk": "Revoked {count} role binding(s).",
-        "partial": "Revoked {revoked}, {failed} failed.",
-        "allFailed": "Bulk revoke failed: {message}"
+        "targetLabel": "目标",
+        "severityLabel": "严重程度",
+        "targetIdLabel": "目标 ID",
+        "targetIdGlobal": "（全局目标请留空）",
+        "targetIdPlaceholder": "应用标识符、环境名称或工作负载标识符",
+        "targetIdGlobalHint": "全局规则会忽略 targetId，后端会拒绝非空值。",
+        "targetIdHint": "目标为应用时填写应用标识符；目标为环境时填写环境名称；依此类推。",
+        "predicateLabel": "判定条件（JSON）",
+        "channelsLabel": "通知渠道（JSON）",
+        "cancel": "取消",
+        "submit": "创建规则",
+        "submitting": "正在创建…"
       }
     },
     "teamMembersBulk": {
@@ -5435,31 +5105,31 @@
       }
     },
     "deployments": {
-      "title": "Deployments",
-      "description": "Every rollout attempt across every app and environment. Click a row to see the workflow timeline, rendered manifests, and logs.",
-      "start": "Start deployment",
-      "filterApp": "Filter by app slug…",
-      "counts": "{filtered} of {total}",
-      "emptyTitle": "No deployments yet",
-      "emptyDescription": "Register an app and roll a deployment from /apps/[slug]/deploy. Deployments land here as soon as the workflow starts.",
-      "openApps": "Open apps",
-      "approvalsCount": "{received}/{required} approvals",
+      "title": "部署",
+      "description": "所有应用和环境中的每一次发布尝试。点击某一行即可查看工作流时间线、渲染后的清单和日志。",
+      "start": "开始部署",
+      "filterApp": "按应用标识符筛选…",
+      "counts": "共 {total} 项，显示 {filtered} 项",
+      "emptyTitle": "暂无部署",
+      "emptyDescription": "注册应用，然后从 /apps/[slug]/deploy 发起部署。工作流一启动，部署就会显示在这里。",
+      "openApps": "打开应用列表",
+      "approvalsCount": "{received}/{required} 已审批",
       "columns": {
-        "appEnv": "App / Env",
-        "image": "Image",
-        "trigger": "Trigger",
-        "status": "Status",
-        "duration": "Duration",
-        "started": "Started",
-        "actions": "Actions"
+        "appEnv": "应用 / 环境",
+        "image": "镜像",
+        "trigger": "触发方式",
+        "status": "状态",
+        "duration": "耗时",
+        "started": "开始时间",
+        "actions": "操作"
       },
-      "rowAriaLabel": "Deployment {app} → {env}. Press Enter to open.",
+      "rowAriaLabel": "部署 {app} → {env}。按 Enter 键打开。",
       "tabs": {
-        "ariaLabel": "Deployment views",
-        "active": "Active",
-        "previews": "Previews",
-        "pending": "Pending",
-        "history": "History"
+        "ariaLabel": "部署视图",
+        "active": "活跃",
+        "previews": "预览",
+        "pending": "待处理",
+        "history": "历史"
       },
       "actions": {
         "label": "操作",
@@ -5475,63 +5145,63 @@
         "copyFail": "无法复制到剪贴板。"
       },
       "bulk": {
-        "selectAllLabel": "Select all visible deployments",
-        "selectRowLabel": "Select {app} / {env}",
-        "selected": "{count, plural, =1 {1 deployment selected} other {# deployments selected}}",
-        "summary": "In {envs}.",
-        "mixedWarning": "Selection mixes in-flight and terminal states — bulk actions are disabled until the set is uniform.",
-        "clear": "Clear",
-        "cancelButton": "Cancel {count}",
-        "redeployButton": "Redeploy {count}",
+        "selectAllLabel": "选择所有可见的部署",
+        "selectRowLabel": "选择 {app} / {env}",
+        "selected": "{count, plural, =1 {已选择 1 个部署} other {已选择 # 个部署}}",
+        "summary": "所在环境：{envs}。",
+        "mixedWarning": "所选部署同时包含进行中和已结束的状态。所选项状态一致前，批量操作不可用。",
+        "clear": "清除",
+        "cancelButton": "取消 {count} 个",
+        "redeployButton": "重新部署 {count} 个",
         "confirmCancel": {
-          "title": "Cancel {count} in-flight deployments?",
-          "description": "Signals each Temporal workflow to cancel. Marks all selected deployments failed. Cluster state already applied stays in place. Affects {envs}.",
-          "reasonLabel": "Reason for cancel",
-          "reasonPlaceholder": "Why are these deploys being cancelled? Persists on the audit log + history sidebar.",
-          "confirm": "Cancel deployments"
+          "title": "取消 {count} 个进行中的部署？",
+          "description": "向每个 Temporal 工作流发送取消信号，并将所有选中的部署标记为失败。已应用的集群状态会保留。影响范围：{envs}。",
+          "reasonLabel": "取消原因",
+          "reasonPlaceholder": "为什么取消这些部署？将保存在审计日志和历史侧栏中。",
+          "confirm": "取消部署"
         },
         "confirmRedeploy": {
-          "title": "Redeploy {count} deployments?",
-          "description": "Spawns a fresh deployment for each selected row with the same image tag. Affects {envs}.",
-          "confirm": "Redeploy all"
+          "title": "重新部署 {count} 个部署？",
+          "description": "为每个选中的行使用相同的镜像标签创建新部署。影响范围：{envs}。",
+          "confirm": "全部重新部署"
         },
         "toasts": {
-          "abortLabel": "Cancel",
-          "redeployLabel": "Redeploy",
-          "allOk": "{label} succeeded for {count} deployments.",
-          "allFailed": "{label} failed for {count} deployments: {message}",
-          "partial": "{label}: {succeeded} succeeded, {failed} failed."
+          "abortLabel": "取消",
+          "redeployLabel": "重新部署",
+          "allOk": "{count} 个部署{label}成功。",
+          "allFailed": "{count} 个部署{label}失败：{message}",
+          "partial": "{label}：成功 {succeeded} 个，失败 {failed} 个。"
         }
       },
       "statusOptions": {
-        "all": "All statuses",
-        "pending_approval": "Pending approval",
-        "pending": "Pending",
-        "deploying": "Deploying",
-        "redeploying": "Redeploying",
-        "running": "Running",
-        "failed": "Failed",
-        "rolled_back": "Rolled back",
-        "superseded": "Superseded"
+        "all": "所有状态",
+        "pending_approval": "等待审批",
+        "pending": "等待中",
+        "deploying": "部署中",
+        "redeploying": "重新部署中",
+        "running": "运行中",
+        "failed": "失败",
+        "rolled_back": "已回滚",
+        "superseded": "已取代"
       },
-      "envWorkload": "env {env} · workload {workload}",
-      "envOnly": "env {env}",
+      "envWorkload": "环境 {env} · 工作负载 {workload}",
+      "envOnly": "环境 {env}",
       "confirm": {
-        "approveTitle": "Approve deploy of {tag}?",
-        "approveDescription": "Unblocks the rollout to {app}/{env}. The workflow resumes immediately.",
-        "approveConfirm": "Approve",
-        "abortTitle": "Abort in-flight deploy of {app}/{env}?",
-        "abortDescription": "Signals the Temporal workflow to cancel. The deployment is marked failed. Whatever changes already shipped to the cluster stay — Astrolift doesn't auto-rollback on abort.",
-        "abortConfirm": "Abort deploy",
-        "abortReasonLabel": "Reason for abort",
-        "abortReasonPlaceholder": "Why is this deploy being aborted? Persists on the audit log + history sidebar.",
-        "reasonRequired": "Reason required",
-        "rollbackTitle": "Rollback {app}/{env} to the previous revision?",
-        "rollbackDescription": "Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded.",
-        "rollbackConfirm": "Rollback",
-        "redeployTitle": "Redeploy {tag} to {app}/{env}?",
-        "redeployDescription": "Spawns a fresh deployment with the same image. Useful to retry after a transient failure or pick up an updated config.",
-        "redeployConfirm": "Redeploy"
+        "approveTitle": "批准 {tag} 的部署？",
+        "approveDescription": "这将放行到 {app}/{env} 的发布。工作流会立即恢复。",
+        "approveConfirm": "批准",
+        "abortTitle": "中止 {app}/{env} 进行中的部署？",
+        "abortDescription": "向 Temporal 工作流发送取消信号，部署将被标记为失败。已发布到集群的任何变更都会保留，Astrolift 不会在中止时自动回滚。",
+        "abortConfirm": "中止部署",
+        "abortReasonLabel": "中止原因",
+        "abortReasonPlaceholder": "为什么中止此部署？将保存在审计日志和历史侧栏中。",
+        "reasonRequired": "请填写原因",
+        "rollbackTitle": "将 {app}/{env} 回滚到上一个修订版本？",
+        "rollbackDescription": "创建一个新的回滚部署，指向先前运行的修订版本。当前修订版本将被取代。",
+        "rollbackConfirm": "回滚",
+        "redeployTitle": "将 {tag} 重新部署到 {app}/{env}？",
+        "redeployDescription": "使用相同镜像开始新部署。适用于临时故障后重试或应用更新后的配置。",
+        "redeployConfirm": "重新部署"
       },
       "startSheet": {
         "title": "开始部署",
@@ -5572,58 +5242,58 @@
       }
     },
     "deploymentDetail": {
-      "olderLog": "Load older run log",
-      "olderLogFailed": "Could not load older run log",
-      "downloadFailed": "Run log download failed",
+      "olderLog": "加载更早的运行日志",
+      "olderLogFailed": "无法加载更早的运行日志",
+      "downloadFailed": "运行日志下载失败",
       "title": "{app} → {env}",
-      "subtitle": "Deployment {id}",
-      "loadingTitle": "Deployment",
-      "loading": "Loading…",
-      "notFoundTitle": "Deployment not found",
-      "notFoundDescription": "The deployment doesn't exist or you don't have permission to view it.",
-      "returnLink": "Try returning to the",
-      "deploymentsList": "deployments list",
-      "approve": "Approve",
-      "abort": "Abort",
-      "rollback": "Rollback",
-      "redeploy": "Redeploy",
+      "subtitle": "部署 {id}",
+      "loadingTitle": "部署",
+      "loading": "正在加载…",
+      "notFoundTitle": "未找到部署",
+      "notFoundDescription": "该部署不存在，或你没有查看权限。",
+      "returnLink": "请尝试返回",
+      "deploymentsList": "部署列表",
+      "approve": "批准",
+      "abort": "中止",
+      "rollback": "回滚",
+      "redeploy": "重新部署",
       "redeployFailed": "重新部署失败",
-      "approvalsCount": "{received}/{required} approvals",
+      "approvalsCount": "{received}/{required} 已审批",
       "fields": {
-        "imageTag": "Image tag",
-        "imageDigest": "Image digest",
-        "clusterRevision": "Cluster revision",
-        "workload": "Workload",
-        "created": "Created",
-        "started": "Started",
-        "succeeded": "Succeeded",
-        "failed": "Failed",
-        "duration": "Duration",
-        "commit": "Commit",
-        "branch": "Branch",
-        "ciActor": "CI actor",
-        "ciProvider": "CI provider",
-        "ciRun": "CI run"
+        "imageTag": "镜像标签",
+        "imageDigest": "镜像摘要",
+        "clusterRevision": "集群修订版本",
+        "workload": "工作负载",
+        "created": "创建时间",
+        "started": "开始时间",
+        "succeeded": "成功时间",
+        "failed": "失败时间",
+        "duration": "耗时",
+        "commit": "提交",
+        "branch": "分支",
+        "ciActor": "CI 执行者",
+        "ciProvider": "CI 提供商",
+        "ciRun": "CI 运行"
       },
-      "lifecycle": "Lifecycle log",
-      "noLog": "No log entries yet.",
-      "manifests": "Rendered manifests",
-      "renderFailed": "Render failed",
-      "noManifests": "No manifests rendered yet.",
-      "events": "Recent events",
-      "noEvents": "No platform events for this app yet.",
+      "lifecycle": "生命周期日志",
+      "noLog": "暂无日志条目。",
+      "manifests": "渲染后的清单",
+      "renderFailed": "渲染失败",
+      "noManifests": "尚未渲染任何清单。",
+      "events": "最近事件",
+      "noEvents": "此应用暂无平台事件。",
       "confirmAbort": {
-        "title": "Abort deploy of {app}/{env}?",
-        "description": "Signals the Temporal workflow to cancel and marks the deployment failed. Changes already applied to the cluster stay in place — Astrolift doesn't auto-rollback on abort. Use Rollback after if needed.",
-        "reasonLabel": "Reason for abort",
-        "reasonPlaceholder": "Why is this deploy being aborted? Persists on the audit log + history sidebar.",
-        "reasonRequired": "Reason required",
-        "confirm": "Abort deploy"
+        "title": "中止 {app}/{env} 的部署？",
+        "description": "向 Temporal 工作流发送取消信号，并将部署标记为失败。已应用到集群的变更会保留，Astrolift 不会在中止时自动回滚。如有需要，请随后使用“回滚”。",
+        "reasonLabel": "中止原因",
+        "reasonPlaceholder": "为什么中止此部署？将保存在审计日志和历史侧栏中。",
+        "reasonRequired": "请填写原因",
+        "confirm": "中止部署"
       },
       "confirmRollback": {
-        "title": "Rollback {app}/{env}?",
-        "description": "Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded.",
-        "confirm": "Rollback"
+        "title": "回滚 {app}/{env}？",
+        "description": "创建一个新的回滚部署，指向先前运行的修订版本。当前修订版本将被取代。",
+        "confirm": "回滚"
       },
       "delete": "删除",
       "retire": "停用",
@@ -5814,8 +5484,8 @@
       "emptyDescription": "Cronjob 工作负载在调度器触发首次运行后会显示在此。",
       "emptyExampleCaption": "在 astrolift.toml 中添加 [[jobs]] 条目以声明一个 cronjob 工作负载：",
       "emptyLearnMore": "查看 astrolift.toml jobs 参考",
-      "envLabel": "env",
-      "workloadLabel": "workload",
+      "envLabel": "环境",
+      "workloadLabel": "工作负载",
       "columns": {
         "app": "应用 / 环境 / 工作负载",
         "k8sJob": "K8s 任务",
@@ -5827,7 +5497,7 @@
     "commands": {
       "emptyTitle": "尚无命令运行",
       "emptyDescription": "针对工作负载的临时命令会显示在此。使用 CLI 运行 `astro app run …`。",
-      "workloadLabel": "workload",
+      "workloadLabel": "工作负载",
       "columns": {
         "app": "应用 / 工作负载",
         "command": "命令",
@@ -5884,7 +5554,7 @@
     "general": {
       "title": "常规",
       "description": "显示在侧边栏和邮件中的显示名称与主页 URL。",
-      "slug": "Slug",
+      "slug": "标识符",
       "slugHint": "Slug 不可更改，用于 URL 和命名空间前缀。",
       "displayName": "显示名称",
       "website": "网站"
@@ -6166,7 +5836,7 @@
     "builtInOption": "{name}（{builtIn}）",
     "name": "名称",
     "namePlaceholder": "发布经理",
-    "slug": "Slug",
+    "slug": "标识符",
     "slugHelp": "在你编辑前由名称生成。创建后不可更改。",
     "bindsAt": "绑定层级",
     "bindsAtHelp": "可授予的位置：此层级或其中的任何对象。创建后不可更改。",
@@ -6362,7 +6032,7 @@
       "name": "名称",
       "descriptionLabel": "描述",
       "descriptionPlaceholder": "用一句话说明此角色的用途。",
-      "slug": "Slug",
+      "slug": "标识符",
       "bindsAt": "绑定层级",
       "bindsAtValue": "{scope, select, ORG {组织或其中的任何对象} TEAM {团队或其中的任何对象} PROJECT {项目或其中的任何对象} APP {应用或其中的任何对象} other {{scope} 或其中的任何对象}}",
       "kind": "类型",
@@ -6690,7 +6360,7 @@
       },
       "name": "名称",
       "namePlaceholder": "非工作时间禁止生产部署",
-      "slug": "Slug",
+      "slug": "标识符",
       "slugHelp": "在你编辑前由名称生成。创建后不可更改。",
       "fixed": "创建后不可更改。",
       "appliesAcross": "适用范围",
@@ -7061,7 +6731,7 @@
       "name": "名称",
       "nameHelp": "在界面中显示的易读名称。",
       "nameRequired": "请为应用命名。",
-      "slug": "Slug",
+      "slug": "标识符",
       "slugPlaceholder": "小写字母、连字符，1-40 个字符",
       "slugRequired": "Slug 为必填项。",
       "slugInvalid": "仅限小写字母、数字和连字符（最多 40 个字符）。",
@@ -7211,13 +6881,13 @@
       "manifestState": "{origin, select, repo {从仓库加载} other {在此起草}}，{valid, select, yes {结构有效} other {无效}}",
       "run": "运行",
       "name": "名称",
-      "slug": "Slug",
+      "slug": "标识符",
       "description": "描述",
       "deployTiming": "部署时机",
       "trigger": "触发方式",
       "triggerLater": "手动（稍后配置）",
       "deployBranch": "部署分支",
-      "cron": "Cron",
+      "cron": "Cron 表达式",
       "approvalGate": "审批关卡",
       "timing": {
         "now": "立即部署",
@@ -7301,7 +6971,17 @@
       "emptyTitle": "尚无工作负载",
       "emptyDescription": "清单注册工作负载后，它们会显示在这里。",
       "replicas": "{count, plural, other {<mono>#</mono> 个副本}}",
-      "public": "公开"
+      "public": "公开",
+      "kinds": {
+        "deployment": "部署",
+        "statefulset": "有状态副本集",
+        "job": "作业",
+        "cronjob": "定时作业",
+        "task": "任务",
+        "agent": "智能体",
+        "workflow": "工作流",
+        "function": "函数"
+      }
     },
     "function": {
       "title": "触发方式",
@@ -7901,7 +7581,9 @@
       "templateUpdated": "已更新模板 {name}",
       "saveFailed": "保存失败",
       "deleteFailed": "删除失败"
-    }
+    },
+    "allView": "全部",
+    "mineView": "我的"
   },
   "appAlertRules": {
     "timeRange": "时间范围",
@@ -8076,7 +7758,9 @@
     "runExit": "退出码 {code}",
     "primary": "主",
     "volumeKindFilter": "类型",
-    "volumeSearch": "搜索卷、挂载路径…"
+    "volumeSearch": "搜索卷、挂载路径…",
+    "allView": "全部",
+    "mineView": "我的"
   },
   "appWorkloads": {
     "name": "名称",
@@ -10076,7 +9760,7 @@
     "startFrom": "起点",
     "intro": "编写工作流定义。要使用你自己的智能体和触发器运行平台模板，请<link>在模板中进行配置</link>。",
     "name": "名称",
-    "slug": "Slug",
+    "slug": "标识符",
     "example": "例如 {value}",
     "description": "描述",
     "descriptionPlaceholder": "此工作流做什么？",
@@ -10282,7 +9966,7 @@
     "generalDescription": "此工作流的名称和用途。",
     "name": "名称",
     "description": "描述",
-    "slug": "Slug",
+    "slug": "标识符",
     "repoDescription": "在仓库中声明；同步会保持其一致，因此此处为只读。",
     "definitionDescription": "工作流定义。请在构建器中编辑其阶段。",
     "repository": "仓库",
@@ -10390,7 +10074,7 @@
   "taskTemplates": {
     "name": "名称",
     "app": "应用",
-    "slug": "Slug",
+    "slug": "标识符",
     "run": "运行",
     "runNow": "立即运行",
     "context": "一次性容器任务：迁移、脚本和手动干预。",
@@ -10487,7 +10171,7 @@
     "formName": "表单名称",
     "nameRequired": "名称为必填项",
     "namePlaceholder": "例如：费用报销",
-    "slug": "Slug",
+    "slug": "标识符",
     "slugRequired": "Slug 为必填项",
     "description": "描述",
     "descriptionPlaceholder": "此表单的用途是什么？",
@@ -11854,9 +11538,9 @@
     "configure": "配置工作负载身份",
     "kind": "类型",
     "kinds": {
-      "irsa": "IAM Roles for Service Accounts (AWS)",
-      "workload_identity": "GKE Workload Identity (GCP)",
-      "federated": "AKS Federated Credentials (Azure)",
+      "irsa": "服务账户的 IAM 角色（AWS）",
+      "workload_identity": "GKE 工作负载身份（GCP）",
+      "federated": "AKS 联合凭据（Azure）",
       "unknown": "未知绑定"
     },
     "lastUsed": "上次使用",
@@ -11935,26 +11619,6 @@
         "health": "健康状况",
         "activity": "活动",
         "settings": "设置"
-      },
-      "functions": {
-        "organization": "组织",
-        "access": "访问权限",
-        "projects": "项目",
-        "clusters": "集群",
-        "domains": "域名",
-        "providers": "提供商",
-        "webhooks": "Webhook",
-        "metrics": "指标",
-        "tokens": "API 密钥",
-        "audit": "审计",
-        "run-audit": "运行",
-        "features": "功能",
-        "activity": "平台活动",
-        "alerts": "告警",
-        "events": "事件",
-        "logs": "日志",
-        "traces": "跟踪",
-        "operations": "操作"
       }
     },
     "unregister": {
@@ -12878,7 +12542,7 @@
     },
     "replay": {
       "round": "第 {n} 轮",
-      "roundShort": "R{n}",
+      "roundShort": "轮{n}",
       "roundLower": "第 {n} 轮",
       "running": "运行中",
       "queued": "排队中",
@@ -13034,6 +12698,19 @@
       },
       "approve": "批准",
       "deny": "拒绝"
+    },
+    "topologyBlurbs": {
+      "service": "一个长期运行的服务",
+      "service-data": "一个服务及其数据库、缓存或存储桶",
+      "service-worker": "一个服务外加后台工作进程",
+      "microservices": "多个相互调用的服务",
+      "service-agent": "服务外加一个协同工作的智能体",
+      "agent": "一个或多个智能体",
+      "functions": "事件触发的函数",
+      "scheduled": "按计划运行的作业",
+      "task": "一次性运行",
+      "workflow": "多步骤流水线",
+      "mixed": "多种类型的工作负载"
     }
   },
   "clusterConnection": {
@@ -13543,7 +13220,7 @@
   },
   "agentSkillsTab": {
     "skill": "技能",
-    "slug": "Slug",
+    "slug": "标识符",
     "version": "版本",
     "tools": "工具",
     "status": "状态",
@@ -13631,7 +13308,7 @@
       "unsavedChanges": "未保存的更改",
       "moreActions": "更多操作",
       "name": "名称",
-      "slug": "Slug",
+      "slug": "标识符",
       "description": "描述",
       "skillDescriptionPlaceholder": "在搜索和选择器中显示的简短描述",
       "toolDescriptionPlaceholder": "此工具的作用",
@@ -14689,7 +14366,7 @@
     "noRequestPayload": "未记录请求负载。",
     "responseBody": "响应正文",
     "noResponseBody": "未记录响应正文。",
-    "httpParen": "(HTTP {status})",
+    "httpParen": "（HTTP {status}）",
     "secretRotated": "密钥轮换时间",
     "version": "版本",
     "created": "创建时间",
@@ -14719,7 +14396,7 @@
     }
   },
   "zentinelleScreen": {
-    "title": "Secure · Zentinelle",
+    "title": "防护 · Zentinelle",
     "description": "AI 智能体 GRC：为 Astrolift 上运行的每个智能体工作负载提供治理、风险与合规。",
     "tagline": "MIT 许可 · 可自托管 · Calliope AI 配套产品",
     "intro": "Zentinelle 是 BROCS 技术栈中的 <strong>Control + Secure</strong> 支柱。它与 Astrolift 并行运行，提供 Astrolift 有意不承担的 AI 专属层：策略执行、内容扫描、合规框架，以及 AI 治理法规要求的完整交互审计记录。",
@@ -15115,7 +14792,44 @@
     "notFoundDescription": "此{label}可能不存在、已从最近列表中过期，或者您没有访问权限。",
     "back": "返回{label}",
     "created": "创建于",
-    "overview": "概览"
+    "overview": "概览",
+    "statuses": {
+      "running": "运行中",
+      "in_progress": "进行中",
+      "provisioning": "预配中",
+      "building": "构建中",
+      "deploying": "部署中",
+      "queued": "排队中",
+      "pending": "等待中",
+      "active": "活跃",
+      "ready": "就绪",
+      "completed": "已完成",
+      "succeeded": "成功",
+      "healthy": "健康",
+      "failed": "失败",
+      "errored": "出错",
+      "timed_out": "已超时",
+      "superseded": "已取代",
+      "cancelled": "已取消",
+      "canceled": "已取消",
+      "torn_down": "已销毁",
+      "expired": "已过期",
+      "unknown": "未知",
+      "invited": "已邀请",
+      "pending_invite": "待接受邀请",
+      "pending_first_login": "待首次登录",
+      "suspended": "已暂停",
+      "deactivated": "已停用",
+      "anonymized": "已匿名化",
+      "info": "信息",
+      "warn": "警告",
+      "warning": "警告",
+      "critical": "严重",
+      "error": "错误",
+      "firing": "触发中",
+      "acknowledged": "已确认",
+      "resolved": "已解决"
+    }
   },
   "alertDetail": {
     "alerts": "告警",
@@ -15568,5 +15282,947 @@
     "manageAccess": "管理访问",
     "emptyTitle": "没有语义层",
     "emptyDescription": "以 [app] kind = \"mimwell\" 声明且你可以读取的应用会显示在这里。"
+  },
+  "navModel": {
+    "functions": {
+      "organization": "组织",
+      "access": "访问权限",
+      "projects": "项目",
+      "clusters": "集群",
+      "domains": "域名",
+      "providers": "服务商",
+      "webhooks": "Webhook",
+      "metrics": "指标",
+      "tokens": "API 密钥",
+      "audit": "审计",
+      "run-audit": "运行",
+      "features": "功能",
+      "activity": "平台活动",
+      "alerts": "告警",
+      "events": "事件",
+      "logs": "日志",
+      "traces": "追踪",
+      "operations": "运维",
+      "home": "首页",
+      "agents": "智能体",
+      "fleet": "智能体集群",
+      "approvals": "审批",
+      "workflows": "工作流",
+      "runs": "运行",
+      "functions": "函数",
+      "skills": "技能",
+      "tools": "工具",
+      "environment-specs": "环境规格",
+      "models": "模型",
+      "workloads": "工作负载",
+      "apps": "应用",
+      "brains": "语义层",
+      "pipelines": "流水线",
+      "deployments": "部署",
+      "deployment-approvals": "部署审批",
+      "jobs": "计划作业",
+      "environments": "环境",
+      "previews": "预览"
+    },
+    "areas": {
+      "home": "首页",
+      "agents": "智能体",
+      "apps": "应用",
+      "admin": "管理"
+    },
+    "groups": {
+      "organization": "组织",
+      "infrastructure": "基础设施",
+      "governance": "用量与治理",
+      "signals": "平台信号"
+    }
+  },
+  "listDefinitions": {
+    "agentBoxes": {
+      "search": "搜索 Box、标识符、智能体…",
+      "fields": {
+        "status": "状态"
+      },
+      "options": {
+        "status": {
+          "pending": "等待中",
+          "provisioning": "预配中",
+          "running": "运行中",
+          "stopped": "已停止",
+          "expired": "已过期",
+          "failed": "失败"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的"
+      },
+      "notes": {
+        "mine": "智能体 Box 尚未标明是否由你启动，因此“我的”为空。所有 Box 都在“全部”中。"
+      }
+    },
+    "agentRuns": {
+      "search": "搜索运行、ID…",
+      "fields": {
+        "status": "状态",
+        "trigger": "触发方式"
+      },
+      "options": {
+        "status": {
+          "running": "运行中",
+          "waiting": "等待中",
+          "succeeded": "成功",
+          "failed": "失败",
+          "cancelled": "已取消"
+        },
+        "trigger": {
+          "manual": "手动",
+          "api": "API",
+          "schedule": "定时",
+          "webhook": "Webhook",
+          "parent": "父运行"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "running": "运行中",
+        "failed": "失败",
+        "waiting": "等待中"
+      },
+      "notes": {
+        "mine": "“我的”是指你发起的此智能体的运行。在 Astrolift 开始记录发起者之前的运行仅显示在“全部”中。"
+      }
+    },
+    "agentSkills": {
+      "search": "搜索技能、标识符…",
+      "fields": {
+        "status": "状态",
+        "scope": "范围"
+      },
+      "options": {
+        "status": {
+          "active": "已启用",
+          "inactive": "未启用"
+        },
+        "scope": {
+          "global": "全局",
+          "org": "组织"
+        }
+      },
+      "views": {
+        "all": "全部"
+      },
+      "notes": {
+        "all": "在浏览器中筛选、排序和分页：读取智能体时会一次性返回所有绑定。"
+      }
+    },
+    "agentTools": {
+      "search": "搜索工具、技能、处理程序…",
+      "fields": {
+        "adapter": "适配器"
+      },
+      "options": {
+        "adapter": {
+          "python_fn": "Python 函数",
+          "http_endpoint": "HTTP 端点",
+          "mcp_server": "MCP 服务器"
+        }
+      },
+      "views": {
+        "all": "全部"
+      },
+      "notes": {
+        "all": "在浏览器中筛选、排序和分页：读取智能体时会一次性返回所有绑定。"
+      }
+    },
+    "agents": {
+      "search": "搜索智能体、标识符、仓库...",
+      "fields": {
+        "project": "项目",
+        "status": "状态",
+        "model": "模型",
+        "runtime": "运行时",
+        "cluster": "集群"
+      },
+      "options": {
+        "status": {
+          "running": "运行中",
+          "failing": "上次运行失败",
+          "scheduled": "已计划",
+          "idle": "空闲"
+        },
+        "model": {
+          "managed": "托管模型",
+          "gateway": "模型网关",
+          "api-key": "API 密钥"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "paused": "已暂停"
+      },
+      "notes": {
+        "mine": "“我的”是指你注册的智能体。在 Astrolift 开始记录注册者之前注册的智能体没有所有者，仅显示在“全部”中。"
+      }
+    },
+    "alertRules": {
+      "search": "搜索规则、目标…",
+      "fields": {
+        "target": "目标",
+        "targetId": "目标 ID",
+        "severity": "严重程度",
+        "state": "状态"
+      },
+      "options": {
+        "target": {
+          "global": "全局",
+          "app": "应用",
+          "environment": "环境",
+          "workload": "工作负载",
+          "managed_service": "托管服务"
+        },
+        "severity": {
+          "info": "信息",
+          "warn": "警告",
+          "critical": "严重"
+        },
+        "state": {
+          "active": "已启用",
+          "muted": "已静音",
+          "inactive": "未启用"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "active": "已启用",
+        "muted": "已静音"
+      },
+      "notes": {
+        "mine": "告警规则尚未记录创建者，因此“我的”为空。",
+        "muted": "在规则查询支持按静音筛选之前，此视图仅保留最新 100 条规则中已静音的规则。"
+      }
+    },
+    "alertSubscriptions": {
+      "search": "搜索应用、标识符…",
+      "fields": {
+        "team": "团队",
+        "project": "项目",
+        "alerts": "告警"
+      },
+      "options": {
+        "alerts": {
+          "on": "已订阅",
+          "off": "未订阅"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的"
+      },
+      "notes": {
+        "mine": "“我的”仅保留最新 100 个应用中你至少会收到一种告警的应用。"
+      }
+    },
+    "appAlertRules": {
+      "search": "搜索告警规则…",
+      "fields": {
+        "severity": "严重程度",
+        "state": "状态"
+      },
+      "options": {
+        "severity": {
+          "critical": "严重",
+          "warning": "警告",
+          "info": "信息"
+        },
+        "state": {
+          "active": "已启用",
+          "muted": "已静音",
+          "inactive": "未启用"
+        }
+      },
+      "views": {
+        "all": "全部"
+      },
+      "notes": {
+        "all": "在浏览器中筛选、排序和分页：此列表的后端字段会一次性返回所有行。"
+      }
+    },
+    "appManagedServices": {
+      "search": "按名称、类型、变体或环境搜索…",
+      "views": {
+        "all": "全部"
+      }
+    },
+    "appPods": {
+      "search": "搜索 Pod、工作负载、节点…",
+      "fields": {
+        "status": "状态"
+      },
+      "views": {
+        "all": "全部"
+      },
+      "notes": {
+        "all": "在浏览器中筛选、排序和分页：此列表的后端字段会一次性返回所有行。"
+      }
+    },
+    "appWorkloads": {
+      "search": "搜索工作负载、标识符、类型…",
+      "fields": {
+        "kind": "类型",
+        "exposure": "访问方式"
+      },
+      "options": {
+        "exposure": {
+          "public": "公开",
+          "internal": "内部"
+        }
+      },
+      "views": {
+        "all": "全部"
+      }
+    },
+    "brains": {
+      "search": "搜索名称和标识符…",
+      "views": {
+        "all": "全部"
+      }
+    },
+    "commandRuns": {
+      "search": "搜索命令、应用、操作员…",
+      "fields": {
+        "app": "应用"
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的"
+      }
+    },
+    "deployKeys": {
+      "search": "搜索密钥、指纹、应用…",
+      "fields": {
+        "scope": "范围",
+        "app": "应用"
+      },
+      "options": {
+        "scope": {
+          "org": "组织范围"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的"
+      },
+      "notes": {
+        "mine": "部署密钥尚未记录生成者，因此“我的”为空。"
+      }
+    },
+    "deployments": {
+      "search": "搜索应用、分支、标签、提交…",
+      "fields": {
+        "app": "应用",
+        "environment": "环境",
+        "status": "状态",
+        "trigger": "触发方式",
+        "since": "起始时间"
+      },
+      "options": {
+        "status": {
+          "pending_approval": "等待审批",
+          "pending": "等待中",
+          "deploying": "部署中",
+          "redeploying": "重新部署中",
+          "running": "运行中",
+          "failed": "失败",
+          "rolled_back": "已回滚",
+          "superseded": "已取代"
+        },
+        "trigger": {
+          "push": "推送",
+          "manual": "手动",
+          "ci": "CI",
+          "scheduled": "定时",
+          "rollback": "回滚",
+          "promotion": "提升"
+        },
+        "since": {
+          "today": "今天",
+          "1h": "最近一小时",
+          "24h": "最近 24 小时",
+          "7d": "最近 7 天",
+          "30d": "最近 30 天",
+          "90d": "最近 90 天"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "waiting": "等待审批",
+        "failed": "失败",
+        "today": "今天"
+      }
+    },
+    "environmentSpecs": {
+      "search": "搜索名称、标识符、镜像、运行时、仓库…",
+      "fields": {
+        "agentType": "智能体类型"
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的"
+      },
+      "notes": {
+        "mine": "“我的”是指你创建的方案。未记录创建者的较早方案显示在“全部”中。"
+      }
+    },
+    "functions": {
+      "search": "搜索函数、标识符、应用…",
+      "fields": {
+        "app": "应用"
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的"
+      },
+      "notes": {
+        "mine": "“我的”是指你创建的工作负载，或位于你创建的应用上的工作负载。在 Astrolift 开始记录创建者之前的工作负载仅显示在“全部”中。"
+      }
+    },
+    "identityProviders": {
+      "search": "搜索提供方、端点、客户端 ID…",
+      "fields": {
+        "kind": "类型",
+        "status": "状态"
+      },
+      "options": {
+        "status": {
+          "active": "已启用",
+          "configured": "已配置"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的"
+      },
+      "notes": {
+        "mine": "身份提供方尚未记录配置者，因此“我的”为空。"
+      }
+    },
+    "jobRuns": {
+      "search": "搜索运行、作业、Job 名称…",
+      "fields": {
+        "app": "应用",
+        "workload": "作业",
+        "environment": "环境",
+        "status": "状态"
+      },
+      "options": {
+        "status": {
+          "running": "运行中",
+          "succeeded": "成功",
+          "failed": "失败",
+          "superseded": "已被替换"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "failed": "失败"
+      }
+    },
+    "jobs": {
+      "search": "搜索作业、应用…",
+      "fields": {
+        "app": "应用"
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "failing": "出现故障",
+        "paused": "已暂停"
+      },
+      "notes": {
+        "failing": "在作业查询支持按上次运行筛选之前，“出现故障”仅保留每页中最近一次运行失败的作业。",
+        "paused": "Astrolift 尚未记录已暂停的计划，因此这里不会显示任何作业。"
+      }
+    },
+    "projects": {
+      "search": "搜索项目、标识符、团队…",
+      "fields": {
+        "team": "团队"
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的"
+      },
+      "notes": {
+        "mine": "项目尚未记录所有者，因此“我的”为空。"
+      }
+    },
+    "runs": {
+      "search": "搜索运行、智能体、工作流、ID…",
+      "fields": {
+        "kind": "类型",
+        "status": "状态",
+        "agent": "智能体",
+        "workflow": "工作流",
+        "project": "项目",
+        "trigger": "触发方式",
+        "since": "起始时间"
+      },
+      "options": {
+        "kind": {
+          "agent": "智能体运行",
+          "workflow": "工作流运行",
+          "task": "任务运行"
+        },
+        "status": {
+          "running": "运行中",
+          "waiting": "等待中",
+          "succeeded": "成功",
+          "failed": "失败",
+          "cancelled": "已取消"
+        },
+        "trigger": {
+          "manual": "手动",
+          "api": "API",
+          "schedule": "定时",
+          "webhook": "Webhook",
+          "parent": "父运行"
+        },
+        "since": {
+          "1h": "最近一小时",
+          "24h": "最近 24 小时",
+          "7d": "最近 7 天",
+          "30d": "最近 30 天",
+          "90d": "最近 90 天"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "running": "运行中",
+        "failed": "失败",
+        "waiting": "等待中",
+        "scheduled": "已计划"
+      },
+      "notes": {
+        "mine": "“我的”是指你发起的运行。在 Astrolift 开始记录发起者之前的运行仅显示在“全部”中。",
+        "scheduled": "定时智能体接下来的触发，时间最近的排在最前。已由计划发起的运行位于“全部”中，触发方式为“定时”。"
+      }
+    },
+    "sessions": {
+      "search": "搜索会话、标签…",
+      "fields": {
+        "kind": "类型",
+        "status": "状态"
+      },
+      "options": {
+        "kind": {
+          "web": "网页",
+          "cli": "CLI",
+          "mobile": "移动端",
+          "browser_extension": "浏览器扩展",
+          "api_token": "API 令牌"
+        },
+        "status": {
+          "current": "此会话",
+          "other": "其他会话"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的"
+      },
+      "notes": {
+        "mine": "这里的每个会话都属于你，因此“我的”与“全部”包含相同的会话。"
+      }
+    },
+    "skillTools": {
+      "search": "搜索工具、标识符、处理程序…",
+      "fields": {
+        "adapter": "适配器"
+      },
+      "options": {
+        "adapter": {
+          "python_fn": "Python 函数",
+          "http_endpoint": "HTTP 端点",
+          "mcp_server": "MCP 服务器"
+        }
+      },
+      "views": {
+        "all": "全部"
+      }
+    },
+    "skills": {
+      "search": "搜索技能、标识符、仓库…",
+      "fields": {
+        "status": "状态",
+        "scope": "范围"
+      },
+      "options": {
+        "status": {
+          "active": "已启用",
+          "inactive": "未启用"
+        },
+        "scope": {
+          "org": "组织",
+          "global": "全局"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "imported": "已导入"
+      },
+      "notes": {
+        "mine": "“我的”是指你编写或导入的技能。在 Astrolift 开始记录编写者之前的技能仅显示在“全部”中。"
+      }
+    },
+    "sourceHosts": {
+      "search": "搜索连接、账号、URL…",
+      "fields": {
+        "host": "主机",
+        "status": "状态"
+      },
+      "options": {
+        "status": {
+          "active": "已启用",
+          "disabled": "已停用"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的"
+      },
+      "notes": {
+        "mine": "“我的”仅保留最新 100 个连接中你的个人连接。"
+      }
+    },
+    "taskTemplates": {
+      "search": "搜索任务模板…",
+      "fields": {
+        "app": "应用"
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的"
+      },
+      "notes": {
+        "mine": "任务模板尚未记录所有者，因此在开始记录之前，“我的”将保持为空。"
+      }
+    },
+    "webhooks": {
+      "search": "搜索投递 URL…",
+      "fields": {
+        "status": "状态",
+        "format": "格式",
+        "failing": "故障"
+      },
+      "options": {
+        "status": {
+          "active": "活跃",
+          "paused": "已暂停"
+        },
+        "format": {
+          "generic": "通用"
+        },
+        "failing": {
+          "yes": "有失败记录"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "failing": "出现故障",
+        "paused": "已暂停"
+      },
+      "notes": {
+        "mine": "Webhook 订阅尚未记录创建者，因此“我的”为空。",
+        "failing": "在 Webhook 查询支持筛选之前，此视图仅保留最新 100 个订阅中符合条件的订阅。",
+        "paused": "在 Webhook 查询支持筛选之前，此视图仅保留最新 100 个订阅中符合条件的订阅。"
+      }
+    },
+    "workflowInstances": {
+      "fields": {
+        "type": "类型",
+        "status": "状态"
+      },
+      "options": {
+        "status": {
+          "running": "运行中",
+          "completed": "已完成",
+          "failed": "失败",
+          "canceled": "已取消",
+          "terminated": "已终止",
+          "timed_out": "已超时"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "running": "运行中",
+        "failed": "失败"
+      },
+      "notes": {
+        "all": "Temporal 按从新到旧的顺序分页。类型和状态筛选在服务器端进行。即使某页为空，“更早”的页面中仍可能有更多已授权的实例。",
+        "mine": "实例以名称而非账户记录发起者，因此在记录账户之前，“我的”为空。Temporal 按从新到旧的顺序分页。类型和状态筛选在服务器端进行。即使某页为空，“更早”的页面中仍可能有更多已授权的实例。",
+        "running": "Temporal 按从新到旧的顺序分页。类型和状态筛选在服务器端进行。即使某页为空，“更早”的页面中仍可能有更多已授权的实例。",
+        "failed": "Temporal 按从新到旧的顺序分页。类型和状态筛选在服务器端进行。即使某页为空，“更早”的页面中仍可能有更多已授权的实例。"
+      }
+    },
+    "workflowRuns": {
+      "search": "搜索运行、ID…",
+      "fields": {
+        "status": "状态",
+        "trigger": "触发方式"
+      },
+      "options": {
+        "status": {
+          "running": "运行中",
+          "waiting": "等待中",
+          "succeeded": "成功",
+          "failed": "失败",
+          "cancelled": "已取消"
+        },
+        "trigger": {
+          "manual": "手动",
+          "api": "API",
+          "schedule": "定时",
+          "webhook": "Webhook",
+          "parent": "父运行"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "running": "运行中",
+        "failed": "失败",
+        "waiting": "等待中"
+      },
+      "notes": {
+        "mine": "工作流运行尚未记录发起者，因此在开始记录之前，“我的”将保持为空。"
+      }
+    },
+    "workflowTriggers": {
+      "search": "搜索触发器、计划…",
+      "fields": {
+        "kind": "类型",
+        "status": "状态"
+      },
+      "options": {
+        "kind": {
+          "schedule": "计划",
+          "webhook": "Webhook",
+          "manual": "手动"
+        },
+        "status": {
+          "enabled": "已启用",
+          "disabled": "已停用"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "enabled": "已启用",
+        "disabled": "已停用"
+      },
+      "notes": {
+        "all": "目前每个工作流只有一个触发器，因此此列表只显示这一个。",
+        "mine": "触发器尚未记录设置者，因此在开始记录之前，“我的”为空。"
+      }
+    },
+    "workflows": {
+      "search": "搜索工作流、标识符、定义...",
+      "fields": {
+        "pattern": "模式",
+        "project": "项目",
+        "status": "上次运行"
+      },
+      "options": {
+        "pattern": {
+          "single": "单阶段",
+          "chained": "链式",
+          "fan_out": "扇出",
+          "supervisor_worker": "监督者 / 工作者",
+          "review_loop": "审核循环",
+          "advisor": "顾问"
+        },
+        "status": {
+          "running": "运行中",
+          "succeeded": "成功",
+          "failed": "失败",
+          "cancelled": "已取消",
+          "never": "从未运行"
+        }
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "templates": "模板"
+      },
+      "notes": {
+        "mine": "工作流尚未记录创建者，因此在开始记录之前，“我的”为空。",
+        "templates": "平台模板为只读：可基于模板创建工作流，或将其克隆后再编辑。"
+      }
+    },
+    "workloads": {
+      "search": "搜索工作负载、标识符、应用…",
+      "fields": {
+        "app": "应用"
+      },
+      "views": {
+        "all": "全部",
+        "mine": "我的",
+        "agents": "智能体",
+        "workflows": "工作流",
+        "functions": "函数"
+      },
+      "notes": {
+        "mine": "“我的”是指你创建的工作负载，或位于你创建的应用上的工作负载。在 Astrolift 开始记录创建者之前的工作负载仅显示在“全部”中。"
+      }
+    }
+  },
+  "relativeAge": {
+    "justNow": "刚刚",
+    "minutes": "{count} 分钟前",
+    "hours": "{count} 小时前",
+    "days": "{count} 天前"
+  },
+  "routeTitles": {
+    "acceptInvitation": "接受邀请",
+    "access": "访问权限",
+    "actionSafety": "操作安全",
+    "activity": "活动",
+    "administration": "管理",
+    "agent": "智能体",
+    "agentRun": "智能体运行",
+    "agents": "智能体",
+    "alertEvent": "告警事件",
+    "alertEvents": "告警事件",
+    "alertRule": "告警规则",
+    "alerts": "告警",
+    "apiKeys": "API 密钥",
+    "apiToken": "API 令牌",
+    "app": "应用",
+    "appearance": "外观",
+    "approvals": "审批",
+    "approvalsQueue": "审批队列",
+    "approveDeployment": "批准部署",
+    "apps": "应用",
+    "assignRoles": "分配角色",
+    "assignments": "分配",
+    "audit": "审计",
+    "builder": "构建器",
+    "checkAccess": "检查访问权限",
+    "cluster": "集群",
+    "clusterActivity": "集群活动",
+    "clusterHealth": "集群健康状况",
+    "clusterPrerequisites": "集群先决条件",
+    "clusterSettings": "集群设置",
+    "clusterStatus": "集群状态",
+    "clusters": "集群",
+    "commandRun": "命令运行",
+    "commandRuns": "命令运行",
+    "configuration": "配置",
+    "customDomains": "自定义域名",
+    "deployment": "部署",
+    "deployments": "部署",
+    "documentation": "文档",
+    "domains": "域名",
+    "downloads": "下载",
+    "driverReference": "驱动参考",
+    "easySetup": "快速设置",
+    "emailDelivery": "邮件投递",
+    "environment": "环境",
+    "environments": "环境",
+    "event": "事件",
+    "events": "事件",
+    "features": "功能",
+    "fleetMap": "群组地图",
+    "functions": "函数",
+    "getHelp": "获取帮助",
+    "getStarted": "开始使用",
+    "grantAccess": "授予访问权限",
+    "holders": "持有者",
+    "home": "首页",
+    "identityProviders": "身份提供商",
+    "jobRun": "作业运行",
+    "jobRuns": "作业运行",
+    "liveAgentSession": "智能体实时会话",
+    "logs": "日志",
+    "logsAndMetrics": "日志和指标",
+    "managedDomain": "托管域名",
+    "managedDomains": "托管域名",
+    "member": "成员",
+    "members": "成员",
+    "metrics": "指标",
+    "models": "模型",
+    "newAgent": "新建智能体",
+    "newApp": "新建应用",
+    "newPipeline": "新建流水线",
+    "newPolicy": "新建策略",
+    "newRole": "新建角色",
+    "newWorkflow": "新建工作流",
+    "notifications": "通知",
+    "operations": "运维",
+    "organization": "组织",
+    "overview": "概览",
+    "pendingGates": "待审批",
+    "people": "人员",
+    "permissions": "权限",
+    "permissionsDiagnostics": "权限诊断",
+    "person": "人员",
+    "pipeline": "流水线",
+    "pipelineSecrets": "流水线密钥",
+    "platformActivity": "平台活动",
+    "platformInstances": "平台实例",
+    "policies": "策略",
+    "policy": "策略",
+    "preview": "预览",
+    "previewEnvironments": "预览环境",
+    "profile": "个人资料",
+    "project": "项目",
+    "projectResources": "项目资源",
+    "projects": "项目",
+    "providers": "服务商",
+    "registerCluster": "注册集群",
+    "resources": "资源",
+    "role": "角色",
+    "roles": "角色",
+    "run": "运行",
+    "runAgent": "运行智能体",
+    "runs": "运行",
+    "scheduledJobs": "计划作业",
+    "secretProposal": "密钥提案",
+    "secretProposals": "密钥提案",
+    "secrets": "密钥",
+    "secure": "防护",
+    "security": "安全",
+    "semanticLayers": "语义层",
+    "settings": "设置",
+    "shell": "终端",
+    "skillsAndTools": "技能和工具",
+    "sourceProviders": "源代码提供商",
+    "startDeployment": "开始部署",
+    "taskRun": "任务运行",
+    "taskTemplates": "任务模板",
+    "team": "团队",
+    "teams": "团队",
+    "traces": "追踪",
+    "triggers": "触发器",
+    "visualizations": "可视化",
+    "webhook": "Webhook",
+    "webhookDelivery": "Webhook 投递",
+    "webhookEvents": "Webhook 事件",
+    "webhooks": "Webhook",
+    "workflow": "工作流",
+    "workflows": "工作流",
+    "workload": "工作负载",
+    "workloads": "工作负载",
+    "zentinelle": "Zentinelle"
   }
 }

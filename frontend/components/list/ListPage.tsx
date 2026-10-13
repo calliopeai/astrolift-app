@@ -12,9 +12,11 @@ import { useLocale, useTranslations } from "next-intl";
  *
  * Minimal usage, a screen (pure) fed by a hook:
  *
- *   // runs-list.ts: the declaration, shared by the hook and the screen
- *   export const RUNS_LIST: ListDefinition = {
+ *   // runs-list.ts: the declaration, shared by the hook and the screen; its
+ *   // labels are the English copy of listDefinitions.runs in the catalogs
+ *   export const RUNS_LIST: CopiedListDefinition = {
  *     id: "agents.runs",
+ *     copy: "runs",
  *     fields: [
  *       { key: "status", label: "Status", options: [{ value: "failed", label: "failed" }, …] },
  *       { key: "agent", label: "Agent", async: searchAgents },
@@ -29,7 +31,7 @@ import { useLocale, useTranslations } from "next-intl";
  *   };
  *
  *   // use-runs-screen.ts: URL state in, query variables out (spec 44 §5.1 contract)
- *   const list = useListState(RUNS_LIST);
+ *   const list = useListState(useLocalizedList(RUNS_LIST));
  *   const { data, loading, error, refetch } = useQuery(RUNS, { variables: {
  *     filter: list.filters, search: list.state.q || null, sort: formatSort(list.state.sort),
  *     first: list.state.pageSize, after: list.state.after,

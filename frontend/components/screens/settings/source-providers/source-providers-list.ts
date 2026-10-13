@@ -11,15 +11,16 @@
  * `null` is every key and `""` the org-scoped ones only, so Scope goes to
  * the server. Keys record no creator, so Mine is empty until they do.
  */
-import { type ListDefinition, standardViews } from "@/components/list/list-state";
+import { type CopiedListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftSourceConnection } from "@/graphql/scm/scm.types";
 
 export const NARROW_LIMIT = 100;
 
 const HOST_FAMILIES = ["github", "gitlab", "bitbucket", "gitea"];
 
-export const SOURCE_HOSTS_LIST: ListDefinition = {
+export const SOURCE_HOSTS_LIST: CopiedListDefinition = {
   id: "admin.providers.hosts",
+  copy: "sourceHosts",
   fields: [
     {
       key: "host",
@@ -76,8 +77,9 @@ export function narrowHosts(
   };
 }
 
-export const DEPLOY_KEYS_LIST: ListDefinition = {
+export const DEPLOY_KEYS_LIST: CopiedListDefinition = {
   id: "admin.providers.keys",
+  copy: "deployKeys",
   fields: [
     {
       key: "scope",

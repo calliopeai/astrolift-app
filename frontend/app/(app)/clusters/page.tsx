@@ -5,10 +5,11 @@ import {
 } from "@/components/screens/clusters/list/clusters-list";
 import { LIST_CLUSTERS_PAGE } from "@/graphql/clusters/clusters.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { ClustersClient } from "./clusters-client";
 
-export const metadata = { title: "Clusters · Astrolift" };
+export const generateMetadata = routeTitle("clusters");
 
 /**
  * Preloads the first page of the fleet so the surface paints with rows

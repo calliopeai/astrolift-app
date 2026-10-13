@@ -33,7 +33,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatRelativeAge } from "@/lib/format";
+import { useRelativeAge } from "@/lib/format";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 
 import { patternLabel, type WorkflowFrameSubject, workflowStatus } from "./workflow-frame-subject";
@@ -94,6 +94,7 @@ export function WorkflowFrame({
   children,
 }: WorkflowFrameProps) {
   const t = useTranslations("workflowFrame");
+  const relativeAge = useRelativeAge();
   const [runOpen, setRunOpen] = React.useState(false);
   const preserveDefinition = (href: string) =>
     exactDefinitionId
@@ -271,7 +272,7 @@ export function WorkflowFrame({
               {failedAt && (
                 <span className="text-muted-foreground font-mono font-normal" title={failedAt}>
                   {" "}
-                  {formatRelativeAge(failedAt)}
+                  {relativeAge(failedAt)}
                 </span>
               )}
             </p>

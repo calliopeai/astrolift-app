@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { PeopleClient } from "./people-client";
 
-export const metadata = { title: "People · Access · Astrolift" };
+export const generateMetadata = routeTitle("people", "access");
 
 /**
  * Admin › Access › People (access UX design 3.1). No preload: the query is

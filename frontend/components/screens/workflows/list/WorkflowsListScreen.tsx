@@ -32,7 +32,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { VizLegend } from "@/components/viz/core/VizLegend";
 import { formatTriggerKind } from "@/components/screens/workflows/detail/workflow-run-state";
-import { formatRelativeAge } from "@/lib/format";
+import { useRelativeAge } from "@/lib/format";
 
 import { useWorkflowGlyphLegend, WorkflowGlyph } from "./WorkflowGlyph";
 import {
@@ -112,13 +112,14 @@ function Name({ row }: { row: WorkflowRow }) {
 }
 
 function LastRun({ row }: { row: WorkflowRow }) {
+  const relativeAge = useRelativeAge();
   return (
     <span className="inline-flex min-w-0 items-center gap-1.5 text-xs">
       <StatusDot status={LAST_RUN_DOT[row.lastRun]} />
       <span className="truncate">{LAST_RUN_LABEL[row.lastRun]}</span>
       {row.lastRunAt && (
         <span className="text-muted-foreground shrink-0 font-mono" title={row.lastRunAt}>
-          {formatRelativeAge(row.lastRunAt)}
+          {relativeAge(row.lastRunAt)}
         </span>
       )}
     </span>

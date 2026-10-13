@@ -1,21 +1,4 @@
 {
-  "nav": {
-    "section": "Platform",
-    "playground": "Playground",
-    "documentation": "Documentation",
-    "settings": "Settings",
-    "history": "History",
-    "starred": "Starred",
-    "introduction": "Introduction",
-    "getStarted": "Get Started",
-    "tutorials": "Tutorials",
-    "changelog": "Changelog",
-    "general": "General",
-    "team": "Team",
-    "billing": "Billing",
-    "limits": "Limits",
-    "hooks": "Hooks"
-  },
   "user": {
     "account": "Account",
     "notifications": "Notifications",
@@ -491,7 +474,8 @@
     "goToDashboard": "Go to dashboard",
     "notFound": "Page not found",
     "notFoundDescription": "The page you are looking for does not exist or has been moved.",
-    "goHome": "Go home"
+    "goHome": "Go home",
+    "critical": "A critical error occurred. Please refresh the page."
   },
   "mainRail": {
     "label": "Main",
@@ -531,67 +515,11 @@
   "a11y": {
     "skipToContent": "Skip to main content"
   },
-  "dashboard": {
-    "stats": {
-      "revenue": "Total revenue",
-      "orders": "Orders",
-      "customers": "Customers",
-      "products": "Products",
-      "fromLastMonth": "from last month"
-    },
-    "revenue": {
-      "title": "Revenue",
-      "description": "Monthly revenue for the last 12 months",
-      "label": "Revenue"
-    },
-    "channels": {
-      "title": "Channels",
-      "description": "Sales by acquisition channel",
-      "organic": "Organic",
-      "direct": "Direct",
-      "referral": "Referral",
-      "paid": "Paid"
-    },
-    "sales": {
-      "title": "Sales by category",
-      "description": "Units sold per product category this quarter",
-      "label": "Units sold",
-      "electronics": "Electronics",
-      "clothing": "Clothing",
-      "accessories": "Accessories",
-      "footwear": "Footwear",
-      "sports": "Sports"
-    }
-  },
   "overview": {
     "title": "Overview",
     "description": "Identity, registry, and lifecycle data for this Astrolift install.",
     "errorBanner": {
       "title": "Couldn't load some data"
-    },
-    "tiles": {
-      "teams": {
-        "label": "Teams",
-        "emptyCta": "Create your first team"
-      },
-      "projects": {
-        "label": "Projects",
-        "emptyCta": "Create a project"
-      },
-      "apps": {
-        "label": "Registered apps",
-        "emptyCta": "Register your first app"
-      },
-      "deployments": {
-        "label": "Running apps",
-        "emptyCta": "No deployments yet"
-      },
-      "costMtd": {
-        "label": "Cost (MTD)",
-        "emptyCta": "Awaiting cost data",
-        "vsPrevMonth": "vs prev month",
-        "noPrevMonth": "no prev month"
-      }
     },
     "fleetHealth": {
       "title": "Fleet health",
@@ -735,31 +663,6 @@
     }
   },
   "settings": {
-    "title": "Settings",
-    "description": "Manage your application preferences.",
-    "language": {
-      "title": "Language",
-      "description": "Choose the language used throughout the interface."
-    },
-    "theme": {
-      "title": "Appearance",
-      "description": "Choose your preferred color scheme.",
-      "light": "Light",
-      "dark": "Dark",
-      "system": "System"
-    },
-    "nav": {
-      "ariaLabel": "Settings sections",
-      "openMobileNav": "Open settings menu",
-      "openMobileNavLabel": "Sections",
-      "mobileTitle": "Settings sections",
-      "mobileDescription": "Jump to any settings area.",
-      "groups": {
-        "organization": "Organization",
-        "personal": "Personal",
-        "tokens": "Tokens"
-      }
-    },
     "breadcrumb": {
       "root": "Settings"
     },
@@ -1098,7 +1001,7 @@
     "prereqAdmin": "<strong>Admin access to the IdP.</strong> You will register a new OIDC or SAML client there.",
     "prereqRedirect": "<strong>Astrolift's redirect URI.</strong> Visible in the <bold>New provider</bold> dialog. Format is <code>{uri}</code>. Every IdP needs this exact value in its allowed callback list.",
     "configureTitle": "Configure by provider kind",
-    "configureBody": "Pick the matching subsection. Every kind ends with the same three clicks in Astrolift: <link>Settings · Identity providers</link> → <strong>New provider</strong> → pick the kind → paste the credentials → <strong>Set active</strong>.",
+    "configureBody": "Pick the matching subsection. Every kind ends with the same three clicks in Astrolift: <link>Settings · Identity providers</link> → <strong>New provider</strong> → pick the kind → paste the credentials → <strong>Make active</strong>.",
     "allowlistTitle": "Domain allowlist (auto-signup)",
     "allowlistBody": "By default, an SSO sign-in succeeds only if Astrolift already has an account for that user. To let new users self-onboard, mark their email domains as trusted.",
     "allowlistStep1": "Open <link>Administration · Organization</link>.",
@@ -1119,7 +1022,7 @@
         "steps": {
           "s1": "At the IdP, register a new OIDC client. Paste the redirect URI shown in the Astrolift dialog (it ends with /app/auth1/callback).",
           "s2": "Copy the client_id, client_secret, and the discovery URL (the .well-known/openid-configuration endpoint).",
-          "s3": "In Astrolift, open Settings · Identity providers · New provider, pick OIDC, paste the values, and Set active."
+          "s3": "In Astrolift, open Settings · Identity providers · New provider, pick OIDC, paste the values, and Make active."
         }
       },
       "cognito": {
@@ -1128,7 +1031,7 @@
         "steps": {
           "s1": "In the AWS console, open the user pool · App integration · Create an app client. Pick a confidential client and add the Astrolift redirect URI.",
           "s2": "Note the User Pool ID, App client ID, and App client secret. The discovery URL is {url}.",
-          "s3": "In Astrolift, New provider · Cognito, paste the three values, Set active."
+          "s3": "In Astrolift, New provider · Cognito, paste the three values, Make active."
         }
       },
       "auth0": {
@@ -1137,7 +1040,7 @@
         "steps": {
           "s1": "In Auth0, Applications · Create Application · Regular Web App. Set Allowed Callback URLs to the redirect URI from the Astrolift dialog.",
           "s2": "Copy the Domain, Client ID, and Client Secret. The discovery URL is {url}.",
-          "s3": "In Astrolift, New provider · Auth0, paste the values, Set active."
+          "s3": "In Astrolift, New provider · Auth0, paste the values, Make active."
         }
       },
       "okta": {
@@ -1146,7 +1049,7 @@
         "steps": {
           "s1": "In Okta admin, Applications · Create App Integration · OIDC · Web Application. Add the Astrolift redirect URI under Sign-in redirect URIs.",
           "s2": "Copy the Client ID, Client Secret, and the Issuer URL (visible under General · OpenID Connect ID Token).",
-          "s3": "In Astrolift, New provider · Okta, paste the values, Set active."
+          "s3": "In Astrolift, New provider · Okta, paste the values, Make active."
         }
       },
       "azureAd": {
@@ -1155,7 +1058,7 @@
         "steps": {
           "s1": "In the Azure portal, App registrations · New registration. Set the redirect URI to the value from Astrolift and platform to Web.",
           "s2": "Under Certificates & secrets, create a client secret and copy its value. Note the Application (client) ID and Directory (tenant) ID.",
-          "s3": "The discovery URL is {url}. Paste it plus the client ID and secret into Astrolift, Set active."
+          "s3": "The discovery URL is {url}. Paste it plus the client ID and secret into Astrolift, Make active."
         }
       },
       "google": {
@@ -1164,7 +1067,7 @@
         "steps": {
           "s1": "In Google Cloud console, APIs & Services · Credentials · Create OAuth client ID · Web application. Add the Astrolift redirect URI.",
           "s2": "Copy the Client ID and Client Secret. The discovery URL is {url}.",
-          "s3": "In Astrolift, New provider · Google, paste the values, Set active. Combine with the domain allowlist below to limit sign-in to your workspace."
+          "s3": "In Astrolift, New provider · Google, paste the values, Make active. Combine with the domain allowlist below to limit sign-in to your workspace."
         }
       },
       "github": {
@@ -1173,7 +1076,7 @@
         "steps": {
           "s1": "In GitHub, Settings · Developer settings · OAuth Apps · New OAuth App. Set the callback URL to the value from Astrolift.",
           "s2": "Copy the Client ID and generate a Client Secret.",
-          "s3": "In Astrolift, New provider · GitHub OAuth, paste the values, Set active."
+          "s3": "In Astrolift, New provider · GitHub OAuth, paste the values, Make active."
         }
       },
       "saml": {
@@ -1182,7 +1085,7 @@
         "steps": {
           "s1": "At the IdP, register a new SAML application. Set the ACS URL and Entity ID to the values shown in the Astrolift dialog.",
           "s2": "Download the IdP metadata XML or copy its URL.",
-          "s3": "In Astrolift, New provider · SAML, paste the metadata URL (or upload the XML), Set active."
+          "s3": "In Astrolift, New provider · SAML, paste the metadata URL (or upload the XML), Make active."
         }
       },
       "local": {
@@ -1235,7 +1138,9 @@
     "relatedTitle": "Related",
     "relatedGetStarted": "<link>Get started</link>: bring the stack up locally; env vars there default to the docker-compose service names.",
     "relatedIdentityProviders": "<link>Identity providers</link>: the AUTH0_* / ASTROLIFT_IDP_* vars are described in detail.",
-    "relatedClusterPrerequisites": "<link>Cluster prerequisites</link>: what the tenant cluster needs separately from these env vars."
+    "relatedClusterPrerequisites": "<link>Cluster prerequisites</link>: what the tenant cluster needs separately from these env vars.",
+    "allView": "All",
+    "mineView": "Mine"
   },
   "docsWebhookEvents": {
     "title": "Webhook events",
@@ -1300,7 +1205,9 @@
       "secrets": "Secrets",
       "identity": "Identity",
       "registry": "Registry"
-    }
+    },
+    "allView": "All",
+    "mineView": "Mine"
   },
   "docsIntroduction": {
     "title": "Introduction",
@@ -1382,43 +1289,6 @@
       "beginner": "Beginner",
       "intermediate": "Intermediate",
       "advanced": "Advanced"
-    }
-  },
-  "hooks": {
-    "title": "Hooks",
-    "description": "Interactive demos for the built-in utility hooks.",
-    "debounce": {
-      "title": "useDebounce",
-      "description": "Value updates only after typing has stopped for 300 ms.",
-      "label": "Search input",
-      "placeholder": "Type something…",
-      "raw": "Raw value",
-      "debounced": "Debounced value"
-    },
-    "localStorage": {
-      "title": "useLocalStorage",
-      "description": "Counter persisted to localStorage — survives page refresh.",
-      "label": "Count",
-      "increment": "Increment",
-      "reset": "Reset"
-    },
-    "clipboard": {
-      "title": "useCopyToClipboard",
-      "description": "Copies text to the clipboard; button resets after 2 seconds.",
-      "label": "Text to copy",
-      "copy": "Copy",
-      "copied": "Copied!"
-    },
-    "confirm": {
-      "title": "useConfirm",
-      "description": "Awaits a Promise from an AlertDialog — no local dialog state required.",
-      "trigger": "Delete item",
-      "dialogTitle": "Delete this item?",
-      "dialogDescription": "This action cannot be undone.",
-      "confirmLabel": "Delete",
-      "cancelLabel": "Cancel",
-      "resultConfirmed": "Confirmed — item deleted.",
-      "resultCancelled": "Cancelled."
     }
   },
   "apps": {
@@ -4652,127 +4522,6 @@
       "emptyTitle": "Quiet feed",
       "emptyDescription": "No events match the current filter. Try clearing it, or trigger a mutation to see one land."
     },
-    "quotas": {
-      "title": "Quotas",
-      "description": "Resource limits per scope. Soft limits trigger alerts; hard limits block the next admission attempt.",
-      "emptyTitle": "No quotas configured",
-      "emptyDescription": "Quotas can be set per organization, team, or project. The default install ships with sensible org-level caps.",
-      "columns": {
-        "scope": "Scope",
-        "resource": "Resource",
-        "usage": "Usage",
-        "bar": "Bar",
-        "limits": "Soft / Hard",
-        "actions": "Actions"
-      },
-      "request": {
-        "buttonRequest": "Request bump",
-        "buttonPending": "Pending request",
-        "title": "Request quota bump",
-        "description": "Asks an org admin to raise the hard limit. They get an in-app notification + an email. Pending status surfaces on this row until decided.",
-        "factorLabel": "Multiplier",
-        "factor1_5x": "1.5x",
-        "factor2x": "2x",
-        "factor3x": "3x",
-        "factor5x": "5x",
-        "factor10x": "10x",
-        "reasonLabel": "Reason",
-        "reasonPlaceholder": "Onboarding the prod team next quarter; current cap blocks the migration.",
-        "reasonHint": "Required. Shows up in the admin notification.",
-        "submit": "Submit request",
-        "submitting": "Submitting…",
-        "cancel": "Cancel",
-        "toastSubmitted": "Quota bump requested",
-        "toastFailed": "Failed to submit request",
-        "pendingBadge": "Pending {factor}x — {reason}"
-      },
-      "overviewTitle": "Utilization",
-      "overviewDescription": "Current usage against hard limits, most-utilized first.",
-      "history": {
-        "button": "History",
-        "title": "{resource} usage history",
-        "description": "Point-in-time usage captured daily, plotted against the soft and hard limits.",
-        "windowLabel": "Window",
-        "windowOption": "Last {days} days",
-        "usedTrend": "Used over time",
-        "latestUsed": "Latest used",
-        "peakUsed": "Peak used",
-        "softLimit": "Soft limit",
-        "hardLimit": "Hard limit",
-        "emptyTitle": "No usage history yet",
-        "emptyDescription": "Usage snapshots are captured once a day. Check back after the collector has run at least once."
-      }
-    },
-    "cost": {
-      "title": "Cost",
-      "description": "Currency-denominated platform spend, rolled up from CostSnapshot rows. Pick a time range; the trend chart marks anomalies (> 2σ day-over-day jumps); the per-resource panel attributes spend to specific managed-service bindings.",
-      "tabsLabel": "Time range",
-      "tab24h": "24h",
-      "tab7d": "7d",
-      "tab30d": "30d",
-      "tabMtd": "MTD",
-      "kpis": {
-        "projectedMonthly": "Projected monthly",
-        "budgets": "Budgets",
-        "window": {
-          "h24": "Last 24 hours",
-          "d7": "Last 7 days",
-          "d30": "Last 30 days",
-          "mtd": "Month to date"
-        }
-      },
-      "forecast": {
-        "vsPreviousMonth": "vs prev month",
-        "mtdLine": "MTD {mtd} · prev month {previous}",
-        "insufficientData": "Not enough daily cost data yet for a confident projection.",
-        "confidence": {
-          "low": "low confidence",
-          "medium": "med confidence",
-          "high": "high confidence"
-        }
-      },
-      "trend": {
-        "title": "Daily trend",
-        "description": "Per-day platform spend over the selected range. Marked points exceed the day-over-day rolling 2σ.",
-        "tooltipDailyTotal": "Daily total",
-        "anomaliesBadge": "{count} anomaly",
-        "emptyTitle": "No cost data in this window",
-        "emptyDescription": "The daily cost collector hasn't written snapshots for the selected range yet, or the cloud-side billing API hasn't reported usage. Live pricing data only — nothing is estimated client-side."
-      },
-      "budgets": {
-        "title": "Budgets",
-        "description": "Budgets fire alerts as you cross each percentage threshold.",
-        "emptyTitle": "No budgets configured",
-        "emptyDescription": "Budgets can be set per organization, team, or project.",
-        "columns": {
-          "scope": "Scope",
-          "period": "Period",
-          "spend": "Spend",
-          "budget": "Budget",
-          "alerts": "Alerts"
-        }
-      },
-      "byCategory": {
-        "title": "By category",
-        "description": "Spend split across workload / managed-service / egress / storage / other.",
-        "empty": "No cost data yet."
-      },
-      "attribution": {
-        "title": "Per-resource attribution",
-        "description": "Spend broken out by managed-service binding (e.g. main_db, events_queue, uploads_bucket). Untagged rows roll up under \"shared / untagged\" — usually shared egress or providers that don't yet apply the platform binding tag.",
-        "coverage": "Attribution coverage: {pct}% ({attributed} of {total})",
-        "unattributedRow": "Shared / untagged",
-        "emptyTitle": "No attributed cost rows",
-        "emptyDescription": "Bindings are visible only after the cloud-side cost driver tags resources with astrolift.io/binding at provision time. Track #432 from:backend for the provider-side rollout.",
-        "columns": {
-          "resource": "Resource",
-          "kind": "Kind",
-          "app": "App",
-          "category": "Category",
-          "amount": "Amount"
-        }
-      }
-    },
     "audit": {
       "title": "Audit log",
       "description": "Every permission decision and every state-changing mutation, append-only. Tenant-scoped at the database layer.",
@@ -4857,24 +4606,6 @@
       "feedLabel": "Audit events",
       "filteredTitle": "No audit events match",
       "filteredDescription": "Remove a filter or change the search to see more."
-    },
-    "membersBulk": {
-      "selectAllLabel": "Select all role bindings",
-      "selectRowLabel": "Select binding {role} on {subject}",
-      "selected": "{count, plural, =1 {1 binding selected} other {# bindings selected}}",
-      "clear": "Clear",
-      "revokeButton": "Revoke {count}",
-      "permissionHint": "You don't have permission to manage members.",
-      "confirm": {
-        "title": "Revoke {count} role binding(s)?",
-        "description": "Each subject loses the permissions these roles granted. Other bindings, if any, remain in effect. The operation is per-binding — if one fails, the others still apply.",
-        "confirmLabel": "Revoke {count}"
-      },
-      "toasts": {
-        "allOk": "Revoked {count} role binding(s).",
-        "partial": "Revoked {revoked}, {failed} failed.",
-        "allFailed": "Bulk revoke failed: {message}"
-      }
     },
     "teamMembersBulk": {
       "tabTitle": "Team members",
@@ -5662,67 +5393,6 @@
         "disconnected": "Disconnected {account}",
         "accountFallback": "account",
         "disconnectFailed": "Could not disconnect this account"
-      }
-    }
-  },
-  "settingsIndex": {
-    "title": "Settings",
-    "description": "Configure the platform's identity, security, and surfaces.",
-    "cardMeta": {
-      "modified": "Modified {when}"
-    },
-    "sections": {
-      "organization": {
-        "title": "Organization",
-        "description": "Display name, website, retention defaults."
-      },
-      "members": {
-        "title": "Members",
-        "description": "Org members, invitations, and role bindings."
-      },
-      "teams": {
-        "title": "Teams",
-        "description": "Group members for shared ownership of apps and projects."
-      },
-      "projects": {
-        "title": "Projects",
-        "description": "Logical groupings of apps owned by teams."
-      },
-      "identityProvider": {
-        "title": "Identity provider",
-        "description": "OIDC / SAML config + SCIM provisioning."
-      },
-      "sourceProviders": {
-        "title": "Source providers",
-        "description": "Connect GitHub / GitLab / Gitea + manage SSH deploy keys."
-      },
-      "managedDomains": {
-        "title": "Managed domains",
-        "description": "DNS zones the platform manages for tenant apps and previews."
-      },
-      "policies": {
-        "title": "ABAC policies",
-        "description": "Runtime predicates layered on top of RBAC."
-      },
-      "permissions": {
-        "title": "Permissions",
-        "description": "Inspect every grant resolved for the current user."
-      },
-      "profile": {
-        "title": "Profile",
-        "description": "Theme + locale."
-      },
-      "security": {
-        "title": "Security",
-        "description": "Active sessions, MFA, admin elevation."
-      },
-      "notifications": {
-        "title": "Notifications",
-        "description": "Inbox of approvals, alerts, invitations."
-      },
-      "apiTokens": {
-        "title": "API tokens",
-        "description": "Long-lived bearer tokens for CLIs and bots."
       }
     }
   },
@@ -7301,7 +6971,17 @@
       "emptyTitle": "No workloads yet",
       "emptyDescription": "Workloads appear here once the manifest registers them.",
       "replicas": "{count, plural, one {<mono>#</mono> replica} other {<mono>#</mono> replicas}}",
-      "public": "public"
+      "public": "public",
+      "kinds": {
+        "deployment": "Deployment",
+        "statefulset": "Stateful set",
+        "job": "Job",
+        "cronjob": "Cronjob",
+        "task": "Task",
+        "agent": "Agent",
+        "workflow": "Workflow",
+        "function": "Function"
+      }
     },
     "function": {
       "title": "Trigger",
@@ -7901,7 +7581,9 @@
       "templateUpdated": "Updated template {name}",
       "saveFailed": "Save failed",
       "deleteFailed": "Delete failed"
-    }
+    },
+    "allView": "All",
+    "mineView": "Mine"
   },
   "appAlertRules": {
     "timeRange": "Time range",
@@ -8076,7 +7758,9 @@
     "runExit": "exit {code}",
     "primary": "primary",
     "volumeKindFilter": "Kind",
-    "volumeSearch": "Search volumes, mount paths…"
+    "volumeSearch": "Search volumes, mount paths…",
+    "allView": "All",
+    "mineView": "Mine"
   },
   "appWorkloads": {
     "name": "Name",
@@ -11935,26 +11619,6 @@
         "health": "Health",
         "activity": "Activity",
         "settings": "Settings"
-      },
-      "functions": {
-        "organization": "Organization",
-        "access": "Access",
-        "projects": "Projects",
-        "clusters": "Clusters",
-        "domains": "Domains",
-        "providers": "Providers",
-        "webhooks": "Webhooks",
-        "metrics": "Metrics",
-        "tokens": "API keys",
-        "audit": "Audit",
-        "run-audit": "Runs",
-        "features": "Features",
-        "activity": "Platform activity",
-        "alerts": "Alerts",
-        "events": "Events",
-        "logs": "Logs",
-        "traces": "Traces",
-        "operations": "Operations"
       }
     },
     "unregister": {
@@ -13034,6 +12698,19 @@
       },
       "approve": "Approve",
       "deny": "Deny"
+    },
+    "topologyBlurbs": {
+      "service": "One long-running service",
+      "service-data": "A service with its database, cache or bucket",
+      "service-worker": "A service plus background workers",
+      "microservices": "Several services calling each other",
+      "service-agent": "Services with an agent working alongside",
+      "agent": "One or more agents",
+      "functions": "Event-triggered functions",
+      "scheduled": "Jobs on a schedule",
+      "task": "One-off runs",
+      "workflow": "A multi-step pipeline",
+      "mixed": "Several kinds of workload"
     }
   },
   "clusterConnection": {
@@ -15115,7 +14792,44 @@
     "notFoundDescription": "This {label} may not exist, may have aged out of the recent list, or you may not have access to it.",
     "back": "Back to {label}",
     "created": "created",
-    "overview": "Overview"
+    "overview": "Overview",
+    "statuses": {
+      "running": "Running",
+      "in_progress": "In progress",
+      "provisioning": "Provisioning",
+      "building": "Building",
+      "deploying": "Deploying",
+      "queued": "Queued",
+      "pending": "Pending",
+      "active": "Active",
+      "ready": "Ready",
+      "completed": "Completed",
+      "succeeded": "Succeeded",
+      "healthy": "Healthy",
+      "failed": "Failed",
+      "errored": "Errored",
+      "timed_out": "Timed out",
+      "superseded": "Superseded",
+      "cancelled": "Cancelled",
+      "canceled": "Cancelled",
+      "torn_down": "Torn down",
+      "expired": "Expired",
+      "unknown": "Unknown",
+      "invited": "Invited",
+      "pending_invite": "Pending invite",
+      "pending_first_login": "Pending first login",
+      "suspended": "Suspended",
+      "deactivated": "Deactivated",
+      "anonymized": "Anonymized",
+      "info": "Info",
+      "warn": "Warning",
+      "warning": "Warning",
+      "critical": "Critical",
+      "error": "Error",
+      "firing": "Firing",
+      "acknowledged": "Acknowledged",
+      "resolved": "Resolved"
+    }
   },
   "alertDetail": {
     "alerts": "Alerts",
@@ -15568,5 +15282,947 @@
     "manageAccess": "Manage access",
     "emptyTitle": "No semantic layers",
     "emptyDescription": "Apps declared with [app] kind = \"mimwell\" that you can read appear here."
+  },
+  "listDefinitions": {
+    "agentBoxes": {
+      "search": "Search boxes, slugs, agents…",
+      "fields": {
+        "status": "Status"
+      },
+      "options": {
+        "status": {
+          "pending": "pending",
+          "provisioning": "provisioning",
+          "running": "running",
+          "stopped": "stopped",
+          "expired": "expired",
+          "failed": "failed"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine"
+      },
+      "notes": {
+        "mine": "Agent boxes do not say yet whether you started them, so Mine is empty. Every box is in All."
+      }
+    },
+    "agentRuns": {
+      "search": "Search runs, ids…",
+      "fields": {
+        "status": "Status",
+        "trigger": "Trigger"
+      },
+      "options": {
+        "status": {
+          "running": "running",
+          "waiting": "waiting",
+          "succeeded": "succeeded",
+          "failed": "failed",
+          "cancelled": "cancelled"
+        },
+        "trigger": {
+          "manual": "manual",
+          "api": "api",
+          "schedule": "schedule",
+          "webhook": "webhook",
+          "parent": "parent"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "running": "Running",
+        "failed": "Failed",
+        "waiting": "Waiting"
+      },
+      "notes": {
+        "mine": "Mine means runs of this agent you started. Runs from before Astrolift recorded who started them show only in All."
+      }
+    },
+    "agentSkills": {
+      "search": "Search skills, slugs…",
+      "fields": {
+        "status": "Status",
+        "scope": "Scope"
+      },
+      "options": {
+        "status": {
+          "active": "Active",
+          "inactive": "Inactive"
+        },
+        "scope": {
+          "global": "Global",
+          "org": "Organization"
+        }
+      },
+      "views": {
+        "all": "All"
+      },
+      "notes": {
+        "all": "Filtered, sorted and paged in the browser: the agent read returns every binding at once."
+      }
+    },
+    "agentTools": {
+      "search": "Search tools, skills, handlers…",
+      "fields": {
+        "adapter": "Adapter"
+      },
+      "options": {
+        "adapter": {
+          "python_fn": "Python function",
+          "http_endpoint": "HTTP endpoint",
+          "mcp_server": "MCP server"
+        }
+      },
+      "views": {
+        "all": "All"
+      },
+      "notes": {
+        "all": "Filtered, sorted and paged in the browser: the agent read returns every binding at once."
+      }
+    },
+    "agents": {
+      "search": "Search agents, slugs, repos...",
+      "fields": {
+        "project": "Project",
+        "status": "Status",
+        "model": "Model",
+        "runtime": "Runtime",
+        "cluster": "Cluster"
+      },
+      "options": {
+        "status": {
+          "running": "running",
+          "failing": "last run failed",
+          "scheduled": "scheduled",
+          "idle": "idle"
+        },
+        "model": {
+          "managed": "Managed model",
+          "gateway": "Model gateway",
+          "api-key": "API key"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "paused": "Paused"
+      },
+      "notes": {
+        "mine": "Mine means agents you registered. Agents registered before Astrolift recorded who registered them have no owner and show only in All."
+      }
+    },
+    "alertRules": {
+      "search": "Search rules, targets…",
+      "fields": {
+        "target": "Target",
+        "targetId": "Target ID",
+        "severity": "Severity",
+        "state": "State"
+      },
+      "options": {
+        "target": {
+          "global": "global",
+          "app": "app",
+          "environment": "environment",
+          "workload": "workload",
+          "managed_service": "managed_service"
+        },
+        "severity": {
+          "info": "info",
+          "warn": "warn",
+          "critical": "critical"
+        },
+        "state": {
+          "active": "active",
+          "muted": "muted",
+          "inactive": "inactive"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "active": "Active",
+        "muted": "Muted"
+      },
+      "notes": {
+        "mine": "Alert rules do not record who created them yet, so Mine is empty.",
+        "muted": "Keeps the muted rules among the newest 100, until the rules query takes a mute filter."
+      }
+    },
+    "alertSubscriptions": {
+      "search": "Search apps, slugs…",
+      "fields": {
+        "team": "Team",
+        "project": "Project",
+        "alerts": "Alerts"
+      },
+      "options": {
+        "alerts": {
+          "on": "subscribed",
+          "off": "not subscribed"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine"
+      },
+      "notes": {
+        "mine": "Mine keeps the apps you get at least one alert for among the newest 100."
+      }
+    },
+    "appAlertRules": {
+      "search": "Search alert rules…",
+      "fields": {
+        "severity": "Severity",
+        "state": "State"
+      },
+      "options": {
+        "severity": {
+          "critical": "Critical",
+          "warning": "Warning",
+          "info": "Info"
+        },
+        "state": {
+          "active": "Active",
+          "muted": "Muted",
+          "inactive": "Inactive"
+        }
+      },
+      "views": {
+        "all": "All"
+      },
+      "notes": {
+        "all": "Filtered, sorted and paged in the browser: this list's backend field returns every row at once."
+      }
+    },
+    "appManagedServices": {
+      "search": "Search by name, kind, variant, or environment…",
+      "views": {
+        "all": "All"
+      }
+    },
+    "appPods": {
+      "search": "Search pods, workloads, nodes…",
+      "fields": {
+        "status": "Status"
+      },
+      "views": {
+        "all": "All"
+      },
+      "notes": {
+        "all": "Filtered, sorted and paged in the browser: this list's backend field returns every row at once."
+      }
+    },
+    "appWorkloads": {
+      "search": "Search workloads, slugs, kinds…",
+      "fields": {
+        "kind": "Kind",
+        "exposure": "Exposure"
+      },
+      "options": {
+        "exposure": {
+          "public": "Public",
+          "internal": "Internal"
+        }
+      },
+      "views": {
+        "all": "All"
+      }
+    },
+    "brains": {
+      "search": "Search names and slugs…",
+      "views": {
+        "all": "All"
+      }
+    },
+    "commandRuns": {
+      "search": "Search commands, apps, operators…",
+      "fields": {
+        "app": "App"
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine"
+      }
+    },
+    "deployKeys": {
+      "search": "Search keys, fingerprints, apps…",
+      "fields": {
+        "scope": "Scope",
+        "app": "App"
+      },
+      "options": {
+        "scope": {
+          "org": "org-scoped"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine"
+      },
+      "notes": {
+        "mine": "Deploy keys do not record who generated them yet, so Mine is empty."
+      }
+    },
+    "deployments": {
+      "search": "Search apps, branches, tags, commits…",
+      "fields": {
+        "app": "App",
+        "environment": "Environment",
+        "status": "Status",
+        "trigger": "Trigger",
+        "since": "Since"
+      },
+      "options": {
+        "status": {
+          "pending_approval": "pending approval",
+          "pending": "pending",
+          "deploying": "deploying",
+          "redeploying": "redeploying",
+          "running": "running",
+          "failed": "failed",
+          "rolled_back": "rolled back",
+          "superseded": "superseded"
+        },
+        "trigger": {
+          "push": "push",
+          "manual": "manual",
+          "ci": "ci",
+          "scheduled": "scheduled",
+          "rollback": "rollback",
+          "promotion": "promotion"
+        },
+        "since": {
+          "today": "Today",
+          "1h": "Last hour",
+          "24h": "Last 24 hours",
+          "7d": "Last 7 days",
+          "30d": "Last 30 days",
+          "90d": "Last 90 days"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "waiting": "Waiting approval",
+        "failed": "Failed",
+        "today": "Today"
+      }
+    },
+    "environmentSpecs": {
+      "search": "Search names, slugs, images, runtimes, repos…",
+      "fields": {
+        "agentType": "Agent type"
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine"
+      },
+      "notes": {
+        "mine": "Mine means recipes you created. Older recipes with no recorded creator appear in All."
+      }
+    },
+    "functions": {
+      "search": "Search functions, slugs, apps…",
+      "fields": {
+        "app": "App"
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine"
+      },
+      "notes": {
+        "mine": "Mine means workloads you created, or on apps you created. Workloads from before Astrolift recorded who created them show only in All."
+      }
+    },
+    "identityProviders": {
+      "search": "Search providers, endpoints, client ids…",
+      "fields": {
+        "kind": "Kind",
+        "status": "Status"
+      },
+      "options": {
+        "status": {
+          "active": "active",
+          "configured": "configured"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine"
+      },
+      "notes": {
+        "mine": "Identity providers do not record who configured them yet, so Mine is empty."
+      }
+    },
+    "jobRuns": {
+      "search": "Search runs, jobs, Job names…",
+      "fields": {
+        "app": "App",
+        "workload": "Job",
+        "environment": "Environment",
+        "status": "Status"
+      },
+      "options": {
+        "status": {
+          "running": "running",
+          "succeeded": "succeeded",
+          "failed": "failed",
+          "superseded": "superseded"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "failed": "Failed"
+      }
+    },
+    "jobs": {
+      "search": "Search jobs, apps…",
+      "fields": {
+        "app": "App"
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "failing": "Failing",
+        "paused": "Paused"
+      },
+      "notes": {
+        "failing": "Failing keeps the jobs on each page whose latest run failed, until the jobs query can filter on the last run.",
+        "paused": "Astrolift does not record a paused schedule yet, so no job shows here."
+      }
+    },
+    "projects": {
+      "search": "Search projects, slugs, teams…",
+      "fields": {
+        "team": "Team"
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine"
+      },
+      "notes": {
+        "mine": "Projects do not record who owns them yet, so Mine is empty."
+      }
+    },
+    "runs": {
+      "search": "Search runs, agents, workflows, ids…",
+      "fields": {
+        "kind": "Kind",
+        "status": "Status",
+        "agent": "Agent",
+        "workflow": "Workflow",
+        "project": "Project",
+        "trigger": "Trigger",
+        "since": "Since"
+      },
+      "options": {
+        "kind": {
+          "agent": "Agent run",
+          "workflow": "Workflow run",
+          "task": "Task run"
+        },
+        "status": {
+          "running": "running",
+          "waiting": "waiting",
+          "succeeded": "succeeded",
+          "failed": "failed",
+          "cancelled": "cancelled"
+        },
+        "trigger": {
+          "manual": "manual",
+          "api": "api",
+          "schedule": "schedule",
+          "webhook": "webhook",
+          "parent": "parent"
+        },
+        "since": {
+          "1h": "Last hour",
+          "24h": "Last 24 hours",
+          "7d": "Last 7 days",
+          "30d": "Last 30 days",
+          "90d": "Last 90 days"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "running": "Running",
+        "failed": "Failed",
+        "waiting": "Waiting",
+        "scheduled": "Scheduled"
+      },
+      "notes": {
+        "mine": "Mine means runs you started. Runs from before Astrolift recorded who started them show only in All.",
+        "scheduled": "The next firings of scheduled agents, soonest first. Runs a schedule already started are in All, with the schedule trigger."
+      }
+    },
+    "sessions": {
+      "search": "Search sessions, labels…",
+      "fields": {
+        "kind": "Kind",
+        "status": "Status"
+      },
+      "options": {
+        "kind": {
+          "web": "web",
+          "cli": "cli",
+          "mobile": "mobile",
+          "browser_extension": "browser extension",
+          "api_token": "api token"
+        },
+        "status": {
+          "current": "this session",
+          "other": "other"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine"
+      },
+      "notes": {
+        "mine": "Every session here is yours, so Mine holds the same sessions as All."
+      }
+    },
+    "skillTools": {
+      "search": "Search tools, slugs, handlers…",
+      "fields": {
+        "adapter": "Adapter"
+      },
+      "options": {
+        "adapter": {
+          "python_fn": "Python function",
+          "http_endpoint": "HTTP endpoint",
+          "mcp_server": "MCP server"
+        }
+      },
+      "views": {
+        "all": "All"
+      }
+    },
+    "skills": {
+      "search": "Search skills, slugs, repos…",
+      "fields": {
+        "status": "Status",
+        "scope": "Scope"
+      },
+      "options": {
+        "status": {
+          "active": "Active",
+          "inactive": "Inactive"
+        },
+        "scope": {
+          "org": "Organization",
+          "global": "Global"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "imported": "Imported"
+      },
+      "notes": {
+        "mine": "Mine means skills you wrote or imported. Skills from before Astrolift recorded who wrote them show only in All."
+      }
+    },
+    "sourceHosts": {
+      "search": "Search connections, accounts, URLs…",
+      "fields": {
+        "host": "Host",
+        "status": "Status"
+      },
+      "options": {
+        "status": {
+          "active": "active",
+          "disabled": "disabled"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine"
+      },
+      "notes": {
+        "mine": "Mine keeps your personal connections among the newest 100."
+      }
+    },
+    "taskTemplates": {
+      "search": "Search task templates…",
+      "fields": {
+        "app": "App"
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine"
+      },
+      "notes": {
+        "mine": "Task templates don't record an owner yet, so Mine stays empty until they do."
+      }
+    },
+    "webhooks": {
+      "search": "Search delivery URLs…",
+      "fields": {
+        "status": "Status",
+        "format": "Format",
+        "failing": "Failing"
+      },
+      "options": {
+        "status": {
+          "active": "active",
+          "paused": "paused"
+        },
+        "format": {
+          "generic": "generic"
+        },
+        "failing": {
+          "yes": "has failures"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "failing": "Failing",
+        "paused": "Paused"
+      },
+      "notes": {
+        "mine": "Webhook subscriptions do not record who created them yet, so Mine is empty.",
+        "failing": "Keeps the matching subscriptions among the newest 100, until the webhooks query takes filters.",
+        "paused": "Keeps the matching subscriptions among the newest 100, until the webhooks query takes filters."
+      }
+    },
+    "workflowInstances": {
+      "fields": {
+        "type": "Type",
+        "status": "Status"
+      },
+      "options": {
+        "status": {
+          "running": "running",
+          "completed": "completed",
+          "failed": "failed",
+          "canceled": "cancelled",
+          "terminated": "terminated",
+          "timed_out": "timed out"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "running": "Running",
+        "failed": "Failed"
+      },
+      "notes": {
+        "all": "Temporal pages newest first. Type and Status filter on the server. Empty pages may have more authorized instances on Older pages.",
+        "mine": "Instances record who started them as a name, not an account, so Mine is empty until they record the account. Temporal pages newest first. Type and Status filter on the server. Empty pages may have more authorized instances on Older pages.",
+        "running": "Temporal pages newest first. Type and Status filter on the server. Empty pages may have more authorized instances on Older pages.",
+        "failed": "Temporal pages newest first. Type and Status filter on the server. Empty pages may have more authorized instances on Older pages."
+      }
+    },
+    "workflowRuns": {
+      "search": "Search runs, ids…",
+      "fields": {
+        "status": "Status",
+        "trigger": "Trigger"
+      },
+      "options": {
+        "status": {
+          "running": "running",
+          "waiting": "waiting",
+          "succeeded": "succeeded",
+          "failed": "failed",
+          "cancelled": "cancelled"
+        },
+        "trigger": {
+          "manual": "manual",
+          "api": "api",
+          "schedule": "schedule",
+          "webhook": "webhook",
+          "parent": "parent"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "running": "Running",
+        "failed": "Failed",
+        "waiting": "Waiting"
+      },
+      "notes": {
+        "mine": "Workflow runs don't record who started them yet, so Mine stays empty until they do."
+      }
+    },
+    "workflowTriggers": {
+      "search": "Search triggers, schedules…",
+      "fields": {
+        "kind": "Kind",
+        "status": "Status"
+      },
+      "options": {
+        "kind": {
+          "schedule": "Schedule",
+          "webhook": "Webhook",
+          "manual": "Manual"
+        },
+        "status": {
+          "enabled": "enabled",
+          "disabled": "disabled"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "enabled": "Enabled",
+        "disabled": "Disabled"
+      },
+      "notes": {
+        "all": "A workflow holds one trigger today, so this list shows that one.",
+        "mine": "Triggers do not record who set them up yet, so Mine is empty until they do."
+      }
+    },
+    "workflows": {
+      "search": "Search workflows, slugs, definitions...",
+      "fields": {
+        "pattern": "Pattern",
+        "project": "Project",
+        "status": "Last run"
+      },
+      "options": {
+        "pattern": {
+          "single": "Single",
+          "chained": "Chained",
+          "fan_out": "Fan-out",
+          "supervisor_worker": "Supervisor / worker",
+          "review_loop": "Review loop",
+          "advisor": "Advisor"
+        },
+        "status": {
+          "running": "running",
+          "succeeded": "succeeded",
+          "failed": "failed",
+          "cancelled": "cancelled",
+          "never": "never run"
+        }
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "templates": "Templates"
+      },
+      "notes": {
+        "mine": "Workflows do not record who created them yet, so Mine is empty until they do.",
+        "templates": "Platform templates are read-only: create a workflow from one, or clone it to edit."
+      }
+    },
+    "workloads": {
+      "search": "Search workloads, slugs, apps…",
+      "fields": {
+        "app": "App"
+      },
+      "views": {
+        "all": "All",
+        "mine": "Mine",
+        "agents": "Agents",
+        "workflows": "Workflows",
+        "functions": "Functions"
+      },
+      "notes": {
+        "mine": "Mine means workloads you created, or on apps you created. Workloads from before Astrolift recorded who created them show only in All."
+      }
+    }
+  },
+  "navModel": {
+    "areas": {
+      "home": "Home",
+      "agents": "Agents",
+      "apps": "Apps",
+      "admin": "Admin"
+    },
+    "groups": {
+      "organization": "Organization",
+      "infrastructure": "Infrastructure",
+      "governance": "Usage & governance",
+      "signals": "Platform signals"
+    },
+    "functions": {
+      "home": "Home",
+      "agents": "Agents",
+      "fleet": "Fleet",
+      "approvals": "Approvals",
+      "workflows": "Workflows",
+      "runs": "Runs",
+      "functions": "Functions",
+      "skills": "Skills",
+      "tools": "Tools",
+      "environment-specs": "Environment specs",
+      "models": "Models",
+      "workloads": "Workloads",
+      "apps": "Apps",
+      "brains": "Semantic layers",
+      "pipelines": "Pipelines",
+      "deployments": "Deployments",
+      "deployment-approvals": "Deployment approvals",
+      "jobs": "Scheduled jobs",
+      "environments": "Environments",
+      "previews": "Previews",
+      "organization": "Organization",
+      "access": "Access",
+      "projects": "Projects",
+      "clusters": "Clusters",
+      "domains": "Domains",
+      "providers": "Providers",
+      "webhooks": "Webhooks",
+      "metrics": "Metrics",
+      "tokens": "API keys",
+      "audit": "Audit",
+      "run-audit": "Runs",
+      "features": "Features",
+      "activity": "Platform activity",
+      "alerts": "Alerts",
+      "events": "Events",
+      "logs": "Logs",
+      "traces": "Traces",
+      "operations": "Operations"
+    }
+  },
+  "relativeAge": {
+    "justNow": "just now",
+    "minutes": "{count}m ago",
+    "hours": "{count}h ago",
+    "days": "{count}d ago"
+  },
+  "routeTitles": {
+    "acceptInvitation": "Accept invitation",
+    "access": "Access",
+    "actionSafety": "Action safety",
+    "activity": "Activity",
+    "administration": "Administration",
+    "agent": "Agent",
+    "agentRun": "Agent run",
+    "agents": "Agents",
+    "alertEvent": "Alert event",
+    "alertEvents": "Alert events",
+    "alertRule": "Alert rule",
+    "alerts": "Alerts",
+    "apiKeys": "API keys",
+    "apiToken": "API token",
+    "app": "App",
+    "appearance": "Appearance",
+    "approvals": "Approvals",
+    "approvalsQueue": "Approvals queue",
+    "approveDeployment": "Approve deployment",
+    "apps": "Apps",
+    "assignRoles": "Assign roles",
+    "assignments": "Assignments",
+    "audit": "Audit",
+    "builder": "Builder",
+    "checkAccess": "Check access",
+    "cluster": "Cluster",
+    "clusterActivity": "Cluster activity",
+    "clusterHealth": "Cluster health",
+    "clusterPrerequisites": "Cluster prerequisites",
+    "clusterSettings": "Cluster settings",
+    "clusterStatus": "Cluster status",
+    "clusters": "Clusters",
+    "commandRun": "Command run",
+    "commandRuns": "Command runs",
+    "configuration": "Configuration",
+    "customDomains": "Custom domains",
+    "deployment": "Deployment",
+    "deployments": "Deployments",
+    "documentation": "Documentation",
+    "domains": "Domains",
+    "downloads": "Downloads",
+    "driverReference": "Driver reference",
+    "easySetup": "Easy setup",
+    "emailDelivery": "Email delivery",
+    "environment": "Environment",
+    "environments": "Environments",
+    "event": "Event",
+    "events": "Events",
+    "features": "Features",
+    "fleetMap": "Fleet map",
+    "functions": "Functions",
+    "getHelp": "Get help",
+    "getStarted": "Get started",
+    "grantAccess": "Grant access",
+    "holders": "Holders",
+    "home": "Home",
+    "identityProviders": "Identity providers",
+    "jobRun": "Job run",
+    "jobRuns": "Job runs",
+    "liveAgentSession": "Live agent session",
+    "logs": "Logs",
+    "logsAndMetrics": "Logs & metrics",
+    "managedDomain": "Managed domain",
+    "managedDomains": "Managed domains",
+    "member": "Member",
+    "members": "Members",
+    "metrics": "Metrics",
+    "models": "Models",
+    "newAgent": "New agent",
+    "newApp": "New app",
+    "newPipeline": "New pipeline",
+    "newPolicy": "New policy",
+    "newRole": "New role",
+    "newWorkflow": "New workflow",
+    "notifications": "Notifications",
+    "operations": "Operations",
+    "organization": "Organization",
+    "overview": "Overview",
+    "pendingGates": "Pending Gates",
+    "people": "People",
+    "permissions": "Permissions",
+    "permissionsDiagnostics": "Permissions diagnostics",
+    "person": "Person",
+    "pipeline": "Pipeline",
+    "pipelineSecrets": "Pipeline Secrets",
+    "platformActivity": "Platform Activity",
+    "platformInstances": "Platform instances",
+    "policies": "Policies",
+    "policy": "Policy",
+    "preview": "Preview",
+    "previewEnvironments": "Preview environments",
+    "profile": "Profile",
+    "project": "Project",
+    "projectResources": "Project resources",
+    "projects": "Projects",
+    "providers": "Providers",
+    "registerCluster": "Register cluster",
+    "resources": "Resources",
+    "role": "Role",
+    "roles": "Roles",
+    "run": "Run",
+    "runAgent": "Run agent",
+    "runs": "Runs",
+    "scheduledJobs": "Scheduled jobs",
+    "secretProposal": "Secret proposal",
+    "secretProposals": "Secret proposals",
+    "secrets": "Secrets",
+    "secure": "Secure",
+    "security": "Security",
+    "semanticLayers": "Semantic layers",
+    "settings": "Settings",
+    "shell": "Shell",
+    "skillsAndTools": "Skills & tools",
+    "sourceProviders": "Source providers",
+    "startDeployment": "Start deployment",
+    "taskRun": "Task run",
+    "taskTemplates": "Task templates",
+    "team": "Team",
+    "teams": "Teams",
+    "traces": "Traces",
+    "triggers": "Triggers",
+    "visualizations": "Visualizations",
+    "webhook": "Webhook",
+    "webhookDelivery": "Webhook delivery",
+    "webhookEvents": "Webhook events",
+    "webhooks": "Webhooks",
+    "workflow": "Workflow",
+    "workflows": "Workflows",
+    "workload": "Workload",
+    "workloads": "Workloads",
+    "zentinelle": "Zentinelle"
   }
 }

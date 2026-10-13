@@ -1,6 +1,7 @@
 "use client";
 
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import { useAreaWorkloads } from "@/components/screens/workloads/use-area-workloads";
 
 import { FUNCTIONS_LIST, functionsPageVariables } from "./functions-list";
@@ -10,7 +11,7 @@ import { FUNCTIONS_LIST, functionsPageVariables } from "./functions-list";
  * functions. The data half of FunctionsScreen.
  */
 export function useFunctions() {
-  const list = useListState(FUNCTIONS_LIST);
+  const list = useListState(useLocalizedList(FUNCTIONS_LIST));
   const { state } = list;
   const page = useAreaWorkloads(
     functionsPageVariables({

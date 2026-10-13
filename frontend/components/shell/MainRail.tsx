@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import type { NavArea, NavFunction } from "@/lib/shell/nav-model";
+import { type NavArea, type NavFunction, navLabel } from "@/lib/shell/nav-model";
 import { cn } from "@/lib/utils";
 
 /**
@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
  *
  * Expanded, 220px: each area is a label with its functions under it, and
  * folds. Collapsed, 48px: the area icons; hovering or focusing one opens its
- * functions as a flyout.
+ * functions as a flyout. Names are the catalog's `navModel` copy, by key.
  */
 export interface MainRailProps {
   nav: NavArea[];
@@ -96,6 +96,7 @@ function FunctionLink({
   isActive: boolean;
   onNavigate?: () => void;
 }) {
+  const nav = useTranslations("navModel");
   const Icon = fn.icon;
   return (
     <Link
@@ -112,12 +113,13 @@ function FunctionLink({
       )}
     >
       <Icon className="size-4 shrink-0 opacity-80" aria-hidden />
-      <span className="truncate">{fn.label}</span>
+      <span className="truncate">{navLabel(nav, "functions", fn.key, fn.label)}</span>
     </Link>
   );
 }
 
 function ExpandedArea({ area, active }: { area: NavArea; active: MainRailProps["active"] }) {
+  const nav = useTranslations("navModel");
   const [open, setOpen] = React.useState(true);
   const isHome = area.key === "home";
   if (isHome) {
@@ -136,7 +138,7 @@ function ExpandedArea({ area, active }: { area: NavArea; active: MainRailProps["
         aria-expanded={open}
         className="text-muted-foreground hover:text-foreground text-2xs flex h-7 w-full items-center justify-between rounded-md px-2 font-semibold tracking-wider uppercase"
       >
-        {area.label}
+        {navLabel(nav, "areas", area.key, area.label)}
         <ChevronDownIcon
           className={cn("size-3 transition-transform", !open && "-rotate-90")}
           aria-hidden
@@ -146,7 +148,9 @@ function ExpandedArea({ area, active }: { area: NavArea; active: MainRailProps["
         area.groups.map((group, i) => (
           <div key={group.label ?? i} className="flex flex-col gap-0.5">
             {group.label && (
-              <div className="text-muted-foreground/80 text-2xs px-2 pt-2 pb-1">{group.label}</div>
+              <div className="text-muted-foreground/80 text-2xs px-2 pt-2 pb-1">
+                {navLabel(nav, "groups", group.key ?? "", group.label)}
+              </div>
             )}
             {group.functions.map((fn) => (
               <FunctionLink
@@ -162,6 +166,8 @@ function ExpandedArea({ area, active }: { area: NavArea; active: MainRailProps["
 }
 
 function CollapsedArea({ area, active }: { area: NavArea; active: MainRailProps["active"] }) {
+  const nav = useTranslations("navModel");
+  const name = navLabel(nav, "areas", area.key, area.label);
   const [open, setOpen] = React.useState(false);
   const Icon = area.icon;
   const isActive = active?.area === area.key;
@@ -183,8 +189,8 @@ function CollapsedArea({ area, active }: { area: NavArea; active: MainRailProps[
     return (
       <Link
         href={fn.href}
-        aria-label={area.label}
-        title={area.label}
+        aria-label={name}
+        title={name}
         aria-current={isActive ? "page" : undefined}
         className="mb-1 flex justify-center"
       >
@@ -195,7 +201,7 @@ function CollapsedArea({ area, active }: { area: NavArea; active: MainRailProps[
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger
-        aria-label={area.label}
+        aria-label={name}
         className="mb-1 flex w-full justify-center focus-visible:outline-none"
         onMouseEnter={() => setOpen(true)}
       >
@@ -208,12 +214,14 @@ function CollapsedArea({ area, active }: { area: NavArea; active: MainRailProps[
         onMouseLeave={() => setOpen(false)}
       >
         <div className="text-muted-foreground text-2xs px-2 pb-1 font-semibold tracking-wider uppercase">
-          {area.label}
+          {name}
         </div>
         {area.groups.map((group, i) => (
           <div key={group.label ?? i} className="flex flex-col gap-0.5">
             {group.label && (
-              <div className="text-muted-foreground/80 text-2xs px-2 pt-2 pb-1">{group.label}</div>
+              <div className="text-muted-foreground/80 text-2xs px-2 pt-2 pb-1">
+                {navLabel(nav, "groups", group.key ?? "", group.label)}
+              </div>
             )}
             {group.functions.map((fn) => (
               <FunctionLink

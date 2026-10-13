@@ -4,13 +4,12 @@ import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import { LIST_WORKLOADS_PAGE } from "@/graphql/registry/registry.queries";
 import { LIST_MANAGED_SERVICES_PAGE } from "@/graphql/services/services.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { ManagedServicesClient } from "../managed-services/managed-services-client";
 import { WorkloadsListClient } from "./workloads-list-client";
 
-export const metadata = {
-  title: "Workloads · Astrolift",
-};
+export const generateMetadata = routeTitle("workloads");
 
 /**
  * The Workloads tab: the app's deployment, statefulset, job and cronjob

@@ -1,8 +1,9 @@
 import { PageShell } from "@/components/PageShell";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { HomeSettingsClient } from "./home-settings-client";
 
-export const metadata = { title: "Home · Settings · Astrolift" };
+export const generateMetadata = routeTitle("home", "settings");
 
 export default function HomeSettingsPage() {
   return (

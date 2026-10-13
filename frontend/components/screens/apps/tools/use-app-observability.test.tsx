@@ -12,7 +12,9 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/apps/web/logs-metrics",
   useRouter: () => ({ replace: navigation.replace }),
 }));
-vi.mock("next-intl", () => ({ useTranslations: () => (key: string) => key }));
+vi.mock("next-intl", () => ({
+  useTranslations: () => Object.assign((key: string) => key, { has: () => false }),
+}));
 vi.mock("@/components/observability/use-metric-scope-options", () => ({
   useMetricScopeOptions: () => ({}),
 }));

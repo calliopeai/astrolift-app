@@ -58,7 +58,11 @@ vi.mock("next-intl", async (original) => {
   return {
     ...actual,
     useTranslations: (namespace?: string) =>
-      namespace?.startsWith("shared.") ? actual.useTranslations(namespace) : (key: string) => key,
+      namespace?.startsWith("shared.") ||
+      namespace?.startsWith("listDefinitions.") ||
+      namespace === "navModel"
+        ? actual.useTranslations(namespace)
+        : (key: string) => key,
   };
 });
 vi.mock("@/lib/permissions/use-my-permissions", () => ({

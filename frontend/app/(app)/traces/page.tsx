@@ -1,5 +1,6 @@
 import { TracesExplorer } from "@/components/screens/traces/TracesScreen";
-export const metadata = { title: "Traces · Astrolift" };
+import { routeTitle } from "@/lib/i18n/route-title";
+export const generateMetadata = routeTitle("traces");
 export default function TracesPage() {
   return <TracesExplorer />;
 }

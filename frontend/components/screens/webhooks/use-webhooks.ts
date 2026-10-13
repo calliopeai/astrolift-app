@@ -10,6 +10,7 @@ import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
 import type { CursorPage } from "@/components/data-table";
 import { useCursorFeed } from "@/components/feed/use-cursor-feed";
 import { useListState, useLocalListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
   CREATE_WEBHOOK,
@@ -80,8 +81,9 @@ export function useWebhooks(appSlug?: string) {
 
   // `astroliftWebhookSubscriptionsPage` takes `appSlug`, `search`, `limit`
   // and `after`, no sort argument, so no column declares a `sortKey`.
-  const routed = useListState(WEBHOOKS_LIST);
-  const local = useLocalListState(WEBHOOKS_LIST);
+  const definition = useLocalizedList(WEBHOOKS_LIST);
+  const routed = useListState(definition);
+  const local = useLocalListState(definition);
   const list = appSlug ? local : routed;
   const query = useQuery<SubscriptionsPageResp>(LIST_WEBHOOKS_PAGE, {
     variables: webhooksVariables(appSlug ?? null, list.filters, list.state),

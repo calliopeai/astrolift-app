@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
+import { routeTitle } from "@/lib/i18n/route-title";
 
-export const metadata = {
-  title: "Source providers · Astrolift",
-};
+export const generateMetadata = routeTitle("sourceProviders");
 
 /**
  * Source providers moved into the unified Providers page (#889). The SCM

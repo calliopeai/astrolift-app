@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { useReviewedStart } from "@/components/reviewed-starts/use-reviewed-start";
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import { useConfirm } from "@/hooks/use-confirm";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 import {
@@ -103,7 +104,7 @@ function toastErrors(errors: TieredValidationError[], fallback: string) {
  * data half of WorkflowsListScreen.
  */
 export function useWorkflowsList() {
-  const list = useListState(WORKFLOWS_LIST);
+  const list = useListState(useLocalizedList(WORKFLOWS_LIST));
   const { state } = list;
   const router = useRouter();
   const confirm = useConfirm();

@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { NewWorkflowClient } from "./new-workflow-client";
 
-export const metadata = { title: "New workflow · Astrolift" };
+export const generateMetadata = routeTitle("newWorkflow");
 
 /**
  * `/workflows/new`: the stepped New workflow page (Source · Stages · Review),

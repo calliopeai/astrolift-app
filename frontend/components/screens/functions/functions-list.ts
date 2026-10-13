@@ -5,15 +5,16 @@
  * (#1233, #2155); the server answers every view, chip, search, sort and
  * page. Pure.
  */
-import { type ListDefinition, standardViews } from "@/components/list/list-state";
+import { type CopiedListDefinition, standardViews } from "@/components/list/list-state";
 import type { NumberedListQuery } from "@/components/screens/agents/skills/catalog";
 import {
   WORKLOADS_MINE_NOTE,
   workloadsPageVariables,
 } from "@/components/screens/workloads/workloads-list";
 
-export const FUNCTIONS_LIST: ListDefinition = {
+export const FUNCTIONS_LIST: CopiedListDefinition = {
   id: "agents.functions",
+  copy: "functions",
   fields: [
     // Free text: the owning app's slug.
     { key: "app", label: "App" },

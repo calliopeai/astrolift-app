@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { useHeldRows } from "@/components/list/use-held-rows";
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import {
   filterRunRows,
   fromWorkflowRun,
@@ -40,7 +41,7 @@ const DEFINITION_RUNS_LIMIT = 100;
  * no current stage, so it gets no live view.
  */
 export function useWorkflowRunsTab(framed: FramedWorkflow): WorkflowRunsTabProps {
-  const list = useListState(WORKFLOW_RUNS_LIST);
+  const list = useListState(useLocalizedList(WORKFLOW_RUNS_LIST));
   const [now] = React.useState(() => Date.now());
   const firstPage = list.state.after === null;
   const configured = framed.kind === "configured" ? framed.workflow : null;

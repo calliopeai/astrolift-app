@@ -60,6 +60,8 @@ export interface NavFunction {
 }
 
 export interface NavGroup {
+  /** Names the group's label in the catalog: `navModel.groups.<key>`. */
+  key?: string;
   label?: string;
   functions: NavFunction[];
 }
@@ -223,6 +225,7 @@ export const NAV: NavArea[] = [
     icon: SettingsIcon,
     groups: [
       {
+        key: "organization",
         label: "Organization",
         functions: [
           {
@@ -251,6 +254,7 @@ export const NAV: NavArea[] = [
         ],
       },
       {
+        key: "infrastructure",
         label: "Infrastructure",
         functions: [
           {
@@ -279,6 +283,7 @@ export const NAV: NavArea[] = [
         ],
       },
       {
+        key: "governance",
         label: "Usage & governance",
         functions: [
           {
@@ -322,6 +327,7 @@ export const NAV: NavArea[] = [
         ],
       },
       {
+        key: "signals",
         label: "Platform signals",
         functions: [
           {
@@ -395,18 +401,50 @@ export function activeFor(
 /**
  * The first crumb of a page inside an area (spec 44 §4.4 rule 3): the area's
  * name, switching between its functions, with `active` checked. Read from
- * this model so the rail and the breadcrumb always agree (rule 7).
+ * this model so the rail and the breadcrumb always agree (rule 7). The crumb
+ * and its options carry their nav keys, so the header shows them in the
+ * viewer's language (`navLabel`).
  */
 export function areaSwitcher(
   nav: NavArea[],
   area: NavArea["key"],
   active: string
-): { label: string; switcher: { label: string; href: string; active: boolean }[] } {
+): {
+  label: string;
+  navArea: NavArea["key"];
+  switcher: { label: string; href: string; active: boolean; navFunction: string }[];
+} {
   const found = nav.find((a) => a.key === area);
   return {
     label: found?.label ?? area,
+    navArea: area,
     switcher: (found?.groups ?? []).flatMap((g) =>
-      g.functions.map((f) => ({ label: f.label, href: f.href, active: f.key === active }))
+      g.functions.map((f) => ({
+        label: f.label,
+        href: f.href,
+        active: f.key === active,
+        navFunction: f.key,
+      }))
     ),
   };
+}
+
+/** The catalog's `navModel` translator, or anything with its shape. */
+export interface NavCopy {
+  (key: string): string;
+  has: (key: string) => boolean;
+}
+
+/**
+ * A rail name in the viewer's language (#2381): `navModel.<kind>.<key>`. A
+ * key the catalog does not have yet keeps the model's English label.
+ */
+export function navLabel(
+  t: NavCopy,
+  kind: "areas" | "groups" | "functions",
+  key: string,
+  fallback: string
+): string {
+  const id = `${kind}.${key}`;
+  return t.has(id) ? t(id) : fallback;
 }

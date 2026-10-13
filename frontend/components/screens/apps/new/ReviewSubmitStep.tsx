@@ -6,7 +6,6 @@ import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import type { SourceKind, TriggerMode } from "@/graphql/registry/registry.types";
-import { TOPOLOGY_META } from "@/lib/topology";
 
 import { deployPreview } from "./deploy-preview";
 
@@ -269,6 +268,7 @@ export function ReviewSubmitStepView({
  */
 function WhatWillDeploy({ state }: { state: ReviewSubmitFields }) {
   const t = useTranslations("appWizard.review");
+  const shapes = useTranslations("vizRender");
   const preview = state.manifestLater ? null : deployPreview(state.manifestRaw);
   const deploys = state.deployTiming !== "skip" && state.triggerFirstDeploy;
   return (
@@ -290,9 +290,9 @@ function WhatWillDeploy({ state }: { state: ReviewSubmitFields }) {
       ) : (
         <div className="min-w-0 rounded-md border">
           <div className="flex min-w-0 flex-wrap items-center gap-2 border-b p-3 text-sm">
-            <span className="font-medium">{TOPOLOGY_META[preview.topology].label}</span>
+            <span className="font-medium">{shapes(`topology.${preview.topology}`)}</span>
             <span className="text-muted-foreground text-xs">
-              {TOPOLOGY_META[preview.topology].blurb}
+              {shapes(`topologyBlurbs.${preview.topology}`)}
             </span>
           </div>
           <ul className="divide-y">

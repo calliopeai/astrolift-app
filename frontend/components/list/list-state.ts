@@ -69,17 +69,30 @@ export interface ListDefinition {
 }
 
 /**
+ * A declaration whose labels are translated: `listDefinitions.<copy>` in
+ * every catalog, applied by `useLocalizedList` (#2381). The labels declared
+ * on it are the English copy.
+ */
+export interface CopiedListDefinition extends ListDefinition {
+  copy: string;
+}
+
+/**
  * Every list has All and Mine (spec 44 §4.4, decision 18). The caller says
- * what Mine filters on (`{ owner: "me" }`, `{ startedBy: "me" }`).
+ * what Mine filters on (`{ owner: "me" }`, `{ startedBy: "me" }`), and a
+ * list built from translated copy passes the two tabs' names in `labels`.
  */
 export function standardViews(
   mine: Record<string, string>,
   extra: ListView[] = [],
-  { mineNote }: { mineNote?: string } = {}
+  {
+    mineNote,
+    labels = { all: "All", mine: "Mine" },
+  }: { mineNote?: string; labels?: { all: string; mine: string } } = {}
 ): ListView[] {
   return [
-    { key: "all", label: "All", filters: {} },
-    { key: "mine", label: "Mine", filters: mine, note: mineNote },
+    { key: "all", label: labels.all, filters: {} },
+    { key: "mine", label: labels.mine, filters: mine, note: mineNote },
     ...extra,
   ];
 }

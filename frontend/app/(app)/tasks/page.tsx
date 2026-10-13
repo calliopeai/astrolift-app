@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { TasksClient } from "./tasks-client";
 
-export const metadata = { title: "Runs · Astrolift" };
+export const generateMetadata = routeTitle("runs");
 
 /** The old /tasks tabs, and where each went. */
 const FORMER_TABS: Record<string, string> = {

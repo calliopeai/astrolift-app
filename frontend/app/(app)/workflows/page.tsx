@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 
 import { workflowsFormerTabTarget } from "@/components/screens/workflows/list/workflows-list";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { WorkflowsClient } from "./workflows-client";
 
-export const metadata = { title: "Workflows · Astrolift" };
+export const generateMetadata = routeTitle("workflows");
 
 /**
  * Agents › Workflows: every workflow, one list (spec 44 §5.1). The old page's

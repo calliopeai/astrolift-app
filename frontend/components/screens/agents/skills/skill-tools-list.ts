@@ -4,7 +4,7 @@
  * sort and page (`orgToolDefsPage` narrowed to this skill, #2155). A skill's
  * tools have no owner of their own, so there is no Mine. Pure.
  */
-import type { ListDefinition } from "@/components/list/list-state";
+import type { CopiedListDefinition } from "@/components/list/list-state";
 
 import { type NumberedListQuery, numberedPageVariables } from "./catalog";
 import { ADAPTERS } from "./tool-adapters";
@@ -13,8 +13,9 @@ import type { ToolDef } from "./use-skill-tool-defs";
 /** A tool as the tab lists it: no schemas, which only the tool's own page reads. */
 export type SkillToolRow = Omit<ToolDef, "inputSchema" | "outputSchema">;
 
-export const SKILL_TOOLS_LIST: ListDefinition = {
+export const SKILL_TOOLS_LIST: CopiedListDefinition = {
   id: "agents.skill.tools",
+  copy: "skillTools",
   fields: [{ key: "adapter", label: "Adapter", options: ADAPTERS }],
   searchPlaceholder: "Search tools, slugs, handlers…",
   defaultSort: [{ key: "name", dir: "asc" }],

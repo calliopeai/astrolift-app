@@ -2,9 +2,12 @@ import { renderWithIntl as render } from "@/test/render-with-intl";
 import { ApolloClient, ApolloLink, InMemoryCache } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
 import { act, fireEvent, renderHook, screen, waitFor } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import type { ReactNode } from "react";
 import { Observable } from "rxjs";
 import { describe, expect, it, vi } from "vitest";
+
+import messages from "@/messages/en.json";
 
 import { TaskHomeScreen } from "./apps/homes/TaskHome";
 import { useTaskRuns } from "./apps/homes/use-task-runs";
@@ -60,6 +63,7 @@ vi.mock("next-intl", async (importOriginal) => {
     ...actual,
     useTranslations: (namespace?: string) =>
       namespace?.startsWith("shared.") ||
+      namespace?.startsWith("listDefinitions.") ||
       namespace === "formSubmissions" ||
       namespace === "eventDetail"
         ? actual.useTranslations(namespace)
@@ -102,7 +106,9 @@ const transport = (initial: Payload = null, delayFor: (operation: string) => num
   return {
     client,
     wrapper: ({ children }: { children: ReactNode }) => (
-      <ApolloProvider client={client}>{children}</ApolloProvider>
+      <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
+        <ApolloProvider client={client}>{children}</ApolloProvider>
+      </NextIntlClientProvider>
     ),
     setPayload: (next: Payload) => {
       payload = next;

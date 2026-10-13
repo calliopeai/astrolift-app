@@ -1,26 +1,9 @@
 {
-  "nav": {
-    "section": "Platform",
-    "playground": "Playground",
-    "documentation": "Documentation",
-    "settings": "Settings",
-    "history": "History",
-    "starred": "Starred",
-    "introduction": "Introduction",
-    "getStarted": "Get Started",
-    "tutorials": "Tutorials",
-    "changelog": "Changelog",
-    "general": "General",
-    "team": "Team",
-    "billing": "Billing",
-    "limits": "Limits",
-    "hooks": "Hooks"
-  },
   "user": {
-    "account": "Account",
-    "notifications": "Notifications",
+    "account": "アカウント",
+    "notifications": "通知",
     "rerunOnboarding": "オンボーディングをやり直す",
-    "logout": "Log out",
+    "logout": "ログアウト",
     "profile": "プロフィール",
     "documentation": "ドキュメント",
     "downloads": "ダウンロード",
@@ -374,7 +357,7 @@
     },
     "hints": {
       "wizard": "ウィザード",
-      "githubGitlab": "github / gitlab",
+      "githubGitlab": "GitHub / GitLab",
       "apiKeys": "API キー"
     },
     "entries": {
@@ -491,7 +474,8 @@
     "goToDashboard": "ダッシュボードへ移動",
     "notFound": "ページが見つかりません",
     "notFoundDescription": "お探しのページは存在しないか、移動されました。",
-    "goHome": "ホームへ"
+    "goHome": "ホームへ",
+    "critical": "重大なエラーが発生しました。ページを再読み込みしてください。"
   },
   "mainRail": {
     "label": "メイン",
@@ -575,15 +559,15 @@
     }
   },
   "language": {
-    "label": "Language",
-    "en": "English",
-    "es": "Spanish",
-    "fr": "French",
-    "de": "German",
-    "ja": "Japanese",
-    "ko": "Korean",
-    "zh-Hans": "Chinese (Simplified)",
-    "pt-BR": "Portuguese (Brazil)"
+    "label": "言語",
+    "en": "英語",
+    "es": "スペイン語",
+    "fr": "フランス語",
+    "de": "ドイツ語",
+    "ja": "日本語",
+    "ko": "韓国語",
+    "zh-Hans": "中国語（簡体字）",
+    "pt-BR": "ポルトガル語（ブラジル）"
   },
   "pageShell": {
     "collapseHeader": "ヘッダーを折りたたむ",
@@ -592,69 +576,13 @@
     "details": "詳細"
   },
   "a11y": {
-    "skipToContent": "Skip to main content"
-  },
-  "dashboard": {
-    "stats": {
-      "revenue": "Total revenue",
-      "orders": "Orders",
-      "customers": "Customers",
-      "products": "Products",
-      "fromLastMonth": "from last month"
-    },
-    "revenue": {
-      "title": "Revenue",
-      "description": "Monthly revenue for the last 12 months",
-      "label": "Revenue"
-    },
-    "channels": {
-      "title": "Channels",
-      "description": "Sales by acquisition channel",
-      "organic": "Organic",
-      "direct": "Direct",
-      "referral": "Referral",
-      "paid": "Paid"
-    },
-    "sales": {
-      "title": "Sales by category",
-      "description": "Units sold per product category this quarter",
-      "label": "Units sold",
-      "electronics": "Electronics",
-      "clothing": "Clothing",
-      "accessories": "Accessories",
-      "footwear": "Footwear",
-      "sports": "Sports"
-    }
+    "skipToContent": "メインコンテンツにスキップ"
   },
   "overview": {
     "title": "概要",
     "description": "この Astrolift インストールの ID・レジストリ・ライフサイクル情報。",
     "errorBanner": {
       "title": "一部のデータを読み込めませんでした"
-    },
-    "tiles": {
-      "teams": {
-        "label": "チーム",
-        "emptyCta": "最初のチームを作成"
-      },
-      "projects": {
-        "label": "プロジェクト",
-        "emptyCta": "プロジェクトを作成"
-      },
-      "apps": {
-        "label": "登録済みアプリ",
-        "emptyCta": "最初のアプリを登録"
-      },
-      "deployments": {
-        "label": "進行中のデプロイ",
-        "emptyCta": "デプロイを実行"
-      },
-      "costMtd": {
-        "label": "コスト (月初来)",
-        "emptyCta": "コストデータを待機中",
-        "vsPrevMonth": "前月比",
-        "noPrevMonth": "前月実績なし"
-      }
     },
     "fleetHealth": {
       "title": "フリートの状態",
@@ -695,134 +623,109 @@
     }
   },
   "onboarding": {
-    "title": "Welcome to Astrolift",
-    "description": "Four quick steps to land your first app on the platform.",
-    "skipCta": "Skip for now",
-    "backCta": "Back",
-    "nextCta": "Next",
-    "finishCta": "Finish setup",
+    "title": "Astrolift へようこそ",
+    "description": "4 つの簡単なステップで、最初のアプリをプラットフォームに導入します。",
+    "skipCta": "今はスキップ",
+    "backCta": "戻る",
+    "nextCta": "次へ",
+    "finishCta": "セットアップを完了",
     "a11y": {
-      "steps": "Onboarding progress"
+      "steps": "オンボーディングの進行状況"
     },
     "toast": {
-      "success": "Onboarding complete — you're all set.",
-      "skipFailed": "Couldn't save your skip. Try again.",
-      "teamFailed": "Couldn't create the team. Pick a different name or slug.",
-      "projectFailed": "Couldn't create the project. Pick a different name or slug.",
-      "appWarning": "Team and project created, but the app couldn't be registered. You can add it later from the apps page.",
-      "submitFailed": "Something went wrong while finishing setup."
+      "success": "オンボーディングが完了しました。準備はすべて整いました。",
+      "skipFailed": "スキップを保存できませんでした。もう一度お試しください。",
+      "teamFailed": "チームを作成できませんでした。別の名前またはスラッグを選んでください。",
+      "projectFailed": "プロジェクトを作成できませんでした。別の名前またはスラッグを選んでください。",
+      "appWarning": "チームとプロジェクトを作成しましたが、アプリを登録できませんでした。後でアプリページから追加できます。",
+      "submitFailed": "セットアップの完了中に問題が発生しました。"
     },
     "welcome": {
-      "greeting": "Let's start with a team.",
-      "description": "Teams own projects and apps. You'll add more later from the Teams page.",
-      "teamNameLabel": "Team name",
-      "teamNamePlaceholder": "e.g. Platform engineering",
-      "teamSlugLabel": "Team slug",
-      "teamSlugPlaceholder": "e.g. platform-eng",
-      "teamSlugHelp": "Lowercase letters, digits, and hyphens. Used in URLs and the CLI."
+      "greeting": "まずはチームから始めましょう。",
+      "description": "チームはプロジェクトとアプリを所有します。後でチームページからさらに追加できます。",
+      "teamNameLabel": "チーム名",
+      "teamNamePlaceholder": "例: プラットフォームエンジニアリング",
+      "teamSlugLabel": "チームのスラッグ",
+      "teamSlugPlaceholder": "例: platform-eng",
+      "teamSlugHelp": "英小文字、数字、ハイフン。URL と CLI で使われます。"
     },
     "project": {
-      "greeting": "Add a project under {team}.",
-      "description": "Projects group related apps inside a team.",
-      "projectNameLabel": "Project name",
-      "projectNamePlaceholder": "e.g. Web platform",
-      "projectSlugLabel": "Project slug",
-      "projectSlugPlaceholder": "e.g. web-platform",
-      "projectDescriptionLabel": "Description (optional)",
-      "projectDescriptionPlaceholder": "What does this project do?"
+      "greeting": "{team} にプロジェクトを追加しましょう。",
+      "description": "プロジェクトは、チーム内の関連するアプリをまとめます。",
+      "projectNameLabel": "プロジェクト名",
+      "projectNamePlaceholder": "例: Web プラットフォーム",
+      "projectSlugLabel": "プロジェクトのスラッグ",
+      "projectSlugPlaceholder": "例: web-platform",
+      "projectDescriptionLabel": "説明（任意）",
+      "projectDescriptionPlaceholder": "このプロジェクトは何をしますか？"
     },
     "repo": {
-      "greeting": "Connect a Git repository.",
-      "description": "Pick a repo to register as the first app in this project. You can skip this and add an app later.",
-      "connectionLabel": "Source connection",
-      "connectionPlaceholder": "Pick a connection",
-      "repoLabel": "Repository",
-      "repoPlaceholder": "Pick a repository",
-      "repoHelp": "Only repositories you have access to via this connection are listed.",
-      "repoFetchError": "Couldn't load repositories ({code}). You can skip this step.",
-      "archivedSuffix": "archived",
-      "defaultBranchLabel": "Default branch",
-      "optionalNote": "This step is optional. Skip to create the team and project without registering an app.",
-      "noConnectionsTitle": "No source providers configured yet.",
-      "noConnectionsDescription": "Connect GitHub, GitLab, or another provider to register apps from this wizard.",
-      "connectCta": "Connect a provider",
-      "skipNote": "You can also skip this and configure a source provider later."
+      "greeting": "Git リポジトリを接続しましょう。",
+      "description": "このプロジェクトの最初のアプリとして登録するリポジトリを選択します。このステップをスキップして、後でアプリを追加することもできます。",
+      "connectionLabel": "ソース接続",
+      "connectionPlaceholder": "接続を選択",
+      "repoLabel": "リポジトリ",
+      "repoPlaceholder": "リポジトリを選択",
+      "repoHelp": "この接続でアクセスできるリポジトリのみが表示されます。",
+      "repoFetchError": "リポジトリを読み込めませんでした（{code}）。このステップはスキップできます。",
+      "archivedSuffix": "アーカイブ済み",
+      "defaultBranchLabel": "デフォルトブランチ",
+      "optionalNote": "このステップは任意です。スキップすると、アプリを登録せずにチームとプロジェクトを作成します。",
+      "noConnectionsTitle": "ソースプロバイダーはまだ設定されていません。",
+      "noConnectionsDescription": "GitHub、GitLab などのプロバイダーを接続すると、このウィザードからアプリを登録できます。",
+      "connectCta": "プロバイダーを接続",
+      "skipNote": "このステップをスキップして、後でソースプロバイダーを設定することもできます。"
     },
     "strategy": {
-      "title": "Pick a deploy strategy",
-      "description": "How should new versions roll out by default? You can tune this per-environment later.",
-      "summaryTitle": "Review",
+      "title": "デプロイ戦略を選択",
+      "description": "新しいバージョンをデフォルトでどのようにロールアウトしますか？後から環境ごとに調整できます。",
+      "summaryTitle": "確認",
       "summary": {
-        "team": "Team",
-        "project": "Project",
-        "repo": "Repository",
-        "repoSkipped": "Skipped — add later",
-        "strategy": "Strategy"
+        "team": "チーム",
+        "project": "プロジェクト",
+        "repo": "リポジトリ",
+        "repoSkipped": "スキップ（後で追加）",
+        "strategy": "戦略"
       },
-      "intentNote": "This sets the default for new apps in this project. The astrolift.toml manifest is the source of truth — you can edit it from the app's config page.",
+      "intentNote": "この設定は、このプロジェクトの新しいアプリのデフォルトになります。astrolift.toml マニフェストが信頼できる唯一の情報源で、アプリの設定ページから編集できます。",
       "options": {
         "rolling": {
-          "label": "Rolling",
-          "description": "Replace pods one by one. Lowest risk for stateless services."
+          "label": "ローリング",
+          "description": "Pod を 1 つずつ置き換えます。ステートレスなサービスでは最もリスクの低い方法です。"
         },
         "blue-green": {
-          "label": "Blue / green",
-          "description": "Stand up the new version alongside the old, then flip traffic."
+          "label": "ブルー / グリーン",
+          "description": "新しいバージョンを古いバージョンと並行して起動し、その後トラフィックを切り替えます。"
         },
         "canary": {
-          "label": "Canary",
-          "description": "Send a small slice of traffic to the new version, then expand."
+          "label": "カナリア",
+          "description": "トラフィックのごく一部を新しいバージョンに送り、その後拡大します。"
         }
       }
     },
     "tour": {
-      "progress": "Step {current} of {total}",
-      "dontShowAgain": "Don't show again",
-      "skipCta": "Skip",
-      "nextCta": "Next",
-      "finishCta": "Got it",
+      "progress": "ステップ {current}/{total}",
+      "dontShowAgain": "今後表示しない",
+      "skipCta": "スキップ",
+      "nextCta": "次へ",
+      "finishCta": "わかりました",
       "steps": {
         "apps-tile": {
-          "title": "Your apps live here",
-          "description": "This tile counts every app registered on the platform. Click through to see the full list."
+          "title": "アプリはここで確認できます",
+          "description": "このタイルには、プラットフォームに登録されたすべてのアプリの数が表示されます。クリックすると一覧全体を表示できます。"
         },
         "apps-nav": {
-          "title": "Register apps to start deploying",
-          "description": "Connect a Git repo to register a new app and roll your first deployment."
+          "title": "アプリを登録してデプロイを開始",
+          "description": "Git リポジトリを接続して新しいアプリを登録し、最初のデプロイを実行します。"
         },
         "clusters-nav": {
-          "title": "Add a cluster to deploy to",
-          "description": "Apps deploy to clusters you've onboarded. Bring in your first cluster from this page."
+          "title": "デプロイ先のクラスターを追加",
+          "description": "アプリは、オンボードしたクラスターにデプロイされます。このページから最初のクラスターを追加してください。"
         }
       }
     }
   },
   "settings": {
-    "title": "Settings",
-    "description": "Manage your application preferences.",
-    "language": {
-      "title": "Language",
-      "description": "Choose the language used throughout the interface."
-    },
-    "theme": {
-      "title": "Appearance",
-      "description": "Choose your preferred color scheme.",
-      "light": "Light",
-      "dark": "Dark",
-      "system": "System"
-    },
-    "nav": {
-      "ariaLabel": "設定セクション",
-      "openMobileNav": "設定メニューを開く",
-      "openMobileNavLabel": "セクション",
-      "mobileTitle": "設定セクション",
-      "mobileDescription": "設定の任意の領域にジャンプします。",
-      "groups": {
-        "organization": "組織",
-        "personal": "個人",
-        "tokens": "トークン"
-      }
-    },
     "breadcrumb": {
       "root": "設定"
     },
@@ -1298,7 +1201,9 @@
     "relatedTitle": "関連項目",
     "relatedGetStarted": "<link>はじめに</link>: スタックをローカルで起動します。そこでの環境変数のデフォルトは docker-compose のサービス名です。",
     "relatedIdentityProviders": "<link>ID プロバイダー</link>: AUTH0_* / ASTROLIFT_IDP_* 変数を詳しく説明しています。",
-    "relatedClusterPrerequisites": "<link>クラスターの前提条件</link>: これらの環境変数とは別にテナントクラスターに必要なもの。"
+    "relatedClusterPrerequisites": "<link>クラスターの前提条件</link>: これらの環境変数とは別にテナントクラスターに必要なもの。",
+    "allView": "すべて",
+    "mineView": "自分の項目"
   },
   "docsWebhookEvents": {
     "title": "Webhook イベント",
@@ -1363,7 +1268,9 @@
       "secrets": "シークレット",
       "identity": "ID",
       "registry": "レジストリ"
-    }
+    },
+    "allView": "すべて",
+    "mineView": "自分の項目"
   },
   "docsIntroduction": {
     "title": "概要",
@@ -1445,43 +1352,6 @@
       "beginner": "初級",
       "intermediate": "中級",
       "advanced": "上級"
-    }
-  },
-  "hooks": {
-    "title": "Hooks",
-    "description": "Interactive demos for the built-in utility hooks.",
-    "debounce": {
-      "title": "useDebounce",
-      "description": "Value updates only after typing has stopped for 300 ms.",
-      "label": "Search input",
-      "placeholder": "Type something…",
-      "raw": "Raw value",
-      "debounced": "Debounced value"
-    },
-    "localStorage": {
-      "title": "useLocalStorage",
-      "description": "Counter persisted to localStorage — survives page refresh.",
-      "label": "Count",
-      "increment": "Increment",
-      "reset": "Reset"
-    },
-    "clipboard": {
-      "title": "useCopyToClipboard",
-      "description": "Copies text to the clipboard; button resets after 2 seconds.",
-      "label": "Text to copy",
-      "copy": "Copy",
-      "copied": "Copied!"
-    },
-    "confirm": {
-      "title": "useConfirm",
-      "description": "Awaits a Promise from an AlertDialog — no local dialog state required.",
-      "trigger": "Delete item",
-      "dialogTitle": "Delete this item?",
-      "dialogDescription": "This action cannot be undone.",
-      "confirmLabel": "Delete",
-      "cancelLabel": "Cancel",
-      "resultConfirmed": "Confirmed — item deleted.",
-      "resultCancelled": "Cancelled."
     }
   },
   "apps": {
@@ -1630,121 +1500,121 @@
     },
     "workloadDetail": {
       "resourceUsage": {
-        "title": "Live resource usage",
+        "title": "ライブのリソース使用量",
         "cpuTitle": "CPU",
-        "memoryTitle": "Memory",
-        "ofRequest": "of request",
-        "ofLimit": "of limit",
-        "currentLabel": "Current",
-        "requestLabel": "Request",
-        "limitLabel": "Limit",
-        "empty": "Live metrics are not flowing for this workload yet. Configure a Prometheus endpoint on the cluster, or wait a minute after the first deploy for the scrape to land.",
-        "sourcedAt": "sampled"
+        "memoryTitle": "メモリ",
+        "ofRequest": "要求比",
+        "ofLimit": "上限比",
+        "currentLabel": "現在",
+        "requestLabel": "要求",
+        "limitLabel": "上限",
+        "empty": "このワークロードのライブメトリクスはまだ届いていません。クラスターに Prometheus エンドポイントを構成するか、初回デプロイ後にスクレイプ結果が反映されるまで 1 分ほどお待ちください。",
+        "sourcedAt": "サンプル取得"
       },
       "scaling": {
-        "title": "Scaling",
-        "manualHeading": "Manual replicas",
-        "manualDescription": "Set the desired replica count. The platform will issue a single patch against the workload's Deployment; the rollout controller drives the rest.",
-        "currentReplicas": "Current",
-        "desiredReplicas": "Desired",
-        "readyReplicas": "Ready",
+        "title": "スケーリング",
+        "manualHeading": "手動レプリカ数",
+        "manualDescription": "希望するレプリカ数を設定します。プラットフォームはワークロードの Deployment にパッチを 1 回だけ適用し、残りはロールアウトコントローラーが処理します。",
+        "currentReplicas": "現在",
+        "desiredReplicas": "希望数",
+        "readyReplicas": "準備完了",
         "hpaHeading": "HPA",
-        "hpaEnabledLabel": "auto-scaling on",
-        "hpaDisabledLabel": "auto-scaling off",
-        "hpaDescription": "When the HPA is enabled the platform won't override its decisions — manual scales are still applied but the controller may reconcile them back inside seconds. Disable the HPA in the manifest to pin the count.",
-        "hpaMin": "Min",
-        "hpaMax": "Max",
-        "hpaTarget": "Target CPU",
-        "hpaCurrent": "Current",
-        "hpaLastScaleAt": "Last scale event",
-        "scalingUp": "Scaling up…",
-        "scalingDown": "Scaling down…",
-        "applyButton": "Apply",
-        "applyingButton": "Applying…",
-        "successToast": "Scale applied — {replicas} replicas requested",
-        "errorToast": "Couldn't apply scale: {message}",
-        "permissionDenied": "You need app.deploy to scale this workload.",
+        "hpaEnabledLabel": "オートスケーリング有効",
+        "hpaDisabledLabel": "オートスケーリング無効",
+        "hpaDescription": "HPA が有効な場合、プラットフォームはその判断を上書きしません。手動スケールも適用されますが、コントローラーが数秒以内に元に戻す場合があります。レプリカ数を固定するには、マニフェストで HPA を無効にしてください。",
+        "hpaMin": "最小",
+        "hpaMax": "最大",
+        "hpaTarget": "CPU 目標値",
+        "hpaCurrent": "現在",
+        "hpaLastScaleAt": "直近のスケールイベント",
+        "scalingUp": "スケールアップ中…",
+        "scalingDown": "スケールダウン中…",
+        "applyButton": "適用",
+        "applyingButton": "適用中…",
+        "successToast": "スケールを適用しました（要求したレプリカ数：{replicas}）",
+        "errorToast": "スケールを適用できませんでした：{message}",
+        "permissionDenied": "このワークロードをスケールするには app.deploy 権限が必要です。",
         "unknownError": "不明なエラー"
       },
       "manifest": {
-        "title": "Manifest",
-        "description": "Kubernetes resources the platform would apply for this workload. Toggle Diff to compare against the previously deployed image tag.",
-        "viewToggleManifest": "Manifest",
-        "viewToggleDiff": "Diff",
-        "noResources": "No resources rendered for this workload — the manifest may not declare it yet.",
-        "errorTitle": "Manifest error",
-        "diffEmpty": "No diff — the rendered manifest matches the previously deployed revision byte-for-byte.",
-        "diffPreviousLabel": "Previously deployed",
-        "diffCurrentLabel": "Current",
-        "diffNoHistory": "No prior deployment to diff against. The first deploy lands the baseline."
+        "title": "マニフェスト",
+        "description": "プラットフォームがこのワークロードに適用する予定の Kubernetes リソースです。「差分」に切り替えると、前回デプロイしたイメージタグと比較できます。",
+        "viewToggleManifest": "マニフェスト",
+        "viewToggleDiff": "差分",
+        "noResources": "このワークロードのリソースはレンダリングされていません。マニフェストでまだ宣言されていない可能性があります。",
+        "errorTitle": "マニフェストのエラー",
+        "diffEmpty": "差分はありません。レンダリングされたマニフェストは、前回デプロイしたリビジョンとバイト単位で一致しています。",
+        "diffPreviousLabel": "前回のデプロイ",
+        "diffCurrentLabel": "現在",
+        "diffNoHistory": "比較対象となる過去のデプロイはありません。最初のデプロイが基準になります。"
       },
       "podStatus": {
-        "title": "Pod status",
-        "headerStatus": "Status",
-        "headerCount": "Count",
-        "headerPercent": "% of total",
-        "empty": "No live pods reported. Either the workload hasn't been deployed yet, the runtime cluster is unreachable, or the manifest declared zero replicas.",
-        "podsCount": "{count} pods",
-        "bucketEmpty": "No pod names returned for this bucket.",
-        "notReady": "not ready"
+        "title": "Pod のステータス",
+        "headerStatus": "ステータス",
+        "headerCount": "件数",
+        "headerPercent": "全体に占める割合",
+        "empty": "稼働中の Pod は報告されていません。ワークロードがまだデプロイされていないか、ランタイムクラスターに到達できないか、マニフェストでレプリカ数が 0 に宣言されています。",
+        "podsCount": "Pod {count} 個",
+        "bucketEmpty": "この区分の Pod 名は返されませんでした。",
+        "notReady": "準備未完了"
       },
       "pods": {
-        "title": "Pods",
-        "empty": "No pods reported for this workload yet.",
-        "columnName": "Name",
-        "columnStatus": "Status",
-        "columnRestarts": "Restarts",
-        "columnNode": "Node",
-        "columnAge": "Age",
-        "flapping": "flapping",
-        "restartReasonsHeading": "Last restart reasons"
+        "title": "Pod",
+        "empty": "このワークロードについて報告された Pod はまだありません。",
+        "columnName": "名前",
+        "columnStatus": "ステータス",
+        "columnRestarts": "再起動",
+        "columnNode": "ノード",
+        "columnAge": "経過時間",
+        "flapping": "不安定",
+        "restartReasonsHeading": "直近の再起動理由"
       },
       "containers": {
         "init": {
-          "title": "Init containers",
-          "description": "Run to completion before the primary starts. Resource budget excluded from steady-state accounting.",
-          "empty": "No init containers declared."
+          "title": "Init コンテナ",
+          "description": "プライマリの起動前に完了まで実行されます。リソース予算は定常状態の集計から除外されます。",
+          "empty": "Init コンテナは宣言されていません。"
         },
         "primary": {
-          "title": "Primary",
-          "description": "The workload's main container — the row whose name matches the workload slug.",
-          "empty": "No primary container detected. Check the workload's container names."
+          "title": "プライマリ",
+          "description": "ワークロードのメインコンテナです。名前がワークロードのスラッグと一致する行が該当します。",
+          "empty": "プライマリコンテナが検出されませんでした。ワークロードのコンテナ名を確認してください。"
         },
         "sidecars": {
-          "title": "Sidecars",
-          "description": "Auxiliary containers (service meshes, log shippers). Their resources don't roll into the primary's budget.",
-          "empty": "No sidecars detected."
+          "title": "サイドカー",
+          "description": "補助コンテナ（サービスメッシュ、ログ転送）です。これらのリソースはプライマリの予算に含まれません。",
+          "empty": "サイドカーは検出されませんでした。"
         },
-        "image": "Image",
-        "cpuReqLimit": "CPU req/limit",
-        "memReqLimit": "Memory req/limit",
-        "restarts": "Restarts",
-        "empty": "This workload has no containers declared in the manifest and no live pods reporting either."
+        "image": "イメージ",
+        "cpuReqLimit": "CPU 要求/上限",
+        "memReqLimit": "メモリ 要求/上限",
+        "restarts": "再起動",
+        "empty": "このワークロードには、マニフェストで宣言されたコンテナも、報告を送っている稼働中の Pod もありません。"
       },
       "fqdn": {
-        "label": "In-cluster service",
-        "copyTitle": "Click to copy",
-        "copyToast": "Copied service FQDN to clipboard",
-        "copyError": "Couldn't copy — select the text and copy manually",
-        "unavailable": "FQDN unavailable — the app row is missing an organization."
+        "label": "クラスター内サービス",
+        "copyTitle": "クリックしてコピー",
+        "copyToast": "サービスの FQDN をクリップボードにコピーしました",
+        "copyError": "コピーできませんでした。テキストを選択して手動でコピーしてください",
+        "unavailable": "FQDN を利用できません。アプリの行に組織が設定されていません。"
       },
       "probes": {
-        "title": "Health probes",
-        "description": "Startup, readiness, and liveness probes declared in the manifest. Read-only — edit in astrolift.toml.",
+        "title": "ヘルスプローブ",
+        "description": "マニフェストで宣言された Startup、Readiness、Liveness の各プローブです。読み取り専用です。編集は astrolift.toml で行ってください。",
         "startup": "Startup",
         "readiness": "Readiness",
         "liveness": "Liveness",
-        "notConfigured": "not configured",
-        "container": "Container",
-        "empty": "No probes declared in the manifest. The workload runs without explicit startup/readiness/liveness gates."
+        "notConfigured": "未設定",
+        "container": "コンテナ",
+        "empty": "マニフェストでプローブが宣言されていません。ワークロードは、明示的な Startup/Readiness/Liveness のゲートなしで実行されます。"
       },
       "volumes": {
-        "title": "Volumes",
-        "description": "Persistent and ephemeral volumes declared in the manifest, plus their mount paths.",
-        "columnName": "Name",
-        "columnKind": "Kind",
-        "columnMount": "Mount path",
-        "columnDetail": "Detail"
+        "title": "ボリューム",
+        "description": "マニフェストで宣言された永続ボリュームと一時ボリューム、およびそのマウントパスです。",
+        "columnName": "名前",
+        "columnKind": "種類",
+        "columnMount": "マウントパス",
+        "columnDetail": "詳細"
       }
     },
     "previews": {
@@ -1882,14 +1752,14 @@
         "warningBadgeLabel": "警告",
         "collapse": "折りたたむ",
         "expand": "展開する",
-        "title": "Recent platform events",
-        "description": "App-scoped slice of the platform event stream — deploy lifecycle, scaling decisions, alert transitions.",
-        "all": "All events",
-        "emptyTitle": "No events for this app yet",
-        "emptyDescription": "Platform events appear here as deploys, scale changes, and alerts fire."
+        "title": "最近のプラットフォームイベント",
+        "description": "プラットフォームのイベントストリームのうち、このアプリに関するもの：デプロイのライフサイクル、スケーリングの判断、アラートの状態遷移。",
+        "all": "すべてのイベント",
+        "emptyTitle": "このアプリのイベントはまだありません",
+        "emptyDescription": "デプロイ、スケール変更、アラートの発生に応じて、プラットフォームのイベントがここに表示されます。"
       },
       "logs": {
-        "pressStreamAll": "「Stream」を押してすべてのレプリカを追跡します。",
+        "pressStreamAll": "「ストリーミング」を押してすべてのレプリカを追跡します。",
         "allReplicas": "すべてのレプリカ",
         "allReplicasDescription": "このアプリのすべてのレプリカからストリーミング — 各行には送信元 Pod のタグが付けられます。",
         "historicalDescription": "過去{range}のログ行を表示しています。",
@@ -1905,37 +1775,37 @@
           "6h": "過去 6 時間",
           "24h": "過去 24 時間"
         },
-        "title": "Live logs",
-        "streaming": "Streaming",
-        "fromCluster": "from the runtime cluster.",
-        "selectPrompt": "Select a pod above to tail its log stream.",
-        "clear": "Clear",
-        "pause": "Pause",
-        "stream": "Stream",
-        "waiting": "Waiting for the first line…",
-        "pressStream": "Press \"Stream\" to start tailing.",
-        "pickPod": "Pick a pod above first.",
-        "bufferCap": "Buffer is capped at {limit} lines. Use the CLI for a true tail without the buffer cap:",
-        "installCli": "Install the CLI",
+        "title": "ライブログ",
+        "streaming": "ストリーミング中:",
+        "fromCluster": "(ランタイムクラスターから)",
+        "selectPrompt": "ログストリームを追跡するには、上で Pod を選択してください。",
+        "clear": "クリア",
+        "pause": "一時停止",
+        "stream": "ストリーミング",
+        "waiting": "最初の行を待機中…",
+        "pressStream": "「ストリーミング」を押して追跡を開始します。",
+        "pickPod": "まず上で Pod を選択してください。",
+        "bufferCap": "バッファーの上限は {limit} 行です。バッファーの上限なしでログを追跡するには、CLI を使用してください：",
+        "installCli": "CLI をインストール",
         "export": "ログをエクスポート",
         "exportTitle": "バッファーされたログをダウンロード可能なファイルとしてエクスポート"
       },
-      "title": "{name} · Observability",
-      "description": "{slug} · pod state and log stream from the runtime cluster",
+      "title": "{name} · 可観測性",
+      "description": "{slug} · ランタイムクラスターからの Pod の状態とログストリーム",
       "pods": {
-        "title": "Pods",
-        "description": "Live pod state from the tenant cluster, refreshed every {seconds}s. Click a row to tail its logs below.",
-        "emptyTitle": "No pods running for this app",
-        "emptyDescription": "Once a deployment has rolled out and the cluster reports pods, they appear here. If you expected pods, check the deployment log.",
-        "emptyAction": "View deployment history",
+        "title": "Pod",
+        "description": "テナントクラスターから取得した Pod のライブ状態です（{seconds} 秒ごとに更新）。行をクリックすると、その Pod のログを下で追跡できます。",
+        "emptyTitle": "このアプリで実行中の Pod はありません",
+        "emptyDescription": "デプロイのロールアウトが完了し、クラスターが Pod を報告すると、ここに表示されます。Pod があるはずの場合は、デプロイログを確認してください。",
+        "emptyAction": "デプロイ履歴を表示",
         "columns": {
           "pod": "Pod",
-          "workload": "Workload",
-          "status": "Status",
-          "ready": "Ready",
-          "restarts": "Restarts",
-          "age": "Age",
-          "node": "Node"
+          "workload": "ワークロード",
+          "status": "ステータス",
+          "ready": "準備完了",
+          "restarts": "再起動",
+          "age": "経過時間",
+          "node": "ノード"
         }
       },
       "logExport": {
@@ -2769,34 +2639,34 @@
       "cancel": "キャンセル"
     },
     "logViewer": {
-      "searchPlaceholder": "Search log buffer…  (press / to focus)",
-      "searchAriaLabel": "Search log buffer",
-      "clearSearch": "Clear search",
-      "regexToggle": "Toggle regex",
-      "regexInvalid": "Invalid regex",
-      "matchCount": "{current} of {total}",
-      "matchNone": "0 matches",
-      "prevMatch": "Previous match (Shift+Enter)",
-      "nextMatch": "Next match (Enter)",
-      "containerLabel": "Container",
-      "containerAll": "All containers",
-      "copyAll": "Copy",
-      "copied": "Copied {count, plural, one {# line} other {# lines}} to clipboard",
-      "copyEmpty": "Nothing to copy — the buffer is empty.",
-      "copyFailed": "Couldn't copy — clipboard access blocked.",
-      "download": "Download",
-      "downloadEmpty": "Nothing to download — the buffer is empty.",
-      "downloadStarted": "Downloading {filename}",
-      "paneAriaLabel": "Log buffer",
-      "levelGroupLabel": "Filter by log level",
-      "bufferFootnote": "Showing {shown} of {buffered} buffered lines (cap {limit}).",
+      "searchPlaceholder": "ログバッファーを検索…（/ キーでフォーカス）",
+      "searchAriaLabel": "ログバッファーを検索",
+      "clearSearch": "検索をクリア",
+      "regexToggle": "正規表現を切り替え",
+      "regexInvalid": "無効な正規表現",
+      "matchCount": "{current} / {total} 件",
+      "matchNone": "0 件",
+      "prevMatch": "前の一致（Shift+Enter）",
+      "nextMatch": "次の一致（Enter）",
+      "containerLabel": "コンテナ",
+      "containerAll": "すべてのコンテナ",
+      "copyAll": "コピー",
+      "copied": "{count, plural, one {# 行} other {# 行}}をクリップボードにコピーしました",
+      "copyEmpty": "コピーする内容がありません。バッファーは空です。",
+      "copyFailed": "コピーできませんでした。クリップボードへのアクセスがブロックされています。",
+      "download": "ダウンロード",
+      "downloadEmpty": "ダウンロードする内容がありません。バッファーは空です。",
+      "downloadStarted": "{filename} をダウンロードしています",
+      "paneAriaLabel": "ログバッファー",
+      "levelGroupLabel": "ログレベルで絞り込む",
+      "bufferFootnote": "バッファー内の {buffered} 行のうち {shown} 行を表示しています（上限 {limit} 行）。",
       "level": {
-        "all": "All",
-        "error": "Error",
-        "warn": "Warn",
-        "info": "Info",
-        "debug": "Debug",
-        "other": "Other"
+        "all": "すべて",
+        "error": "エラー",
+        "warn": "警告",
+        "info": "情報",
+        "debug": "デバッグ",
+        "other": "その他"
       },
       "filterPlaceholder": "行を絞り込む…",
       "filteredEmpty": "レベルとテキストのフィルターに一致する行はありません。"
@@ -2813,29 +2683,29 @@
     },
     "wizard": {
       "approval": {
-        "toggleLabel": "Require approval before deploying",
-        "safer": "Safer",
-        "toggleHint": "Triggered deploys land in \"pending approval\" until an approver signs off. Pick a team OR a specific set of users — approvers can't self-approve a deploy they pushed.",
-        "teamLabel": "Approver team",
-        "teamPlaceholder": "No team selected",
-        "teamNoneOption": "No team — pick users instead",
-        "teamHint": "Any active member of this team may approve. Mutually exclusive with the user picker.",
-        "minimumLabel": "Required approver count",
-        "minimumHintUsers": "1–{max} based on your user selection.",
-        "minimumHintTeam": "Number of distinct approvers required. At least 1.",
-        "usersLabel": "Approver users",
-        "usersPlaceholderTeam": "Team mode selected — clear the team picker to add users.",
-        "usersPlaceholderEmpty": "No users selected yet.",
-        "userRemove": "Remove {label}",
-        "orphanRemove": "Remove orphaned approver {id}",
-        "orphanSuffix": "(no longer a member)",
-        "search": "Search org members by name or email…",
-        "loading": "Loading org members…",
-        "noMembers": "No active org members yet — invite someone first.",
-        "noMatch": "No members match the search.",
-        "errorPickAny": "Pick at least one approver — a team or one or more users.",
-        "errorBoth": "Pick a team OR specific users, not both.",
-        "errorMinTooHigh": "Minimum approvals cannot exceed the number of selected users."
+        "toggleLabel": "デプロイ前に承認を必須にする",
+        "safer": "より安全",
+        "toggleHint": "トリガーされたデプロイは、承認者が承認するまで「承認待ち」になります。チームまたは特定のユーザーのどちらかを選択してください。承認者は、自分がプッシュしたデプロイを自分で承認することはできません。",
+        "teamLabel": "承認者チーム",
+        "teamPlaceholder": "チームが選択されていません",
+        "teamNoneOption": "チームなし（代わりにユーザーを選択）",
+        "teamHint": "このチームの有効なメンバーなら誰でも承認できます。ユーザーの選択とは併用できません。",
+        "minimumLabel": "必要な承認者数",
+        "minimumHintUsers": "選択したユーザー数に基づき 1–{max} の範囲で指定します。",
+        "minimumHintTeam": "必要な承認者（別々のユーザー）の人数です。最小値は 1 です。",
+        "usersLabel": "承認者ユーザー",
+        "usersPlaceholderTeam": "チームモードが選択されています。ユーザーを追加するには、チームの選択を解除してください。",
+        "usersPlaceholderEmpty": "ユーザーはまだ選択されていません。",
+        "userRemove": "{label} を削除",
+        "orphanRemove": "孤立した承認者 {id} を削除",
+        "orphanSuffix": "（メンバーではなくなりました）",
+        "search": "名前またはメールアドレスで組織メンバーを検索…",
+        "loading": "組織メンバーを読み込み中…",
+        "noMembers": "有効な組織メンバーはまだいません。先にメンバーを招待してください。",
+        "noMatch": "検索に一致するメンバーはいません。",
+        "errorPickAny": "承認者を少なくとも 1 つ選択してください（チーム、または 1 人以上のユーザー）。",
+        "errorBoth": "チームと特定のユーザーのどちらか一方を選択してください。両方は選択できません。",
+        "errorMinTooHigh": "最小承認数は、選択したユーザー数を超えることはできません。"
       }
     },
     "deployments": {
@@ -2879,7 +2749,7 @@
         "all": "すべてのトリガー",
         "push": "プッシュ",
         "manual": "手動",
-        "ci": "ci",
+        "ci": "CI",
         "scheduled": "スケジュール",
         "rollback": "ロールバック",
         "promotion": "昇格"
@@ -3437,7 +3307,7 @@
         "noSkills": "スキルはまだありません",
         "noSkillsHint": "エージェントの知識を定義するには、少なくとも 1 つのスキルを追加してください。",
         "removeSkill": "スキルを削除",
-        "slug": "Slug",
+        "slug": "スラッグ",
         "skillName": "名前",
         "description": "説明",
         "content": "内容",
@@ -3583,70 +3453,70 @@
       }
     },
     "logs": {
-      "title": "{name} · Logs",
-      "description": "{slug} · live output from the running workloads",
+      "title": "{name} · ログ",
+      "description": "{slug} · 実行中のワークロードからのライブ出力",
       "logs": {
-        "title": "Live logs",
-        "selectPrompt": "Pick a pod to start tailing — sidecars surface under the container picker once a pod is selected.",
+        "title": "ライブログ",
+        "selectPrompt": "ログの追跡を開始するには Pod を選択してください。Pod を選択すると、サイドカーがコンテナの選択欄に表示されます。",
         "podLabel": "Pod",
-        "podPlaceholder": "Pick a pod…"
+        "podPlaceholder": "Pod を選択…"
       }
     },
     "shell": {
-      "title": "{name} · Shell",
-      "description": "{slug} · interactive shell into the running workloads",
+      "title": "{name} · ターミナル",
+      "description": "{slug} · 実行中のワークロードへの対話型シェル",
       "podLabel": "Pod",
-      "podPlaceholder": "Pick a pod…",
-      "containerLabel": "Container",
-      "containerPlaceholder": "Pick a container…",
+      "podPlaceholder": "Pod を選択…",
+      "containerLabel": "コンテナ",
+      "containerPlaceholder": "コンテナを選択…",
       "terminal": {
-        "title": "In-browser terminal",
-        "description": "Attach a PTY to a chosen pod and container — same backend protocol the CLI uses, no context switch.",
-        "open": "Open shell",
-        "close": "Close shell",
-        "targetDescription": "Ready to attach to {container} in {pod}.",
-        "pickTarget": "Pick a pod + container above to open a shell.",
-        "readyHint": "Click Open shell to attach the terminal.",
-        "ariaLabel": "Interactive pod terminal",
-        "statusConnecting": "Connecting to pod…",
+        "title": "ブラウザー内ターミナル",
+        "description": "選択した Pod とコンテナに PTY を接続します。CLI と同じバックエンドプロトコルを使うため、コンテキストを切り替える必要はありません。",
+        "open": "シェルを開く",
+        "close": "シェルを閉じる",
+        "targetDescription": "{pod} の {container} に接続する準備ができました。",
+        "pickTarget": "シェルを開くには、上で Pod とコンテナを選択してください。",
+        "readyHint": "「シェルを開く」をクリックしてターミナルを接続します。",
+        "ariaLabel": "Pod の対話型ターミナル",
+        "statusConnecting": "Pod に接続中…",
         "statusClosed": "セッションが終了しました。新しいシェルを開いてください。切断直前に送信した入力の結果は不明な場合があります。入力は再送されません。",
-        "statusDenied": "Permission denied — your role does not include app.exec_pod.",
-        "statusError": "Terminal error — see the log line above for details.",
+        "statusDenied": "権限がありません。ロールに app.exec_pod が含まれていません。",
+        "statusError": "ターミナルエラーです。詳細は上のログ行を確認してください。",
         "authExpired": "セッションの有効期限が切れました。再度サインインして新しいシェルを開いてください。",
-        "targetGone": "That target no longer exists — it may have been removed.",
-        "untilThen": "Or run {cli} locally — the CLI uses the same backend protocol.",
-        "install": "Install the CLI",
-        "manageTokens": "Manage deploy tokens",
-        "expand": "Expand to full screen",
-        "collapse": "Exit full screen (Esc)",
-        "popOut": "Open in a separate window",
-        "resizeHandle": "Drag to resize the terminal",
+        "targetGone": "その接続先はもう存在しません。削除された可能性があります。",
+        "untilThen": "または、ローカルで {cli} を実行してください。CLI も同じバックエンドプロトコルを使用します。",
+        "install": "CLI をインストール",
+        "manageTokens": "デプロイトークンを管理",
+        "expand": "全画面表示に切り替える",
+        "collapse": "全画面表示を終了（Esc）",
+        "popOut": "別のウィンドウで開く",
+        "resizeHandle": "ドラッグしてターミナルのサイズを変更",
         "stepUpRequired": "ここでコンソールを開くには、もう一度サインインしてください。"
       },
       "shortcuts": {
-        "title": "CLI shortcuts",
-        "description": "Common commands you'd run against this app. Each one authenticates with your local {login} session.",
-        "openShell": "Open an interactive shell",
-        "djangoCmd": "Run a Django management command",
-        "tailLogs": "Tail logs from the primary workload"
+        "title": "CLI ショートカット",
+        "description": "このアプリに対してよく実行するコマンドです。各コマンドは、ローカルの {login} セッションで認証されます。",
+        "openShell": "対話型シェルを開く",
+        "djangoCmd": "Django の管理コマンドを実行",
+        "tailLogs": "プライマリワークロードのログを追跡"
       },
-      "copy": "Copy command",
-      "copied": "Copied to clipboard",
-      "copyFailed": "Couldn't copy — clipboard access blocked",
+      "copy": "コマンドをコピー",
+      "copied": "クリップボードにコピーしました",
+      "copyFailed": "コピーできませんでした。クリップボードへのアクセスがブロックされています",
       "upload": {
-        "title": "Upload script",
-        "description": "Drop a .py / .sql / .sh / .ts / .js / .rb / .go file. We mint a pre-signed URL, push the bytes, and hand you a paste-ready curl + run pair.",
-        "pick": "Upload script",
-        "uploading": "Uploading…",
-        "clear": "Clear uploaded file",
-        "empty": "No file uploaded yet — the command palette below runs unchanged.",
-        "path": "Will land at {path}",
-        "runLabel": "Run command",
-        "fetchLabel": "Fetch into the pod first",
-        "note": "The pre-signed URL is scoped to this upload. Run the fetch command inside the pod before the run command; the bytes are fetched over HTTPS and dropped at /tmp.",
-        "success": "Uploaded {name}",
-        "failed": "Upload failed: {error}",
-        "noUrl": "no pre-signed URL returned"
+        "title": "スクリプトをアップロード",
+        "description": ".py / .sql / .sh / .ts / .js / .rb / .go ファイルをドロップしてください。署名付き URL を発行してファイルの内容を送信し、そのまま貼り付けられる curl コマンドと実行コマンドの組を用意します。",
+        "pick": "スクリプトをアップロード",
+        "uploading": "アップロード中…",
+        "clear": "アップロードしたファイルをクリア",
+        "empty": "ファイルはまだアップロードされていません。下のコマンドパレットは変更なしで実行されます。",
+        "path": "配置先：{path}",
+        "runLabel": "実行コマンド",
+        "fetchLabel": "まず Pod 内に取得",
+        "note": "署名付き URL はこのアップロード専用です。実行コマンドの前に、Pod 内で取得コマンドを実行してください。ファイルは HTTPS 経由で取得され、/tmp に保存されます。",
+        "success": "{name} をアップロードしました",
+        "failed": "アップロードに失敗しました：{error}",
+        "noUrl": "署名付き URL が返されませんでした"
       }
     },
     "workloadActions": {
@@ -4366,8 +4236,8 @@
       "copy": "コピー",
       "scopes": "必要な GitLab スコープ: <code>read_api</code>、<code>read_repository</code>、<code>read_user</code>。<em>Confidential</em> はオンのままにしてください。",
       "step3": "結果をここに貼り付け",
-      "applicationId": "Application ID",
-      "secret": "Secret",
+      "applicationId": "アプリケーション ID",
+      "secret": "シークレット",
       "secretHelp": "暗号化して保存されます。GitLab は Secret を一度しか表示しないため、ページを離れる前にコピーしてください。",
       "cancel": "キャンセル",
       "connecting": "接続中…",
@@ -4810,138 +4680,7 @@
       }
     }
   },
-  "settingsIndex": {
-    "title": "Settings",
-    "description": "Configure the platform's identity, security, and surfaces.",
-    "cardMeta": {
-      "modified": "Modified {when}"
-    },
-    "sections": {
-      "organization": {
-        "title": "Organization",
-        "description": "Display name, website, retention defaults."
-      },
-      "identityProvider": {
-        "title": "Identity provider",
-        "description": "OIDC / SAML config + SCIM provisioning."
-      },
-      "sourceProviders": {
-        "title": "Source providers",
-        "description": "Connect GitHub / GitLab / Gitea + manage SSH deploy keys."
-      },
-      "managedDomains": {
-        "title": "Managed domains",
-        "description": "DNS zones the platform manages for tenant apps and previews."
-      },
-      "policies": {
-        "title": "ABAC policies",
-        "description": "Runtime predicates layered on top of RBAC."
-      },
-      "permissions": {
-        "title": "Permissions",
-        "description": "Inspect every grant resolved for the current user."
-      },
-      "profile": {
-        "title": "Profile",
-        "description": "Theme + locale."
-      },
-      "security": {
-        "title": "Security",
-        "description": "Active sessions, MFA, admin elevation."
-      },
-      "notifications": {
-        "title": "Notifications",
-        "description": "Inbox of approvals, alerts, invitations."
-      },
-      "apiTokens": {
-        "title": "API tokens",
-        "description": "Long-lived bearer tokens for CLIs and bots."
-      },
-      "members": {
-        "title": "Members",
-        "description": "Org members, invitations, and role bindings."
-      },
-      "teams": {
-        "title": "Teams",
-        "description": "Group members for shared ownership of apps and projects."
-      },
-      "projects": {
-        "title": "Projects",
-        "description": "Logical groupings of apps owned by teams."
-      }
-    }
-  },
   "lists": {
-    "cost": {
-      "title": "Cost",
-      "description": "Currency-denominated platform spend, rolled up from CostSnapshot rows. Pick a time range; the trend chart marks anomalies (> 2σ day-over-day jumps); the per-resource panel attributes spend to specific managed-service bindings.",
-      "tabsLabel": "Time range",
-      "tab24h": "24h",
-      "tab7d": "7d",
-      "tab30d": "30d",
-      "tabMtd": "MTD",
-      "kpis": {
-        "projectedMonthly": "Projected monthly",
-        "budgets": "Budgets",
-        "window": {
-          "h24": "Last 24 hours",
-          "d7": "Last 7 days",
-          "d30": "Last 30 days",
-          "mtd": "Month to date"
-        }
-      },
-      "forecast": {
-        "vsPreviousMonth": "vs prev month",
-        "mtdLine": "MTD {mtd} · prev month {previous}",
-        "insufficientData": "Not enough daily cost data yet for a confident projection.",
-        "confidence": {
-          "low": "low confidence",
-          "medium": "med confidence",
-          "high": "high confidence"
-        }
-      },
-      "trend": {
-        "title": "Daily trend",
-        "description": "Per-day platform spend over the selected range. Marked points exceed the day-over-day rolling 2σ.",
-        "tooltipDailyTotal": "Daily total",
-        "anomaliesBadge": "{count} anomaly",
-        "emptyTitle": "No cost data in this window",
-        "emptyDescription": "The daily cost collector hasn't written snapshots for the selected range yet, or the cloud-side billing API hasn't reported usage. Live pricing data only — nothing is estimated client-side."
-      },
-      "budgets": {
-        "title": "Budgets",
-        "description": "Budgets fire alerts as you cross each percentage threshold.",
-        "emptyTitle": "No budgets configured",
-        "emptyDescription": "Budgets can be set per organization, team, or project.",
-        "columns": {
-          "scope": "Scope",
-          "period": "Period",
-          "spend": "Spend",
-          "budget": "Budget",
-          "alerts": "Alerts"
-        }
-      },
-      "byCategory": {
-        "title": "By category",
-        "description": "Spend split across workload / managed-service / egress / storage / other.",
-        "empty": "No cost data yet."
-      },
-      "attribution": {
-        "title": "Per-resource attribution",
-        "description": "Spend broken out by managed-service binding (e.g. main_db, events_queue, uploads_bucket). Untagged rows roll up under \"shared / untagged\" — usually shared egress or providers that don't yet apply the platform binding tag.",
-        "coverage": "Attribution coverage: {pct}% ({attributed} of {total})",
-        "unattributedRow": "Shared / untagged",
-        "emptyTitle": "No attributed cost rows",
-        "emptyDescription": "Bindings are visible only after the cloud-side cost driver tags resources with astrolift.io/binding at provision time. Track #432 from:backend for the provider-side rollout.",
-        "columns": {
-          "resource": "Resource",
-          "kind": "Kind",
-          "app": "App",
-          "category": "Category",
-          "amount": "Amount"
-        }
-      }
-    },
     "audit": {
       "title": "監査ログ",
       "description": "すべての権限判断と状態を変更する操作を、過去の記録を変更せずに追加します。組織ごとの分離はデータベースで適用されます。",
@@ -5037,72 +4776,72 @@
         "awaitingLabel": "未承認",
         "awaitingEmpty": "対象の承認者が見つかりません。アプリのポリシーを確認してください。"
       },
-      "title": "Approve deployment",
-      "loading": "Loading…",
-      "notFoundTitle": "Deployment not found",
-      "notFoundDescription": "The deployment doesn't exist or you don't have permission to view it.",
-      "expired": "The approval link may have expired, or the deployment was deleted. Return to the",
-      "deploymentsList": "deployments list",
+      "title": "デプロイを承認",
+      "loading": "読み込み中…",
+      "notFoundTitle": "デプロイが見つかりません",
+      "notFoundDescription": "デプロイが存在しないか、表示する権限がありません。",
+      "expired": "承認リンクの有効期限が切れたか、デプロイが削除された可能性があります。次のページに戻ってください:",
+      "deploymentsList": "デプロイ一覧",
       "fields": {
-        "imageTag": "Image tag",
-        "imageDigest": "Image digest",
-        "clusterRevision": "Cluster revision",
-        "workload": "Workload",
-        "created": "Created",
-        "started": "Started"
+        "imageTag": "イメージタグ",
+        "imageDigest": "イメージダイジェスト",
+        "clusterRevision": "クラスターのリビジョン",
+        "workload": "ワークロード",
+        "created": "作成日時",
+        "started": "開始日時"
       },
-      "approvalsCount": "{received} / {required} approvals",
-      "awaiting": "Awaiting approval",
-      "awaitingDesc": "{remaining} more approval(s) required before this deployment proceeds. Self-approval is rejected by the backend.",
-      "approve": "Approve",
-      "reject": "Reject",
-      "missingPermission": "You don't have app.approve_deploy; ask an org admin to approve.",
-      "viewDetail": "View full detail",
-      "viewDetailShort": "View detail",
-      "alreadyApproved": "Already approved",
-      "alreadyApprovedDesc": "The deployment moved past the approval gate. Status: {status}.",
-      "failed": "Deployment failed",
-      "failedDesc": "Approval no longer applies. Inspect the lifecycle log on the detail page.",
-      "noAction": "No approval action available in current state {status}.",
-      "selfTriggerBadge": "Pushed by you",
-      "selfTriggerHelp": "This deployment was triggered by you. Another approver is required (separation of duties).",
-      "rejectedReasonLabel": "Rejection reason",
+      "approvalsCount": "承認 {received} / {required}",
+      "awaiting": "承認待ち",
+      "awaitingDesc": "このデプロイを進めるには、あと {remaining} 件の承認が必要です。自己承認はバックエンドで拒否されます。",
+      "approve": "承認",
+      "reject": "却下",
+      "missingPermission": "app.approve_deploy 権限がありません。組織の管理者に承認を依頼してください。",
+      "viewDetail": "詳細をすべて表示",
+      "viewDetailShort": "詳細を表示",
+      "alreadyApproved": "承認済み",
+      "alreadyApprovedDesc": "デプロイは承認ゲートを通過しました。状態: {status}。",
+      "failed": "デプロイに失敗しました",
+      "failedDesc": "承認はもう適用されません。詳細ページでライフサイクルログを確認してください。",
+      "noAction": "現在の状態 {status} では、実行できる承認操作はありません。",
+      "selfTriggerBadge": "あなたがプッシュ",
+      "selfTriggerHelp": "このデプロイはあなたが開始しました。別の承認者が必要です（職務分掌）。",
+      "rejectedReasonLabel": "却下の理由",
       "commit": {
-        "viewDiff": "View commit",
-        "noMessage": "No commit message recorded for this deploy.",
-        "expand": "Show {hidden} more lines",
-        "collapse": "Collapse"
+        "viewDiff": "コミットを表示",
+        "noMessage": "このデプロイにはコミットメッセージが記録されていません。",
+        "expand": "さらに {hidden} 行を表示",
+        "collapse": "折りたたむ"
       },
       "toasts": {
-        "approved": "Approved — status now {status}",
-        "approveFailed": "Approve failed",
-        "rejected": "Deployment rejected",
-        "rejectFailed": "Reject failed"
+        "approved": "承認しました。現在の状態: {status}",
+        "approveFailed": "承認に失敗しました",
+        "rejected": "デプロイを却下しました",
+        "rejectFailed": "却下に失敗しました"
       },
       "history": {
-        "title": "Approval history",
-        "empty": "No approval events recorded yet.",
-        "actorUnknown": "unknown actor",
+        "title": "承認履歴",
+        "empty": "承認イベントはまだ記録されていません。",
+        "actorUnknown": "不明な実行者",
         "action": {
-          "started": "Deploy started",
-          "approved": "Approved",
-          "rejected": "Rejected",
-          "aborted": "Aborted",
-          "other": "Lifecycle event"
+          "started": "デプロイ開始",
+          "approved": "承認",
+          "rejected": "却下",
+          "aborted": "中止",
+          "other": "ライフサイクルイベント"
         }
       },
       "confirm": {
-        "title": "Approve deploy of {tag}?",
-        "description": "Unblocks the rollout to {app}/{env}. The workflow resumes immediately and traffic shifts according to the configured strategy. Self-approval on a deploy you triggered is rejected by the backend.",
-        "confirm": "Approve deployment"
+        "title": "{tag} のデプロイを承認しますか？",
+        "description": "{app}/{env} へのロールアウトのブロックを解除します。ワークフローはすぐに再開され、設定された戦略に従ってトラフィックが切り替わります。自分が開始したデプロイの自己承認はバックエンドで拒否されます。",
+        "confirm": "デプロイを承認"
       },
       "confirmReject": {
-        "title": "Reject deploy of {tag}?",
-        "description": "Marks the deployment failed for {app}/{env}. CI must re-trigger to create a fresh deployment for review.",
-        "reasonLabel": "Reason for rejection",
-        "reasonPlaceholder": "Why is this deploy being rejected? Persists on the audit log + history sidebar.",
-        "reasonRequired": "Reason required",
-        "confirm": "Reject deployment"
+        "title": "{tag} のデプロイを却下しますか？",
+        "description": "{app}/{env} のデプロイを失敗として記録します。レビュー用の新しいデプロイを作成するには、CI から再実行する必要があります。",
+        "reasonLabel": "却下の理由",
+        "reasonPlaceholder": "このデプロイを却下する理由は？監査ログと履歴サイドバーに保存されます。",
+        "reasonRequired": "理由を入力してください",
+        "confirm": "デプロイを却下"
       }
     },
     "approvalsQueue": {
@@ -5153,173 +4892,104 @@
       }
     },
     "events": {
-      "title": "Events",
-      "description": "Append-only platform fact log: every state change of interest to dashboards, webhooks, and event-driven workflows.",
-      "filterPlaceholder": "Filter by event type (e.g. app.deployed)",
-      "aggregateToggle": "Group repeats",
-      "aggregateBadge": "×{count} similar",
-      "expandLabel": "Expand",
-      "collapseLabel": "Collapse",
-      "sourceLabel": "Source",
-      "emptyTitle": "Quiet feed",
-      "emptyDescription": "No events match the current filter. Try clearing it, or trigger a mutation to see one land."
-    },
-    "quotas": {
-      "title": "Quotas",
-      "description": "Resource limits per scope. Soft limits trigger alerts; hard limits block the next admission attempt.",
-      "emptyTitle": "No quotas configured",
-      "emptyDescription": "Quotas can be set per organization, team, or project. The default install ships with sensible org-level caps.",
-      "columns": {
-        "scope": "Scope",
-        "resource": "Resource",
-        "usage": "Usage",
-        "bar": "Bar",
-        "limits": "Soft / Hard",
-        "actions": "Actions"
-      },
-      "request": {
-        "buttonRequest": "Request bump",
-        "buttonPending": "Pending request",
-        "title": "Request quota bump",
-        "description": "Asks an org admin to raise the hard limit. They get an in-app notification + an email. Pending status surfaces on this row until decided.",
-        "factorLabel": "Multiplier",
-        "factor1_5x": "1.5x",
-        "factor2x": "2x",
-        "factor3x": "3x",
-        "factor5x": "5x",
-        "factor10x": "10x",
-        "reasonLabel": "Reason",
-        "reasonPlaceholder": "Onboarding the prod team next quarter; current cap blocks the migration.",
-        "reasonHint": "Required. Shows up in the admin notification.",
-        "submit": "Submit request",
-        "submitting": "Submitting…",
-        "cancel": "Cancel",
-        "toastSubmitted": "Quota bump requested",
-        "toastFailed": "Failed to submit request",
-        "pendingBadge": "Pending {factor}x — {reason}"
-      },
-      "overviewTitle": "Utilization",
-      "overviewDescription": "Current usage against hard limits, most-utilized first.",
-      "history": {
-        "button": "History",
-        "title": "{resource} usage history",
-        "description": "Point-in-time usage captured daily, plotted against the soft and hard limits.",
-        "windowLabel": "Window",
-        "windowOption": "Last {days} days",
-        "usedTrend": "Used over time",
-        "latestUsed": "Latest used",
-        "peakUsed": "Peak used",
-        "softLimit": "Soft limit",
-        "hardLimit": "Hard limit",
-        "emptyTitle": "No usage history yet",
-        "emptyDescription": "Usage snapshots are captured once a day. Check back after the collector has run at least once."
-      }
+      "title": "イベント",
+      "description": "プラットフォームで起きた事実を追記のみで記録するログです。ダッシュボード、Webhook、イベント駆動ワークフローに関係するすべての状態変化が含まれます。",
+      "filterPlaceholder": "イベントタイプで絞り込み（例: app.deployed）",
+      "aggregateToggle": "繰り返しをまとめる",
+      "aggregateBadge": "類似 ×{count}",
+      "expandLabel": "展開",
+      "collapseLabel": "折りたたむ",
+      "sourceLabel": "ソース",
+      "emptyTitle": "フィードは静かです",
+      "emptyDescription": "現在のフィルターに一致するイベントはありません。フィルターをクリアするか、ミューテーションを実行してイベントが記録されるのを確認してください。"
     },
     "alerts": {
       "mute": {
-        "menuLabel": "Mute",
-        "preset1h": "Mute for 1 hour",
-        "preset4h": "Mute for 4 hours",
-        "preset24h": "Mute for 24 hours",
-        "presetCustom": "Mute for custom duration…",
-        "unmute": "Unmute now",
-        "badge": "Muted ({remaining} left)",
-        "badgeExpired": "Muted",
-        "showMuted": "Show muted",
-        "hideMuted": "Hide muted",
-        "toastMuted": "Muted {name} for {duration}",
-        "toastUnmuted": "Unmuted {name}",
-        "toastMuteFailed": "Failed to mute rule",
-        "toastUnmuteFailed": "Failed to unmute rule",
-        "customTitle": "Mute {name}",
-        "customDescription": "Silence channel fan-out until the TTL expires. The rule keeps producing AlertEvent rows so the incident timeline stays intact. Mute is capped at 7 days.",
-        "durationLabel": "Duration (hours)",
-        "reasonLabel": "Reason",
-        "reasonPlaceholder": "Known outage — DB migration in progress",
-        "reasonHint": "Surfaces on the audit log + on the muted-rule badge.",
-        "submit": "Mute rule",
-        "cancel": "Cancel"
+        "menuLabel": "ミュート",
+        "preset1h": "1 時間ミュート",
+        "preset4h": "4 時間ミュート",
+        "preset24h": "24 時間ミュート",
+        "presetCustom": "期間を指定してミュート…",
+        "unmute": "今すぐミュートを解除",
+        "badge": "ミュート中（残り {remaining}）",
+        "badgeExpired": "ミュート中",
+        "showMuted": "ミュート中のルールを表示",
+        "hideMuted": "ミュート中のルールを非表示",
+        "toastMuted": "{name} を {duration} ミュートしました",
+        "toastUnmuted": "{name} のミュートを解除しました",
+        "toastMuteFailed": "ルールをミュートできませんでした",
+        "toastUnmuteFailed": "ルールのミュートを解除できませんでした",
+        "customTitle": "{name} をミュート",
+        "customDescription": "TTL が切れるまで、チャネルへの通知配信を停止します。ルールは引き続き AlertEvent の行を生成するため、インシデントのタイムラインは保たれます。ミュートの上限は 7 日です。",
+        "durationLabel": "期間（時間）",
+        "reasonLabel": "理由",
+        "reasonPlaceholder": "既知の障害：DB マイグレーション実施中",
+        "reasonHint": "監査ログと、ミュート中のルールのバッジに表示されます。",
+        "submit": "ルールをミュート",
+        "cancel": "キャンセル"
       },
-      "title": "Alerts",
-      "description": "Org-wide alert rules + the firing events they produce. Rules target apps, environments, workloads, or the org globally; firing events surface in the bottom panel.",
-      "newRule": "New rule",
+      "title": "アラート",
+      "description": "組織全体のアラートルールと、ルールによって発生したイベントです。ルールはアプリ、環境、ワークロード、または組織全体を対象とします。発生したイベントは専用のフィードに表示されます。",
+      "newRule": "新しいルール",
       "stats": {
-        "rules": "Rules",
-        "active": "{count} active",
-        "unresolved": "Unresolved",
-        "inWindow": "in current window",
-        "total": "Total events",
-        "latest": "latest 100"
+        "rules": "ルール",
+        "active": "有効 {count} 件",
+        "unresolved": "未解決",
+        "inWindow": "現在の期間内",
+        "total": "イベント総数",
+        "latest": "最新 100 件"
       },
       "rules": {
-        "title": "Rules",
-        "description": "Predicates fire events when matching telemetry crosses a threshold.",
-        "emptyTitle": "No alert rules yet",
-        "emptyDescription": "Create a rule to start surfacing platform events as alerts.",
+        "title": "ルール",
+        "description": "一致するテレメトリがしきい値を超えると、条件式がイベントを発生させます。",
+        "emptyTitle": "アラートルールはまだありません",
+        "emptyDescription": "ルールを作成すると、プラットフォームのイベントをアラートとして表示できるようになります。",
         "columns": {
-          "name": "Name",
-          "target": "Target",
-          "severity": "Severity",
-          "created": "Created"
+          "name": "名前",
+          "target": "対象",
+          "severity": "重大度",
+          "created": "作成日"
         }
       },
       "events": {
-        "title": "Recent events",
-        "description": "Firing instances from the rules above. Acknowledge to silence while the underlying issue is being worked.",
-        "emptyTitle": "No events yet",
-        "emptyDescription": "Events appear here when an active rule's predicate matches incoming telemetry.",
+        "title": "イベント",
+        "description": "アラートルールによって発生したイベントです。根本的な問題への対応中は、確認済みにすると通知を止められます。",
+        "emptyTitle": "イベントはまだありません",
+        "emptyDescription": "有効なルールの条件式が受信したテレメトリに一致すると、ここにイベントが表示されます。",
         "columns": {
-          "summary": "Summary",
-          "severity": "Severity",
-          "fired": "Fired",
-          "state": "State"
+          "summary": "概要",
+          "severity": "重大度",
+          "fired": "発生",
+          "state": "状態"
         },
-        "resolved": "resolved",
-        "acknowledged": "acknowledged",
-        "firing": "firing",
-        "ack": "Ack"
+        "resolved": "解決済み",
+        "acknowledged": "確認済み",
+        "firing": "発生中",
+        "ack": "確認"
       },
       "delete": {
-        "title": "Delete rule \"{name}\"?",
-        "fallbackTitle": "Delete rule?",
-        "description": "Soft-deletes the rule. Events that already fired stay in the log and remain reachable from the event panel — only future evaluations stop. Re-create the rule with the same target to resume coverage.",
-        "confirm": "Delete rule"
+        "title": "ルール「{name}」を削除しますか？",
+        "fallbackTitle": "ルールを削除しますか？",
+        "description": "ルールを論理削除します。すでに発生したイベントはログに残り、イベントパネルから引き続き参照できます。停止するのは今後の評価だけです。監視を再開するには、同じ対象でルールを作成し直してください。",
+        "confirm": "ルールを削除"
       },
       "create": {
-        "title": "New alert rule",
-        "description": "Predicate matches against the platform event stream. Notify channels describe where firing events go (Slack, email, webhook).",
-        "nameLabel": "Name",
+        "title": "新しいアラートルール",
+        "description": "条件式はプラットフォームのイベントストリームと照合されます。通知チャネルには、発生したイベントの送信先（Slack、メール、Webhook）を記述します。",
+        "nameLabel": "名前",
         "namePlaceholder": "failed-deploy",
-        "targetLabel": "Target",
-        "severityLabel": "Severity",
-        "targetIdLabel": "Target ID",
-        "targetIdGlobal": "(blank for global)",
-        "targetIdPlaceholder": "app slug, env name, or workload slug",
-        "targetIdGlobalHint": "Global rules ignore targetId — backend rejects non-empty values.",
-        "targetIdHint": "App slug for app target; env name for env target; etc.",
-        "predicateLabel": "Predicate (JSON)",
-        "channelsLabel": "Notify channels (JSON)",
-        "cancel": "Cancel",
-        "submit": "Create rule",
-        "submitting": "Creating…"
-      }
-    },
-    "membersBulk": {
-      "selectAllLabel": "Select all role bindings",
-      "selectRowLabel": "Select binding {role} on {subject}",
-      "selected": "{count, plural, =1 {1 binding selected} other {# bindings selected}}",
-      "clear": "Clear",
-      "revokeButton": "Revoke {count}",
-      "permissionHint": "You don't have permission to manage members.",
-      "confirm": {
-        "title": "Revoke {count} role binding(s)?",
-        "description": "Each subject loses the permissions these roles granted. Other bindings, if any, remain in effect. The operation is per-binding — if one fails, the others still apply.",
-        "confirmLabel": "Revoke {count}"
-      },
-      "toasts": {
-        "allOk": "Revoked {count} role binding(s).",
-        "partial": "Revoked {revoked}, {failed} failed.",
-        "allFailed": "Bulk revoke failed: {message}"
+        "targetLabel": "対象",
+        "severityLabel": "重大度",
+        "targetIdLabel": "対象 ID",
+        "targetIdGlobal": "（グローバルの場合は空欄）",
+        "targetIdPlaceholder": "アプリのスラッグ、環境名、またはワークロードのスラッグ",
+        "targetIdGlobalHint": "グローバルルールでは targetId は無視されます。空でない値はバックエンドで拒否されます。",
+        "targetIdHint": "対象が app ならアプリのスラッグ、env なら環境名、のように指定します。",
+        "predicateLabel": "条件式（JSON）",
+        "channelsLabel": "通知チャネル（JSON）",
+        "cancel": "キャンセル",
+        "submit": "ルールを作成",
+        "submitting": "作成中…"
       }
     },
     "teamMembersBulk": {
@@ -5435,31 +5105,31 @@
       }
     },
     "deployments": {
-      "title": "Deployments",
-      "description": "Every rollout attempt across every app and environment. Click a row to see the workflow timeline, rendered manifests, and logs.",
-      "start": "Start deployment",
-      "filterApp": "Filter by app slug…",
-      "counts": "{filtered} of {total}",
-      "emptyTitle": "No deployments yet",
-      "emptyDescription": "Register an app and roll a deployment from /apps/[slug]/deploy. Deployments land here as soon as the workflow starts.",
-      "openApps": "Open apps",
-      "approvalsCount": "{received}/{required} approvals",
+      "title": "デプロイ",
+      "description": "すべてのアプリと環境にわたる、すべてのロールアウトの試行です。行をクリックすると、ワークフローのタイムライン、レンダリングされたマニフェスト、ログを確認できます。",
+      "start": "デプロイを開始",
+      "filterApp": "アプリのスラッグで絞り込み…",
+      "counts": "{total} 件中 {filtered} 件",
+      "emptyTitle": "デプロイはまだありません",
+      "emptyDescription": "アプリを登録し、/apps/[slug]/deploy からデプロイを開始してください。ワークフローが開始されると、デプロイはすぐにここに表示されます。",
+      "openApps": "アプリを開く",
+      "approvalsCount": "承認 {received}/{required}",
       "columns": {
-        "appEnv": "App / Env",
-        "image": "Image",
-        "trigger": "Trigger",
-        "status": "Status",
-        "duration": "Duration",
-        "started": "Started",
-        "actions": "Actions"
+        "appEnv": "アプリ / 環境",
+        "image": "イメージ",
+        "trigger": "トリガー",
+        "status": "状態",
+        "duration": "所要時間",
+        "started": "開始日時",
+        "actions": "操作"
       },
-      "rowAriaLabel": "Deployment {app} → {env}. Press Enter to open.",
+      "rowAriaLabel": "デプロイ {app} → {env}。Enter キーを押すと開きます。",
       "tabs": {
-        "ariaLabel": "Deployment views",
-        "active": "Active",
-        "previews": "Previews",
-        "pending": "Pending",
-        "history": "History"
+        "ariaLabel": "デプロイの表示",
+        "active": "稼働中",
+        "previews": "プレビュー",
+        "pending": "保留中",
+        "history": "履歴"
       },
       "actions": {
         "label": "操作",
@@ -5475,63 +5145,63 @@
         "copyFail": "クリップボードにコピーできませんでした。"
       },
       "bulk": {
-        "selectAllLabel": "Select all visible deployments",
-        "selectRowLabel": "Select {app} / {env}",
-        "selected": "{count, plural, =1 {1 deployment selected} other {# deployments selected}}",
-        "summary": "In {envs}.",
-        "mixedWarning": "Selection mixes in-flight and terminal states — bulk actions are disabled until the set is uniform.",
-        "clear": "Clear",
-        "cancelButton": "Cancel {count}",
-        "redeployButton": "Redeploy {count}",
+        "selectAllLabel": "表示中のデプロイをすべて選択",
+        "selectRowLabel": "{app} / {env} を選択",
+        "selected": "{count, plural, =1 {1 件のデプロイを選択中} other {# 件のデプロイを選択中}}",
+        "summary": "対象: {envs}。",
+        "mixedWarning": "選択に進行中と終了済みの状態が混在しています。状態が揃うまで一括操作は無効です。",
+        "clear": "解除",
+        "cancelButton": "{count} 件をキャンセル",
+        "redeployButton": "{count} 件を再デプロイ",
         "confirmCancel": {
-          "title": "Cancel {count} in-flight deployments?",
-          "description": "Signals each Temporal workflow to cancel. Marks all selected deployments failed. Cluster state already applied stays in place. Affects {envs}.",
-          "reasonLabel": "Reason for cancel",
-          "reasonPlaceholder": "Why are these deploys being cancelled? Persists on the audit log + history sidebar.",
-          "confirm": "Cancel deployments"
+          "title": "進行中の {count} 件のデプロイをキャンセルしますか？",
+          "description": "各 Temporal ワークフローにキャンセルのシグナルを送信し、選択したすべてのデプロイを失敗として記録します。すでに適用されたクラスターの状態はそのまま残ります。対象: {envs}。",
+          "reasonLabel": "キャンセルの理由",
+          "reasonPlaceholder": "これらのデプロイをキャンセルする理由は？監査ログと履歴サイドバーに保存されます。",
+          "confirm": "デプロイをキャンセル"
         },
         "confirmRedeploy": {
-          "title": "Redeploy {count} deployments?",
-          "description": "Spawns a fresh deployment for each selected row with the same image tag. Affects {envs}.",
-          "confirm": "Redeploy all"
+          "title": "{count} 件のデプロイを再デプロイしますか？",
+          "description": "選択した各行について、同じイメージタグで新しいデプロイを開始します。対象: {envs}。",
+          "confirm": "すべて再デプロイ"
         },
         "toasts": {
-          "abortLabel": "Cancel",
-          "redeployLabel": "Redeploy",
-          "allOk": "{label} succeeded for {count} deployments.",
-          "allFailed": "{label} failed for {count} deployments: {message}",
-          "partial": "{label}: {succeeded} succeeded, {failed} failed."
+          "abortLabel": "キャンセル",
+          "redeployLabel": "再デプロイ",
+          "allOk": "{count} 件のデプロイで「{label}」に成功しました。",
+          "allFailed": "{count} 件のデプロイで「{label}」に失敗しました: {message}",
+          "partial": "{label}: 成功 {succeeded} 件、失敗 {failed} 件。"
         }
       },
       "statusOptions": {
-        "all": "All statuses",
-        "pending_approval": "Pending approval",
-        "pending": "Pending",
-        "deploying": "Deploying",
-        "redeploying": "Redeploying",
-        "running": "Running",
-        "failed": "Failed",
-        "rolled_back": "Rolled back",
-        "superseded": "Superseded"
+        "all": "すべての状態",
+        "pending_approval": "承認待ち",
+        "pending": "待機中",
+        "deploying": "デプロイ中",
+        "redeploying": "再デプロイ中",
+        "running": "実行中",
+        "failed": "失敗",
+        "rolled_back": "ロールバック済み",
+        "superseded": "置き換え済み"
       },
-      "envWorkload": "env {env} · workload {workload}",
-      "envOnly": "env {env}",
+      "envWorkload": "環境 {env} · ワークロード {workload}",
+      "envOnly": "環境 {env}",
       "confirm": {
-        "approveTitle": "Approve deploy of {tag}?",
-        "approveDescription": "Unblocks the rollout to {app}/{env}. The workflow resumes immediately.",
-        "approveConfirm": "Approve",
-        "abortTitle": "Abort in-flight deploy of {app}/{env}?",
-        "abortDescription": "Signals the Temporal workflow to cancel. The deployment is marked failed. Whatever changes already shipped to the cluster stay — Astrolift doesn't auto-rollback on abort.",
-        "abortConfirm": "Abort deploy",
-        "abortReasonLabel": "Reason for abort",
-        "abortReasonPlaceholder": "Why is this deploy being aborted? Persists on the audit log + history sidebar.",
-        "reasonRequired": "Reason required",
-        "rollbackTitle": "Rollback {app}/{env} to the previous revision?",
-        "rollbackDescription": "Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded.",
-        "rollbackConfirm": "Rollback",
-        "redeployTitle": "Redeploy {tag} to {app}/{env}?",
-        "redeployDescription": "Spawns a fresh deployment with the same image. Useful to retry after a transient failure or pick up an updated config.",
-        "redeployConfirm": "Redeploy"
+        "approveTitle": "{tag} のデプロイを承認しますか？",
+        "approveDescription": "{app}/{env} へのロールアウトのブロックを解除します。ワークフローはすぐに再開されます。",
+        "approveConfirm": "承認",
+        "abortTitle": "{app}/{env} の進行中のデプロイを中止しますか？",
+        "abortDescription": "Temporal ワークフローにキャンセルのシグナルを送信します。デプロイは失敗として記録されます。すでにクラスターに反映された変更はそのまま残ります。Astrolift は中止時に自動でロールバックしません。",
+        "abortConfirm": "デプロイを中止",
+        "abortReasonLabel": "中止の理由",
+        "abortReasonPlaceholder": "このデプロイを中止する理由は？監査ログと履歴サイドバーに保存されます。",
+        "reasonRequired": "理由を入力してください",
+        "rollbackTitle": "{app}/{env} を以前のリビジョンにロールバックしますか？",
+        "rollbackDescription": "以前に稼働していたリビジョンを指す、新しいロールバック用のデプロイを作成します。現在のリビジョンは置き換え済みになります。",
+        "rollbackConfirm": "ロールバック",
+        "redeployTitle": "{tag} を {app}/{env} に再デプロイしますか？",
+        "redeployDescription": "同じイメージで新しいデプロイを開始します。一時的な障害の後に再試行したり、更新された設定を適用したりする際に役立ちます。",
+        "redeployConfirm": "再デプロイ"
       },
       "startSheet": {
         "title": "デプロイを開始",
@@ -5572,58 +5242,58 @@
       }
     },
     "deploymentDetail": {
-      "olderLog": "Load older run log",
-      "olderLogFailed": "Could not load older run log",
-      "downloadFailed": "Run log download failed",
+      "olderLog": "以前の実行ログを読み込む",
+      "olderLogFailed": "以前の実行ログを読み込めませんでした",
+      "downloadFailed": "実行ログのダウンロードに失敗しました",
       "title": "{app} → {env}",
-      "subtitle": "Deployment {id}",
-      "loadingTitle": "Deployment",
-      "loading": "Loading…",
-      "notFoundTitle": "Deployment not found",
-      "notFoundDescription": "The deployment doesn't exist or you don't have permission to view it.",
-      "returnLink": "Try returning to the",
-      "deploymentsList": "deployments list",
-      "approve": "Approve",
-      "abort": "Abort",
-      "rollback": "Rollback",
-      "redeploy": "Redeploy",
+      "subtitle": "デプロイ {id}",
+      "loadingTitle": "デプロイ",
+      "loading": "読み込み中…",
+      "notFoundTitle": "デプロイが見つかりません",
+      "notFoundDescription": "デプロイが存在しないか、表示する権限がありません。",
+      "returnLink": "次のページに戻ってみてください:",
+      "deploymentsList": "デプロイ一覧",
+      "approve": "承認",
+      "abort": "中止",
+      "rollback": "ロールバック",
+      "redeploy": "再デプロイ",
       "redeployFailed": "再デプロイに失敗しました",
-      "approvalsCount": "{received}/{required} approvals",
+      "approvalsCount": "承認 {received}/{required}",
       "fields": {
-        "imageTag": "Image tag",
-        "imageDigest": "Image digest",
-        "clusterRevision": "Cluster revision",
-        "workload": "Workload",
-        "created": "Created",
-        "started": "Started",
-        "succeeded": "Succeeded",
-        "failed": "Failed",
-        "duration": "Duration",
-        "commit": "Commit",
-        "branch": "Branch",
-        "ciActor": "CI actor",
-        "ciProvider": "CI provider",
-        "ciRun": "CI run"
+        "imageTag": "イメージタグ",
+        "imageDigest": "イメージダイジェスト",
+        "clusterRevision": "クラスターのリビジョン",
+        "workload": "ワークロード",
+        "created": "作成日時",
+        "started": "開始日時",
+        "succeeded": "成功日時",
+        "failed": "失敗日時",
+        "duration": "所要時間",
+        "commit": "コミット",
+        "branch": "ブランチ",
+        "ciActor": "CI の実行者",
+        "ciProvider": "CI プロバイダー",
+        "ciRun": "CI 実行"
       },
-      "lifecycle": "Lifecycle log",
-      "noLog": "No log entries yet.",
-      "manifests": "Rendered manifests",
-      "renderFailed": "Render failed",
-      "noManifests": "No manifests rendered yet.",
-      "events": "Recent events",
-      "noEvents": "No platform events for this app yet.",
+      "lifecycle": "ライフサイクルログ",
+      "noLog": "ログエントリはまだありません。",
+      "manifests": "レンダリングされたマニフェスト",
+      "renderFailed": "レンダリングに失敗しました",
+      "noManifests": "レンダリングされたマニフェストはまだありません。",
+      "events": "最近のイベント",
+      "noEvents": "このアプリのプラットフォームイベントはまだありません。",
       "confirmAbort": {
-        "title": "Abort deploy of {app}/{env}?",
-        "description": "Signals the Temporal workflow to cancel and marks the deployment failed. Changes already applied to the cluster stay in place — Astrolift doesn't auto-rollback on abort. Use Rollback after if needed.",
-        "reasonLabel": "Reason for abort",
-        "reasonPlaceholder": "Why is this deploy being aborted? Persists on the audit log + history sidebar.",
-        "reasonRequired": "Reason required",
-        "confirm": "Abort deploy"
+        "title": "{app}/{env} のデプロイを中止しますか？",
+        "description": "Temporal ワークフローにキャンセルのシグナルを送信し、デプロイを失敗として記録します。クラスターにすでに適用された変更はそのまま残ります。Astrolift は中止時に自動でロールバックしません。必要に応じて、その後「ロールバック」を使用してください。",
+        "reasonLabel": "中止の理由",
+        "reasonPlaceholder": "このデプロイを中止する理由は？監査ログと履歴サイドバーに保存されます。",
+        "reasonRequired": "理由を入力してください",
+        "confirm": "デプロイを中止"
       },
       "confirmRollback": {
-        "title": "Rollback {app}/{env}?",
-        "description": "Creates a new rollback deployment that points at the prior running revision. The current revision becomes superseded.",
-        "confirm": "Rollback"
+        "title": "{app}/{env} をロールバックしますか？",
+        "description": "以前に稼働していたリビジョンを指す、新しいロールバック用のデプロイを作成します。現在のリビジョンは置き換え済みになります。",
+        "confirm": "ロールバック"
       },
       "delete": "削除",
       "retire": "停止",
@@ -5814,8 +5484,8 @@
       "emptyDescription": "Cronjob ワークロードは、スケジューラが最初の実行をトリガーするとここに表示されます。",
       "emptyExampleCaption": "Cronjob ワークロードを宣言するには、astrolift.toml に [[jobs]] エントリを追加してください:",
       "emptyLearnMore": "astrolift.toml の jobs リファレンスを見る",
-      "envLabel": "env",
-      "workloadLabel": "workload",
+      "envLabel": "環境",
+      "workloadLabel": "ワークロード",
       "columns": {
         "app": "アプリ / 環境 / ワークロード",
         "k8sJob": "K8s ジョブ",
@@ -5827,7 +5497,7 @@
     "commands": {
       "emptyTitle": "まだコマンド実行はありません",
       "emptyDescription": "ワークロードに対するアドホックコマンドはここに表示されます。`astro app run …` でCLIから実行してください。",
-      "workloadLabel": "workload",
+      "workloadLabel": "ワークロード",
       "columns": {
         "app": "アプリ / ワークロード",
         "command": "コマンド",
@@ -7217,7 +6887,7 @@
       "trigger": "トリガー",
       "triggerLater": "手動（後で設定）",
       "deployBranch": "デプロイブランチ",
-      "cron": "Cron",
+      "cron": "Cron 式",
       "approvalGate": "承認ゲート",
       "timing": {
         "now": "今すぐデプロイ",
@@ -7301,7 +6971,17 @@
       "emptyTitle": "まだワークロードはありません",
       "emptyDescription": "マニフェストがワークロードを登録すると、ここに表示されます。",
       "replicas": "{count, plural, other {レプリカ <mono>#</mono>}}",
-      "public": "公開"
+      "public": "公開",
+      "kinds": {
+        "deployment": "Deployment",
+        "statefulset": "StatefulSet",
+        "job": "Job",
+        "cronjob": "Cronjob",
+        "task": "タスク",
+        "agent": "エージェント",
+        "workflow": "ワークフロー",
+        "function": "関数"
+      }
     },
     "function": {
       "title": "トリガー",
@@ -7901,7 +7581,9 @@
       "templateUpdated": "テンプレート {name} を更新しました",
       "saveFailed": "保存に失敗しました",
       "deleteFailed": "削除に失敗しました"
-    }
+    },
+    "allView": "すべて",
+    "mineView": "自分の項目"
   },
   "appAlertRules": {
     "timeRange": "期間",
@@ -8076,7 +7758,9 @@
     "runExit": "終了コード {code}",
     "primary": "プライマリ",
     "volumeKindFilter": "種類",
-    "volumeSearch": "ボリューム、マウントパスを検索…"
+    "volumeSearch": "ボリューム、マウントパスを検索…",
+    "allView": "すべて",
+    "mineView": "自分の項目"
   },
   "appWorkloads": {
     "name": "名前",
@@ -11854,9 +11538,9 @@
     "configure": "ワークロード ID を構成",
     "kind": "種類",
     "kinds": {
-      "irsa": "IAM Roles for Service Accounts (AWS)",
+      "irsa": "サービスアカウントの IAM ロール (AWS)",
       "workload_identity": "GKE Workload Identity (GCP)",
-      "federated": "AKS Federated Credentials (Azure)",
+      "federated": "AKS フェデレーション資格情報 (Azure)",
       "unknown": "不明なバインド"
     },
     "lastUsed": "最終使用",
@@ -11935,26 +11619,6 @@
         "health": "健全性",
         "activity": "アクティビティ",
         "settings": "設定"
-      },
-      "functions": {
-        "organization": "組織",
-        "access": "アクセス",
-        "projects": "プロジェクト",
-        "clusters": "クラスター",
-        "domains": "ドメイン",
-        "providers": "プロバイダー",
-        "webhooks": "Webhook",
-        "metrics": "メトリクス",
-        "tokens": "API キー",
-        "audit": "監査",
-        "run-audit": "実行",
-        "features": "機能",
-        "activity": "プラットフォームのアクティビティ",
-        "alerts": "アラート",
-        "events": "イベント",
-        "logs": "ログ",
-        "traces": "トレース",
-        "operations": "操作"
       }
     },
     "unregister": {
@@ -13034,6 +12698,19 @@
       },
       "approve": "承認",
       "deny": "拒否"
+    },
+    "topologyBlurbs": {
+      "service": "常時稼働する 1 つのサービス",
+      "service-data": "データベース、キャッシュ、またはバケットを備えたサービス",
+      "service-worker": "サービスとバックグラウンドワーカー",
+      "microservices": "互いに呼び出し合う複数のサービス",
+      "service-agent": "エージェントが並行して動作するサービス",
+      "agent": "1 つ以上のエージェント",
+      "functions": "イベントで起動する関数",
+      "scheduled": "スケジュールに従って実行されるジョブ",
+      "task": "単発の実行",
+      "workflow": "複数ステップのパイプライン",
+      "mixed": "複数の種類のワークロード"
     }
   },
   "clusterConnection": {
@@ -13142,7 +12819,7 @@
     "podHealth": "Podの状態",
     "podsRunning": "実行中のPod",
     "deploymentsReady": "準備済みDeployment",
-    "latency": "Apiserver p99",
+    "latency": "API サーバー p99",
     "network": "ネットワーク受信",
     "restartRate": "再起動 / 分",
     "noEndpointTitle": "Prometheusエンドポイントなし",
@@ -14719,7 +14396,7 @@
     }
   },
   "zentinelleScreen": {
-    "title": "Secure · Zentinelle",
+    "title": "保護 · Zentinelle",
     "description": "AI エージェント GRC: Astrolift 上で動くすべてのエージェントワークロードのガバナンス、リスク、コンプライアンス。",
     "tagline": "MIT ライセンス · セルフホスト可能 · Calliope AI のコンパニオン製品",
     "intro": "Zentinelle は BROCS スタックの <strong>Control + Secure</strong> を担う柱です。Astrolift と並行して動作し、Astrolift があえて担わない AI 固有のレイヤーを提供します。ポリシーの適用、コンテンツスキャン、コンプライアンスフレームワーク、そして AI ガバナンス規制が求める完全なインタラクション監査証跡です。",
@@ -15115,7 +14792,44 @@
     "notFoundDescription": "この{label}は存在しないか、最近の一覧から外れたか、アクセス権がない可能性があります。",
     "back": "{label}に戻る",
     "created": "作成",
-    "overview": "概要"
+    "overview": "概要",
+    "statuses": {
+      "running": "実行中",
+      "in_progress": "進行中",
+      "provisioning": "プロビジョニング中",
+      "building": "ビルド中",
+      "deploying": "デプロイ中",
+      "queued": "キュー待ち",
+      "pending": "保留中",
+      "active": "有効",
+      "ready": "準備完了",
+      "completed": "完了",
+      "succeeded": "成功",
+      "healthy": "正常",
+      "failed": "失敗",
+      "errored": "エラー",
+      "timed_out": "タイムアウト",
+      "superseded": "置き換え済み",
+      "cancelled": "キャンセル済み",
+      "canceled": "キャンセル済み",
+      "torn_down": "削除済み",
+      "expired": "期限切れ",
+      "unknown": "不明",
+      "invited": "招待済み",
+      "pending_invite": "招待待ち",
+      "pending_first_login": "初回ログイン待ち",
+      "suspended": "停止中",
+      "deactivated": "無効化済み",
+      "anonymized": "匿名化済み",
+      "info": "情報",
+      "warn": "警告",
+      "warning": "警告",
+      "critical": "重大",
+      "error": "エラー",
+      "firing": "発生中",
+      "acknowledged": "確認済み",
+      "resolved": "解決済み"
+    }
   },
   "alertDetail": {
     "alerts": "アラート",
@@ -15568,5 +15282,947 @@
     "manageAccess": "アクセスを管理",
     "emptyTitle": "セマンティックレイヤーはありません",
     "emptyDescription": "[app] kind = \"mimwell\" で宣言され、閲覧できるアプリがここに表示されます。"
+  },
+  "navModel": {
+    "functions": {
+      "organization": "組織",
+      "access": "アクセス",
+      "projects": "プロジェクト",
+      "clusters": "クラスター",
+      "domains": "ドメイン",
+      "providers": "プロバイダー",
+      "webhooks": "Webhook",
+      "metrics": "メトリクス",
+      "tokens": "API キー",
+      "audit": "監査",
+      "run-audit": "実行",
+      "features": "機能",
+      "activity": "プラットフォームのアクティビティ",
+      "alerts": "アラート",
+      "events": "イベント",
+      "logs": "ログ",
+      "traces": "トレース",
+      "operations": "運用",
+      "home": "ホーム",
+      "agents": "エージェント",
+      "fleet": "フリート",
+      "approvals": "承認",
+      "workflows": "ワークフロー",
+      "runs": "実行",
+      "functions": "関数",
+      "skills": "スキル",
+      "tools": "ツール",
+      "environment-specs": "環境仕様",
+      "models": "モデル",
+      "workloads": "ワークロード",
+      "apps": "アプリ",
+      "brains": "セマンティックレイヤー",
+      "pipelines": "パイプライン",
+      "deployments": "デプロイ",
+      "deployment-approvals": "デプロイの承認",
+      "jobs": "スケジュール済みジョブ",
+      "environments": "環境",
+      "previews": "プレビュー"
+    },
+    "areas": {
+      "home": "ホーム",
+      "agents": "エージェント",
+      "apps": "アプリ",
+      "admin": "管理"
+    },
+    "groups": {
+      "organization": "組織",
+      "infrastructure": "インフラ",
+      "governance": "使用状況とガバナンス",
+      "signals": "プラットフォームのシグナル"
+    }
+  },
+  "relativeAge": {
+    "justNow": "たった今",
+    "minutes": "{count} 分前",
+    "hours": "{count} 時間前",
+    "days": "{count} 日前"
+  },
+  "routeTitles": {
+    "acceptInvitation": "招待を承諾",
+    "access": "アクセス",
+    "actionSafety": "操作の安全性",
+    "activity": "アクティビティ",
+    "administration": "管理",
+    "agent": "エージェント",
+    "agentRun": "エージェントの実行",
+    "agents": "エージェント",
+    "alertEvent": "アラートイベント",
+    "alertEvents": "アラートイベント",
+    "alertRule": "アラートルール",
+    "alerts": "アラート",
+    "apiKeys": "API キー",
+    "apiToken": "API トークン",
+    "app": "アプリ",
+    "appearance": "外観",
+    "approvals": "承認",
+    "approvalsQueue": "承認キュー",
+    "approveDeployment": "デプロイを承認",
+    "apps": "アプリ",
+    "assignRoles": "ロールを割り当て",
+    "assignments": "割り当て",
+    "audit": "監査",
+    "builder": "ビルダー",
+    "checkAccess": "アクセスを確認",
+    "cluster": "クラスター",
+    "clusterActivity": "クラスターのアクティビティ",
+    "clusterHealth": "クラスターの健全性",
+    "clusterPrerequisites": "クラスターの前提条件",
+    "clusterSettings": "クラスターの設定",
+    "clusterStatus": "クラスターの状態",
+    "clusters": "クラスター",
+    "commandRun": "コマンドの実行",
+    "commandRuns": "コマンドの実行",
+    "configuration": "構成",
+    "customDomains": "カスタムドメイン",
+    "deployment": "デプロイ",
+    "deployments": "デプロイ",
+    "documentation": "ドキュメント",
+    "domains": "ドメイン",
+    "downloads": "ダウンロード",
+    "driverReference": "ドライバーリファレンス",
+    "easySetup": "かんたん設定",
+    "emailDelivery": "メール配信",
+    "environment": "環境",
+    "environments": "環境",
+    "event": "イベント",
+    "events": "イベント",
+    "features": "機能",
+    "fleetMap": "フリートマップ",
+    "functions": "関数",
+    "getHelp": "ヘルプ",
+    "getStarted": "はじめに",
+    "grantAccess": "アクセスを付与",
+    "holders": "保持者",
+    "home": "ホーム",
+    "identityProviders": "ID プロバイダー",
+    "jobRun": "ジョブの実行",
+    "jobRuns": "ジョブの実行",
+    "liveAgentSession": "エージェントのライブセッション",
+    "logs": "ログ",
+    "logsAndMetrics": "ログとメトリクス",
+    "managedDomain": "管理対象ドメイン",
+    "managedDomains": "管理対象ドメイン",
+    "member": "メンバー",
+    "members": "メンバー",
+    "metrics": "メトリクス",
+    "models": "モデル",
+    "newAgent": "新しいエージェント",
+    "newApp": "新しいアプリ",
+    "newPipeline": "新しいパイプライン",
+    "newPolicy": "新しいポリシー",
+    "newRole": "新しいロール",
+    "newWorkflow": "新しいワークフロー",
+    "notifications": "通知",
+    "operations": "運用",
+    "organization": "組織",
+    "overview": "概要",
+    "pendingGates": "承認待ち",
+    "people": "メンバー",
+    "permissions": "権限",
+    "permissionsDiagnostics": "権限の診断",
+    "person": "メンバー",
+    "pipeline": "パイプライン",
+    "pipelineSecrets": "パイプラインのシークレット",
+    "platformActivity": "プラットフォームのアクティビティ",
+    "platformInstances": "プラットフォームインスタンス",
+    "policies": "ポリシー",
+    "policy": "ポリシー",
+    "preview": "プレビュー",
+    "previewEnvironments": "プレビュー環境",
+    "profile": "プロフィール",
+    "project": "プロジェクト",
+    "projectResources": "プロジェクトのリソース",
+    "projects": "プロジェクト",
+    "providers": "プロバイダー",
+    "registerCluster": "クラスターを登録",
+    "resources": "リソース",
+    "role": "ロール",
+    "roles": "ロール",
+    "run": "実行",
+    "runAgent": "エージェントを実行",
+    "runs": "実行",
+    "scheduledJobs": "スケジュール済みジョブ",
+    "secretProposal": "シークレット提案",
+    "secretProposals": "シークレット変更提案",
+    "secrets": "シークレット",
+    "secure": "保護",
+    "security": "セキュリティ",
+    "semanticLayers": "セマンティックレイヤー",
+    "settings": "設定",
+    "shell": "ターミナル",
+    "skillsAndTools": "スキルとツール",
+    "sourceProviders": "ソースプロバイダー",
+    "startDeployment": "デプロイを開始",
+    "taskRun": "タスクの実行",
+    "taskTemplates": "タスクテンプレート",
+    "team": "チーム",
+    "teams": "チーム",
+    "traces": "トレース",
+    "triggers": "トリガー",
+    "visualizations": "可視化",
+    "webhook": "Webhook",
+    "webhookDelivery": "Webhook 配信",
+    "webhookEvents": "Webhook イベント",
+    "webhooks": "Webhook",
+    "workflow": "ワークフロー",
+    "workflows": "ワークフロー",
+    "workload": "ワークロード",
+    "workloads": "ワークロード",
+    "zentinelle": "Zentinelle"
+  },
+  "listDefinitions": {
+    "agentBoxes": {
+      "search": "ボックス、スラッグ、エージェントを検索…",
+      "fields": {
+        "status": "状態"
+      },
+      "options": {
+        "status": {
+          "pending": "保留中",
+          "provisioning": "プロビジョニング中",
+          "running": "実行中",
+          "stopped": "停止済み",
+          "expired": "期限切れ",
+          "failed": "失敗"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目"
+      },
+      "notes": {
+        "mine": "エージェントボックスには、自分が開始したかどうかの情報がまだないため、「自分の項目」は空です。すべてのボックスは「すべて」に表示されます。"
+      }
+    },
+    "agentRuns": {
+      "search": "実行、ID を検索…",
+      "fields": {
+        "status": "ステータス",
+        "trigger": "トリガー"
+      },
+      "options": {
+        "status": {
+          "running": "実行中",
+          "waiting": "待機中",
+          "succeeded": "成功",
+          "failed": "失敗",
+          "cancelled": "キャンセル済み"
+        },
+        "trigger": {
+          "manual": "手動",
+          "api": "API",
+          "schedule": "スケジュール",
+          "webhook": "Webhook",
+          "parent": "親の実行"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "running": "実行中",
+        "failed": "失敗",
+        "waiting": "待機中"
+      },
+      "notes": {
+        "mine": "「自分の項目」には、このエージェントの実行のうち自分が開始したものが表示されます。Astrolift が開始者を記録する前の実行は「すべて」にのみ表示されます。"
+      }
+    },
+    "agentSkills": {
+      "search": "スキル、スラッグを検索…",
+      "fields": {
+        "status": "状態",
+        "scope": "スコープ"
+      },
+      "options": {
+        "status": {
+          "active": "有効",
+          "inactive": "無効"
+        },
+        "scope": {
+          "global": "グローバル",
+          "org": "組織"
+        }
+      },
+      "views": {
+        "all": "すべて"
+      },
+      "notes": {
+        "all": "ブラウザーで絞り込み、並べ替え、ページ分割を行います。エージェントの読み込みではすべての紐付けが一度に返されます。"
+      }
+    },
+    "agentTools": {
+      "search": "ツール、スキル、ハンドラーを検索…",
+      "fields": {
+        "adapter": "アダプター"
+      },
+      "options": {
+        "adapter": {
+          "python_fn": "Python 関数",
+          "http_endpoint": "HTTP エンドポイント",
+          "mcp_server": "MCP サーバー"
+        }
+      },
+      "views": {
+        "all": "すべて"
+      },
+      "notes": {
+        "all": "ブラウザーで絞り込み、並べ替え、ページ分割を行います。エージェントの読み込みではすべての紐付けが一度に返されます。"
+      }
+    },
+    "agents": {
+      "search": "エージェント、スラッグ、リポジトリを検索...",
+      "fields": {
+        "project": "プロジェクト",
+        "status": "状態",
+        "model": "モデル",
+        "runtime": "ランタイム",
+        "cluster": "クラスター"
+      },
+      "options": {
+        "status": {
+          "running": "実行中",
+          "failing": "前回の実行が失敗",
+          "scheduled": "スケジュール済み",
+          "idle": "待機中"
+        },
+        "model": {
+          "managed": "マネージドモデル",
+          "gateway": "モデルゲートウェイ",
+          "api-key": "API キー"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "paused": "一時停止中"
+      },
+      "notes": {
+        "mine": "「自分の項目」には、自分が登録したエージェントが表示されます。Astrolift が登録者を記録する前に登録されたエージェントには所有者がなく、「すべて」にのみ表示されます。"
+      }
+    },
+    "alertRules": {
+      "search": "ルール、対象を検索…",
+      "fields": {
+        "target": "対象",
+        "targetId": "対象 ID",
+        "severity": "重大度",
+        "state": "状態"
+      },
+      "options": {
+        "target": {
+          "global": "グローバル",
+          "app": "アプリ",
+          "environment": "環境",
+          "workload": "ワークロード",
+          "managed_service": "マネージドサービス"
+        },
+        "severity": {
+          "info": "情報",
+          "warn": "警告",
+          "critical": "重大"
+        },
+        "state": {
+          "active": "有効",
+          "muted": "ミュート中",
+          "inactive": "無効"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "active": "有効",
+        "muted": "ミュート中"
+      },
+      "notes": {
+        "mine": "アラートルールには作成者がまだ記録されないため、「自分の項目」は空です。",
+        "muted": "ルールのクエリがミュートでの絞り込みに対応するまでは、最新の 100 件からミュート中のルールを表示します。"
+      }
+    },
+    "alertSubscriptions": {
+      "search": "アプリ、スラッグを検索…",
+      "fields": {
+        "team": "チーム",
+        "project": "プロジェクト",
+        "alerts": "アラート"
+      },
+      "options": {
+        "alerts": {
+          "on": "購読中",
+          "off": "未購読"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目"
+      },
+      "notes": {
+        "mine": "最新の 100 件から、自分がアラートを 1 つ以上受け取るアプリを表示します。"
+      }
+    },
+    "appAlertRules": {
+      "search": "アラートルールを検索…",
+      "fields": {
+        "severity": "重大度",
+        "state": "状態"
+      },
+      "options": {
+        "severity": {
+          "critical": "重大",
+          "warning": "警告",
+          "info": "情報"
+        },
+        "state": {
+          "active": "有効",
+          "muted": "ミュート中",
+          "inactive": "無効"
+        }
+      },
+      "views": {
+        "all": "すべて"
+      },
+      "notes": {
+        "all": "ブラウザーで絞り込み、並べ替え、ページ分割を行います。バックエンドはすべての行を一度に返します。"
+      }
+    },
+    "appManagedServices": {
+      "search": "名前、種類、バリアント、環境で検索…",
+      "views": {
+        "all": "すべて"
+      }
+    },
+    "appPods": {
+      "search": "Pod、ワークロード、ノードを検索…",
+      "fields": {
+        "status": "ステータス"
+      },
+      "views": {
+        "all": "すべて"
+      },
+      "notes": {
+        "all": "ブラウザーで絞り込み、並べ替え、ページ分割を行います。バックエンドはすべての行を一度に返します。"
+      }
+    },
+    "appWorkloads": {
+      "search": "ワークロード、スラッグ、種類を検索…",
+      "fields": {
+        "kind": "種類",
+        "exposure": "公開範囲"
+      },
+      "options": {
+        "exposure": {
+          "public": "公開",
+          "internal": "内部"
+        }
+      },
+      "views": {
+        "all": "すべて"
+      }
+    },
+    "brains": {
+      "search": "名前とスラッグを検索…",
+      "views": {
+        "all": "すべて"
+      }
+    },
+    "commandRuns": {
+      "search": "コマンド、アプリ、実行者を検索…",
+      "fields": {
+        "app": "アプリ"
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目"
+      }
+    },
+    "deployKeys": {
+      "search": "キー、フィンガープリント、アプリを検索…",
+      "fields": {
+        "scope": "スコープ",
+        "app": "アプリ"
+      },
+      "options": {
+        "scope": {
+          "org": "組織スコープ"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目"
+      },
+      "notes": {
+        "mine": "デプロイキーには生成者がまだ記録されないため、「自分の項目」は空です。"
+      }
+    },
+    "deployments": {
+      "search": "アプリ、ブランチ、タグ、コミットを検索…",
+      "fields": {
+        "app": "アプリ",
+        "environment": "環境",
+        "status": "状態",
+        "trigger": "トリガー",
+        "since": "期間"
+      },
+      "options": {
+        "status": {
+          "pending_approval": "承認待ち",
+          "pending": "待機中",
+          "deploying": "デプロイ中",
+          "redeploying": "再デプロイ中",
+          "running": "実行中",
+          "failed": "失敗",
+          "rolled_back": "ロールバック済み",
+          "superseded": "置き換え済み"
+        },
+        "trigger": {
+          "push": "プッシュ",
+          "manual": "手動",
+          "ci": "CI",
+          "scheduled": "スケジュール",
+          "rollback": "ロールバック",
+          "promotion": "昇格"
+        },
+        "since": {
+          "today": "今日",
+          "1h": "過去 1 時間",
+          "24h": "過去 24 時間",
+          "7d": "過去 7 日間",
+          "30d": "過去 30 日間",
+          "90d": "過去 90 日間"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分のデプロイ",
+        "waiting": "承認待ち",
+        "failed": "失敗",
+        "today": "今日"
+      }
+    },
+    "environmentSpecs": {
+      "search": "名前、スラッグ、イメージ、ランタイム、リポジトリを検索…",
+      "fields": {
+        "agentType": "エージェントの種類"
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目"
+      },
+      "notes": {
+        "mine": "「自分の項目」には、自分が作成したレシピが表示されます。作成者が記録されていない古いレシピは「すべて」に表示されます。"
+      }
+    },
+    "functions": {
+      "search": "関数、スラッグ、アプリを検索…",
+      "fields": {
+        "app": "アプリ"
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目"
+      },
+      "notes": {
+        "mine": "「自分の項目」には、自分が作成したワークロード、または自分が作成したアプリのワークロードが表示されます。Astrolift が作成者を記録する前のワークロードは「すべて」にのみ表示されます。"
+      }
+    },
+    "identityProviders": {
+      "search": "プロバイダー、エンドポイント、クライアント ID を検索…",
+      "fields": {
+        "kind": "種類",
+        "status": "ステータス"
+      },
+      "options": {
+        "status": {
+          "active": "有効",
+          "configured": "設定済み"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目"
+      },
+      "notes": {
+        "mine": "ID プロバイダーには設定者がまだ記録されないため、「自分の項目」は空です。"
+      }
+    },
+    "jobRuns": {
+      "search": "実行、ジョブ、Job 名を検索…",
+      "fields": {
+        "app": "アプリ",
+        "workload": "ジョブ",
+        "environment": "環境",
+        "status": "ステータス"
+      },
+      "options": {
+        "status": {
+          "running": "実行中",
+          "succeeded": "成功",
+          "failed": "失敗",
+          "superseded": "置換済み"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "failed": "失敗"
+      }
+    },
+    "jobs": {
+      "search": "ジョブ、アプリを検索…",
+      "fields": {
+        "app": "アプリ"
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "failing": "失敗中",
+        "paused": "一時停止中"
+      },
+      "notes": {
+        "failing": "ジョブのクエリが最終実行での絞り込みに対応するまでは、「失敗中」には各ページのジョブのうち最新の実行が失敗したものを表示します。",
+        "paused": "Astrolift はスケジュールの一時停止をまだ記録しないため、ここにはジョブが表示されません。"
+      }
+    },
+    "projects": {
+      "search": "プロジェクト、スラッグ、チームを検索…",
+      "fields": {
+        "team": "チーム"
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目"
+      },
+      "notes": {
+        "mine": "プロジェクトには所有者がまだ記録されないため、「自分の項目」は空です。"
+      }
+    },
+    "runs": {
+      "search": "実行、エージェント、ワークフロー、ID を検索…",
+      "fields": {
+        "kind": "種類",
+        "status": "ステータス",
+        "agent": "エージェント",
+        "workflow": "ワークフロー",
+        "project": "プロジェクト",
+        "trigger": "トリガー",
+        "since": "期間"
+      },
+      "options": {
+        "kind": {
+          "agent": "エージェントの実行",
+          "workflow": "ワークフローの実行",
+          "task": "タスクの実行"
+        },
+        "status": {
+          "running": "実行中",
+          "waiting": "待機中",
+          "succeeded": "成功",
+          "failed": "失敗",
+          "cancelled": "キャンセル済み"
+        },
+        "trigger": {
+          "manual": "手動",
+          "api": "API",
+          "schedule": "スケジュール",
+          "webhook": "Webhook",
+          "parent": "親の実行"
+        },
+        "since": {
+          "1h": "過去 1 時間",
+          "24h": "過去 24 時間",
+          "7d": "過去 7 日間",
+          "30d": "過去 30 日間",
+          "90d": "過去 90 日間"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "running": "実行中",
+        "failed": "失敗",
+        "waiting": "待機中",
+        "scheduled": "スケジュール済み"
+      },
+      "notes": {
+        "mine": "「自分の項目」には、自分が開始した実行が表示されます。Astrolift が開始者を記録する前の実行は「すべて」にのみ表示されます。",
+        "scheduled": "スケジュール済みのエージェントの次回の実行予定を早い順に表示します。スケジュールによってすでに開始された実行は、トリガーが「スケジュール」の実行として「すべて」に表示されます。"
+      }
+    },
+    "sessions": {
+      "search": "セッション、ラベルを検索…",
+      "fields": {
+        "kind": "種類",
+        "status": "ステータス"
+      },
+      "options": {
+        "kind": {
+          "web": "Web",
+          "cli": "CLI",
+          "mobile": "モバイル",
+          "browser_extension": "ブラウザー拡張機能",
+          "api_token": "API トークン"
+        },
+        "status": {
+          "current": "このセッション",
+          "other": "他のセッション"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目"
+      },
+      "notes": {
+        "mine": "ここにあるセッションはすべて自分のものなので、「自分の項目」には「すべて」と同じセッションが含まれます。"
+      }
+    },
+    "skillTools": {
+      "search": "ツール、スラッグ、ハンドラーを検索…",
+      "fields": {
+        "adapter": "アダプター"
+      },
+      "options": {
+        "adapter": {
+          "python_fn": "Python 関数",
+          "http_endpoint": "HTTP エンドポイント",
+          "mcp_server": "MCP サーバー"
+        }
+      },
+      "views": {
+        "all": "すべて"
+      }
+    },
+    "skills": {
+      "search": "スキル、スラッグ、リポジトリを検索…",
+      "fields": {
+        "status": "状態",
+        "scope": "スコープ"
+      },
+      "options": {
+        "status": {
+          "active": "有効",
+          "inactive": "無効"
+        },
+        "scope": {
+          "org": "組織",
+          "global": "グローバル"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "imported": "インポート済み"
+      },
+      "notes": {
+        "mine": "「自分の項目」には、自分が作成またはインポートしたスキルが表示されます。Astrolift が作成者を記録する前のスキルは「すべて」にのみ表示されます。"
+      }
+    },
+    "sourceHosts": {
+      "search": "接続、アカウント、URL を検索…",
+      "fields": {
+        "host": "ホスト",
+        "status": "ステータス"
+      },
+      "options": {
+        "status": {
+          "active": "有効",
+          "disabled": "無効"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目"
+      },
+      "notes": {
+        "mine": "最新の 100 件から、自分の個人用の接続を表示します。"
+      }
+    },
+    "taskTemplates": {
+      "search": "タスクテンプレートを検索…",
+      "fields": {
+        "app": "アプリ"
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目"
+      },
+      "notes": {
+        "mine": "タスクテンプレートには所有者がまだ記録されないため、記録されるまで「自分の項目」は空のままです。"
+      }
+    },
+    "webhooks": {
+      "search": "配信 URL を検索…",
+      "fields": {
+        "status": "状態",
+        "format": "形式",
+        "failing": "失敗中"
+      },
+      "options": {
+        "status": {
+          "active": "有効",
+          "paused": "一時停止中"
+        },
+        "format": {
+          "generic": "汎用"
+        },
+        "failing": {
+          "yes": "失敗あり"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "failing": "失敗中",
+        "paused": "一時停止中"
+      },
+      "notes": {
+        "mine": "Webhook サブスクリプションには作成者がまだ記録されないため、「自分の項目」は空です。",
+        "failing": "Webhook のクエリがフィルターに対応するまでは、最新の 100 件から一致するサブスクリプションを表示します。",
+        "paused": "Webhook のクエリがフィルターに対応するまでは、最新の 100 件から一致するサブスクリプションを表示します。"
+      }
+    },
+    "workflowInstances": {
+      "fields": {
+        "type": "種類",
+        "status": "ステータス"
+      },
+      "options": {
+        "status": {
+          "running": "実行中",
+          "completed": "完了",
+          "failed": "失敗",
+          "canceled": "キャンセル済み",
+          "terminated": "強制終了",
+          "timed_out": "タイムアウト"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "running": "実行中",
+        "failed": "失敗"
+      },
+      "notes": {
+        "all": "Temporal は新しい順にページを返します。種類とステータスの絞り込みはサーバー側で行われます。ページが空でも、「古い項目」で進んだ先のページに権限のあるインスタンスがある場合があります。",
+        "mine": "インスタンスは開始者をアカウントではなく名前で記録するため、アカウントが記録されるまで「自分の項目」は空です。Temporal は新しい順にページを返します。種類とステータスの絞り込みはサーバー側で行われます。ページが空でも、「古い項目」で進んだ先のページに権限のあるインスタンスがある場合があります。",
+        "running": "Temporal は新しい順にページを返します。種類とステータスの絞り込みはサーバー側で行われます。ページが空でも、「古い項目」で進んだ先のページに権限のあるインスタンスがある場合があります。",
+        "failed": "Temporal は新しい順にページを返します。種類とステータスの絞り込みはサーバー側で行われます。ページが空でも、「古い項目」で進んだ先のページに権限のあるインスタンスがある場合があります。"
+      }
+    },
+    "workflowRuns": {
+      "search": "実行、ID を検索…",
+      "fields": {
+        "status": "ステータス",
+        "trigger": "トリガー"
+      },
+      "options": {
+        "status": {
+          "running": "実行中",
+          "waiting": "待機中",
+          "succeeded": "成功",
+          "failed": "失敗",
+          "cancelled": "キャンセル済み"
+        },
+        "trigger": {
+          "manual": "手動",
+          "api": "API",
+          "schedule": "スケジュール",
+          "webhook": "Webhook",
+          "parent": "親の実行"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "running": "実行中",
+        "failed": "失敗",
+        "waiting": "待機中"
+      },
+      "notes": {
+        "mine": "ワークフローの実行には開始者がまだ記録されないため、記録されるまで「自分の項目」は空のままです。"
+      }
+    },
+    "workflowTriggers": {
+      "search": "トリガー、スケジュールを検索…",
+      "fields": {
+        "kind": "種類",
+        "status": "ステータス"
+      },
+      "options": {
+        "kind": {
+          "schedule": "スケジュール",
+          "webhook": "Webhook",
+          "manual": "手動"
+        },
+        "status": {
+          "enabled": "有効",
+          "disabled": "無効"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "enabled": "有効",
+        "disabled": "無効"
+      },
+      "notes": {
+        "all": "現在、ワークフローが持つトリガーは 1 つのため、この一覧にはそのトリガーが表示されます。",
+        "mine": "トリガーには設定者がまだ記録されないため、記録されるまで「自分の項目」は空です。"
+      }
+    },
+    "workflows": {
+      "search": "ワークフロー、スラッグ、定義を検索...",
+      "fields": {
+        "pattern": "パターン",
+        "project": "プロジェクト",
+        "status": "最終実行"
+      },
+      "options": {
+        "pattern": {
+          "single": "シングル",
+          "chained": "チェーン",
+          "fan_out": "ファンアウト",
+          "supervisor_worker": "スーパーバイザー / ワーカー",
+          "review_loop": "レビューループ",
+          "advisor": "アドバイザー"
+        },
+        "status": {
+          "running": "実行中",
+          "succeeded": "成功",
+          "failed": "失敗",
+          "cancelled": "キャンセル済み",
+          "never": "未実行"
+        }
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "templates": "テンプレート"
+      },
+      "notes": {
+        "mine": "ワークフローには作成者がまだ記録されないため、記録されるまで「自分の項目」は空です。",
+        "templates": "プラットフォームテンプレートは読み取り専用です。テンプレートからワークフローを作成するか、複製して編集してください。"
+      }
+    },
+    "workloads": {
+      "search": "ワークロード、スラッグ、アプリを検索…",
+      "fields": {
+        "app": "アプリ"
+      },
+      "views": {
+        "all": "すべて",
+        "mine": "自分の項目",
+        "agents": "エージェント",
+        "workflows": "ワークフロー",
+        "functions": "関数"
+      },
+      "notes": {
+        "mine": "「自分の項目」には、自分が作成したワークロード、または自分が作成したアプリのワークロードが表示されます。Astrolift が作成者を記録する前のワークロードは「すべて」にのみ表示されます。"
+      }
+    }
   }
 }

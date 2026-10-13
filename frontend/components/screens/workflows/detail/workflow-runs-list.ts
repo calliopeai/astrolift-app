@@ -4,16 +4,17 @@
  * Runs tab is the same idea (`AGENT_RUNS_LIST`), so this is that list with
  * the workflow's own list id and Mine note. Pure.
  */
-import { standardViews, type ListDefinition } from "@/components/list/list-state";
+import { standardViews, type CopiedListDefinition } from "@/components/list/list-state";
 import { AGENT_RUNS_LIST, type RunRow } from "@/components/screens/tasks/runs-list";
 import type { TieredWorkflowRun } from "@/graphql/workflows/tiered.types";
 
 import { configuredRunOutcome, workflowRunHref } from "./workflow-run-model";
 
 /** All · Mine · Running · Failed · Waiting, status and since chips, newest first by cursor. */
-export const WORKFLOW_RUNS_LIST: ListDefinition = {
+export const WORKFLOW_RUNS_LIST: CopiedListDefinition = {
   ...AGENT_RUNS_LIST,
   id: "workflows.workflow-runs",
+  copy: "workflowRuns",
   views: standardViews(
     { startedBy: "me" },
     AGENT_RUNS_LIST.views.filter((v) => v.key !== "all" && v.key !== "mine"),

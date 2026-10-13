@@ -4,6 +4,7 @@ import { useQuery } from "@apollo/client/react";
 import { useState } from "react";
 
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import {
   AGENT_ENVIRONMENT_SPEC_DETAIL,
   AGENT_ENVIRONMENT_SPECS_PAGE,
@@ -26,7 +27,7 @@ type PageData = {
 };
 
 export const useEnvironmentSpecs = () => {
-  const list = useListState(ENVIRONMENT_SPECS_LIST);
+  const list = useListState(useLocalizedList(ENVIRONMENT_SPECS_LIST));
   const { org, loading: orgLoading } = useActiveOrg();
   const orgId = org?.id ?? "";
   const { data, loading, error, refetch } = useQuery<PageData>(AGENT_ENVIRONMENT_SPECS_PAGE, {

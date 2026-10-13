@@ -182,7 +182,10 @@ function podsList(
     ],
     searchPlaceholder: t("podSearch"),
     defaultSort: [{ key: "order", dir: "asc" }],
-    views: standardViews({ owner: "me" }, [], { mineNote: t("notPersonal") }),
+    views: standardViews({ owner: "me" }, [], {
+      mineNote: t("notPersonal"),
+      labels: { all: t("allView"), mine: t("mineView") },
+    }),
     paging: "numbered",
     pageSizes: [25, 50, 100],
   };
@@ -1143,7 +1146,10 @@ const volumesList = (t: (key: string) => string): ListDefinition => ({
   ],
   searchPlaceholder: t("volumeSearch"),
   defaultSort: [{ key: "name", dir: "asc" }],
-  views: standardViews({ owner: "me" }, [], { mineNote: t("notPersonal") }),
+  views: standardViews({ owner: "me" }, [], {
+    mineNote: t("notPersonal"),
+    labels: { all: t("allView"), mine: t("mineView") },
+  }),
   paging: "numbered",
   pageSizes: [25, 50, 100],
 });

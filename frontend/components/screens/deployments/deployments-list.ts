@@ -9,7 +9,7 @@
  * list's order as `sort` (#2155).
  */
 import type { SortState } from "@/components/data-table";
-import type { ListDefinition } from "@/components/list/list-state";
+import type { CopiedListDefinition } from "@/components/list/list-state";
 import { formatSort, standardViews } from "@/components/list/list-state";
 import type { TimelineStep } from "@/components/run/Timeline";
 import type { LogLine } from "@/components/run/LogView";
@@ -38,8 +38,9 @@ const STATUSES: DeploymentStatus[] = [
 
 const TRIGGERS: TriggerKind[] = ["push", "manual", "ci", "scheduled", "rollback", "promotion"];
 
-export const DEPLOYMENTS_LIST: ListDefinition = {
+export const DEPLOYMENTS_LIST: CopiedListDefinition = {
   id: "apps.deployments",
+  copy: "deployments",
   fields: [
     { key: "app", label: "App" },
     { key: "environment", label: "Environment" },
