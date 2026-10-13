@@ -50,6 +50,7 @@ ALLOWED: dict[str, str] = {
     "/app/": "public: the backend landing page (version, environment, links), no tenant data",
     "/.well-known/apple-app-site-association": "public: the iOS universal-link file the OS fetches anonymously",
     "/.well-known/assetlinks.json": "public: the Android app-link file the OS fetches anonymously",
+    "/api/brains/v1/jwks.json": "public: brain read token public keys, fetched anonymously by the cluster edge (#2320)",
     "/^favicon\\.ico$": "public: redirect to the static favicon",
     "/health/": "public: the load balancer's health probe",
     "/health/<str:subset>/": "public: the load balancer's health probe, one check subset",

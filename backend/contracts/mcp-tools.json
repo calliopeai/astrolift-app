@@ -850,6 +850,29 @@
       ]
     },
     {
+      "description": "Connect to one hosted brain this identity can read, by app slug: its endpoints, the header to send and a 15-minute read token for this identity and this brain (#2320). Ask again for a fresh token; a revoked share stops new tokens at once.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_connect_brain",
+      "required_permissions": [
+        "app.read"
+      ],
+      "required_scopes": [
+        "mcp:read",
+        "read:apps"
+      ]
+    },
+    {
       "description": "List registered agents and their source/package delivery state.",
       "inputSchema": {
         "additionalProperties": false,

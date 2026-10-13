@@ -1866,6 +1866,21 @@ type AstroliftBrain {
   sharedWith: [AstroliftBrainShare!]!
 }
 
+type AstroliftBrainConnection {
+  id: GUID!
+  slug: String!
+  endpoints: [String!]!
+  header: String!
+  token: String!
+  expiresAt: String!
+}
+
+type AstroliftBrainConnectionMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftBrainConnection
+}
+
 type AstroliftBrainEnvironment {
   name: String!
   url: String!
@@ -6839,6 +6854,13 @@ input BeginLocalModelArtifactInput {
   files: [LocalModelFileInput!]!
 }
 
+input BindManagedDomainDelegationInput {
+  domainId: GUID!
+  expectedDomainVersion: Int!
+  connectionId: GUID!
+  expectedConnectionVersion: Int!
+}
+
 input BootstrapOptionOverride {
   componentKey: String!
   optionKey: String!
@@ -7700,6 +7722,7 @@ type DnsProviderConnectionType {
   verifiedAt: DateTime
   expiresAt: DateTime
   dnsWritesSupported: Boolean!
+  delegationZoneName: String!
 }
 
 type DnsProviderConnectionTypeMutationResult {
@@ -8037,6 +8060,14 @@ enum GoldenSignalUnavailableReason {
   PROVIDER_ERROR
   NO_DATA_YET
   NOT_INSTRUMENTED
+}
+
+input GrantCloudflareDelegationInput {
+  connectionId: GUID!
+  expectedVersion: Int!
+  zoneId: String!
+  zoneName: String!
+  token: String!
 }
 
 input GrantRoleInput {
@@ -9272,6 +9303,8 @@ input MoveAppToTeamInput {
 
 type Mutation {
   connectCloudflareDnsToken(input: ConnectCloudflareDnsTokenInput!): DnsProviderConnectionTypeMutationResult!
+  grantCloudflareDelegation(input: GrantCloudflareDelegationInput!): DnsProviderConnectionTypeMutationResult!
+  bindManagedDomainDelegation(input: BindManagedDomainDelegationInput!): DnsProviderConnectionTypeMutationResult!
   retestDnsProviderConnection(input: CloudflareDnsConnectionInput!): DnsProviderConnectionTypeMutationResult!
   disconnectDnsProviderConnection(input: CloudflareDnsConnectionInput!): DnsProviderConnectionTypeMutationResult!
   beginCloudflareDnsOAuth(input: BeginCloudflareDnsOAuthInput!): CloudflareDnsOAuthStartMutationResult!
@@ -9488,6 +9521,11 @@ type Mutation {
   setRetentionPolicy(input: SetRetentionPolicyInput!): AstroliftRetentionPolicyMutationResult!
   archiveApp(input: ArchiveAppInput!): AstroliftRegisteredAppMutationResult!
   restoreApp(input: RestoreAppInput!): AstroliftRegisteredAppMutationResult!
+
+  """
+  A 15-minute read token for one brain the caller can read (#2320), with its endpoints and the header to send it in. The cluster edge admits it to that brain only; a revoked share stops new tokens at once. The token is never written to the audit log.
+  """
+  issueBrainReadToken(slug: String!): AstroliftBrainConnectionMutationResult!
   setAppAccess(input: SetAppAccessInput!): AstroliftAppAccessMutationResult!
   sendInstallAlertMailTest(input: SendInstallAlertMailTestInput!): InstallAlertMailTestMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!

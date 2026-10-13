@@ -1797,6 +1797,21 @@ export type AstroliftBrain = {
   team: Scalars['String']['output'];
 };
 
+export type AstroliftBrainConnection = {
+  endpoints: Array<Scalars['String']['output']>;
+  expiresAt: Scalars['String']['output'];
+  header: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  slug: Scalars['String']['output'];
+  token: Scalars['String']['output'];
+};
+
+export type AstroliftBrainConnectionMutationResult = {
+  data?: Maybe<AstroliftBrainConnection>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftBrainEnvironment = {
   name: Scalars['String']['output'];
   url: Scalars['String']['output'];
@@ -6408,6 +6423,13 @@ export type BeginLocalModelArtifactInput = {
   organizationId: Scalars['GUID']['input'];
 };
 
+export type BindManagedDomainDelegationInput = {
+  connectionId: Scalars['GUID']['input'];
+  domainId: Scalars['GUID']['input'];
+  expectedConnectionVersion: Scalars['Int']['input'];
+  expectedDomainVersion: Scalars['Int']['input'];
+};
+
 export type BootstrapOptionOverride = {
   componentKey: Scalars['String']['input'];
   optionKey: Scalars['String']['input'];
@@ -7239,6 +7261,7 @@ export type DnsProviderConnectionSupport = {
 
 export type DnsProviderConnectionType = {
   authMethod: Scalars['String']['output'];
+  delegationZoneName: Scalars['String']['output'];
   dnsWritesSupported: Scalars['Boolean']['output'];
   expiresAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
@@ -7566,6 +7589,14 @@ export type GoldenSignalUnavailableReason =
   | 'QUERY_ERROR'
   | 'TARGET_NOT_OWNED'
   | 'WORKLOAD_NOT_FOUND';
+
+export type GrantCloudflareDelegationInput = {
+  connectionId: Scalars['GUID']['input'];
+  expectedVersion: Scalars['Int']['input'];
+  token: Scalars['String']['input'];
+  zoneId: Scalars['String']['input'];
+  zoneName: Scalars['String']['input'];
+};
 
 export type GrantRoleInput = {
   expiresAt: InputMaybe<Scalars['DateTime']['input']>;
@@ -8780,6 +8811,7 @@ export type Mutation = {
   authorizeLocalModelUploads: LocalModelUploadAuthorizationMutationResult;
   beginCloudflareDnsOAuth: CloudflareDnsOAuthStartMutationResult;
   beginLocalModelArtifact: LocalModelArtifactMutationResult;
+  bindManagedDomainDelegation: DnsProviderConnectionTypeMutationResult;
   bringClusterIntoManagement: AstroliftTenantClusterMutationResult;
   bulkApproveDeployments: AstroliftBulkDeploymentResultDataMutationResult;
   bulkAssignAstroliftTeamMemberRoles: AstroliftBulkAssignTeamMemberRolesPayloadMutationResult;
@@ -8910,6 +8942,7 @@ export type Mutation = {
   /** Generate a temporary authentication token for Rocket.Chat. TTL is configured on the Rocket.Chat server. */
   generateRocketChatToken: Scalars['String']['output'];
   generateSshDeployKey: AstroliftSshDeployKeyCreatedMutationResult;
+  grantCloudflareDelegation: DnsProviderConnectionTypeMutationResult;
   grantRole: AstroliftRoleBindingMutationResult;
   grantTeamAccessToApp: AstroliftAppTeamAccessMutationResult;
   heartbeatSession: AstroliftHeartbeatSessionPayloadMutationResult;
@@ -8922,6 +8955,8 @@ export type Mutation = {
   installClusterAgent: AstroliftClusterAgentInstallMutationResult;
   installClusterPrereqs: AstroliftTenantClusterMutationResult;
   installScmWebhook: AstroliftScmWebhookInstallationMutationResult;
+  /** A 15-minute read token for one brain the caller can read (#2320), with its endpoints and the header to send it in. The cluster edge admits it to that brain only; a revoked share stops new tokens at once. The token is never written to the audit log. */
+  issueBrainReadToken: AstroliftBrainConnectionMutationResult;
   issueClusterAgentKey: ClusteragentkeyissuedpayloadMutationResult;
   launchTask: AstroliftLaunchTaskResultMutationResult;
   /** Create a new directory in the library. */
@@ -9390,6 +9425,11 @@ export type MutationBeginCloudflareDnsOAuthArgs = {
 
 export type MutationBeginLocalModelArtifactArgs = {
   input: BeginLocalModelArtifactInput;
+};
+
+
+export type MutationBindManagedDomainDelegationArgs = {
+  input: BindManagedDomainDelegationInput;
 };
 
 
@@ -10040,6 +10080,11 @@ export type MutationGenerateSshDeployKeyArgs = {
 };
 
 
+export type MutationGrantCloudflareDelegationArgs = {
+  input: GrantCloudflareDelegationInput;
+};
+
+
 export type MutationGrantRoleArgs = {
   input: GrantRoleInput;
 };
@@ -10090,6 +10135,11 @@ export type MutationInstallClusterPrereqsArgs = {
 
 export type MutationInstallScmWebhookArgs = {
   input: InstallScmWebhookInput;
+};
+
+
+export type MutationIssueBrainReadTokenArgs = {
+  slug: Scalars['String']['input'];
 };
 
 

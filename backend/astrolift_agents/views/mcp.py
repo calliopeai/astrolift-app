@@ -124,6 +124,7 @@ TOOL_SCOPES: dict[str, Any] = {
     "astrolift_import_workflow_manifest": workflow_manifest_import_scope,
     "astrolift_list_brains": ANY_SCOPE,
     "astrolift_get_brain": ANY_SCOPE,
+    "astrolift_connect_brain": ANY_SCOPE,
     "astrolift_list_agents": ANY_SCOPE,
     "astrolift_list_tasks": ANY_SCOPE,
     "astrolift_get_task_by_client_request_id": ANY_SCOPE,
@@ -358,6 +359,23 @@ def _get_brain(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
     if app is None:
         raise McpCallError("brain not found", code="not_found")
     return describe_brain(app)
+
+
+def _connect_brain(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_registry.brain_tokens import BrainTokenError, connection_descriptor
+    from astrolift_registry.brains import visible_brains
+
+    slug = str(args.get("slug") or "").strip()
+    app = visible_brains().filter(slug=slug).first() if slug else None
+    if app is None:
+        raise McpCallError("brain not found", code="not_found")
+    user = getattr(request, "user", None)
+    if user is None or not getattr(user, "is_authenticated", False):
+        raise McpCallError("a brain token is issued to a person", code="permission_denied")
+    try:
+        return connection_descriptor(user=user, brain=app)
+    except BrainTokenError as exc:
+        raise McpCallError(str(exc), code="unavailable") from None
 
 
 def _list_agents(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
@@ -1074,6 +1092,7 @@ _HANDLERS: dict[str, ToolHandler] = {
     "astrolift_reconcile_workflow_schedule": workflow_mcp.reconcile_schedule,
     "astrolift_list_brains": _list_brains,
     "astrolift_get_brain": _get_brain,
+    "astrolift_connect_brain": _connect_brain,
     "astrolift_list_agents": _list_agents,
     "astrolift_get_agent": _get_agent,
     "astrolift_get_task": _get_task,

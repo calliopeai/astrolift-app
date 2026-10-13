@@ -580,3 +580,27 @@ async def reissue_cert(
         extra={"cluster_id": cluster_id},
     )
     return result
+
+
+def _delegate_parent_zone_sync(zone: str, nameservers: list[str]) -> dict[str, Any]:
+    from astrolift_clusters.cloudflare_delegation import delegate
+    from astrolift_clusters.models import ManagedDomain
+
+    domain = ManagedDomain.objects.filter(zone=zone, deleted_at__isnull=True).first()
+    if domain is None:
+        return {"action": "unbound"}
+    return delegate(domain.pk, nameservers)
+
+
+@activity.defn(name="astrolift.managed_domain.delegate_parent_zone")
+async def delegate_parent_zone(cluster_id: int, zone: str, nameservers: list[str]) -> dict[str, Any]:
+    """Write the NS set that delegates ``zone`` into its parent, when the
+    domain is bound to a provider connection holding a delegation grant
+    (#1787). Unbound, conflicting or failing writes leave the operator's
+    manual path; the outcome is on ``dns_config["delegation_write"]``."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    result = await sync_to_async(_delegate_parent_zone_sync)(zone, list(nameservers))
+    log.info("delegate_parent_zone: zone=%s cluster=%s action=%s", zone, cluster_id, result.get("action"))
+    return result

@@ -170,6 +170,7 @@ from astrolift_workflows.activities.pipeline_job_spawn import (
     spawn_pipeline_job,
 )
 from astrolift_workflows.activities.provision_managed_domain import (
+    delegate_parent_zone,
     mark_managed_domain_active,
     poll_cert_issuance,
     provision_dns_zone,
@@ -401,6 +402,7 @@ __all__ = [
     "update_secrets",
     "update_stage_execution",
     "validate_migration_target",
+    "delegate_parent_zone",
     "validate_ns_delegation",
     "verify_app_hostnames",
     "verify_reachability",

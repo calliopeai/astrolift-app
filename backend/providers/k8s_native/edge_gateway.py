@@ -76,6 +76,13 @@ EDGE_FRONT_LABEL = "astrolift.dev/edge-front"
 # one) and again on every route (so the app never sees it).
 ID_TOKEN_HEADER = "X-Astrolift-Id-Token"
 
+# A brain read token (#2320): minted by the control plane for one caller and
+# one brain app, sent by machine clients (Chat Studio, cykick) in place of a
+# browser session. Not stripped at the listener (the JWT filter reads it);
+# stripped on every route so the app never sees it.
+BRAIN_TOKEN_HEADER = "X-Astrolift-Brain-Token"
+BRAIN_JWT_PROVIDER_NAME = "astrolift-brain"
+
 USER_HEADER = "X-Auth-Request-User"
 EMAIL_HEADER = "X-Auth-Request-Email"
 DEFAULT_GATEWAY_SECRET_HEADER = "X-Astrolift-Gateway-Secret"
@@ -147,6 +154,33 @@ def edge_authorization(
     """
     claim = groups_claim(oidc_auth_config)
     rules: list[dict[str, Any]] = []
+    brains = brain_audiences(access_rules)
+    for access in access_rules or []:
+        audience = str(access.get("brain_audience") or "")
+        hosts = sorted({str(h) for h in access.get("hosts") or [] if h})
+        if audience and hosts:
+            rules.append(
+                {
+                    "name": _rule_name(str(access.get("name") or hosts[0]), "brain"),
+                    "action": "Allow",
+                    "principal": {
+                        "headers": [{"name": ":authority", "values": hosts}],
+                        "jwt": {
+                            "provider": BRAIN_JWT_PROVIDER_NAME,
+                            "claims": [{"name": "aud", "values": [audience]}],
+                        },
+                    },
+                }
+            )
+    if brains:
+        # A brain token opens only the brain it names; anywhere else it is refused.
+        rules.append(
+            {
+                "name": "brain-token-elsewhere",
+                "action": "Deny",
+                "principal": {"jwt": {"provider": BRAIN_JWT_PROVIDER_NAME}},
+            }
+        )
     for access in access_rules or []:
         hosts = sorted({str(h) for h in access.get("hosts") or [] if h})
         groups = sorted({str(g) for g in access.get("groups") or [] if g})
@@ -187,6 +221,22 @@ def edge_authorization(
     if not rules:
         return None
     return {"defaultAction": "Allow", "rules": rules}
+
+
+def brain_audiences(access_rules: list[dict[str, Any]] | None) -> dict[str, Any]:
+    """``{"issuer", "jwks_uri", "audiences"}`` for the brain token provider, or ``{}``.
+
+    Every brain entry carries the control plane's issuer and JWKS URI; they
+    are one install's, so the first entry's are used.
+    """
+    entries = [a for a in access_rules or [] if a.get("brain_audience") and a.get("hosts")]
+    if not entries:
+        return {}
+    return {
+        "issuer": str(entries[0]["brain_issuer"]),
+        "jwks_uri": str(entries[0]["brain_jwks_uri"]),
+        "audiences": sorted({str(a["brain_audience"]) for a in entries}),
+    }
 
 
 def edge_access_denied_policy() -> dict[str, Any]:
@@ -262,6 +312,7 @@ def edge_security_policy(
 ) -> dict[str, Any]:
     """The one OIDC + JWT policy every gated route shares."""
     config = oidc_auth_config
+    brain = brain_audiences(access_rules)
     issuer = issuer_from_discovery_url(str(config["discovery_url"]))
     auth_host = str(config["auth_proxy_host"])
     return _manifest(
@@ -295,6 +346,9 @@ def edge_security_policy(
                 "cookieNames": {"accessToken": ACCESS_TOKEN_COOKIE, "idToken": ID_TOKEN_COOKIE},
                 "scopes": ["openid", "email", "profile"],
                 "forwardIDToken": {"header": ID_TOKEN_HEADER},
+                # A request carrying a brain token skips the browser login and
+                # goes to the JWT filter (#2320); every other request is unchanged.
+                **({"passThroughAuthHeader": True} if brain else {}),
             },
             "jwt": {
                 "providers": [
@@ -311,7 +365,24 @@ def edge_security_policy(
                             {"claim": "sub", "header": USER_HEADER},
                             {"claim": "email", "header": EMAIL_HEADER},
                         ],
-                    }
+                    },
+                    *(
+                        [
+                            {
+                                "name": BRAIN_JWT_PROVIDER_NAME,
+                                "issuer": brain["issuer"],
+                                "audiences": brain["audiences"],
+                                "remoteJWKS": {"uri": brain["jwks_uri"]},
+                                "extractFrom": {"headers": [{"name": BRAIN_TOKEN_HEADER}]},
+                                "claimToHeaders": [
+                                    {"claim": "sub", "header": USER_HEADER},
+                                    {"claim": "email", "header": EMAIL_HEADER},
+                                ],
+                            }
+                        ]
+                        if brain
+                        else []
+                    ),
                 ]
             },
             **({"authorization": authz} if (authz := edge_authorization(access_rules, config)) else {}),
@@ -1005,7 +1076,7 @@ def render_app_routes(
                 ]
             }
         else:
-            modifier: dict[str, Any] = {"remove": [ID_TOKEN_HEADER]}
+            modifier: dict[str, Any] = {"remove": [ID_TOKEN_HEADER, BRAIN_TOKEN_HEADER]}
             if header_set:
                 modifier["set"] = header_set
             rule = {

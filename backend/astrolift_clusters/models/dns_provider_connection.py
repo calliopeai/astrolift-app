@@ -20,6 +20,14 @@ class DnsProviderConnection(BaseCoreModel):
     refresh_ciphertext = models.BinaryField(default=bytes)
     verified_at = models.DateTimeField(null=True)
     expires_at = models.DateTimeField(null=True)
+    # Delegation write grant (#1787): a separate, operator-confirmed token with
+    # Zone.DNS:Edit on exactly one parent zone. It writes only the NS set that
+    # delegates a managed child zone; the read credential above never writes.
+    delegation_backend_kind = models.CharField(max_length=32, blank=True)
+    delegation_ciphertext = models.BinaryField(default=bytes)
+    delegation_zone_id = models.CharField(max_length=32, blank=True)
+    delegation_zone_name = models.CharField(max_length=255, blank=True)
+    delegation_verified_at = models.DateTimeField(null=True)
 
     def save(self, *args, **kwargs):
         if self.pk:

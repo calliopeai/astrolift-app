@@ -28,6 +28,7 @@ from astrolift_identity.urls import (
 )
 from astrolift_lifecycle.urls import urlpatterns as lifecycle_api_urls
 from astrolift_pipelines.urls import urlpatterns as pipeline_webhook_urls
+from astrolift_registry.views_brain_jwks import brain_jwks
 from astrolift_scm.urls import urlpatterns as scm_webhook_urls
 from auth1.forms import AuthAdminForm
 from auth1.sessions import Auth1SessionWorkflow
@@ -154,6 +155,8 @@ urlpatterns = [
     # These MUST stay anonymous-accessible — the OS verifier doesn't
     # carry a session — so they sit ahead of the ``base`` include that
     # routes most app traffic through auth1.
+    # Brain read token keys (#2320), fetched by the cluster edge; public keys only.
+    path("api/brains/v1/jwks.json", brain_jwks),
     path(".well-known/apple-app-site-association", apple_app_site_association),
     path(".well-known/assetlinks.json", assetlinks_json),
     path(base, include(urls)),

@@ -44,6 +44,25 @@ def is_restricted(access: dict[str, list[str]]) -> bool:
     return bool(access["groups"] or access["users"])
 
 
+def brain_fields(app: Any) -> dict[str, str]:
+    """What the edge needs to admit brain read tokens for ``app`` (#2320), or ``{}``.
+
+    Only apps of a brain kind; empty, logged, when the install has no https
+    URL to issue tokens from.
+    """
+    from astrolift_manifest.app_kinds import BRAIN_KINDS
+
+    if getattr(app, "app_kind", "") not in BRAIN_KINDS:
+        return {}
+    from astrolift_registry.brain_tokens import BrainTokenError, issuer, jwks_uri
+
+    try:
+        return {"brain_audience": str(app.guid), "brain_issuer": issuer(), "brain_jwks_uri": jwks_uri()}
+    except BrainTokenError:
+        logger.warning("edge access: %s is a brain but the install has no https URL for tokens", app.slug)
+        return {}
+
+
 def _key(app: Any, namespace: str) -> str:
     # The app's guid, not its slug: two orgs can each have an app of the same
     # slug on one shared cluster, and a slug prefix would match both.
@@ -101,12 +120,14 @@ def record_environment(cluster: Any, app: Any, namespace: str, rendered: list[di
             and item.get("metadata", {}).get("labels", {}).get("astrolift.dev/namespace") == namespace
             and item.get("metadata", {}).get("labels", {}).get("astrolift.dev/custom-domain")
         ]
-        if (hosts and is_restricted(access)) or custom_routes:
+        brain = brain_fields(app) if hosts else {}
+        if (hosts and (is_restricted(access) or brain)) or custom_routes:
             rules[key] = {
                 "name": f"{app.slug}-{namespace}",
                 "hosts": hosts,
                 **access,
                 **({"custom_routes": custom_routes} if custom_routes else {}),
+                **brain,
             }
         else:
             rules.pop(key, None)
@@ -144,7 +165,7 @@ def set_app_access(app: Any, *, groups: Any, users: Any, source: str) -> dict[st
         if not ours:
             continue
         for key, entry in ours.items():
-            if is_restricted(access) or entry.get("custom_routes"):
+            if is_restricted(access) or entry.get("custom_routes") or entry.get("brain_audience"):
                 rules[key] = {**entry, **access}
             else:
                 rules.pop(key)

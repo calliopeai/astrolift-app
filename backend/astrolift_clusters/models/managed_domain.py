@@ -36,6 +36,17 @@ class ManagedDomain(BaseCoreModel):
     )
     dns_provider_zone_id = models.CharField(max_length=32, blank=True, default="", editable=False)
     dns_provider_connection_version = models.PositiveIntegerField(null=True, editable=False)
+    # The parent zone that delegates this zone, held at a DNS provider the
+    # platform may write the delegating NS set into (#1787). Platform-written.
+    delegation_connection = models.ForeignKey(
+        "astrolift_clusters.DnsProviderConnection",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        editable=False,
+    )
+    delegation_zone_id = models.CharField(max_length=32, blank=True, default="", editable=False)
     # A Route 53 zone seen through a cluster's declared AWS credential (#2287).
     # Platform-written by the guided connection, never from dns_config, and
     # pinned to the account the zone was observed in.
