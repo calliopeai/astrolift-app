@@ -369,6 +369,35 @@ export function EmailDetailSheetView({
   );
 }
 
+// ── Sending account, shared with the domain Email delivery page (#2289) ──
+
+/** Sandbox or production access and send quota for the exact selected service. */
+export function SendingAccountView({
+  detail,
+  loading,
+}: {
+  detail: AstroliftEmailServiceDetail | null;
+  loading: boolean;
+}) {
+  const t = useTranslations("appEmailService");
+  if (!detail) {
+    return loading ? (
+      <div className="grid gap-3 md:grid-cols-2">
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
+      </div>
+    ) : (
+      <p className="text-muted-foreground text-sm">{t("unavailable")}</p>
+    );
+  }
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      <ReputationPanel detail={detail} />
+      <QuotaPanel detail={detail} />
+    </div>
+  );
+}
+
 // ── Reputation / sandbox status (#633) ─────────────────────────────
 
 function ReputationPanel({ detail }: { detail: AstroliftEmailServiceDetail }) {

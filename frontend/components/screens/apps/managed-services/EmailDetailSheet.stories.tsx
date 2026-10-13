@@ -23,6 +23,7 @@ import {
   EngagementMetricsPanelView,
   MessageLogPanelView,
   SenderConfigPanelView,
+  SendingAccountView,
   SuppressionPanelView,
   TemplatesPanelView,
   TemplateStatsView,
@@ -307,4 +308,39 @@ export const TemplateStatsLoading: Story = {
 
 export const TemplateStatsEmpty: Story = {
   render: () => <TemplateStatsView {...TEMPLATE_STATS} points={[]} />,
+};
+
+/** The sending account on the domain Email delivery page (#2289): production access. */
+export const SendingAccountProduction: Story = {
+  render: () => <SendingAccountView detail={EMAIL_DETAIL} loading={false} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("Production access")).toBeVisible();
+  },
+};
+
+/** Sandbox: only verified recipients, and the quota near its ceiling. */
+export const SendingAccountSandbox: Story = {
+  render: () => (
+    <SendingAccountView
+      detail={{
+        ...EMAIL_DETAIL,
+        quota: { maxSendRate: 1, max24HourSend: 200, sentLast24h: 190 },
+        accountStatus: { ...EMAIL_DETAIL.accountStatus!, productionAccess: false },
+      }}
+      loading={false}
+    />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("Sandbox")).toBeVisible();
+  },
+};
+
+export const SendingAccountLoading: Story = {
+  render: () => <SendingAccountView detail={null} loading />,
+};
+
+export const SendingAccountUnavailable: Story = {
+  render: () => <SendingAccountView detail={null} loading={false} />,
 };
