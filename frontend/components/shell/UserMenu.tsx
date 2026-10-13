@@ -5,6 +5,7 @@ import {
   BookOpenIcon,
   DownloadIcon,
   KeyRoundIcon,
+  LifeBuoyIcon,
   LogOutIcon,
   RotateCcwIcon,
   ShieldIcon,
@@ -35,6 +36,8 @@ export interface UserMenuProps {
   email: string;
   onSignOut: () => void;
   collapsed?: boolean;
+  /** The install has the support module on (`support.enabled`). */
+  support?: boolean;
 }
 
 function initialsOf(name: string): string {
@@ -49,7 +52,13 @@ function initialsOf(name: string): string {
   );
 }
 
-export function UserMenu({ fullName, email, onSignOut, collapsed = false }: UserMenuProps) {
+export function UserMenu({
+  fullName,
+  email,
+  onSignOut,
+  collapsed = false,
+  support = false,
+}: UserMenuProps) {
   const t = useTranslations("user");
   const links = [
     { href: "/settings/profile", label: t("profile"), icon: UserIcon },
@@ -61,6 +70,7 @@ export function UserMenu({ fullName, email, onSignOut, collapsed = false }: User
   const help = [
     { href: "/documentation", label: t("documentation"), icon: BookOpenIcon },
     { href: "/downloads", label: t("downloads"), icon: DownloadIcon },
+    ...(support ? [{ href: "/support", label: t("support"), icon: LifeBuoyIcon }] : []),
   ];
   return (
     <DropdownMenu>

@@ -9,7 +9,8 @@
     "downloads": "Descargas",
     "accountMenu": "{name}: menú de la cuenta",
     "apiTokens": "Tokens de API",
-    "security": "Seguridad"
+    "security": "Seguridad",
+    "support": "Soporte"
   },
   "projectResourcesScreen": {
     "notFound": "Proyecto no encontrado",
@@ -16261,6 +16262,63 @@
     "workflows": "Flujos",
     "workload": "Carga de trabajo",
     "workloads": "Cargas de trabajo",
-    "zentinelle": "Zentinelle"
+    "zentinelle": "Zentinelle",
+    "support": "Soporte"
+  },
+  "support": {
+    "title": "Soporte",
+    "description": "Abra un caso con el soporte de Calliope AI para esta instalación y sígalo aquí.",
+    "newCase": "Abrir un caso",
+    "caseTitle": "Resumen",
+    "caseBody": "Qué ocurrió",
+    "severity": "Gravedad",
+    "sev1": "Gravedad 1: producción caída",
+    "sev2": "Gravedad 2: degradación importante",
+    "sev3": "Gravedad 3: impacto menor",
+    "sev4": "Gravedad 4: pregunta o solicitud",
+    "severityShort": "G{level}",
+    "submit": "Abrir caso",
+    "submitting": "Abriendo…",
+    "created": "Caso abierto:",
+    "cases": "Sus casos",
+    "empty": "Aún no hay casos",
+    "emptyHelp": "Los casos que abra para esta organización aparecen aquí con su estado.",
+    "loadError": "No se pudieron cargar los casos",
+    "retry": "Reintentar",
+    "unavailable": "El soporte no está disponible en esta instalación",
+    "unavailableHelp": "Un administrador de la instalación activa el módulo de soporte en la configuración de la plataforma.",
+    "updated": "Actualizado {when}",
+    "caseId": "ID del caso",
+    "opened": "Abierto",
+    "coverage": "Cobertura",
+    "continuous": "las 24 horas con esta gravedad",
+    "thread": "Conversación",
+    "reply": "Respuesta",
+    "sendReply": "Enviar respuesta",
+    "sending": "Enviando…",
+    "supportTeam": "Equipo de soporte",
+    "status": {
+      "new": "Nuevo",
+      "triaged": "Clasificado",
+      "accepted": "Aceptado",
+      "backlog": "Pendiente",
+      "declined": "Rechazado",
+      "fixed_pending_release": "Corregido, pendiente de publicación",
+      "released": "Publicado"
+    },
+    "event": {
+      "created": "Abierto por {author}",
+      "status_changed": "Estado cambiado a {to}",
+      "severity_changed": "Gravedad cambiada",
+      "commented": "{author} escribió",
+      "support_replied": "{author} respondió"
+    },
+    "errors": {
+      "coverage": "Esta implementación no tiene cobertura de soporte activa. Contacte con su equipo de cuenta de Calliope AI.",
+      "invalid": "Revise el resumen, la descripción y la gravedad e inténtelo de nuevo.",
+      "denied": "Su rol en esta organización no permite hacerlo.",
+      "notFound": "Este caso ya no está disponible.",
+      "unavailableNow": "No se pudo contactar con el soporte. Inténtelo de nuevo en unos minutos."
+    }
   }
 }

@@ -9,7 +9,8 @@
     "profile": "Profile",
     "documentation": "Documentation",
     "downloads": "Downloads",
-    "accountMenu": "{name}: account menu"
+    "accountMenu": "{name}: account menu",
+    "support": "Support"
   },
   "projectResourcesScreen": {
     "notFound": "Project not found",
@@ -16258,6 +16259,63 @@
     "workflows": "Workflows",
     "workload": "Workload",
     "workloads": "Workloads",
-    "zentinelle": "Zentinelle"
+    "zentinelle": "Zentinelle",
+    "support": "Support"
+  },
+  "support": {
+    "title": "Support",
+    "description": "Open a case with Calliope AI support for this install and follow it here.",
+    "newCase": "Open a case",
+    "caseTitle": "Summary",
+    "caseBody": "What happened",
+    "severity": "Severity",
+    "sev1": "Severity 1: production down",
+    "sev2": "Severity 2: major degradation",
+    "sev3": "Severity 3: minor impact",
+    "sev4": "Severity 4: question or request",
+    "severityShort": "S{level}",
+    "submit": "Open case",
+    "submitting": "Opening…",
+    "created": "Case opened:",
+    "cases": "Your cases",
+    "empty": "No cases yet",
+    "emptyHelp": "Cases you open for this organization appear here with their status.",
+    "loadError": "Cases could not be loaded",
+    "retry": "Retry",
+    "unavailable": "Support is not available on this install",
+    "unavailableHelp": "An install administrator turns the support module on in the platform settings.",
+    "updated": "Updated {when}",
+    "caseId": "Case ID",
+    "opened": "Opened",
+    "coverage": "Coverage",
+    "continuous": "around the clock at this severity",
+    "thread": "Conversation",
+    "reply": "Reply",
+    "sendReply": "Send reply",
+    "sending": "Sending…",
+    "supportTeam": "Support",
+    "status": {
+      "new": "New",
+      "triaged": "Triaged",
+      "accepted": "Accepted",
+      "backlog": "Backlog",
+      "declined": "Declined",
+      "fixed_pending_release": "Fixed, pending release",
+      "released": "Released"
+    },
+    "event": {
+      "created": "Opened by {author}",
+      "status_changed": "Status changed to {to}",
+      "severity_changed": "Severity changed",
+      "commented": "{author} wrote",
+      "support_replied": "{author} replied"
+    },
+    "errors": {
+      "coverage": "This deployment has no active support coverage. Contact your Calliope AI account team.",
+      "invalid": "Check the summary, description and severity, then try again.",
+      "denied": "Your role in this organization cannot do this.",
+      "notFound": "This case is no longer available.",
+      "unavailableNow": "Support could not be reached. Try again in a few minutes."
+    }
   }
 }

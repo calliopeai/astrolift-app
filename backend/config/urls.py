@@ -65,6 +65,17 @@ def support_tickets_view(request):
     return support_tickets(request)
 
 
+@route_auth(
+    credential="active session or API bearer",
+    permissions=(Permission.ORG_READ,),
+    scope="explicit active organization; Client Cove scopes the ticket to that organization",
+)
+def support_ticket_view(request, ticket_id):
+    from core.views_client_cove_support import support_ticket
+
+    return support_ticket(request, ticket_id)
+
+
 admin.autodiscover()
 admin.site.login_form = AuthAdminForm
 admin.site.login_template = "admin/auth1_login.html"
@@ -200,7 +211,17 @@ urlpatterns = [
     # prefix. Scoped-Bearer-key auth, same shape as the runner/dispatch
     # REST surfaces above.
     *clusters_api_urls,  # /api/clusters/v1/<guid>/heartbeat/
-    path("api/support/v1/tickets/", support_tickets_view, name="support-tickets"),
+    # Bearer callers carry no CSRF token; a session POST must send the UI header.
+    path(
+        "api/support/v1/tickets/",
+        csrf_exempt(require_ui_header_for_session(support_tickets_view)),
+        name="support-tickets",
+    ),
+    path(
+        "api/support/v1/tickets/<uuid:ticket_id>/",
+        csrf_exempt(require_ui_header_for_session(support_ticket_view)),
+        name="support-ticket",
+    ),
     re_path(r"^favicon\.ico$", favicon_view),
     path(f"{base}metrics/", metrics_view, name="metrics"),
     path("health/", include("health_check.urls")),

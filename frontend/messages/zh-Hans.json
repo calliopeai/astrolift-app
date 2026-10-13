@@ -9,7 +9,8 @@
     "downloads": "下载",
     "accountMenu": "{name}：账户菜单",
     "apiTokens": "API 令牌",
-    "security": "安全"
+    "security": "安全",
+    "support": "支持"
   },
   "projectResourcesScreen": {
     "notFound": "未找到项目",
@@ -16258,6 +16259,63 @@
     "workflows": "工作流",
     "workload": "工作负载",
     "workloads": "工作负载",
-    "zentinelle": "Zentinelle"
+    "zentinelle": "Zentinelle",
+    "support": "支持"
+  },
+  "support": {
+    "title": "支持",
+    "description": "为此安装向 Calliope AI 支持团队提交工单，并在此跟进。",
+    "newCase": "提交工单",
+    "caseTitle": "摘要",
+    "caseBody": "发生了什么",
+    "severity": "严重程度",
+    "sev1": "严重程度 1：生产中断",
+    "sev2": "严重程度 2：严重降级",
+    "sev3": "严重程度 3：轻微影响",
+    "sev4": "严重程度 4：问题或请求",
+    "severityShort": "S{level}",
+    "submit": "提交工单",
+    "submitting": "正在提交…",
+    "created": "工单已提交：",
+    "cases": "你的工单",
+    "empty": "暂无工单",
+    "emptyHelp": "你为此组织提交的工单会连同状态显示在这里。",
+    "loadError": "无法加载工单",
+    "retry": "重试",
+    "unavailable": "此安装不提供支持服务",
+    "unavailableHelp": "安装管理员可在平台设置中开启支持模块。",
+    "updated": "{when}更新",
+    "caseId": "工单 ID",
+    "opened": "提交时间",
+    "coverage": "支持范围",
+    "continuous": "此严重程度提供全天候支持",
+    "thread": "对话",
+    "reply": "回复",
+    "sendReply": "发送回复",
+    "sending": "正在发送…",
+    "supportTeam": "支持团队",
+    "status": {
+      "new": "新建",
+      "triaged": "已分诊",
+      "accepted": "已受理",
+      "backlog": "待处理",
+      "declined": "已拒绝",
+      "fixed_pending_release": "已修复，待发布",
+      "released": "已发布"
+    },
+    "event": {
+      "created": "由 {author} 提交",
+      "status_changed": "状态变更为 {to}",
+      "severity_changed": "严重程度已变更",
+      "commented": "{author} 留言",
+      "support_replied": "{author} 已回复"
+    },
+    "errors": {
+      "coverage": "此部署没有有效的支持服务。请联系你的 Calliope AI 客户团队。",
+      "invalid": "请检查摘要、描述和严重程度后重试。",
+      "denied": "你在此组织中的角色无权执行此操作。",
+      "notFound": "此工单已不可用。",
+      "unavailableNow": "无法连接支持服务。请几分钟后重试。"
+    }
   }
 }

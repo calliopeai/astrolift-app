@@ -9,7 +9,8 @@
     "downloads": "Downloads",
     "accountMenu": "{name}: Kontomenü",
     "apiTokens": "API-Tokens",
-    "security": "Sicherheit"
+    "security": "Sicherheit",
+    "support": "Support"
   },
   "projectResourcesScreen": {
     "notFound": "Projekt nicht gefunden",
@@ -15512,7 +15513,8 @@
     "workflows": "Workflows",
     "workload": "Workload",
     "workloads": "Workloads",
-    "zentinelle": "Zentinelle"
+    "zentinelle": "Zentinelle",
+    "support": "Support"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -16261,6 +16263,62 @@
       "notes": {
         "mine": "„Meine“ umfasst Workloads, die Sie erstellt haben oder die zu Apps gehören, die Sie erstellt haben. Workloads aus der Zeit, bevor Astrolift erfasste, wer sie erstellt hat, erscheinen nur unter „Alle“."
       }
+    }
+  },
+  "support": {
+    "title": "Support",
+    "description": "Eröffnen Sie für diese Installation einen Fall beim Calliope AI Support und verfolgen Sie ihn hier.",
+    "newCase": "Fall eröffnen",
+    "caseTitle": "Zusammenfassung",
+    "caseBody": "Was ist passiert",
+    "severity": "Schweregrad",
+    "sev1": "Schweregrad 1: Produktion ausgefallen",
+    "sev2": "Schweregrad 2: erhebliche Beeinträchtigung",
+    "sev3": "Schweregrad 3: geringe Auswirkung",
+    "sev4": "Schweregrad 4: Frage oder Anfrage",
+    "severityShort": "S{level}",
+    "submit": "Fall eröffnen",
+    "submitting": "Wird eröffnet…",
+    "created": "Fall eröffnet:",
+    "cases": "Ihre Fälle",
+    "empty": "Noch keine Fälle",
+    "emptyHelp": "Fälle, die Sie für diese Organisation eröffnen, erscheinen hier mit ihrem Status.",
+    "loadError": "Die Fälle konnten nicht geladen werden",
+    "retry": "Erneut versuchen",
+    "unavailable": "Support ist auf dieser Installation nicht verfügbar",
+    "unavailableHelp": "Ein Installationsadministrator aktiviert das Support-Modul in den Plattformeinstellungen.",
+    "updated": "Aktualisiert {when}",
+    "caseId": "Fall-ID",
+    "opened": "Eröffnet",
+    "coverage": "Abdeckung",
+    "continuous": "bei diesem Schweregrad rund um die Uhr",
+    "thread": "Verlauf",
+    "reply": "Antwort",
+    "sendReply": "Antwort senden",
+    "sending": "Wird gesendet…",
+    "supportTeam": "Support-Team",
+    "status": {
+      "new": "Neu",
+      "triaged": "Gesichtet",
+      "accepted": "Angenommen",
+      "backlog": "Zurückgestellt",
+      "declined": "Abgelehnt",
+      "fixed_pending_release": "Behoben, Veröffentlichung ausstehend",
+      "released": "Veröffentlicht"
+    },
+    "event": {
+      "created": "Eröffnet von {author}",
+      "status_changed": "Status geändert zu {to}",
+      "severity_changed": "Schweregrad geändert",
+      "commented": "{author} schrieb",
+      "support_replied": "{author} antwortete"
+    },
+    "errors": {
+      "coverage": "Für diese Bereitstellung besteht keine aktive Support-Abdeckung. Wenden Sie sich an Ihr Calliope AI Account-Team.",
+      "invalid": "Prüfen Sie Zusammenfassung, Beschreibung und Schweregrad und versuchen Sie es erneut.",
+      "denied": "Ihre Rolle in dieser Organisation erlaubt das nicht.",
+      "notFound": "Dieser Fall ist nicht mehr verfügbar.",
+      "unavailableNow": "Der Support war nicht erreichbar. Versuchen Sie es in einigen Minuten erneut."
     }
   }
 }

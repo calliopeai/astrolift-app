@@ -9,7 +9,8 @@
     "downloads": "Downloads",
     "accountMenu": "{name}: menu da conta",
     "apiTokens": "Tokens de API",
-    "security": "Segurança"
+    "security": "Segurança",
+    "support": "Suporte"
   },
   "projectResourcesScreen": {
     "notFound": "Projeto não encontrado",
@@ -15509,7 +15510,8 @@
     "workflows": "Fluxos",
     "workload": "Carga de trabalho",
     "workloads": "Cargas de trabalho",
-    "zentinelle": "Zentinelle"
+    "zentinelle": "Zentinelle",
+    "support": "Suporte"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -16258,6 +16260,62 @@
       "notes": {
         "mine": "Minhas mostra as cargas de trabalho que você criou ou que estão em aplicativos criados por você. As cargas de trabalho criadas antes de o Astrolift passar a registrar quem as cria aparecem apenas em Todas."
       }
+    }
+  },
+  "support": {
+    "title": "Suporte",
+    "description": "Abra um chamado com o suporte da Calliope AI para esta instalação e acompanhe-o aqui.",
+    "newCase": "Abrir um chamado",
+    "caseTitle": "Resumo",
+    "caseBody": "O que aconteceu",
+    "severity": "Gravidade",
+    "sev1": "Gravidade 1: produção parada",
+    "sev2": "Gravidade 2: degradação grave",
+    "sev3": "Gravidade 3: impacto menor",
+    "sev4": "Gravidade 4: dúvida ou solicitação",
+    "severityShort": "G{level}",
+    "submit": "Abrir chamado",
+    "submitting": "Abrindo…",
+    "created": "Chamado aberto:",
+    "cases": "Seus chamados",
+    "empty": "Nenhum chamado ainda",
+    "emptyHelp": "Os chamados abertos para esta organização aparecem aqui com o status.",
+    "loadError": "Não foi possível carregar os chamados",
+    "retry": "Tentar novamente",
+    "unavailable": "O suporte não está disponível nesta instalação",
+    "unavailableHelp": "Um administrador da instalação ativa o módulo de suporte nas configurações da plataforma.",
+    "updated": "Atualizado {when}",
+    "caseId": "ID do chamado",
+    "opened": "Aberto em",
+    "coverage": "Cobertura",
+    "continuous": "24 horas nesta gravidade",
+    "thread": "Conversa",
+    "reply": "Resposta",
+    "sendReply": "Enviar resposta",
+    "sending": "Enviando…",
+    "supportTeam": "Equipe de suporte",
+    "status": {
+      "new": "Novo",
+      "triaged": "Triado",
+      "accepted": "Aceito",
+      "backlog": "Em espera",
+      "declined": "Recusado",
+      "fixed_pending_release": "Corrigido, aguardando publicação",
+      "released": "Publicado"
+    },
+    "event": {
+      "created": "Aberto por {author}",
+      "status_changed": "Status alterado para {to}",
+      "severity_changed": "Gravidade alterada",
+      "commented": "{author} escreveu",
+      "support_replied": "{author} respondeu"
+    },
+    "errors": {
+      "coverage": "Esta implantação não tem cobertura de suporte ativa. Fale com a equipe de conta da Calliope AI.",
+      "invalid": "Confira o resumo, a descrição e a gravidade e tente novamente.",
+      "denied": "Sua função nesta organização não permite isso.",
+      "notFound": "Este chamado não está mais disponível.",
+      "unavailableNow": "Não foi possível contatar o suporte. Tente novamente em alguns minutos."
     }
   }
 }
