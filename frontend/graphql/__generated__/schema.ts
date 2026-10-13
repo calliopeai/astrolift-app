@@ -4077,6 +4077,54 @@ export type AstroliftPipelineSecretChangeMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftPlatformSecretInventory = {
+  canReveal: Scalars['Boolean']['output'];
+  provider: Scalars['String']['output'];
+  refs: Array<AstroliftPlatformSecretRef>;
+  store: AstroliftPlatformSecretStore;
+};
+
+export type AstroliftPlatformSecretRef = {
+  envVar: Scalars['String']['output'];
+  error: Scalars['String']['output'];
+  exists: Scalars['Boolean']['output'];
+  specSlug: Scalars['String']['output'];
+  uri: Scalars['String']['output'];
+};
+
+export type AstroliftPlatformSecretStore = {
+  clusterSlug: Scalars['String']['output'];
+  organizationName: Scalars['String']['output'];
+  organizationSlug: Scalars['String']['output'];
+  sharedCluster: Scalars['Boolean']['output'];
+  specCount: Scalars['Int']['output'];
+};
+
+export type AstroliftPlatformSetting = {
+  changed: Scalars['Boolean']['output'];
+  choices: Array<Scalars['String']['output']>;
+  default: Scalars['String']['output'];
+  editable: Scalars['Boolean']['output'];
+  group: Scalars['String']['output'];
+  helpText: Scalars['String']['output'];
+  key: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  readOnlyReason: Scalars['String']['output'];
+  value: Scalars['String']['output'];
+  warning: Scalars['String']['output'];
+};
+
+export type AstroliftPlatformSettingChange = {
+  previousValue: Scalars['String']['output'];
+  setting: AstroliftPlatformSetting;
+};
+
+export type AstroliftPlatformSettingChangeMutationResult = {
+  data?: Maybe<AstroliftPlatformSettingChange>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftPodResourceUsage = {
   lastRestartAt?: Maybe<Scalars['DateTime']['output']>;
   podName: Scalars['String']['output'];
@@ -6194,6 +6242,7 @@ export type AstroliftZentinelleConnection = {
   connectedAt?: Maybe<Scalars['DateTime']['output']>;
   disconnectedAt?: Maybe<Scalars['DateTime']['output']>;
   gatewayFeatureEnabled: Scalars['Boolean']['output'];
+  gatewayUrl: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   lastError: Scalars['String']['output'];
   status: Scalars['String']['output'];
@@ -6800,6 +6849,7 @@ export type ConnectUserSourceProviderInput = {
 
 export type ConnectZentinelleInput = {
   enrollmentCode: Scalars['String']['input'];
+  gatewayUrl: InputMaybe<Scalars['String']['input']>;
   url: Scalars['String']['input'];
 };
 
@@ -8984,6 +9034,8 @@ export type Mutation = {
   rerunAstroliftOnboarding: AstroliftRerunOnboardingPayloadMutationResult;
   resendInvitation: AstroliftInvitationCreatedMutationResult;
   resetClusterAuthUserPassword: AstroliftClusterAuthUserChangeMutationResult;
+  /** Put an install setting back to its default (#1861). */
+  resetPlatformSetting: AstroliftPlatformSettingChangeMutationResult;
   restartAstroliftWorkload: AstroliftWorkloadOpPayloadMutationResult;
   restoreApp: AstroliftRegisteredAppMutationResult;
   resumeAppIngress: AstroliftAppEnvironmentMutationResult;
@@ -9054,12 +9106,15 @@ export type Mutation = {
   /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with PRECONDITION; turning one off always succeeds. */
   setOrganizationModule: AstroliftOrganizationModuleMutationResult;
   setPipelineSecret: AstroliftPipelineSecretChangeMutationResult;
+  /** Set an install setting (#1861). ``value`` is text, ``true``/``false`` for a yes/no setting, validated as the Django admin validates it. A setting with a ``warning`` needs ``confirmed``. Platform operator only, with a fresh sign-in. */
+  setPlatformSetting: AstroliftPlatformSettingChangeMutationResult;
   setPreviewPinned: AstroliftPreviewEnvironmentMutationResult;
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
   /** Enable or disable an exact owned workflow definition at its reviewed revision. Does not start a run or confirm schedule state. */
   setWorkflowDefinitionEnabled: WorkflowDefinitionActivationResult;
   setZentinelleGatewayEnabled: AstroliftZentinelleClusterGatewayMutationResult;
+  setZentinelleGatewayUrl: AstroliftZentinelleConnectionMutationResult;
   /** Cancel a sign request. Sign requests are not available: this always refuses. */
   signRequestCancel: Scalars['Boolean']['output'];
   /** Sign a sign request. Sign requests are not available: this always refuses. */
@@ -10513,6 +10568,12 @@ export type MutationResetClusterAuthUserPasswordArgs = {
 };
 
 
+export type MutationResetPlatformSettingArgs = {
+  confirmed?: Scalars['Boolean']['input'];
+  key: Scalars['String']['input'];
+};
+
+
 export type MutationRestartAstroliftWorkloadArgs = {
   ifMatchVersion?: InputMaybe<Scalars['Int']['input']>;
   input: RestartWorkloadInput;
@@ -10863,6 +10924,13 @@ export type MutationSetPipelineSecretArgs = {
 };
 
 
+export type MutationSetPlatformSettingArgs = {
+  confirmed?: Scalars['Boolean']['input'];
+  key: Scalars['String']['input'];
+  value: Scalars['String']['input'];
+};
+
+
 export type MutationSetPreviewPinnedArgs = {
   input: SetPreviewPinnedInput;
 };
@@ -10887,6 +10955,11 @@ export type MutationSetWorkflowDefinitionEnabledArgs = {
 
 export type MutationSetZentinelleGatewayEnabledArgs = {
   input: SetZentinelleGatewayEnabledInput;
+};
+
+
+export type MutationSetZentinelleGatewayUrlArgs = {
+  input: SetZentinelleGatewayUrlInput;
 };
 
 
@@ -12000,6 +12073,12 @@ export type Query = {
   astroliftPipelines: Array<AstroliftPipeline>;
   astroliftPipelinesPage: AstroliftPipelinePage;
   astroliftPlatformApiUrl: Scalars['String']['output'];
+  /** One organization's agent secret refs and whether its store holds each, never the values (#1861). Probed as dispatch resolves them. */
+  astroliftPlatformSecretInventory?: Maybe<AstroliftPlatformSecretInventory>;
+  /** Each organization's agent secret store: the cluster it resolves from (#1861). */
+  astroliftPlatformSecretStores: Array<AstroliftPlatformSecretStore>;
+  /** Every install setting, grouped, for the platform operator (#1861). */
+  astroliftPlatformSettings: Array<AstroliftPlatformSetting>;
   astroliftPodResourceUsage?: Maybe<AstroliftPodResourceUsage>;
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftPoliciesPage. */
   astroliftPolicies: Array<AstroliftPolicy>;
@@ -13504,6 +13583,11 @@ export type QueryAstroliftPipelinesPageArgs = {
   after?: InputMaybe<Scalars['String']['input']>;
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftPlatformSecretInventoryArgs = {
+  organizationSlug: Scalars['String']['input'];
 };
 
 
@@ -15294,6 +15378,10 @@ export type SetRetentionPolicyInput = {
 export type SetZentinelleGatewayEnabledInput = {
   clusterId: Scalars['GUID']['input'];
   enabled: Scalars['Boolean']['input'];
+};
+
+export type SetZentinelleGatewayUrlInput = {
+  gatewayUrl: InputMaybe<Scalars['String']['input']>;
 };
 
 export type SharedDirectoryType = {

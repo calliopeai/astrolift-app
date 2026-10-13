@@ -157,6 +157,43 @@ def normalize_base_url(raw: str) -> str:
     return url
 
 
+def normalize_gateway_url(raw: str | None) -> str:
+    """Validate the URL cluster gateways use to reach Zentinelle (#1905).
+
+    Empty means the gateways use the connection's URL. Plain http is allowed
+    only to an in-cluster Service name (``*.svc`` or ``*.svc.cluster.local``),
+    where the traffic never leaves the cluster network.
+    """
+    url = (raw or "").strip().rstrip("/")
+    if not url:
+        return ""
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise ZentinelleConnectError(
+            ErrorCode.VALIDATION,
+            "gatewayUrl must be a URL, e.g. http://zentinelle.zentinelle.svc.cluster.local:8000",
+            field="gatewayUrl",
+        )
+    if parts.username or parts.password or parts.query or parts.fragment:
+        raise ZentinelleConnectError(
+            ErrorCode.VALIDATION,
+            "gatewayUrl must not carry credentials, a query or a fragment",
+            field="gatewayUrl",
+        )
+    in_cluster = parts.hostname.endswith((".svc", ".svc.cluster.local"))
+    if parts.scheme == "http" and not in_cluster and not settings.DEBUG:
+        raise ZentinelleConnectError(
+            ErrorCode.VALIDATION,
+            "gatewayUrl must use https unless it names an in-cluster Service (*.svc.cluster.local)",
+            field="gatewayUrl",
+        )
+    if len(url) > 500:
+        raise ZentinelleConnectError(
+            ErrorCode.VALIDATION, "gatewayUrl is longer than 500 characters", field="gatewayUrl"
+        )
+    return url
+
+
 # ---- HTTP -----------------------------------------------------------
 
 
@@ -541,7 +578,7 @@ def _deploy(gateway: ZentinelleClusterGateway) -> None:
     try:
         manifests = gateway_manifests(
             cluster_id=gateway.zentinelle_cluster_id,
-            zentinelle_url=gateway.connection.base_url,
+            zentinelle_url=gateway.connection.gateway_url or gateway.connection.base_url,
             image=_gateway_image(),
         )
         _apply(gateway.cluster, manifests)
@@ -555,9 +592,12 @@ def _deploy(gateway: ZentinelleClusterGateway) -> None:
 # ---- operations -----------------------------------------------------
 
 
-def connect(*, organization, url: str, code: str, install_url: str, actor=None) -> ZentinelleConnection:
+def connect(
+    *, organization, url: str, code: str, install_url: str, gateway_url: str = "", actor=None
+) -> ZentinelleConnection:
     """Exchange an enrollment code for this organization's install credential."""
     base_url = normalize_base_url(url)
+    gateway_url = normalize_gateway_url(gateway_url)
     code = (code or "").strip()
     if not code or len(code) > _ENROLLMENT_CODE_MAX_LENGTH:
         raise ZentinelleConnectError(
@@ -602,6 +642,7 @@ def connect(*, organization, url: str, code: str, install_url: str, actor=None) 
             connection = ZentinelleConnection.objects.create(
                 organization=organization,
                 base_url=base_url,
+                gateway_url=gateway_url,
                 status=ZentinelleConnection.Status.CONNECTED,
                 zentinelle_install_id=str(answered.get("id") or "")[:64],
                 tenant_ids=[str(t) for t in tenants] if isinstance(tenants, list) else [],
@@ -1042,6 +1083,39 @@ def reconcile_gateways() -> list[GatewayReconcile]:
             log.warning("zentinelle: reconcile of cluster %s failed: %s", gateway.cluster.slug, exc.message)
         results.append(GatewayReconcile(gateway.cluster.slug, outcome))
     return results
+
+
+def set_gateway_url(*, connection: ZentinelleConnection, url: str | None) -> list[GatewayReconcile]:
+    """Point this connection's cluster gateways at ``url`` (empty: the
+    connection's own URL) and redeploy each running one so it takes effect
+    (#1905). One cluster's failure is reported and recorded on its gateway;
+    the others still move."""
+    gateway_url = normalize_gateway_url(url)
+    if gateway_url == connection.gateway_url:
+        return []
+    connection.gateway_url = gateway_url
+    connection.save()
+    results: list[GatewayReconcile] = []
+    rows = ZentinelleClusterGateway.objects.filter(
+        connection=connection, deleted_at__isnull=True, gateway_deployed=True
+    ).select_related("cluster", "connection")
+    for gateway in rows:
+        try:
+            _run_locked(gateway.cluster, _redeploy_locked, gateway)
+            outcome = "deployed"
+        except ZentinelleConnectError as exc:
+            outcome = f"failed: {exc.message}"
+            log.warning(
+                "zentinelle: gateway URL change on cluster %s failed: %s", gateway.cluster.slug, exc.message
+            )
+        results.append(GatewayReconcile(gateway.cluster.slug, outcome))
+    return results
+
+
+def _redeploy_locked(gateway: ZentinelleClusterGateway) -> None:
+    gateway = _live(gateway)
+    _require_connected(gateway.connection)
+    _deploy(gateway)
 
 
 def _reconcile_locked(gateway: ZentinelleClusterGateway, on: bool) -> str:

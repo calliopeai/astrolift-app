@@ -35,3 +35,63 @@ export const ADMIN_FEATURE_INVENTORY = gql`
     }
   }
 `;
+
+export const PLATFORM_SETTING_FIELDS = gql`
+  fragment PlatformSettingFields on AstroliftPlatformSetting {
+    key
+    group
+    kind
+    helpText
+    value
+    default
+    changed
+    choices
+    editable
+    readOnlyReason
+    warning
+  }
+`;
+
+// Every install setting for Administration › Platform settings (#1861).
+// Platform operator only; a credential's value is never returned.
+export const PLATFORM_SETTINGS = gql`
+  query PlatformSettings {
+    astroliftPlatformSettings {
+      ...PlatformSettingFields
+    }
+  }
+  ${PLATFORM_SETTING_FIELDS}
+`;
+
+// Each organization's agent secret store, for the platform operator (#1861).
+export const PLATFORM_SECRET_STORES = gql`
+  query PlatformSecretStores {
+    astroliftPlatformSecretStores {
+      organizationSlug
+      organizationName
+      clusterSlug
+      sharedCluster
+      specCount
+    }
+  }
+`;
+
+// One organization's agent secret refs with presence, never values (#1861).
+export const PLATFORM_SECRET_INVENTORY = gql`
+  query PlatformSecretInventory($organizationSlug: String!) {
+    astroliftPlatformSecretInventory(organizationSlug: $organizationSlug) {
+      provider
+      canReveal
+      store {
+        organizationSlug
+      }
+      refs {
+        specSlug
+        envVar
+        uri
+        exists
+        error
+      }
+    }
+  }
+`;

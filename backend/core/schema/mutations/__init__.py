@@ -1,4 +1,5 @@
 """Core Strawberry mutations — assembled from individual modules."""
+
 from __future__ import annotations
 
 from typing import Optional
@@ -14,6 +15,7 @@ from core.schema.mutations.notification import NotificationMutations
 from core.schema.mutations.permissions import PermissionMutations
 from core.schema.mutations.rocketchat import RocketchatMutations
 from core.schema.mutations.upload import UploadMutations
+from core.schema.types.platform_settings import PlatformSettingsMutations
 from core.schema.mutations.user import UserMutations
 
 
@@ -26,6 +28,7 @@ class Mutation(
     RocketchatMutations,
     UploadMutations,
     FeatureFlagMutations,
+    PlatformSettingsMutations,
 ):
     """Root mutation type for the core Strawberry schema.
 

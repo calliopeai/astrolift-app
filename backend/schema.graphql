@@ -4263,6 +4263,54 @@ type AstroliftPipelineSecretChangeMutationResult {
   data: AstroliftPipelineSecretChange
 }
 
+type AstroliftPlatformSecretInventory {
+  store: AstroliftPlatformSecretStore!
+  provider: String!
+  canReveal: Boolean!
+  refs: [AstroliftPlatformSecretRef!]!
+}
+
+type AstroliftPlatformSecretRef {
+  specSlug: String!
+  envVar: String!
+  uri: String!
+  exists: Boolean!
+  error: String!
+}
+
+type AstroliftPlatformSecretStore {
+  organizationSlug: String!
+  organizationName: String!
+  clusterSlug: String!
+  sharedCluster: Boolean!
+  specCount: Int!
+}
+
+type AstroliftPlatformSetting {
+  key: String!
+  group: String!
+  kind: String!
+  helpText: String!
+  value: String!
+  default: String!
+  changed: Boolean!
+  choices: [String!]!
+  editable: Boolean!
+  readOnlyReason: String!
+  warning: String!
+}
+
+type AstroliftPlatformSettingChange {
+  setting: AstroliftPlatformSetting!
+  previousValue: String!
+}
+
+type AstroliftPlatformSettingChangeMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftPlatformSettingChange
+}
+
 type AstroliftPodResourceUsage {
   reason: AstroliftObservabilityPanelReason!
   podName: String!
@@ -6617,6 +6665,7 @@ type AstroliftZentinelleClusterGatewayMutationResult {
 type AstroliftZentinelleConnection {
   id: GUID!
   baseUrl: String!
+  gatewayUrl: String!
   status: String!
   zentinelleInstallId: String!
   tenantIds: [String!]!
@@ -7245,6 +7294,7 @@ input ConnectUserSourceProviderInput {
 input ConnectZentinelleInput {
   url: String!
   enrollmentCode: String!
+  gatewayUrl: String = null
 }
 
 enum CostWindow {
@@ -9342,6 +9392,14 @@ type Mutation {
   """
   setFeatureFlag(key: String!, enabled: Boolean!): FeatureFlagInfoMutationResult!
 
+  """
+  Set an install setting (#1861). ``value`` is text, ``true``/``false`` for a yes/no setting, validated as the Django admin validates it. A setting with a ``warning`` needs ``confirmed``. Platform operator only, with a fresh sign-in.
+  """
+  setPlatformSetting(key: String!, value: String!, confirmed: Boolean! = false): AstroliftPlatformSettingChangeMutationResult!
+
+  """Put an install setting back to its default (#1861)."""
+  resetPlatformSetting(key: String!, confirmed: Boolean! = false): AstroliftPlatformSettingChangeMutationResult!
+
   """Delete an object by its global ID (soft-delete via delete_check)."""
   delete(gid: ID!): Boolean!
 
@@ -9460,6 +9518,7 @@ type Mutation {
   placeObservabilityRetentionHold(input: PlaceObservabilityRetentionHoldInput!): ObservabilityRetentionHoldTypeMutationResult!
   releaseObservabilityRetentionHold(input: ReleaseObservabilityRetentionHoldInput!): ObservabilityRetentionHoldTypeMutationResult!
   connectZentinelle(input: ConnectZentinelleInput!): AstroliftZentinelleConnectionMutationResult!
+  setZentinelleGatewayUrl(input: SetZentinelleGatewayUrlInput!): AstroliftZentinelleConnectionMutationResult!
   disconnectZentinelle(input: DisconnectZentinelleInput!): AstroliftZentinelleDisconnectMutationResult!
   registerZentinelleCluster(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
   setZentinelleGatewayEnabled(input: SetZentinelleGatewayEnabledInput!): AstroliftZentinelleClusterGatewayMutationResult!
@@ -10272,6 +10331,19 @@ type Query {
   The model the install serves on its own GPUs (calliope-installer#446), read-only in the console; null when the platform model is a cloud API or off.
   """
   astroliftInstallManagedModel: AstroliftInstallManagedModel
+
+  """Every install setting, grouped, for the platform operator (#1861)."""
+  astroliftPlatformSettings: [AstroliftPlatformSetting!]!
+
+  """
+  Each organization's agent secret store: the cluster it resolves from (#1861).
+  """
+  astroliftPlatformSecretStores: [AstroliftPlatformSecretStore!]!
+
+  """
+  One organization's agent secret refs and whether its store holds each, never the values (#1861). Probed as dispatch resolves them.
+  """
+  astroliftPlatformSecretInventory(organizationSlug: String!): AstroliftPlatformSecretInventory
   organization(id: ID!): OrganizationType
   organizations(query: String = null): [OrganizationType!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use organizationsPage.")
 
@@ -11427,6 +11499,10 @@ input SetRetentionPolicyInput {
 input SetZentinelleGatewayEnabledInput {
   clusterId: GUID!
   enabled: Boolean!
+}
+
+input SetZentinelleGatewayUrlInput {
+  gatewayUrl: String = null
 }
 
 type SharedDirectoryType {
