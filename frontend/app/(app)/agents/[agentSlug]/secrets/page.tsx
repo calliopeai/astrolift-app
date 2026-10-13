@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { SecretsContent } from "../components/secrets-content";
 
-export const metadata = { title: "Secrets · Agent · Astrolift" };
+export const generateMetadata = routeTitle("secrets", "agent");
 
 /**
  * The Secrets tab (spec 44 §5.2): the agent's secret bindings as an

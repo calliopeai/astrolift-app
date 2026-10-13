@@ -1,9 +1,10 @@
 import { LIST_WEBHOOKS_PAGE } from "@/graphql/operations/operations.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { WebhooksClient } from "./webhooks-client";
 
-export const metadata = { title: "Webhooks · Astrolift" };
+export const generateMetadata = routeTitle("webhooks");
 
 /**
  * Preloads the first page so the list paints with rows instead of

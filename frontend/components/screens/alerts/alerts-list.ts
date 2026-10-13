@@ -11,7 +11,7 @@
  * Events (their own route, /alerts/events): a Feed on
  * `astroliftAlertEventsPage`, All or Firing (`unresolvedOnly`).
  */
-import { type ListDefinition, standardViews } from "@/components/list/list-state";
+import { type CopiedListDefinition, standardViews } from "@/components/list/list-state";
 
 import type { AlertRule } from "./use-alerts";
 
@@ -20,8 +20,9 @@ export const NARROW_LIMIT = 100;
 const TARGETS = ["global", "app", "environment", "workload", "managed_service"];
 const SEVERITIES = ["info", "warn", "critical"];
 
-export const ALERT_RULES_LIST: ListDefinition = {
+export const ALERT_RULES_LIST: CopiedListDefinition = {
   id: "admin.alerts.rules",
+  copy: "alertRules",
   fields: [
     { key: "target", label: "Target", options: TARGETS.map((t) => ({ value: t, label: t })) },
     { key: "targetId", label: "Target ID" },

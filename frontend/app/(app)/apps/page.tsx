@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { AppsClient } from "./apps-client";
 
-export const metadata = { title: "Apps · Astrolift" };
+export const generateMetadata = routeTitle("apps");
 
 /**
  * No PreloadQuery here on purpose (#1232). This page used to warm

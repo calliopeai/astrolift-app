@@ -3,6 +3,7 @@
 import { useQuery } from "@apollo/client/react";
 
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import type { ListBrainsQuery } from "@/graphql/__generated__/operations";
 import { LIST_BRAINS } from "@/graphql/registry/brains.queries";
 
@@ -12,7 +13,7 @@ export type BrainRow = ListBrainsQuery["astroliftBrains"][number];
 
 /** The data half of BrainsScreen: the server's search over readable brains. */
 export function useBrains() {
-  const list = useListState(BRAINS_LIST);
+  const list = useListState(useLocalizedList(BRAINS_LIST));
   const search = list.state.q.trim();
   const { data, previousData, loading, error, refetch } = useQuery<ListBrainsQuery>(LIST_BRAINS, {
     variables: { search: search || null },

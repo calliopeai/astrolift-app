@@ -12,7 +12,7 @@
  * Filter, search, sort and paging run in the browser (selectRows) until
  * that query takes the list's arguments.
  */
-import { type ListDefinition, standardViews } from "@/components/list/list-state";
+import { type CopiedListDefinition, standardViews } from "@/components/list/list-state";
 import {
   selectRows,
   type SelectRowsSpec,
@@ -25,8 +25,9 @@ import { formatTriggerKind } from "./workflow-run-state";
 /** The kinds a configured workflow's trigger takes; any other value lists as itself. */
 export const TRIGGER_KINDS = ["schedule", "webhook", "manual"] as const;
 
-export const WORKFLOW_TRIGGERS_LIST: ListDefinition = {
+export const WORKFLOW_TRIGGERS_LIST: CopiedListDefinition = {
   id: "workflows.workflow-triggers",
+  copy: "workflowTriggers",
   fields: [
     {
       key: "kind",

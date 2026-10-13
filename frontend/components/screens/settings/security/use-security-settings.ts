@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { useLocalListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 
 import {
   LOGOUT_ALL_SESSIONS,
@@ -31,7 +32,7 @@ interface SessionsResp {
 export function useSecuritySettings() {
   const t = useTranslations("securitySessions");
   // In memory: the Security settings page owns its query string.
-  const list = useLocalListState(SESSIONS_LIST);
+  const list = useLocalListState(useLocalizedList(SESSIONS_LIST));
   const { data, loading, error, refetch } = useQuery<SessionsResp>(LIST_ACTIVE_SESSIONS, {
     fetchPolicy: "cache-and-network",
   });

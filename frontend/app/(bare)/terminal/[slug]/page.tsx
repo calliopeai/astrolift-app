@@ -1,8 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { PopoutTerminalClient } from "./popout-terminal-client";
 
-export const metadata = {
-  title: "Shell · Astrolift",
-};
+export const generateMetadata = routeTitle("shell");
 
 /**
  * The popped-out pod shell (#1246) — `window.open` target for the Shell tab's

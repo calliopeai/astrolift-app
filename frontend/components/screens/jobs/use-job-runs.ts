@@ -5,6 +5,7 @@ import { useQuery } from "@apollo/client/react";
 import type { CursorPage } from "@/components/data-table";
 import { useHeldRows } from "@/components/list/use-held-rows";
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import { LIST_SCHEDULED_JOB_RUNS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftScheduledJobRun } from "@/graphql/lifecycle/lifecycle.types";
 
@@ -21,7 +22,7 @@ interface JobRunsPageResp {
  * to the server. The data half of JobRunsScreen.
  */
 export function useJobRuns() {
-  const list = useListState(JOB_RUNS_LIST);
+  const list = useListState(useLocalizedList(JOB_RUNS_LIST));
   const { state } = list;
   const variables = jobRunsVariables(list.filters, state);
   const query = useQuery<JobRunsPageResp>(LIST_SCHEDULED_JOB_RUNS_PAGE, {

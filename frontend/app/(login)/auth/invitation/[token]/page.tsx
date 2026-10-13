@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { InvitationAcceptClient } from "./invitation-accept-client";
 
-export const metadata = { title: "Accept invitation · Astrolift" };
+export const generateMetadata = routeTitle("acceptInvitation");
 
 export default async function InvitationAcceptPage({
   params,

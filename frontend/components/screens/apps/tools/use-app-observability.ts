@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { selectContainerName, selectPodName } from "@/lib/pod-target";
 
 import { useLocalListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import type { ObservabilityPanelReason } from "@/components/observability/panel-reason";
 import { useMetricScopeOptions } from "@/components/observability/use-metric-scope-options";
 import { usePodResourceUsage } from "@/components/observability/use-pod-resource-usage";
@@ -204,7 +205,7 @@ export function useAppObservability(slug: string, panel: MetricsPanel = "signals
   );
   // The Pods panel's list: in memory, since the panel's own `?section=` and
   // `?panel=` must survive a filter change.
-  const podsList = useLocalListState(APP_PODS_LIST);
+  const podsList = useLocalListState(useLocalizedList(APP_PODS_LIST));
   const podPage = selectPods(podRows, podsList.filters, podsList.state);
   const qs = searchParams?.toString() ?? "";
   const podHref = (pod: AstroliftAppPod) => {

@@ -65,7 +65,10 @@ vi.mock("next-intl", async (importOriginal) => {
   return {
     ...actual,
     useTranslations: (namespace?: string) =>
-      namespace?.startsWith("shared.") || namespace?.startsWith("notificationSettings")
+      namespace?.startsWith("shared.") ||
+      namespace?.startsWith("notificationSettings") ||
+      namespace?.startsWith("listDefinitions.") ||
+      namespace === "navModel"
         ? actual.useTranslations(namespace)
         : (key: string, params?: Record<string, unknown>) =>
             params?.remaining ? `Muted ${params.remaining}` : key,

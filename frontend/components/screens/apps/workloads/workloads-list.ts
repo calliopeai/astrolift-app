@@ -10,7 +10,7 @@
  * Pure.
  */
 import type { SortState } from "@/components/data-table";
-import { formatSort, type ListDefinition } from "@/components/list/list-state";
+import { formatSort, type CopiedListDefinition } from "@/components/list/list-state";
 import type { WorkloadKind } from "@/graphql/registry/registry.types";
 
 export const KIND_LABEL: Record<WorkloadKind, string> = {
@@ -27,8 +27,9 @@ export const KIND_LABEL: Record<WorkloadKind, string> = {
 /** The kinds an app's own Workloads tab holds (spec 44 §10.2). */
 export const APP_WORKLOAD_KINDS: WorkloadKind[] = ["deployment", "statefulset", "job", "cronjob"];
 
-export const APP_WORKLOADS_LIST: ListDefinition = {
+export const APP_WORKLOADS_LIST: CopiedListDefinition = {
   id: "apps.workloads",
+  copy: "appWorkloads",
   fields: [
     {
       key: "kind",

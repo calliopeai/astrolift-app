@@ -1,9 +1,10 @@
 import { PreloadQuery } from "@/lib/apollo";
 import { LIST_ENVIRONMENTS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { EnvironmentsClient } from "./environments-client";
 
-export const metadata = { title: "Environments · Astrolift" };
+export const generateMetadata = routeTitle("environments");
 
 /**
  * Preloads the All view's first page. These have to be exactly the

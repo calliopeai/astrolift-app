@@ -6,6 +6,7 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import { useLocalListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
   ACKNOWLEDGE_ALERT_EVENT,
@@ -115,7 +116,7 @@ export function useAlertRules(appId: string) {
     createState.loading || deleteState.loading || muteState.loading || unmuteState.loading;
 
   const ruleList = rules.data?.astroliftAlertRules ?? [];
-  const list = useLocalListState(APP_ALERT_RULES_LIST);
+  const list = useLocalListState(useLocalizedList(APP_ALERT_RULES_LIST));
   const page = selectAlertRules(ruleList, list.filters, list.state);
 
   async function onUnmute(r: AlertRule) {

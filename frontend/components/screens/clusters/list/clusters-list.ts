@@ -11,7 +11,7 @@
 import type { SortState } from "@/components/data-table";
 import { type ListDefinition, formatSort, standardViews } from "@/components/list/list-state";
 import type { Crumb } from "@/components/shell/ShellHeader";
-import { NAV } from "@/lib/shell/nav-model";
+import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 
 export type Lifecycle = "registered" | "managing" | "managed" | "error";
 
@@ -90,13 +90,11 @@ export function localizedClustersList(
 
 /** Admin ▾ › Clusters [› name]: the first crumb switches between the Admin functions. */
 export function clusterCrumbs(name?: string): Crumb[] {
-  const admin = NAV.find((a) => a.key === "admin");
-  const switcher = (admin?.groups ?? []).flatMap((g) =>
-    g.functions.map((f) => ({ label: f.label, href: f.href, active: f.key === "clusters" }))
-  );
-  const crumbs: Crumb[] = [{ label: "Admin", switcher }];
+  const crumbs: Crumb[] = [areaSwitcher(NAV, "admin", "clusters")];
   crumbs.push(
-    name === undefined ? { label: "Clusters" } : { label: "Clusters", href: "/clusters" }
+    name === undefined
+      ? { label: "Clusters", navFunction: "clusters" }
+      : { label: "Clusters", href: "/clusters", navFunction: "clusters" }
   );
   if (name !== undefined) crumbs.push({ label: name });
   return crumbs;
@@ -107,14 +105,8 @@ export function localizedClusterCrumbs(
   t: { (key: string): string; has: (key: string) => boolean },
   name?: string
 ): Crumb[] {
-  const admin = NAV.find((area) => area.key === "admin");
-  const switcher = (admin?.groups ?? []).flatMap((group) =>
-    group.functions.map((item) => ({
-      label: t.has(`functions.${item.key}`) ? t(`functions.${item.key}`) : item.label,
-      href: item.href,
-      active: item.key === "clusters",
-    }))
-  );
+  // The switcher's names are the rail's (`navModel.functions`, by key).
+  const { switcher } = areaSwitcher(NAV, "admin", "clusters");
   return [
     { label: t("admin"), switcher },
     name === undefined ? { label: t("clusters") } : { label: t("clusters"), href: "/clusters" },

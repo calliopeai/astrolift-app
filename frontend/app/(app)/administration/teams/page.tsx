@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
 
 import { legacyTeamsHref } from "@/components/screens/administration/access/access-nav";
+import { routeTitle } from "@/lib/i18n/route-title";
 
-export const metadata = { title: "Teams · Astrolift" };
+export const generateMetadata = routeTitle("teams");
 
 /**
  * Teams moved to Admin › Access (access UX design 5). `?team=<slug>` (the

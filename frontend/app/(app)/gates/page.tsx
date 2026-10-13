@@ -1,9 +1,10 @@
 import { LIST_PENDING_HUMAN_GATES } from "@/graphql/workflows/tiered.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { PendingGatesClient } from "./pending-gates-client";
 
-export const metadata = { title: "Pending Gates · Astrolift" };
+export const generateMetadata = routeTitle("pendingGates");
 
 // #1820, org-wide pending-gates list: every open human_gate across the
 // org's workflow runs that the caller may decide, in one place, so an

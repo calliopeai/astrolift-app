@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
+import { routeTitle } from "@/lib/i18n/route-title";
 
-export const metadata = {
-  title: "Projects · Astrolift",
-};
+export const generateMetadata = routeTitle("projects");
 
 /**
  * /settings/projects is an alias for the canonical org-projects

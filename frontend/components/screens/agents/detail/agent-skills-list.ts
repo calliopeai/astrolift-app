@@ -9,7 +9,7 @@
  * answer the rest exactly, with numbered pages; each view says so. Pure.
  */
 import type { SortState } from "@/components/data-table";
-import type { ListDefinition } from "@/components/list/list-state";
+import type { CopiedListDefinition } from "@/components/list/list-state";
 import type { AstroliftAgentSkill, AstroliftToolDef } from "@/graphql/agents/agents.types";
 
 const CLIENT_NOTE =
@@ -22,8 +22,9 @@ export const ADAPTER_LABELS: Record<string, string> = {
   mcp_server: "MCP server",
 };
 
-export const AGENT_SKILLS_LIST: ListDefinition = {
+export const AGENT_SKILLS_LIST: CopiedListDefinition = {
   id: "agents.detail.skills",
+  copy: "agentSkills",
   fields: [
     {
       key: "status",
@@ -66,9 +67,10 @@ export function toolRows(skills: AstroliftAgentSkill[]): AgentToolRow[] {
   );
 }
 
-export function agentToolsList(adapters: string[]): ListDefinition {
+export function agentToolsList(adapters: string[]): CopiedListDefinition {
   return {
     id: "agents.detail.tools",
+    copy: "agentTools",
     fields: [
       {
         key: "adapter",

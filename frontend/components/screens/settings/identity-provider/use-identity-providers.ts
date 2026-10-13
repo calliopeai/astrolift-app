@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { useLocalListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 
 import {
   SET_ACTIVE_IDENTITY_PROVIDER,
@@ -28,7 +29,7 @@ interface Resp {
 export function useIdentityProviders() {
   const t = useTranslations("identityProviders.toasts");
   // In memory: the Providers page keeps its tab in the hash and owns the query string.
-  const list = useLocalListState(IDENTITY_PROVIDERS_LIST);
+  const list = useLocalListState(useLocalizedList(IDENTITY_PROVIDERS_LIST));
   const { can } = useMyPermissions();
   const canManageIdp = can("org.update");
   const { data, loading, error } = useQuery<Resp>(LIST_IDENTITY_PROVIDERS);

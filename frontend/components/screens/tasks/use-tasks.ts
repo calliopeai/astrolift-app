@@ -6,7 +6,12 @@ import * as React from "react";
 import { toast } from "sonner";
 
 import type { CursorPage } from "@/components/data-table";
-import { type ListDefinition, standardViews, useListState } from "@/components/list/use-list-state";
+import {
+  type CopiedListDefinition,
+  standardViews,
+  useListState,
+} from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import { RUN_TASK } from "@/graphql/lifecycle/lifecycle.mutations";
 import type { AstroliftTaskRun } from "@/graphql/lifecycle/lifecycle.types";
 import { LIST_WORKLOADS_PAGE } from "@/graphql/registry/registry.queries";
@@ -43,8 +48,9 @@ interface MutationResultLite<T> {
  */
 const TASK_KIND_TERM = "task";
 
-export const TASK_TEMPLATES_LIST: ListDefinition = {
+export const TASK_TEMPLATES_LIST: CopiedListDefinition = {
   id: "tasks.templates",
+  copy: "taskTemplates",
   fields: [{ key: "app", label: "App" }],
   searchPlaceholder: "Search task templates…",
   defaultSort: [{ key: "created", dir: "desc" }],
@@ -61,7 +67,7 @@ export const TASK_TEMPLATES_LIST: ListDefinition = {
  */
 export function useTaskTemplates(): TaskTemplatesScreenProps {
   const router = useRouter();
-  const list = useListState(TASK_TEMPLATES_LIST);
+  const list = useListState(useLocalizedList(TASK_TEMPLATES_LIST));
   const mine = list.filters.owner === "me";
 
   const { data, loading, error, refetch } = useQuery<WorkloadsPageResp>(LIST_WORKLOADS_PAGE, {

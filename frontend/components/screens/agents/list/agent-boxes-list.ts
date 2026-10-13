@@ -8,11 +8,12 @@
  * not whether that is the viewer, so Mine is empty until it does. Pure.
  */
 import type { SelectRowsSpec } from "@/components/list/select-rows";
-import { type ListDefinition, standardViews } from "@/components/list/list-state";
+import { type CopiedListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftAgentBox } from "@/graphql/agents/agents.types";
 
-export const AGENT_BOXES_LIST: ListDefinition = {
+export const AGENT_BOXES_LIST: CopiedListDefinition = {
   id: "agents.boxes",
+  copy: "agentBoxes",
   fields: [
     {
       key: "status",

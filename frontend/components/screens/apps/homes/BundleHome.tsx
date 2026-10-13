@@ -48,8 +48,8 @@ export function BundleHomeScreen({ workloads, workloadHref }: BundleHomeScreenPr
       >
         <ul className="divide-y">
           {workloads.map((w) => {
-            const meta = WORKLOAD_KIND_META[w.kind] ?? WORKLOAD_KIND_META.deployment;
-            const Icon = meta.Icon;
+            const kind = Object.hasOwn(WORKLOAD_KIND_META, w.kind) ? w.kind : "deployment";
+            const Icon = WORKLOAD_KIND_META[kind].Icon;
             return (
               <li key={w.id}>
                 <Link
@@ -62,7 +62,7 @@ export function BundleHomeScreen({ workloads, workloadHref }: BundleHomeScreenPr
                       {w.name}
                     </span>
                     <span className="text-muted-foreground flex flex-wrap gap-x-3 text-xs">
-                      <span>{meta.label}</span>
+                      <span>{t(`kinds.${kind}`)}</span>
                       {w.kind === "cronjob" && w.schedule ? (
                         <span className="font-mono">{w.schedule}</span>
                       ) : null}

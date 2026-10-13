@@ -9,6 +9,7 @@ import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
 
 import { useHeldRows } from "@/components/list/use-held-rows";
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import {
   ABORT_DEPLOYMENT,
   APPROVE_DEPLOYMENT,
@@ -52,7 +53,7 @@ const REFETCH_LIST = ["ListDeploymentsPage"];
 export function useDeployments() {
   const feedback = useDeploymentFeedback();
   const t = useTranslations("lists.deployments");
-  const list = useListState(DEPLOYMENTS_LIST);
+  const list = useListState(useLocalizedList(DEPLOYMENTS_LIST));
   const { state } = list;
   // Fixed per visit: Today's midnight and the since windows do not move
   // under the reader.

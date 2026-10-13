@@ -6,13 +6,14 @@
  * creator, so Mine is empty.
  */
 import type { SelectRowsSpec } from "@/components/list/select-rows";
-import { type ListDefinition, standardViews } from "@/components/list/list-state";
+import { type CopiedListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftIdentityProvider } from "@/graphql/identity/identity.types";
 
 const KINDS = ["oidc", "saml", "cognito", "auth0", "okta", "azure_ad", "google", "github", "local"];
 
-export const IDENTITY_PROVIDERS_LIST: ListDefinition = {
+export const IDENTITY_PROVIDERS_LIST: CopiedListDefinition = {
   id: "providers.identity",
+  copy: "identityProviders",
   fields: [
     { key: "kind", label: "Kind", options: KINDS.map((k) => ({ value: k, label: k })) },
     {

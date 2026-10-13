@@ -1,5 +1,6 @@
 import { LegacyTeamAssignmentsClient } from "@/components/screens/administration/access/team-memberships/LegacyTeamAssignmentsClient";
-export const metadata = { title: "Assign roles · Team · Astrolift" };
+import { routeTitle } from "@/lib/i18n/route-title";
+export const generateMetadata = routeTitle("assignRoles", "team");
 export default async function LegacyAssignmentsPage({
   params,
 }: {

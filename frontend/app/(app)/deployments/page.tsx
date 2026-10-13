@@ -1,9 +1,10 @@
 import { LIST_DEPLOYMENTS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { DeploymentsClient } from "./deployments-client";
 
-export const metadata = { title: "Deployments · Astrolift" };
+export const generateMetadata = routeTitle("deployments");
 
 /**
  * Preloads the first page of the All view so the table paints with rows

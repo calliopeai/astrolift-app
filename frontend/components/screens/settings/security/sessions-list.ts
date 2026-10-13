@@ -6,13 +6,14 @@
  * Every session here is the viewer's own, so Mine is the same as All.
  */
 import type { SelectRowsSpec } from "@/components/list/select-rows";
-import { type ListDefinition, standardViews } from "@/components/list/list-state";
+import { type CopiedListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftActiveSession } from "@/graphql/identity/identity.types";
 
 const KINDS = ["web", "cli", "mobile", "browser_extension", "api_token"];
 
-export const SESSIONS_LIST: ListDefinition = {
+export const SESSIONS_LIST: CopiedListDefinition = {
   id: "settings.security.sessions",
+  copy: "sessions",
   fields: [
     {
       key: "kind",

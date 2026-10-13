@@ -12,6 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { navLabel } from "@/lib/shell/nav-model";
 import { cn } from "@/lib/utils";
 
 /**
@@ -24,6 +25,8 @@ export interface CrumbSwitchOption {
   label: string;
   href: string;
   active?: boolean;
+  /** The rail function it opens: shown under the rail's name for it (`navLabel`). */
+  navFunction?: string;
 }
 
 export interface Crumb {
@@ -32,6 +35,9 @@ export interface Crumb {
   href?: string;
   /** The sideways move: the area's functions, or the person's projects. */
   switcher?: CrumbSwitchOption[];
+  /** The rail area or function the crumb names: shown under the rail's name for it. */
+  navArea?: string;
+  navFunction?: string;
 }
 
 export interface ShellHeaderProps {
@@ -104,14 +110,20 @@ export function ShellHeader({
 
 function CrumbItem({ crumb, isLast }: { crumb: Crumb; isLast: boolean }) {
   const t = useTranslations("shared.shellHeader");
+  const nav = useTranslations("navModel");
+  const label = crumb.navArea
+    ? navLabel(nav, "areas", crumb.navArea, crumb.label)
+    : crumb.navFunction
+      ? navLabel(nav, "functions", crumb.navFunction, crumb.label)
+      : crumb.label;
   if (crumb.switcher && crumb.switcher.length > 0) {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger
           className="hover:text-foreground focus-visible:ring-ring inline-flex min-w-0 items-center gap-1 rounded-sm focus-visible:ring-2 focus-visible:outline-none"
-          aria-label={t("switch", { label: crumb.label })}
+          aria-label={t("switch", { label })}
         >
-          <span className="truncate">{crumb.label}</span>
+          <span className="truncate">{label}</span>
           <ChevronDownIcon className="size-3.5 shrink-0" aria-hidden />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-48">
@@ -123,7 +135,7 @@ function CrumbItem({ crumb, isLast }: { crumb: Crumb; isLast: boolean }) {
                 className="flex items-center gap-2"
               >
                 <CheckIcon className={cn("size-3.5", !o.active && "invisible")} aria-hidden />
-                {o.label}
+                {o.navFunction ? navLabel(nav, "functions", o.navFunction, o.label) : o.label}
               </Link>
             </DropdownMenuItem>
           ))}
@@ -134,13 +146,13 @@ function CrumbItem({ crumb, isLast }: { crumb: Crumb; isLast: boolean }) {
   if (isLast || !crumb.href) {
     return (
       <span aria-current="page" className="text-foreground min-w-0 truncate">
-        {crumb.label}
+        {label}
       </span>
     );
   }
   return (
     <Link href={crumb.href} className="hover:text-foreground min-w-0 truncate">
-      {crumb.label}
+      {label}
     </Link>
   );
 }

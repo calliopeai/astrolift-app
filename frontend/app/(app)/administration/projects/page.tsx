@@ -1,14 +1,10 @@
-import {
-  LIST_PROJECTS,
-  LIST_TEAMS,
-} from "@/graphql/identity/identity.queries";
+import { LIST_PROJECTS, LIST_TEAMS } from "@/graphql/identity/identity.queries";
 import { PreloadQuery } from "@/lib/apollo";
 
 import { ProjectsClient } from "@/app/(app)/projects/projects-client";
+import { routeTitle } from "@/lib/i18n/route-title";
 
-export const metadata = {
-  title: "Projects · Astrolift",
-};
+export const generateMetadata = routeTitle("projects");
 
 export default function AdministrationProjectsPage() {
   return (

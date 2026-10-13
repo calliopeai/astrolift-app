@@ -192,7 +192,10 @@ function emailList(
     fields,
     searchPlaceholder,
     defaultSort,
-    views: standardViews({ owner: "me" }, [], { mineNote: t("notPersonal") }),
+    views: standardViews({ owner: "me" }, [], {
+      mineNote: t("notPersonal"),
+      labels: { all: t("allView"), mine: t("mineView") },
+    }),
     paging: "numbered",
     pageSizes: [25, 50, 100],
   };

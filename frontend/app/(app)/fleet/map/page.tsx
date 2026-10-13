@@ -1,8 +1,9 @@
 import { PageShell } from "@/components/PageShell";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { FleetMapClient } from "./fleet-map-client";
 
-export const metadata = { title: "Fleet map · Astrolift" };
+export const generateMetadata = routeTitle("fleetMap");
 
 /**
  * /fleet/map — the live agent-fleet dispatch map (#1091, LiveFlowMap P2).

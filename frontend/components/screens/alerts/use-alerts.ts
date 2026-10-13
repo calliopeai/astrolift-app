@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import type { CursorPage } from "@/components/data-table";
 import { useCursorFeed } from "@/components/feed/use-cursor-feed";
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
   ACKNOWLEDGE_ALERT_EVENT,
@@ -87,7 +88,7 @@ export function useAlerts() {
   const t = useTranslations("lists.alerts");
 
   const appSlug = useSearchParams()?.get("app") || null;
-  const list = useListState(ALERT_RULES_LIST);
+  const list = useListState(useLocalizedList(ALERT_RULES_LIST));
   const rules = useQuery<RulesPageResp>(LIST_ALERT_RULES_PAGE, {
     variables: { ...rulesVariables(list.filters, list.state), appSlug },
     fetchPolicy: "cache-and-network",

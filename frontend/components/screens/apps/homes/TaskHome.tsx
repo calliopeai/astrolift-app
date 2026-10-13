@@ -7,7 +7,7 @@ import { Panel, PanelGrid } from "@/components/panel/Panel";
 import { Timeline, type StepState, type TimelineStep } from "@/components/run/Timeline";
 import { StatusDot } from "@/components/StatusDot";
 import type { AstroliftTaskRun } from "@/graphql/lifecycle/lifecycle.types";
-import { formatRelativeAge } from "@/lib/format";
+import { useRelativeAge } from "@/lib/format";
 
 import { formatDuration, runStatusDot, titleCaseStatus } from "./run-status";
 import type { useTaskRuns } from "./use-task-runs";
@@ -83,6 +83,7 @@ export function TaskHomeScreen({ runs, loading, error, onRetry }: TaskHomeScreen
   const latest = runs[0] ?? null;
   const failed = latest ? isFailed(latest.status) : false;
   const t = useTranslations("appHomes.task");
+  const relativeAge = useRelativeAge();
   const steps = taskStages(latest).map((s) => ({ ...s, name: t(`stages.${STAGE_KEYS[s.name]}`) }));
 
   return (
@@ -134,7 +135,7 @@ export function TaskHomeScreen({ runs, loading, error, onRetry }: TaskHomeScreen
               <StatusDot status={runStatusDot(r.status)} />
               <span className="w-24 shrink-0">{titleCaseStatus(r.status)}</span>
               <span className="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">
-                {r.startedAt ? formatRelativeAge(r.startedAt) : t("notStarted")}
+                {r.startedAt ? relativeAge(r.startedAt) : t("notStarted")}
               </span>
               <span className="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
                 {formatDuration(r.durationSeconds)}

@@ -1,9 +1,10 @@
 import { PreloadQuery } from "@/lib/apollo";
 import { LIST_ALERT_EVENTS } from "@/graphql/operations/alerts.queries";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { AlertEventDetailClient } from "./alert-event-detail-client";
 
-export const metadata = { title: "Alert event · Astrolift" };
+export const generateMetadata = routeTitle("alertEvent");
 
 /**
  * Alert event detail (#1106) — drill-in target for an /alerts event row.

@@ -1,9 +1,10 @@
 import { GET_CLUSTER } from "@/graphql/clusters/clusters.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { ClusterHealthClient } from "./cluster-health-client";
 
-export const metadata = { title: "Cluster health · Astrolift" };
+export const generateMetadata = routeTitle("clusterHealth");
 
 export default async function ClusterHealthPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

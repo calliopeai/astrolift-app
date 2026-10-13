@@ -10,7 +10,7 @@
  * Mine is the workloads the viewer owns (`owner: "me"`). Nothing is
  * filtered, sorted or paged in the browser. Pure.
  */
-import { type ListDefinition, standardViews } from "@/components/list/list-state";
+import { type CopiedListDefinition, standardViews } from "@/components/list/list-state";
 import {
   type NumberedListQuery,
   numberedPageVariables,
@@ -29,8 +29,9 @@ export function scaleLabel(w: AstroliftWorkload): string {
 const MINE_NOTE =
   "Mine means workloads you created, or on apps you created. Workloads from before Astrolift recorded who created them show only in All.";
 
-export const WORKLOADS_LIST: ListDefinition = {
+export const WORKLOADS_LIST: CopiedListDefinition = {
   id: "agents.workloads",
+  copy: "workloads",
   fields: [
     // Free text: the owning app's slug.
     { key: "app", label: "App" },

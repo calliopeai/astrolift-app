@@ -196,7 +196,7 @@ describe("apps crumbs", () => {
     const [area, fn] = appsListCrumbs("deployments");
     expect(area.label).toBe("Apps");
     expect(area.switcher?.find((o) => o.active)?.href).toBe("/deployments");
-    expect(fn).toEqual({ label: "Deployments" });
+    expect(fn).toEqual({ label: "Deployments", navFunction: "deployments" });
   });
 
   it("a detail starts at its function", () => {

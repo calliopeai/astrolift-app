@@ -11,7 +11,7 @@
  * rows with no filter or sort, so both are answered in the browser with
  * numbered pages and a note saying so. Pure.
  */
-import type { ListDefinition } from "@/components/list/list-state";
+import type { CopiedListDefinition } from "@/components/list/list-state";
 import type { AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
 
 import { CLIENT_LIST_NOTE, type ClientListSpec, selectClientRows } from "../client-list";
@@ -39,8 +39,9 @@ export function metricsPanelQuery(current: string, panel: MetricsPanel): string 
   return next.toString();
 }
 
-export const APP_PODS_LIST: ListDefinition = {
+export const APP_PODS_LIST: CopiedListDefinition = {
   id: "apps.metrics.pods",
+  copy: "appPods",
   fields: [
     {
       key: "status",
@@ -92,8 +93,9 @@ export function selectPods(
   return selectClientRows(all, filters, state, PODS_SPEC);
 }
 
-export const APP_ALERT_RULES_LIST: ListDefinition = {
+export const APP_ALERT_RULES_LIST: CopiedListDefinition = {
   id: "apps.metrics.alert-rules",
+  copy: "appAlertRules",
   fields: [
     {
       key: "severity",

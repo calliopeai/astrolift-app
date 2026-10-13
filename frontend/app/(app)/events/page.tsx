@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { EventsClient } from "./events-client";
 
-export const metadata = { title: "Events · Astrolift" };
+export const generateMetadata = routeTitle("events");
 
 /**
  * No `PreloadQuery`: both feeds are cursor walks whose first request

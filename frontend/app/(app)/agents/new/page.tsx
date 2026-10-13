@@ -1,10 +1,11 @@
 import { LIST_PROJECTS, LIST_TEAMS } from "@/graphql/identity/identity.queries";
 import { LIST_SOURCE_CONNECTIONS } from "@/graphql/scm/scm.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { WizardClient } from "./wizard-client";
 
-export const metadata = { title: "New agent · Astrolift" };
+export const generateMetadata = routeTitle("newAgent");
 
 /**
  * Agents › New agent (spec 33 PR-8, spec 44 §5.4): point at a repo, find its

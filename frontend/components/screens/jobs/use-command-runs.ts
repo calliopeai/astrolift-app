@@ -5,6 +5,7 @@ import { useQuery } from "@apollo/client/react";
 import type { CursorPage } from "@/components/data-table";
 import { useHeldRows } from "@/components/list/use-held-rows";
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import { LIST_COMMAND_RUNS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftCommandRun } from "@/graphql/lifecycle/lifecycle.types";
 
@@ -21,7 +22,7 @@ interface CommandRunsPageResp {
  * CommandRunsScreen.
  */
 export function useCommandRuns() {
-  const list = useListState(COMMAND_RUNS_LIST);
+  const list = useListState(useLocalizedList(COMMAND_RUNS_LIST));
   const { state } = list;
   const query = useQuery<CommandRunsPageResp>(LIST_COMMAND_RUNS_PAGE, {
     variables: commandRunsVariables(list.filters, state),

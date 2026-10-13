@@ -21,7 +21,12 @@ function appsArea() {
 /** The Apps area's functions, `active` checked. */
 export function appsSwitcher(active: AppsFunction): CrumbSwitchOption[] {
   return (appsArea()?.groups ?? []).flatMap((g) =>
-    g.functions.map((f) => ({ label: f.label, href: f.href, active: f.key === active }))
+    g.functions.map((f) => ({
+      label: f.label,
+      href: f.href,
+      active: f.key === active,
+      navFunction: f.key,
+    }))
   );
 }
 
@@ -35,15 +40,15 @@ export function appsListCrumbs(fn: AppsFunction, ...rest: Crumb[]): Crumb[] {
   const label = functionLabel(fn);
   const href = appsSwitcher(fn).find((o) => o.active)?.href;
   return [
-    { label: appsArea()?.label ?? "Apps", switcher: appsSwitcher(fn) },
-    rest.length > 0 ? { label, href } : { label },
+    { label: appsArea()?.label ?? "Apps", navArea: "apps", switcher: appsSwitcher(fn) },
+    rest.length > 0 ? { label, href, navFunction: fn } : { label, navFunction: fn },
     ...rest,
   ];
 }
 
 /** A detail under a roll-up: `Deployments ▾ › storefront › deploy 4f2a9c1e`. */
 export function appsDetailCrumbs(fn: AppsFunction, ...rest: Crumb[]): Crumb[] {
-  return [{ label: functionLabel(fn), switcher: appsSwitcher(fn) }, ...rest];
+  return [{ label: functionLabel(fn), navFunction: fn, switcher: appsSwitcher(fn) }, ...rest];
 }
 
 /** The since filter's choices, with Today first (the Deployments view). */

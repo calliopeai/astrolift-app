@@ -9,7 +9,7 @@
  * next firing of the scheduled agents on the page, from `agentUpcomingRuns`.
  */
 import type { SortState } from "@/components/data-table";
-import { type ListDefinition, formatSort, standardViews } from "@/components/list/list-state";
+import { type CopiedListDefinition, formatSort, standardViews } from "@/components/list/list-state";
 import type { Crumb } from "@/components/shell/ShellHeader";
 import type { AstroliftAgentFleetRow, AstroliftAgentListItem } from "@/graphql/agents/agents.types";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
@@ -95,8 +95,9 @@ export function toAgentRow(item: AstroliftAgentFleetRow, next: string | null = n
 /** The value Mine filters on: agents the viewer registered. */
 export const MINE = "me";
 
-export const AGENTS_LIST: ListDefinition = {
+export const AGENTS_LIST: CopiedListDefinition = {
   id: "agents",
+  copy: "agents",
   fields: [
     // Free text: a project slug.
     { key: "project", label: "Project" },

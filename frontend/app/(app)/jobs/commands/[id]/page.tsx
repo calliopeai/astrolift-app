@@ -1,9 +1,10 @@
 import { PreloadQuery } from "@/lib/apollo";
 import { GET_COMMAND_RUN } from "@/graphql/lifecycle/lifecycle.queries";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { CommandRunDetailClient } from "./command-run-detail-client";
 
-export const metadata = { title: "Command run · Astrolift" };
+export const generateMetadata = routeTitle("commandRun");
 
 /**
  * Command run detail (#1106) — drill-in target for a /jobs Commands row.

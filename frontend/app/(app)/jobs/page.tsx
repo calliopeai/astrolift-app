@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { JobsClient } from "./jobs-client";
 
-export const metadata = { title: "Scheduled jobs · Astrolift" };
+export const generateMetadata = routeTitle("scheduledJobs");
 
 /**
  * No `PreloadQuery`: the jobs page query lives in its client hook

@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import { RUN_AGENT } from "@/graphql/agents/agents.mutations";
 import {
   AGENT_FLEET_LIST_PAGE,
@@ -53,7 +54,7 @@ const POLL_MS = 15_000;
  */
 export function useAgentsList() {
   const t = useTranslations("agentDispatch");
-  const list = useListState(AGENTS_LIST);
+  const list = useListState(useLocalizedList(AGENTS_LIST));
   const { state } = list;
   const router = useRouter();
   const client = useApolloClient();

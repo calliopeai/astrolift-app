@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
+import { routeTitle } from "@/lib/i18n/route-title";
 
-export const metadata = {
-  title: "Managed domains · Astrolift",
-};
+export const generateMetadata = routeTitle("managedDomains");
 
 /**
  * /settings/managed-domains was a duplicate of the canonical

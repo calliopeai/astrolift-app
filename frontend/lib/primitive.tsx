@@ -40,16 +40,17 @@ export const PRIMITIVE_META: Record<PrimitiveKind, PrimitiveMeta> = {
   bundle: { label: "Bundle", Icon: BoxIcon, blurb: "Several workloads in one app" },
 };
 
-// Per-workload-kind chrome (for the bundle grid + workload rows).
-export const WORKLOAD_KIND_META: Record<WorkloadKind, { label: string; Icon: LucideIcon }> = {
-  deployment: { label: "Deployment", Icon: RocketIcon },
-  statefulset: { label: "Stateful set", Icon: DatabaseIcon },
-  job: { label: "Job", Icon: ListChecksIcon },
-  cronjob: { label: "Cronjob", Icon: TimerIcon },
-  task: { label: "Task", Icon: ListChecksIcon },
-  agent: { label: "Agent", Icon: BotIcon },
-  workflow: { label: "Workflow", Icon: WorkflowIcon },
-  function: { label: "Function", Icon: BoltIcon },
+// Per-workload-kind chrome (for the bundle grid + workload rows). The kind's
+// name is the catalog's (`appHomes.bundle.kinds.<kind>`).
+export const WORKLOAD_KIND_META: Record<WorkloadKind, { Icon: LucideIcon }> = {
+  deployment: { Icon: RocketIcon },
+  statefulset: { Icon: DatabaseIcon },
+  job: { Icon: ListChecksIcon },
+  cronjob: { Icon: TimerIcon },
+  task: { Icon: ListChecksIcon },
+  agent: { Icon: BotIcon },
+  workflow: { Icon: WorkflowIcon },
+  function: { Icon: BoltIcon },
 };
 
 /**

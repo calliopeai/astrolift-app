@@ -1,12 +1,10 @@
 import { PreloadQuery } from "@/lib/apollo";
-import {
-  GET_DEPLOYMENT,
-  GET_DEPLOYMENT_LOG,
-} from "@/graphql/lifecycle/lifecycle.queries";
+import { GET_DEPLOYMENT, GET_DEPLOYMENT_LOG } from "@/graphql/lifecycle/lifecycle.queries";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { DeploymentDetailClient } from "./deployment-detail-client";
 
-export const metadata = { title: "Deployment · Astrolift" };
+export const generateMetadata = routeTitle("deployment");
 
 export default async function DeploymentDetailPage({
   params,

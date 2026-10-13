@@ -69,6 +69,7 @@ function configurationList(groups: Group[], t: Translate): ListDefinition {
     defaultSort: [{ key: "order", dir: "asc" }],
     views: standardViews({ owner: "me" }, [], {
       mineNote: t("mineNote"),
+      labels: { all: t("allView"), mine: t("mineView") },
     }),
     paging: "numbered",
     pageSizes: [25, 50, 100],

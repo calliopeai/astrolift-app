@@ -1,4 +1,4 @@
-import { type ListDefinition, standardViews } from "@/components/list/list-state";
+import { type CopiedListDefinition, standardViews } from "@/components/list/list-state";
 
 import { type NumberedListQuery, numberedPageVariables } from "../skills/catalog";
 
@@ -24,8 +24,9 @@ export interface EnvironmentSpec {
   updatedAt: string;
 }
 
-export const ENVIRONMENT_SPECS_LIST: ListDefinition = {
+export const ENVIRONMENT_SPECS_LIST: CopiedListDefinition = {
   id: "agents.environment-specs",
+  copy: "environmentSpecs",
   fields: [
     {
       key: "agentType",

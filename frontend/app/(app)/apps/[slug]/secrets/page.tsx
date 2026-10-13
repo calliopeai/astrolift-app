@@ -5,10 +5,11 @@ import {
   LIST_APP_SECRETS,
 } from "@/graphql/services/services.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { SecretsClient } from "./secrets-client";
 
-export const metadata = { title: "Secrets · App · Astrolift" };
+export const generateMetadata = routeTitle("secrets", "app");
 
 /**
  * The Secrets tab: the keys, or the attached bundles on `?section=bundles`.

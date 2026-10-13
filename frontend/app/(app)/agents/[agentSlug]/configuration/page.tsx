@@ -5,10 +5,11 @@ import {
 import { LIST_WEBHOOKS } from "@/graphql/operations/operations.queries";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { ConfigurationContent } from "../components/configuration-content";
 
-export const metadata = { title: "Configuration · Agent · Astrolift" };
+export const generateMetadata = routeTitle("configuration", "agent");
 
 /**
  * The Configuration tab (spec 44 §5.2, §5.3): Build, Run mode & triggers,

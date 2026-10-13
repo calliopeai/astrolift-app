@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { PoliciesClient } from "./policies-client";
 
-export const metadata = { title: "Policies · Administration · Astrolift" };
+export const generateMetadata = routeTitle("policies", "administration");
 
 /**
  * The list reads `astroliftPoliciesPage` with its own search and cursor; it
