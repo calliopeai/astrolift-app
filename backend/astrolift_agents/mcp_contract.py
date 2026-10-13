@@ -402,6 +402,17 @@ MCP_TOOL_META: dict[str, dict[str, Any]] = {
         "permission": Permission.APP_READ,
         "inputSchema": _schema({"slug": {"type": "string"}}, required=("slug",)),
     },
+    "astrolift_connect_brain": {
+        "description": (
+            "Connect to one hosted brain this identity can read, by app slug: its endpoints, the "
+            "header to send and a 15-minute read token for this identity and this brain (#2320). "
+            "Ask again for a fresh token; a revoked share stops new tokens at once."
+        ),
+        "scope": SCOPE_MCP_READ,
+        "additional_scopes": (SCOPE_READ_APPS,),
+        "permission": Permission.APP_READ,
+        "inputSchema": _schema({"slug": {"type": "string"}}, required=("slug",)),
+    },
     "astrolift_list_agents": {
         "description": "List registered agents and their source/package delivery state.",
         "scope": SCOPE_MCP_READ,

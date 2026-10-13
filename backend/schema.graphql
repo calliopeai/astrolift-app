@@ -1866,6 +1866,21 @@ type AstroliftBrain {
   sharedWith: [AstroliftBrainShare!]!
 }
 
+type AstroliftBrainConnection {
+  id: GUID!
+  slug: String!
+  endpoints: [String!]!
+  header: String!
+  token: String!
+  expiresAt: String!
+}
+
+type AstroliftBrainConnectionMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftBrainConnection
+}
+
 type AstroliftBrainEnvironment {
   name: String!
   url: String!
@@ -9488,6 +9503,11 @@ type Mutation {
   setRetentionPolicy(input: SetRetentionPolicyInput!): AstroliftRetentionPolicyMutationResult!
   archiveApp(input: ArchiveAppInput!): AstroliftRegisteredAppMutationResult!
   restoreApp(input: RestoreAppInput!): AstroliftRegisteredAppMutationResult!
+
+  """
+  A 15-minute read token for one brain the caller can read (#2320), with its endpoints and the header to send it in. The cluster edge admits it to that brain only; a revoked share stops new tokens at once. The token is never written to the audit log.
+  """
+  issueBrainReadToken(slug: String!): AstroliftBrainConnectionMutationResult!
   setAppAccess(input: SetAppAccessInput!): AstroliftAppAccessMutationResult!
   sendInstallAlertMailTest(input: SendInstallAlertMailTestInput!): InstallAlertMailTestMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!

@@ -13,6 +13,7 @@ import base64
 import json
 
 from k8s_native.edge_gateway import (
+    BRAIN_TOKEN_HEADER,
     DEFAULT_GATEWAY_SECRET_HEADER,
     EDGE_NAMESPACE,
     EDGE_OIDC_SECRET_NAME,
@@ -169,7 +170,7 @@ def test_app_routes_live_on_the_edge_and_reach_back_by_grant():
     [rule] = route["spec"]["rules"]
     assert rule["backendRefs"] == [{"name": "web", "namespace": "conflict-veruus", "port": 8080}]
     modifier = rule["filters"][0]["requestHeaderModifier"]
-    assert modifier["remove"] == [ID_TOKEN_HEADER]
+    assert modifier["remove"] == [ID_TOKEN_HEADER, BRAIN_TOKEN_HEADER]
     assert modifier["set"] == [{"name": DEFAULT_GATEWAY_SECRET_HEADER, "value": "gw-secret"}]
     assert grant["metadata"]["namespace"] == "conflict-veruus"
     assert grant["spec"]["to"] == [{"group": "", "kind": "Service", "name": "web"}]
@@ -250,3 +251,58 @@ def test_app_alb_rule_joins_the_apps_group_and_points_at_the_edge():
     assert rule["host"] == "veruus-demo.astro.example.net"
     assert rule["http"]["paths"][0]["backend"]["service"]["name"] == EDGE_SERVICE_NAME
     assert ingress["spec"]["tls"] == [{"hosts": ["veruus-demo.astro.example.net"]}]
+
+
+# ---- brain read tokens (#2320) -------------------------------------------
+
+BRAIN_RULE = {
+    "name": "leo-brain-production",
+    "hosts": ["leo-brain.astro.example.net"],
+    "groups": [],
+    "users": [],
+    "brain_audience": "01a0-brain-guid",
+    "brain_issuer": "https://astrolift.example.net",
+    "brain_jwks_uri": "https://astrolift.example.net/.well-known/astrolift-jwks.json",
+}
+OPEN_APP_RULE = {"name": "shop-production", "hosts": ["shop.astro.example.net"], "groups": ["eng"], "users": []}
+
+
+def _policy(access_rules):
+    component = edge_component(COGNITO, ingress_class="envoy", access_rules=access_rules)
+    [policy] = [p for p in _by_kind(component.post_install_manifests, "SecurityPolicy") if "oidc" in p["spec"]]
+    return policy["spec"]
+
+
+def test_no_brain_leaves_the_policy_as_it_was():
+    spec = _policy([OPEN_APP_RULE])
+    assert "passThroughAuthHeader" not in spec["oidc"]
+    assert "astrolift-brain" not in [p["name"] for p in spec["jwt"]["providers"]]
+    assert len(spec["jwt"]["providers"]) == 1
+
+
+def test_a_brain_adds_a_token_provider_that_skips_the_browser_login():
+    spec = _policy([BRAIN_RULE, OPEN_APP_RULE])
+    assert spec["oidc"]["passThroughAuthHeader"] is True
+    [brain] = [p for p in spec["jwt"]["providers"] if p["name"] == "astrolift-brain"]
+    assert brain["issuer"] == "https://astrolift.example.net"
+    assert brain["audiences"] == ["01a0-brain-guid"]
+    assert brain["extractFrom"] == {"headers": [{"name": BRAIN_TOKEN_HEADER}]}
+    assert brain["remoteJWKS"]["uri"].endswith("/.well-known/astrolift-jwks.json")
+
+
+def test_a_brain_token_opens_only_the_brain_it_names():
+    rules = _policy([BRAIN_RULE, OPEN_APP_RULE])["authorization"]["rules"]
+    allow, deny = rules[0], rules[1]
+    assert allow["action"] == "Allow"
+    assert allow["principal"]["headers"] == [{"name": ":authority", "values": ["leo-brain.astro.example.net"]}]
+    assert allow["principal"]["jwt"] == {
+        "provider": "astrolift-brain",
+        "claims": [{"name": "aud", "values": ["01a0-brain-guid"]}],
+    }
+    assert deny == {
+        "name": "brain-token-elsewhere",
+        "action": "Deny",
+        "principal": {"jwt": {"provider": "astrolift-brain"}},
+    }
+    # The ordinary per-app rules follow, unchanged.
+    assert any(r["name"].startswith("shop-production") for r in rules[2:])

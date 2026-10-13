@@ -184,6 +184,7 @@ no role change or administrator token is needed to repair the CLI scope mapping.
 | `astrolift_list_agents` | Discover registered agents and their source/package state. |
 | `astrolift_list_brains` | List the hosted brains (apps of a brain kind) the token can read, with endpoints and shares. |
 | `astrolift_get_brain` | Describe one readable brain by app slug; anything not readable is `not_found`. |
+| `astrolift_connect_brain` | Endpoints, the header to send and a 15-minute read token for one readable brain; the cluster edge admits it to that brain only. |
 | `astrolift_list_runtimes` | Discover the configured runtime names and container images. |
 | `astrolift_list_tasks` | List runs by `status`, `agent_slug`, and/or `project_slug`. |
 | `astrolift_get_task` | Read one run's lifecycle, placement, result and failure. |
