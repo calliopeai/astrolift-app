@@ -9155,7 +9155,13 @@
         "readyHelp": "Ihre Anfrage kann geprüft werden. Das Hosting beginnt nach der Bestätigung.",
         "acceptedHelp": "Prüfen Sie die Bereitstellung, bevor Sie Apps verbinden.",
         "huggingFaceHelp": "Entdecken Sie öffentliche Modelle oder verbinden Sie Ihr Konto für private und zugangsbeschränkte Repositories.",
-        "localSourceHelp": "Laden Sie unterstützte Safetensors-Gewichte und Tokenizer-Dateien von Ihrem Computer hoch."
+        "localSourceHelp": "Laden Sie unterstützte Safetensors-Gewichte und Tokenizer-Dateien von Ihrem Computer hoch.",
+        "blockedTitle": "„Deployment prüfen“ wird verfügbar, sobald Folgendes erledigt ist:",
+        "blockClustersRefreshing": "Die Clusterliste wird aktualisiert. Bitte einen Moment warten.",
+        "blockClustersUnavailable": "Die Clusterliste konnte nicht geladen werden. Laden Sie die Seite neu.",
+        "blockAccess": "Der Modellzugriff ist nicht bestätigt: {reason}",
+        "blockLicense": "Bestätigen Sie, dass Sie die Modelllizenz geprüft haben.",
+        "blockRuntime": "Die Laufzeitprüfung ist fehlgeschlagen: {reason}"
       },
       "localImport": {
         "selectSource": "Modellquelle",

@@ -9155,7 +9155,13 @@
         "readyHelp": "Tu solicitud está lista para revisar. El alojamiento comienza tras confirmarla.",
         "acceptedHelp": "Comprueba que el despliegue esté listo antes de conectar aplicaciones.",
         "huggingFaceHelp": "Descubre modelos públicos o conecta tu cuenta para repositorios privados y restringidos.",
-        "localSourceHelp": "Sube pesos safetensors compatibles y archivos del tokenizador desde tu equipo."
+        "localSourceHelp": "Sube pesos safetensors compatibles y archivos del tokenizador desde tu equipo.",
+        "blockedTitle": "«Revisar despliegue» se habilita cuando se complete lo siguiente:",
+        "blockClustersRefreshing": "La lista de clústeres se está actualizando. Espere un momento.",
+        "blockClustersUnavailable": "No se pudo cargar la lista de clústeres. Vuelva a cargar la página.",
+        "blockAccess": "El acceso al modelo no está confirmado: {reason}",
+        "blockLicense": "Confirme que revisó la licencia del modelo.",
+        "blockRuntime": "La comprobación del entorno de ejecución no se superó: {reason}"
       },
       "localImport": {
         "selectSource": "Origen del modelo",

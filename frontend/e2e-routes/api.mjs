@@ -611,6 +611,7 @@ function value(type, field, args, role) {
         "admin.permissions_enabled",
         "admin.cost_enabled",
         "admin.quotas_enabled",
+        "support.enabled",
       ].map((key) => object({ key, enabled: true }));
     if (field === "modules")
       return ["apps", "agents", "workflows", "admin", "models"].map((key) => object({ key }));

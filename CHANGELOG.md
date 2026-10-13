@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- The model deploy page says why **Review deployment** is disabled. The checks step lists every condition that is still unmet, in order:
+  - hosting is limited to platform super-admins;
+  - a missing name, cluster, compute or resource request;
+  - the cluster list is refreshing or failed to load;
+  - access to the model is unconfirmed, with its reason;
+  - the license is not yet confirmed;
+  - the runtime check has not passed, with its reason.
+
+  Each entry with a fix links to its field. Before, the button was greyed out with no explanation, which is how a SteadyMD operator could not tell what stopped a deployment.
+
+- An expired session sends you to sign in instead of leaving an empty app. The GraphQL endpoint answers an anonymous call with `401` and `UNAUTHENTICATED`, and the web app opens its "session expired" prompt on that 401. Before, it answered with an HTML `403`, which the app read as "your role has no access": a shell named "User" with no navigation. That is what CONFLICT showed on 2026-10-13. The CLI already maps a 401 to "log in again".
+
 - Support cases from inside Astrolift (#1809). With the support module on, **Support** in the account menu opens a page to open a case with Calliope AI support for this install (summary, description, severity), list the organization's cases with their status, and read and answer one. Cases are filed in Client Cove against the install's own `CLIENT_COVE_DEPLOYMENT_ID`; the browser cannot pick another deployment or product. New `GET`/`POST /api/support/v1/tickets/<id>/` reads and replies. The routes now take bearer callers (they were refused by CSRF) and require the UI header on a session POST. Refusals carry a code (`SUPPORT_COVERAGE_REQUIRED` for a deployment without coverage, and the like), and Client Cove's own error text is not passed through. The module needs both `FEATURE_SUPPORT` and the platform setting `SUPPORT_ENABLED`, which `astroliftServerInfo` now publishes as `support.enabled`. Operator setup: `docs/operators/client-cove-support.md`.
 
 - Every REST refusal names its code the way GraphQL and MCP do (#1867). The 403s from the builder (Chat Studio) API, the CI deploy endpoint and the Client Cove support endpoint now carry `"code": "PERMISSION_DENIED"` next to their existing `detail` and `reason`. The organization-mismatch refusal the tenant middleware returns on `/graphql` carries it in `errors[].extensions.code`, so the CLI prints `PERMISSION_DENIED: …` there as it does for every other refusal. The change only adds a key; existing fields are unchanged.

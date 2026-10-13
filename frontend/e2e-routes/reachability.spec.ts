@@ -30,6 +30,11 @@ test("owner can reach every active page from rendered navigation", async ({
       if (frame.type === "ping") socket.send(JSON.stringify({ type: "pong" }));
     });
   });
+  // The support page reads Django's REST surface, which this fixture's
+  // GraphQL server does not serve: an organization with no cases yet.
+  await page.route("**/api/support/v1/tickets/", (route) =>
+    route.fulfill({ json: { tickets: [] } })
+  );
   const runtimeErrors: string[] = [];
   page.on("pageerror", (error) => runtimeErrors.push(`${page.url()}: ${error.message}`));
   page.on("console", (message) => {

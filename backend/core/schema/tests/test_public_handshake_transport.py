@@ -80,7 +80,7 @@ def test_main_transport_still_requires_authentication(client, settings):
         data=json.dumps({"query": QUERY}),
         content_type="application/json",
     )
-    assert response.status_code == 403
+    assert response.status_code == 401
 
 
 def test_discovery_remains_rate_limited_per_ip(client, settings, monkeypatch):

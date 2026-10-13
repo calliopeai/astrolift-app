@@ -9155,7 +9155,13 @@
         "readyHelp": "Votre demande est prête à valider. L’hébergement commence après confirmation.",
         "acceptedHelp": "Suivez la disponibilité du déploiement avant de connecter des applications.",
         "huggingFaceHelp": "Découvrez les modèles publics ou connectez votre compte pour les dépôts privés et restreints.",
-        "localSourceHelp": "Importez des poids safetensors compatibles et les fichiers du tokenizer depuis votre ordinateur."
+        "localSourceHelp": "Importez des poids safetensors compatibles et les fichiers du tokenizer depuis votre ordinateur.",
+        "blockedTitle": "« Vérifier le déploiement » se débloque une fois ces points réglés :",
+        "blockClustersRefreshing": "La liste des clusters est en cours d’actualisation. Patientez un instant.",
+        "blockClustersUnavailable": "Impossible de charger la liste des clusters. Rechargez la page.",
+        "blockAccess": "L’accès au modèle n’est pas confirmé : {reason}",
+        "blockLicense": "Confirmez que vous avez examiné la licence du modèle.",
+        "blockRuntime": "La vérification de l’environnement d’exécution a échoué : {reason}"
       },
       "localImport": {
         "selectSource": "Source du modèle",

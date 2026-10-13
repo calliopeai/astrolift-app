@@ -1,7 +1,7 @@
 import { ApolloLink, HttpLink, Observable, split } from "@apollo/client";
 import { setContext } from "@apollo/client/link/context";
 import { onError } from "@apollo/client/link/error";
-import { CombinedGraphQLErrors } from "@apollo/client/errors";
+import { CombinedGraphQLErrors, ServerError } from "@apollo/client/errors";
 import { getMainDefinition } from "@apollo/client/utilities";
 import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { createClient } from "graphql-ws";
@@ -41,17 +41,26 @@ const authLink = setContext(async (_, { headers }) => {
 // the operator can copy any unsaved draft before re-authing. The
 // modal then routes them to /auth/login itself. The token is cleared
 // here so any subsequent request also fails fast and re-dispatches.
+function sessionExpired() {
+  clearToken();
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("astrolift:session-expired"));
+  }
+}
+
 const errorLink = onError(({ error }) => {
   if (CombinedGraphQLErrors.is(error)) {
     for (const { extensions } of error.errors) {
       if (extensions?.code === "UNAUTHENTICATED") {
-        clearToken();
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("astrolift:session-expired"));
-        }
+        sessionExpired();
         return;
       }
     }
+    return;
+  }
+  // An expired session is refused before GraphQL runs, as an HTTP 401.
+  if (ServerError.is(error) && error.statusCode === 401) {
+    sessionExpired();
     return;
   }
   console.error("[Apollo] Network error:", error);

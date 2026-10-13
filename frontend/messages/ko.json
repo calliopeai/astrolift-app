@@ -9152,7 +9152,13 @@
         "readyHelp": "요청을 검토할 수 있습니다. 확인 후 호스팅이 시작됩니다.",
         "acceptedHelp": "앱을 연결하기 전에 배포 준비 상태를 확인하세요.",
         "huggingFaceHelp": "공개 모델을 찾거나 계정을 연결하여 비공개 및 접근 제한 저장소를 이용하세요.",
-        "localSourceHelp": "컴퓨터에서 지원되는 safetensors 가중치와 토크나이저 파일을 업로드하세요."
+        "localSourceHelp": "컴퓨터에서 지원되는 safetensors 가중치와 토크나이저 파일을 업로드하세요.",
+        "blockedTitle": "다음 항목을 완료하면 '배포 검토'이(가) 활성화됩니다:",
+        "blockClustersRefreshing": "클러스터 목록을 새로 고치는 중입니다. 잠시 기다려 주세요.",
+        "blockClustersUnavailable": "클러스터 목록을 불러오지 못했습니다. 페이지를 새로 고치세요.",
+        "blockAccess": "모델 접근이 확인되지 않았습니다: {reason}",
+        "blockLicense": "모델 라이선스를 검토했음을 확인하세요.",
+        "blockRuntime": "런타임 확인을 통과하지 못했습니다: {reason}"
       },
       "localImport": {
         "selectSource": "모델 소스",

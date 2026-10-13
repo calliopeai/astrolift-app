@@ -9152,7 +9152,13 @@
         "readyHelp": "Sua solicitação está pronta para revisão. A hospedagem começa após a confirmação.",
         "acceptedHelp": "Verifique se a implantação está pronta antes de conectar aplicativos.",
         "huggingFaceHelp": "Descubra modelos públicos ou conecte sua conta para acessar repositórios privados e restritos.",
-        "localSourceHelp": "Envie pesos safetensors compatíveis e arquivos do tokenizador do seu computador."
+        "localSourceHelp": "Envie pesos safetensors compatíveis e arquivos do tokenizador do seu computador.",
+        "blockedTitle": "“Revisar implantação” é liberado quando isto estiver concluído:",
+        "blockClustersRefreshing": "A lista de clusters está sendo atualizada. Aguarde um momento.",
+        "blockClustersUnavailable": "Não foi possível carregar a lista de clusters. Recarregue a página.",
+        "blockAccess": "O acesso ao modelo não foi confirmado: {reason}",
+        "blockLicense": "Confirme que você revisou a licença do modelo.",
+        "blockRuntime": "A verificação do runtime não passou: {reason}"
       },
       "localImport": {
         "selectSource": "Origem do modelo",

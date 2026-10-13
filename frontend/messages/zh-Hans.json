@@ -9152,7 +9152,13 @@
         "readyHelp": "请求已可供审核。确认后将开始托管。",
         "acceptedHelp": "连接应用前，请检查部署就绪状态。",
         "huggingFaceHelp": "发现公开模型，或连接账号以访问私有和受限仓库。",
-        "localSourceHelp": "从计算机上传受支持的 safetensors 权重和分词器文件。"
+        "localSourceHelp": "从计算机上传受支持的 safetensors 权重和分词器文件。",
+        "blockedTitle": "完成以下各项后即可使用“查看部署”：",
+        "blockClustersRefreshing": "集群列表正在刷新，请稍候。",
+        "blockClustersUnavailable": "无法加载集群列表，请重新加载页面。",
+        "blockAccess": "尚未确认模型访问权限：{reason}",
+        "blockLicense": "请确认你已审阅模型许可证。",
+        "blockRuntime": "运行时检查未通过：{reason}"
       },
       "localImport": {
         "selectSource": "模型来源",

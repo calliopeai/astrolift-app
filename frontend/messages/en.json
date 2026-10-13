@@ -9152,7 +9152,13 @@
         "readyHelp": "Your request is ready to review. Hosting starts after confirmation.",
         "acceptedHelp": "Track deployment readiness before connecting apps.",
         "huggingFaceHelp": "Discover public models or connect your account for private and gated repositories.",
-        "localSourceHelp": "Upload supported safetensors weights and tokenizer files from your computer."
+        "localSourceHelp": "Upload supported safetensors weights and tokenizer files from your computer.",
+        "blockedTitle": "Review deployment unlocks when these are done:",
+        "blockClustersRefreshing": "The cluster list is refreshing. Wait a moment.",
+        "blockClustersUnavailable": "The cluster list could not be loaded. Reload the page.",
+        "blockAccess": "Model access is not confirmed: {reason}",
+        "blockLicense": "Confirm you reviewed the model license.",
+        "blockRuntime": "The runtime check did not pass: {reason}"
       },
       "localImport": {
         "selectSource": "Model source",

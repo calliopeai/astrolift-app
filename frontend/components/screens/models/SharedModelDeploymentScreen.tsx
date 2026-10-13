@@ -190,6 +190,49 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
     !clusters.stale &&
     !clusters.error
   );
+  // Every reason Review deployment is still disabled, in the order to fix them.
+  const blockers: { key: string; text: string; target?: string }[] = [
+    ...(!props.hostingAllowed ? [{ key: "admin", text: hosting("adminRequired") }] : []),
+    ...missingFields.map((field) => ({
+      key: field.key,
+      text: usability(field.key),
+      target: field.target,
+    })),
+    ...(clusters.loading || clusters.stale
+      ? [{ key: "clusters", text: hosting("blockClustersRefreshing") }]
+      : clusters.error
+        ? [{ key: "clusters", text: hosting("blockClustersUnavailable") }]
+        : []),
+    ...(props.sourceAccess.loading
+      ? [{ key: "access", text: hosting("accessChecking") }]
+      : !props.sourceAccess.confirmed
+        ? [
+            {
+              key: "access",
+              text: hosting("blockAccess", {
+                reason: props.sourceAccess.reason ?? hosting("accessUnknown"),
+              }),
+            },
+          ]
+        : []),
+    ...(!props.licenseReviewed
+      ? [{ key: "license", text: hosting("blockLicense"), target: `${id}-license` }]
+      : []),
+    ...(request && admissionLoading
+      ? [{ key: "runtime", text: t("verifying") }]
+      : request && admissionError
+        ? [{ key: "runtime", text: hosting("blockRuntime", { reason: admissionError }) }]
+        : request && admission?.requestKey === requestKey && !admission.eligible
+          ? [
+              {
+                key: "runtime",
+                text: hosting("blockRuntime", { reason: admission.reason ?? t("unverified") }),
+              },
+            ]
+          : request && admission?.requestKey !== requestKey
+            ? [{ key: "runtime", text: t("unverified") }]
+            : []),
+  ];
   const placementComplete = Boolean(
     request && props.hostingAllowed && !clusters.loading && !clusters.stale && !clusters.error
   );
@@ -532,6 +575,7 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
                       </p>
                       <Label className="flex items-center gap-2">
                         <input
+                          id={`${id}-license`}
                           type="checkbox"
                           checked={props.licenseReviewed}
                           onChange={(event) => props.onLicenseReviewed(event.target.checked)}
@@ -615,7 +659,49 @@ function DeploymentScreen(props: SharedModelDeploymentScreenProps) {
                       )}
                     </section>
                   </div>
-                  <Button type="submit" disabled={!eligible || Boolean(createdId)}>
+                  {!eligible && !createdId && blockers.length > 0 && (
+                    <div
+                      id="model-hosting-blockers"
+                      role="status"
+                      className="border-warning-border bg-warning-bg text-warning-fg space-y-1 rounded-md border p-3 text-sm"
+                    >
+                      <p className="font-medium">{hosting("blockedTitle")}</p>
+                      <ul className="list-disc space-y-1 pl-5">
+                        {blockers.map((blocker) => (
+                          <li key={blocker.key}>
+                            {blocker.target ? (
+                              <a
+                                className="underline"
+                                href={`#${blocker.target}`}
+                                onClick={(event) => {
+                                  event.preventDefault();
+                                  const target = blocker.target!;
+                                  if (target === `${id}-license`) {
+                                    document.getElementById(target)?.focus();
+                                  } else {
+                                    navigate(1, target);
+                                  }
+                                }}
+                              >
+                                {blocker.text}
+                              </a>
+                            ) : (
+                              blocker.text
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  <Button
+                    type="submit"
+                    disabled={!eligible || Boolean(createdId)}
+                    aria-describedby={
+                      !eligible && !createdId && blockers.length > 0
+                        ? "model-hosting-blockers"
+                        : undefined
+                    }
+                  >
                     {t("review")}
                   </Button>
                 </div>
