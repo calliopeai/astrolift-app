@@ -49,6 +49,46 @@ export const RuntimeNotConfigured: Story = {
     },
   },
 };
+/** Every reason Review deployment is disabled is listed, not left to guess. */
+export const BlockedChecks: Story = {
+  args: {
+    ...sharedDeploymentProps,
+    licenseReviewed: false,
+    sourceAccess: {
+      ...sharedDeploymentProps.sourceAccess,
+      confirmed: false,
+      reason: "The token cannot read this gated repository",
+    },
+    admission: {
+      ...sharedDeploymentProps.admission!,
+      eligible: false,
+      reason: "No certified GPU runtime is configured",
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const button = canvas.getByRole("button", { name: "Review deployment" });
+    await expect(button).toBeDisabled();
+    const blockers = canvas.getByText(en.models.shared.hosting.blockedTitle).parentElement!;
+    await expect(button).toHaveAttribute("aria-describedby", blockers.id);
+    await expect(blockers).toHaveTextContent("The token cannot read this gated repository");
+    await expect(blockers).toHaveTextContent(en.models.shared.hosting.blockLicense);
+    await expect(blockers).toHaveTextContent("No certified GPU runtime is configured");
+    await userEvent.click(within(blockers).getByText(en.models.shared.hosting.blockLicense));
+    await expect(
+      canvas.getByRole("checkbox", { name: en.models.shared.hosting.licenseReview })
+    ).toHaveFocus();
+  },
+};
+/** A ready request shows no blocker list. */
+export const ReadyNoBlockers: Story = {
+  args: sharedDeploymentProps,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("button", { name: "Review deployment" })).toBeEnabled();
+    await expect(canvas.queryByText(en.models.shared.hosting.blockedTitle)).toBeNull();
+  },
+};
 export const Verifying: Story = {
   args: { ...sharedDeploymentProps, admission: null, admissionLoading: true },
 };

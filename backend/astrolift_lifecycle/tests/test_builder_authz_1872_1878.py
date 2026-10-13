@@ -415,6 +415,7 @@ def test_a_token_without_write_apps_is_refused_on_every_route(world, workflow_st
     for response in (_create(headers), _sync(dev, headers), _promote(dev, headers)):
         assert response.status_code == 403, response.content
         assert response.json() == {
+            "code": "PERMISSION_DENIED",
             "detail": "the api token lacks the write:apps scope",
             "reason": "missing_scope",
             "scope": "write:apps",
@@ -485,6 +486,7 @@ def test_promote_needs_app_deploy_as_well_as_app_create(world, workflow_starts):
 
     assert promoted.status_code == 403, promoted.content
     assert promoted.json() == {
+        "code": "PERMISSION_DENIED",
         "detail": "app.deploy is required on team 'eng'",
         "reason": "missing_permission",
         "permission": "app.deploy",
@@ -524,11 +526,13 @@ def test_a_team_admin_promotes_into_their_team_and_no_other(world, workflow_star
         assert into_ops.status_code == 403, into_ops.content
         assert into_ops.json() == (
             {
+                "code": "PERMISSION_DENIED",
                 "detail": "the api token does not cover this live team owner",
                 "reason": "outside_token_team",
             }
             if token_team is not None
             else {
+                "code": "PERMISSION_DENIED",
                 "detail": "app.create is required on team 'ops'",
                 "reason": "missing_permission",
                 "permission": "app.create",
@@ -577,6 +581,7 @@ def test_a_token_for_a_deleted_team_is_refused(world, workflow_starts):
     sync = _sync(dev, headers)
     assert sync.status_code == 403, sync.content
     assert sync.json() == {
+        "code": "PERMISSION_DENIED",
         "detail": "the api token does not cover this live team owner",
         "reason": "outside_token_team",
     }
@@ -603,6 +608,9 @@ def test_request_headers_do_not_widen_the_check(world, workflow_starts):
     assert into_ops.json()["detail"] == "app.create is required on team 'ops'"
     assert into_b.status_code == 403, into_b.content
     assert into_b.json()["detail"] == "Selected organization does not match the API token's organization."
+    # One refusal code everywhere (#1867): the REST body, and the GraphQL-shaped error the CLI reads.
+    assert into_ops.json()["code"] == into_b.json()["code"] == "PERMISSION_DENIED"
+    assert into_b.json()["errors"][0]["extensions"]["code"] == "PERMISSION_DENIED"
     assert DevEnvironment.objects.count() == 2
     assert not RegisteredApp.objects.exists()
     assert workflow_starts == []

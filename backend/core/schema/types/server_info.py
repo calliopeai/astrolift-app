@@ -71,6 +71,11 @@ _PUBLIC_FEATURE_FLAGS: tuple[tuple[str, str, str], ...] = (
         "Outbound email notifications are enabled on this install.",
     ),
     (
+        "SUPPORT_ENABLED",
+        "support.enabled",
+        "The Client Cove support module (open and follow support cases) is switched on for this install.",
+    ),
+    (
         "ZENTINELLE_ENABLED",
         "zentinelle.enabled",
         "Zentinelle governance surfaces (agent Activity/Reasoning/Token-Usage/Compliance tabs) are enabled on this install.",

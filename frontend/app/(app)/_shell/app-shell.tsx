@@ -21,6 +21,7 @@ import { useStepUp } from "@/components/use-step-up";
 import { useWayfinding } from "@/components/use-wayfinding";
 import { WayfindingBubble } from "@/components/WayfindingBubble";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
+import { FEATURE_FLAG_SUPPORT, useFeatureFlag } from "@/graphql/server/server.hooks";
 import { GET_MY_PROFILE, LIST_NAV_TREE } from "@/graphql/identity/identity.queries";
 import type { AstroliftMyProfile, AstroliftNavTree } from "@/graphql/identity/identity.types";
 import { useMe, useModules } from "@/graphql/user/user.hooks";
@@ -52,6 +53,7 @@ export function AppShellContainer({ children }: { children: React.ReactNode }) {
   }>(LIST_NAV_TREE, { fetchPolicy: "cache-and-network" });
   const notifications = useMyNotifications();
   const elevation = useElevation();
+  const support = useFeatureFlag(FEATURE_FLAG_SUPPORT);
   const shortcuts = useKeyboardShortcuts();
   const wayfinding = useWayfinding();
   const stepUp = useStepUp();
@@ -102,7 +104,12 @@ export function AppShellContainer({ children }: { children: React.ReactNode }) {
             <>
               <ElevationIndicator {...elevation} />
               <NotificationsBell {...notifications} />
-              <UserMenu fullName={fullName} email={profile?.email ?? ""} onSignOut={signOut} />
+              <UserMenu
+                fullName={fullName}
+                email={profile?.email ?? ""}
+                onSignOut={signOut}
+                support={support}
+              />
             </>
           }
         />

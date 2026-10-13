@@ -13,6 +13,7 @@ export const FEATURE_FLAG_ZENTINELLE = "zentinelle.enabled";
 export const FEATURE_FLAG_ADMIN_COST = "admin.cost_enabled";
 export const FEATURE_FLAG_ADMIN_QUOTAS = "admin.quotas_enabled";
 export const FEATURE_FLAG_ADMIN_PERMISSIONS = "admin.permissions_enabled";
+export const FEATURE_FLAG_SUPPORT = "support.enabled";
 
 type ServerInfoData = {
   astroliftServerInfo: {
@@ -35,10 +36,7 @@ export function useFeatureFlag(key: string): boolean {
   });
 
   return React.useMemo(
-    () =>
-      (data?.astroliftServerInfo?.featureFlags ?? []).some(
-        (f) => f.key === key && f.enabled,
-      ),
-    [data?.astroliftServerInfo?.featureFlags, key],
+    () => (data?.astroliftServerInfo?.featureFlags ?? []).some((f) => f.key === key && f.enabled),
+    [data?.astroliftServerInfo?.featureFlags, key]
   );
 }

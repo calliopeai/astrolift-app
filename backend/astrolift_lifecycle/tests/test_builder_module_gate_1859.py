@@ -157,6 +157,7 @@ def test_acceptance_org_b_is_off_org_a_is_on():
         denied = _call(method, path, bearer_b)
         assert denied.status_code == 403, (path, denied.content)
         assert denied.json() == {
+            "code": "PERMISSION_DENIED",
             "detail": "the chat_studio_integration module is not enabled for this organization",
             "reason": "module_not_enabled",
             "module": MODULE,

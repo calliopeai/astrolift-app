@@ -168,6 +168,7 @@ def test_a_teammate_without_admin_cannot_sync_another_members_env(world):
 
     assert response.status_code == 403, response.content
     assert response.json() == {
+        "code": "PERMISSION_DENIED",
         "detail": "only the dev environment's creator or a team admin may do this",
         "reason": "not_owner",
     }
@@ -321,6 +322,7 @@ def test_a_null_team_row_is_org_admin_only_even_for_its_own_creator(world):
     denied = _sync(dev, _bearer(owner, world.org))
     assert denied.status_code == 403, denied.content
     assert denied.json() == {
+        "code": "PERMISSION_DENIED",
         "detail": "app.create is required in this organization",
         "reason": "missing_permission",
         "permission": "app.create",

@@ -2,6 +2,8 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { NextIntlClientProvider } from "next-intl";
 import en from "@/messages/en.json";
 import { DOMAIN_ACTIVE } from "@/components/screens/domains/domains-environments.fixtures";
+import { EMAIL_DETAIL } from "@/components/screens/apps/managed-services/app-managed-services.fixtures";
+import { SendingAccountView } from "@/components/screens/apps/managed-services/EmailDetailSheet";
 import { DomainEmailScreen } from "./DomainEmailScreen";
 import { EmailDeliveryPanel } from "./EmailDeliveryPanel";
 import { DELIVERY_PANEL, DELIVERY_TEST } from "./EmailDeliveryPanel.stories";
@@ -78,6 +80,17 @@ export const SourceRefused: Story = {
         {...DELIVERY_PANEL}
         support={{ allowed: false, reason: "EXACT_TEST_TRANSPORT_UNSUPPORTED" }}
       />
+    ),
+  },
+};
+/** Sending account (sandbox or production, quota) above the test send (#2289). */
+export const WithSendingAccount: Story = {
+  args: {
+    delivery: (
+      <>
+        <SendingAccountView detail={EMAIL_DETAIL} loading={false} />
+        <EmailDeliveryPanel {...DELIVERY_PANEL} />
+      </>
     ),
   },
 };

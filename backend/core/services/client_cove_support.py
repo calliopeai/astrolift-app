@@ -59,11 +59,19 @@ class ClientCoveSupportClient:
         response.raise_for_status()
         return response.json()
 
-    def create_ticket(self, *, product: str, deployment_id: str, title: str, body: str) -> dict:
+    def create_ticket(
+        self, *, product: str, deployment_id: str, title: str, body: str, severity: int = 3
+    ) -> dict:
         response = requests.post(
             f"{self.base_url}/app/api/support/tickets/",
             headers={**self.headers, "Content-Type": "application/json"},
-            json={"product": product, "deployment_id": deployment_id, "title": title, "body": body},
+            json={
+                "product": product,
+                "deployment_id": deployment_id,
+                "title": title,
+                "body": body,
+                "severity": severity,
+            },
             timeout=10,
         )
         response.raise_for_status()

@@ -261,6 +261,7 @@ def test_ci_deploy_cross_app_token_returns_403(
     )
     assert r.status_code == 403
     assert "not authorized" in r.json()["detail"].lower()
+    assert r.json()["code"] == "PERMISSION_DENIED"
     assert workflow_starts == []
     assert Deployment.objects.count() == 0
 
@@ -284,6 +285,7 @@ def test_ci_deploy_token_missing_scope_returns_403(app_with_manifest, env, workf
     )
     assert r.status_code == 403
     assert "scope" in r.json()["detail"].lower()
+    assert r.json()["code"] == "PERMISSION_DENIED"
     assert workflow_starts == []
 
 

@@ -249,6 +249,7 @@ def test_unavailable_sign_actions_refuse_before_resolving_a_supplied_id(world, q
 )
 def test_http_legacy_routes_gate_before_external_access(world, route, method, ceiling, settings, monkeypatch):
     monkeypatch.setenv("FEATURE_SUPPORT", "1")
+    settings.CLIENT_COVE_DEPLOYMENT_ID = "0b6f7a6e-1c3a-4c56-9f2a-6f0e3c9d2a11"
     calls = []
 
     class Support:
@@ -261,12 +262,15 @@ def test_http_legacy_routes_gate_before_external_access(world, route, method, ce
         def create_ticket(self, **kwargs):
             return {"created": True}
 
+    monkeypatch.setattr("core.views_client_cove_support.module_enabled", lambda: True)
+
     monkeypatch.setattr("core.views_client_cove_support.ClientCoveSupportClient", Support)
     grant(world, "TEAM" if ceiling == "team-session" else "ORG", Permission.ORG_READ)
     client = Client()
     headers = {
         "HTTP_X_ASTROLIFT_ORGANIZATION": str(world.org.guid),
         "HTTP_X_ASTROLIFT_TEAM": str(world.medops.pk),
+        "HTTP_X_PLATFORM": "web",
     }
     path = "/app/export/" if route == "export" else "/api/support/v1/tickets/"
     send = getattr(client, method)

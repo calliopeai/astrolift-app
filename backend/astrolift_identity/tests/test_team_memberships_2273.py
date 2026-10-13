@@ -867,7 +867,7 @@ def test_navigation_actual_http_anonymous_has_no_self_hints(world):
         HTTP_X_ASTROLIFT_ORGANIZATION=str(world.org.guid),
         HTTP_X_PLATFORM="WEB",
     )
-    assert response.status_code == 403
+    assert response.status_code == 401
     assert b"teamAccessNavigation" not in response.content
 
 

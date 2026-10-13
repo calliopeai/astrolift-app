@@ -86,6 +86,12 @@ const keys = [
   "acceptedHelp",
   "huggingFaceHelp",
   "localSourceHelp",
+  "blockedTitle",
+  "blockClustersRefreshing",
+  "blockClustersUnavailable",
+  "blockAccess",
+  "blockLicense",
+  "blockRuntime",
 ] as const;
 
 function ConnectedCopy() {
@@ -118,7 +124,13 @@ describe("model hosting copy contract", () => {
         return "value" in node ? [node.value] : [];
       });
       const expected =
-        key === "connected" ? ["account"] : key === "connectionPage" ? ["page", "pages"] : [];
+        key === "connected"
+          ? ["account"]
+          : key === "connectionPage"
+            ? ["page", "pages"]
+            : key === "blockAccess" || key === "blockRuntime"
+              ? ["reason"]
+              : [];
       expect(argumentsFound.sort(), `${locale}.${key}`).toEqual(expected.sort());
       const t = createTranslator({
         locale,
@@ -127,8 +139,8 @@ describe("model hosting copy contract", () => {
           throw error;
         },
       });
-      const formatted = t(key, { account: "reader-verified", page: 2, pages: 7 });
-      expect(formatted).not.toMatch(/\{(?:account|page|pages)\}/);
+      const formatted = t(key, { account: "reader-verified", page: 2, pages: 7, reason: "r" });
+      expect(formatted).not.toMatch(/\{(?:account|page|pages|reason)\}/);
       expect(formatted).not.toBe(`models.shared.hosting.${key}`);
     }
     expect(messages.runtimeHelp).toContain("vLLM 0.15.1");

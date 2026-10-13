@@ -95,7 +95,7 @@ def test_verified_session_header_still_authenticates_after_relay_retirement(user
     session_key = authenticated.session.session_key
     query = {"query": "query { astroliftServerInfo { version } }"}
     anonymous = Client().post("/app/gql/config/", query, content_type="application/json")
-    assert anonymous.status_code == 403
+    assert anonymous.status_code == 401
     response = Client().post(
         "/app/gql/config/",
         query,

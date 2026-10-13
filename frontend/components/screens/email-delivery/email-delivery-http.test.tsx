@@ -16,6 +16,7 @@ import {
   DOMAIN_DIAGNOSTICS,
 } from "@/components/screens/domains/domains-environments.fixtures";
 import { EMAIL } from "@/components/screens/apps/overview/app-overview-cards-b.fixtures";
+import { EMAIL_DETAIL } from "@/components/screens/apps/managed-services/app-managed-services.fixtures";
 import { EmailDeliveryClient } from "./EmailDeliveryClient";
 import { DELIVERY_PANEL, DELIVERY_TEST } from "./EmailDeliveryPanel.stories";
 const identity = vi.hoisted(() => ({ actor: "", org: "" }));
@@ -115,6 +116,11 @@ beforeEach(async () => {
       httpStatus: null,
       tlsVerified: null,
       latencyMs: 1,
+    }),
+    astroliftEmailServiceDetail: ({ managedServiceId }: { managedServiceId: string }) => ({
+      ...EMAIL_DETAIL,
+      managedServiceId,
+      accountStatus: { ...EMAIL_DETAIL.accountStatus!, productionAccess: false },
     }),
     emailDeliveryTestSupport: () => support,
     emailDeliveryTestsPage: ({ after }: { after: string | null }) => {
@@ -288,6 +294,14 @@ describe("actual mounted SDL email HttpLink boundary", () => {
     );
     fireEvent.change(screen.getByLabelText(c.services), { target: { value: id } });
     await waitFor(() => expect(screen.getByText("sender@acme.example")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(en.appEmailService.reputation.sandboxNote)).toBeInTheDocument()
+    );
+    expect(
+      requests
+        .filter((r) => r.operationName === "GetEmailServiceDetail")
+        .map((r) => r.variables.managedServiceId)
+    ).toEqual([id]);
     expect(screen.getByText(c.different)).toBeInTheDocument();
     await waitFor(() =>
       expect(requests.some((r) => r.operationName === "DnsConnectionSupport")).toBe(true)

@@ -17,3 +17,11 @@ export const Collapsed: StoryObj = {
     </div>
   ),
 };
+/** The install has the support module on: Support joins Documentation and Downloads. */
+export const WithSupport: StoryObj = {
+  render: () => (
+    <div className="w-56">
+      <UserMenu fullName="Leo Mata" email="leo@example.com" onSignOut={() => {}} support />
+    </div>
+  ),
+};

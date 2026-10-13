@@ -9,7 +9,8 @@
     "downloads": "ダウンロード",
     "accountMenu": "{name}: アカウントメニュー",
     "apiTokens": "API トークン",
-    "security": "セキュリティ"
+    "security": "セキュリティ",
+    "support": "サポート"
   },
   "projectResourcesScreen": {
     "notFound": "プロジェクトが見つかりません",
@@ -9151,7 +9152,13 @@
         "readyHelp": "リクエストをレビューできます。承認後にホスティングが開始されます。",
         "acceptedHelp": "アプリを接続する前に、デプロイの準備状況を確認します。",
         "huggingFaceHelp": "公開モデルを検索するか、アカウントを接続して非公開やアクセス制限付きのリポジトリを利用します。",
-        "localSourceHelp": "対応する safetensors の重みとトークナイザーファイルをコンピューターからアップロードします。"
+        "localSourceHelp": "対応する safetensors の重みとトークナイザーファイルをコンピューターからアップロードします。",
+        "blockedTitle": "次の項目が完了すると「デプロイを確認」が有効になります:",
+        "blockClustersRefreshing": "クラスター一覧を更新しています。しばらくお待ちください。",
+        "blockClustersUnavailable": "クラスター一覧を読み込めませんでした。ページを再読み込みしてください。",
+        "blockAccess": "モデルへのアクセスが確認されていません: {reason}",
+        "blockLicense": "モデルのライセンスを確認したことをチェックしてください。",
+        "blockRuntime": "ランタイムの確認に失敗しました: {reason}"
       },
       "localImport": {
         "selectSource": "モデルのソース",
@@ -15509,7 +15516,8 @@
     "workflows": "ワークフロー",
     "workload": "ワークロード",
     "workloads": "ワークロード",
-    "zentinelle": "Zentinelle"
+    "zentinelle": "Zentinelle",
+    "support": "サポート"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -16258,6 +16266,62 @@
       "notes": {
         "mine": "「自分の項目」には、自分が作成したワークロード、または自分が作成したアプリのワークロードが表示されます。Astrolift が作成者を記録する前のワークロードは「すべて」にのみ表示されます。"
       }
+    }
+  },
+  "support": {
+    "title": "サポート",
+    "description": "このインストールについて Calliope AI サポートにケースを作成し、ここで進捗を確認できます。",
+    "newCase": "ケースを作成",
+    "caseTitle": "概要",
+    "caseBody": "発生した内容",
+    "severity": "重大度",
+    "sev1": "重大度 1: 本番停止",
+    "sev2": "重大度 2: 大きな機能低下",
+    "sev3": "重大度 3: 軽微な影響",
+    "sev4": "重大度 4: 質問または依頼",
+    "severityShort": "S{level}",
+    "submit": "ケースを作成",
+    "submitting": "作成中…",
+    "created": "ケースを作成しました:",
+    "cases": "あなたのケース",
+    "empty": "ケースはまだありません",
+    "emptyHelp": "この組織で作成したケースがステータスとともにここに表示されます。",
+    "loadError": "ケースを読み込めませんでした",
+    "retry": "再試行",
+    "unavailable": "このインストールではサポートを利用できません",
+    "unavailableHelp": "インストール管理者がプラットフォーム設定でサポートモジュールを有効にします。",
+    "updated": "{when}に更新",
+    "caseId": "ケース ID",
+    "opened": "作成日時",
+    "coverage": "サポート範囲",
+    "continuous": "この重大度では 24 時間対応",
+    "thread": "やり取り",
+    "reply": "返信",
+    "sendReply": "返信を送信",
+    "sending": "送信中…",
+    "supportTeam": "サポートチーム",
+    "status": {
+      "new": "新規",
+      "triaged": "トリアージ済み",
+      "accepted": "受付済み",
+      "backlog": "保留",
+      "declined": "却下",
+      "fixed_pending_release": "修正済み・リリース待ち",
+      "released": "リリース済み"
+    },
+    "event": {
+      "created": "{author} が作成",
+      "status_changed": "ステータスが {to} に変更",
+      "severity_changed": "重大度が変更",
+      "commented": "{author} のコメント",
+      "support_replied": "{author} が返信"
+    },
+    "errors": {
+      "coverage": "このデプロイメントには有効なサポート契約がありません。Calliope AI の担当チームにお問い合わせください。",
+      "invalid": "概要、説明、重大度を確認してから再度お試しください。",
+      "denied": "この組織でのあなたのロールではこの操作はできません。",
+      "notFound": "このケースは利用できなくなりました。",
+      "unavailableNow": "サポートに接続できませんでした。数分後にもう一度お試しください。"
     }
   }
 }

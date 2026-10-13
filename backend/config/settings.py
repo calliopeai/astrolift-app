@@ -507,6 +507,8 @@ ASTROLIFT_DEPLOY_PIPELINE_ENABLED = env_bool("FEATURE_DEPLOY_PIPELINE", True)
 ASTROLIFT_SUPPORT_ENABLED = env_bool("FEATURE_SUPPORT", False)
 CLIENT_COVE_SUPPORT_URL = os.environ.get("CLIENT_COVE_SUPPORT_URL", "").rstrip("/")
 CLIENT_COVE_SUPPORT_API_KEY = os.environ.get("CLIENT_COVE_SUPPORT_API_KEY", "")
+# This install's deployment in Client Cove; support cases are filed against it (#1809).
+CLIENT_COVE_DEPLOYMENT_ID = os.environ.get("CLIENT_COVE_DEPLOYMENT_ID", "")
 
 AGENT_RUNTIME_CLASS = env_str("AGENT_RUNTIME_CLASS", "")
 

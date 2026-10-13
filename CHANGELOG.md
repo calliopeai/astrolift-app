@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- The model deploy page says why **Review deployment** is disabled. The checks step lists every condition that is still unmet, in order:
+  - hosting is limited to platform super-admins;
+  - a missing name, cluster, compute or resource request;
+  - the cluster list is refreshing or failed to load;
+  - access to the model is unconfirmed, with its reason;
+  - the license is not yet confirmed;
+  - the runtime check has not passed, with its reason.
+
+  Each entry with a fix links to its field. Before, the button was greyed out with no explanation, which is how a SteadyMD operator could not tell what stopped a deployment.
+
+- An expired session sends you to sign in instead of leaving an empty app. The GraphQL endpoint answers an anonymous call with `401` and `UNAUTHENTICATED`, and the web app opens its "session expired" prompt on that 401. Before, it answered with an HTML `403`, which the app read as "your role has no access": a shell named "User" with no navigation. That is what CONFLICT showed on 2026-10-13. The CLI already maps a 401 to "log in again".
+
+- Support cases from inside Astrolift (#1809). With the support module on, **Support** in the account menu opens a page to open a case with Calliope AI support for this install (summary, description, severity), list the organization's cases with their status, and read and answer one. Cases are filed in Client Cove against the install's own `CLIENT_COVE_DEPLOYMENT_ID`; the browser cannot pick another deployment or product. New `GET`/`POST /api/support/v1/tickets/<id>/` reads and replies. The routes now take bearer callers (they were refused by CSRF) and require the UI header on a session POST. Refusals carry a code (`SUPPORT_COVERAGE_REQUIRED` for a deployment without coverage, and the like), and Client Cove's own error text is not passed through. The module needs both `FEATURE_SUPPORT` and the platform setting `SUPPORT_ENABLED`, which `astroliftServerInfo` now publishes as `support.enabled`. Operator setup: `docs/operators/client-cove-support.md`.
+
+- Every REST refusal names its code the way GraphQL and MCP do (#1867). The 403s from the builder (Chat Studio) API, the CI deploy endpoint and the Client Cove support endpoint now carry `"code": "PERMISSION_DENIED"` next to their existing `detail` and `reason`. The organization-mismatch refusal the tenant middleware returns on `/graphql` carries it in `errors[].extensions.code`, so the CLI prints `PERMISSION_DENIED: …` there as it does for every other refusal. The change only adds a key; existing fields are unchanged.
+
+- The domain Email delivery page shows the selected service's sending account above the test send (#2289): sandbox or production access with the sandbox's verified-recipients warning, reputation, bounce and complaint rates, and the send rate and 24-hour quota with how much of it is used. These are the same reads as the app's email detail sheet, for the exact service chosen, so a test that only reaches verified recipients is explained before it is sent.
+
 - A connected client can read a brain through the cluster edge (#2320). `issueBrainReadToken(slug)` and the MCP tool `astrolift_connect_brain` return the brain's endpoints, the header to send (`X-Astrolift-Brain-Token`) and a 15-minute ES256 token for the caller and that brain, issued only when `visible_brains()` admits the caller (team shares, token ceiling, archiving). The edge verifies it against the install's keys at `/api/brains/v1/jwks.json` (rotated every 30 days, a retired key published for a day more), lets it into that brain's hosts only with the caller's identity in the usual headers, and strips it before the app. A request without the header still goes through the browser sign-in; a revoked share stops new tokens at once and an issued one lasts out its 15 minutes. Migration registry 0044.
 
 - Managed domains under a Cloudflare parent zone are delegated automatically (#1787). `grantCloudflareDelegation` stores a separate, operator-confirmed Cloudflare token with `Zone.DNS:Edit` on exactly one parent zone (verified live, sealed; the connection's read token never writes), and `bindManagedDomainDelegation` binds a managed domain to the connection whose grant covers its parent. Provisioning then writes the delegating NS set right after creating the Route 53 child zone: only NS records, only at the exact child name, idempotent; NS records pointing elsewhere or any other record at that name are reported and left alone, never updated or deleted. The outcome is on the domain's `dns_config.delegation_write`; without a binding the operator adds the records by hand, as before. Both mutations need a fresh sign-in. Migration clusters 0025.

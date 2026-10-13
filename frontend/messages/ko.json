@@ -9,7 +9,8 @@
     "downloads": "다운로드",
     "accountMenu": "{name}: 계정 메뉴",
     "apiTokens": "API 토큰",
-    "security": "보안"
+    "security": "보안",
+    "support": "지원"
   },
   "projectResourcesScreen": {
     "notFound": "프로젝트를 찾을 수 없습니다",
@@ -9151,7 +9152,13 @@
         "readyHelp": "요청을 검토할 수 있습니다. 확인 후 호스팅이 시작됩니다.",
         "acceptedHelp": "앱을 연결하기 전에 배포 준비 상태를 확인하세요.",
         "huggingFaceHelp": "공개 모델을 찾거나 계정을 연결하여 비공개 및 접근 제한 저장소를 이용하세요.",
-        "localSourceHelp": "컴퓨터에서 지원되는 safetensors 가중치와 토크나이저 파일을 업로드하세요."
+        "localSourceHelp": "컴퓨터에서 지원되는 safetensors 가중치와 토크나이저 파일을 업로드하세요.",
+        "blockedTitle": "다음 항목을 완료하면 '배포 검토'이(가) 활성화됩니다:",
+        "blockClustersRefreshing": "클러스터 목록을 새로 고치는 중입니다. 잠시 기다려 주세요.",
+        "blockClustersUnavailable": "클러스터 목록을 불러오지 못했습니다. 페이지를 새로 고치세요.",
+        "blockAccess": "모델 접근이 확인되지 않았습니다: {reason}",
+        "blockLicense": "모델 라이선스를 검토했음을 확인하세요.",
+        "blockRuntime": "런타임 확인을 통과하지 못했습니다: {reason}"
       },
       "localImport": {
         "selectSource": "모델 소스",
@@ -16258,6 +16265,63 @@
     "workflows": "워크플로",
     "workload": "워크로드",
     "workloads": "워크로드",
-    "zentinelle": "Zentinelle"
+    "zentinelle": "Zentinelle",
+    "support": "지원"
+  },
+  "support": {
+    "title": "지원",
+    "description": "이 설치에 대해 Calliope AI 지원팀에 케이스를 열고 여기에서 진행 상황을 확인하세요.",
+    "newCase": "케이스 열기",
+    "caseTitle": "요약",
+    "caseBody": "발생한 내용",
+    "severity": "심각도",
+    "sev1": "심각도 1: 프로덕션 중단",
+    "sev2": "심각도 2: 주요 성능 저하",
+    "sev3": "심각도 3: 경미한 영향",
+    "sev4": "심각도 4: 질문 또는 요청",
+    "severityShort": "S{level}",
+    "submit": "케이스 열기",
+    "submitting": "여는 중…",
+    "created": "케이스가 열렸습니다:",
+    "cases": "내 케이스",
+    "empty": "아직 케이스가 없습니다",
+    "emptyHelp": "이 조직에서 연 케이스가 상태와 함께 여기에 표시됩니다.",
+    "loadError": "케이스를 불러오지 못했습니다",
+    "retry": "다시 시도",
+    "unavailable": "이 설치에서는 지원을 사용할 수 없습니다",
+    "unavailableHelp": "설치 관리자가 플랫폼 설정에서 지원 모듈을 켭니다.",
+    "updated": "{when} 업데이트",
+    "caseId": "케이스 ID",
+    "opened": "생성 시각",
+    "coverage": "지원 범위",
+    "continuous": "이 심각도에서는 24시간 대응",
+    "thread": "대화",
+    "reply": "답장",
+    "sendReply": "답장 보내기",
+    "sending": "보내는 중…",
+    "supportTeam": "지원팀",
+    "status": {
+      "new": "신규",
+      "triaged": "분류됨",
+      "accepted": "접수됨",
+      "backlog": "보류",
+      "declined": "거절됨",
+      "fixed_pending_release": "수정됨, 릴리스 대기",
+      "released": "릴리스됨"
+    },
+    "event": {
+      "created": "{author} 님이 생성",
+      "status_changed": "상태가 {to}(으)로 변경됨",
+      "severity_changed": "심각도가 변경됨",
+      "commented": "{author} 님의 댓글",
+      "support_replied": "{author} 님이 답장함"
+    },
+    "errors": {
+      "coverage": "이 배포에는 활성 지원 계약이 없습니다. Calliope AI 계정 팀에 문의하세요.",
+      "invalid": "요약, 설명, 심각도를 확인한 후 다시 시도하세요.",
+      "denied": "이 조직에서의 역할로는 이 작업을 할 수 없습니다.",
+      "notFound": "이 케이스는 더 이상 사용할 수 없습니다.",
+      "unavailableNow": "지원팀에 연결할 수 없습니다. 몇 분 후 다시 시도하세요."
+    }
   }
 }

@@ -9,7 +9,8 @@
     "downloads": "Téléchargements",
     "accountMenu": "{name} : menu du compte",
     "apiTokens": "Jetons d’API",
-    "security": "Sécurité"
+    "security": "Sécurité",
+    "support": "Assistance"
   },
   "projectResourcesScreen": {
     "notFound": "Projet introuvable",
@@ -9154,7 +9155,13 @@
         "readyHelp": "Votre demande est prête à valider. L’hébergement commence après confirmation.",
         "acceptedHelp": "Suivez la disponibilité du déploiement avant de connecter des applications.",
         "huggingFaceHelp": "Découvrez les modèles publics ou connectez votre compte pour les dépôts privés et restreints.",
-        "localSourceHelp": "Importez des poids safetensors compatibles et les fichiers du tokenizer depuis votre ordinateur."
+        "localSourceHelp": "Importez des poids safetensors compatibles et les fichiers du tokenizer depuis votre ordinateur.",
+        "blockedTitle": "« Vérifier le déploiement » se débloque une fois ces points réglés :",
+        "blockClustersRefreshing": "La liste des clusters est en cours d’actualisation. Patientez un instant.",
+        "blockClustersUnavailable": "Impossible de charger la liste des clusters. Rechargez la page.",
+        "blockAccess": "L’accès au modèle n’est pas confirmé : {reason}",
+        "blockLicense": "Confirmez que vous avez examiné la licence du modèle.",
+        "blockRuntime": "La vérification de l’environnement d’exécution a échoué : {reason}"
       },
       "localImport": {
         "selectSource": "Source du modèle",
@@ -15512,7 +15519,8 @@
     "workflows": "Flux",
     "workload": "Charge de travail",
     "workloads": "Charges de travail",
-    "zentinelle": "Zentinelle"
+    "zentinelle": "Zentinelle",
+    "support": "Assistance"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -16261,6 +16269,62 @@
       "notes": {
         "mine": "« Les miennes » regroupe les charges de travail que vous avez créées, ou rattachées à des applications que vous avez créées. Les charges de travail créées avant qu’Astrolift n’enregistre leur créateur n’apparaissent que dans « Toutes »."
       }
+    }
+  },
+  "support": {
+    "title": "Assistance",
+    "description": "Ouvrez un dossier auprès de l’assistance Calliope AI pour cette installation et suivez-le ici.",
+    "newCase": "Ouvrir un dossier",
+    "caseTitle": "Résumé",
+    "caseBody": "Ce qui s’est passé",
+    "severity": "Gravité",
+    "sev1": "Gravité 1 : production arrêtée",
+    "sev2": "Gravité 2 : dégradation majeure",
+    "sev3": "Gravité 3 : impact mineur",
+    "sev4": "Gravité 4 : question ou demande",
+    "severityShort": "G{level}",
+    "submit": "Ouvrir le dossier",
+    "submitting": "Ouverture…",
+    "created": "Dossier ouvert :",
+    "cases": "Vos dossiers",
+    "empty": "Aucun dossier pour l’instant",
+    "emptyHelp": "Les dossiers ouverts pour cette organisation s’affichent ici avec leur statut.",
+    "loadError": "Impossible de charger les dossiers",
+    "retry": "Réessayer",
+    "unavailable": "L’assistance n’est pas disponible sur cette installation",
+    "unavailableHelp": "Un administrateur de l’installation active le module d’assistance dans les paramètres de la plateforme.",
+    "updated": "Mis à jour {when}",
+    "caseId": "ID du dossier",
+    "opened": "Ouvert",
+    "coverage": "Couverture",
+    "continuous": "24 h/24 à cette gravité",
+    "thread": "Échanges",
+    "reply": "Réponse",
+    "sendReply": "Envoyer la réponse",
+    "sending": "Envoi…",
+    "supportTeam": "Équipe d’assistance",
+    "status": {
+      "new": "Nouveau",
+      "triaged": "Qualifié",
+      "accepted": "Accepté",
+      "backlog": "En attente",
+      "declined": "Refusé",
+      "fixed_pending_release": "Corrigé, en attente de publication",
+      "released": "Publié"
+    },
+    "event": {
+      "created": "Ouvert par {author}",
+      "status_changed": "Statut passé à {to}",
+      "severity_changed": "Gravité modifiée",
+      "commented": "{author} a écrit",
+      "support_replied": "{author} a répondu"
+    },
+    "errors": {
+      "coverage": "Ce déploiement n’a pas de couverture d’assistance active. Contactez votre équipe commerciale Calliope AI.",
+      "invalid": "Vérifiez le résumé, la description et la gravité, puis réessayez.",
+      "denied": "Votre rôle dans cette organisation ne le permet pas.",
+      "notFound": "Ce dossier n’est plus disponible.",
+      "unavailableNow": "L’assistance est injoignable. Réessayez dans quelques minutes."
     }
   }
 }
