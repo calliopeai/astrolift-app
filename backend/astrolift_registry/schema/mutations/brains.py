@@ -47,7 +47,6 @@ class BrainMutations:
     def issue_brain_read_token(self, info: Info, slug: str) -> MutationResultType[BrainConnectionType]:
         from astrolift_registry.brain_tokens import BrainTokenError, connection_descriptor
         from astrolift_registry.brains import visible_brains
-
         from core.tenancy import get_current_tenant
 
         tenant = get_current_tenant()
