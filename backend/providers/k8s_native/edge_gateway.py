@@ -41,6 +41,7 @@ from typing import Any
 from _sdk.cluster import BootstrapComponent
 
 from .central_auth import cookie_scope_for, issuer_from_discovery_url
+from .logout import SIGNED_OUT_PATH, configured_logout_url
 
 EDGE_COMPONENT_KEY = "envoy-gateway"
 EDGE_CHART_VERSION = "1.9.1"
@@ -51,6 +52,7 @@ GATEWAY_NAME = "edge"
 EDGE_PROXY_CONFIG_NAME = "edge"
 EDGE_SECURITY_POLICY_NAME = "edge-oidc"
 AUTH_ROUTE_NAME = "auth"
+SIGNED_OUT_ROUTE_NAME = "auth-signed-out"
 
 # The Service Envoy Gateway creates for the Gateway's proxies. Pinned so the
 # load balancer in front of it can name it; the generated name carries a hash.
@@ -230,6 +232,31 @@ ACCESS_DENIED_PAGE = (
 )
 
 
+SIGNED_OUT_PAGE = (
+    "<!doctype html><html lang=en><meta charset=utf-8><title>Signed out</title>"
+    '<body style="font-family:system-ui,sans-serif;max-width:36rem;margin:15vh auto;padding:0 1rem">'
+    "<h1>You have signed out</h1>"
+    "<p>Your session has ended here and with the sign-in provider. "
+    "Open an app again to sign in, as yourself or as someone else.</p></body></html>"
+)
+
+
+def end_session_endpoint(oidc_auth_config: dict[str, Any] | None) -> str:
+    """The IdP logout the edge sends a signed-out browser to (#1727).
+
+    Envoy builds it as ``<endpoint>?id_token_hint=&client_id=&post_logout_redirect_uri=``.
+    Cognito ignores ``post_logout_redirect_uri`` and honours only its own
+    ``logout_uri``, so the cluster's validated ``logout_url`` (which carries
+    ``client_id`` and ``logout_uri``) is used as the endpoint, ending in an
+    empty ``_`` parameter that absorbs the ``?`` Envoy appends. Empty when the
+    cluster sets no ``logout_url``: the provider's discovered endpoint is used.
+    """
+    url = configured_logout_url(oidc_auth_config)
+    if not url:
+        return ""
+    return url + ("&_=" if "?" in url else "?_=")
+
+
 def edge_security_policy(
     oidc_auth_config: dict[str, Any], access_rules: list[dict[str, Any]] | None = None
 ) -> dict[str, Any]:
@@ -253,7 +280,10 @@ def edge_security_policy(
                 }
             ],
             "oidc": {
-                "provider": {"issuer": issuer},
+                "provider": {
+                    "issuer": issuer,
+                    **({"endSessionEndpoint": end} if (end := end_session_endpoint(config)) else {}),
+                },
                 "clientID": str(config["client_id"]),
                 "clientSecret": {"name": EDGE_OIDC_SECRET_NAME},
                 # The single callback: every app sends its logins here.
@@ -402,6 +432,44 @@ def edge_post_install_manifests(
                     AUTH_ROUTE_NAME,
                     EDGE_NAMESPACE,
                     spec={"directResponse": {"statusCode": 200, "body": {"type": "Inline", "inline": "ok"}}},
+                ),
+                # After logout the IdP returns the browser to the auth host. That
+                # landing is ungated, or it would start a new login at once.
+                _manifest(
+                    "gateway.envoyproxy.io/v1alpha1",
+                    "HTTPRouteFilter",
+                    SIGNED_OUT_ROUTE_NAME,
+                    EDGE_NAMESPACE,
+                    spec={
+                        "directResponse": {
+                            "statusCode": 200,
+                            "contentType": "text/html",
+                            "body": {"type": "Inline", "inline": SIGNED_OUT_PAGE},
+                        }
+                    },
+                ),
+                _route(
+                    SIGNED_OUT_ROUTE_NAME,
+                    [auth_host],
+                    gated=False,
+                    rules=[
+                        {
+                            "matches": [
+                                {"path": {"type": "Exact", "value": "/"}},
+                                {"path": {"type": "PathPrefix", "value": SIGNED_OUT_PATH}},
+                            ],
+                            "filters": [
+                                {
+                                    "type": "ExtensionRef",
+                                    "extensionRef": {
+                                        "group": "gateway.envoyproxy.io",
+                                        "kind": "HTTPRouteFilter",
+                                        "name": SIGNED_OUT_ROUTE_NAME,
+                                    },
+                                }
+                            ],
+                        }
+                    ],
                 ),
                 _route(
                     AUTH_ROUTE_NAME,
