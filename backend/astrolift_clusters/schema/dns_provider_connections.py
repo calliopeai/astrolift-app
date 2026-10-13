@@ -13,6 +13,7 @@ from astrolift_clusters.cloudflare_dns_transport import DnsConnectionError
 from astrolift_clusters.models import DnsProviderConnection, ManagedDomain
 from astrolift_clusters.scopes import cluster_catalog_org_scope
 from astrolift_graphql import GUID, MutationResultType, PageType, failure, numbered_page, success
+from astrolift_identity.step_up import requires_elevation
 from core.decorators import tenant_scoped
 from core.mutations import MutationResult, mutation_audit
 from core.permissions import Permission, PermissionDenied, require_permission
@@ -59,6 +60,8 @@ class DnsProviderConnectionType:
     verified_at: datetime | None
     expires_at: datetime | None
     dns_writes_supported: bool = False
+    delegation_zone_name: str = ""
+    """The one parent zone this connection may write delegating NS records into (#1787)."""
 
 
 def connection_type(row):
@@ -77,6 +80,8 @@ def connection_type(row):
         revocation_state=row.revocation_state,
         verified_at=row.verified_at,
         expires_at=row.expires_at,
+        dns_writes_supported=bool(row.delegation_zone_id),
+        delegation_zone_name=row.delegation_zone_name,
     )
 
 
@@ -154,6 +159,25 @@ class BeginCloudflareDnsOAuthInput:
 @strawberry.type
 class CloudflareDnsOAuthStart:
     authorization_url: str
+
+
+@strawberry.input
+class GrantCloudflareDelegationInput:
+    """A separate Cloudflare API token with Zone.DNS:Edit on exactly one parent zone (#1787)."""
+
+    connection_id: GUID
+    expected_version: int
+    zone_id: str
+    zone_name: str
+    token: str
+
+
+@strawberry.input
+class BindManagedDomainDelegationInput:
+    domain_id: GUID
+    expected_domain_version: int
+    connection_id: GUID
+    expected_connection_version: int
 
 
 @strawberry.input
@@ -480,6 +504,59 @@ class DnsProviderConnectionsMutation:
                 service.connect_token(info.context.request, input.organization_id, input.name, input.token)
             )
         )
+
+    @strawberry.mutation
+    @dns_mutation("dns.connection.delegation.grant")
+    @requires_elevation(action_label="Let Astrolift write DNS delegation records")
+    @require_permission(
+        Permission.PROVIDER_PLUGIN_CONFIGURE,
+        scope=cluster_catalog_org_scope(Permission.PROVIDER_PLUGIN_CONFIGURE),
+    )
+    @tenant_scoped()
+    def grant_cloudflare_delegation(
+        self, info: Info, input: GrantCloudflareDelegationInput
+    ) -> MutationResultType[DnsProviderConnectionType]:
+        """Verify a delegation token against one parent zone and seal it on the
+        connection (#1787). It writes only the NS records that delegate a managed
+        child zone; the connection's read token never writes."""
+        from astrolift_clusters import cloudflare_delegation
+
+        return success(
+            connection_type(
+                cloudflare_delegation.grant(
+                    info.context.request,
+                    input.connection_id,
+                    input.expected_version,
+                    input.zone_id,
+                    input.zone_name,
+                    input.token,
+                )
+            )
+        )
+
+    @strawberry.mutation
+    @dns_mutation("dns.domain.delegation.bind")
+    @requires_elevation(action_label="Delegate a managed domain from its parent zone")
+    @require_permission(
+        Permission.PROVIDER_PLUGIN_CONFIGURE,
+        scope=cluster_catalog_org_scope(Permission.PROVIDER_PLUGIN_CONFIGURE),
+    )
+    @tenant_scoped()
+    def bind_managed_domain_delegation(
+        self, info: Info, input: BindManagedDomainDelegationInput
+    ) -> MutationResultType[DnsProviderConnectionType]:
+        """Name the connection whose delegation grant covers the domain's parent
+        zone. The next provisioning run writes the NS set there (#1787)."""
+        from astrolift_clusters import cloudflare_delegation
+
+        domain = cloudflare_delegation.bind(
+            info.context.request,
+            input.domain_id,
+            input.expected_domain_version,
+            input.connection_id,
+            input.expected_connection_version,
+        )
+        return success(connection_type(domain.delegation_connection))
 
     @strawberry.mutation
     @dns_mutation("dns.connection.retest")

@@ -234,6 +234,7 @@ def _run_workflow(monkeypatch, *, delegation, patched=False):
     from temporalio import workflow as temporalio_workflow
 
     from astrolift_workflows.activities import (
+        delegate_parent_zone,
         mark_managed_domain_active,
         poll_cert_issuance,
         provision_dns_zone,
@@ -258,6 +259,8 @@ def _run_workflow(monkeypatch, *, delegation, patched=False):
             return {"status": "issued"}
         if activity_fn is register_managed_domain_row:
             return 1
+        if activity_fn is delegate_parent_zone:
+            return {"action": "unbound"}
         if activity_fn is validate_ns_delegation:
             return delegation.pop(0) if isinstance(delegation, list) else delegation
         assert activity_fn is mark_managed_domain_active
@@ -335,3 +338,15 @@ def test_delegation_that_never_lands_still_refuses_after_the_window(monkeypatch)
     result, called = _run_workflow(monkeypatch, delegation=failed, patched=True)
     assert result.ok is False and "NS delegation not in place" in result.message
     assert called.count("validate_ns_delegation") == 3 and "mark_managed_domain_active" not in called
+
+
+def test_the_parent_delegation_is_written_right_after_the_zone_1787(monkeypatch):
+    result, called = _run_workflow(monkeypatch, delegation={"passed": True, "reason": "ok"}, patched=True)
+    assert result.ok is True
+    assert called.index("provision_dns_zone") + 1 == called.index("delegate_parent_zone")
+    assert called.index("delegate_parent_zone") < called.index("request_wildcard_cert_for_zone")
+
+
+def test_a_run_from_before_1787_does_not_write_the_delegation(monkeypatch):
+    _result, called = _run_workflow(monkeypatch, delegation={"passed": True, "reason": "ok"}, patched=False)
+    assert "delegate_parent_zone" not in called

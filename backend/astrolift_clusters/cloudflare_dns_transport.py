@@ -59,12 +59,14 @@ def token_text(value):
 class CloudflareReadClient:
     """One finite operation. Each native response triggers current admission again."""
 
-    def __init__(self, token, checkpoint, *, opener=None, clock=time.monotonic):
+    def __init__(self, token, checkpoint, *, opener=None, clock=time.monotonic, writes=False):
         from django.db import connection
 
         if connection.in_atomic_block:
             raise DnsConnectionError("TRANSACTION_UNSUPPORTED")
         self._token = token_text(token) if token is not None else None
+        # Only a delegation grant's client writes, and only NS records (#1787).
+        self._writes = writes
         self._checkpoint = checkpoint
         self._clock = clock
         self._deadline = clock() + 30
@@ -79,14 +81,27 @@ class CloudflareReadClient:
         if self._clock() >= self._deadline:
             raise DnsConnectionError("DEADLINE_EXCEEDED")
 
-    def json(self, path, *, form=None):
+    def json(self, path, *, form=None, record=None):
         self.current()
         if self._requests >= 12:
             raise DnsConnectionError("INVENTORY_LIMIT")
-        if form is None:
+        if record is not None:
+            if not self._writes or self._token is None:
+                raise DnsConnectionError("WRITE_NOT_GRANTED")
+            if not re.fullmatch(r"/zones/[0-9a-f]{32}/dns_records", path) or record.get("type") != "NS":
+                raise DnsConnectionError("INVALID_NATIVE_PATH")
+            url = "https://api.cloudflare.com/client/v4" + path
+            data = json.dumps(record).encode()
+            headers = {
+                "Authorization": "Bearer " + self._token,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            }
+        elif form is None:
             if self._token is None:
                 raise DnsConnectionError("CREDENTIAL_UNAVAILABLE")
-            if not re.fullmatch(
+            verify = self._writes and path == "/user/tokens/verify"
+            if not verify and not re.fullmatch(
                 r"/zones(?:/[0-9a-f]{32}(?:/dns_records)?)?(?:\?page=[1-8]&per_page=50)?", path
             ):
                 raise DnsConnectionError("INVALID_NATIVE_PATH")
@@ -194,6 +209,30 @@ class CloudflareReadClient:
 
     def zones(self):
         return self.inventory("/zones", zone_metadata)
+
+    def token_active(self):
+        """The delegation token is live (``/user/tokens/verify``)."""
+        result = self._result(self.json("/user/tokens/verify"))
+        return isinstance(result, dict) and result.get("status") == "active"
+
+    def create_ns(self, zone_id, zone_name, name, nameserver):
+        """Create one NS record, ``name`` -> ``nameserver``, in the parent zone."""
+        name = hostname(name)
+        parent = hostname(zone_name)
+        if not name.endswith("." + parent):
+            raise DnsConnectionError("RECORD_OUTSIDE_ZONE")
+        created = record_metadata(
+            self._result(
+                self.json(
+                    "/zones/" + native_id(zone_id) + "/dns_records",
+                    record={"type": "NS", "name": name, "content": hostname(nameserver), "ttl": 3600},
+                )
+            ),
+            parent,
+        )
+        if created["type"] != "NS" or created["name"] != name:
+            raise DnsConnectionError("INVALID_RESPONSE")
+        return created
 
     def zone(self, zone_id, zone_name):
         item = zone_metadata(self._result(self.json("/zones/" + native_id(zone_id))))

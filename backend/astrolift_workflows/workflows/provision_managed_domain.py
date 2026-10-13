@@ -47,6 +47,7 @@ from astrolift_workflows.inputs import (
 
 with workflow.unsafe.imports_passed_through():
     from astrolift_workflows.activities.provision_managed_domain import (
+        delegate_parent_zone,
         mark_managed_domain_active,
         poll_cert_issuance,
         provision_dns_zone,
@@ -132,6 +133,21 @@ class ProvisionManagedDomainWorkflow:
             nameservers = zone_result.get("nameservers", []) if isinstance(zone_result, dict) else []
 
         self._zone_id = zone_id
+
+        # Step 1b: write the delegating NS set into the parent zone when the
+        # domain is bound to a provider grant (#1787). Best effort: an
+        # unbound, conflicting or failed write leaves the manual path, and
+        # the delegation gate below still decides activation.
+        if nameservers and workflow.patched("cloudflare-delegation-1787"):
+            try:
+                await workflow.execute_activity(
+                    delegate_parent_zone,
+                    args=[input.cluster_id, zone, nameservers],
+                    start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                    retry_policy=_ACTIVITY_RETRY,
+                )
+            except Exception:  # noqa: BLE001 — recorded on the domain; never blocks provisioning
+                pass
 
         # Step 2: request wildcard cert + write DNS-01 validation records.
         try:

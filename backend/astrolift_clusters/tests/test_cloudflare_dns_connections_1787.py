@@ -871,8 +871,15 @@ def test_real_migration_retained_secret_history_refuses_then_empty_roundtrip(wor
         clusters_applied = {m for m in original_applied if m[0] == "astrolift_clusters" and m[1] <= refusing}
         after = set(MigrationExecutor(connection).loader.applied_migrations)
         assert {m for m in after if m[0] == "astrolift_clusters"} == clusters_applied
-        assert bytes(DnsProviderConnection.all_objects.get(pk=row.pk).secret_ciphertext) == secret.backend_ref
-        DnsProviderConnection.all_objects.filter(pk=row.pk).delete()
+        # Read and delete by explicit columns: later migrations (0025's delegation
+        # fields) are unapplied here, so the current model is ahead of the table.
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT secret_ciphertext FROM astrolift_clusters_dnsproviderconnection WHERE id = %s",
+                [row.pk],
+            )
+            assert bytes(cursor.fetchone()[0]) == secret.backend_ref
+            cursor.execute("DELETE FROM astrolift_clusters_dnsproviderconnection WHERE id = %s", [row.pk])
         executor = MigrationExecutor(connection)
         executor.migrate([("astrolift_clusters", "0022_reviewed_log_collector")])
         assert "astrolift_clusters_dnsproviderconnection" not in connection.introspection.table_names()
