@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import {
   useUpdateConfiguredWorkflow,
   useWorkflowsEntitlement,
@@ -29,7 +30,7 @@ export function useWorkflowTriggers(
   workflow: ConfiguredWorkflowWithRuns | null,
   refetch: () => void
 ): WorkflowTriggersViewProps {
-  const list = useListState(WORKFLOW_TRIGGERS_LIST);
+  const list = useListState(useLocalizedList(WORKFLOW_TRIGGERS_LIST));
   const { state } = list;
   const entitlement = useWorkflowsEntitlement();
   const [updateWorkflow] = useUpdateConfiguredWorkflow();

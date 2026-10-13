@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useEffect, useRef } from "react";
 
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useConfirm } from "@/hooks/use-confirm";
 import {
@@ -26,7 +27,7 @@ export const INSTANCE_PARAM = "instance";
 export const RUN_PARAM = "instanceRun";
 
 export function useWorkflowInstancesList() {
-  const list = useListState(WORKFLOW_INSTANCES_LIST);
+  const list = useListState(useLocalizedList(WORKFLOW_INSTANCES_LIST));
   const { state } = list;
   const params = useSearchParams();
   const pathname = usePathname() ?? "";

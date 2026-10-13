@@ -142,7 +142,7 @@ You want users to sign in with their existing corporate identity instead of a se
 - Admin access to the IdP. You will register a new OIDC or SAML client there.
 - Astrolift's redirect URI. Visible in the New provider dialog. Format is https:// /app/auth1/callback . Every IdP needs this exact value in its allowed callback list.
 ## Configure by provider kind
-Pick the matching subsection. Every kind ends with the same three clicks in Astrolift: Settings · Identity providers → New provider → pick the kind → paste the credentials → Set active .
+Pick the matching subsection. Every kind ends with the same three clicks in Astrolift: Settings · Identity providers → New provider → pick the kind → paste the credentials → Make active .
 ## Domain allowlist (auto-signup)
 By default, an SSO sign-in succeeds only if Astrolift already has an account for that user. To let new users self-onboard, mark their email domains as trusted.
 - Open Administration · Organization .

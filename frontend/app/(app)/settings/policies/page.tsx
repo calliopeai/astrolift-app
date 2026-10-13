@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
+import { routeTitle } from "@/lib/i18n/route-title";
 
-export const metadata = { title: "Policies · Astrolift" };
+export const generateMetadata = routeTitle("policies");
 
 /**
  * Policies moved to the Admin control plane at

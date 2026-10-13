@@ -8,6 +8,7 @@ import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
 
 import type { CursorPage } from "@/components/data-table";
 import { useLocalListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
@@ -81,7 +82,7 @@ export function useManagedServices(slug: string) {
     query: LIST_MANAGED_SERVICES_PAGE,
     variables: { appSlug: slug, environmentName: null },
     extract: (d) => (d as PageResp | undefined)?.astroliftManagedServicesPage,
-    list: useLocalListState(APP_MANAGED_SERVICES_LIST),
+    list: useLocalListState(useLocalizedList(APP_MANAGED_SERVICES_LIST)),
     pollInterval: 15000,
   });
 

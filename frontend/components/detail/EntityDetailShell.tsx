@@ -11,7 +11,7 @@ import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DefinitionList, type DefinitionListItem } from "@/components/ui/definition-list";
-import { formatRelativeAge } from "@/lib/format";
+import { useRelativeAge } from "@/lib/format";
 
 /**
  * Standing list→detail pattern (#1106): the shared chrome for a single
@@ -75,14 +75,18 @@ export function DetailStatusBadge({
   tone?: Dot;
   label?: string;
 }) {
+  const t = useTranslations("detailShell.statuses");
+  const key = status.toLowerCase();
   // `tone` lets a caller pin the dot colour when the shared vocabulary map is
   // wrong for that entity — e.g. a preview env's "running" is healthy (ok),
   // not in-flight (pending) as it means for a job run.
-  const dot = tone ?? STATUS_DOT[status.toLowerCase()] ?? "muted";
+  const dot = tone ?? STATUS_DOT[key] ?? "muted";
+  // A status the catalog names reads in the viewer's language (#2381); one
+  // it does not know yet is the API's value, title-cased.
   return (
     <Badge variant={dot === "error" ? "destructive" : "secondary"} className="gap-1.5">
       <StatusDot status={dot} />
-      {label ?? titleCase(status)}
+      {label ?? (key && t.has(key) ? t(key) : titleCase(status))}
     </Badge>
   );
 }
@@ -94,8 +98,9 @@ export function DetailTimestamp({
   iso: string | null | undefined;
   format?: (iso: string) => string;
 }) {
+  const relativeAge = useRelativeAge();
   if (!iso) return <span className="text-muted-foreground">—</span>;
-  return <span title={iso}>{format ? format(iso) : formatRelativeAge(iso)}</span>;
+  return <span title={iso}>{format ? format(iso) : relativeAge(iso)}</span>;
 }
 
 export interface EntityDetailShellProps {

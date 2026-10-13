@@ -1,9 +1,10 @@
 import { LIST_MANAGED_DOMAINS } from "@/graphql/clusters/clusters.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { DomainsClient } from "./domains-client";
 
-export const metadata = { title: "Domains · Astrolift" };
+export const generateMetadata = routeTitle("domains");
 
 export default async function DomainsPage({
   searchParams,

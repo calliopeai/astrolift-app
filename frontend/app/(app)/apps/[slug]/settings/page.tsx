@@ -3,10 +3,11 @@ import { LIST_APP_DOMAINS, LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecyc
 import { LIST_WEBHOOKS } from "@/graphql/operations/operations.queries";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { AppSettingsTabClient } from "./settings-client";
 
-export const metadata = { title: "Settings · App · Astrolift" };
+export const generateMetadata = routeTitle("settings", "app");
 
 /**
  * The Settings tab (spec 44 §5.2, §5.3) on the settings archetype: General

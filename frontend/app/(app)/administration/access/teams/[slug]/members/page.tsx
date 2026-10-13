@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { TeamMembersClient } from "../team-clients";
 
-export const metadata = { title: "Members · Team · Astrolift" };
+export const generateMetadata = routeTitle("members", "team");
 
 /** The scoped membership client resolves one exact team, without capped SSR lists. */
 export default async function TeamMembersPage({ params }: { params: Promise<{ slug: string }> }) {

@@ -3,10 +3,11 @@ import { LIST_APP_DEPLOY_TOKENS_PAGE } from "@/graphql/lifecycle/lifecycle.queri
 import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { AppAccessClient } from "./access-client";
 
-export const metadata = { title: "Access · App · Astrolift" };
+export const generateMetadata = routeTitle("access", "app");
 
 /**
  * The Access tab (spec 44 §5.2, §10.3): who may reach and change the app.

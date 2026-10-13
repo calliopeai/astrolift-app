@@ -1,9 +1,10 @@
 import { LIST_ALERT_RULES_PAGE } from "@/graphql/operations/alerts.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { AlertsClient } from "./alerts-client";
 
-export const metadata = { title: "Alerts · Astrolift" };
+export const generateMetadata = routeTitle("alerts");
 
 /**
  * Preloads the rules list's first page so it paints with rows instead of

@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { FunctionsClient } from "./functions-client";
 
-export const metadata = { title: "Functions · Astrolift" };
+export const generateMetadata = routeTitle("functions");
 
 /**
  * Functions — event-driven, short-lived container invocations.

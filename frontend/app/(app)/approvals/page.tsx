@@ -1,11 +1,12 @@
 import { LIST_DEPLOYMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import { LIST_SECRET_CHANGE_PROPOSALS_PAGE } from "@/graphql/services/services.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { ApprovalsQueueClient } from "./approvals-queue-client";
 import { SecretProposalsQueueClient } from "./secret-proposals-queue-client";
 
-export const metadata = { title: "Approvals queue · Astrolift" };
+export const generateMetadata = routeTitle("approvalsQueue");
 
 // #420 / #488 — global approvals queue. Lists pending deployment
 // approvals + pending secret-change proposals side by side; both axes

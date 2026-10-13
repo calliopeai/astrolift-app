@@ -1,9 +1,10 @@
 import { PreloadQuery } from "@/lib/apollo";
 import { LIST_PREVIEW_ENVIRONMENTS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { PreviewsClient } from "./previews-client";
 
-export const metadata = { title: "Preview environments · Astrolift" };
+export const generateMetadata = routeTitle("previewEnvironments");
 
 /**
  * Preloads the first page the list asks for (see `previewsVariables`: no

@@ -5,10 +5,11 @@
  * list declares no fields and no sortable column; kind and status filters
  * wait on the backend. Pure.
  */
-import type { ListDefinition } from "@/components/list/list-state";
+import type { CopiedListDefinition } from "@/components/list/list-state";
 
-export const APP_MANAGED_SERVICES_LIST: ListDefinition = {
+export const APP_MANAGED_SERVICES_LIST: CopiedListDefinition = {
   id: "apps.workloads.managed-services",
+  copy: "appManagedServices",
   fields: [],
   searchPlaceholder: "Search by name, kind, variant, or environment…",
   defaultSort: [],

@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import { DELETE_TOOL_DEF } from "@/graphql/agents/agents.mutations";
 import { TOOL_DEFS_LIST_PAGE } from "@/graphql/agents/agents.queries";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
@@ -31,7 +32,7 @@ export function useSkillTools(id: string) {
   const skill = useSkill(id);
   const { org } = useActiveOrg();
   const orgId = org?.id ?? "";
-  const list = useListState(SKILL_TOOLS_LIST);
+  const list = useListState(useLocalizedList(SKILL_TOOLS_LIST));
   const { state } = list;
   const owner = skill.skill;
   const page = useQuery<ToolDefsPageData>(TOOL_DEFS_LIST_PAGE, {

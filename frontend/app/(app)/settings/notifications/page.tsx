@@ -1,9 +1,10 @@
 import { LIST_MY_NOTIFICATIONS } from "@/graphql/operations/operations.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { NotificationsClient } from "./notifications-client";
 
-export const metadata = { title: "Notifications · Settings · Astrolift" };
+export const generateMetadata = routeTitle("notifications", "settings");
 
 /**
  * Preloads the inbox only when the inbox is the section on screen (the

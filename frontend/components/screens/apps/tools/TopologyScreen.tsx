@@ -9,7 +9,6 @@ import type { TopologyEdge, TopologyNode } from "@/components/topology/types";
 import { AppView } from "@/components/viz/AppView";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
-import { TOPOLOGY_META } from "@/lib/topology";
 import { cn } from "@/lib/utils";
 
 import { topologySnapshot } from "./topology-snapshot";
@@ -48,6 +47,7 @@ export function TopologyScreen({
 }: TopologyScreenProps) {
   const t = useTranslations("apps.topology");
   const tDetail = useTranslations("apps.detail.topology");
+  const shapes = useTranslations("vizRender");
   const snapshot = React.useMemo(
     () => topologySnapshot({ slug: a?.slug ?? slug, name: a?.name ?? slug }, nodes, edges),
     [a?.slug, a?.name, slug, nodes, edges]
@@ -80,7 +80,7 @@ export function TopologyScreen({
         title={<span className="[overflow-wrap:anywhere]">{tDetail("title")}</span>}
         description={
           <span className="[overflow-wrap:anywhere]">
-            {TOPOLOGY_META[snapshot.topology].label} · {t("graphDescription")}
+            {shapes(`topology.${snapshot.topology}`)} · {t("graphDescription")}
           </span>
         }
         onSelectNode={

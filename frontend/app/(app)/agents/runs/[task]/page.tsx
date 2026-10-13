@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { AgentTaskDetail } from "./task-detail-client";
 
-export const metadata = { title: "Agent run · Astrolift" };
+export const generateMetadata = routeTitle("agentRun");
 
 /**
  * Agent run detail — one AgentTask by id (#1105). The drill-down target for

@@ -9,6 +9,7 @@ import { refetchAfterMutation } from "@/lib/apollo/mutation-feedback";
 
 import type { CursorPage } from "@/components/data-table";
 import { useLocalListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import {
   CLEAR_ALERT_SUBSCRIPTION,
@@ -49,7 +50,7 @@ export function useAlertSubscriptions() {
   const t = useTranslations("notificationSettings.toasts");
   // `astroliftAppsPage` takes `search`, `limit` and `cursor` (not `after`):
   // the search is a server argument, and no column declares a `sortKey`.
-  const list = useLocalListState(ALERT_SUBSCRIPTIONS_LIST);
+  const list = useLocalListState(useLocalizedList(ALERT_SUBSCRIPTIONS_LIST));
   const apps = useQuery<AppsPageResp>(LIST_APPS_PAGE, {
     variables: alertSubscriptionsVariables(list.filters, list.state),
     fetchPolicy: "cache-and-network",

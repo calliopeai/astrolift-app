@@ -1,4 +1,8 @@
-import { type ListDefinition, type ListView, standardViews } from "@/components/list/list-state";
+import {
+  type CopiedListDefinition,
+  type ListView,
+  standardViews,
+} from "@/components/list/list-state";
 import type { SelectRowsState } from "@/components/list/select-rows";
 import type { WorkflowInstance } from "@/graphql/workflows/workflows.types";
 
@@ -22,8 +26,9 @@ function withNote(views: ListView[]): ListView[] {
   return views.map((v) => ({ ...v, note: v.note ? `${v.note} ${PAGE_NOTE}` : PAGE_NOTE }));
 }
 
-export const WORKFLOW_INSTANCES_LIST: ListDefinition = {
+export const WORKFLOW_INSTANCES_LIST: CopiedListDefinition = {
   id: "workflows.instances",
+  copy: "workflowInstances",
   fields: [
     // Free text, matched exactly by Temporal: `DeployAppWorkflow`.
     { key: "type", label: "Type" },

@@ -3,6 +3,7 @@
 import { useQuery } from "@apollo/client/react";
 
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import { LIST_APP_PODS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppPod } from "@/graphql/lifecycle/lifecycle.types";
 import { LIST_WORKLOADS_PAGE } from "@/graphql/registry/registry.queries";
@@ -103,7 +104,7 @@ function aggregatePodStatus(
  * (`appWorkloadsVariables` of the default list state); keep the two in step.
  */
 export function useWorkloadsList(slug: string) {
-  const list = useListState(APP_WORKLOADS_LIST);
+  const list = useListState(useLocalizedList(APP_WORKLOADS_LIST));
   const { state } = list;
 
   const workloads = useQuery<WorkloadsPageResp>(LIST_WORKLOADS_PAGE, {

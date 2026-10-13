@@ -1,9 +1,10 @@
 import { PreloadQuery } from "@/lib/apollo";
 import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { EnvironmentDetailClient } from "./environment-detail-client";
 
-export const metadata = { title: "Environment · Astrolift" };
+export const generateMetadata = routeTitle("environment");
 
 /**
  * Environment detail (#1106) — drill-in target for a global /environments row.

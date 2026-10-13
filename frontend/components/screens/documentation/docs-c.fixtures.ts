@@ -16,7 +16,7 @@ export const DOCS_C_KINDS_LONG: IdentityProviderKind[] = [
     steps: [
       `Register a client at https://${LONG}.example.com/.well-known/openid-configuration and paste the redirect URI.`,
       `Copy the client_id ${LONG} and the client_secret.`,
-      "In Astrolift, New provider · OIDC, paste the values, Set active.",
+      "In Astrolift, New provider · OIDC, paste the values, Make active.",
     ],
   },
 ];

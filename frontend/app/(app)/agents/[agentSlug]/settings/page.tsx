@@ -6,10 +6,11 @@ import { LIST_APP_DOMAINS, LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecyc
 import { LIST_MANAGED_SERVICES } from "@/graphql/services/services.queries";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { AgentSettingsTabClient } from "./settings-client";
 
-export const metadata = { title: "Settings · Agent · Astrolift" };
+export const generateMetadata = routeTitle("settings", "agent");
 
 /**
  * The Settings tab (spec 44 §5.2, §5.3): General, Environments, Domains,

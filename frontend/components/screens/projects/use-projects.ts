@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import type { CursorPage } from "@/components/data-table";
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import { SOFT_DELETE_PROJECT } from "@/graphql/identity/identity.mutations";
 import { LIST_PROJECTS, LIST_PROJECTS_PAGE, LIST_TEAMS } from "@/graphql/identity/identity.queries";
 import type {
@@ -32,7 +33,7 @@ interface TeamsResp {
 export function useProjects() {
   // `astroliftProjectsPage` takes `search`, `limit` and `after` only — no sort
   // argument, so no column declares a `sortKey`.
-  const list = useListState(PROJECTS_LIST);
+  const list = useListState(useLocalizedList(PROJECTS_LIST));
   const query = useQuery<ProjectsPageResp>(LIST_PROJECTS_PAGE, {
     variables: projectsVariables(list.filters, list.state),
     fetchPolicy: "cache-and-network",

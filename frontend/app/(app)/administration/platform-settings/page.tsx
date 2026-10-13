@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { PlatformSettingsClient } from "./platform-settings-client";
 
-export const metadata = { title: "Platform settings · Astrolift" };
+export const generateMetadata = routeTitle("platformSettings");
 
 export default function AdministrationPlatformSettingsPage() {
   return <PlatformSettingsClient />;

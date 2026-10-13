@@ -39,12 +39,12 @@ describe("agentsCrumbs", () => {
     const [area, self] = agentsCrumbs("skills");
     expect(area.label).toBe("Agents");
     expect(area.switcher?.find((o) => o.active)?.href).toBe("/agents/skills");
-    expect(self).toEqual({ label: "Skills" });
+    expect(self).toEqual({ label: "Skills", navFunction: "skills" });
   });
 
   it("links the function once an entity follows it", () => {
     expect(agentsCrumbs("models", { label: "qwen" }).slice(1)).toEqual([
-      { label: "Models", href: "/models" },
+      { label: "Models", href: "/models", navFunction: "models" },
       { label: "qwen" },
     ]);
   });

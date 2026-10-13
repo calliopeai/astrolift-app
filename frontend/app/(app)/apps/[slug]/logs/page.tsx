@@ -6,15 +6,14 @@ import { LIST_APP_PODS } from "@/graphql/lifecycle/lifecycle.queries";
 import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
 import { GET_APP, LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { CommandRunnerClient } from "../commands/command-runner-client";
 import { ObservabilityClient } from "../observability/observability-client";
 import { ShellClient } from "../shell/shell-client";
 import { LogsClient } from "./logs-client";
 
-export const metadata = {
-  title: "Logs & metrics · Astrolift",
-};
+export const generateMetadata = routeTitle("logsAndMetrics");
 
 /**
  * The Logs & metrics tab (spec 44 §5.2, §10.3): Logs, Metrics (the former

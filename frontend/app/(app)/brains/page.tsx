@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { BrainsClient } from "./brains-client";
 
-export const metadata = { title: "Semantic layers · Astrolift" };
+export const generateMetadata = routeTitle("semanticLayers");
 
 /**
  * Semantic layers: the hosted brain apps (`[app] kind = "mimwell"`) the

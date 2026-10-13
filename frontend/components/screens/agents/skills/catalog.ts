@@ -44,7 +44,10 @@ const HREF: Record<AgentsFunction, string> = {
  */
 export function agentsCrumbs(fn: AgentsFunction, ...tail: Crumb[]): Crumb[] {
   const area = areaSwitcher(NAV, "agents", fn);
-  const self: Crumb = tail.length > 0 ? { label: LABEL[fn], href: HREF[fn] } : { label: LABEL[fn] };
+  const self: Crumb =
+    tail.length > 0
+      ? { label: LABEL[fn], href: HREF[fn], navFunction: fn }
+      : { label: LABEL[fn], navFunction: fn };
   return [area, self, ...tail];
 }
 

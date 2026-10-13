@@ -91,6 +91,13 @@ public/           Static assets
 - **Forms**: react-hook-form + zod. Schema in co-located `schema.ts`. Always
   Client Components.
 - **Route labels**: Add entries in `lib/routes.ts` for breadcrumb display.
+- **Route titles**: `export const generateMetadata = routeTitle("page", "section")`
+  (`lib/i18n/route-title.ts`); each key is a `routeTitles` message in every
+  catalog. No hard-coded `metadata.title`.
+- **List labels**: a list declaration is a `CopiedListDefinition` whose `copy`
+  names its `listDefinitions.<copy>` messages; the hook hands it to
+  `useListState` through `useLocalizedList` (`components/list/list-copy.test.ts`
+  holds both ends to it).
 - **Permissions**: PermissionSlug enum in
   `graphql/permissions/permissions.types.ts`. Server guard:
   `requirePermission()`. Client guard: `<PermissionGuard>`.

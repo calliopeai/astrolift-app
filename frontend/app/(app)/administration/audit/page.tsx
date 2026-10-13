@@ -3,10 +3,11 @@ import {
   LIST_AUDIT_EVENTS_PAGE,
 } from "@/graphql/operations/operations.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { AuditClient } from "./audit-client";
 
-export const metadata = { title: "Audit · Astrolift" };
+export const generateMetadata = routeTitle("audit");
 
 export default function AuditPage() {
   return (

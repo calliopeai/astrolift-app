@@ -6,6 +6,7 @@ import { toast } from "sonner";
 
 import { useHeldRows } from "@/components/list/use-held-rows";
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import { CANCEL_TASK, RETRY_AGENT_TASK } from "@/graphql/agents/agents.mutations";
 import {
   AGENT_TASKS_LIST_PAGE,
@@ -90,7 +91,7 @@ export function useRuns({ agent }: UseRunsOptions = {}): RunsScreenProps {
   const { org } = useActiveOrg();
   const orgId = org?.id ?? "";
   const modules = useModules();
-  const list = useListState(agent ? AGENT_RUNS_LIST : RUNS_LIST);
+  const list = useListState(useLocalizedList(agent ? AGENT_RUNS_LIST : RUNS_LIST));
   const { state, filters } = list;
   const [now] = React.useState(() => Date.now());
   const firstPage = state.after === null;

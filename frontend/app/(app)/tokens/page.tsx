@@ -1,9 +1,10 @@
 import { LIST_API_TOKENS_PAGE } from "@/graphql/identity/identity.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { TokensClient } from "./tokens-client";
 
-export const metadata = { title: "API keys · Astrolift" };
+export const generateMetadata = routeTitle("apiKeys");
 
 /**
  * Preloads the list's first page, the query the page reads. The variables

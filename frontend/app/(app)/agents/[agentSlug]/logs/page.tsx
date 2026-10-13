@@ -10,10 +10,11 @@ import { LIST_DEPLOYMENTS, LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecyc
 import { LIST_EVENTS } from "@/graphql/operations/operations.queries";
 import { GET_APP } from "@/graphql/registry/registry.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { ObserveContent } from "../components/observe-content";
 
-export const metadata = { title: "Logs & metrics · Agent · Astrolift" };
+export const generateMetadata = routeTitle("logsAndMetrics", "agent");
 
 /**
  * The Logs & metrics tab (spec 44 §5.2, §9 step 5): Live runs (the former

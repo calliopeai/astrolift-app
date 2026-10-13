@@ -7,7 +7,7 @@
  * own subscriptions, not the apps query, so Mine (apps you get at least one
  * alert for) and Alerts narrow a wider page (`NARROW_LIMIT`) in the client.
  */
-import { type ListDefinition, standardViews } from "@/components/list/list-state";
+import { type CopiedListDefinition, standardViews } from "@/components/list/list-state";
 import type { AstroliftUserAlertSubscription } from "@/graphql/lifecycle/lifecycle.types";
 import type { AstroliftRegisteredApp } from "@/graphql/registry/registry.types";
 
@@ -15,8 +15,9 @@ import { ALERT_KINDS, subKey } from "./alert-kinds";
 
 export const NARROW_LIMIT = 100;
 
-export const ALERT_SUBSCRIPTIONS_LIST: ListDefinition = {
+export const ALERT_SUBSCRIPTIONS_LIST: CopiedListDefinition = {
   id: "settings.alert-subscriptions",
+  copy: "alertSubscriptions",
   fields: [
     { key: "team", label: "Team" },
     { key: "project", label: "Project" },

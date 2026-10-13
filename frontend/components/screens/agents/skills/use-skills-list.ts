@@ -4,6 +4,7 @@ import { useQuery } from "@apollo/client/react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import { SKILLS_LIST_PAGE } from "@/graphql/agents/agents.queries";
 import { useActiveOrg } from "@/graphql/identity/identity.hooks";
 
@@ -30,7 +31,7 @@ export const IMPORT_PARAM = "import";
  * SkillsListScreen.
  */
 export function useSkillsList() {
-  const list = useListState(SKILLS_LIST);
+  const list = useListState(useLocalizedList(SKILLS_LIST));
   const { state } = list;
   const params = useSearchParams();
   const pathname = usePathname() ?? "";

@@ -15,7 +15,7 @@ import type {
   AppHealthPulseStatus,
   AstroliftRegisteredApp,
 } from "@/graphql/registry/registry.types";
-import { NAV } from "@/lib/shell/nav-model";
+import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 import { TOPOLOGY_META, type TopologyKind } from "@/lib/topology";
 
 /** One row: the app, with the topology and clusters the page returns, typed. */
@@ -144,15 +144,7 @@ export function localizedAppsList(
 
 /** `Apps ▾` [› tail]: the first crumb switches between the Apps area's functions. */
 export function appsCrumbs(tail?: Crumb): Crumb[] {
-  const area = NAV.find((a) => a.key === "apps");
-  const crumbs: Crumb[] = [
-    {
-      label: area?.label ?? "Apps",
-      switcher: (area?.groups ?? []).flatMap((g) =>
-        g.functions.map((f) => ({ label: f.label, href: f.href, active: f.key === "apps" }))
-      ),
-    },
-  ];
+  const crumbs: Crumb[] = [areaSwitcher(NAV, "apps", "apps")];
   if (tail) crumbs.push(tail);
   return crumbs;
 }

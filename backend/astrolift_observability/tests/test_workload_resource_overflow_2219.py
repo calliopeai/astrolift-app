@@ -87,3 +87,14 @@ def test_real_prometheus_wire_rejects_nonfinite_aggregate(usage, limits):
         server.shutdown()
         server.server_close()
         thread.join(2)
+
+
+def test_the_cpu_rate_window_holds_several_scrapes_2263():
+    """A 1m window over 30s jittery cAdvisor scrapes leaves steps with no
+    rate and the measurement reads as PARTIAL_DATA; CPU uses at least 2m."""
+    from astrolift_observability.workload_resources import rate_window
+
+    assert rate_window(300) == "2m"
+    assert rate_window(3600) == "2m"
+    assert rate_window(6 * 3600) == "5m"
+    assert rate_window(7 * 24 * 3600) == "15m"

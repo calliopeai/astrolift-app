@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 
 import { workflowRunHref } from "@/components/screens/workflows/detail/workflow-run-model";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { RunsContent } from "../components/runs-content";
 
-export const metadata = { title: "Runs · Workflow · Astrolift" };
+export const generateMetadata = routeTitle("runs", "workflow");
 
 /**
  * The Runs tab: this workflow's runs (spec 44 §5.2); `/run` and `/observe`

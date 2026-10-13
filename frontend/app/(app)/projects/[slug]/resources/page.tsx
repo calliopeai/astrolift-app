@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { ProjectResourcesClient } from "./project-resources-client";
 
-export const metadata = { title: "Project resources · Astrolift" };
+export const generateMetadata = routeTitle("projectResources");
 
 export default async function ProjectResourcesPage({
   params,

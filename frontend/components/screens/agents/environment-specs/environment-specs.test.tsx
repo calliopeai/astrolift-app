@@ -1,8 +1,11 @@
 import { ApolloClient, ApolloLink, InMemoryCache, Observable } from "@apollo/client";
 import { ApolloProvider } from "@apollo/client/react";
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { NextIntlClientProvider } from "next-intl";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
+
+import messages from "@/messages/en.json";
 
 import { activeFor, NAV, visibleNav } from "@/lib/shell/nav-model";
 
@@ -71,7 +74,9 @@ function network() {
       fail = value;
     },
     wrapper: ({ children }: { children: ReactNode }) => (
-      <ApolloProvider client={client}>{children}</ApolloProvider>
+      <NextIntlClientProvider locale="en" messages={messages} timeZone="UTC">
+        <ApolloProvider client={client}>{children}</ApolloProvider>
+      </NextIntlClientProvider>
     ),
   };
 }

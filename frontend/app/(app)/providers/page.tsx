@@ -1,9 +1,10 @@
 import { LIST_CLUSTERS, LIST_PROVIDER_PLUGINS } from "@/graphql/clusters/clusters.queries";
 import { PreloadQuery } from "@/lib/apollo";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { ProvidersClient } from "./providers-client";
 
-export const metadata = { title: "Providers · Astrolift" };
+export const generateMetadata = routeTitle("providers");
 
 /**
  * Unified Providers surface (#887 / #889 / #890). Preloads only the Cloud

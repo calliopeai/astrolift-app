@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { AgentVncPopout } from "./popout-client";
 
-export const metadata = { title: "Live agent session · Astrolift" };
+export const generateMetadata = routeTitle("liveAgentSession");
 
 /**
  * Pop-out route — a dedicated, full-height noVNC session for a single

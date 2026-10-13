@@ -166,7 +166,7 @@ describe("agentRunCrumbs", () => {
       { label: "run 7f22c1d3" }
     );
     expect(crumbs.slice(1)).toEqual([
-      { label: "Runs", href: "/tasks" },
+      { label: "Runs", href: "/tasks", navFunction: "runs" },
       { label: "BDR outreach", href: "/agents/bdr-outreach" },
       { label: "run 7f22c1d3" },
     ]);

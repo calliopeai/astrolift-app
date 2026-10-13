@@ -1,6 +1,8 @@
+import { routeTitle } from "@/lib/i18n/route-title";
+
 import { TaskTemplatesClient } from "./task-templates-client";
 
-export const metadata = { title: "Task templates · Astrolift" };
+export const generateMetadata = routeTitle("taskTemplates");
 
 /**
  * Task templates: workloads of kind=task, each with Run now. A container

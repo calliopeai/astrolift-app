@@ -1,8 +1,7 @@
 import { CustomDomainsDoc } from "@/components/screens/documentation/CustomDomainsDoc";
+import { routeTitle } from "@/lib/i18n/route-title";
 
-export const metadata = {
-  title: "Custom domains · Documentation · Astrolift",
-};
+export const generateMetadata = routeTitle("customDomains", "documentation");
 
 export default function CustomDomainsPage() {
   return <CustomDomainsDoc />;

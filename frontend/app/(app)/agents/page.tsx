@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
 
 import { agentsFormerTabTarget } from "@/components/screens/agents/list/agents-list";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { AgentsClient } from "./agents-client";
 
-export const metadata = { title: "Agents · Astrolift" };
+export const generateMetadata = routeTitle("agents");
 
 /**
  * Agents › Agents: the registered agents, one list (spec 44 §5.1). The old

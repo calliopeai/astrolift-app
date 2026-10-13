@@ -1,9 +1,13 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 // Raw hex + inline styles are intentional (astrolift/no-raw-design-values
 // escape-hatch case): this boundary replaces the root layout on hard
 // crashes, where globals.css — and therefore every design token — may not
-// be loaded, so Tailwind classes and var(--token) cannot apply.
+// be loaded, so Tailwind classes and var(--token) cannot apply. The copy is
+// `errorScreens`; app/global-error.tsx gives it a provider of its own, since
+// the root layout's is gone too.
 
 export interface GlobalErrorScreenProps {
   /** The thrown error's message; empty falls back to a generic line. */
@@ -15,6 +19,7 @@ export interface GlobalErrorScreenProps {
 
 /** The body of app/global-error.tsx; the route keeps the <html>/<body> it must render. */
 export function GlobalErrorScreen({ message, digest, onReset }: GlobalErrorScreenProps) {
+  const t = useTranslations("errorScreens");
   return (
     <div
       style={{
@@ -29,13 +34,13 @@ export function GlobalErrorScreen({ message, digest, onReset }: GlobalErrorScree
         fontFamily: "system-ui, sans-serif",
       }}
     >
-      <h2 style={{ fontSize: "1.125rem", fontWeight: 600, margin: 0 }}>Something went wrong</h2>
+      <h2 style={{ fontSize: "1.125rem", fontWeight: 600, margin: 0 }}>{t("title")}</h2>
       <p style={{ fontSize: "0.875rem", color: "#6b7280", margin: 0, maxWidth: "24rem" }}>
-        {message || "A critical error occurred. Please refresh the page."}
+        {message || t("critical")}
       </p>
       {digest && (
         <p style={{ fontSize: "0.75rem", color: "#9ca3af", fontFamily: "monospace", margin: 0 }}>
-          Error ID: {digest}
+          {t("errorId", { digest })}
         </p>
       )}
       <button
@@ -49,7 +54,7 @@ export function GlobalErrorScreen({ message, digest, onReset }: GlobalErrorScree
           cursor: "pointer",
         }}
       >
-        Try again
+        {t("tryAgain")}
       </button>
     </div>
   );

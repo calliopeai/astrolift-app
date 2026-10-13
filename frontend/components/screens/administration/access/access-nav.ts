@@ -52,10 +52,15 @@ export function accessCrumbs(
   const current = ACCESS_FUNCTIONS.find((f) => f.key === fn)!;
   const crumbs: Crumb[] = [
     permitted
-      ? { label: "Admin", switcher: [{ label: "Access", href: ACCESS_BASE, active: true }] }
+      ? {
+          label: "Admin",
+          navArea: "admin",
+          switcher: [{ label: "Access", href: ACCESS_BASE, active: true, navFunction: "access" }],
+        }
       : adminCrumb(adminKey()),
     {
       label: "Access",
+      navFunction: "access",
       switcher: ACCESS_FUNCTIONS.filter((f) => !permitted || permitted.includes(f.key)).map(
         (f) => ({
           label: f.label,

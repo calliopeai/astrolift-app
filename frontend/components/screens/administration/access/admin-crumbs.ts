@@ -13,10 +13,12 @@ export function adminCrumb(active: string): Crumb {
   );
   return {
     label: "Admin",
+    navArea: "admin",
     switcher: (group?.functions ?? []).map((f) => ({
       label: f.label,
       href: f.href,
       active: f.key === active,
+      navFunction: f.key,
     })),
   };
 }

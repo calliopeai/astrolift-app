@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { selectRows } from "@/components/list/select-rows";
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import type {
   DestroyAgentBoxMutation,
   EnsureAgentBoxMutation,
@@ -38,7 +39,7 @@ export interface StartBoxInput {
 export function useAgentBoxes(orgId: string) {
   const t = useTranslations("agentBoxes");
   const [includeEnded, setIncludeEnded] = React.useState(false);
-  const list = useListState(AGENT_BOXES_LIST);
+  const list = useListState(useLocalizedList(AGENT_BOXES_LIST));
 
   const query = useQuery<AgentBoxesData, AgentBoxesVars>(LIST_AGENT_BOXES, {
     variables: { orgId, includeEnded },

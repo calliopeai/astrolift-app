@@ -1,9 +1,10 @@
 import { PreloadQuery } from "@/lib/apollo";
 import { LIST_WEBHOOK_DELIVERIES } from "@/graphql/operations/operations.queries";
+import { routeTitle } from "@/lib/i18n/route-title";
 
 import { DeliveryDetailClient } from "./delivery-detail-client";
 
-export const metadata = { title: "Webhook delivery · Astrolift" };
+export const generateMetadata = routeTitle("webhookDelivery");
 
 /**
  * Webhook delivery detail (#1106) — drill-in target for a delivery row on the

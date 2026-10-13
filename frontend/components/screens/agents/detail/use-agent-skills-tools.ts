@@ -4,6 +4,7 @@ import { useQuery } from "@apollo/client/react";
 import * as React from "react";
 
 import { useListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import { GET_AGENT_DETAIL } from "@/graphql/agents/agents.queries";
 import type { AstroliftAgentDetail } from "@/graphql/agents/agents.types";
 
@@ -41,7 +42,7 @@ function useAgentDetail(slug: string, orgId: string) {
 /** Skills & tools › Skills: the agent's bound skills, URL-state list. */
 export function useAgentSkills(slug: string, orgId: string) {
   const detail = useAgentDetail(slug, orgId);
-  const list = useListState(AGENT_SKILLS_LIST);
+  const list = useListState(useLocalizedList(AGENT_SKILLS_LIST));
   const { state } = list;
   const { rows, totalCount } = React.useMemo(
     () =>
@@ -57,7 +58,7 @@ export function useAgentTools(slug: string, orgId: string) {
   const all = React.useMemo(() => toolRows(detail.skills), [detail.skills]);
   const adapters = toolAdapters(all).join(",");
   const def = React.useMemo(() => agentToolsList(adapters ? adapters.split(",") : []), [adapters]);
-  const list = useListState(def);
+  const list = useListState(useLocalizedList(def));
   const { state } = list;
   const { rows, totalCount } = React.useMemo(
     () => selectTools(all, list.filters, state.q, state.sort, state.page, state.pageSize),

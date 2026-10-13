@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { useLocalListState } from "@/components/list/use-list-state";
+import { useLocalizedList } from "@/components/list/use-localized-list";
 import {
   SECTION_PARAM,
   type SectionSelection,
@@ -95,7 +96,7 @@ export function useSourceHosts() {
   // `components/ScmCallbackToast`) so they surface regardless of where
   // `return_to` lands; the page query cache-and-network-fetches on mount,
   // so the row state is up to date without an explicit refetch here.
-  const list = useLocalListState(SOURCE_HOSTS_LIST);
+  const list = useLocalListState(useLocalizedList(SOURCE_HOSTS_LIST));
   const page = useQuery<ConnectionsPageResp>(LIST_SOURCE_CONNECTIONS_PAGE, {
     variables: hostsVariables(list.filters, list.state),
     fetchPolicy: "cache-and-network",
@@ -178,7 +179,7 @@ export type SourceHostsData = ReturnType<typeof useSourceHosts>;
  */
 export function useDeployKeys() {
   const t = useTranslations("sourceProviders.toasts");
-  const list = useLocalListState(DEPLOY_KEYS_LIST);
+  const list = useLocalListState(useLocalizedList(DEPLOY_KEYS_LIST));
   const page = useQuery<KeysPageResp>(LIST_SSH_DEPLOY_KEYS_PAGE, {
     variables: keysVariables(list.filters, list.state),
     fetchPolicy: "cache-and-network",
