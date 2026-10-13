@@ -48,8 +48,16 @@ class BrainMutations:
         from astrolift_registry.brain_tokens import BrainTokenError, connection_descriptor
         from astrolift_registry.brains import visible_brains
 
+        from core.tenancy import get_current_tenant
+
+        tenant = get_current_tenant()
+        org_id = tenant.organization_id if tenant else None
         # Not visible and not a brain read the same, so existence never leaks.
-        brain = visible_brains().filter(slug=slug.strip()).first() if slug.strip() else None
+        brain = (
+            visible_brains().filter(organization_id=org_id, slug=slug.strip()).first()
+            if slug.strip() and org_id is not None
+            else None
+        )
         if brain is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "brain not found", field="slug")
         user = _actor()
