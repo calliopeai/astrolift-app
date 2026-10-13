@@ -109,7 +109,7 @@ def _resolve_org(token):
     if org is not None:
         return org, None
     return None, JsonResponse(
-        {"detail": "token organization no longer exists"},
+        {"code": "PERMISSION_DENIED", "detail": "token organization no longer exists"},
         status=403,
     )
 
@@ -135,7 +135,7 @@ def _module_gate(org):
     else:
         detail = "the chat_studio_integration module is not enabled for this organization"
     return JsonResponse(
-        {"detail": detail, "reason": reason, "module": CHAT_STUDIO_INTEGRATION},
+        {"code": "PERMISSION_DENIED", "detail": detail, "reason": reason, "module": CHAT_STUDIO_INTEGRATION},
         status=403,
     )
 
@@ -155,6 +155,7 @@ def _authorize(token, org, permissions: tuple[Permission, ...], *, team=None, or
     if missing:
         return JsonResponse(
             {
+                "code": "PERMISSION_DENIED",
                 "detail": f"the api token lacks the {missing} scope",
                 "reason": "missing_scope",
                 "scope": missing,
@@ -166,6 +167,7 @@ def _authorize(token, org, permissions: tuple[Permission, ...], *, team=None, or
         if token.team_id is not None:
             return JsonResponse(
                 {
+                    "code": "PERMISSION_DENIED",
                     "detail": "the api token does not cover this organization owner",
                     "reason": "outside_token_team",
                 },
@@ -180,6 +182,7 @@ def _authorize(token, org, permissions: tuple[Permission, ...], *, team=None, or
         ):
             return JsonResponse(
                 {
+                    "code": "PERMISSION_DENIED",
                     "detail": "the api token does not cover this live team owner",
                     "reason": "outside_token_team",
                 },
@@ -196,6 +199,7 @@ def _authorize(token, org, permissions: tuple[Permission, ...], *, team=None, or
             except PermissionDenied:
                 return JsonResponse(
                     {
+                        "code": "PERMISSION_DENIED",
                         "detail": f"{permission.value} is required {where}",
                         "reason": "missing_permission",
                         "permission": permission.value,
@@ -273,6 +277,7 @@ def _owner_denied(token, dev) -> JsonResponse | None:
         return None
     return JsonResponse(
         {
+            "code": "PERMISSION_DENIED",
             "detail": "only the dev environment's creator or a team admin may do this",
             "reason": "not_owner",
         },
@@ -1081,7 +1086,7 @@ def capabilities(request):
         return error
     denied = enforce_scopes(token, (SCOPE_WRITE_APPS,))
     if denied:
-        return JsonResponse({"detail": denied}, status=403)
+        return JsonResponse({"code": "PERMISSION_DENIED", "detail": denied}, status=403)
     return JsonResponse(
         {
             "artifact_transport": "private-archive-v1",

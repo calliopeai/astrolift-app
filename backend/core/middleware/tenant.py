@@ -66,7 +66,11 @@ class TenantContextMiddleware(MiddlewareMixin):
             api_token, request.META.get(ORG_HEADER, "")
         ):
             message = "Selected organization does not match the API token's organization."
-            return JsonResponse({"detail": message, "errors": [{"message": message}]}, status=403)
+            # The code GraphQL, MCP and the CLI use for every other refusal (#1867).
+            error = {"message": message, "extensions": {"code": "PERMISSION_DENIED"}}
+            return JsonResponse(
+                {"detail": message, "code": "PERMISSION_DENIED", "errors": [error]}, status=403
+            )
 
         organization_id = self._resolve_organization_id(request)
         team_id = self._resolve_team_id(request, organization_id)

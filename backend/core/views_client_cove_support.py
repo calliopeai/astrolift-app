@@ -35,11 +35,11 @@ def support_tickets(request):
             )
         )
     ):
-        return JsonResponse({"error": "organization unavailable"}, status=403)
+        return JsonResponse({"code": "PERMISSION_DENIED", "error": "organization unavailable"}, status=403)
     try:
         check_permission(Permission.ORG_READ, scope=PermissionScope(kind=ScopeKind.ORG, id=organization.pk))
     except PermissionDenied:
-        return JsonResponse({"error": "support access denied"}, status=403)
+        return JsonResponse({"code": "PERMISSION_DENIED", "error": "support access denied"}, status=403)
     try:
         client = ClientCoveSupportClient(user=request.user, organization=organization)
         if request.method == "GET":

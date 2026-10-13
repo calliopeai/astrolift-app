@@ -119,7 +119,7 @@ def _resolve_deploy_token(request: HttpRequest, app_slug: str):
     # Deploy tokens are app-scoped — refuse cross-app use.
     if token.registered_app.slug != app_slug:
         return None, JsonResponse(
-            {"detail": "token is not authorized for this app"},
+            {"detail": "token is not authorized for this app", "code": "PERMISSION_DENIED"},
             status=403,
         )
 
@@ -129,7 +129,7 @@ def _resolve_deploy_token(request: HttpRequest, app_slug: str):
     # normalizes them to ``app.deploy``.
     if token.scopes and not {"app.deploy", "deploy"} & set(token.scopes):
         return None, JsonResponse(
-            {"detail": "token scope does not include app.deploy"},
+            {"detail": "token scope does not include app.deploy", "code": "PERMISSION_DENIED"},
             status=403,
         )
 
