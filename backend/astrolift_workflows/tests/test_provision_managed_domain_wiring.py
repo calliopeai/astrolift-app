@@ -230,7 +230,7 @@ def test_observed_nameservers_separates_no_delegation_from_no_answer(monkeypatch
 # ---- workflow step order --------------------------------------------------
 
 
-def _run_workflow(monkeypatch, *, delegation):
+def _run_workflow(monkeypatch, *, delegation, patched=False):
     from temporalio import workflow as temporalio_workflow
 
     from astrolift_workflows.activities import (
@@ -259,11 +259,17 @@ def _run_workflow(monkeypatch, *, delegation):
         if activity_fn is register_managed_domain_row:
             return 1
         if activity_fn is validate_ns_delegation:
-            return delegation
+            return delegation.pop(0) if isinstance(delegation, list) else delegation
         assert activity_fn is mark_managed_domain_active
         return None
 
     monkeypatch.setattr(temporalio_workflow, "execute_activity", _fake_execute_activity)
+    monkeypatch.setattr(temporalio_workflow, "patched", lambda patch_id: patched)
+
+    async def _no_wait(*args, **kwargs):
+        called.append("wait")
+
+    monkeypatch.setattr(temporalio_workflow, "wait_condition", _no_wait)
 
     result = asyncio.new_event_loop().run_until_complete(
         ProvisionManagedDomainWorkflow().run(
@@ -298,3 +304,34 @@ def test_workflow_activates_once_delegation_checks_out(monkeypatch):
 
     assert result.ok is True
     assert called.index("validate_ns_delegation") < called.index("mark_managed_domain_active")
+
+
+def test_a_run_from_before_the_fix_still_checks_delegation_once(monkeypatch):
+    """Unpatched (replaying an older run): one check, as before."""
+    failed = {"passed": False, "reason": "NS delegation incomplete"}
+    result, called = _run_workflow(monkeypatch, delegation=failed, patched=False)
+    assert result.ok is False and called.count("validate_ns_delegation") == 1
+
+
+def test_delegation_is_polled_until_it_propagates_2389(monkeypatch):
+    """The registrar change lands after the first checks: the run waits and
+    activates instead of ending with the zone stuck (#2389)."""
+    checks = [
+        {"passed": False, "reason": "NS delegation incomplete"},
+        {"passed": False, "reason": "NS delegation incomplete"},
+        {"passed": True, "reason": "NS delegation OK"},
+    ]
+    result, called = _run_workflow(monkeypatch, delegation=checks, patched=True)
+    assert result.ok is True
+    assert called.count("validate_ns_delegation") == 3 and called.count("wait") == 2
+    assert called[-1] == "mark_managed_domain_active"
+
+
+def test_delegation_that_never_lands_still_refuses_after_the_window(monkeypatch):
+    from astrolift_workflows.workflows import provision_managed_domain as module
+
+    monkeypatch.setattr(module, "_DELEGATION_POLL_MAX_ATTEMPTS", 3)
+    failed = {"passed": False, "reason": "NS delegation incomplete: ['ns-1.awsdns-01.com']"}
+    result, called = _run_workflow(monkeypatch, delegation=failed, patched=True)
+    assert result.ok is False and "NS delegation not in place" in result.message
+    assert called.count("validate_ns_delegation") == 3 and "mark_managed_domain_active" not in called
