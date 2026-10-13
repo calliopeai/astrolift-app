@@ -109,7 +109,8 @@ def test_routes_attach_only_from_the_platform_namespace():
 def test_auth_host_route_is_gated_so_the_callback_runs():
     component = edge_component(COGNITO, ingress_class="envoy")
     routes = _by_kind(component.post_install_manifests, "HTTPRoute")
-    [auth] = [r for r in routes if r["spec"]["hostnames"] == ["auth.astro.example.net"]]
+    [auth] = [r for r in routes if r["metadata"]["name"] == "auth"]
+    assert auth["spec"]["hostnames"] == ["auth.astro.example.net"]
     assert auth["metadata"]["labels"][GATE_LABEL] == "gated"
 
 
@@ -306,3 +307,48 @@ def test_a_brain_token_opens_only_the_brain_it_names():
     }
     # The ordinary per-app rules follow, unchanged.
     assert any(r["name"].startswith("shop-production") for r in rules[2:])
+
+
+# ---- sign-out (#1727) ------------------------------------------------------
+
+COGNITO_LOGOUT = {
+    **COGNITO,
+    "logout_url": (
+        "https://acme.auth.us-west-2.amazoncognito.com/logout"
+        "?client_id=central-client-id&logout_uri=https%3A%2F%2Fauth.astro.example.net%2F"
+    ),
+}
+
+
+def test_sign_out_ends_the_cognito_session_through_logout_uri():
+    """Envoy appends ?id_token_hint=&client_id=&post_logout_redirect_uri= to
+    the endpoint. Cognito honours only its own logout_uri, so the endpoint is
+    the cluster's logout_url with an empty parameter absorbing that '?'."""
+    component = edge_component(COGNITO_LOGOUT, ingress_class="envoy")
+    [policy] = [p for p in _by_kind(component.post_install_manifests, "SecurityPolicy") if "oidc" in p["spec"]]
+    endpoint = policy["spec"]["oidc"]["provider"]["endSessionEndpoint"]
+    assert endpoint == COGNITO_LOGOUT["logout_url"] + "&_="
+    envoy_redirect = endpoint + "?id_token_hint=&client_id=central-client-id&post_logout_redirect_uri=x"
+    assert "logout_uri=https%3A%2F%2Fauth.astro.example.net%2F&_=?id_token_hint=" in envoy_redirect
+
+
+def test_without_a_logout_url_the_discovered_endpoint_is_left_alone():
+    component = edge_component(COGNITO, ingress_class="envoy")
+    [policy] = [p for p in _by_kind(component.post_install_manifests, "SecurityPolicy") if "oidc" in p["spec"]]
+    assert "endSessionEndpoint" not in policy["spec"]["oidc"]["provider"]
+
+
+def test_the_signed_out_landing_is_ungated_so_it_does_not_sign_in_again():
+    component = edge_component(COGNITO_LOGOUT, ingress_class="envoy")
+    routes = _by_kind(component.post_install_manifests, "HTTPRoute")
+    [landing] = [r for r in routes if r["metadata"]["name"] == "auth-signed-out"]
+    assert landing["spec"]["hostnames"] == ["auth.astro.example.net"]
+    assert GATE_LABEL not in landing["metadata"]["labels"]
+    paths = {m["path"]["value"] for m in landing["spec"]["rules"][0]["matches"]}
+    assert paths == {"/", "/auth/logged-out"}
+    [page] = [
+        f
+        for f in _by_kind(component.post_install_manifests, "HTTPRouteFilter")
+        if f["metadata"]["name"] == "auth-signed-out"
+    ]
+    assert "You have signed out" in page["spec"]["directResponse"]["body"]["inline"]
