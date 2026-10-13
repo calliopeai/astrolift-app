@@ -6839,6 +6839,13 @@ input BeginLocalModelArtifactInput {
   files: [LocalModelFileInput!]!
 }
 
+input BindManagedDomainDelegationInput {
+  domainId: GUID!
+  expectedDomainVersion: Int!
+  connectionId: GUID!
+  expectedConnectionVersion: Int!
+}
+
 input BootstrapOptionOverride {
   componentKey: String!
   optionKey: String!
@@ -7700,6 +7707,7 @@ type DnsProviderConnectionType {
   verifiedAt: DateTime
   expiresAt: DateTime
   dnsWritesSupported: Boolean!
+  delegationZoneName: String!
 }
 
 type DnsProviderConnectionTypeMutationResult {
@@ -8037,6 +8045,14 @@ enum GoldenSignalUnavailableReason {
   PROVIDER_ERROR
   NO_DATA_YET
   NOT_INSTRUMENTED
+}
+
+input GrantCloudflareDelegationInput {
+  connectionId: GUID!
+  expectedVersion: Int!
+  zoneId: String!
+  zoneName: String!
+  token: String!
 }
 
 input GrantRoleInput {
@@ -9272,6 +9288,8 @@ input MoveAppToTeamInput {
 
 type Mutation {
   connectCloudflareDnsToken(input: ConnectCloudflareDnsTokenInput!): DnsProviderConnectionTypeMutationResult!
+  grantCloudflareDelegation(input: GrantCloudflareDelegationInput!): DnsProviderConnectionTypeMutationResult!
+  bindManagedDomainDelegation(input: BindManagedDomainDelegationInput!): DnsProviderConnectionTypeMutationResult!
   retestDnsProviderConnection(input: CloudflareDnsConnectionInput!): DnsProviderConnectionTypeMutationResult!
   disconnectDnsProviderConnection(input: CloudflareDnsConnectionInput!): DnsProviderConnectionTypeMutationResult!
   beginCloudflareDnsOAuth(input: BeginCloudflareDnsOAuthInput!): CloudflareDnsOAuthStartMutationResult!
