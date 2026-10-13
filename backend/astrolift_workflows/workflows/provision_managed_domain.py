@@ -67,6 +67,11 @@ _ACTIVITY_RETRY = RetryPolicy(
 # 30 s × 144 attempts = 72 h maximum cert-issuance wait.
 _POLL_INTERVAL = timedelta(seconds=30)
 _POLL_MAX_ATTEMPTS = 144
+# NS delegation is the operator's registrar change, and it propagates on the
+# registrar's schedule: checked every 5 minutes for up to 48 hours (#2389).
+# A ``revalidate`` signal checks at once.
+_DELEGATION_POLL_INTERVAL = timedelta(minutes=5)
+_DELEGATION_POLL_MAX_ATTEMPTS = 576
 
 
 def _truncate(message: str, *, limit: int = 4000) -> str:
@@ -124,9 +129,7 @@ class ProvisionManagedDomainWorkflow:
                     message=_truncate(f"provision_dns_zone failed: {exc}"),
                 )
             zone_id = zone_result.get("zone_id", "") if isinstance(zone_result, dict) else ""
-            nameservers = (
-                zone_result.get("nameservers", []) if isinstance(zone_result, dict) else []
-            )
+            nameservers = zone_result.get("nameservers", []) if isinstance(zone_result, dict) else []
 
         self._zone_id = zone_id
 
@@ -184,9 +187,7 @@ class ProvisionManagedDomainWorkflow:
                     message=_truncate(f"poll_cert_issuance failed: {exc}"),
                 )
 
-            status = (
-                poll_result.get("status", "") if isinstance(poll_result, dict) else ""
-            )
+            status = poll_result.get("status", "") if isinstance(poll_result, dict) else ""
             if status == "issued":
                 issued = True
                 break
@@ -194,8 +195,7 @@ class ProvisionManagedDomainWorkflow:
                 return WorkflowResult(
                     ok=False,
                     message=_truncate(
-                        f"cert issuance failed for zone {zone!r}: "
-                        + str(poll_result.get("message", ""))
+                        f"cert issuance failed for zone {zone!r}: " + str(poll_result.get("message", ""))
                     ),
                 )
 
@@ -216,8 +216,7 @@ class ProvisionManagedDomainWorkflow:
             return WorkflowResult(
                 ok=False,
                 message=_truncate(
-                    f"cert issuance timed out for zone {zone!r} "
-                    f"after {_POLL_MAX_ATTEMPTS} attempts"
+                    f"cert issuance timed out for zone {zone!r} " f"after {_POLL_MAX_ATTEMPTS} attempts"
                 ),
             )
 
@@ -239,25 +238,38 @@ class ProvisionManagedDomainWorkflow:
         # the nameservers Step 1 handed back before the zone is fit to serve —
         # activating one that still resolves to the operator's previous DNS
         # provider provisions apps at hostnames nobody can reach.
-        try:
-            delegation = await workflow.execute_activity(
-                validate_ns_delegation,
-                args=[input.cluster_id, zone],
-                start_to_close_timeout=_ACTIVITY_TIMEOUT,
-                retry_policy=_ACTIVITY_RETRY,
+        # Checked until it holds, not once (#2389): a single check failed
+        # every zone whose registrar change had not propagated yet, and the
+        # run ended with the zone stuck at validate_ns_delegation.
+        attempts = _DELEGATION_POLL_MAX_ATTEMPTS if workflow.patched("ns-delegation-poll-2389") else 1
+        delegation = None
+        for attempt in range(1, attempts + 1):
+            try:
+                delegation = await workflow.execute_activity(
+                    validate_ns_delegation,
+                    args=[input.cluster_id, zone],
+                    start_to_close_timeout=_ACTIVITY_TIMEOUT,
+                    retry_policy=_ACTIVITY_RETRY,
+                )
+            except Exception as exc:  # noqa: BLE001
+                return WorkflowResult(
+                    ok=False,
+                    message=_truncate(f"validate_ns_delegation failed: {exc}"),
+                )
+            if (isinstance(delegation, dict) and delegation.get("passed")) or attempt >= attempts:
+                break
+            self._revalidate_requested = False
+            await workflow.wait_condition(
+                lambda: self._revalidate_requested,
+                timeout=_DELEGATION_POLL_INTERVAL,
             )
-        except Exception as exc:  # noqa: BLE001
-            return WorkflowResult(
-                ok=False,
-                message=_truncate(f"validate_ns_delegation failed: {exc}"),
-            )
+            self._revalidate_requested = False
         if not (isinstance(delegation, dict) and delegation.get("passed")):
             reason = delegation.get("reason", "") if isinstance(delegation, dict) else ""
             return WorkflowResult(
                 ok=False,
                 message=_truncate(
-                    f"NS delegation not in place for zone {zone!r}; zone left "
-                    f"inactive: {reason}"
+                    f"NS delegation not in place for zone {zone!r}; zone left " f"inactive: {reason}"
                 ),
             )
 
