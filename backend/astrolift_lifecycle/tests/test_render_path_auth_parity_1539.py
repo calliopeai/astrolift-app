@@ -159,6 +159,42 @@ def test_both_render_paths_produce_the_same_gate(deployment, cluster):
     assert workflow_annotations == deploy_annotations
 
 
+def test_both_render_paths_carry_the_apps_edge_mapping(deployment, cluster):
+    """#1733 on both producers. The deploy path built its driver without the
+    app's ``[edge]`` block, so an app reading its own header names got only
+    the default secret header and refused every request (SteadyMD QS-Ops)."""
+    from core.app_deploy import _render_managed_subdomain_ingress
+
+    cluster.ingress_class = "nginx"
+    cluster.oidc_auth_config = {**OIDC_CONFIG, "gateway_secret": "s" * 40}
+    cluster.save()
+    app = deployment.registered_app
+    app.manifest_normalized = {
+        **(app.manifest_normalized or {}),
+        "edge": {
+            "gateway_secret_header": "x-qsr-proxy-secret",
+            "identity_headers": [["email", "x-qsr-user-email"], ["user", "x-qsr-user-id"]],
+        },
+    }
+    app.save()
+
+    snippet = "nginx.ingress.kubernetes.io/configuration-snippet"
+    deploy_path = _render_managed_subdomain_ingress(
+        deployment,
+        _make_manifest(),
+        "ns",
+        deployment.app_environment.managed_domain,
+        cluster,
+    )
+    deploy_snippets = {i["metadata"]["annotations"].get(snippet) for i in deploy_path}
+    workflow_snippets = {i["metadata"]["annotations"].get(snippet) for i in _managed_ingresses(deployment)}
+    (rendered,) = deploy_snippets
+    assert 'proxy_set_header x-qsr-proxy-secret "' in rendered
+    assert "proxy_set_header x-qsr-user-id $astrolift_edge_user;" in rendered
+    assert "X-Astrolift-Gateway-Secret" not in rendered
+    assert workflow_snippets == deploy_snippets
+
+
 # ---- alb / Cognito ---------------------------------------------------
 
 

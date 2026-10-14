@@ -272,6 +272,11 @@ class K8sIngressConfig:
 
     cluster_driver: Any | None = None
 
+    edge: dict | None = None
+    """The app's normalized ``[edge]`` block (#1733), rendered into the
+    gate's fenced snippet. Without it this path stamped only the default
+    header and an app reading its own names was refused every request."""
+
 
 class K8sIngressDriver(IngressDriver):
     def __init__(self, *, config: K8sIngressConfig) -> None:
@@ -448,7 +453,7 @@ class K8sIngressDriver(IngressDriver):
         if tls_strategy == "letsencrypt":
             annotations["cert-manager.io/cluster-issuer"] = self._config.cert_manager_issuer
         if self._config.oidc_auth is not None:
-            annotations.update(nginx_auth_annotations(self._config.oidc_auth))
+            annotations.update(nginx_auth_annotations(self._config.oidc_auth, edge=self._config.edge))
 
         rules = [
             {
