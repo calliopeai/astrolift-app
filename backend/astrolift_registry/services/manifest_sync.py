@@ -401,6 +401,7 @@ def resync_app_manifest_from_repo(
     *,
     fetch: _FetchFn | None = None,
     ref: str = "",
+    discard_staged: bool = False,
 ) -> ResyncResult:
     """Re-fetch + reconcile ``app``'s manifest, and leave an audit trail.
 
@@ -414,7 +415,7 @@ def resync_app_manifest_from_repo(
     Emission never affects the result: an events-backend failure must not
     turn a successful resync into a failed one.
     """
-    result = _resync_app_manifest_from_repo(app, fetch=fetch, ref=ref)
+    result = _resync_app_manifest_from_repo(app, fetch=fetch, ref=ref, discard_staged=discard_staged)
     if result.status != "in_sync":
         try:
             Event.emit(
@@ -539,6 +540,7 @@ def _resync_app_manifest_from_repo(
     *,
     fetch: _FetchFn | None = None,
     ref: str = "",
+    discard_staged: bool = False,
 ) -> ResyncResult:
     """Re-fetch + reconcile ``app``'s manifest from its source repo.
 
@@ -603,15 +605,17 @@ def _resync_app_manifest_from_repo(
     # from the DB's source-of-truth means applying the repo would
     # drop work the operator hasn't pushed yet. Refuse rather than
     # clobber. The destructive ``syncManifestFromRepo`` mutation is
-    # the explicit "yes, throw away my draft" path.
+    # the explicit "yes, throw away my draft" path: it passes
+    # ``discard_staged``, after the Config page's confirmation.
     staged = app.manifest_raw_staged or ""
-    if staged.strip() and repo_text.strip() != db_raw.strip():
+    if staged.strip() and not discard_staged and repo_text.strip() != db_raw.strip():
         return ResyncResult(
             status="diverged",
             changes=ResyncChanges(),
             error=(
                 "DB has unpushed staged drafts that would be clobbered by "
-                "repo content. Push or discard staged drafts before resync."
+                "repo content. Push the draft to the repo, or use Pull from "
+                "repo on the app's Config page to discard it."
             ),
         )
 
@@ -630,6 +634,9 @@ def _resync_app_manifest_from_repo(
             now = timezone.now()
             app.last_resync_at = now
             fields.append("last_resync_at")
+            if discard_staged and staged:
+                app.manifest_raw_staged = ""
+                fields.append("manifest_raw_staged")
             fields += _clear_stale_bootstrap_failure(app)
             fields += ["updated_at", "version"]
             app.save(update_fields=fields)
@@ -650,7 +657,7 @@ def _resync_app_manifest_from_repo(
         # upstream — clearing it is the right thing). We've already
         # refused above when the buffer would lose work.
         healed = _clear_stale_bootstrap_failure(app)
-        if staged.strip() and repo_text.strip() == staged.strip():
+        if staged.strip() and (discard_staged or repo_text.strip() == staged.strip()):
             app.manifest_raw_staged = ""
             app.save(
                 update_fields=[
