@@ -332,22 +332,27 @@ def test_sync_from_repo_returns_failure_when_no_connection(permission_resolver):
     assert "no active source connection" in result.errors[0].message
 
 
-def test_sync_from_repo_returns_failure_on_diverged(permission_resolver, monkeypatch):
-    """A staged buffer + repo content that differs from the DB
-    surfaces as SCM_DIVERGED so the UI can warn before clobbering."""
+def test_sync_from_repo_discards_a_staged_draft(permission_resolver, monkeypatch):
+    """Pull from repo is the confirmed "throw my draft away" path. It used to
+    refuse with SCM_DIVERGED like the deploy-time resync, and nothing else
+    could clear a draft, so an app with a stale draft (SteadyMD QS-Ops,
+    2026-10-14) could only push the old config back over the repo."""
+    from astrolift_registry.services.manifest_sync import resync_app_manifest_from_repo
+
     org, app = _scaffold(manifest_raw=_VALID_TOML, manifest_hash="abc")
     _scaffold_github_conn(org)
     app.manifest_raw_staged = "operator's pending draft"
     app.save(update_fields=["manifest_raw_staged"])
     permission_resolver.grant(Permission.APP_UPDATE)
 
-    # Repo has a different content from both the DB anchor + the
-    # staged buffer — the divergence guard fires.
     other_toml = _VALID_TOML.replace('name = "hello"', 'name = "hello-renamed"')
     monkeypatch.setattr(
         "astrolift_registry.services.manifest_sync._default_fetch",
         lambda *a, **kw: other_toml,
     )
+
+    # The deploy-time resync still refuses: it runs unattended.
+    assert resync_app_manifest_from_repo(app).status == "diverged"
 
     with _ctx(org):
         result = RegistryMutation().sync_manifest_from_repo(
@@ -355,8 +360,10 @@ def test_sync_from_repo_returns_failure_on_diverged(permission_resolver, monkeyp
             input=SyncManifestFromRepoInput(id=str(app.guid)),
         )
 
-    assert not result.ok
-    assert result.errors[0].code == "SCM_DIVERGED"
+    assert result.ok, result.errors
+    app.refresh_from_db()
+    assert app.manifest_raw_staged == ""
+    assert app.manifest_raw.strip() == other_toml.strip()
 
 
 def test_push_with_no_staged_returns_nothing_to_push(

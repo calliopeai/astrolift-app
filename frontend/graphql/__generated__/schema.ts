@@ -2793,6 +2793,7 @@ export type AstroliftElevationStatus = {
   method?: Maybe<Scalars['String']['output']>;
   requiredFor: Array<Scalars['String']['output']>;
   secondsRemaining: Scalars['Int']['output'];
+  supportedMethods: Array<Scalars['String']['output']>;
 };
 
 export type AstroliftEmailAccountStatus = {

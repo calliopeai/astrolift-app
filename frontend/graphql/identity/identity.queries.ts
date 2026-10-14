@@ -1012,6 +1012,7 @@ export const GET_ELEVATION_STATUS = gql`
       secondsRemaining
       method
       requiredFor
+      supportedMethods
     }
   }
 `;

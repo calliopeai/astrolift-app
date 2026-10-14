@@ -694,7 +694,7 @@ class ManifestMutations:
         # provider so the manifest_raw + hash actually mirror the
         # repo's content. Issue #536.
         with allow_project_attach(actor_may_attach_project_services(app)):
-            result = resync_app_manifest_from_repo(app)
+            result = resync_app_manifest_from_repo(app, discard_staged=True)
         if result.status == "fetch_failed":
             return gql_failure(
                 "SCM_FETCH_FAILED",
