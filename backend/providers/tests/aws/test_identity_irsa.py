@@ -593,3 +593,65 @@ def test_empty_reconcile_removes_only_the_platform_inline_policy(driver, iam_cli
     for _ in range(2):
         driver.create_identity_role(name="empty-union", permissions=[])
         assert iam_client.list_role_policies(RoleName="empty-union")["PolicyNames"] == ["external-policy"]
+
+
+# ---- Secrets Manager grants by name (SteadyMD DV-9250) ------------------
+
+MASTER = "astrolift/rds/astrolift-01a136fba4157c67b4ec0982ff880b39/master"
+MASTER_ARN = f"arn:aws:secretsmanager:us-east-1:123456789012:secret:{MASTER}-*"
+SECRET_READ = {"Effect": "Allow", "Action": ["secretsmanager:GetSecretValue"], "Resource": MASTER}
+
+
+def _workload_policy(iam_client, role: str) -> dict:
+    document = iam_client.get_role_policy(RoleName=role, PolicyName="astrolift-workload-policy")["PolicyDocument"]
+    return json.loads(document) if isinstance(document, str) else document
+
+
+def test_a_secret_granted_by_name_is_written_as_its_arn(driver: IRSADriver, iam_client) -> None:
+    """IAM refuses a secret name as a Resource ("must be in ARN format"); the
+    first deploy of an app with a managed Postgres failed on PutRolePolicy."""
+    driver.create_identity_role(name="abbott-cgm", permissions=[SECRET_READ])
+    [statement] = _workload_policy(iam_client, "abbott-cgm")["Statement"]
+    assert statement["Resource"] == MASTER_ARN
+    assert statement["Action"] == ["secretsmanager:GetSecretValue"]
+
+
+def test_reconcile_writes_and_verifies_the_same_arn(driver: IRSADriver, iam_client) -> None:
+    owner = {
+        "organization": "0b6f7a6e-1c3a-4c56-9f2a-6f0e3c9d2a11",
+        "app": "5f0c2d4e-8a7b-4c1d-9e3f-2a1b0c9d8e7f",
+        "cluster": "6a1d3e5f-9b8c-4d2e-8f4a-3b2c1d0e9f8a",
+    }
+    subjects = ["system:serviceaccount:white-label-production:abbott-cgm"]
+    driver.reconcile_managed_identity(
+        name="astrolift-abbott-cgm", permissions=[SECRET_READ], owner=owner, subjects=subjects
+    )
+    [statement] = _workload_policy(iam_client, "astrolift-abbott-cgm")["Statement"]
+    assert statement["Resource"] == MASTER_ARN
+    assert driver.verify_managed_identity(
+        name="astrolift-abbott-cgm", permissions=[SECRET_READ], owner=owner, subjects=subjects
+    )
+
+
+@pytest.mark.parametrize(
+    ("resource", "expected"),
+    [
+        (
+            [MASTER, "astrolift/rds/x/url#DATABASE_URL"],
+            [MASTER_ARN, "arn:aws:secretsmanager:us-east-1:123456789012:secret:astrolift/rds/x/url-*"],
+        ),
+        (
+            "arn:aws:secretsmanager:us-east-1:123456789012:secret:kept-AbCdEf",
+            "arn:aws:secretsmanager:us-east-1:123456789012:secret:kept-AbCdEf",
+        ),
+        ("*", "*"),
+    ],
+)
+def test_secret_resources_keep_arns_and_wildcards(driver: IRSADriver, resource, expected) -> None:
+    statement = {"Effect": "Allow", "Action": "secretsmanager:GetSecretValue", "Resource": resource}
+    assert driver._policy([statement])["Statement"] == [{**statement, "Resource": expected}]
+
+
+def test_other_grants_are_left_as_written(driver: IRSADriver) -> None:
+    statement = {"Effect": "Allow", "Action": ["s3:GetObject"], "Resource": "arn:aws:s3:::bucket/*"}
+    assert driver._policy([statement])["Statement"] == [statement]

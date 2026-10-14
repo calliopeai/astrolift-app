@@ -285,3 +285,54 @@ def test_adopting_leaves_a_non_preview_environment_in_the_app_namespace(env):
 
     env.refresh_from_db()
     assert env.k8s_namespace == ""
+
+
+_STAGING_ONLY = """
+name = "hello-app"
+
+[[workloads]]
+name = "web"
+kind = "deployment"
+is_public = true
+
+  [[workloads.containers]]
+  name = "web"
+  is_primary = true
+  port = 8080
+
+[[managed_services]]
+kind = "redis"
+name = "cache"
+
+[environments.staging]
+replicas = 1
+"""
+
+
+def test_registration_creates_the_environments_the_manifest_declares(placed):
+    """Registration passes no names; the manifest's ``[environments.*]`` keys
+    are created, as they are on resync. Before, a manifest declaring staging
+    got only the production environment its unscoped service defaults to
+    (SteadyMD DV-9250)."""
+    placed.app.manifest_raw = _STAGING_ONLY
+    placed.app.save(update_fields=["manifest_raw"])
+
+    _bootstrap_app_environments(placed.app, [])
+
+    names = set(
+        AppEnvironment.objects.filter(registered_app=placed.app, deleted_at__isnull=True).values_list(
+            "name", flat=True
+        )
+    )
+    assert names == {"staging", "production"}
+
+
+def test_a_manifest_without_environments_still_gets_production(placed):
+    placed.app.manifest_raw = _STAGING_ONLY.split("[[managed_services]]")[0]
+    placed.app.save(update_fields=["manifest_raw"])
+
+    _bootstrap_app_environments(placed.app, [])
+
+    assert list(AppEnvironment.objects.filter(registered_app=placed.app).values_list("name", flat=True)) == [
+        "production"
+    ]

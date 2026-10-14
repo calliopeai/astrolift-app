@@ -500,7 +500,7 @@ class IRSADriver(WorkloadIdentityDriver):
             self._iam.put_role_policy(
                 RoleName=name,
                 PolicyName="astrolift-workload-policy",
-                PolicyDocument=json.dumps({"Version": "2012-10-17", "Statement": permissions}),
+                PolicyDocument=json.dumps(self._policy(permissions)),
             )
         else:
             with suppress(self._iam.exceptions.NoSuchEntityException):
@@ -530,8 +530,7 @@ class IRSADriver(WorkloadIdentityDriver):
             )
         except self._iam.exceptions.NoSuchEntityException:
             return not permissions
-        expected = {"Version": "2012-10-17", "Statement": permissions}
-        return policy == expected
+        return policy == self._policy(permissions)
 
     @driver_op(cloud="aws", driver="identity", audit=True, sensitive_kind="identity.create_role")
     def create_identity_role(
@@ -577,12 +576,7 @@ class IRSADriver(WorkloadIdentityDriver):
                     self._iam.put_role_policy(
                         RoleName=name,
                         PolicyName="astrolift-workload-policy",
-                        PolicyDocument=json.dumps(
-                            {
-                                "Version": "2012-10-17",
-                                "Statement": permissions,
-                            }
-                        ),
+                        PolicyDocument=json.dumps(self._policy(permissions)),
                     )
                 else:
                     with suppress(self._iam.exceptions.NoSuchEntityException):
@@ -599,12 +593,7 @@ class IRSADriver(WorkloadIdentityDriver):
                 self._iam.put_role_policy(
                     RoleName=name,
                     PolicyName="astrolift-workload-policy",
-                    PolicyDocument=json.dumps(
-                        {
-                            "Version": "2012-10-17",
-                            "Statement": permissions,
-                        }
-                    ),
+                    PolicyDocument=json.dumps(self._policy(permissions)),
                 )
             except Exception as exc:
                 raise map_client_error(exc) from exc
@@ -872,6 +861,36 @@ class IRSADriver(WorkloadIdentityDriver):
         path = self._config.role_path.strip("/")
         path_segment = f"{path}/" if path else ""
         return f"arn:aws:iam::{self._config.account_id}:role/{path_segment}{role_name}"
+
+    def _policy(self, permissions: list[dict[str, Any]]) -> dict[str, Any]:
+        """The inline policy document for ``permissions``.
+
+        Managed-service drivers grant Secrets Manager reads on the secret's
+        name (``astrolift/rds/<id>/master``), the form they also use as the
+        binding's ``secret_ref``. IAM accepts only an ARN or ``*`` as a
+        ``Resource``, so a name is written as the secret's ARN with the
+        six-character suffix Secrets Manager appends (``-*``). Without this
+        the first deploy of an app with a managed database failed on
+        ``PutRolePolicy`` (SteadyMD DV-9250).
+        """
+        statements = []
+        for statement in permissions:
+            actions = statement.get("Action") or []
+            actions = [actions] if isinstance(actions, str) else actions
+            if not any(str(action).startswith("secretsmanager:") for action in actions):
+                statements.append(statement)
+                continue
+            resource = statement.get("Resource")
+            resources = [resource] if isinstance(resource, str) else list(resource or [])
+            arns = [self._secret_arn(str(value)) for value in resources]
+            statements.append({**statement, "Resource": arns[0] if isinstance(resource, str) else arns})
+        return {"Version": "2012-10-17", "Statement": statements}
+
+    def _secret_arn(self, value: str) -> str:
+        if value == "*" or value.startswith("arn:"):
+            return value
+        name = value.split("#", 1)[0]
+        return f"arn:aws:secretsmanager:{self._config.region}:{self._config.account_id}:secret:{name}-*"
 
     def _oidc_trust_policy(self) -> dict[str, Any]:
         """Trust policy template — initial form has no subject claim
