@@ -2793,6 +2793,7 @@ export type AstroliftElevationStatus = {
   method?: Maybe<Scalars['String']['output']>;
   requiredFor: Array<Scalars['String']['output']>;
   secondsRemaining: Scalars['Int']['output'];
+  supportedMethods: Array<Scalars['String']['output']>;
 };
 
 export type AstroliftEmailAccountStatus = {
@@ -17739,7 +17740,7 @@ export type ListMyConnectedAccountsQuery = { astroliftMyConnectedAccounts: Array
 export type GetElevationStatusQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type GetElevationStatusQuery = { astroliftElevationStatus: { elevated: boolean, elevatedUntil?: string | null, secondsRemaining: number, method?: string | null, requiredFor: Array<string> } };
+export type GetElevationStatusQuery = { astroliftElevationStatus: { elevated: boolean, elevatedUntil?: string | null, secondsRemaining: number, method?: string | null, requiredFor: Array<string>, supportedMethods: Array<string> } };
 
 export type ExportMembersCsvQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;

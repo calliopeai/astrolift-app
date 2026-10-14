@@ -2249,7 +2249,7 @@ class IdentityQuery:
         in a logged-out shell without a try/catch.
         """
         from astrolift_identity.session_elevation import get_status
-        from astrolift_identity.step_up import list_gated_resolvers
+        from astrolift_identity.step_up import _supported_step_up_methods, list_gated_resolvers
 
         request = getattr(info.context, "request", None)
         viewer = getattr(request, "user", None) if request else None
@@ -2275,6 +2275,7 @@ class IdentityQuery:
             seconds_remaining=status.seconds_remaining,
             method=status.method,
             required_for=gated,
+            supported_methods=_supported_step_up_methods(session),
         )
 
 

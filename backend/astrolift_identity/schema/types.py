@@ -841,6 +841,9 @@ class ElevationStatusType:
     backend will gate behind a fresh elevation — the FE uses it to
     pre-prompt instead of waiting for the first STEP_UP_REQUIRED
     envelope after the user already clicked Save.
+
+    ``supported_methods`` is what this session can step up with (``sso``
+    for an IdP sign-in), for a refusal whose envelope did not carry it.
     """
 
     elevated: bool
@@ -848,6 +851,7 @@ class ElevationStatusType:
     seconds_remaining: int
     method: str | None
     required_for: list[str]
+    supported_methods: list[str] = strawberry.field(default_factory=list)
 
 
 def active_session_to_type(row, *, is_current: bool) -> ActiveSessionType:

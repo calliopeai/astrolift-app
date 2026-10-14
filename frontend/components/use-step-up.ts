@@ -1,12 +1,14 @@
 "use client";
 
-import { useMutation } from "@apollo/client/react";
+import { useMutation, useQuery } from "@apollo/client/react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
 import { ELEVATE_ADMIN_SESSION } from "@/graphql/identity/identity.mutations";
+import { GET_ELEVATION_STATUS } from "@/graphql/identity/identity.queries";
 import type {
   AstroliftElevatePayload,
+  AstroliftElevationStatus,
   ElevateAdminSessionInput,
 } from "@/graphql/identity/identity.types";
 import type { MutationError } from "@/graphql/identity/identity.types";
@@ -68,9 +70,18 @@ export function useStepUp() {
   const [trigger, setTrigger] = React.useState<StepUpEventDetail | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
+  // Most gated mutations do not select ``supportedMethods`` on their
+  // errors, so the refusal arrives without it. The session's own status
+  // knows: without it an SSO user got a password form they cannot fill.
+  const { data: status } = useQuery<{ astroliftElevationStatus: AstroliftElevationStatus }>(
+    GET_ELEVATION_STATUS,
+    { skip: !open, fetchPolicy: "cache-first" }
+  );
+  const sessionMethods = status?.astroliftElevationStatus.supportedMethods as StepUpMethod[] | undefined;
+
   const method: StepUpMethod = React.useMemo(
-    () => pickMethod(trigger?.supportedMethods),
-    [trigger]
+    () => pickMethod(trigger?.supportedMethods?.length ? trigger.supportedMethods : sessionMethods),
+    [trigger, sessionMethods]
   );
 
   const [elevate, { loading }] = useMutation<ElevateResponse, { input: ElevateAdminSessionInput }>(

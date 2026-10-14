@@ -280,4 +280,6 @@ export interface AstroliftElevationStatus {
   secondsRemaining: number;
   method: AstroliftElevationMethod | null;
   requiredFor: string[];
+  /** What this session can step up with; ``sso`` for an IdP sign-in. */
+  supportedMethods: string[];
 }

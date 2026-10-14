@@ -2895,6 +2895,7 @@ type AstroliftElevationStatus {
   secondsRemaining: Int!
   method: String
   requiredFor: [String!]!
+  supportedMethods: [String!]!
 }
 
 type AstroliftEmailAccountStatus {

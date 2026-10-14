@@ -600,6 +600,24 @@ def test_elevation_status_query_reflects_elevation():
     assert isinstance(result.required_for, list)
 
 
+def test_elevation_status_query_names_the_sessions_step_up_method():
+    """An SSO sign-in steps up through the IdP. Most gated mutations do not
+    select ``supportedMethods`` on their refusal, so the prompt reads it here;
+    without it a Cognito user got a password form they cannot fill."""
+    from astrolift_identity.sessions import SESSION_LOGIN_METHOD_KEY
+
+    user = _admin_user()
+    session = _FakeSession({SESSION_LOGIN_METHOD_KEY: "sso"})
+    assert IdentityQuery().astrolift_elevation_status(_info(user, session=session)).supported_methods == [
+        "sso"
+    ]
+
+    session = _FakeSession({SESSION_LOGIN_METHOD_KEY: "password"})
+    assert IdentityQuery().astrolift_elevation_status(_info(user, session=session)).supported_methods == [
+        "password"
+    ]
+
+
 def test_elevation_status_query_for_unauthenticated_returns_unelevated():
     request = SimpleNamespace(user=None, session=None)
     info = SimpleNamespace(context=SimpleNamespace(request=request, user=None))
@@ -610,6 +628,7 @@ def test_elevation_status_query_for_unauthenticated_returns_unelevated():
     assert result.elevated_until is None
     assert result.method is None
     assert result.required_for == []
+    assert result.supported_methods == []
 
 
 # ---- credential verifier sanity ---------------------------------------
