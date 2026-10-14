@@ -66,6 +66,7 @@ from _sdk.cluster import (
     StorageClassInfo,
     TeardownReport,
     WorkloadStatus,
+    apply_error_message,
     classify_apply_error,
     workload_status_from_object,
 )
@@ -480,7 +481,7 @@ class EKSClusterDriver(ClusterDriver):
                         name=name,
                         namespace=manifest_ns,
                         exception_type=type(exc).__name__,
-                        exception_message=str(exc),
+                        exception_message=apply_error_message(exc),
                         is_retryable=classify_apply_error(exc),
                     )
                 )
