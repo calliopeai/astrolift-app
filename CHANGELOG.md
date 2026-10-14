@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- An app with a managed database deploys on AWS again. The platform grants the app's workload role read access to the database's master secret, and wrote the secret's name as the policy `Resource`. IAM accepts only an ARN or `*` there, so `PutRolePolicy` failed (`MalformedPolicyDocument: Resource astrolift/rds/<id>/master must be in ARN format`) and the first deploy stopped before any pod was created. The identity driver now writes a Secrets Manager name as its ARN (`arn:aws:secretsmanager:<region>:<account>:secret:<name>-*`) when it writes and verifies the role policy. That covers every managed database type that grants by name (Postgres, MySQL, Aurora, SQL Server, DocumentDB, ElastiCache, MemoryDB). Reported by SteadyMD on abbott-cgm (DV-9250).
+
 - The model deploy page says why **Review deployment** is disabled. The checks step lists every condition that is still unmet, in order:
   - hosting is limited to platform super-admins;
   - a missing name, cluster, compute or resource request;
