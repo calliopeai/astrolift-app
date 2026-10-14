@@ -41,6 +41,7 @@ from _sdk.cluster import (
     StorageClassInfo,
     TeardownReport,
     WorkloadStatus,
+    apply_error_message,
     classify_apply_error,
     workload_status_from_object,
 )
@@ -162,7 +163,7 @@ class K8sNativeClusterDriver(ClusterDriver):
                         name=name,
                         namespace=namespace,
                         exception_type=type(exc).__name__,
-                        exception_message=str(exc),
+                        exception_message=apply_error_message(exc),
                         is_retryable=classify_apply_error(exc),
                     )
                 )
@@ -781,7 +782,18 @@ class K8sNativeClusterDriver(ClusterDriver):
                         "config": {
                             "large-client-header-buffers": "4 32k",
                             "proxy-buffer-size": "16k",
+                            # configuration-snippet is a Critical-risk
+                            # annotation; controller 1.12 lowers the default
+                            # ceiling to High and would refuse it.
+                            "annotations-risk-level": "Critical",
                         },
+                        # The central auth gate stamps its gateway secret on
+                        # each app through configuration-snippet (see
+                        # providers.k8s_native.ingress), and the chart turns
+                        # snippets off by default. Without this every gated
+                        # Ingress is refused at admission, which a re-applied
+                        # chart did to SteadyMD's cluster (DV-9250).
+                        "allowSnippetAnnotations": True,
                     },
                 },
                 requires=["metallb"],

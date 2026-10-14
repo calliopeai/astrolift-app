@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -66,6 +67,30 @@ _TRANSIENT_EXCEPTION_NAMES = frozenset(
         "ServerSelectionTimeoutError",
     }
 )
+
+
+def apply_error_message(exc: BaseException) -> str:
+    """The apiserver's own reason for refusing a manifest, on one line.
+
+    A Kubernetes client error stringifies as the status code on its first
+    line with the Status body several lines below, and a deploy's persisted
+    failure keeps only the first line. So an admission webhook's refusal
+    reached the operator as a bare ``400`` (SteadyMD DV-9250). Lead with
+    the code and the Status ``message`` instead; anything else keeps
+    ``str(exc)``.
+    """
+    status = getattr(exc, "status", None)
+    body = getattr(exc, "body", None)
+    if isinstance(body, bytes):
+        body = body.decode("utf-8", "replace")
+    if isinstance(status, int) and isinstance(body, str):
+        try:
+            message = json.loads(body).get("message")
+        except (ValueError, AttributeError):
+            message = None
+        if isinstance(message, str) and message.strip():
+            return f"{status}: {' '.join(message.split())}"
+    return str(exc)
 
 
 def classify_apply_error(exc: BaseException) -> bool:

@@ -34,6 +34,7 @@ from _sdk.cluster import (
     RolloutResult,
     StorageClassInfo,
     TeardownReport,
+    apply_error_message,
     classify_apply_error,
     workload_status_from_object,
 )
@@ -230,7 +231,7 @@ class GKEClusterDriver(ClusterDriver):
                         name=name,
                         namespace=namespace,
                         exception_type=type(exc).__name__,
-                        exception_message=str(exc),
+                        exception_message=apply_error_message(exc),
                         is_retryable=classify_apply_error(exc),
                     )
                 )

@@ -65,3 +65,12 @@ def test_metrics_queries_use_the_namespace_preserved_by_the_collector():
     monitor = _ingress_component().helm_values["controller"]["metrics"]["serviceMonitor"]
     assert monitor["honorLabels"] is True
     assert NGINX_INGRESS.namespace_label == "namespace"
+
+
+def test_snippet_annotations_are_allowed():
+    """The gate's gateway secret rides on configuration-snippet. The chart
+    turns snippets off by default, and then every gated Ingress is refused
+    at admission (DV-9250)."""
+    controller = _ingress_component().helm_values["controller"]
+    assert controller.get("allowSnippetAnnotations") is True
+    assert _controller_config().get("annotations-risk-level") == "Critical"

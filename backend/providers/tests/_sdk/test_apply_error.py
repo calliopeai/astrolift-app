@@ -8,7 +8,7 @@ transient (HTTP 5xx, ConnectionError, TimeoutError) from permanent (HTTP
 
 from __future__ import annotations
 
-from _sdk.cluster import ApplyError, ApplyResult, classify_apply_error
+from _sdk.cluster import ApplyError, ApplyResult, apply_error_message, classify_apply_error
 
 
 def test_apply_error_str_matches_legacy_shape() -> None:
@@ -84,3 +84,33 @@ def test_classify_uses_http_status_when_set() -> None:
     e400 = _ApiException("err")
     e400.status = 422
     assert classify_apply_error(e400) is False
+
+
+class _ApiError(Exception):
+    """The shape of a kubernetes client error: status code on the first
+    line of ``str()``, the Status body further down."""
+
+    def __init__(self, status: int, body: bytes) -> None:
+        super().__init__(f"{status}\nReason: Bad Request\nHTTP response body: {body!r}")
+        self.status = status
+        self.body = body
+
+
+def test_apply_error_message_leads_with_the_apiserver_reason() -> None:
+    """An admission webhook's refusal used to reach the operator as a bare
+    ``400``, because the persisted reason keeps only the first line."""
+    exc = _ApiError(
+        400,
+        b'{"kind":"Status","status":"Failure","message":"admission webhook \\"validate.nginx.ingress.kubernetes.io\\" '
+        b'denied the request: nginx.ingress.kubernetes.io/configuration-snippet annotation cannot be used",'
+        b'"reason":"BadRequest","code":400}',
+    )
+    message = apply_error_message(exc)
+    assert message.startswith("400: admission webhook")
+    assert "configuration-snippet annotation cannot be used" in message
+    assert "\n" not in message
+
+
+def test_apply_error_message_falls_back_to_str() -> None:
+    assert apply_error_message(TimeoutError("timed out")) == "timed out"
+    assert apply_error_message(_ApiError(500, b"not json")).startswith("500\n")
