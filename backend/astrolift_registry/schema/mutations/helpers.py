@@ -481,9 +481,14 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
     from astrolift_workflows.inputs import Actor, OnboardAppInput
 
     manifest_services = ()
+    declared_env_names: list[str] = []
     if app.manifest_raw:
         try:
-            manifest_services = normalize(parse_raw(app.manifest_raw)).managed_services
+            raw_manifest = parse_raw(app.manifest_raw)
+            manifest_services = normalize(raw_manifest).managed_services
+            # Registration passes no names; the manifest's own
+            # ``[environments.*]`` keys are the ones resync would use (DV-9250).
+            declared_env_names = list(raw_manifest.raw.get("environments", {}).keys())
         except ManifestError:
             # Registration deliberately persists malformed inline manifests
             # with a parse_failed status so operators can repair them later.
@@ -534,7 +539,7 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
     # allows; the app surfaces the missing binding instead.
     base_zone: str = getattr(_managed_domain, "zone", None) or ""
     created_any = False
-    effective_env_names = list(env_names) if env_names else []
+    effective_env_names = list(env_names) if env_names else declared_env_names
     for service in manifest_services:
         if service.environment not in effective_env_names:
             effective_env_names.append(service.environment)
