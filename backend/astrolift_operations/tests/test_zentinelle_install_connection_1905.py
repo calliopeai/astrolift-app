@@ -371,6 +371,38 @@ def test_a_move_whose_old_registration_cannot_be_revoked_stands_and_says_so(
     assert "could not be revoked in Zentinelle" in gateway.last_error and "by hand" in gateway.last_error
 
 
+@override_config(ZENTINELLE_GATEWAY_ENABLED=True, ZENTINELLE_GATEWAY_IMAGE=IMAGE)
+def test_a_move_whose_redeploy_fails_keeps_the_revoke_note_and_moving_again_redeploys(
+    org, operator, plugin, admin, zentinelle, driver
+):
+    shared = _make_cluster(plugin, None, "shared")
+    _registered_by(_connect(org).data.id, shared)
+    assert _connect_install(org, operator, gateway_url=IN_CLUSTER).ok
+    zentinelle.overrides[("DELETE", f"{API}/clusters/{shared.guid}")] = FakeResponse(500, {"detail": "boom"})
+    driver.fail["Deployment"] = "connection refused"
+
+    result = _shared(org, operator, "move_zentinelle_shared_cluster_to_install", shared)
+
+    assert result.ok is False and "moved to the install connection" in result.errors[0].message
+    gateway = ZentinelleClusterGateway.objects.get(cluster=shared)
+    assert gateway.connection.is_install and gateway.gateway_deployed is False
+    assert "could not be deployed" in gateway.last_error and "by hand" in gateway.last_error
+
+    del driver.fail["Deployment"]
+    zentinelle.calls.clear()
+    again = _shared(org, operator, "move_zentinelle_shared_cluster_to_install", shared)
+
+    assert again.ok, again.errors
+    assert zentinelle.by() == []
+    gateway.refresh_from_db()
+    assert gateway.gateway_deployed is True and gateway.last_error == ""
+    env = {
+        e["name"]: e["value"]
+        for e in driver.last("Deployment")["spec"]["template"]["spec"]["containers"][0]["env"]
+    }
+    assert env["ZENTINELLE_URL"] == IN_CLUSTER
+
+
 def test_a_move_zentinelle_refuses_leaves_the_cluster_with_the_organization(
     org, operator, plugin, admin, zentinelle, driver
 ):

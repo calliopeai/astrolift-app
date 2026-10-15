@@ -803,6 +803,9 @@ def _move_locked(install: ZentinelleConnection, cluster) -> ZentinelleClusterGat
             field="clusterId",
         )
     if gateway.connection_id == install.pk:
+        # Moving again finishes a move whose redeploy failed.
+        if gateway.gateway_enabled and not gateway.gateway_deployed and gateway_feature_enabled():
+            _deploy(gateway)
         return gateway
     if cluster.organization_id is not None:
         raise ZentinelleConnectError(
@@ -853,12 +856,22 @@ def _move_locked(install: ZentinelleConnection, cluster) -> ZentinelleClusterGat
                 f"registration could not be revoked in Zentinelle ({exc.message}); revoke cluster "
                 f"{gateway.zentinelle_cluster_id} there by hand"
             )
+    undeployed = ""
     if gateway.gateway_enabled and gateway_feature_enabled():
         # The install's gateway URL may differ from the organization's.
-        _deploy(gateway)
-    if unrevoked:
-        gateway.last_error = unrevoked
+        try:
+            _deploy(gateway)
+        except ZentinelleConnectError as exc:
+            # Still running with the organization's URL: marked undeployed so
+            # that moving again (or reconcile) redeploys it.
+            gateway.gateway_deployed = False
+            undeployed = f"{exc.message}; move it again once the cluster is reachable"
+    notes = "; ".join(note for note in (undeployed, unrevoked) if note)
+    if notes:
+        gateway.last_error = notes
         gateway.save()
+    if undeployed:
+        raise ZentinelleConnectError(ErrorCode.INTERNAL, f"moved to the install connection, but {notes}")
     return gateway
 
 
