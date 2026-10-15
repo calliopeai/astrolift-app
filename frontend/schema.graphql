@@ -1339,6 +1339,11 @@ type AstroliftAppEnvironment {
   """The owner's user pk: the environment's creator, else the app's."""
   ownerUserId: String
   ownedByMe: Boolean!
+
+  """
+  What the viewer may do here (#1867): app.deploy (pause and resume deploys or ingress), app.update (settings). From the same checker and environment facts as the mutations; advisory, the mutation still decides.
+  """
+  viewerPermissions: [String!]!
 }
 
 type AstroliftAppEnvironmentMutationResult {
@@ -10455,6 +10460,7 @@ type Query {
   astroliftMyProfile: AstroliftMyProfile
   astroliftMyUiPreferences: AstroliftUiPreferences
   astroliftMyPermissions: [String!]!
+  astroliftAccessRevision: String!
   astroliftActiveIdentityProvider: AstroliftIdentityProvider
   astroliftActiveSessions: [AstroliftActiveSession!]!
   astroliftElevationStatus: AstroliftElevationStatus!

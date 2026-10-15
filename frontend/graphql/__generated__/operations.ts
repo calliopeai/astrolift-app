@@ -1305,6 +1305,8 @@ export type AstroliftAppEnvironment = {
   requiredApprovals: Scalars['Int']['output'];
   settings: Array<AstroliftEnvironmentSetting>;
   url: Scalars['String']['output'];
+  /** What the viewer may do here (#1867): app.deploy (pause and resume deploys or ingress), app.update (settings). From the same checker and environment facts as the mutations; advisory, the mutation still decides. */
+  viewerPermissions: Array<Scalars['String']['output']>;
 };
 
 export type AstroliftAppEnvironmentMutationResult = {
@@ -11929,6 +11931,7 @@ export type Query = {
   astroliftAccessOn: AstroliftAccessEntryPage;
   /** Easy-mode starting points (#2272): each names the stock role it grants per scope and, from that role's permissions, the tasks it allows and excludes. Never super-admin. */
   astroliftAccessPresets: Array<AstroliftAccessPreset>;
+  astroliftAccessRevision: Scalars['String']['output'];
   /** Approval requests for gated actions in this organization (#2202), newest first; pass a status (pending, approved, rejected, cancelled, expired, consumed) to filter. */
   astroliftActionApprovalRequests: Array<AstroliftActionApprovalRequest>;
   /** What each gated action asks of the viewer (#2202), optionally on one app: confirmation, fresh verification and whether an admin may approve their own. */
@@ -17888,7 +17891,7 @@ export type ListEnvironmentsQueryVariables = Exact<{
 }>;
 
 
-export type ListEnvironmentsQuery = { astroliftEnvironments: Array<{ id: string, name: string, url: string, deploysPaused: boolean, ingressPaused: boolean, requiredApprovals: number, registeredAppSlug: string, clusterSlug?: string | null, clusterId?: string | null, clusterProviderPluginSlug?: string | null, domainZone?: string | null, createdAt: string, settings: Array<{ id: string, key: string, value: string }> }> };
+export type ListEnvironmentsQuery = { astroliftEnvironments: Array<{ id: string, name: string, url: string, deploysPaused: boolean, ingressPaused: boolean, requiredApprovals: number, registeredAppSlug: string, clusterSlug?: string | null, clusterId?: string | null, clusterProviderPluginSlug?: string | null, domainZone?: string | null, createdAt: string, viewerPermissions: Array<string>, settings: Array<{ id: string, key: string, value: string }> }> };
 
 export type ListEnvironmentsPageQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
@@ -17900,7 +17903,7 @@ export type ListEnvironmentsPageQueryVariables = Exact<{
 }>;
 
 
-export type ListEnvironmentsPageQuery = { astroliftEnvironmentsPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, name: string, url: string, deploysPaused: boolean, ingressPaused: boolean, requiredApprovals: number, registeredAppSlug: string, clusterSlug?: string | null, clusterId?: string | null, clusterProviderPluginSlug?: string | null, domainZone?: string | null, createdAt: string, kind: string, region: string, ownedByMe: boolean, settings: Array<{ id: string, key: string, value: string }> }> } };
+export type ListEnvironmentsPageQuery = { astroliftEnvironmentsPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, name: string, url: string, deploysPaused: boolean, ingressPaused: boolean, requiredApprovals: number, registeredAppSlug: string, clusterSlug?: string | null, clusterId?: string | null, clusterProviderPluginSlug?: string | null, domainZone?: string | null, createdAt: string, kind: string, region: string, ownedByMe: boolean, viewerPermissions: Array<string>, settings: Array<{ id: string, key: string, value: string }> }> } };
 
 export type ListDeploymentsQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
@@ -19134,6 +19137,11 @@ export type GetMyPermissionsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type GetMyPermissionsQuery = { astroliftMyPermissions: Array<string> };
+
+export type GetAccessRevisionQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type GetAccessRevisionQuery = { astroliftAccessRevision: string };
 
 export type AccessPresetsQueryVariables = Exact<{ [key: string]: never; }>;
 

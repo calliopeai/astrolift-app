@@ -47,7 +47,6 @@ export function environmentsProps(
     error: null,
     onRetry: noop,
     busy: false,
-    canPause: true,
     onPause: noopAsync,
     onResume: noopAsync,
     ...overrides,

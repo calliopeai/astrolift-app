@@ -11,7 +11,6 @@ import { useListState, useLocalListState } from "@/components/list/use-list-stat
 import { PAUSE_ENVIRONMENT, RESUME_ENVIRONMENT } from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_ENVIRONMENTS_PAGE } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
-import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import { localizedEnvironmentsList, environmentsVariables } from "./environments-list";
 
@@ -39,7 +38,6 @@ export function useEnvironments(appSlug?: string) {
   const local = useLocalListState(definition);
   const list = appSlug ? local : routed;
   const { state } = list;
-  const { can } = useMyPermissions();
   const variables = environmentsVariables(appSlug ?? null, {
     q: state.q,
     filters: list.filters,
@@ -111,7 +109,6 @@ export function useEnvironments(appSlug?: string) {
       void query.refetch();
     },
     busy: pauseState.loading || resumeState.loading,
-    canPause: can("app.deploy"),
     onPause,
     onResume,
   };

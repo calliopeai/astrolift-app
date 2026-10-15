@@ -15,6 +15,7 @@ export const LIST_ENVIRONMENTS = gql`
       clusterProviderPluginSlug
       domainZone
       createdAt
+      viewerPermissions
       settings {
         id
         key
@@ -63,6 +64,7 @@ export const LIST_ENVIRONMENTS_PAGE = gql`
         kind
         region
         ownedByMe
+        viewerPermissions
         settings {
           id
           key

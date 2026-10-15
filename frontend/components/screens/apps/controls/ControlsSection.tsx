@@ -21,6 +21,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { environmentCan } from "@/lib/permissions/environment-permissions";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -133,7 +134,7 @@ export function EnvironmentControlsView({
             </Badge>
           )}
         </div>
-        <Can permission="app.deploy">
+        {environmentCan(env, "app.deploy") && (
           <Button
             size="sm"
             variant={env.deploysPaused ? "default" : "outline"}
@@ -149,7 +150,7 @@ export function EnvironmentControlsView({
             )}
             {env.deploysPaused ? t("resume") : t("pause")}
           </Button>
-        </Can>
+        )}
       </div>
 
       <Can permission="app.deploy">

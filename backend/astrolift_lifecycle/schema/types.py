@@ -138,6 +138,14 @@ class AppEnvironmentType:
         default=None, description="The owner's user pk: the environment's creator, else the app's."
     )
     owned_by_me: bool = False
+    viewer_permissions: list[str] = strawberry.field(
+        default_factory=list,
+        description=(
+            "What the viewer may do here (#1867): app.deploy (pause and resume deploys or ingress), "
+            "app.update (settings). From the same checker and environment facts as the mutations; "
+            "advisory, the mutation still decides."
+        ),
+    )
 
 
 @strawberry.type(name="AstroliftDeploymentApprover")
@@ -603,7 +611,14 @@ def _env_url(env) -> str:
     return env.url or ""
 
 
-def app_env_to_type(env, *, keys: list[str] | None = None) -> AppEnvironmentType:
+def app_env_to_type(
+    env, *, keys: list[str] | None = None, viewer_permissions: list[str] | None = None
+) -> AppEnvironmentType:
+    """``viewer_permissions`` is a list resolver's batched answer; a single row works out its own."""
+    if viewer_permissions is None:
+        from astrolift_lifecycle.viewer_permissions import environment_viewer_permissions
+
+        viewer_permissions = environment_viewer_permissions([env])[env.pk]
     raw = list(env.settings.filter(deleted_at__isnull=True))
     if keys is not None:
         raw = [s for s in raw if s.key in keys]
@@ -632,6 +647,7 @@ def app_env_to_type(env, *, keys: list[str] | None = None) -> AppEnvironmentType
         region=(env.tenant_cluster.region or "") if env.tenant_cluster_id else "",
         owner_user_id=str(owner_id) if owner_id else None,
         owned_by_me=_viewer_started(owner_id),
+        viewer_permissions=viewer_permissions,
     )
 
 

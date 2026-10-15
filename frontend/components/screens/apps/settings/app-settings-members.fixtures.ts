@@ -129,6 +129,7 @@ function environment(
     name,
     ingressPaused: false,
     settings: [],
+    viewerPermissions: ["app.deploy", "app.update"],
     ...patch,
   } as AstroliftAppEnvironment;
 }

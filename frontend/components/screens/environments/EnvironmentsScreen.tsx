@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
-import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { Column, EmptyStateSpec } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
@@ -14,6 +13,7 @@ import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
+import { environmentCan } from "@/lib/permissions/environment-permissions";
 
 import type { EnvironmentsState } from "./use-environments";
 
@@ -28,7 +28,8 @@ const ABOVE_ROW_LINK = "relative z-10";
 /**
  * Apps › Environments (spec 44 §4.4, §5.1): every deploy target across apps
  * on the shared list, views All · Mine · Production · Previews, numbered
- * pages, pause and resume deploys in each row's ⋯. On an app's Settings tab
+ * pages, pause and resume deploys in each row's ⋯ where that environment's
+ * own viewerPermissions allow them. On an app's Settings tab
  * (and an agent's) the same list is embedded and its rows stay put, since
  * the global detail would leave the app. Pure view; the data half is
  * useEnvironments.
@@ -43,7 +44,6 @@ export function EnvironmentsScreen({
   error,
   onRetry,
   busy,
-  canPause,
   onPause,
   onResume,
 }: EnvironmentsScreenProps) {
@@ -135,21 +135,18 @@ export function EnvironmentsScreen({
   function rowActions(e: AstroliftAppEnvironment) {
     return (
       <>
-        {canPause && (
-          <Can permission="app.deploy">
-            {e.deploysPaused ? (
-              <DropdownMenuItem disabled={busy} onSelect={() => void onResume(e)}>
-                <PlayIcon className="size-4" />
-                {t("resume")}
-              </DropdownMenuItem>
-            ) : (
-              <DropdownMenuItem disabled={busy} onSelect={() => setPauseTarget(e)}>
-                <PauseIcon className="size-4" />
-                {t("pause")}
-              </DropdownMenuItem>
-            )}
-          </Can>
-        )}
+        {environmentCan(e, "app.deploy") &&
+          (e.deploysPaused ? (
+            <DropdownMenuItem disabled={busy} onSelect={() => void onResume(e)}>
+              <PlayIcon className="size-4" />
+              {t("resume")}
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem disabled={busy} onSelect={() => setPauseTarget(e)}>
+              <PauseIcon className="size-4" />
+              {t("pause")}
+            </DropdownMenuItem>
+          ))}
         {e.url && (
           <DropdownMenuItem asChild>
             <a href={e.url} target="_blank" rel="noreferrer">

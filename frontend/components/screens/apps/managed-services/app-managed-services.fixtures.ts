@@ -95,6 +95,7 @@ function env(name: string): AstroliftAppEnvironment {
     kind: name === "prod" || name === "production" ? "production" : "other",
     region: "us-west-2",
     ownedByMe: false,
+    viewerPermissions: ["app.deploy", "app.update"],
     createdAt: "2026-09-01T12:00:00Z",
     deploysPaused: false,
     ingressPaused: false,

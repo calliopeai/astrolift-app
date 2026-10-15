@@ -33,6 +33,7 @@ function env(id: string, name: string): AstroliftAppEnvironment {
     kind: name === "prod" || name === "production" ? "production" : "other",
     region: "us-east-1",
     ownedByMe: false,
+    viewerPermissions: ["app.deploy", "app.update"],
     clusterId: null,
     clusterSlug: "prod-us-east",
     clusterProviderPluginSlug: null,

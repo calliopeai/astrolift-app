@@ -5,6 +5,7 @@ import * as React from "react";
 import { useTranslations } from "next-intl";
 
 import { useAppCan } from "@/lib/permissions/app-permissions";
+import { environmentCan } from "@/lib/permissions/environment-permissions";
 
 import { Can } from "@/components/Can";
 import { Button } from "@/components/ui/button";
@@ -48,9 +49,11 @@ export function EnvironmentSettingsView({
   onRetry,
 }: EnvironmentSettingsViewProps) {
   const t = useTranslations("apps.environmentOverrides");
-  const allowed = useAppCan("app.update");
+  const appAllowed = useAppCan("app.update");
   const [selectedEnvId, setSelectedEnvId] = React.useState<string>("");
   const effectiveEnv = envs.find((e) => e.id === selectedEnvId) ?? envs[0];
+  // And the selected environment's own answer (#1867): a policy can refuse one environment.
+  const allowed = appAllowed && environmentCan(effectiveEnv, "app.update");
   const settings = effectiveEnv?.settings ?? [];
   // Local observations prevent A→B→A from reviving a draft; the server has no CAS.
   const fingerprint = JSON.stringify([

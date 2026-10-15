@@ -6,6 +6,13 @@ export const GET_MY_PERMISSIONS = gql`
   }
 `;
 
+/** Moves when the viewer's roles, attributes, policies or session do (#1867). */
+export const GET_ACCESS_REVISION = gql`
+  query GetAccessRevision {
+    astroliftAccessRevision
+  }
+`;
+
 /** Easy-mode starting points over the stock roles (#2272). */
 export const ACCESS_PRESETS = gql`
   query AccessPresets {
