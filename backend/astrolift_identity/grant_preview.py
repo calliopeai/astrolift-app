@@ -373,8 +373,10 @@ def _answer(
     label = labels.get((target.kind, target.pk), target.kind.lower())
     if groups:
         notes.append("Group members are read from the groups the IdP asserted at each member's last sign-in.")
+    # The binding a change replaces no longer holds its old role afterwards.
+    after_rows = [r for r in rows if r.binding_guid != changed_guid]
     policies = (
-        _policy_effects(org_id, target, new_role, ids, users, rows, mine, stored)
+        _policy_effects(org_id, target, new_role, ids, users, after_rows, mine, stored)
         if new_role is not None
         else []
     )

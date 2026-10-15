@@ -204,3 +204,22 @@ def test_removal_previews_no_policies(world, manager):
             info, input=GrantPreviewInput(action="REMOVE", binding_id=GUID(str(binding.guid)))
         )
     assert result.ok and result.policies == []
+
+
+def test_a_change_drops_the_replaced_roles_policies(world, manager):
+    person = _member(world, "chg")
+    old = _role(DEPLOY, slug=f"old-{_tag()}")
+    binding = RoleBinding.objects.create(
+        user=person, role=old, scope_kind="APP", scope_id=world.medops_app.pk
+    )
+    held = _policy(world, action_pattern="app.deploy", actor_pattern={"user_role_at_scope": [old.slug]})
+    info = SimpleNamespace(context=SimpleNamespace(user=manager, request=SimpleNamespace(user=manager)))
+    with tenant_context(TenantContext(organization_id=world.org.pk, actor_user_id=manager.pk)):
+        result = IdentityQuery().astrolift_grant_preview(
+            info,
+            input=GrantPreviewInput(
+                action="CHANGE", binding_id=GUID(str(binding.guid)), role_id=GUID(str(_role(DEPLOY).guid))
+            ),
+        )
+    assert result.ok, result.errors
+    assert held.slug not in _by_slug(result)
