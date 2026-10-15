@@ -3596,6 +3596,17 @@
         "inSync": "Already in sync.",
         "accepted": "Resync accepted for {slug}.",
         "reportedState": "Resync accepted for {slug}; reported state: {state}. Completion is unconfirmed."
+      },
+      "addEnvironment": {
+        "title": "Add environment",
+        "description": "Create another environment for this app, such as staging. It gets a namespace and hostname of its own on the chosen cluster, and its first deploy brings it up.",
+        "nameLabel": "Name",
+        "nameHint": "Lowercase letters, digits and hyphens, at most 63 characters.",
+        "clusterLabel": "Cluster",
+        "defaultCluster": "App default cluster",
+        "button": "Add environment",
+        "created": "Environment {name} created.",
+        "failed": "Could not create the environment."
       }
     },
     "workloadDetail": {

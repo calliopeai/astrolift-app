@@ -2628,6 +2628,17 @@
         "inSync": "已同步。",
         "accepted": "已接受 {slug} 的重新同步。",
         "reportedState": "已接受 {slug} 的重新同步；报告的状态为：{state}。尚未确认完成。"
+      },
+      "addEnvironment": {
+        "title": "添加环境",
+        "description": "为此应用创建另一个环境，例如 staging。它会在所选集群上获得独立的命名空间和主机名，首次部署时启动。",
+        "nameLabel": "名称",
+        "nameHint": "仅限小写字母、数字和连字符，最多 63 个字符。",
+        "clusterLabel": "集群",
+        "defaultCluster": "应用默认集群",
+        "button": "添加环境",
+        "created": "已创建环境 {name}。",
+        "failed": "无法创建环境。"
       }
     },
     "common": {

@@ -41,6 +41,8 @@ export interface AppSettingsTabSlots {
   manifest?: React.ReactNode;
   webhooks?: React.ReactNode;
   environments?: React.ReactNode;
+  /** Add an environment after registration (#2398). */
+  addEnvironment?: React.ReactNode;
   environmentSettings?: React.ReactNode;
   /**
    * Sections of their own, for a resource whose Settings holds them: an
@@ -226,14 +228,16 @@ export function AppSettingsTab({
     sections.push(titled("manifest", tSection("manifest"), slots.manifest));
   const webhooks = gate(access.webhooks, "webhook.update", slots.webhooks);
   if (webhooks) sections.push(titled("webhooks", tSection("webhooks"), webhooks));
+  const addEnvironment = gate(access.update, "app.update", slots.addEnvironment);
   const overrides = gate(access.update, "app.update", slots.environmentSettings);
-  if (present(slots.environments) || overrides) {
+  if (present(slots.environments) || addEnvironment || overrides) {
     sections.push(
       titled(
         "environments",
         tSection("environments"),
         <div className="flex min-w-0 flex-col gap-10">
           {slots.environments}
+          {addEnvironment}
           {overrides}
         </div>
       )

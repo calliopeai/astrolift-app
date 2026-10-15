@@ -71,6 +71,7 @@ ROUTES = (
     ("upload_custom_domain_certificate", "mutation", "custom_domain_app_scope", "input.id"),
     ("set_domain_redirects", "mutation", "custom_domain_app_scope", "input.domain_id"),
     ("set_domain_path_routes", "mutation", "custom_domain_app_scope", "input.domain_id"),
+    ("create_app_environment", "mutation", "app_scope_by_slug", "input.app_slug"),
     ("pause_environment", "mutation", "environment_app_scope", "input.id"),
     ("resume_environment", "mutation", "environment_app_scope", "input.id"),
     ("pause_app_ingress", "mutation", "environment_app_scope", "input.id"),

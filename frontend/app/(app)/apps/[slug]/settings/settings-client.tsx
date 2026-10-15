@@ -1,5 +1,6 @@
 "use client";
 
+import { AddEnvironmentView } from "@/components/screens/apps/settings/AddEnvironment";
 import { AppIdentityView } from "@/components/screens/apps/settings/AppIdentity";
 import { AppSettingsScreen } from "@/components/screens/apps/settings/AppSettingsScreen";
 import { AppSettingsTab } from "@/components/screens/apps/settings/AppSettingsTab";
@@ -12,6 +13,7 @@ import { ManagedServicesAdminView } from "@/components/screens/apps/settings/Man
 import { ResyncSourceView } from "@/components/screens/apps/settings/ResyncSource";
 import { RetentionPolicyView } from "@/components/screens/apps/settings/RetentionPolicy";
 import { RunScheduledJobView } from "@/components/screens/apps/settings/RunScheduledJob";
+import { useAddEnvironment } from "@/components/screens/apps/settings/use-add-environment";
 import { useAppIdentity } from "@/components/screens/apps/settings/use-app-identity";
 import { useAppSettings } from "@/components/screens/apps/settings/use-app-settings";
 import { useAppSettingsTab } from "@/components/screens/apps/settings/use-app-settings-tab";
@@ -103,6 +105,7 @@ export function AppSettingsTabClient({ slug }: { slug: string }) {
               manifest: <ManifestPreviewClient slug={a.slug} />,
               webhooks: <WebhooksClient appSlug={a.slug} />,
               environments: <EnvironmentsClient appSlug={a.slug} />,
+              addEnvironment: <AddEnvironmentCard appSlug={a.slug} />,
               environmentSettings: <EnvironmentSettingsCard appSlug={a.slug} />,
               archive: <ArchiveAppCard app={a} />,
               deregister: <DangerZoneCard appSlug={a.slug} appName={a.name} />,
@@ -246,6 +249,10 @@ export function RetentionPolicyCard({ app }: { app: AstroliftRegisteredApp }) {
       policies={app.retentionPolicies ?? []}
     />
   );
+}
+
+function AddEnvironmentCard({ appSlug }: { appSlug: string }) {
+  return <AddEnvironmentView {...useAddEnvironment(appSlug)} />;
 }
 
 export function EnvironmentSettingsCard({ appSlug }: { appSlug: string }) {

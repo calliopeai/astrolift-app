@@ -6,6 +6,7 @@ import type {
 import type { AstroliftRegisteredApp, AstroliftWorkload } from "@/graphql/registry/registry.types";
 import type { AstroliftManagedService } from "@/graphql/services/services.types";
 
+import type { AddEnvironmentViewProps } from "./AddEnvironment";
 import type { AppIdentityViewProps } from "./AppIdentity";
 import type { AppSettingsScreenProps } from "./AppSettingsScreen";
 import type { ArchiveAppViewProps } from "./ArchiveApp";
@@ -263,6 +264,17 @@ export const FORCE_REDEPLOY: ForceRedeployViewProps = {
   previewLoading: false,
   loadPreview: () => {},
   onForceRedeploy: yes,
+};
+
+// ─── add environment ──────────────────────────────────────────────────────────
+
+export const ADD_ENVIRONMENT: AddEnvironmentViewProps = {
+  clusters: [
+    { slug: "dev-cluster", name: "Dev cluster" },
+    { slug: "prod-us-east-1", name: "Production (us-east-1)" },
+  ],
+  creating: false,
+  onCreate: yes,
 };
 
 // ─── danger zone ──────────────────────────────────────────────────────────────

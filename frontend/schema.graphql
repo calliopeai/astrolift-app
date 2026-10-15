@@ -7370,6 +7370,12 @@ input CreateApiTokenInput {
   teamSlug: String = null
 }
 
+input CreateAppEnvironmentInput {
+  appSlug: String!
+  name: String!
+  clusterSlug: String = null
+}
+
 input CreateClusterAuthGroupInput {
   clusterId: GUID!
   expectedSource: ExpectedClusterAuthSourceInput = null
@@ -9606,6 +9612,7 @@ type Mutation {
   rollbackDeployment(input: DeploymentByIdInput!, ifMatchVersion: Int = null): AstroliftDeploymentMutationResult!
   redeployApp(input: DeploymentByIdInput!, ifMatchVersion: Int = null): AstroliftDeploymentMutationResult!
   promoteDeployment(input: PromoteDeploymentInput!): AstroliftDeploymentMutationResult!
+  createAppEnvironment(input: CreateAppEnvironmentInput!): AstroliftAppEnvironmentMutationResult!
   pauseEnvironment(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
   resumeEnvironment(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!
   pauseAppIngress(input: EnvironmentByIdInput!): AstroliftAppEnvironmentMutationResult!

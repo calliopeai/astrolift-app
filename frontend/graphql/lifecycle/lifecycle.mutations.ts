@@ -424,6 +424,21 @@ const ENVIRONMENT_FIELDS = `
   createdAt
 `;
 
+export const CREATE_APP_ENVIRONMENT = gql`
+  mutation CreateAppEnvironment($input: CreateAppEnvironmentInput!) {
+    createAppEnvironment(input: $input) {
+      ok
+      errors {
+        code
+        message
+      }
+      data {
+        ${ENVIRONMENT_FIELDS}
+      }
+    }
+  }
+`;
+
 export const PAUSE_ENVIRONMENT = gql`
   mutation PauseEnvironment($input: EnvironmentByIdInput!) {
     pauseEnvironment(input: $input) {
