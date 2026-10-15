@@ -682,6 +682,15 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
 
     await sync_to_async(stamp_binding_revisions)(resources, env)
 
+    from astrolift_services.rds_ca import inject_rds_ca, rds_binding_secret_names
+
+    resources = inject_rds_ca(
+        resources,
+        app_slug=app.slug,
+        namespace=namespace,
+        secret_names=await sync_to_async(rds_binding_secret_names)(env),
+    )
+
     # Fold in CustomDomain Ingress + TLS Secret resources (#397). Each
     # validated + active/byo domain gets its own Ingress so per-host
     # TLS strategy choices stay isolated — auto-issued ACM lives on the
