@@ -54,6 +54,28 @@ EMAIL_ADDRESS = re.compile(r"[^@\s<>,;]{1,64}@[^@\s<>,;]{1,255}\Z")
 SLACK_RETRYABLE_ERRORS = frozenset({"ratelimited", "internal_error", "fatal_error", "service_unavailable"})
 
 
+class _WebhookUrlLogFilter(logging.Filter):
+    """httpx logs every request URL at INFO; an incoming webhook URL is the
+    credential, so its path and query are dropped before the record is
+    emitted."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple) and len(args) > 1:
+            parts = urlsplit(str(args[1]))
+            host = (parts.hostname or "").lower()
+            if any(
+                host == suffix or (suffix.startswith(".") and host.endswith(suffix))
+                for hosts in WEBHOOK_HOSTS.values()
+                for suffix in hosts
+            ):
+                record.args = (args[0], f"{parts.scheme}://{host}/[redacted]", *args[2:])
+        return True
+
+
+logging.getLogger("httpx").addFilter(_WebhookUrlLogFilter())
+
+
 class DeliveryConfigurationError(ValueError):
     """A channel's configuration is not acceptable. The message is safe to show."""
 

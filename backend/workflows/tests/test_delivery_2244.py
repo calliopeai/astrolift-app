@@ -268,6 +268,25 @@ def test_credentials_never_reach_rows_audit_or_logs(scheduled, http, audit, capl
     }
 
 
+def test_webhook_urls_stay_out_of_the_http_client_request_log(scheduled, monkeypatch, caplog):
+    # httpx itself logs each request URL at INFO; go through its real client.
+    def real_client_post(url, *, json=None, headers=None, timeout=None):
+        transport = httpx.MockTransport(lambda request: httpx.Response(200))
+        with httpx.Client(transport=transport) as client:
+            return client.post(url, json=json, headers=headers, timeout=timeout)
+
+    monkeypatch.setattr("workflows.delivery.httpx.post", real_client_post)
+    slack = _channel(scheduled.organization, "slack_webhook", secret=SLACK_URL)
+    scheduled.delivery_channels.set([slack])
+    run, _ = _settled_run(scheduled)
+
+    with caplog.at_level(logging.INFO, logger="httpx"):
+        deliver_run(run.pk)
+
+    assert "HTTP Request: POST https://hooks.slack.com/[redacted]" in caplog.text
+    assert "s3cr3t" not in caplog.text
+
+
 def test_a_slack_app_channel_threads_later_runs_under_the_first_post(scheduled, http):
     calls, answers = http
     app = _channel(scheduled.organization, "slack_app", secret=BOT_TOKEN, slack_channel="C0123456789")
