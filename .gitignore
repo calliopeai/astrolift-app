@@ -44,6 +44,8 @@ frontend/.env
 frontend/.env.local
 credentials.json
 *.pem
+# Public Amazon RDS CA bundle, vendored on purpose (#2404).
+!backend/astrolift_services/data/rds-global-bundle.pem
 *.key
 
 # Sentry
