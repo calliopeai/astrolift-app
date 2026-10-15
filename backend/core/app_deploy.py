@@ -2126,6 +2126,7 @@ def _render_managed_subdomain_ingress(
                     rendered["metadata"].setdefault("annotations", {}).update(group_annotations)
                 out.append(rendered)
     else:
+        from core.ingress_reconcile import _edge_config
         from providers.k8s_native.ingress import K8sIngressConfig, K8sIngressDriver
 
         oidc_auth = oidc_auth_for_cluster(cluster)
@@ -2148,6 +2149,7 @@ def _render_managed_subdomain_ingress(
                 ingress_class_name=ingress_class,
                 cert_manager_issuer="letsencrypt-prod",
                 oidc_auth=oidc_auth,
+                edge=_edge_config(app),
             )
         )
         tls_strategy = "letsencrypt" if not cert_arn else "provided"
