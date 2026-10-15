@@ -998,17 +998,24 @@ def put_github_file(
         with urllib.request.urlopen(req, timeout=15) as resp:
             payload = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as exc:
-        if (expected_sha is not None or expected_absent) and exc.code in (409, 422):
-            raise GithubProviderError(
-                "CONFLICT",
-                "GitHub refused the conditional file write; review the current file before retrying.",
-                recoverable=True,
-            ) from exc
         body_text = ""
         try:
             body_text = exc.read().decode("utf-8", "replace")[:300]
         except Exception:
             pass
+        # Only a SHA precondition failure is a conflict. A protected branch,
+        # a missing branch or a scope refusal ride the same 409/422 codes
+        # and were reported as "review the current file", hiding the cause.
+        if (
+            (expected_sha is not None or expected_absent)
+            and exc.code in (409, 422)
+            and ("does not match" in body_text or "sha" in body_text.lower())
+        ):
+            raise GithubProviderError(
+                "CONFLICT",
+                "GitHub refused the conditional file write; review the current file before retrying.",
+                recoverable=True,
+            ) from exc
         # GitHub categorically refuses .github/workflows/* writes from a
         # token missing the ``workflow`` scope; the refusal body names the
         # scope but rides varying status codes, so detect by body (#1542).
