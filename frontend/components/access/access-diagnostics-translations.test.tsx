@@ -123,6 +123,18 @@ describe.each(Object.entries(catalogs))("%s access diagnostics", (locale, messag
     ]);
   });
 
+  it("shows an unrecognized scope kind as-is instead of failing on a missing message", () => {
+    const odd = { ...target, kind: "Fixture" } as unknown as typeof target;
+    const onError = vi.fn();
+    render(
+      <NextIntlClientProvider locale={locale} messages={messages} onError={onError}>
+        <AccessExplainer diagnosis={diagnosis} target={odd} bindingHref={() => "#"} />
+      </NextIntlClientProvider>
+    );
+    expect(onError).not.toHaveBeenCalled();
+    expect(screen.getByRole("status")).toHaveTextContent("Fixture");
+  });
+
   it("renders an org-wide positive superuser result from the supplied answer without fabricating a target", () => {
     render(
       provider(
