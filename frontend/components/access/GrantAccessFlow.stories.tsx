@@ -16,6 +16,8 @@ import {
   PAYMENTS_TEAM,
   PREVIEW,
   PREVIEW_MANY,
+  PREVIEW_NO_POLICIES,
+  PREVIEW_POLICIES,
   PREVIEW_REFUSED,
   PRINCIPALS,
   ROLES,
@@ -207,6 +209,21 @@ export const ReviewMany: Story = {
       initialPreview={PREVIEW_MANY}
     />
   ),
+};
+
+/** The org's policies and the app's deploy-approval setting that would hold or stop it (#2272). */
+export const ReviewPolicies: Story = {
+  render: () => <Flow initialDraft={READY} initialStep={4} initialPreview={PREVIEW_POLICIES} />,
+  play: async ({ canvasElement }) => {
+    const c = within(canvasElement);
+    await expect(c.getByText("Denied by policy")).toBeInTheDocument();
+    await expect(c.getByText("Approval required")).toBeInTheDocument();
+  },
+};
+
+/** No policy applies: the review says so rather than staying silent. */
+export const ReviewNoPolicies: Story = {
+  render: () => <Flow initialDraft={READY} initialStep={4} initialPreview={PREVIEW_NO_POLICIES} />,
 };
 
 export const ReviewLoading: Story = {

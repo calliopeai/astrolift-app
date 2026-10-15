@@ -3088,6 +3088,8 @@ export type AstroliftGrantPreview = {
   ok: Scalars['Boolean']['output'];
   /** The permissions in play. */
   permissions: Array<Scalars['String']['output']>;
+  /** Saved policies and app settings that hold or stop what the draft grants. */
+  policies: Array<AstroliftGrantPreviewPolicy>;
   refusal?: Maybe<Scalars['String']['output']>;
   scopeGuid?: Maybe<Scalars['GUID']['output']>;
   scopeKind?: Maybe<Scalars['String']['output']>;
@@ -3129,6 +3131,21 @@ export type AstroliftGrantPreviewPerson = {
   user: AstroliftUser;
   /** Their other grants that carry permissions in play, excluding the one being changed. */
   via: Array<AstroliftGrantPreviewSource>;
+};
+
+export type AstroliftGrantPreviewPolicy = {
+  detail: Scalars['String']['output'];
+  /** APPROVAL_REQUIRED, DENIED or MAY_DENY. */
+  outcome: Scalars['String']['output'];
+  /** How many of the people reached it applies to. */
+  peopleCount: Scalars['Int']['output'];
+  /** The drafted permissions it applies to. */
+  permissions: Array<Scalars['String']['output']>;
+  policyId?: Maybe<Scalars['GUID']['output']>;
+  policyName?: Maybe<Scalars['String']['output']>;
+  policySlug?: Maybe<Scalars['String']['output']>;
+  /** POLICY, or APP_SETTING for the app's deploy-approval setting. */
+  source: Scalars['String']['output'];
 };
 
 export type AstroliftGrantPreviewSource = {

@@ -6074,7 +6074,36 @@
     "grant": "Vergeben",
     "allowed": "Erlaubt",
     "notIncluded": "Nicht enthalten",
-    "footer": "Um eine zu vergeben, weisen Sie ihre Rolle unter <link>Zuweisungen</link> zu."
+    "footer": "Um eine zu vergeben, weisen Sie ihre Rolle unter <link>Zuweisungen</link> zu.",
+    "approval": {
+      "title": "Freigabe vor Bereitstellungen verlangen",
+      "intro": "Aktiviert die eigene Bereitstellungsfreigabe einer App: Jede Bereitstellung wartet, bis genug Personen aus dem Freigabeteam zustimmen.",
+      "loading": "Wird geladen…",
+      "loadError": "Die Apps konnten nicht gelesen werden: {error}",
+      "retry": "Erneut versuchen",
+      "noApps": "Diese Organisation hat noch keine Apps.",
+      "app": "App",
+      "pickApp": "App auswählen",
+      "wholeApp": "Diese Einstellung gilt für jede Bereitstellung von {app}, durch alle, die sie bereitstellen können, nicht nur für die Personen, denen Sie Zugriff gewähren.",
+      "cannotChange": "Sie sehen diese Einstellung, können sie aber nicht ändern: Für Änderungen an den Einstellungen von {app} ist die Berechtigung zum Aktualisieren der App nötig.",
+      "legend": "Bereitstellungsfreigabe für {app}",
+      "require": "Vor jeder Bereitstellung eine Freigabe verlangen",
+      "team": "Freigabeteam",
+      "pickTeam": "Team auswählen",
+      "quorum": "Benötigte Freigaben",
+      "approvals": "{count, plural, one {# Freigabe} other {# Freigaben}}",
+      "replacesPeople": "Freigeben dürfen derzeit bestimmte Personen. Beim Speichern mit einem Team werden sie ersetzt.",
+      "approversNeed": "Freigebende brauchen außerdem die Berechtigung, Bereitstellungen dieser App freizugeben, zum Beispiel über die Vorlage Freigebende Person.",
+      "save": "Speichern",
+      "saving": "Wird gespeichert…",
+      "saved": "Gespeichert.",
+      "saveFailed": "Die Einstellung konnte nicht gespeichert werden."
+    },
+    "models": {
+      "title": "Modellzugriff",
+      "body": "Es gibt keine Vorlage für Modellnutzer. Welche Apps sich mit welchen Modellen verbinden dürfen und ob eine Verbindung freigegeben werden muss, legt die Modellverbindungsrichtlinie der Organisation fest.",
+      "link": "Modellverbindungsrichtlinie öffnen"
+    }
   },
   "adminRuns": {
     "title": "Läufe",
@@ -8445,6 +8474,16 @@
           "roles": "Rollen",
           "policies": "Richtlinien",
           "check": "Zugriff prüfen"
+        },
+        "policies": {
+          "heading": "Richtlinien",
+          "none": "Keine Richtlinie und keine App-Einstellung hält auf oder verhindert, was dies gewährt.",
+          "appSetting": "Bereitstellungsfreigabe dieser App",
+          "outcome": {
+            "APPROVAL_REQUIRED": "Freigabe erforderlich",
+            "DENIED": "Durch Richtlinie verweigert",
+            "MAY_DENY": "Kann durch Richtlinie verweigert werden"
+          }
         }
       },
       "legacyGrantRole": {

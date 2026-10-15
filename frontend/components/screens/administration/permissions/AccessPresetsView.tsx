@@ -3,6 +3,7 @@
 import { CheckIcon, MinusIcon } from "lucide-react";
 import Link from "next/link";
 import { useTranslations } from "next-intl";
+import type * as React from "react";
 
 import { ShellHeader } from "@/components/shell/ShellHeader";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,14 @@ import { grantHref } from "../access/access-nav";
 import { permissionsCrumbs } from "../access/admin-crumbs";
 import type { useAccessPresets } from "./use-access-presets";
 
-export type AccessPresetsViewProps = ReturnType<typeof useAccessPresets>;
+export type AccessPresetsViewProps = ReturnType<typeof useAccessPresets> & {
+  /** Guided deploy approval (`DeployApprovalSetup`), mounted by the route. */
+  deployApproval?: React.ReactNode;
+};
+
+/** Where the org's model-connection policy lives (#2270); there is no Model consumer preset. */
+export const MODEL_CONNECTION_POLICY_HREF =
+  "/administration/organization?section=model-connections";
 
 const SCOPES = ["ORG", "TEAM", "PROJECT", "APP"];
 
@@ -19,9 +27,17 @@ const SCOPES = ["ORG", "TEAM", "PROJECT", "APP"];
  * Admin › Permissions › Easy setup (#2272): the plain-language starting
  * points. Each preset is a stock role per scope, and the table shows what that
  * role allows and leaves out, as the server computes it from the role's
- * permissions. Assigning one is an ordinary assignment of that role.
+ * permissions. Assigning one is an ordinary assignment of that role. Below
+ * them, guided deploy approval and, in place of a Model consumer preset, the
+ * way to the org's model-connection policy.
  */
-export function AccessPresetsView({ presets, loading, error, onRetry }: AccessPresetsViewProps) {
+export function AccessPresetsView({
+  presets,
+  loading,
+  error,
+  onRetry,
+  deployApproval,
+}: AccessPresetsViewProps) {
   const t = useTranslations("adminPresets");
   const scopeLabel = (level: string) => (SCOPES.includes(level) ? t(`scopes.${level}`) : level);
   return (
@@ -122,6 +138,16 @@ export function AccessPresetsView({ presets, loading, error, onRetry }: AccessPr
           </p>
         </div>
       )}
+      {deployApproval}
+      <section aria-labelledby="model-access" className="space-y-1">
+        <h2 id="model-access" className="font-semibold">
+          {t("models.title")}
+        </h2>
+        <p className="text-muted-foreground max-w-prose text-sm">{t("models.body")}</p>
+        <Link className="text-sm underline underline-offset-2" href={MODEL_CONNECTION_POLICY_HREF}>
+          {t("models.link")}
+        </Link>
+      </section>
     </div>
   );
 }

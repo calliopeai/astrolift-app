@@ -58,6 +58,18 @@ const preview = {
   allowed: true,
   refusal: null,
   notes: ["SERVER_NOTE"],
+  policies: [
+    {
+      outcome: "DENIED",
+      source: "POLICY",
+      policyId: "0192a3b4-0000-7000-8000-00000000f001",
+      policySlug: "release-freeze",
+      policyName: "Release freeze",
+      permissions: ["app.deploy"],
+      peopleCount: 1,
+      detail: "SERVER_POLICY_DETAIL",
+    },
+  ],
 };
 
 function fixture(locale: "en" | "es" | "ja" = "es") {
@@ -175,6 +187,7 @@ describe("grant access actual Apollo HTTP boundary", () => {
       refusal: "ACTUAL_DENIAL: org.manage_members",
       gainingCount: 401,
       notes: ["SERVER_NOTE"],
+      policies: preview.policies,
     });
     f.preview({ ...preview, allowed: false });
     expect((await result.current.preview(draft)).refusal).toBe(f.t("cannotGrant"));

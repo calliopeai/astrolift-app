@@ -6017,7 +6017,36 @@
     "grant": "Grant",
     "allowed": "Allowed",
     "notIncluded": "Not included",
-    "footer": "To grant one, assign its role under <link>Assignments</link>."
+    "footer": "To grant one, assign its role under <link>Assignments</link>.",
+    "approval": {
+      "title": "Require approval before deploys",
+      "intro": "Turns on an app's own deploy-approval setting: each deploy waits until enough people on the approver team approve it.",
+      "loading": "Loading…",
+      "loadError": "The apps could not be read: {error}",
+      "retry": "Retry",
+      "noApps": "This organization has no apps yet.",
+      "app": "App",
+      "pickApp": "Pick an app",
+      "wholeApp": "This setting applies to every deploy of {app}, by anyone who can deploy it, not only to the people you grant access to.",
+      "cannotChange": "You can see this setting but not change it: changing {app}'s settings needs permission to update the app.",
+      "legend": "Deploy approval for {app}",
+      "require": "Require approval before each deploy",
+      "team": "Approver team",
+      "pickTeam": "Pick a team",
+      "quorum": "Approvals needed",
+      "approvals": "{count, plural, one {# approval} other {# approvals}}",
+      "replacesPeople": "Its approvers are specific people today. Saving with a team replaces them.",
+      "approversNeed": "Approvers also need permission to approve deploys on this app, for example the Approver preset.",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Saved.",
+      "saveFailed": "The setting could not be saved."
+    },
+    "models": {
+      "title": "Model access",
+      "body": "There is no model consumer preset. Which apps may connect to which models, and whether a connection needs approval, is set by the organization's model connection policy.",
+      "link": "Open the model connection policy"
+    }
   },
   "adminRuns": {
     "title": "Runs",
@@ -8442,6 +8471,16 @@
           "roles": "Roles",
           "policies": "Policies",
           "check": "Check access"
+        },
+        "policies": {
+          "heading": "Policies",
+          "none": "No policy or app setting holds or stops what this grants.",
+          "appSetting": "This app's deploy-approval setting",
+          "outcome": {
+            "APPROVAL_REQUIRED": "Approval required",
+            "DENIED": "Denied by policy",
+            "MAY_DENY": "May be denied by policy"
+          }
         }
       },
       "legacyGrantRole": {
