@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { expect, within } from "storybook/test";
+import { expect, fn, userEvent, within } from "storybook/test";
 
 import { useLocalListState } from "@/components/list/use-list-state";
 
-import { BRAINS, LONG_BRAIN } from "./brains.fixtures";
+import { BRAINS, CONNECTION, LONG_BRAIN } from "./brains.fixtures";
 import { BRAINS_LIST } from "./brains-list";
 import { BrainsScreen, type BrainsScreenProps } from "./BrainsScreen";
 import type { BrainRow } from "./use-brains";
@@ -32,6 +32,10 @@ function Brains({
       stale={false}
       error={null}
       onRetry={() => {}}
+      connection={null}
+      connecting={false}
+      onConnect={async () => {}}
+      onDismissConnection={() => {}}
       {...patch}
     />
   );
@@ -48,6 +52,31 @@ export const Full: Story = {
     await expect(canvas.getByText("Owning team only")).toBeInTheDocument();
   },
 };
+
+/** Connect asks for a token; a layer that is not served has nothing to connect to. */
+const onConnect = fn(async (_slug: string) => {});
+export const Connect: Story = {
+  render: () => <Brains onConnect={onConnect} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const [served, notServed] = await canvas.findAllByRole("button", { name: "Connect" });
+    await expect(notServed).toBeDisabled();
+    await userEvent.click(served);
+    await expect(onConnect).toHaveBeenCalledWith("leo-brain");
+  },
+};
+
+/** The issued token, shown once: the MCP URL and a client config to paste. */
+export const Connected: Story = {
+  render: () => <Brains connection={CONNECTION} />,
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    await expect(await body.findByText("https://brain.acme.example/mcp")).toBeInTheDocument();
+    await expect(body.getByText(/X-Astrolift-Brain-Token/)).toBeInTheDocument();
+  },
+};
+
+export const Connecting: Story = { render: () => <Brains connecting /> };
 
 export const Empty: Story = { render: () => <Brains rows={[]} /> };
 export const Loading: Story = { render: () => <Brains rows={[]} loading totalCount={null} /> };

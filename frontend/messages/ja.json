@@ -15321,7 +15321,20 @@
     "shareTitle": "{team}: {access}",
     "manageAccess": "アクセスを管理",
     "emptyTitle": "セマンティックレイヤーはありません",
-    "emptyDescription": "[app] kind = \"mimwell\" で宣言され、閲覧できるアプリがここに表示されます。"
+    "emptyDescription": "[app] kind = \"mimwell\" で宣言され、閲覧できるアプリがここに表示されます。",
+    "columnConnect": "MCP クライアント",
+    "connect": "接続",
+    "connectFailed": "読み取りトークンを発行できませんでした。",
+    "connectDialog": {
+      "title": "{slug} に接続",
+      "description": "Chat Studio などの MCP クライアントに貼り付けてください。あなたに発行された読み取りトークンを含み、表示されるのは今回だけです。有効期限は {expiresAt} です。新しいトークンが必要な場合は再度接続してください。",
+      "mcpUrl": "MCP の URL",
+      "config": "MCP クライアント設定",
+      "copy": "コピー",
+      "copyLabel": "{label} をコピー",
+      "copied": "コピーしました",
+      "done": "完了"
+    }
   },
   "navModel": {
     "functions": {
