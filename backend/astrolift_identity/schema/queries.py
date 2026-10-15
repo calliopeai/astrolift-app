@@ -171,9 +171,27 @@ class ModuleEntitlementType:
             "Always true for apps, agents, workflows and admin. For the per-org "
             "modules (chat_studio_integration, agent_live_attach, "
             "chat_studio_agent_runs) it is true only when an org admin turned "
-            "the module on and the install has not forced it off. Independent "
-            "of the can* fields."
+            "the module on, the install has not forced it off and the licence does "
+            "not withhold it. Independent of the can* fields."
         )
+    )
+    licensed: bool = strawberry.field(
+        default=True,
+        description=(
+            "False when the install's signed licence withholds this per-org module: "
+            "it is off for every organization and an org admin cannot turn it on. "
+            "A licence that grants a module only allows it; it never turns one on. "
+            "Always true for the install-wide modules and when the licence has no say."
+        ),
+    )
+    source: str | None = strawberry.field(
+        default=None,
+        description=(
+            "Who last switched this per-org module for the active organization: "
+            "``org_admin`` or ``licence`` (the licence turned it off by withholding "
+            "it). Null when the org has never switched it, and for the install-wide "
+            "modules."
+        ),
     )
 
 
@@ -234,7 +252,12 @@ class MeType:
         Descendant grants and the selected team cannot supply owner authority.
         """
         from astrolift_identity.model_entitlements import models_entitlement
-        from astrolift_identity.org_modules import enabled_modules
+        from astrolift_identity.org_modules import (
+            INSTALL_SWITCHES,
+            enabled_modules,
+            module_sources,
+            withheld_by_licence,
+        )
         from astrolift_identity.permission_resolver import resolve_effective_permissions_anywhere
         from core.tenancy import get_current_tenant
 
@@ -268,6 +291,7 @@ class MeType:
         # and then gets a 403 on every create.
         create_scopes = granted_scopes(tenant, Permission.APP_CREATE)
         chat_studio_can_create = create_scopes.org or bool(create_scopes.team_ids)
+        sources = module_sources(tenant.organization_id)
         return [
             ModuleEntitlementType(
                 key=r.key,
@@ -276,6 +300,8 @@ class MeType:
                 can_manage=r.can_manage,
                 can_run=r.can_run,
                 enabled=r.enabled,
+                licensed=not (r.key in INSTALL_SWITCHES and withheld_by_licence(r.key)),
+                source=sources.get(r.key) if r.key in INSTALL_SWITCHES else None,
             )
             for r in rows
         ]

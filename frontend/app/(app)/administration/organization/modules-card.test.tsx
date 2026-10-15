@@ -52,10 +52,24 @@ vi.mock("@apollo/client/react", () => ({
   useMutation: () => [state.setModule, { loading: false }],
 }));
 
-vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
+vi.mock("sonner", () => ({ toast }));
 
-function moduleEntitlement(key: string, enabled: boolean) {
-  return { key, canView: true, canCreate: true, canManage: true, canRun: true, enabled };
+function moduleEntitlement(
+  key: string,
+  enabled: boolean,
+  licence: { licensed?: boolean; source?: string | null } = {}
+) {
+  return {
+    key,
+    canView: true,
+    canCreate: true,
+    canManage: true,
+    canRun: true,
+    enabled,
+    licensed: licence.licensed ?? true,
+    source: licence.source ?? null,
+  };
 }
 
 describe("ModulesCard", () => {
@@ -127,5 +141,47 @@ describe("ModulesCard", () => {
     expect(state.setModule.mock.calls[0][0].variables).toEqual({
       input: { key: "chat_studio_integration", enabled: false },
     });
+  });
+
+  it("disables a module the licence withholds and says why (#1879)", () => {
+    state.modules[2] = moduleEntitlement("chat_studio_agent_runs", false, {
+      licensed: false,
+      source: "licence",
+    });
+    render(<ModulesCard />);
+
+    expect(screen.getByRole("switch", { name: /enable chat studio agent runs/i })).toBeDisabled();
+    expect(screen.getByText("Not included in this install's license")).toBeInTheDocument();
+  });
+
+  it("says when the licence turned a module off and leaves it for the org admin", () => {
+    state.modules[2] = moduleEntitlement("chat_studio_agent_runs", false, { source: "licence" });
+    render(<ModulesCard />);
+
+    expect(screen.getByRole("switch", { name: /enable chat studio agent runs/i })).toBeEnabled();
+    expect(
+      screen.getByText("Turned off when the license withheld it. An org admin can turn it back on.")
+    ).toBeInTheDocument();
+  });
+
+  it("translates a licence refusal by its code, not the server's English", async () => {
+    state.setModule = vi.fn().mockResolvedValue({
+      data: {
+        setOrganizationModule: {
+          ok: false,
+          errors: [{ code: "MODULE_NOT_LICENSED", message: "server english" }],
+          data: null,
+        },
+      },
+    });
+    render(<ModulesCard />);
+
+    fireEvent.click(screen.getByRole("switch", { name: /enable chat studio agent runs/i }));
+
+    await waitFor(() =>
+      expect(toast.error).toHaveBeenCalledWith(
+        "This module is not included in this install's license."
+      )
+    );
   });
 });

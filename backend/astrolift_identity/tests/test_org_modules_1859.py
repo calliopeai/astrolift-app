@@ -323,7 +323,7 @@ def test_enabling_a_module_the_install_forced_off_is_refused(org_a, permission_r
     with override_config(CHAT_STUDIO_INTEGRATION_ALLOWED=False):
         refused = _set(org_a, CHAT, True)
         assert refused.ok is False
-        assert refused.errors[0].code == "PRECONDITION"
+        assert refused.errors[0].code == "MODULE_DISABLED_BY_INSTALL"
         assert not OrganizationModule.objects.filter(organization=org_a).exists()
         # Turning it off is always allowed.
         assert _set(org_a, CHAT, False).ok is True

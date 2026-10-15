@@ -3827,9 +3827,13 @@ export type AstroliftModuleEntitlement = {
   canManage: Scalars['Boolean']['output'];
   canRun: Scalars['Boolean']['output'];
   canView: Scalars['Boolean']['output'];
-  /** Whether the module is switched on for the active organization. Always true for apps, agents, workflows and admin. For the per-org modules (chat_studio_integration, agent_live_attach, chat_studio_agent_runs) it is true only when an org admin turned the module on and the install has not forced it off. Independent of the can* fields. */
+  /** Whether the module is switched on for the active organization. Always true for apps, agents, workflows and admin. For the per-org modules (chat_studio_integration, agent_live_attach, chat_studio_agent_runs) it is true only when an org admin turned the module on, the install has not forced it off and the licence does not withhold it. Independent of the can* fields. */
   enabled: Scalars['Boolean']['output'];
   key: Scalars['String']['output'];
+  /** False when the install's signed licence withholds this per-org module: it is off for every organization and an org admin cannot turn it on. A licence that grants a module only allows it; it never turns one on. Always true for the install-wide modules and when the licence has no say. */
+  licensed: Scalars['Boolean']['output'];
+  /** Who last switched this per-org module for the active organization: ``org_admin`` or ``licence`` (the licence turned it off by withholding it). Null when the org has never switched it, and for the install-wide modules. */
+  source?: Maybe<Scalars['String']['output']>;
 };
 
 export type AstroliftMyConnectedAccount = {
@@ -9194,7 +9198,7 @@ export type Mutation = {
   setModelConnectionRestriction: ModelConnectionPolicyMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
   setNotificationProfile: AstroliftNotificationProfileMutationResult;
-  /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with PRECONDITION; turning one off always succeeds. */
+  /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with MODULE_DISABLED_BY_INSTALL, and one the install's licence withholds with MODULE_NOT_LICENSED; turning one off always succeeds. */
   setOrganizationModule: AstroliftOrganizationModuleMutationResult;
   setPipelineSecret: AstroliftPipelineSecretChangeMutationResult;
   /** Set an install setting (#1861). ``value`` is text, ``true``/``false`` for a yes/no setting, validated as the Django admin validates it. A setting with a ``warning`` needs ``confirmed``. Platform operator only, with a fresh sign-in. */

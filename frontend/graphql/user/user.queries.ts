@@ -15,6 +15,8 @@ export const GET_ME = gql`
         canManage
         canRun
         enabled
+        licensed
+        source
       }
     }
   }
