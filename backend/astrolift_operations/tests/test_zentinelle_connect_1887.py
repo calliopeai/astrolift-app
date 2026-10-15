@@ -422,6 +422,12 @@ def test_every_zentinelle_mutation_is_listed_as_step_up_gated():
         "set_zentinelle_gateway_url",
         "rotate_zentinelle_gateway_credential",
         "unregister_zentinelle_cluster",
+        "connect_zentinelle_install",
+        "set_zentinelle_install_gateway_url",
+        "disconnect_zentinelle_install",
+        "register_zentinelle_shared_cluster",
+        "move_zentinelle_shared_cluster_to_install",
+        "unregister_zentinelle_shared_cluster",
     } <= gated
 
 
@@ -612,33 +618,43 @@ def test_register_deploys_the_gateway_when_the_flag_is_on(org, cluster, admin, z
     assert driver.last("Service")["spec"]["ports"][0]["port"] == 8742
 
 
-def test_another_orgs_cluster_is_not_found_and_a_shared_one_registers(
+def test_another_orgs_cluster_is_not_found_and_a_shared_one_is_the_installs(
     org, other_org, plugin, admin, zentinelle, driver
 ):
+    """A shared cluster registers through the install connection only (#1905)."""
     foreign = _make_cluster(plugin, other_org, "foreign")
     shared = _make_cluster(plugin, None, "shared")
     assert _connect(org).ok
     zentinelle.calls.clear()
 
     refused = _register(org, foreign)
-    accepted = _register(org, shared)
+    shared_refused = _register(org, shared)
 
     assert refused.ok is False and _code(refused) == "NOT_FOUND"
-    assert accepted.ok, accepted.errors
-    assert [path for _m, path in zentinelle.paths()] == [f"{API}/clusters"]
+    assert shared_refused.ok is False and _code(shared_refused) == "PRECONDITION"
+    assert zentinelle.calls == [] and driver.applied == []
+    assert not ZentinelleClusterGateway.objects.filter(cluster=shared).exists()
 
 
 def test_a_cluster_has_one_gateway_whichever_org_registered_it(
     org, other_org, plugin, admin, zentinelle, driver
 ):
+    """A shared cluster an org registered before #1905 stays that org's: it may
+    register it again (a credential replacement), and nobody else may."""
     shared = _make_cluster(plugin, None, "shared")
-    assert _connect(org).ok
-    assert _register(org, shared).ok
+    connection = _connect(org).data
+    ZentinelleClusterGateway.objects.create(
+        connection=ZentinelleConnection.objects.get(guid=str(connection.id)),
+        cluster=shared,
+        zentinelle_cluster_id=str(shared.guid),
+    )
     assert _connect(other_org).ok
 
     result = _register(other_org, shared)
+    again = _register(org, shared)
 
     assert result.ok is False and _code(result) == "CONFLICT"
+    assert again.ok, again.errors
     assert ZentinelleClusterGateway.objects.get(cluster=shared).connection.organization == org
 
 

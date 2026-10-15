@@ -127,10 +127,15 @@ def _validate(connection, body, presented):
         actual_cluster = str(resolve_agent_cluster(target.organization).guid)
     if actual_cluster != body["cluster_id"]:
         raise AgentEnforcementError("Enforcement cluster does not match the saved target", 403)
+    # A shared cluster's gateway is the install connection's (#1905); the
+    # organization's runs on it are still this connection's.
     if (
         actual_cluster
         and not ZentinelleClusterGateway.objects.filter(
-            connection=connection, zentinelle_cluster_id=actual_cluster, cluster__deleted_at__isnull=True
+            Q(connection=connection)
+            | Q(connection__organization__isnull=True, cluster__organization__isnull=True),
+            zentinelle_cluster_id=actual_cluster,
+            cluster__deleted_at__isnull=True,
         ).exists()
     ):
         raise AgentEnforcementError("Enforcement cluster is outside the install", 403)

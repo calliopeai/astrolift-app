@@ -403,13 +403,27 @@ def resolve_model_gateway(*, cluster, organization, spec) -> ModelGateway:
             "disconnect and connect again",
         )
     cluster_pk = getattr(cluster, "pk", None)
-    gateway = ZentinelleClusterGateway.objects.filter(cluster_id=cluster_pk).first() if cluster_pk else None
+    gateway = (
+        ZentinelleClusterGateway.objects.filter(cluster_id=cluster_pk).select_related("connection").first()
+        if cluster_pk
+        else None
+    )
     slug = getattr(cluster, "slug", "?")
     if gateway is None:
         raise _refusal(
             spec.slug, f"cluster {slug} runs no Zentinelle gateway; register the cluster with Zentinelle"
         )
-    if gateway.connection_id != connection.pk:
+    # A shared cluster's gateway is the install's (#1905). The run's key is
+    # still minted through the organization's own connection, so Zentinelle
+    # attributes its traffic to the organization's tenant.
+    install_gateway = gateway.connection.is_install and getattr(cluster, "organization_id", None) is None
+    if install_gateway and gateway.connection.status != ZentinelleConnection.Status.CONNECTED:
+        raise _refusal(
+            spec.slug,
+            f"the gateway on shared cluster {slug} belongs to the install's Zentinelle connection, "
+            "which is not connected",
+        )
+    if gateway.connection_id != connection.pk and not install_gateway:
         # One gateway per cluster, scoped to the tenants of the connection
         # that registered it: another organization's tenants.
         raise _refusal(

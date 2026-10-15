@@ -9569,6 +9569,12 @@ type Mutation {
   setZentinelleGatewayEnabled(input: SetZentinelleGatewayEnabledInput!): AstroliftZentinelleClusterGatewayMutationResult!
   rotateZentinelleGatewayCredential(input: RotateZentinelleGatewayCredentialInput!): AstroliftZentinelleClusterGatewayMutationResult!
   unregisterZentinelleCluster(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
+  connectZentinelleInstall(input: ConnectZentinelleInput!): AstroliftZentinelleConnectionMutationResult!
+  setZentinelleInstallGatewayUrl(input: SetZentinelleGatewayUrlInput!): AstroliftZentinelleConnectionMutationResult!
+  disconnectZentinelleInstall(input: DisconnectZentinelleInput!): AstroliftZentinelleDisconnectMutationResult!
+  registerZentinelleSharedCluster(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
+  moveZentinelleSharedClusterToInstall(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
+  unregisterZentinelleSharedCluster(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
   registerTenantCluster(input: RegisterTenantClusterInput!): AstroliftTenantClusterMutationResult!
   issueClusterAgentKey(input: IssueClusterAgentKeyInput!): ClusteragentkeyissuedpayloadMutationResult!
   deployClusterAgent(input: DeployClusterAgentInput!): AstroliftTenantClusterMutationResult!
@@ -10489,6 +10495,7 @@ type Query {
   astroliftAuditRetention: AstroliftAuditRetention!
   astroliftObservabilityRetention: [ObservabilityRetentionType!]!
   astroliftZentinelleConnection: AstroliftZentinelleConnection
+  astroliftZentinelleInstallConnection: AstroliftZentinelleConnection
   astroliftWorkflowRuns(limit: Int! = 50): [AstroliftWorkflowRun!]!
   astroliftWebhookSubscriptions(appSlug: String = null): [AstroliftWebhookSubscription!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftWebhookSubscriptionsPage.")
   astroliftWebhookSubscriptionsPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftWebhookSubscriptionPage!

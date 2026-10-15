@@ -8851,6 +8851,7 @@ export type Mutation = {
   connectManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
   connectSource: AstroliftSourceConnectionMutationResult;
   connectZentinelle: AstroliftZentinelleConnectionMutationResult;
+  connectZentinelleInstall: AstroliftZentinelleConnectionMutationResult;
   /** Cancel, terminate, or retry cleanup for an exact owned execution. */
   controlWorkflowExecution: WorkflowExecutionControlResult;
   createAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
@@ -8936,6 +8937,7 @@ export type Mutation = {
   disconnectHuggingFace: HuggingFaceConnectionTypeMutationResult;
   disconnectSource: AstroliftSourceConnectionMutationResult;
   disconnectZentinelle: AstroliftZentinelleDisconnectMutationResult;
+  disconnectZentinelleInstall: AstroliftZentinelleDisconnectMutationResult;
   elevateAdminSession: AstroliftElevatePayloadMutationResult;
   ensureAgentBox: AstroliftAgentBoxMutationResult;
   exportAstroliftAppLogs: AstroliftAppLogExportMutationResult;
@@ -8989,6 +8991,7 @@ export type Mutation = {
   markOnboardingComplete: AstroliftMarkOnboardingCompletePayloadMutationResult;
   migrateAppToCluster: AstroliftAppEnvironmentMutationResult;
   moveAppToTeam: AstroliftRegisteredAppMutationResult;
+  moveZentinelleSharedClusterToInstall: AstroliftZentinelleClusterGatewayMutationResult;
   muteAlertRule: AstroliftAlertRuleMutationResult;
   /** Create or update a notification via NotificationSerializer. */
   notification: MutationResult;
@@ -9054,6 +9057,7 @@ export type Mutation = {
   registerOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
   registerTenantCluster: AstroliftTenantClusterMutationResult;
   registerZentinelleCluster: AstroliftZentinelleClusterGatewayMutationResult;
+  registerZentinelleSharedCluster: AstroliftZentinelleClusterGatewayMutationResult;
   reissueManagedDomainCert: ReissueManagedDomainCertPayloadMutationResult;
   rejectActionRequest: AstroliftActionApprovalRequestMutationResult;
   rejectDeployment: AstroliftDeploymentMutationResult;
@@ -9158,6 +9162,7 @@ export type Mutation = {
   setWorkflowDefinitionEnabled: WorkflowDefinitionActivationResult;
   setZentinelleGatewayEnabled: AstroliftZentinelleClusterGatewayMutationResult;
   setZentinelleGatewayUrl: AstroliftZentinelleConnectionMutationResult;
+  setZentinelleInstallGatewayUrl: AstroliftZentinelleConnectionMutationResult;
   /** Cancel a sign request. Sign requests are not available: this always refuses. */
   signRequestCancel: Scalars['Boolean']['output'];
   /** Sign a sign request. Sign requests are not available: this always refuses. */
@@ -9201,6 +9206,7 @@ export type Mutation = {
   unregisterBedrockModelConnection: ClusterModelDeploymentMutationResult;
   unregisterTenantCluster: SoftdeletepayloadMutationResult;
   unregisterZentinelleCluster: AstroliftZentinelleClusterGatewayMutationResult;
+  unregisterZentinelleSharedCluster: AstroliftZentinelleClusterGatewayMutationResult;
   updateAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
   updateAgentRunSpec: AstroliftAgentRunSpecMutationResult;
   updateAgentSecretBundle: AstroliftAgentSecretBundleMutationResult;
@@ -9597,6 +9603,11 @@ export type MutationConnectSourceArgs = {
 
 
 export type MutationConnectZentinelleArgs = {
+  input: ConnectZentinelleInput;
+};
+
+
+export type MutationConnectZentinelleInstallArgs = {
   input: ConnectZentinelleInput;
 };
 
@@ -10032,6 +10043,11 @@ export type MutationDisconnectZentinelleArgs = {
 };
 
 
+export type MutationDisconnectZentinelleInstallArgs = {
+  input: DisconnectZentinelleInput;
+};
+
+
 export type MutationElevateAdminSessionArgs = {
   input: ElevateAdminSessionInput;
 };
@@ -10232,6 +10248,11 @@ export type MutationMigrateAppToClusterArgs = {
 
 export type MutationMoveAppToTeamArgs = {
   input: MoveAppToTeamInput;
+};
+
+
+export type MutationMoveZentinelleSharedClusterToInstallArgs = {
+  input: ZentinelleClusterInput;
 };
 
 
@@ -10512,6 +10533,11 @@ export type MutationRegisterTenantClusterArgs = {
 
 
 export type MutationRegisterZentinelleClusterArgs = {
+  input: ZentinelleClusterInput;
+};
+
+
+export type MutationRegisterZentinelleSharedClusterArgs = {
   input: ZentinelleClusterInput;
 };
 
@@ -11026,6 +11052,11 @@ export type MutationSetZentinelleGatewayUrlArgs = {
 };
 
 
+export type MutationSetZentinelleInstallGatewayUrlArgs = {
+  input: SetZentinelleGatewayUrlInput;
+};
+
+
 export type MutationSignRequestCancelArgs = {
   gid: Scalars['String']['input'];
   note: Scalars['String']['input'];
@@ -11217,6 +11248,11 @@ export type MutationUnregisterTenantClusterArgs = {
 
 
 export type MutationUnregisterZentinelleClusterArgs = {
+  input: ZentinelleClusterInput;
+};
+
+
+export type MutationUnregisterZentinelleSharedClusterArgs = {
   input: ZentinelleClusterInput;
 };
 
@@ -12249,6 +12285,7 @@ export type Query = {
   astroliftWorkloads: Array<AstroliftWorkload>;
   astroliftWorkloadsPage: AstroliftWorkloadPage;
   astroliftZentinelleConnection?: Maybe<AstroliftZentinelleConnection>;
+  astroliftZentinelleInstallConnection?: Maybe<AstroliftZentinelleConnection>;
   /**
    * Query mutation audit logs. Superuser only.
    * @deprecated Caps at 200 rows with no way to reach the 201st. Use auditLogsPage.

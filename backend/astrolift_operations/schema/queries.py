@@ -74,7 +74,7 @@ from astrolift_operations.topology_traffic import TopologyTraffic, query_topolog
 from astrolift_operations.visibility import rules_for_app, visible_events, visible_rules, visible_webhooks
 from astrolift_registry.scopes import app_scope_by_slug, live_app_owners
 from core.decorators import tenant_scoped
-from core.permissions import Permission, require_permission
+from core.permissions import Permission, check_platform_operator, require_permission
 from core.schema.enums import ObservabilityPanelReason
 from core.tenancy import get_current_tenant
 
@@ -1030,6 +1030,18 @@ class OperationsQuery(InstallAlertMailQuery):
         if org_id is None:
             return None
         connection = ZentinelleConnection.objects.filter(organization_id=org_id).first()
+        return zentinelle_connection_to_type(connection) if connection is not None else None
+
+    @strawberry.field
+    @require_permission(Permission.ZENTINELLE_STATUS_VIEW)
+    def astrolift_zentinelle_install_connection(self, info: Info) -> ZentinelleConnectionType | None:
+        """The install connection shared clusters register through, and those
+        clusters (#1905), or null when there is none. Platform operator only:
+        every organization's admins hold ``zentinelle.status_view``."""
+        request = getattr(info.context, "request", None)
+        user = getattr(request, "user", None) or getattr(info.context, "user", None)
+        check_platform_operator(user, gate=Permission.ZENTINELLE_STATUS_VIEW)
+        connection = ZentinelleConnection.objects.filter(organization__isnull=True).first()
         return zentinelle_connection_to_type(connection) if connection is not None else None
 
     @strawberry.field
