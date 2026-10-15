@@ -33,6 +33,26 @@ export const ACCESS_PRESETS = gql`
   }
 `;
 
+/**
+ * The org's apps with their deploy-approval setting and what the viewer may
+ * do on each, for Easy setup's guided approval (#2272).
+ */
+export const DEPLOY_APPROVAL_APPS = gql`
+  query DeployApprovalApps {
+    astroliftApps {
+      id
+      slug
+      name
+      requiresApproval
+      approverTeamId
+      approverUserIds
+      minimumApprovals
+      version
+      viewerPermissions
+    }
+  }
+`;
+
 /** What each gated action asks of the viewer (#2202, #2203). */
 export const ACTION_SAFETY = gql`
   query ActionSafety($appSlug: String) {

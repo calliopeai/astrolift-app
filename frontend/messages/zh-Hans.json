@@ -6103,7 +6103,36 @@
     "grant": "授予",
     "allowed": "允许",
     "notIncluded": "不包含",
-    "footer": "如需授予，请在<link>分配</link>下分配其角色。"
+    "footer": "如需授予，请在<link>分配</link>下分配其角色。",
+    "approval": {
+      "title": "部署前需要审批",
+      "intro": "开启应用自身的部署审批设置:每次部署都会等待审批团队中足够多的人批准。",
+      "loading": "正在加载…",
+      "loadError": "无法读取应用:{error}",
+      "retry": "重试",
+      "noApps": "此组织还没有应用。",
+      "app": "应用",
+      "pickApp": "选择应用",
+      "wholeApp": "此设置适用于任何有权部署 {app} 的人对 {app} 的每次部署,而不仅是你授予访问权限的人。",
+      "cannotChange": "你可以查看此设置但不能更改:更改 {app} 的设置需要更新该应用的权限。",
+      "legend": "{app} 的部署审批",
+      "require": "每次部署前需要审批",
+      "team": "审批团队",
+      "pickTeam": "选择团队",
+      "quorum": "所需审批数",
+      "approvals": "{count, plural, other {# 个审批}}",
+      "replacesPeople": "目前的审批人是指定的人员。使用团队保存会替换他们。",
+      "approversNeed": "审批人还需要审批此应用部署的权限,例如审批人预设。",
+      "save": "保存",
+      "saving": "正在保存…",
+      "saved": "已保存。",
+      "saveFailed": "无法保存设置。"
+    },
+    "models": {
+      "title": "模型访问",
+      "body": "没有模型使用者预设。哪些应用可以连接哪些模型,以及连接是否需要审批,由组织的模型连接策略决定。",
+      "link": "打开模型连接策略"
+    }
   },
   "adminRuns": {
     "title": "运行",
@@ -8473,6 +8502,16 @@
           "roles": "角色",
           "policies": "策略",
           "check": "检查访问"
+        },
+        "policies": {
+          "heading": "策略",
+          "none": "没有策略或应用设置会搁置或阻止此授权。",
+          "appSetting": "此应用的部署审批设置",
+          "outcome": {
+            "APPROVAL_REQUIRED": "需要审批",
+            "DENIED": "被策略拒绝",
+            "MAY_DENY": "可能被策略拒绝"
+          }
         }
       },
       "legacyGrantRole": {

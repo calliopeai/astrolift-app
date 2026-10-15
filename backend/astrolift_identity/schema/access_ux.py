@@ -151,6 +151,23 @@ class GrantPreviewGroupType:
     member_count: int
 
 
+@strawberry.type(name="AstroliftGrantPreviewPolicy")
+class GrantPreviewPolicyType:
+    """A saved policy, or an app's deploy-approval setting, that would hold
+    or stop what the draft grants (#2272)."""
+
+    outcome: str = strawberry.field(description="APPROVAL_REQUIRED, DENIED or MAY_DENY.")
+    source: str = strawberry.field(
+        description="POLICY, or APP_SETTING for the app's deploy-approval setting."
+    )
+    policy_id: GUID | None
+    policy_slug: str | None
+    policy_name: str | None
+    permissions: list[str] = strawberry.field(description="The drafted permissions it applies to.")
+    people_count: int = strawberry.field(description="How many of the people reached it applies to.")
+    detail: str
+
+
 @strawberry.type(name="AstroliftGrantPreview")
 class GrantPreviewType:
     """Who a draft grant, change or removal affects, read-only (#2126).
@@ -179,6 +196,9 @@ class GrantPreviewType:
     allowed: bool = strawberry.field(description="Whether the caller's grant ceiling allows it.")
     refusal: str | None
     notes: list[str]
+    policies: list[GrantPreviewPolicyType] = strawberry.field(
+        description="Saved policies and app settings that hold or stop what the draft grants."
+    )
 
 
 # ---------------------------------------------------------------------

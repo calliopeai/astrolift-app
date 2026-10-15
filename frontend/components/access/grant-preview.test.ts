@@ -108,6 +108,33 @@ describe("previewOf", () => {
     );
   });
 
+  it("carries the policies that hold or stop the grant, and none when the server sends none", () => {
+    const policies = [
+      {
+        outcome: "APPROVAL_REQUIRED",
+        source: "POLICY",
+        policyId: "p-1",
+        policySlug: "two-approvers",
+        policyName: "Two approvers",
+        permissions: ["app.deploy"],
+        peopleCount: 1,
+        detail: "approval_required: this check carries no approval count",
+      },
+      {
+        outcome: "APPROVAL_REQUIRED",
+        source: "APP_SETTING",
+        policyId: null,
+        policySlug: null,
+        policyName: null,
+        permissions: ["app.deploy"],
+        peopleCount: 1,
+        detail: "Deploys of this app wait for 2 approvals.",
+      },
+    ];
+    expect(previewOf({ ...server, policies }).policies).toEqual(policies);
+    expect(previewOf(server).policies).toEqual([]);
+  });
+
   it("a direct grant held elsewhere has no via", () => {
     expect(sourceOfPreview(undefined)).toEqual({});
   });

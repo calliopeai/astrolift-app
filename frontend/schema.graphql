@@ -3210,6 +3210,11 @@ type AstroliftGrantPreview {
   allowed: Boolean!
   refusal: String
   notes: [String!]!
+
+  """
+  Saved policies and app settings that hold or stop what the draft grants.
+  """
+  policies: [AstroliftGrantPreviewPolicy!]!
 }
 
 type AstroliftGrantPreviewGroup {
@@ -3254,6 +3259,24 @@ type AstroliftGrantPreviewPerson {
   Their other grants that carry permissions in play, excluding the one being changed.
   """
   via: [AstroliftGrantPreviewSource!]!
+}
+
+type AstroliftGrantPreviewPolicy {
+  """APPROVAL_REQUIRED, DENIED or MAY_DENY."""
+  outcome: String!
+
+  """POLICY, or APP_SETTING for the app's deploy-approval setting."""
+  source: String!
+  policyId: GUID
+  policySlug: String
+  policyName: String
+
+  """The drafted permissions it applies to."""
+  permissions: [String!]!
+
+  """How many of the people reached it applies to."""
+  peopleCount: Int!
+  detail: String!
 }
 
 type AstroliftGrantPreviewSource {

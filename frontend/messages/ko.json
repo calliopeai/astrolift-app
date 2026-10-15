@@ -6103,7 +6103,36 @@
     "grant": "부여",
     "allowed": "허용",
     "notIncluded": "포함 안 됨",
-    "footer": "부여하려면 <link>할당</link>에서 해당 역할을 할당하세요."
+    "footer": "부여하려면 <link>할당</link>에서 해당 역할을 할당하세요.",
+    "approval": {
+      "title": "배포 전에 승인 요구",
+      "intro": "앱 자체의 배포 승인 설정을 켭니다. 각 배포는 승인 팀에서 충분한 인원이 승인할 때까지 기다립니다.",
+      "loading": "불러오는 중…",
+      "loadError": "앱을 읽을 수 없습니다: {error}",
+      "retry": "다시 시도",
+      "noApps": "이 조직에는 아직 앱이 없습니다.",
+      "app": "앱",
+      "pickApp": "앱 선택",
+      "wholeApp": "이 설정은 액세스를 부여하는 사람뿐 아니라 {app}을(를) 배포할 수 있는 모든 사람의 {app} 배포 전체에 적용됩니다.",
+      "cannotChange": "이 설정을 볼 수는 있지만 변경할 수는 없습니다. {app}의 설정을 변경하려면 앱을 업데이트할 권한이 필요합니다.",
+      "legend": "{app}의 배포 승인",
+      "require": "각 배포 전에 승인 요구",
+      "team": "승인 팀",
+      "pickTeam": "팀 선택",
+      "quorum": "필요한 승인 수",
+      "approvals": "{count, plural, other {승인 #건}}",
+      "replacesPeople": "현재 승인자는 특정 사람들입니다. 팀으로 저장하면 대체됩니다.",
+      "approversNeed": "승인자에게는 이 앱의 배포를 승인할 권한도 필요합니다(예: 승인자 프리셋).",
+      "save": "저장",
+      "saving": "저장 중…",
+      "saved": "저장했습니다.",
+      "saveFailed": "설정을 저장할 수 없습니다."
+    },
+    "models": {
+      "title": "모델 액세스",
+      "body": "모델 사용자 프리셋은 없습니다. 어떤 앱이 어떤 모델에 연결할 수 있는지, 연결에 승인이 필요한지는 조직의 모델 연결 정책에서 정합니다.",
+      "link": "모델 연결 정책 열기"
+    }
   },
   "adminRuns": {
     "title": "실행",
@@ -8473,6 +8502,16 @@
           "roles": "역할",
           "policies": "정책",
           "check": "접근 확인"
+        },
+        "policies": {
+          "heading": "정책",
+          "none": "이 부여를 보류하거나 막는 정책이나 앱 설정이 없습니다.",
+          "appSetting": "이 앱의 배포 승인 설정",
+          "outcome": {
+            "APPROVAL_REQUIRED": "승인 필요",
+            "DENIED": "정책에 의해 거부됨",
+            "MAY_DENY": "정책에 의해 거부될 수 있음"
+          }
         }
       },
       "legacyGrantRole": {

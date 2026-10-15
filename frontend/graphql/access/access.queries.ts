@@ -126,8 +126,9 @@ const GRANT_PREVIEW_PERSON = gql`
 /**
  * What a grant, change or removal would do before it is written (#2126):
  * who gains, loses or keeps which permissions and through what, the grant
- * ceiling (`allowed`, `refusal`), and the IdP groups it reaches. Needs
- * `org.manage_members`.
+ * ceiling (`allowed`, `refusal`), the IdP groups it reaches, and the saved
+ * policies and app deploy-approval setting that would hold or stop it
+ * (#2272). Needs `org.manage_members`.
  */
 export const GRANT_PREVIEW = gql`
   ${GRANT_PREVIEW_PERSON}
@@ -160,6 +161,16 @@ export const GRANT_PREVIEW = gql`
       allowed
       refusal
       notes
+      policies {
+        outcome
+        source
+        policyId
+        policySlug
+        policyName
+        permissions
+        peopleCount
+        detail
+      }
     }
   }
 `;

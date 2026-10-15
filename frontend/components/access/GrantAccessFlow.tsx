@@ -1,10 +1,12 @@
 "use client";
 
 import { AlertTriangleIcon, CheckCircle2Icon, SearchIcon, XCircleIcon } from "lucide-react";
+import Link from "next/link";
 import * as React from "react";
 import { useFormatter, useTranslations } from "next-intl";
 
 import { type Crumb, ShellHeader } from "@/components/shell/ShellHeader";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -63,6 +65,20 @@ export interface GrantPreview {
   refusal?: string | null;
   /** The server's caveats (a group's future members, an expiry), in words. */
   notes?: string[];
+  /** Saved policies, and the app's deploy-approval setting, that hold or stop what it grants (#2272). */
+  policies?: GrantPolicyEffect[];
+}
+
+/** One policy, or the app's deploy-approval setting, as the preview evaluated it. */
+export interface GrantPolicyEffect {
+  outcome: "APPROVAL_REQUIRED" | "DENIED" | "MAY_DENY";
+  source: "POLICY" | "APP_SETTING";
+  policyId?: string | null;
+  policySlug?: string | null;
+  policyName?: string | null;
+  permissions: string[];
+  peopleCount: number;
+  detail: string;
 }
 
 /**
@@ -704,6 +720,7 @@ function Review({
               {n}
             </p>
           ))}
+          {p.policies && <PolicyEffects policies={p.policies} />}
           {p.gaining.length > 0 && (
             <section className="flex min-w-0 flex-col gap-2">
               <h3 className="text-muted-foreground text-xs font-medium uppercase">
@@ -782,6 +799,60 @@ function Review({
         </section>
       )}
     </div>
+  );
+}
+
+const OUTCOME_BADGE = {
+  APPROVAL_REQUIRED: "secondary",
+  DENIED: "destructive",
+  MAY_DENY: "outline",
+} as const;
+
+/** What the org's policies, and the app's deploy-approval setting, do to this grant (#2272). */
+function PolicyEffects({ policies }: { policies: GrantPolicyEffect[] }) {
+  const t = useTranslations("shared.access.grant");
+  return (
+    <section aria-label={t("policies.heading")} className="flex min-w-0 flex-col gap-2">
+      <h3 className="text-muted-foreground text-xs font-medium uppercase">
+        {t("policies.heading")}
+      </h3>
+      {policies.length === 0 ? (
+        <p className="text-muted-foreground text-xs">{t("policies.none")}</p>
+      ) : (
+        <ul className="min-w-0 divide-y rounded-md border">
+          {policies.map((e) => (
+            <li
+              key={`${e.source}:${e.policyId ?? ""}`}
+              className="flex min-w-0 flex-col gap-1 px-3 py-2"
+            >
+              <span className="flex min-w-0 flex-wrap items-center gap-2 text-sm">
+                <Badge variant={OUTCOME_BADGE[e.outcome] ?? "outline"}>
+                  {t(`policies.outcome.${e.outcome}`)}
+                </Badge>
+                {e.source === "APP_SETTING" ? (
+                  <span>{t("policies.appSetting")}</span>
+                ) : e.policyId ? (
+                  <Link
+                    className="[overflow-wrap:anywhere] underline underline-offset-2"
+                    href={`/administration/policies/${encodeURIComponent(e.policyId)}`}
+                  >
+                    {e.policyName || e.policySlug}
+                  </Link>
+                ) : (
+                  <span>{e.policyName || e.policySlug}</span>
+                )}
+              </span>
+              <span className="text-muted-foreground text-2xs min-w-0 font-mono [overflow-wrap:anywhere]">
+                {e.permissions.join(", ")}
+              </span>
+              <span className="text-muted-foreground min-w-0 text-xs [overflow-wrap:anywhere]">
+                {e.detail}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

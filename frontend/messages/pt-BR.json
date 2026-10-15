@@ -6103,7 +6103,36 @@
     "grant": "Conceder",
     "allowed": "Permitido",
     "notIncluded": "Não incluído",
-    "footer": "Para conceder uma, atribua a função em <link>Atribuições</link>."
+    "footer": "Para conceder uma, atribua a função em <link>Atribuições</link>.",
+    "approval": {
+      "title": "Exigir aprovação antes das implantações",
+      "intro": "Ativa a configuração de aprovação de implantações do próprio app: cada implantação espera até que pessoas suficientes da equipe aprovadora a aprovem.",
+      "loading": "Carregando…",
+      "loadError": "Não foi possível ler os apps: {error}",
+      "retry": "Tentar novamente",
+      "noApps": "Esta organização ainda não tem apps.",
+      "app": "Aplicativo",
+      "pickApp": "Escolha um app",
+      "wholeApp": "Esta configuração vale para toda implantação de {app}, feita por qualquer pessoa que possa implantá-lo, não só para as pessoas a quem você concede acesso.",
+      "cannotChange": "Você pode ver esta configuração, mas não alterá-la: alterar as configurações de {app} exige permissão para atualizar o app.",
+      "legend": "Aprovação de implantações de {app}",
+      "require": "Exigir aprovação antes de cada implantação",
+      "team": "Equipe aprovadora",
+      "pickTeam": "Escolha uma equipe",
+      "quorum": "Aprovações necessárias",
+      "approvals": "{count, plural, one {# aprovação} other {# aprovações}}",
+      "replacesPeople": "Hoje os aprovadores são pessoas específicas. Salvar com uma equipe as substitui.",
+      "approversNeed": "Os aprovadores também precisam de permissão para aprovar implantações neste app, por exemplo o preset Aprovador.",
+      "save": "Salvar",
+      "saving": "Salvando…",
+      "saved": "Salvo.",
+      "saveFailed": "Não foi possível salvar a configuração."
+    },
+    "models": {
+      "title": "Acesso a modelos",
+      "body": "Não há preset de consumidor de modelos. Quais apps podem se conectar a quais modelos, e se uma conexão precisa de aprovação, é definido pela política de conexão de modelos da organização.",
+      "link": "Abrir a política de conexão de modelos"
+    }
   },
   "adminRuns": {
     "title": "Execuções",
@@ -8473,6 +8502,16 @@
           "roles": "Papéis",
           "policies": "Políticas",
           "check": "Verificar acesso"
+        },
+        "policies": {
+          "heading": "Políticas",
+          "none": "Nenhuma política ou configuração do app retém ou impede o que isto concede.",
+          "appSetting": "Aprovação de implantações deste app",
+          "outcome": {
+            "APPROVAL_REQUIRED": "Requer aprovação",
+            "DENIED": "Negado por política",
+            "MAY_DENY": "Pode ser negado por política"
+          }
         }
       },
       "legacyGrantRole": {

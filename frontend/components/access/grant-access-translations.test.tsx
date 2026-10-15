@@ -14,7 +14,16 @@ import ko from "@/messages/ko.json";
 import pt from "@/messages/pt-BR.json";
 import zh from "@/messages/zh-Hans.json";
 
-import { CHECKOUT, DANA, DEPLOYER, PREVIEW, ROLES, SAM } from "./fixtures";
+import {
+  CHECKOUT,
+  DANA,
+  DEPLOYER,
+  PREVIEW,
+  PREVIEW_NO_POLICIES,
+  PREVIEW_POLICIES,
+  ROLES,
+  SAM,
+} from "./fixtures";
 import { localizedGrantEffect } from "./grant-copy";
 import { GrantAccessFlow, type GrantAccessFlowProps } from "./GrantAccessFlow";
 
@@ -123,6 +132,25 @@ describe.each(Object.entries(catalogs))("%s grant flow", (locale, messages) => {
       );
       expect(effect).toBe(t("effect", { count, already: 0, what: t("access"), where: "" }));
     }
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("shows the policies that hold or stop the grant, and says so when none do (#2272)", () => {
+    const view = render(
+      ui({ initialStep: 4, initialDraft: draft, initialPreview: PREVIEW_POLICIES })
+    );
+    const section = screen.getByRole("region", { name: t("policies.heading") });
+    expect(section).toHaveTextContent(t("policies.outcome.DENIED"));
+    expect(section).toHaveTextContent(t("policies.outcome.MAY_DENY"));
+    expect(section).toHaveTextContent(t("policies.outcome.APPROVAL_REQUIRED"));
+    expect(section).toHaveTextContent(t("policies.appSetting"));
+    expect(screen.getByRole("link", { name: "Release freeze" })).toHaveAttribute(
+      "href",
+      "/administration/policies/pol-freeze"
+    );
+    view.unmount();
+    render(ui({ initialStep: 4, initialDraft: draft, initialPreview: PREVIEW_NO_POLICIES }));
+    expect(screen.getByText(t("policies.none"))).toBeVisible();
     expect(onError).not.toHaveBeenCalled();
   });
 

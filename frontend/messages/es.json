@@ -6097,7 +6097,36 @@
     "grant": "Conceder",
     "allowed": "Permitido",
     "notIncluded": "No incluido",
-    "footer": "Para conceder una, asigna su rol en <link>Asignaciones</link>."
+    "footer": "Para conceder una, asigna su rol en <link>Asignaciones</link>.",
+    "approval": {
+      "title": "Exigir aprobación antes de desplegar",
+      "intro": "Activa la aprobación de despliegues propia de una app: cada despliegue espera hasta que suficientes personas del equipo aprobador lo aprueben.",
+      "loading": "Cargando…",
+      "loadError": "No se pudieron leer las apps: {error}",
+      "retry": "Reintentar",
+      "noApps": "Esta organización aún no tiene apps.",
+      "app": "Aplicación",
+      "pickApp": "Elige una app",
+      "wholeApp": "Este ajuste se aplica a cada despliegue de {app}, por cualquiera que pueda desplegarla, no solo a las personas a las que concedes acceso.",
+      "cannotChange": "Puedes ver este ajuste pero no cambiarlo: cambiar los ajustes de {app} requiere permiso para actualizar la app.",
+      "legend": "Aprobación de despliegues de {app}",
+      "require": "Exigir aprobación antes de cada despliegue",
+      "team": "Equipo aprobador",
+      "pickTeam": "Elige un equipo",
+      "quorum": "Aprobaciones necesarias",
+      "approvals": "{count, plural, one {# aprobación} other {# aprobaciones}}",
+      "replacesPeople": "Hoy sus aprobadores son personas concretas. Guardar con un equipo las reemplaza.",
+      "approversNeed": "Los aprobadores también necesitan permiso para aprobar despliegues en esta app, por ejemplo el preajuste Aprobador.",
+      "save": "Guardar",
+      "saving": "Guardando…",
+      "saved": "Guardado.",
+      "saveFailed": "No se pudo guardar el ajuste."
+    },
+    "models": {
+      "title": "Acceso a modelos",
+      "body": "No hay un preajuste de consumidor de modelos. Qué apps pueden conectarse a qué modelos, y si una conexión necesita aprobación, lo define la política de conexión de modelos de la organización.",
+      "link": "Abrir la política de conexión de modelos"
+    }
   },
   "adminRuns": {
     "title": "Ejecuciones",
@@ -8476,6 +8505,16 @@
           "roles": "Roles",
           "policies": "Políticas",
           "check": "Comprobar acceso"
+        },
+        "policies": {
+          "heading": "Políticas",
+          "none": "Ninguna política ni ajuste de la app retiene o impide lo que esto concede.",
+          "appSetting": "Aprobación de despliegues de esta app",
+          "outcome": {
+            "APPROVAL_REQUIRED": "Requiere aprobación",
+            "DENIED": "Denegado por política",
+            "MAY_DENY": "Puede denegarlo una política"
+          }
         }
       },
       "legacyGrantRole": {

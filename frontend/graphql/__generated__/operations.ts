@@ -3090,6 +3090,8 @@ export type AstroliftGrantPreview = {
   ok: Scalars['Boolean']['output'];
   /** The permissions in play. */
   permissions: Array<Scalars['String']['output']>;
+  /** Saved policies and app settings that hold or stop what the draft grants. */
+  policies: Array<AstroliftGrantPreviewPolicy>;
   refusal?: Maybe<Scalars['String']['output']>;
   scopeGuid?: Maybe<Scalars['GUID']['output']>;
   scopeKind?: Maybe<Scalars['String']['output']>;
@@ -3131,6 +3133,21 @@ export type AstroliftGrantPreviewPerson = {
   user: AstroliftUser;
   /** Their other grants that carry permissions in play, excluding the one being changed. */
   via: Array<AstroliftGrantPreviewSource>;
+};
+
+export type AstroliftGrantPreviewPolicy = {
+  detail: Scalars['String']['output'];
+  /** APPROVAL_REQUIRED, DENIED or MAY_DENY. */
+  outcome: Scalars['String']['output'];
+  /** How many of the people reached it applies to. */
+  peopleCount: Scalars['Int']['output'];
+  /** The drafted permissions it applies to. */
+  permissions: Array<Scalars['String']['output']>;
+  policyId?: Maybe<Scalars['GUID']['output']>;
+  policyName?: Maybe<Scalars['String']['output']>;
+  policySlug?: Maybe<Scalars['String']['output']>;
+  /** POLICY, or APP_SETTING for the app's deploy-approval setting. */
+  source: Scalars['String']['output'];
 };
 
 export type AstroliftGrantPreviewSource = {
@@ -16631,7 +16648,7 @@ export type GrantPreviewQueryVariables = Exact<{
 }>;
 
 
-export type GrantPreviewQuery = { astroliftGrantPreview: { ok: boolean, errors: Array<string>, action: string, permissions: Array<string>, scopeKind?: string | null, scopeGuid?: string | null, sourceScopeLabel: string, summary: string, gainingCount: number, losingCount: number, unchangedCount: number, allowed: boolean, refusal?: string | null, notes: Array<string>, gaining: Array<{ memberId?: string | null, through: Array<string>, gained: Array<string>, lost: Array<string>, kept: Array<string>, user: { id: string, username: string, email: string }, via: Array<{ source: string, bindingId?: string | null, roleSlug?: string | null, roleName?: string | null, scopeKind?: string | null, scopeGuid?: string | null, sourceScopeLabel: string, groupExternalId?: string | null, teamSlug?: string | null, inherited: boolean, permissions: Array<string> }> }>, losing: Array<{ memberId?: string | null, through: Array<string>, gained: Array<string>, lost: Array<string>, kept: Array<string>, user: { id: string, username: string, email: string }, via: Array<{ source: string, bindingId?: string | null, roleSlug?: string | null, roleName?: string | null, scopeKind?: string | null, scopeGuid?: string | null, sourceScopeLabel: string, groupExternalId?: string | null, teamSlug?: string | null, inherited: boolean, permissions: Array<string> }> }>, unchanged: Array<{ memberId?: string | null, through: Array<string>, gained: Array<string>, lost: Array<string>, kept: Array<string>, user: { id: string, username: string, email: string }, via: Array<{ source: string, bindingId?: string | null, roleSlug?: string | null, roleName?: string | null, scopeKind?: string | null, scopeGuid?: string | null, sourceScopeLabel: string, groupExternalId?: string | null, teamSlug?: string | null, inherited: boolean, permissions: Array<string> }> }>, groups: Array<{ groupExternalId: string, memberCount: number }> } };
+export type GrantPreviewQuery = { astroliftGrantPreview: { ok: boolean, errors: Array<string>, action: string, permissions: Array<string>, scopeKind?: string | null, scopeGuid?: string | null, sourceScopeLabel: string, summary: string, gainingCount: number, losingCount: number, unchangedCount: number, allowed: boolean, refusal?: string | null, notes: Array<string>, gaining: Array<{ memberId?: string | null, through: Array<string>, gained: Array<string>, lost: Array<string>, kept: Array<string>, user: { id: string, username: string, email: string }, via: Array<{ source: string, bindingId?: string | null, roleSlug?: string | null, roleName?: string | null, scopeKind?: string | null, scopeGuid?: string | null, sourceScopeLabel: string, groupExternalId?: string | null, teamSlug?: string | null, inherited: boolean, permissions: Array<string> }> }>, losing: Array<{ memberId?: string | null, through: Array<string>, gained: Array<string>, lost: Array<string>, kept: Array<string>, user: { id: string, username: string, email: string }, via: Array<{ source: string, bindingId?: string | null, roleSlug?: string | null, roleName?: string | null, scopeKind?: string | null, scopeGuid?: string | null, sourceScopeLabel: string, groupExternalId?: string | null, teamSlug?: string | null, inherited: boolean, permissions: Array<string> }> }>, unchanged: Array<{ memberId?: string | null, through: Array<string>, gained: Array<string>, lost: Array<string>, kept: Array<string>, user: { id: string, username: string, email: string }, via: Array<{ source: string, bindingId?: string | null, roleSlug?: string | null, roleName?: string | null, scopeKind?: string | null, scopeGuid?: string | null, sourceScopeLabel: string, groupExternalId?: string | null, teamSlug?: string | null, inherited: boolean, permissions: Array<string> }> }>, groups: Array<{ groupExternalId: string, memberCount: number }>, policies: Array<{ outcome: string, source: string, policyId?: string | null, policySlug?: string | null, policyName?: string | null, permissions: Array<string>, peopleCount: number, detail: string }> } };
 
 export type PolicyConditionCatalogQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -19239,6 +19256,11 @@ export type AccessPresetsQueryVariables = Exact<{ [key: string]: never; }>;
 
 export type AccessPresetsQuery = { astroliftAccessPresets: Array<{ key: string, label: string, summary: string, roles: Array<{ scopeLevel: string, roleSlug: string, tasks: Array<{ key: string, label: string, granted: boolean }> }> }> };
 
+export type DeployApprovalAppsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type DeployApprovalAppsQuery = { astroliftApps: Array<{ id: string, slug: string, name: string, requiresApproval: boolean, approverTeamId?: string | null, approverUserIds: Array<string>, minimumApprovals: number, version: number, viewerPermissions: Array<string> }> };
+
 export type ActionSafetyQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;
 }>;
@@ -19257,6 +19279,13 @@ export type ActionSafetyRulesQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type ActionSafetyRulesQuery = { astroliftActionSafetyRules: Array<{ action: string, scopeKind: string, scopeId?: string | null, scopeLabel: string, enabled?: boolean | null, allowSelfApproval?: boolean | null, requireApproval?: boolean | null, minimumApprovals?: number | null }> };
+
+export type UpdateAppDeployApprovalMutationVariables = Exact<{
+  input: UpdateAppInput;
+}>;
+
+
+export type UpdateAppDeployApprovalMutation = { updateApp: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, requiresApproval: boolean, approverTeamId?: string | null, approverUserIds: Array<string>, minimumApprovals: number, version: number } | null } };
 
 export type CreatePipelineMutationVariables = Exact<{
   input: CreatePipelineInput;
