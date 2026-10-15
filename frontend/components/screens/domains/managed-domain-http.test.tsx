@@ -88,6 +88,14 @@ beforeEach(async () => {
       tlsVerified: null,
       latencyMs: null,
     }),
+    // The delegation panel (#1787) lists connections once support allows writes.
+    dnsProviderConnectionsPage: () => ({
+      page: 1,
+      pageSize: 50,
+      totalCount: 0,
+      nextCursor: null,
+      items: [],
+    }),
     dnsProviderDomainBinding: () => ({
       domainId: domain.id,
       domainVersion: domain.version,

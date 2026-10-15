@@ -3400,6 +3400,9 @@ export type AstroliftManagedDomain = {
   createdAt: Scalars['DateTime']['output'];
   defaultFor: Scalars['String']['output'];
   delegationCheck: Scalars['JSON']['output'];
+  delegationConnectionId?: Maybe<Scalars['GUID']['output']>;
+  delegationWrite: Scalars['JSON']['output'];
+  delegationZoneName: Scalars['String']['output'];
   dnsDriver: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   isWildcardManaged: Scalars['Boolean']['output'];

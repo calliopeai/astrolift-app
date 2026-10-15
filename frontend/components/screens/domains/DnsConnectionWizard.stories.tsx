@@ -15,6 +15,7 @@ const connection = {
   verifiedAt: "2026-10-04T01:00:00Z",
   expiresAt: null,
   dnsWritesSupported: false,
+  delegationZoneName: "",
 };
 const zone = {
   id: "0123456789abcdef0123456789abcdef",

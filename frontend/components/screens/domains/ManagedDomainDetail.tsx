@@ -19,11 +19,14 @@ import { domainDiagnosticReasonKey } from "./domain-diagnostic-reasons";
 import type { ManagedDomainState } from "./use-managed-domain";
 import { DomainRecordRouting } from "./DomainRecordRouting";
 import { DomainDefaultSettings, type DomainDefaultSettingsProps } from "./DomainDefaultSettings";
+import { DnsDelegationPanel, type DnsDelegationPanelProps } from "./DnsDelegationPanel";
 
 export type ManagedDomainDetailProps = ManagedDomainState & {
   id: string;
   initialTab?: Tab;
   defaultSettings?: DomainDefaultSettingsProps | null;
+  /** Parent-zone delegation through a Cloudflare grant (#1787). */
+  delegation?: DnsDelegationPanelProps | null;
   /**
    * Why Astrolift writes no DNS on this install (DNS withheld,
    * calliope-installer#447). Verify and Revalidate still run: the certificate
@@ -349,6 +352,7 @@ function DetailTabs({
         {tab === "overview" && (
           <>
             {props.defaultSettings && <DomainDefaultSettings {...props.defaultSettings} />}
+            {props.delegation && <DnsDelegationPanel {...props.delegation} />}
             <section className="space-y-3 rounded-lg border p-4">
               <h2 className="font-semibold">{t("configuration")}</h2>
               <div className="flex flex-wrap gap-2">

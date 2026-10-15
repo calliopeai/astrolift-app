@@ -20,6 +20,9 @@ export const GET_MANAGED_DOMAIN = gql`
       challengeRecordName
       challengeRecordValue
       delegationCheck
+      delegationConnectionId
+      delegationZoneName
+      delegationWrite
     }
   }
 `;
@@ -220,6 +223,7 @@ export const DNS_CONNECTIONS_PAGE = gql`
         verifiedAt
         expiresAt
         dnsWritesSupported
+        delegationZoneName
       }
     }
   }
@@ -486,6 +490,44 @@ export const DNS_DOMAIN_BINDING = gql`
       zoneName
       dnsWritesSupported
       canVerify
+    }
+  }
+`;
+// #1787: a separate Cloudflare token that may write delegating NS records into
+// one parent zone, and the binding that names it for a managed domain. Both
+// need a fresh sign-in; the token is never read back.
+export const GRANT_CLOUDFLARE_DELEGATION = gql`
+  mutation GrantCloudflareDelegation($input: GrantCloudflareDelegationInput!) {
+    grantCloudflareDelegation(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        version
+        dnsWritesSupported
+        delegationZoneName
+      }
+    }
+  }
+`;
+export const BIND_MANAGED_DOMAIN_DELEGATION = gql`
+  mutation BindManagedDomainDelegation($input: BindManagedDomainDelegationInput!) {
+    bindManagedDomainDelegation(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        version
+        delegationZoneName
+      }
     }
   }
 `;
