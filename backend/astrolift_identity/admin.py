@@ -86,7 +86,7 @@ class OrganizationAllowlistedDomainAdmin(_TenantAdminMixin, admin.ModelAdmin):
 
 @admin.register(OrganizationModule)
 class OrganizationModuleAdmin(_TenantAdminMixin, admin.ModelAdmin):
-    list_display = ("key", "organization", "enabled", "deleted_at")
+    list_display = ("key", "organization", "enabled", "source", "deleted_at")
     list_filter = ("key", "enabled")
     readonly_fields = ("guid", "created_at", "updated_at", "version")
 

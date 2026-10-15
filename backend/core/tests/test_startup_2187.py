@@ -69,7 +69,7 @@ def test_successful_migration_preserves_bootstrap_and_server(startup, monkeypatc
     assert startup.commands.index("python manage.py bootstrap_admin") < startup.commands.index(
         "python manage.py bootstrap_idp"
     )
-    assert startup.commands[-1] == "python manage.py bootstrap_managed_domain"
+    assert startup.commands[-1] == "python manage.py sync_licence_modules"
     expected = "uvicorn config.asgi:application --host 0.0.0.0 --port 8000"
     assert startup.system_calls == ["service cron start", expected + (" --reload" if reload else "")]
 
@@ -80,7 +80,7 @@ def test_successful_migration_preserves_bootstrap_and_server(startup, monkeypatc
 def test_non_migration_failure_keeps_existing_optional_command_behavior(startup, optional_command):
     startup.results[optional_command] = 9
     startup.run()
-    assert startup.commands[-1] == "python manage.py bootstrap_managed_domain"
+    assert startup.commands[-1] == "python manage.py sync_licence_modules"
     assert startup.system_calls[-1] == "uvicorn config.asgi:application --host 0.0.0.0 --port 8000"
 
 

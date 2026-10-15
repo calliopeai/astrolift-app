@@ -124,6 +124,7 @@ def _module_gate(org):
     from astrolift_identity.org_modules import (
         CHAT_STUDIO_INTEGRATION,
         REASON_DISABLED_BY_INSTALL,
+        REASON_NOT_LICENSED,
         module_state,
     )
 
@@ -132,6 +133,8 @@ def _module_gate(org):
         return None
     if reason == REASON_DISABLED_BY_INSTALL:
         detail = "the chat_studio_integration module is turned off on this install"
+    elif reason == REASON_NOT_LICENSED:
+        detail = "the chat_studio_integration module is not included in this install's licence"
     else:
         detail = "the chat_studio_integration module is not enabled for this organization"
     return JsonResponse(

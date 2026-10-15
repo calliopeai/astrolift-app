@@ -67,6 +67,10 @@ ON_STARTUP = [
     # The install's apps zone, handed over by the installer (#374). Create-only
     # and a no-op when ASTROLIFT_MANAGED_DOMAIN_ZONE is unset.
     "bootstrap_managed_domain",
+    # Per-org modules from the signed licence (#1879). The licence arrives in
+    # the environment at task start, so this is when it changes; a no-op when
+    # the licence has no modules claim.
+    "sync_licence_modules",
 ]
 
 logger.warning("[STARTUP] Running startup... ==================================")

@@ -9,7 +9,7 @@ from astrolift_graphql import MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import OrganizationModule
-from astrolift_identity.org_modules import INSTALL_SWITCHES, allowed_by_install
+from astrolift_identity.org_modules import INSTALL_SWITCHES, allowed_by_install, withheld_by_licence
 from astrolift_identity.schema.mutations.helpers import _actor
 from astrolift_identity.schema.mutations.types import (
     SetOrganizationModuleInput,
@@ -67,6 +67,12 @@ class OrganizationModuleMutations:
                 f"the {key} module is turned off on this install; ask the install admin",
                 field="key",
             )
+        if input.enabled and withheld_by_licence(key):
+            return gql_failure(
+                ErrorCode.PRECONDITION.value,
+                f"the {key} module is not included in this install's licence",
+                field="key",
+            )
 
         actor = _actor()
         row, _created = OrganizationModule.objects.get_or_create(
@@ -75,6 +81,7 @@ class OrganizationModuleMutations:
             defaults={"created_by": actor},
         )
         row.enabled = bool(input.enabled)
+        row.source = OrganizationModule.Source.ORG_ADMIN
         row.updated_by = actor
         row.save()
         return gql_success(_OrganizationModulePayload(key=key, enabled=row.enabled))
