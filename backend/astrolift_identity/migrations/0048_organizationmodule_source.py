@@ -3,7 +3,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("astrolift_identity", "0046_action_approvals"),
+        ("astrolift_identity", "0047_step_up_pin"),
     ]
 
     operations = [
