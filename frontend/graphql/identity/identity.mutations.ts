@@ -817,6 +817,9 @@ export const ELEVATE_ADMIN_SESSION = gql`
 
 // #2399: the viewer's step-up PIN. Setting one needs a fresh SSO or
 // password elevation; the refusal opens the step-up prompt like any other.
+// ``supportedMethods`` is selected so the prompt takes the refusal's list
+// (never the PIN) instead of the session's, which offers the PIN first and
+// would loop a PIN change through a PIN step-up the set refuses.
 export const SET_STEP_UP_PIN = gql`
   mutation SetStepUpPin($input: SetStepUpPinInput!) {
     setStepUpPin(input: $input) {
@@ -825,6 +828,7 @@ export const SET_STEP_UP_PIN = gql`
         code
         message
         field
+        supportedMethods
       }
       data {
         replaced
