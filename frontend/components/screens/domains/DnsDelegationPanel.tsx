@@ -96,7 +96,10 @@ export function DnsDelegationPanel(props: DnsDelegationPanelProps) {
           <dt className="text-muted-foreground">{t("binding")}</dt>
           <dd className="break-all">
             {props.boundZoneName
-              ? t("boundTo", { parent: props.boundZoneName, connection: bound?.name ?? "" })
+              ? t("boundTo", {
+                  parent: props.boundZoneName,
+                  connection: bound?.name ?? t("connection"),
+                })
               : t("unbound")}
           </dd>
         </div>

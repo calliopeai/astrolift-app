@@ -10,6 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DomainDetailClient } from "@/app/(app)/domains/[id]/domain-detail-client";
 import { ELEVATED_EVENT } from "@/lib/auth/step-up-events";
 import en from "@/messages/en.json";
+import { DELEGATION } from "./DnsDelegationPanel.stories";
+import { DnsDelegationPanel } from "./DnsDelegationPanel";
 import { DOMAIN_ACTIVE, DOMAIN_DIAGNOSTICS } from "./domains-environments.fixtures";
 vi.mock("@/graphql/identity/identity.hooks", () => ({
   useActiveOrg: () => ({
@@ -250,5 +252,22 @@ describe("parent zone delegation through the actual schema (#1787)", () => {
     expect(
       within(panel()).getByText("apps.acme.example already has CNAME records")
     ).toBeInTheDocument();
+  });
+  it("names the binding for a viewer who cannot list connections", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
+        <DnsDelegationPanel
+          {...DELEGATION}
+          canWrite={false}
+          connections={null}
+          boundConnectionId={connection.id}
+          boundZoneName={ZONE.name}
+        />
+      </NextIntlClientProvider>
+    );
+    expect(
+      screen.getByText(`From ${ZONE.name} through ${en.domainDelegation.connection}`)
+    ).toBeInTheDocument();
+    expect(screen.getByText(en.domainDelegation.operatorOnly)).toBeInTheDocument();
   });
 });
