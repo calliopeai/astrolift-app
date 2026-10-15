@@ -9,7 +9,8 @@ per-organization decision. Two switches decide whether it is on for an org:
   fallback contract asks for, calliopeai/calliope-vscode#796);
 * the install's signed licence, when it carries the modules claim
   (``astrolift_identity.licence``, #1879): a module it withholds is off for
-  every org, whatever the org admin set;
+  every org, whatever the org admin set. A grant only allows a module; it
+  never turns one on;
 * the org admin's ``OrganizationModule`` row, off until they turn it on.
 
 This is the only place they are combined, so ``me.modules``, the builder
@@ -19,7 +20,7 @@ API gate and the AHP attach relay (#1860) cannot disagree about a module.
 from __future__ import annotations
 
 from astrolift_identity.licence import licence_fingerprint, licensed_modules
-from astrolift_identity.models import Organization, OrganizationModule
+from astrolift_identity.models import OrganizationModule
 
 CHAT_STUDIO_INTEGRATION = str(OrganizationModule.Key.CHAT_STUDIO_INTEGRATION)
 AGENT_LIVE_ATTACH = str(OrganizationModule.Key.AGENT_LIVE_ATTACH)
@@ -80,63 +81,48 @@ def enabled_modules(organization_id: int | None) -> frozenset[str]:
     )
 
 
+def module_sources(organization_id: int | None) -> dict[str, str]:
+    """Who last set each module the org has a row for: ``org_admin`` or ``licence``."""
+    return dict(
+        OrganizationModule.objects.filter(organization_id=organization_id).values_list("key", "source")
+    )
+
+
 def sync_from_licence() -> list[tuple[int, str, bool]]:
-    """Seed every org's module rows from the licence; ``(org_id, key, enabled)`` per change.
+    """Turn off, in every org, each module the licence withholds; ``(org_id, key, False)`` per change.
 
-    Nothing happens when the licence has no say. Otherwise, per org and module:
-
-    * granted and the org has no row: turned on, ``source=licence``;
-    * granted and the licence turned it off earlier: turned back on, so an
-      upgrade restores what a downgrade took;
-    * granted and the org admin turned it off: left off, their call stands;
-    * withheld (a downgrade or a withdrawal): turned off, ``source=licence``,
-      and the org admin cannot turn it back on while the licence withholds it.
-
-    A grant never overrides the install admin's force-off: that is checked at
-    read time in :func:`module_state`, not here. Each change is audited.
+    Nothing happens when the licence has no say. A grant only allows a module:
+    it never turns one on, so a module stays off until the org admin turns it
+    on (#1859). A withheld module that is on is turned off with
+    ``source=licence``, and the org admin cannot turn it back on while the
+    licence withholds it. When a later licence grants it again it stays off
+    until the org admin turns it on. Each change is audited.
     """
     from core.mutations import AuditEntry, emit_audit
 
     granted = licensed_modules()
     if granted is None:
         return []
-    licence = OrganizationModule.Source.LICENCE
+    withheld = [key for key in INSTALL_SWITCHES if key not in granted]
     changes = []
-    for org_id in Organization.objects.filter(deleted_at__isnull=True).values_list("pk", flat=True):
-        rows = {row.key: row for row in OrganizationModule.objects.filter(organization_id=org_id)}
-        for key in INSTALL_SWITCHES:
-            row = rows.get(key)
-            if key in granted:
-                if row is None:
-                    # Every container runs this at start, so another may have just made it.
-                    _row, created = OrganizationModule.objects.get_or_create(
-                        organization_id=org_id, key=key, defaults={"enabled": True, "source": licence}
-                    )
-                    if not created:
-                        continue
-                elif not row.enabled and row.source == licence:
-                    row.enabled = True
-                    row.save()
-                else:
-                    continue
-            elif row is not None and row.enabled:
-                row.enabled = False
-                row.source = licence
-                row.save()
-            else:
-                continue
-            changes.append((org_id, key, key in granted))
-            emit_audit(
-                AuditEntry(
-                    actor_user_id=None,
-                    organization_id=org_id,
-                    action="org.module.licence",
-                    decision="ALLOW",
-                    target_kind="OrganizationModule",
-                    target_id=key,
-                    duration_ms=0,
-                    permissions=(),
-                    extra={"enabled": key in granted, "licence": licence_fingerprint()},
-                )
+    for row in OrganizationModule.objects.filter(
+        key__in=withheld, enabled=True, organization__deleted_at__isnull=True
+    ).order_by("organization_id", "key"):
+        row.enabled = False
+        row.source = OrganizationModule.Source.LICENCE
+        row.save()
+        changes.append((row.organization_id, row.key, False))
+        emit_audit(
+            AuditEntry(
+                actor_user_id=None,
+                organization_id=row.organization_id,
+                action="org.module.licence",
+                decision="ALLOW",
+                target_kind="OrganizationModule",
+                target_id=row.key,
+                duration_ms=0,
+                permissions=(),
+                extra={"enabled": False, "licence": licence_fingerprint()},
             )
+        )
     return changes

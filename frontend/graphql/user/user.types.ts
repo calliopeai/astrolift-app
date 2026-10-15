@@ -24,6 +24,11 @@ export type ModuleEntitlement = {
   // (chat_studio_integration, agent_live_attach) true only when an org
   // admin turned it on and the install has not forced it off.
   enabled: boolean;
+  // False when the install's signed licence withholds this per-org module
+  // (#1879): off for every org and an org admin cannot turn it on.
+  licensed?: boolean;
+  // Who last switched a per-org module: "org_admin" or "licence" (#1879).
+  source?: string | null;
 };
 
 export type CurrentUser = {

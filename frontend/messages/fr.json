@@ -5696,6 +5696,8 @@
     "description": "Intégrations facultatives pour cette organisation. Un admin de l'installation peut toujours en désactiver une pour toutes les organisations.",
     "loadError": "Impossible de charger les modules",
     "installOff": "Désactivé sur cette installation",
+    "licenceWithheld": "Non inclus dans la licence de cette installation",
+    "licenceTurnedOff": "Désactivé quand la licence ne l'incluait pas. Un administrateur de l'organisation peut le réactiver.",
     "enable": "Activer {module}",
     "disable": "Désactiver {module}",
     "enabledToast": "{module} activé",
@@ -5718,6 +5720,10 @@
         "label": "Application des politiques aux agents",
         "description": "Permet à Zentinelle d'appliquer des actions de politique aux agents et boxes de cette organisation."
       }
+    },
+    "errors": {
+      "MODULE_DISABLED_BY_INSTALL": "Ce module est désactivé sur cette installation. Contactez l'administrateur de l'installation.",
+      "MODULE_NOT_LICENSED": "Ce module n'est pas inclus dans la licence de cette installation."
     }
   },
   "actionSafety": {

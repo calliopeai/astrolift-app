@@ -1,6 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 
-import { modules, modulesAllOff, modulesLoading, modulesLong, modulesReadOnly } from "./fixtures";
+import {
+  modules,
+  modulesAllOff,
+  modulesLicence,
+  modulesLoading,
+  modulesLong,
+  modulesReadOnly,
+} from "./fixtures";
 import { ModulesCard } from "./ModulesCard";
 
 const meta: Meta<typeof ModulesCard> = {
@@ -24,6 +31,9 @@ export const ReadOnly: Story = { args: modulesReadOnly };
 export const Error: Story = {
   args: { error: { name: "Error", message: "Permission denied while loading this section" } },
 };
+
+/** A module the licence withholds, and one it turned off before granting it again. */
+export const Licence: Story = { args: modulesLicence };
 
 export const Pending: Story = { args: { ...modules, pendingKey: "chat_studio_integration" } };
 

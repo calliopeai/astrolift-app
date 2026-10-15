@@ -5702,6 +5702,8 @@
     "description": "この組織向けのオプション連携です。インストール管理者は、すべての組織で強制的にオフにできます。",
     "loadError": "モジュールを読み込めませんでした",
     "installOff": "このインストールではオフです",
+    "licenceWithheld": "このインストールのライセンスに含まれていません",
+    "licenceTurnedOff": "ライセンスに含まれなくなったときにオフになりました。組織管理者が再びオンにできます。",
     "enable": "{module} を有効にする",
     "disable": "{module} を無効にする",
     "enabledToast": "{module} を有効にしました",
@@ -5724,6 +5726,10 @@
         "label": "エージェントポリシーの適用",
         "description": "Zentinelle がこの組織のエージェントとボックスにポリシーアクションを適用できるようにします。"
       }
+    },
+    "errors": {
+      "MODULE_DISABLED_BY_INSTALL": "このモジュールはこのインストールでオフになっています。インストール管理者に連絡してください。",
+      "MODULE_NOT_LICENSED": "このモジュールはこのインストールのライセンスに含まれていません。"
     }
   },
   "actionSafety": {

@@ -204,6 +204,8 @@ const MODULE_ITEMS: ModuleItem[] = [
     description: "Lets Chat Studio reach this organization's apps through the builder API.",
     enabled: true,
     installAllowed: true,
+    licensed: true,
+    source: null,
   },
   {
     key: "agent_live_attach",
@@ -211,6 +213,8 @@ const MODULE_ITEMS: ModuleItem[] = [
     description: "Lets members attach live to a running agent session.",
     enabled: false,
     installAllowed: false,
+    licensed: true,
+    source: null,
   },
   {
     key: "chat_studio_agent_runs",
@@ -218,6 +222,8 @@ const MODULE_ITEMS: ModuleItem[] = [
     description: "Lets Chat Studio launch this organization's registered agents.",
     enabled: false,
     installAllowed: true,
+    licensed: true,
+    source: null,
   },
 ];
 
@@ -239,6 +245,18 @@ export const modulesReadOnly: ModulesCardProps = { ...modules, canManage: false 
 export const modulesAllOff: ModulesCardProps = {
   ...modules,
   items: MODULE_ITEMS.map((m) => ({ ...m, enabled: false, installAllowed: false })),
+};
+
+/** The licence withholds one module and had turned another off before granting it again. */
+export const modulesLicence: ModulesCardProps = {
+  ...modules,
+  items: MODULE_ITEMS.map((m, i) =>
+    i === 0
+      ? { ...m, enabled: false, licensed: false, source: "licence" }
+      : i === 2
+        ? { ...m, enabled: false, source: "licence" }
+        : m
+  ),
 };
 
 export const modulesLong: ModulesCardProps = {

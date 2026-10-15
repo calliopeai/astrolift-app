@@ -5702,6 +5702,8 @@
     "description": "此组织的可选集成。安装管理员仍可为所有组织强制关闭其中任一项。",
     "loadError": "无法加载模块",
     "installOff": "已在此安装中关闭",
+    "licenceWithheld": "未包含在此安装的许可证中",
+    "licenceTurnedOff": "许可证不再包含该模块时已将其关闭。组织管理员可以重新开启。",
     "enable": "启用 {module}",
     "disable": "停用 {module}",
     "enabledToast": "已启用 {module}",
@@ -5724,6 +5726,10 @@
         "label": "智能体策略执行",
         "description": "允许 Zentinelle 对此组织的智能体和 box 执行策略操作。"
       }
+    },
+    "errors": {
+      "MODULE_DISABLED_BY_INSTALL": "此模块已在此安装中关闭。请联系安装管理员。",
+      "MODULE_NOT_LICENSED": "此模块未包含在此安装的许可证中。"
     }
   },
   "actionSafety": {

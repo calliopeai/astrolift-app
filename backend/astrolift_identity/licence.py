@@ -1,11 +1,13 @@
 """The per-org modules the install's signed licence grants (#1879).
 
 Client Cove signs the licence (RS256, ``iss`` ``client-cove``) and the
-deployment agent pulls it; Astrolift reads it from the environment
-(``settings.CALLIOPE_LICENSE``) and verifies it against
-``settings.CALLIOPE_LICENSE_PUBLIC_KEY``. One claim is read:
+deployment agent pulls it and delivers it into the deployment's
+``<deployment>-astrolift-license`` secret (calliope-installer); Astrolift reads
+it from the environment (``settings.CALLIOPE_LICENSE``) and verifies it against
+``settings.CALLIOPE_LICENSE_PUBLIC_KEY``. ECS resolves both at task start, so a
+new licence takes effect at the next Astrolift restart. One claim is read:
 ``astrolift_modules``, the list of ``OrganizationModule`` keys this install's
-organizations may have.
+organizations may turn on. A grant only allows a module; it never turns one on.
 
 ``None`` from :func:`licensed_modules` means the licence has no say: no
 licence, no key, a signature that does not verify, or a licence without the

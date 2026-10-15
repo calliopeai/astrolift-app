@@ -5639,6 +5639,8 @@
     "description": "Optional integrations for this organization. An install admin can still force one off for every organization.",
     "loadError": "Could not load modules",
     "installOff": "Turned off on this install",
+    "licenceWithheld": "Not included in this install's license",
+    "licenceTurnedOff": "Turned off when the license withheld it. An org admin can turn it back on.",
     "enable": "Enable {module}",
     "disable": "Disable {module}",
     "enabledToast": "{module} enabled",
@@ -5661,6 +5663,10 @@
         "label": "Agent policy enforcement",
         "description": "Lets Zentinelle apply policy actions to this organization's agents and boxes."
       }
+    },
+    "errors": {
+      "MODULE_DISABLED_BY_INSTALL": "This module is turned off on this install. Ask the install admin.",
+      "MODULE_NOT_LICENSED": "This module is not included in this install's license."
     }
   },
   "actionSafety": {

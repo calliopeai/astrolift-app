@@ -31,6 +31,11 @@ def _module_target(*args, **kwargs):
     return ("OrganizationModule", key) if key else None
 
 
+# Codes the modules card translates; the message stays for API callers.
+ERROR_DISABLED_BY_INSTALL = "MODULE_DISABLED_BY_INSTALL"
+ERROR_NOT_LICENSED = "MODULE_NOT_LICENSED"
+
+
 @strawberry.type
 class OrganizationModuleMutations:
     @strawberry.field(
@@ -39,7 +44,8 @@ class OrganizationModuleMutations:
             "(org admins: ``org.update``). ``key`` is ``chat_studio_integration``, "
             "``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module "
             "the install admin has forced off (``astroliftServerInfo.featureFlags``, "
-            "``modules.*_allowed``) is refused with PRECONDITION; turning one off "
+            "``modules.*_allowed``) is refused with MODULE_DISABLED_BY_INSTALL, and one "
+            "the install's licence withholds with MODULE_NOT_LICENSED; turning one off "
             "always succeeds."
         )
     )
@@ -63,13 +69,13 @@ class OrganizationModuleMutations:
             )
         if input.enabled and not allowed_by_install(key):
             return gql_failure(
-                ErrorCode.PRECONDITION.value,
+                ERROR_DISABLED_BY_INSTALL,
                 f"the {key} module is turned off on this install; ask the install admin",
                 field="key",
             )
         if input.enabled and withheld_by_licence(key):
             return gql_failure(
-                ErrorCode.PRECONDITION.value,
+                ERROR_NOT_LICENSED,
                 f"the {key} module is not included in this install's licence",
                 field="key",
             )

@@ -5696,6 +5696,8 @@
     "description": "Optionale Integrationen für diese Organisation. Ein Installations-Admin kann eine davon trotzdem für alle Organisationen abschalten.",
     "loadError": "Module konnten nicht geladen werden",
     "installOff": "Auf dieser Installation abgeschaltet",
+    "licenceWithheld": "Nicht in der Lizenz dieser Installation enthalten",
+    "licenceTurnedOff": "Abgeschaltet, als die Lizenz das Modul nicht enthielt. Ein Org-Admin kann es wieder einschalten.",
     "enable": "{module} aktivieren",
     "disable": "{module} deaktivieren",
     "enabledToast": "{module} aktiviert",
@@ -5718,6 +5720,10 @@
         "label": "Durchsetzung von Agent-Richtlinien",
         "description": "Erlaubt Zentinelle, Richtlinienaktionen auf die Agents und Boxen dieser Organisation anzuwenden."
       }
+    },
+    "errors": {
+      "MODULE_DISABLED_BY_INSTALL": "Dieses Modul ist auf dieser Installation abgeschaltet. Wenden Sie sich an den Installations-Admin.",
+      "MODULE_NOT_LICENSED": "Dieses Modul ist nicht in der Lizenz dieser Installation enthalten."
     }
   },
   "actionSafety": {
