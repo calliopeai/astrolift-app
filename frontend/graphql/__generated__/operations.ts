@@ -7367,11 +7367,13 @@ export type EmailDeliveryTestPage = {
 export type EmailDeliveryTestSupport = {
   accountId?: Maybe<Scalars['String']['output']>;
   allowed: Scalars['Boolean']['output'];
+  eventCollectionConfigured: Scalars['Boolean']['output'];
   identity?: Maybe<Scalars['String']['output']>;
   reason?: Maybe<Scalars['String']['output']>;
   region?: Maybe<Scalars['String']['output']>;
   sender?: Maybe<Scalars['String']['output']>;
   serviceVersion?: Maybe<Scalars['Int']['output']>;
+  transport?: Maybe<Scalars['String']['output']>;
 };
 
 export type Emailsuppressionaddpayload = {
@@ -19667,7 +19669,7 @@ export type EmailDeliverySupportQueryVariables = Exact<{
 }>;
 
 
-export type EmailDeliverySupportQuery = { emailDeliveryTestSupport: { allowed: boolean, reason?: string | null, serviceVersion?: number | null, sender?: string | null, identity?: string | null, accountId?: string | null, region?: string | null } };
+export type EmailDeliverySupportQuery = { emailDeliveryTestSupport: { allowed: boolean, reason?: string | null, serviceVersion?: number | null, sender?: string | null, identity?: string | null, accountId?: string | null, region?: string | null, transport?: string | null, eventCollectionConfigured: boolean } };
 
 export type EmailDeliveryTestsPageQueryVariables = Exact<{
   managedServiceId: Scalars['GUID']['input'];

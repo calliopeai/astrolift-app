@@ -313,6 +313,60 @@ def test_observation_timeout_is_explicit_and_late_delivery_can_recover(world):
     assert email_delivery.display_status(row) == "delivered"
 
 
+def test_acceptance_without_event_destination_is_not_observable_not_timed_out(world):
+    world.wire["feedback"] = False
+    result = send(world)
+    assert result["ok"] and result["data"]["status"] == "not_observable", result
+    assert not result["data"]["eventTrackingConfigured"]
+    row = EmailDeliveryTest.objects.get()
+    row.accepted_at = timezone.now() - timedelta(minutes=16)
+    row.save()
+    assert email_delivery.display_status(row) == "not_observable"
+
+
+SUPPORT = "query($id:GUID!){emailDeliveryTestSupport(managedServiceId:$id){allowed reason transport eventCollectionConfigured}}"
+
+
+def support(world):
+    result = graphql(world, SUPPORT, {"id": str(world.svc.guid)})
+    assert not result.get("errors"), result
+    return result["data"]["emailDeliveryTestSupport"]
+
+
+def test_support_states_event_collection_for_exact_ses_source(world, settings):
+    assert support(world) == {
+        "allowed": True,
+        "reason": None,
+        "transport": "aws_ses",
+        "eventCollectionConfigured": True,
+    }
+    settings.SES_EVENTS_SNS_TOPIC_ARN = ""
+    assert support(world)["eventCollectionConfigured"] is False
+    assert not world.wire["requests"]
+
+
+@pytest.mark.parametrize("variant", ["smtp", "azure_acs"])
+def test_support_names_unsupported_transport_as_not_observable(world, variant):
+    world.svc.variant = variant
+    world.svc.save()
+    assert support(world) == {
+        "allowed": False,
+        "reason": "EXACT_TEST_TRANSPORT_UNSUPPORTED",
+        "transport": variant,
+        "eventCollectionConfigured": False,
+    }
+
+
+def test_support_refusal_without_write_authority_names_no_source(world):
+    world.svc.variant = "azure_acs"
+    world.svc.save()
+    world.role.permissions = [Permission.APP_READ.value]
+    world.role.save()
+    result = support(world)
+    assert not result["allowed"] and result["transport"] is None
+    assert result["reason"] != "EXACT_TEST_TRANSPORT_UNSUPPORTED"
+
+
 def test_feedback_before_send_ack_is_saved_and_reconciled(world):
     def early(_path):
         row = EmailDeliveryTest.objects.get()

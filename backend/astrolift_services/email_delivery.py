@@ -333,6 +333,9 @@ def test_history_page(info, service_id, *, after=None, limit=25):
 
 
 def display_status(row):
+    # Without a verified event destination nothing can arrive; never imply an observation lapsed.
+    if row.status == "accepted" and not row.feedback_topic_arns:
+        return "not_observable"
     if (
         row.status in {"accepted", "deferred"}
         and row.accepted_at

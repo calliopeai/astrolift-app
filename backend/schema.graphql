@@ -7835,6 +7835,8 @@ type EmailDeliveryTestSupport {
   identity: String
   accountId: String
   region: String
+  transport: String
+  eventCollectionConfigured: Boolean!
 }
 
 type Emailsuppressionaddpayload {
