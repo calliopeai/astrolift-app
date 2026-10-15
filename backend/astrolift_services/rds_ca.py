@@ -125,13 +125,15 @@ def inject_rds_ca(
             if not any(
                 (row.get("configMapRef") or {}).get("name") == env_name for row in container["envFrom"]
             ):
-                container["envFrom"].insert(0, {"configMapRef": {"name": env_name}})
+                # Optional: a task or job pod can be rendered and applied without
+                # the ConfigMaps; it should start, just without the bundle.
+                container["envFrom"].insert(0, {"configMapRef": {"name": env_name, "optional": True}})
             mounts = container.setdefault("volumeMounts", [])
             if not any(m.get("name") == VOLUME_NAME for m in mounts):
                 mounts.append({"name": VOLUME_NAME, "mountPath": MOUNT_DIR, "readOnly": True})
             volumes = pod_spec.setdefault("volumes", [])
             if not any(v.get("name") == VOLUME_NAME for v in volumes):
-                volumes.append({"name": VOLUME_NAME, "configMap": {"name": bundle_name}})
+                volumes.append({"name": VOLUME_NAME, "configMap": {"name": bundle_name, "optional": True}})
             injected = True
     if not injected:
         return resources

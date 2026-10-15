@@ -99,10 +99,15 @@ def test_rds_postgres_binding_mounts_the_ca_and_points_env_at_it(app, env):
     pod = web["spec"]["template"]["spec"]
     container = pod["containers"][0]
     # First in envFrom: every later source and every explicit env entry wins.
-    assert container["envFrom"][0] == {"configMapRef": {"name": env_configmap_name(app.slug)}}
+    assert container["envFrom"][0] == {
+        "configMapRef": {"name": env_configmap_name(app.slug), "optional": True}
+    }
     assert {"secretRef": {"name": _bindings_secret_name(app.slug)}} in container["envFrom"]
     assert {"name": VOLUME_NAME, "mountPath": MOUNT_DIR, "readOnly": True} in container["volumeMounts"]
-    assert {"name": VOLUME_NAME, "configMap": {"name": bundle_configmap_name(app.slug)}} in pod["volumes"]
+    assert {
+        "name": VOLUME_NAME,
+        "configMap": {"name": bundle_configmap_name(app.slug), "optional": True},
+    } in pod["volumes"]
 
 
 @pytest.mark.django_db
@@ -147,7 +152,7 @@ def test_an_env_var_the_app_sets_is_not_overridden():
     container = job["spec"]["jobTemplate"]["spec"]["template"]["spec"]["containers"][0]
     assert container["env"] == own
     assert container["envFrom"] == [
-        {"configMapRef": {"name": env_configmap_name("app")}},
+        {"configMapRef": {"name": env_configmap_name("app"), "optional": True}},
         {"secretRef": {"name": "astrolift-bindings-app"}},
     ]
 
