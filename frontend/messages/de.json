@@ -15335,7 +15335,20 @@
     "shareTitle": "{team}: {access}",
     "manageAccess": "Zugriff verwalten",
     "emptyTitle": "Keine semantischen Schichten",
-    "emptyDescription": "Apps mit [app] kind = \"mimwell\", die du lesen kannst, erscheinen hier."
+    "emptyDescription": "Apps mit [app] kind = \"mimwell\", die du lesen kannst, erscheinen hier.",
+    "columnConnect": "MCP-Clients",
+    "connect": "Verbinden",
+    "connectFailed": "Lesetoken konnte nicht ausgestellt werden.",
+    "connectDialog": {
+      "title": "{slug} verbinden",
+      "description": "Fügen Sie dies in einen MCP-Client wie Chat Studio ein. Es enthält ein für Sie ausgestelltes Lesetoken, das nur jetzt angezeigt wird; es läuft {expiresAt} ab. Verbinden Sie erneut für ein neues.",
+      "mcpUrl": "MCP-URL",
+      "config": "MCP-Client-Konfiguration",
+      "copy": "Kopieren",
+      "copyLabel": "{label} kopieren",
+      "copied": "Kopiert",
+      "done": "Fertig"
+    }
   },
   "navModel": {
     "functions": {

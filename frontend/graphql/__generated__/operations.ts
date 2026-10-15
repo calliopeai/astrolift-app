@@ -19237,6 +19237,13 @@ export type PlaygroundEndpointsPageQueryVariables = Exact<{
 
 export type PlaygroundEndpointsPageQuery = { astroliftModelEndpointsPage: { totalCount?: number | null, page?: number | null, pageSize?: number | null, items: Array<{ id: string, name: string, variant: string, registeredAppSlug: string, environmentName: string }> } };
 
+export type IssueBrainReadTokenMutationVariables = Exact<{
+  slug: Scalars['String']['input'];
+}>;
+
+
+export type IssueBrainReadTokenMutation = { issueBrainReadToken: { ok: boolean, errors: Array<{ field?: string | null, message: string, code: string }>, data?: { id: string, slug: string, endpoints: Array<string>, header: string, token: string, expiresAt: string } | null } };
+
 export type ListBrainsQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
 }>;

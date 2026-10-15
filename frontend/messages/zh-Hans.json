@@ -15332,7 +15332,20 @@
     "shareTitle": "{team}：{access}",
     "manageAccess": "管理访问",
     "emptyTitle": "没有语义层",
-    "emptyDescription": "以 [app] kind = \"mimwell\" 声明且你可以读取的应用会显示在这里。"
+    "emptyDescription": "以 [app] kind = \"mimwell\" 声明且你可以读取的应用会显示在这里。",
+    "columnConnect": "MCP 客户端",
+    "connect": "连接",
+    "connectFailed": "无法签发读取令牌。",
+    "connectDialog": {
+      "title": "连接 {slug}",
+      "description": "将其粘贴到 Chat Studio 等 MCP 客户端中。其中包含为你签发的读取令牌，仅此时显示；将于 {expiresAt} 过期。如需新令牌，请重新连接。",
+      "mcpUrl": "MCP 地址",
+      "config": "MCP 客户端配置",
+      "copy": "复制",
+      "copyLabel": "复制{label}",
+      "copied": "已复制",
+      "done": "完成"
+    }
   },
   "navModel": {
     "functions": {

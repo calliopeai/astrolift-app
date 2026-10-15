@@ -1,14 +1,16 @@
 "use client";
 
-import { BrainCircuitIcon } from "lucide-react";
+import { BrainCircuitIcon, PlugIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 
 import type { Column } from "@/components/data-table";
 import { ListPage } from "@/components/list/ListPage";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 
+import { ConnectBrainDialog } from "./ConnectBrainDialog";
 import type { BrainRow, BrainsState } from "./use-brains";
 
 export type BrainsScreenProps = BrainsState;
@@ -20,8 +22,9 @@ const ABOVE_ROW_LINK = "relative z-10";
 /**
  * Apps › Semantic layers (#2320): the hosted brain apps the viewer can read,
  * with where they are served and which teams they are shared with. Sharing a
- * layer is sharing its app (Access on the app). Pure view; data from
- * useBrains.
+ * layer is sharing its app (Access on the app). Connect issues the viewer a
+ * short-lived read token and shows it once as an MCP client config. Pure
+ * view; data from useBrains.
  */
 export function BrainsScreen({
   list,
@@ -31,6 +34,10 @@ export function BrainsScreen({
   stale,
   error,
   onRetry,
+  connection,
+  connecting,
+  onConnect,
+  onDismissConnection,
 }: BrainsScreenProps) {
   const t = useTranslations("brains");
   const columns: Column<BrainRow>[] = [
@@ -114,30 +121,51 @@ export function BrainsScreen({
         </Link>
       ),
     },
+    {
+      id: "connect",
+      header: t("columnConnect"),
+      align: "right",
+      cellClassName: ABOVE_ROW_LINK,
+      cell: (b) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={connecting || !b.environments.length}
+          title={b.environments.length ? undefined : t("notServed")}
+          onClick={() => void onConnect(b.slug)}
+        >
+          <PlugIcon className="size-3.5" />
+          {t("connect")}
+        </Button>
+      ),
+    },
   ];
   return (
-    <ListPage<BrainRow>
-      header={{
-        crumbs: [areaSwitcher(NAV, "apps", "brains"), { label: t("title") }],
-        title: t("title"),
-        context: t("context"),
-      }}
-      list={list}
-      label={t("title")}
-      columns={columns}
-      rows={rows}
-      getRowId={(b) => b.id}
-      rowHref={(b) => `/apps/${b.slug}`}
-      loading={loading}
-      stale={stale}
-      error={error}
-      onRetry={onRetry}
-      empty={{
-        icon: <BrainCircuitIcon className="size-5" />,
-        title: t("emptyTitle"),
-        description: t("emptyDescription"),
-      }}
-      totalCount={totalCount}
-    />
+    <>
+      <ListPage<BrainRow>
+        header={{
+          crumbs: [areaSwitcher(NAV, "apps", "brains"), { label: t("title") }],
+          title: t("title"),
+          context: t("context"),
+        }}
+        list={list}
+        label={t("title")}
+        columns={columns}
+        rows={rows}
+        getRowId={(b) => b.id}
+        rowHref={(b) => `/apps/${b.slug}`}
+        loading={loading}
+        stale={stale}
+        error={error}
+        onRetry={onRetry}
+        empty={{
+          icon: <BrainCircuitIcon className="size-5" />,
+          title: t("emptyTitle"),
+          description: t("emptyDescription"),
+        }}
+        totalCount={totalCount}
+      />
+      <ConnectBrainDialog connection={connection} onDismiss={onDismissConnection} />
+    </>
   );
 }

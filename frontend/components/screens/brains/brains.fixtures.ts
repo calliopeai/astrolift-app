@@ -1,3 +1,4 @@
+import type { BrainConnection } from "./brain-connection";
 import type { BrainRow } from "./use-brains";
 
 export const BRAINS: BrainRow[] = [
@@ -47,4 +48,13 @@ export const LONG_BRAIN: BrainRow = {
     team: `team-with-a-long-name-${i}`,
     access: "viewer",
   })),
+};
+
+export const CONNECTION: BrainConnection = {
+  id: "b0000000-0000-4000-8000-000000000001",
+  slug: "leo-brain",
+  endpoints: ["https://brain.acme.example"],
+  header: "X-Astrolift-Brain-Token",
+  token: "eyJhbGciOiJFUzI1NiIsImtpZCI6ImZpeHR1cmUifQ.eyJzY29wZSI6ImJyYWluOnJlYWQifQ.c2ln",
+  expiresAt: "2026-10-14T12:15:00+00:00",
 };
