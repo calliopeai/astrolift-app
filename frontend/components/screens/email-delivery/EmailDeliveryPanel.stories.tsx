@@ -77,6 +77,8 @@ export const DELIVERY_PANEL: EmailDeliveryPanelProps = {
     identity: "acme.example",
     accountId: "123456789012",
     region: "us-west-2",
+    transport: "aws_ses",
+    eventCollectionConfigured: true,
   },
   supportLoading: false,
   supportError: null,
@@ -135,17 +137,28 @@ export const PermissionDenied: Story = {
       identity: null,
       accountId: null,
       region: null,
+      transport: null,
+      eventCollectionConfigured: false,
     },
   },
 };
 export const UnsupportedTransport: Story = {
   args: {
     support: {
-      ...DELIVERY_PANEL.support!,
       allowed: false,
       reason: "EXACT_TEST_TRANSPORT_UNSUPPORTED",
+      serviceVersion: null,
+      sender: null,
+      identity: null,
+      accountId: null,
+      region: null,
+      transport: "azure_acs",
+      eventCollectionConfigured: false,
     },
   },
+};
+export const EventCollectionNotConfigured: Story = {
+  args: { support: { ...DELIVERY_PANEL.support!, eventCollectionConfigured: false } },
 };
 export const SupportReadFailure: Story = {
   args: { support: null, supportError: "read unavailable" },
@@ -193,9 +206,10 @@ export const MixedProviderObservations: Story = {
         "deferred",
         "rejected",
         "observation_timed_out",
+        "not_observable",
         "unknown",
       ].map((status, index) => ({ ...DELIVERY_TEST, id: `test-${index}`, status })),
-      totalCount: 8,
+      totalCount: 9,
     }),
   },
 };

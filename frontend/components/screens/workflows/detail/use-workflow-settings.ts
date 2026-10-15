@@ -6,6 +6,11 @@ import { toast } from "sonner";
 
 import { useSettingsSection } from "@/components/settings/use-settings-section";
 import {
+  useSetWorkflowDeliveryChannels,
+  useWorkflowDeliveryChannels,
+  useWorkflowDeliverySelection,
+} from "@/graphql/workflows/delivery.hooks";
+import {
   useDeleteConfiguredWorkflow,
   useDeleteDefinition,
   useUpdateConfiguredWorkflow,
@@ -14,7 +19,7 @@ import {
 import type { TieredMutationResult } from "@/graphql/workflows/tiered.types";
 
 import { definitionDeletable, type FramedWorkflow } from "./use-workflow-frame";
-import type { WorkflowSettingsViewProps } from "./WorkflowSettings";
+import type { WorkflowDeliverySettings, WorkflowSettingsViewProps } from "./WorkflowSettings";
 
 function firstError(result: TieredMutationResult | undefined, fallback: string): string {
   const e = result?.errors?.[0];
@@ -35,6 +40,11 @@ export function useWorkflowSettings(framed: FramedWorkflow): WorkflowSettingsVie
   const [deleteConfigured] = useDeleteConfiguredWorkflow();
   const [deleteDefinition] = useDeleteDefinition();
   const [saveError, setSaveError] = React.useState<string | null>(null);
+  const configuredGuid = framed.kind === "configured" ? framed.workflow.guid : null;
+  const channelsQ = useWorkflowDeliveryChannels(!configuredGuid);
+  const selectionQ = useWorkflowDeliverySelection(configuredGuid);
+  const [setChannels, { loading: deliverySaving }] = useSetWorkflowDeliveryChannels();
+  const [deliveryError, setDeliveryError] = React.useState<string | null>(null);
 
   if (framed.kind === "definition") {
     const d = framed.definition;
@@ -59,11 +69,38 @@ export function useWorkflowSettings(framed: FramedWorkflow): WorkflowSettingsVie
   }
 
   const w = framed.workflow;
+  const selection = selectionQ.data?.workflowDeliverySelection;
+  const channels = channelsQ.data?.workflowDeliveryChannels;
+  const delivery: WorkflowDeliverySettings | undefined =
+    selection && channels
+      ? {
+          channels,
+          selected: selection.channelGuids,
+          recent: selection.recentDeliveries,
+          saving: deliverySaving,
+          error: deliveryError,
+          onSave: canManage
+            ? async (channelGuids) => {
+                setDeliveryError(null);
+                const { data } = await setChannels({
+                  variables: { workflowId: w.guid, channelIds: channelGuids },
+                });
+                if (!data?.setWorkflowDeliveryChannels?.ok) {
+                  setDeliveryError(firstError(data?.setWorkflowDeliveryChannels, "Failed to save"));
+                  return false;
+                }
+                toast.success("Delivery saved");
+                return true;
+              }
+            : undefined,
+        }
+      : undefined;
   return {
     kind: "configured",
     general: { name: w.name, slug: w.slug, description: w.description },
     readOnly: canManage ? undefined : { permission: "workflow.update" },
     single,
+    delivery,
     saving,
     saveError,
     onSave: async ({ name, description }) => {

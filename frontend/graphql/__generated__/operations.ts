@@ -7412,11 +7412,13 @@ export type EmailDeliveryTestPage = {
 export type EmailDeliveryTestSupport = {
   accountId?: Maybe<Scalars['String']['output']>;
   allowed: Scalars['Boolean']['output'];
+  eventCollectionConfigured: Scalars['Boolean']['output'];
   identity?: Maybe<Scalars['String']['output']>;
   reason?: Maybe<Scalars['String']['output']>;
   region?: Maybe<Scalars['String']['output']>;
   sender?: Maybe<Scalars['String']['output']>;
   serviceVersion?: Maybe<Scalars['Int']['output']>;
+  transport?: Maybe<Scalars['String']['output']>;
 };
 
 export type Emailsuppressionaddpayload = {
@@ -8933,6 +8935,8 @@ export type Mutation = {
   createWorkflow: CreateWorkflowResult;
   /** Create a new workflow definition (platform operator only). */
   createWorkflowDefinition: MutationResult;
+  /** Add a delivery channel for scheduled workflow results (org admins: org.update). kind is slack_webhook, slack_app, teams_webhook or email. credential is the incoming webhook URL, or the Slack app's bot token for slack_app; it is stored in the org secret store and never returned. */
+  createWorkflowDeliveryChannel: WorkflowDeliveryChannelResult;
   /** Add a stage to a writable workflow definition. order=null appends after the definition's last stage. */
   createWorkflowStage: CreateWorkflowStageResult;
   /** Create an inbound webhook trigger for a workflow definition (platform operator only). */
@@ -8970,6 +8974,8 @@ export type Mutation = {
   deleteWorkflow: WorkflowScheduleResult;
   /** Soft-delete an org-owned workflow definition by slug. */
   deleteWorkflowDefinition: MutationResult;
+  /** Remove a delivery channel and its stored credential (org admins: org.update). */
+  deleteWorkflowDeliveryChannel: MutationResult;
   /** Soft-delete a stage from a writable definition (spec 40 §6). */
   deleteWorkflowStage: MutationResult;
   deployClusterAgent: AstroliftTenantClusterMutationResult;
@@ -9209,6 +9215,8 @@ export type Mutation = {
   setStepUpPin: AstroliftStepUpPinSetPayloadMutationResult;
   /** Enable or disable an exact owned workflow definition at its reviewed revision. Does not start a run or confirm schedule state. */
   setWorkflowDefinitionEnabled: WorkflowDefinitionActivationResult;
+  /** Choose the delivery channels a configured Workflow posts its scheduled results to (workflow editors: workflow.update). channelIds replaces the selection; [] clears it. */
+  setWorkflowDeliveryChannels: WorkflowDeliverySelectionResult;
   setZentinelleGatewayEnabled: AstroliftZentinelleClusterGatewayMutationResult;
   setZentinelleGatewayUrl: AstroliftZentinelleConnectionMutationResult;
   setZentinelleInstallGatewayUrl: AstroliftZentinelleConnectionMutationResult;
@@ -9294,6 +9302,8 @@ export type Mutation = {
   updateWorkflow: CreateWorkflowResult;
   /** Update an org-owned workflow definition (globals are read-only). */
   updateWorkflowDefinition: MutationResult;
+  /** Change a delivery channel (org admins: org.update). Omitted fields keep their value; a credential replaces the stored one. The kind cannot change. */
+  updateWorkflowDeliveryChannel: WorkflowDeliveryChannelResult;
   /** Update a stage's fields on a writable definition (spec 40 §6). */
   updateWorkflowStage: MutationResult;
   uploadCustomDomainCertificate: AstroliftAppDomainMutationResult;
@@ -9842,6 +9852,15 @@ export type MutationCreateWorkflowDefinitionArgs = {
 };
 
 
+export type MutationCreateWorkflowDeliveryChannelArgs = {
+  credential?: InputMaybe<Scalars['String']['input']>;
+  emailRecipients?: InputMaybe<Array<Scalars['String']['input']>>;
+  kind: Scalars['String']['input'];
+  name: Scalars['String']['input'];
+  slackChannel?: InputMaybe<Scalars['String']['input']>;
+};
+
+
 export type MutationCreateWorkflowStageArgs = {
   agentDefinitionGuid?: InputMaybe<Scalars['String']['input']>;
   agentRef?: InputMaybe<Scalars['String']['input']>;
@@ -10018,6 +10037,11 @@ export type MutationDeleteWorkflowArgs = {
 
 export type MutationDeleteWorkflowDefinitionArgs = {
   slug: Scalars['String']['input'];
+};
+
+
+export type MutationDeleteWorkflowDeliveryChannelArgs = {
+  channelId: Scalars['GUID']['input'];
 };
 
 
@@ -11096,6 +11120,12 @@ export type MutationSetWorkflowDefinitionEnabledArgs = {
 };
 
 
+export type MutationSetWorkflowDeliveryChannelsArgs = {
+  channelIds: Array<Scalars['GUID']['input']>;
+  workflowId: Scalars['GUID']['input'];
+};
+
+
 export type MutationSetZentinelleGatewayEnabledArgs = {
   input: SetZentinelleGatewayEnabledInput;
 };
@@ -11517,6 +11547,16 @@ export type MutationUpdateWorkflowDefinitionArgs = {
   slug: Scalars['String']['input'];
   states?: InputMaybe<Scalars['JSON']['input']>;
   transitions?: InputMaybe<Scalars['JSON']['input']>;
+};
+
+
+export type MutationUpdateWorkflowDeliveryChannelArgs = {
+  channelId: Scalars['GUID']['input'];
+  credential?: InputMaybe<Scalars['String']['input']>;
+  emailRecipients?: InputMaybe<Array<Scalars['String']['input']>>;
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+  name?: InputMaybe<Scalars['String']['input']>;
+  slackChannel?: InputMaybe<Scalars['String']['input']>;
 };
 
 
@@ -12456,6 +12496,10 @@ export type Query = {
   workflowDefinitions: Array<WorkflowDefinitionSummary>;
   /** Cursor-paginated page of the workflow definitions visible to the caller, by name (A→Z). */
   workflowDefinitionsPage: WorkflowDefinitionSummaryPage;
+  /** The org's result delivery channels for scheduled workflows (#2244). Credentials are never returned. */
+  workflowDeliveryChannels: Array<WorkflowDeliveryChannelType>;
+  /** The delivery channels one configured Workflow posts its scheduled results to, and its recent deliveries. */
+  workflowDeliverySelection?: Maybe<WorkflowDeliverySelectionType>;
   /** One owned execution by the WorkflowRun ID returned on dispatch or its GUID. */
   workflowExecution?: Maybe<WorkflowExecution>;
   /** Recorded stage history of an exact owned execution, newest first. */
@@ -14808,6 +14852,11 @@ export type QueryWorkflowDefinitionsPageArgs = {
 };
 
 
+export type QueryWorkflowDeliverySelectionArgs = {
+  workflowId: Scalars['GUID']['input'];
+};
+
+
 export type QueryWorkflowExecutionArgs = {
   executionId: Scalars['ID']['input'];
 };
@@ -16359,6 +16408,50 @@ export type WorkflowDefinitionType = {
   states: Scalars['JSON']['output'];
   transitions: Scalars['JSON']['output'];
   workflowStages: Array<WorkflowStageType>;
+};
+
+export type WorkflowDeliveryChannelResult = {
+  channel?: Maybe<WorkflowDeliveryChannelType>;
+  errors: Array<ValidationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type WorkflowDeliveryChannelType = {
+  emailRecipients: Array<Scalars['String']['output']>;
+  guid: Scalars['String']['output'];
+  hasCredential: Scalars['Boolean']['output'];
+  isActive: Scalars['Boolean']['output'];
+  /** slack_webhook, slack_app, teams_webhook or email. */
+  kind: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  slackChannel: Scalars['String']['output'];
+};
+
+export type WorkflowDeliverySelectionResult = {
+  errors: Array<ValidationError>;
+  ok: Scalars['Boolean']['output'];
+  selection?: Maybe<WorkflowDeliverySelectionType>;
+};
+
+export type WorkflowDeliverySelectionType = {
+  channelGuids: Array<Scalars['String']['output']>;
+  recentDeliveries: Array<WorkflowDeliveryType>;
+  workflowGuid: Scalars['String']['output'];
+};
+
+export type WorkflowDeliveryType = {
+  attempts: Scalars['Int']['output'];
+  channelGuid?: Maybe<Scalars['String']['output']>;
+  channelName?: Maybe<Scalars['String']['output']>;
+  createdAt: Scalars['String']['output'];
+  deliveredAt?: Maybe<Scalars['String']['output']>;
+  guid: Scalars['String']['output'];
+  lastError: Scalars['String']['output'];
+  /** result, or owner_notice for a failed run's owner email. */
+  purpose: Scalars['String']['output'];
+  runOutcome: Scalars['String']['output'];
+  /** pending, retrying, delivered or failed. */
+  status: Scalars['String']['output'];
 };
 
 export type WorkflowExecution = {
@@ -19779,7 +19872,7 @@ export type EmailDeliverySupportQueryVariables = Exact<{
 }>;
 
 
-export type EmailDeliverySupportQuery = { emailDeliveryTestSupport: { allowed: boolean, reason?: string | null, serviceVersion?: number | null, sender?: string | null, identity?: string | null, accountId?: string | null, region?: string | null } };
+export type EmailDeliverySupportQuery = { emailDeliveryTestSupport: { allowed: boolean, reason?: string | null, serviceVersion?: number | null, sender?: string | null, identity?: string | null, accountId?: string | null, region?: string | null, transport?: string | null, eventCollectionConfigured: boolean } };
 
 export type EmailDeliveryTestsPageQueryVariables = Exact<{
   managedServiceId: Scalars['GUID']['input'];
@@ -20044,6 +20137,52 @@ export type UploadFileMutationVariables = Exact<{
 
 
 export type UploadFileMutation = { fileUpload: { id?: string | null, preSignedUrl?: string | null, publicUrl?: string | null } };
+
+export type CreateWorkflowDeliveryChannelMutationVariables = Exact<{
+  name: Scalars['String']['input'];
+  kind: Scalars['String']['input'];
+  credential?: InputMaybe<Scalars['String']['input']>;
+  slackChannel?: InputMaybe<Scalars['String']['input']>;
+  emailRecipients?: InputMaybe<Array<Scalars['String']['input']> | Scalars['String']['input']>;
+}>;
+
+
+export type CreateWorkflowDeliveryChannelMutation = { createWorkflowDeliveryChannel: { ok: boolean, errors: Array<{ field: string, messages: Array<string> }>, channel?: { guid: string, name: string, kind: string, slackChannel: string, emailRecipients: Array<string>, isActive: boolean, hasCredential: boolean } | null } };
+
+export type UpdateWorkflowDeliveryChannelMutationVariables = Exact<{
+  channelId: Scalars['GUID']['input'];
+  isActive?: InputMaybe<Scalars['Boolean']['input']>;
+}>;
+
+
+export type UpdateWorkflowDeliveryChannelMutation = { updateWorkflowDeliveryChannel: { ok: boolean, errors: Array<{ field: string, messages: Array<string> }>, channel?: { guid: string, name: string, kind: string, slackChannel: string, emailRecipients: Array<string>, isActive: boolean, hasCredential: boolean } | null } };
+
+export type DeleteWorkflowDeliveryChannelMutationVariables = Exact<{
+  channelId: Scalars['GUID']['input'];
+}>;
+
+
+export type DeleteWorkflowDeliveryChannelMutation = { deleteWorkflowDeliveryChannel: { ok: boolean, errors: Array<{ field: string, messages: Array<string> }> } };
+
+export type SetWorkflowDeliveryChannelsMutationVariables = Exact<{
+  workflowId: Scalars['GUID']['input'];
+  channelIds: Array<Scalars['GUID']['input']> | Scalars['GUID']['input'];
+}>;
+
+
+export type SetWorkflowDeliveryChannelsMutation = { setWorkflowDeliveryChannels: { ok: boolean, errors: Array<{ field: string, messages: Array<string> }>, selection?: { workflowGuid: string, channelGuids: Array<string>, recentDeliveries: Array<{ guid: string, channelGuid?: string | null, channelName?: string | null, purpose: string, runOutcome: string, status: string, attempts: number, lastError: string, createdAt: string, deliveredAt?: string | null }> } | null } };
+
+export type WorkflowDeliveryChannelsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type WorkflowDeliveryChannelsQuery = { workflowDeliveryChannels: Array<{ guid: string, name: string, kind: string, slackChannel: string, emailRecipients: Array<string>, isActive: boolean, hasCredential: boolean }> };
+
+export type WorkflowDeliverySelectionQueryVariables = Exact<{
+  workflowId: Scalars['GUID']['input'];
+}>;
+
+
+export type WorkflowDeliverySelectionQuery = { workflowDeliverySelection?: { workflowGuid: string, channelGuids: Array<string>, recentDeliveries: Array<{ guid: string, channelGuid?: string | null, channelName?: string | null, purpose: string, runOutcome: string, status: string, attempts: number, lastError: string, createdAt: string, deliveredAt?: string | null }> } | null };
 
 export type StartWorkflowMutationVariables = Exact<{
   workflowSlug: Scalars['String']['input'];

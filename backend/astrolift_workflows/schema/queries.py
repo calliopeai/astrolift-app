@@ -37,6 +37,12 @@ from astrolift_workflows.client import (
 from astrolift_workflows.configuration_targets import configured_workflow_scope, find_configured_workflow
 from astrolift_workflows.import_scopes import import_definition_owner_scope
 from astrolift_workflows.schedule_operations import schedule_workflow, workflow_schedule_scope
+from astrolift_workflows.schema.delivery_types import (
+    WorkflowDeliveryChannelType,
+    WorkflowDeliverySelectionType,
+    channel_to_type,
+    selection_to_type,
+)
 from astrolift_workflows.schema.execution_types import WorkflowExecutionStages, WorkflowExecutionType
 from astrolift_workflows.schema.human_gate_types import HumanGateDecisionState
 from astrolift_workflows.schema.schedule_types import WorkflowScheduleState, schedule_to_type
@@ -700,6 +706,42 @@ class WorkflowsQuery:
             limit=limit,
         )
         return page.map(workflow_to_type)
+
+    @strawberry.field(
+        description="The org's result delivery channels for scheduled workflows (#2244). Credentials are never returned."
+    )
+    @require_permission(Permission.WORKFLOW_READ, any_scope=True)
+    @tenant_scoped()
+    def workflow_delivery_channels(self, info: Info) -> list[WorkflowDeliveryChannelType]:
+        from workflows.models import DeliveryChannel
+
+        caller = _caller_org_pk()
+        if caller is None:
+            return []
+        return [
+            channel_to_type(c)
+            for c in DeliveryChannel.objects.filter(organization_id=caller).order_by("name", "pk")
+        ]
+
+    @strawberry.field(
+        description="The delivery channels one configured Workflow posts its scheduled results to, and its recent deliveries."
+    )
+    @require_permission(Permission.WORKFLOW_READ, scope=configured_workflow_scope(Permission.WORKFLOW_READ))
+    @tenant_scoped()
+    def workflow_delivery_selection(
+        self,
+        info: Info,
+        workflow_id: GUID,  # type: ignore[valid-type]
+    ) -> WorkflowDeliverySelectionType | None:
+        caller = _caller_org_pk()
+        wf = find_configured_workflow(caller, workflow_id=workflow_id) if caller is not None else None
+        if wf is None:
+            return None
+        check_permission(
+            Permission.WORKFLOW_READ,
+            scope=reviewed_definition_scope(wf.definition, caller, permission=Permission.WORKFLOW_READ),
+        )
+        return selection_to_type(wf)
 
     @strawberry.field(
         description="One configured Workflow by exact ID or legacy slug, with its recent runs. A supplied slug must match the ID."

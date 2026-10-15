@@ -400,9 +400,17 @@ describe("actual mounted SDL email HttpLink boundary", () => {
     expect(JSON.stringify(stored)).not.toContain("private-body-canary");
   });
   it("disables source-denied sends without interpreting missing support as permission", async () => {
-    support = { ...support!, allowed: false, reason: "EXACT_TEST_TRANSPORT_UNSUPPORTED" };
+    support = {
+      ...support!,
+      allowed: false,
+      reason: "EXACT_TEST_TRANSPORT_UNSUPPORTED",
+      transport: "smtp",
+      eventCollectionConfigured: false,
+    };
     await start();
     expect(screen.getByText(c.denied)).toBeInTheDocument();
+    expect(screen.getByText(c.transportSmtp)).toBeInTheDocument();
+    expect(screen.getByText(c.transportUnsupported)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: c.send })).toBeDisabled();
     expect(writes()).toEqual([]);
   });

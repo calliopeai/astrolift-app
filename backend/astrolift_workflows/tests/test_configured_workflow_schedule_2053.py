@@ -251,6 +251,7 @@ async def test_two_fires_of_one_schedule_action_each_run_to_completion(scheduled
         create_scheduled_workflow_run,
         record_scheduled_workflow_start,
     )
+    from astrolift_workflows.activities.workflow_result_delivery import deliver_workflow_run_result
     from astrolift_workflows.activities.workflow_stage_activities import (
         get_workflow_stages,
         mark_workflow_run,
@@ -269,6 +270,7 @@ async def test_two_fires_of_one_schedule_action_each_run_to_completion(scheduled
         activities=[
             create_scheduled_workflow_run,
             record_scheduled_workflow_start,
+            deliver_workflow_run_result,
             get_workflow_stages,
             snapshot_checkpoint,
             mark_workflow_run,

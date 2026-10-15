@@ -66,7 +66,7 @@ function readIntent(key: string): Intent | null {
     value.format !== 1 ||
     !guid(value.requestId) ||
     !/^[a-f0-9]{64}$/.test(value.contentSha256 ?? "") ||
-    !source({ allowed: true, ...value.source })
+    !source({ allowed: true, eventCollectionConfigured: false, ...value.source })
   )
     throw new Error("Invalid recovery metadata");
   return value as Intent;
@@ -345,6 +345,7 @@ export function useEmailDelivery(id: string, serviceName: string): EmailDelivery
       "complained",
       "rejected",
       "observation_timed_out",
+      "not_observable",
     ].includes(current.status);
   function onStartAnother() {
     if (!canStartAnother) return;
