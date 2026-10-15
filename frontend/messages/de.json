@@ -750,6 +750,27 @@
         "toastUriCopied": "Verifizierungs-URL kopiert",
         "toastCopyFailed": "Kopieren fehlgeschlagen. Wähle den Text aus und kopiere ihn manuell.",
         "toastPayloadCopied": "Payload kopiert"
+      },
+      "stepUpPin": {
+        "title": "Bestätigungs-PIN",
+        "description": "Eine 6- bis 8-stellige PIN, mit der du sensible Aktionen wie ein Produktions-Deployment ohne erneute Anmeldung bestätigst.",
+        "badgeSet": "Festgelegt",
+        "badgeLocked": "Gesperrt",
+        "pin": "PIN",
+        "newPin": "Neue PIN",
+        "confirm": "PIN bestätigen",
+        "hint": "Zum Festlegen oder Ändern der PIN musst du dich zuerst erneut anmelden. Zu viele falsche PINs sperren sie.",
+        "set": "PIN festlegen",
+        "change": "PIN ändern",
+        "clear": "PIN entfernen",
+        "locked": "Nach zu vielen Fehlversuchen gesperrt. Lege eine neue PIN fest, um sie wieder zu nutzen.",
+        "orgDisallows": "Deine Organisation erlaubt keine Bestätigungs-PINs, daher wird diese nicht verwendet.",
+        "errorFormat": "Verwende 6 bis 8 Ziffern.",
+        "errorMismatch": "Die PINs stimmen nicht überein.",
+        "toastSet": "Bestätigungs-PIN festgelegt",
+        "toastChanged": "Bestätigungs-PIN geändert",
+        "toastCleared": "Bestätigungs-PIN entfernt",
+        "toastFailed": "Bestätigungs-PIN konnte nicht aktualisiert werden"
       }
     }
   },
@@ -5590,7 +5611,9 @@
           "label": "Ausblenden",
           "blurb": "Nur änderbare Einstellungen anzeigen"
         }
-      }
+      },
+      "allowStepUpPin": "Bestätigung mit persönlicher PIN erlauben",
+      "allowStepUpPinHint": "Mitglieder können eine 6- bis 8-stellige PIN festlegen und sensible Aktionen damit statt mit einer erneuten Anmeldung bestätigen. Lass dies aus, wenn deine Compliance für jede Bestätigung den Identitätsanbieter verlangt."
     },
     "sections": {
       "houseTheme": "Hausdesign",
@@ -6554,7 +6577,15 @@
     "errors": {
       "passwordRequired": "Passwort ist erforderlich.",
       "generic": "Passwort konnte nicht bestätigt werden. Bitte erneut versuchen.",
-      "network": "Server nicht erreichbar. Verbindung prüfen und erneut versuchen."
+      "network": "Server nicht erreichbar. Verbindung prüfen und erneut versuchen.",
+      "pinFormat": "Deine PIN hat 6 bis 8 Ziffern.",
+      "pinLocked": "Deine PIN ist nach zu vielen Fehlversuchen gesperrt. Bestätige anders und lege dann eine neue PIN fest."
+    },
+    "pin": {
+      "label": "Bestätigungs-PIN",
+      "description": "Gib deine Bestätigungs-PIN ein, um fortzufahren.",
+      "useSso": "Stattdessen Single Sign-on verwenden",
+      "usePassword": "Stattdessen Passwort verwenden"
     }
   },
   "pageShell": {

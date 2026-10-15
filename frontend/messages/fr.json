@@ -750,6 +750,27 @@
         "toastUriCopied": "URL de vérification copiée",
         "toastCopyFailed": "Copie impossible. Sélectionnez le texte et copiez-le manuellement.",
         "toastPayloadCopied": "Charge utile copiée"
+      },
+      "stepUpPin": {
+        "title": "Code PIN de vérification",
+        "description": "Un code PIN de 6 à 8 chiffres pour confirmer les actions sensibles, comme un déploiement en production, sans vous reconnecter.",
+        "badgeSet": "Défini",
+        "badgeLocked": "Verrouillé",
+        "pin": "Code PIN",
+        "newPin": "Nouveau code PIN",
+        "confirm": "Confirmer le code PIN",
+        "hint": "Pour définir ou modifier votre code PIN, vous devez d'abord vous reconnecter. Trop de codes erronés le verrouillent.",
+        "set": "Définir le code PIN",
+        "change": "Modifier le code PIN",
+        "clear": "Supprimer le code PIN",
+        "locked": "Verrouillé après trop d'essais erronés. Définissez un nouveau code PIN pour l'utiliser à nouveau.",
+        "orgDisallows": "Votre organisation n'autorise pas les codes PIN de vérification, celui-ci n'est donc pas utilisé.",
+        "errorFormat": "Utilisez 6 à 8 chiffres.",
+        "errorMismatch": "Les codes PIN ne correspondent pas.",
+        "toastSet": "Code PIN de vérification défini",
+        "toastChanged": "Code PIN de vérification modifié",
+        "toastCleared": "Code PIN de vérification supprimé",
+        "toastFailed": "Impossible de mettre à jour votre code PIN de vérification"
       }
     }
   },
@@ -5590,7 +5611,9 @@
           "label": "Masquer",
           "blurb": "N'afficher que les paramètres modifiables"
         }
-      }
+      },
+      "allowStepUpPin": "Autoriser la vérification par code PIN personnel",
+      "allowStepUpPinHint": "Les membres peuvent définir un code PIN de 6 à 8 chiffres et confirmer les actions sensibles avec lui au lieu de se reconnecter. Laissez désactivé si votre conformité exige le fournisseur d'identité pour chaque vérification."
     },
     "sections": {
       "houseTheme": "Thème maison",
@@ -6554,7 +6577,15 @@
     "errors": {
       "passwordRequired": "Le mot de passe est requis.",
       "generic": "Impossible de vérifier votre mot de passe. Réessayez.",
-      "network": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez."
+      "network": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
+      "pinFormat": "Votre code PIN comporte 6 à 8 chiffres.",
+      "pinLocked": "Votre code PIN est verrouillé après trop d'essais erronés. Confirmez autrement, puis définissez un nouveau code PIN."
+    },
+    "pin": {
+      "label": "Code PIN de vérification",
+      "description": "Saisissez votre code PIN de vérification pour continuer.",
+      "useSso": "Utiliser l'authentification unique",
+      "usePassword": "Utiliser votre mot de passe"
     }
   },
   "pageShell": {

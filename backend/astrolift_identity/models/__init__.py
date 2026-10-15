@@ -30,6 +30,7 @@ from astrolift_identity.models.session import (
     LoginMethod,
     RevocationReason,
 )
+from astrolift_identity.models.step_up_pin import StepUpPin
 from astrolift_identity.models.team import Team
 from astrolift_identity.models.team_membership_action import TeamMembershipAction
 
@@ -62,6 +63,7 @@ __all__ = [
     "Role",
     "RoleBinding",
     "ScimGroup",
+    "StepUpPin",
     "Team",
     "TeamMembershipAction",
     "UserPreferences",

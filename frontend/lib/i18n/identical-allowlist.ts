@@ -82,6 +82,7 @@ export const IDENTICAL_EVERYWHERE: readonly string[] = [
   "Okta",
   "p95",
   "PagerDuty",
+  "PIN",
   "Pod",
   "PR",
   "PR —",

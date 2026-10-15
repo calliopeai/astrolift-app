@@ -65,6 +65,7 @@ from astrolift_identity.schema.mutations.types import (  # noqa: F401
     RevokeRoleBindingInput,
     SetActiveIdentityProviderInput,
     SetOrganizationModuleInput,
+    SetStepUpPinInput,
     SoftDeleteByGuidInput,
     UpdateIdentityProviderInput,
     UpdateMyProfileInput,

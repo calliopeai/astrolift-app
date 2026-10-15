@@ -136,13 +136,14 @@ export const stepUpLink = new ApolloLink((operation, forward) => {
                   // the session bag hasn't been stamped yet; the modal
                   // treats undefined as the legacy password-only case.
                   const raw = stepUp.supportedMethods;
-                  const known = ["password", "sso", "webauthn", "magic_link"];
+                  const known = ["password", "sso", "webauthn", "magic_link", "pin"];
                   const supported = Array.isArray(raw)
                     ? (raw.filter((m): m is string => typeof m === "string" && known.includes(m)) as (
                         | "password"
                         | "sso"
                         | "webauthn"
                         | "magic_link"
+                        | "pin"
                       )[])
                     : undefined;
                   const detail: StepUpEventDetail = {

@@ -161,6 +161,11 @@ EXEMPT: dict[str, str] = {
         "indicator that has to render before any tenant context is "
         "picked (e.g. on the org switcher itself)."
     ),
+    "IdentityQuery.my_step_up_pin": (
+        "#2399 step-up PIN: the caller's own PIN state (set, locked) and "
+        "whether the request's org allows PINs. Self-service and keyed on "
+        "the viewer; the PIN hash never leaves the server."
+    ),
     "IdentityMutation.set_active_organization": (
         "the act of selecting a tenant context cannot itself be tenant-scoped"
     ),

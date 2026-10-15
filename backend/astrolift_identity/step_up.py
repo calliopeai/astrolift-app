@@ -32,6 +32,7 @@ from typing import Any
 from astrolift_graphql import failure as gql_failure
 from astrolift_identity.session_elevation import (
     METHOD_PASSWORD,
+    METHOD_PIN,
     METHOD_SSO,
     METHOD_WEBAUTHN,
     SESSION_KEY_ELEVATED_UNTIL,
@@ -158,7 +159,7 @@ def check_elevation(
     # API-token call, a disabled gate and a call with no session.
     request = info.context.request
     session = request.session
-    supported = _supported_step_up_methods(session)
+    supported = _supported_step_up_methods(session, user=getattr(request, "user", None))
     # #496 — when the install requires attestation for sensitive ops,
     # the attestation gate runs in *addition* to the standard step-up
     # freshness gate. A session that is freshly elevated but not
@@ -233,8 +234,13 @@ def _emit_deny_audit(
         log.exception("step_up: audit emit failed on deny for %s", resolver_name)
 
 
-def _supported_step_up_methods(session: Any) -> list[str]:
+def _supported_step_up_methods(session: Any, *, user: Any = None) -> list[str]:
     """Derive the credential families the FE may use to satisfy step-up.
+
+    With ``user``, a usable step-up PIN (#2399: set, not locked, and the
+    org allows it) is listed first, ahead of the login method it stands in
+    for. Without ``user`` the PIN is never listed, which is how a caller
+    that must not accept a PIN asks for the methods.
 
     Driven by :data:`SESSION_LOGIN_METHOD_KEY` written at login time:
 
@@ -253,6 +259,20 @@ def _supported_step_up_methods(session: Any) -> list[str]:
     works for password users) rather than an empty list (which would
     render no controls at all).
     """
+    base = _login_step_up_methods(session)
+    if user is not None:
+        from astrolift_identity.step_up_pin import pin_available
+
+        try:
+            if pin_available(user):
+                return [METHOD_PIN, *base]
+        except Exception:  # noqa: BLE001 -- never blow up the deny path on a PIN lookup
+            log.exception("step_up: PIN availability lookup failed; leaving it out")
+    return base
+
+
+def _login_step_up_methods(session: Any) -> list[str]:
+    """The step-up method the session's own login method implies."""
     if session is None:
         return [METHOD_PASSWORD]
     try:

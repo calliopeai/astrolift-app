@@ -756,6 +756,27 @@
         "toastUriCopied": "URL de verificação copiada",
         "toastCopyFailed": "Não foi possível copiar. Selecione o texto e copie manualmente.",
         "toastPayloadCopied": "Payload copiado"
+      },
+      "stepUpPin": {
+        "title": "PIN de verificação",
+        "description": "Um PIN de 6 a 8 dígitos para confirmar ações sensíveis, como um deploy em produção, sem entrar de novo.",
+        "badgeSet": "Definido",
+        "badgeLocked": "Bloqueado",
+        "pin": "PIN",
+        "newPin": "Novo PIN",
+        "confirm": "Confirmar PIN",
+        "hint": "Para definir ou alterar seu PIN, você precisa entrar de novo primeiro. Muitos PINs errados o bloqueiam.",
+        "set": "Definir PIN",
+        "change": "Alterar PIN",
+        "clear": "Remover PIN",
+        "locked": "Bloqueado após muitas tentativas erradas. Defina um novo PIN para usá-lo de novo.",
+        "orgDisallows": "Sua organização não permite PINs de verificação, então este não é usado.",
+        "errorFormat": "Use de 6 a 8 dígitos.",
+        "errorMismatch": "Os PINs não coincidem.",
+        "toastSet": "PIN de verificação definido",
+        "toastChanged": "PIN de verificação alterado",
+        "toastCleared": "PIN de verificação removido",
+        "toastFailed": "Não foi possível atualizar seu PIN de verificação"
       }
     }
   },
@@ -5596,7 +5617,9 @@
           "label": "Ocultar",
           "blurb": "Mostrar só as configurações que você pode alterar"
         }
-      }
+      },
+      "allowStepUpPin": "Permitir verificação com PIN pessoal",
+      "allowStepUpPinHint": "Membros podem definir um PIN de 6 a 8 dígitos e confirmar ações sensíveis com ele em vez de entrar de novo. Deixe desativado se sua conformidade exige o provedor de identidade em toda verificação."
     },
     "sections": {
       "houseTheme": "Tema da casa",
@@ -6560,7 +6583,15 @@
     "errors": {
       "passwordRequired": "A senha é obrigatória.",
       "generic": "Não foi possível confirmar sua senha. Tente novamente.",
-      "network": "Não foi possível contatar o servidor. Verifique sua conexão e tente novamente."
+      "network": "Não foi possível contatar o servidor. Verifique sua conexão e tente novamente.",
+      "pinFormat": "Seu PIN tem de 6 a 8 dígitos.",
+      "pinLocked": "Seu PIN foi bloqueado após muitas tentativas erradas. Confirme de outra forma e depois defina um novo PIN."
+    },
+    "pin": {
+      "label": "PIN de verificação",
+      "description": "Digite seu PIN de verificação para continuar.",
+      "useSso": "Usar login único",
+      "usePassword": "Usar sua senha"
     }
   },
   "approvals": {

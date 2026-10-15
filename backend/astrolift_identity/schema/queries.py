@@ -108,6 +108,7 @@ from astrolift_identity.schema.types import (
     RoleBindingType,
     RoleType,
     SearchableUserType,
+    StepUpPinStatusType,
     TeamType,
     UiPreferencesType,
     _resolve_display_name,
@@ -2261,6 +2262,17 @@ class IdentityQuery:
         ]
 
     @strawberry.field
+    def my_step_up_pin(self, info: Info) -> StepUpPinStatusType | None:
+        """The viewer's step-up PIN state (#2399). Self-only; None when signed out."""
+        from astrolift_identity.schema.types import step_up_pin_status
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return None
+        return step_up_pin_status(viewer)
+
+    @strawberry.field
     def astrolift_elevation_status(self, info: Info) -> ElevationStatusType:
         """Snapshot of the current session's step-up elevation (#487).
 
@@ -2297,7 +2309,7 @@ class IdentityQuery:
             seconds_remaining=status.seconds_remaining,
             method=status.method,
             required_for=gated,
-            supported_methods=_supported_step_up_methods(session),
+            supported_methods=_supported_step_up_methods(session, user=viewer),
         )
 
 

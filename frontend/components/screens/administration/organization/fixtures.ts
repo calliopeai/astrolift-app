@@ -28,6 +28,7 @@ export const ORG: AstroliftOrganization = {
   name: "Acme Launch Co.",
   website: "https://acme.example",
   allowUserProfileEdit: true,
+  allowStepUpPin: false,
   appearanceDefault: { ground: "emerald", accent: "green" },
   appearanceLocked: false,
   restrictedSettingsDefault: "show",

@@ -19,11 +19,14 @@ from astrolift_identity.schema.mutations.types import (
     AttestSessionInput,
     ElevateAdminSessionInput,
     RequestAttestationChallengeInput,
+    SetStepUpPinInput,
     _AttestationChallengePayload,
     _AttestationResult,
     _DeelevatePayload,
     _ElevatePayload,
+    _StepUpPinSetPayload,
 )
+from astrolift_identity.schema.types import StepUpPinStatusType
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
 from core.tenancy import get_current_tenant
 
@@ -144,6 +147,61 @@ class StepUpMutations:
         was_elevated = get_status(session).elevated
         deelevate(session)
         return gql_success(_DeelevatePayload(previously_elevated=was_elevated))
+
+    # ---- Step-up PIN (#2399) ----------------------------------------
+    #
+    # Self-only. Setting or changing a PIN needs a fresh SSO or password
+    # elevation: a PIN elevation is refused here, so a PIN never vouches
+    # for the next one. Clearing needs nothing; it only takes a shortcut
+    # away. The refusal lists the methods without the PIN so the prompt
+    # asks for SSO or password.
+
+    @strawberry.field
+    @mutation_audit(
+        action="auth.step_up_pin.set", extras=lambda r: {"replaced": r.data.replaced} if r.ok else None
+    )
+    def set_step_up_pin(
+        self, info: Info, input: SetStepUpPinInput
+    ) -> MutationResultType[_StepUpPinSetPayload]:
+        from astrolift_identity.schema.types import step_up_pin_status
+        from astrolift_identity.session_elevation import METHOD_PASSWORD, METHOD_SSO, get_status
+        from astrolift_identity.step_up import _supported_step_up_methods
+        from astrolift_identity.step_up_pin import StepUpPinError, org_allows_pin, set_pin
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        session = getattr(request, "session", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
+        if session is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "step-up auth requires a browser session")
+        if not org_allows_pin():
+            return gql_failure(ErrorCode.PRECONDITION.value, "this organization does not allow step-up PINs")
+        status = get_status(session)
+        if not status.elevated or status.method not in (METHOD_SSO, METHOD_PASSWORD):
+            return gql_failure(
+                ErrorCode.STEP_UP_REQUIRED.value,
+                "Setting a step-up PIN requires a fresh sign-in.",
+                supported_methods=_supported_step_up_methods(session),
+            )
+        try:
+            replaced = set_pin(viewer, input.pin)
+        except StepUpPinError as exc:
+            return gql_failure(ErrorCode.VALIDATION.value, str(exc), field="pin")
+        return gql_success(_StepUpPinSetPayload(replaced=replaced, status=step_up_pin_status(viewer)))
+
+    @strawberry.field
+    @mutation_audit(action="auth.step_up_pin.clear")
+    def clear_step_up_pin(self, info: Info) -> MutationResultType[StepUpPinStatusType]:
+        from astrolift_identity.schema.types import step_up_pin_status
+        from astrolift_identity.step_up_pin import clear_pin
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, "not authenticated")
+        clear_pin(viewer)
+        return gql_success(step_up_pin_status(viewer))
 
     # ---- Device attestation (#496) ---------------------------------
     #

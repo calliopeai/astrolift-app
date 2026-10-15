@@ -3942,6 +3942,7 @@ export type AstroliftOrgSkillRepoMutationResult = {
 };
 
 export type AstroliftOrganization = {
+  allowStepUpPin: Scalars['Boolean']['output'];
   allowUserProfileEdit: Scalars['Boolean']['output'];
   appearanceDefault: Scalars['JSON']['output'];
   appearanceLocked: Scalars['Boolean']['output'];
@@ -5487,6 +5488,29 @@ export type AstroliftStepRunPage = {
   pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftStepUpPinSetPayload = {
+  replaced: Scalars['Boolean']['output'];
+  status: AstroliftStepUpPinStatus;
+};
+
+export type AstroliftStepUpPinSetPayloadMutationResult = {
+  data?: Maybe<AstroliftStepUpPinSetPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftStepUpPinStatus = {
+  isSet: Scalars['Boolean']['output'];
+  locked: Scalars['Boolean']['output'];
+  orgAllows: Scalars['Boolean']['output'];
+};
+
+export type AstroliftStepUpPinStatusMutationResult = {
+  data?: Maybe<AstroliftStepUpPinStatus>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftTaskRun = {
@@ -8841,6 +8865,7 @@ export type Mutation = {
   clearAgentQuarantine: NoneTypeMutationResult;
   clearAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
   clearEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
+  clearStepUpPin: AstroliftStepUpPinStatusMutationResult;
   /** Deep-copy a visible workflow definition + its stages into the caller's org as a new editable definition (spec 40 §2.1). New slug on collision; global stages copy with agent_definition cleared. */
   cloneWorkflowDefinition: CloneWorkflowDefinitionResult;
   configureAgentTaskCallbacks: AgentTaskCallbackPolicyMutationResult;
@@ -9156,6 +9181,7 @@ export type Mutation = {
   setPreviewPinned: AstroliftPreviewEnvironmentMutationResult;
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
+  setStepUpPin: AstroliftStepUpPinSetPayloadMutationResult;
   /** Enable or disable an exact owned workflow definition at its reviewed revision. Does not start a run or confirm schedule state. */
   setWorkflowDefinitionEnabled: WorkflowDefinitionActivationResult;
   setZentinelleGatewayEnabled: AstroliftZentinelleClusterGatewayMutationResult;
@@ -11011,6 +11037,11 @@ export type MutationSetRetentionPolicyArgs = {
 };
 
 
+export type MutationSetStepUpPinArgs = {
+  input: SetStepUpPinInput;
+};
+
+
 export type MutationSetWorkflowDefinitionEnabledArgs = {
   definitionId: Scalars['GUID']['input'];
   expectedRevision: Scalars['String']['input'];
@@ -12312,6 +12343,7 @@ export type Query = {
   modelConnectionReviewRequest?: Maybe<ModelConnectionRequest>;
   modelConnectionTargetsPage: ModelConnectionDestinationPage;
   modelHostingAction: ModelHostingAction;
+  myStepUpPin?: Maybe<AstroliftStepUpPinStatus>;
   orgSkillRepos: Array<AstroliftOrgSkillRepo>;
   orgToolDefs: Array<AstroliftToolDef>;
   orgToolDefsPage: AstroliftToolDefPage;
@@ -15441,6 +15473,10 @@ export type SetRetentionPolicyInput = {
   signal: Scalars['String']['input'];
 };
 
+export type SetStepUpPinInput = {
+  pin: Scalars['String']['input'];
+};
+
 export type SetZentinelleGatewayEnabledInput = {
   clusterId: Scalars['GUID']['input'];
   enabled: Scalars['Boolean']['input'];
@@ -15904,6 +15940,7 @@ export type UpdateOrgSkillRepoInput = {
 };
 
 export type UpdateOrganizationInput = {
+  allowStepUpPin: InputMaybe<Scalars['Boolean']['input']>;
   allowUserProfileEdit: InputMaybe<Scalars['Boolean']['input']>;
   appearanceDefault: InputMaybe<Scalars['JSON']['input']>;
   appearanceLocked: InputMaybe<Scalars['Boolean']['input']>;
@@ -17492,7 +17529,7 @@ export type IdentityTimestampsFragment = { createdAt: string, updatedAt: string,
 export type ListOrganizationsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
-export type ListOrganizationsQuery = { astroliftOrganizations: Array<{ id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: unknown, appearanceLocked: boolean, restrictedSettingsDefault: string, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null }> };
+export type ListOrganizationsQuery = { astroliftOrganizations: Array<{ id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: unknown, appearanceLocked: boolean, restrictedSettingsDefault: string, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, allowStepUpPin: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null }> };
 
 export type ListTeamsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -17557,7 +17594,7 @@ export type GetOrganizationQueryVariables = Exact<{
 }>;
 
 
-export type GetOrganizationQuery = { astroliftOrganization?: { id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: unknown, appearanceLocked: boolean, restrictedSettingsDefault: string, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null } | null };
+export type GetOrganizationQuery = { astroliftOrganization?: { id: string, slug: string, name: string, website: string, scimEnabled: boolean, auditLogRetentionDays: number, appearanceDefault: unknown, appearanceLocked: boolean, restrictedSettingsDefault: string, previewMaxActiveDefault: number, logRetentionDaysDefault: number, allowUserProfileEdit: boolean, allowStepUpPin: boolean, onboardingCompletedAt?: string | null, createdAt: string, updatedAt: string, deletedAt?: string | null } | null };
 
 export type GetOnboardingStateQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -17751,6 +17788,11 @@ export type ListMyConnectedAccountsQueryVariables = Exact<{ [key: string]: never
 
 
 export type ListMyConnectedAccountsQuery = { astroliftMyConnectedAccounts: Array<{ providerConfigId: string, providerKind: string, providerLabel: string, isConnected: boolean, linkedAccountLogin?: string | null, reauthRequired: boolean, expiresAt?: string | null, lastUsedAt?: string | null }> };
+
+export type MyStepUpPinQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type MyStepUpPinQuery = { myStepUpPin?: { orgAllows: boolean, isSet: boolean, locked: boolean } | null };
 
 export type GetElevationStatusQueryVariables = Exact<{ [key: string]: never; }>;
 

@@ -30,6 +30,7 @@ export const Full: Story = {
   render: () => (
     <SecurityScreen
       sessions={card("Active sessions", "Sessions card slot")}
+      stepUpPin={card("Step-up PIN", "Step-up PIN card slot")}
       pairDevice={card("Pair a device", "Pair-device card slot")}
     />
   ),

@@ -8,6 +8,7 @@ import { ELEVATE_ADMIN_SESSION } from "@/graphql/identity/identity.mutations";
 import { GET_ELEVATION_STATUS } from "@/graphql/identity/identity.queries";
 import type {
   AstroliftElevatePayload,
+  AstroliftElevationMethod,
   AstroliftElevationStatus,
   ElevateAdminSessionInput,
 } from "@/graphql/identity/identity.types";
@@ -23,7 +24,8 @@ import {
 
 /**
  * Admin step-up (#487): opened by the step-up event any mutation can raise,
- * elevating by password or SSO. The data half of StepUpPrompt.
+ * elevating by password, SSO or a step-up PIN (#2399). The data half of
+ * StepUpPrompt.
  */
 type ElevateResponse = {
   elevateAdminSession: {
@@ -41,11 +43,12 @@ type ElevateResponse = {
  */
 function pickMethod(supported: StepUpMethod[] | undefined): StepUpMethod {
   if (!supported || supported.length === 0) return "password";
-  // First-known-wins. SSO before password, password before webauthn:
-  // matches the backend's per-session "one method at a time" contract
-  // and keeps the modal deterministic when a buggy backend returns
-  // an unexpected mix.
-  const order: StepUpMethod[] = ["sso", "password", "webauthn", "magic_link"];
+  // First-known-wins. A PIN first (#2399: the backend lists it only when
+  // the org allows it and the person has one), then SSO before password,
+  // password before webauthn: matches the backend's per-session "one
+  // method at a time" contract and keeps the modal deterministic when a
+  // buggy backend returns an unexpected mix.
+  const order: StepUpMethod[] = ["pin", "sso", "password", "webauthn", "magic_link"];
   for (const candidate of order) {
     if (supported.includes(candidate)) return candidate;
   }
@@ -73,15 +76,21 @@ export function useStepUp() {
   // Most gated mutations do not select ``supportedMethods`` on their
   // errors, so the refusal arrives without it. The session's own status
   // knows: without it an SSO user got a password form they cannot fill.
-  const { data: status } = useQuery<{ astroliftElevationStatus: AstroliftElevationStatus }>(
-    GET_ELEVATION_STATUS,
-    { skip: !open, fetchPolicy: "cache-first" }
-  );
+  const { data: status, refetch: refetchStatus } = useQuery<{
+    astroliftElevationStatus: AstroliftElevationStatus;
+  }>(GET_ELEVATION_STATUS, { skip: !open, fetchPolicy: "cache-first" });
   const sessionMethods = status?.astroliftElevationStatus.supportedMethods as StepUpMethod[] | undefined;
+  // The person chose the login method over their PIN, or the PIN locked.
+  const [pinDeclined, setPinDeclined] = React.useState(false);
 
+  const supported = trigger?.supportedMethods?.length ? trigger.supportedMethods : sessionMethods;
+  const fallbackMethod: StepUpMethod = React.useMemo(
+    () => pickMethod(supported?.filter((m) => m !== "pin")),
+    [supported]
+  );
   const method: StepUpMethod = React.useMemo(
-    () => pickMethod(trigger?.supportedMethods?.length ? trigger.supportedMethods : sessionMethods),
-    [trigger, sessionMethods]
+    () => (pinDeclined ? fallbackMethod : pickMethod(supported)),
+    [pinDeclined, fallbackMethod, supported]
   );
 
   const [elevate, { loading }] = useMutation<ElevateResponse, { input: ElevateAdminSessionInput }>(
@@ -100,6 +109,7 @@ export function useStepUp() {
       setTrigger(detail);
       setOpen(true);
       setError(null);
+      setPinDeclined(false);
     }
     window.addEventListener(STEP_UP_EVENT, onStepUp);
     return () => window.removeEventListener(STEP_UP_EVENT, onStepUp);
@@ -112,10 +122,38 @@ export function useStepUp() {
       setError(t("errors.passwordRequired"));
       return false;
     }
+    return submit("password", password);
+  }
+
+  /**
+   * PIN branch (#2399). A wrong PIN re-reads the session's methods: once
+   * the PIN locks, the backend stops listing it and the prompt falls back
+   * to SSO or password.
+   */
+  async function onSubmitPin(pin: string): Promise<boolean> {
+    setError(null);
+    if (!/^\d{6,8}$/.test(pin)) {
+      setError(t("errors.pinFormat"));
+      return false;
+    }
+    if (await submit("pin", pin)) return true;
+    try {
+      const { data } = await refetchStatus();
+      if (!data?.astroliftElevationStatus.supportedMethods.includes("pin")) {
+        setPinDeclined(true);
+        setError(t("errors.pinLocked"));
+      }
+    } catch {
+      // The wrong-PIN message already shows; the next try re-reads.
+    }
+    return false;
+  }
+
+  async function submit(elevateMethod: AstroliftElevationMethod, credential: string): Promise<boolean> {
     try {
       const { data } = await elevate({
         variables: {
-          input: { method: "password", credential: password },
+          input: { method: elevateMethod, credential },
         },
       });
       const payload = data?.elevateAdminSession;
@@ -152,6 +190,12 @@ export function useStepUp() {
     window.location.assign(ssoElevateUrl());
   }
 
+  /** Use SSO or password instead of the PIN. */
+  function onDeclinePin() {
+    setError(null);
+    setPinDeclined(true);
+  }
+
   function onCancel() {
     setOpen(false);
     // Notify waiters so they can drop the pending mutation instead
@@ -162,10 +206,13 @@ export function useStepUp() {
   return {
     open,
     method,
+    fallbackMethod,
     message: trigger?.message ?? null,
     error,
     submitting: loading,
     onSubmitPassword,
+    onSubmitPin,
+    onDeclinePin,
     onSso,
     onCancel,
   };

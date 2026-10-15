@@ -43,7 +43,7 @@ from astrolift_operations.observability_profile import (
 from astrolift_services.model_retirement import retirement_guard
 from core.appearance import AppearanceError, validate_appearance
 from core.decorators import tenant_scoped
-from core.mutations import ErrorCode, mutation_audit
+from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
 from core.permissions import Permission, require_permission
 from core.resource_tags import ResourceTagError, validate_resource_tags
 from core.tenancy import get_current_tenant
@@ -174,6 +174,11 @@ class OrganizationMutations:
             setattr(org, column, days_value)
         if input.allow_user_profile_edit is not None:
             org.allow_user_profile_edit = input.allow_user_profile_edit
+        step_up_pin_changed = (
+            input.allow_step_up_pin is not None and bool(input.allow_step_up_pin) != org.allow_step_up_pin
+        )
+        if step_up_pin_changed:
+            org.allow_step_up_pin = bool(input.allow_step_up_pin)
         if input.default_resource_tags is not None:
             # Refused here rather than at provision time. A tag that only
             # AWS accepts would otherwise provision fine for weeks and then
@@ -241,6 +246,22 @@ class OrganizationMutations:
             except UiPreferenceError as exc:
                 return gql_failure(ErrorCode.VALIDATION.value, str(exc), field=exc.field)
         org.save()
+        if step_up_pin_changed:
+            # Its own row (#2399): a security reviewer looks for when PIN
+            # step-up was allowed or forbidden, not for every org.update.
+            emit_audit(
+                AuditEntry(
+                    actor_user_id=tenant.actor_user_id if tenant else None,
+                    organization_id=org.pk,
+                    action="org.step_up_pin_policy.changed",
+                    decision="ALLOW",
+                    target_kind="organization",
+                    target_id=org.pk,
+                    duration_ms=0,
+                    permissions=(Permission.ORG_UPDATE.value,),
+                    extra={"allow_step_up_pin": org.allow_step_up_pin},
+                )
+            )
         return gql_success(organization_to_type(org))
 
     @strawberry.field

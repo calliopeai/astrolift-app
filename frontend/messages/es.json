@@ -750,6 +750,27 @@
         "toastUriCopied": "URL de verificación copiada",
         "toastCopyFailed": "No se pudo copiar. Selecciona el texto y cópialo manualmente.",
         "toastPayloadCopied": "Carga útil copiada"
+      },
+      "stepUpPin": {
+        "title": "PIN de verificación",
+        "description": "Un PIN de 6 a 8 dígitos para confirmar acciones sensibles, como un despliegue a producción, sin volver a iniciar sesión.",
+        "badgeSet": "Definido",
+        "badgeLocked": "Bloqueado",
+        "pin": "PIN",
+        "newPin": "PIN nuevo",
+        "confirm": "Confirmar PIN",
+        "hint": "Para definir o cambiar tu PIN primero debes volver a iniciar sesión. Demasiados PIN incorrectos lo bloquean.",
+        "set": "Definir PIN",
+        "change": "Cambiar PIN",
+        "clear": "Quitar PIN",
+        "locked": "Bloqueado tras demasiados intentos fallidos. Define un PIN nuevo para volver a usarlo.",
+        "orgDisallows": "Tu organización no permite PIN de verificación, así que este no se usa.",
+        "errorFormat": "Usa de 6 a 8 dígitos.",
+        "errorMismatch": "Los PIN no coinciden.",
+        "toastSet": "PIN de verificación definido",
+        "toastChanged": "PIN de verificación cambiado",
+        "toastCleared": "PIN de verificación quitado",
+        "toastFailed": "No se pudo actualizar tu PIN de verificación"
       }
     }
   },
@@ -5590,7 +5611,9 @@
           "label": "Ocultar",
           "blurb": "Mostrar solo los ajustes que puedes cambiar"
         }
-      }
+      },
+      "allowStepUpPin": "Permitir verificación con un PIN personal",
+      "allowStepUpPinHint": "Los miembros pueden definir un PIN de 6 a 8 dígitos y confirmar acciones sensibles con él en lugar de volver a iniciar sesión. Déjalo desactivado si tu cumplimiento normativo exige el proveedor de identidad en cada verificación."
     },
     "sections": {
       "houseTheme": "Tema de la casa",
@@ -6554,7 +6577,15 @@
     "errors": {
       "passwordRequired": "La contraseña es obligatoria.",
       "generic": "No se pudo confirmar tu contraseña. Inténtalo de nuevo.",
-      "network": "No se pudo contactar al servidor. Revisa tu conexión e inténtalo de nuevo."
+      "network": "No se pudo contactar al servidor. Revisa tu conexión e inténtalo de nuevo.",
+      "pinFormat": "Tu PIN tiene de 6 a 8 dígitos.",
+      "pinLocked": "Tu PIN se bloqueó tras demasiados intentos fallidos. Confirma de otra forma y luego define un PIN nuevo."
+    },
+    "pin": {
+      "label": "PIN de verificación",
+      "description": "Introduce tu PIN de verificación para continuar.",
+      "useSso": "Usar inicio de sesión único",
+      "usePassword": "Usar tu contraseña"
     }
   },
   "pageShell": {

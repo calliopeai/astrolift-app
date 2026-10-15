@@ -756,6 +756,27 @@
         "toastUriCopied": "検証 URL をコピーしました",
         "toastCopyFailed": "コピーできませんでした。テキストを選択して手動でコピーしてください。",
         "toastPayloadCopied": "ペイロードをコピーしました"
+      },
+      "stepUpPin": {
+        "title": "確認用 PIN",
+        "description": "本番デプロイなどの重要な操作を、再サインインせずに確認するための 6〜8 桁の PIN です。",
+        "badgeSet": "設定済み",
+        "badgeLocked": "ロック中",
+        "pin": "PIN",
+        "newPin": "新しい PIN",
+        "confirm": "PIN の確認",
+        "hint": "PIN の設定や変更の前に再サインインが必要です。誤った PIN が多すぎるとロックされます。",
+        "set": "PIN を設定",
+        "change": "PIN を変更",
+        "clear": "PIN を削除",
+        "locked": "誤った入力が多すぎたためロックされました。再び使うには新しい PIN を設定してください。",
+        "orgDisallows": "組織が確認用 PIN を許可していないため、この PIN は使われません。",
+        "errorFormat": "6〜8 桁の数字を使ってください。",
+        "errorMismatch": "PIN が一致しません。",
+        "toastSet": "確認用 PIN を設定しました",
+        "toastChanged": "確認用 PIN を変更しました",
+        "toastCleared": "確認用 PIN を削除しました",
+        "toastFailed": "確認用 PIN を更新できませんでした"
       }
     }
   },
@@ -5596,7 +5617,9 @@
           "label": "非表示",
           "blurb": "変更できる設定のみ表示します"
         }
-      }
+      },
+      "allowStepUpPin": "個人 PIN による確認を許可",
+      "allowStepUpPinHint": "メンバーは 6〜8 桁の PIN を設定し、再サインインの代わりにそれで重要な操作を確認できます。コンプライアンス上、すべての確認で ID プロバイダーが必要な場合はオフのままにしてください。"
     },
     "sections": {
       "houseTheme": "ハウステーマ",
@@ -6560,7 +6583,15 @@
     "errors": {
       "passwordRequired": "パスワードを入力してください。",
       "generic": "パスワードを確認できませんでした。もう一度お試しください。",
-      "network": "サーバーに接続できませんでした。接続を確認してもう一度お試しください。"
+      "network": "サーバーに接続できませんでした。接続を確認してもう一度お試しください。",
+      "pinFormat": "PIN は 6〜8 桁の数字です。",
+      "pinLocked": "誤った入力が多すぎたため PIN はロックされました。別の方法で確認してから、新しい PIN を設定してください。"
+    },
+    "pin": {
+      "label": "確認用 PIN",
+      "description": "続行するには確認用 PIN を入力してください。",
+      "useSso": "代わりにシングルサインオンを使う",
+      "usePassword": "代わりにパスワードを使う"
     }
   },
   "approvals": {

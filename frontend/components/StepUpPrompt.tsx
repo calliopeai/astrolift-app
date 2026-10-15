@@ -9,6 +9,8 @@
  * ``STEP_UP_REQUIRED`` in its envelope). Branches on
  * ``supportedMethods`` from the deny envelope:
  *
+ *   pin       → the person's step-up PIN (#2399), with a way back to
+ *               SSO or password; offered first when the backend lists it
  *   password  → existing form (the #487 default)
  *   sso       → "Re-authenticate" button → /app/auth1/elevate-sso?return=...
  *   webauthn  → stubbed out-of-scope for #526, falls back to password
@@ -24,7 +26,7 @@
  * so any mutation, anywhere in the tree, can trigger it.
  */
 
-import { LockKeyholeIcon, ShieldCheckIcon } from "lucide-react";
+import { KeyRoundIcon, LockKeyholeIcon, ShieldCheckIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import * as React from "react";
 
@@ -47,10 +49,13 @@ export type StepUpPromptProps = ReturnType<typeof useStepUp>;
 export function StepUpPrompt({
   open,
   method,
+  fallbackMethod,
   message,
   error,
   submitting: loading,
   onSubmitPassword,
+  onSubmitPin,
+  onDeclinePin,
   onSso: handleSsoElevate,
   onCancel,
 }: StepUpPromptProps) {
@@ -58,15 +63,18 @@ export function StepUpPrompt({
   const [password, setPassword] = React.useState("");
   const passwordRef = React.useRef<HTMLInputElement>(null);
 
-  // Focus the password field once the modal opens so the operator can
-  // start typing immediately; matters on mobile, where it saves a tap.
+  const pinBranch = method === "pin";
+
+  // Focus the password or PIN field once the modal opens so the operator
+  // can start typing immediately; matters on mobile, where it saves a tap.
   React.useEffect(() => {
     if (open) requestAnimationFrame(() => passwordRef.current?.focus());
-  }, [open]);
+  }, [open, pinBranch]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (await onSubmitPassword(password)) setPassword("");
+    const submit = pinBranch ? onSubmitPin : onSubmitPassword;
+    if (await submit(password)) setPassword("");
   }
 
   function handleCancel() {
@@ -94,7 +102,12 @@ export function StepUpPrompt({
             {ssoBranch ? t("sso.title") : t("title")}
           </DialogTitle>
           <DialogDescription id="step-up-desc">
-            {message?.trim() || (ssoBranch ? t("sso.description") : t("description"))}
+            {message?.trim() ||
+              (ssoBranch
+                ? t("sso.description")
+                : pinBranch
+                  ? t("pin.description")
+                  : t("description"))}
           </DialogDescription>
         </DialogHeader>
         {ssoBranch ? (
@@ -113,14 +126,21 @@ export function StepUpPrompt({
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="step-up-password" className="flex items-center gap-2">
-                <LockKeyholeIcon className="size-4" aria-hidden />
-                {t("passwordLabel")}
+                {pinBranch ? (
+                  <KeyRoundIcon className="size-4" aria-hidden />
+                ) : (
+                  <LockKeyholeIcon className="size-4" aria-hidden />
+                )}
+                {pinBranch ? t("pin.label") : t("passwordLabel")}
               </Label>
               <Input
                 ref={passwordRef}
                 id="step-up-password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete={pinBranch ? "off" : "current-password"}
+                inputMode={pinBranch ? "numeric" : undefined}
+                maxLength={pinBranch ? 8 : undefined}
+                className={pinBranch ? "font-mono tracking-widest" : undefined}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
@@ -131,6 +151,20 @@ export function StepUpPrompt({
                 <p id="step-up-error" className="text-destructive text-sm" role="alert">
                   {error}
                 </p>
+              ) : null}
+              {pinBranch ? (
+                <Button
+                  type="button"
+                  variant="link"
+                  className="h-auto px-0 text-xs"
+                  onClick={() => {
+                    setPassword("");
+                    onDeclinePin();
+                  }}
+                  disabled={loading}
+                >
+                  {fallbackMethod === "sso" ? t("pin.useSso") : t("pin.usePassword")}
+                </Button>
               ) : null}
             </div>
             <DialogFooter className="gap-2 sm:gap-0">

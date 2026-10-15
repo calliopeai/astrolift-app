@@ -29,11 +29,15 @@ class AstroliftIdentityConfig(AppConfig):
         # post ``method=sso`` directly. The real SSO step-up ceremony
         # runs through ``astrolift_identity.step_up_sso`` — not the
         # mutation — so the SSO verifier is intentionally deny-only.
+        # The PIN verifier (#2399) refuses unless the org allows PINs.
         from astrolift_identity.session_elevation import (
             compose_verifiers,
             default_password_verifier,
             default_sso_verifier,
             register_credential_verifier,
         )
+        from astrolift_identity.step_up_pin import pin_verifier
 
-        register_credential_verifier(compose_verifiers(default_password_verifier, default_sso_verifier))
+        register_credential_verifier(
+            compose_verifiers(default_password_verifier, default_sso_verifier, pin_verifier)
+        )

@@ -23,6 +23,7 @@ export const LIST_ORGANIZATIONS = gql`
       previewMaxActiveDefault
       logRetentionDaysDefault
       allowUserProfileEdit
+      allowStepUpPin
       onboardingCompletedAt
       createdAt
       updatedAt
@@ -285,6 +286,7 @@ export const GET_ORGANIZATION = gql`
       previewMaxActiveDefault
       logRetentionDaysDefault
       allowUserProfileEdit
+      allowStepUpPin
       onboardingCompletedAt
       createdAt
       updatedAt
@@ -1004,6 +1006,17 @@ void IDENTITY_TIMESTAMPS;
 // #487 — step-up auth. The nav indicator polls this query so the
 // "Admin elevated for N more minutes" badge stays accurate without
 // requiring the user to refresh the page.
+/** The viewer's step-up PIN (#2399), for the security settings card. */
+export const MY_STEP_UP_PIN = gql`
+  query MyStepUpPin {
+    myStepUpPin {
+      orgAllows
+      isSet
+      locked
+    }
+  }
+`;
+
 export const GET_ELEVATION_STATUS = gql`
   query GetElevationStatus {
     astroliftElevationStatus {

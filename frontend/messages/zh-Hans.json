@@ -756,6 +756,27 @@
         "toastUriCopied": "验证 URL 已复制",
         "toastCopyFailed": "无法复制。请选择文本并手动复制。",
         "toastPayloadCopied": "载荷已复制"
+      },
+      "stepUpPin": {
+        "title": "验证 PIN",
+        "description": "一个 6 到 8 位的 PIN，用于确认生产部署等敏感操作，无需重新登录。",
+        "badgeSet": "已设置",
+        "badgeLocked": "已锁定",
+        "pin": "PIN",
+        "newPin": "新 PIN",
+        "confirm": "确认 PIN",
+        "hint": "设置或更改 PIN 前需要先重新登录。错误的 PIN 输入过多会将其锁定。",
+        "set": "设置 PIN",
+        "change": "更改 PIN",
+        "clear": "清除 PIN",
+        "locked": "错误次数过多，已被锁定。设置新的 PIN 后即可再次使用。",
+        "orgDisallows": "你的组织不允许使用验证 PIN，因此不会使用此 PIN。",
+        "errorFormat": "请使用 6 到 8 位数字。",
+        "errorMismatch": "两次输入的 PIN 不一致。",
+        "toastSet": "已设置验证 PIN",
+        "toastChanged": "已更改验证 PIN",
+        "toastCleared": "已清除验证 PIN",
+        "toastFailed": "无法更新你的验证 PIN"
       }
     }
   },
@@ -5596,7 +5617,9 @@
           "label": "隐藏",
           "blurb": "仅显示可更改的设置"
         }
-      }
+      },
+      "allowStepUpPin": "允许使用个人 PIN 进行验证",
+      "allowStepUpPinHint": "成员可以设置 6 到 8 位的 PIN，并用它确认敏感操作，而无需重新登录。如果你的合规要求每次验证都使用身份提供商，请保持关闭。"
     },
     "sections": {
       "houseTheme": "内部主题",
@@ -6560,7 +6583,15 @@
     "errors": {
       "passwordRequired": "需要密码。",
       "generic": "无法确认您的密码。请重试。",
-      "network": "无法连接到服务器。请检查您的连接后重试。"
+      "network": "无法连接到服务器。请检查您的连接后重试。",
+      "pinFormat": "你的 PIN 为 6 到 8 位数字。",
+      "pinLocked": "错误次数过多，你的 PIN 已被锁定。请用其他方式确认，然后设置新的 PIN。"
+    },
+    "pin": {
+      "label": "验证 PIN",
+      "description": "输入你的验证 PIN 以继续。",
+      "useSso": "改用单点登录",
+      "usePassword": "改用密码"
     }
   },
   "approvals": {
