@@ -16,7 +16,6 @@ import { useTranslations } from "next-intl";
 import * as React from "react";
 import { useEffect, useState } from "react";
 
-import { Can } from "@/components/Can";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -153,48 +152,51 @@ export function EnvironmentControlsView({
         )}
       </div>
 
-      <Can permission="app.deploy">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <input
-            type="text"
-            value={imageTag}
-            onChange={(e) => setImageTag(e.target.value)}
-            placeholder={lastTag ? lastTag : t("imageTagPlaceholder")}
-            className="border-input bg-background flex-1 rounded-md border px-2 py-1 font-mono text-xs"
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleDeploy}
-            disabled={deploying || env.deploysPaused}
-            title={env.deploysPaused ? t("tooltipResumeFirst") : t("tooltipDeployNow")}
-            className="gap-1.5"
-          >
-            {deploying ? (
-              <Loader2Icon className="size-3.5 animate-spin" />
-            ) : (
-              <RocketIcon className="size-3.5" />
-            )}
-            {t("deployNow")}
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={onRebuildAndDeploy}
-            disabled={rebuilding || env.deploysPaused}
-            title={env.deploysPaused ? t("tooltipResumeFirst") : t("tooltipRebuildAndDeploy")}
-            className="gap-1.5"
-          >
-            {rebuilding ? (
-              <Loader2Icon className="size-3.5 animate-spin" />
-            ) : (
-              <RefreshCwIcon className="size-3.5" />
-            )}
-            {t("rebuildAndDeploy")}
-          </Button>
-        </div>
-        <p className="text-muted-foreground text-xs">{t("deployCaption")}</p>
-      </Can>
+      {/* Deploying here is checked with this environment's facts too (#1867). */}
+      {environmentCan(env, "app.deploy") && (
+        <>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              type="text"
+              value={imageTag}
+              onChange={(e) => setImageTag(e.target.value)}
+              placeholder={lastTag ? lastTag : t("imageTagPlaceholder")}
+              className="border-input bg-background flex-1 rounded-md border px-2 py-1 font-mono text-xs"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleDeploy}
+              disabled={deploying || env.deploysPaused}
+              title={env.deploysPaused ? t("tooltipResumeFirst") : t("tooltipDeployNow")}
+              className="gap-1.5"
+            >
+              {deploying ? (
+                <Loader2Icon className="size-3.5 animate-spin" />
+              ) : (
+                <RocketIcon className="size-3.5" />
+              )}
+              {t("deployNow")}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={onRebuildAndDeploy}
+              disabled={rebuilding || env.deploysPaused}
+              title={env.deploysPaused ? t("tooltipResumeFirst") : t("tooltipRebuildAndDeploy")}
+              className="gap-1.5"
+            >
+              {rebuilding ? (
+                <Loader2Icon className="size-3.5 animate-spin" />
+              ) : (
+                <RefreshCwIcon className="size-3.5" />
+              )}
+              {t("rebuildAndDeploy")}
+            </Button>
+          </div>
+          <p className="text-muted-foreground text-xs">{t("deployCaption")}</p>
+        </>
+      )}
 
       {env.requiredApprovals > 0 && (
         <p className="text-muted-foreground text-2xs flex items-center gap-1.5">

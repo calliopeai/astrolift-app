@@ -9,7 +9,8 @@ viewer in the active org:
   those can name, the org's group mappings and app shares, and how many of
   the bindings are still unexpired;
 * attributes: the viewer's IdP groups, superuser and active flags, the
-  client IP, the session's sign-in time and factors;
+  client IP (only where an org policy has an ip_allowlist condition), the
+  session's sign-in time and factors;
 * policies: the org's ABAC policies;
 * session: the session or API token making the request.
 
@@ -58,6 +59,15 @@ def access_revision(tenant, attrs, *, session_key: str | None = None, api_token=
         .first()
     )
     authenticated_at = attrs.session_authenticated_at() if attrs is not None else None
+    # The client IP only matters to an ip_allowlist condition. Behind a load
+    # balancer it can differ request to request, so it moves the revision
+    # only where the org has such a condition, not on every install.
+    uses_ip = any(
+        isinstance(condition, dict) and condition.get("kind") == "ip_allowlist"
+        for conditions in Policy.objects.filter(organization_id=org_id).values_list("conditions", flat=True)
+        if isinstance(conditions, list)
+        for condition in conditions
+    )
     factors = attrs.session_factors() if attrs is not None else None
     inputs = [
         org_id,
@@ -69,7 +79,7 @@ def access_revision(tenant, attrs, *, session_key: str | None = None, api_token=
         _summary(GroupRoleMapping.all_objects.filter(organization_id=org_id)),
         _summary(AppTeamAccess.all_objects.filter(registered_app__organization_id=org_id)),
         _summary(Policy.all_objects.filter(organization_id=org_id)),
-        attrs.client_ip if attrs is not None else None,
+        attrs.client_ip if attrs is not None and uses_ip else None,
         authenticated_at,
         sorted(factors) if factors is not None else None,
         hashlib.sha256(session_key.encode()).hexdigest() if session_key else None,

@@ -153,8 +153,22 @@ def test_a_change_to_roles_attributes_or_policies_moves_it(world, change):
 def test_a_change_of_session_or_its_attributes_moves_it(world):
     before = revision(world)
     assert revision(world, session_key="s2") != before
-    assert revision(world, client_ip="10.0.0.2") != before
     assert revision(world, authenticated_at=timezone.now()) != before
+
+
+def test_the_client_ip_moves_it_only_where_a_policy_reads_it(world):
+    # Behind a load balancer the IP can change request to request; without an
+    # ip_allowlist condition that must not drop every client's cache.
+    assert revision(world, client_ip="10.0.0.2") == revision(world)
+    Policy.objects.create(
+        organization=world.org,
+        slug="rev-ip",
+        name="Office only",
+        scope_level="ORG",
+        action_pattern="app.deploy",
+        conditions=[{"kind": "ip_allowlist", "cidrs": ["10.0.0.0/8"]}],
+    )
+    assert revision(world, client_ip="10.0.0.2") != revision(world)
 
 
 def test_a_bearer_token_change_moves_it(world):

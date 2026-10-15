@@ -5,6 +5,8 @@ import { userEvent } from "storybook/test";
 import { describe, expect, it } from "vitest";
 
 import { useLocalListState } from "@/components/list/use-list-state";
+import { envControls } from "@/components/screens/apps/controls/app-controls.fixtures";
+import { EnvironmentControlsView } from "@/components/screens/apps/controls/ControlsSection";
 import {
   ENV_SETTINGS,
   ENVIRONMENTS,
@@ -108,5 +110,23 @@ describe("environment actions follow each environment's viewerPermissions", () =
       </Providers>
     );
     expect(screen.getByRole("button", { name: t.add })).toBeDisabled();
+  });
+
+  it("offers pause and deploy on an environment card only where app.deploy is allowed", () => {
+    const t = en.apps.settings.controls;
+    const { rerender } = render(
+      <Providers>
+        <EnvironmentControlsView {...envControls(ALLOWED)} />
+      </Providers>
+    );
+    expect(screen.getByRole("button", { name: t.deployNow })).toBeInTheDocument();
+    rerender(
+      <Providers>
+        <EnvironmentControlsView {...envControls(DENIED)} />
+      </Providers>
+    );
+    expect(screen.queryByRole("button", { name: t.deployNow })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: t.rebuildAndDeploy })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: t.pause })).not.toBeInTheDocument();
   });
 });
