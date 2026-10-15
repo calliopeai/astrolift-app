@@ -461,6 +461,44 @@ def _viewer_can_access_project(*, project, viewer) -> bool:
     return False
 
 
+def _place_app_environment(
+    app: RegisteredApp, env_name: str, cluster: TenantCluster, managed_domain, *, any_cluster: bool = False
+):
+    """Create one ``AppEnvironment`` of ``app`` on ``cluster``, placed the way
+    every bootstrap places one: its namespace per #1922 and, when that is a
+    namespace of its own, a hostname label of its own under ``managed_domain``.
+    ``any_cluster`` as in ``namespace_for_new_environment``.
+    """
+    from astrolift_lifecycle.models import AppEnvironment
+    from astrolift_registry.namespaces import namespace_for_new_environment
+    from core.app_deploy import environment_hostname_label
+
+    # No domain, no URL (#1689). This used to fall back to the org slug,
+    # which is not a DNS zone: the env came up claiming
+    # ``https://<app>.<org-slug>``, an address that can never resolve,
+    # while the same ``None`` left ``managed_domain`` unbound so the
+    # render emitted no Ingress at all. The app read as deployed and
+    # healthy and was unreachable, and nothing anywhere said why. An
+    # empty URL is the honest answer and is already what the model
+    # allows; the app surfaces the missing binding instead.
+    base_zone: str = getattr(managed_domain, "zone", None) or ""
+    k8s_namespace = namespace_for_new_environment(
+        app, name=env_name, cluster=cluster, any_cluster=any_cluster
+    )
+    label = app.subdomain or app.slug
+    if k8s_namespace:
+        label = environment_hostname_label(label, env_name)
+    return AppEnvironment.objects.create(
+        registered_app=app,
+        tenant_cluster=cluster,
+        name=env_name,
+        k8s_namespace=k8s_namespace,
+        url=(f"https://{label}.{base_zone}" if base_zone else ""),
+        managed_domain=managed_domain,
+        required_approvals=0,
+    )
+
+
 def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> None:
     """Create AppEnvironment rows and kick off OnboardAppWorkflow when the
     app is still in its initial ``pending`` provisioning state.
@@ -529,15 +567,6 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
     from astrolift_clusters.models import resolve_managed_domain
 
     _managed_domain = resolve_managed_domain(app.organization, for_preview=False)
-    # No domain, no URL (#1689). This used to fall back to the org slug,
-    # which is not a DNS zone: the env came up claiming
-    # ``https://<app>.<org-slug>``, an address that can never resolve,
-    # while the same ``None`` left ``managed_domain`` unbound so the
-    # render emitted no Ingress at all. The app read as deployed and
-    # healthy and was unreachable, and nothing anywhere said why. An
-    # empty URL is the honest answer and is already what the model
-    # allows; the app surfaces the missing binding instead.
-    base_zone: str = getattr(_managed_domain, "zone", None) or ""
     created_any = False
     effective_env_names = list(env_names) if env_names else declared_env_names
     for service in manifest_services:
@@ -548,8 +577,6 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
         if not has_any:
             effective_env_names = ["production"]
     from astrolift_lifecycle.services.preview_lineage import PRIMARY_NAME_PREFERENCE
-    from astrolift_registry.namespaces import namespace_for_new_environment
-    from core.app_deploy import environment_hostname_label
 
     # The first environment of an app on a cluster renders into the app
     # namespace and serves the app's hostname; a later one on the same
@@ -565,19 +592,7 @@ def _bootstrap_app_environments(app: RegisteredApp, env_names: list[str]) -> Non
             deleted_at__isnull=True,
         ).exists()
         if not existing:
-            k8s_namespace = namespace_for_new_environment(app, name=env_name, cluster=cluster)
-            label = app.subdomain or app.slug
-            if k8s_namespace:
-                label = environment_hostname_label(label, env_name)
-            AppEnvironment.objects.create(
-                registered_app=app,
-                tenant_cluster=cluster,
-                name=env_name,
-                k8s_namespace=k8s_namespace,
-                url=(f"https://{label}.{base_zone}" if base_zone else ""),
-                managed_domain=_managed_domain,
-                required_approvals=0,
-            )
+            _place_app_environment(app, env_name, cluster, _managed_domain)
             created_any = True
 
     # ``persist_manifest`` runs before environment bootstrap during initial

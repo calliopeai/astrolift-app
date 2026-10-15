@@ -2622,6 +2622,17 @@
         "inSync": "Bereits synchron.",
         "accepted": "Synchronisierung für {slug} angenommen.",
         "reportedState": "Synchronisierung für {slug} angenommen; gemeldeter Status: {state}. Der Abschluss ist unbestätigt."
+      },
+      "addEnvironment": {
+        "title": "Umgebung hinzufügen",
+        "description": "Erstellen Sie eine weitere Umgebung für diese App, etwa Staging. Sie erhält auf dem gewählten Cluster einen eigenen Namespace und Hostnamen, und ihr erstes Deployment startet sie.",
+        "nameLabel": "Name",
+        "nameHint": "Kleinbuchstaben, Ziffern und Bindestriche, höchstens 63 Zeichen.",
+        "clusterLabel": "Cluster",
+        "defaultCluster": "Standardcluster der App",
+        "button": "Umgebung hinzufügen",
+        "created": "Umgebung {name} erstellt.",
+        "failed": "Die Umgebung konnte nicht erstellt werden."
       }
     },
     "common": {

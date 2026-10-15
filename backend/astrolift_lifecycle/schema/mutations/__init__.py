@@ -66,6 +66,7 @@ from astrolift_lifecycle.schema.mutations.types import (  # noqa: F401
     CancelDeregisterPayload,
     CiSecretValidationType,
     ClearEnvironmentSettingInput,
+    CreateAppEnvironmentInput,
     CreateDeployTokenInput,
     CreatePreviewEnvironmentInput,
     DeleteAppDnsRecordInput,

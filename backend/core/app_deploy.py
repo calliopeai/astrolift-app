@@ -1346,6 +1346,17 @@ def render_resources_for_deployment(
             cluster_override=cluster_override,
         )
 
+    # Node (and libpq with PGSSLROOTCERT) can only verify an RDS endpoint
+    # with the Amazon RDS CA, which neither ships (#2404).
+    from astrolift_services.rds_ca import inject_rds_ca, rds_binding_secret_names
+
+    resources = inject_rds_ca(
+        resources,
+        app_slug=app.slug,
+        namespace=namespace,
+        secret_names=rds_binding_secret_names(env),
+    )
+
     # Workload identity (#1011): IAM-authed managed services run through a
     # provider-annotated Kubernetes ServiceAccount, never static credentials.
     if prepared_gcp_identity is None and has_managed and cluster is not None:

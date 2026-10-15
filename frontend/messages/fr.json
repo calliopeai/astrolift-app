@@ -2622,6 +2622,17 @@
         "inSync": "Déjà synchronisé.",
         "accepted": "Resynchronisation acceptée pour {slug}.",
         "reportedState": "Resynchronisation acceptée pour {slug} ; état signalé : {state}. L’achèvement n’est pas confirmé."
+      },
+      "addEnvironment": {
+        "title": "Ajouter un environnement",
+        "description": "Créez un autre environnement pour cette app, par exemple staging. Il reçoit son propre namespace et nom d'hôte sur le cluster choisi, et son premier déploiement le démarre.",
+        "nameLabel": "Nom",
+        "nameHint": "Lettres minuscules, chiffres et tirets, 63 caractères au maximum.",
+        "clusterLabel": "Cluster",
+        "defaultCluster": "Cluster par défaut de l'app",
+        "button": "Ajouter un environnement",
+        "created": "Environnement {name} créé.",
+        "failed": "Impossible de créer l'environnement."
       }
     },
     "common": {

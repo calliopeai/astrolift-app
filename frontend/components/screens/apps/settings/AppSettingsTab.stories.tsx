@@ -11,6 +11,7 @@ import { ConfigEditorScreen } from "../config/ConfigEditorScreen";
 import { ManifestPreviewScreen } from "../config/ManifestPreviewScreen";
 
 import {
+  ADD_ENVIRONMENT,
   ARCHIVE,
   DANGER_ZONE,
   DEREGISTER_PREVIEW,
@@ -27,6 +28,7 @@ import {
   WEBHOOK_DEPLOYS,
   WEBHOOK_DEPLOYS_PAUSED,
 } from "./app-settings-members.fixtures";
+import { AddEnvironmentView } from "./AddEnvironment";
 import { AppIdentityView } from "./AppIdentity";
 import {
   type AppSettingsTabAccess,
@@ -72,6 +74,7 @@ const SLOTS: AppSettingsTabSlots = {
   managedServicesAdmin: <ManagedServicesAdminView {...MANAGED_SERVICES_ADMIN} />,
   configuration: <ConfigEditorScreen {...EDITOR} />,
   manifest: <ManifestPreviewScreen {...PREVIEW_PROPS} />,
+  addEnvironment: <AddEnvironmentView {...ADD_ENVIRONMENT} />,
   environmentSettings: <EnvironmentSettingsView {...ENV_SETTINGS} />,
   archive: <ArchiveAppView {...ARCHIVE} />,
   deregister: <DangerZoneView {...DANGER_ZONE} preview={DEREGISTER_PREVIEW} />,
