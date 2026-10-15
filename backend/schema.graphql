@@ -4130,6 +4130,7 @@ type AstroliftOrganization {
   metricsRollupRetentionDaysDefault: Int!
   traceRetentionDaysDefault: Int!
   allowUserProfileEdit: Boolean!
+  allowStepUpPin: Boolean!
   defaultResourceTags: JSON!
   managedServiceIsolationPolicy: JSON!
   appearanceDefault: JSON!
@@ -5838,6 +5839,29 @@ type AstroliftStepRunPage {
 
   """Rows per page on a numbered page; null on a cursor page."""
   pageSize: Int
+}
+
+type AstroliftStepUpPinSetPayload {
+  replaced: Boolean!
+  status: AstroliftStepUpPinStatus!
+}
+
+type AstroliftStepUpPinSetPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftStepUpPinSetPayload
+}
+
+type AstroliftStepUpPinStatus {
+  orgAllows: Boolean!
+  isSet: Boolean!
+  locked: Boolean!
+}
+
+type AstroliftStepUpPinStatusMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftStepUpPinStatus
 }
 
 type AstroliftTaskRun {
@@ -9497,6 +9521,8 @@ type Mutation {
   heartbeatSession: AstroliftHeartbeatSessionPayloadMutationResult!
   elevateAdminSession(input: ElevateAdminSessionInput!): AstroliftElevatePayloadMutationResult!
   deelevateAdminSession: AstroliftDeelevatePayloadMutationResult!
+  setStepUpPin(input: SetStepUpPinInput!): AstroliftStepUpPinSetPayloadMutationResult!
+  clearStepUpPin: AstroliftStepUpPinStatusMutationResult!
   requestAttestationChallenge(input: RequestAttestationChallengeInput!): AstroliftAttestationChallengePayloadMutationResult!
   attestSession(input: AttestSessionInput!): AstroliftAttestationResultMutationResult!
   assertSession(input: AssertSessionInput!): AstroliftAttestationResultMutationResult!
@@ -10464,6 +10490,7 @@ type Query {
   astroliftMyPermissions: [String!]!
   astroliftActiveIdentityProvider: AstroliftIdentityProvider
   astroliftActiveSessions: [AstroliftActiveSession!]!
+  myStepUpPin: AstroliftStepUpPinStatus
   astroliftElevationStatus: AstroliftElevationStatus!
   installAlertMailSupport(eventKind: String! = "deploy.failed"): InstallAlertMailSupport!
   installAlertMailTestsPage(eventKind: String! = "deploy.failed", after: String = null, limit: Int! = 25): InstallAlertMailTestPage!
@@ -11542,6 +11569,10 @@ input SetRetentionPolicyInput {
   retentionDays: Int!
 }
 
+input SetStepUpPinInput {
+  pin: String!
+}
+
 input SetZentinelleGatewayEnabledInput {
   clusterId: GUID!
   enabled: Boolean!
@@ -11980,6 +12011,7 @@ input UpdateOrganizationInput {
   metricsRollupRetentionDaysDefault: Int = null
   traceRetentionDaysDefault: Int = null
   allowUserProfileEdit: Boolean = null
+  allowStepUpPin: Boolean = null
   defaultResourceTags: JSON = null
   managedServiceIsolationPolicy: JSON = null
   appearanceDefault: JSON = null

@@ -9,9 +9,11 @@ import { PageShell } from "@/components/PageShell";
  */
 export function SecurityScreen({
   sessions,
+  stepUpPin,
   pairDevice,
 }: {
   sessions: React.ReactNode;
+  stepUpPin?: React.ReactNode;
   pairDevice: React.ReactNode;
 }) {
   const t = useTranslations("securitySettings");
@@ -19,6 +21,7 @@ export function SecurityScreen({
     <PageShell title={t("title")} description={t("description")}>
       <div className="grid gap-4">
         {sessions}
+        {stepUpPin}
         {pairDevice}
       </div>
     </PageShell>

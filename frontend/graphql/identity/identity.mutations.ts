@@ -170,6 +170,7 @@ export const UPDATE_ORGANIZATION = gql`
         previewMaxActiveDefault
         logRetentionDaysDefault
         allowUserProfileEdit
+        allowStepUpPin
       }
     }
   }
@@ -809,6 +810,47 @@ export const ELEVATE_ADMIN_SESSION = gql`
         elevatedUntil
         secondsRemaining
         method
+      }
+    }
+  }
+`;
+
+// #2399: the viewer's step-up PIN. Setting one needs a fresh SSO or
+// password elevation; the refusal opens the step-up prompt like any other.
+export const SET_STEP_UP_PIN = gql`
+  mutation SetStepUpPin($input: SetStepUpPinInput!) {
+    setStepUpPin(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        replaced
+        status {
+          orgAllows
+          isSet
+          locked
+        }
+      }
+    }
+  }
+`;
+
+export const CLEAR_STEP_UP_PIN = gql`
+  mutation ClearStepUpPin {
+    clearStepUpPin {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        orgAllows
+        isSet
+        locked
       }
     }
   }

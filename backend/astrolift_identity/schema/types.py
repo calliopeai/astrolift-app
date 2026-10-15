@@ -37,6 +37,8 @@ class OrganizationType:
     metrics_rollup_retention_days_default: int
     trace_retention_days_default: int
     allow_user_profile_edit: bool
+    # Members may step up with a personal PIN (#2399). Off by default.
+    allow_step_up_pin: bool
     # Operator tags stamped on every cloud resource this org provisions
     # (#1505). Portable by construction: refused on write unless all three
     # clouds would accept them.
@@ -122,6 +124,7 @@ def organization_to_type(org) -> OrganizationType:
         metrics_rollup_retention_days_default=org.metrics_rollup_retention_days_default,
         trace_retention_days_default=org.trace_retention_days_default,
         allow_user_profile_edit=org.allow_user_profile_edit,
+        allow_step_up_pin=org.allow_step_up_pin,
         default_resource_tags=dict(org.default_resource_tags or {}),
         managed_service_isolation_policy=dict(org.managed_service_isolation_policy or {}),
         appearance_default=dict(org.appearance_default or {}),
@@ -852,6 +855,27 @@ class ElevationStatusType:
     method: str | None
     required_for: list[str]
     supported_methods: list[str] = strawberry.field(default_factory=list)
+
+
+@strawberry.type(name="AstroliftStepUpPinStatus")
+class StepUpPinStatusType:
+    """The viewer's step-up PIN (#2399), for the account security card.
+
+    ``org_allows`` is the org's opt-in; without it a stored PIN is never
+    offered or accepted. ``locked`` is set after too many wrong PINs and
+    only a new PIN clears it.
+    """
+
+    org_allows: bool
+    is_set: bool
+    locked: bool
+
+
+def step_up_pin_status(user) -> StepUpPinStatusType:
+    from astrolift_identity.step_up_pin import org_allows_pin, pin_state
+
+    is_set, locked = pin_state(user)
+    return StepUpPinStatusType(org_allows=org_allows_pin(), is_set=is_set, locked=locked)
 
 
 def active_session_to_type(row, *, is_current: bool) -> ActiveSessionType:

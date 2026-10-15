@@ -96,6 +96,13 @@ class Organization(NamedBaseCoreModel):
             "append-only trigger still refuses DELETE (see #1594)."
         ),
     )
+    # Whether people in this org may step up with a personal PIN instead of
+    # a full SSO or password re-verification (#2399). Off by default: some
+    # compliance postures want the IdP and nothing else.
+    allow_step_up_pin = models.BooleanField(
+        default=False,
+        help_text="Let members step up for sensitive actions with a personal 6 to 8 digit PIN.",
+    )
     preview_max_active_default = models.PositiveIntegerField(default=5)
     log_retention_days_default = models.PositiveIntegerField(default=30)
     # Observability streams. Metrics carry two horizons because raw

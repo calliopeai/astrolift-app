@@ -12,6 +12,7 @@ from astrolift_graphql import (
 )
 from astrolift_identity.schema.types import (
     OrganizationType,
+    StepUpPinStatusType,
 )
 
 
@@ -40,6 +41,7 @@ class UpdateOrganizationInput:
     metrics_rollup_retention_days_default: int | None = None
     trace_retention_days_default: int | None = None
     allow_user_profile_edit: bool | None = None
+    allow_step_up_pin: bool | None = None
     # Operator tags stamped on every resource this org provisions (#1505).
     # A whole-map replace rather than a merge: there has to be a way to
     # remove a tag, and `{}` is the obvious one.
@@ -431,6 +433,21 @@ class _LogoutAllSessionsPayload:
 class _OrganizationModulePayload:
     key: str
     enabled: bool
+
+
+@strawberry.input
+class SetStepUpPinInput:
+    """A new step-up PIN (#2399): 6 to 8 digits."""
+
+    pin: str
+
+
+@strawberry.type(name="AstroliftStepUpPinSetPayload")
+class _StepUpPinSetPayload:
+    """``replaced`` tells a change from a first set, for the audit row and the toast."""
+
+    replaced: bool
+    status: StepUpPinStatusType
 
 
 @strawberry.type(name="AstroliftElevatePayload")

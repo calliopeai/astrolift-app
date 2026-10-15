@@ -256,7 +256,7 @@ export interface AstroliftBulkAssignTeamMemberRolesPayload {
 
 // ---- #487 step-up auth ------------------------------------------------
 
-export type AstroliftElevationMethod = "password" | "otp" | "webauthn" | "magic_link";
+export type AstroliftElevationMethod = "password" | "otp" | "webauthn" | "magic_link" | "pin";
 
 export interface ElevateAdminSessionInput {
   method: AstroliftElevationMethod;

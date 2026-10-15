@@ -64,6 +64,7 @@ export function OrganizationSettings({
       website: org?.website ?? "",
       auditDays: String(org?.auditLogRetentionDays ?? 365),
       allowProfileEdit: org?.allowUserProfileEdit ?? true,
+      allowStepUpPin: org?.allowStepUpPin ?? false,
       restrictedSettingsDefault: isRestrictedSettings(org?.restrictedSettingsDefault)
         ? org.restrictedSettingsDefault
         : PRODUCT_RESTRICTED_SETTINGS,
@@ -74,6 +75,7 @@ export function OrganizationSettings({
   const [website, setWebsite] = React.useState(saved.website);
   const [auditDays, setAuditDays] = React.useState(saved.auditDays);
   const [allowProfileEdit, setAllowProfileEdit] = React.useState(saved.allowProfileEdit);
+  const [allowStepUpPin, setAllowStepUpPin] = React.useState(saved.allowStepUpPin);
   const [restrictedDefault, setRestrictedDefault] = React.useState<RestrictedSettings>(
     saved.restrictedSettingsDefault
   );
@@ -83,6 +85,7 @@ export function OrganizationSettings({
     setWebsite(saved.website);
     setAuditDays(saved.auditDays);
     setAllowProfileEdit(saved.allowProfileEdit);
+    setAllowStepUpPin(saved.allowStepUpPin);
     setRestrictedDefault(saved.restrictedSettingsDefault);
   }, [saved]);
 
@@ -95,6 +98,7 @@ export function OrganizationSettings({
   const policiesDirty =
     Boolean(org) &&
     (allowProfileEdit !== saved.allowProfileEdit ||
+      allowStepUpPin !== saved.allowStepUpPin ||
       restrictedDefault !== saved.restrictedSettingsDefault);
 
   const sections = [
@@ -216,12 +220,15 @@ export function OrganizationSettings({
           saving={saving}
           onCancel={() => {
             setAllowProfileEdit(saved.allowProfileEdit);
+            setAllowStepUpPin(saved.allowStepUpPin);
             setRestrictedDefault(saved.restrictedSettingsDefault);
           }}
-          onSave={() => save({ allowProfileEdit, restrictedSettingsDefault: restrictedDefault })}
+          onSave={() =>
+            save({ allowProfileEdit, allowStepUpPin, restrictedSettingsDefault: restrictedDefault })
+          }
         >
           {orgsLoading ? (
-            <FieldSkeletons count={2} />
+            <FieldSkeletons count={3} />
           ) : (
             <div className="flex min-w-0 flex-col gap-5">
               <label className="flex min-w-0 items-start gap-3 text-sm sm:max-w-xl">
@@ -238,6 +245,20 @@ export function OrganizationSettings({
                       path: "/settings/profile",
                       code: (chunks) => <code className="font-mono">{chunks}</code>,
                     })}
+                  </span>
+                </span>
+              </label>
+              <label className="flex min-w-0 items-start gap-3 text-sm sm:max-w-xl">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={allowStepUpPin}
+                  onChange={(e) => setAllowStepUpPin(e.target.checked)}
+                />
+                <span className="min-w-0">
+                  <span className="font-medium">{t("policies.allowStepUpPin")}</span>
+                  <span className="text-muted-foreground mt-0.5 block text-xs leading-relaxed">
+                    {t("policies.allowStepUpPinHint")}
                   </span>
                 </span>
               </label>
