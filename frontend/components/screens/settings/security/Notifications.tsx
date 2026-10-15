@@ -15,6 +15,8 @@ export interface NotificationsScreenProps {
   /** The alert-subscriptions list (AlertSubscriptionsView), filled by the route. */
   alertSubscriptions: React.ReactNode;
   installAlertMail?: React.ReactNode;
+  /** The org's workflow result delivery channels (#2244); org admins only. */
+  workflowDelivery?: React.ReactNode;
 }
 
 /**
@@ -27,9 +29,11 @@ export function NotificationsScreen({
   inbox,
   alertSubscriptions,
   installAlertMail,
+  workflowDelivery,
 }: NotificationsScreenProps) {
   const t = useTranslations("installAlertMail");
   const tn = useTranslations("notificationSettings");
+  const td = useTranslations("workflowDelivery");
   return (
     <PageShell title={tn("title")} description={tn("description")}>
       <SettingsPage
@@ -39,6 +43,9 @@ export function NotificationsScreen({
           { id: "alerts", title: tn("alerts.title"), content: alertSubscriptions },
           ...(installAlertMail
             ? [{ id: "install-email", title: t("title"), content: installAlertMail }]
+            : []),
+          ...(workflowDelivery
+            ? [{ id: "workflow-delivery", title: td("channelsTitle"), content: workflowDelivery }]
             : []),
         ]}
       />

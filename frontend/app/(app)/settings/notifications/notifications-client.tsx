@@ -1,5 +1,7 @@
 "use client";
 
+import { DeliveryChannelsPanel } from "@/components/screens/workflows/delivery/DeliveryChannelsPanel";
+import { useDeliveryChannels } from "@/components/screens/workflows/delivery/use-delivery-channels";
 import { InstallAlertMailClient } from "@/components/screens/settings/install-alert-mail/InstallAlertMailClient";
 import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 import { NotificationsScreen } from "@/components/screens/settings/security/Notifications";
@@ -20,10 +22,19 @@ export function NotificationsClient() {
           <InstallAlertMailClient />
         ) : undefined
       }
+      workflowDelivery={
+        !permissions.loading && !permissions.error && permissions.can("org.update") ? (
+          <DeliveryChannelsCard />
+        ) : undefined
+      }
       inbox={<InboxCard />}
       alertSubscriptions={<AlertSubscriptionsCard />}
     />
   );
+}
+
+function DeliveryChannelsCard() {
+  return <DeliveryChannelsPanel {...useDeliveryChannels()} />;
 }
 
 function InboxCard() {

@@ -10,6 +10,11 @@ import {
   SettingsSection,
 } from "@/components/settings/SettingsPage";
 import type { SectionSelection } from "@/components/settings/use-settings-section";
+import {
+  DeliveryChannelPicker,
+  type DeliveryRecord,
+} from "@/components/screens/workflows/delivery/DeliveryChannelPicker";
+import type { DeliveryChannel } from "@/components/screens/workflows/delivery/DeliveryChannelsPanel";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,6 +32,17 @@ export interface WorkflowSettingsSource {
   ref: string;
 }
 
+/** Where a configured workflow's scheduled results go (#2244). */
+export interface WorkflowDeliverySettings {
+  channels: DeliveryChannel[];
+  selected: string[];
+  recent: DeliveryRecord[];
+  saving?: boolean;
+  error?: string | null;
+  /** Replaces the selection. Resolves true on success. */
+  onSave?: (channelGuids: string[]) => Promise<boolean>;
+}
+
 export interface WorkflowSettingsViewProps {
   kind: "configured" | "definition";
   general: WorkflowSettingsGeneral;
@@ -40,6 +56,8 @@ export interface WorkflowSettingsViewProps {
   onSave?: (next: { name: string; description: string }) => Promise<boolean>;
   /** Present when the viewer may delete it; the Danger zone is left out otherwise. */
   onDelete?: () => Promise<unknown>;
+  /** A configured workflow's delivery channels; the section is left out without it. */
+  delivery?: WorkflowDeliverySettings;
 }
 
 function Field({ id, label, children }: { id: string; label: string; children: React.ReactNode }) {
@@ -60,6 +78,31 @@ function ReadField({ label, value }: { label: string; value: string }) {
   );
 }
 
+function DeliverySection({ delivery }: { delivery: WorkflowDeliverySettings }) {
+  const t = useTranslations("workflowDelivery");
+  const [value, setValue] = React.useState(delivery.selected);
+  const dirty =
+    value.length !== delivery.selected.length || value.some((g) => !delivery.selected.includes(g));
+  return (
+    <SettingsSection
+      title={t("sectionTitle")}
+      description={t("sectionDescription")}
+      dirty={dirty}
+      saving={delivery.saving}
+      error={delivery.error}
+      onSave={delivery.onSave ? () => delivery.onSave?.(value) : undefined}
+      onCancel={() => setValue(delivery.selected)}
+    >
+      <DeliveryChannelPicker
+        channels={delivery.channels}
+        value={value}
+        onChange={setValue}
+        recent={delivery.recent}
+      />
+    </SettingsSection>
+  );
+}
+
 /**
  * The Settings tab (spec 44 §5.2, §5.3): General and one Danger zone, one
  * section at a time by `?section=`. A configured workflow's name and
@@ -77,8 +120,10 @@ export function WorkflowSettingsView({
   saveError,
   onSave,
   onDelete,
+  delivery,
 }: WorkflowSettingsViewProps) {
   const t = useTranslations("workflowSettings");
+  const tDelivery = useTranslations("workflowDelivery");
   const [name, setName] = React.useState(general.name);
   const [description, setDescription] = React.useState(general.description);
   const dirty = name !== general.name || description !== general.description;
@@ -140,7 +185,19 @@ export function WorkflowSettingsView({
     <SettingsPage
       single={single}
       readOnly={readOnly}
-      sections={[{ id: "general", title: t("general"), content: generalSection }]}
+      sections={[
+        { id: "general", title: t("general"), content: generalSection },
+        ...(kind === "configured" && delivery
+          ? [
+              {
+                id: "delivery",
+                title: tDelivery("sectionTitle"),
+                // Keyed on the saved selection, so a save or refetch resets it.
+                content: <DeliverySection key={delivery.selected.join(",")} delivery={delivery} />,
+              },
+            ]
+          : []),
+      ]}
       dangerZone={
         onDelete ? (
           <DangerAction

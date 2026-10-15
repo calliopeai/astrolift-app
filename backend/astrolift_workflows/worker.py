@@ -209,6 +209,7 @@ from astrolift_workflows.activities.scheduled import (
     probe_app_dns_activity,
 )
 from astrolift_workflows.activities.webhook_deliver import deliver_webhook
+from astrolift_workflows.activities.workflow_result_delivery import deliver_workflow_run_result
 from astrolift_workflows.workflows import (
     AgentBoxReapTickWorkflow,
     AgentCronTickWorkflow,
@@ -373,6 +374,7 @@ ACTIVITIES = (
     create_scheduled_pipeline_run,
     create_scheduled_workflow_run,
     record_scheduled_workflow_start,
+    deliver_workflow_run_result,
     deliver_webhook,
     finish_command_run,
     poll_command_run,

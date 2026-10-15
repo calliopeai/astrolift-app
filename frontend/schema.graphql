@@ -9898,6 +9898,26 @@ type Mutation {
   Reorder a definition's stages (spec 40 §6). Pass stage guids in the new order.
   """
   reorderWorkflowStages(definitionSlug: String!, stageGuids: [ID!]!): MutationResult!
+
+  """
+  Add a delivery channel for scheduled workflow results (org admins: org.update). kind is slack_webhook, slack_app, teams_webhook or email. credential is the incoming webhook URL, or the Slack app's bot token for slack_app; it is stored in the org secret store and never returned.
+  """
+  createWorkflowDeliveryChannel(name: String!, kind: String!, credential: String = null, slackChannel: String = null, emailRecipients: [String!] = null): WorkflowDeliveryChannelResult!
+
+  """
+  Change a delivery channel (org admins: org.update). Omitted fields keep their value; a credential replaces the stored one. The kind cannot change.
+  """
+  updateWorkflowDeliveryChannel(channelId: GUID!, name: String = null, credential: String = null, slackChannel: String = null, emailRecipients: [String!] = null, isActive: Boolean = null): WorkflowDeliveryChannelResult!
+
+  """
+  Remove a delivery channel and its stored credential (org admins: org.update).
+  """
+  deleteWorkflowDeliveryChannel(channelId: GUID!): MutationResult!
+
+  """
+  Choose the delivery channels a configured Workflow posts its scheduled results to (workflow editors: workflow.update). channelIds replaces the selection; [] clears it.
+  """
+  setWorkflowDeliveryChannels(workflowId: GUID!, channelIds: [GUID!]!): WorkflowDeliverySelectionResult!
   changeAstroliftTeamMembership(input: ChangeAstroliftTeamMembershipInput!): AstroliftTeamMembershipChangeMutationResult!
   astroliftAnonymizeUser(input: AstroliftAnonymizeUserInput!): AstroliftAnonymizeUserPayloadMutationResult!
   astroliftConnectUserSourceProvider(input: ConnectUserSourceProviderInput!): AstroliftConnectUserSourceProviderPayloadMutationResult!
@@ -10817,6 +10837,16 @@ type Query {
 
   """Cursor-paginated page of the org's configured Workflows (tier 2)."""
   workflowsPage(orgId: ID = null, search: String = null, limit: Int! = 50, after: String = null): ConfiguredWorkflowPage!
+
+  """
+  The org's result delivery channels for scheduled workflows (#2244). Credentials are never returned.
+  """
+  workflowDeliveryChannels: [WorkflowDeliveryChannelType!]!
+
+  """
+  The delivery channels one configured Workflow posts its scheduled results to, and its recent deliveries.
+  """
+  workflowDeliverySelection(workflowId: GUID!): WorkflowDeliverySelectionType
 
   """
   One configured Workflow by exact ID or legacy slug, with its recent runs. A supplied slug must match the ID.
@@ -12356,6 +12386,53 @@ type WorkflowDefinitionType {
   instanceCount: Int!
   activeInstanceCount: Int!
   workflowStages: [WorkflowStageType!]!
+}
+
+type WorkflowDeliveryChannelResult {
+  ok: Boolean!
+  errors: [ValidationError!]!
+  channel: WorkflowDeliveryChannelType
+}
+
+type WorkflowDeliveryChannelType {
+  guid: String!
+  name: String!
+
+  """slack_webhook, slack_app, teams_webhook or email."""
+  kind: String!
+  slackChannel: String!
+  emailRecipients: [String!]!
+  isActive: Boolean!
+  hasCredential: Boolean!
+}
+
+type WorkflowDeliverySelectionResult {
+  ok: Boolean!
+  errors: [ValidationError!]!
+  selection: WorkflowDeliverySelectionType
+}
+
+type WorkflowDeliverySelectionType {
+  workflowGuid: String!
+  channelGuids: [String!]!
+  recentDeliveries: [WorkflowDeliveryType!]!
+}
+
+type WorkflowDeliveryType {
+  guid: String!
+  channelGuid: String
+  channelName: String
+
+  """result, or owner_notice for a failed run's owner email."""
+  purpose: String!
+  runOutcome: String!
+
+  """pending, retrying, delivered or failed."""
+  status: String!
+  attempts: Int!
+  lastError: String!
+  createdAt: String!
+  deliveredAt: String
 }
 
 type WorkflowExecution {
