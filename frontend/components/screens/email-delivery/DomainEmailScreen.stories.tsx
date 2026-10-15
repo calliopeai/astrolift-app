@@ -78,7 +78,12 @@ export const SourceRefused: Story = {
     delivery: (
       <EmailDeliveryPanel
         {...DELIVERY_PANEL}
-        support={{ allowed: false, reason: "EXACT_TEST_TRANSPORT_UNSUPPORTED" }}
+        support={{
+          allowed: false,
+          reason: "EXACT_TEST_TRANSPORT_UNSUPPORTED",
+          transport: "smtp",
+          eventCollectionConfigured: false,
+        }}
       />
     ),
   },

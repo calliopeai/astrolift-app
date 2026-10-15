@@ -7412,11 +7412,13 @@ export type EmailDeliveryTestPage = {
 export type EmailDeliveryTestSupport = {
   accountId?: Maybe<Scalars['String']['output']>;
   allowed: Scalars['Boolean']['output'];
+  eventCollectionConfigured: Scalars['Boolean']['output'];
   identity?: Maybe<Scalars['String']['output']>;
   reason?: Maybe<Scalars['String']['output']>;
   region?: Maybe<Scalars['String']['output']>;
   sender?: Maybe<Scalars['String']['output']>;
   serviceVersion?: Maybe<Scalars['Int']['output']>;
+  transport?: Maybe<Scalars['String']['output']>;
 };
 
 export type Emailsuppressionaddpayload = {

@@ -99,6 +99,10 @@ class EmailDeliveryTestSupport:
     identity: str | None
     account_id: str | None
     region: str | None
+    # Selected service's transport, also when it has no exact test path (for example azure_acs, smtp).
+    transport: str | None = None
+    # Whether provider delivery events can be collected for tests from this source.
+    event_collection_configured: bool = False
 
 
 @strawberry.type
@@ -137,18 +141,24 @@ class EmailDeliveryQuery:
     )
     @tenant_scoped()
     def email_delivery_test_support(self, info: Info, managed_service_id: GUID) -> EmailDeliveryTestSupport:
+        row = None
         try:
             row = delivery._fresh(info, managed_service_id)
             config, sender, _ = delivery.source(row)
-        except (PermissionDenied, delivery.EmailTestUnavailable):
+        except (PermissionDenied, delivery.EmailTestUnavailable) as exc:
+            # Fixed source codes are shown only after write authority was admitted for this service.
+            authorized = row is not None and isinstance(exc, delivery.EmailTestUnavailable)
             return EmailDeliveryTestSupport(
                 allowed=False,
-                reason="The current role or exact applied email binding does not support test sends.",
+                reason=str(exc)
+                if authorized
+                else "The current role or exact applied email binding does not support test sends.",
                 service_version=None,
                 sender=None,
                 identity=None,
                 account_id=None,
                 region=None,
+                transport=("aws_ses" if row.variant == "ses" else row.variant) if authorized else None,
             )
         return EmailDeliveryTestSupport(
             allowed=True,
@@ -158,6 +168,8 @@ class EmailDeliveryQuery:
             identity=config.identity,
             account_id=config.credential.declared_account,
             region=config.region,
+            transport="aws_ses",
+            event_collection_configured=bool(config.feedback_topic_arns),
         )
 
 

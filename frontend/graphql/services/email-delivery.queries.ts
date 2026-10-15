@@ -33,6 +33,8 @@ export const EMAIL_DELIVERY_SUPPORT = gql`
       identity
       accountId
       region
+      transport
+      eventCollectionConfigured
     }
   }
 `;

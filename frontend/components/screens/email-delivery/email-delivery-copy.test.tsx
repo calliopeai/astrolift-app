@@ -10,11 +10,17 @@ import ko from "@/messages/ko.json";
 import zh from "@/messages/zh-Hans.json";
 import pt from "@/messages/pt-BR.json";
 import { AppShell } from "@/components/shell/AppShell";
+import { IDENTICAL_EVERYWHERE, IDENTICAL_IN } from "@/lib/i18n/identical-allowlist";
 import { EmailDeliveryPanel } from "./EmailDeliveryPanel";
-import { DELIVERY_PANEL, DELIVERY_TEST } from "./EmailDeliveryPanel.stories";
+import {
+  DELIVERY_PANEL,
+  DELIVERY_TEST,
+  EventCollectionNotConfigured,
+  UnsupportedTransport,
+} from "./EmailDeliveryPanel.stories";
 
 const keys =
-  `title intro checking supportUnavailable denied refresh service sender identity account region sourceVersion recipient subject body optional review reviewHelp reviewed send retry sending uncertain acceptedUnverified acceptedHelp noTracking simulatorHelp currentRequest startAnother history emptyHistory historyUnavailable createdAt observedAt providerMessageId status reason submitting accepted unknown failed suppressed delivered deferred bounced complained rejected observationTimedOut unrecognizedStatus domainTitle domainHelp apps appSearch services selectApp selectService noApps noServices selectionUnavailable match different unconfirmedDomain mailDns dnsHelp mx spf dmarc dkim selector lookup invalidSelector lookupLoading lookupUnavailable recordsEmpty perspective checkedAt records recoverHelp invalidRecipient invalidContent dkimRecordType`.split(
+  `title intro checking supportUnavailable denied refresh service sender identity account region sourceVersion recipient subject body optional review reviewHelp reviewed send retry sending uncertain acceptedUnverified acceptedHelp noTracking simulatorHelp currentRequest startAnother history emptyHistory historyUnavailable createdAt observedAt providerMessageId status reason submitting accepted unknown failed suppressed delivered deferred bounced complained rejected observationTimedOut unrecognizedStatus domainTitle domainHelp apps appSearch services selectApp selectService noApps noServices selectionUnavailable match different unconfirmedDomain mailDns dnsHelp mx spf dmarc dkim selector lookup invalidSelector lookupLoading lookupUnavailable recordsEmpty perspective checkedAt records recoverHelp invalidRecipient invalidContent dkimRecordType notObservable transport transportAwsSes transportAzureAcs transportSmtp transportUnsupported deliveryNotObservable`.split(
     " "
   );
 const catalogues = { en, es, fr, de, ja, ko, "zh-Hans": zh, "pt-BR": pt };
@@ -58,7 +64,11 @@ describe("email delivery public copy", () => {
       if (locale !== "en")
         expect(
           Object.entries(messages.emailDelivery).filter(
-            ([key, value]) => value === en.emailDelivery[key as keyof typeof en.emailDelivery]
+            ([key, value]) =>
+              value === en.emailDelivery[key as keyof typeof en.emailDelivery] &&
+              // Brand names and allowlisted words read the same in every catalogue (#2381).
+              !IDENTICAL_EVERYWHERE.includes(value) &&
+              !(IDENTICAL_IN[locale] ?? []).includes(value)
           ).length
         ).toBeLessThan(4);
       const onError = vi.fn();
@@ -81,6 +91,42 @@ describe("email delivery public copy", () => {
       expect(onError).not.toHaveBeenCalled();
     }
   );
+  it("names an unsupported transport and states delivery is not observable", () => {
+    const { rerender } = render(
+      <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
+        <EmailDeliveryPanel {...DELIVERY_PANEL} {...UnsupportedTransport.args} reviewed canSend />
+      </NextIntlClientProvider>
+    );
+    expect(screen.getByText(en.emailDelivery.transportAzureAcs)).toBeInTheDocument();
+    expect(screen.getByText(en.emailDelivery.transportUnsupported)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: en.emailDelivery.send })).toBeDisabled();
+    rerender(
+      <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
+        <EmailDeliveryPanel {...DELIVERY_PANEL} {...EventCollectionNotConfigured.args} />
+      </NextIntlClientProvider>
+    );
+    expect(screen.getByText(en.emailDelivery.transportAwsSes)).toBeInTheDocument();
+    expect(screen.getByText(en.emailDelivery.deliveryNotObservable)).toBeInTheDocument();
+    expect(screen.queryByText(en.emailDelivery.transportUnsupported)).not.toBeInTheDocument();
+  });
+  it("shows an accepted test without event collection as not observable, never timed out", () => {
+    render(
+      <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
+        <EmailDeliveryPanel
+          {...DELIVERY_PANEL}
+          history={{
+            ...DELIVERY_PANEL.history,
+            rows: [{ ...DELIVERY_TEST, status: "not_observable", eventTrackingConfigured: false }],
+          }}
+        />
+      </NextIntlClientProvider>
+    );
+    const history = screen.getByRole("table", { name: en.emailDelivery.history });
+    expect(within(history).getByText(en.emailDelivery.notObservable)).toBeInTheDocument();
+    expect(
+      within(history).queryByText(en.emailDelivery.unrecognizedStatus)
+    ).not.toBeInTheDocument();
+  });
   it("does not enable sends from stale or refused support even with a stale action flag", () => {
     const send = vi.fn();
     const { rerender } = render(

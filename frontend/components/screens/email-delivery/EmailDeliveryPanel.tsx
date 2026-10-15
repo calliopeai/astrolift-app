@@ -64,6 +64,12 @@ const statuses = {
   complained: "complained",
   rejected: "rejected",
   observation_timed_out: "observationTimedOut",
+  not_observable: "notObservable",
+} as const;
+const transports = {
+  aws_ses: "transportAwsSes",
+  azure_acs: "transportAzureAcs",
+  smtp: "transportSmtp",
 } as const;
 
 /** Pure exact-source review and content-free provider-observation history. */
@@ -97,7 +103,14 @@ export function EmailDeliveryPanel(p: EmailDeliveryPanelProps) {
     },
     { id: "reason", header: t("reason"), cell: (r) => r.reasonCode || "—" },
   ];
+  const transport = p.support?.transport;
   const fields = [
+    [
+      "transport",
+      transport && transport in transports
+        ? t(transports[transport as keyof typeof transports])
+        : transport,
+    ],
     ["sender", p.support?.sender],
     ["identity", p.support?.identity],
     ["account", p.support?.accountId],
@@ -126,7 +139,15 @@ export function EmailDeliveryPanel(p: EmailDeliveryPanelProps) {
         <Card className="p-3">
           <p>{t("denied")}</p>
           {p.support?.reason ? <p className="font-mono text-xs">{p.support.reason}</p> : null}
+          {p.support?.reason === "EXACT_TEST_TRANSPORT_UNSUPPORTED" ? (
+            <p className="text-sm">{t("transportUnsupported")}</p>
+          ) : null}
         </Card>
+      ) : null}
+      {p.support?.allowed && !p.support.eventCollectionConfigured ? (
+        <p role="status" className="text-sm">
+          {t("deliveryNotObservable")}
+        </p>
       ) : null}
       {p.support ? (
         <dl className="grid gap-2 sm:grid-cols-2">
