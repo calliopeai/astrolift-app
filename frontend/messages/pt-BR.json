@@ -15332,7 +15332,20 @@
     "shareTitle": "{team}: {access}",
     "manageAccess": "Gerenciar acesso",
     "emptyTitle": "Nenhuma camada semântica",
-    "emptyDescription": "Apps declarados com [app] kind = \"mimwell\" que você pode ler aparecem aqui."
+    "emptyDescription": "Apps declarados com [app] kind = \"mimwell\" que você pode ler aparecem aqui.",
+    "columnConnect": "Clientes MCP",
+    "connect": "Conectar",
+    "connectFailed": "Não foi possível emitir um token de leitura.",
+    "connectDialog": {
+      "title": "Conectar {slug}",
+      "description": "Cole isto em um cliente MCP como o Chat Studio. Contém um token de leitura emitido para você, exibido apenas agora; expira {expiresAt}. Conecte novamente para obter outro.",
+      "mcpUrl": "URL do MCP",
+      "config": "Configuração do cliente MCP",
+      "copy": "Copiar",
+      "copyLabel": "Copiar {label}",
+      "copied": "Copiado",
+      "done": "Concluído"
+    }
   },
   "navModel": {
     "functions": {

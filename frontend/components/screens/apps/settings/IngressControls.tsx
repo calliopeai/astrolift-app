@@ -3,13 +3,13 @@
 import { Loader2Icon, PauseIcon, PlayIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { Can } from "@/components/Can";
 import { StatusDot } from "@/components/StatusDot";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Section } from "@/components/ui/section";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
+import { environmentCan } from "@/lib/permissions/environment-permissions";
 
 import type { useIngressControls } from "./use-ingress-controls";
 
@@ -85,7 +85,7 @@ function IngressRow({
           </Badge>
         )}
       </div>
-      <Can permission="app.deploy">
+      {environmentCan(env, "app.deploy") && (
         <Button
           size="sm"
           variant={paused ? "default" : "outline"}
@@ -101,7 +101,7 @@ function IngressRow({
           )}
           {paused ? t("resume") : t("pause")}
         </Button>
-      </Can>
+      )}
     </div>
   );
 }

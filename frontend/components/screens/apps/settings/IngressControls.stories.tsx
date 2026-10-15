@@ -23,6 +23,11 @@ export const Empty: Story = { args: { envs: [] } };
 /** No error state; a failed toggle is a toast. Shown: a toggle in flight. */
 export const Toggling: Story = { args: { busyIds: [ENVIRONMENTS[0].id] } };
 
+/** Per environment (#1867): a policy denies app.deploy on production alone. */
+export const ProductionDenied: Story = {
+  args: { envs: [{ ...ENVIRONMENTS[0], viewerPermissions: ["app.update"] }, ENVIRONMENTS[1]] },
+};
+
 export const LongStrings: Story = {
   args: { envs: [{ ...ENVIRONMENTS[0], name: LONG }, ENVIRONMENTS[1]] },
 };

@@ -15332,7 +15332,20 @@
     "shareTitle": "{team}: {access}",
     "manageAccess": "액세스 관리",
     "emptyTitle": "시맨틱 레이어 없음",
-    "emptyDescription": "[app] kind = \"mimwell\"로 선언되어 읽을 수 있는 앱이 여기에 표시됩니다."
+    "emptyDescription": "[app] kind = \"mimwell\"로 선언되어 읽을 수 있는 앱이 여기에 표시됩니다.",
+    "columnConnect": "MCP 클라이언트",
+    "connect": "연결",
+    "connectFailed": "읽기 토큰을 발급하지 못했습니다.",
+    "connectDialog": {
+      "title": "{slug} 연결",
+      "description": "Chat Studio 같은 MCP 클라이언트에 붙여 넣으세요. 회원님에게 발급된 읽기 토큰이 들어 있으며 지금만 표시됩니다. {expiresAt}에 만료됩니다. 새 토큰이 필요하면 다시 연결하세요.",
+      "mcpUrl": "MCP 주소",
+      "config": "MCP 클라이언트 구성",
+      "copy": "복사",
+      "copyLabel": "{label} 복사",
+      "copied": "복사됨",
+      "done": "완료"
+    }
   },
   "navModel": {
     "functions": {

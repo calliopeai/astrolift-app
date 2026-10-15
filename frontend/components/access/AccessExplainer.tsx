@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
+import { localizedScopeLabel } from "./access-copy";
 import { type ScopeRef } from "./access-model";
 
 /** One step of `permissionDiagnose` (core/schema/types/permission_analysis.py). */
@@ -101,7 +102,7 @@ export function AccessExplainer({
   className,
 }: AccessExplainerProps) {
   const t = useTranslations("shared.access.diagnostics");
-  const scopeT = useTranslations("shared.access.scope");
+  const accessT = useTranslations("shared.access");
   if (loading) {
     return (
       <div className={cn("flex min-w-0 flex-col gap-2", className)} aria-busy>
@@ -167,7 +168,9 @@ export function AccessExplainer({
             {
               username: d.username,
               permission: d.permission,
-              ...(target ? { kind: scopeT(target.kind), name: target.name } : {}),
+              ...(target
+                ? { kind: localizedScopeLabel(target.kind, accessT), name: target.name }
+                : {}),
               who: (chunks) => <span className="font-mono">{chunks}</span>,
               action: (chunks) => <span className="font-mono">{chunks}</span>,
               target: (chunks) => <span className="font-mono">{chunks}</span>,

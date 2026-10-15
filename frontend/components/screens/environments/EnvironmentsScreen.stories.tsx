@@ -96,8 +96,26 @@ export const Embedded: Story = {
   ),
 };
 
-/** No app.deploy permission: no pause or resume in the row menu. */
-export const ReadOnly: Story = { render: () => <Environments canPause={false} /> };
+/** No app.deploy on any environment: no pause or resume in the row menu. */
+export const ReadOnly: Story = {
+  render: () => (
+    <Environments all={ALL_ENVIRONMENTS.map((e) => ({ ...e, viewerPermissions: [] }))} />
+  ),
+};
+
+/**
+ * Per environment (#1867): a policy denies deploys to production alone, so
+ * only the other rows offer pause or resume.
+ */
+export const ProductionDenied: Story = {
+  render: () => (
+    <Environments
+      all={ALL_ENVIRONMENTS.map((e) =>
+        e.id === ENV_PROD.id ? { ...e, viewerPermissions: ["app.update"] } : e
+      )}
+    />
+  ),
+};
 
 /** A pause or resume in flight: the row actions are disabled. */
 export const Busy: Story = { render: () => <Environments busy /> };

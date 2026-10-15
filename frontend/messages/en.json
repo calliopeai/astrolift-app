@@ -15332,7 +15332,20 @@
     "shareTitle": "{team}: {access}",
     "manageAccess": "Manage access",
     "emptyTitle": "No semantic layers",
-    "emptyDescription": "Apps declared with [app] kind = \"mimwell\" that you can read appear here."
+    "emptyDescription": "Apps declared with [app] kind = \"mimwell\" that you can read appear here.",
+    "columnConnect": "MCP clients",
+    "connect": "Connect",
+    "connectFailed": "Could not issue a read token.",
+    "connectDialog": {
+      "title": "Connect {slug}",
+      "description": "Paste this into an MCP client such as Chat Studio. It carries a read token issued to you, shown only now; it expires {expiresAt}. Connect again for a new one.",
+      "mcpUrl": "MCP URL",
+      "config": "MCP client config",
+      "copy": "Copy",
+      "copyLabel": "Copy {label}",
+      "copied": "Copied",
+      "done": "Done"
+    }
   },
   "listDefinitions": {
     "agentBoxes": {

@@ -15335,7 +15335,20 @@
     "shareTitle": "{team} : {access}",
     "manageAccess": "Gérer l’accès",
     "emptyTitle": "Aucune couche sémantique",
-    "emptyDescription": "Les applications déclarées avec [app] kind = \"mimwell\" que vous pouvez lire apparaissent ici."
+    "emptyDescription": "Les applications déclarées avec [app] kind = \"mimwell\" que vous pouvez lire apparaissent ici.",
+    "columnConnect": "Clients MCP",
+    "connect": "Connecter",
+    "connectFailed": "Impossible d'émettre un jeton de lecture.",
+    "connectDialog": {
+      "title": "Connecter {slug}",
+      "description": "Collez ceci dans un client MCP comme Chat Studio. Il contient un jeton de lecture émis pour vous, affiché uniquement maintenant ; il expire {expiresAt}. Reconnectez-vous pour en obtenir un nouveau.",
+      "mcpUrl": "URL MCP",
+      "config": "Configuration du client MCP",
+      "copy": "Copier",
+      "copyLabel": "Copier {label}",
+      "copied": "Copié",
+      "done": "Terminé"
+    }
   },
   "navModel": {
     "functions": {
