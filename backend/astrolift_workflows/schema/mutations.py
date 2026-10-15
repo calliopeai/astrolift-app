@@ -20,6 +20,7 @@ from strawberry.types import Info
 
 from astrolift_graphql import GUID
 from astrolift_identity.operation_context import agent_region_operation, execution_operation
+from astrolift_identity.scopes import identity_organization_scope
 from astrolift_workflows.client import (
     cancel_workflow,
     signal_workflow,
@@ -37,6 +38,12 @@ from astrolift_workflows.schedule_operations import (
     validate_schedule_configuration,
     workflow_schedule_scope,
 )
+from astrolift_workflows.schema.delivery_types import (
+    WorkflowDeliveryChannelResult,
+    WorkflowDeliverySelectionResult,
+    channel_to_type,
+    selection_to_type,
+)
 from astrolift_workflows.schema.execution_types import WorkflowExecutionControlResult, WorkflowExecutionType
 from astrolift_workflows.schema.human_gate_types import HumanGateDecisionResult
 from astrolift_workflows.schema.schedule_types import (
@@ -49,6 +56,7 @@ from astrolift_workflows.schema.workflow_config_types import (
     workflow_to_type,
 )
 from core.decorators import TenantRequired, tenant_scoped
+from core.mutations import mutation_audit
 from core.permissions import (
     Permission,
     PermissionDenied,
@@ -1167,6 +1175,211 @@ class WorkflowsMutation:
                 s.updated_by = info.context.user
                 s.save(update_fields=["order", "updated_by", "updated_at", "version"])
         return MutationResult.success()
+
+    # ── result delivery channels (#2244) ────────────────────────────────
+
+    @strawberry.mutation(
+        description=(
+            "Add a delivery channel for scheduled workflow results (org admins: org.update). "
+            "kind is slack_webhook, slack_app, teams_webhook or email. credential is the incoming "
+            "webhook URL, or the Slack app's bot token for slack_app; it is stored in the org secret "
+            "store and never returned."
+        )
+    )
+    @mutation_audit(action="workflow.delivery_channel.create")
+    @require_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE))
+    @tenant_scoped()
+    def create_workflow_delivery_channel(
+        self,
+        info: Info,
+        name: str,
+        kind: str,
+        credential: str | None = None,
+        slack_channel: str | None = None,
+        email_recipients: list[str] | None = None,
+    ) -> WorkflowDeliveryChannelResult:
+        from django.db import IntegrityError
+
+        from workflows.delivery import DeliveryConfigurationError, store_channel_secret, validate_channel
+        from workflows.models import DeliveryChannel
+
+        org, err = _resolve_caller_org(None)
+        if err is not None:
+            return WorkflowDeliveryChannelResult(ok=False, errors=err.errors)
+        name = (name or "").strip()
+        if not name or len(name) > 120:
+            return WorkflowDeliveryChannelResult(ok=False, errors=_failure("name", "Enter a name.").errors)
+        try:
+            channel_id, recipients = validate_channel(
+                kind,
+                secret=credential,
+                slack_channel=slack_channel or "",
+                recipients=email_recipients,
+                creating=True,
+            )
+        except DeliveryConfigurationError as exc:
+            return WorkflowDeliveryChannelResult(ok=False, errors=_failure("credential", str(exc)).errors)
+        user = info.context.user
+        try:
+            with transaction.atomic():
+                channel = DeliveryChannel.objects.create(
+                    organization=org,
+                    name=name,
+                    kind=kind,
+                    slack_channel=channel_id,
+                    email_recipients=recipients,
+                    created_by=user,
+                    updated_by=user,
+                )
+                if credential is not None and kind != DeliveryChannel.Kind.EMAIL:
+                    store_channel_secret(channel, credential)
+        except IntegrityError:
+            return WorkflowDeliveryChannelResult(
+                ok=False, errors=_failure("name", "A channel with this name already exists.").errors
+            )
+        return WorkflowDeliveryChannelResult(ok=True, channel=channel_to_type(channel))
+
+    @strawberry.mutation(
+        description=(
+            "Change a delivery channel (org admins: org.update). Omitted fields keep their value; "
+            "a credential replaces the stored one. The kind cannot change."
+        )
+    )
+    @mutation_audit(action="workflow.delivery_channel.update")
+    @require_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE))
+    @tenant_scoped()
+    def update_workflow_delivery_channel(
+        self,
+        info: Info,
+        channel_id: GUID,  # type: ignore[valid-type]
+        name: str | None = None,
+        credential: str | None = None,
+        slack_channel: str | None = None,
+        email_recipients: list[str] | None = None,
+        is_active: bool | None = None,
+    ) -> WorkflowDeliveryChannelResult:
+        from django.db import IntegrityError
+
+        from workflows.delivery import DeliveryConfigurationError, store_channel_secret, validate_channel
+        from workflows.models import DeliveryChannel
+
+        org, err = _resolve_caller_org(None)
+        if err is not None:
+            return WorkflowDeliveryChannelResult(ok=False, errors=err.errors)
+        try:
+            with transaction.atomic():
+                channel = (
+                    DeliveryChannel.objects.select_for_update()
+                    .filter(organization=org, guid=str(channel_id))
+                    .first()
+                )
+                if channel is None:
+                    return WorkflowDeliveryChannelResult(
+                        ok=False, errors=_failure("channel_id", "Delivery channel not found.").errors
+                    )
+                if name is not None:
+                    if not name.strip() or len(name.strip()) > 120:
+                        return WorkflowDeliveryChannelResult(
+                            ok=False, errors=_failure("name", "Enter a name.").errors
+                        )
+                    channel.name = name.strip()
+                try:
+                    channel.slack_channel, recipients = validate_channel(
+                        channel.kind,
+                        secret=credential,
+                        slack_channel=channel.slack_channel if slack_channel is None else slack_channel,
+                        recipients=channel.email_recipients if email_recipients is None else email_recipients,
+                        creating=False,
+                    )
+                except DeliveryConfigurationError as exc:
+                    return WorkflowDeliveryChannelResult(
+                        ok=False, errors=_failure("credential", str(exc)).errors
+                    )
+                channel.email_recipients = recipients
+                if is_active is not None:
+                    channel.is_active = is_active
+                channel.updated_by = info.context.user
+                channel.save()
+                if credential is not None and channel.kind != DeliveryChannel.Kind.EMAIL:
+                    store_channel_secret(channel, credential)
+        except IntegrityError:
+            return WorkflowDeliveryChannelResult(
+                ok=False, errors=_failure("name", "A channel with this name already exists.").errors
+            )
+        return WorkflowDeliveryChannelResult(ok=True, channel=channel_to_type(channel))
+
+    @strawberry.mutation(
+        description="Remove a delivery channel and its stored credential (org admins: org.update)."
+    )
+    @mutation_audit(action="workflow.delivery_channel.delete")
+    @require_permission(Permission.ORG_UPDATE, scope=identity_organization_scope(Permission.ORG_UPDATE))
+    @tenant_scoped()
+    def delete_workflow_delivery_channel(
+        self,
+        info: Info,
+        channel_id: GUID,  # type: ignore[valid-type]
+    ) -> MutationResult:
+        from astrolift_lifecycle.services.secrets import delete_org_secret
+        from workflows.models import DeliveryChannel
+
+        org, err = _resolve_caller_org(None)
+        if err is not None:
+            return err
+        with transaction.atomic():
+            channel = (
+                DeliveryChannel.objects.select_for_update()
+                .filter(organization=org, guid=str(channel_id))
+                .first()
+            )
+            if channel is None:
+                return _failure("channel_id", "Delivery channel not found.")
+            channel.soft_delete(by=info.context.user)
+            delete_org_secret(org, channel.secret_key)
+        return MutationResult.success()
+
+    @strawberry.mutation(
+        description=(
+            "Choose the delivery channels a configured Workflow posts its scheduled results to "
+            "(workflow editors: workflow.update). channelIds replaces the selection; [] clears it."
+        )
+    )
+    @mutation_audit(action="workflow.delivery_selection.set")
+    @require_permission(
+        Permission.WORKFLOW_UPDATE, scope=configured_workflow_scope(Permission.WORKFLOW_UPDATE)
+    )
+    @tenant_scoped()
+    def set_workflow_delivery_channels(
+        self,
+        info: Info,
+        workflow_id: GUID,  # type: ignore[valid-type]
+        channel_ids: list[GUID],  # type: ignore[valid-type]
+    ) -> WorkflowDeliverySelectionResult:
+        from workflows.models import DeliveryChannel
+
+        org, err = _resolve_caller_org(None)
+        if err is not None:
+            return WorkflowDeliverySelectionResult(ok=False, errors=err.errors)
+        with transaction.atomic():
+            wf = find_configured_workflow(org.pk, workflow_id=workflow_id, lock=True)
+            if wf is None:
+                return WorkflowDeliverySelectionResult(
+                    ok=False, errors=_failure("workflow_id", "Workflow not found.").errors
+                )
+            check_permission(
+                Permission.WORKFLOW_UPDATE,
+                scope=reviewed_definition_scope(wf.definition, org.pk, permission=Permission.WORKFLOW_UPDATE),
+            )
+            wanted = {str(c) for c in channel_ids}
+            channels = list(DeliveryChannel.objects.filter(organization=org, guid__in=wanted))
+            if len(channels) != len(wanted):
+                return WorkflowDeliverySelectionResult(
+                    ok=False,
+                    errors=_failure("channel_ids", "One or more delivery channels were not found.").errors,
+                )
+            wf.delivery_channels.set(channels)
+            wf.updated_by = info.context.user
+            wf.save(update_fields=["updated_by", "updated_at", "version"], skip_binding_validation=True)
+        return WorkflowDeliverySelectionResult(ok=True, selection=selection_to_type(wf))
 
 
 def _configuration_authorizer(info, permission):

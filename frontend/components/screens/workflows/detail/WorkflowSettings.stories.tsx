@@ -3,6 +3,8 @@ import { expect, within } from "storybook/test";
 
 import { useLocalSettingsSection } from "@/components/settings/use-settings-section";
 
+import { CHANNELS, RECENT, TEAMS_CHANNEL } from "../delivery/delivery.fixtures";
+
 import { DEFINITION, LONG_DEFINITION } from "./workflow-detail-a.fixtures";
 import { LONG_WORKFLOW, WORKFLOW } from "./workflow-detail-b.fixtures";
 import { WorkflowSettingsView, type WorkflowSettingsViewProps } from "./WorkflowSettings";
@@ -46,6 +48,35 @@ export const DangerZone: Story = {
     await expect(
       within(canvasElement).getByRole("button", { name: "Delete workflow" })
     ).toBeInTheDocument();
+  },
+};
+
+/** Delivery: the channels scheduled runs post to, saved on their own (#2244). */
+export const Delivery: Story = {
+  args: {
+    section: "delivery",
+    delivery: {
+      channels: CHANNELS,
+      selected: [TEAMS_CHANNEL.guid],
+      recent: RECENT,
+      onSave: async () => true,
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("checkbox", { name: /Ops Teams channel/ })).toBeChecked();
+    await expect(canvas.getByRole("button", { name: "Save" })).toBeDisabled();
+  },
+};
+
+/** Without `workflow.update` the channels show, disabled. */
+export const DeliveryReadOnly: Story = {
+  args: {
+    section: "delivery",
+    readOnly: { permission: "workflow.update" },
+    onSave: undefined,
+    onDelete: undefined,
+    delivery: { channels: CHANNELS, selected: [TEAMS_CHANNEL.guid], recent: RECENT },
   },
 };
 

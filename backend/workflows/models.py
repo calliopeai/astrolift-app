@@ -700,6 +700,9 @@ class Workflow(BaseCoreModel):
     schedule_spec_hash = models.CharField(max_length=64, blank=True, default="", editable=False)
     trigger_ref = models.CharField(max_length=200, null=True, blank=True)
     is_enabled = models.BooleanField(default=True)
+    # Where a scheduled run's result card goes (#2244). Org admins configure
+    # the channels; workflow editors pick them here.
+    delivery_channels = models.ManyToManyField("DeliveryChannel", related_name="workflows", blank=True)
 
     # Slug is unique per org (not globally) — drop the legacy field-level
     # uniqueness inherited from BaseCoreModel.
@@ -966,3 +969,93 @@ class WorkflowStageExecution(BaseCoreModel):
 
     def __str__(self) -> str:
         return f"StageExecution {self.stage} run={self.workflow_run_id} [{self.status}]"
+
+
+class DeliveryChannel(DurableBaseCoreModel):
+    """An org's destination for scheduled workflow results (#2244).
+
+    The incoming webhook URL or Slack bot token is a credential: it lives in
+    the org secret store (``OrgSecret``) under :attr:`secret_key`, never in a
+    column of this row. Email recipients are addresses, not credentials, so
+    they stay on the row where an admin can read them back.
+    """
+
+    class Kind(models.TextChoices):
+        SLACK_WEBHOOK = "slack_webhook", "Slack incoming webhook"
+        SLACK_APP = "slack_app", "Slack app channel post"
+        TEAMS_WEBHOOK = "teams_webhook", "Microsoft Teams webhook"
+        EMAIL = "email", "Email"
+
+    organization = models.ForeignKey(
+        "astrolift_identity.Organization", related_name="delivery_channels", on_delete=models.CASCADE
+    )
+    name = models.CharField(max_length=120)
+    kind = models.CharField(max_length=16, choices=Kind.choices)
+    # Slack app posts only: the channel ID the bot posts to.
+    slack_channel = models.CharField(max_length=80, blank=True, default="")
+    email_recipients = models.JSONField(default=list, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "name"],
+                condition=models.Q(deleted_at__isnull=True),
+                name="delivery_channel_org_name_unique",
+            ),
+        ]
+
+    @property
+    def secret_key(self) -> str:
+        return f"astrolift/workflow-delivery/{self.guid}"
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.kind})"
+
+
+class WorkflowDelivery(DurableBaseCoreModel):
+    """The audit record of one result delivery to one target (#2244).
+
+    One row per (run, target): a retried activity finds the row and skips a
+    target already delivered or permanently failed, so a retry never posts
+    twice. ``last_error`` is a short reason, never a URL, token or address.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending"
+        RETRYING = "retrying"
+        DELIVERED = "delivered"
+        FAILED = "failed"
+
+    class Purpose(models.TextChoices):
+        RESULT = "result"
+        OWNER_NOTICE = "owner_notice"
+
+    organization = models.ForeignKey("astrolift_identity.Organization", on_delete=models.CASCADE)
+    workflow = models.ForeignKey(Workflow, related_name="deliveries", on_delete=models.PROTECT)
+    workflow_run = models.ForeignKey(
+        "astrolift_operations.WorkflowRun", related_name="deliveries", on_delete=models.PROTECT
+    )
+    channel = models.ForeignKey(
+        DeliveryChannel, related_name="deliveries", null=True, blank=True, on_delete=models.PROTECT
+    )
+    recipient_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    target_key = models.CharField(max_length=80)
+    purpose = models.CharField(max_length=16, choices=Purpose.choices, default=Purpose.RESULT)
+    run_outcome = models.CharField(max_length=16)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    last_error = models.CharField(max_length=255, blank=True, default="")
+    # Slack app posts: the message ``ts``, the thread parent for later runs.
+    external_ref = models.CharField(max_length=64, blank=True, default="")
+    delivered_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["workflow_run", "target_key"], name="workflow_delivery_target_unique"
+            ),
+        ]
+        indexes = [models.Index(fields=["workflow", "-created_at"], name="workflow_delivery_recent_idx")]
