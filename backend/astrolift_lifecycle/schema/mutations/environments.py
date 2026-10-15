@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 import strawberry
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from strawberry.types import Info
 
@@ -80,6 +80,11 @@ class EnvironmentMutations:
         )
         if app is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "app not found", field="appSlug")
+        if app.provisioning_status in (
+            RegisteredApp.ProvisioningStatus.TEARING_DOWN,
+            RegisteredApp.ProvisioningStatus.DEREGISTERED,
+        ):
+            return gql_failure(ErrorCode.PRECONDITION.value, "app is being deregistered", field="appSlug")
 
         name = (input.name or "").strip()
         if not _ENV_NAME.match(name):
@@ -151,6 +156,9 @@ class EnvironmentMutations:
                     )
                     with allow_project_attach(actor_may_attach_project_services(app)):
                         reconcile_managed_services(app, tuple(s for s in services if s.environment in live))
+        except IntegrityError:
+            # A concurrent create of the same name won the unique constraint.
+            return gql_failure(ErrorCode.CONFLICT.value, f"environment {name!r} already exists", field="name")
         except ValueError as exc:
             return gql_failure(ErrorCode.VALIDATION.value, str(exc))
 

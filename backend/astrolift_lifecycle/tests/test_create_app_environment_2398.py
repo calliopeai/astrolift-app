@@ -90,6 +90,35 @@ def test_refuses_a_name_the_app_already_has(placed):
     assert result.errors[0].code == "CONFLICT"
 
 
+def test_refuses_an_app_being_deregistered(placed):
+    placed.app.provisioning_status = "tearing_down"
+    placed.app.save(update_fields=["provisioning_status"])
+
+    result = _create(placed.org, app_slug=placed.app.slug, name="staging")
+
+    assert not result.ok
+    assert result.errors[0].code == "PRECONDITION"
+    assert not AppEnvironment.objects.filter(registered_app=placed.app, name="staging").exists()
+
+
+def test_a_concurrent_create_of_the_same_name_is_a_conflict(placed, monkeypatch):
+    """The exists() check can pass for two callers at once; the unique
+    constraint decides, and the loser gets CONFLICT rather than a 500."""
+    from django.db import IntegrityError
+
+    import astrolift_registry.schema.mutations.helpers as helpers
+
+    def _lost_race(*args, **kwargs):
+        raise IntegrityError("appenv_name_unique_active_per_app")
+
+    monkeypatch.setattr(helpers, "_place_app_environment", _lost_race)
+
+    result = _create(placed.org, app_slug=placed.app.slug, name="staging")
+
+    assert not result.ok
+    assert result.errors[0].code == "CONFLICT"
+
+
 @pytest.mark.parametrize("name", ["", "Staging", "has space", "-lead", "x" * 64, "preview-pr-1"])
 def test_refuses_names_that_cannot_be_an_environment(placed, name):
     result = _create(placed.org, app_slug=placed.app.slug, name=name)
