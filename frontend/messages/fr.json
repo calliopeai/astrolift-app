@@ -750,6 +750,27 @@
         "toastUriCopied": "URL de vérification copiée",
         "toastCopyFailed": "Copie impossible. Sélectionnez le texte et copiez-le manuellement.",
         "toastPayloadCopied": "Charge utile copiée"
+      },
+      "stepUpPin": {
+        "title": "Code PIN de vérification",
+        "description": "Un code PIN de 6 à 8 chiffres pour confirmer les actions sensibles, comme un déploiement en production, sans vous reconnecter.",
+        "badgeSet": "Défini",
+        "badgeLocked": "Verrouillé",
+        "pin": "Code PIN",
+        "newPin": "Nouveau code PIN",
+        "confirm": "Confirmer le code PIN",
+        "hint": "Pour définir ou modifier votre code PIN, vous devez d'abord vous reconnecter. Trop de codes erronés le verrouillent.",
+        "set": "Définir le code PIN",
+        "change": "Modifier le code PIN",
+        "clear": "Supprimer le code PIN",
+        "locked": "Verrouillé après trop d'essais erronés. Définissez un nouveau code PIN pour l'utiliser à nouveau.",
+        "orgDisallows": "Votre organisation n'autorise pas les codes PIN de vérification, celui-ci n'est donc pas utilisé.",
+        "errorFormat": "Utilisez 6 à 8 chiffres.",
+        "errorMismatch": "Les codes PIN ne correspondent pas.",
+        "toastSet": "Code PIN de vérification défini",
+        "toastChanged": "Code PIN de vérification modifié",
+        "toastCleared": "Code PIN de vérification supprimé",
+        "toastFailed": "Impossible de mettre à jour votre code PIN de vérification"
       }
     }
   },
@@ -5590,7 +5611,9 @@
           "label": "Masquer",
           "blurb": "N'afficher que les paramètres modifiables"
         }
-      }
+      },
+      "allowStepUpPin": "Autoriser la vérification par code PIN personnel",
+      "allowStepUpPinHint": "Les membres peuvent définir un code PIN de 6 à 8 chiffres et confirmer les actions sensibles avec lui au lieu de se reconnecter. Laissez désactivé si votre conformité exige le fournisseur d'identité pour chaque vérification."
     },
     "sections": {
       "houseTheme": "Thème maison",
@@ -5696,6 +5719,8 @@
     "description": "Intégrations facultatives pour cette organisation. Un admin de l'installation peut toujours en désactiver une pour toutes les organisations.",
     "loadError": "Impossible de charger les modules",
     "installOff": "Désactivé sur cette installation",
+    "licenceWithheld": "Non inclus dans la licence de cette installation",
+    "licenceTurnedOff": "Désactivé quand la licence ne l'incluait pas. Un administrateur de l'organisation peut le réactiver.",
     "enable": "Activer {module}",
     "disable": "Désactiver {module}",
     "enabledToast": "{module} activé",
@@ -5718,6 +5743,10 @@
         "label": "Application des politiques aux agents",
         "description": "Permet à Zentinelle d'appliquer des actions de politique aux agents et boxes de cette organisation."
       }
+    },
+    "errors": {
+      "MODULE_DISABLED_BY_INSTALL": "Ce module est désactivé sur cette installation. Contactez l'administrateur de l'installation.",
+      "MODULE_NOT_LICENSED": "Ce module n'est pas inclus dans la licence de cette installation."
     }
   },
   "actionSafety": {
@@ -6074,7 +6103,36 @@
     "grant": "Accorder",
     "allowed": "Autorisé",
     "notIncluded": "Non inclus",
-    "footer": "Pour en accorder une, attribuez son rôle dans <link>Attributions</link>."
+    "footer": "Pour en accorder une, attribuez son rôle dans <link>Attributions</link>.",
+    "approval": {
+      "title": "Exiger une approbation avant les déploiements",
+      "intro": "Active le réglage d'approbation des déploiements propre à une app : chaque déploiement attend que suffisamment de membres de l'équipe d'approbation l'approuvent.",
+      "loading": "Chargement…",
+      "loadError": "Impossible de lire les apps : {error}",
+      "retry": "Réessayer",
+      "noApps": "Cette organisation n'a encore aucune app.",
+      "app": "Application",
+      "pickApp": "Choisir une app",
+      "wholeApp": "Ce réglage s'applique à chaque déploiement de {app}, par toute personne qui peut la déployer, pas seulement aux personnes à qui vous donnez accès.",
+      "cannotChange": "Vous voyez ce réglage sans pouvoir le modifier : modifier les réglages de {app} demande l'autorisation de mettre à jour l'app.",
+      "legend": "Approbation des déploiements de {app}",
+      "require": "Exiger une approbation avant chaque déploiement",
+      "team": "Équipe d'approbation",
+      "pickTeam": "Choisir une équipe",
+      "quorum": "Approbations nécessaires",
+      "approvals": "{count, plural, one {# approbation} other {# approbations}}",
+      "replacesPeople": "Ses approbateurs sont aujourd'hui des personnes précises. Enregistrer avec une équipe les remplace.",
+      "approversNeed": "Les approbateurs ont aussi besoin de l'autorisation d'approuver les déploiements de cette app, par exemple avec le préréglage Approbateur.",
+      "save": "Enregistrer",
+      "saving": "Enregistrement…",
+      "saved": "Enregistré.",
+      "saveFailed": "Le réglage n'a pas pu être enregistré."
+    },
+    "models": {
+      "title": "Accès aux modèles",
+      "body": "Il n'existe pas de préréglage consommateur de modèles. Les apps qui peuvent se connecter à quels modèles, et si une connexion doit être approuvée, relèvent de la politique de connexion aux modèles de l'organisation.",
+      "link": "Ouvrir la politique de connexion aux modèles"
+    }
   },
   "adminRuns": {
     "title": "Exécutions",
@@ -6554,7 +6612,15 @@
     "errors": {
       "passwordRequired": "Le mot de passe est requis.",
       "generic": "Impossible de vérifier votre mot de passe. Réessayez.",
-      "network": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez."
+      "network": "Impossible de joindre le serveur. Vérifiez votre connexion et réessayez.",
+      "pinFormat": "Votre code PIN comporte 6 à 8 chiffres.",
+      "pinLocked": "Votre code PIN est verrouillé après trop d'essais erronés. Confirmez autrement, puis définissez un nouveau code PIN."
+    },
+    "pin": {
+      "label": "Code PIN de vérification",
+      "description": "Saisissez votre code PIN de vérification pour continuer.",
+      "useSso": "Utiliser l'authentification unique",
+      "usePassword": "Utiliser votre mot de passe"
     }
   },
   "pageShell": {
@@ -8445,6 +8511,16 @@
           "roles": "Rôles",
           "policies": "Politiques",
           "check": "Vérifier l’accès"
+        },
+        "policies": {
+          "heading": "Politiques",
+          "none": "Aucune politique ni aucun réglage de l'app ne retient ou n'empêche ce que cela accorde.",
+          "appSetting": "Approbation des déploiements de cette app",
+          "outcome": {
+            "APPROVAL_REQUIRED": "Approbation requise",
+            "DENIED": "Refusé par une politique",
+            "MAY_DENY": "Peut être refusé par une politique"
+          }
         }
       },
       "legacyGrantRole": {

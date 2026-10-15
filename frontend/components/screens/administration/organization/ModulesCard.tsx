@@ -69,8 +69,12 @@ function ModuleRow({
 }) {
   // Install-wide kill switch (#1859) — off forces the module off for every
   // organization, regardless of what this org's own row says.
-  const { installAllowed, enabled } = item;
-  const disabled = pending || permsLoading || !canManage || !installAllowed;
+  // A licence that withholds the module (#1879) also keeps it off; one the
+  // licence turned off stays off once granted again, until an org admin
+  // turns it back on.
+  const { installAllowed, licensed, enabled } = item;
+  const disabled = pending || permsLoading || !canManage || !installAllowed || !licensed;
+  const licenceTurnedOff = licensed && !enabled && item.source === "licence";
   const t = useTranslations("adminModules");
 
   return (
@@ -81,6 +85,12 @@ function ModuleRow({
           {item.description}
         </p>
         {!installAllowed && <p className="text-muted-foreground mt-1 text-xs">{t("installOff")}</p>}
+        {installAllowed && !licensed && (
+          <p className="text-muted-foreground mt-1 text-xs">{t("licenceWithheld")}</p>
+        )}
+        {installAllowed && licenceTurnedOff && (
+          <p className="text-muted-foreground mt-1 text-xs">{t("licenceTurnedOff")}</p>
+        )}
       </div>
       <ModuleToggle
         checked={enabled}

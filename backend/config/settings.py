@@ -509,6 +509,12 @@ CLIENT_COVE_SUPPORT_URL = os.environ.get("CLIENT_COVE_SUPPORT_URL", "").rstrip("
 CLIENT_COVE_SUPPORT_API_KEY = os.environ.get("CLIENT_COVE_SUPPORT_API_KEY", "")
 # This install's deployment in Client Cove; support cases are filed against it (#1809).
 CLIENT_COVE_DEPLOYMENT_ID = os.environ.get("CLIENT_COVE_DEPLOYMENT_ID", "")
+# The signed licence the deployment agent pulls from Client Cove and its RS256
+# verification key, under the names the Workbench hub reads them by, so one
+# agent write shape serves both. Only the per-org modules are read from it
+# (astrolift_identity.licence, #1879); empty means the licence has no say.
+CALLIOPE_LICENSE = os.environ.get("CALLIOPE_OFFLINE_LICENSE", "").strip()
+CALLIOPE_LICENSE_PUBLIC_KEY = os.environ.get("CALLIOPE_LICENSE_PUBLIC_KEY", "").strip()
 
 AGENT_RUNTIME_CLASS = env_str("AGENT_RUNTIME_CLASS", "")
 

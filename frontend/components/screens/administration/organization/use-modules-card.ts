@@ -52,7 +52,14 @@ export interface ModuleItem {
   enabled: boolean;
   /** Install-wide kill switch (#1859): false forces the module off for every org. */
   installAllowed: boolean;
+  /** False when the install's signed licence withholds the module (#1879). */
+  licensed: boolean;
+  /** Who last switched it: "org_admin", "licence" or null when never switched. */
+  source: string | null;
 }
+
+// Refusal codes from setOrganizationModule the card has its own words for.
+const REFUSAL_CODES = ["MODULE_DISABLED_BY_INSTALL", "MODULE_NOT_LICENSED"] as const;
 
 /** The server half of ModulesCard: entitlements, the install gate and the toggle. */
 export function useModulesCard() {
@@ -89,7 +96,11 @@ export function useModulesCard() {
       });
       const result = data?.setOrganizationModule;
       if (!result?.ok) {
-        throw new Error(result?.errors?.[0]?.message ?? t("updateError"));
+        const code = result?.errors?.[0]?.code;
+        const known = REFUSAL_CODES.find((c) => c === code);
+        throw new Error(
+          known ? t(`errors.${known}`) : (result?.errors?.[0]?.message ?? t("updateError"))
+        );
       }
       toast.success(
         t(next ? "enabledToast" : "disabledToast", { module: t(`items.${config.key}.label`) })
@@ -108,6 +119,8 @@ export function useModulesCard() {
     description: t(`items.${config.key}.description`),
     enabled: modules.get(config.key)?.enabled ?? false,
     installAllowed: installAllowed[i],
+    licensed: modules.get(config.key)?.licensed ?? true,
+    source: modules.get(config.key)?.source ?? null,
   }));
 
   return {

@@ -7,6 +7,9 @@ the install admin can still force it off everywhere (see
 ``astrolift_identity.org_modules``, which is the only reader).
 
 No row means the org never turned the module on, so it is off.
+
+``source`` records who made the last change, the org admin or the install's
+signed licence (#1879), so the admin UI can explain why a module moved.
 """
 
 from __future__ import annotations
@@ -23,6 +26,10 @@ class OrganizationModule(BaseCoreModel):
         AGENT_POLICY_ENFORCEMENT = "agent_policy_enforcement"
         CHAT_STUDIO_AGENT_RUNS = "chat_studio_agent_runs"
 
+    class Source(models.TextChoices):
+        ORG_ADMIN = "org_admin"
+        LICENCE = "licence"
+
     organization = models.ForeignKey(
         "astrolift_identity.Organization",
         related_name="module_flags",
@@ -30,6 +37,7 @@ class OrganizationModule(BaseCoreModel):
     )
     key = models.CharField(max_length=64, choices=Key.choices)
     enabled = models.BooleanField(default=False)
+    source = models.CharField(max_length=16, choices=Source.choices, db_default=Source.ORG_ADMIN)
 
     class Meta:
         constraints = [

@@ -3210,6 +3210,11 @@ type AstroliftGrantPreview {
   allowed: Boolean!
   refusal: String
   notes: [String!]!
+
+  """
+  Saved policies and app settings that hold or stop what the draft grants.
+  """
+  policies: [AstroliftGrantPreviewPolicy!]!
 }
 
 type AstroliftGrantPreviewGroup {
@@ -3254,6 +3259,24 @@ type AstroliftGrantPreviewPerson {
   Their other grants that carry permissions in play, excluding the one being changed.
   """
   via: [AstroliftGrantPreviewSource!]!
+}
+
+type AstroliftGrantPreviewPolicy {
+  """APPROVAL_REQUIRED, DENIED or MAY_DENY."""
+  outcome: String!
+
+  """POLICY, or APP_SETTING for the app's deploy-approval setting."""
+  source: String!
+  policyId: GUID
+  policySlug: String
+  policyName: String
+
+  """The drafted permissions it applies to."""
+  permissions: [String!]!
+
+  """How many of the people reached it applies to."""
+  peopleCount: Int!
+  detail: String!
 }
 
 type AstroliftGrantPreviewSource {
@@ -3990,9 +4013,19 @@ type AstroliftModuleEntitlement {
   canRun: Boolean!
 
   """
-  Whether the module is switched on for the active organization. Always true for apps, agents, workflows and admin. For the per-org modules (chat_studio_integration, agent_live_attach, chat_studio_agent_runs) it is true only when an org admin turned the module on and the install has not forced it off. Independent of the can* fields.
+  Whether the module is switched on for the active organization. Always true for apps, agents, workflows and admin. For the per-org modules (chat_studio_integration, agent_live_attach, chat_studio_agent_runs) it is true only when an org admin turned the module on, the install has not forced it off and the licence does not withhold it. Independent of the can* fields.
   """
   enabled: Boolean!
+
+  """
+  False when the install's signed licence withholds this per-org module: it is off for every organization and an org admin cannot turn it on. A licence that grants a module only allows it; it never turns one on. Always true for the install-wide modules and when the licence has no say.
+  """
+  licensed: Boolean!
+
+  """
+  Who last switched this per-org module for the active organization: ``org_admin`` or ``licence`` (the licence turned it off by withholding it). Null when the org has never switched it, and for the install-wide modules.
+  """
+  source: String
 }
 
 type AstroliftMyConnectedAccount {
@@ -4135,6 +4168,7 @@ type AstroliftOrganization {
   metricsRollupRetentionDaysDefault: Int!
   traceRetentionDaysDefault: Int!
   allowUserProfileEdit: Boolean!
+  allowStepUpPin: Boolean!
   defaultResourceTags: JSON!
   managedServiceIsolationPolicy: JSON!
   appearanceDefault: JSON!
@@ -5843,6 +5877,29 @@ type AstroliftStepRunPage {
 
   """Rows per page on a numbered page; null on a cursor page."""
   pageSize: Int
+}
+
+type AstroliftStepUpPinSetPayload {
+  replaced: Boolean!
+  status: AstroliftStepUpPinStatus!
+}
+
+type AstroliftStepUpPinSetPayloadMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftStepUpPinSetPayload
+}
+
+type AstroliftStepUpPinStatus {
+  orgAllows: Boolean!
+  isSet: Boolean!
+  locked: Boolean!
+}
+
+type AstroliftStepUpPinStatusMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftStepUpPinStatus
 }
 
 type AstroliftTaskRun {
@@ -9481,7 +9538,7 @@ type Mutation {
   removeOrganizationAllowlistDomain(input: RemoveOrganizationAllowlistDomainInput!): SoftdeletepayloadMutationResult!
 
   """
-  Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with PRECONDITION; turning one off always succeeds.
+  Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with MODULE_DISABLED_BY_INSTALL, and one the install's licence withholds with MODULE_NOT_LICENSED; turning one off always succeeds.
   """
   setOrganizationModule(input: SetOrganizationModuleInput!): AstroliftOrganizationModuleMutationResult!
   createApiToken(input: CreateApiTokenInput!): AstroliftApiTokenPlaintextMutationResult!
@@ -9502,6 +9559,8 @@ type Mutation {
   heartbeatSession: AstroliftHeartbeatSessionPayloadMutationResult!
   elevateAdminSession(input: ElevateAdminSessionInput!): AstroliftElevatePayloadMutationResult!
   deelevateAdminSession: AstroliftDeelevatePayloadMutationResult!
+  setStepUpPin(input: SetStepUpPinInput!): AstroliftStepUpPinSetPayloadMutationResult!
+  clearStepUpPin: AstroliftStepUpPinStatusMutationResult!
   requestAttestationChallenge(input: RequestAttestationChallengeInput!): AstroliftAttestationChallengePayloadMutationResult!
   attestSession(input: AttestSessionInput!): AstroliftAttestationResultMutationResult!
   assertSession(input: AssertSessionInput!): AstroliftAttestationResultMutationResult!
@@ -9574,6 +9633,12 @@ type Mutation {
   setZentinelleGatewayEnabled(input: SetZentinelleGatewayEnabledInput!): AstroliftZentinelleClusterGatewayMutationResult!
   rotateZentinelleGatewayCredential(input: RotateZentinelleGatewayCredentialInput!): AstroliftZentinelleClusterGatewayMutationResult!
   unregisterZentinelleCluster(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
+  connectZentinelleInstall(input: ConnectZentinelleInput!): AstroliftZentinelleConnectionMutationResult!
+  setZentinelleInstallGatewayUrl(input: SetZentinelleGatewayUrlInput!): AstroliftZentinelleConnectionMutationResult!
+  disconnectZentinelleInstall(input: DisconnectZentinelleInput!): AstroliftZentinelleDisconnectMutationResult!
+  registerZentinelleSharedCluster(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
+  moveZentinelleSharedClusterToInstall(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
+  unregisterZentinelleSharedCluster(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
   registerTenantCluster(input: RegisterTenantClusterInput!): AstroliftTenantClusterMutationResult!
   issueClusterAgentKey(input: IssueClusterAgentKeyInput!): ClusteragentkeyissuedpayloadMutationResult!
   deployClusterAgent(input: DeployClusterAgentInput!): AstroliftTenantClusterMutationResult!
@@ -10470,6 +10535,7 @@ type Query {
   astroliftAccessRevision: String!
   astroliftActiveIdentityProvider: AstroliftIdentityProvider
   astroliftActiveSessions: [AstroliftActiveSession!]!
+  myStepUpPin: AstroliftStepUpPinStatus
   astroliftElevationStatus: AstroliftElevationStatus!
   installAlertMailSupport(eventKind: String! = "deploy.failed"): InstallAlertMailSupport!
   installAlertMailTestsPage(eventKind: String! = "deploy.failed", after: String = null, limit: Int! = 25): InstallAlertMailTestPage!
@@ -10495,6 +10561,7 @@ type Query {
   astroliftAuditRetention: AstroliftAuditRetention!
   astroliftObservabilityRetention: [ObservabilityRetentionType!]!
   astroliftZentinelleConnection: AstroliftZentinelleConnection
+  astroliftZentinelleInstallConnection: AstroliftZentinelleConnection
   astroliftWorkflowRuns(limit: Int! = 50): [AstroliftWorkflowRun!]!
   astroliftWebhookSubscriptions(appSlug: String = null): [AstroliftWebhookSubscription!]! @deprecated(reason: "Caps at 200 rows with no way to reach the 201st. Use astroliftWebhookSubscriptionsPage.")
   astroliftWebhookSubscriptionsPage(appSlug: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftWebhookSubscriptionPage!
@@ -11548,6 +11615,10 @@ input SetRetentionPolicyInput {
   retentionDays: Int!
 }
 
+input SetStepUpPinInput {
+  pin: String!
+}
+
 input SetZentinelleGatewayEnabledInput {
   clusterId: GUID!
   enabled: Boolean!
@@ -11986,6 +12057,7 @@ input UpdateOrganizationInput {
   metricsRollupRetentionDaysDefault: Int = null
   traceRetentionDaysDefault: Int = null
   allowUserProfileEdit: Boolean = null
+  allowStepUpPin: Boolean = null
   defaultResourceTags: JSON = null
   managedServiceIsolationPolicy: JSON = null
   appearanceDefault: JSON = null

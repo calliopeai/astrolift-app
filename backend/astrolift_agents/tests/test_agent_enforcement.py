@@ -148,6 +148,35 @@ def test_bad_delivery_never_claims_or_controls_a_target(governed, change):
     assert not AgentTaskInputMessage.objects.exists()
 
 
+@pytest.mark.parametrize("owner", ["install", "other-org"])
+def test_a_shared_cluster_is_inside_the_install_only_behind_the_install_gateway(governed, owner):
+    """A shared cluster's gateway is the install connection's (#1905): the
+    organization's runs there are still its own. Another organization's
+    gateway on it is not."""
+    from astrolift_clusters.models import TenantCluster
+    from astrolift_identity.models import Organization
+
+    secret = encrypt_at_rest(("sk_astroinst_" + "b" * 48).encode())
+    gateway_owner = (
+        None if owner == "install" else Organization.objects.create(name="Globex", slug="globex-policy")
+    )
+    other = ZentinelleConnection.objects.create(
+        organization=gateway_owner,
+        base_url="https://zentinelle.invalid",
+        zentinelle_install_id=str(uuid.uuid4()),
+        credential_backend_kind=secret.backend_kind,
+        credential_ciphertext=secret.backend_ref,
+    )
+    TenantCluster.objects.filter(pk=governed.cluster.pk).update(organization=None)
+    ZentinelleClusterGateway.objects.filter(cluster=governed.cluster).update(connection=other)
+
+    if owner == "install":
+        assert apply(governed, body(governed))["status"]
+    else:
+        with pytest.raises(policy.AgentEnforcementError, match="outside the install"):
+            apply(governed, body(governed))
+
+
 def test_stable_action_and_fresh_nonce_repair_receipts_without_repeating_controls(governed):
     value = body(governed, action="steer")
     assert apply(governed, value)["applied_action"] == "steer"

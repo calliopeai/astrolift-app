@@ -750,6 +750,27 @@
         "toastUriCopied": "URL de verificación copiada",
         "toastCopyFailed": "No se pudo copiar. Selecciona el texto y cópialo manualmente.",
         "toastPayloadCopied": "Carga útil copiada"
+      },
+      "stepUpPin": {
+        "title": "PIN de verificación",
+        "description": "Un PIN de 6 a 8 dígitos para confirmar acciones sensibles, como un despliegue a producción, sin volver a iniciar sesión.",
+        "badgeSet": "Definido",
+        "badgeLocked": "Bloqueado",
+        "pin": "PIN",
+        "newPin": "PIN nuevo",
+        "confirm": "Confirmar PIN",
+        "hint": "Para definir o cambiar tu PIN primero debes volver a iniciar sesión. Demasiados PIN incorrectos lo bloquean.",
+        "set": "Definir PIN",
+        "change": "Cambiar PIN",
+        "clear": "Quitar PIN",
+        "locked": "Bloqueado tras demasiados intentos fallidos. Define un PIN nuevo para volver a usarlo.",
+        "orgDisallows": "Tu organización no permite PIN de verificación, así que este no se usa.",
+        "errorFormat": "Usa de 6 a 8 dígitos.",
+        "errorMismatch": "Los PIN no coinciden.",
+        "toastSet": "PIN de verificación definido",
+        "toastChanged": "PIN de verificación cambiado",
+        "toastCleared": "PIN de verificación quitado",
+        "toastFailed": "No se pudo actualizar tu PIN de verificación"
       }
     }
   },
@@ -5590,7 +5611,9 @@
           "label": "Ocultar",
           "blurb": "Mostrar solo los ajustes que puedes cambiar"
         }
-      }
+      },
+      "allowStepUpPin": "Permitir verificación con un PIN personal",
+      "allowStepUpPinHint": "Los miembros pueden definir un PIN de 6 a 8 dígitos y confirmar acciones sensibles con él en lugar de volver a iniciar sesión. Déjalo desactivado si tu cumplimiento normativo exige el proveedor de identidad en cada verificación."
     },
     "sections": {
       "houseTheme": "Tema de la casa",
@@ -5696,6 +5719,8 @@
     "description": "Integraciones opcionales para esta organización. Un admin de la instalación puede desactivar cualquiera para todas las organizaciones.",
     "loadError": "No se pudieron cargar los módulos",
     "installOff": "Desactivado en esta instalación",
+    "licenceWithheld": "No incluido en la licencia de esta instalación",
+    "licenceTurnedOff": "Se desactivó cuando la licencia no lo incluía. Un administrador de la organización puede volver a activarlo.",
     "enable": "Activar {module}",
     "disable": "Desactivar {module}",
     "enabledToast": "{module} activado",
@@ -5718,6 +5743,10 @@
         "label": "Aplicación de políticas a agentes",
         "description": "Permite que Zentinelle aplique acciones de política a los agentes y boxes de esta organización."
       }
+    },
+    "errors": {
+      "MODULE_DISABLED_BY_INSTALL": "Este módulo está desactivado en esta instalación. Consulta al administrador de la instalación.",
+      "MODULE_NOT_LICENSED": "Este módulo no está incluido en la licencia de esta instalación."
     }
   },
   "actionSafety": {
@@ -6074,7 +6103,36 @@
     "grant": "Conceder",
     "allowed": "Permitido",
     "notIncluded": "No incluido",
-    "footer": "Para conceder una, asigna su rol en <link>Asignaciones</link>."
+    "footer": "Para conceder una, asigna su rol en <link>Asignaciones</link>.",
+    "approval": {
+      "title": "Exigir aprobación antes de desplegar",
+      "intro": "Activa la aprobación de despliegues propia de una app: cada despliegue espera hasta que suficientes personas del equipo aprobador lo aprueben.",
+      "loading": "Cargando…",
+      "loadError": "No se pudieron leer las apps: {error}",
+      "retry": "Reintentar",
+      "noApps": "Esta organización aún no tiene apps.",
+      "app": "Aplicación",
+      "pickApp": "Elige una app",
+      "wholeApp": "Este ajuste se aplica a cada despliegue de {app}, por cualquiera que pueda desplegarla, no solo a las personas a las que concedes acceso.",
+      "cannotChange": "Puedes ver este ajuste pero no cambiarlo: cambiar los ajustes de {app} requiere permiso para actualizar la app.",
+      "legend": "Aprobación de despliegues de {app}",
+      "require": "Exigir aprobación antes de cada despliegue",
+      "team": "Equipo aprobador",
+      "pickTeam": "Elige un equipo",
+      "quorum": "Aprobaciones necesarias",
+      "approvals": "{count, plural, one {# aprobación} other {# aprobaciones}}",
+      "replacesPeople": "Hoy sus aprobadores son personas concretas. Guardar con un equipo las reemplaza.",
+      "approversNeed": "Los aprobadores también necesitan permiso para aprobar despliegues en esta app, por ejemplo el preajuste Aprobador.",
+      "save": "Guardar",
+      "saving": "Guardando…",
+      "saved": "Guardado.",
+      "saveFailed": "No se pudo guardar el ajuste."
+    },
+    "models": {
+      "title": "Acceso a modelos",
+      "body": "No hay un preajuste de consumidor de modelos. Qué apps pueden conectarse a qué modelos, y si una conexión necesita aprobación, lo define la política de conexión de modelos de la organización.",
+      "link": "Abrir la política de conexión de modelos"
+    }
   },
   "adminRuns": {
     "title": "Ejecuciones",
@@ -6554,7 +6612,15 @@
     "errors": {
       "passwordRequired": "La contraseña es obligatoria.",
       "generic": "No se pudo confirmar tu contraseña. Inténtalo de nuevo.",
-      "network": "No se pudo contactar al servidor. Revisa tu conexión e inténtalo de nuevo."
+      "network": "No se pudo contactar al servidor. Revisa tu conexión e inténtalo de nuevo.",
+      "pinFormat": "Tu PIN tiene de 6 a 8 dígitos.",
+      "pinLocked": "Tu PIN se bloqueó tras demasiados intentos fallidos. Confirma de otra forma y luego define un PIN nuevo."
+    },
+    "pin": {
+      "label": "PIN de verificación",
+      "description": "Introduce tu PIN de verificación para continuar.",
+      "useSso": "Usar inicio de sesión único",
+      "usePassword": "Usar tu contraseña"
     }
   },
   "pageShell": {
@@ -8445,6 +8511,16 @@
           "roles": "Roles",
           "policies": "Políticas",
           "check": "Comprobar acceso"
+        },
+        "policies": {
+          "heading": "Políticas",
+          "none": "Ninguna política ni ajuste de la app retiene o impide lo que esto concede.",
+          "appSetting": "Aprobación de despliegues de esta app",
+          "outcome": {
+            "APPROVAL_REQUIRED": "Requiere aprobación",
+            "DENIED": "Denegado por política",
+            "MAY_DENY": "Puede denegarlo una política"
+          }
         }
       },
       "legacyGrantRole": {

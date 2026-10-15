@@ -5,6 +5,7 @@ import { routeTitle } from "@/lib/i18n/route-title";
 
 import { PairDeviceCard } from "./pair-device-card";
 import { SecuritySettingsClient } from "./security-settings-client";
+import { StepUpPinCard } from "./step-up-pin-card";
 
 export const generateMetadata = routeTitle("security", "settings");
 
@@ -16,6 +17,7 @@ export default function SecuritySettingsPage() {
           <SecuritySettingsClient />
         </PreloadQuery>
       }
+      stepUpPin={<StepUpPinCard />}
       pairDevice={<PairDeviceCard />}
     />
   );

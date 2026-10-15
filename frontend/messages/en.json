@@ -693,6 +693,27 @@
         "toastUriCopied": "Verification URL copied",
         "toastCopyFailed": "Could not copy. Select the text and copy manually.",
         "toastPayloadCopied": "Payload copied"
+      },
+      "stepUpPin": {
+        "title": "Step-up PIN",
+        "description": "A 6 to 8 digit PIN for confirming sensitive actions, such as a production deploy, without signing in again.",
+        "badgeSet": "Set",
+        "badgeLocked": "Locked",
+        "pin": "PIN",
+        "newPin": "New PIN",
+        "confirm": "Confirm PIN",
+        "hint": "Setting or changing your PIN asks you to sign in again first. Too many wrong PINs lock it.",
+        "set": "Set PIN",
+        "change": "Change PIN",
+        "clear": "Clear PIN",
+        "locked": "Locked after too many wrong attempts. Set a new PIN to use it again.",
+        "orgDisallows": "Your organization does not allow step-up PINs, so this one is not used.",
+        "errorFormat": "Use 6 to 8 digits.",
+        "errorMismatch": "The PINs do not match.",
+        "toastSet": "Step-up PIN set",
+        "toastChanged": "Step-up PIN changed",
+        "toastCleared": "Step-up PIN cleared",
+        "toastFailed": "Could not update your step-up PIN"
       }
     }
   },
@@ -5533,7 +5554,9 @@
           "label": "Hide",
           "blurb": "Only show settings you can change"
         }
-      }
+      },
+      "allowStepUpPin": "Allow step-up with a personal PIN",
+      "allowStepUpPinHint": "Members can set a 6 to 8 digit PIN and confirm sensitive actions with it instead of signing in again. Leave this off if your compliance posture requires the identity provider for every step-up."
     },
     "sections": {
       "houseTheme": "House theme",
@@ -5639,6 +5662,8 @@
     "description": "Optional integrations for this organization. An install admin can still force one off for every organization.",
     "loadError": "Could not load modules",
     "installOff": "Turned off on this install",
+    "licenceWithheld": "Not included in this install's license",
+    "licenceTurnedOff": "Turned off when the license withheld it. An org admin can turn it back on.",
     "enable": "Enable {module}",
     "disable": "Disable {module}",
     "enabledToast": "{module} enabled",
@@ -5661,6 +5686,10 @@
         "label": "Agent policy enforcement",
         "description": "Lets Zentinelle apply policy actions to this organization's agents and boxes."
       }
+    },
+    "errors": {
+      "MODULE_DISABLED_BY_INSTALL": "This module is turned off on this install. Ask the install admin.",
+      "MODULE_NOT_LICENSED": "This module is not included in this install's license."
     }
   },
   "actionSafety": {
@@ -6017,7 +6046,36 @@
     "grant": "Grant",
     "allowed": "Allowed",
     "notIncluded": "Not included",
-    "footer": "To grant one, assign its role under <link>Assignments</link>."
+    "footer": "To grant one, assign its role under <link>Assignments</link>.",
+    "approval": {
+      "title": "Require approval before deploys",
+      "intro": "Turns on an app's own deploy-approval setting: each deploy waits until enough people on the approver team approve it.",
+      "loading": "Loading…",
+      "loadError": "The apps could not be read: {error}",
+      "retry": "Retry",
+      "noApps": "This organization has no apps yet.",
+      "app": "App",
+      "pickApp": "Pick an app",
+      "wholeApp": "This setting applies to every deploy of {app}, by anyone who can deploy it, not only to the people you grant access to.",
+      "cannotChange": "You can see this setting but not change it: changing {app}'s settings needs permission to update the app.",
+      "legend": "Deploy approval for {app}",
+      "require": "Require approval before each deploy",
+      "team": "Approver team",
+      "pickTeam": "Pick a team",
+      "quorum": "Approvals needed",
+      "approvals": "{count, plural, one {# approval} other {# approvals}}",
+      "replacesPeople": "Its approvers are specific people today. Saving with a team replaces them.",
+      "approversNeed": "Approvers also need permission to approve deploys on this app, for example the Approver preset.",
+      "save": "Save",
+      "saving": "Saving…",
+      "saved": "Saved.",
+      "saveFailed": "The setting could not be saved."
+    },
+    "models": {
+      "title": "Model access",
+      "body": "There is no model consumer preset. Which apps may connect to which models, and whether a connection needs approval, is set by the organization's model connection policy.",
+      "link": "Open the model connection policy"
+    }
   },
   "adminRuns": {
     "title": "Runs",
@@ -6553,10 +6611,18 @@
     "errors": {
       "passwordRequired": "Password is required.",
       "generic": "Verification failed. Try again.",
-      "network": "Couldn't reach the server. Try again."
+      "network": "Couldn't reach the server. Try again.",
+      "pinFormat": "Your PIN is 6 to 8 digits.",
+      "pinLocked": "Your PIN is locked after too many wrong attempts. Confirm another way, then set a new PIN."
     },
     "indicator": "Admin elevated for {minutes, plural, one {# more minute} other {# more minutes}}",
-    "deelevateLabel": "End admin elevation now"
+    "deelevateLabel": "End admin elevation now",
+    "pin": {
+      "label": "Step-up PIN",
+      "description": "Enter your step-up PIN to continue.",
+      "useSso": "Use single sign-on instead",
+      "usePassword": "Use your password instead"
+    }
   },
   "elevation": {
     "active": "Admin elevated",
@@ -8442,6 +8508,16 @@
           "roles": "Roles",
           "policies": "Policies",
           "check": "Check access"
+        },
+        "policies": {
+          "heading": "Policies",
+          "none": "No policy or app setting holds or stops what this grants.",
+          "appSetting": "This app's deploy-approval setting",
+          "outcome": {
+            "APPROVAL_REQUIRED": "Approval required",
+            "DENIED": "Denied by policy",
+            "MAY_DENY": "May be denied by policy"
+          }
         }
       },
       "legacyGrantRole": {

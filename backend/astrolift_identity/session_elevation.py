@@ -64,8 +64,11 @@ METHOD_MAGIC_LINK = "magic_link"
 # in KNOWN_METHODS so the elevation row + audit + status query
 # surface ``sso`` consistently with the password / webauthn paths.
 METHOD_SSO = "sso"
+# #2399: a per-user PIN, checked by ``astrolift_identity.step_up_pin``
+# and only when the org allows it.
+METHOD_PIN = "pin"
 KNOWN_METHODS: frozenset[str] = frozenset(
-    {METHOD_PASSWORD, METHOD_OTP, METHOD_WEBAUTHN, METHOD_MAGIC_LINK, METHOD_SSO}
+    {METHOD_PASSWORD, METHOD_OTP, METHOD_WEBAUTHN, METHOD_MAGIC_LINK, METHOD_SSO, METHOD_PIN}
 )
 
 # Default fallback when Constance is unreachable (test settings that
@@ -158,12 +161,27 @@ def get_status(session: Any, *, now: dt.datetime | None = None) -> ElevationStat
     remaining = int((parsed - now).total_seconds())
     if remaining <= 0:
         return ElevationStatus(elevated=False, elevated_until=parsed, method=method, seconds_remaining=0)
+    if method == METHOD_PIN and not _pin_allowed_for_tenant():
+        # Elevation is session-wide but the PIN opt-in is per org (#2399):
+        # a PIN step-up taken under one org must not count in an org that
+        # forbids PINs, nor after the org turns them off.
+        return ElevationStatus(elevated=False, elevated_until=parsed, method=method, seconds_remaining=0)
     return ElevationStatus(
         elevated=True,
         elevated_until=parsed,
         method=method if method in KNOWN_METHODS else None,
         seconds_remaining=remaining,
     )
+
+
+def _pin_allowed_for_tenant() -> bool:
+    from astrolift_identity.step_up_pin import org_allows_pin
+
+    try:
+        return org_allows_pin()
+    except Exception:  # noqa: BLE001 -- fail closed: the PIN elevation does not count
+        log.exception("could not read the org PIN policy; treating a PIN elevation as lapsed")
+        return False
 
 
 def is_elevated(session: Any, *, now: dt.datetime | None = None) -> bool:

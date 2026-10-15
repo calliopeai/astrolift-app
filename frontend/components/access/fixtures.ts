@@ -469,6 +469,47 @@ export const PREVIEW_REFUSED: GrantPreview = {
   refusal: "You cannot grant app.rollback: you do not hold it on app checkout.",
 };
 
+/** The saved policies and the app's deploy-approval setting that hold or stop it (#2272). */
+export const PREVIEW_POLICIES: GrantPreview = {
+  ...PREVIEW,
+  policies: [
+    {
+      outcome: "DENIED",
+      source: "POLICY",
+      policyId: "pol-freeze",
+      policySlug: "release-freeze",
+      policyName: "Release freeze",
+      permissions: ["app.deploy", "app.rollback"],
+      peopleCount: 2,
+      detail: "policy release-freeze denies app.deploy",
+    },
+    {
+      outcome: "MAY_DENY",
+      source: "POLICY",
+      policyId: "pol-office",
+      policySlug: "office-network",
+      policyName: "Office network only",
+      permissions: ["app.deploy"],
+      peopleCount: 2,
+      detail:
+        "policy office-network allows only when its conditions hold, and a condition cannot be evaluated, so it denies (ip_allowlist: this request carries no client IP)",
+    },
+    {
+      outcome: "APPROVAL_REQUIRED",
+      source: "APP_SETTING",
+      policyId: null,
+      policySlug: null,
+      policyName: null,
+      permissions: ["app.deploy"],
+      peopleCount: 2,
+      detail: "Deploys of this app wait for 2 approvals (the app's deploy-approval setting).",
+    },
+  ],
+};
+
+/** No saved policy or app setting holds or stops it. */
+export const PREVIEW_NO_POLICIES: GrantPreview = { ...PREVIEW, policies: [] };
+
 // ---------------------------------------------------------------------------
 // Policy condition catalog and simulation
 // ---------------------------------------------------------------------------

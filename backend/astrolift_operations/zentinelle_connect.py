@@ -22,6 +22,12 @@ goes from Zentinelle's answer into the ``zentinelle-gateway-credential``
 Secret and nowhere else: not the database, a log line, an audit row, an
 error message or a GraphQL payload.
 
+Shared clusters (no organization) register through the install connection
+(no organization either), which only the platform operator connects (#1905).
+A shared cluster an organization registered before that stays on the
+organization's connection until the operator moves it
+(``move_to_install``); nothing moves it on its own.
+
 The gateway runs as Deployment + Service ``zentinelle-gateway`` in
 ``astrolift-system``, applied through the cluster driver the same way as the
 keep-alive agent, and only while ``ZENTINELLE_GATEWAY_ENABLED`` is on.
@@ -273,13 +279,14 @@ def _refused(reply: _Reply, action: str) -> ZentinelleConnectError:
 
 
 def _not_connected(connection: ZentinelleConnection) -> ZentinelleConnectError:
+    owner = "the install" if connection.is_install else "this organization"
     if connection.status == ZentinelleConnection.Status.REVOKED:
         return ZentinelleConnectError(
             ErrorCode.PRECONDITION,
-            "Zentinelle no longer accepts this organization's install credential (the install was "
+            f"Zentinelle no longer accepts {owner}'s install credential (the install was "
             "disconnected in Zentinelle). Disconnect, then connect again with a new enrollment code.",
         )
-    return ZentinelleConnectError(ErrorCode.PRECONDITION, "this organization is not connected to Zentinelle")
+    return ZentinelleConnectError(ErrorCode.PRECONDITION, f"{owner} is not connected to Zentinelle")
 
 
 def _require_connected(connection: ZentinelleConnection) -> None:
@@ -595,7 +602,8 @@ def _deploy(gateway: ZentinelleClusterGateway) -> None:
 def connect(
     *, organization, url: str, code: str, install_url: str, gateway_url: str = "", actor=None
 ) -> ZentinelleConnection:
-    """Exchange an enrollment code for this organization's install credential."""
+    """Exchange an enrollment code for this organization's install credential,
+    or with ``organization`` None, the install connection's (#1905)."""
     base_url = normalize_base_url(url)
     gateway_url = normalize_gateway_url(gateway_url)
     code = (code or "").strip()
@@ -606,12 +614,14 @@ def connect(
             field="enrollmentCode",
         )
     if ZentinelleConnection.objects.filter(organization=organization).exists():
+        owner = "the install" if organization is None else "this organization"
         raise ZentinelleConnectError(
-            ErrorCode.CONFLICT, "this organization already has a Zentinelle connection; disconnect it first"
+            ErrorCode.CONFLICT, f"{owner} already has a Zentinelle connection; disconnect it first"
         )
 
     host = urlsplit(install_url).netloc or install_url
-    install = {"base_url": install_url, "name": f"{organization.name} ({host})"[:255]}
+    name = "Astrolift install" if organization is None else organization.name
+    install = {"base_url": install_url, "name": f"{name} ({host})"[:255]}
     reply = _call("POST", f"{base_url}{API_PATH}/connect", payload={"code": code, "install": install})
     if reply.status == 400 and reply.body.get("error") == "invalid_enrollment_code":
         raise ZentinelleConnectError(
@@ -657,15 +667,26 @@ def connect(
         with contextlib.suppress(ZentinelleConnectError):
             _call("DELETE", f"{base_url}{API_PATH}/install", credential=credential)
         raise ZentinelleConnectError(
-            ErrorCode.CONFLICT, "this organization was connected to Zentinelle by a concurrent request"
+            ErrorCode.CONFLICT, "this connection was made by a concurrent request"
         ) from None
     log.info(
         "zentinelle: organization %s connected to %s (install %s)",
-        organization.pk,
+        organization.pk if organization is not None else "(install)",
         base_url,
         connection.zentinelle_install_id,
     )
     return connection
+
+
+def _registration(cluster) -> dict[str, Any]:
+    payload: dict[str, Any] = {"cluster_id": str(cluster.guid)}
+    plugin = getattr(cluster, "provider_plugin", None)
+    provider = str(getattr(plugin, "slug", "") or "")
+    if _PROVIDER.match(provider):
+        payload["provider"] = provider
+    if _REGION.match(cluster.region or ""):
+        payload["region"] = cluster.region
+    return payload
 
 
 def register_cluster(*, connection: ZentinelleConnection, cluster) -> ZentinelleClusterGateway:
@@ -683,11 +704,33 @@ def _register_locked(connection: ZentinelleConnection, cluster) -> ZentinelleClu
 
     connection.refresh_from_db()
     _require_connected(connection)
-    gateway = ZentinelleClusterGateway.objects.filter(cluster=cluster).first()
+    gateway = ZentinelleClusterGateway.objects.filter(cluster=cluster).select_related("connection").first()
+    if connection.is_install and cluster.organization_id is not None:
+        raise ZentinelleConnectError(
+            ErrorCode.PRECONDITION,
+            "an organization's cluster registers through that organization's Zentinelle connection",
+            field="clusterId",
+        )
     if gateway is not None and gateway.connection_id != connection.pk:
+        if connection.is_install:
+            raise ZentinelleConnectError(
+                ErrorCode.CONFLICT,
+                "this shared cluster's gateway is registered through an organization's Zentinelle "
+                "connection; move it to the install connection instead",
+                field="clusterId",
+            )
         raise ZentinelleConnectError(
             ErrorCode.CONFLICT,
             "this cluster's gateway is registered through another organization's Zentinelle connection",
+            field="clusterId",
+        )
+    # A shared cluster an organization registered before #1905 may still be
+    # registered again (a credential replacement) until it is moved.
+    if gateway is None and not connection.is_install and cluster.organization_id is None:
+        raise ZentinelleConnectError(
+            ErrorCode.PRECONDITION,
+            "a shared cluster registers through the install's Zentinelle connection, "
+            "which the platform operator manages",
             field="clusterId",
         )
     retired = (TenantCluster.Lifecycle.DECOMMISSIONING, TenantCluster.Lifecycle.DECOMMISSIONED)
@@ -700,14 +743,7 @@ def _register_locked(connection: ZentinelleConnection, cluster) -> ZentinelleClu
     # could then not be delivered.
     _apply(cluster, [namespace_manifest()])
 
-    payload: dict[str, Any] = {"cluster_id": str(cluster.guid)}
-    plugin = getattr(cluster, "provider_plugin", None)
-    provider = str(getattr(plugin, "slug", "") or "")
-    if _PROVIDER.match(provider):
-        payload["provider"] = provider
-    if _REGION.match(cluster.region or ""):
-        payload["region"] = cluster.region
-    reply = _install_call(connection, "POST", "/clusters", payload)
+    reply = _install_call(connection, "POST", "/clusters", _registration(cluster))
     if not reply.ok:
         raise _refused(reply, "the cluster registration")
     credential, name = _gateway_credential(reply)
@@ -738,6 +774,104 @@ def _register_locked(connection: ZentinelleConnection, cluster) -> ZentinelleClu
 
     if gateway.gateway_enabled and gateway_feature_enabled():
         _deploy(gateway)
+    return gateway
+
+
+def move_to_install(*, install: ZentinelleConnection, cluster) -> ZentinelleClusterGateway:
+    """Move a shared cluster's gateway from the organization connection that
+    registered it to the install connection (#1905). The operator's explicit
+    step; nothing calls it on its own.
+
+    The install registers the cluster first and its credential replaces the
+    Secret, so the gateway keeps a working credential throughout. Only then is
+    the organization's registration revoked in Zentinelle; if that fails, the
+    move stands and ``last_error`` says what to revoke by hand.
+    """
+    return _run_locked(cluster, _move_locked, install, cluster)
+
+
+def _move_locked(install: ZentinelleConnection, cluster) -> ZentinelleClusterGateway:
+    install.refresh_from_db()
+    if not install.is_install:
+        raise ZentinelleConnectError(ErrorCode.PRECONDITION, "not the install connection")
+    _require_connected(install)
+    gateway = ZentinelleClusterGateway.objects.filter(cluster=cluster).select_related("connection").first()
+    if gateway is None:
+        raise ZentinelleConnectError(
+            ErrorCode.NOT_FOUND,
+            "this cluster is not registered with Zentinelle; register it through the install connection",
+            field="clusterId",
+        )
+    if gateway.connection_id == install.pk:
+        # Moving again finishes a move whose redeploy failed.
+        if gateway.gateway_enabled and not gateway.gateway_deployed and gateway_feature_enabled():
+            _deploy(gateway)
+        return gateway
+    if cluster.organization_id is not None:
+        raise ZentinelleConnectError(
+            ErrorCode.PRECONDITION,
+            "only a shared cluster moves to the install connection",
+            field="clusterId",
+        )
+    previous = gateway.connection
+
+    _apply(cluster, [namespace_manifest()])
+    reply = _install_call(install, "POST", "/clusters", _registration(cluster))
+    if not reply.ok:
+        raise _refused(reply, "the cluster registration")
+    credential, name = _gateway_credential(reply)
+    try:
+        _apply(cluster, [credential_secret_manifest(credential)], credential=credential)
+    except ZentinelleConnectError as exc:
+        raise _fail(
+            gateway,
+            exc,
+            f"Zentinelle registered the cluster through the install, but its credential could not be "
+            f"written to it: {exc.message}. Move it again once the cluster is reachable.",
+        ) from None
+    gateway.connection = install
+    gateway.gateway_name = name
+    gateway.credential_rotated_at = timezone.now()
+    gateway.last_error = ""
+    gateway.save()
+    log.info(
+        "zentinelle: moved cluster %s from organization %s to the install connection",
+        cluster.slug,
+        previous.organization_id,
+    )
+
+    # The running gateway rereads its credential file when Zentinelle refuses
+    # the old one, so revoking it now does not interrupt the gateway.
+    unrevoked = ""
+    if previous.status == ZentinelleConnection.Status.CONNECTED:
+        try:
+            old = _install_call(
+                previous, "DELETE", f"/clusters/{gateway.zentinelle_cluster_id}", revoked_ok=True
+            )
+            if not (old.ok or old.status in (401, 404)):
+                raise _refused(old, "the cluster revocation")
+        except ZentinelleConnectError as exc:
+            unrevoked = (
+                f"moved to the install connection, but organization {previous.organization_id}'s "
+                f"registration could not be revoked in Zentinelle ({exc.message}); revoke cluster "
+                f"{gateway.zentinelle_cluster_id} there by hand"
+            )
+    undeployed = ""
+    if gateway.gateway_enabled and gateway_feature_enabled():
+        # The install's gateway URL may differ from the organization's.
+        try:
+            _deploy(gateway)
+        except ZentinelleConnectError as exc:
+            # Still running with the organization's URL: marked undeployed so
+            # that moving again (or reconcile) redeploys it.
+            gateway.gateway_deployed = False
+            undeployed = f"{exc.message}; move it again once the cluster is reachable"
+    notes = "; ".join(note for note in (undeployed, unrevoked) if note)
+    if notes:
+        gateway.last_error = notes
+        gateway.save()
+    if undeployed:
+        raise ZentinelleConnectError(ErrorCode.INTERNAL, f"moved to the install connection, but {notes}")
     return gateway
 
 

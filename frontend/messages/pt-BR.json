@@ -756,6 +756,27 @@
         "toastUriCopied": "URL de verificação copiada",
         "toastCopyFailed": "Não foi possível copiar. Selecione o texto e copie manualmente.",
         "toastPayloadCopied": "Payload copiado"
+      },
+      "stepUpPin": {
+        "title": "PIN de verificação",
+        "description": "Um PIN de 6 a 8 dígitos para confirmar ações sensíveis, como um deploy em produção, sem entrar de novo.",
+        "badgeSet": "Definido",
+        "badgeLocked": "Bloqueado",
+        "pin": "PIN",
+        "newPin": "Novo PIN",
+        "confirm": "Confirmar PIN",
+        "hint": "Para definir ou alterar seu PIN, você precisa entrar de novo primeiro. Muitos PINs errados o bloqueiam.",
+        "set": "Definir PIN",
+        "change": "Alterar PIN",
+        "clear": "Remover PIN",
+        "locked": "Bloqueado após muitas tentativas erradas. Defina um novo PIN para usá-lo de novo.",
+        "orgDisallows": "Sua organização não permite PINs de verificação, então este não é usado.",
+        "errorFormat": "Use de 6 a 8 dígitos.",
+        "errorMismatch": "Os PINs não coincidem.",
+        "toastSet": "PIN de verificação definido",
+        "toastChanged": "PIN de verificação alterado",
+        "toastCleared": "PIN de verificação removido",
+        "toastFailed": "Não foi possível atualizar seu PIN de verificação"
       }
     }
   },
@@ -5596,7 +5617,9 @@
           "label": "Ocultar",
           "blurb": "Mostrar só as configurações que você pode alterar"
         }
-      }
+      },
+      "allowStepUpPin": "Permitir verificação com PIN pessoal",
+      "allowStepUpPinHint": "Membros podem definir um PIN de 6 a 8 dígitos e confirmar ações sensíveis com ele em vez de entrar de novo. Deixe desativado se sua conformidade exige o provedor de identidade em toda verificação."
     },
     "sections": {
       "houseTheme": "Tema da casa",
@@ -5702,6 +5725,8 @@
     "description": "Integrações opcionais para esta organização. Um admin da instalação ainda pode desativar uma delas para todas as organizações.",
     "loadError": "Não foi possível carregar os módulos",
     "installOff": "Desativado nesta instalação",
+    "licenceWithheld": "Não incluído na licença desta instalação",
+    "licenceTurnedOff": "Desativado quando a licença deixou de incluí-lo. Um administrador da organização pode reativá-lo.",
     "enable": "Ativar {module}",
     "disable": "Desativar {module}",
     "enabledToast": "{module} ativado",
@@ -5724,6 +5749,10 @@
         "label": "Aplicação de políticas a agentes",
         "description": "Permite que o Zentinelle aplique ações de política aos agentes e boxes desta organização."
       }
+    },
+    "errors": {
+      "MODULE_DISABLED_BY_INSTALL": "Este módulo está desativado nesta instalação. Fale com o administrador da instalação.",
+      "MODULE_NOT_LICENSED": "Este módulo não está incluído na licença desta instalação."
     }
   },
   "actionSafety": {
@@ -6080,7 +6109,36 @@
     "grant": "Conceder",
     "allowed": "Permitido",
     "notIncluded": "Não incluído",
-    "footer": "Para conceder uma, atribua a função em <link>Atribuições</link>."
+    "footer": "Para conceder uma, atribua a função em <link>Atribuições</link>.",
+    "approval": {
+      "title": "Exigir aprovação antes das implantações",
+      "intro": "Ativa a configuração de aprovação de implantações do próprio app: cada implantação espera até que pessoas suficientes da equipe aprovadora a aprovem.",
+      "loading": "Carregando…",
+      "loadError": "Não foi possível ler os apps: {error}",
+      "retry": "Tentar novamente",
+      "noApps": "Esta organização ainda não tem apps.",
+      "app": "Aplicativo",
+      "pickApp": "Escolha um app",
+      "wholeApp": "Esta configuração vale para toda implantação de {app}, feita por qualquer pessoa que possa implantá-lo, não só para as pessoas a quem você concede acesso.",
+      "cannotChange": "Você pode ver esta configuração, mas não alterá-la: alterar as configurações de {app} exige permissão para atualizar o app.",
+      "legend": "Aprovação de implantações de {app}",
+      "require": "Exigir aprovação antes de cada implantação",
+      "team": "Equipe aprovadora",
+      "pickTeam": "Escolha uma equipe",
+      "quorum": "Aprovações necessárias",
+      "approvals": "{count, plural, one {# aprovação} other {# aprovações}}",
+      "replacesPeople": "Hoje os aprovadores são pessoas específicas. Salvar com uma equipe as substitui.",
+      "approversNeed": "Os aprovadores também precisam de permissão para aprovar implantações neste app, por exemplo o preset Aprovador.",
+      "save": "Salvar",
+      "saving": "Salvando…",
+      "saved": "Salvo.",
+      "saveFailed": "Não foi possível salvar a configuração."
+    },
+    "models": {
+      "title": "Acesso a modelos",
+      "body": "Não há preset de consumidor de modelos. Quais apps podem se conectar a quais modelos, e se uma conexão precisa de aprovação, é definido pela política de conexão de modelos da organização.",
+      "link": "Abrir a política de conexão de modelos"
+    }
   },
   "adminRuns": {
     "title": "Execuções",
@@ -6560,7 +6618,15 @@
     "errors": {
       "passwordRequired": "A senha é obrigatória.",
       "generic": "Não foi possível confirmar sua senha. Tente novamente.",
-      "network": "Não foi possível contatar o servidor. Verifique sua conexão e tente novamente."
+      "network": "Não foi possível contatar o servidor. Verifique sua conexão e tente novamente.",
+      "pinFormat": "Seu PIN tem de 6 a 8 dígitos.",
+      "pinLocked": "Seu PIN foi bloqueado após muitas tentativas erradas. Confirme de outra forma e depois defina um novo PIN."
+    },
+    "pin": {
+      "label": "PIN de verificação",
+      "description": "Digite seu PIN de verificação para continuar.",
+      "useSso": "Usar login único",
+      "usePassword": "Usar sua senha"
     }
   },
   "approvals": {
@@ -8442,6 +8508,16 @@
           "roles": "Papéis",
           "policies": "Políticas",
           "check": "Verificar acesso"
+        },
+        "policies": {
+          "heading": "Políticas",
+          "none": "Nenhuma política ou configuração do app retém ou impede o que isto concede.",
+          "appSetting": "Aprovação de implantações deste app",
+          "outcome": {
+            "APPROVAL_REQUIRED": "Requer aprovação",
+            "DENIED": "Negado por política",
+            "MAY_DENY": "Pode ser negado por política"
+          }
         }
       },
       "legacyGrantRole": {

@@ -30,6 +30,7 @@ import {
   expiryToIso,
   type GrantDraft,
   type GrantOutcome,
+  type GrantPolicyEffect,
   type GrantPreview,
 } from "./GrantAccessFlow";
 import { useScopeTree } from "./use-scope-tree";
@@ -106,6 +107,16 @@ interface PreviewResp {
     allowed: boolean;
     refusal?: string | null;
     notes: string[];
+    policies?: {
+      outcome: string;
+      source: string;
+      policyId?: string | null;
+      policySlug?: string | null;
+      policyName?: string | null;
+      permissions: string[];
+      peopleCount: number;
+      detail: string;
+    }[];
   };
 }
 
@@ -150,6 +161,11 @@ export function previewOf(
     groups: p.groups,
     refusal: p.allowed ? null : p.refusal || refusal,
     notes: p.notes,
+    policies: (p.policies ?? []).map((e) => ({
+      ...e,
+      outcome: e.outcome as GrantPolicyEffect["outcome"],
+      source: e.source === "APP_SETTING" ? "APP_SETTING" : "POLICY",
+    })),
   };
 }
 

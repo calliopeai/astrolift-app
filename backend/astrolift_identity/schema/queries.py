@@ -108,6 +108,7 @@ from astrolift_identity.schema.types import (
     RoleBindingType,
     RoleType,
     SearchableUserType,
+    StepUpPinStatusType,
     TeamType,
     UiPreferencesType,
     _resolve_display_name,
@@ -170,9 +171,27 @@ class ModuleEntitlementType:
             "Always true for apps, agents, workflows and admin. For the per-org "
             "modules (chat_studio_integration, agent_live_attach, "
             "chat_studio_agent_runs) it is true only when an org admin turned "
-            "the module on and the install has not forced it off. Independent "
-            "of the can* fields."
+            "the module on, the install has not forced it off and the licence does "
+            "not withhold it. Independent of the can* fields."
         )
+    )
+    licensed: bool = strawberry.field(
+        default=True,
+        description=(
+            "False when the install's signed licence withholds this per-org module: "
+            "it is off for every organization and an org admin cannot turn it on. "
+            "A licence that grants a module only allows it; it never turns one on. "
+            "Always true for the install-wide modules and when the licence has no say."
+        ),
+    )
+    source: str | None = strawberry.field(
+        default=None,
+        description=(
+            "Who last switched this per-org module for the active organization: "
+            "``org_admin`` or ``licence`` (the licence turned it off by withholding "
+            "it). Null when the org has never switched it, and for the install-wide "
+            "modules."
+        ),
     )
 
 
@@ -233,7 +252,12 @@ class MeType:
         Descendant grants and the selected team cannot supply owner authority.
         """
         from astrolift_identity.model_entitlements import models_entitlement
-        from astrolift_identity.org_modules import enabled_modules
+        from astrolift_identity.org_modules import (
+            INSTALL_SWITCHES,
+            enabled_modules,
+            module_sources,
+            withheld_by_licence,
+        )
         from astrolift_identity.permission_resolver import resolve_effective_permissions_anywhere
         from core.tenancy import get_current_tenant
 
@@ -267,6 +291,7 @@ class MeType:
         # and then gets a 403 on every create.
         create_scopes = granted_scopes(tenant, Permission.APP_CREATE)
         chat_studio_can_create = create_scopes.org or bool(create_scopes.team_ids)
+        sources = module_sources(tenant.organization_id)
         return [
             ModuleEntitlementType(
                 key=r.key,
@@ -275,6 +300,8 @@ class MeType:
                 can_manage=r.can_manage,
                 can_run=r.can_run,
                 enabled=r.enabled,
+                licensed=not (r.key in INSTALL_SWITCHES and withheld_by_licence(r.key)),
+                source=sources.get(r.key) if r.key in INSTALL_SWITCHES else None,
             )
             for r in rows
         ]
@@ -2261,6 +2288,17 @@ class IdentityQuery:
         ]
 
     @strawberry.field
+    def my_step_up_pin(self, info: Info) -> StepUpPinStatusType | None:
+        """The viewer's step-up PIN state (#2399). Self-only; None when signed out."""
+        from astrolift_identity.schema.types import step_up_pin_status
+
+        request = getattr(info.context, "request", None)
+        viewer = getattr(request, "user", None) if request else None
+        if viewer is None or not viewer.is_authenticated:
+            return None
+        return step_up_pin_status(viewer)
+
+    @strawberry.field
     def astrolift_elevation_status(self, info: Info) -> ElevationStatusType:
         """Snapshot of the current session's step-up elevation (#487).
 
@@ -2297,7 +2335,7 @@ class IdentityQuery:
             seconds_remaining=status.seconds_remaining,
             method=status.method,
             required_for=gated,
-            supported_methods=_supported_step_up_methods(session),
+            supported_methods=_supported_step_up_methods(session, user=viewer),
         )
 
 

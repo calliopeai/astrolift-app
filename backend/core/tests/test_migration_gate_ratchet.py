@@ -48,6 +48,10 @@ GRANDFATHERED_DESTRUCTIVE: frozenset[str] = frozenset(
         # scoped constraint. Constraint metadata is dropped and recreated;
         # no table rows or columns are removed.
         "astrolift_services/0023_manifest_managed_services",
+        # Recreates the one-live-connection-per-org constraint with
+        # nulls_distinct=False so the install-level row (no organization) is
+        # also unique. Constraint metadata only; no rows or columns are removed.
+        "astrolift_operations/0033_zentinelle_install_connection",
         # Constraint-only replacement (#2213): preserve the existing app/project
         # owner branches while adding explicit org+cluster-owned vLLM models.
         # Recreate msvc_attachment_unique_app_env for live legacy attachments,

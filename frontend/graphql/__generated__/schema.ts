@@ -3090,6 +3090,8 @@ export type AstroliftGrantPreview = {
   ok: Scalars['Boolean']['output'];
   /** The permissions in play. */
   permissions: Array<Scalars['String']['output']>;
+  /** Saved policies and app settings that hold or stop what the draft grants. */
+  policies: Array<AstroliftGrantPreviewPolicy>;
   refusal?: Maybe<Scalars['String']['output']>;
   scopeGuid?: Maybe<Scalars['GUID']['output']>;
   scopeKind?: Maybe<Scalars['String']['output']>;
@@ -3131,6 +3133,21 @@ export type AstroliftGrantPreviewPerson = {
   user: AstroliftUser;
   /** Their other grants that carry permissions in play, excluding the one being changed. */
   via: Array<AstroliftGrantPreviewSource>;
+};
+
+export type AstroliftGrantPreviewPolicy = {
+  detail: Scalars['String']['output'];
+  /** APPROVAL_REQUIRED, DENIED or MAY_DENY. */
+  outcome: Scalars['String']['output'];
+  /** How many of the people reached it applies to. */
+  peopleCount: Scalars['Int']['output'];
+  /** The drafted permissions it applies to. */
+  permissions: Array<Scalars['String']['output']>;
+  policyId?: Maybe<Scalars['GUID']['output']>;
+  policyName?: Maybe<Scalars['String']['output']>;
+  policySlug?: Maybe<Scalars['String']['output']>;
+  /** POLICY, or APP_SETTING for the app's deploy-approval setting. */
+  source: Scalars['String']['output'];
 };
 
 export type AstroliftGrantPreviewSource = {
@@ -3810,9 +3827,13 @@ export type AstroliftModuleEntitlement = {
   canManage: Scalars['Boolean']['output'];
   canRun: Scalars['Boolean']['output'];
   canView: Scalars['Boolean']['output'];
-  /** Whether the module is switched on for the active organization. Always true for apps, agents, workflows and admin. For the per-org modules (chat_studio_integration, agent_live_attach, chat_studio_agent_runs) it is true only when an org admin turned the module on and the install has not forced it off. Independent of the can* fields. */
+  /** Whether the module is switched on for the active organization. Always true for apps, agents, workflows and admin. For the per-org modules (chat_studio_integration, agent_live_attach, chat_studio_agent_runs) it is true only when an org admin turned the module on, the install has not forced it off and the licence does not withhold it. Independent of the can* fields. */
   enabled: Scalars['Boolean']['output'];
   key: Scalars['String']['output'];
+  /** False when the install's signed licence withholds this per-org module: it is off for every organization and an org admin cannot turn it on. A licence that grants a module only allows it; it never turns one on. Always true for the install-wide modules and when the licence has no say. */
+  licensed: Scalars['Boolean']['output'];
+  /** Who last switched this per-org module for the active organization: ``org_admin`` or ``licence`` (the licence turned it off by withholding it). Null when the org has never switched it, and for the install-wide modules. */
+  source?: Maybe<Scalars['String']['output']>;
 };
 
 export type AstroliftMyConnectedAccount = {
@@ -3942,6 +3963,7 @@ export type AstroliftOrgSkillRepoMutationResult = {
 };
 
 export type AstroliftOrganization = {
+  allowStepUpPin: Scalars['Boolean']['output'];
   allowUserProfileEdit: Scalars['Boolean']['output'];
   appearanceDefault: Scalars['JSON']['output'];
   appearanceLocked: Scalars['Boolean']['output'];
@@ -5487,6 +5509,29 @@ export type AstroliftStepRunPage = {
   pageSize?: Maybe<Scalars['Int']['output']>;
   /** Total rows matching the filters, across all pages. */
   totalCount?: Maybe<Scalars['Int']['output']>;
+};
+
+export type AstroliftStepUpPinSetPayload = {
+  replaced: Scalars['Boolean']['output'];
+  status: AstroliftStepUpPinStatus;
+};
+
+export type AstroliftStepUpPinSetPayloadMutationResult = {
+  data?: Maybe<AstroliftStepUpPinSetPayload>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftStepUpPinStatus = {
+  isSet: Scalars['Boolean']['output'];
+  locked: Scalars['Boolean']['output'];
+  orgAllows: Scalars['Boolean']['output'];
+};
+
+export type AstroliftStepUpPinStatusMutationResult = {
+  data?: Maybe<AstroliftStepUpPinStatus>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftTaskRun = {
@@ -8841,6 +8886,7 @@ export type Mutation = {
   clearAgentQuarantine: NoneTypeMutationResult;
   clearAlertSubscription: AstroliftUserAlertSubscriptionMutationResult;
   clearEnvironmentSetting: AstroliftEnvironmentSettingMutationResult;
+  clearStepUpPin: AstroliftStepUpPinStatusMutationResult;
   /** Deep-copy a visible workflow definition + its stages into the caller's org as a new editable definition (spec 40 §2.1). New slug on collision; global stages copy with agent_definition cleared. */
   cloneWorkflowDefinition: CloneWorkflowDefinitionResult;
   configureAgentTaskCallbacks: AgentTaskCallbackPolicyMutationResult;
@@ -8853,6 +8899,7 @@ export type Mutation = {
   connectManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
   connectSource: AstroliftSourceConnectionMutationResult;
   connectZentinelle: AstroliftZentinelleConnectionMutationResult;
+  connectZentinelleInstall: AstroliftZentinelleConnectionMutationResult;
   /** Cancel, terminate, or retry cleanup for an exact owned execution. */
   controlWorkflowExecution: WorkflowExecutionControlResult;
   createAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
@@ -8938,6 +8985,7 @@ export type Mutation = {
   disconnectHuggingFace: HuggingFaceConnectionTypeMutationResult;
   disconnectSource: AstroliftSourceConnectionMutationResult;
   disconnectZentinelle: AstroliftZentinelleDisconnectMutationResult;
+  disconnectZentinelleInstall: AstroliftZentinelleDisconnectMutationResult;
   elevateAdminSession: AstroliftElevatePayloadMutationResult;
   ensureAgentBox: AstroliftAgentBoxMutationResult;
   exportAstroliftAppLogs: AstroliftAppLogExportMutationResult;
@@ -8991,6 +9039,7 @@ export type Mutation = {
   markOnboardingComplete: AstroliftMarkOnboardingCompletePayloadMutationResult;
   migrateAppToCluster: AstroliftAppEnvironmentMutationResult;
   moveAppToTeam: AstroliftRegisteredAppMutationResult;
+  moveZentinelleSharedClusterToInstall: AstroliftZentinelleClusterGatewayMutationResult;
   muteAlertRule: AstroliftAlertRuleMutationResult;
   /** Create or update a notification via NotificationSerializer. */
   notification: MutationResult;
@@ -9056,6 +9105,7 @@ export type Mutation = {
   registerOrgSkillRepo: AstroliftOrgSkillRepoMutationResult;
   registerTenantCluster: AstroliftTenantClusterMutationResult;
   registerZentinelleCluster: AstroliftZentinelleClusterGatewayMutationResult;
+  registerZentinelleSharedCluster: AstroliftZentinelleClusterGatewayMutationResult;
   reissueManagedDomainCert: ReissueManagedDomainCertPayloadMutationResult;
   rejectActionRequest: AstroliftActionApprovalRequestMutationResult;
   rejectDeployment: AstroliftDeploymentMutationResult;
@@ -9148,7 +9198,7 @@ export type Mutation = {
   setModelConnectionRestriction: ModelConnectionPolicyMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
   setNotificationProfile: AstroliftNotificationProfileMutationResult;
-  /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with PRECONDITION; turning one off always succeeds. */
+  /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with MODULE_DISABLED_BY_INSTALL, and one the install's licence withholds with MODULE_NOT_LICENSED; turning one off always succeeds. */
   setOrganizationModule: AstroliftOrganizationModuleMutationResult;
   setPipelineSecret: AstroliftPipelineSecretChangeMutationResult;
   /** Set an install setting (#1861). ``value`` is text, ``true``/``false`` for a yes/no setting, validated as the Django admin validates it. A setting with a ``warning`` needs ``confirmed``. Platform operator only, with a fresh sign-in. */
@@ -9156,10 +9206,12 @@ export type Mutation = {
   setPreviewPinned: AstroliftPreviewEnvironmentMutationResult;
   setProjectBundleSecretValue: AstroliftSecretBundleMutationResult;
   setRetentionPolicy: AstroliftRetentionPolicyMutationResult;
+  setStepUpPin: AstroliftStepUpPinSetPayloadMutationResult;
   /** Enable or disable an exact owned workflow definition at its reviewed revision. Does not start a run or confirm schedule state. */
   setWorkflowDefinitionEnabled: WorkflowDefinitionActivationResult;
   setZentinelleGatewayEnabled: AstroliftZentinelleClusterGatewayMutationResult;
   setZentinelleGatewayUrl: AstroliftZentinelleConnectionMutationResult;
+  setZentinelleInstallGatewayUrl: AstroliftZentinelleConnectionMutationResult;
   /** Cancel a sign request. Sign requests are not available: this always refuses. */
   signRequestCancel: Scalars['Boolean']['output'];
   /** Sign a sign request. Sign requests are not available: this always refuses. */
@@ -9203,6 +9255,7 @@ export type Mutation = {
   unregisterBedrockModelConnection: ClusterModelDeploymentMutationResult;
   unregisterTenantCluster: SoftdeletepayloadMutationResult;
   unregisterZentinelleCluster: AstroliftZentinelleClusterGatewayMutationResult;
+  unregisterZentinelleSharedCluster: AstroliftZentinelleClusterGatewayMutationResult;
   updateAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
   updateAgentRunSpec: AstroliftAgentRunSpecMutationResult;
   updateAgentSecretBundle: AstroliftAgentSecretBundleMutationResult;
@@ -9599,6 +9652,11 @@ export type MutationConnectSourceArgs = {
 
 
 export type MutationConnectZentinelleArgs = {
+  input: ConnectZentinelleInput;
+};
+
+
+export type MutationConnectZentinelleInstallArgs = {
   input: ConnectZentinelleInput;
 };
 
@@ -10034,6 +10092,11 @@ export type MutationDisconnectZentinelleArgs = {
 };
 
 
+export type MutationDisconnectZentinelleInstallArgs = {
+  input: DisconnectZentinelleInput;
+};
+
+
 export type MutationElevateAdminSessionArgs = {
   input: ElevateAdminSessionInput;
 };
@@ -10234,6 +10297,11 @@ export type MutationMigrateAppToClusterArgs = {
 
 export type MutationMoveAppToTeamArgs = {
   input: MoveAppToTeamInput;
+};
+
+
+export type MutationMoveZentinelleSharedClusterToInstallArgs = {
+  input: ZentinelleClusterInput;
 };
 
 
@@ -10514,6 +10582,11 @@ export type MutationRegisterTenantClusterArgs = {
 
 
 export type MutationRegisterZentinelleClusterArgs = {
+  input: ZentinelleClusterInput;
+};
+
+
+export type MutationRegisterZentinelleSharedClusterArgs = {
   input: ZentinelleClusterInput;
 };
 
@@ -11011,6 +11084,11 @@ export type MutationSetRetentionPolicyArgs = {
 };
 
 
+export type MutationSetStepUpPinArgs = {
+  input: SetStepUpPinInput;
+};
+
+
 export type MutationSetWorkflowDefinitionEnabledArgs = {
   definitionId: Scalars['GUID']['input'];
   expectedRevision: Scalars['String']['input'];
@@ -11024,6 +11102,11 @@ export type MutationSetZentinelleGatewayEnabledArgs = {
 
 
 export type MutationSetZentinelleGatewayUrlArgs = {
+  input: SetZentinelleGatewayUrlInput;
+};
+
+
+export type MutationSetZentinelleInstallGatewayUrlArgs = {
   input: SetZentinelleGatewayUrlInput;
 };
 
@@ -11219,6 +11302,11 @@ export type MutationUnregisterTenantClusterArgs = {
 
 
 export type MutationUnregisterZentinelleClusterArgs = {
+  input: ZentinelleClusterInput;
+};
+
+
+export type MutationUnregisterZentinelleSharedClusterArgs = {
   input: ZentinelleClusterInput;
 };
 
@@ -12252,6 +12340,7 @@ export type Query = {
   astroliftWorkloads: Array<AstroliftWorkload>;
   astroliftWorkloadsPage: AstroliftWorkloadPage;
   astroliftZentinelleConnection?: Maybe<AstroliftZentinelleConnection>;
+  astroliftZentinelleInstallConnection?: Maybe<AstroliftZentinelleConnection>;
   /**
    * Query mutation audit logs. Superuser only.
    * @deprecated Caps at 200 rows with no way to reach the 201st. Use auditLogsPage.
@@ -12312,6 +12401,7 @@ export type Query = {
   modelConnectionReviewRequest?: Maybe<ModelConnectionRequest>;
   modelConnectionTargetsPage: ModelConnectionDestinationPage;
   modelHostingAction: ModelHostingAction;
+  myStepUpPin?: Maybe<AstroliftStepUpPinStatus>;
   orgSkillRepos: Array<AstroliftOrgSkillRepo>;
   orgToolDefs: Array<AstroliftToolDef>;
   orgToolDefsPage: AstroliftToolDefPage;
@@ -15441,6 +15531,10 @@ export type SetRetentionPolicyInput = {
   signal: Scalars['String']['input'];
 };
 
+export type SetStepUpPinInput = {
+  pin: Scalars['String']['input'];
+};
+
 export type SetZentinelleGatewayEnabledInput = {
   clusterId: Scalars['GUID']['input'];
   enabled: Scalars['Boolean']['input'];
@@ -15904,6 +15998,7 @@ export type UpdateOrgSkillRepoInput = {
 };
 
 export type UpdateOrganizationInput = {
+  allowStepUpPin: InputMaybe<Scalars['Boolean']['input']>;
   allowUserProfileEdit: InputMaybe<Scalars['Boolean']['input']>;
   appearanceDefault: InputMaybe<Scalars['JSON']['input']>;
   appearanceLocked: InputMaybe<Scalars['Boolean']['input']>;

@@ -756,6 +756,27 @@
         "toastUriCopied": "验证 URL 已复制",
         "toastCopyFailed": "无法复制。请选择文本并手动复制。",
         "toastPayloadCopied": "载荷已复制"
+      },
+      "stepUpPin": {
+        "title": "验证 PIN",
+        "description": "一个 6 到 8 位的 PIN，用于确认生产部署等敏感操作，无需重新登录。",
+        "badgeSet": "已设置",
+        "badgeLocked": "已锁定",
+        "pin": "PIN",
+        "newPin": "新 PIN",
+        "confirm": "确认 PIN",
+        "hint": "设置或更改 PIN 前需要先重新登录。错误的 PIN 输入过多会将其锁定。",
+        "set": "设置 PIN",
+        "change": "更改 PIN",
+        "clear": "清除 PIN",
+        "locked": "错误次数过多，已被锁定。设置新的 PIN 后即可再次使用。",
+        "orgDisallows": "你的组织不允许使用验证 PIN，因此不会使用此 PIN。",
+        "errorFormat": "请使用 6 到 8 位数字。",
+        "errorMismatch": "两次输入的 PIN 不一致。",
+        "toastSet": "已设置验证 PIN",
+        "toastChanged": "已更改验证 PIN",
+        "toastCleared": "已清除验证 PIN",
+        "toastFailed": "无法更新你的验证 PIN"
       }
     }
   },
@@ -5596,7 +5617,9 @@
           "label": "隐藏",
           "blurb": "仅显示可更改的设置"
         }
-      }
+      },
+      "allowStepUpPin": "允许使用个人 PIN 进行验证",
+      "allowStepUpPinHint": "成员可以设置 6 到 8 位的 PIN，并用它确认敏感操作，而无需重新登录。如果你的合规要求每次验证都使用身份提供商，请保持关闭。"
     },
     "sections": {
       "houseTheme": "内部主题",
@@ -5702,6 +5725,8 @@
     "description": "此组织的可选集成。安装管理员仍可为所有组织强制关闭其中任一项。",
     "loadError": "无法加载模块",
     "installOff": "已在此安装中关闭",
+    "licenceWithheld": "未包含在此安装的许可证中",
+    "licenceTurnedOff": "许可证不再包含该模块时已将其关闭。组织管理员可以重新开启。",
     "enable": "启用 {module}",
     "disable": "停用 {module}",
     "enabledToast": "已启用 {module}",
@@ -5724,6 +5749,10 @@
         "label": "智能体策略执行",
         "description": "允许 Zentinelle 对此组织的智能体和 box 执行策略操作。"
       }
+    },
+    "errors": {
+      "MODULE_DISABLED_BY_INSTALL": "此模块已在此安装中关闭。请联系安装管理员。",
+      "MODULE_NOT_LICENSED": "此模块未包含在此安装的许可证中。"
     }
   },
   "actionSafety": {
@@ -6080,7 +6109,36 @@
     "grant": "授予",
     "allowed": "允许",
     "notIncluded": "不包含",
-    "footer": "如需授予，请在<link>分配</link>下分配其角色。"
+    "footer": "如需授予，请在<link>分配</link>下分配其角色。",
+    "approval": {
+      "title": "部署前需要审批",
+      "intro": "开启应用自身的部署审批设置:每次部署都会等待审批团队中足够多的人批准。",
+      "loading": "正在加载…",
+      "loadError": "无法读取应用:{error}",
+      "retry": "重试",
+      "noApps": "此组织还没有应用。",
+      "app": "应用",
+      "pickApp": "选择应用",
+      "wholeApp": "此设置适用于任何有权部署 {app} 的人对 {app} 的每次部署,而不仅是你授予访问权限的人。",
+      "cannotChange": "你可以查看此设置但不能更改:更改 {app} 的设置需要更新该应用的权限。",
+      "legend": "{app} 的部署审批",
+      "require": "每次部署前需要审批",
+      "team": "审批团队",
+      "pickTeam": "选择团队",
+      "quorum": "所需审批数",
+      "approvals": "{count, plural, other {# 个审批}}",
+      "replacesPeople": "目前的审批人是指定的人员。使用团队保存会替换他们。",
+      "approversNeed": "审批人还需要审批此应用部署的权限,例如审批人预设。",
+      "save": "保存",
+      "saving": "正在保存…",
+      "saved": "已保存。",
+      "saveFailed": "无法保存设置。"
+    },
+    "models": {
+      "title": "模型访问",
+      "body": "没有模型使用者预设。哪些应用可以连接哪些模型,以及连接是否需要审批,由组织的模型连接策略决定。",
+      "link": "打开模型连接策略"
+    }
   },
   "adminRuns": {
     "title": "运行",
@@ -6560,7 +6618,15 @@
     "errors": {
       "passwordRequired": "需要密码。",
       "generic": "无法确认您的密码。请重试。",
-      "network": "无法连接到服务器。请检查您的连接后重试。"
+      "network": "无法连接到服务器。请检查您的连接后重试。",
+      "pinFormat": "你的 PIN 为 6 到 8 位数字。",
+      "pinLocked": "错误次数过多，你的 PIN 已被锁定。请用其他方式确认，然后设置新的 PIN。"
+    },
+    "pin": {
+      "label": "验证 PIN",
+      "description": "输入你的验证 PIN 以继续。",
+      "useSso": "改用单点登录",
+      "usePassword": "改用密码"
     }
   },
   "approvals": {
@@ -8442,6 +8508,16 @@
           "roles": "角色",
           "policies": "策略",
           "check": "检查访问"
+        },
+        "policies": {
+          "heading": "策略",
+          "none": "没有策略或应用设置会搁置或阻止此授权。",
+          "appSetting": "此应用的部署审批设置",
+          "outcome": {
+            "APPROVAL_REQUIRED": "需要审批",
+            "DENIED": "被策略拒绝",
+            "MAY_DENY": "可能被策略拒绝"
+          }
         }
       },
       "legacyGrantRole": {

@@ -18,7 +18,14 @@ For each person it compares the permissions in play (the roles' slugs)
 before and after: **gaining** people get at least one they did not have,
 **losing** people lose at least one, **unchanged** people already had them
 (or keep them) through another grant, which is listed with its source.
-ABAC policies are not applied: a preview says what RBAC would grant.
+
+What the draft role grants is then run through the org's saved policies
+(#2272), for each person it reaches, on the draft's scope: a policy that
+would refuse it until approvals arrive is **approval required**, one that
+refuses it outright is **denied by policy**, and one whose answer turns on
+what only a real request carries (a client IP, a session) **may deny**. On
+an app, the app's own deploy-approval setting counts as approval required
+for deploys. Platform operators are not subject to an org's policies.
 """
 
 from __future__ import annotations
@@ -33,6 +40,11 @@ from astrolift_graphql import GUID
 MAX_PRINCIPALS = 50
 
 ACTIONS = ("GRANT", "CHANGE", "REMOVE")
+
+APPROVAL_REQUIRED = "APPROVAL_REQUIRED"
+DENIED = "DENIED"
+MAY_DENY = "MAY_DENY"
+_POLICY_RANK = {DENIED: 0, MAY_DENY: 1, APPROVAL_REQUIRED: 2}
 
 
 @dataclasses.dataclass
@@ -361,7 +373,13 @@ def _answer(
     label = labels.get((target.kind, target.pk), target.kind.lower())
     if groups:
         notes.append("Group members are read from the groups the IdP asserted at each member's last sign-in.")
-    notes.append("ABAC policies are not applied; they can still deny what this grants.")
+    # The binding a change replaces no longer holds its old role afterwards.
+    after_rows = [r for r in rows if r.binding_guid != changed_guid]
+    policies = (
+        _policy_effects(org_id, target, new_role, ids, users, after_rows, mine, stored)
+        if new_role is not None
+        else []
+    )
     return GrantPreviewType(
         ok=True,
         errors=[],
@@ -383,7 +401,114 @@ def _answer(
         allowed=allowed,
         refusal=None if allowed else REFUSAL,
         notes=notes,
+        policies=policies,
     )
+
+
+def _verdict(outcome) -> str | None:
+    """How one policy outcome reads in a preview, or None when it does not deny."""
+
+    from astrolift_identity import policy_simulation
+
+    if not outcome.denies:
+        return None
+    waiting = [c for c in outcome.conditions if c.holds is not True]
+    # A malformed condition denies every request, whatever it carries.
+    if any(c.holds is None and c.detail.startswith("malformed") for c in waiting):
+        return DENIED
+    if waiting and not outcome.assumed and all(c.kind == "approval_required" for c in waiting):
+        return APPROVAL_REQUIRED
+    return DENIED if policy_simulation.classify(outcome) == policy_simulation.DENIED else MAY_DENY
+
+
+def _policy_effects(org_id, target, role, ids, users, rows, mine, stored):
+    """The org's saved policies, and an app's deploy-approval setting, that
+    would stop or hold what ``role`` grants on ``target`` (#2272)."""
+
+    from astrolift_identity import abac
+    from astrolift_identity.permission_resolver import _scope_ancestry
+    from astrolift_identity.schema.access_ux import GrantPreviewPolicyType
+    from astrolift_registry.models import RegisteredApp
+    from core.permissions import Permission, PermissionScope, ScopeKind
+    from core.tenancy import TenantContext
+
+    permissions = sorted(role.permissions or ())
+    people = [u for u in ids if u in users and not (users[u].is_superuser and users[u].is_active)]
+    chain = _scope_ancestry(
+        TenantContext(organization_id=org_id), PermissionScope(kind=ScopeKind(target.kind), id=target.pk)
+    )
+    attrs = abac.RequestAttributes(authenticated_at=None, auth_factors=None)
+    policies = abac.org_policies(org_id, attrs)
+    found: dict[str, dict] = {}
+    for user_id in people if chain else []:
+        roles = {r.role.slug for r in rows if mine(r, user_id)} | {role.slug}
+        groups = frozenset(g for g in stored.get(user_id) or [] if isinstance(g, str))
+        for slug in permissions:
+            subject = abac.new_subject(
+                organization_id=org_id,
+                actor_user_id=user_id,
+                permission=slug,
+                chain=chain,
+                roles_at_target=roles,
+                groups=groups,
+                attrs=attrs,
+            )
+            for policy, outcome in zip(policies, abac.evaluate(subject, policies).outcomes, strict=True):
+                verdict = _verdict(outcome)
+                if verdict is None:
+                    continue
+                entry = found.setdefault(
+                    str(policy.guid),
+                    {
+                        "policy": policy,
+                        "verdict": verdict,
+                        "detail": outcome.detail,
+                        "perms": set(),
+                        "people": set(),
+                    },
+                )
+                if _POLICY_RANK[verdict] < _POLICY_RANK[entry["verdict"]]:
+                    entry["verdict"], entry["detail"] = verdict, outcome.detail
+                entry["perms"].add(slug)
+                entry["people"].add(user_id)
+
+    out = [
+        GrantPreviewPolicyType(
+            outcome=e["verdict"],
+            source="POLICY",
+            policy_id=GUID(str(e["policy"].guid)),
+            policy_slug=e["policy"].slug,
+            policy_name=e["policy"].name,
+            permissions=sorted(e["perms"]),
+            people_count=len(e["people"]),
+            detail=e["detail"],
+        )
+        for e in found.values()
+    ]
+    deploy = Permission.APP_DEPLOY.value
+    if target.kind == "APP" and deploy in permissions:
+        app = (
+            RegisteredApp.objects.filter(pk=target.pk, organization_id=org_id)
+            .values("requires_approval", "minimum_approvals")
+            .first()
+        )
+        if app and app["requires_approval"]:
+            need = max(int(app["minimum_approvals"] or 1), 1)
+            out.append(
+                GrantPreviewPolicyType(
+                    outcome=APPROVAL_REQUIRED,
+                    source="APP_SETTING",
+                    policy_id=None,
+                    policy_slug=None,
+                    policy_name=None,
+                    permissions=[deploy],
+                    people_count=len(people),
+                    detail=f"Deploys of this app wait for {need} approval{'s' if need != 1 else ''} "
+                    "(the app's deploy-approval setting).",
+                )
+            )
+    out.sort(key=lambda p: (_POLICY_RANK[p.outcome], p.policy_slug or ""))
+    return out
 
 
 def _people(n: int) -> str:
@@ -426,4 +551,5 @@ def _failed(action: str, *errors: str):
         allowed=False,
         refusal=None,
         notes=[],
+        policies=[],
     )

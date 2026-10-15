@@ -955,6 +955,63 @@ def test_a_gateway_registered_by_another_organization_is_not_used(
     )
 
 
+def _connect_install(zentinelle, status=ZentinelleConnection.Status.CONNECTED):
+    sealed = encrypt_at_rest(zentinelle.install(SimpleNamespace(slug="install")).encode("utf-8"))
+    return ZentinelleConnection.objects.create(
+        organization=None,
+        base_url=BASE,
+        status=status,
+        tenant_ids=["tenant-install"],
+        credential_backend_kind=sealed.backend_kind,
+        credential_ciphertext=sealed.backend_ref,
+        connected_at=timezone.now(),
+    )
+
+
+@override_config(ZENTINELLE_GATEWAY_ENABLED=True)
+def test_each_organizations_run_on_a_shared_cluster_uses_the_install_gateway_with_its_own_key(
+    org, other_org, plugin, zentinelle, driver, store
+):
+    """The shared cluster's gateway is the install's (#1905), and each
+    organization's key is still minted by its own install, so Zentinelle
+    attributes the traffic to that organization's tenant."""
+    shared = _cluster(plugin, None, slug="shared")
+    _register(_connect_install(zentinelle), shared)
+    for organization in (org, other_org):
+        _connect(zentinelle, organization)
+    task_a = _task(org, _spec(org, model_gateway=True))
+    task_b = _task(other_org, _spec(other_org, model_gateway=True), guid=uuid.uuid4())
+
+    assert _spawn(shared, task_a).ok
+    assert _spawn(shared, task_b).ok
+
+    assert [(call.method, call.install) for call in zentinelle.calls] == [
+        ("POST", org.slug),
+        ("POST", other_org.slug),
+    ]
+    task_a.refresh_from_db()
+    assert task_a.model_gateway_connection.organization == org
+
+
+@override_config(ZENTINELLE_GATEWAY_ENABLED=True)
+def test_a_shared_cluster_behind_a_revoked_install_connection_is_refused(
+    org, plugin, zentinelle, driver, store
+):
+    shared = _cluster(plugin, None, slug="shared")
+    _register(_connect_install(zentinelle, ZentinelleConnection.Status.REVOKED), shared)
+    _connect(zentinelle, org)
+    task = _task(org, _spec(org, model_gateway=True))
+
+    _refused(
+        shared,
+        task,
+        zentinelle,
+        driver,
+        store,
+        phrase="belongs to the install's Zentinelle connection, which is not connected",
+    )
+
+
 @override_config(ZENTINELLE_GATEWAY_ENABLED=True)
 def test_another_organizations_connection_is_never_used(org, other_org, cluster, zentinelle, driver, store):
     _register(_connect(zentinelle, other_org), cluster)

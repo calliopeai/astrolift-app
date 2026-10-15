@@ -8,6 +8,7 @@ import type { AstroliftRole, AstroliftRoleBinding } from "@/graphql/identity/ide
 import { pageData } from "../access/fixtures";
 
 import type { AssignmentsViewProps } from "./AssignmentsView";
+import type { DeployApprovalSetupProps } from "./DeployApprovalSetup";
 import type { NewRoleScreenProps } from "./NewRoleScreen";
 import type { PermissionsDiagnosticsViewProps } from "./PermissionsDiagnosticsView";
 import { roleCatalog } from "./role-catalog";
@@ -526,4 +527,51 @@ export const SCOPED_SAFETY_FIXTURE = {
   error: null,
   onAdd: async () => true,
   onClear: () => {},
+};
+
+/** Guided deploy approval (#2272): one app gated by a team, one open, one the viewer cannot change. */
+export const DEPLOY_APPROVAL_FIXTURE: DeployApprovalSetupProps = {
+  apps: [
+    {
+      id: "app-checkout",
+      slug: "checkout",
+      name: "checkout",
+      requiresApproval: false,
+      minimumApprovals: 1,
+      approverTeamId: null,
+      approverUserIds: [],
+      version: 4,
+      canUpdate: true,
+    },
+    {
+      id: "app-billing",
+      slug: "billing-api",
+      name: "billing-api",
+      requiresApproval: true,
+      minimumApprovals: 2,
+      approverTeamId: "team-payments",
+      approverUserIds: [],
+      version: 9,
+      canUpdate: true,
+    },
+    {
+      id: "app-ledger",
+      slug: "ledger",
+      name: "ledger",
+      requiresApproval: true,
+      minimumApprovals: 1,
+      approverTeamId: null,
+      approverUserIds: ["61"],
+      version: 2,
+      canUpdate: false,
+    },
+  ],
+  teams: [
+    { id: "team-payments", name: "Payments" },
+    { id: "team-platform", name: "Platform" },
+  ],
+  loading: false,
+  error: null,
+  onRetry: () => {},
+  onSave: async () => null,
 };

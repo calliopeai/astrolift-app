@@ -5,6 +5,12 @@ Zentinelle issued; ``zentinelle.gateway_manage`` registers and unregisters
 clusters and turns their gateways on and off (#1888). Every mutation is
 step-up gated and audited, and no payload carries a credential. The work
 itself is in ``astrolift_operations.zentinelle_connect``.
+
+The install connection (#1905), which shared clusters register through, is
+the platform operator's alone: ``ZentinelleInstallMutations`` checks for the
+operator on every call, since every organization's admins hold the
+``zentinelle.*`` permissions. An org admin's mutations above never reach it:
+they look rows up by the caller's organization, and it has none.
 """
 
 from __future__ import annotations
@@ -39,7 +45,7 @@ from astrolift_operations.schema.types import (
 from astrolift_operations.scopes import org_scope
 from core.decorators import tenant_scoped
 from core.mutations import ErrorCode, mutation_audit
-from core.permissions import Permission, require_permission
+from core.permissions import Permission, check_platform_operator, require_permission
 from core.tenancy import get_current_tenant
 
 ZentinelleConnectError = zentinelle_connect.ZentinelleConnectError
@@ -100,6 +106,31 @@ def _not_registered() -> MutationResultType[None]:
         "this cluster is not registered with this organization's Zentinelle connection",
         field="clusterId",
     )
+
+
+def _operator(info: Info, gate: Permission) -> None:
+    request = getattr(info.context, "request", None)
+    user = getattr(request, "user", None) or getattr(info.context, "user", None)
+    check_platform_operator(user, gate=gate)
+
+
+def _install_connection() -> ZentinelleConnection | None:
+    return ZentinelleConnection.objects.filter(organization__isnull=True).first()
+
+
+def _shared_cluster(cluster_id):
+    from astrolift_clusters.models import TenantCluster
+
+    return (
+        TenantCluster.objects.filter(organization__isnull=True, guid=str(cluster_id), deleted_at__isnull=True)
+        .select_related("provider_plugin")
+        .first()
+    )
+
+
+def _install_target(root, info, input):
+    connection = _install_connection()
+    return ("ZentinelleConnection", str(connection.guid)) if connection is not None else None
 
 
 def _cluster_target(root, info, input):
@@ -305,6 +336,157 @@ class ZentinelleMutations:
         gateway = _gateway(_caller_org_id(), input.cluster_id)
         if gateway is None:
             return _not_registered()
+        try:
+            gateway = zentinelle_connect.unregister_cluster(gateway=gateway, actor=_actor())
+        except ZentinelleConnectError as exc:
+            return _refusal(exc)
+        return gql_success(zentinelle_cluster_gateway_to_type(gateway))
+
+
+@strawberry.type
+class ZentinelleInstallMutations:
+    """The install connection shared clusters register through (#1905). Platform operator only."""
+
+    @strawberry.field
+    @mutation_audit(action="zentinelle.install.connect", extras=_connect_extras)
+    @requires_elevation(action_label="Connect the install to Zentinelle")
+    @require_permission(Permission.ZENTINELLE_CONNECT)
+    def connect_zentinelle_install(
+        self, info: Info, input: ConnectZentinelleInput
+    ) -> MutationResultType[ZentinelleConnectionType]:
+        """Exchange an install-scoped Zentinelle enrollment code for the install
+        connection's credential. The credential is stored encrypted and never returned."""
+        _operator(info, Permission.ZENTINELLE_CONNECT)
+        try:
+            connection = zentinelle_connect.connect(
+                organization=None,
+                url=input.url,
+                code=input.enrollment_code,
+                install_url=zentinelle_connect.install_base_url(),
+                gateway_url=input.gateway_url or "",
+                actor=_actor(),
+            )
+        except ZentinelleConnectError as exc:
+            return _refusal(exc)
+        return gql_success(zentinelle_connection_to_type(connection))
+
+    @strawberry.field
+    @mutation_audit(
+        action="zentinelle.install.gateway_url.set", target=_install_target, extras=_gateway_url_extras
+    )
+    @requires_elevation(action_label="Change where shared cluster gateways reach Zentinelle")
+    @require_permission(Permission.ZENTINELLE_CONNECT)
+    def set_zentinelle_install_gateway_url(
+        self, info: Info, input: SetZentinelleGatewayUrlInput
+    ) -> MutationResultType[ZentinelleConnectionType]:
+        """Point the shared clusters' gateways at another Zentinelle URL and redeploy the running ones."""
+        _operator(info, Permission.ZENTINELLE_CONNECT)
+        connection = _install_connection()
+        if connection is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "the install is not connected to Zentinelle")
+        try:
+            zentinelle_connect.set_gateway_url(connection=connection, url=input.gateway_url)
+        except ZentinelleConnectError as exc:
+            return _refusal(exc)
+        connection.refresh_from_db()
+        return gql_success(zentinelle_connection_to_type(connection))
+
+    @strawberry.field
+    @mutation_audit(action="zentinelle.install.disconnect", target=_install_target, extras=_disconnect_extras)
+    @requires_elevation(action_label="Disconnect the install from Zentinelle")
+    @require_permission(Permission.ZENTINELLE_CONNECT)
+    def disconnect_zentinelle_install(
+        self, info: Info, input: DisconnectZentinelleInput
+    ) -> MutationResultType[ZentinelleDisconnectType]:
+        """Revoke the install connection in Zentinelle, then remove every shared cluster's gateway."""
+        _operator(info, Permission.ZENTINELLE_CONNECT)
+        connection = _install_connection()
+        if connection is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "the install is not connected to Zentinelle")
+        try:
+            outcome = zentinelle_connect.disconnect(connection=connection, actor=_actor(), force=input.force)
+        except ZentinelleConnectError as exc:
+            return _refusal(exc)
+        return gql_success(
+            ZentinelleDisconnectType(
+                connection=zentinelle_connection_to_type(outcome.connection),
+                warnings=outcome.warnings,
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(
+        action="zentinelle.install.cluster.register", target=_cluster_target, extras=_gateway_extras
+    )
+    @requires_elevation(action_label="Register a shared cluster with Zentinelle")
+    @require_permission(Permission.ZENTINELLE_GATEWAY_MANAGE)
+    def register_zentinelle_shared_cluster(
+        self, info: Info, input: ZentinelleClusterInput
+    ) -> MutationResultType[ZentinelleClusterGatewayType]:
+        """Register a shared cluster through the install connection and write its gateway credential."""
+        _operator(info, Permission.ZENTINELLE_GATEWAY_MANAGE)
+        connection = _install_connection()
+        if connection is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "connect the install to Zentinelle first")
+        cluster = _shared_cluster(input.cluster_id)
+        if cluster is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value, f"shared cluster {input.cluster_id!r} not found", field="clusterId"
+            )
+        try:
+            gateway = zentinelle_connect.register_cluster(connection=connection, cluster=cluster)
+        except ZentinelleConnectError as exc:
+            return _refusal(exc)
+        return gql_success(zentinelle_cluster_gateway_to_type(gateway))
+
+    @strawberry.field
+    @mutation_audit(action="zentinelle.install.cluster.move", target=_cluster_target, extras=_gateway_extras)
+    @requires_elevation(action_label="Move a shared cluster to the install's Zentinelle connection")
+    @require_permission(Permission.ZENTINELLE_GATEWAY_MANAGE)
+    def move_zentinelle_shared_cluster_to_install(
+        self, info: Info, input: ZentinelleClusterInput
+    ) -> MutationResultType[ZentinelleClusterGatewayType]:
+        """Move a shared cluster an organization registered to the install connection.
+        The install registers it first; the organization's registration is revoked after."""
+        _operator(info, Permission.ZENTINELLE_GATEWAY_MANAGE)
+        connection = _install_connection()
+        if connection is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "connect the install to Zentinelle first")
+        cluster = _shared_cluster(input.cluster_id)
+        if cluster is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value, f"shared cluster {input.cluster_id!r} not found", field="clusterId"
+            )
+        try:
+            gateway = zentinelle_connect.move_to_install(install=connection, cluster=cluster)
+        except ZentinelleConnectError as exc:
+            return _refusal(exc)
+        return gql_success(zentinelle_cluster_gateway_to_type(gateway))
+
+    @strawberry.field
+    @mutation_audit(action="zentinelle.install.cluster.unregister", target=_cluster_target)
+    @requires_elevation(action_label="Unregister a shared cluster from Zentinelle")
+    @require_permission(Permission.ZENTINELLE_GATEWAY_MANAGE)
+    def unregister_zentinelle_shared_cluster(
+        self, info: Info, input: ZentinelleClusterInput
+    ) -> MutationResultType[ZentinelleClusterGatewayType]:
+        """Revoke a shared cluster in Zentinelle, then remove its gateway and credential Secret."""
+        _operator(info, Permission.ZENTINELLE_GATEWAY_MANAGE)
+        gateway = (
+            ZentinelleClusterGateway.objects.filter(
+                connection__organization__isnull=True,
+                connection__deleted_at__isnull=True,
+                cluster__guid=str(input.cluster_id),
+            )
+            .select_related("connection", "cluster")
+            .first()
+        )
+        if gateway is None:
+            return gql_failure(
+                ErrorCode.NOT_FOUND.value,
+                "this cluster is not registered with the install's Zentinelle connection",
+                field="clusterId",
+            )
         try:
             gateway = zentinelle_connect.unregister_cluster(gateway=gateway, actor=_actor())
         except ZentinelleConnectError as exc:

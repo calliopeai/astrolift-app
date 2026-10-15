@@ -16,6 +16,8 @@ export interface OrganizationSettingsDraft {
   website: string;
   auditDays: string;
   allowProfileEdit: boolean;
+  /** Members may step up with a personal PIN (#2399). */
+  allowStepUpPin: boolean;
   /** Settings a member can't change, for members who have not chosen themselves. */
   restrictedSettingsDefault: RestrictedSettings;
 }
@@ -44,6 +46,7 @@ export function useOrganizationSettings() {
           website: draft.website.trim(),
           auditLogRetentionDays: Number(draft.auditDays) || 365,
           allowUserProfileEdit: draft.allowProfileEdit,
+          allowStepUpPin: draft.allowStepUpPin,
           restrictedSettingsDefault: draft.restrictedSettingsDefault,
         },
       },

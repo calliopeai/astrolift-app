@@ -71,7 +71,7 @@ from astrolift_operations.schema.mutations.types import (  # noqa: F401
     _SoftDeletePayload,
 )
 from astrolift_operations.schema.mutations.webhooks import WebhookMutations
-from astrolift_operations.schema.mutations.zentinelle import ZentinelleMutations
+from astrolift_operations.schema.mutations.zentinelle import ZentinelleInstallMutations, ZentinelleMutations
 
 
 @strawberry.type
@@ -85,5 +85,6 @@ class OperationsMutation(
     BulkOpsMutations,
     RetentionHoldMutations,
     ZentinelleMutations,
+    ZentinelleInstallMutations,
 ):
     """Root mutation type — inherits fields from each domain mixin."""

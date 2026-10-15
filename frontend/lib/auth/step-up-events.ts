@@ -26,9 +26,10 @@ export const DEELEVATED_EVENT = "astrolift:deelevated" as const;
  * ``astrolift_identity.session_elevation``. The deny envelope from a
  * ``@requires_elevation``-gated mutation lists which one(s) apply to
  * the current session — SSO-only installs surface ``"sso"``,
- * local-login installs surface ``"password"`` (#526).
+ * local-login installs surface ``"password"`` (#526). A person with a
+ * step-up PIN in an org that allows it gets ``"pin"`` first (#2399).
  */
-export type StepUpMethod = "password" | "sso" | "webauthn" | "magic_link";
+export type StepUpMethod = "password" | "sso" | "webauthn" | "magic_link" | "pin";
 
 export type StepUpEventDetail = {
   operationName: string;
