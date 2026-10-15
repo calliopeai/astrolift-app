@@ -124,7 +124,7 @@ def host(apps):
             if route == "branches/main/protection":
                 return self.response(200 if state.protected else 404)
             if route == "branches/main":
-                return self.response(200, {"commit": {"sha": "b" * 40}})
+                return self.response(200, {"commit": {"sha": "b" * 40}, "protected": state.protected})
             if route == "git/refs" and self.command == "POST":
                 branch = body["ref"].removeprefix("refs/heads/")
                 assert body["sha"] == "b" * 40

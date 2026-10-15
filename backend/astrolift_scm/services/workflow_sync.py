@@ -787,17 +787,19 @@ def _is_github_branch_protected(
     repo_full_name: str,
     branch: str,
 ) -> bool:
-    """GET /repos/{owner}/{repo}/branches/{branch}/protection.
+    """GET /repos/{owner}/{repo}/branches/{branch} and read ``protected``.
 
-    404 → unprotected; 200 → protected; auth / other errors bubble as
-    "treat as unprotected" so we don't unnecessarily push every change
-    through a PR. The mutation surface still surfaces a downstream
-    write failure cleanly via ``fetch_failed``.
+    The ``/protection`` sub-resource needs repo admin and answers 404 to
+    anyone else, so a non-admin token read every protected branch as open
+    and the sync PUT straight onto it, which GitHub refused (SteadyMD
+    smd-white-label). The branch's own ``protected`` flag is visible to
+    any reader. Auth / other errors still read as "unprotected"; the
+    write then surfaces its own failure via ``fetch_failed``.
     """
     token = _token(connection)
     base = _github_api_base(connection)
     safe_branch = urllib.parse.quote(branch, safe="")
-    url = f"{base}/repos/{_safe_repo(repo_full_name)}/branches/{safe_branch}/protection"
+    url = f"{base}/repos/{_safe_repo(repo_full_name)}/branches/{safe_branch}"
     req = urllib.request.Request(
         url,
         headers={
@@ -809,10 +811,10 @@ def _is_github_branch_protected(
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
-            _ = resp.read()
-            return True
-    except urllib.error.HTTPError as exc:
-        if exc.code == 404:
+            payload = json.loads(resp.read().decode("utf-8") or "{}")
+            return bool(isinstance(payload, dict) and payload.get("protected"))
+    except (urllib.error.HTTPError, ValueError) as exc:
+        if getattr(exc, "code", None) == 404:
             return False
         # 401/403/etc. — fall through to "not protected" so the write
         # path attempts a direct PUT. If the write also auth-fails,

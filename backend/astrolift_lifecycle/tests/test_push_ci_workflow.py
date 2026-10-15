@@ -219,8 +219,8 @@ def test_creates_workflow_file_when_missing(
             # The superseded-workflow cleanup (#1697) looks for the app's
             # other managed path; this repo has no such file.
             return "error", _http_error(404, b'{"message":"Not Found"}', url)
-        if method == "GET" and "/branches/main/protection" in url:
-            return "error", _http_error(404, b'{"message":"Branch not protected"}', url)
+        if method == "GET" and url.endswith("/branches/main"):
+            return "response", json.dumps({"commit": {"sha": "headsha"}, "protected": False}).encode()
         if method == "PUT" and f"/contents/{github_workflow_path_for(app_with_repo)}" in url:
             body = json.dumps(
                 {
@@ -299,8 +299,6 @@ def test_a_file_astrolift_did_not_write_is_not_overwritten(
             # The superseded-workflow cleanup (#1697) looks for the app's
             # other managed path; this repo has no such file.
             return "error", _http_error(404, b'{"message":"Not Found"}', url)
-        if method == "GET" and "/branches/main/protection" in url:
-            return "error", _http_error(404, b"", url)
         # Side-branch creation: read the deploy branch tip, then create the ref.
         if method == "GET" and "/branches/main" in url:
             return "response", json.dumps({"commit": {"sha": "headsha"}}).encode()
@@ -409,11 +407,9 @@ def test_protected_branch_opens_pull_request(
             # The superseded-workflow cleanup (#1697) looks for the app's
             # other managed path; this repo has no such file.
             return "error", _http_error(404, b'{"message":"Not Found"}', url)
-        if method == "GET" and "/branches/main/protection" in url:
-            return "response", json.dumps({"enabled": True}).encode()
-        # Head SHA lookup for the deploy branch.
+        # The protection probe and the head SHA lookup read the same branch.
         if method == "GET" and url.endswith("/branches/main"):
-            return "response", json.dumps({"commit": {"sha": "abc123head"}}).encode()
+            return "response", json.dumps({"commit": {"sha": "abc123head"}, "protected": True}).encode()
         # Create ref for side branch.
         if method == "POST" and url.endswith("/git/refs"):
             return "response", json.dumps({"ref": "refs/heads/astrolift/ci-workflow-..."}).encode()
