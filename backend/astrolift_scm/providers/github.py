@@ -1003,14 +1003,16 @@ def put_github_file(
             body_text = exc.read().decode("utf-8", "replace")[:300]
         except Exception:
             pass
-        # Only a SHA precondition failure is a conflict. A protected branch,
-        # a missing branch or a scope refusal ride the same 409/422 codes
-        # and were reported as "review the current file", hiding the cause.
-        if (
-            (expected_sha is not None or expected_absent)
-            and exc.code in (409, 422)
-            and ("does not match" in body_text or "sha" in body_text.lower())
-        ):
+        # A protected branch, a missing branch or a scope refusal ride the
+        # same 409/422 codes as a SHA precondition failure, and were reported
+        # as "review the current file", hiding the cause. Only a refusal that
+        # names none of those is a conflict.
+        lowered = body_text.lower()
+        other_cause = any(
+            marker in lowered
+            for marker in ("pull request", "protected branch", "rule violation", "scope", "branch not found")
+        )
+        if (expected_sha is not None or expected_absent) and exc.code in (409, 422) and not other_cause:
             raise GithubProviderError(
                 "CONFLICT",
                 "GitHub refused the conditional file write; review the current file before retrying.",
