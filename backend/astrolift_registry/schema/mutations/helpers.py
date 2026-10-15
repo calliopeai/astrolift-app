@@ -461,10 +461,13 @@ def _viewer_can_access_project(*, project, viewer) -> bool:
     return False
 
 
-def _place_app_environment(app: RegisteredApp, env_name: str, cluster: TenantCluster, managed_domain):
+def _place_app_environment(
+    app: RegisteredApp, env_name: str, cluster: TenantCluster, managed_domain, *, any_cluster: bool = False
+):
     """Create one ``AppEnvironment`` of ``app`` on ``cluster``, placed the way
     every bootstrap places one: its namespace per #1922 and, when that is a
     namespace of its own, a hostname label of its own under ``managed_domain``.
+    ``any_cluster`` as in ``namespace_for_new_environment``.
     """
     from astrolift_lifecycle.models import AppEnvironment
     from astrolift_registry.namespaces import namespace_for_new_environment
@@ -479,7 +482,9 @@ def _place_app_environment(app: RegisteredApp, env_name: str, cluster: TenantClu
     # empty URL is the honest answer and is already what the model
     # allows; the app surfaces the missing binding instead.
     base_zone: str = getattr(managed_domain, "zone", None) or ""
-    k8s_namespace = namespace_for_new_environment(app, name=env_name, cluster=cluster)
+    k8s_namespace = namespace_for_new_environment(
+        app, name=env_name, cluster=cluster, any_cluster=any_cluster
+    )
     label = app.subdomain or app.slug
     if k8s_namespace:
         label = environment_hostname_label(label, env_name)

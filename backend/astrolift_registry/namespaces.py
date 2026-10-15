@@ -127,13 +127,17 @@ def unique_environment_namespace(
     raise RuntimeError(f"no free Kubernetes namespace derived from {preferred!r}")
 
 
-def namespace_for_new_environment(app, *, name: str, cluster) -> str:
+def namespace_for_new_environment(app, *, name: str, cluster, any_cluster: bool = False) -> str:
     """The ``k8s_namespace`` a new non-preview environment of ``app`` records (#1922).
 
     Blank, meaning the app namespace, which is where the first environment
     of an app on a cluster renders exactly as before. When a live
     environment of ``app`` on ``cluster`` already renders there, a namespace
     of its own: ``<app namespace>-<name>``, or that plus a hash when taken.
+
+    ``any_cluster`` counts an environment in the app namespace on any
+    cluster (#2398): that one serves the app's bare hostname, so a second
+    one on another cluster would serve the same hostname there too.
     """
     from _sdk.k8s_naming import dns_label
 
@@ -142,9 +146,10 @@ def namespace_for_new_environment(app, *, name: str, cluster) -> str:
 
     if cluster is None:
         return ""
-    shares = AppEnvironment.objects.filter(
-        registered_app=app, tenant_cluster=cluster, k8s_namespace=""
-    ).exists()
+    shares = AppEnvironment.objects.filter(registered_app=app, k8s_namespace="")
+    if not any_cluster:
+        shares = shares.filter(tenant_cluster=cluster)
+    shares = shares.exists()
     if not shares:
         return ""
     return unique_environment_namespace(

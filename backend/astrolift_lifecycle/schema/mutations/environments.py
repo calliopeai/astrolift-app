@@ -130,8 +130,15 @@ class EnvironmentMutations:
 
         try:
             with transaction.atomic():
+                # Bootstrap places every environment on one cluster; this one
+                # may land on another, where the app namespace would serve
+                # the app's bare hostname a second time.
                 env = _place_app_environment(
-                    app, name, cluster, resolve_managed_domain(app.organization, for_preview=False)
+                    app,
+                    name,
+                    cluster,
+                    resolve_managed_domain(app.organization, for_preview=False),
+                    any_cluster=True,
                 )
                 if any(service.environment == name for service in services):
                     # Reconcile only what has somewhere to land: a service

@@ -142,3 +142,28 @@ def test_without_a_default_cluster_the_caller_must_choose(placed):
 
     result = _create(placed.org, app_slug=placed.app.slug, name="staging", cluster_slug=placed.cluster.slug)
     assert result.ok, result.errors
+
+
+def test_on_another_cluster_it_still_serves_a_hostname_of_its_own(placed, provider_plugin):
+    # Production renders into the app namespace on its cluster and serves the
+    # app's bare hostname. An environment on a second cluster that also
+    # rendered into the app namespace would serve that same hostname there,
+    # and the two clusters' Ingresses would fight over production's DNS.
+    second = TenantCluster.objects.create(
+        organization=placed.org,
+        name="second",
+        slug="second-2398",
+        provider_plugin=provider_plugin,
+        provider_config={},
+        endpoint="https://second.invalid",
+        auth_method=TenantCluster.AuthMethod.KUBECONFIG,
+        auth_config={},
+        lifecycle=TenantCluster.Lifecycle.MANAGED.value,
+    )
+
+    result = _create(placed.org, app_slug=placed.app.slug, name="staging", cluster_slug=second.slug)
+
+    assert result.ok, result.errors
+    env = AppEnvironment.objects.get(registered_app=placed.app, name="staging")
+    assert env.tenant_cluster_id == second.pk
+    assert env.k8s_namespace
