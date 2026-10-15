@@ -119,6 +119,7 @@ from astrolift_lifecycle.scopes import (
     scheduled_job_run_app_scope,
     task_run_app_scope,
 )
+from astrolift_lifecycle.viewer_permissions import environment_viewer_permissions
 from astrolift_lifecycle.visibility import (
     cluster_owned_and_live,
     historical_deployment_rows,
@@ -927,7 +928,9 @@ class LifecycleQuery(ManagedDomainAppRouteQuery, ManagedDomainAppRouteOperationQ
         if app_slug:
             qs = qs.filter(registered_app__slug=app_slug)
         qs = visible_operation_rows(qs, Permission.APP_READ, environment_path="self")
-        return [app_env_to_type(e) for e in qs[:300]]
+        rows = list(qs[:300])
+        permissions = environment_viewer_permissions(rows)
+        return [app_env_to_type(e, viewer_permissions=permissions[e.pk]) for e in rows]
 
     @strawberry.field
     @require_permission(Permission.APP_READ, any_scope=True)
@@ -983,7 +986,9 @@ class LifecycleQuery(ManagedDomainAppRouteQuery, ManagedDomainAppRouteOperationQ
         )
         order_by = resolve_list_sort(sort, ENVIRONMENTS_SORT_KEYS, default=ENVIRONMENTS_DEFAULT_SORT)
         qs = visible_operation_rows(qs, Permission.APP_READ, environment_path="self")
-        return numbered_page(qs, order_by=order_by, page=page, page_size=page_size).map(app_env_to_type)
+        result = numbered_page(qs, order_by=order_by, page=page, page_size=page_size)
+        permissions = environment_viewer_permissions(result.rows)
+        return result.map(lambda e: app_env_to_type(e, viewer_permissions=permissions[e.pk]))
 
     @strawberry.field(
         deprecation_reason=("Caps at 200 rows with no way to reach the 201st. Use astroliftDeploymentsPage.")

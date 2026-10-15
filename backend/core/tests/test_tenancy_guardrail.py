@@ -77,6 +77,10 @@ EXEMPT: dict[str, str] = {
         "self-service: returns the caller's effective permissions — "
         "ordering matters because permissions drive nav rendering"
     ),
+    "IdentityQuery.astrolift_access_revision": (
+        "self-service: a digest of the caller's own grants and session, "
+        "so the client knows when its cached permissions are stale"
+    ),
     "IdentityQuery.astrolift_nav_tree": (
         "self-service: returns the shape of the tenant the caller is "
         "already scoped to. tenant_scoped is the visibility boundary; "

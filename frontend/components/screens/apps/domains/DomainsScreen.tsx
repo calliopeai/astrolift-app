@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { AstroliftAppEnvironment } from "@/graphql/lifecycle/lifecycle.types";
 import { DOC_LINKS } from "@/lib/docs/urls";
+import { environmentCan } from "@/lib/permissions/environment-permissions";
 
 import { AddDomainSheet } from "./AddDomainSheet";
 import {
@@ -422,7 +423,7 @@ function IngressStatusCard({
               {t("live")}
             </Badge>
           )}
-          <Can permission="app.deploy">
+          {environmentCan(env, "app.deploy") && (
             <Button
               size="sm"
               variant={paused ? "default" : "outline"}
@@ -438,7 +439,7 @@ function IngressStatusCard({
               )}
               {paused ? t("resume") : t("pause")}
             </Button>
-          </Can>
+          )}
         </>
       }
     >

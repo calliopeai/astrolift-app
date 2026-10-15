@@ -173,3 +173,15 @@ export const JapaneseEnvironmentWidth768: Story = {
     </NextIntlClientProvider>
   ),
 };
+
+/** This environment refuses deploys (#1867): neither pause nor deploy is offered. */
+export const EnvironmentDeployDenied: Story = {
+  render: () => (
+    <EnvironmentControlsView {...envControls({ ...ENV_PROD, viewerPermissions: ["app.update"] })} />
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.queryByRole("button", { name: /Deploy now/ })).toBeNull();
+    await expect(canvas.queryByRole("button", { name: /Pause/ })).toBeNull();
+  },
+};

@@ -2183,6 +2183,28 @@ class IdentityQuery:
 
     @strawberry.field
     @tenant_scoped()
+    def astrolift_access_revision(self, info: Info) -> str:
+        """Changes whenever the viewer's roles, attributes, policies or session do (#1867).
+
+        Clients hold capabilities (``astroliftMyPermissions``, each object's
+        ``viewerPermissions``) against this value and drop them when it moves.
+        Empty for an anonymous caller. Like those fields it grants nothing.
+        """
+        from astrolift_identity.abac import current_attributes
+        from astrolift_identity.access_revision import access_revision
+        from astrolift_identity.api_tokens import get_current_api_token
+        from core.tenancy import get_current_tenant
+
+        session = getattr(getattr(info.context, "request", None), "session", None)
+        return access_revision(
+            get_current_tenant(),
+            current_attributes(),
+            session_key=getattr(session, "session_key", None),
+            api_token=get_current_api_token(),
+        )
+
+    @strawberry.field
+    @tenant_scoped()
     def astrolift_active_identity_provider(self, info: Info) -> IdentityProviderType | None:
         """The IdP currently bound to the active organization (or None).
 

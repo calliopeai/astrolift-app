@@ -7,6 +7,7 @@ import { LiveRegionProvider } from "@/providers/LiveRegion";
 import { ScmCallbackToast } from "@/providers/ScmCallbackToast";
 import { AppearancePolicyBridge } from "@/providers/AppearancePolicyBridge";
 import { UiPreferencesBridge } from "@/providers/UiPreferencesBridge";
+import { AccessRevisionBridge } from "@/providers/AccessRevisionBridge";
 import { SessionExpiredModal } from "@/components/SessionExpiredModal";
 import { SkipToContent } from "@/components/SkipToContent";
 import { getClient } from "@/lib/apollo";
@@ -84,6 +85,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             (#135, #2154) reach the browser-stored preferences here. */}
         <AppearancePolicyBridge />
         <UiPreferencesBridge />
+        {/* Cached permissions are dropped when the viewer's access changes (#1867). */}
+        <AccessRevisionBridge />
         <AppShellContainer>{children}</AppShellContainer>
         <ScmCallbackToast />
         <SessionExpiredModal />

@@ -141,6 +141,7 @@ ALLOWED: dict[str, str] = {
     "Query.astroliftMyProfile": "self-service: the caller's own editable profile",
     "Query.astroliftOrganizations": "self-service: the orgs the caller is an active member of, to pick a tenant from",
     "Query.astroliftMyPermissions": "self-service: the caller's own effective permissions",
+    "Query.astroliftAccessRevision": "self-service: when the caller's own permissions may have changed",
     "Query.astroliftNavTree": "self-service: the shape of the caller's own org for the sidebar",
     "Query.astroliftActiveIdentityProvider": "self-service: the IdP the sign-in page renders",
     "Query.astroliftActiveSessions": "self-service: the caller's own sessions",

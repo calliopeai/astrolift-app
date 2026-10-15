@@ -40,6 +40,7 @@ const makeRows = () => [
     clusterSlug: "CLUSTER_LITERAL",
     clusterProviderPluginSlug: "PROVIDER_LITERAL",
     createdAt: "2026-10-01T00:00:00Z",
+    viewerPermissions: ["app.update"],
     settings: [
       { id: guid(4), key: existingKey, value: existingValue },
       { id: guid(5), key: "cpu_limit", value: "" },
@@ -53,6 +54,7 @@ const makeRows = () => [
     clusterSlug: "CLUSTER_LITERAL",
     clusterProviderPluginSlug: "PROVIDER_LITERAL",
     createdAt: "2026-10-01T00:00:00Z",
+    viewerPermissions: ["app.update"],
     settings: [],
   },
 ];
