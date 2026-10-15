@@ -1054,7 +1054,8 @@ class ZentinelleClusterGatewayType:
 
 @strawberry.type(name="AstroliftZentinelleConnection")
 class ZentinelleConnectionType:
-    """This organization's connection to a Zentinelle deployment (#1887).
+    """This organization's connection to a Zentinelle deployment (#1887), or
+    the install's, which shared clusters register through (#1905).
 
     The install credential is stored encrypted and is never returned.
     """

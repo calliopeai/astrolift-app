@@ -12,6 +12,12 @@ to Zentinelle is already configured per org (``WebhookSubscription``), and
 connecting is an org-admin action, so a single install-wide row would let
 one org's admin rewire every org's governance.
 
+The one exception is the install connection (#1905): a row with no
+organization, connected by the platform operator. Shared clusters (no
+organization) register only through it, since every organization trusts a
+shared cluster and none of them should own its gateway. Organization-owned
+clusters keep their organization's connection.
+
 The install credential is kept encrypted with ``core.secrets``, like SCM
 tokens. The gateway credential is not kept at all: Zentinelle returns it
 once, it is written into the cluster Secret, and a lost one is replaced by
@@ -27,7 +33,8 @@ from core.models.base import BaseCoreModel
 
 
 class ZentinelleConnection(BaseCoreModel):
-    """One organization's link to one Zentinelle deployment."""
+    """One organization's link to one Zentinelle deployment, or the install's
+    (no organization) for shared clusters."""
 
     class Status(models.TextChoices):
         CONNECTED = "connected"
@@ -40,6 +47,9 @@ class ZentinelleConnection(BaseCoreModel):
         "astrolift_identity.Organization",
         related_name="zentinelle_connections",
         on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        help_text="Null for the install connection, which shared clusters register through (#1905).",
     )
     base_url = models.URLField(max_length=500)
     gateway_url = models.CharField(
@@ -79,9 +89,16 @@ class ZentinelleConnection(BaseCoreModel):
             models.UniqueConstraint(
                 fields=("organization",),
                 condition=models.Q(deleted_at__isnull=True),
+                # One live install connection too.
+                nulls_distinct=False,
                 name="zentinelle_connection_one_live_per_org",
             )
         ]
+
+    @property
+    def is_install(self) -> bool:
+        """The install connection, which shared clusters register through."""
+        return self.organization_id is None
 
     def __str__(self) -> str:
         return f"ZentinelleConnection({self.organization_id}, {self.base_url}, {self.status})"

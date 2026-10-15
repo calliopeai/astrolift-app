@@ -8,7 +8,9 @@ Zentinelle with the bootstrap secret, then runs
 
 with the code in that environment variable. ``--gateway-url`` points the
 cluster gateways at a private, in-cluster Zentinelle address (#1905); it is
-applied to an existing connection too. The code is never an argument,
+applied to an existing connection too. ``--install`` in place of ``--org``
+connects the install connection that shared clusters register through
+(#1905), with an install-scoped code. The code is never an argument,
 so it is not in the task's command line, its logs or a process listing.
 
 The exchange is the org-admin ``connectZentinelle`` mutation's
@@ -40,7 +42,13 @@ class Command(BaseCommand):
     help = "Connect an organization to Zentinelle with an enrollment code read from an environment variable."
 
     def add_arguments(self, parser):
-        parser.add_argument("--org", required=True, help="Slug of the organization to connect.")
+        target = parser.add_mutually_exclusive_group(required=True)
+        target.add_argument("--org", help="Slug of the organization to connect.")
+        target.add_argument(
+            "--install",
+            action="store_true",
+            help="Connect the install connection, which shared clusters register through.",
+        )
         parser.add_argument("--url", required=True, help="Zentinelle's URL.")
         parser.add_argument(
             "--code-env",
@@ -61,9 +69,12 @@ class Command(BaseCommand):
         code_env = options["code_env"]
         if not _ENV_NAME.match(code_env):
             raise CommandError("--code-env must name an environment variable, not hold the code")
-        organization = Organization.objects.filter(slug=options["org"]).first()
-        if organization is None:
-            raise CommandError(f"no organization {options['org']!r}")
+        organization = None
+        if not options["install"]:
+            organization = Organization.objects.filter(slug=options["org"]).first()
+            if organization is None:
+                raise CommandError(f"no organization {options['org']!r}")
+        who = "the install" if organization is None else f"organization {organization.slug}"
         try:
             url = zentinelle_connect.normalize_base_url(options["url"])
             gateway_url = zentinelle_connect.normalize_gateway_url(options["gateway_url"])
@@ -74,8 +85,8 @@ class Command(BaseCommand):
         if existing is not None and existing.status == ZentinelleConnection.Status.CONNECTED:
             if existing.base_url != url:
                 raise CommandError(
-                    f"organization {organization.slug!r} is connected to {existing.base_url}; "
-                    "an org admin disconnects it before it connects elsewhere"
+                    f"{who} is connected to {existing.base_url}; "
+                    "an administrator disconnects it before it connects elsewhere"
                 )
             try:
                 live = zentinelle_connect.credential_accepted(existing)
@@ -92,7 +103,7 @@ class Command(BaseCommand):
                     raise CommandError(exc.message) from None
                 self.stdout.write(f"cluster gateways now reach Zentinelle at {gateway_url or url}")
             self._enable_flags()
-            self.stdout.write(f"organization {organization.slug} already connected to {url}; nothing to do")
+            self.stdout.write(f"{who} already connected to {url}; nothing to do")
             return
 
         code = os.environ.get(code_env, "").strip()
@@ -117,7 +128,7 @@ class Command(BaseCommand):
         self._audit(organization, connection, started)
         self._enable_flags()
         self.stdout.write(
-            f"organization {organization.slug} connected to {url} "
+            f"{who} connected to {url} "
             f"(Zentinelle install {connection.zentinelle_install_id or 'unknown'})"
         )
 
@@ -137,8 +148,8 @@ class Command(BaseCommand):
         emit_audit(
             AuditEntry(
                 actor_user_id=None,
-                organization_id=organization.pk,
-                action="zentinelle.connect",
+                organization_id=organization.pk if organization is not None else None,
+                action="zentinelle.connect" if organization is not None else "zentinelle.install.connect",
                 decision="ALLOW",
                 target_kind="ZentinelleConnection",
                 target_id=str(connection.guid),
