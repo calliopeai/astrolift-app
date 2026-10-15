@@ -6925,6 +6925,12 @@ export type CreateApiTokenInput = {
   teamSlug: InputMaybe<Scalars['String']['input']>;
 };
 
+export type CreateAppEnvironmentInput = {
+  appSlug: Scalars['String']['input'];
+  clusterSlug: InputMaybe<Scalars['String']['input']>;
+  name: Scalars['String']['input'];
+};
+
 export type CreateClusterAuthGroupInput = {
   clusterId: Scalars['GUID']['input'];
   description: Scalars['String']['input'];
@@ -8852,6 +8858,7 @@ export type Mutation = {
   createAgentTrigger: AstroliftAgentTriggerResult;
   createAlertRule: AstroliftAlertRuleMutationResult;
   createApiToken: AstroliftApiTokenPlaintextMutationResult;
+  createAppEnvironment: AstroliftAppEnvironmentMutationResult;
   createClusterAuthGroup: AstroliftClusterAuthUserChangeMutationResult;
   createClusterAuthUser: AstroliftClusterAuthUserMutationResult;
   createDeployToken: DeployTokenSecretRevealMutationResult;
@@ -9632,6 +9639,11 @@ export type MutationCreateAlertRuleArgs = {
 
 export type MutationCreateApiTokenArgs = {
   input: CreateApiTokenInput;
+};
+
+
+export type MutationCreateAppEnvironmentArgs = {
+  input: CreateAppEnvironmentInput;
 };
 
 

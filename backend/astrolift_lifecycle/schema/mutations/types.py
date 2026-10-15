@@ -224,6 +224,16 @@ class EnvironmentByIdInput:
 
 
 @strawberry.input
+class CreateAppEnvironmentInput:
+    """Add an environment to a registered app (#2398). ``cluster_slug``
+    defaults to the app's default cluster."""
+
+    app_slug: str
+    name: str
+    cluster_slug: str | None = None
+
+
+@strawberry.input
 class AddAppDomainInput:
     app_slug: str
     hostname: str

@@ -2628,6 +2628,17 @@
         "inSync": "すでに同期されています。",
         "accepted": "{slug} の再同期を受け付けました。",
         "reportedState": "{slug} の再同期を受け付けました。報告された状態: {state}。完了は未確認です。"
+      },
+      "addEnvironment": {
+        "title": "環境を追加",
+        "description": "このアプリに staging などの環境を追加します。選択したクラスター上に専用の名前空間とホスト名が割り当てられ、最初のデプロイで起動します。",
+        "nameLabel": "名前",
+        "nameHint": "小文字、数字、ハイフンのみ、63 文字以内。",
+        "clusterLabel": "クラスター",
+        "defaultCluster": "アプリの既定クラスター",
+        "button": "環境を追加",
+        "created": "環境 {name} を作成しました。",
+        "failed": "環境を作成できませんでした。"
       }
     },
     "common": {
