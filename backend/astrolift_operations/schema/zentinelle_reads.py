@@ -406,6 +406,7 @@ class ZentinelleReadsMutations:
             connection = _connection()
             events: list[zentinelle_reads.AuditEvent] = []
             cursor = None
+            cursors: set[str] = set()
             while slugs != []:
                 page, cursor = zentinelle_reads.audit_page(
                     connection,
@@ -423,6 +424,12 @@ class ZentinelleReadsMutations:
                     )
                 if cursor is None:
                     break
+                if cursor in cursors:
+                    return gql_failure(
+                        ErrorCode.INTERNAL.value,
+                        "Zentinelle answered the same audit cursor twice; the export stopped",
+                    )
+                cursors.add(cursor)
         except (_ReadError, ZentinelleConnectError) as exc:
             return gql_failure(exc.code.value, exc.message, field=exc.field)
         stamp = timezone.now().strftime("%Y%m%dT%H%M%SZ")

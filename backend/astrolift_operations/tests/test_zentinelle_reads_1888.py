@@ -416,3 +416,18 @@ def test_export_refuses_an_unknown_format(world, zentinelle):
             world.info, ExportZentinelleAuditInput(since=SINCE, format="pdf")
         )
     assert not result.ok and result.errors[0].field == "format"
+
+
+def test_export_stops_when_zentinelle_repeats_a_cursor(world, zentinelle, monkeypatch):
+    def stuck(method, url, **kwargs):
+        zentinelle(method, url, **kwargs)
+        return FakeResponse(200, {"events": [], "next_cursor": "7"})
+
+    monkeypatch.setattr(zentinelle_connect.requests, "request", stuck)
+    _grant(world, [Permission.ZENTINELLE_AUDIT_EXPORT])
+    with as_tenant(world, world.user):
+        result = ZentinelleReadsMutations().export_zentinelle_audit(
+            world.info, ExportZentinelleAuditInput(since=SINCE)
+        )
+    assert not result.ok and "same audit cursor" in result.errors[0].message
+    assert len(zentinelle.reads()) == 2
