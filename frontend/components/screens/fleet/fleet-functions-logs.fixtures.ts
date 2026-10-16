@@ -80,6 +80,7 @@ const TASK: AstroliftAgentTask = {
   snapshotUrl: null,
   podName: "research-scout-7f3c2a91",
   namespace: "agents-growth",
+  model: "",
 };
 
 export const TASKS: AstroliftAgentTask[] = [

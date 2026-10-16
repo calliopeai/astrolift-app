@@ -13860,6 +13860,7 @@
       "finished": "Finalizada",
       "pod": "Pod",
       "namespace": "Espacio de nombres",
+      "model": "Modelo",
       "callbackUrl": "URL de devolución de llamada",
       "liveSession": "Sesión en directo",
       "liveNow": "en directo ahora",

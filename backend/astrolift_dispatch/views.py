@@ -729,6 +729,19 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
             task.result = result
             task.save(update_fields=["result", "updated_at", "version"])
 
+        from astrolift_agents.services.task_completion_callbacks import normalized_usage
+
+        # Record the model the harness reports on any callback (#2416), so a
+        # run that later times out or is cancelled still carries it.
+        reported_model = normalized_usage(body.get("usage"))["model"]
+        if (
+            reported_model
+            and reported_model != task.model
+            and task.status in {AgentTask.Status.PROVISIONING, AgentTask.Status.RUNNING}
+        ):
+            task.model = reported_model
+            task.save(update_fields=["model", "updated_at", "version"])
+
         if new_status in {"completed", "failed"}:
             if task.status in AgentTask.TERMINAL_STATUSES:
                 return JsonResponse(
@@ -755,8 +768,6 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
                     "message": body.get("error", ""),
                     "output": body.get("result", ""),
                 }
-            from astrolift_agents.services.task_completion_callbacks import normalized_usage
-
             task.completion_usage = normalized_usage(body.get("usage"))
             task.save(update_fields=["result", "failure", "completion_usage", "updated_at", "version"])
             target = AgentTask.Status.COMPLETED if new_status == "completed" else AgentTask.Status.FAILED

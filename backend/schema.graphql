@@ -803,6 +803,7 @@ type AstroliftAgentTask {
   callbackStatus: String
   callbackAttempts: Int!
   callbackLastError: String
+  model: String!
 }
 
 type AstroliftAgentTaskBacklog {

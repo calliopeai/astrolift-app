@@ -13857,6 +13857,7 @@
       "finished": "结束",
       "pod": "Pod",
       "namespace": "命名空间",
+      "model": "模型",
       "callbackUrl": "回调 URL",
       "liveSession": "实时会话",
       "liveNow": "正在实时运行",

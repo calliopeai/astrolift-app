@@ -292,6 +292,9 @@ class AgentTaskType:
     callback_status: str | None = None
     callback_attempts: int = 0
     callback_last_error: str | None = None
+    # The model the run used, as the harness reported it (#2416); empty
+    # until a report arrives.
+    model: str = ""
 
 
 @strawberry.type(name="AstroliftAgentInteraction")
@@ -853,6 +856,7 @@ def agent_task_to_type(t, *, can_watch: bool | None = None) -> AgentTaskType:
         callback_status=callback.status if callback is not None else None,
         callback_attempts=callback.attempts if callback is not None else 0,
         callback_last_error=(callback.last_error or None) if callback is not None else None,
+        model=t.model,
     )
 
 

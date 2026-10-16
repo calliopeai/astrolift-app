@@ -783,6 +783,7 @@ export type AstroliftAgentTask = {
   failureMessage?: Maybe<Scalars['String']['output']>;
   finishedAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
+  model: Scalars['String']['output'];
   namespace: Scalars['String']['output'];
   podName: Scalars['String']['output'];
   projectSlug: Scalars['String']['output'];
