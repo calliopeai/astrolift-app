@@ -360,6 +360,75 @@ def test_callback_heartbeat_keeps_running(org, dispatcher, brief, raw_key):
 
 
 @pytest.mark.django_db(transaction=True)
+def test_callback_records_reported_model_on_task(org, dispatcher, brief, raw_key):
+    """#2416: the model the harness reports lands on the task record, from a
+    heartbeat first and then the terminal callback, and reaches GraphQL."""
+    from astrolift_agents.schema.types import agent_task_to_type
+
+    task = _make_task(org, dispatcher, brief, AgentTask.Status.RUNNING)
+    resp = Client().post(
+        CALLBACK.format(task.guid),
+        data=json.dumps({"status": "running", "usage": {"model": "claude-sonnet-4-6"}}),
+        content_type="application/json",
+        **_auth(raw_key),
+    )
+    assert resp.status_code == 200
+    task.refresh_from_db()
+    assert task.model == "claude-sonnet-4-6"
+
+    resp = Client().post(
+        CALLBACK.format(task.guid),
+        data=json.dumps(
+            {
+                "status": "completed",
+                "result": "done",
+                "usage": {"model": "claude-opus-4-8", "input_tokens": 3},
+            }
+        ),
+        content_type="application/json",
+        **_auth(raw_key),
+    )
+    assert resp.status_code == 200
+    task.refresh_from_db()
+    assert task.status == AgentTask.Status.COMPLETED
+    assert task.model == "claude-opus-4-8"
+    assert task.completion_usage["model"] == "claude-opus-4-8"
+    assert agent_task_to_type(task, can_watch=False).model == "claude-opus-4-8"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_callback_without_model_keeps_reported_model(org, dispatcher, brief, raw_key):
+    """A later callback with no usable model never erases the recorded one."""
+    task = _make_task(org, dispatcher, brief, AgentTask.Status.RUNNING)
+    task.model = "gpt-5"
+    task.save(update_fields=["model", "updated_at", "version"])
+    for usage in (None, {"model": ""}, {"model": "bad\nmodel"}, {"model": 7}):
+        resp = Client().post(
+            CALLBACK.format(task.guid),
+            data=json.dumps({"status": "running", "usage": usage}),
+            content_type="application/json",
+            **_auth(raw_key),
+        )
+        assert resp.status_code == 200
+    task.refresh_from_db()
+    assert task.model == "gpt-5"
+
+
+@pytest.mark.django_db(transaction=True)
+def test_late_callback_cannot_change_terminal_task_model(org, dispatcher, brief, raw_key):
+    task = _make_task(org, dispatcher, brief, AgentTask.Status.COMPLETED)
+    resp = Client().post(
+        CALLBACK.format(task.guid),
+        data=json.dumps({"usage": {"model": "late-model"}}),
+        content_type="application/json",
+        **_auth(raw_key),
+    )
+    assert resp.status_code == 200
+    task.refresh_from_db()
+    assert task.model == ""
+
+
+@pytest.mark.django_db(transaction=True)
 def test_callback_finding_is_persisted_and_survives_terminal_result(org, dispatcher, brief, raw_key):
     task = _make_task(org, dispatcher, brief, AgentTask.Status.RUNNING)
     finding = {"item": "feedback-1", "decision": "filed", "jira_key": "DV-123"}

@@ -13825,6 +13825,7 @@
       "finished": "종료",
       "pod": "Pod",
       "namespace": "네임스페이스",
+      "model": "모델",
       "callbackUrl": "콜백 URL",
       "liveSession": "실시간 세션",
       "liveNow": "현재 실시간 실행 중",

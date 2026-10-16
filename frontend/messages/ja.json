@@ -13825,6 +13825,7 @@
       "finished": "終了",
       "pod": "Pod",
       "namespace": "名前空間",
+      "model": "モデル",
       "callbackUrl": "コールバック URL",
       "liveSession": "ライブセッション",
       "liveNow": "現在ライブ配信中",

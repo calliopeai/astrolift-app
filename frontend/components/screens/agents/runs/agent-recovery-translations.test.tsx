@@ -294,6 +294,21 @@ describe.each(locales)("agent recovery in %s", (locale) => {
     expect(screen.queryByRole("button", { name: t("run.kill") })).not.toBeInTheDocument();
     expect(h.errors).not.toHaveBeenCalled();
   });
+  it("shows the reported model under its localized label, and a dash before any report", () => {
+    const h = harness(locale);
+    const t = translator(locale);
+    const { unmount } = render(
+      <AgentRunDetail {...RUN_DETAIL} task={{ ...RUNNING_TASK, model: "LITERAL_MODEL" }} />,
+      { wrapper: h.Wrapper }
+    );
+    const term = screen.getByText(t("run.model"));
+    expect(term.nextElementSibling).toHaveTextContent("LITERAL_MODEL");
+    unmount();
+    render(<AgentRunDetail {...RUN_DETAIL} task={{ ...RUNNING_TASK, model: "" }} />, {
+      wrapper: h.Wrapper,
+    });
+    expect(screen.getByText(t("run.model")).nextElementSibling).toHaveTextContent("—");
+  });
   it("copies the exact run ID and reports unavailable clipboard without false success", async () => {
     const h = harness(locale);
     const t = translator(locale);

@@ -120,6 +120,11 @@ class AgentTask(BaseCoreModel):
     # Terminal outputs — only one is populated depending on outcome.
     result = models.JSONField(null=True, blank=True)
     completion_usage = models.JSONField(default=dict, blank=True)
+    # The model the run actually used, as the harness reported it on a
+    # callback's ``usage.model`` (#2416). Blank until a report arrives; the
+    # latest report wins. Lets usage and governance attribute per model
+    # without reading gateway logs.
+    model = models.CharField(max_length=256, blank=True, default="")
     failure = models.JSONField(null=True, blank=True)
     event_sequence = models.PositiveIntegerField(default=0)
     event_bytes = models.PositiveIntegerField(default=0)

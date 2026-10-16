@@ -13825,6 +13825,7 @@
       "finished": "Finished",
       "pod": "Pod",
       "namespace": "Namespace",
+      "model": "Model",
       "callbackUrl": "Callback URL",
       "liveSession": "Live session",
       "liveNow": "live now",
