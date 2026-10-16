@@ -11,6 +11,7 @@ BACKLOG = "0040_agent_task_backlog"
 MERGE = "0041_merge_startup_and_backlog"
 
 
+@pytest.mark.rarely
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.parametrize("starting_migration", [BASE, STARTUP, BACKLOG])
 def test_combined_upgrade_preserves_tasks_from_either_branch(starting_migration):

@@ -528,6 +528,7 @@ def test_owned_history_has_real_keyset_pages_without_row_fanout(world):
     assert not world.wire["connections"]
 
 
+@pytest.mark.rarely
 def test_actual_migration_preserves_retained_intents_then_empty_roundtrip(world):
     from django.db import connection
     from django.db.migrations.executor import MigrationExecutor

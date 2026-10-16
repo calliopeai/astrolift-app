@@ -1001,6 +1001,7 @@ def test_mutex_original_app_cluster_anchor_survives_owner_reassignment(world, fi
             pytest.fail("owner reassignment must not acquire another effect mutex")
 
 
+@pytest.mark.rarely
 @pytest.mark.parametrize(
     "state,retired", [("RESERVED", False), ("SENT", False), ("OBSERVED", False), ("OBSERVED", True)]
 )

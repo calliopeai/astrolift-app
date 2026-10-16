@@ -530,6 +530,7 @@ def test_shared_alias_denied_by_actual_abac_has_zero_preparation_effect(bridge):
     assert not GCPGKEPreparationJournal._unscoped.exists()
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("original_retires", [False, True])
 def test_next_detach_plan_retains_history_uids_and_only_removes_endpoint_grants(bridge, original_retires):
     world = bridge
@@ -752,6 +753,7 @@ def test_accepted_operation_metadata_and_derived_plan_are_immutable(bridge):
         assert row.derived_native_union_sha256 == derived
 
 
+@pytest.mark.rarely
 @pytest.mark.parametrize("retired", [False, True])
 def test_real_migration_rollback_refuses_any_retained_history_then_empty_roundtrip(world, retired):
     from django.db.migrations.executor import MigrationExecutor
