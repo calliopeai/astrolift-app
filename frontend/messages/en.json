@@ -16504,6 +16504,7 @@
       "unbound": "Not bound"
     },
     "operatorOnly": "Only a platform operator can grant write access or bind a domain.",
+    "withheld": "DNS is withheld on this install, so Astrolift writes no delegation records and grant and bind are off. Add the NS records at the parent zone by hand.",
     "loading": "Loading…",
     "detected": "Connections that can delegate this domain",
     "grantFor": "May write NS records into {parent}",

@@ -16507,6 +16507,7 @@
       "unbound": "Non lié"
     },
     "operatorOnly": "Seul un opérateur de la plateforme peut accorder l'écriture ou lier un domaine.",
+    "withheld": "Le DNS est retenu sur cette installation : Astrolift n'écrit aucun enregistrement de délégation, et l'octroi et la liaison sont désactivés. Ajoutez les enregistrements NS dans la zone parente à la main.",
     "loading": "Chargement…",
     "detected": "Connexions pouvant déléguer ce domaine",
     "grantFor": "Peut écrire des enregistrements NS dans {parent}",

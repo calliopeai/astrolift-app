@@ -16504,6 +16504,7 @@
       "unbound": "Não vinculado"
     },
     "operatorOnly": "Só um operador da plataforma pode conceder gravação ou vincular um domínio.",
+    "withheld": "O DNS está retido nesta instalação, então o Astrolift não grava registros de delegação e conceder e vincular estão desativados. Adicione os registros NS na zona pai manualmente.",
     "loading": "Carregando…",
     "detected": "Conexões que podem delegar este domínio",
     "grantFor": "Pode gravar registros NS em {parent}",

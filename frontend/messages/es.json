@@ -16507,6 +16507,7 @@
       "unbound": "Sin vincular"
     },
     "operatorOnly": "Solo un operador de la plataforma puede conceder escritura o vincular un dominio.",
+    "withheld": "El DNS está retenido en esta instalación, así que Astrolift no escribe registros de delegación y conceder y vincular están desactivados. Añade a mano los registros NS en la zona principal.",
     "loading": "Cargando…",
     "detected": "Conexiones que pueden delegar este dominio",
     "grantFor": "Puede escribir registros NS en {parent}",
