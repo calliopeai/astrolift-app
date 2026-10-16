@@ -2366,6 +2366,39 @@ export type AstroliftContainerStatus = {
   waitingReason: Scalars['String']['output'];
 };
 
+export type AstroliftConversationTransfer = {
+  abortReason: Scalars['String']['output'];
+  abortedAt?: Maybe<Scalars['DateTime']['output']>;
+  acknowledgedAt?: Maybe<Scalars['DateTime']['output']>;
+  admissionDeadline: Scalars['DateTime']['output'];
+  agentTaskId?: Maybe<Scalars['GUID']['output']>;
+  committedAt?: Maybe<Scalars['DateTime']['output']>;
+  envelopeSha256: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  progress: Scalars['JSON']['output'];
+  record: Scalars['JSON']['output'];
+  snapshotSha256: Scalars['String']['output'];
+  state: Scalars['String']['output'];
+  transferId: Scalars['String']['output'];
+  uploadUrl: Scalars['String']['output'];
+};
+
+export type AstroliftConversationTransferCapability = {
+  destinationIdentity: Scalars['String']['output'];
+  harnessHostContract: Scalars['String']['output'];
+  managedConversation: Scalars['Boolean']['output'];
+  maxEnvelopeBytes: Scalars['Int']['output'];
+  protocolVersion: Scalars['Int']['output'];
+  reason: Scalars['String']['output'];
+  undo: Scalars['Boolean']['output'];
+};
+
+export type AstroliftConversationTransferMutationResult = {
+  data?: Maybe<AstroliftConversationTransfer>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftCostAttribution = {
   attributedRows: Array<AstroliftCostBindingRow>;
   currency: Scalars['String']['output'];
@@ -6926,6 +6959,12 @@ export type ConnectZentinelleInput = {
   url: Scalars['String']['input'];
 };
 
+export type ConversationTransferRecordInput = {
+  reason: Scalars['String']['input'];
+  record: Scalars['JSON']['input'];
+  snapshotSha256: Scalars['String']['input'];
+};
+
 export type CostWindow =
   | 'D7'
   | 'D30'
@@ -8834,6 +8873,7 @@ export type MoveAppToTeamInput = {
 };
 
 export type Mutation = {
+  abortConversationTransfer: AstroliftConversationTransferMutationResult;
   abortDeployment: AstroliftDeploymentMutationResult;
   acceptInvitation: AstroliftInvitationMutationResult;
   acknowledgeAlertEvent: AstroliftAlertEventMutationResult;
@@ -8894,6 +8934,7 @@ export type Mutation = {
   clearStepUpPin: AstroliftStepUpPinStatusMutationResult;
   /** Deep-copy a visible workflow definition + its stages into the caller's org as a new editable definition (spec 40 §2.1). New slug on collision; global stages copy with agent_definition cleared. */
   cloneWorkflowDefinition: CloneWorkflowDefinitionResult;
+  commitConversationTransfer: AstroliftConversationTransferMutationResult;
   configureAgentTaskCallbacks: AgentTaskCallbackPolicyMutationResult;
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
@@ -9071,6 +9112,7 @@ export type Mutation = {
   placeObservabilityRetentionHold: ObservabilityRetentionHoldTypeMutationResult;
   /** Get a pre-signed URL for uploading an image or file. Optionally attach it to an entity via owner_container_property. */
   preSignedUrlImageUpload: PreSignedUrlUploadResult;
+  prepareConversationTransfer: AstroliftConversationTransferMutationResult;
   prepareManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
   /** Process a previously uploaded data import file. */
   processFile: ProcessFileResult;
@@ -9317,8 +9359,14 @@ export type Mutation = {
   /** Upsert user profile via UtilityForm.apply_forms. */
   upsertUser: UpsertUserResult;
   validateAstroliftCiSecrets: AstroliftValidateCiSecretsPayloadMutationResult;
+  verifyConversationTransfer: AstroliftConversationTransferMutationResult;
   verifyManagedDomain: VerifyManagedDomainPayloadMutationResult;
   withdrawSecretChange: AstroliftSecretChangeProposalMutationResult;
+};
+
+
+export type MutationAbortConversationTransferArgs = {
+  input: ConversationTransferRecordInput;
 };
 
 
@@ -9617,6 +9665,11 @@ export type MutationClearEnvironmentSettingArgs = {
 export type MutationCloneWorkflowDefinitionArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
   slug: Scalars['String']['input'];
+};
+
+
+export type MutationCommitConversationTransferArgs = {
+  input: ConversationTransferRecordInput;
 };
 
 
@@ -10414,6 +10467,11 @@ export type MutationPreSignedUrlImageUploadArgs = {
   name?: InputMaybe<Scalars['String']['input']>;
   ownerContainerProperty?: InputMaybe<Scalars['String']['input']>;
   uuid?: InputMaybe<Scalars['UUID']['input']>;
+};
+
+
+export type MutationPrepareConversationTransferArgs = {
+  input: PrepareConversationTransferInput;
 };
 
 
@@ -11617,6 +11675,11 @@ export type MutationValidateAstroliftCiSecretsArgs = {
 };
 
 
+export type MutationVerifyConversationTransferArgs = {
+  input: ConversationTransferRecordInput;
+};
+
+
 export type MutationVerifyManagedDomainArgs = {
   input: VerifyManagedDomainInput;
 };
@@ -11881,6 +11944,14 @@ export type PreSignedUrlUploadResult = {
   preSignedUrl?: Maybe<Scalars['String']['output']>;
   publicUrl?: Maybe<Scalars['String']['output']>;
   uuid?: Maybe<Scalars['UUID']['output']>;
+};
+
+export type PrepareConversationTransferInput = {
+  agentSlug: Scalars['String']['input'];
+  envelopeBytes: Scalars['Int']['input'];
+  envelopeSha256: Scalars['String']['input'];
+  environmentSpecId: InputMaybe<Scalars['GUID']['input']>;
+  record: Scalars['JSON']['input'];
 };
 
 export type ProcessFileResult = {
@@ -12408,6 +12479,8 @@ export type Query = {
   clusterModelSubscriptionTargetsPage: ModelSubscriptionTargetPage;
   clusterModelSubscriptionsPage: ModelSubscriptionPage;
   clusterModelUpdateAdmission: ModelRuntimeAdmission;
+  conversationTransfer?: Maybe<AstroliftConversationTransfer>;
+  conversationTransferCapability?: Maybe<AstroliftConversationTransferCapability>;
   dispatchers: Array<AstroliftDispatcherInstance>;
   dnsProviderConnectionSupport: DnsProviderConnectionSupport;
   dnsProviderConnectionsPage: DnsProviderConnectionTypePage;
@@ -14474,6 +14547,17 @@ export type QueryClusterModelSubscriptionsPageArgs = {
 
 export type QueryClusterModelUpdateAdmissionArgs = {
   input: UpdateClusterModelInput;
+};
+
+
+export type QueryConversationTransferArgs = {
+  transferId: Scalars['String']['input'];
+};
+
+
+export type QueryConversationTransferCapabilityArgs = {
+  agentSlug: Scalars['String']['input'];
+  environmentSpecId?: InputMaybe<Scalars['GUID']['input']>;
 };
 
 
