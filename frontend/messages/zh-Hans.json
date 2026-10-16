@@ -3941,6 +3941,28 @@
         "toastFailed": "无法保存应用详情",
         "save": "保存"
       },
+      "build": {
+        "title": "构建",
+        "description": "镜像的构建来源。构建上下文相对于仓库根目录，Dockerfile 相对于构建上下文。",
+        "buildContext": "构建上下文",
+        "dockerfile": "Dockerfile",
+        "contextRequired": "请输入构建上下文。仓库根目录用 . 表示。",
+        "dockerfileRequired": "请输入 Dockerfile 路径。",
+        "defaultsHelp": "保持默认值（. 或 Dockerfile）的路径，由清单中设置的 build_context 或 dockerfile_path 决定。",
+        "prebuilt": "此应用部署的是预构建镜像，因此在构建模式改变之前，不会从这些路径构建任何内容。",
+        "resyncCi": "已保存。在同步之前，仓库中的 CI 工作流仍从之前的路径构建。请在 CI 设置中同步，或运行以下命令：",
+        "platformBuild": "已保存。下一次平台构建将使用这些路径。",
+        "buildMode": "构建模式",
+        "manifest": "清单",
+        "modes": {
+          "ci_pushed": "由你的 CI 构建并推送",
+          "platform_build": "由 Astrolift 构建",
+          "none": "预构建镜像"
+        },
+        "save": "保存",
+        "toastSaved": "构建设置已保存",
+        "toastFailed": "无法保存构建设置"
+      },
       "empty": "此应用暂无内容。"
     },
     "environmentOverrides": {
@@ -6921,6 +6943,13 @@
       "pathLabel": "清单路径",
       "pathHelp": "<code>astrolift.toml</code> 在仓库中的位置。默认为仓库根目录。Monorepo 可以托管多个应用；请让每个注册指向各自的路径（例如 <code>services/api/astrolift.toml</code>）。",
       "branchLabel": "默认分支",
+      "buildContextLabel": "构建上下文",
+      "buildContextFromDirectory": "清单所在的目录，应用将从这里构建。输入 <code>.</code> 表示仓库根目录。",
+      "buildContextFromRoot": "仓库根目录，即清单所在的位置。",
+      "buildContextFromManifest": "仓库根目录：清单自身设置了 <code>build_context</code> 或 <code>dockerfile_path</code>，这些设置以清单所在目录为基准生效。",
+      "buildContextEdited": "按输入的值使用，相对于仓库根目录。清空后将恢复为检测到的上下文。",
+      "dockerfileLabel": "Dockerfile",
+      "dockerfileHelp": "相对于构建上下文。",
       "laterTitle": "稍后设置清单",
       "laterHelp": "现在注册应用，暂不提供清单。注册后将进入应用的<b>清单</b>标签页，准备好后可在那里添加或同步 <code>astrolift.toml</code>。适用于空仓库，或架构不是应用清单的智能体配置仓库。",
       "label": "清单",
@@ -6955,6 +6984,9 @@
       "defaultBranch": "默认分支",
       "sourceKind": "来源类型",
       "manifestPath": "清单路径",
+      "buildContext": "构建上下文",
+      "dockerfile": "Dockerfile",
+      "buildFromManifest": "在清单中设置",
       "manifest": "清单",
       "manifestLater": "稍后设置",
       "manifestState": "{origin, select, repo {从仓库加载} other {在此起草}}，{valid, select, yes {结构有效} other {无效}}",

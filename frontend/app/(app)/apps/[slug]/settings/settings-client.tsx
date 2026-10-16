@@ -5,6 +5,7 @@ import { AppIdentityView } from "@/components/screens/apps/settings/AppIdentity"
 import { AppSettingsScreen } from "@/components/screens/apps/settings/AppSettingsScreen";
 import { AppSettingsTab } from "@/components/screens/apps/settings/AppSettingsTab";
 import { ArchiveAppView } from "@/components/screens/apps/settings/ArchiveApp";
+import { BuildSettingsView } from "@/components/screens/apps/settings/BuildSettings";
 import { DangerZoneView } from "@/components/screens/apps/settings/DangerZone";
 import { EnvironmentSettingsView } from "@/components/screens/apps/settings/EnvironmentSettings";
 import { ForceRedeployView } from "@/components/screens/apps/settings/ForceRedeploy";
@@ -18,6 +19,7 @@ import { useAppIdentity } from "@/components/screens/apps/settings/use-app-ident
 import { useAppSettings } from "@/components/screens/apps/settings/use-app-settings";
 import { useAppSettingsTab } from "@/components/screens/apps/settings/use-app-settings-tab";
 import { useArchiveApp } from "@/components/screens/apps/settings/use-archive-app";
+import { useBuildSettings } from "@/components/screens/apps/settings/use-build-settings";
 import { useDangerZone } from "@/components/screens/apps/settings/use-danger-zone";
 import { useEnvironmentSettings } from "@/components/screens/apps/settings/use-environment-settings";
 import { useForceRedeploy } from "@/components/screens/apps/settings/use-force-redeploy";
@@ -78,6 +80,7 @@ export function AppSettingsTabClient({ slug }: { slug: string }) {
               ),
               teams: <TeamsCard appSlug={a.slug} appId={a.id} homeTeamSlug={a.teamSlug} />,
               deployStrategy: <DeployStrategyCard app={a} />,
+              build: <BuildSettingsCard app={a} />,
               // CI setup is hidden when the app has no source repo (#382).
               ciSetup: a.sourceRepo ? (
                 <CiSetupSection
@@ -118,6 +121,10 @@ export function AppSettingsTabClient({ slug }: { slug: string }) {
 
 function AppIdentityCard({ app }: { app: AstroliftRegisteredApp }) {
   return <AppIdentityView {...useAppIdentity(app)} />;
+}
+
+function BuildSettingsCard({ app }: { app: AstroliftRegisteredApp }) {
+  return <BuildSettingsView {...useBuildSettings(app)} />;
 }
 
 /**

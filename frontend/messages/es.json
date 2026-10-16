@@ -3935,6 +3935,28 @@
         "toastFailed": "No se pudieron guardar los detalles de la aplicación",
         "save": "Guardar"
       },
+      "build": {
+        "title": "Compilación",
+        "description": "Desde dónde se compila la imagen. El contexto de compilación es relativo a la raíz del repositorio, y el Dockerfile, al contexto de compilación.",
+        "buildContext": "Contexto de compilación",
+        "dockerfile": "Dockerfile",
+        "contextRequired": "Escribe un contexto de compilación. Usa . para la raíz del repositorio.",
+        "dockerfileRequired": "Escribe la ruta de un Dockerfile.",
+        "defaultsHelp": "Una ruta que conserva su valor predeterminado (. o Dockerfile) deja que la decida un build_context o dockerfile_path definido en el manifiesto.",
+        "prebuilt": "Esta aplicación despliega una imagen ya compilada, así que no se compila nada desde estas rutas hasta que cambie su modo de compilación.",
+        "resyncCi": "Guardado. El flujo de trabajo de CI del repositorio compila desde las rutas anteriores hasta que lo sincronices, en la configuración de CI o con este comando:",
+        "platformBuild": "Guardado. La próxima compilación de la plataforma usa estas rutas.",
+        "buildMode": "Modo de compilación",
+        "manifest": "Manifiesto",
+        "modes": {
+          "ci_pushed": "Tu CI compila y publica",
+          "platform_build": "Astrolift compila",
+          "none": "Imagen ya compilada"
+        },
+        "save": "Guardar",
+        "toastSaved": "Configuración de compilación guardada",
+        "toastFailed": "No se pudo guardar la configuración de compilación"
+      },
       "empty": "No hay contenido aquí para esta aplicación."
     },
     "environmentOverrides": {
@@ -6924,6 +6946,13 @@
       "pathLabel": "Ruta del manifiesto",
       "pathHelp": "Dónde está <code>astrolift.toml</code> en el repositorio. Por defecto, la raíz del repositorio. Un monorepo puede alojar varias aplicaciones; apunta cada registro a su propia ruta (p. ej., <code>services/api/astrolift.toml</code>).",
       "branchLabel": "Rama predeterminada",
+      "buildContextLabel": "Contexto de compilación",
+      "buildContextFromDirectory": "El directorio del manifiesto, así que la aplicación se compila desde ahí. Escribe <code>.</code> para la raíz del repositorio.",
+      "buildContextFromRoot": "La raíz del repositorio, donde está el manifiesto.",
+      "buildContextFromManifest": "La raíz del repositorio: el propio manifiesto define <code>build_context</code> o <code>dockerfile_path</code>, y esos valores se aplican desde su directorio.",
+      "buildContextEdited": "Tal como lo escribiste, relativo a la raíz del repositorio. Vacíalo para volver al contexto detectado.",
+      "dockerfileLabel": "Dockerfile",
+      "dockerfileHelp": "Relativo al contexto de compilación.",
       "laterTitle": "Configurar el manifiesto más tarde",
       "laterHelp": "Registra la aplicación ahora sin manifiesto. Te llevaremos a la pestaña <b>Manifiesto</b> de la aplicación, donde podrás añadir o sincronizar <code>astrolift.toml</code> cuando quieras. Útil para un repositorio vacío o un repositorio de configuración de agentes cuyo esquema no es un manifiesto de aplicación.",
       "label": "Manifiesto",
@@ -6958,6 +6987,9 @@
       "defaultBranch": "Rama predeterminada",
       "sourceKind": "Tipo de origen",
       "manifestPath": "Ruta del manifiesto",
+      "buildContext": "Contexto de compilación",
+      "dockerfile": "Dockerfile",
+      "buildFromManifest": "Definido en el manifiesto",
       "manifest": "Manifiesto",
       "manifestLater": "Configurar más tarde",
       "manifestState": "{origin, select, repo {Cargado del repositorio} other {Redactado aquí}}, {valid, select, yes {estructura válida} other {no válido}}",
