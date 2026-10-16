@@ -20,6 +20,7 @@ LEAF = ("astrolift_lifecycle", "0047_managed_domain_app_binding")
 PREVIOUS = ("astrolift_lifecycle", "0046_builder_artifact")
 
 
+@pytest.mark.rarely
 def test_empty_journal_actual_reverse_forward_restores_whole_graph():
     executor = MigrationExecutor(connection)
     targets = executor.loader.graph.leaf_nodes()
@@ -35,6 +36,7 @@ def test_empty_journal_actual_reverse_forward_restores_whole_graph():
     assert not ManagedDomainAppBinding.all_objects.exists()
 
 
+@pytest.mark.rarely
 def test_retained_journal_reverse_refuses_rows_and_migration_record_intact(admitted):
     row = reserve(admitted)
     row.soft_delete()

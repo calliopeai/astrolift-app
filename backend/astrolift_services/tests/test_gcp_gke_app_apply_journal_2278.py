@@ -65,7 +65,9 @@ from core.permissions import PermissionDenied
 from providers.tests.gcp.test_gke_app_apply_2278 import native as tls_fixture
 from providers.tests.gcp.test_identity_submission_2278 import SubmissionWire
 
-pytestmark = pytest.mark.django_db(transaction=True)
+# 30 to 75 s a test on CI: the bridge fixture runs the real source, preparation
+# and IAM pipeline (about 19,000 queries) for every test (#2413).
+pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.slow]
 
 
 @pytest.fixture
@@ -491,6 +493,7 @@ def test_original_incarnation_replaced_after_uid_commit_refuses_no_followon(brid
     assert independent(w.reservation.journal_id)[0] == "EVIDENCE"
 
 
+@pytest.mark.rarely
 def test_retained_history_blocks_rollback_before_trigger_removal(bridge):
     from django.db.migrations.executor import MigrationExecutor
     from django.db.migrations.recorder import MigrationRecorder

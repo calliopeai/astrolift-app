@@ -97,6 +97,7 @@ def test_append_only_history_refuses_mutation(world, client, operation):
     assert row.run_id == "" and row.deleted_at is None
 
 
+@pytest.mark.rarely
 def test_retained_history_refuses_reverse_before_trigger_removed(world, client):
     from django.db import connection
     from django.db.migrations.executor import MigrationExecutor

@@ -2,7 +2,24 @@ name: ci
 
 on:
   workflow_dispatch:
+    inputs:
+      tier:
+        # Test tiers (#2413): pr skips slow and rarely tests, main skips
+        # rarely tests, nightly runs everything except manual ones.
+        description: "Test tier"
+        type: choice
+        options: [main, pr, nightly]
+        default: main
+  workflow_call:
+    inputs:
+      tier:
+        description: "Test tier: pr, main or nightly"
+        type: string
+        required: true
   pull_request:
+    # ready_for_review starts CI when a draft is marked ready; drafts
+    # themselves skip every job (see `changes`).
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
   # Re-enabled (#1244). While this was dispatch-only, nothing verified a PR
@@ -19,28 +36,55 @@ on:
 permissions:
   contents: read
 
+# A newer push to a pull request cancels the older run. On main a running run
+# is never cancelled, so every main run that starts finishes its slow tier; a
+# newer push only replaces a run that is still waiting. The nightly tier has a
+# lane of its own and never displaces a waiting main run.
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ inputs.tier == 'nightly' && 'nightly-' || '' }}${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   changes:
     name: classify changes
+    # Drafts burn no runner minutes: CI starts when the PR is marked ready.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Reads the merged pull request and its runs to decide whether a push
+      # to main only needs the slow tier.
+      actions: read
+      pull-requests: read
     outputs:
       backend: ${{ steps.classify.outputs.backend }}
+      shards: ${{ steps.classify.outputs.shards }}
+      contracts: ${{ steps.classify.outputs.contracts }}
+      providers: ${{ steps.classify.outputs.providers }}
       frontend: ${{ steps.classify.outputs.frontend }}
+      routes: ${{ steps.classify.outputs.routes }}
+      format_files: ${{ steps.classify.outputs.format_files }}
       backend_test_matrix: ${{ steps.classify.outputs.backend_test_matrix }}
+      pytest_markers: ${{ steps.classify.outputs.pytest_markers }}
+      testdb_key: ${{ steps.testdb.outputs.key }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      # Everything that decides the migrated schema. A shard restores the
+      # database dumped under this key instead of migrating from scratch.
+      - name: Key the migrated test database
+        id: testdb
+        run: |
+          echo "key=testdb-pg16-${{ hashFiles('backend/**/migrations/**', 'backend/Pipfile.lock', 'backend/config/*.py', '.github/workflows/ci.yml') }}" >> "$GITHUB_OUTPUT"
       - name: Classify changed paths
         id: classify
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.sha }}
           EVENT_NAME: ${{ github.event_name }}
+          TIER: ${{ inputs.tier }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [[ "$EVENT_NAME" != workflow_dispatch && -n "$BASE_SHA" && ! "$BASE_SHA" =~ ^0+$ ]]; then
             if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
@@ -50,51 +94,34 @@ jobs:
           python3 - <<'PY'
           import json
           import os
+          import re
+          import string
           import subprocess
+          from datetime import datetime
 
+          # Logical shards. A shard with `partitions` > 1 splits its sorted
+          # test files round-robin over that many jobs, named -a, -b, ...
+          # Each extra job costs about two minutes of setup, so a shard is
+          # split only while its pull-request tier would outlast the
+          # frontend route walk (#2413).
           shards = {
               "workflow-runtime": {
                   "paths": "astrolift_workflows",
+                  "partitions": 2,
                   "temporal": True,
               },
               "app-lifecycle": {
                   "paths": "astrolift_lifecycle",
                   "temporal": True,
               },
-              "core-identity-operations-a": {
+              "core-identity-operations": {
                   "paths": "astrolift_operations core astrolift_identity",
-                  "partition": 0,
                   "partitions": 2,
                   "temporal": False,
               },
-              "core-identity-operations-b": {
-                  "paths": "astrolift_operations core astrolift_identity",
-                  "partition": 1,
+              "agent-control": {
+                  "paths": "astrolift_agents",
                   "partitions": 2,
-                  "temporal": False,
-              },
-              "agent-control-a": {
-                  "paths": "astrolift_agents",
-                  "partition": 0,
-                  "partitions": 4,
-                  "temporal": True,
-              },
-              "agent-control-b": {
-                  "paths": "astrolift_agents",
-                  "partition": 1,
-                  "partitions": 4,
-                  "temporal": True,
-              },
-              "agent-control-c": {
-                  "paths": "astrolift_agents",
-                  "partition": 2,
-                  "partitions": 4,
-                  "temporal": True,
-              },
-              "agent-control-d": {
-                  "paths": "astrolift_agents",
-                  "partition": 3,
-                  "partitions": 4,
                   "temporal": True,
               },
               "agent-dispatch": {
@@ -103,6 +130,7 @@ jobs:
               },
               "registration-clusters": {
                   "paths": "astrolift_scm astrolift_clusters astrolift_registry",
+                  "partitions": 2,
                   "temporal": False,
               },
               "manifest-foundation": {
@@ -114,6 +142,7 @@ jobs:
                       "astrolift_services astrolift_pipelines astrolift_forms "
                       "astrolift_billing astrolift_compliance"
                   ),
+                  "partitions": 3,
                   "temporal": True,
               },
               "control-surface": {
@@ -131,44 +160,114 @@ jobs:
           }
           impacts = {
               "astrolift_agents": {
-                  "agent-control-a", "agent-control-b", "agent-control-c",
-                  "agent-control-d", "agent-dispatch",
-                  "workflow-runtime", "services-platform",
+                  "agent-control", "agent-dispatch", "workflow-runtime", "services-platform",
               },
               "astrolift_dispatch": {
-                  "agent-control-a", "agent-control-b", "agent-control-c",
-                  "agent-control-d", "agent-dispatch",
-                  "workflow-runtime", "services-platform",
+                  "agent-control", "agent-dispatch", "workflow-runtime", "services-platform",
               },
               "astrolift_clusters": {"registration-clusters", "app-lifecycle", "services-platform"},
-              "astrolift_operations": {
-                  "core-identity-operations-a", "core-identity-operations-b",
-              },
-              "astrolift_identity": {
-                  "core-identity-operations-a", "core-identity-operations-b",
-                  "registration-clusters",
-              },
+              "astrolift_operations": {"core-identity-operations"},
+              "astrolift_identity": {"core-identity-operations", "registration-clusters"},
               "astrolift_lifecycle": {"app-lifecycle", "workflow-runtime"},
               "astrolift_registry": {"registration-clusters", "workflow-runtime", "services-platform"},
               "astrolift_services": {"services-platform", "workflow-runtime", "app-lifecycle"},
               "workflows": {"manifest-foundation", "workflow-runtime"},
           }
+          # Files outside backend/ that backend tests read. A change to one
+          # runs the shard owning the reading test, even when no backend file
+          # changed and the path would otherwise skip the backend.
+          readers = {
+              "docs/runbooks/chained-agent-workflows.md": {"manifest-foundation"},
+              "frontend/DOCS.md": {"agent-control"},
+              "frontend/ROUTES.md": {"agent-control"},
+              "frontend/components/screens/models/native-model-projection.fixture.json": {
+                  "services-platform",
+              },
+              "frontend/graphql/observability/explorers.queries.ts": {"manifest-foundation"},
+              "frontend/graphql/workflows/tiered.mutations.ts": {"manifest-foundation"},
+              "frontend/graphql/workflows/tiered.queries.ts": {"manifest-foundation"},
+              "frontend/lib/appearance.ts": {"core-identity-operations"},
+              "frontend/lib/permissions/permissions.generated.ts": {"core-identity-operations"},
+              "frontend/schema.graphql": {"core-identity-operations"},
+          }
           broad_roots = {"core", "config", "astrolift_graphql", "auth1"}
+          # Test tiers (#2413), registered in backend/pytest.ini. `slow` is
+          # the delta a push to main adds when its pull request already
+          # passed the `pr` tier against the same base.
+          tiers = {
+              "pr": "not slow and not rarely and not manual",
+              "slow": "slow and not rarely and not manual",
+              "main": "not rarely and not manual",
+              "nightly": "not manual",
+          }
+
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True).strip()
+
+          def api(path):
+              return json.loads(subprocess.check_output(["gh", "api", path], text=True))
+
+          def when(stamp):
+              return datetime.fromisoformat(stamp.replace("Z", "+00:00"))
+
+          def covered_by_pull_request(before, head):
+              """True when this push merges one pull request whose final head
+              passed this workflow after `before` became main, so the merged
+              tree is the one its pull-request tier already tested."""
+              repo = os.environ["GITHUB_REPOSITORY"]
+              if git("rev-list", "--parents", "-n", "1", head).split()[1:2] != [before]:
+                  return False, "the push is not one commit on top of the previous main"
+              pulls = [p for p in api(f"repos/{repo}/commits/{head}/pulls") if p.get("merge_commit_sha") == head]
+              if not pulls:
+                  return False, "no pull request was merged as this commit"
+              pull = pulls[0]
+              landed = when(git("show", "-s", "--format=%cI", before))
+              runs = api(
+                  f"repos/{repo}/actions/workflows/ci.yml/runs"
+                  f"?event=pull_request&status=success&head_sha={pull['head']['sha']}&per_page=20"
+              )["workflow_runs"]
+              for run in runs:
+                  if when(run["run_started_at"] or run["created_at"]) < landed:
+                      continue
+                  jobs = api(f"repos/{repo}/actions/runs/{run['id']}/jobs?per_page=100")["jobs"]
+                  if any(j["name"] == "classify changes" and j["conclusion"] == "success" for j in jobs):
+                      return True, f"#{pull['number']} passed run {run['id']} on this base"
+              return False, f"#{pull['number']} has no passing run on this base"
+
           event = os.environ["EVENT_NAME"]
           base = os.environ.get("BASE_SHA", "")
           head = os.environ["HEAD_SHA"]
-          full = event in {"workflow_dispatch", "push"} or not base or set(base) == {"0"}
-          paths = [] if full else subprocess.check_output(
-              ["git", "diff", "--name-only", "--diff-filter=ACMRTD", base, head],
-              text=True,
-          ).splitlines()
+          diffable = event != "workflow_dispatch" and base and set(base) != {"0"}
+          changed = git("diff", "--name-only", "--diff-filter=ACMRTD", base, head).splitlines() if diffable else []
+          tier = os.environ.get("TIER") or ""
+          reason = "requested" if tier else ""
+          if not tier and event == "push" and diffable:
+              try:
+                  covered, reason = covered_by_pull_request(base, head)
+              except Exception as exc:  # any lookup failure runs the whole main tier
+                  covered, reason = False, f"lookup failed: {exc}"
+              tier = "slow" if covered else "main"
+          tier = tier or ("pr" if event == "pull_request" else "main")
+          if tier not in tiers:
+              raise SystemExit(f"Unknown test tier {tier!r}; expected one of {sorted(tiers)}")
+          markers = tiers[tier]
+          if "not manual" not in markers:
+              raise SystemExit(f"Tier {tier} would select manual tests: {markers!r}")
+          full = not diffable
+          paths = [] if full else changed
 
-          backend = full
-          frontend = full
+          backend = frontend = routes = contracts = providers = full
           selected = set(shards) if full else set()
           for path in paths:
+              selected |= readers.get(path, set())
               if path.startswith("backend/"):
-                  backend = True
+                  # backend/README.md and its siblings: no test reads them.
+                  if path.count("/") == 1 and path.endswith(".md"):
+                      continue
+                  backend = contracts = True
+                  # The providers suite only imports backend/providers and
+                  # the native artifact scripts.
+                  providers = providers or path.startswith(("backend/providers/", "backend/scripts/"))
                   root = path.split("/", 2)[1]
                   if root in broad_roots or root not in owners:
                       selected = set(shards)
@@ -176,37 +275,81 @@ jobs:
                       selected |= impacts.get(root, {owners[root]})
               elif path.startswith("frontend/"):
                   frontend = True
+                  contracts = contracts or path == "frontend/schema.graphql"
+                  # The route walk renders en-US only, so another locale's
+                  # catalogue cannot change it. The layout job's Storybook
+                  # translation specs still check every locale.
+                  if not path.startswith("frontend/messages/") or path.endswith("/en.json"):
+                      routes = True
               elif path.startswith((".github/", "docker/")) or path in {
                   "Makefile", "bootstrap.sh", "run.sh"
               }:
-                  backend = frontend = True
+                  backend = frontend = routes = contracts = providers = True
                   selected = set(shards)
               elif path.startswith("docs/") or path.endswith(".md") or path in {
                   "LICENSE", ".gitignore"
               }:
                   continue
               else:
-                  backend = frontend = True
+                  backend = frontend = routes = contracts = providers = True
                   selected = set(shards)
-
           if backend and not selected:
               selected = set(shards)
-          include = [
-              {
-                  "name": name,
-                  "partition": 0,
-                  "partitions": 1,
-                  **shards[name],
-              }
-              for name in shards
-              if name in selected
+
+          include = []
+          for name, shard in shards.items():
+              if name not in selected:
+                  continue
+              if tier == "slow":
+                  # Only the slow tests are new to this push: one job per
+                  # shard over the files that carry the marker.
+                  files = sorted(
+                      os.path.relpath(os.path.join(root, fname), "backend")
+                      for top in shard["paths"].split()
+                      for root, _dirs, names in os.walk(os.path.join("backend", top))
+                      for fname in names
+                      if (fname.startswith("test_") or fname.endswith("_tests.py")) and fname.endswith(".py")
+                      and re.search(r"\bmark\.slow\b", open(os.path.join(root, fname), encoding="utf-8").read())
+                  )
+                  if files:
+                      include.append({
+                          "name": f"{name}-slow", "shard": name, "paths": " ".join(files),
+                          "temporal": shard["temporal"], "partition": 0, "partitions": 1,
+                      })
+                  continue
+              count = shard.get("partitions", 1)
+              for index in range(count):
+                  include.append({
+                      "name": f"{name}-{string.ascii_lowercase[index]}" if count > 1 else name,
+                      "shard": name,
+                      "paths": shard["paths"],
+                      "temporal": shard["temporal"],
+                      "partition": index,
+                      "partitions": count,
+                  })
+          if tier == "slow":
+              # The pull request's own run already covered everything else.
+              backend = frontend = routes = contracts = providers = False
+          # The formatting ratchet checks the frontend files this change touches.
+          format_files = [
+              path.removeprefix("frontend/")
+              for path in changed
+              if path.startswith("frontend/") and os.path.isfile(path)
           ]
-          matrix = {"include": include}
+          flags = {
+              "backend": backend, "shards": bool(include), "contracts": contracts,
+              "providers": providers, "frontend": frontend, "routes": routes,
+          }
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write(f"backend={str(backend).lower()}\n")
-              output.write(f"frontend={str(frontend).lower()}\n")
-              output.write(f"backend_test_matrix={json.dumps(matrix, separators=(',', ':'))}\n")
-          print(f"backend={backend} frontend={frontend} shards={sorted(selected)}")
+              for key, value in flags.items():
+                  output.write(f"{key}={str(value).lower()}\n")
+              output.write(f"format_files={json.dumps(format_files, separators=(',', ':'))}\n")
+              output.write(
+                  f"backend_test_matrix={json.dumps({'include': include}, separators=(',', ':'))}\n"
+              )
+              output.write(f"pytest_markers={markers}\n")
+          print(f"tier={tier} ({reason or event}) markers={markers!r}")
+          print(f"{flags} shards={[entry['name'] for entry in include]}")
           PY
 
   lint:
@@ -259,7 +402,7 @@ jobs:
   backend-test-shard:
     name: test shard (${{ matrix.name }})
     needs: changes
-    if: ${{ needs.changes.outputs.backend == 'true' }}
+    if: ${{ needs.changes.outputs.shards == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -307,11 +450,17 @@ jobs:
       TEMPORAL_NAMESPACE: default
     steps:
       - uses: actions/checkout@v4
+      # The whole pipenv virtualenv is cached, keyed on everything it is
+      # built from (#2413): a cache hit skips about a minute of installs.
       - uses: actions/setup-python@v5
+        id: python
         with:
           python-version: "3.12"
-          cache: "pip"
-          cache-dependency-path: backend/Pipfile.lock
+          cache: "pipenv"
+          cache-dependency-path: |
+            backend/Pipfile
+            backend/Pipfile.lock
+            backend/providers/pyproject.toml
       - name: Install Temporal CLI
         if: ${{ matrix.temporal }}
         # Tests against real Temporal (test env) per backend/CLAUDE.md.
@@ -345,21 +494,25 @@ jobs:
         # expected vs. recorded hash and breaks `--deploy`.
         run: pip install "pipenv==2026.6.1"
       - name: Install dependencies
+        if: ${{ steps.python.outputs.cache-hit != 'true' }}
         run: pipenv install --dev --deploy
       - name: Install in-tree provider plugins
         # The lifecycle observability surface dispatches through the
         # provider drivers (#299) — install the in-tree providers
         # tree into the same pipenv venv so `_sdk` + `k8s_native` +
         # the cloud plugins resolve at import time. The Docker image
-        # does this in its build step; CI mirrors it.
-        run: pipenv run pip install './providers[aws,gcp,azure,k8s]'
+        # does this in its build step; CI mirrors it. The second install
+        # replaces the copy a cached virtualenv carries from an older commit.
+        run: |
+          pipenv run pip install './providers[aws,gcp,azure,k8s]'
+          pipenv run pip install --no-deps --force-reinstall ./providers
       - name: Prepare verified native collector test artifacts
-        if: ${{ matrix.name == 'registration-clusters' }}
+        if: ${{ matrix.shard == 'registration-clusters' }}
         run: |
           python scripts/prepare_collector_test_artifacts.py "$RUNNER_TEMP/collector-native"
           echo "COLLECTOR_RENDER_ARTIFACTS=$RUNNER_TEMP/collector-native" >> "$GITHUB_ENV"
       - name: Prepare verified native subscription metrics test engine
-        if: ${{ matrix.name == 'services-platform' }}
+        if: ${{ matrix.shard == 'services-platform' }}
         run: |
           python scripts/prepare_promtool_test_artifacts.py "$RUNNER_TEMP/prometheus-native"
           echo "PROMTOOL_BINARY=$RUNNER_TEMP/prometheus-native/promtool" >> "$GITHUB_ENV"
@@ -378,6 +531,49 @@ jobs:
           SQL
           psql -h 127.0.0.1 -U dbadmin -d astrolift_test -Atc \
             "SELECT name || '=' || setting FROM pg_settings WHERE name IN ('fsync', 'full_page_writes', 'synchronous_commit', 'checkpoint_timeout', 'max_wal_size', 'autovacuum') ORDER BY name"
+      # Migrating from scratch took about 3.5 minutes in every shard. The
+      # first shard to migrate a schema dumps it under a key of every file
+      # that shapes it; later shards restore that dump and pytest reuses it
+      # (`--reuse-db` still runs `migrate`, which applies anything missing).
+      - name: Restore the migrated test database
+        id: testdb
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/testdb
+          key: ${{ needs.changes.outputs.testdb_key }}
+      - name: Load or migrate the test database
+        env:
+          PGPASSWORD: Password123
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+          RESTORED: ${{ steps.testdb.outputs.cache-hit }}
+          DUMP: ${{ runner.temp }}/testdb/test_astrolift_test.dump
+        run: |
+          set -euo pipefail
+          fresh() {
+            psql -h 127.0.0.1 -U dbadmin -d astrolift_test -v ON_ERROR_STOP=1 \
+              -c "DROP DATABASE IF EXISTS test_astrolift_test" -c "CREATE DATABASE test_astrolift_test"
+          }
+          fresh
+          # The server's own pg_restore and pg_dump, so client and server
+          # versions always match.
+          if [[ "$RESTORED" == true ]] && docker exec -i "$POSTGRES_CONTAINER" \
+              pg_restore -U dbadmin -d test_astrolift_test --no-owner --no-privileges --exit-on-error < "$DUMP"; then
+            echo "Restored the migrated test database."
+            exit 0
+          fi
+          fresh
+          # What pytest-django runs when it creates the test database.
+          POSTGRES_DB=test_astrolift_test pipenv run python manage.py migrate --run-syncdb --noinput
+          mkdir -p "$(dirname "$DUMP")"
+          docker exec "$POSTGRES_CONTAINER" pg_dump -U dbadmin -Fc test_astrolift_test > "$DUMP"
+      - name: Save the migrated test database
+        if: ${{ steps.testdb.outputs.cache-hit != 'true' }}
+        # Parallel shards race to save the same key; the losers only warn.
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/testdb
+          key: ${{ needs.changes.outputs.testdb_key }}
       - name: Run tests
         # Not `-x`. Halting at the first failure is why the suite's real state
         # stayed unknown for weeks: one failure masks every one behind it, so
@@ -385,19 +581,28 @@ jobs:
         # reports the whole set at once, which is what attributing the backlog
         # in #1244 actually needs. The provider tree has its own parallel job;
         # repeating its 2,299 tests here added several minutes without adding
-        # coverage. The agent-control and core/identity rows split test files
-        # deterministically because they were the remaining critical path. Each
-        # shard still applies the real migration graph: a few models are defined
-        # outside conventional models modules, so pytest-django's --nomigrations
-        # model discovery cannot reproduce the production schema. `--durations`
-        # keeps future tuning evidence-driven.
+        # coverage. Partitioned rows split their sorted test files round-robin.
+        # Every shard still tests the real migration graph, restored or
+        # migrated above: a few models are defined outside conventional models
+        # modules, so pytest-django's --nomigrations model discovery cannot
+        # reproduce the production schema. `--durations` keeps future tuning
+        # evidence-driven.
+        #
+        # PYTEST_MARKERS is the tier from `changes` (#2413): pull requests skip
+        # `slow` and `rarely` tests, a push to main runs the `slow` ones its
+        # pull request skipped, nightly runs both. `manual` tests never run
+        # here (backend/conftest.py refuses them under CI).
+        env:
+          PYTEST_MARKERS: ${{ needs.changes.outputs.pytest_markers }}
         run: |
           set -euo pipefail
+          echo "tier markers: $PYTEST_MARKERS"
+          status=0
           if (( ${{ matrix.partitions }} > 1 )); then
             mapfile -t TEST_FILES < <(
               find ${{ matrix.paths }} -type f \
                 \( -name 'test_*.py' -o -name '*_tests.py' \) -print \
-                | sort \
+                | LC_ALL=C sort \
                 | awk -v partition=${{ matrix.partition }} \
                       -v partitions=${{ matrix.partitions }} \
                       '(NR - 1) % partitions == partition'
@@ -405,25 +610,36 @@ jobs:
             printf 'partition %s/%s: %s test files\n' \
               "${{ matrix.partition }}" "${{ matrix.partitions }}" "${#TEST_FILES[@]}"
             test "${#TEST_FILES[@]}" -gt 0
-            pipenv run pytest -q --tb=short -rf --durations=20 \
-              "${TEST_FILES[@]}"
+            pipenv run pytest -q --tb=short -rf --durations=20 --reuse-db -m "$PYTEST_MARKERS" \
+              "${TEST_FILES[@]}" || status=$?
           else
-            pipenv run pytest -q --tb=short -rf --durations=20 \
-              ${{ matrix.paths }}
+            pipenv run pytest -q --tb=short -rf --durations=20 --reuse-db -m "$PYTEST_MARKERS" \
+              ${{ matrix.paths }} || status=$?
           fi
+          # 5 means every collected test belongs to a tier this run skips.
+          if (( status == 5 )); then
+            echo "No test in this shard is in the selected tier."
+            exit 0
+          fi
+          exit "$status"
 
   test:
     name: test (real postgres)
-    if: ${{ always() }}
+    # Skipped, not failed, for a draft: nothing ran.
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
     needs: [changes, backend-test-shard]
     runs-on: ubuntu-latest
     steps:
+      # One check for the whole matrix: the job result is success only when
+      # every partition of every selected shard succeeded.
       - name: Require every real-Postgres shard
         env:
-          BACKEND_CHANGED: ${{ needs.changes.outputs.backend }}
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          SHARDS_SELECTED: ${{ needs.changes.outputs.shards }}
           SHARD_RESULT: ${{ needs.backend-test-shard.result }}
         run: |
-          if [[ "$BACKEND_CHANGED" != true ]]; then
+          test "$CHANGES_RESULT" = success
+          if [[ "$SHARDS_SELECTED" != true ]]; then
             echo "No backend-impacting paths changed; real-Postgres shards were not needed."
             exit 0
           fi
@@ -440,8 +656,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
+        id: python
         with:
           python-version: "3.12"
+          cache: "pipenv"
+          cache-dependency-path: |
+            backend/Pipfile
+            backend/Pipfile.lock
+            backend/providers/pyproject.toml
       - name: Install pipenv
         # Pinned to the version that generated Pipfile.lock — pipenv
         # ships breaking changes to its Pipfile-hash algorithm across
@@ -449,19 +671,23 @@ jobs:
         # expected vs. recorded hash and breaks `--deploy`.
         run: pip install "pipenv==2026.6.1"
       - name: Install dependencies
+        if: ${{ steps.python.outputs.cache-hit != 'true' }}
         run: pipenv install --dev --deploy
       - name: Install in-tree provider plugins
         # Mirrors the test job — mypy follows imports into
         # core.cluster_observability which references _sdk.cluster
         # from the providers tree.
-        run: pipenv run pip install './providers[aws,gcp,azure,k8s]'
+        run: |
+          pipenv run pip install './providers[aws,gcp,azure,k8s]'
+          pipenv run pip install --no-deps --force-reinstall ./providers
       - name: Run mypy on the platform core
         run: pipenv run mypy core config || true
 
   contracts:
     name: generated contracts
     needs: changes
-    if: ${{ needs.changes.outputs.backend == 'true' }}
+    # Also runs when only frontend/schema.graphql changed: it is compared below.
+    if: ${{ needs.changes.outputs.contracts == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -485,16 +711,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
+        id: python
         with:
           python-version: "3.12"
-          cache: "pip"
-          cache-dependency-path: backend/Pipfile.lock
+          cache: "pipenv"
+          cache-dependency-path: |
+            backend/Pipfile
+            backend/Pipfile.lock
+            backend/providers/pyproject.toml
       - name: Install pipenv
         run: pip install "pipenv==2026.6.1"
       - name: Install dependencies
+        if: ${{ steps.python.outputs.cache-hit != 'true' }}
         run: pipenv install --dev --deploy
       - name: Install in-tree provider plugins
-        run: pipenv run pip install './providers[aws,gcp,azure,k8s]'
+        run: |
+          pipenv run pip install './providers[aws,gcp,azure,k8s]'
+          pipenv run pip install --no-deps --force-reinstall ./providers
       - name: Verify generated GraphQL and MCP contracts
         run: |
           pipenv run python manage.py export_contracts --check
@@ -508,7 +741,9 @@ jobs:
     # This job makes that mistake structurally impossible going forward.
     name: test (providers)
     needs: changes
-    if: ${{ needs.changes.outputs.backend == 'true' }}
+    # The suite imports only backend/providers and the native artifact
+    # scripts, so it runs when one of those (or CI itself) changes.
+    if: ${{ needs.changes.outputs.providers == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -518,6 +753,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/providers/pyproject.toml
       - name: Install providers + test extras
         run: pip install -e ".[aws,gcp,azure,k8s,dev]"
       - name: Lint (providers)
@@ -542,7 +779,7 @@ jobs:
     # bug (production install crashed on server_side_apply) at PR time.
     name: no-stub-factory gate (providers)
     needs: changes
-    if: ${{ needs.changes.outputs.backend == 'true' }}
+    if: ${{ needs.changes.outputs.providers == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -621,8 +858,10 @@ jobs:
           print("OK — no real-but-stubbed factory classes found.")
           PY
 
-  frontend-lint:
-    name: lint (frontend)
+  # The frontend runs as four parallel jobs (#2413); `lint (frontend)` below
+  # keeps its old name as the one check that requires all of them.
+  frontend-checks:
+    name: frontend checks (lint, types, format, generated files)
     needs: changes
     if: ${{ needs.changes.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
@@ -634,51 +873,42 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
+      # node_modules itself is cached (#2413): restoring it takes seconds,
+      # `npm ci` took 2.7 minutes in each of these jobs. Saved straight after
+      # `npm ci`, before any build writes its own caches into it.
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache/restore@v4
+        with:
+          path: frontend/node_modules
+          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
       - name: Install dependencies
+        if: ${{ steps.node-modules.outputs.cache-hit != 'true' }}
         run: npm ci
+      - name: Save node_modules
+        if: ${{ steps.node-modules.outputs.cache-hit != 'true' }}
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: frontend/node_modules
+          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
       - name: Lint
         run: npm run lint
-      # Despite the job's name, it also typechecks and runs vitest (#2128).
       - name: Typecheck
         run: npm run typecheck
-      - name: Test
-        run: npm test
-      # The design-system catalog (spec 44 §8). `npm test` renders every story;
-      # this proves the catalog itself still builds.
-      - name: Build the component catalog
-        run: npm run build-storybook
-      # Spec 44 §6 and §8: every long-string and 768px story, and every
-      # dialog and sheet, rendered in Chromium from that build and checked for
-      # a horizontal page scroll, text past its dialog, sheet or table frame,
-      # anything past the story's own 768px frame, and page errors
-      # (e2e/layout.spec.ts). About 735 stories, under 3 minutes on 4 workers.
-      - name: Install Chromium for the layout test
-        run: npx playwright install --with-deps chromium
-      - name: Layout at 768px
-        run: npm run test:layout
-      # The production build is the only check that sees the server/client
-      # boundary: a server page calling into a "use client" module passes
-      # lint, typecheck and vitest and then fails the image build on main.
-      - name: Build the app
-        run: npm run build
+      # A ratchet, not a sweep: `prettier --check .` fails on files main has
+      # never formatted, so only the files this change touches must comply.
+      # Generated outputs are in .prettierignore; their generators own them.
+      - name: Format check the changed files
         env:
-          NEXT_TELEMETRY_DISABLED: "1"
-          NEXT_PUBLIC_API_ORIGIN: "http://127.0.0.1:6172"
-          API_INTERNAL_ROOT: "http://127.0.0.1:6172"
-          TZ: "UTC"
-      - name: Walk production routes through rendered navigation
-        run: npm run test:routes
-        env:
-          TZ: "UTC"
-      - name: Save route navigation evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: production-route-navigation
-          path: frontend/test-results/routes
-          if-no-files-found: ignore
+          FORMAT_FILES: ${{ needs.changes.outputs.format_files }}
+        run: |
+          mapfile -t files < <(jq -r '.[]' <<<"$FORMAT_FILES")
+          if (( ${#files[@]} == 0 )); then
+            echo "No changed frontend files to check."
+            exit 0
+          fi
+          npx prettier --check --ignore-unknown "${files[@]}"
       - name: Verify generated GraphQL client types
         run: |
           npm run codegen
@@ -694,3 +924,181 @@ jobs:
         run: |
           npm run docs:corpus
           git diff --exit-code -- DOCS.md ../backend/astrolift_agents/data/docs.md
+
+  frontend-unit:
+    name: frontend unit (${{ matrix.shard }}/3)
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # node_modules itself is cached (#2413): restoring it takes seconds,
+      # `npm ci` took 2.7 minutes in each of these jobs. Saved straight after
+      # `npm ci`, before any build writes its own caches into it.
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache/restore@v4
+        with:
+          path: frontend/node_modules
+          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
+      - name: Install dependencies
+        if: ${{ steps.node-modules.outputs.cache-hit != 'true' }}
+        run: npm ci
+      - name: Save node_modules
+        if: ${{ steps.node-modules.outputs.cache-hit != 'true' }}
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: frontend/node_modules
+          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
+      # vitest splits test files, so the story renderer (stories.test.tsx,
+      # about 200 s alone) stays whole in one shard.
+      - name: Test
+        run: npm test -- --shard=${{ matrix.shard }}/3
+
+  frontend-layout:
+    name: frontend layout (Storybook at 768px)
+    needs: changes
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # node_modules itself is cached (#2413): restoring it takes seconds,
+      # `npm ci` took 2.7 minutes in each of these jobs. Saved straight after
+      # `npm ci`, before any build writes its own caches into it.
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache/restore@v4
+        with:
+          path: frontend/node_modules
+          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
+      - name: Install dependencies
+        if: ${{ steps.node-modules.outputs.cache-hit != 'true' }}
+        run: npm ci
+      - name: Save node_modules
+        if: ${{ steps.node-modules.outputs.cache-hit != 'true' }}
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: frontend/node_modules
+          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
+      # The design-system catalog (spec 44 §8). `npm test` renders every story;
+      # this proves the catalog itself still builds.
+      - name: Build the component catalog
+        run: npm run build-storybook
+      # Spec 44 §6 and §8: every long-string and 768px story, and every
+      # dialog and sheet, rendered in Chromium from that build and checked for
+      # a horizontal page scroll, text past its dialog, sheet or table frame,
+      # anything past the story's own 768px frame, and page errors
+      # (e2e/layout.spec.ts). The e2e/*-translations specs assert exact
+      # translated strings, so this job runs for message catalogue changes.
+      - name: Install Chromium for the layout test
+        run: npx playwright install --with-deps chromium
+      - name: Layout at 768px
+        run: npm run test:layout
+
+  frontend-routes:
+    name: frontend routes (production build and navigation)
+    needs: changes
+    if: ${{ needs.changes.outputs.routes == 'true' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # node_modules itself is cached (#2413): restoring it takes seconds,
+      # `npm ci` took 2.7 minutes in each of these jobs. Saved straight after
+      # `npm ci`, before any build writes its own caches into it.
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache/restore@v4
+        with:
+          path: frontend/node_modules
+          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
+      - name: Install dependencies
+        if: ${{ steps.node-modules.outputs.cache-hit != 'true' }}
+        run: npm ci
+      - name: Save node_modules
+        if: ${{ steps.node-modules.outputs.cache-hit != 'true' }}
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: frontend/node_modules
+          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('frontend/package-lock.json') }}
+      - name: Install Chromium for the route walk
+        run: npx playwright install --with-deps chromium
+      # The production build is the only check that sees the server/client
+      # boundary: a server page calling into a "use client" module passes
+      # lint, typecheck and vitest and then fails the image build on main.
+      - name: Build the app
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          NEXT_PUBLIC_API_ORIGIN: "http://127.0.0.1:6172"
+          API_INTERNAL_ROOT: "http://127.0.0.1:6172"
+          TZ: "UTC"
+      # One sequential walk of the rendered navigation graph, about 13 minutes:
+      # the critical path of a frontend change.
+      - name: Walk production routes through rendered navigation
+        run: npm run test:routes
+        env:
+          TZ: "UTC"
+      - name: Save route navigation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-route-navigation
+          path: frontend/test-results/routes
+          if-no-files-found: ignore
+          retention-days: 5
+
+  frontend-lint:
+    name: lint (frontend)
+    if: ${{ always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false) }}
+    needs: [changes, frontend-checks, frontend-unit, frontend-layout, frontend-routes]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every frontend job
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          FRONTEND: ${{ needs.changes.outputs.frontend }}
+          ROUTES: ${{ needs.changes.outputs.routes }}
+          CHECKS_RESULT: ${{ needs.frontend-checks.result }}
+          UNIT_RESULT: ${{ needs.frontend-unit.result }}
+          LAYOUT_RESULT: ${{ needs.frontend-layout.result }}
+          ROUTES_RESULT: ${{ needs.frontend-routes.result }}
+        run: |
+          test "$CHANGES_RESULT" = success
+          if [[ "$FRONTEND" != true ]]; then
+            echo "No frontend-impacting paths changed; frontend jobs were not needed."
+            exit 0
+          fi
+          echo "checks=$CHECKS_RESULT unit=$UNIT_RESULT layout=$LAYOUT_RESULT routes=$ROUTES_RESULT"
+          test "$CHECKS_RESULT" = success
+          test "$UNIT_RESULT" = success
+          test "$LAYOUT_RESULT" = success
+          if [[ "$ROUTES" == true ]]; then
+            test "$ROUTES_RESULT" = success
+          else
+            echo "Only non-English message catalogues changed; the en-US route walk was not needed."
+          fi

@@ -326,6 +326,7 @@ def test_retained_journal_requires_origin_after_endpoint_graph_is_gone(monkeypat
         refuse_unsupported_origin(w.medops_app)
 
 
+@pytest.mark.rarely
 def test_actual_migration_roundtrip_is_empty_only_and_retained_history_refuses(world, client):
     from django.db import connection
     from django.db.migrations.executor import MigrationExecutor

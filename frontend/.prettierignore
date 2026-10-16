@@ -4,3 +4,8 @@ out/
 build/
 next-env.d.ts
 public/
+# Generated outputs, checked byte-for-byte against their generators in CI:
+graphql/__generated__/
+schema.graphql
+ROUTES.md
+DOCS.md

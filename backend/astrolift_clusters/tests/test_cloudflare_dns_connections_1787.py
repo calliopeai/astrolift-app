@@ -843,6 +843,7 @@ def test_disconnect_local_receipt_survives_remote_recording_failure(
     assert not row.secret_ciphertext and len(wire.calls) == before + (fault == "persist_revoke")
 
 
+@pytest.mark.rarely
 def test_real_migration_retained_secret_history_refuses_then_empty_roundtrip(world):
     from django.db import connection
     from django.db.migrations.executor import MigrationExecutor

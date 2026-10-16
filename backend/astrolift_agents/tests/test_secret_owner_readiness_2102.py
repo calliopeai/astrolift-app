@@ -211,6 +211,7 @@ def test_unknown_organization_error_does_not_echo_user_input(no_backend):
     assert no_backend == []
 
 
+@pytest.mark.slow
 @pytest.mark.django_db(transaction=True)
 def test_actual_manage_cli_uses_owned_pg_database_and_strict_exit_without_backend(world):
     environment = os.environ.copy()

@@ -124,6 +124,7 @@ def approval_policy(w, *, environment=None):
     )
 
 
+@pytest.mark.slow
 def test_actual_protected_quorum_reaches_bootstrap_and_readback_without_default_vote_facts(
     source_world, client
 ):
@@ -306,6 +307,7 @@ def test_same_environment_approved_deployment_cannot_take_over_pending_source(so
     assert source.state == "UNSENT" and source.unique_id is None and not w.native.writes
 
 
+@pytest.mark.slow
 def test_original_pending_deployment_context_can_resume_after_policy_restoration(source_world, client):
     w = source_world
     _, reference, context, source = pending_approved_source(w, client)
@@ -317,6 +319,7 @@ def test_original_pending_deployment_context_can_resume_after_policy_restoration
     assert w.native.writes == 1
 
 
+@pytest.mark.slow
 def test_observed_original_source_can_be_reused_by_fresh_later_deployment(source_world, client):
     w = source_world
     first, reference, context = dispatch_context(w, client)

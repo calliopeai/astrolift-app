@@ -46,6 +46,7 @@ def _refuse(service, **fields):
         service._base_manager.create(name="invalid-native-fixture", **fields)
 
 
+@pytest.mark.rarely
 @pytest.mark.django_db(transaction=True)
 def test_real_native_owner_migration_preserves_rows_and_replaces_only_reviewed_constraint():
     assert connection.vendor == "postgresql", "owner-check acceptance requires PostgreSQL"

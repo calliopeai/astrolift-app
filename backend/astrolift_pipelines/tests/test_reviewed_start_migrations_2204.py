@@ -10,6 +10,7 @@ OLD = ("astrolift_pipelines", "0009_pipelinerun_definition_digest_and_more")
 NEW = ("astrolift_pipelines", "0011_jobrun_cluster_jobrun_k8s_job_uid_and_more")
 
 
+@pytest.mark.rarely
 @pytest.mark.parametrize("collision", [False, True])
 def test_historical_run_owners_are_backfilled_and_duplicate_numbers_are_not_rewritten(collision):
     from astrolift_identity.models import Organization
