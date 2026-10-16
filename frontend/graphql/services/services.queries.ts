@@ -206,21 +206,18 @@ export const LIST_MANAGED_SERVICES = gql`
 `;
 
 /**
- * Cursor-paginated companion to ``LIST_MANAGED_SERVICES`` (#1230). The flat
- * field is deprecated for applying no ordering at all — row order was
- * whatever Postgres returned — so this is also what makes the list stable
- * between renders.
+ * The services table's bounded basic projection (#2207): no config,
+ * attachments or grants, and a typed failure instead of provider text.
  */
-export const LIST_MANAGED_SERVICES_PAGE = gql`
-  ${MANAGED_SERVICE_FIELDS}
-  query ListManagedServicesPage(
+export const LIST_MANAGED_SERVICE_SUMMARIES_PAGE = gql`
+  query ListManagedServiceSummariesPage(
     $appSlug: String!
     $environmentName: String
     $search: String
     $limit: Int
     $after: String
   ) {
-    astroliftManagedServicesPage(
+    astroliftManagedServiceSummariesPage(
       appSlug: $appSlug
       environmentName: $environmentName
       search: $search
@@ -228,10 +225,41 @@ export const LIST_MANAGED_SERVICES_PAGE = gql`
       after: $after
     ) {
       items {
-        ...ManagedServiceFields
+        id
+        name
+        kind
+        variant
+        status
+        statusFailure {
+          code
+          message
+        }
+        posture {
+          dkimVerified
+          domainStatus
+          backupEnabled
+          snapshotPolicy
+          publicAccessBlocked
+        }
+        environmentName
+        registeredAppSlug
+        createdAt
+        updatedAt
+        lastActionAt
+        lastActionKind
       }
       nextCursor
       totalCount
+    }
+  }
+`;
+
+/** One of the app's services by exact GUID; the email sheet's config read. */
+export const GET_APP_MANAGED_SERVICE_CONFIG = gql`
+  query GetAppManagedServiceConfig($appSlug: String!, $id: GUID!) {
+    astroliftAppManagedService(appSlug: $appSlug, id: $id) {
+      id
+      config
     }
   }
 `;

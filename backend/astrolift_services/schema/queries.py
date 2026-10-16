@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import functools
+import uuid
 
 import strawberry
 from django.db.models import Count, Prefetch, Q
+from django.db.models.fields.json import KeyTransform
 from django.db.models.functions import Lower
 from graphql import GraphQLError
 from strawberry.types import Info
@@ -76,6 +78,7 @@ from astrolift_services.schema.types import (
     ManagedServiceObjectsType,
     ManagedServiceObjectType,
     ManagedServiceQueueDepthType,
+    ManagedServiceSummaryType,
     ManagedServiceType,
     ModelEndpointsFilterInput,
     ModelPromptReadinessType,
@@ -89,6 +92,7 @@ from astrolift_services.schema.types import (
     WorkloadIdentityGrantType,
     attachment_to_type,
     managed_service_catalog_entry_to_type,
+    managed_service_summary_to_type,
     managed_service_to_type,
     secret_bundle_to_type,
     secret_change_proposal_metadata_to_type,
@@ -625,47 +629,37 @@ _MODEL_ENDPOINT_FILTERS: dict[str, FilterField] = {
 }
 
 
-def _managed_services_qs(
+def _app_managed_service_rows(
     *,
     app_slug: str,
     environment_name: str | None,
     search: str | None = None,
 ):
-    """Filtered, unordered managed-service stream for one app.
+    """Filtered, unordered, unloaded managed-service stream for one app.
 
-    Shared by ``astrolift_managed_services`` and its paginated sibling so
-    the two can never disagree about what a row is. Ordering is
-    deliberately not applied here — ``keyset_page`` imposes it from the
-    seek key.
+    The one row set every app-owned services read is cut from, so the full
+    list, its page, the bounded summary page and the exact read can never
+    disagree about what a row is. Ordering is deliberately not applied
+    here; ``keyset_page`` imposes it from the seek key. Callers choose
+    what to load.
 
     Module-level rather than a method on ``ServicesQuery``: Strawberry
     binds ``self`` on a ROOT field resolver to the schema's root value,
-    and the Django view leaves that ``None`` — ``self._helper()`` inside
+    and the Django view leaves that ``None``; ``self._helper()`` inside
     a root resolver raises ``AttributeError`` at execution time. Same
     trap ``_agent_list_rows`` documents in ``astrolift_agents``.
 
     ManagedService carries no org column of its own; it reaches the
     tenant through the owning app. A ``None`` org id yields ``.none()``
-    rather than an unscoped queryset — deny-by-default (#1042 / #1183).
+    rather than an unscoped queryset: deny-by-default (#1042 / #1183).
     """
     org_id = _caller_org_id()
     if org_id is None:
         return ManagedService.objects.none()
-    qs = (
-        ManagedService.objects.select_related("registered_app", "app_environment", "created_by")
-        .prefetch_related(
-            "attachments",
-            "volume_bindings",
-            Prefetch(
-                "workload_identity_grants",
-                queryset=WorkloadIdentityGrant.objects.select_related("app_environment"),
-            ),
-        )
-        .filter(
-            registered_app__slug=app_slug,
-            registered_app__organization_id=org_id,
-            deleted_at__isnull=True,
-        )
+    qs = ManagedService.objects.filter(
+        registered_app__slug=app_slug,
+        registered_app__organization_id=org_id,
+        deleted_at__isnull=True,
     )
     if environment_name:
         qs = qs.filter(app_environment__name=environment_name)
@@ -681,6 +675,67 @@ def _managed_services_qs(
             )
         )
     return credential_managed_services(visible_operation_rows(qs, Permission.APP_READ))
+
+
+def _managed_services_qs(
+    *,
+    app_slug: str,
+    environment_name: str | None,
+    search: str | None = None,
+):
+    """The app's rows with everything ``managed_service_to_type`` reads."""
+    return (
+        _app_managed_service_rows(app_slug=app_slug, environment_name=environment_name, search=search)
+        .select_related("registered_app", "app_environment", "created_by")
+        .prefetch_related(
+            "attachments",
+            "volume_bindings",
+            Prefetch(
+                "workload_identity_grants",
+                queryset=WorkloadIdentityGrant.objects.select_related("app_environment"),
+            ),
+        )
+    )
+
+
+def _managed_service_summary_rows(
+    *,
+    app_slug: str,
+    environment_name: str | None,
+    search: str | None = None,
+):
+    """The app's rows with only the columns ``managed_service_summary_to_type``
+    reads (#2207): no prefetch, no config document. The posture facts are
+    pulled out of ``config`` key by key in SQL."""
+    return (
+        _app_managed_service_rows(app_slug=app_slug, environment_name=environment_name, search=search)
+        .select_related("registered_app", "app_environment__tenant_cluster")
+        .only(
+            "guid",
+            "name",
+            "kind",
+            "variant",
+            "status",
+            "status_error",
+            "operation_kind",
+            "operation_started_at",
+            "operation_completed_at",
+            "created_at",
+            "updated_at",
+            "last_action_at",
+            "last_action_kind",
+            "registered_app__slug",
+            "app_environment__name",
+            "app_environment__tenant_cluster__slug",
+        )
+        .annotate(
+            posture_dkim_verified=KeyTransform("dkim_verified", "config"),
+            posture_domain_status=KeyTransform("domain_status", "config"),
+            posture_backup_enabled=KeyTransform("backup_enabled", "config"),
+            posture_snapshot_policy=KeyTransform("snapshot_policy", "config"),
+            posture_public_access_blocked=KeyTransform("public_access_blocked", "config"),
+        )
+    )
 
 
 @strawberry.type
@@ -1233,6 +1288,63 @@ class ServicesQuery(
             limit=limit,
         )
         return page.map(managed_service_to_type)
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_managed_service_summaries_page(
+        self,
+        info: Info,
+        app_slug: str,
+        environment_name: str | None = None,
+        search: str | None = None,
+        limit: int = 50,
+        after: str | None = None,
+    ) -> PageType[ManagedServiceSummaryType]:
+        """The services table's bounded basic projection (#2207).
+
+        The same rows, order, search and cursor as
+        ``astroliftManagedServicesPage``, but each row loads one column
+        list: no config, attachments, volume bindings, grants or driver
+        resolution, so a 50-row page costs a 50-row SELECT whatever the
+        client selects. ``statusFailure`` replaces the raw provider text.
+        """
+        page = keyset_page(
+            _managed_service_summary_rows(
+                app_slug=app_slug,
+                environment_name=environment_name,
+                search=search,
+            ),
+            cursor=after,
+            limit=limit,
+        )
+        return page.map(managed_service_summary_to_type)
+
+    @strawberry.field
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @require_app_collection_scope(Permission.APP_READ)
+    @tenant_scoped()
+    def astrolift_app_managed_service(
+        self,
+        info: Info,
+        app_slug: str,
+        id: GUID,
+    ) -> ManagedServiceType | None:
+        """One of the app's services by exact GUID, full record (#2207).
+
+        Cut from the same row set as ``astroliftManagedServicesPage``, so
+        it reveals nothing that page would not. A GUID that is malformed,
+        deleted, another app's or another tenant's resolves to null, never
+        to a same-name row.
+        """
+        try:
+            guid = uuid.UUID(str(id))
+        except (TypeError, ValueError, AttributeError):
+            return None
+        # tenancy: _app_managed_service_rows pins registered_app__organization_id to the caller's org
+        row = _managed_services_qs(app_slug=app_slug, environment_name=None).filter(guid=guid).first()
+        return managed_service_to_type(row) if row is not None else None
 
     @strawberry.field
     @require_permission(
