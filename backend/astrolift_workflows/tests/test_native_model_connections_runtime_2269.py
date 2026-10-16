@@ -80,6 +80,7 @@ async def test_actual_worker_observes_binding_without_invoke_readiness(temporal_
     assert w.model.model_ready_observed_at is None
 
 
+@pytest.mark.slow
 async def test_actual_worker_observation_timeout_is_bounded_and_failed(temporal_env, prepared, monkeypatch):
     w, row = prepared
     observed = []

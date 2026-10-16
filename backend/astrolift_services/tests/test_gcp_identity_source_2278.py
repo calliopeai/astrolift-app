@@ -86,6 +86,7 @@ def independent_row(source_id):
         db.close()
 
 
+@pytest.mark.slow
 def test_http_bootstrap_one_create_committed_numeric_uid_and_read_only_current_context(world):
     states = []
 
@@ -338,6 +339,7 @@ def test_protected_and_retired_history_blocks_empty_replacement(world):
     )
 
 
+@pytest.mark.rarely
 def test_reverse_denial_preserves_rows_and_migration_record_and_complete_graph(world):
     bootstrap(world)
     executor = MigrationExecutor(connection)

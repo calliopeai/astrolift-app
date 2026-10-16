@@ -294,6 +294,7 @@ def test_unregister_is_local_only_even_when_external_source_disappears(world, cl
     assert world.reads == before
 
 
+@pytest.mark.rarely
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.parametrize("deleted", [False, True])
 def test_owner_migration_rollback_refuses_persisted_native_rows(world, client, deleted):

@@ -31,7 +31,7 @@ from .test_domain_app_route_store_2299 import admitted, world  # noqa: F401
 
 connected_source = source_fixture
 
-pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.asyncio]
+pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.asyncio, pytest.mark.slow]
 
 
 async def bind_worker(temporal_env, monkeypatch):

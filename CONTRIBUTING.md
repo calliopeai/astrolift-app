@@ -54,6 +54,45 @@ cd backend && mypy core config       # type check
 
 `make fmt` will auto-fix formatting and most lint issues.
 
+### Test tiers
+
+Every backend test is in one of four tiers. Its marker is registered in
+`backend/pytest.ini` and selected with `-m`; CI picks the tier from the event
+(#2413).
+
+| Tier | Marker | Pull request | Push to `main` | Nightly | Plain local `pytest` |
+|---|---|---|---|---|---|
+| default | none | runs | see below | runs | runs |
+| sometimes | `slow` | skipped | runs | runs | runs |
+| rarely | `rarely` | skipped | skipped | runs | runs |
+| manual | `manual` | never | never | never | only with `-m manual` |
+
+- `slow`: 15 seconds or more on CI. Tenancy, permission and guardrail tests
+  stay in the default tier, whatever they cost.
+- `rarely`: heavy migration roundtrip, reverse and backfill tests. Every
+  shard already applies the forward migration graph.
+- `manual`: needs infrastructure CI does not have. Under `CI`, an `-m`
+  expression that selects manual tests is refused, and a run without one
+  deselects them.
+
+A push to `main` that merges a pull request whose CI passed against that
+same `main` runs only the `slow` tests that pull request skipped. Any other
+push runs the default and `slow` tiers. Both run only the shards the change
+can affect, and the `nightly` workflow (07:17 UTC, or on dispatch) runs every
+shard and every tier except `manual`.
+
+Markers are strict: a misspelt one fails collection. Run a tier locally:
+
+```bash
+./run.sh test -m "not slow and not rarely"   # what a pull request runs
+./run.sh test -m "not rarely"                # what main adds up to
+./run.sh test                                # what the nightly runs
+./run.sh test -m manual path/to/test_file.py # manual tests, explicitly
+```
+
+To run the main or nightly tier on a branch before it merges, dispatch `ci`
+on the branch with `tier: main` or `tier: nightly`.
+
 ### Frontend
 
 ```bash
@@ -77,6 +116,7 @@ cd frontend && npm run codegen
 - Don't refactor surrounding code that wasn't part of the issue.
 - Keep PRs reviewable — split large work into stacked PRs if needed.
 - The PR description should explain *what* changed and *why*. Reviewers can read the diff for the *how*.
+- Open the pull request as a draft while you iterate: CI does not run on drafts. Mark it ready for review once the pull-request tier passes locally (`./run.sh test -m "not slow and not rarely"`, plus the frontend checks above). That starts CI, and each later push cancels the run before it.
 - All checks must pass before merge: tests, lint, typecheck, codegen drift check.
 
 ## Issue Reporting

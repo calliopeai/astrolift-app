@@ -229,6 +229,7 @@ def accept(client, w):
     return ManagedDomainAppBinding.objects.get(guid=result["data"]["id"])
 
 
+@pytest.mark.slow
 def test_actual_authenticated_review_connect_and_native_allocation_mapping_alias(
     connected_source, client, monkeypatch
 ):
@@ -249,6 +250,7 @@ def test_actual_authenticated_review_connect_and_native_allocation_mapping_alias
         assert len(w.native["writes"]) == 2 and len(dns["writes"]) == 1
 
 
+@pytest.mark.slow
 def test_native_lost_domain_reply_retains_unknown_and_never_resends(connected_source, client, monkeypatch):
     w = connected_source
     with dns_certificate_wire(monkeypatch) as dns:
@@ -264,6 +266,7 @@ def test_native_lost_domain_reply_retains_unknown_and_never_resends(connected_so
         assert len(w.native["writes"]) == 1 and dns["writes"] == []
 
 
+@pytest.mark.slow
 def test_native_returned_domain_ack_survives_withdrawal_without_mapping_or_alias(
     connected_source, client, monkeypatch
 ):
@@ -286,6 +289,7 @@ OPERATION = """query($input: ManagedDomainAppRouteOperationInput!) { managedDoma
 PREPARE = """mutation($input:ManagedDomainAppRouteWriteInput!) { prepareManagedDomainAppRoute(input:$input) {ok errors {code} data {id requestId status}} }"""
 
 
+@pytest.mark.slow
 def test_original_unknown_operation_recovers_without_review_or_new_allocation(
     connected_source, client, monkeypatch
 ):
@@ -315,6 +319,7 @@ def test_original_unknown_operation_recovers_without_review_or_new_allocation(
         assert len(w.native["writes"]) == 1
 
 
+@pytest.mark.slow
 def test_missing_certificate_prepares_exact_existing_zone_then_connect_review(
     connected_source, client, monkeypatch
 ):

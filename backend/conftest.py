@@ -71,6 +71,7 @@ from core.permissions import register_permission_resolver  # noqa: E402
 from core.request_context import generate_ulid, set_request_id  # noqa: E402
 from core.tenancy import TenantContext  # noqa: E402
 from core.tenancy import tenant_context as _tenant_ctx  # noqa: E402
+from core.testing.tiers import refuse_manual_in_ci, split_manual  # noqa: E402
 
 _original_sql_flush_base = BaseDatabaseOperations.sql_flush
 _original_sql_flush_pg = PostgresDatabaseOperations.sql_flush
@@ -86,6 +87,28 @@ def _sql_flush_with_cascade_pg(self, style, tables, *, reset_sequences=False, al
 
 BaseDatabaseOperations.sql_flush = _sql_flush_with_cascade_base
 PostgresDatabaseOperations.sql_flush = _sql_flush_with_cascade_pg
+
+
+# Test tiers (#2413): see core/testing/tiers.py. A manual test runs only when
+# -m names it, never under CI, and a run that drops some says so.
+_MANUAL_DESELECTED = pytest.StashKey[int]()
+
+
+def pytest_configure(config):
+    refuse_manual_in_ci(config.getoption("markexpr"), os.environ)
+
+
+def pytest_collection_modifyitems(config, items):
+    kept, manual = split_manual(config.getoption("markexpr"), os.environ, items)
+    if manual:
+        items[:] = kept
+        config.hook.pytest_deselected(items=manual)
+        config.stash[_MANUAL_DESELECTED] = len(manual)
+
+
+def pytest_terminal_summary(terminalreporter, config):
+    if count := config.stash.get(_MANUAL_DESELECTED, 0):
+        terminalreporter.write_line(f"{count} manual test(s) deselected; select them with -m manual")
 
 
 # Re-export the reusable two-tenant fixture (#537). Importing it here

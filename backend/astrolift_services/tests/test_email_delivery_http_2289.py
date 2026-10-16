@@ -557,6 +557,7 @@ def test_retired_send_intent_cannot_be_automatically_retried(world):
     assert len(outbound(world)) == 1
 
 
+@pytest.mark.rarely
 def test_retained_history_blocks_destructive_migration_rollback(world):
     from django.db import connection
     from django.db.migrations.executor import MigrationExecutor
@@ -573,6 +574,7 @@ def test_retained_history_blocks_destructive_migration_rollback(world):
     assert EmailDeliveryTest._base_manager.filter(pk=row.pk).exists()
 
 
+@pytest.mark.rarely
 @pytest.mark.django_db(transaction=True)
 def test_empty_mail_history_migration_roundtrip():
     from django.db import connection

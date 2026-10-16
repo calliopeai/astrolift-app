@@ -20,7 +20,8 @@ from astrolift_services.tests.test_gcp_gke_app_apply_journal_2278 import (
 )
 from core.permissions import PermissionDenied
 
-pytestmark = pytest.mark.django_db(transaction=True)
+# 30 to 90 s a test on CI: each one rebuilds the GKE journal world (#2413).
+pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.slow]
 
 
 @pytest.fixture

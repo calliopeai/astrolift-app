@@ -124,6 +124,7 @@ async def run_activity(world, client, temporal_env, implementation, *, cancel_st
     return result
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "withdraw", ["none", "before_refresh", "after_refresh", "token_after_refresh", "reader", "reader_denied"]
@@ -308,6 +309,7 @@ async def test_actual_google_auth_grpc_refresh_thread_checks_execution_before_ht
     assert marker not in captured.out + captured.err
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "withdraw", ["none", "before_create", "after_create", "reader", "producer", "refresh"]
@@ -403,6 +405,7 @@ async def test_actual_source_rpc_and_final_transition_guard_preserves_withdrawn_
     assert True in flags and False in flags
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_bound_callback_under_source_parent_locks_never_waits_for_expected(world, client, temporal_env):
     held, release = Event(), Event()
