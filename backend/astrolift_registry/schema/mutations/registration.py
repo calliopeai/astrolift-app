@@ -14,9 +14,10 @@ from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.models import Project
+from astrolift_manifest.build_context import detected_build_context, sets_build_paths
 from astrolift_manifest.persist import actor_may_attach_project_services, allow_project_attach
 from astrolift_registry.cron import CronValidationError, validate_cron_expression
-from astrolift_registry.models import RegisteredApp
+from astrolift_registry.models import Container, RegisteredApp
 from astrolift_registry.schema.mutations.helpers import (
     _bootstrap_app_environments,
     _ensure_owner_access,
@@ -49,6 +50,20 @@ from core.friendly_name import friendly_name_from_slug
 from core.mutations import ErrorCode, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
+
+
+def _persisted_manifest_sets_build_paths(app: RegisteredApp) -> bool:
+    """True when a live container of ``app`` names its own Dockerfile or context.
+
+    Reads the rows the manifest bootstrap just persisted, the same rows the
+    build resolves its paths from (``build_image._resolve_build_paths``).
+    """
+    containers = Container.objects.filter(
+        workload__registered_app=app,
+        workload__deleted_at__isnull=True,
+        deleted_at__isnull=True,
+    ).values_list("dockerfile_path", "build_context")
+    return any(sets_build_paths(dockerfile, context) for dockerfile, context in containers)
 
 
 @strawberry.type
@@ -202,6 +217,8 @@ class RegistrationMutations:
         )
         if build_context_err is not None:
             return build_context_err
+        # No context named: detect it once the manifest has been read, below.
+        detect_build_context = not (build_context or "").strip()
         # Before the app exists: a refusal must leave nothing half-registered.
         attach_denial = _project_service_attach_denial(input.manifest_raw or "", project)
         if attach_denial is not None:
@@ -369,14 +386,17 @@ class RegistrationMutations:
 
         app.manifest_bootstrap_status = _bootstrap_status
         app.manifest_bootstrap_error = _bootstrap_error
-        app.save(
-            update_fields=[
-                "manifest_bootstrap_status",
-                "manifest_bootstrap_error",
-                "updated_at",
-                "version",
-            ]
-        )
+        bootstrap_fields = ["manifest_bootstrap_status", "manifest_bootstrap_error", "updated_at", "version"]
+        if detect_build_context:
+            # Before environments, onboarding and the CI autowire read it
+            # (astrolift-cli #159). The workloads just persisted say whether
+            # the manifest names its own build paths.
+            app.build_context = detected_build_context(
+                app.manifest_path,
+                manifest_sets_build_paths=_persisted_manifest_sets_build_paths(app),
+            )
+            bootstrap_fields.append("build_context")
+        app.save(update_fields=bootstrap_fields)
 
         with allow_project_attach(actor_may_attach_project_services(app)):
             _bootstrap_app_environments(app, [])

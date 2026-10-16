@@ -14990,7 +14990,8 @@ export type RegisterAppInput = {
   approverTeamId: InputMaybe<Scalars['GUID']['input']>;
   approverUserIds: InputMaybe<Array<Scalars['String']['input']>>;
   buildArgs: InputMaybe<Scalars['JSON']['input']>;
-  buildContext: Scalars['String']['input'];
+  /** Build context, relative to the repository root. Omit it to use the manifest's directory, or the repository root when the manifest sets build_context or dockerfile_path itself. */
+  buildContext: InputMaybe<Scalars['String']['input']>;
   buildMode: Scalars['String']['input'];
   buildStrategy: Scalars['String']['input'];
   cronExpression: InputMaybe<Scalars['String']['input']>;
