@@ -3243,7 +3243,7 @@
       "openRepo": "Repository öffnen",
       "confirmSync": {
         "title": "Aus Repository abrufen?",
-        "description": "Verwirft den ungespeicherten Entwurf und lädt das Manifest aus dem Repository als neue Grundlage. Nicht übertragene Änderungen gehen verloren; kopiere sie vorher, wenn du sie zusammenführen möchtest.",
+        "description": "Verwirft den ungespeicherten Entwurf und lädt das Manifest aus dem Repository als neue Grundlage. App-Secrets in [env] werden in das geladene Manifest übernommen; andere nicht übertragene Änderungen gehen verloren, kopiere sie also vorher, wenn du sie zusammenführen möchtest.",
         "confirm": "Aus Repository abrufen"
       },
       "confirmApply": {

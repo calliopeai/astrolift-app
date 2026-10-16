@@ -3243,7 +3243,7 @@
       "openRepo": "Ouvrir le dépôt",
       "confirmSync": {
         "title": "Récupérer depuis le dépôt ?",
-        "description": "Abandonne le brouillon non enregistré et récupère le manifeste du dépôt comme nouvelle base. Les modifications non envoyées seront perdues ; copiez-les d'abord si vous souhaitez les fusionner.",
+        "description": "Abandonne le brouillon non enregistré et récupère le manifeste du dépôt comme nouvelle base. Les secrets de l'application dans [env] sont reportés sur le manifeste récupéré ; les autres modifications non envoyées seront perdues, copiez-les d'abord si vous souhaitez les fusionner.",
         "confirm": "Récupérer depuis le dépôt"
       },
       "confirmApply": {
