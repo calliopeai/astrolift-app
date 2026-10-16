@@ -44,6 +44,11 @@ export type DnsDelegationPanelProps = {
   zonesError: string | null;
   onGrant: (zone: DelegationZone, token: string) => Promise<boolean>;
   onBind: (connection: DelegationConnection) => Promise<boolean>;
+  /**
+   * The install withholds DNS (calliope-installer#447): provisioning writes no
+   * delegation records, so grant and bind are off and the panel is read-only.
+   */
+  dnsWithheld?: boolean;
 };
 
 export const isParentZone = (parent: string, child: string) =>
@@ -133,7 +138,9 @@ export function DnsDelegationPanel(props: DnsDelegationPanelProps) {
           </dd>
         </div>
       </dl>
-      {props.connectionsLoading ? (
+      {props.dnsWithheld ? (
+        <p className="text-warning-fg text-sm">{t("withheld")}</p>
+      ) : props.connectionsLoading ? (
         <p role="status">{t("loading")}</p>
       ) : !props.canWrite ? (
         <p className="text-muted-foreground text-sm">{t("operatorOnly")}</p>

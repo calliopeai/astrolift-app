@@ -74,6 +74,8 @@ from astrolift_agents.schema.types import (
     AgentUpcomingRunPageType,
     AgentUpcomingRunType,
     BriefType,
+    ConversationTransferCapabilityType,
+    ConversationTransferType,
     DiscoveredAgentManifestType,
     DispatcherInstanceType,
     OrgSkillRepoType,
@@ -96,6 +98,7 @@ from astrolift_agents.schema.types import (
     agent_tasks_to_types,
     agent_trigger_to_type,
     brief_to_type,
+    conversation_transfer_to_type,
     dispatcher_to_type,
     org_skill_repo_to_type,
     skill_to_type,
@@ -106,6 +109,7 @@ from astrolift_agents.scopes import (
     agent_org_scope,
     agent_task_scope,
     agent_workload_app_scope,
+    conversation_transfer_scope,
 )
 from astrolift_agents.visibility import agent_boxes as visible_agent_boxes
 from astrolift_agents.visibility import agent_tasks as visible_agent_tasks
@@ -1290,6 +1294,70 @@ class AgentsQuery:
             organization_id=org_pk, agent_task=task, client_request_id=request_guid
         ).first()
         return agent_task_input_message_to_type(row) if row else None
+
+    @strawberry.field
+    @require_permission(
+        Permission.AGENT_DISPATCH,
+        scope=agent_workload_app_scope("agent_slug", Permission.AGENT_DISPATCH),
+    )
+    @tenant_scoped()
+    def conversation_transfer_capability(
+        self, info: Info, agent_slug: str, environment_spec_id: GUID | None = None
+    ) -> ConversationTransferCapabilityType | None:
+        """Whether this agent's session can host a moved conversation (#1971).
+
+        The IDE asks before it sends anything. Null when the caller cannot
+        dispatch the agent, or the agent or spec does not resolve.
+        """
+        from astrolift_agents.services.conversation_transfer import (
+            ConversationTransferError,
+            transfer_capability,
+            transfer_destination,
+        )
+
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        try:
+            organization, workload, spec = transfer_destination(
+                org_pk, agent_slug, environment_spec_id, Permission.AGENT_DISPATCH
+            )
+        except ConversationTransferError:
+            return None
+        cap = transfer_capability(organization=organization, workload=workload, environment_spec=spec)
+        return ConversationTransferCapabilityType(
+            managed_conversation=cap["managedConversation"],
+            harness_host_contract=cap["harnessHostContract"],
+            undo=cap["undo"],
+            protocol_version=cap["protocolVersion"],
+            destination_identity=cap["destinationIdentity"],
+            max_envelope_bytes=cap["maxEnvelopeBytes"],
+            reason=cap["reason"],
+        )
+
+    @strawberry.field
+    @require_permission(
+        Permission.AGENT_READ, scope=conversation_transfer_scope("transfer_id", Permission.AGENT_READ)
+    )
+    @tenant_scoped()
+    def conversation_transfer(self, info: Info, transfer_id: str) -> ConversationTransferType | None:
+        """The caller's own moved conversation, by the IDE's transferId (#1971).
+
+        Install progress and state, for polling between prepare and commit.
+        Null for another requester's transfer or one the caller cannot read.
+        """
+        from astrolift_agents.services.conversation_transfer import owned_transfer, upload_url
+
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        requester_id = tenant.actor_user_id if tenant else None
+        request = getattr(info.context, "request", None)
+        user = getattr(request, "user", None) if request else None
+        if user is not None and getattr(user, "is_authenticated", False):
+            requester_id = user.pk
+        transfer = owned_transfer(org_pk, transfer_id, Permission.AGENT_READ, requester_id)
+        if transfer is None:
+            return None
+        return conversation_transfer_to_type(transfer, upload_url=upload_url(transfer))
 
     @strawberry.field
     @require_permission(Permission.AGENT_READ, any_scope=True)

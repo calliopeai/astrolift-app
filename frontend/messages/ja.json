@@ -3941,6 +3941,28 @@
         "toastFailed": "アプリの情報を保存できませんでした",
         "save": "保存"
       },
+      "build": {
+        "title": "ビルド",
+        "description": "イメージのビルド元です。ビルドコンテキストはリポジトリのルートからの相対パス、Dockerfile はビルドコンテキストからの相対パスです。",
+        "buildContext": "ビルドコンテキスト",
+        "dockerfile": "Dockerfile",
+        "contextRequired": "ビルドコンテキストを入力してください。リポジトリのルートは . です。",
+        "dockerfileRequired": "Dockerfile のパスを入力してください。",
+        "defaultsHelp": "既定値（. または Dockerfile）のままのパスは、マニフェストで設定された build_context または dockerfile_path に従います。",
+        "prebuilt": "このアプリはビルド済みのイメージをデプロイするため、ビルドモードが変わるまでこれらのパスからは何もビルドされません。",
+        "resyncCi": "保存しました。リポジトリの CI ワークフローは、同期するまで以前のパスからビルドします。CI 設定で同期するか、次のコマンドを実行してください:",
+        "platformBuild": "保存しました。次回のプラットフォームビルドからこれらのパスを使用します。",
+        "buildMode": "ビルドモード",
+        "manifest": "マニフェスト",
+        "modes": {
+          "ci_pushed": "CI がビルドしてプッシュ",
+          "platform_build": "Astrolift がビルド",
+          "none": "ビルド済みイメージ"
+        },
+        "save": "保存",
+        "toastSaved": "ビルド設定を保存しました",
+        "toastFailed": "ビルド設定を保存できませんでした"
+      },
       "empty": "このアプリの内容はありません。"
     },
     "environmentOverrides": {
@@ -6921,6 +6943,13 @@
       "pathLabel": "マニフェストのパス",
       "pathHelp": "リポジトリ内の <code>astrolift.toml</code> の場所です。既定はリポジトリのルートです。モノレポには複数のアプリを置けます。登録ごとに専用のパスを指定してください（例: <code>services/api/astrolift.toml</code>）。",
       "branchLabel": "デフォルトブランチ",
+      "buildContextLabel": "ビルドコンテキスト",
+      "buildContextFromDirectory": "マニフェストのディレクトリです。アプリはここからビルドされます。リポジトリのルートにするには <code>.</code> を入力してください。",
+      "buildContextFromRoot": "マニフェストがあるリポジトリのルートです。",
+      "buildContextFromManifest": "リポジトリのルートです。マニフェスト自体が <code>build_context</code> または <code>dockerfile_path</code> を設定しており、それらがマニフェストのディレクトリを基準に適用されます。",
+      "buildContextEdited": "入力したとおりで、リポジトリのルートからの相対パスです。空にすると検出されたコンテキストに戻ります。",
+      "dockerfileLabel": "Dockerfile",
+      "dockerfileHelp": "ビルドコンテキストからの相対パスです。",
       "laterTitle": "マニフェストを後で設定",
       "laterHelp": "マニフェストなしで今すぐアプリを登録します。登録後はアプリの <b>マニフェスト</b> タブに移動し、準備ができたら <code>astrolift.toml</code> を追加または同期できます。空のリポジトリや、スキーマがアプリのマニフェストではないエージェント設定リポジトリに便利です。",
       "label": "マニフェスト",
@@ -6955,6 +6984,9 @@
       "defaultBranch": "デフォルトブランチ",
       "sourceKind": "ソースの種類",
       "manifestPath": "マニフェストのパス",
+      "buildContext": "ビルドコンテキスト",
+      "dockerfile": "Dockerfile",
+      "buildFromManifest": "マニフェストで設定",
       "manifest": "マニフェスト",
       "manifestLater": "後で設定",
       "manifestState": "{origin, select, repo {リポジトリから読み込み} other {ここで作成}}、{valid, select, yes {構造は有効} other {無効}}",
@@ -13825,6 +13857,7 @@
       "finished": "終了",
       "pod": "Pod",
       "namespace": "名前空間",
+      "model": "モデル",
       "callbackUrl": "コールバック URL",
       "liveSession": "ライブセッション",
       "liveNow": "現在ライブ配信中",
@@ -15485,6 +15518,26 @@
       "copyLabel": "{label} をコピー",
       "copied": "コピーしました",
       "done": "完了"
+    },
+    "host": "アプリをホスト",
+    "hostTitle": "このレイヤー上にアプリをホスト",
+    "hosted": "{slug} を作成しました。デプロイするとレイヤーの読み取りを開始します。",
+    "hostFailed": "アプリを作成できませんでした。",
+    "hostDialog": {
+      "title": "{slug} 上にアプリをホスト",
+      "description": "brain-app テンプレートからアプリを作成します。指定したイメージを実行する公開 Web ワークロードが 1 つです。デプロイのたびに、このレイヤーの MCP URL と読み取りトークンが渡されます。",
+      "project": "プロジェクト",
+      "selectProject": "プロジェクトを選択",
+      "noProjects": "プロジェクトがありません",
+      "image": "イメージ",
+      "imageHelp": "公開済みのイメージ参照。例: レジストリのパスとタグ。",
+      "name": "名前",
+      "namePlaceholder": "空欄なら自動生成",
+      "port": "ポート",
+      "envHelp": "アプリは BRAIN_MCP_URL、BRAIN_TOKEN、BRAIN_TOKEN_HEADER を読み取ります。トークンはデプロイごとに更新され、アプリを削除すると失効します。",
+      "cancel": "キャンセル",
+      "create": "アプリを作成",
+      "creating": "作成中…"
     }
   },
   "navModel": {
@@ -16504,6 +16557,7 @@
       "unbound": "未バインド"
     },
     "operatorOnly": "書き込みの付与やドメインのバインドはプラットフォームオペレーターのみ可能です。",
+    "withheld": "このインストールでは DNS が保留されているため、Astrolift は委任レコードを書き込まず、付与とバインドは無効です。親ゾーンに NS レコードを手動で追加してください。",
     "loading": "読み込み中…",
     "detected": "このドメインを委任できる接続",
     "grantFor": "{parent} に NS レコードを書き込み可能",

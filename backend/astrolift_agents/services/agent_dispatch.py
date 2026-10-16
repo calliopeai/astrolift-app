@@ -70,6 +70,7 @@ def dispatch_registered_agent(
     callback_secret_ref: str | None = None,
     correlation_id: str | None = None,
     callback_mode: str = "FULL",
+    conversation_transfer=None,
 ):
     """Create, prepare, queue, and durably dispatch one registered agent.
 
@@ -97,6 +98,10 @@ def dispatch_registered_agent(
     retry runs what the original ran even after the agent re-synced.
     ``owner_project_id`` / ``owner_team_id`` copy the original task's ownership,
     so a retry is visible to exactly who could see the run it repeats.
+
+    ``conversation_transfer`` (#1971) is linked to the task in the same
+    transaction that creates it, so the spawner always sees the paused
+    arrival it must install.
     """
     from astrolift_agents.models import AgentEnvironmentSpec, AgentTask
     from astrolift_agents.services.task_preparation import (
@@ -311,6 +316,9 @@ def dispatch_registered_agent(
                 from astrolift_agents.models import AgentTaskCompletionCallback
 
                 AgentTaskCompletionCallback.objects.create(task=task, organization=organization, **callback)
+            if conversation_transfer is not None:
+                conversation_transfer.agent_task = task
+                conversation_transfer.save(update_fields=["agent_task", "updated_at", "version"])
     except IntegrityError:
         # A concurrent caller won the race for this exact key -- the
         # unique constraint, not this check, is the actual guard.

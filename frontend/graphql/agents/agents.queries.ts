@@ -122,6 +122,7 @@ export const GET_AGENT_TASK = gql`
       snapshotUrl
       podName
       namespace
+      model
     }
   }
 `;

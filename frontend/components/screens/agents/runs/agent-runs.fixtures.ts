@@ -28,6 +28,7 @@ export const RUNNING_TASK: AstroliftAgentTask = {
   snapshotUrl: null,
   podName: "agent-bdr-outreach-7f3c2a10-x2k9p",
   namespace: "agents-sales",
+  model: "claude-sonnet-4-6",
 };
 
 export const COMPLETED_TASK: AstroliftAgentTask = {
@@ -46,6 +47,7 @@ export const FAILED_TASK: AstroliftAgentTask = {
   vncEnabled: false,
   vncUrl: "",
   podName: "",
+  model: "",
   failureMessage:
     'spawn failed: secret "agents/org-1/bdr-outreach/crm-token" not found in the agent secret store',
 };
@@ -56,6 +58,7 @@ export const LONG_TASK: AstroliftAgentTask = {
   ...RUNNING_TASK,
   podName: `agent-${LONG}`,
   namespace: `agents-${LONG}`,
+  model: `model-${LONG}`,
   callbackUrl: `https://hooks.example.com/agents/${LONG}/callback?token=${LONG}`,
   result: json({ note: LONG, nested: { list: [LONG, LONG] } }),
   failureMessage: `runtime error: ${LONG} ${LONG}`,

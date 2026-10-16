@@ -55,6 +55,7 @@ from astrolift_agents.schema.types import (
     AgentTaskInputMessageType,
     AgentTaskInputReplyType,
     AgentTaskType,
+    ConversationTransferType,
     OrgSkillRepoType,
     SkillType,
     ToolDefType,
@@ -65,6 +66,7 @@ from astrolift_agents.schema.types import (
     agent_secret_bundle_to_type,
     agent_task_input_message_to_type,
     agent_task_to_type,
+    conversation_transfer_to_type,
     org_skill_repo_to_type,
     skill_to_type,
     tool_def_to_type,
@@ -78,6 +80,7 @@ from astrolift_agents.scopes import (
     agent_task_scope,
     agent_trigger_scope,
     agent_workload_app_scope,
+    conversation_transfer_scope,
 )
 from astrolift_agents.services.agent_enforcement import quarantine_scope
 from astrolift_agents.services.agent_package import (
@@ -268,6 +271,37 @@ class RunAstroliftAgentInput:
     callback_secret_ref: str | None = None
     correlation_id: str | None = None
     callback_mode: AgentTaskCallbackMode = AgentTaskCallbackMode.FULL
+
+
+@strawberry.input
+class PrepareConversationTransferInput:
+    """Prepare a managed conversation Move into an agent's session (#1971).
+
+    ``record`` is the IDE's TaskTransferRecord in state ``preparing``,
+    addressed to the capability's ``destinationIdentity``. The full
+    envelope is uploaded to the returned ``uploadUrl``; ``envelopeSha256``
+    and ``envelopeBytes`` bind the upload. Call again after the upload, and
+    then until the transfer is ``destination_ready``; retries never reinstall.
+    """
+
+    agent_slug: str
+    record: JSON
+    envelope_sha256: str
+    envelope_bytes: int
+    environment_spec_id: GUID | None = None
+
+
+@strawberry.input
+class ConversationTransferRecordInput:
+    """A later step of a prepared transfer, named by ``record.transferId``.
+
+    ``snapshotSha256`` is the canonical-JSON SHA-256 of the envelope's
+    snapshot; verify and commit require it. ``reason`` explains an abort.
+    """
+
+    record: JSON
+    snapshot_sha256: str = ""
+    reason: str = ""
 
 
 @strawberry.input
@@ -608,6 +642,49 @@ def _input_author(info: Info) -> tuple[object | None, str]:
         if actor is not None:
             return actor, (getattr(actor, "username", "") or getattr(actor, "email", "") or "")
     return None, "system"
+
+
+def _transfer_failure(exc):
+    code = {
+        "validation": ErrorCode.VALIDATION.value,
+        "not_found": ErrorCode.NOT_FOUND.value,
+        "precondition": ErrorCode.PRECONDITION.value,
+        "conflict": ErrorCode.CONFLICT.value,
+        "permission_denied": ErrorCode.PERMISSION_DENIED.value,
+    }.get(exc.code, ErrorCode.INTERNAL.value)
+    return gql_failure(code, exc.message, field=exc.field or None)
+
+
+def _transfer_step(info, input, step):
+    tenant = get_current_tenant()
+    org_pk = tenant.organization_id if tenant else None
+    if org_pk is None:
+        return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+    record = input.record if isinstance(input.record, dict) else {}
+    requester_id = getattr(_dispatch_actor(info), "user_id", None)
+    from astrolift_agents.services.conversation_transfer import (
+        NO_REQUESTER_REASON,
+        ConversationTransferError,
+        owned_transfer,
+    )
+
+    if requester_id is None:
+        # A transfer belongs to the user who prepared it (#1971).
+        return gql_failure(ErrorCode.PERMISSION_DENIED.value, NO_REQUESTER_REASON)
+    transfer = owned_transfer(org_pk, record.get("transferId"), Permission.AGENT_DISPATCH, requester_id)
+    if transfer is None:
+        return gql_failure(ErrorCode.NOT_FOUND.value, "transfer not found", field="record")
+
+    try:
+        transfer = step(transfer, record)
+    except ConversationTransferError as exc:
+        return _transfer_failure(exc)
+    return gql_success(conversation_transfer_to_type(transfer))
+
+
+def _transfer_target(self, info, input):
+    record = input.record if isinstance(input.record, dict) else {}
+    return ("AgentConversationTransfer", str(record.get("transferId") or ""))
 
 
 # ---------------------------------------------------------------------------
@@ -3281,6 +3358,120 @@ class AgentsMutation:
             return gql_failure(ErrorCode.NOT_FOUND.value, "skill repo not found")
         repo.soft_delete()
         return gql_success(org_skill_repo_to_type(repo))
+
+    @strawberry.field
+    @mutation_audit(action="agents.conversation_transfer.prepare", target=_transfer_target)
+    @require_permission(
+        Permission.AGENT_DISPATCH,
+        scope=agent_workload_app_scope("input.agent_slug", Permission.AGENT_DISPATCH),
+        operation=agent_region_operation,
+    )
+    @tenant_scoped()
+    def prepare_conversation_transfer(
+        self, info: Info, input: PrepareConversationTransferInput
+    ) -> MutationResultType[ConversationTransferType]:
+        """Paused admission of a managed conversation Move (#1971).
+
+        Refuses, with a reason and before anything is created, when the
+        agent's environment cannot host the conversation, or the caller has
+        no user identity to own it. Otherwise records the arrival and
+        returns ``uploadUrl``; after the upload it refuses a wrong-sized
+        envelope, else returns ``validating`` while a worker checks the
+        envelope and admits a paused session that installs it. The caller
+        polls by calling again until ``destination_ready`` (or ``aborted``
+        with ``abortReason``), before ``admissionDeadline``.
+        """
+        tenant = get_current_tenant()
+        org_pk = tenant.organization_id if tenant else None
+        if org_pk is None:
+            return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
+        from astrolift_agents.services.conversation_transfer import (
+            ConversationTransferError,
+            prepare_transfer,
+            transfer_destination,
+            upload_url,
+        )
+        from astrolift_identity.api_tokens import get_current_api_token
+
+        api_token = get_current_api_token()
+        try:
+            organization, workload, spec = transfer_destination(
+                org_pk, input.agent_slug, input.environment_spec_id, Permission.AGENT_DISPATCH
+            )
+            transfer = prepare_transfer(
+                organization=organization,
+                workload=workload,
+                environment_spec=spec,
+                record=input.record,
+                envelope_sha256=input.envelope_sha256,
+                envelope_bytes=input.envelope_bytes,
+                actor=_dispatch_actor(info),
+                team_id=api_token.team_id if api_token is not None else None,
+            )
+        except ConversationTransferError as exc:
+            return _transfer_failure(exc)
+        return gql_success(conversation_transfer_to_type(transfer, upload_url=upload_url(transfer)))
+
+    @strawberry.field
+    @mutation_audit(action="agents.conversation_transfer.verify", target=_transfer_target)
+    @require_permission(Permission.AGENT_DISPATCH, scope=conversation_transfer_scope())
+    @tenant_scoped()
+    def verify_conversation_transfer(
+        self, info: Info, input: ConversationTransferRecordInput
+    ) -> MutationResultType[ConversationTransferType]:
+        """Accept only the exact acknowledged arrival, with no transport (#1971)."""
+        from astrolift_agents.services.conversation_transfer import verify_transfer
+
+        return _transfer_step(
+            info,
+            input,
+            lambda transfer, record: verify_transfer(
+                transfer, record=record, snapshot_sha256=input.snapshot_sha256
+            ),
+        )
+
+    @strawberry.field
+    @mutation_audit(action="agents.conversation_transfer.commit", target=_transfer_target)
+    @require_permission(Permission.AGENT_DISPATCH, scope=conversation_transfer_scope())
+    @tenant_scoped()
+    def commit_conversation_transfer(
+        self, info: Info, input: ConversationTransferRecordInput
+    ) -> MutationResultType[ConversationTransferType]:
+        """Start the session from the installed state, exactly once (#1971).
+
+        ``record`` is the committed TaskTransferRecord: owned by the
+        destination, with the source's stop and commit times. A retry with
+        the same record returns the same commit.
+        """
+        from astrolift_agents.services.conversation_transfer import commit_transfer
+
+        return _transfer_step(
+            info,
+            input,
+            lambda transfer, record: commit_transfer(
+                transfer, record=record, snapshot_sha256=input.snapshot_sha256
+            ),
+        )
+
+    @strawberry.field
+    @mutation_audit(action="agents.conversation_transfer.abort", target=_transfer_target)
+    @require_permission(Permission.AGENT_DISPATCH, scope=conversation_transfer_scope())
+    @tenant_scoped()
+    def abort_conversation_transfer(
+        self, info: Info, input: ConversationTransferRecordInput
+    ) -> MutationResultType[ConversationTransferType]:
+        """Retire an arrival before commit, removing what it created (#1971).
+
+        Deletes the stored envelope and cancels the paused session.
+        Idempotent; refused once the session has started.
+        """
+        from astrolift_agents.services.conversation_transfer import abort_transfer
+
+        return _transfer_step(
+            info,
+            input,
+            lambda transfer, record: abort_transfer(transfer, record=record, reason=input.reason),
+        )
 
 
 def json_canonical(payload: dict) -> str:

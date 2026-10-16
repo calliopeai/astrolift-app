@@ -16,7 +16,21 @@ string `build_args` on that app. The build context is relative to the repository
 checkout; the Dockerfile is relative to that context. For example, a nested
 `extensions/demo/astrolift.toml` can use context `extensions/demo` and Dockerfile
 `Dockerfile`. CI resolves that file to `extensions/demo/Dockerfile` at checkout.
-The manifest's directory alone does not replace the saved build inputs.
+
+A registration that names no build context gets one detected from its manifest
+path: `extensions/demo/astrolift.toml` builds `extensions/demo`, with `Dockerfile`
+inside it. A manifest that sets `build_context` or `dockerfile_path` itself keeps
+the repository root as the app's context, so those paths apply from the manifest's
+directory. `astro app register` and the new-app wizard show the detected paths
+before registering; an explicit context, including `.`, is stored as given.
+
+Detection runs only at registration. An app registered earlier keeps the context
+it saved, usually `.`, until someone changes it with
+`astro app set-build-context <app> <path>` or the app's **Settings → Source and
+build → Build**. The workflow in the repository keeps the old paths until it is
+pushed again: sync it under **CI setup**, or run
+`astro ci setup <app> --skip-webhook --skip-secrets`. A full `astro ci setup` also
+re-pushes the CI secrets, which rotates the deploy token.
 
 Missing registry, Dockerfile or context refuses workflow sync with an actionable
 `PRECONDITION`, before repository writes. Unsafe paths, malformed arguments and

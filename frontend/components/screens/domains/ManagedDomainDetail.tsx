@@ -352,7 +352,9 @@ function DetailTabs({
         {tab === "overview" && (
           <>
             {props.defaultSettings && <DomainDefaultSettings {...props.defaultSettings} />}
-            {props.delegation && <DnsDelegationPanel {...props.delegation} />}
+            {props.delegation && (
+              <DnsDelegationPanel {...props.delegation} dnsWithheld={!!props.dnsRestriction} />
+            )}
             <section className="space-y-3 rounded-lg border p-4">
               <h2 className="font-semibold">{t("configuration")}</h2>
               <div className="flex flex-wrap gap-2">

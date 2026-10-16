@@ -199,6 +199,10 @@ from astrolift_workflows.activities.configured_workflow_schedule_fire import (
     create_scheduled_workflow_run,
     record_scheduled_workflow_start,
 )
+from astrolift_workflows.activities.conversation_transfer import (
+    expire_conversation_transfers_tick,
+    validate_conversation_transfer,
+)
 from astrolift_workflows.activities.domain_app_route import reconcile_domain_app_route
 from astrolift_workflows.activities.install_cluster_agent import install_cluster_agent_attempt
 from astrolift_workflows.activities.install_cluster_log_collector import install_cluster_log_collector_attempt
@@ -278,6 +282,10 @@ from astrolift_workflows.workflows import (
     WorkflowDefinitionRunWorkflow,
     WorkflowRunReconcileTickWorkflow,
 )
+from astrolift_workflows.workflows.conversation_transfer import (
+    ConversationTransferExpiryTickWorkflow,
+    ValidateConversationTransferWorkflow,
+)
 from astrolift_workflows.workflows.domain_app_route import ManagedDomainAppRouteWorkflow
 from astrolift_workflows.workflows.install_cluster_agent import InstallClusterAgentWorkflow
 from astrolift_workflows.workflows.install_cluster_log_collector import InstallClusterLogCollectorWorkflow
@@ -288,6 +296,8 @@ WORKFLOWS = (
     InstallClusterLogCollectorWorkflow,
     AgentTaskCallbackReconcileWorkflow,
     DeliverAgentTaskCallbackWorkflow,
+    ConversationTransferExpiryTickWorkflow,
+    ValidateConversationTransferWorkflow,
     SharedModelReconcileWorkflow,
     NativeModelConnectionReconcileWorkflow,
     AgentBoxReapTickWorkflow,
@@ -360,6 +370,8 @@ ACTIVITIES = (
     install_cluster_log_collector_attempt,
     deliver_agent_task_callback,
     reconcile_agent_task_callbacks,
+    expire_conversation_transfers_tick,
+    validate_conversation_transfer,
     apply_shared_model,
     observe_shared_model,
     activate_shared_model_subscriptions,

@@ -3941,6 +3941,28 @@
         "toastFailed": "Não foi possível salvar os detalhes do aplicativo",
         "save": "Salvar"
       },
+      "build": {
+        "title": "Compilação",
+        "description": "De onde a imagem é compilada. O contexto de compilação é relativo à raiz do repositório, e o Dockerfile, ao contexto de compilação.",
+        "buildContext": "Contexto de compilação",
+        "dockerfile": "Dockerfile",
+        "contextRequired": "Digite um contexto de compilação. Use . para a raiz do repositório.",
+        "dockerfileRequired": "Digite o caminho de um Dockerfile.",
+        "defaultsHelp": "Um caminho mantido no valor padrão (. ou Dockerfile) deixa que um build_context ou dockerfile_path definido no manifesto decida.",
+        "prebuilt": "Este aplicativo implanta uma imagem já compilada, então nada é compilado a partir desses caminhos até que o modo de compilação mude.",
+        "resyncCi": "Salvo. O workflow de CI no repositório compila a partir dos caminhos anteriores até você sincronizá-lo, na configuração de CI ou com este comando:",
+        "platformBuild": "Salvo. A próxima compilação da plataforma usa esses caminhos.",
+        "buildMode": "Modo de compilação",
+        "manifest": "Manifesto",
+        "modes": {
+          "ci_pushed": "Seu CI compila e envia",
+          "platform_build": "O Astrolift compila",
+          "none": "Imagem já compilada"
+        },
+        "save": "Salvar",
+        "toastSaved": "Configurações de compilação salvas",
+        "toastFailed": "Não foi possível salvar as configurações de compilação"
+      },
       "empty": "Não há conteúdo aqui para este aplicativo."
     },
     "environmentOverrides": {
@@ -6921,6 +6943,13 @@
       "pathLabel": "Caminho do manifesto",
       "pathHelp": "Onde <code>astrolift.toml</code> fica no repositório. O padrão é a raiz do repositório. Monorepos podem hospedar vários aplicativos; aponte cada registro para o próprio caminho (ex.: <code>services/api/astrolift.toml</code>).",
       "branchLabel": "Branch padrão",
+      "buildContextLabel": "Contexto de compilação",
+      "buildContextFromDirectory": "O diretório do manifesto, então o aplicativo é compilado a partir dele. Digite <code>.</code> para a raiz do repositório.",
+      "buildContextFromRoot": "A raiz do repositório, onde está o manifesto.",
+      "buildContextFromManifest": "A raiz do repositório: o próprio manifesto define <code>build_context</code> ou <code>dockerfile_path</code>, e esses valores se aplicam a partir do diretório dele.",
+      "buildContextEdited": "Como digitado, relativo à raiz do repositório. Limpe o campo para voltar ao contexto detectado.",
+      "dockerfileLabel": "Dockerfile",
+      "dockerfileHelp": "Relativo ao contexto de compilação.",
       "laterTitle": "Configurar o manifesto depois",
       "laterHelp": "Registre o aplicativo agora, sem manifesto. Você vai cair na aba <b>Manifesto</b> do aplicativo, onde pode adicionar ou sincronizar <code>astrolift.toml</code> quando quiser. Útil para um repositório vazio ou um repositório de configuração de agentes cujo esquema não é um manifesto de aplicativo.",
       "label": "Manifesto",
@@ -6955,6 +6984,9 @@
       "defaultBranch": "Branch padrão",
       "sourceKind": "Tipo de origem",
       "manifestPath": "Caminho do manifesto",
+      "buildContext": "Contexto de compilação",
+      "dockerfile": "Dockerfile",
+      "buildFromManifest": "Definido no manifesto",
       "manifest": "Manifesto",
       "manifestLater": "Configurar depois",
       "manifestState": "{origin, select, repo {Carregado do repositório} other {Rascunho feito aqui}}, {valid, select, yes {estrutura válida} other {inválido}}",
@@ -13825,6 +13857,7 @@
       "finished": "Finalizada",
       "pod": "Pod",
       "namespace": "Namespace",
+      "model": "Modelo",
       "callbackUrl": "URL de callback",
       "liveSession": "Sessão ao vivo",
       "liveNow": "ao vivo agora",
@@ -15485,6 +15518,26 @@
       "copyLabel": "Copiar {label}",
       "copied": "Copiado",
       "done": "Concluído"
+    },
+    "host": "Hospedar um app",
+    "hostTitle": "Hospedar um app nesta camada",
+    "hosted": "{slug} foi criado. Implante-o para começar a ler a camada.",
+    "hostFailed": "Não foi possível criar o app.",
+    "hostDialog": {
+      "title": "Hospedar um app em {slug}",
+      "description": "Cria um app a partir do modelo brain-app: uma carga web pública que executa sua imagem. Cada implantação fornece a URL MCP desta camada e um token de leitura para ela.",
+      "project": "Projeto",
+      "selectProject": "Selecione um projeto",
+      "noProjects": "Nenhum projeto",
+      "image": "Imagem",
+      "imageHelp": "Uma referência de imagem publicada, por exemplo um caminho de registro e uma tag.",
+      "name": "Nome",
+      "namePlaceholder": "Gerado quando vazio",
+      "port": "Porta",
+      "envHelp": "O app lê BRAIN_MCP_URL, BRAIN_TOKEN e BRAIN_TOKEN_HEADER. O token muda a cada implantação e é revogado quando o app é excluído.",
+      "cancel": "Cancelar",
+      "create": "Criar app",
+      "creating": "Criando…"
     }
   },
   "navModel": {
@@ -16504,6 +16557,7 @@
       "unbound": "Não vinculado"
     },
     "operatorOnly": "Só um operador da plataforma pode conceder gravação ou vincular um domínio.",
+    "withheld": "O DNS está retido nesta instalação, então o Astrolift não grava registros de delegação e conceder e vincular estão desativados. Adicione os registros NS na zona pai manualmente.",
     "loading": "Carregando…",
     "detected": "Conexões que podem delegar este domínio",
     "grantFor": "Pode gravar registros NS em {parent}",

@@ -3290,6 +3290,28 @@
         "toastFailed": "Could not save the app details",
         "save": "Save"
       },
+      "build": {
+        "title": "Build",
+        "description": "Where the image is built from. The build context is relative to the repository root, and the Dockerfile to the build context.",
+        "buildContext": "Build context",
+        "dockerfile": "Dockerfile",
+        "contextRequired": "Enter a build context. Use . for the repository root.",
+        "dockerfileRequired": "Enter a Dockerfile path.",
+        "defaultsHelp": "A path left at its default (. or Dockerfile) lets a build_context or dockerfile_path set in the manifest decide it.",
+        "prebuilt": "This app deploys a pre-built image, so nothing is built from these paths until its build mode changes.",
+        "resyncCi": "Saved. The CI workflow in the repository builds from the previous paths until you sync it, under CI setup or with this command:",
+        "platformBuild": "Saved. The next platform build uses these paths.",
+        "buildMode": "Build mode",
+        "manifest": "Manifest",
+        "modes": {
+          "ci_pushed": "Your CI builds and pushes",
+          "platform_build": "Astrolift builds",
+          "none": "Pre-built image"
+        },
+        "save": "Save",
+        "toastSaved": "Build settings saved",
+        "toastFailed": "Could not save the build settings"
+      },
       "empty": "Nothing here for this app."
     },
     "settings": {
@@ -6921,6 +6943,13 @@
       "pathLabel": "Manifest path",
       "pathHelp": "Where <code>astrolift.toml</code> lives in the repo. Defaults to the repository root. Monorepos can host multiple apps; point each registration at its own path (e.g. <code>services/api/astrolift.toml</code>).",
       "branchLabel": "Default branch",
+      "buildContextLabel": "Build context",
+      "buildContextFromDirectory": "The manifest's directory, so the app builds from there. Enter <code>.</code> for the repository root.",
+      "buildContextFromRoot": "The repository root, where the manifest is.",
+      "buildContextFromManifest": "The repository root: the manifest sets <code>build_context</code> or <code>dockerfile_path</code> itself, and those apply from its directory.",
+      "buildContextEdited": "As entered, relative to the repository root. Clear it to go back to the detected context.",
+      "dockerfileLabel": "Dockerfile",
+      "dockerfileHelp": "Relative to the build context.",
       "laterTitle": "Set up manifest later",
       "laterHelp": "Register the app now without a manifest. We'll land you on the app's <b>Manifest</b> tab, where you can add or sync <code>astrolift.toml</code> when you're ready. Useful for an empty repo, or an agent config repo whose schema isn't an app manifest.",
       "label": "Manifest",
@@ -6955,6 +6984,9 @@
       "defaultBranch": "Default branch",
       "sourceKind": "Source kind",
       "manifestPath": "Manifest path",
+      "buildContext": "Build context",
+      "dockerfile": "Dockerfile",
+      "buildFromManifest": "Set in the manifest",
       "manifest": "Manifest",
       "manifestLater": "Set up later",
       "manifestState": "{origin, select, repo {Loaded from repo} other {Drafted here}}, {valid, select, yes {valid shape} other {invalid}}",
@@ -13825,6 +13857,7 @@
       "finished": "Finished",
       "pod": "Pod",
       "namespace": "Namespace",
+      "model": "Model",
       "callbackUrl": "Callback URL",
       "liveSession": "Live session",
       "liveNow": "live now",
@@ -15485,6 +15518,26 @@
       "copyLabel": "Copy {label}",
       "copied": "Copied",
       "done": "Done"
+    },
+    "host": "Host an app",
+    "hostTitle": "Host an app on this layer",
+    "hosted": "Created {slug}. Deploy it to start reading the layer.",
+    "hostFailed": "Could not create the app.",
+    "hostDialog": {
+      "title": "Host an app on {slug}",
+      "description": "Creates an app from the brain-app template: one public web workload running your image. Each deploy gives it this layer's MCP URL and a read token for it.",
+      "project": "Project",
+      "selectProject": "Select a project",
+      "noProjects": "No projects",
+      "image": "Image",
+      "imageHelp": "A pushed image reference, for example a registry path and tag.",
+      "name": "Name",
+      "namePlaceholder": "Generated when blank",
+      "port": "Port",
+      "envHelp": "The app reads BRAIN_MCP_URL, BRAIN_TOKEN and BRAIN_TOKEN_HEADER. The token rotates on every deploy and is revoked when the app is deleted.",
+      "cancel": "Cancel",
+      "create": "Create app",
+      "creating": "Creating…"
     }
   },
   "listDefinitions": {
@@ -16504,6 +16557,7 @@
       "unbound": "Not bound"
     },
     "operatorOnly": "Only a platform operator can grant write access or bind a domain.",
+    "withheld": "DNS is withheld on this install, so Astrolift writes no delegation records and grant and bind are off. Add the NS records at the parent zone by hand.",
     "loading": "Loading…",
     "detected": "Connections that can delegate this domain",
     "grantFor": "May write NS records into {parent}",

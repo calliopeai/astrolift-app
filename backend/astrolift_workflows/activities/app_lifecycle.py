@@ -1518,6 +1518,17 @@ def _update_secrets_sync(deployment_id: int, *, target_cluster_id: int | None = 
         subscription_backend = driver_for_capability(d.app_environment.tenant_cluster, "secrets")
         resources.extend(binding_secret(row, subscription_backend) for row in subscriptions)
 
+    # The brain an app hosted on a brain reads (#2243): its MCP URLs and a
+    # read token minted for this deploy.
+    from astrolift_registry.brain_apps import BrainAppError, brain_secret
+
+    try:
+        brain = brain_secret(d, namespace)
+    except BrainAppError as exc:
+        raise AppDeployError(f"brain binding: {exc}") from exc
+    if brain is not None:
+        resources.append(brain)
+
     # ---- synthesized managed-service bindings Secret --------------
     # One universal Secret plus selector-scoped Secrets where the manifest
     # names particular workloads. Resolves the driver-side ValueRefs (literal

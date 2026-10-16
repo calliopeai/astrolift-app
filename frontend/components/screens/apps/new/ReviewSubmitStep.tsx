@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import type { SourceKind, TriggerMode } from "@/graphql/registry/registry.types";
+import { detectBuildPaths } from "@/lib/manifest/build-paths";
 
 import { deployPreview } from "./deploy-preview";
 
@@ -40,6 +41,9 @@ export interface ReviewSubmitFields {
   minimumApprovals: number;
   manifestRaw: string;
   manifestLater: boolean;
+  /** Null: the detected value (see `detectBuildPaths`). */
+  buildContext: string | null;
+  dockerfilePath: string | null;
   connectionIsAppInstall: boolean;
   pushCiWorkflow: boolean;
   triggerFirstDeploy: boolean;
@@ -106,6 +110,15 @@ export function ReviewSubmitStepView({
   const code = (chunks: ReactNode) => (
     <code className="bg-muted rounded px-1 py-0.5 font-mono">{chunks}</code>
   );
+  // A manifest that sets its own build paths decides them, unless typed over.
+  const detected = detectBuildPaths(state.manifestPath, state.manifestRaw);
+  const fromManifest = detected.source === "manifestPaths";
+  const buildRow = (label: string, typed: string | null, value: string) => {
+    const own = typed?.trim();
+    return own || !fromManifest
+      ? { label, value: own || value, mono: true }
+      : { label, value: t("buildFromManifest") };
+  };
   return (
     <div className="flex flex-col gap-5">
       <section className="grid min-w-0 gap-3 sm:grid-cols-2">
@@ -118,6 +131,8 @@ export function ReviewSubmitStepView({
             { label: t("defaultBranch"), value: state.defaultBranch, mono: true },
             { label: t("sourceKind"), value: state.sourceKind },
             { label: t("manifestPath"), value: state.manifestPath, mono: true },
+            buildRow(t("buildContext"), state.buildContext, detected.buildContext),
+            buildRow(t("dockerfile"), state.dockerfilePath, detected.dockerfilePath),
             {
               label: t("manifest"),
               value: state.manifestLater

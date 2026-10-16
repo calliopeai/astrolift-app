@@ -23,3 +23,18 @@ export function manifestRawForSubmit(
   if (state.manifestFromRepo && hasMaskedEnvValues(state.manifestRaw)) return null;
   return state.manifestRaw.trim() || null;
 }
+
+/**
+ * The build paths registerApp gets (astrolift-cli #159). An untouched or
+ * cleared build context is sent as null, so the server detects it from the
+ * manifest it reads; an untouched Dockerfile is left out, for the server's
+ * `Dockerfile`. What the operator typed is sent as typed.
+ */
+export function buildPathsForSubmit(state: Pick<WizardState, "buildContext" | "dockerfilePath">): {
+  buildContext: string | null;
+  dockerfilePath?: string;
+} {
+  const buildContext = state.buildContext?.trim() || null;
+  const dockerfilePath = state.dockerfilePath?.trim();
+  return dockerfilePath ? { buildContext, dockerfilePath } : { buildContext };
+}

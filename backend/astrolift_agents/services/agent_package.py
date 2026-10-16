@@ -46,6 +46,8 @@ RESERVED_AGENT_ENVIRONMENT_NAMES = frozenset(
         "ASTROLIFT_BRIEF_ID",
         "ASTROLIFT_CLUSTER_KEY",
         "ASTROLIFT_CONTROLLER_URL",
+        # A moved conversation's paused admission (#1971).
+        "ASTROLIFT_CONVERSATION_TRANSFER_URL",
         "ASTROLIFT_MANIFEST_PATH",
         "ASTROLIFT_PAYLOAD_HASH",
         "ASTROLIFT_PAYLOAD_URL",

@@ -9,6 +9,7 @@ from astrolift_dispatch.managed_runtime_views import validate_managed_runtime
 from astrolift_dispatch.views import (
     agent_callback,
     agent_checkin,
+    agent_transfer,
     heartbeat,
     ingest_task_logs,
     ingest_task_meter,
@@ -38,6 +39,8 @@ urlpatterns = [
     # Thread-mode agent checkin + callback
     path("api/dispatch/v1/agents/<str:task_id>/checkin/", agent_checkin, name="agent-checkin"),
     path("api/dispatch/v1/agents/<str:task_id>/callback/", agent_callback, name="agent-callback"),
+    # Paused admission of a moved conversation (#1971)
+    path("api/dispatch/v1/agents/<str:task_id>/transfer/", agent_transfer, name="agent-transfer"),
     # Log streaming and metering (#51, #56)
     path("api/dispatch/v1/tasks/<str:task_id>/logs/", csrf_exempt(ingest_task_logs), name="task-logs-ingest"),
     path(

@@ -729,6 +729,19 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
             task.result = result
             task.save(update_fields=["result", "updated_at", "version"])
 
+        from astrolift_agents.services.task_completion_callbacks import normalized_usage
+
+        # Record the model the harness reports on any callback (#2416), so a
+        # run that later times out or is cancelled still carries it.
+        reported_model = normalized_usage(body.get("usage"))["model"]
+        if (
+            reported_model
+            and reported_model != task.model
+            and task.status in {AgentTask.Status.PROVISIONING, AgentTask.Status.RUNNING}
+        ):
+            task.model = reported_model
+            task.save(update_fields=["model", "updated_at", "version"])
+
         if new_status in {"completed", "failed"}:
             if task.status in AgentTask.TERMINAL_STATUSES:
                 return JsonResponse(
@@ -755,8 +768,6 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
                     "message": body.get("error", ""),
                     "output": body.get("result", ""),
                 }
-            from astrolift_agents.services.task_completion_callbacks import normalized_usage
-
             task.completion_usage = normalized_usage(body.get("usage"))
             task.save(update_fields=["result", "failure", "completion_usage", "updated_at", "version"])
             target = AgentTask.Status.COMPLETED if new_status == "completed" else AgentTask.Status.FAILED
@@ -801,6 +812,76 @@ def agent_callback(request: HttpRequest, task_id: str) -> JsonResponse:
         payload["input_response"] = input_response
     payload.update(_steering_input_payload(task, input_intent))
     return JsonResponse(payload)
+
+
+_MAX_TRANSFER_PROGRESS_BYTES = 512 * 1024
+
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+@_require_agent_callback_auth
+def agent_transfer(request: HttpRequest, task_id: str) -> JsonResponse:
+    """A paused task's moved conversation (#1971).
+
+    ``GET`` returns the runner's view: the transfer state, the envelope's
+    presigned download URL while it is still being installed, its digest and
+    size, and the receipt the install must repeat. ``start`` turns true once
+    the IDE commits; ``abort`` once the arrival is retired, when the runner
+    exits without starting.
+
+    ``POST`` reports install progress: ``{phase, status, reason?, receipt?}``.
+    A ``failed`` status or the ``refused`` phase retires the arrival with the
+    reason (a box that cannot hold undo refuses before any change). The
+    ``installed``/``done`` report carries the receipt; only an exact one makes
+    the transfer ``destination_ready``. Any report past the transfer's
+    admission deadline retires it instead, and the view says ``abort``.
+    """
+    from astrolift_agents.models import AgentConversationTransfer
+    from astrolift_agents.services.conversation_transfer import (
+        ConversationTransferError,
+        record_runner_progress,
+        runner_view,
+    )
+
+    tasks = AgentTask.objects.filter(guid=task_id, deleted_at__isnull=True)
+    callback_hash = getattr(request, "agent_callback_token_hash", "")
+    if callback_hash:
+        tasks = tasks.filter(callback_token_hash=callback_hash)
+    else:
+        tasks = tasks.filter(organization=request.dispatcher.organization, dispatcher=request.dispatcher)
+    transfer = (
+        AgentConversationTransfer.objects.filter(agent_task__in=tasks)
+        .select_related("organization", "agent_task")
+        .first()
+    )
+    if transfer is None:
+        return JsonResponse({"error": "no conversation transfer for this task"}, status=404)
+    if request.method == "GET":
+        return JsonResponse(runner_view(transfer))
+
+    try:
+        content_length = int(request.META.get("CONTENT_LENGTH") or 0)
+    except (TypeError, ValueError):
+        content_length = 0
+    if content_length > _MAX_TRANSFER_PROGRESS_BYTES:
+        return JsonResponse({"error": "progress body is too large"}, status=413)
+    try:
+        body = json.loads(request.body, parse_constant=_reject_nonfinite_json)
+    except (RequestDataTooBig, json.JSONDecodeError, ValueError):
+        return JsonResponse({"error": "invalid JSON"}, status=400)
+    try:
+        view = record_runner_progress(transfer, body)
+    except ConversationTransferError as exc:
+        status = 409 if exc.code == "conflict" else 400
+        return JsonResponse({"error": exc.message}, status=status)
+    record_interaction(
+        transfer.agent_task,
+        kind=AgentInteraction.Kind.CONTROL_API,
+        name="conversation_transfer",
+        status="error" if view["abort"] else "ok",
+        detail={"phase": body.get("phase"), "status": body.get("status"), "state": view["state"]},
+    )
+    return JsonResponse(view)
 
 
 def _steering_input_payload(task: AgentTask, input_intent: str | None) -> dict:

@@ -60,6 +60,7 @@ def brief_env_vars(task: AgentTask) -> list[dict[str, str]]:
             {"name": "ASTROLIFT_CLUSTER_KEY", "value": callback_key},
         ]
     )
+    env.extend(conversation_transfer_env_vars(task))
 
     if not task.brief_id:
         return env
@@ -129,8 +130,11 @@ def _append_payload_env(env: list[dict[str, str]], *, task: AgentTask, brief: Br
     snapshot = brief.manifest_snapshot if isinstance(brief.manifest_snapshot, dict) else {}
     required = bool(snapshot.get("requires_payload"))
     # Cover scheduling + execution, with a 15-minute floor for normal
-    # tasks and S3's seven-day SigV4 ceiling for unusually long runs.
-    timeout = max(1, int(getattr(task, "timeout_seconds", 300) or 300))
+    # tasks and S3's seven-day SigV4 ceiling for unusually long runs. A
+    # moved conversation's paused admission (#1971) comes before its timeout.
+    from astrolift_agents.services.task_timeout import admission_allowance_seconds
+
+    timeout = max(1, int(getattr(task, "timeout_seconds", 300) or 300)) + admission_allowance_seconds(task)
     expires_in = min(604800, max(900, timeout + 600))
     try:
         delivery = payload_env(brief=brief, organization=task.organization, expires_in=expires_in)
@@ -205,6 +209,23 @@ def dispatch_input_env_vars(task: AgentTask) -> list[dict[str, str]]:
             "value": json.dumps(payload, separators=(",", ":")),
         }
     ]
+
+
+def conversation_transfer_env_vars(task: AgentTask) -> list[dict[str, str]]:
+    """Point a paused arrival's runner at its transfer endpoint (#1971).
+
+    Present only for a task hosting a moved conversation. The runner then
+    installs the envelope, waits for commit, and resumes the conversation
+    instead of running ``AGENT_PROMPT``.
+    """
+    from astrolift_agents.models import AgentConversationTransfer, AgentTask
+
+    if not isinstance(task, AgentTask) or task.pk is None:
+        return []
+    if not AgentConversationTransfer.objects.filter(agent_task_id=task.pk).exists():
+        return []
+    url = f"{_get_controller_url()}/api/dispatch/v1/agents/{task.guid}/transfer/"
+    return [{"name": "ASTROLIFT_CONVERSATION_TRANSFER_URL", "value": url}]
 
 
 def inject_brief_into_job_spec(job_spec: dict[str, Any], task: AgentTask) -> dict[str, Any]:

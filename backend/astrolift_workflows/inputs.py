@@ -528,6 +528,28 @@ class DispatchAgentTaskInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class ValidateConversationTransferInput:
+    """Input for ``ValidateConversationTransferWorkflow`` (#1971).
+
+    The worker half of ``prepareConversationTransfer``: stream the uploaded
+    envelope of the transfer with pk ``transfer_id``, validate it, and
+    dispatch the paused task that installs it. ``actor``, ``team_id`` and
+    ``trigger_kind`` are the preparing caller's, frozen at the request that
+    saw the complete upload; ``undo`` is whether the destination can hold
+    undo history.
+
+    Workflow id is ``ValidateConversationTransferWorkflow-<transfer guid>``,
+    so a repeated prepare joins the running validation.
+    """
+
+    transfer_id: int
+    actor: Actor
+    team_id: int | None = None
+    undo: bool = True
+    trigger_kind: str = "manual"
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class WorkflowResult:
     ok: bool
     message: str = ""

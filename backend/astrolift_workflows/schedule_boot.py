@@ -110,6 +110,13 @@ PHASE_3A_ACTIVE_KINDS: frozenset[ScheduleKind] = frozenset(
         # Same shape as the reconcile above: read-only cluster reads, per-box
         # try/except, and an unobservable box is left alone.
         ScheduleKind.AGENT_BOX_REAP,
+        # Conversation-transfer expiry ships active (#1971) for the box
+        # reaper's reason: held, a moved conversation that never committed
+        # keeps its paused task running and its envelope stored past the
+        # admission deadline, so holding it costs correctness. It retires
+        # only transfers past their own deadline or whose paused session
+        # already ended, never a committed one, per-transfer try/except.
+        ScheduleKind.CONVERSATION_TRANSFER_EXPIRY,
         # Cert-expiry monitoring ships active (#155) — the third detector
         # alongside uptime and alert-eval, and the only one that sees a cert
         # that quietly stopped renewing. Held it would be worthless: the

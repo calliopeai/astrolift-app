@@ -54,7 +54,7 @@ def jwks_uri() -> str:
     return issuer() + JWKS_PATH
 
 
-def _new_key() -> BrainTokenKey:
+def _new_key(**owner: Any) -> BrainTokenKey:
     from core.secrets import encrypt_at_rest
 
     private = ec.generate_private_key(ec.SECP256R1())
@@ -69,6 +69,7 @@ def _new_key() -> BrainTokenKey:
         private_key_backend_kind=sealed.backend_kind,
         private_key_ciphertext=sealed.backend_ref,
         public_jwk={**public, "kid": kid, "use": "sig", "alg": ALGORITHM},
+        **owner,
     )
 
 
@@ -77,7 +78,9 @@ def signing_key(*, now: dt.datetime | None = None) -> BrainTokenKey:
     now = now or timezone.now()
     with transaction.atomic():
         live = list(
-            BrainTokenKey.objects.select_for_update().filter(retired_at__isnull=True).order_by("-created_at")
+            BrainTokenKey.objects.select_for_update()
+            .filter(retired_at__isnull=True, binding__isnull=True)
+            .order_by("-created_at")
         )
         current = live[0] if live and live[0].created_at > now - KEY_SIGNING_LIFETIME else None
         for key in live:
@@ -89,13 +92,19 @@ def signing_key(*, now: dt.datetime | None = None) -> BrainTokenKey:
 
 def jwks(*, now: dt.datetime | None = None) -> dict[str, Any]:
     """The public keys the edge verifies against: the live ones and those
-    retired within ``KEY_PUBLISHED_AFTER_RETIREMENT``."""
+    retired within ``KEY_PUBLISHED_AFTER_RETIREMENT``, and the keys of every
+    live hosted-app binding (#2243)."""
     from django.db.models import Q
 
+    from astrolift_registry.brain_apps import live_binding_keys
+
     now = now or timezone.now()
-    rows = BrainTokenKey.objects.filter(
+    caller_keys = Q(binding__isnull=True) & (
         Q(retired_at__isnull=True) | Q(retired_at__gt=now - KEY_PUBLISHED_AFTER_RETIREMENT)
-    ).order_by("-created_at")
+    )
+    rows = BrainTokenKey.objects.filter(caller_keys | Q(pk__in=live_binding_keys().values("pk"))).order_by(
+        "-created_at"
+    )
     return {"keys": [dict(row.public_jwk) for row in rows]}
 
 
