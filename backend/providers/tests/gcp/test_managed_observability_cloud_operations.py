@@ -1244,6 +1244,7 @@ def test_runtime_config_reads_operator_controls() -> None:
         operation_timeout_seconds=600,
         operation_poll_interval_seconds=0.25,
         allowed_writer_identities=(_LISTED_WRITER,),
+        cluster_name="gcp-prod",
     )
 
 

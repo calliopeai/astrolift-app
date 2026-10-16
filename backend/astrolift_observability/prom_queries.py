@@ -158,6 +158,20 @@ def _build_labels(
     return labels
 
 
+def _app_extra(identity_labels: dict[str, str] | None, namespace: str | None) -> dict[str, str] | None:
+    """The extra matchers of an app-instrumentation query: the identity
+    labels, plus the app environment's namespace when known.
+
+    ``app`` / ``environment`` / ``workload`` are labels a workload sets on
+    itself, and a slug is unique only within one org, so on a shared cluster
+    another tenant's series can carry the same values. The namespace is the
+    scrape target's, which the workload cannot choose (#2418 audit).
+    """
+    if not namespace:
+        return identity_labels
+    return {**(identity_labels or {}), "namespace": namespace}
+
+
 def _render_label_match(labels: dict[str, str]) -> str:
     """Render ``{a="x",b="y"}`` with deterministic key order."""
     inner = ",".join(f'{k}="{v}"' for k, v in sorted(labels.items()))
@@ -251,7 +265,7 @@ def build_request_rate_query(
         app_slug=app_slug,
         environment_name=environment_name,
         workload_slug=workload_slug,
-        extra=identity_labels,
+        extra=_app_extra(identity_labels, namespace),
     )
     expr = f"sum(rate(http_requests_total{_render_label_match(labels)}[{rate_window}]))"
     return QueryPlan(promql=expr, labels=labels, rate_window=rate_window)
@@ -302,7 +316,7 @@ def build_error_rate_query(
         app_slug=app_slug,
         environment_name=environment_name,
         workload_slug=workload_slug,
-        extra=identity_labels,
+        extra=_app_extra(identity_labels, namespace),
     )
     base_match = _render_label_match(labels)
     err_match = _render_label_match_with_extra(labels, 'code=~"5.."')
@@ -363,7 +377,7 @@ def build_latency_quantile_query(
         app_slug=app_slug,
         environment_name=environment_name,
         workload_slug=workload_slug,
-        extra=identity_labels,
+        extra=_app_extra(identity_labels, namespace),
     )
     match = _render_label_match(labels)
     expr = (
@@ -563,6 +577,7 @@ def build_status_code_breakdown_query(
         app_slug=app_slug,
         environment_name=environment_name,
         workload_slug=workload_slug,
+        extra=_app_extra(None, namespace),
     )
     match = _render_label_match(labels)
     expr = f"sum by (code) (rate(http_requests_total{match}[{rate_window}]))"
@@ -736,6 +751,7 @@ def build_endpoint_request_rate_query(
     environment_name: str | None,
     range_seconds: int,
     workload_slug: str | None = None,
+    namespace: str | None = None,
 ) -> QueryPlan:
     """Per-route traffic — requests / second grouped by ``http_route``.
 
@@ -745,6 +761,7 @@ def build_endpoint_request_rate_query(
         app_slug=app_slug,
         environment_name=environment_name,
         workload_slug=workload_slug,
+        extra=_app_extra(None, namespace),
     )
     rate_window = pick_rate_window(range_seconds)
     match = _render_label_match(labels)
@@ -758,6 +775,7 @@ def build_endpoint_error_rate_query(
     environment_name: str | None,
     range_seconds: int,
     workload_slug: str | None = None,
+    namespace: str | None = None,
 ) -> QueryPlan:
     """Per-route error rate — ratio of 5xx to total, grouped by ``http_route``.
 
@@ -768,6 +786,7 @@ def build_endpoint_error_rate_query(
         app_slug=app_slug,
         environment_name=environment_name,
         workload_slug=workload_slug,
+        extra=_app_extra(None, namespace),
     )
     rate_window = pick_rate_window(range_seconds)
     base_match = _render_label_match(labels)
@@ -786,6 +805,7 @@ def build_endpoint_latency_quantile_query(
     range_seconds: int,
     quantile: float,
     workload_slug: str | None = None,
+    namespace: str | None = None,
 ) -> QueryPlan:
     """Per-route latency quantile, grouped by ``http_route``.
 
@@ -800,6 +820,7 @@ def build_endpoint_latency_quantile_query(
         app_slug=app_slug,
         environment_name=environment_name,
         workload_slug=workload_slug,
+        extra=_app_extra(None, namespace),
     )
     rate_window = pick_rate_window(range_seconds)
     match = _render_label_match(labels)

@@ -35,7 +35,7 @@ from typing import Any
 import strawberry
 from strawberry.types import Info
 
-from astrolift_observability import prom_client, prom_queries, url_probe, url_resolution
+from astrolift_observability import prom_client, prom_queries, promql_scope, url_probe, url_resolution
 from astrolift_observability.schema.types import (
     AppEndpointMetric,
     AppGoldenSignal,
@@ -1245,11 +1245,11 @@ class GoldenSignalsQuery:
         sane — ``pick_step_seconds`` in ``prom_queries`` provides a standard
         helper.
 
-        Permission: ``APP_READ`` — same gate as the golden-signals queries.
-        No PromQL allow-list: the query is passed verbatim. Operators with
-        ``APP_READ`` already have full read access to the cluster's metric stream
-        via the golden-signals surface; this query adds free-form expression
-        capability without widening the permission boundary.
+        Permission: ``APP_READ``, the same gate as the golden-signals queries.
+        The cluster Prometheus is shared by every tenant on the cluster, so the
+        expression is confined to the app environment's namespace before it
+        runs: every selector gains a ``namespace`` matcher, and an expression
+        the confiner cannot read is refused rather than run (#2418).
         """
         if not query or not query.strip():
             return ExecutePromqlResult(ok=False, error="query is required", series=[])
@@ -1265,11 +1265,20 @@ class GoldenSignalsQuery:
                 organization_id=tenant.organization_id,
                 deleted_at__isnull=True,
             )
-            .only("id", "slug")
+            .only("id", "slug", "k8s_namespace", "organization__slug")
             .first()
         )
         if app is None:
             return ExecutePromqlResult(ok=False, error="app not found", series=[])
+
+        try:
+            confined = promql_scope.confine_to_namespace(
+                query.strip(), namespace_for_app_environment(app, environment_name)
+            )
+        except promql_scope.PromqlScopeError as exc:
+            return ExecutePromqlResult(
+                ok=False, error=f"query cannot be confined to this app: {exc}", series=[]
+            )
 
         endpoint = prom_client.resolve_prometheus_endpoint(app=app, environment_name=environment_name)
         if endpoint is None:
@@ -1282,7 +1291,7 @@ class GoldenSignalsQuery:
         try:
             rows = prometheus_client.query_range(
                 endpoint=endpoint,
-                query=query.strip(),
+                query=confined,
                 start_unix=start_unix,
                 end_unix=end_unix,
                 step_seconds=step_seconds,
@@ -1405,11 +1414,15 @@ class GoldenSignalsQuery:
                 organization_id=tenant.organization_id,
                 deleted_at__isnull=True,
             )
-            .only("id", "slug")
+            .select_related("organization")
+            .only("id", "slug", "k8s_namespace", "organization__slug")
             .first()
         )
         if app is None:
             return []
+        # The app's own series only: a same-slug app of another org on a
+        # shared cluster carries the same ``app`` label (#2418 audit).
+        namespace = namespace_for_app_environment(app, environment_name)
 
         endpoint = prom_client.resolve_prometheus_endpoint(app=app, environment_name=environment_name)
         if endpoint is None:
@@ -1425,12 +1438,14 @@ class GoldenSignalsQuery:
             environment_name=environment_name,
             range_seconds=seconds,
             workload_slug=workload_slug,
+            namespace=namespace,
         )
         err_plan = prom_queries.build_endpoint_error_rate_query(
             app_slug=app.slug,
             environment_name=environment_name,
             range_seconds=seconds,
             workload_slug=workload_slug,
+            namespace=namespace,
         )
         lat_plans = {
             q: prom_queries.build_endpoint_latency_quantile_query(
@@ -1439,6 +1454,7 @@ class GoldenSignalsQuery:
                 range_seconds=seconds,
                 quantile=q,
                 workload_slug=workload_slug,
+                namespace=namespace,
             )
             for q in (0.5, 0.9, 0.99)
         }

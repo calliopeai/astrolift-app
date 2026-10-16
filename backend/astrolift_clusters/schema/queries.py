@@ -794,10 +794,17 @@ class ClustersQuery:
         )
         if cluster is None:
             return None
+        namespaces = None
+        if _tenant_view_of_shared(info, cluster):
+            # The platform namespace's pods and events are the platform's and
+            # name other orgs' activity (#1967); a tenant sees its own
+            # namespaces' only, and none when it has no app there (#2418).
+            namespaces = _org_app_namespaces(cluster, tenant.organization_id)
         try:
-            payload = cluster_health_dispatch(
-                cluster=cluster,
-                event_limit=event_limit,
+            payload = (
+                cluster_health_dispatch(cluster=cluster, namespaces=namespaces, event_limit=event_limit)
+                if namespaces is None or namespaces
+                else {"pods": [], "events": []}
             )
         except ClusterManagementError:
             payload = {"pods": [], "events": []}
@@ -1057,6 +1064,18 @@ class ClustersQuery:
         ).first()
         if cluster is None:
             return _unavailable
+        if _tenant_view_of_shared(info, cluster):
+            # Cluster-wide sums over every org's pods, nodes and deployments
+            # (#2418); the tenant's own reads are its app's metrics.
+            return ClusterPrometheusMetricsType(
+                available=False,
+                reason="shared_cluster",
+                node_count=None,
+                pod_running_ratio=None,
+                cpu_utilization=None,
+                memory_utilization=None,
+                deployment_ready_ratio=None,
+            )
 
         pc = cluster.provider_config or {}
         endpoint = (pc.get("prometheus_endpoint") or "").strip()
@@ -1169,10 +1188,12 @@ class ClustersQuery:
             guid=str(cluster_id),
             deleted_at__isnull=True,
         ).first()
-        if cluster is None:
+        if cluster is None or _tenant_view_of_shared(info, cluster):
+            # On a shared cluster these sum every org's pods, network and
+            # restarts (#2418), so a tenant gets none of them.
             return ClusterPrometheusRangeMetricsType(
                 available=False,
-                reason=None,
+                reason=None if cluster is None else "shared_cluster",
                 range_seconds=range_seconds,
                 step_seconds=step_seconds,
                 series=[],

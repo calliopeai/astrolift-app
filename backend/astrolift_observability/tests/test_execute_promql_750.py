@@ -209,7 +209,7 @@ def test_execute_promql_prometheus_error_degrades(permission_resolver):
         result = GoldenSignalsQuery().astrolift_execute_promql(
             _info(),
             app_slug=app.slug,
-            query="this is invalid {",
+            query="rate(up)",
             start_unix=_START,
             end_unix=_END,
             step_seconds=_STEP,

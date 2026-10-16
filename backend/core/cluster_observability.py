@@ -734,6 +734,8 @@ def _gcp_managed_config_for(
             allowed_writer_identities=tuple(
                 str(value) for value in pc.get("cloud_operations_allowed_writer_identities") or []
             ),
+            # The GKE cluster name, resolved as the cluster driver resolves it.
+            cluster_name=str(pc.get("cluster_name", cluster.slug)),
         )
 
     if pair == ("postgres", "cloudsql") or (kind == "postgres" and not variant):
