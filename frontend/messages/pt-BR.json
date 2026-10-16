@@ -3249,7 +3249,7 @@
       "openRepo": "Abrir repositório",
       "confirmSync": {
         "title": "Obter do repositório?",
-        "description": "Descarta o rascunho não salvo e obtém o manifesto do repositório como nova base. Edições não enviadas serão perdidas; copie-as antes se quiser mesclá-las.",
+        "description": "Descarta o rascunho não salvo e obtém o manifesto do repositório como nova base. Os segredos do aplicativo em [env] passam para o manifesto obtido; as demais edições não enviadas serão perdidas, então copie-as antes se quiser mesclá-las.",
         "confirm": "Obter do repositório"
       },
       "confirmApply": {

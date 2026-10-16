@@ -3243,7 +3243,7 @@
       "openRepo": "Abrir repositorio",
       "confirmSync": {
         "title": "¿Traer del repositorio?",
-        "description": "Descarta el borrador sin guardar de este editor y trae el manifiesto del repositorio como nueva base. Se perderán las ediciones que no hayas enviado; cópialas antes si quieres combinarlas.",
+        "description": "Descarta el borrador sin guardar de este editor y trae el manifiesto del repositorio como nueva base. Los secretos de la aplicación en [env] pasan al manifiesto traído; se perderán las demás ediciones que no hayas enviado, así que cópialas antes si quieres combinarlas.",
         "confirm": "Traer del repositorio"
       },
       "confirmApply": {

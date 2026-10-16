@@ -3030,7 +3030,7 @@
       "openRepo": "Open repo",
       "confirmSync": {
         "title": "Pull from repo?",
-        "description": "Discards the unsaved draft in this editor and pulls the source manifest from the repo as the new base. Any edits you haven't pushed are lost — copy them out first if you want to merge.",
+        "description": "Discards the unsaved draft in this editor and pulls the source manifest from the repo as the new base. App secrets in [env] carry over to the pulled manifest; any other edits you haven't pushed are lost, so copy them out first if you want to merge.",
         "confirm": "Pull from repo"
       },
       "confirmApply": {

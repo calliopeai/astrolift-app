@@ -17,7 +17,11 @@ button calls:
 4. When the DB has a staged draft AND the repo has new content,
    refuse with ``status="diverged"`` — clobbering the draft is the
    point of the existing destructive ``syncManifestFromRepo``
-   mutation, not this one.
+   mutation, not this one. Only edits outside the top-level ``[env]``
+   table count: that table's edits are the app's literal secrets
+   (``astrolift_services.secret_literals``), which never block a sync
+   and which every sync, the destructive one included, carries onto
+   the new manifest.
 5. When the repo matches the DB, return ``status="in_sync"`` with
    empty changes.
 6. Otherwise call ``persist_manifest`` to reconcile workloads +
@@ -51,6 +55,7 @@ from astrolift_manifest.discover import (
     scan_agent_manifests_with_skips,
     scan_app_manifests,
 )
+from astrolift_manifest.env_edit import AppEnvEdits, app_env_edits, reapply_app_env_edits
 from astrolift_manifest.normalize import NormalizationDefaults, manifest_hash, normalize
 from astrolift_manifest.parser import ManifestError, parse_raw
 from astrolift_manifest.persist import persist_manifest
@@ -112,7 +117,8 @@ class ResyncResult:
                         ``manifest_raw`` / hashes / ``last_resync_at``
                         were updated atomically.
     - ``diverged``   — DB has a staged draft that would be clobbered
-                        by the repo content; nothing applied.
+                        by the repo content; nothing applied. Its
+                        ``[env]`` secrets alone never refuse.
     - ``fetch_failed`` — SCM fetch raised or returned ``None``; DB
                         unchanged. ``error`` carries the host-side
                         message so the UI can surface it.
@@ -588,6 +594,31 @@ def _resync_app_manifest_from_repo(
     # AppEnvironment rows for apps that haven't been provisioned yet.
     env_names = list(repo_raw_manifest.raw.get("environments", {}).keys())
 
+    with transaction.atomic():
+        # The fetch above can take seconds. Read the stored manifest and the
+        # staged draft again under the app's row lock, so a secret set in
+        # the meantime is carried forward below rather than written over.
+        RegisteredApp.all_objects.select_for_update(no_key=True).filter(pk=app.pk).first()
+        app.refresh_from_db()
+        return _reconcile_with_repo(
+            app,
+            repo_text=repo_text,
+            repo_manifest=repo_manifest,
+            env_names=env_names,
+            discard_staged=discard_staged,
+        )
+
+
+def _reconcile_with_repo(
+    app: RegisteredApp,
+    *,
+    repo_text: str,
+    repo_manifest: NormalizedManifest,
+    env_names: list[str],
+    discard_staged: bool,
+) -> ResyncResult:
+    """The guard, no-op and apply steps of :func:`_resync_app_manifest_from_repo`,
+    run under its row lock on ``app``."""
     repo_hash = manifest_hash(repo_manifest.serialized)
     db_raw = app.manifest_raw or ""
 
@@ -601,21 +632,31 @@ def _resync_app_manifest_from_repo(
         except ManifestError:
             db_manifest = None
 
-    # Diverged guard: a staged draft + repo content that differs
+    # A staged draft holds two kinds of edit. Its top-level [env] edits are
+    # the app's literal secrets: setAppSecret, rotateAppSecret,
+    # deleteAppSecret and bulkImportAppSecrets write them there, the deploy
+    # reads them from there, and there is no other copy of their values. A
+    # sync carries them onto whatever the repo brings (_staged_after_sync),
+    # so they never block it and are never lost to it. Anything else in the
+    # draft is manifest work that only a push to the repo keeps.
+    staged = app.manifest_raw_staged or ""
+    edits = app_env_edits(db_raw, staged) if staged.strip() else None
+    manifest_draft = bool(staged.strip()) and (edits is None or edits.other_changes)
+
+    # Diverged guard: such manifest work + repo content that differs
     # from the DB's source-of-truth means applying the repo would
     # drop work the operator hasn't pushed yet. Refuse rather than
     # clobber. The destructive ``syncManifestFromRepo`` mutation is
     # the explicit "yes, throw away my draft" path: it passes
     # ``discard_staged``, after the Config page's confirmation.
-    staged = app.manifest_raw_staged or ""
-    if staged.strip() and not discard_staged and repo_text.strip() != db_raw.strip():
+    if manifest_draft and not discard_staged and repo_text.strip() != db_raw.strip():
         return ResyncResult(
             status="diverged",
             changes=ResyncChanges(),
             error=(
-                "DB has unpushed staged drafts that would be clobbered by "
+                "DB has unpushed staged drafts outside [env] that would be clobbered by "
                 "repo content. Push the draft to the repo, or use Pull from "
-                "repo on the app's Config page to discard it."
+                "repo on the app's Config page to discard it; app secrets in [env] are kept."
             ),
         )
 
@@ -634,9 +675,22 @@ def _resync_app_manifest_from_repo(
             now = timezone.now()
             app.last_resync_at = now
             fields.append("last_resync_at")
-            if discard_staged and staged:
-                app.manifest_raw_staged = ""
-                fields.append("manifest_raw_staged")
+            # The hash leaves out comments, [environments.*] and the
+            # top-level [env], so the repo text can move while it stays
+            # put. Store the text anyway: the guard above compares text,
+            # and a stored copy that never caught up made it refuse every
+            # deploy once a draft existed, with nothing left to apply.
+            moved = repo_text != db_raw
+            if moved:
+                app.manifest_raw = repo_text
+                fields.append("manifest_raw")
+            if moved or discard_staged:
+                new_staged = _staged_after_sync(
+                    staged, edits, base=app.manifest_raw, repo_text=repo_text, discard_staged=discard_staged
+                )
+                if new_staged != staged:
+                    app.manifest_raw_staged = new_staged
+                    fields.append("manifest_raw_staged")
             fields += _clear_stale_bootstrap_failure(app)
             fields += ["updated_at", "version"]
             app.save(update_fields=fields)
@@ -652,35 +706,44 @@ def _resync_app_manifest_from_repo(
         persist_manifest(app, repo_manifest, raw_text=repo_text)
         app.last_synced_hash = repo_hash
         app.last_resync_at = timezone.now()
-        # Sync from repo is destructive on the staging buffer when
-        # repo == buffer (operator's pending draft already landed
-        # upstream — clearing it is the right thing). We've already
-        # refused above when the buffer would lose work.
         healed = _clear_stale_bootstrap_failure(app)
-        if staged.strip() and (discard_staged or repo_text.strip() == staged.strip()):
-            app.manifest_raw_staged = ""
-            app.save(
-                update_fields=[
-                    "manifest_raw_staged",
-                    "last_synced_hash",
-                    "last_resync_at",
-                    *healed,
-                    "updated_at",
-                    "version",
-                ]
-            )
-        else:
-            app.save(
-                update_fields=[
-                    "last_synced_hash",
-                    "last_resync_at",
-                    *healed,
-                    "updated_at",
-                    "version",
-                ]
-            )
+        fields = ["last_synced_hash", "last_resync_at", *healed, "updated_at", "version"]
+        new_staged = _staged_after_sync(
+            staged, edits, base=repo_text, repo_text=repo_text, discard_staged=discard_staged
+        )
+        if new_staged != staged:
+            app.manifest_raw_staged = new_staged
+            fields.append("manifest_raw_staged")
+        app.save(update_fields=fields)
 
     return ResyncResult(status="applied", changes=changes, env_names=env_names)
+
+
+def _staged_after_sync(
+    staged: str,
+    edits: AppEnvEdits | None,
+    *,
+    base: str,
+    repo_text: str,
+    discard_staged: bool,
+) -> str:
+    """The staged buffer once a sync has made ``base`` the stored manifest.
+
+    The draft's top-level ``[env]`` edits, the app's literal secrets, are
+    made again on ``base``; nothing is left staged once ``base`` already
+    carries them. A draft that also edits anything else keeps those edits
+    unless the sync discards them (Pull from repo), which still carries
+    its secrets, or the repo now holds exactly that draft (it was pushed,
+    secrets and all). A draft that can't be taken apart is all or nothing.
+    """
+    if not staged.strip():
+        return staged
+    if edits is not None and (discard_staged or not edits.other_changes):
+        carried = reapply_app_env_edits(base, edits)
+        return "" if carried == base else carried
+    if discard_staged or repo_text.strip() == staged.strip():
+        return ""
+    return staged
 
 
 def summarize_changes(changes: ResyncChanges) -> str:

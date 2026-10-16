@@ -9,9 +9,12 @@ from astrolift_manifest.env_edit import (
     REDACTED_DOCUMENT,
     REDACTED_ENV_VALUE,
     REDACTED_LINE,
+    AppEnvEdits,
+    app_env_edits,
     delete_app_env_key,
     parse_dotenv,
     read_app_env,
+    reapply_app_env_edits,
     redact_dotenv_values,
     redact_env_values,
     resolve_masked_env_values,
@@ -143,6 +146,52 @@ def test_round_trip_preserves_other_top_level_keys() -> None:
     assert parsed["app"]["name"] == "hello"
     assert parsed["workloads"][0]["name"] == "web"
     assert "env" in parsed
+
+
+def test_app_env_edits_reads_a_secrets_only_draft_through_the_reformat() -> None:
+    """set/delete re-dump the whole document; that is not an edit."""
+    staged, _ = delete_app_env_key(
+        set_app_env_keys(_BASE, {"API_KEY": "k", "LOG_LEVEL": "debug"}), "DATABASE_URL"
+    )
+    assert staged != _BASE
+    assert app_env_edits(_BASE, staged) == AppEnvEdits(
+        values={"API_KEY": "k", "LOG_LEVEL": "debug"},
+        removed=frozenset({"DATABASE_URL"}),
+        other_changes=False,
+    )
+
+
+def test_app_env_edits_flags_an_edit_outside_env() -> None:
+    staged = set_app_env_keys(_BASE.replace('kind = "service"', 'kind = "worker"'), {"API_KEY": "k"})
+    edits = app_env_edits(_BASE, staged)
+    assert edits is not None
+    assert edits.other_changes is True
+    assert edits.values == {"API_KEY": "k"}
+
+
+def test_app_env_edits_cannot_split_a_draft_it_cannot_read() -> None:
+    assert app_env_edits(_BASE, "not = [valid toml") is None
+    assert app_env_edits(_BASE, 'name = "hello"\nenv = "not a table"\n') is None
+
+
+def test_reapply_app_env_edits_lands_on_a_new_base() -> None:
+    edits = AppEnvEdits(
+        values={"API_KEY": "k", "LOG_LEVEL": "debug"},
+        removed=frozenset({"DATABASE_URL"}),
+        other_changes=False,
+    )
+    moved = _BASE.replace('name = "web"', 'name = "api"').replace(
+        'LOG_LEVEL = "info"', 'LOG_LEVEL = "warn"\nFROM_REPO = "r"'
+    )
+    out = tomllib.loads(reapply_app_env_edits(moved, edits))
+    assert out["workloads"][0]["name"] == "api"
+    # The draft's values win over the base's; keys it never touched follow the base.
+    assert out["env"] == {"LOG_LEVEL": "debug", "FROM_REPO": "r", "API_KEY": "k"}
+
+
+def test_reapply_app_env_edits_leaves_a_base_that_carries_them_byte_for_byte() -> None:
+    edits = AppEnvEdits(values={"LOG_LEVEL": "info"}, removed=frozenset({"GONE"}), other_changes=False)
+    assert reapply_app_env_edits(_BASE, edits) == _BASE
 
 
 def test_parse_dotenv_basic() -> None:

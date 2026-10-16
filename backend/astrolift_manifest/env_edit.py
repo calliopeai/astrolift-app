@@ -1057,6 +1057,70 @@ def delete_app_env_key(toml_text: str, key: str) -> tuple[str, bool]:
     return tomli_w.dumps(data), True
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class AppEnvEdits:
+    """What a staged draft changes in the top-level ``[env]`` table over the
+    manifest it was staged from.
+
+    That table is where setAppSecret, rotateAppSecret, deleteAppSecret,
+    bulkImportAppSecrets and an applied secret-change proposal keep the
+    app's literal secrets; the staged buffer is the only store their values
+    have. ``values`` maps each key the draft adds or changes to its value,
+    ``removed`` names each key it deletes, and ``other_changes`` says
+    whether the draft also edits anything outside that table.
+    """
+
+    values: dict[str, Any]
+    removed: frozenset[str]
+    other_changes: bool
+
+
+def app_env_edits(base_text: str, staged_text: str) -> AppEnvEdits | None:
+    """Split ``staged_text`` into its top-level ``[env]`` edits over
+    ``base_text`` and whether it changes anything else.
+
+    None when either text does not parse as TOML or has a top-level ``env``
+    that is not a table: such a draft can't be taken apart, so the caller
+    treats it as one manifest edit."""
+    base = _loads_or_none(base_text or "")
+    staged = _loads_or_none(staged_text or "")
+    if base is None or staged is None:
+        return None
+    base_env = base.pop("env", {})
+    staged_env = staged.pop("env", {})
+    if not isinstance(base_env, dict) or not isinstance(staged_env, dict):
+        return None
+    return AppEnvEdits(
+        values={key: value for key, value in staged_env.items() if base_env.get(key) != value},
+        removed=frozenset(key for key in base_env if key not in staged_env),
+        other_changes=base != staged,
+    )
+
+
+def reapply_app_env_edits(toml_text: str, edits: AppEnvEdits) -> str:
+    """``toml_text`` with ``edits`` made to its top-level ``[env]`` table.
+
+    ``toml_text`` itself, byte for byte, when it already carries them.
+    Otherwise a ``tomli_w`` dump, as :func:`set_app_env_keys` writes: no
+    comments or formatting kept, and an ``env`` that is not a table is
+    replaced."""
+    import tomli_w
+
+    data: dict = tomllib.loads(toml_text) if toml_text and toml_text.strip() else {}
+    env = data.get("env", {})
+    if not isinstance(env, dict):
+        env = {}
+    updated = {key: value for key, value in env.items() if key not in edits.removed}
+    updated.update(edits.values)
+    if updated == env:
+        return toml_text
+    if updated:
+        data["env"] = updated
+    else:
+        data.pop("env", None)
+    return tomli_w.dumps(data)
+
+
 def parse_dotenv(text: str) -> dict[str, str]:
     """Parse ``.env``-shape text (KEY=value, comment lines, blank
     lines). Quoted values are unquoted; multi-line values are not
