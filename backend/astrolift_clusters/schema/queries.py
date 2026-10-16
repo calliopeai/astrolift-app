@@ -488,7 +488,7 @@ class ClustersQuery:
             ManagedDomain.objects.filter(
                 Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
             )
-            .select_related("organization")
+            .select_related("organization", "delegation_connection")
             .order_by("zone")[:200]
         )
         from astrolift_clusters.domain_diagnostics import provision_clusters

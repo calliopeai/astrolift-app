@@ -144,15 +144,13 @@ export function useDnsConnectionSetup(domainId?: string) {
   const connectionPage = connectionsQuery.error
     ? null
     : (connectionsQuery.data?.dnsProviderConnectionsPage ?? null);
+  // A delegation grant (#1787) writes only NS records for a bound domain; the
+  // connection's read token, which this setup uses, stays read-only.
   const validPage =
     connectionPage?.page === page &&
     connectionPage.pageSize === 20 &&
     connectionPage.items.every(
-      (c) =>
-        isGuid(c.id) &&
-        version(c.version) &&
-        c.provider === "CLOUDFLARE" &&
-        c.dnsWritesSupported === false
+      (c) => isGuid(c.id) && version(c.version) && c.provider === "CLOUDFLARE"
     );
   const connections =
     validPage && (!connectionRecovery || recoveredConnections) ? connectionPage : null;
@@ -689,11 +687,7 @@ export function useDnsConnectionSetup(domainId?: string) {
             value?.page === page &&
             value.pageSize === 20 &&
             value.items.every(
-              (c) =>
-                isGuid(c.id) &&
-                version(c.version) &&
-                c.provider === "CLOUDFLARE" &&
-                c.dnsWritesSupported === false
+              (c) => isGuid(c.id) && version(c.version) && c.provider === "CLOUDFLARE"
             )
           )
             setRecoveredConnections(true);

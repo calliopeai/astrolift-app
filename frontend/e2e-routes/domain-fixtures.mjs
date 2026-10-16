@@ -21,6 +21,7 @@ const connection = {
   verifiedAt: timestamp,
   expiresAt: null,
   dnsWritesSupported: false,
+  delegationZoneName: "",
 };
 const initial = {
   id: domainId,
@@ -38,6 +39,9 @@ const initial = {
   provisionNameservers: ["ns-0.awsdns-00.com", "ns-1.awsdns-01.net"],
   provisionValidationRecords: [],
   provisionError: null,
+  delegationConnectionId: null,
+  delegationZoneName: "",
+  delegationWrite: {},
   provisionClusterId: "33333333-3333-4333-8333-333333333333",
   organizationSlug: "fixture",
   createdAt: timestamp,

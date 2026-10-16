@@ -3400,6 +3400,9 @@ export type AstroliftManagedDomain = {
   createdAt: Scalars['DateTime']['output'];
   defaultFor: Scalars['String']['output'];
   delegationCheck: Scalars['JSON']['output'];
+  delegationConnectionId?: Maybe<Scalars['GUID']['output']>;
+  delegationWrite: Scalars['JSON']['output'];
+  delegationZoneName: Scalars['String']['output'];
   dnsDriver: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
   isWildcardManaged: Scalars['Boolean']['output'];
@@ -17540,7 +17543,7 @@ export type ManagedDomainQueryVariables = Exact<{
 }>;
 
 
-export type ManagedDomainQuery = { astroliftManagedDomain?: { id: string, version: number, zone: string, dnsDriver: string, defaultFor: string, isWildcardManaged: boolean, organizationSlug?: string | null, createdAt: string, provisionState: string, provisionNameservers: unknown, provisionValidationRecords: unknown, provisionClusterId?: string | null, verificationState: string, verifiedAt?: string | null, challengeRecordName: string, challengeRecordValue: string, delegationCheck: unknown } | null };
+export type ManagedDomainQuery = { astroliftManagedDomain?: { id: string, version: number, zone: string, dnsDriver: string, defaultFor: string, isWildcardManaged: boolean, organizationSlug?: string | null, createdAt: string, provisionState: string, provisionNameservers: unknown, provisionValidationRecords: unknown, provisionClusterId?: string | null, verificationState: string, verifiedAt?: string | null, challengeRecordName: string, challengeRecordValue: string, delegationCheck: unknown, delegationConnectionId?: string | null, delegationZoneName: string, delegationWrite: unknown } | null };
 
 export type ManagedDomainActionsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -17584,7 +17587,7 @@ export type DnsConnectionsPageQueryVariables = Exact<{
 }>;
 
 
-export type DnsConnectionsPageQuery = { dnsProviderConnectionsPage: { page?: number | null, pageSize?: number | null, totalCount?: number | null, nextCursor?: string | null, items: Array<{ id: string, version: number, name: string, provider: string, authMethod: string, state: string, revocationState: string, verifiedAt?: string | null, expiresAt?: string | null, dnsWritesSupported: boolean }> } };
+export type DnsConnectionsPageQuery = { dnsProviderConnectionsPage: { page?: number | null, pageSize?: number | null, totalCount?: number | null, nextCursor?: string | null, items: Array<{ id: string, version: number, name: string, provider: string, authMethod: string, state: string, revocationState: string, verifiedAt?: string | null, expiresAt?: string | null, dnsWritesSupported: boolean, delegationZoneName: string }> } };
 
 export type ConnectCloudflareTokenMutationVariables = Exact<{
   input: ConnectCloudflareDnsTokenInput;
@@ -17674,6 +17677,20 @@ export type DnsDomainBindingQueryVariables = Exact<{
 
 
 export type DnsDomainBindingQuery = { dnsProviderDomainBinding?: { domainId: string, domainVersion: number, state: string, connectionId?: string | null, connectionVersion?: number | null, currentConnectionVersion?: number | null, zoneId?: string | null, zoneName: string, dnsWritesSupported: boolean, canVerify: boolean } | null };
+
+export type GrantCloudflareDelegationMutationVariables = Exact<{
+  input: GrantCloudflareDelegationInput;
+}>;
+
+
+export type GrantCloudflareDelegationMutation = { grantCloudflareDelegation: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, version: number, dnsWritesSupported: boolean, delegationZoneName: string } | null } };
+
+export type BindManagedDomainDelegationMutationVariables = Exact<{
+  input: BindManagedDomainDelegationInput;
+}>;
+
+
+export type BindManagedDomainDelegationMutation = { bindManagedDomainDelegation: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, version: number, delegationZoneName: string } | null } };
 
 export type IdentityTimestampsFragment = { createdAt: string, updatedAt: string, deletedAt?: string | null };
 

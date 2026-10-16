@@ -278,6 +278,12 @@ describe("DNS connection actual SDL HttpLink journey", () => {
     expect(verify).toBeDisabled();
     expect(requests.some((r) => r.operationName === "VerifyDnsDomain")).toBe(false);
   });
+  it("still lists a connection that holds a delegation grant (#1787)", async () => {
+    connection = { ...connection, dnsWritesSupported: true, delegationZoneName: "example.test" };
+    await start();
+    expect(screen.getByText(connection.name)).toBeInTheDocument();
+    expect(screen.queryByText(c.unavailable)).not.toBeInTheDocument();
+  });
   it("keeps incomplete zone inventory unavailable instead of selectable empty success", async () => {
     incompleteZones = true;
     await start();

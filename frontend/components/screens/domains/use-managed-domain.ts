@@ -344,6 +344,9 @@ export function useManagedDomain(id: string) {
     onVerify,
     verifying,
     canVerify,
+    // Current DNS connection authority, shared with the delegation panel (#1787).
+    dnsConnectionsAllowed: bindingAllowed,
+    dnsConnectionsLoading: ownDomainReadable && supportQuery.loading,
     onDelete,
     deleting,
     removed,

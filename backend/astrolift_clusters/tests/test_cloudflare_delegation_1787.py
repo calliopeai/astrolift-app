@@ -244,3 +244,20 @@ def test_delegate_leaves_someone_elses_records_alone(world, wire, client):
 def test_an_unbound_domain_is_left_to_the_operator(world):
     domain = _domain(world)
     assert delegation.delegate(domain.pk, ROUTE53) == {"action": "unbound"}
+
+
+def test_the_domain_shows_its_delegation_binding_and_last_write(world, wire, client):
+    domain = _bound(client, world, wire)
+    _serve(wire, [])
+    delegation.delegate(domain.pk, ROUTE53)
+    read = (
+        "query($d:GUID!){astroliftManagedDomain(domainId:$d)"
+        "{delegationConnectionId delegationZoneName delegationWrite}}"
+    )
+
+    row = graphql(client, world, read, {"d": str(domain.guid)})["data"]["astroliftManagedDomain"]
+
+    assert row["delegationConnectionId"] == world.connection_id
+    assert row["delegationZoneName"] == ZONE["name"]
+    assert row["delegationWrite"]["action"] == "created"
+    assert WRITE_TOKEN not in json.dumps(row)

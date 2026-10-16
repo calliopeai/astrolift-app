@@ -210,6 +210,11 @@ class ManagedDomainType:
     # Latest public-DNS delegation finding. Kept in dns_config so old rows
     # remain migration-free while operators can see why activation is gated.
     delegation_check: JSON
+    # The connection whose Cloudflare grant writes this zone's delegating NS
+    # set into its parent, that parent, and the last write outcome (#1787).
+    delegation_connection_id: GUID | None
+    delegation_zone_name: str
+    delegation_write: JSON
     provision_cluster_id: str | None
     # Proof-of-control challenge (#1931). 'pending' means the zone name
     # already existed in the provider (or the caller asked to adopt one) and
@@ -397,6 +402,7 @@ def domain_to_type(domain, *, provision_clusters=None) -> ManagedDomainType:
 
     cluster = provision_cluster(domain) if provision_clusters is None else provision_clusters.get(domain.pk)
     delegation_check = (domain.dns_config or {}).get("delegation_check", {})
+    connection = domain.delegation_connection if domain.delegation_connection_id else None
     return ManagedDomainType(
         id=GUID(str(domain.guid)),
         version=domain.version,
@@ -410,6 +416,9 @@ def domain_to_type(domain, *, provision_clusters=None) -> ManagedDomainType:
         provision_nameservers=domain.provision_nameservers or [],
         provision_validation_records=domain.provision_validation_records or [],
         delegation_check=delegation_check,
+        delegation_connection_id=(GUID(str(connection.guid)) if connection else None),
+        delegation_zone_name=(connection.delegation_zone_name if connection else ""),
+        delegation_write=(domain.dns_config or {}).get("delegation_write", {}),
         provision_cluster_id=(str(cluster.guid) if cluster else None),
         verification_state=domain.verification_state,
         challenge_record_name=(f"_astrolift-challenge.{domain.zone}" if domain.verification_token else ""),

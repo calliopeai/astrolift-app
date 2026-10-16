@@ -3553,6 +3553,9 @@ type AstroliftManagedDomain {
   provisionNameservers: JSON!
   provisionValidationRecords: JSON!
   delegationCheck: JSON!
+  delegationConnectionId: GUID
+  delegationZoneName: String!
+  delegationWrite: JSON!
   provisionClusterId: String
   verificationState: String!
   challengeRecordName: String!
