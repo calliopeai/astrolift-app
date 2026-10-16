@@ -3624,7 +3624,7 @@ type AstroliftManagedService {
   variant: String!
   isolation: String!
   status: String!
-  statusError: String!
+  statusError: String! @deprecated(reason: "Raw provider text. Use statusFailure on astroliftManagedServiceSummariesPage for a credential-free typed reading.")
   config: JSON!
   appliedConfig: JSON
   operationKind: String!
@@ -3849,6 +3849,14 @@ type AstroliftManagedServicePage {
   pageSize: Int
 }
 
+type AstroliftManagedServicePosture {
+  dkimVerified: Boolean
+  domainStatus: String!
+  backupEnabled: Boolean
+  snapshotPolicy: String!
+  publicAccessBlocked: Boolean
+}
+
 type AstroliftManagedServiceQueueDepth {
   managedServiceId: GUID!
   kind: String!
@@ -3856,6 +3864,48 @@ type AstroliftManagedServiceQueueDepth {
   depth: Int!
   inFlight: Int!
   sampledAt: DateTime
+}
+
+type AstroliftManagedServiceStatusFailure {
+  code: String!
+  message: String!
+}
+
+type AstroliftManagedServiceSummary {
+  id: GUID!
+  name: String!
+  kind: String!
+  variant: String!
+  status: String!
+  statusFailure: AstroliftManagedServiceStatusFailure
+  posture: AstroliftManagedServicePosture!
+  registeredAppSlug: String!
+  clusterSlug: String!
+  environmentName: String!
+  operationKind: String!
+  operationStartedAt: DateTime
+  operationCompletedAt: DateTime
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  lastActionAt: DateTime
+  lastActionKind: String!
+}
+
+"""One page of a cursor-paginated or numbered list."""
+type AstroliftManagedServiceSummaryPage {
+  items: [AstroliftManagedServiceSummary!]!
+
+  """Opaque token for the next page; null when the list is exhausted."""
+  nextCursor: String
+
+  """Total rows matching the filters, across all pages."""
+  totalCount: Int
+
+  """The 1-based page number on a numbered page; null on a cursor page."""
+  page: Int
+
+  """Rows per page on a numbered page; null on a cursor page."""
+  pageSize: Int
 }
 
 type AstroliftManagedServiceTestEmailResult {
@@ -10924,6 +10974,8 @@ type Query {
   astroliftAppSecretBundleAttachments(appSlug: String!, environmentName: String = null): [AstroliftAppSecretBundleAttachment!]!
   astroliftManagedServices(appSlug: String!, environmentName: String = null): [AstroliftManagedService!]! @deprecated(reason: "Unbounded, and applies no ordering at all — row order is whatever Postgres returns. Use astroliftManagedServicesPage.")
   astroliftManagedServicesPage(appSlug: String!, environmentName: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftManagedServicePage!
+  astroliftManagedServiceSummariesPage(appSlug: String!, environmentName: String = null, search: String = null, limit: Int! = 50, after: String = null): AstroliftManagedServiceSummaryPage!
+  astroliftAppManagedService(appSlug: String!, id: GUID!): AstroliftManagedService
   astroliftManagedServiceCostPreview(managedServiceId: GUID!, expectedContextRevision: String = null): AstroliftManagedServiceCostPreview
   astroliftWorkloadIdentityGrants(appSlug: String!, environmentName: String = null, unappliedOnly: Boolean! = false): [AstroliftWorkloadIdentityGrant!]!
   astroliftManagedServiceObjects(managedServiceId: GUID!, limit: Int! = 10): AstroliftManagedServiceObjects

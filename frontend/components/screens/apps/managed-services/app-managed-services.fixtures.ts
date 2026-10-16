@@ -44,8 +44,14 @@ export function service(name: string, patch: Partial<ManagedService> = {}): Mana
     kind: "postgres",
     variant: "db.t4g.medium",
     status: "active",
-    statusError: "",
-    config: {},
+    statusFailure: null,
+    posture: {
+      dkimVerified: null,
+      domainStatus: "",
+      backupEnabled: null,
+      snapshotPolicy: "",
+      publicAccessBlocked: null,
+    },
     environmentName: "production",
     registeredAppSlug: "storefront",
     createdAt: "2026-09-01T12:00:00Z",
@@ -56,28 +62,37 @@ export function service(name: string, patch: Partial<ManagedService> = {}): Mana
   };
 }
 
+/** A posture with the given facts reported and the rest unreported. */
+function posture(facts: Partial<ManagedService["posture"]>): ManagedService["posture"] {
+  return { ...service("").posture, ...facts };
+}
+
+const PROVIDER_FAILURE = {
+  code: "provider_error",
+  message: "The provider reported a failure. Its detail is withheld from list reads.",
+};
+
 export const SERVICES: ManagedService[] = [
   service("checkout-db", {
     kind: "rds_postgres",
-    config: { backup_enabled: true, snapshot_policy: "daily-7d" },
+    posture: posture({ backupEnabled: true, snapshotPolicy: "daily-7d" }),
   }),
   service("sessions", { kind: "redis", variant: "cache.t4g.small", status: "provisioning" }),
   service("assets", {
     kind: "s3_bucket",
     variant: "",
-    config: { public_access_blocked: false },
+    posture: posture({ publicAccessBlocked: false }),
   }),
   service("transactional", {
     kind: "email",
     variant: "",
-    config: { sns_event_destination_arn: "arn:aws:sns:us-west-2:123456789012:ses-events" },
   }),
   service("notifications", {
     kind: "ses_email",
     variant: "",
     status: "failed",
-    statusError: "SES identity verification timed out after 72h; re-publish the TXT record.",
-    config: { dkim_verified: false, domain_status: "pending_verification" },
+    statusFailure: PROVIDER_FAILURE,
+    posture: posture({ dkimVerified: false, domainStatus: "pending_verification" }),
   }),
   service("orders-queue", {
     kind: "sqs",
@@ -132,12 +147,11 @@ export const LONG_SERVICES: ManagedService[] = [
     kind: "aurora_serverless",
     variant: "serverless-v2-min-0.5-max-128-acu-with-a-long-variant-label",
     environmentName: "production-us-west-2-blue-green-candidate",
-    config: {
-      backup_enabled: false,
-      snapshot_policy: "hourly-24h-then-daily-35d-then-weekly-52w-cross-region",
-    },
-    statusError:
-      "InvalidParameterCombination: the requested minimum capacity is below the engine version's floor; upgrade the engine or raise min_acu before retrying the provision workflow.",
+    posture: posture({
+      backupEnabled: false,
+      snapshotPolicy: "hourly-24h-then-daily-35d-then-weekly-52w-cross-region",
+    }),
+    statusFailure: PROVIDER_FAILURE,
   }),
 ];
 

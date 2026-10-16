@@ -23,7 +23,6 @@ export function ManagedServicesClient({ slug }: { slug: string }) {
           managedServiceId={svc.id}
           serviceName={svc.name || svc.kind}
           appSlug={slug}
-          serviceConfig={svc.config ?? {}}
           open
           onOpenChange={onOpenChange}
         />

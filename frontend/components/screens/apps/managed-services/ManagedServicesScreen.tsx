@@ -59,9 +59,9 @@ const KIND_OPTIONS = ["postgres", "redis", "s3", "sqs", "mysql", "kafka"];
 // from the lifecycle status alone (e.g. an `active` SES service can still
 // be sending un-DKIMed email; an `active` S3 bucket can be wide-open).
 //
-// Missing config keys render nothing — the JSON is sparse and we want the
-// row to stay quiet rather than nag with "not configured" when the driver
-// hasn't yet populated the field.
+// Unreported facts render nothing: the driver fills them in over time and
+// the row should stay quiet rather than nag with "not configured". The
+// facts come typed on the summary row (#2207); the list never loads config.
 
 const GREEN_BADGE = "border-success-border bg-success/15 text-success-fg";
 const AMBER_BADGE = "border-warning-border bg-warning/15 text-warning-fg";
@@ -69,29 +69,21 @@ const RED_BADGE = "border-destructive/40 bg-destructive/15 text-destructive";
 
 function ValidationBadges({ service }: { service: ManagedService }) {
   const t = useTranslations("appManagedServices");
-  const cfg = service.config ?? {};
+  const posture = service.posture;
   const items: React.ReactNode[] = [];
 
   switch (service.kind) {
     case "ses_email": {
-      if ("dkim_verified" in cfg) {
-        const verified = cfg.dkim_verified === true;
-        items.push(
-          <Badge key="dkim" variant="outline" className={verified ? GREEN_BADGE : AMBER_BADGE}>
-            {verified ? t("dkimVerified") : t("dkimPending")}
-          </Badge>
-        );
-      } else {
-        items.push(
-          <Badge key="dkim" variant="outline" className={AMBER_BADGE}>
-            {t("dkimPending")}
-          </Badge>
-        );
-      }
-      if (typeof cfg.domain_status === "string" && cfg.domain_status) {
+      const verified = posture.dkimVerified === true;
+      items.push(
+        <Badge key="dkim" variant="outline" className={verified ? GREEN_BADGE : AMBER_BADGE}>
+          {verified ? t("dkimVerified") : t("dkimPending")}
+        </Badge>
+      );
+      if (posture.domainStatus) {
         items.push(
           <Badge key="domain" variant="outline" className="capitalize">
-            {cfg.domain_status.replace(/_/g, " ")}
+            {posture.domainStatus.replace(/_/g, " ")}
           </Badge>
         );
       }
@@ -99,26 +91,26 @@ function ValidationBadges({ service }: { service: ManagedService }) {
     }
     case "rds_postgres":
     case "aurora_serverless": {
-      if ("backup_enabled" in cfg) {
-        const enabled = cfg.backup_enabled === true;
+      if (posture.backupEnabled !== null) {
+        const enabled = posture.backupEnabled;
         items.push(
           <Badge key="backup" variant="outline" className={enabled ? GREEN_BADGE : AMBER_BADGE}>
             {enabled ? t("backupsEnabled") : t("noBackupPolicy")}
           </Badge>
         );
       }
-      if (typeof cfg.snapshot_policy === "string" && cfg.snapshot_policy) {
+      if (posture.snapshotPolicy) {
         items.push(
           <Badge key="snap" variant="outline" className="text-2xs font-mono">
-            {cfg.snapshot_policy}
+            {posture.snapshotPolicy}
           </Badge>
         );
       }
       break;
     }
     case "s3_bucket": {
-      if ("public_access_blocked" in cfg) {
-        const blocked = cfg.public_access_blocked === true;
+      if (posture.publicAccessBlocked !== null) {
+        const blocked = posture.publicAccessBlocked;
         items.push(
           <Badge key="public" variant="outline" className={blocked ? GREEN_BADGE : RED_BADGE}>
             {blocked ? t("publicBlocked") : t("publicOpen")}
@@ -129,9 +121,10 @@ function ValidationBadges({ service }: { service: ManagedService }) {
     }
   }
 
-  // statusError applies to every kind; surface even when the kind block
-  // above produced no badges so the operator still sees the failure.
-  if (service.statusError) {
+  // A failure applies to every kind; surface it even when the kind block
+  // above produced no badges so the operator still sees it. The text is
+  // the platform's typed reading, never the provider's raw error.
+  if (service.statusFailure) {
     items.push(
       <TooltipProvider key="err-prov">
         <Tooltip>
@@ -141,7 +134,7 @@ function ValidationBadges({ service }: { service: ManagedService }) {
             </Badge>
           </TooltipTrigger>
           <TooltipContent className="max-w-sm">
-            <span className="text-2xs font-mono break-words">{service.statusError}</span>
+            <span className="text-2xs font-mono break-words">{service.statusFailure.message}</span>
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>

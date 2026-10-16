@@ -221,7 +221,12 @@ class ManagedServiceType:
     the org's compliance floor outranks the request."""
 
     status: str
-    status_error: str
+    status_error: str = strawberry.field(
+        deprecation_reason=(
+            "Raw provider text. Use statusFailure on astroliftManagedServiceSummariesPage for "
+            "a credential-free typed reading."
+        )
+    )
     config: JSON
     applied_config: JSON | None
     operation_kind: str
@@ -272,6 +277,138 @@ class ManagedServiceType:
     manifest declared or one from before this was recorded."""
 
     deployed_by_me: bool = False
+
+
+@strawberry.type(name="AstroliftManagedServiceStatusFailure")
+class ManagedServiceStatusFailureType:
+    """A credential-free, typed reading of ``status_error`` (#2207).
+
+    The raw column holds whatever the provider raised, which can echo
+    endpoints, ARNs or request bodies. A list row gets a code and a fixed
+    platform message instead; the raw text stays off the basic projection.
+    """
+
+    code: str
+    """``enqueue_failed`` | ``reconcile_failed`` | ``source_revoked`` |
+    ``provider_error``. ``provider_error`` covers every text the platform
+    did not author itself."""
+
+    message: str
+
+
+@strawberry.type(name="AstroliftManagedServicePosture")
+class ManagedServicePostureType:
+    """The few validation facts the services table badges, read out of
+    ``config`` in SQL so the config document itself is never loaded.
+
+    Null means the driver has not reported the fact yet."""
+
+    dkim_verified: bool | None = None
+    domain_status: str = ""
+    backup_enabled: bool | None = None
+    snapshot_policy: str = ""
+    public_access_blocked: bool | None = None
+
+
+@strawberry.type(name="AstroliftManagedServiceSummary")
+class ManagedServiceSummaryType:
+    """One row of an app's services table, bounded (#2207).
+
+    No config, applied config, attachments, volume bindings, grants or
+    driver resolution: each row costs one SELECT column list, whatever the
+    client selects. Open a row through its exact GUID for the full record.
+    """
+
+    id: GUID
+    name: str
+    kind: str
+    variant: str
+    status: str
+    status_failure: ManagedServiceStatusFailureType | None
+    posture: ManagedServicePostureType
+    registered_app_slug: str
+    cluster_slug: str
+    environment_name: str
+    operation_kind: str
+    operation_started_at: dt.datetime | None
+    operation_completed_at: dt.datetime | None
+    created_at: dt.datetime
+    updated_at: dt.datetime
+    last_action_at: dt.datetime | None
+    last_action_kind: str
+
+
+# Texts the platform writes to ``status_error`` itself. Anything else came
+# from a provider or an exception and is never echoed on a basic read.
+_PLATFORM_STATUS_ERRORS: dict[str, tuple[str, str]] = {
+    "Managed-resource workflow could not be enqueued": (
+        "enqueue_failed",
+        "The managed-resource workflow could not be started. Retry the action.",
+    ),
+    "Shared model reconciliation failed; retry or operator review is required.": (
+        "reconcile_failed",
+        "Shared model reconciliation failed; retry or operator review is required.",
+    ),
+    "Revocation was observed; retained native source admission is unavailable.": (
+        "source_revoked",
+        "Revocation was observed; retained native source admission is unavailable.",
+    ),
+}
+_ENQUEUE_PREFIX = "could not enqueue managed-service update:"
+_PROVIDER_ERROR = (
+    "provider_error",
+    "The provider reported a failure. Its detail is withheld from list reads.",
+)
+
+
+def status_failure_for(status_error: str | None) -> ManagedServiceStatusFailureType | None:
+    text = (status_error or "").strip()
+    if not text:
+        return None
+    if text.startswith(_ENQUEUE_PREFIX):
+        code, message = _PLATFORM_STATUS_ERRORS["Managed-resource workflow could not be enqueued"]
+    else:
+        code, message = _PLATFORM_STATUS_ERRORS.get(text, _PROVIDER_ERROR)
+    return ManagedServiceStatusFailureType(code=code, message=message)
+
+
+def _posture_bool(value) -> bool | None:
+    return value if isinstance(value, bool) else None
+
+
+def _posture_text(value) -> str:
+    return value[:64] if isinstance(value, str) else ""
+
+
+def managed_service_summary_to_type(svc) -> ManagedServiceSummaryType:
+    """Render a row loaded by ``_managed_service_summary_rows``."""
+    env = svc.app_environment
+    cluster = env.tenant_cluster if env else None
+    return ManagedServiceSummaryType(
+        id=GUID(str(svc.guid)),
+        name=svc.name,
+        kind=svc.kind,
+        variant=svc.variant or "",
+        status=svc.status,
+        status_failure=status_failure_for(svc.status_error),
+        posture=ManagedServicePostureType(
+            dkim_verified=_posture_bool(svc.posture_dkim_verified),
+            domain_status=_posture_text(svc.posture_domain_status),
+            backup_enabled=_posture_bool(svc.posture_backup_enabled),
+            snapshot_policy=_posture_text(svc.posture_snapshot_policy),
+            public_access_blocked=_posture_bool(svc.posture_public_access_blocked),
+        ),
+        registered_app_slug=svc.registered_app.slug,
+        cluster_slug=cluster.slug if cluster else "",
+        environment_name=env.name if env else "",
+        operation_kind=svc.operation_kind or "",
+        operation_started_at=svc.operation_started_at,
+        operation_completed_at=svc.operation_completed_at,
+        created_at=svc.created_at,
+        updated_at=svc.updated_at,
+        last_action_at=svc.last_action_at,
+        last_action_kind=svc.last_action_kind or "",
+    )
 
 
 @strawberry.input(name="AstroliftModelEndpointsFilter")

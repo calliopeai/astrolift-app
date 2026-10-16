@@ -2,7 +2,7 @@ import { activeSection, type SearchParams } from "@/components/screens/apps/deta
 import { AppTabSections } from "@/components/screens/apps/detail/AppTabSections";
 import { LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import { LIST_WORKLOADS_PAGE } from "@/graphql/registry/registry.queries";
-import { LIST_MANAGED_SERVICES_PAGE } from "@/graphql/services/services.queries";
+import { LIST_MANAGED_SERVICE_SUMMARIES_PAGE } from "@/graphql/services/services.queries";
 import { PreloadQuery } from "@/lib/apollo";
 import { routeTitle } from "@/lib/i18n/route-title";
 
@@ -39,7 +39,7 @@ export default async function AppWorkloadsPage({
         <PreloadQuery query={LIST_ENVIRONMENTS} variables={{ appSlug: slug }}>
           {/* The first page the section's list asks for (use-managed-services). */}
           <PreloadQuery
-            query={LIST_MANAGED_SERVICES_PAGE}
+            query={LIST_MANAGED_SERVICE_SUMMARIES_PAGE}
             variables={{
               appSlug: slug,
               environmentName: null,

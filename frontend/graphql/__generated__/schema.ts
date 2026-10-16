@@ -3499,6 +3499,7 @@ export type AstroliftManagedService = {
   providerPortalUrl: Scalars['String']['output'];
   registeredAppSlug: Scalars['String']['output'];
   status: Scalars['String']['output'];
+  /** @deprecated Raw provider text. Use statusFailure on astroliftManagedServiceSummariesPage for a credential-free typed reading. */
   statusError: Scalars['String']['output'];
   updatedAt: Scalars['DateTime']['output'];
   variant: Scalars['String']['output'];
@@ -3691,6 +3692,14 @@ export type AstroliftManagedServicePage = {
   totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
+export type AstroliftManagedServicePosture = {
+  backupEnabled?: Maybe<Scalars['Boolean']['output']>;
+  dkimVerified?: Maybe<Scalars['Boolean']['output']>;
+  domainStatus: Scalars['String']['output'];
+  publicAccessBlocked?: Maybe<Scalars['Boolean']['output']>;
+  snapshotPolicy: Scalars['String']['output'];
+};
+
 export type AstroliftManagedServiceQueueDepth = {
   depth: Scalars['Int']['output'];
   inFlight: Scalars['Int']['output'];
@@ -3698,6 +3707,44 @@ export type AstroliftManagedServiceQueueDepth = {
   managedServiceId: Scalars['GUID']['output'];
   name: Scalars['String']['output'];
   sampledAt?: Maybe<Scalars['DateTime']['output']>;
+};
+
+export type AstroliftManagedServiceStatusFailure = {
+  code: Scalars['String']['output'];
+  message: Scalars['String']['output'];
+};
+
+export type AstroliftManagedServiceSummary = {
+  clusterSlug: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  environmentName: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  kind: Scalars['String']['output'];
+  lastActionAt?: Maybe<Scalars['DateTime']['output']>;
+  lastActionKind: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  operationCompletedAt?: Maybe<Scalars['DateTime']['output']>;
+  operationKind: Scalars['String']['output'];
+  operationStartedAt?: Maybe<Scalars['DateTime']['output']>;
+  posture: AstroliftManagedServicePosture;
+  registeredAppSlug: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  statusFailure?: Maybe<AstroliftManagedServiceStatusFailure>;
+  updatedAt: Scalars['DateTime']['output'];
+  variant: Scalars['String']['output'];
+};
+
+/** One page of a cursor-paginated or numbered list. */
+export type AstroliftManagedServiceSummaryPage = {
+  items: Array<AstroliftManagedServiceSummary>;
+  /** Opaque token for the next page; null when the list is exhausted. */
+  nextCursor?: Maybe<Scalars['String']['output']>;
+  /** The 1-based page number on a numbered page; null on a cursor page. */
+  page?: Maybe<Scalars['Int']['output']>;
+  /** Rows per page on a numbered page; null on a cursor page. */
+  pageSize?: Maybe<Scalars['Int']['output']>;
+  /** Total rows matching the filters, across all pages. */
+  totalCount?: Maybe<Scalars['Int']['output']>;
 };
 
 export type AstroliftManagedServiceTestEmailResult = {
@@ -12297,6 +12344,7 @@ export type Query = {
   astroliftAppIdentityBinding: AstroliftAppIdentityBindingResult;
   astroliftAppKinds: Array<AstroliftAppKind>;
   astroliftAppLogs: AstroliftAppLogPage;
+  astroliftAppManagedService?: Maybe<AstroliftManagedService>;
   astroliftAppManagedServiceMetrics?: Maybe<AstroliftManagedServiceMetrics>;
   astroliftAppMetricNames: AstroliftAppMetricNames;
   astroliftAppMetrics?: Maybe<AstroliftAppMetrics>;
@@ -12404,6 +12452,7 @@ export type Query = {
   astroliftManagedServiceCostPreview?: Maybe<AstroliftManagedServiceCostPreview>;
   astroliftManagedServiceObjects?: Maybe<AstroliftManagedServiceObjects>;
   astroliftManagedServiceQueueDepth?: Maybe<AstroliftManagedServiceQueueDepth>;
+  astroliftManagedServiceSummariesPage: AstroliftManagedServiceSummaryPage;
   /** @deprecated Unbounded, and applies no ordering at all — row order is whatever Postgres returns. Use astroliftManagedServicesPage. */
   astroliftManagedServices: Array<AstroliftManagedService>;
   astroliftManagedServicesPage: AstroliftManagedServicePage;
@@ -13149,6 +13198,12 @@ export type QueryAstroliftAppLogsArgs = {
 };
 
 
+export type QueryAstroliftAppManagedServiceArgs = {
+  appSlug: Scalars['String']['input'];
+  id: Scalars['GUID']['input'];
+};
+
+
 export type QueryAstroliftAppManagedServiceMetricsArgs = {
   expectedContextRevision?: InputMaybe<Scalars['String']['input']>;
   managedServiceId: Scalars['ID']['input'];
@@ -13781,6 +13836,15 @@ export type QueryAstroliftManagedServiceObjectsArgs = {
 
 export type QueryAstroliftManagedServiceQueueDepthArgs = {
   managedServiceId: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftManagedServiceSummariesPageArgs = {
+  after?: InputMaybe<Scalars['String']['input']>;
+  appSlug: Scalars['String']['input'];
+  environmentName?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  search?: InputMaybe<Scalars['String']['input']>;
 };
 
 
