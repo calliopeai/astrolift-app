@@ -1210,6 +1210,11 @@ def deployment_env_from(deployment: Deployment) -> tuple[list[str], dict]:
     from astrolift_services.model_subscriptions import coherent_subscriptions, subscription_secret_name
 
     env_from.extend(subscription_secret_name(row) for row in coherent_subscriptions(env))
+    from astrolift_registry.brain_apps import deployment_brain_secret
+
+    brain_secret = deployment_brain_secret(deployment)
+    if brain_secret:
+        env_from.append(brain_secret)
     return env_from, workload_env_from
 
 
@@ -1384,6 +1389,10 @@ def render_resources_for_deployment(
     from astrolift_services.model_subscriptions import stamp_binding_revisions
 
     stamp_binding_revisions(resources, env)
+
+    from astrolift_registry.brain_apps import stamp_brain_key
+
+    stamp_brain_key(resources, deployment)
 
     if prepared_gcp_identity is not None:
         from core.gcp_prepared_identity_render import (

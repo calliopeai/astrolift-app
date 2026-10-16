@@ -104,6 +104,12 @@ AGENT_POD_CPU_REQUEST = env_str("AGENT_POD_CPU_REQUEST", "250m")
 AGENT_POD_CPU_LIMIT = env_str("AGENT_POD_CPU_LIMIT", "4")
 AGENT_POD_MEMORY_REQUEST = env_str("AGENT_POD_MEMORY_REQUEST", "512Mi")
 AGENT_POD_MEMORY_LIMIT = env_str("AGENT_POD_MEMORY_LIMIT", "8Gi")
+# How long a moved conversation's paused admission may take, from prepare to
+# commit (#1971). Past it the expiry sweep retires the transfer; a paused
+# task's own timeout only starts at commit. Clamped to 1 minute .. 1 day.
+CONVERSATION_TRANSFER_ADMISSION_SECONDS = int(
+    env_str("ASTROLIFT_CONVERSATION_TRANSFER_ADMISSION_SECONDS", "1800")
+)
 ASTROLIFT_COLLECTOR_PROBE_IMAGE = env_str("ASTROLIFT_COLLECTOR_PROBE_IMAGE", "")
 MANAGED_IDE_BROWSER_IMAGE = env_str("MANAGED_IDE_BROWSER_IMAGE", "")
 MANAGED_IDE_STORAGE_CLASS = env_str("MANAGED_IDE_STORAGE_CLASS", "")

@@ -24,3 +24,28 @@ export const ISSUE_BRAIN_READ_TOKEN = gql`
     }
   }
 `;
+
+/**
+ * An app hosted on a brain (#2243), from the brain-app template. Each deploy
+ * gives it the brain's MCP URLs and a read token as BRAIN_* env.
+ */
+export const HOST_APP_ON_BRAIN = gql`
+  mutation HostAppOnBrain($input: HostAppOnBrainInput!) {
+    hostAppOnBrain(input: $input) {
+      ok
+      errors {
+        field
+        message
+        code
+      }
+      data {
+        brainSlug
+        environmentName
+        app {
+          id
+          slug
+        }
+      }
+    }
+  }
+`;

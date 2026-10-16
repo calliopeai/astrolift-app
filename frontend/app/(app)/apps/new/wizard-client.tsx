@@ -27,7 +27,7 @@ import {
   NewAppSection,
   type NewAppStep,
 } from "@/components/screens/apps/new/NewAppPage";
-import { manifestRawForSubmit } from "./manifest-submit";
+import { buildPathsForSubmit, manifestRawForSubmit } from "./manifest-submit";
 import { AppDetailsStep } from "./steps/AppDetailsStep";
 import { DeployStrategyStep } from "./steps/DeployStrategyStep";
 import { ManifestPreviewStep } from "./steps/ManifestPreviewStep";
@@ -93,6 +93,11 @@ export interface WizardState {
   // manifest gate. When set, the manifest step is always valid and submit
   // sends manifestRaw: null.
   manifestLater: boolean;
+  // Build paths (astrolift-cli #159). Null shows the value detected from the
+  // manifest path and sends null, so the server detects it again; a string
+  // is what the operator typed.
+  buildContext: string | null;
+  dockerfilePath: string | null;
 
   // Run: details
   name: string;
@@ -135,6 +140,8 @@ export function initialWizardState(): WizardState {
     manifestValid: false,
     manifestErrors: [],
     manifestLater: false,
+    buildContext: null,
+    dockerfilePath: null,
     name: "",
     slug: "",
     slugTouched: false,
@@ -313,6 +320,7 @@ function ScopedWizardClient() {
             // the Manifest tab is where the operator adds it. A repo manifest
             // with masked env values is also sent as null (#1948).
             manifestRaw: manifestRawForSubmit(state),
+            ...buildPathsForSubmit(state),
             defaultBranch: state.defaultBranch.trim() || "main",
             deployBranch: state.deployBranch.trim() || "main",
             // "skip" timing forces manual trigger so the app registers

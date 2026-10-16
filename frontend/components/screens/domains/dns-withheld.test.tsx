@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import * as preview from "../../../.storybook/preview";
 import * as handshake from "../apps/domains/DomainHandshakeCard.stories";
 import * as email from "../apps/managed-services/EmailDetailSheet.stories";
+import * as delegation from "./DnsDelegationPanel.stories";
 import * as detail from "./ManagedDomainDetail.stories";
 import * as list from "./ManagedDomainsScreen.stories";
 
@@ -14,6 +15,7 @@ import * as list from "./ManagedDomainsScreen.stories";
 setProjectAnnotations(preview);
 const { AddZoneDnsWithheld, AddZoneDnsUnset } = composeStories(list);
 const { DnsWithheld, DnsUnset } = composeStories(detail);
+const delegationStories = composeStories(delegation);
 const { PlatformZoneDnsWithheld, PlatformZoneDnsUnset } = composeStories(handshake);
 const { IdentityPendingDnsWithheld, IdentityPendingDnsUnset } = composeStories(email);
 
@@ -23,6 +25,8 @@ describe("DNS withheld notes", () => {
     ["add zone, unset", AddZoneDnsUnset, false],
     ["zone detail, withheld", DnsWithheld, true],
     ["zone detail, unset", DnsUnset, false],
+    ["parent zone delegation, withheld", delegationStories.DnsWithheld, true],
+    ["parent zone delegation, unset", delegationStories.DnsUnset, false],
     ["platform zone domain, withheld", PlatformZoneDnsWithheld, true],
     ["platform zone domain, unset", PlatformZoneDnsUnset, false],
     ["SES identity, withheld", IdentityPendingDnsWithheld, true],

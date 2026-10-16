@@ -232,6 +232,8 @@ const REVIEW_STATE: ReviewSubmitStepViewProps["state"] = {
   minimumApprovals: 2,
   manifestRaw: REVIEW_MANIFEST,
   manifestLater: false,
+  buildContext: null,
+  dockerfilePath: null,
   connectionIsAppInstall: true,
   pushCiWorkflow: true,
   triggerFirstDeploy: true,
@@ -298,6 +300,16 @@ export const REVIEW_MINIMAL: ReviewSubmitStepViewProps = {
     connectionIsAppInstall: false,
     pushCiWorkflow: false,
     triggerFirstDeploy: false,
+  },
+};
+
+/** A monorepo app with a Dockerfile typed over the detected one. */
+export const REVIEW_MONOREPO: ReviewSubmitStepViewProps = {
+  ...REVIEW,
+  state: {
+    ...REVIEW_STATE,
+    manifestPath: "src/abbott-cgm/astrolift.toml",
+    dockerfilePath: "docker/Dockerfile.prod",
   },
 };
 

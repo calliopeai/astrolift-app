@@ -248,8 +248,15 @@ def _clamp_ttl(seconds: int) -> int:
 
 
 def task_key_ttl(task) -> int:
-    """A task's key lives for its timeout, the Job's own deadline, plus the margin."""
-    return _clamp_ttl(max(1, int(getattr(task, "timeout_seconds", 300) or 300)) + KEY_TTL_MARGIN_SECONDS)
+    """A task's key lives for its timeout, the Job's own deadline, plus the margin.
+
+    A moved conversation's paused admission (#1971) comes before its timeout
+    starts, so its key covers that too.
+    """
+    from astrolift_agents.services.task_timeout import admission_allowance_seconds
+
+    timeout = max(1, int(getattr(task, "timeout_seconds", 300) or 300))
+    return _clamp_ttl(timeout + admission_allowance_seconds(task) + KEY_TTL_MARGIN_SECONDS)
 
 
 def box_key_ttl(box) -> int:

@@ -249,6 +249,9 @@ export const GET_APP = gql`
   query GetApp($slug: String!, $includeDrift: Boolean = false) {
     astroliftApp(slug: $slug, includeDrift: $includeDrift) {
       ...AppFields
+      buildMode
+      buildContext
+      dockerfilePath
       stagedEnvChanges
       viewerPermissions
       configDrift {

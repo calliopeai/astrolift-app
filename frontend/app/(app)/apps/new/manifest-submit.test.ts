@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hasMaskedEnvValues, manifestRawForSubmit } from "./manifest-submit";
+import { buildPathsForSubmit, hasMaskedEnvValues, manifestRawForSubmit } from "./manifest-submit";
 
 const MASKED_VALUE = "[ASTROLIFT_REDACTED_ENV_VALUE]";
 
@@ -60,5 +60,25 @@ describe("hasMaskedEnvValues", () => {
     expect(hasMaskedEnvValues("# [ASTROLIFT_REDACTED_ENV_COMMENT:1]\n")).toBe(true);
     expect(hasMaskedEnvValues("# [ASTROLIFT_REDACTED_UNPARSEABLE_MANIFEST]\n")).toBe(true);
     expect(hasMaskedEnvValues('name = "hello"\n')).toBe(false);
+  });
+});
+
+describe("buildPathsForSubmit", () => {
+  it("sends a null context and no Dockerfile when untouched, for the server to detect", () => {
+    expect(buildPathsForSubmit({ buildContext: null, dockerfilePath: null })).toEqual({
+      buildContext: null,
+    });
+  });
+
+  it("treats a cleared field as untouched", () => {
+    expect(buildPathsForSubmit({ buildContext: "  ", dockerfilePath: "" })).toEqual({
+      buildContext: null,
+    });
+  });
+
+  it("sends typed paths trimmed, including an explicit repository root", () => {
+    expect(
+      buildPathsForSubmit({ buildContext: " . ", dockerfilePath: " docker/Dockerfile.prod " })
+    ).toEqual({ buildContext: ".", dockerfilePath: "docker/Dockerfile.prod" });
   });
 });

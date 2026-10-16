@@ -146,4 +146,17 @@ export const MANIFEST_STATE: ManifestPreviewFields = {
   manifestValid: true,
   manifestErrors: [],
   manifestLater: false,
+  buildContext: null,
+  dockerfilePath: null,
 };
+
+/** A monorepo app (SteadyMD's abbott-cgm shape): builds from its directory. */
+export const MONOREPO_MANIFEST_STATE: ManifestPreviewFields = {
+  ...MANIFEST_STATE,
+  manifestPath: "src/abbott-cgm/astrolift.toml",
+};
+
+/** A manifest that reaches the repository root itself (ConflictHQ/bdr#139). */
+export const OWN_BUILD_PATHS_MANIFEST = `${VALID_MANIFEST}build_context = "../.."
+dockerfile_path = "Dockerfile.web"
+`;

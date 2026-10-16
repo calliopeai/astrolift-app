@@ -12,7 +12,7 @@ import { ELEVATED_EVENT } from "@/lib/auth/step-up-events";
 import en from "@/messages/en.json";
 import { DELEGATION } from "./DnsDelegationPanel.stories";
 import { DnsDelegationPanel } from "./DnsDelegationPanel";
-import { DOMAIN_ACTIVE, DOMAIN_DIAGNOSTICS } from "./domains-environments.fixtures";
+import { DNS_WITHHELD, DOMAIN_ACTIVE, DOMAIN_DIAGNOSTICS } from "./domains-environments.fixtures";
 vi.mock("@/graphql/identity/identity.hooks", () => ({
   useActiveOrg: () => ({
     org: { id: "a0000000-0000-4000-8000-000000000002", slug: "acme" },
@@ -48,6 +48,7 @@ type Connection = typeof base & {
 type Request = { operationName: string; variables: Record<string, unknown> };
 let server: Server, client: ApolloClient, domain: typeof DOMAIN_ACTIVE;
 let connection: Connection, requests: Request[], errors: string[], stepUp: boolean;
+let withheld: { capability: string; reason: string }[];
 beforeEach(async () => {
   domain = structuredClone(DOMAIN_ACTIVE);
   connection = {
@@ -61,9 +62,10 @@ beforeEach(async () => {
   requests = [];
   errors = [];
   stepUp = true;
+  withheld = [];
   const refused = (code: string) => ({ ok: false, errors: [{ code, message: code }], data: null });
   const roots = {
-    astroliftWithheldCapabilities: () => [],
+    astroliftWithheldCapabilities: () => withheld,
     astroliftManagedDomain: () => domain,
     astroliftManagedDomainDiagnostics: () => ({
       ...DOMAIN_DIAGNOSTICS,
@@ -269,5 +271,24 @@ describe("parent zone delegation through the actual schema (#1787)", () => {
       screen.getByText(`From ${ZONE.name} through ${en.domainDelegation.connection}`)
     ).toBeInTheDocument();
     expect(screen.getByText(en.domainDelegation.operatorOnly)).toBeInTheDocument();
+  });
+
+  it("is read-only with the reason when the install withholds DNS (calliope-installer#447)", async () => {
+    withheld = [{ capability: "dns", reason: DNS_WITHHELD }];
+    domain = {
+      ...domain,
+      delegationConnectionId: connection.id,
+      delegationZoneName: ZONE.name,
+      delegationWrite: { action: "created", nameservers: ["ns-1.awsdns-01.org"] },
+    };
+    render(<View />);
+    await screen.findByRole("heading", { name: en.domainDelegation.title });
+    expect(await within(panel()).findByText(en.domainDelegation.withheld)).toBeInTheDocument();
+    expect(within(panel()).getByText("ns-1.awsdns-01.org")).toBeInTheDocument();
+    expect(within(panel()).queryByLabelText(en.domainDelegation.token)).toBeNull();
+    expect(within(panel()).queryByLabelText(en.domainDelegation.connection)).toBeNull();
+    expect(within(panel()).queryByRole("button")).toBeNull();
+    expect(sent("GrantCloudflareDelegation")).toHaveLength(0);
+    expect(sent("BindManagedDomainDelegation")).toHaveLength(0);
   });
 });

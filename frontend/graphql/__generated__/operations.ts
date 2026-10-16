@@ -783,6 +783,7 @@ export type AstroliftAgentTask = {
   failureMessage?: Maybe<Scalars['String']['output']>;
   finishedAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['GUID']['output'];
+  model: Scalars['String']['output'];
   namespace: Scalars['String']['output'];
   podName: Scalars['String']['output'];
   projectSlug: Scalars['String']['output'];
@@ -1799,6 +1800,20 @@ export type AstroliftBrain = {
   team: Scalars['String']['output'];
 };
 
+export type AstroliftBrainApp = {
+  app: AstroliftRegisteredApp;
+  brainSlug: Scalars['String']['output'];
+  envKeys: Array<Scalars['String']['output']>;
+  environmentName: Scalars['String']['output'];
+  template: Scalars['String']['output'];
+};
+
+export type AstroliftBrainAppMutationResult = {
+  data?: Maybe<AstroliftBrainApp>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftBrainConnection = {
   endpoints: Array<Scalars['String']['output']>;
   expiresAt: Scalars['String']['output'];
@@ -2364,6 +2379,39 @@ export type AstroliftContainerStatus = {
   state: Scalars['String']['output'];
   terminatedReason: Scalars['String']['output'];
   waitingReason: Scalars['String']['output'];
+};
+
+export type AstroliftConversationTransfer = {
+  abortReason: Scalars['String']['output'];
+  abortedAt?: Maybe<Scalars['DateTime']['output']>;
+  acknowledgedAt?: Maybe<Scalars['DateTime']['output']>;
+  admissionDeadline: Scalars['DateTime']['output'];
+  agentTaskId?: Maybe<Scalars['GUID']['output']>;
+  committedAt?: Maybe<Scalars['DateTime']['output']>;
+  envelopeSha256: Scalars['String']['output'];
+  id: Scalars['GUID']['output'];
+  progress: Scalars['JSON']['output'];
+  record: Scalars['JSON']['output'];
+  snapshotSha256: Scalars['String']['output'];
+  state: Scalars['String']['output'];
+  transferId: Scalars['String']['output'];
+  uploadUrl: Scalars['String']['output'];
+};
+
+export type AstroliftConversationTransferCapability = {
+  destinationIdentity: Scalars['String']['output'];
+  harnessHostContract: Scalars['String']['output'];
+  managedConversation: Scalars['Boolean']['output'];
+  maxEnvelopeBytes: Scalars['Int']['output'];
+  protocolVersion: Scalars['Int']['output'];
+  reason: Scalars['String']['output'];
+  undo: Scalars['Boolean']['output'];
+};
+
+export type AstroliftConversationTransferMutationResult = {
+  data?: Maybe<AstroliftConversationTransfer>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
 };
 
 export type AstroliftCostAttribution = {
@@ -6282,6 +6330,40 @@ export type AstroliftWorkloadsFilter = {
   owner: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
+export type AstroliftZentinelleAuditEvent = {
+  action: Scalars['String']['output'];
+  actor: Scalars['String']['output'];
+  agentId: Scalars['String']['output'];
+  agentSlug: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  occurredAt?: Maybe<Scalars['DateTime']['output']>;
+  resourceId: Scalars['String']['output'];
+  resourceName: Scalars['String']['output'];
+  resourceType: Scalars['String']['output'];
+};
+
+export type AstroliftZentinelleAuditExport = {
+  content: Scalars['String']['output'];
+  contentType: Scalars['String']['output'];
+  filename: Scalars['String']['output'];
+  rowCount: Scalars['Int']['output'];
+};
+
+export type AstroliftZentinelleAuditExportMutationResult = {
+  data?: Maybe<AstroliftZentinelleAuditExport>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftZentinelleAuditPage = {
+  events: Array<AstroliftZentinelleAuditEvent>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+};
+
+export type AstroliftZentinelleCapability = {
+  connected: Scalars['Boolean']['output'];
+};
+
 export type AstroliftZentinelleClusterGateway = {
   clusterId: Scalars['GUID']['output'];
   clusterSlug: Scalars['String']['output'];
@@ -6331,6 +6413,31 @@ export type AstroliftZentinelleDisconnectMutationResult = {
   data?: Maybe<AstroliftZentinelleDisconnect>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftZentinellePolicy = {
+  description: Scalars['String']['output'];
+  enforcement: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  policyType: Scalars['String']['output'];
+  priority: Scalars['Int']['output'];
+  scope: Scalars['String']['output'];
+};
+
+export type AstroliftZentinelleUsage = {
+  rows: Array<AstroliftZentinelleUsageRow>;
+  since: Scalars['DateTime']['output'];
+};
+
+export type AstroliftZentinelleUsageRow = {
+  agentSlug: Scalars['String']['output'];
+  costUsd: Scalars['Float']['output'];
+  inputTokens: Scalars['Int']['output'];
+  model: Scalars['String']['output'];
+  outputTokens: Scalars['Int']['output'];
+  provider: Scalars['String']['output'];
+  requests: Scalars['Int']['output'];
 };
 
 export type AttachCloudflareDnsZoneInput = {
@@ -6926,6 +7033,12 @@ export type ConnectZentinelleInput = {
   url: Scalars['String']['input'];
 };
 
+export type ConversationTransferRecordInput = {
+  reason: Scalars['String']['input'];
+  record: Scalars['JSON']['input'];
+  snapshotSha256: Scalars['String']['input'];
+};
+
 export type CostWindow =
   | 'D7'
   | 'D30'
@@ -7513,6 +7626,15 @@ export type ExportAuditEventsInput = {
   targetKind: InputMaybe<Scalars['String']['input']>;
 };
 
+export type ExportZentinelleAuditInput = {
+  agentSlug: InputMaybe<Scalars['String']['input']>;
+  format: Scalars['String']['input'];
+  projectId: InputMaybe<Scalars['GUID']['input']>;
+  since: Scalars['DateTime']['input'];
+  teamId: InputMaybe<Scalars['GUID']['input']>;
+  until: InputMaybe<Scalars['DateTime']['input']>;
+};
+
 export type ExtendPreviewTtlInputGql = {
   days: Scalars['Int']['input'];
   id: Scalars['GUID']['input'];
@@ -7676,6 +7798,15 @@ export type GroupOperationInput = {
   groupId: Scalars['ID']['input'];
   operation: Scalars['String']['input'];
   userIds: Array<Scalars['ID']['input']>;
+};
+
+export type HostAppOnBrainInput = {
+  brainSlug: Scalars['String']['input'];
+  image: Scalars['String']['input'];
+  name: InputMaybe<Scalars['String']['input']>;
+  port: InputMaybe<Scalars['Int']['input']>;
+  projectId: Scalars['GUID']['input'];
+  slug: InputMaybe<Scalars['String']['input']>;
 };
 
 export type HuggingFaceConnectionType = {
@@ -8834,6 +8965,7 @@ export type MoveAppToTeamInput = {
 };
 
 export type Mutation = {
+  abortConversationTransfer: AstroliftConversationTransferMutationResult;
   abortDeployment: AstroliftDeploymentMutationResult;
   acceptInvitation: AstroliftInvitationMutationResult;
   acknowledgeAlertEvent: AstroliftAlertEventMutationResult;
@@ -8894,6 +9026,7 @@ export type Mutation = {
   clearStepUpPin: AstroliftStepUpPinStatusMutationResult;
   /** Deep-copy a visible workflow definition + its stages into the caller's org as a new editable definition (spec 40 §2.1). New slug on collision; global stages copy with agent_definition cleared. */
   cloneWorkflowDefinition: CloneWorkflowDefinitionResult;
+  commitConversationTransfer: AstroliftConversationTransferMutationResult;
   configureAgentTaskCallbacks: AgentTaskCallbackPolicyMutationResult;
   configureProviderPlugin: ProviderpluginconfigpayloadMutationResult;
   /** Confirm or update a previously uploaded file. Set delete=true to soft-delete the upload. */
@@ -8999,6 +9132,7 @@ export type Mutation = {
   ensureAgentBox: AstroliftAgentBoxMutationResult;
   exportAstroliftAppLogs: AstroliftAppLogExportMutationResult;
   exportAuditEvents: AstroliftAuditExportMutationResult;
+  exportZentinelleAudit: AstroliftZentinelleAuditExportMutationResult;
   extendPreviewTtl: AstroliftPreviewEnvironmentMutationResult;
   /** Upload a file and get a pre-signed URL. Creates a FileUpload wrapper around the Upload. */
   fileUpload: FileUploadResult;
@@ -9013,6 +9147,8 @@ export type Mutation = {
   grantRole: AstroliftRoleBindingMutationResult;
   grantTeamAccessToApp: AstroliftAppTeamAccessMutationResult;
   heartbeatSession: AstroliftHeartbeatSessionPayloadMutationResult;
+  /** Create an app hosted on a brain the caller can read (#2243), from the brain-app template: one public web workload running ``image``. Each deploy gives it the brain's MCP URLs and a read token for that brain as env (BRAIN_*), rotated on every deploy and revoked when the app is deleted. Deploy it with startDeployment. */
+  hostAppOnBrain: AstroliftBrainAppMutationResult;
   importSkillsFromRepo: AstroliftImportSkillsResultMutationResult;
   /** Import a popular visual agent/workflow builder export (Langflow, Flowise, …) into an Astrolift WorkflowDefinition. preview=true (default) returns the mapped manifest + gap report without persisting; preview=false creates an org-scoped, disabled definition + stages. */
   importWorkflowFlow: ImportWorkflowFlowResult;
@@ -9071,6 +9207,7 @@ export type Mutation = {
   placeObservabilityRetentionHold: ObservabilityRetentionHoldTypeMutationResult;
   /** Get a pre-signed URL for uploading an image or file. Optionally attach it to an entity via owner_container_property. */
   preSignedUrlImageUpload: PreSignedUrlUploadResult;
+  prepareConversationTransfer: AstroliftConversationTransferMutationResult;
   prepareManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
   /** Process a previously uploaded data import file. */
   processFile: ProcessFileResult;
@@ -9317,8 +9454,14 @@ export type Mutation = {
   /** Upsert user profile via UtilityForm.apply_forms. */
   upsertUser: UpsertUserResult;
   validateAstroliftCiSecrets: AstroliftValidateCiSecretsPayloadMutationResult;
+  verifyConversationTransfer: AstroliftConversationTransferMutationResult;
   verifyManagedDomain: VerifyManagedDomainPayloadMutationResult;
   withdrawSecretChange: AstroliftSecretChangeProposalMutationResult;
+};
+
+
+export type MutationAbortConversationTransferArgs = {
+  input: ConversationTransferRecordInput;
 };
 
 
@@ -9617,6 +9760,11 @@ export type MutationClearEnvironmentSettingArgs = {
 export type MutationCloneWorkflowDefinitionArgs = {
   orgId?: InputMaybe<Scalars['ID']['input']>;
   slug: Scalars['String']['input'];
+};
+
+
+export type MutationCommitConversationTransferArgs = {
+  input: ConversationTransferRecordInput;
 };
 
 
@@ -10145,6 +10293,11 @@ export type MutationExportAuditEventsArgs = {
 };
 
 
+export type MutationExportZentinelleAuditArgs = {
+  input: ExportZentinelleAuditInput;
+};
+
+
 export type MutationExtendPreviewTtlArgs = {
   input: ExtendPreviewTtlInputGql;
 };
@@ -10197,6 +10350,11 @@ export type MutationGrantRoleArgs = {
 
 export type MutationGrantTeamAccessToAppArgs = {
   input: GrantTeamAccessInput;
+};
+
+
+export type MutationHostAppOnBrainArgs = {
+  input: HostAppOnBrainInput;
 };
 
 
@@ -10414,6 +10572,11 @@ export type MutationPreSignedUrlImageUploadArgs = {
   name?: InputMaybe<Scalars['String']['input']>;
   ownerContainerProperty?: InputMaybe<Scalars['String']['input']>;
   uuid?: InputMaybe<Scalars['UUID']['input']>;
+};
+
+
+export type MutationPrepareConversationTransferArgs = {
+  input: PrepareConversationTransferInput;
 };
 
 
@@ -11617,6 +11780,11 @@ export type MutationValidateAstroliftCiSecretsArgs = {
 };
 
 
+export type MutationVerifyConversationTransferArgs = {
+  input: ConversationTransferRecordInput;
+};
+
+
 export type MutationVerifyManagedDomainArgs = {
   input: VerifyManagedDomainInput;
 };
@@ -11881,6 +12049,14 @@ export type PreSignedUrlUploadResult = {
   preSignedUrl?: Maybe<Scalars['String']['output']>;
   publicUrl?: Maybe<Scalars['String']['output']>;
   uuid?: Maybe<Scalars['UUID']['output']>;
+};
+
+export type PrepareConversationTransferInput = {
+  agentSlug: Scalars['String']['input'];
+  envelopeBytes: Scalars['Int']['input'];
+  envelopeSha256: Scalars['String']['input'];
+  environmentSpecId: InputMaybe<Scalars['GUID']['input']>;
+  record: Scalars['JSON']['input'];
 };
 
 export type ProcessFileResult = {
@@ -12382,8 +12558,12 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftWorkloadsPage. */
   astroliftWorkloads: Array<AstroliftWorkload>;
   astroliftWorkloadsPage: AstroliftWorkloadPage;
+  astroliftZentinelleAuditPage: AstroliftZentinelleAuditPage;
+  astroliftZentinelleCapability: AstroliftZentinelleCapability;
   astroliftZentinelleConnection?: Maybe<AstroliftZentinelleConnection>;
   astroliftZentinelleInstallConnection?: Maybe<AstroliftZentinelleConnection>;
+  astroliftZentinellePolicies: Array<AstroliftZentinellePolicy>;
+  astroliftZentinelleUsage: AstroliftZentinelleUsage;
   /**
    * Query mutation audit logs. Superuser only.
    * @deprecated Caps at 200 rows with no way to reach the 201st. Use auditLogsPage.
@@ -12408,6 +12588,8 @@ export type Query = {
   clusterModelSubscriptionTargetsPage: ModelSubscriptionTargetPage;
   clusterModelSubscriptionsPage: ModelSubscriptionPage;
   clusterModelUpdateAdmission: ModelRuntimeAdmission;
+  conversationTransfer?: Maybe<AstroliftConversationTransfer>;
+  conversationTransferCapability?: Maybe<AstroliftConversationTransferCapability>;
   dispatchers: Array<AstroliftDispatcherInstance>;
   dnsProviderConnectionSupport: DnsProviderConnectionSupport;
   dnsProviderConnectionsPage: DnsProviderConnectionTypePage;
@@ -14346,6 +14528,30 @@ export type QueryAstroliftWorkloadsPageArgs = {
 };
 
 
+export type QueryAstroliftZentinelleAuditPageArgs = {
+  agentSlug?: InputMaybe<Scalars['String']['input']>;
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  projectId?: InputMaybe<Scalars['GUID']['input']>;
+  since?: InputMaybe<Scalars['DateTime']['input']>;
+  teamId?: InputMaybe<Scalars['GUID']['input']>;
+};
+
+
+export type QueryAstroliftZentinellePoliciesArgs = {
+  agentSlug?: InputMaybe<Scalars['String']['input']>;
+  projectId?: InputMaybe<Scalars['GUID']['input']>;
+};
+
+
+export type QueryAstroliftZentinelleUsageArgs = {
+  agentSlug?: InputMaybe<Scalars['String']['input']>;
+  projectId?: InputMaybe<Scalars['GUID']['input']>;
+  since?: InputMaybe<Scalars['DateTime']['input']>;
+  teamId?: InputMaybe<Scalars['GUID']['input']>;
+};
+
+
 export type QueryAuditLogsArgs = {
   limit?: Scalars['Int']['input'];
   operation?: InputMaybe<Scalars['String']['input']>;
@@ -14474,6 +14680,17 @@ export type QueryClusterModelSubscriptionsPageArgs = {
 
 export type QueryClusterModelUpdateAdmissionArgs = {
   input: UpdateClusterModelInput;
+};
+
+
+export type QueryConversationTransferArgs = {
+  transferId: Scalars['String']['input'];
+};
+
+
+export type QueryConversationTransferCapabilityArgs = {
+  agentSlug: Scalars['String']['input'];
+  environmentSpecId?: InputMaybe<Scalars['GUID']['input']>;
 };
 
 
@@ -14990,7 +15207,8 @@ export type RegisterAppInput = {
   approverTeamId: InputMaybe<Scalars['GUID']['input']>;
   approverUserIds: InputMaybe<Array<Scalars['String']['input']>>;
   buildArgs: InputMaybe<Scalars['JSON']['input']>;
-  buildContext: Scalars['String']['input'];
+  /** Build context, relative to the repository root. Omit it to use the manifest's directory, or the repository root when the manifest sets build_context or dockerfile_path itself. */
+  buildContext: InputMaybe<Scalars['String']['input']>;
   buildMode: Scalars['String']['input'];
   buildStrategy: Scalars['String']['input'];
   cronExpression: InputMaybe<Scalars['String']['input']>;
@@ -19466,6 +19684,13 @@ export type IssueBrainReadTokenMutationVariables = Exact<{
 
 export type IssueBrainReadTokenMutation = { issueBrainReadToken: { ok: boolean, errors: Array<{ field?: string | null, message: string, code: string }>, data?: { id: string, slug: string, endpoints: Array<string>, header: string, token: string, expiresAt: string } | null } };
 
+export type HostAppOnBrainMutationVariables = Exact<{
+  input: HostAppOnBrainInput;
+}>;
+
+
+export type HostAppOnBrainMutation = { hostAppOnBrain: { ok: boolean, errors: Array<{ field?: string | null, message: string, code: string }>, data?: { brainSlug: string, environmentName: string, app: { id: string, slug: string } } | null } };
+
 export type ListBrainsQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
 }>;
@@ -19525,7 +19750,7 @@ export type GetAppQueryVariables = Exact<{
 }>;
 
 
-export type GetAppQuery = { astroliftApp?: { stagedEnvChanges: Array<string>, viewerPermissions: Array<string>, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, configDrift?: { hasDrift: boolean, fields: Array<string>, environmentName: string, lastChecked: string } | null, autowire?: { connected: boolean, ciWorkflow: string, webhook: string, secrets: string, checkedAt?: string | null, detail: string } | null, ciWorkflowSyncStatus?: { state: string, syncedTemplateVersion?: number | null, currentTemplateVersion: number, syncedAt?: string | null, checkedAt?: string | null, path: string, prUrl: string, detail: string, repoText: string, renderedText: string, repoTextPulledAt?: string | null } | null, settingsLastModified?: { deployStrategy?: string | null, deployTokens?: string | null, secrets?: string | null, managedServices?: string | null, domains?: string | null, webhooks?: string | null, members?: string | null, observability?: string | null } | null, retentionPolicies: Array<{ id: string, signal: string, retentionDays: number }>, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } } | null };
+export type GetAppQuery = { astroliftApp?: { buildMode: string, buildContext: string, dockerfilePath: string, stagedEnvChanges: Array<string>, viewerPermissions: Array<string>, id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, configDrift?: { hasDrift: boolean, fields: Array<string>, environmentName: string, lastChecked: string } | null, autowire?: { connected: boolean, ciWorkflow: string, webhook: string, secrets: string, checkedAt?: string | null, detail: string } | null, ciWorkflowSyncStatus?: { state: string, syncedTemplateVersion?: number | null, currentTemplateVersion: number, syncedAt?: string | null, checkedAt?: string | null, path: string, prUrl: string, detail: string, repoText: string, renderedText: string, repoTextPulledAt?: string | null } | null, settingsLastModified?: { deployStrategy?: string | null, deployTokens?: string | null, secrets?: string | null, managedServices?: string | null, domains?: string | null, webhooks?: string | null, members?: string | null, observability?: string | null } | null, retentionPolicies: Array<{ id: string, signal: string, retentionDays: number }>, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } } | null };
 
 export type ListWorkloadsQueryVariables = Exact<{
   appSlug?: InputMaybe<Scalars['String']['input']>;

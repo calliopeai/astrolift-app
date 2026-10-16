@@ -3935,6 +3935,28 @@
         "toastFailed": "App-Details konnten nicht gespeichert werden",
         "save": "Speichern"
       },
+      "build": {
+        "title": "Build",
+        "description": "Woraus das Image gebaut wird. Der Build-Kontext ist relativ zum Stammverzeichnis des Repositorys, das Dockerfile relativ zum Build-Kontext.",
+        "buildContext": "Build-Kontext",
+        "dockerfile": "Dockerfile",
+        "contextRequired": "Geben Sie einen Build-Kontext ein. Verwenden Sie . für das Stammverzeichnis des Repositorys.",
+        "dockerfileRequired": "Geben Sie einen Dockerfile-Pfad ein.",
+        "defaultsHelp": "Ein Pfad, der auf seinem Standardwert (. oder Dockerfile) bleibt, überlässt die Entscheidung einem im Manifest festgelegten build_context oder dockerfile_path.",
+        "prebuilt": "Diese App stellt ein vorgefertigtes Image bereit; aus diesen Pfaden wird nichts gebaut, bis sich ihr Build-Modus ändert.",
+        "resyncCi": "Gespeichert. Der CI-Workflow im Repository baut aus den vorherigen Pfaden, bis Sie ihn synchronisieren, unter CI-Einrichtung oder mit diesem Befehl:",
+        "platformBuild": "Gespeichert. Der nächste Plattform-Build verwendet diese Pfade.",
+        "buildMode": "Build-Modus",
+        "manifest": "Manifest",
+        "modes": {
+          "ci_pushed": "Ihre CI baut und pusht",
+          "platform_build": "Astrolift baut",
+          "none": "Vorgefertigtes Image"
+        },
+        "save": "Speichern",
+        "toastSaved": "Build-Einstellungen gespeichert",
+        "toastFailed": "Build-Einstellungen konnten nicht gespeichert werden"
+      },
       "empty": "Hier gibt es nichts für diese App."
     },
     "environmentOverrides": {
@@ -6924,6 +6946,13 @@
       "pathLabel": "Manifest-Pfad",
       "pathHelp": "Wo <code>astrolift.toml</code> im Repository liegt. Standard ist das Stammverzeichnis des Repositorys. Monorepos können mehrere Apps enthalten; verweisen Sie jede Registrierung auf ihren eigenen Pfad (z. B. <code>services/api/astrolift.toml</code>).",
       "branchLabel": "Standard-Branch",
+      "buildContextLabel": "Build-Kontext",
+      "buildContextFromDirectory": "Das Verzeichnis des Manifests, die App wird also von dort aus gebaut. Geben Sie <code>.</code> für das Stammverzeichnis des Repositorys ein.",
+      "buildContextFromRoot": "Das Stammverzeichnis des Repositorys, in dem das Manifest liegt.",
+      "buildContextFromManifest": "Das Stammverzeichnis des Repositorys: Das Manifest legt <code>build_context</code> oder <code>dockerfile_path</code> selbst fest, und diese gelten ab seinem Verzeichnis.",
+      "buildContextEdited": "Wie eingegeben, relativ zum Stammverzeichnis des Repositorys. Leeren Sie das Feld, um zum erkannten Kontext zurückzukehren.",
+      "dockerfileLabel": "Dockerfile",
+      "dockerfileHelp": "Relativ zum Build-Kontext.",
       "laterTitle": "Manifest später einrichten",
       "laterHelp": "Registrieren Sie die Anwendung jetzt ohne Manifest. Sie landen danach im Tab <b>Manifest</b> der Anwendung, wo Sie <code>astrolift.toml</code> hinzufügen oder synchronisieren können, sobald Sie bereit sind. Nützlich für ein leeres Repository oder ein Agent-Konfigurations-Repository, dessen Schema kein Anwendungsmanifest ist.",
       "label": "Manifest",
@@ -6958,6 +6987,9 @@
       "defaultBranch": "Standard-Branch",
       "sourceKind": "Quellentyp",
       "manifestPath": "Manifest-Pfad",
+      "buildContext": "Build-Kontext",
+      "dockerfile": "Dockerfile",
+      "buildFromManifest": "Im Manifest festgelegt",
       "manifest": "Manifest",
       "manifestLater": "Später einrichten",
       "manifestState": "{origin, select, repo {Aus Repository geladen} other {Hier entworfen}}, {valid, select, yes {gültige Struktur} other {ungültig}}",
@@ -13828,6 +13860,7 @@
       "finished": "Beendet",
       "pod": "Pod",
       "namespace": "Namespace",
+      "model": "Modell",
       "callbackUrl": "Callback-URL",
       "liveSession": "Live-Sitzung",
       "liveNow": "jetzt live",
@@ -15488,6 +15521,26 @@
       "copyLabel": "{label} kopieren",
       "copied": "Kopiert",
       "done": "Fertig"
+    },
+    "host": "App hosten",
+    "hostTitle": "Eine App auf dieser Ebene hosten",
+    "hosted": "{slug} wurde erstellt. Stellen Sie sie bereit, damit sie die Ebene liest.",
+    "hostFailed": "Die App konnte nicht erstellt werden.",
+    "hostDialog": {
+      "title": "Eine App auf {slug} hosten",
+      "description": "Erstellt eine App aus der Vorlage brain-app: ein öffentlicher Web-Workload mit Ihrem Image. Jede Bereitstellung gibt ihr die MCP-URL dieser Ebene und ein Lesetoken dafür.",
+      "project": "Projekt",
+      "selectProject": "Projekt auswählen",
+      "noProjects": "Keine Projekte",
+      "image": "Image",
+      "imageHelp": "Eine veröffentlichte Image-Referenz, zum Beispiel ein Registry-Pfad mit Tag.",
+      "name": "Name",
+      "namePlaceholder": "Wird erzeugt, wenn leer",
+      "port": "Port",
+      "envHelp": "Die App liest BRAIN_MCP_URL, BRAIN_TOKEN und BRAIN_TOKEN_HEADER. Das Token wechselt bei jeder Bereitstellung und wird widerrufen, wenn die App gelöscht wird.",
+      "cancel": "Abbrechen",
+      "create": "App erstellen",
+      "creating": "Wird erstellt…"
     }
   },
   "navModel": {
@@ -16507,6 +16560,7 @@
       "unbound": "Nicht gebunden"
     },
     "operatorOnly": "Nur ein Plattformbetreiber kann Schreibzugriff erteilen oder eine Domain binden.",
+    "withheld": "DNS ist auf dieser Installation zurückgehalten, daher schreibt Astrolift keine Delegationseinträge, und Erteilen und Binden sind deaktiviert. Tragen Sie die NS-Einträge in der übergeordneten Zone von Hand ein.",
     "loading": "Wird geladen…",
     "detected": "Verbindungen, die diese Domain delegieren können",
     "grantFor": "Darf NS-Einträge in {parent} schreiben",

@@ -16,6 +16,7 @@ from astrolift_agents.models.agent_task_event import AgentTaskEvent
 from astrolift_agents.models.agent_task_input import AgentTaskInputMessage
 from astrolift_agents.models.agent_task_input_reply import AgentTaskInputReply
 from astrolift_agents.models.brief import Brief
+from astrolift_agents.models.conversation_transfer import AgentConversationTransfer
 from astrolift_agents.models.dispatcher_instance import DispatcherInstance
 from astrolift_agents.models.managed_box_runtime import ManagedBoxRuntime
 from astrolift_agents.models.org_skill_repo import OrgSkillRepo
@@ -37,6 +38,7 @@ from astrolift_agents.models.workflow_trigger import WorkflowSchedule, WorkflowW
 
 __all__ = [
     "AgentBox",
+    "AgentConversationTransfer",
     "AgentHostAction",
     "AgentHostAuthority",
     "AgentHostProjection",

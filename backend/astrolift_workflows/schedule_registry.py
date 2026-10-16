@@ -218,6 +218,16 @@ class ScheduleKind(StrEnum):
     unreachable cluster resolves to "leave as-is" rather than to a death
     certificate."""
 
+    CONVERSATION_TRANSFER_EXPIRY = "conversation_transfer_expiry"
+    """Every 60 s: retire every moved conversation (#1971) whose paused
+    admission passed its deadline (``CONVERSATION_TRANSFER_ADMISSION_SECONDS``)
+    or whose paused session ended before the commit: the transfer turns
+    aborted with its reason, its stored envelope is deleted and its paused
+    task cancelled. Touches only transfers past their own deadline or with a
+    dead session, never a committed one; with no runtime opted in through
+    ``ASTROLIFT_CONVERSATION_TRANSFER_RUNTIMES`` there are none and the tick
+    is a no-op."""
+
     CERT_EXPIRY = "cert_expiry"
     PRUNE_OBSERVABILITY_DATA = "prune_observability_data"
     """Evict observability data past each org's configured retention (#1602).
@@ -519,6 +529,15 @@ DEFAULT_SCHEDULES: tuple[ScheduleDefinition, ...] = (
             kind=ScheduleKind.AGENT_BOX_REAP,
         ),
         description="Settle live AgentBox rows against their k8s Job (#128)",
+    ),
+    ScheduleDefinition(
+        kind=ScheduleKind.CONVERSATION_TRANSFER_EXPIRY,
+        workflow_name="ConversationTransferExpiryTickWorkflow",
+        interval_seconds=60,
+        schedule_id=schedule_id_for(
+            kind=ScheduleKind.CONVERSATION_TRANSFER_EXPIRY,
+        ),
+        description="Retire moved conversations past their admission deadline (#1971)",
     ),
     ScheduleDefinition(
         kind=ScheduleKind.CERT_EXPIRY,

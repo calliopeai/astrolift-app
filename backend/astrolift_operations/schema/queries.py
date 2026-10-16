@@ -69,6 +69,7 @@ from astrolift_operations.schema.types import (
     workflow_run_to_type,
     zentinelle_connection_to_type,
 )
+from astrolift_operations.schema.zentinelle_reads import ZentinelleReadsQuery
 from astrolift_operations.scopes import org_scope, provider_read_operation, webhook_scope
 from astrolift_operations.topology_traffic import TopologyTraffic, query_topology_traffic, topology_operations
 from astrolift_operations.visibility import rules_for_app, visible_events, visible_rules, visible_webhooks
@@ -309,7 +310,7 @@ def _alert_events_qs(
 
 
 @strawberry.type
-class OperationsQuery(InstallAlertMailQuery):
+class OperationsQuery(InstallAlertMailQuery, ZentinelleReadsQuery):
     @strawberry.field
     @require_permission(
         Permission.APP_READ_METRICS,

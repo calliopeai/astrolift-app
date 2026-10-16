@@ -1,6 +1,6 @@
 "use client";
 
-import { BrainCircuitIcon, PlugIcon } from "lucide-react";
+import { AppWindowIcon, BrainCircuitIcon, PlugIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Link from "next/link";
 
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { areaSwitcher, NAV } from "@/lib/shell/nav-model";
 
 import { ConnectBrainDialog } from "./ConnectBrainDialog";
+import { HostBrainAppDialog } from "./HostBrainAppDialog";
 import type { BrainRow, BrainsState } from "./use-brains";
 
 export type BrainsScreenProps = BrainsState;
@@ -23,7 +24,8 @@ const ABOVE_ROW_LINK = "relative z-10";
  * Apps › Semantic layers (#2320): the hosted brain apps the viewer can read,
  * with where they are served and which teams they are shared with. Sharing a
  * layer is sharing its app (Access on the app). Connect issues the viewer a
- * short-lived read token and shows it once as an MCP client config. Pure
+ * short-lived read token and shows it once as an MCP client config. Host an
+ * app creates an app on the layer from the brain-app template (#2243). Pure
  * view; data from useBrains.
  */
 export function BrainsScreen({
@@ -38,6 +40,12 @@ export function BrainsScreen({
   connecting,
   onConnect,
   onDismissConnection,
+  hostingSlug,
+  hostProjects,
+  hostSubmitting,
+  onHost,
+  onDismissHost,
+  onSubmitHost,
 }: BrainsScreenProps) {
   const t = useTranslations("brains");
   const columns: Column<BrainRow>[] = [
@@ -127,16 +135,28 @@ export function BrainsScreen({
       align: "right",
       cellClassName: ABOVE_ROW_LINK,
       cell: (b) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={connecting || !b.environments.length}
-          title={b.environments.length ? undefined : t("notServed")}
-          onClick={() => void onConnect(b.slug)}
-        >
-          <PlugIcon className="size-3.5" />
-          {t("connect")}
-        </Button>
+        <span className="inline-flex gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={connecting || !b.environments.length}
+            title={b.environments.length ? undefined : t("notServed")}
+            onClick={() => void onConnect(b.slug)}
+          >
+            <PlugIcon className="size-3.5" />
+            {t("connect")}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!b.environments.length}
+            title={b.environments.length ? t("hostTitle") : t("notServed")}
+            onClick={() => onHost(b.slug)}
+          >
+            <AppWindowIcon className="size-3.5" />
+            {t("host")}
+          </Button>
+        </span>
       ),
     },
   ];
@@ -166,6 +186,13 @@ export function BrainsScreen({
         totalCount={totalCount}
       />
       <ConnectBrainDialog connection={connection} onDismiss={onDismissConnection} />
+      <HostBrainAppDialog
+        brainSlug={hostingSlug}
+        projects={hostProjects}
+        submitting={hostSubmitting}
+        onSubmit={(values) => void onSubmitHost(values)}
+        onDismiss={onDismissHost}
+      />
     </>
   );
 }

@@ -260,6 +260,14 @@ export function AgentRunDetail({
                 ),
               },
               {
+                term: t("model"),
+                description: (
+                  <span className="font-mono text-xs [overflow-wrap:anywhere]">
+                    {task.model || "—"}
+                  </span>
+                ),
+              },
+              {
                 term: t("callbackUrl"),
                 description: (
                   <span className="font-mono text-xs [overflow-wrap:anywhere]">

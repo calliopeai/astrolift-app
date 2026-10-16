@@ -803,6 +803,7 @@ type AstroliftAgentTask {
   callbackStatus: String
   callbackAttempts: Int!
   callbackLastError: String
+  model: String!
 }
 
 type AstroliftAgentTaskBacklog {
@@ -1871,6 +1872,20 @@ type AstroliftBrain {
   sharedWith: [AstroliftBrainShare!]!
 }
 
+type AstroliftBrainApp {
+  app: AstroliftRegisteredApp!
+  brainSlug: String!
+  template: String!
+  environmentName: String!
+  envKeys: [String!]!
+}
+
+type AstroliftBrainAppMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftBrainApp
+}
+
 type AstroliftBrainConnection {
   id: GUID!
   slug: String!
@@ -2452,6 +2467,39 @@ type AstroliftContainerStatus {
   lastRestartReasons: [String!]!
   lastRestartAt: DateTime
   resources: AstroliftContainerResources!
+}
+
+type AstroliftConversationTransfer {
+  id: GUID!
+  transferId: String!
+  state: String!
+  record: JSON!
+  snapshotSha256: String!
+  envelopeSha256: String!
+  uploadUrl: String!
+  progress: JSON!
+  abortReason: String!
+  agentTaskId: GUID
+  admissionDeadline: DateTime!
+  acknowledgedAt: DateTime
+  committedAt: DateTime
+  abortedAt: DateTime
+}
+
+type AstroliftConversationTransferCapability {
+  managedConversation: Boolean!
+  harnessHostContract: String!
+  undo: Boolean!
+  protocolVersion: Int!
+  destinationIdentity: String!
+  maxEnvelopeBytes: Int!
+  reason: String!
+}
+
+type AstroliftConversationTransferMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftConversationTransfer
 }
 
 type AstroliftCostAttribution {
@@ -6723,6 +6771,40 @@ input AstroliftWorkloadsFilter {
   owner: [String!] = null
 }
 
+type AstroliftZentinelleAuditEvent {
+  id: String!
+  occurredAt: DateTime
+  action: String!
+  resourceType: String!
+  resourceId: String!
+  resourceName: String!
+  agentSlug: String!
+  agentId: String!
+  actor: String!
+}
+
+type AstroliftZentinelleAuditExport {
+  filename: String!
+  content: String!
+  contentType: String!
+  rowCount: Int!
+}
+
+type AstroliftZentinelleAuditExportMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftZentinelleAuditExport
+}
+
+type AstroliftZentinelleAuditPage {
+  events: [AstroliftZentinelleAuditEvent!]!
+  nextCursor: String
+}
+
+type AstroliftZentinelleCapability {
+  connected: Boolean!
+}
+
 type AstroliftZentinelleClusterGateway {
   clusterId: GUID!
   clusterSlug: String!
@@ -6772,6 +6854,31 @@ type AstroliftZentinelleDisconnectMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftZentinelleDisconnect
+}
+
+type AstroliftZentinellePolicy {
+  id: String!
+  name: String!
+  policyType: String!
+  enforcement: String!
+  scope: String!
+  priority: Int!
+  description: String!
+}
+
+type AstroliftZentinelleUsage {
+  since: DateTime!
+  rows: [AstroliftZentinelleUsageRow!]!
+}
+
+type AstroliftZentinelleUsageRow {
+  agentSlug: String!
+  provider: String!
+  model: String!
+  requests: Int!
+  inputTokens: Int!
+  outputTokens: Int!
+  costUsd: Float!
 }
 
 input AttachCloudflareDnsZoneInput {
@@ -7385,6 +7492,12 @@ input ConnectZentinelleInput {
   gatewayUrl: String = null
 }
 
+input ConversationTransferRecordInput {
+  record: JSON!
+  snapshotSha256: String! = ""
+  reason: String! = ""
+}
+
 enum CostWindow {
   H24
   D7
@@ -7989,6 +8102,15 @@ input ExportAuditEventsInput {
   filter: AstroliftAuditEventsFilter = null
 }
 
+input ExportZentinelleAuditInput {
+  since: DateTime!
+  until: DateTime = null
+  format: String! = "ndjson"
+  agentSlug: String = null
+  projectId: GUID = null
+  teamId: GUID = null
+}
+
 input ExtendPreviewTtlInputGql {
   id: GUID!
   days: Int!
@@ -8163,6 +8285,15 @@ input GroupOperationInput {
   userIds: [ID!]!
   groupId: ID!
   operation: String!
+}
+
+input HostAppOnBrainInput {
+  brainSlug: String!
+  projectId: GUID!
+  image: String!
+  name: String = null
+  slug: String = null
+  port: Int = null
 }
 
 type HuggingFaceConnectionType {
@@ -9602,6 +9733,11 @@ type Mutation {
   A 15-minute read token for one brain the caller can read (#2320), with its endpoints and the header to send it in. The cluster edge admits it to that brain only; a revoked share stops new tokens at once. The token is never written to the audit log.
   """
   issueBrainReadToken(slug: String!): AstroliftBrainConnectionMutationResult!
+
+  """
+  Create an app hosted on a brain the caller can read (#2243), from the brain-app template: one public web workload running ``image``. Each deploy gives it the brain's MCP URLs and a read token for that brain as env (BRAIN_*), rotated on every deploy and revoked when the app is deleted. Deploy it with startDeployment.
+  """
+  hostAppOnBrain(input: HostAppOnBrainInput!): AstroliftBrainAppMutationResult!
   setAppAccess(input: SetAppAccessInput!): AstroliftAppAccessMutationResult!
   sendInstallAlertMailTest(input: SendInstallAlertMailTestInput!): InstallAlertMailTestMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
@@ -9644,6 +9780,7 @@ type Mutation {
   registerZentinelleSharedCluster(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
   moveZentinelleSharedClusterToInstall(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
   unregisterZentinelleSharedCluster(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
+  exportZentinelleAudit(input: ExportZentinelleAuditInput!): AstroliftZentinelleAuditExportMutationResult!
   registerTenantCluster(input: RegisterTenantClusterInput!): AstroliftTenantClusterMutationResult!
   issueClusterAgentKey(input: IssueClusterAgentKeyInput!): ClusteragentkeyissuedpayloadMutationResult!
   deployClusterAgent(input: DeployClusterAgentInput!): AstroliftTenantClusterMutationResult!
@@ -9868,6 +10005,10 @@ type Mutation {
   registerOrgSkillRepo(input: RegisterOrgSkillRepoInput!, orgId: ID!): AstroliftOrgSkillRepoMutationResult!
   updateOrgSkillRepo(input: UpdateOrgSkillRepoInput!): AstroliftOrgSkillRepoMutationResult!
   removeOrgSkillRepo(input: RemoveOrgSkillRepoInput!): AstroliftOrgSkillRepoMutationResult!
+  prepareConversationTransfer(input: PrepareConversationTransferInput!): AstroliftConversationTransferMutationResult!
+  verifyConversationTransfer(input: ConversationTransferRecordInput!): AstroliftConversationTransferMutationResult!
+  commitConversationTransfer(input: ConversationTransferRecordInput!): AstroliftConversationTransferMutationResult!
+  abortConversationTransfer(input: ConversationTransferRecordInput!): AstroliftConversationTransferMutationResult!
 
   """
   Start the exact reviewed definition with declared inputs and an actor-scoped requestId; retry the same request after an uncertain response.
@@ -10271,6 +10412,14 @@ type PreSignedUrlUploadResult {
   uuid: UUID
 }
 
+input PrepareConversationTransferInput {
+  agentSlug: String!
+  record: JSON!
+  envelopeSha256: String!
+  envelopeBytes: Int!
+  environmentSpecId: GUID = null
+}
+
 type ProcessFileResult {
   errors: Int
   processId: ID
@@ -10564,6 +10713,10 @@ type Query {
   astroliftElevationStatus: AstroliftElevationStatus!
   installAlertMailSupport(eventKind: String! = "deploy.failed"): InstallAlertMailSupport!
   installAlertMailTestsPage(eventKind: String! = "deploy.failed", after: String = null, limit: Int! = 25): InstallAlertMailTestPage!
+  astroliftZentinelleCapability: AstroliftZentinelleCapability!
+  astroliftZentinelleUsage(since: DateTime = null, agentSlug: String = null, projectId: GUID = null, teamId: GUID = null): AstroliftZentinelleUsage!
+  astroliftZentinellePolicies(agentSlug: String = null, projectId: GUID = null): [AstroliftZentinellePolicy!]!
+  astroliftZentinelleAuditPage(since: DateTime = null, cursor: String = null, limit: Int! = 100, agentSlug: String = null, projectId: GUID = null, teamId: GUID = null): AstroliftZentinelleAuditPage!
   astroliftTopologyTraffic(appSlug: String!, start: DateTime!, end: DateTime!, environmentName: String = null): TopologyTraffic
   astroliftEvent(id: GUID!): AstroliftEvent
   astroliftAlertRule(id: GUID!): AstroliftAlertRule
@@ -10839,6 +10992,8 @@ type Query {
   agentTask(id: ID!): AstroliftAgentTask
   agentTaskTransitionsSince(orgId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentTask!]!
   agentTaskInputMessage(taskId: ID!, clientRequestId: String!): AstroliftAgentTaskInputMessage
+  conversationTransferCapability(agentSlug: String!, environmentSpecId: GUID = null): AstroliftConversationTransferCapability
+  conversationTransfer(transferId: String!): AstroliftConversationTransfer
   agentTaskByClientRequestId(orgId: ID!, clientRequestId: String!): AstroliftAgentTask
   agentTaskInteractions(orgId: ID!, taskId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentInteraction!]!
   agentTaskBacklog(orgId: ID!, taskId: ID!): AstroliftAgentTaskBacklog
@@ -11065,7 +11220,11 @@ input RegisterAppInput {
   buildMode: String! = "ci_pushed"
   buildStrategy: String! = "off"
   dockerfilePath: String! = "Dockerfile"
-  buildContext: String! = "."
+
+  """
+  Build context, relative to the repository root. Omit it to use the manifest's directory, or the repository root when the manifest sets build_context or dockerfile_path itself.
+  """
+  buildContext: String = null
   buildArgs: JSON = null
   cronExpression: String = null
   requiresApproval: Boolean = null

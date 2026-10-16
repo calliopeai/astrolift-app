@@ -72,6 +72,7 @@ from astrolift_operations.schema.mutations.types import (  # noqa: F401
 )
 from astrolift_operations.schema.mutations.webhooks import WebhookMutations
 from astrolift_operations.schema.mutations.zentinelle import ZentinelleInstallMutations, ZentinelleMutations
+from astrolift_operations.schema.zentinelle_reads import ZentinelleReadsMutations
 
 
 @strawberry.type
@@ -86,5 +87,6 @@ class OperationsMutation(
     RetentionHoldMutations,
     ZentinelleMutations,
     ZentinelleInstallMutations,
+    ZentinelleReadsMutations,
 ):
     """Root mutation type — inherits fields from each domain mixin."""

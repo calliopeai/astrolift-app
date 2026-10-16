@@ -1060,7 +1060,8 @@ class DiscoveredAppManifestType:
     ``manifest_path`` is the repo-relative path (the value that becomes
     ``RegisteredApp.manifest_path`` and the key registration dedupes on).
     ``build_context`` is the per-service subdir the app builds from
-    (``apps/<slug>`` for a monorepo service, ``"."`` for a root manifest).
+    (``apps/<slug>`` for a monorepo service, ``"."`` for a root manifest or
+    one that names its own build_context / dockerfile_path).
     ``name`` is the manifest's top-level name; ``workload_count`` is how many
     workloads it declares. ``already_registered`` is True when an app for that
     repo + manifest path already exists.

@@ -134,6 +134,39 @@ def agent_task_scope(field: str = "id", permission=Permission.AGENT_READ):
     return _scope
 
 
+def conversation_transfer_scope(field: str = "input.record", permission=Permission.AGENT_DISPATCH):
+    """A moved conversation's scope (#1971): its paused task's, else, before
+    the task exists, its agent's app, else explicit org. ``field`` names a
+    TaskTransferRecord or a bare transferId."""
+
+    def _scope(args: dict[str, Any]) -> PermissionScope:
+        value = read_arg(args, field)
+        transfer_id = value.get("transferId") if isinstance(value, dict) else value
+        org_id = _org_id()
+        if not isinstance(transfer_id, str) or not transfer_id or org_id is None:
+            return _org_scope()
+        from astrolift_agents.models import AgentConversationTransfer
+        from astrolift_agents.visibility import app_permission_scope
+
+        transfer = (
+            AgentConversationTransfer.objects.filter(organization_id=org_id, transfer_id=transfer_id)
+            .select_related("agent_task", "agent_definition__registered_app")
+            .first()
+        )
+        if transfer is None:
+            return _org_scope()
+        if transfer.agent_task is not None:
+            return _owner_scope(transfer.agent_task, org_id, permission)
+        definition = transfer.agent_definition
+        if definition is not None and definition.deleted_at is None:
+            app = definition.registered_app
+            if app.organization_id == org_id and app.deleted_at is None:
+                return app_permission_scope(app, permission) or _org_scope()
+        return _org_scope()
+
+    return _scope
+
+
 def agent_box_scope(field: str = "slug", permission=Permission.AGENT_READ):
     """The box's scope, resolved through the rows ``permission`` reaches (#1866).
 

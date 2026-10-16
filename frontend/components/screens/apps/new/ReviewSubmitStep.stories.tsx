@@ -5,6 +5,7 @@ import {
   REVIEW_FAILED,
   REVIEW_LONG,
   REVIEW_MINIMAL,
+  REVIEW_MONOREPO,
   REVIEW_RUNNING,
   REVIEW_SUBMITTING,
 } from "./apps-wizard-steps-b.fixtures";
@@ -32,6 +33,9 @@ export const Empty: Story = { args: REVIEW_MINIMAL };
 
 /** Submit failed and a side effect failed. */
 export const SubmitFailed: Story = { args: REVIEW_FAILED };
+
+/** A monorepo app: the detected build context, and a Dockerfile typed over. */
+export const Monorepo: Story = { args: REVIEW_MONOREPO };
 
 export const LongStrings: Story = { args: REVIEW_LONG };
 

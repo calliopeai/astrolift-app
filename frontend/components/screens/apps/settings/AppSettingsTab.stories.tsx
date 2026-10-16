@@ -13,6 +13,8 @@ import { ManifestPreviewScreen } from "../config/ManifestPreviewScreen";
 import {
   ADD_ENVIRONMENT,
   ARCHIVE,
+  BUILD,
+  BUILD_LONG,
   DANGER_ZONE,
   DEREGISTER_PREVIEW,
   ENV_SETTINGS,
@@ -36,6 +38,7 @@ import {
   type AppSettingsTabSlots,
 } from "./AppSettingsTab";
 import { ArchiveAppView } from "./ArchiveApp";
+import { BuildSettingsView } from "./BuildSettings";
 import { DangerZoneView } from "./DangerZone";
 import { EnvironmentSettingsView } from "./EnvironmentSettings";
 import { ForceRedeployView } from "./ForceRedeploy";
@@ -65,6 +68,7 @@ const NONE: AppSettingsTabAccess = { update: false, deploy: false, delete: false
 
 const SLOTS: AppSettingsTabSlots = {
   identity: <AppIdentityView {...IDENTITY} />,
+  build: <BuildSettingsView {...BUILD} />,
   resync: <ResyncSourceView {...RESYNC} />,
   webhookDeploys: <WebhookDeploysPauseView {...WEBHOOK_DEPLOYS} />,
   forceRedeploy: <ForceRedeployView {...FORCE_REDEPLOY} />,
@@ -189,6 +193,7 @@ export const ConfigurationError: Story = {
 const LONG_SLOTS: AppSettingsTabSlots = {
   ...SLOTS,
   identity: <AppIdentityView {...IDENTITY_LONG} />,
+  build: <BuildSettingsView {...BUILD_LONG} />,
   configuration: <ConfigEditorScreen {...EDITOR} slug={LONG} app={LONG_APP} />,
   archive: <ArchiveAppView {...ARCHIVE} appName={LONG} />,
   deregister: <DangerZoneView {...DANGER_ZONE} appName={LONG} stillLive={[LONG, `${LONG}-2`]} />,

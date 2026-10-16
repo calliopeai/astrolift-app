@@ -187,6 +187,11 @@ def test_default_allowlist_is_phase_3a_yes_set():
         # attachable and left its Secret behind (read-only cluster reads,
         # per-box try/except, an unobservable box is left untouched).
         ScheduleKind.AGENT_BOX_REAP,
+        # Moved-conversation expiry ships active (#1971): held, a transfer
+        # that never committed keeps its paused task and stored envelope past
+        # the admission deadline. Only transfers past their own deadline or
+        # with an ended session are retired, never a committed one.
+        ScheduleKind.CONVERSATION_TRANSFER_EXPIRY,
         # Cert-expiry monitor ships active (#155) — the failure it catches
         # (a cert that quietly stopped renewing) only shows up otherwise as
         # a production TLS outage. Read-only provider reads, per-domain
