@@ -662,7 +662,10 @@ class ManifestMutations:
         the hash anchor.
 
         Discards any staged edits — sync is destructive on purpose,
-        the UI is expected to confirm before calling.
+        the UI is expected to confirm before calling. The one exception
+        is the top-level ``[env]`` table, where setAppSecret and the
+        other secret writes keep the app's literal secrets: those edits
+        are made again on the pulled manifest, never dropped.
 
         Delegates the SCM-side fetch + parse + apply to
         :func:`resync_app_manifest_from_repo` so the diff-and-apply
