@@ -112,6 +112,9 @@ class CloudOperationsConfig:
     # Service accounts a log sink may write to its destination as, through
     # custom_writer_identity. Empty refuses every one (#2087).
     allowed_writer_identities: tuple[str, ...] = ()
+    # The GKE cluster whose container entries the bundle routes and its tenant
+    # sinks, log metrics and exclusions may select (#2419). Empty pins nothing.
+    cluster_name: str = ""
 
 
 @dataclass(frozen=True)
@@ -997,7 +1000,8 @@ class CloudOperationsDriver(ManagedServiceDriver):
             desired,
             base_labels,
         )
-        for resource, route in _route_declarations(bundle_id, bucket_name):
+        cluster_name = self._config.cluster_name
+        for resource, route in _route_declarations(bundle_id, bucket_name, cluster_name):
             self._reconcile_many(self._logging, resource, project, [route], bundle_id, desired, base_labels)
         for resource, parent in (
             (_SINK, project),
@@ -1014,7 +1018,11 @@ class CloudOperationsDriver(ManagedServiceDriver):
                 bundle_id,
                 desired,
                 base_labels,
-                transform=_bundle_confined(bundle_id, bucket_name) if resource in {_SINK, _LOG_METRIC} else None,
+                transform=(
+                    _bundle_confined(bundle_id, bucket_name, cluster_name)
+                    if resource in {_SINK, _LOG_METRIC, _EXCLUSION}
+                    else None
+                ),
             )
 
         channel_names = self._reconcile_many(
@@ -1119,6 +1127,22 @@ class CloudOperationsDriver(ManagedServiceDriver):
             body["notificationChannels"] = [channel_by_id[str(item)] for item in ids]
             return body
 
+        own_entries = _bundle_entries(bundle_id, cluster_name)
+
+        def confined_alert_body(declaration: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+            # A log-match condition reads entries into the notification, so it
+            # selects only the bundle's own, like a sink (#2419).
+            conditions = []
+            for condition in body.get("conditions") or []:
+                matched = condition.get("conditionMatchedLog") if isinstance(condition, Mapping) else None
+                if isinstance(matched, Mapping):
+                    confined = _confine_filter(str(matched.get("filter") or ""), own_entries)
+                    condition = {**condition, "conditionMatchedLog": {**matched, "filter": confined}}
+                conditions.append(condition)
+            if conditions:
+                body["conditions"] = conditions
+            return alert_body(declaration, body)
+
         self._reconcile_many(
             self._monitoring,
             _ALERT,
@@ -1127,7 +1151,7 @@ class CloudOperationsDriver(ManagedServiceDriver):
             bundle_id,
             desired,
             base_labels,
-            transform=alert_body,
+            transform=confined_alert_body,
         )
 
         if bool(cfg.get("prune", True)):
@@ -2275,17 +2299,66 @@ def bundle_pod_labels(handle: str, config: Mapping[str, Any] | None) -> dict[str
     return {BUNDLE_POD_LABEL: bundle_id}
 
 
-def _bundle_entries(bundle_id: str) -> str:
+def _bundle_entries(bundle_id: str, cluster_name: str = "") -> str:
     """The container entries of the pods carrying ``bundle_id``'s pod label.
 
     GKE puts pod labels on the entry's ``labels``, never on ``resource.labels``,
     which for ``k8s_container`` hold only the project, location, cluster,
-    namespace, pod and container names.
+    namespace, pod and container names. Pinned to ``cluster_name`` when the
+    driver knows it, so a pod on another GKE cluster in the project, whose
+    admin can set any pod label, cannot write into the bundle (#2419).
     """
-    return f'resource.type="k8s_container" AND {_ENTRY_BUNDLE_LABEL}="{bundle_id}"'
+    entries = f'resource.type="k8s_container" AND {_ENTRY_BUNDLE_LABEL}="{bundle_id}"'
+    if cluster_name:
+        entries += f' AND resource.labels.cluster_name="{_filter_string(cluster_name)}"'
+    return entries
 
 
-def _route_declarations(bundle_id: str, bucket_name: str) -> list[tuple[_ResourceKind, dict[str, Any]]]:
+def _filter_string(value: str) -> str:
+    """``value`` as the body of a Logging query language string literal."""
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _confine_filter(tenant_filter: str, own: str) -> str:
+    """``tenant_filter`` narrowed to the entries ``own`` selects (#2419).
+
+    AND binds loosest in the Logging query language, so a top-level AND holds
+    whatever the tenant wrote. The newlines end any ``--`` comment the tenant
+    filter closes on, which would otherwise swallow the confinement. A filter
+    whose parentheses do not balance could close the wrapping group early, so
+    it is refused.
+    """
+    tenant_filter = tenant_filter.strip()
+    if not tenant_filter:
+        return own
+    depth = 0
+    position = 0
+    while position < len(tenant_filter):
+        char = tenant_filter[position]
+        if char == '"':
+            position += 1
+            while position < len(tenant_filter) and tenant_filter[position] != '"':
+                position += 2 if tenant_filter[position] == "\\" else 1
+        elif tenant_filter.startswith("--", position):
+            newline = tenant_filter.find("\n", position)
+            position = len(tenant_filter) if newline < 0 else newline
+        elif char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+            if depth < 0:
+                break
+        position += 1
+    if depth != 0:
+        raise CloudOperationsError("log filter parentheses must balance")
+    return f"(\n{tenant_filter}\n)\nAND {own}"
+
+
+def _route_declarations(
+    bundle_id: str,
+    bucket_name: str,
+    cluster_name: str = "",
+) -> list[tuple[_ResourceKind, dict[str, Any]]]:
     """The sink routing the bound workloads' container logs into the bundle's
     bucket, and the exclusion keeping them out of ``_Default`` (#2099).
 
@@ -2298,7 +2371,7 @@ def _route_declarations(bundle_id: str, bucket_name: str) -> list[tuple[_Resourc
     """
     if not bucket_name:
         return []
-    entries = _bundle_entries(bundle_id)
+    entries = _bundle_entries(bundle_id, cluster_name)
     return [
         (
             _SINK,
@@ -2315,15 +2388,23 @@ def _route_declarations(bundle_id: str, bucket_name: str) -> list[tuple[_Resourc
 def _bundle_confined(
     bundle_id: str,
     bucket_name: str,
+    cluster_name: str = "",
 ) -> Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]]:
-    """Keep a tenant's project-level sink or log metric off other bundles (#2099).
+    """Keep a tenant's project-level sink, log metric or exclusion on its own
+    bundle's entries (#2099, #2419).
 
-    Sinks and log-based metrics select from every entry in the project, so one
-    bundle could copy another's container entries into its own bucket, or a
-    sink could write straight into another bundle's bucket, around the view
-    grant. The filter is narrowed to entries no other bundle's pod label marks,
-    and a Cloud Logging bucket destination must be the bundle's own.
+    Sinks, log-based metrics and exclusions select from every entry in the
+    project, so one bundle could copy another's container entries, or the
+    project's unlabelled platform and unbound-app entries, into its own
+    bucket; drop another bundle's entries from ``_Default``; or write straight
+    into another bundle's bucket around the view grant. The filter is narrowed
+    to the container entries of pods carrying this bundle's pod label, on the
+    bundle's cluster when the driver knows it, and a Cloud Logging bucket
+    destination must be the bundle's own. Entries no bundle label marks, such
+    as audit or load balancer logs, are the project's, not a tenant's, so no
+    tenant declaration selects them.
     """
+    own = _bundle_entries(bundle_id, cluster_name)
 
     def confine(declaration: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
         destination = str(body.get("destination") or "")
@@ -2335,9 +2416,7 @@ def _bundle_confined(
             raise CloudOperationsError(
                 f"log sink {declaration['id']!r} may route to a Cloud Logging bucket only if it is the bundle's own",
             )
-        own = f'(NOT {_ENTRY_BUNDLE_LABEL}:* OR {_ENTRY_BUNDLE_LABEL}="{bundle_id}")'
-        tenant_filter = str(body.get("filter") or "").strip()
-        body["filter"] = f"({tenant_filter}) AND {own}" if tenant_filter else own
+        body["filter"] = _confine_filter(str(body.get("filter") or ""), own)
         return body
 
     return confine

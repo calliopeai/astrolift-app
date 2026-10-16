@@ -74,6 +74,7 @@ from astrolift_operations.scopes import org_scope, provider_read_operation, webh
 from astrolift_operations.topology_traffic import TopologyTraffic, query_topology_traffic, topology_operations
 from astrolift_operations.visibility import rules_for_app, visible_events, visible_rules, visible_webhooks
 from astrolift_registry.scopes import app_scope_by_slug, live_app_owners
+from core.cluster_observability import namespace_for_app
 from core.decorators import tenant_scoped
 from core.permissions import Permission, check_platform_operator, require_permission
 from core.schema.enums import ObservabilityPanelReason
@@ -1453,7 +1454,8 @@ class OperationsQuery(InstallAlertMailQuery, ZentinelleReadsQuery):
             live_app_owners(
                 RegisteredApp.objects.filter(slug=app_slug, organization_id=org_id, deleted_at__isnull=True)
             )
-            .only("id", "guid", "slug", "k8s_namespace")
+            .select_related("organization")
+            .only("id", "guid", "slug", "k8s_namespace", "organization__slug")
             .first()
         )
         if app is None:
@@ -1475,7 +1477,9 @@ class OperationsQuery(InstallAlertMailQuery, ZentinelleReadsQuery):
             try:
                 return _query_prometheus_for_app(
                     app_slug=app.slug,
-                    namespace=app.k8s_namespace or "",
+                    # The resolved namespace, never empty: ``app=`` alone also
+                    # matches a same-slug app of another org (#2418 audit).
+                    namespace=namespace_for_app(app),
                     time_range=time_range,
                     window_seconds=window_seconds,
                     bucket_count=bucket_count,

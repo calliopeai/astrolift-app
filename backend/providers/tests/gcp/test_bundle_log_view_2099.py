@@ -414,11 +414,12 @@ def test_a_tenant_sink_or_log_metric_cannot_select_another_bundles_entries() -> 
         },
     )
     bundle = handle.handle.rsplit("/", 1)[-1]
-    own = f'(NOT {_ENTRY_LABEL}:* OR {_ENTRY_LABEL}="{bundle}")'
+    # Only the bundle's own entries since #2419, not every unlabelled one.
+    own = f'resource.type="k8s_container" AND {_ENTRY_LABEL}="{bundle}"'
 
     assert logging.resources["log_sinks"]["projects/acme-prod/sinks/export"]["filter"] == own
     metric = logging.resources["log_metrics"]["projects/acme-prod/metrics/errors"]
-    assert metric["filter"] == f"(severity>=ERROR) AND {own}"
+    assert metric["filter"] == f"(\nseverity>=ERROR\n)\nAND {own}"
 
 
 def test_a_tenant_sink_on_one_bundle_never_receives_another_bundles_container_logs() -> None:
