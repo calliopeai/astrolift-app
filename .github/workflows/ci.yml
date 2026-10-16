@@ -77,6 +77,13 @@ jobs:
         id: testdb
         run: |
           echo "key=testdb-pg16-${{ hashFiles('backend/**/migrations/**', 'backend/Pipfile.lock', 'backend/config/*.py', '.github/workflows/ci.yml') }}" >> "$GITHUB_OUTPUT"
+      - name: Look up the migrated test database
+        id: testdb-cached
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/testdb
+          key: ${{ steps.testdb.outputs.key }}
+          lookup-only: true
       - name: Classify changed paths
         id: classify
         env:
@@ -85,6 +92,7 @@ jobs:
           EVENT_NAME: ${{ github.event_name }}
           TIER: ${{ inputs.tier }}
           GH_TOKEN: ${{ github.token }}
+          TESTDB_CACHED: ${{ steps.testdb-cached.outputs.cache-hit }}
         run: |
           if [[ "$EVENT_NAME" != workflow_dispatch && -n "$BASE_SHA" && ! "$BASE_SHA" =~ ^0+$ ]]; then
             if ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
@@ -330,6 +338,14 @@ jobs:
           if tier == "slow":
               # The pull request's own run already covered everything else.
               backend = frontend = routes = contracts = providers = False
+          if event == "push" and not include and os.environ.get("TESTDB_CACHED") != "true":
+              # Nothing here would migrate, yet main has no dump for this
+              # schema: build it once now rather than in every shard of every
+              # pull request until the nightly run.
+              include.append({
+                  "name": "test-database", "shard": "test-database", "paths": "",
+                  "temporal": False, "partition": 0, "partitions": 1,
+              })
           # The formatting ratchet checks the frontend files this change touches.
           format_files = [
               path.removeprefix("frontend/")
@@ -579,6 +595,7 @@ jobs:
           path: ${{ runner.temp }}/testdb
           key: ${{ needs.changes.outputs.testdb_key }}
       - name: Run tests
+        if: ${{ matrix.shard != 'test-database' }}
         # Not `-x`. Halting at the first failure is why the suite's real state
         # stayed unknown for weeks: one failure masks every one behind it, so
         # each fix buys exactly one more data point. Running to completion
