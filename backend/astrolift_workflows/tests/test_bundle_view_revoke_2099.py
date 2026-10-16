@@ -58,7 +58,9 @@ def world(app, env, cluster, monkeypatch):
     project_iam = FakeIAMWithViews()
     _AlreadyExists.__name__ = "AlreadyExists"
     identity = GCPWorkloadIdentityDriver(
-        config=GCPWIConfig(project_id="acme-prod", iam_client=FakeIAMClient(), project_iam_client=project_iam),
+        config=GCPWIConfig(
+            project_id="acme-prod", iam_client=FakeIAMClient(), project_iam_client=project_iam
+        ),
     )
     resolved = []
 
@@ -68,13 +70,25 @@ def world(app, env, cluster, monkeypatch):
 
     def binding(svc):
         driver, _, _ = _driver(logging=logging_client)
-        return driver.binding(ServiceHandle(svc.backend_ref, managed_service_id=str(svc.guid)), dict(svc.config))
+        return driver.binding(
+            ServiceHandle(svc.backend_ref, managed_service_id=str(svc.guid)), dict(svc.config)
+        )
 
-    monkeypatch.setattr("astrolift_workflows.activities.capability_deprovision._resolve_capability_driver", resolve)
-    monkeypatch.setattr("astrolift_workflows.activities.managed_service_lifecycle._managed_binding_for", binding)
+    monkeypatch.setattr(
+        "astrolift_workflows.activities.capability_deprovision._resolve_capability_driver", resolve
+    )
+    monkeypatch.setattr(
+        "astrolift_workflows.activities.managed_service_lifecycle._managed_binding_for", binding
+    )
     member = f"serviceAccount:{service_account_email_for(workload_identity_role_name(app), 'acme-prod')}"
     return SimpleNamespace(
-        app=app, env=env, cluster=cluster, logging=logging_client, iam=project_iam, member=member, resolved=resolved
+        app=app,
+        env=env,
+        cluster=cluster,
+        logging=logging_client,
+        iam=project_iam,
+        member=member,
+        resolved=resolved,
     )
 
 
@@ -283,7 +297,9 @@ def test_detaching_any_other_service_starts_no_reconcile(
     )
     attachment = ManagedServiceAttachment.objects.create(managed_service=redis, app_environment=world.env)
     starts = []
-    monkeypatch.setattr("astrolift_workflows.client.start_workflow", lambda *args, **kwargs: starts.append(args))
+    monkeypatch.setattr(
+        "astrolift_workflows.client.start_workflow", lambda *args, **kwargs: starts.append(args)
+    )
     permission_resolver.grant(Permission.PROJECT_UPDATE)
 
     with django_capture_on_commit_callbacks(execute=True):
@@ -314,7 +330,10 @@ def test_a_reconcile_that_cannot_start_is_logged_and_the_detach_stands(
     assert attachment.deleted_at is not None
     [record] = [r for r in caplog.records if r.name == "astrolift_services.schema.mutations.managed_services"]
     assert record.levelno == logging.ERROR
-    assert record.getMessage() == f"could not start the workload identity reconcile after a detach from {world.env.guid}"
+    assert (
+        record.getMessage()
+        == f"could not start the workload identity reconcile after a detach from {world.env.guid}"
+    )
     assert "temporal unavailable" in str(record.exc_info[1])
 
 
@@ -337,7 +356,9 @@ async def test_the_reconcile_workflow_runs_the_identity_activity_on_the_sandboxe
     async with worker:
         result = await temporal_env.client.execute_workflow(
             ReconcileWorkloadIdentityWorkflow.run,
-            ReconcileWorkloadIdentityInput(registered_app_id=7, app_environment_id=9, actor=Actor(kind="system")),
+            ReconcileWorkloadIdentityInput(
+                registered_app_id=7, app_environment_id=9, actor=Actor(kind="system")
+            ),
             id="reconcile-identity-2099",
             task_queue="astrolift-test",
         )

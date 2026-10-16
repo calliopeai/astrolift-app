@@ -145,7 +145,9 @@ def test_only_the_workloads_a_bundle_is_bound_to_are_labelled(app, env, bundles)
     assert BUNDLE_POD_LABEL not in _pod_labels(resources, "CronJob", "nightly")
 
 
-@pytest.mark.parametrize("config", [{"access_mode": "read"}, {"access_mode": "metrics"}, {"log_bucket": False}])
+@pytest.mark.parametrize(
+    "config", [{"access_mode": "read"}, {"access_mode": "metrics"}, {"log_bucket": False}]
+)
 def test_a_binding_that_writes_no_logs_labels_no_pod(app, env, bundles, config):
     _bundle(app, env, bundles.handle["a"], config=config)
 
