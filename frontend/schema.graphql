@@ -1871,6 +1871,20 @@ type AstroliftBrain {
   sharedWith: [AstroliftBrainShare!]!
 }
 
+type AstroliftBrainApp {
+  app: AstroliftRegisteredApp!
+  brainSlug: String!
+  template: String!
+  environmentName: String!
+  envKeys: [String!]!
+}
+
+type AstroliftBrainAppMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftBrainApp
+}
+
 type AstroliftBrainConnection {
   id: GUID!
   slug: String!
@@ -8165,6 +8179,15 @@ input GroupOperationInput {
   operation: String!
 }
 
+input HostAppOnBrainInput {
+  brainSlug: String!
+  projectId: GUID!
+  image: String!
+  name: String = null
+  slug: String = null
+  port: Int = null
+}
+
 type HuggingFaceConnectionType {
   id: GUID!
   version: Int!
@@ -9602,6 +9625,11 @@ type Mutation {
   A 15-minute read token for one brain the caller can read (#2320), with its endpoints and the header to send it in. The cluster edge admits it to that brain only; a revoked share stops new tokens at once. The token is never written to the audit log.
   """
   issueBrainReadToken(slug: String!): AstroliftBrainConnectionMutationResult!
+
+  """
+  Create an app hosted on a brain the caller can read (#2243), from the brain-app template: one public web workload running ``image``. Each deploy gives it the brain's MCP URLs and a read token for that brain as env (BRAIN_*), rotated on every deploy and revoked when the app is deleted. Deploy it with startDeployment.
+  """
+  hostAppOnBrain(input: HostAppOnBrainInput!): AstroliftBrainAppMutationResult!
   setAppAccess(input: SetAppAccessInput!): AstroliftAppAccessMutationResult!
   sendInstallAlertMailTest(input: SendInstallAlertMailTestInput!): InstallAlertMailTestMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!

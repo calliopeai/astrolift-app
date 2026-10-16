@@ -15485,6 +15485,26 @@
       "copyLabel": "Copiar {label}",
       "copied": "Copiado",
       "done": "Concluído"
+    },
+    "host": "Hospedar um app",
+    "hostTitle": "Hospedar um app nesta camada",
+    "hosted": "{slug} foi criado. Implante-o para começar a ler a camada.",
+    "hostFailed": "Não foi possível criar o app.",
+    "hostDialog": {
+      "title": "Hospedar um app em {slug}",
+      "description": "Cria um app a partir do modelo brain-app: uma carga web pública que executa sua imagem. Cada implantação fornece a URL MCP desta camada e um token de leitura para ela.",
+      "project": "Projeto",
+      "selectProject": "Selecione um projeto",
+      "noProjects": "Nenhum projeto",
+      "image": "Imagem",
+      "imageHelp": "Uma referência de imagem publicada, por exemplo um caminho de registro e uma tag.",
+      "name": "Nome",
+      "namePlaceholder": "Gerado quando vazio",
+      "port": "Porta",
+      "envHelp": "O app lê BRAIN_MCP_URL, BRAIN_TOKEN e BRAIN_TOKEN_HEADER. O token muda a cada implantação e é revogado quando o app é excluído.",
+      "cancel": "Cancelar",
+      "create": "Criar app",
+      "creating": "Criando…"
     }
   },
   "navModel": {

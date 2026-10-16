@@ -58,3 +58,8 @@ export const CONNECTION: BrainConnection = {
   token: "eyJhbGciOiJFUzI1NiIsImtpZCI6ImZpeHR1cmUifQ.eyJzY29wZSI6ImJyYWluOnJlYWQifQ.c2ln",
   expiresAt: "2026-10-14T12:15:00+00:00",
 };
+
+export const HOST_PROJECTS = [
+  { id: "p0000000-0000-4000-8000-000000000001", label: "platform/core" },
+  { id: "p0000000-0000-4000-8000-000000000002", label: "medops/intake" },
+];

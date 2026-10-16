@@ -4,6 +4,10 @@ ES256 key pairs. The private key is sealed at rest like every other platform
 secret; the public half is published as a JWK the cluster edge verifies
 tokens against. A key signs for 30 days, then is retired and stays published
 for a day so tokens it signed (15 minutes at most) still verify.
+
+A key with a ``binding`` signs only the tokens of one app hosted on a brain
+(#2243), one per deploy of an environment; it is published while its binding,
+app and brain are live, which is how deleting any of them revokes it.
 """
 
 from __future__ import annotations
@@ -19,6 +23,20 @@ class BrainTokenKey(BaseCoreModel):
     private_key_ciphertext = models.BinaryField()
     public_jwk = models.JSONField()
     retired_at = models.DateTimeField(null=True, blank=True)
+    binding = models.ForeignKey(
+        "astrolift_registry.BrainAppBinding",
+        related_name="keys",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+    )
+    deployment = models.ForeignKey(
+        "astrolift_lifecycle.Deployment",
+        related_name="+",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
 
     def __str__(self) -> str:
         return f"BrainTokenKey({self.kid})"

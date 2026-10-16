@@ -15485,6 +15485,26 @@
       "copyLabel": "{label} 복사",
       "copied": "복사됨",
       "done": "완료"
+    },
+    "host": "앱 호스팅",
+    "hostTitle": "이 레이어에 앱 호스팅",
+    "hosted": "{slug}을(를) 만들었습니다. 배포하면 레이어를 읽기 시작합니다.",
+    "hostFailed": "앱을 만들 수 없습니다.",
+    "hostDialog": {
+      "title": "{slug}에 앱 호스팅",
+      "description": "brain-app 템플릿으로 앱을 만듭니다. 지정한 이미지를 실행하는 공개 웹 워크로드 하나입니다. 배포할 때마다 이 레이어의 MCP URL과 읽기 토큰을 받습니다.",
+      "project": "프로젝트",
+      "selectProject": "프로젝트 선택",
+      "noProjects": "프로젝트 없음",
+      "image": "이미지",
+      "imageHelp": "게시된 이미지 참조입니다. 예: 레지스트리 경로와 태그.",
+      "name": "이름",
+      "namePlaceholder": "비워 두면 자동 생성",
+      "port": "포트",
+      "envHelp": "앱은 BRAIN_MCP_URL, BRAIN_TOKEN, BRAIN_TOKEN_HEADER를 읽습니다. 토큰은 배포할 때마다 바뀌고 앱을 삭제하면 폐기됩니다.",
+      "cancel": "취소",
+      "create": "앱 만들기",
+      "creating": "만드는 중…"
     }
   },
   "navModel": {

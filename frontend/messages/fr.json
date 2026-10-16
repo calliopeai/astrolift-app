@@ -15488,6 +15488,26 @@
       "copyLabel": "Copier {label}",
       "copied": "Copié",
       "done": "Terminé"
+    },
+    "host": "Héberger une app",
+    "hostTitle": "Héberger une app sur cette couche",
+    "hosted": "{slug} a été créée. Déployez-la pour qu'elle commence à lire la couche.",
+    "hostFailed": "Impossible de créer l'app.",
+    "hostDialog": {
+      "title": "Héberger une app sur {slug}",
+      "description": "Crée une app à partir du modèle brain-app : une charge web publique qui exécute votre image. Chaque déploiement lui donne l'URL MCP de cette couche et un jeton de lecture.",
+      "project": "Projet",
+      "selectProject": "Sélectionnez un projet",
+      "noProjects": "Aucun projet",
+      "image": "Image",
+      "imageHelp": "Une référence d'image publiée, par exemple un chemin de registre et une étiquette.",
+      "name": "Nom",
+      "namePlaceholder": "Généré si vide",
+      "port": "Port",
+      "envHelp": "L'app lit BRAIN_MCP_URL, BRAIN_TOKEN et BRAIN_TOKEN_HEADER. Le jeton change à chaque déploiement et est révoqué quand l'app est supprimée.",
+      "cancel": "Annuler",
+      "create": "Créer l'app",
+      "creating": "Création…"
     }
   },
   "navModel": {

@@ -1799,6 +1799,20 @@ export type AstroliftBrain = {
   team: Scalars['String']['output'];
 };
 
+export type AstroliftBrainApp = {
+  app: AstroliftRegisteredApp;
+  brainSlug: Scalars['String']['output'];
+  envKeys: Array<Scalars['String']['output']>;
+  environmentName: Scalars['String']['output'];
+  template: Scalars['String']['output'];
+};
+
+export type AstroliftBrainAppMutationResult = {
+  data?: Maybe<AstroliftBrainApp>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftBrainConnection = {
   endpoints: Array<Scalars['String']['output']>;
   expiresAt: Scalars['String']['output'];
@@ -7678,6 +7692,15 @@ export type GroupOperationInput = {
   userIds: Array<Scalars['ID']['input']>;
 };
 
+export type HostAppOnBrainInput = {
+  brainSlug: Scalars['String']['input'];
+  image: Scalars['String']['input'];
+  name: InputMaybe<Scalars['String']['input']>;
+  port: InputMaybe<Scalars['Int']['input']>;
+  projectId: Scalars['GUID']['input'];
+  slug: InputMaybe<Scalars['String']['input']>;
+};
+
 export type HuggingFaceConnectionType = {
   accountUsername: Scalars['String']['output'];
   id: Scalars['GUID']['output'];
@@ -9013,6 +9036,8 @@ export type Mutation = {
   grantRole: AstroliftRoleBindingMutationResult;
   grantTeamAccessToApp: AstroliftAppTeamAccessMutationResult;
   heartbeatSession: AstroliftHeartbeatSessionPayloadMutationResult;
+  /** Create an app hosted on a brain the caller can read (#2243), from the brain-app template: one public web workload running ``image``. Each deploy gives it the brain's MCP URLs and a read token for that brain as env (BRAIN_*), rotated on every deploy and revoked when the app is deleted. Deploy it with startDeployment. */
+  hostAppOnBrain: AstroliftBrainAppMutationResult;
   importSkillsFromRepo: AstroliftImportSkillsResultMutationResult;
   /** Import a popular visual agent/workflow builder export (Langflow, Flowise, …) into an Astrolift WorkflowDefinition. preview=true (default) returns the mapped manifest + gap report without persisting; preview=false creates an org-scoped, disabled definition + stages. */
   importWorkflowFlow: ImportWorkflowFlowResult;
@@ -10197,6 +10222,11 @@ export type MutationGrantRoleArgs = {
 
 export type MutationGrantTeamAccessToAppArgs = {
   input: GrantTeamAccessInput;
+};
+
+
+export type MutationHostAppOnBrainArgs = {
+  input: HostAppOnBrainInput;
 };
 
 

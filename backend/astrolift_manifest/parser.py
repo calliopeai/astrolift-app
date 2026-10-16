@@ -273,6 +273,7 @@ def parse_raw(toml_text: str) -> RawManifest:
     edge = _parse_edge(data.get("edge"), "edge")
     ingress_access = _parse_ingress_access(data.get("ingress"), "ingress")
     app_kind = _parse_app_kind(data.get("app"))
+    brain = _parse_brain(data.get("brain"), "brain")
 
     if workloads:
         public_count = sum(1 for w in workloads if w.is_public)
@@ -292,6 +293,7 @@ def parse_raw(toml_text: str) -> RawManifest:
         edge=edge,
         ingress_access=ingress_access,
         app_kind=app_kind,
+        brain=brain,
         raw=data,
     )
 
@@ -307,6 +309,25 @@ def _parse_app_kind(app_table: Any) -> str:
         return resolve_app_kind(app_table.get("kind"))
     except ValueError as exc:
         raise ManifestError(str(exc), path="app.kind") from exc
+
+
+def _parse_brain(value: Any, path: str) -> str:
+    """``[brain]``: the hosted brain this app reads (#2243), by slug.
+
+    Absent is ``""``. The manifest only names the brain; the binding that
+    lets the app read it is granted by someone who can (``hostAppOnBrain``).
+    """
+    if value is None:
+        return ""
+    if not isinstance(value, dict):
+        raise ManifestError("[brain] must be a table", path=path)
+    unknown = sorted(set(value) - {"slug"})
+    if unknown:
+        raise ManifestError(f"unknown brain key(s): {', '.join(unknown)}; valid key is slug", path=path)
+    slug = value.get("slug")
+    if not isinstance(slug, str) or not slug.strip():
+        raise ManifestError("brain.slug must be the slug of a hosted brain", path=f"{path}.slug")
+    return slug.strip()
 
 
 def _parse_ingress_access(value: Any, path: str) -> dict[str, list[str]] | None:

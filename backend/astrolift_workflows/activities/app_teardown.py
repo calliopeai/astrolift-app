@@ -417,6 +417,11 @@ def _soft_delete_app_records_sync(registered_app_id: int) -> dict[str, int]:
         ),
         "secret_bundle_refs",
     )
+    # Brain bindings (#2243), held or served: their keys are deleted, so no
+    # token the app was issued verifies again.
+    from astrolift_registry.brain_apps import revoke_app
+
+    summary["brain_bindings"] = revoke_app(registered_app_id)
     _soft_delete_queryset(
         AppEnvironment.objects.filter(
             registered_app_id=registered_app_id,
