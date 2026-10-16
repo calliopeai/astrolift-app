@@ -219,3 +219,44 @@ def test_a_log_view_reader_is_never_widened(permission: dict[str, Any], message:
         _identity(project_iam).create_identity_role("app-identity", [permission])
 
     assert project_iam.set_calls == [] and project_iam.view_set_calls == []
+
+
+def test_a_tenant_sink_or_log_metric_cannot_select_another_bundles_entries() -> None:
+    _, logging, handle, _ = _bound(
+        {
+            "log_sinks": [
+                {"id": "export", "body": {"destination": "bigquery.googleapis.com/projects/acme-prod/datasets/logs"}},
+            ],
+            "log_metrics": [{"id": "errors", "body": {"filter": "severity>=ERROR"}}],
+        },
+    )
+    bundle = handle.handle.rsplit("/", 1)[-1]
+    own = f'(NOT labels."astrolift_io_observability_bundle":* OR labels."astrolift_io_observability_bundle"="{bundle}")'
+
+    assert logging.resources["log_sinks"]["projects/acme-prod/sinks/export"]["filter"] == own
+    metric = logging.resources["log_metrics"]["projects/acme-prod/metrics/errors"]
+    assert metric["filter"] == f"(severity>=ERROR) AND {own}"
+
+
+def test_a_tenant_sink_cannot_write_into_another_bundles_bucket() -> None:
+    _, logging, _, _ = _bound(msid="managed-2")
+    other_bucket = next(iter(logging.resources["log_bucket"]))
+    driver, _, _ = _driver()
+
+    result = driver.provision(
+        _spec(
+            {
+                "deletion_protection": False,
+                "log_sinks": [
+                    {
+                        "id": "inject",
+                        "unique_writer_identity": False,
+                        "body": {"destination": f"logging.googleapis.com/{other_bucket}"},
+                    },
+                ],
+            },
+        ),
+    )
+
+    assert result.ok is False
+    assert "bundle's own" in result.message

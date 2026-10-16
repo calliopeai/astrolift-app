@@ -999,6 +999,7 @@ class CloudOperationsDriver(ManagedServiceDriver):
                 bundle_id,
                 desired,
                 base_labels,
+                transform=_bundle_confined(bundle_id, bucket_name) if resource in {_SINK, _LOG_METRIC} else None,
             )
 
         channel_names = self._reconcile_many(
@@ -2243,6 +2244,37 @@ def _route_declarations(bundle_id: str, bucket_name: str) -> list[tuple[_Resourc
         ),
         (_EXCLUSION, {"id": f"{bundle_id}.route", "body": {"filter": entries}}),
     ]
+
+
+def _bundle_confined(
+    bundle_id: str,
+    bucket_name: str,
+) -> Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]]:
+    """Keep a tenant's project-level sink or log metric off other bundles (#2099).
+
+    Sinks and log-based metrics select from every entry in the project, so one
+    bundle could copy another's labelled entries into its own bucket, or a sink
+    could write straight into another bundle's bucket, around the view grant.
+    The filter is narrowed to entries no other bundle labels, and a Cloud
+    Logging bucket destination must be the bundle's own.
+    """
+
+    def confine(declaration: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+        destination = str(body.get("destination") or "")
+        if (
+            destination.startswith("logging.googleapis.com/")
+            and "/buckets/" in destination
+            and destination != f"logging.googleapis.com/{bucket_name}"
+        ):
+            raise CloudOperationsError(
+                f"log sink {declaration['id']!r} may route to a Cloud Logging bucket only if it is the bundle's own",
+            )
+        own = f'(NOT labels."{_BUNDLE_LABEL}":* OR labels."{_BUNDLE_LABEL}"="{bundle_id}")'
+        tenant_filter = str(body.get("filter") or "").strip()
+        body["filter"] = f"({tenant_filter}) AND {own}" if tenant_filter else own
+        return body
+
+    return confine
 
 
 def _console_url(project_id: str, dashboard_name: str) -> str:
