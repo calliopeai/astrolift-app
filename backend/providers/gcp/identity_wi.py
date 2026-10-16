@@ -10,11 +10,14 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from _sdk._telemetry import driver_op
 from _sdk.identity import WorkloadIdentityDriver
 from gcp._errors import NotFoundError, map_api_error
+
+if TYPE_CHECKING:
+    from collections.abc import Collection
 
 _ACCOUNT_ID_RE = re.compile(r"^[a-z][a-z0-9-]{4,28}[a-z0-9]$")
 _ROLE_RE = re.compile(
@@ -216,6 +219,39 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
         )
         return email
 
+    @driver_op(cloud="gcp", driver="identity", audit=True, sensitive_kind="identity.withdraw_log_views")
+    def withdraw_log_view_grants(self, name: str, views: list[str]) -> list[str]:
+        """Take the identity off the read grant on each of ``views`` (#2099).
+
+        ``create_identity_role`` only adds view grants, so a detached Cloud
+        Operations bundle stayed readable by the app it was detached from. The
+        caller names the views of bundles the app is no longer bound to; only
+        the unconditional ``roles/logging.viewAccessor`` binding this driver
+        writes is touched, and a view that no longer exists has nothing left to
+        withdraw. Returns the views the identity was taken off.
+        """
+        member = f"serviceAccount:{self._sa_email(name=name)}"
+        withdrawn: list[str] = []
+        for view in dict.fromkeys(views):
+            if not self._log_view({"role": _VIEW_ACCESSOR, "resource": view}):
+                raise ValueError(f"{view!r} is not a Cloud Logging view")
+            client = self._project_iam_client()
+            try:
+                policy = client.get_log_view_iam_policy(view=view)
+            except Exception as exc:
+                if _not_found(exc):
+                    continue
+                raise map_api_error(exc) from exc
+            updated = _without_member(policy, roles=(_VIEW_ACCESSOR,), member=member)
+            if updated is None:
+                continue
+            try:
+                client.set_log_view_iam_policy(view=view, policy=updated)
+            except Exception as exc:
+                raise map_api_error(exc) from exc
+            withdrawn.append(view)
+        return withdrawn
+
     @driver_op(cloud="gcp", driver="identity", audit=True, sensitive_kind="identity.attach_policy")
     def attach_policy(self, role: str, policy: str) -> None:
         validated = self._validated_roles([{"role": policy}])
@@ -311,24 +347,9 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
         try:
             client = self._project_iam_client()
             policy = client.get_project_iam_policy(project_id=self._config.project_id)
-            member = f"serviceAccount:{sa_email}"
-            bindings: list[dict[str, Any]] = []
-            changed = False
-            for binding in policy.get("bindings") or []:
-                members = list(binding.get("members") or [])
-                if binding.get("role") in roles and not binding.get("condition") and member in members:
-                    members.remove(member)
-                    changed = True
-                    if not members:
-                        continue
-                    binding = {**binding, "members": members}
-                bindings.append(binding)
-            if not changed:
-                return
-            updated = dict(policy)
-            updated["bindings"] = bindings
-            updated["version"] = max(int(updated.get("version") or 1), 3)
-            client.set_project_iam_policy(project_id=self._config.project_id, policy=updated)
+            updated = _without_member(policy, roles=roles, member=f"serviceAccount:{sa_email}")
+            if updated is not None:
+                client.set_project_iam_policy(project_id=self._config.project_id, policy=updated)
         except Exception as exc:
             raise map_api_error(exc) from exc
 
@@ -379,6 +400,33 @@ def _with_member(policy: dict[str, Any], *, role: str, member: str) -> dict[str,
     updated["bindings"] = bindings
     updated["version"] = max(int(updated.get("version") or 1), 3)
     return updated
+
+
+def _without_member(policy: dict[str, Any], *, roles: Collection[str], member: str) -> dict[str, Any] | None:
+    """``policy`` with ``member`` off its unconditional bindings of ``roles``, or None when it is on none."""
+    bindings: list[dict[str, Any]] = []
+    changed = False
+    for item in policy.get("bindings") or []:
+        members = list(item.get("members") or [])
+        if item.get("role") in roles and not item.get("condition") and member in members:
+            members.remove(member)
+            changed = True
+            if not members:
+                continue
+            item = {**item, "members": members}
+        bindings.append(dict(item))
+    if not changed:
+        return None
+    updated = dict(policy)
+    updated["bindings"] = bindings
+    updated["version"] = max(int(updated.get("version") or 1), 3)
+    return updated
+
+
+def _not_found(exc: Exception) -> bool:
+    """A 404 from the REST adapter (``requests.HTTPError``) or a client library ``NotFound``."""
+    response = getattr(exc, "response", None)
+    return type(exc).__name__ == "NotFound" or getattr(response, "status_code", None) == 404
 
 
 __all__ = [

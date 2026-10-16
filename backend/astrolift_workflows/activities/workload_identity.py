@@ -390,17 +390,28 @@ def _ensure_workload_identity_locked(
     if not cluster_owned_and_live(cluster, app.organization_id):
         raise ValueError("workload identity cluster is not live in the app organization")
     groups = _identity_services_by_environment(app, cluster)
+    plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
     if not reconcile_empty and not next(
         (services for env, services in groups if env.pk == environment.pk), []
     ):
+        # The environment's last binding may be the one just detached, and its
+        # log view grant is not taken back unless the reconcile names it (#2099).
+        retired = _retired_log_views(app, cluster, groups, []) if plugin_slug == "gcp" else []
+        withdrawn = (
+            _resolve_capability_driver(cluster, "identity").withdraw_log_view_grants(
+                workload_identity_role_name(app), retired
+            )
+            if retired
+            else []
+        )
         return {
             "skipped": True,
             "reason": "no managed services",
             "registered_app_id": registered_app_id,
+            "withdrawn_log_views": withdrawn,
         }
     services = list({service.pk: service for _, group in groups for service in group}.values())
 
-    plugin_slug = getattr(getattr(cluster, "provider_plugin", None), "slug", "")
     if reconcile_empty and plugin_slug != "aws":
         raise ValueError("Native empty-union reconciliation requires the admitted AWS cluster.")
     from astrolift_services.native_model_connections import is_bedrock_connection, verify_source
@@ -484,6 +495,7 @@ def _ensure_workload_identity_locked(
     # The reconcile records what became of each grant before it raises, so the
     # per-assignment state is persisted on the failing path too — that is the
     # path an operator most needs it on.
+    withdrawn: list[str] = []
     try:
         if native_mode:
             owner = {
@@ -503,6 +515,12 @@ def _ensure_workload_identity_locked(
                 raise ValueError("Owned workload identity reconciliation could not be observed.")
         else:
             role_arn = identity_driver.create_identity_role(role_name, permissions)
+            # A GCP identity's log view grants are written one view at a time,
+            # so a bundle no live binding reads keeps its grant unless it is
+            # named here (#2099).
+            retired = _retired_log_views(app, cluster, groups, permissions) if plugin_slug == "gcp" else []
+            if retired:
+                withdrawn = identity_driver.withdraw_log_view_grants(role_name, retired)
     except Exception:
         persist_states()
         raise
@@ -551,7 +569,57 @@ def _ensure_workload_identity_locked(
         "prune_refusals": len(refusals),
         "annotation": annotation,
         "unavailable_native_services": unavailable_native,
+        "withdrawn_log_views": withdrawn,
     }
+
+
+def _retired_log_views(
+    app: Any,
+    cluster: Any,
+    groups: list[tuple[Any, list[Any]]],
+    permissions: list[dict[str, Any]],
+) -> list[str]:
+    """Log views of Cloud Operations bundles the app was bound to on ``cluster``
+    that no live binding reads any more (#2099).
+
+    The candidates are every bundle bound to the app here, live, detached or
+    deleted, read from the bucket its binding recorded (``GCP_LOG_BUCKET``);
+    those rows outlive a detach and a deletion, and no driver is asked, so a
+    retired bundle never reaches one. A view stays granted when this
+    reconcile's ``permissions`` still declare it, or a bundle still bound
+    (``groups``) reads it by its config.
+    """
+    from django.db.models import Q
+    from gcp.managed.observability_cloud_operations import (
+        KIND,
+        LOG_BUCKET_ENV,
+        VARIANT,
+        binding_reads_logs,
+        log_view_for_bucket,
+    )
+
+    from astrolift_services.models import ManagedService, ManagedServiceBinding
+
+    bound = ManagedService.all_objects.filter(kind=KIND, variant=VARIANT).filter(
+        Q(registered_app=app, app_environment__tenant_cluster=cluster)
+        | Q(
+            registered_app__isnull=True,
+            tenant_cluster=cluster,
+            attachments__app_environment__registered_app=app,
+        )
+    )
+    buckets: dict[int, set[str]] = {}
+    for service_id, bucket in ManagedServiceBinding.all_objects.filter(
+        managed_service__in=bound.values("pk"), env_key=LOG_BUCKET_ENV
+    ).values_list("managed_service_id", "env_value_ref"):
+        buckets.setdefault(service_id, set()).add(bucket)
+    kept = {str(permission.get("resource") or "") for permission in permissions}
+    for _, services in groups:
+        for service in services:
+            if (service.kind, service.variant) == (KIND, VARIANT) and binding_reads_logs(service.config):
+                kept.update(log_view_for_bucket(bucket) for bucket in buckets.get(service.pk, ()))
+    views = {log_view_for_bucket(bucket) for found in buckets.values() for bucket in found}
+    return sorted(view for view in views - kept if view)
 
 
 def _persist_grant_state(
