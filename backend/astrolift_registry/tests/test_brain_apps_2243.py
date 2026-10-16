@@ -213,6 +213,22 @@ def test_a_redeploy_rotates_the_token_and_the_one_before_last_stops_verifying(wo
         _verify(first, audience)
 
 
+def test_a_failed_deploy_does_not_cost_the_release_still_serving_its_token(world, monkeypatch):
+    app, env = _hosted(world)
+    audience = str(world.medops_app.guid)
+    serving = _deploy(app, env)
+    live = _materialize(serving, monkeypatch)["BRAIN_TOKEN"]
+    Deployment.objects.filter(pk=serving.pk).update(status=Deployment.Status.RUNNING.value)
+    failed = _deploy(app, env)
+    _materialize(failed, monkeypatch)
+    Deployment.objects.filter(pk=failed.pk).update(status=Deployment.Status.FAILED.value)
+
+    _materialize(_deploy(app, env), monkeypatch)
+    _materialize(_deploy(app, env), monkeypatch)
+
+    _verify(live, audience)  # the running release's pods still read
+
+
 def test_deleting_the_app_or_the_brain_revokes_its_tokens(world, monkeypatch):
     app, env = _hosted(world)
     token = _materialize(_deploy(app, env), monkeypatch)["BRAIN_TOKEN"]

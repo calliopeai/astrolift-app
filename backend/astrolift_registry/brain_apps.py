@@ -148,6 +148,7 @@ def _deployment_key(binding: BrainAppBinding, deployment: Any) -> BrainTokenKey:
     reuses it, so only a new deploy rotates."""
     from django.db import transaction
 
+    from astrolift_lifecycle.models import Deployment
     from astrolift_registry.brain_tokens import _new_key
 
     with transaction.atomic():
@@ -158,8 +159,14 @@ def _deployment_key(binding: BrainAppBinding, deployment: Any) -> BrainTokenKey:
         same_env = BrainTokenKey.objects.filter(
             binding=binding, deployment__app_environment_id=deployment.app_environment_id
         ).order_by("-created_at", "-pk")
-        # Keep the release being replaced; drop everything older.
-        stale = [row.pk for row in same_env[1:]]
+        # Keep the release being replaced (the newest key) and the release
+        # still serving (a running deploy's key, when a deploy since failed);
+        # drop everything older.
+        stale = [
+            row.pk
+            for row in same_env.select_related("deployment")[1:]
+            if row.deployment.status != Deployment.Status.RUNNING.value
+        ]
         if stale:
             BrainTokenKey.objects.filter(pk__in=stale).delete()
         return _new_key(binding=binding, deployment=deployment)
