@@ -18,20 +18,29 @@ import {
 } from "@/graphql/services/services.mutations";
 import {
   LIST_MANAGED_SERVICES,
-  LIST_MANAGED_SERVICES_PAGE,
+  LIST_MANAGED_SERVICE_SUMMARIES_PAGE,
 } from "@/graphql/services/services.queries";
 
 import { useCursorList } from "../use-cursor-list";
 import { APP_MANAGED_SERVICES_LIST } from "./managed-services-list";
 
+/** One row of `astroliftManagedServiceSummariesPage` (#2207). */
 export interface ManagedService {
   id: string;
   name: string;
   kind: string;
   variant: string;
   status: string;
-  statusError: string;
-  config: Record<string, unknown>;
+  /** A typed, credential-free reading of the failure; never provider text. */
+  statusFailure: { code: string; message: string } | null;
+  /** The badged validation facts; null when the driver has not reported one. */
+  posture: {
+    dkimVerified: boolean | null;
+    domainStatus: string;
+    backupEnabled: boolean | null;
+    snapshotPolicy: string;
+    publicAccessBlocked: boolean | null;
+  };
   environmentName: string;
   registeredAppSlug: string;
   createdAt: string;
@@ -53,7 +62,7 @@ export interface DeprovisionOptions {
 }
 
 interface PageResp {
-  astroliftManagedServicesPage: CursorPage<ManagedService>;
+  astroliftManagedServiceSummariesPage: CursorPage<ManagedService>;
 }
 
 interface EnvsResp {
@@ -69,25 +78,24 @@ export function useManagedServices(slug: string) {
   const envs = useQuery<EnvsResp>(LIST_ENVIRONMENTS, {
     variables: { appSlug: slug },
   });
-  // `astroliftManagedServicesPage` searches the service name, kind,
-  // variant and environment, and takes no sort argument, so no column
-  // declares a `sortKey`. The flat field it replaces is deprecated for
-  // applying no ordering at all — row order was whatever Postgres
-  // returned — so paging also makes the list stable between polls. The
-  // 15s poll stays: a provisioning service settles while an operator
-  // watches this page.
+  // `astroliftManagedServiceSummariesPage` searches the service name,
+  // kind, variant and environment, and takes no sort argument, so no
+  // column declares a `sortKey`. It walks the rows of
+  // `astroliftManagedServicesPage` in the same order, but each row loads
+  // no config, attachments or grants (#2207), so the 15s poll stays
+  // cheap while a provisioning service settles.
   // The list state is in memory: the section lives under
   // `?section=managed-services`, which a URL list state would drop.
   const services = useCursorList<ManagedService>({
-    query: LIST_MANAGED_SERVICES_PAGE,
+    query: LIST_MANAGED_SERVICE_SUMMARIES_PAGE,
     variables: { appSlug: slug, environmentName: null },
-    extract: (d) => (d as PageResp | undefined)?.astroliftManagedServicesPage,
+    extract: (d) => (d as PageResp | undefined)?.astroliftManagedServiceSummariesPage,
     list: useLocalListState(useLocalizedList(APP_MANAGED_SERVICES_LIST)),
     pollInterval: 15000,
   });
 
   const refetch = [
-    "ListManagedServicesPage",
+    "ListManagedServiceSummariesPage",
     {
       query: LIST_MANAGED_SERVICES,
       variables: { appSlug: slug, environmentName: null },

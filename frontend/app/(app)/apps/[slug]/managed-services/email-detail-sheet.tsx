@@ -12,6 +12,7 @@ import {
   TemplateStatsView,
 } from "@/components/screens/apps/managed-services/EmailDetailSheet";
 import {
+  useAppManagedServiceConfig,
   useEmailCost,
   useEmailDetail,
   useEmailTemplates,
@@ -30,7 +31,6 @@ interface EmailDetailSheetProps {
   managedServiceId: string;
   serviceName: string;
   appSlug: string;
-  serviceConfig: Record<string, unknown>;
   open: boolean;
   onOpenChange: (next: boolean) => void;
 }
@@ -44,11 +44,14 @@ export function EmailDetailSheet({
   managedServiceId,
   serviceName,
   appSlug,
-  serviceConfig,
   open,
   onOpenChange,
 }: EmailDetailSheetProps) {
-  const { detail, loading, onRefetch } = useEmailDetail(managedServiceId, open);
+  const { detail: loaded, loading, onRefetch } = useEmailDetail(managedServiceId, open);
+  // The panels write over this config, so none renders before it is read.
+  const config = useAppManagedServiceConfig(appSlug, managedServiceId, open);
+  const detail = config ? loaded : null;
+  const serviceConfig = config ?? {};
   // SES is the only backend that writes its own verification records, on AWS.
   const onAws = detail?.pluginSlug === "aws";
   const dns = useWithheldCapabilities({ skip: !onAws }).dns;
@@ -60,7 +63,7 @@ export function EmailDetailSheet({
       open={open}
       onOpenChange={onOpenChange}
       detail={detail}
-      loading={loading}
+      loading={loading || (open && config === null)}
       dnsRestriction={onAws ? dns : null}
       panels={
         detail

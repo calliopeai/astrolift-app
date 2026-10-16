@@ -32,7 +32,7 @@ const slots = {
     <EmailDetailSheetView
       {...EMAIL_SHEET}
       serviceName={svc.name}
-      serviceConfig={svc.config ?? EMAIL_CONFIG}
+      serviceConfig={EMAIL_CONFIG}
       onOpenChange={onOpenChange}
     />
   ),

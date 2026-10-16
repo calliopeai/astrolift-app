@@ -28,6 +28,7 @@ import {
   UPDATE_MANAGED_SERVICE,
 } from "@/graphql/services/services.mutations";
 import {
+  GET_APP_MANAGED_SERVICE_CONFIG,
   GET_EMAIL_ENGAGEMENT_METRICS,
   GET_EMAIL_MESSAGES,
   GET_EMAIL_SERVICE_DETAIL,
@@ -63,6 +64,27 @@ export function useEmailDetail(managedServiceId: string, open: boolean) {
       void refetch();
     },
   };
+}
+
+/**
+ * The service's config by exact GUID (#2207). The services table loads
+ * no config, so the sheet reads it here; null until it has loaded, and
+ * null when the GUID no longer resolves for this app.
+ */
+export function useAppManagedServiceConfig(
+  appSlug: string,
+  managedServiceId: string,
+  open: boolean
+): Record<string, unknown> | null {
+  const { data } = useQuery<{
+    astroliftAppManagedService: { id: string; config: Record<string, unknown> } | null;
+  }>(GET_APP_MANAGED_SERVICE_CONFIG, {
+    variables: { appSlug, id: managedServiceId },
+    skip: !open,
+    fetchPolicy: "cache-and-network",
+  });
+  const row = data?.astroliftAppManagedService;
+  return row && row.id === managedServiceId ? (row.config ?? {}) : null;
 }
 
 // ── Cost-per-period tile (#630) ────────────────────────────────────
@@ -232,7 +254,11 @@ interface UpdateManagedServiceResp {
 /** Saves the sender fields into the service config. */
 export function useSenderConfig(managedServiceId: string, serviceConfig: Record<string, unknown>) {
   const t = useTranslations("appEmailService.toasts");
-  const [updateSvc, { loading }] = useMutation<UpdateManagedServiceResp>(UPDATE_MANAGED_SERVICE);
+  // The next save spreads this config, so it must be re-read once a save lands.
+  const [updateSvc, { loading }] = useMutation<UpdateManagedServiceResp>(UPDATE_MANAGED_SERVICE, {
+    refetchQueries: ["GetAppManagedServiceConfig"],
+    awaitRefetchQueries: true,
+  });
 
   /**
    * Writes `values` over the current config (blank values drop the key).
