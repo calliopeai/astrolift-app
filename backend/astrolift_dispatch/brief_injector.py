@@ -60,6 +60,7 @@ def brief_env_vars(task: AgentTask) -> list[dict[str, str]]:
             {"name": "ASTROLIFT_CLUSTER_KEY", "value": callback_key},
         ]
     )
+    env.extend(conversation_transfer_env_vars(task))
 
     if not task.brief_id:
         return env
@@ -205,6 +206,23 @@ def dispatch_input_env_vars(task: AgentTask) -> list[dict[str, str]]:
             "value": json.dumps(payload, separators=(",", ":")),
         }
     ]
+
+
+def conversation_transfer_env_vars(task: AgentTask) -> list[dict[str, str]]:
+    """Point a paused arrival's runner at its transfer endpoint (#1971).
+
+    Present only for a task hosting a moved conversation. The runner then
+    installs the envelope, waits for commit, and resumes the conversation
+    instead of running ``AGENT_PROMPT``.
+    """
+    from astrolift_agents.models import AgentConversationTransfer, AgentTask
+
+    if not isinstance(task, AgentTask) or task.pk is None:
+        return []
+    if not AgentConversationTransfer.objects.filter(agent_task_id=task.pk).exists():
+        return []
+    url = f"{_get_controller_url()}/api/dispatch/v1/agents/{task.guid}/transfer/"
+    return [{"name": "ASTROLIFT_CONVERSATION_TRANSFER_URL", "value": url}]
 
 
 def inject_brief_into_job_spec(job_spec: dict[str, Any], task: AgentTask) -> dict[str, Any]:

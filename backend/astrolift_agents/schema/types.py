@@ -339,6 +339,48 @@ class AgentTaskInputMessageType:
     client_request_id: str | None = None
 
 
+@strawberry.type(name="AstroliftConversationTransferCapability")
+class ConversationTransferCapabilityType:
+    """Whether an agent's environment can host a moved conversation (#1971).
+
+    The IDE reads this before it sends anything, and writes
+    ``destinationIdentity`` into its record's ``destination.identity``.
+    ``reason`` says why ``managedConversation`` is false.
+    """
+
+    managed_conversation: bool
+    harness_host_contract: str
+    undo: bool
+    protocol_version: int
+    destination_identity: str
+    max_envelope_bytes: int
+    reason: str
+
+
+@strawberry.type(name="AstroliftConversationTransfer")
+class ConversationTransferType:
+    """A managed conversation moving into an Astrolift session (#1971).
+
+    ``record`` is the TaskTransferRecord as this receiver acknowledged it.
+    ``uploadUrl`` is set only while the arrival waits for its envelope.
+    ``progress`` lists ``{phase, status, at, reason?}`` install reports.
+    """
+
+    id: GUID
+    transfer_id: str
+    state: str
+    record: JSON
+    snapshot_sha256: str
+    envelope_sha256: str
+    upload_url: str
+    progress: JSON
+    abort_reason: str
+    agent_task_id: GUID | None
+    acknowledged_at: dt.datetime | None
+    committed_at: dt.datetime | None
+    aborted_at: dt.datetime | None
+
+
 @strawberry.type(name="AstroliftAgentEnvironmentSpec")
 class AgentEnvironmentSpecType:
     """A reusable, org-scoped recipe for the container environment an
@@ -837,6 +879,24 @@ def agent_task_input_message_to_type(msg) -> AgentTaskInputMessageType:
         created_at=msg.created_at,
         delivered_at=msg.delivered_at,
         client_request_id=str(msg.client_request_id) if msg.client_request_id else None,
+    )
+
+
+def conversation_transfer_to_type(transfer, *, upload_url: str = "") -> ConversationTransferType:
+    return ConversationTransferType(
+        id=GUID(str(transfer.guid)),
+        transfer_id=transfer.transfer_id,
+        state=transfer.state,
+        record=transfer.record,
+        snapshot_sha256=transfer.snapshot_sha256,
+        envelope_sha256=transfer.envelope_sha256,
+        upload_url=upload_url,
+        progress=transfer.progress,
+        abort_reason=transfer.abort_reason,
+        agent_task_id=GUID(str(transfer.agent_task.guid)) if transfer.agent_task_id else None,
+        acknowledged_at=transfer.acknowledged_at,
+        committed_at=transfer.committed_at,
+        aborted_at=transfer.aborted_at,
     )
 
 

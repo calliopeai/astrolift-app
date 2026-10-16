@@ -2454,6 +2454,38 @@ type AstroliftContainerStatus {
   resources: AstroliftContainerResources!
 }
 
+type AstroliftConversationTransfer {
+  id: GUID!
+  transferId: String!
+  state: String!
+  record: JSON!
+  snapshotSha256: String!
+  envelopeSha256: String!
+  uploadUrl: String!
+  progress: JSON!
+  abortReason: String!
+  agentTaskId: GUID
+  acknowledgedAt: DateTime
+  committedAt: DateTime
+  abortedAt: DateTime
+}
+
+type AstroliftConversationTransferCapability {
+  managedConversation: Boolean!
+  harnessHostContract: String!
+  undo: Boolean!
+  protocolVersion: Int!
+  destinationIdentity: String!
+  maxEnvelopeBytes: Int!
+  reason: String!
+}
+
+type AstroliftConversationTransferMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftConversationTransfer
+}
+
 type AstroliftCostAttribution {
   attributedRows: [AstroliftCostBindingRow!]!
   unattributedCents: Int!
@@ -7385,6 +7417,12 @@ input ConnectZentinelleInput {
   gatewayUrl: String = null
 }
 
+input ConversationTransferRecordInput {
+  record: JSON!
+  snapshotSha256: String! = ""
+  reason: String! = ""
+}
+
 enum CostWindow {
   H24
   D7
@@ -9868,6 +9906,10 @@ type Mutation {
   registerOrgSkillRepo(input: RegisterOrgSkillRepoInput!, orgId: ID!): AstroliftOrgSkillRepoMutationResult!
   updateOrgSkillRepo(input: UpdateOrgSkillRepoInput!): AstroliftOrgSkillRepoMutationResult!
   removeOrgSkillRepo(input: RemoveOrgSkillRepoInput!): AstroliftOrgSkillRepoMutationResult!
+  prepareConversationTransfer(input: PrepareConversationTransferInput!): AstroliftConversationTransferMutationResult!
+  verifyConversationTransfer(input: ConversationTransferRecordInput!): AstroliftConversationTransferMutationResult!
+  commitConversationTransfer(input: ConversationTransferRecordInput!): AstroliftConversationTransferMutationResult!
+  abortConversationTransfer(input: ConversationTransferRecordInput!): AstroliftConversationTransferMutationResult!
 
   """
   Start the exact reviewed definition with declared inputs and an actor-scoped requestId; retry the same request after an uncertain response.
@@ -10269,6 +10311,14 @@ type PreSignedUrlUploadResult {
   publicUrl: String
   fileUrl: String
   uuid: UUID
+}
+
+input PrepareConversationTransferInput {
+  agentSlug: String!
+  record: JSON!
+  envelopeSha256: String!
+  envelopeBytes: Int!
+  environmentSpecId: GUID = null
 }
 
 type ProcessFileResult {
@@ -10839,6 +10889,8 @@ type Query {
   agentTask(id: ID!): AstroliftAgentTask
   agentTaskTransitionsSince(orgId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentTask!]!
   agentTaskInputMessage(taskId: ID!, clientRequestId: String!): AstroliftAgentTaskInputMessage
+  conversationTransferCapability(agentSlug: String!, environmentSpecId: GUID = null): AstroliftConversationTransferCapability
+  conversationTransfer(transferId: String!): AstroliftConversationTransfer
   agentTaskByClientRequestId(orgId: ID!, clientRequestId: String!): AstroliftAgentTask
   agentTaskInteractions(orgId: ID!, taskId: ID!, since: DateTime = null, limit: Int! = 200): [AstroliftAgentInteraction!]!
   agentTaskBacklog(orgId: ID!, taskId: ID!): AstroliftAgentTaskBacklog
