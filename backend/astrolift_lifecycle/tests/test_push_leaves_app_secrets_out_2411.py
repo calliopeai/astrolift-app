@@ -244,13 +244,13 @@ def test_push_writes_the_manifest_edits_and_no_secret_value(permission_resolver,
     result = _push(app)
 
     assert result.ok, result.errors
-    assert result.data.note == "pushed"
-    assert result.data.branch_name == _HEAD
-    assert repo.fetches == ["main"]
     [(branch, written)] = repo.writes
-    assert branch == _HEAD
     for value in platform_env.values():
         assert value not in written
+    assert result.data.note == "pushed"
+    assert result.data.branch_name == branch == _HEAD
+    # The [env] written is the one on the pull request's base branch.
+    assert repo.fetches == ["main"]
     pushed = tomllib.loads(written)
     # The repo's [env] as it is, the platform's rotation and deletion not
     # carried either; the edit outside [env] is.
