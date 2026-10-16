@@ -6771,6 +6771,40 @@ input AstroliftWorkloadsFilter {
   owner: [String!] = null
 }
 
+type AstroliftZentinelleAuditEvent {
+  id: String!
+  occurredAt: DateTime
+  action: String!
+  resourceType: String!
+  resourceId: String!
+  resourceName: String!
+  agentSlug: String!
+  agentId: String!
+  actor: String!
+}
+
+type AstroliftZentinelleAuditExport {
+  filename: String!
+  content: String!
+  contentType: String!
+  rowCount: Int!
+}
+
+type AstroliftZentinelleAuditExportMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftZentinelleAuditExport
+}
+
+type AstroliftZentinelleAuditPage {
+  events: [AstroliftZentinelleAuditEvent!]!
+  nextCursor: String
+}
+
+type AstroliftZentinelleCapability {
+  connected: Boolean!
+}
+
 type AstroliftZentinelleClusterGateway {
   clusterId: GUID!
   clusterSlug: String!
@@ -6820,6 +6854,31 @@ type AstroliftZentinelleDisconnectMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftZentinelleDisconnect
+}
+
+type AstroliftZentinellePolicy {
+  id: String!
+  name: String!
+  policyType: String!
+  enforcement: String!
+  scope: String!
+  priority: Int!
+  description: String!
+}
+
+type AstroliftZentinelleUsage {
+  since: DateTime!
+  rows: [AstroliftZentinelleUsageRow!]!
+}
+
+type AstroliftZentinelleUsageRow {
+  agentSlug: String!
+  provider: String!
+  model: String!
+  requests: Int!
+  inputTokens: Int!
+  outputTokens: Int!
+  costUsd: Float!
 }
 
 input AttachCloudflareDnsZoneInput {
@@ -8041,6 +8100,15 @@ input ExportAuditEventsInput {
   targetId: String = null
   subjectUserId: String = null
   filter: AstroliftAuditEventsFilter = null
+}
+
+input ExportZentinelleAuditInput {
+  since: DateTime!
+  until: DateTime = null
+  format: String! = "ndjson"
+  agentSlug: String = null
+  projectId: GUID = null
+  teamId: GUID = null
 }
 
 input ExtendPreviewTtlInputGql {
@@ -9712,6 +9780,7 @@ type Mutation {
   registerZentinelleSharedCluster(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
   moveZentinelleSharedClusterToInstall(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
   unregisterZentinelleSharedCluster(input: ZentinelleClusterInput!): AstroliftZentinelleClusterGatewayMutationResult!
+  exportZentinelleAudit(input: ExportZentinelleAuditInput!): AstroliftZentinelleAuditExportMutationResult!
   registerTenantCluster(input: RegisterTenantClusterInput!): AstroliftTenantClusterMutationResult!
   issueClusterAgentKey(input: IssueClusterAgentKeyInput!): ClusteragentkeyissuedpayloadMutationResult!
   deployClusterAgent(input: DeployClusterAgentInput!): AstroliftTenantClusterMutationResult!
@@ -10644,6 +10713,10 @@ type Query {
   astroliftElevationStatus: AstroliftElevationStatus!
   installAlertMailSupport(eventKind: String! = "deploy.failed"): InstallAlertMailSupport!
   installAlertMailTestsPage(eventKind: String! = "deploy.failed", after: String = null, limit: Int! = 25): InstallAlertMailTestPage!
+  astroliftZentinelleCapability: AstroliftZentinelleCapability!
+  astroliftZentinelleUsage(since: DateTime = null, agentSlug: String = null, projectId: GUID = null, teamId: GUID = null): AstroliftZentinelleUsage!
+  astroliftZentinellePolicies(agentSlug: String = null, projectId: GUID = null): [AstroliftZentinellePolicy!]!
+  astroliftZentinelleAuditPage(since: DateTime = null, cursor: String = null, limit: Int! = 100, agentSlug: String = null, projectId: GUID = null, teamId: GUID = null): AstroliftZentinelleAuditPage!
   astroliftTopologyTraffic(appSlug: String!, start: DateTime!, end: DateTime!, environmentName: String = null): TopologyTraffic
   astroliftEvent(id: GUID!): AstroliftEvent
   astroliftAlertRule(id: GUID!): AstroliftAlertRule

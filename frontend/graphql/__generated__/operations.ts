@@ -6330,6 +6330,40 @@ export type AstroliftWorkloadsFilter = {
   owner: InputMaybe<Array<Scalars['String']['input']>>;
 };
 
+export type AstroliftZentinelleAuditEvent = {
+  action: Scalars['String']['output'];
+  actor: Scalars['String']['output'];
+  agentId: Scalars['String']['output'];
+  agentSlug: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  occurredAt?: Maybe<Scalars['DateTime']['output']>;
+  resourceId: Scalars['String']['output'];
+  resourceName: Scalars['String']['output'];
+  resourceType: Scalars['String']['output'];
+};
+
+export type AstroliftZentinelleAuditExport = {
+  content: Scalars['String']['output'];
+  contentType: Scalars['String']['output'];
+  filename: Scalars['String']['output'];
+  rowCount: Scalars['Int']['output'];
+};
+
+export type AstroliftZentinelleAuditExportMutationResult = {
+  data?: Maybe<AstroliftZentinelleAuditExport>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftZentinelleAuditPage = {
+  events: Array<AstroliftZentinelleAuditEvent>;
+  nextCursor?: Maybe<Scalars['String']['output']>;
+};
+
+export type AstroliftZentinelleCapability = {
+  connected: Scalars['Boolean']['output'];
+};
+
 export type AstroliftZentinelleClusterGateway = {
   clusterId: Scalars['GUID']['output'];
   clusterSlug: Scalars['String']['output'];
@@ -6379,6 +6413,31 @@ export type AstroliftZentinelleDisconnectMutationResult = {
   data?: Maybe<AstroliftZentinelleDisconnect>;
   errors: Array<MutationError>;
   ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftZentinellePolicy = {
+  description: Scalars['String']['output'];
+  enforcement: Scalars['String']['output'];
+  id: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  policyType: Scalars['String']['output'];
+  priority: Scalars['Int']['output'];
+  scope: Scalars['String']['output'];
+};
+
+export type AstroliftZentinelleUsage = {
+  rows: Array<AstroliftZentinelleUsageRow>;
+  since: Scalars['DateTime']['output'];
+};
+
+export type AstroliftZentinelleUsageRow = {
+  agentSlug: Scalars['String']['output'];
+  costUsd: Scalars['Float']['output'];
+  inputTokens: Scalars['Int']['output'];
+  model: Scalars['String']['output'];
+  outputTokens: Scalars['Int']['output'];
+  provider: Scalars['String']['output'];
+  requests: Scalars['Int']['output'];
 };
 
 export type AttachCloudflareDnsZoneInput = {
@@ -7565,6 +7624,15 @@ export type ExportAuditEventsInput = {
   subjectUserId: InputMaybe<Scalars['String']['input']>;
   targetId: InputMaybe<Scalars['String']['input']>;
   targetKind: InputMaybe<Scalars['String']['input']>;
+};
+
+export type ExportZentinelleAuditInput = {
+  agentSlug: InputMaybe<Scalars['String']['input']>;
+  format: Scalars['String']['input'];
+  projectId: InputMaybe<Scalars['GUID']['input']>;
+  since: Scalars['DateTime']['input'];
+  teamId: InputMaybe<Scalars['GUID']['input']>;
+  until: InputMaybe<Scalars['DateTime']['input']>;
 };
 
 export type ExtendPreviewTtlInputGql = {
@@ -9064,6 +9132,7 @@ export type Mutation = {
   ensureAgentBox: AstroliftAgentBoxMutationResult;
   exportAstroliftAppLogs: AstroliftAppLogExportMutationResult;
   exportAuditEvents: AstroliftAuditExportMutationResult;
+  exportZentinelleAudit: AstroliftZentinelleAuditExportMutationResult;
   extendPreviewTtl: AstroliftPreviewEnvironmentMutationResult;
   /** Upload a file and get a pre-signed URL. Creates a FileUpload wrapper around the Upload. */
   fileUpload: FileUploadResult;
@@ -10221,6 +10290,11 @@ export type MutationExportAstroliftAppLogsArgs = {
 
 export type MutationExportAuditEventsArgs = {
   input: ExportAuditEventsInput;
+};
+
+
+export type MutationExportZentinelleAuditArgs = {
+  input: ExportZentinelleAuditInput;
 };
 
 
@@ -12484,8 +12558,12 @@ export type Query = {
   /** @deprecated Caps at 200 rows with no way to reach the 201st. Use astroliftWorkloadsPage. */
   astroliftWorkloads: Array<AstroliftWorkload>;
   astroliftWorkloadsPage: AstroliftWorkloadPage;
+  astroliftZentinelleAuditPage: AstroliftZentinelleAuditPage;
+  astroliftZentinelleCapability: AstroliftZentinelleCapability;
   astroliftZentinelleConnection?: Maybe<AstroliftZentinelleConnection>;
   astroliftZentinelleInstallConnection?: Maybe<AstroliftZentinelleConnection>;
+  astroliftZentinellePolicies: Array<AstroliftZentinellePolicy>;
+  astroliftZentinelleUsage: AstroliftZentinelleUsage;
   /**
    * Query mutation audit logs. Superuser only.
    * @deprecated Caps at 200 rows with no way to reach the 201st. Use auditLogsPage.
@@ -14447,6 +14525,30 @@ export type QueryAstroliftWorkloadsPageArgs = {
   pageSize?: InputMaybe<Scalars['Int']['input']>;
   search?: InputMaybe<Scalars['String']['input']>;
   sort?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftZentinelleAuditPageArgs = {
+  agentSlug?: InputMaybe<Scalars['String']['input']>;
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  limit?: Scalars['Int']['input'];
+  projectId?: InputMaybe<Scalars['GUID']['input']>;
+  since?: InputMaybe<Scalars['DateTime']['input']>;
+  teamId?: InputMaybe<Scalars['GUID']['input']>;
+};
+
+
+export type QueryAstroliftZentinellePoliciesArgs = {
+  agentSlug?: InputMaybe<Scalars['String']['input']>;
+  projectId?: InputMaybe<Scalars['GUID']['input']>;
+};
+
+
+export type QueryAstroliftZentinelleUsageArgs = {
+  agentSlug?: InputMaybe<Scalars['String']['input']>;
+  projectId?: InputMaybe<Scalars['GUID']['input']>;
+  since?: InputMaybe<Scalars['DateTime']['input']>;
+  teamId?: InputMaybe<Scalars['GUID']['input']>;
 };
 
 
