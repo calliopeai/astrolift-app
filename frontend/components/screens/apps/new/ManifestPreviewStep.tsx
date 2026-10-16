@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DEFAULT_DOCKERFILE, detectBuildPaths } from "@/lib/manifest/build-paths";
 import { detectTomlSchema } from "@/lib/manifest/schema-detect";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,10 @@ export interface ManifestPreviewFields {
   manifestValid: boolean;
   manifestErrors: string[];
   manifestLater: boolean;
+  /** Null shows (and registers with) the context detected from the manifest. */
+  buildContext: string | null;
+  /** Null shows (and registers with) `Dockerfile`, relative to the build context. */
+  dockerfilePath: string | null;
 }
 
 export interface ManifestPreviewStepProps<S extends ManifestPreviewFields> {
@@ -51,8 +56,9 @@ export interface ManifestPreviewStepProps<S extends ManifestPreviewFields> {
 }
 
 /**
- * Wizard step 2: manifest path, the fetched (or seeded) astrolift.toml, and
- * the "set up manifest later" escape hatch.
+ * Wizard step 2: manifest path, the build context and Dockerfile detected
+ * from it (editable, astrolift-cli #159), the fetched (or seeded)
+ * astrolift.toml, and the "set up manifest later" escape hatch.
  */
 export function ManifestPreviewStepView<S extends ManifestPreviewFields>({
   state,
@@ -68,6 +74,14 @@ export function ManifestPreviewStepView<S extends ManifestPreviewFields>({
   const code = (chunks: React.ReactNode) => <code className="font-mono">{chunks}</code>;
   const agentConfigDetected = detectTomlSchema(state.manifestRaw) === "agent_config";
   const isReadOnly = (fetchState === "found" && !editing) || state.manifestLater;
+  const detected = detectBuildPaths(state.manifestPath, state.manifestRaw);
+  const contextHelp = state.buildContext?.trim()
+    ? t("buildContextEdited")
+    : detected.source === "manifestDirectory"
+      ? t.rich("buildContextFromDirectory", { code })
+      : detected.source === "manifestPaths"
+        ? t.rich("buildContextFromManifest", { code })
+        : t("buildContextFromRoot");
 
   return (
     <div className="flex flex-col gap-4">
@@ -90,6 +104,31 @@ export function ManifestPreviewStepView<S extends ManifestPreviewFields>({
             onChange={(e) => setState((s) => ({ ...s, defaultBranch: e.target.value }))}
             className="font-mono text-xs"
           />
+        </div>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="build-context">{t("buildContextLabel")}</Label>
+          <Input
+            id="build-context"
+            value={state.buildContext ?? detected.buildContext}
+            placeholder={detected.buildContext}
+            onChange={(e) => setState((s) => ({ ...s, buildContext: e.target.value }))}
+            className="font-mono text-xs"
+          />
+          <p className="text-muted-foreground text-xs">{contextHelp}</p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="dockerfile-path">{t("dockerfileLabel")}</Label>
+          <Input
+            id="dockerfile-path"
+            value={state.dockerfilePath ?? detected.dockerfilePath}
+            placeholder={DEFAULT_DOCKERFILE}
+            onChange={(e) => setState((s) => ({ ...s, dockerfilePath: e.target.value }))}
+            className="font-mono text-xs"
+          />
+          <p className="text-muted-foreground text-xs">{t("dockerfileHelp")}</p>
         </div>
       </div>
 

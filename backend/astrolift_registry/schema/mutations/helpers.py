@@ -299,8 +299,9 @@ def _validate_build_path_field(raw, *, field: str):
 
     Returns ``(value, error)`` mirroring ``_validate_build_mode``. A None
     or empty input passes straight through unchanged -- ``register_app``
-    applies its own ``"Dockerfile"``/``"."`` default on an empty value,
-    and ``update_app``'s ``None`` is the "leave untouched" sentinel.
+    applies ``"Dockerfile"`` and detects the build context on an empty
+    value (``astrolift_manifest.build_context``), and ``update_app``'s
+    ``None`` is the "leave untouched" sentinel.
     ``field`` is the GraphQL-facing input field name (e.g.
     ``"dockerfilePath"``), used both in the error message and the
     envelope's ``field`` so the FE can point at the right input.

@@ -11065,7 +11065,11 @@ input RegisterAppInput {
   buildMode: String! = "ci_pushed"
   buildStrategy: String! = "off"
   dockerfilePath: String! = "Dockerfile"
-  buildContext: String! = "."
+
+  """
+  Build context, relative to the repository root. Omit it to use the manifest's directory, or the repository root when the manifest sets build_context or dockerfile_path itself.
+  """
+  buildContext: String = null
   buildArgs: JSON = null
   cronExpression: String = null
   requiresApproval: Boolean = null

@@ -30,6 +30,8 @@ from collections.abc import Mapping
 from pathlib import PurePosixPath
 from typing import Any
 
+from astrolift_manifest.build_context import detected_build_context, sets_build_paths
+
 # ---- runtime detection --------------------------------------------------
 
 
@@ -638,6 +640,8 @@ def scan_agent_manifests_with_skips(
 # (``apps/<slug>`` for a monorepo service, ``"."`` for a root manifest) so each
 # service builds from its own subdir — the build activity reads
 # ``RegisteredApp.build_context`` as the context path within the source tree.
+# A manifest that names its own ``build_context`` / ``dockerfile_path`` gets
+# ``"."`` instead, so those paths apply (``astrolift_manifest.build_context``).
 _APPS_DIR = "apps"
 
 
@@ -650,7 +654,8 @@ class DiscoveredAppManifest:
     ``(source_repo, manifest_path)`` uniqueness, so re-scans dedupe on it).
     ``build_context`` is the manifest's own directory — the subdir the service
     builds from (``"."`` for a root manifest) — so each service in a monorepo
-    builds from its own folder. ``name`` is the manifest's top-level name;
+    builds from its own folder; ``"."`` when the manifest names its own build
+    paths, which then apply as declared. ``name`` is the manifest's top-level name;
     ``workload_count`` is how many workloads the manifest declares (a
     self-describing preview hint).
     """
@@ -688,9 +693,11 @@ def _candidate_app_manifest_paths(files: Mapping[str, Any]) -> list[str]:
     return sorted(set(out))
 
 
-def _parse_app_manifest(text: str | None) -> tuple[str, int, str] | None:
-    """Parse one manifest body and return ``(name, workload_count, app_kind)`` when it is
-    an app manifest, else ``None``.
+def _parse_app_manifest(text: str | None) -> tuple[str, int, str, bool] | None:
+    """Parse one manifest body and return ``(name, workload_count, app_kind,
+    sets_build_paths)`` when it is an app manifest, else ``None``.
+    ``sets_build_paths`` is True when a container, job or task names its own
+    ``build_context`` or ``dockerfile_path``.
 
     A manifest qualifies as an app when it declares at least one *non-agent*
     workload. A pure single-agent manifest (its sole workload is
@@ -713,7 +720,10 @@ def _parse_app_manifest(text: str | None) -> tuple[str, int, str] | None:
         return None
     if not any(w.kind != "agent" for w in manifest.workloads):
         return None
-    return manifest.name, len(manifest.workloads), manifest.app_kind
+    declares = any(
+        sets_build_paths(c.dockerfile_path, c.build_context) for w in manifest.workloads for c in w.containers
+    )
+    return manifest.name, len(manifest.workloads), manifest.app_kind, declares
 
 
 def scan_app_manifests(files: Mapping[str, Any]) -> list[DiscoveredAppManifest]:
@@ -733,8 +743,8 @@ def scan_app_manifests(files: Mapping[str, Any]) -> list[DiscoveredAppManifest]:
         parsed = _parse_app_manifest(files.get(path) if isinstance(files.get(path), str) else None)
         if parsed is None:
             continue
-        name, workload_count, app_kind = parsed
-        build_context = path.rsplit("/", 1)[0] if "/" in path else "."
+        name, workload_count, app_kind, declares_build_paths = parsed
+        build_context = detected_build_context(path, manifest_sets_build_paths=declares_build_paths)
         found.append(
             DiscoveredAppManifest(
                 manifest_path=path,

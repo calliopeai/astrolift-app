@@ -3935,6 +3935,28 @@
         "toastFailed": "Impossible d’enregistrer les détails de l’application",
         "save": "Enregistrer"
       },
+      "build": {
+        "title": "Compilation",
+        "description": "D’où l’image est compilée. Le contexte de compilation est relatif à la racine du dépôt, et le Dockerfile au contexte de compilation.",
+        "buildContext": "Contexte de compilation",
+        "dockerfile": "Dockerfile",
+        "contextRequired": "Saisissez un contexte de compilation. Utilisez . pour la racine du dépôt.",
+        "dockerfileRequired": "Saisissez le chemin d’un Dockerfile.",
+        "defaultsHelp": "Un chemin laissé à sa valeur par défaut (. ou Dockerfile) laisse un build_context ou un dockerfile_path défini dans le manifeste en décider.",
+        "prebuilt": "Cette application déploie une image déjà compilée : rien n’est compilé depuis ces chemins tant que son mode de compilation ne change pas.",
+        "resyncCi": "Enregistré. Le workflow de CI du dépôt compile depuis les chemins précédents tant que vous ne l’avez pas synchronisé, dans la configuration CI ou avec cette commande :",
+        "platformBuild": "Enregistré. La prochaine compilation par la plateforme utilise ces chemins.",
+        "buildMode": "Mode de compilation",
+        "manifest": "Manifeste",
+        "modes": {
+          "ci_pushed": "Votre CI compile et publie",
+          "platform_build": "Astrolift compile",
+          "none": "Image déjà compilée"
+        },
+        "save": "Enregistrer",
+        "toastSaved": "Paramètres de compilation enregistrés",
+        "toastFailed": "Impossible d’enregistrer les paramètres de compilation"
+      },
       "empty": "Aucun contenu ici pour cette application."
     },
     "environmentOverrides": {
@@ -6924,6 +6946,13 @@
       "pathLabel": "Chemin du manifeste",
       "pathHelp": "Emplacement de <code>astrolift.toml</code> dans le dépôt. Par défaut, la racine du dépôt. Un monorepo peut héberger plusieurs apps ; faites pointer chaque enregistrement vers son propre chemin (p. ex. <code>services/api/astrolift.toml</code>).",
       "branchLabel": "Branche par défaut",
+      "buildContextLabel": "Contexte de compilation",
+      "buildContextFromDirectory": "Le répertoire du manifeste : l’application est donc compilée à partir de là. Saisissez <code>.</code> pour la racine du dépôt.",
+      "buildContextFromRoot": "La racine du dépôt, où se trouve le manifeste.",
+      "buildContextFromManifest": "La racine du dépôt : le manifeste définit lui-même <code>build_context</code> ou <code>dockerfile_path</code>, qui s’appliquent depuis son répertoire.",
+      "buildContextEdited": "Tel que saisi, relatif à la racine du dépôt. Videz le champ pour revenir au contexte détecté.",
+      "dockerfileLabel": "Dockerfile",
+      "dockerfileHelp": "Relatif au contexte de compilation.",
       "laterTitle": "Configurer le manifeste plus tard",
       "laterHelp": "Enregistrez l’application maintenant, sans manifeste. Vous arriverez sur l’onglet <b>Manifeste</b> de l’application, où vous pourrez ajouter ou synchroniser <code>astrolift.toml</code> quand vous serez prêt. Utile pour un dépôt vide ou un dépôt de configuration d’agents dont le schéma n’est pas un manifeste d’application.",
       "label": "Manifeste",
@@ -6958,6 +6987,9 @@
       "defaultBranch": "Branche par défaut",
       "sourceKind": "Type de source",
       "manifestPath": "Chemin du manifeste",
+      "buildContext": "Contexte de compilation",
+      "dockerfile": "Dockerfile",
+      "buildFromManifest": "Défini dans le manifeste",
       "manifest": "Manifeste",
       "manifestLater": "À configurer plus tard",
       "manifestState": "{origin, select, repo {Chargé depuis le dépôt} other {Rédigé ici}}, {valid, select, yes {structure valide} other {non valide}}",

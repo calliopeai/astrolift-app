@@ -42,7 +42,18 @@ class RegisterAppInput:
     # ``nixpacks``. Validated against the model choices.
     build_strategy: str = "off"
     dockerfile_path: str = "Dockerfile"
-    build_context: str = "."
+    # None (or blank) detects the context once the manifest is read:
+    # the manifest's own directory, or "." when the manifest names its own
+    # build_context / dockerfile_path (astrolift-cli #159). An explicit "."
+    # keeps the repository root.
+    build_context: str | None = strawberry.field(
+        default=None,
+        description=(
+            "Build context, relative to the repository root. Omit it to use the "
+            "manifest's directory, or the repository root when the manifest sets "
+            "build_context or dockerfile_path itself."
+        ),
+    )
     build_args: strawberry.scalars.JSON | None = None
     # Five-field cron expression. Required when ``trigger_mode == 'cron'``
     # and ignored otherwise; the resolver enforces both rules.

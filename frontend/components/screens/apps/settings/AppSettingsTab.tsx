@@ -25,6 +25,8 @@ export interface AppSettingsTabSlots {
   assignProject?: React.ReactNode;
   teams?: React.ReactNode;
   deployStrategy?: React.ReactNode;
+  /** Build context and Dockerfile (BuildSettingsView). */
+  build?: React.ReactNode;
   /** Shown only when the app has a repository. */
   ciSetup?: React.ReactNode;
   resync?: React.ReactNode;
@@ -100,7 +102,7 @@ const GENERAL_GROUPS: {
     key: "source",
     permission: "app.update",
     access: "update",
-    slots: ["deployStrategy", "ciSetup", "resync"],
+    slots: ["deployStrategy", "build", "ciSetup", "resync"],
   },
   {
     key: "deploys",

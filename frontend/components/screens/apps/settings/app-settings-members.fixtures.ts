@@ -8,6 +8,7 @@ import type { AstroliftManagedService } from "@/graphql/services/services.types"
 
 import type { AddEnvironmentViewProps } from "./AddEnvironment";
 import type { AppIdentityViewProps } from "./AppIdentity";
+import type { BuildSettingsViewProps } from "./BuildSettings";
 import type { AppSettingsScreenProps } from "./AppSettingsScreen";
 import type { ArchiveAppViewProps } from "./ArchiveApp";
 import type { DangerZoneViewProps } from "./DangerZone";
@@ -88,6 +89,37 @@ export const IDENTITY_LONG: AppIdentityViewProps = {
   sourceRepo: `acme/${LONG}`,
   sourceUrl: `https://github.com/acme/${LONG}/tree/main/services/checkout/${LONG}`,
   defaultBranch: `release/${LONG}`,
+};
+
+// ─── build ────────────────────────────────────────────────────────────────────
+
+/** A monorepo app building from its manifest's directory (astrolift-cli #159). */
+export const BUILD: BuildSettingsViewProps = {
+  buildContext: "src/abbott-cgm",
+  dockerfilePath: "Dockerfile",
+  buildMode: "ci_pushed",
+  manifestPath: "src/abbott-cgm/astrolift.toml",
+  hasRepository: true,
+  slug: "abbott-cgm",
+  saving: false,
+  onSave: noop,
+};
+
+/** Registered before detection: the repository root, as every app was. */
+export const BUILD_ROOT: BuildSettingsViewProps = {
+  ...BUILD,
+  buildContext: ".",
+  dockerfilePath: "Dockerfile",
+  manifestPath: "astrolift.toml",
+  slug: "checkout",
+};
+
+export const BUILD_LONG: BuildSettingsViewProps = {
+  ...BUILD,
+  buildContext: `services/${LONG}`,
+  dockerfilePath: `deploy/${LONG}/Dockerfile.production`,
+  manifestPath: `services/${LONG}/astrolift.toml`,
+  slug: LONG,
 };
 
 // ─── resync ───────────────────────────────────────────────────────────────────
