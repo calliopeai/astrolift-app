@@ -535,6 +535,10 @@ jobs:
       # first shard to migrate a schema dumps it under a key of every file
       # that shapes it; later shards restore that dump and pytest reuses it
       # (`--reuse-db` still runs `migrate`, which applies anything missing).
+      # The restored schema matches a migrated one except that PostgreSQL
+      # re-parses IN-list CHECK constraints and partial-index predicates into
+      # an equivalent form, so compare those by behaviour, not by
+      # pg_get_constraintdef text, across a migration roundtrip.
       - name: Restore the migrated test database
         id: testdb
         uses: actions/cache/restore@v4
