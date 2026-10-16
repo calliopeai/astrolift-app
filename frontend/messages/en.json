@@ -423,7 +423,7 @@
     "divergedTitle": "This deploy used the saved manifest, not your repo",
     "fallbackTitle": "This deploy used the last known manifest",
     "registrationBody": "Its <code>astrolift.toml</code> couldn't be read when the app was registered, so no services were created from it. Fix the manifest and resync, or the next deploy will have nothing to ship.",
-    "divergedBody": "An unsaved draft of <code>astrolift.toml</code> is held on the platform, so the copy in your repo was left alone to avoid discarding it. Push or discard the draft, then deploy again.",
+    "divergedBody": "A draft of <code>astrolift.toml</code> on the platform has edits outside <code>[env]</code>, so the copy in your repo was left alone to avoid discarding them. Use Pull from repo on the Config page to take the repo's version, then deploy again. App secrets in <code>[env]</code> are kept.",
     "fallbackBody": "The manifest couldn't be read from your repo, so the previous one was used. Anything you pushed since the last successful read is not in this rollout.",
     "reviewDraft": "Review the draft",
     "openManifest": "Open the manifest"
@@ -2644,7 +2644,7 @@
     },
     "secrets": {
       "title": "Secrets",
-      "description": "App-level [env] literals + attached bundles + managed-service envelopes for {slug}. Set/delete writes to the staged manifest; push to repo to land.",
+      "description": "App-level [env] literals + attached bundles + managed-service envelopes for {slug}. Set/delete writes to the staged manifest on the platform; Push to repo leaves [env] values out.",
       "bulkImport": "Bulk import",
       "newSecret": "New secret",
       "environment": "Environment",
@@ -2678,7 +2678,7 @@
       "delete": {
         "title": "Delete {key}?",
         "fallbackTitle": "Delete secret?",
-        "description": "Stages the change in the platform-side manifest. Push the staged manifest to the repo from the Config page to land the change. Recoverable until pushed.",
+        "description": "Stages the removal in the platform-side manifest. App secrets in [env] stay on the platform; Push to repo doesn't carry the change.",
         "confirm": "Delete secret"
       },
       "setSheet": {
@@ -2686,7 +2686,7 @@
         "description": "Sets one literal in the app's [env] table. Plaintext is never returned by the API; only this submit ships the value to the backend.",
         "keyLabel": "Key",
         "valueLabel": "Value",
-        "valueHint": "Stored in manifest_raw_staged. Use Push to repo on the Config page to commit the change.",
+        "valueHint": "Stored in manifest_raw_staged on the platform. It never reaches the repo, not even through Push to repo.",
         "submit": "Save secret",
         "submitting": "Saving…",
         "scope": "Scope",
@@ -3191,6 +3191,7 @@
         "applied": "Applied",
         "applyFailed": "Apply failed",
         "nothingToPush": "No staged changes to push.",
+        "envOnly": "Only app secrets in [env] are staged. They stay on the platform and aren't pushed to the repo.",
         "prOpened": "PR opened: {branch}",
         "pushed": "Push complete",
         "pushFailed": "Push failed",

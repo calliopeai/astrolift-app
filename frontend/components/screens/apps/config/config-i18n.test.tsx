@@ -218,6 +218,11 @@ it.each(locales)(
     const requests: { name: string; variables: Record<string, unknown> }[] = [];
     let raw = DRAFT;
     let denied = false;
+    let pushed = {
+      prUrl: "https://source.example/pr/1",
+      branchName: "config/raw-branch",
+      note: "",
+    };
     const client = new ApolloClient({
       cache: new InMemoryCache(),
       link: new ApolloLink(
@@ -253,12 +258,7 @@ it.each(locales)(
                   pushManifestToRepo: {
                     ok: true,
                     errors: [],
-                    data: {
-                      id: APP.id,
-                      prUrl: "https://source.example/pr/1",
-                      branchName: "config/raw-branch",
-                      note: "",
-                    },
+                    data: { id: APP.id, ...pushed },
                   },
                 };
               observer.next({ data });
@@ -289,6 +289,12 @@ it.each(locales)(
       await hook.result.current.handlePush();
     });
     expect(toasts.success).toHaveBeenCalledWith(t("prOpened", { branch: "config/raw-branch" }));
+    // Only app secrets staged: a push never carries [env], so nothing goes out.
+    pushed = { prUrl: "", branchName: "", note: "env_only" };
+    await act(async () => {
+      await hook.result.current.handlePush();
+    });
+    expect(toasts.message).toHaveBeenLastCalledWith(t("envOnly"));
     denied = true;
     act(() => hook.result.current.setDraft(DRAFT));
     await act(async () => {

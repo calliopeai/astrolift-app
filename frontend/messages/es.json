@@ -423,7 +423,7 @@
     "divergedTitle": "Este despliegue usó el manifiesto guardado, no tu repositorio",
     "fallbackTitle": "Este despliegue usó el último manifiesto conocido",
     "registrationBody": "No se pudo leer su <code>astrolift.toml</code> al registrar la aplicación, así que no se creó ningún servicio a partir de él. Corrige el manifiesto y vuelve a sincronizar, o el próximo despliegue no tendrá nada que publicar.",
-    "divergedBody": "La plataforma conserva un borrador sin guardar de <code>astrolift.toml</code>, así que no se tocó la copia de tu repositorio para no descartarlo. Publica o descarta el borrador y vuelve a desplegar.",
+    "divergedBody": "Un borrador de <code>astrolift.toml</code> en la plataforma tiene cambios fuera de <code>[env]</code>, así que no se tocó la copia de tu repositorio para no descartarlos. Usa Traer del repositorio en Configuración para tomar la versión del repositorio y vuelve a desplegar. Los secretos de la aplicación en <code>[env]</code> se conservan.",
     "fallbackBody": "No se pudo leer el manifiesto de tu repositorio, así que se usó el anterior. Lo que hayas publicado desde la última lectura correcta no está en este despliegue.",
     "reviewDraft": "Revisar el borrador",
     "openManifest": "Abrir el manifiesto"
@@ -2857,7 +2857,7 @@
     },
     "secrets": {
       "title": "Secretos",
-      "description": "Valores literales de [env], paquetes adjuntos y datos de conexión de servicios administrados para {slug}. Guardar o eliminar modifica el manifiesto preparado; envíalo al repositorio para registrar el cambio.",
+      "description": "Valores literales de [env], paquetes adjuntos y datos de conexión de servicios administrados para {slug}. Guardar o eliminar modifica el manifiesto preparado en la plataforma; Enviar al repositorio deja fuera los valores de [env].",
       "bulkImport": "Importar en lote",
       "newSecret": "Nuevo secreto",
       "environment": "Entorno",
@@ -2876,7 +2876,7 @@
       "delete": {
         "title": "¿Eliminar {key}?",
         "fallbackTitle": "¿Eliminar secreto?",
-        "description": "Prepara el cambio en el manifiesto de la plataforma. Envíalo al repositorio desde Configuración para confirmarlo. Se puede recuperar hasta que lo envíes.",
+        "description": "Prepara la eliminación en el manifiesto de la plataforma. Los secretos de la aplicación en [env] se quedan en la plataforma; Enviar al repositorio no incluye el cambio.",
         "confirm": "Eliminar secreto"
       },
       "setSheet": {
@@ -2884,7 +2884,7 @@
         "description": "Define un valor literal en la tabla [env] de la app. La API no devuelve el texto sin cifrar; solo este envío entrega el valor al backend.",
         "keyLabel": "Clave",
         "valueLabel": "Valor",
-        "valueHint": "Se guarda en manifest_raw_staged. Usa Enviar al repositorio en Configuración para confirmar el cambio.",
+        "valueHint": "Se guarda en manifest_raw_staged en la plataforma. Nunca llega al repositorio, ni siquiera con Enviar al repositorio.",
         "submit": "Guardar secreto",
         "submitting": "Guardando…",
         "scope": "Ámbito",
@@ -3404,6 +3404,7 @@
         "applied": "Aplicado",
         "applyFailed": "No se pudo aplicar",
         "nothingToPush": "No hay cambios preparados para enviar.",
+        "envOnly": "Solo hay secretos de la aplicación en [env] preparados. Se quedan en la plataforma y no se envían al repositorio.",
         "prOpened": "PR abierto: {branch}",
         "pushed": "Envío completado",
         "pushFailed": "No se pudo enviar",

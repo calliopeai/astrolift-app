@@ -31,7 +31,9 @@ was.
 
 Used by the GraphQL secrets resolver (#279). Mutations write to
 the staging buffer (``manifest_raw_staged``); the user-driven
-'Push to Repo' flow re-serializes to the source repo.
+'Push to Repo' flow re-serializes it to the source repo with the
+repo's own ``[env]`` in place of the staged one
+(``with_app_env_from``, #2411), so secret values never reach git.
 """
 
 from __future__ import annotations
@@ -1118,6 +1120,38 @@ def reapply_app_env_edits(toml_text: str, edits: AppEnvEdits) -> str:
         data["env"] = updated
     else:
         data.pop("env", None)
+    return tomli_w.dumps(data)
+
+
+_NO_ENV_TABLE = object()
+
+
+def with_app_env_from(toml_text: str, source_text: str) -> str | None:
+    """``toml_text`` with the top-level ``[env]`` table of ``source_text`` in
+    place of its own, or with no top-level ``env`` at all when
+    ``source_text`` has no such table or does not parse.
+
+    What Push to repo writes (#2411): the staged draft with the ``[env]``
+    the repo already has, so the pull request carries none of the values
+    the platform keeps in that table. ``toml_text`` itself, byte for byte,
+    when it already has that table. Otherwise a ``tomli_w`` dump, as
+    :func:`reapply_app_env_edits` writes. None when ``toml_text`` does not
+    parse, since its ``[env]`` can't then be told apart from the rest."""
+    import tomli_w
+
+    data = _loads_or_none(toml_text or "")
+    if data is None:
+        return None
+    source = _loads_or_none(source_text or "") or {}
+    env = source.get("env", _NO_ENV_TABLE)
+    if not isinstance(env, dict):
+        env = _NO_ENV_TABLE
+    if data.get("env", _NO_ENV_TABLE) == env:
+        return toml_text
+    if env is _NO_ENV_TABLE:
+        data.pop("env", None)
+    else:
+        data["env"] = env
     return tomli_w.dumps(data)
 
 

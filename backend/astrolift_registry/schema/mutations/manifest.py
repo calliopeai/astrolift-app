@@ -745,20 +745,33 @@ class ManifestMutations:
         """Open a PR with the staged manifest.
 
         Returns ok + ``note='nothing_to_push'`` when there's no
-        staged change. On success, writes the staged TOML to a fresh
-        branch on the source repo and opens a PR / MR against the
-        base branch; the payload carries the operator-clickable URL
-        + the host-side identifier.
+        staged change, and ``note='env_only'`` when every staged change
+        is in the top-level ``[env]`` table. On success, writes the
+        staged TOML to a fresh branch on the source repo and opens a
+        PR / MR against the base branch; the payload carries the
+        operator-clickable URL + the host-side identifier.
+
+        The top-level ``[env]`` table is never pushed (#2411). setAppSecret
+        and the other secret writes keep the app's literal secrets there,
+        in plaintext, and every repo sync carries them onto the manifest
+        it lands (``manifest_sync``), so they need no commit to survive.
+        The file written takes its ``[env]`` from the base branch's copy
+        of the manifest, none when that copy has none or can't be read:
+        the pull request leaves the repo's table as it is, whatever the
+        draft or ``manifest_raw`` holds, and its body says so whenever
+        the draft's table differs.
 
         Never raises; SCM failures are translated to a
         ``SCM_PUSH_FAILED`` envelope per the MutationResult contract.
         Issue #535.
         """
+        from astrolift_manifest.env_edit import app_env_edits, with_app_env_from
         from astrolift_registry.services.manifest_sync import (
             _pick_source_connection,
         )
         from astrolift_scm.providers import (
             ProviderError,
+            fetch_file,
             open_pull_request,
             put_file,
         )
@@ -780,6 +793,20 @@ class ManifestMutations:
                     pr_url="",
                     branch_name="",
                     note="nothing_to_push",
+                )
+            )
+
+        # The same split the repo sync makes: [env] edits are app secrets,
+        # anything else is manifest work. With only the former there is
+        # nothing a pull request may carry.
+        edits = app_env_edits(app.manifest_raw or "", staged)
+        if edits is not None and not edits.other_changes and (edits.values or edits.removed):
+            return gql_success(
+                _ManifestPushPayload(
+                    id=input.id,
+                    pr_url="",
+                    branch_name="",
+                    note="env_only",
                 )
             )
 
@@ -808,12 +835,36 @@ class ManifestMutations:
         )
 
         try:
+            # The [env] the pull request is reviewed against: the base
+            # branch's, not manifest_raw's. manifest_raw can hold values the
+            # repo never had (an inline registration manifest, a direct apply
+            # while the repo was unreachable), and the repo may have moved.
+            repo_text = fetch_file(
+                connection,
+                repo_full_name=app.source_repo,
+                path=manifest_path,
+                ref=base_branch,
+            )
+            content = with_app_env_from(staged, repo_text or "")
+            if content is None:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "the staged manifest doesn't parse, so its [env] values can't be kept out of "
+                    "a pull request -- fix the draft or use Pull from repo to replace it",
+                    field="rawManifest",
+                )
+            if content != staged:
+                pr_body += (
+                    "\n\nAstrolift keeps app secrets in the top-level `[env]` table on the platform "
+                    "and never writes them to the repo, so this pull request does not carry the "
+                    "`[env]` changes staged there."
+                )
             put_file(
                 connection,
                 repo_full_name=app.source_repo,
                 path=manifest_path,
                 branch=head_branch,
-                content=staged,
+                content=content,
                 commit_message=commit_message,
             )
             pr = open_pull_request(

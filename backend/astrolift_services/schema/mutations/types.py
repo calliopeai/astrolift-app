@@ -17,8 +17,7 @@ class SetAppSecretInput:
     mutation writes to ``manifest_raw_staged`` (same buffer #277
     set up). It reaches a workload's envFrom on the next deploy
     directly, no push-to-repo round trip required (#1758);
-    ``pushManifestToRepo`` is only needed if the operator also wants
-    git to track the change."""
+    ``pushManifestToRepo`` never carries the value to git (#2411)."""
 
     app_slug: str
     key: str

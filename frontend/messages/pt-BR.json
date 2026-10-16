@@ -423,7 +423,7 @@
     "divergedTitle": "Esta implantação usou o manifesto salvo, não o seu repositório",
     "fallbackTitle": "Esta implantação usou o último manifesto conhecido",
     "registrationBody": "Não foi possível ler o <code>astrolift.toml</code> quando o aplicativo foi registrado, então nenhum serviço foi criado a partir dele. Corrija o manifesto e sincronize novamente, ou a próxima implantação não terá nada a publicar.",
-    "divergedBody": "Há um rascunho não salvo de <code>astrolift.toml</code> na plataforma, por isso a cópia do seu repositório não foi usada, para não descartá-lo. Envie ou descarte o rascunho e implante novamente.",
+    "divergedBody": "Um rascunho de <code>astrolift.toml</code> na plataforma tem edições fora de <code>[env]</code>, por isso a cópia do seu repositório não foi usada, para não descartá-las. Use Obter do repositório na página Configuração para usar a versão do repositório e implante novamente. Os segredos do aplicativo em <code>[env]</code> são mantidos.",
     "fallbackBody": "Não foi possível ler o manifesto do seu repositório, então o anterior foi usado. O que você enviou desde a última leitura bem-sucedida não está nesta implantação.",
     "reviewDraft": "Revisar o rascunho",
     "openManifest": "Abrir o manifesto"
@@ -2863,7 +2863,7 @@
     },
     "secrets": {
       "title": "Segredos",
-      "description": "Valores literais de [env], pacotes anexados e dados de conexão de serviços gerenciados para {slug}. Definir ou excluir altera o manifesto preparado; envie-o ao repositório para registrar a mudança.",
+      "description": "Valores literais de [env], pacotes anexados e dados de conexão de serviços gerenciados para {slug}. Definir ou excluir altera o manifesto preparado na plataforma; Enviar ao repositório deixa de fora os valores de [env].",
       "bulkImport": "Importar em lote",
       "newSecret": "Novo segredo",
       "environment": "Ambiente",
@@ -2882,7 +2882,7 @@
       "delete": {
         "title": "Excluir {key}?",
         "fallbackTitle": "Excluir segredo?",
-        "description": "Prepara a mudança no manifesto da plataforma. Envie-o ao repositório pela página de Configuração para confirmá-la. É possível recuperar antes do envio.",
+        "description": "Prepara a remoção no manifesto da plataforma. Os segredos do aplicativo em [env] ficam na plataforma; Enviar ao repositório não inclui a mudança.",
         "confirm": "Excluir segredo"
       },
       "setSheet": {
@@ -2890,7 +2890,7 @@
         "description": "Define um valor literal na tabela [env] do app. A API não retorna texto simples; apenas este envio transmite o valor ao backend.",
         "keyLabel": "Chave",
         "valueLabel": "Valor",
-        "valueHint": "Armazenado em manifest_raw_staged. Use Enviar ao repositório na página Configuração para confirmar a mudança.",
+        "valueHint": "Armazenado em manifest_raw_staged na plataforma. Nunca chega ao repositório, nem mesmo com Enviar ao repositório.",
         "submit": "Salvar segredo",
         "submitting": "Salvando…",
         "scope": "Escopo",
@@ -3410,6 +3410,7 @@
         "applied": "Aplicado",
         "applyFailed": "Falha ao aplicar",
         "nothingToPush": "Não há alterações preparadas para enviar.",
+        "envOnly": "Só há segredos do aplicativo em [env] preparados. Eles ficam na plataforma e não são enviados ao repositório.",
         "prOpened": "PR aberto: {branch}",
         "pushed": "Envio concluído",
         "pushFailed": "Falha ao enviar",

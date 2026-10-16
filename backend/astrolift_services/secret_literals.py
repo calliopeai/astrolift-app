@@ -186,7 +186,9 @@ def _deployable_literals(app) -> dict[str, str]:
     the ``manifest_raw`` value. Anchoring on the staged buffer, rather
     than replaying every applied proposal over ``manifest_raw``, keeps an
     old approval from overriding a later repo change to the same key: a
-    pushed and synced draft clears the buffer. The base stamp covers the
+    key stops being pending once the synced repo carries the staged
+    value, which only a commit made in the repo does (Push to repo leaves
+    ``[env]`` out, #2411). The base stamp covers the
     rest: re-staging a value the repo has since rotated out is not
     covered by the approval that first set it (#1758 re-review, 3). A
     proposal applied before stamps existed vouches for nothing.

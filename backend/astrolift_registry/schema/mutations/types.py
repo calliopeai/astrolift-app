@@ -381,7 +381,9 @@ class PushManifestToRepoInput:
     """Open a PR against the source repo with the staged TOML.
 
     No-op (returns ok + 'nothing_to_push' note) when there's no
-    pending staged change."""
+    pending staged change, and (ok + 'env_only') when the only staged
+    changes are app secrets in the top-level ``[env]`` table, which a
+    push never carries (#2411)."""
 
     id: GUID
     pr_title: str | None = None

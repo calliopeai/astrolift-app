@@ -230,6 +230,9 @@ export function useConfigEditor(slug: string) {
       const note = result.data?.note;
       if (note === "nothing_to_push") {
         toast.message(t("nothingToPush"));
+      } else if (note === "env_only") {
+        // Only [env] edits are staged: app secrets, which a push never carries.
+        toast.message(t("envOnly"));
       } else if (result.data?.prUrl) {
         toast.success(t("prOpened", { branch: result.data.branchName }));
       } else {

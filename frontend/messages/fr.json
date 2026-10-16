@@ -423,7 +423,7 @@
     "divergedTitle": "Ce déploiement a utilisé le manifeste enregistré, pas votre dépôt",
     "fallbackTitle": "Ce déploiement a utilisé le dernier manifeste connu",
     "registrationBody": "Son fichier <code>astrolift.toml</code> n’a pas pu être lu lors de l’enregistrement, aucun service n’a donc été créé. Corrigez le manifeste et resynchronisez, sinon le prochain déploiement n’aura rien à livrer.",
-    "divergedBody": "Un brouillon non enregistré de <code>astrolift.toml</code> est conservé sur la plateforme ; la copie de votre dépôt n’a donc pas été utilisée pour ne pas l’écraser. Poussez ou abandonnez le brouillon, puis redéployez.",
+    "divergedBody": "Un brouillon de <code>astrolift.toml</code> sur la plateforme contient des modifications hors de <code>[env]</code> ; la copie de votre dépôt n’a donc pas été utilisée pour ne pas les écraser. Utilisez Récupérer depuis le dépôt sur la page Configuration pour reprendre la version du dépôt, puis redéployez. Les secrets de l’application dans <code>[env]</code> sont conservés.",
     "fallbackBody": "Le manifeste n’a pas pu être lu depuis votre dépôt ; le précédent a donc été utilisé. Ce que vous avez poussé depuis la dernière lecture réussie n’est pas inclus dans ce déploiement.",
     "reviewDraft": "Examiner le brouillon",
     "openManifest": "Ouvrir le manifeste"
@@ -2857,7 +2857,7 @@
     },
     "secrets": {
       "title": "Secrets",
-      "description": "Valeurs littérales de [env], ensembles joints et données de connexion des services gérés pour {slug}. Enregistrer ou supprimer modifie le manifeste préparé ; envoyez-le au dépôt pour enregistrer le changement.",
+      "description": "Valeurs littérales de [env], ensembles joints et données de connexion des services gérés pour {slug}. Enregistrer ou supprimer modifie le manifeste préparé sur la plateforme ; Envoyer au dépôt laisse de côté les valeurs de [env].",
       "bulkImport": "Importer en masse",
       "newSecret": "Nouveau secret",
       "environment": "Environnement",
@@ -2876,7 +2876,7 @@
       "delete": {
         "title": "Supprimer {key} ?",
         "fallbackTitle": "Supprimer le secret ?",
-        "description": "Prépare le changement dans le manifeste de la plateforme. Envoyez-le au dépôt depuis Configuration pour le confirmer. Il reste récupérable avant l’envoi.",
+        "description": "Prépare la suppression dans le manifeste de la plateforme. Les secrets de l’application dans [env] restent sur la plateforme ; Envoyer au dépôt n’inclut pas ce changement.",
         "confirm": "Supprimer le secret"
       },
       "setSheet": {
@@ -2884,7 +2884,7 @@
         "description": "Définit une valeur littérale dans la table [env] de l’application. L’API ne renvoie pas le texte en clair ; seul cet envoi transmet la valeur au backend.",
         "keyLabel": "Clé",
         "valueLabel": "Valeur",
-        "valueHint": "Stocké dans manifest_raw_staged. Utilisez Envoyer au dépôt sur la page Configuration pour confirmer le changement.",
+        "valueHint": "Stocké dans manifest_raw_staged sur la plateforme. Il n’arrive jamais dans le dépôt, même avec Envoyer au dépôt.",
         "submit": "Enregistrer le secret",
         "submitting": "Enregistrement…",
         "scope": "Portée",
@@ -3404,6 +3404,7 @@
         "applied": "Appliqué",
         "applyFailed": "Échec de l'application",
         "nothingToPush": "Aucune modification préparée à envoyer.",
+        "envOnly": "Seuls des secrets de l’application dans [env] sont préparés. Ils restent sur la plateforme et ne sont pas envoyés au dépôt.",
         "prOpened": "PR ouvert : {branch}",
         "pushed": "Envoi terminé",
         "pushFailed": "Échec de l'envoi",
