@@ -14,14 +14,14 @@ button calls:
 3. Parse + normalize the repo content. Compute the diff against the
    DB's persisted state (workloads / env / managed services /
    schedules).
-4. When the DB has a staged draft that edits anything outside the
-   top-level ``[env]`` table AND the repo has new content, refuse
-   with ``status="diverged"`` — clobbering the draft is the point of
-   the existing destructive ``syncManifestFromRepo`` mutation, not
-   this one. The draft's ``[env]`` edits are the app's literal
-   secrets (``astrolift_services.secret_literals``): they never block
-   a sync, and every sync, the destructive one included, carries them
-   onto the new manifest.
+4. When the DB has a staged draft AND the repo has new content,
+   refuse with ``status="diverged"`` — clobbering the draft is the
+   point of the existing destructive ``syncManifestFromRepo``
+   mutation, not this one. Only edits outside the top-level ``[env]``
+   table count: that table's edits are the app's literal secrets
+   (``astrolift_services.secret_literals``), which never block a sync
+   and which every sync, the destructive one included, carries onto
+   the new manifest.
 5. When the repo matches the DB, return ``status="in_sync"`` with
    empty changes.
 6. Otherwise call ``persist_manifest`` to reconcile workloads +
@@ -116,9 +116,9 @@ class ResyncResult:
                         reconciled the workloads + containers, and
                         ``manifest_raw`` / hashes / ``last_resync_at``
                         were updated atomically.
-    - ``diverged``   — DB has a staged draft, beyond its ``[env]``
-                        secrets, that would be clobbered by the repo
-                        content; nothing applied.
+    - ``diverged``   — DB has a staged draft that would be clobbered
+                        by the repo content; nothing applied. Its
+                        ``[env]`` secrets alone never refuse.
     - ``fetch_failed`` — SCM fetch raised or returned ``None``; DB
                         unchanged. ``error`` carries the host-side
                         message so the UI can surface it.
