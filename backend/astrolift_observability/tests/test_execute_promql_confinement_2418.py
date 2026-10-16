@@ -79,6 +79,51 @@ def test_a_comment_cannot_hide_a_selector() -> None:
 
 
 @pytest.mark.parametrize(
+    ("query", "confined"),
+    [
+        # Prometheus ends a comment at a carriage return too. A scanner that
+        # read on to the newline, and copied the comment before a grouping
+        # list, handed Prometheus ``secret`` with no namespace matcher.
+        ("sum by #c\r(a) (secret) + \n(x)", f"sum by (a) (secret{{{NS}}}) + \n(x{{{NS}}})"),
+        (
+            "sum(y) without #c\r(a) + secret + \n(a)",
+            f"sum(y{{{NS}}}) without (a) + secret{{{NS}}} + \n(a{{{NS}}})",
+        ),
+        ("x #c\rsecret", f"x{{{NS}}} \rsecret{{{NS}}}"),
+    ],
+)
+def test_a_carriage_return_ends_a_comment_as_prometheus_reads_it(query: str, confined: str) -> None:
+    assert confine_to_namespace(query, "acme-web") == confined
+
+
+@pytest.mark.parametrize(
+    ("query", "confined"),
+    [
+        # After a fill modifier an operand follows, so ``or`` there is a metric.
+        ("x + fill(0) or", f"x{{{NS}}} + fill(0) or{{{NS}}}"),
+        ("x + fill_left(1) fill_right(-2) offset", f"x{{{NS}}} + fill_left(1) fill_right(-2) offset{{{NS}}}"),
+    ],
+)
+def test_the_operand_after_a_fill_modifier_is_confined(query: str, confined: str) -> None:
+    assert confine_to_namespace(query, "acme-web") == confined
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        # Reads target_info through no selector of the query.
+        "info(up)",
+        # A call the scanner does not know may be a modifier it would misread.
+        "not_a_function(up)",
+        "x + fill(up) y",
+    ],
+)
+def test_an_unknown_call_is_refused(query: str) -> None:
+    with pytest.raises(PromqlScopeError):
+        confine_to_namespace(query, "acme-web")
+
+
+@pytest.mark.parametrize(
     "query",
     [
         '"unterminated',

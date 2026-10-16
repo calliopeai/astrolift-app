@@ -51,6 +51,30 @@ _OPERAND_KEYWORDS = frozenset({"by", "without", "and", "or", "unless", "offset"}
 #: Keywords that are never a metric name. The grouping ones may take a
 #: parenthesised list of label names, which are not selectors.
 _MODIFIERS = frozenset({"on", "ignoring", "group_left", "group_right", "bool", "atan2"})
+#: Every PromQL function (Prometheus 3.x, with 2.x's ``holt_winters``). A call
+#: to any other name is refused: a keyword Prometheus adds later may make the
+#: word after it an operand, which the scanner would then misread. ``info`` is
+#: left out because it reads ``target_info`` through no selector of the query.
+_FUNCTIONS = frozenset(
+    """
+    abs absent absent_over_time acos acosh asin asinh atan atanh avg_over_time ceil
+    changes clamp clamp_max clamp_min cos cosh count_over_time day_of_month day_of_week
+    day_of_year days_in_month deg delta deriv double_exponential_smoothing end exp
+    first_over_time floor histogram_avg histogram_count histogram_fraction
+    histogram_quantile histogram_quantiles histogram_stddev histogram_stdvar
+    histogram_sum holt_winters hour idelta increase irate label_join label_replace
+    last_over_time ln log10 log2 mad_over_time max_of max_over_time min_of min_over_time
+    minute month pi predict_linear present_over_time quantile_over_time rad range rate
+    resets round scalar sgn sin sinh sort sort_by_label sort_by_label_desc sort_desc
+    sqrt start start_timestamp stddev_over_time stdvar_over_time step sum_over_time tan
+    tanh time timestamp ts_of_first_over_time ts_of_last_over_time ts_of_max_over_time
+    ts_of_min_over_time vector year
+    """.split(),
+)
+#: The binary-operator fill modifiers, ``a + fill(0) b``. After one an operand
+#: follows, so a keyword there is a metric name and is confined.
+_FILL = frozenset({"fill", "fill_left", "fill_right"})
+_FILL_VALUE = re.compile(r"\(\s*[-+]?\s*(?:" + _NUMBER.pattern + r"|(?i:inf|nan))\s*\)")
 _LABEL_LIST = re.compile(r"\(\s*(?:[A-Za-z_][A-Za-z0-9_]*\s*(?:,\s*[A-Za-z_][A-Za-z0-9_]*\s*)*,?\s*)?\)")
 
 
@@ -75,13 +99,16 @@ def _string_end(query: str, start: int) -> int:
     raise PromqlScopeError("unterminated string literal")
 
 
+_COMMENT = re.compile(r"#[^\r\n]*")
+"""A comment, which Prometheus ends at a carriage return as well as a newline."""
+
+
 def _skip_space(query: str, position: int) -> int:
     while position < len(query):
         if query[position].isspace():
             position += 1
         elif query[position] == "#":
-            newline = query.find("\n", position)
-            position = len(query) if newline < 0 else newline
+            position = _COMMENT.match(query, position).end()  # type: ignore[union-attr]
         else:
             break
     return position
@@ -142,7 +169,9 @@ def confine_to_namespace(query: str, namespace: str) -> str:
         labels = _LABEL_LIST.match(query, following)
         if labels is None:
             raise PromqlScopeError(f"{word!r} needs a list of plain label names")
-        out.append(query[after : labels.end()])
+        # The space and comments skipped become one space: a comment is never
+        # passed on, so Prometheus cannot end it somewhere this scanner did not.
+        out.append(" " * (following > after) + query[following : labels.end()])
         return labels.end()
 
     while position < len(query):
@@ -151,8 +180,7 @@ def confine_to_namespace(query: str, namespace: str) -> str:
             out.append(char)
             position += 1
         elif char == "#":
-            newline = query.find("\n", position)
-            position = len(query) if newline < 0 else newline
+            position = _COMMENT.match(query, position).end()  # type: ignore[union-attr]
         elif char in "\"'`":
             end = _string_end(query, position)
             out.append(query[position:end])
@@ -199,8 +227,16 @@ def confine_to_namespace(query: str, namespace: str) -> str:
             elif operand and lowered in _OPERAND_KEYWORDS:
                 # Prometheus reads a keyword where an operand belongs as a metric name.
                 position, operand = selector(word, end), False
+            elif lowered in _FILL and next_char == "(":
+                fill = _FILL_VALUE.match(query, following)
+                if fill is None:
+                    raise PromqlScopeError(f"{word!r} needs a number")
+                out.append(word + " " * (following > end) + query[following : fill.end()])
+                position, operand = fill.end(), True
             elif next_char == "(":
                 # A function or aggregation call.
+                if word not in _FUNCTIONS and lowered not in _AGGREGATIONS:
+                    raise PromqlScopeError(f"unsupported function {word!r}")
                 out.append(word)
                 position = end
             elif (

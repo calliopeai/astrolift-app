@@ -747,11 +747,17 @@ class ClustersQuery:
         default_bound = RegisteredApp.objects.filter(
             default_tenant_cluster=cluster,
             deleted_at__isnull=True,
-        ).values_list("pk", flat=True)
+        )
         env_bound = AppEnvironment.objects.filter(
             tenant_cluster=cluster,
             deleted_at__isnull=True,
-        ).values_list("registered_app_id", flat=True)
+        )
+        if _tenant_view_of_shared(info, cluster):
+            # A shared cluster hosts every org's apps; a tenant counts its own.
+            default_bound = default_bound.filter(organization_id=tenant.organization_id)
+            env_bound = env_bound.filter(registered_app__organization_id=tenant.organization_id)
+        default_bound = default_bound.values_list("pk", flat=True)
+        env_bound = env_bound.values_list("registered_app_id", flat=True)
         return len(set(default_bound) | set(env_bound))
 
     @strawberry.field

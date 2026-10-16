@@ -142,3 +142,22 @@ def test_the_operator_still_sees_the_shared_clusters_health(shared, permission_r
         ClustersQuery().astrolift_cluster_health(_info(_operator()), cluster_id=GUID(str(shared.guid)))
 
     assert calls == [{"cluster": shared, "namespaces": None, "event_limit": 50}]
+
+
+def test_a_tenant_counts_only_its_own_apps_on_a_shared_cluster(shared, permission_resolver):
+    a, b = _org("a"), _org("b")
+    _app_on(a, shared, "web")
+    _app_on(b, shared, "api")
+    _app_on(b, shared, "worker")
+    permission_resolver.grant(Permission.CLUSTER_REGISTER)
+
+    with tenant_context(TenantContext(organization_id=a.id)):
+        tenant_count = ClustersQuery().astrolift_app_count_for_cluster(
+            _info(), cluster_id=GUID(str(shared.guid))
+        )
+        operator_count = ClustersQuery().astrolift_app_count_for_cluster(
+            _info(_operator()), cluster_id=GUID(str(shared.guid))
+        )
+
+    assert tenant_count == 1
+    assert operator_count == 3
