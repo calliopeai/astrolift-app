@@ -16557,6 +16557,7 @@
       "unbound": "未绑定"
     },
     "operatorOnly": "只有平台运维人员可以授予写入权限或绑定域名。",
+    "withheld": "此安装已保留 DNS，因此 Astrolift 不会写入委派记录，授予和绑定已关闭。请在父区域中手动添加 NS 记录。",
     "loading": "正在加载…",
     "detected": "可以委派此域名的连接",
     "grantFor": "可在 {parent} 中写入 NS 记录",

@@ -16560,6 +16560,7 @@
       "unbound": "Nicht gebunden"
     },
     "operatorOnly": "Nur ein Plattformbetreiber kann Schreibzugriff erteilen oder eine Domain binden.",
+    "withheld": "DNS ist auf dieser Installation zurückgehalten, daher schreibt Astrolift keine Delegationseinträge, und Erteilen und Binden sind deaktiviert. Tragen Sie die NS-Einträge in der übergeordneten Zone von Hand ein.",
     "loading": "Wird geladen…",
     "detected": "Verbindungen, die diese Domain delegieren können",
     "grantFor": "Darf NS-Einträge in {parent} schreiben",

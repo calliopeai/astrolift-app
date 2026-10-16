@@ -1,5 +1,6 @@
 import { NextIntlClientProvider } from "next-intl";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import en from "@/messages/en.json";
 import { DnsDelegationPanel, type DnsDelegationPanelProps } from "./DnsDelegationPanel";
 
@@ -87,4 +88,31 @@ export const NoParentInAccount: Story = { args: { parentZones: [] } };
 export const TokenRefused: Story = { args: { error: "TOKEN_INACTIVE" } };
 export const OperatorOnly: Story = {
   args: { canWrite: false, connections: null, selectedConnectionId: null, parentZones: null },
+};
+/**
+ * calliope-installer#447: the install withholds DNS, so provisioning writes no
+ * delegation records. The binding and last write still show; grant and bind
+ * do not. DnsUnset is the same bound domain without the restriction.
+ */
+const withheldPlay =
+  (withheld: boolean): Story["play"] =>
+  async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("ns-1.awsdns-01.org")).toBeVisible();
+    if (withheld) {
+      await expect(canvas.getByText(/DNS is withheld/)).toBeVisible();
+      await expect(canvas.queryByRole("button")).toBeNull();
+      await expect(canvas.queryByLabelText("Write token")).toBeNull();
+    } else {
+      await expect(canvas.queryByText(/DNS is withheld/)).toBeNull();
+      await expect(canvas.getByRole("button", { name: "Grant write access" })).toBeVisible();
+    }
+  };
+export const DnsWithheld: Story = {
+  args: { ...BoundAndWritten.args, dnsWithheld: true },
+  play: withheldPlay(true),
+};
+export const DnsUnset: Story = {
+  args: { ...BoundAndWritten.args, dnsWithheld: false },
+  play: withheldPlay(false),
 };
