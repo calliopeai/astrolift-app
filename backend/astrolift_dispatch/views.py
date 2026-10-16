@@ -822,7 +822,8 @@ def agent_transfer(request: HttpRequest, task_id: str) -> JsonResponse:
     A ``failed`` status or the ``refused`` phase retires the arrival with the
     reason (a box that cannot hold undo refuses before any change). The
     ``installed``/``done`` report carries the receipt; only an exact one makes
-    the transfer ``destination_ready``.
+    the transfer ``destination_ready``. Any report past the transfer's
+    admission deadline retires it instead, and the view says ``abort``.
     """
     from astrolift_agents.models import AgentConversationTransfer
     from astrolift_agents.services.conversation_transfer import (

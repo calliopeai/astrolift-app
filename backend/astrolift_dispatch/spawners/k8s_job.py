@@ -94,7 +94,10 @@ class K8sJobSpawner(ContainerSpawner):
             for condition in (job.get("status") or {}).get("conditions", [])
         ):
             raise RuntimeError("Agent Job has already ended")
-        deadline = max(1, int(task.timeout_seconds or 300)) + seconds
+        from astrolift_agents.services.task_timeout import admission_allowance_seconds
+
+        # A moved conversation's paused admission (#1971) ran before its timeout.
+        deadline = max(1, int(task.timeout_seconds or 300)) + admission_allowance_seconds(task) + seconds
         if job.get("spec", {}).get("activeDeadlineSeconds") == deadline:
             return
         manifest = deepcopy(job)
@@ -313,12 +316,21 @@ class K8sJobSpawner(ContainerSpawner):
                         connection_id=gateway.connection.pk, agent_id=agent_id, expect_missing=True
                     )
                 return SpawnResult(external_id=job_name, ok=False, error=str(exc))
+            from astrolift_agents.services.task_timeout import admission_allowance_seconds
+
             timeout = max(1, int(getattr(task, "timeout_seconds", 300) or 300))
-            if not key_covers(gateway_key.expires_at, timeout):
+            # A moved conversation (#1971) waits for its commit before the timeout starts.
+            admission = admission_allowance_seconds(task)
+            if not key_covers(gateway_key.expires_at, timeout + admission):
                 revoke_run_key(connection_id=gateway.connection.pk, agent_id=agent_id)
+                ends = (
+                    f"the task's {admission}s admission window and {timeout}s timeout end"
+                    if admission
+                    else f"the task's {timeout}s timeout ends"
+                )
                 error = (
                     f"Zentinelle caps the run's gateway key at {gateway_key.expires_at.isoformat()}, before "
-                    f"the task's {timeout}s timeout ends, so it was not started; shorten the timeout, or "
+                    f"{ends}, so it was not started; shorten the timeout, or "
                     "raise ASTROLIFT_AGENT_KEY_MAX_LIFETIME_SECONDS in Zentinelle"
                 )
                 return SpawnResult(external_id=job_name, ok=False, error=error)
@@ -856,6 +868,7 @@ def _render_agent_job(
     override of the same name wins (k8s takes the later duplicate — the
     same ordering ``agent_container_env`` relies on for plain-before-secret).
     """
+    from astrolift_agents.services.task_timeout import admission_allowance_seconds
     from astrolift_dispatch.agent_secrets import agent_container_env, task_secret_name
     from astrolift_dispatch.pod_hardening import harden_agent_pod
 
@@ -923,8 +936,10 @@ def _render_agent_job(
             "completions": 1,
             # Kubernetes enforces the task deadline even if the Temporal
             # worker or control plane is unavailable. This is the final
-            # backstop against a runaway agent pod.
-            "activeDeadlineSeconds": max(1, int(getattr(task, "timeout_seconds", 300) or 300)),
+            # backstop against a runaway agent pod. A moved conversation's
+            # paused admission (#1971) comes before its timeout starts.
+            "activeDeadlineSeconds": max(1, int(getattr(task, "timeout_seconds", 300) or 300))
+            + admission_allowance_seconds(task),
             "template": {
                 "metadata": {
                     "labels": {

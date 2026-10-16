@@ -361,9 +361,12 @@ class ConversationTransferCapabilityType:
 class ConversationTransferType:
     """A managed conversation moving into an Astrolift session (#1971).
 
-    ``record`` is the TaskTransferRecord as this receiver acknowledged it.
-    ``uploadUrl`` is set only while the arrival waits for its envelope.
-    ``progress`` lists ``{phase, status, at, reason?}`` install reports.
+    ``state`` is preparing, validating, destination_ready, committed or
+    aborted. ``record`` is the TaskTransferRecord as this receiver
+    acknowledged it. ``uploadUrl`` is set only while the arrival waits for
+    its envelope. ``progress`` lists ``{phase, status, at, reason?}``
+    reports. ``admissionDeadline`` is when the transfer must have committed
+    by; past it, it is aborted.
     """
 
     id: GUID
@@ -376,6 +379,7 @@ class ConversationTransferType:
     progress: JSON
     abort_reason: str
     agent_task_id: GUID | None
+    admission_deadline: dt.datetime
     acknowledged_at: dt.datetime | None
     committed_at: dt.datetime | None
     aborted_at: dt.datetime | None
@@ -894,6 +898,7 @@ def conversation_transfer_to_type(transfer, *, upload_url: str = "") -> Conversa
         progress=transfer.progress,
         abort_reason=transfer.abort_reason,
         agent_task_id=GUID(str(transfer.agent_task.guid)) if transfer.agent_task_id else None,
+        admission_deadline=transfer.admission_deadline,
         acknowledged_at=transfer.acknowledged_at,
         committed_at=transfer.committed_at,
         aborted_at=transfer.aborted_at,

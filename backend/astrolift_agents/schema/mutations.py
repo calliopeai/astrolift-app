@@ -650,6 +650,7 @@ def _transfer_failure(exc):
         "not_found": ErrorCode.NOT_FOUND.value,
         "precondition": ErrorCode.PRECONDITION.value,
         "conflict": ErrorCode.CONFLICT.value,
+        "permission_denied": ErrorCode.PERMISSION_DENIED.value,
     }.get(exc.code, ErrorCode.INTERNAL.value)
     return gql_failure(code, exc.message, field=exc.field or None)
 
@@ -661,8 +662,15 @@ def _transfer_step(info, input, step):
         return gql_failure(ErrorCode.PRECONDITION.value, "no active organization")
     record = input.record if isinstance(input.record, dict) else {}
     requester_id = getattr(_dispatch_actor(info), "user_id", None)
-    from astrolift_agents.services.conversation_transfer import ConversationTransferError, owned_transfer
+    from astrolift_agents.services.conversation_transfer import (
+        NO_REQUESTER_REASON,
+        ConversationTransferError,
+        owned_transfer,
+    )
 
+    if requester_id is None:
+        # A transfer belongs to the user who prepared it (#1971).
+        return gql_failure(ErrorCode.PERMISSION_DENIED.value, NO_REQUESTER_REASON)
     transfer = owned_transfer(org_pk, record.get("transferId"), Permission.AGENT_DISPATCH, requester_id)
     if transfer is None:
         return gql_failure(ErrorCode.NOT_FOUND.value, "transfer not found", field="record")
@@ -3365,10 +3373,13 @@ class AgentsMutation:
         """Paused admission of a managed conversation Move (#1971).
 
         Refuses, with a reason and before anything is created, when the
-        agent's environment cannot host the conversation. Otherwise records
-        the arrival and returns ``uploadUrl``; after the upload, admits a
-        paused session that installs it. The caller polls by calling again
-        until ``destination_ready`` (or ``aborted`` with ``abortReason``).
+        agent's environment cannot host the conversation, or the caller has
+        no user identity to own it. Otherwise records the arrival and
+        returns ``uploadUrl``; after the upload it refuses a wrong-sized
+        envelope, else returns ``validating`` while a worker checks the
+        envelope and admits a paused session that installs it. The caller
+        polls by calling again until ``destination_ready`` (or ``aborted``
+        with ``abortReason``), before ``admissionDeadline``.
         """
         tenant = get_current_tenant()
         org_pk = tenant.organization_id if tenant else None

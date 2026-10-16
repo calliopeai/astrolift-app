@@ -130,8 +130,11 @@ def _append_payload_env(env: list[dict[str, str]], *, task: AgentTask, brief: Br
     snapshot = brief.manifest_snapshot if isinstance(brief.manifest_snapshot, dict) else {}
     required = bool(snapshot.get("requires_payload"))
     # Cover scheduling + execution, with a 15-minute floor for normal
-    # tasks and S3's seven-day SigV4 ceiling for unusually long runs.
-    timeout = max(1, int(getattr(task, "timeout_seconds", 300) or 300))
+    # tasks and S3's seven-day SigV4 ceiling for unusually long runs. A
+    # moved conversation's paused admission (#1971) comes before its timeout.
+    from astrolift_agents.services.task_timeout import admission_allowance_seconds
+
+    timeout = max(1, int(getattr(task, "timeout_seconds", 300) or 300)) + admission_allowance_seconds(task)
     expires_in = min(604800, max(900, timeout + 600))
     try:
         delivery = payload_env(brief=brief, organization=task.organization, expires_in=expires_in)

@@ -2370,6 +2370,7 @@ export type AstroliftConversationTransfer = {
   abortReason: Scalars['String']['output'];
   abortedAt?: Maybe<Scalars['DateTime']['output']>;
   acknowledgedAt?: Maybe<Scalars['DateTime']['output']>;
+  admissionDeadline: Scalars['DateTime']['output'];
   agentTaskId?: Maybe<Scalars['GUID']['output']>;
   committedAt?: Maybe<Scalars['DateTime']['output']>;
   envelopeSha256: Scalars['String']['output'];
