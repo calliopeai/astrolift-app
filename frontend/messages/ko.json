@@ -423,7 +423,7 @@
     "divergedTitle": "이 배포는 저장소가 아닌 저장된 매니페스트를 사용했습니다",
     "fallbackTitle": "이 배포는 마지막으로 확인된 매니페스트를 사용했습니다",
     "registrationBody": "앱을 등록할 때 <code>astrolift.toml</code>을 읽을 수 없어 서비스가 생성되지 않았습니다. 매니페스트를 수정하고 다시 동기화하지 않으면 다음 배포에서 배포할 내용이 없습니다.",
-    "divergedBody": "플랫폼에 저장되지 않은 <code>astrolift.toml</code> 초안이 있어, 초안이 삭제되지 않도록 저장소의 사본은 사용하지 않았습니다. 초안을 푸시하거나 삭제한 뒤 다시 배포하세요.",
+    "divergedBody": "플랫폼의 <code>astrolift.toml</code> 초안에 <code>[env]</code> 밖의 변경 사항이 있어, 이를 버리지 않도록 저장소의 사본은 사용하지 않았습니다. 설정 페이지에서 “저장소에서 가져오기”로 저장소의 내용을 받은 뒤 다시 배포하세요. <code>[env]</code>의 앱 시크릿은 유지됩니다.",
     "fallbackBody": "저장소에서 매니페스트를 읽을 수 없어 이전 매니페스트를 사용했습니다. 마지막으로 읽기에 성공한 이후 푸시한 내용은 이번 롤아웃에 포함되지 않았습니다.",
     "reviewDraft": "초안 검토",
     "openManifest": "매니페스트 열기"
@@ -2863,7 +2863,7 @@
     },
     "secrets": {
       "title": "비밀 값",
-      "description": "{slug}의 앱 공통 [env] 값, 연결된 번들 및 관리형 서비스의 연결 정보입니다. 설정·삭제는 준비된 매니페스트에 저장되며 저장소에 푸시하면 반영됩니다.",
+      "description": "{slug}의 앱 공통 [env] 값, 연결된 번들 및 관리형 서비스의 연결 정보입니다. 설정·삭제는 플랫폼의 준비된 매니페스트에 저장되며, 저장소에 보내기에는 [env] 값이 포함되지 않습니다.",
       "bulkImport": "일괄 가져오기",
       "newSecret": "새 비밀 값",
       "environment": "환경",
@@ -2882,7 +2882,7 @@
       "delete": {
         "title": "{key}을(를) 삭제할까요?",
         "fallbackTitle": "비밀 값을 삭제할까요?",
-        "description": "플랫폼 매니페스트에 변경을 준비합니다. 설정 페이지에서 저장소로 푸시하면 반영됩니다. 푸시 전까지는 복구할 수 있습니다.",
+        "description": "플랫폼 매니페스트에 삭제를 준비합니다. [env]의 앱 시크릿은 플랫폼에 남으며, 저장소에 보내기에는 이 변경이 포함되지 않습니다.",
         "confirm": "비밀 값 삭제"
       },
       "setSheet": {
@@ -2890,7 +2890,7 @@
         "description": "앱의 [env] 테이블에 값을 설정합니다. API는 평문을 반환하지 않으며 이 제출을 통해서만 값이 백엔드로 전달됩니다.",
         "keyLabel": "키",
         "valueLabel": "값",
-        "valueHint": "manifest_raw_staged에 저장됩니다. 설정 페이지에서 저장소로 푸시하여 변경을 반영하세요.",
+        "valueHint": "플랫폼의 manifest_raw_staged에 저장됩니다. 저장소에 보내기를 사용해도 저장소에는 기록되지 않습니다.",
         "submit": "비밀 값 저장",
         "submitting": "저장 중…",
         "scope": "적용 범위",
@@ -3410,6 +3410,7 @@
         "applied": "적용됨",
         "applyFailed": "적용 실패",
         "nothingToPush": "전송할 스테이징된 변경 내용이 없습니다.",
+        "envOnly": "준비된 변경은 [env]의 앱 시크릿뿐입니다. 시크릿은 플랫폼에 남으며 저장소로 보내지 않습니다.",
         "prOpened": "PR 열림: {branch}",
         "pushed": "전송 완료",
         "pushFailed": "전송 실패",

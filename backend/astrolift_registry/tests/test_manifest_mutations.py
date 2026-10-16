@@ -441,8 +441,10 @@ def test_push_with_staged_opens_pr(permission_resolver, monkeypatch):
     assert result.data.note == "pushed"
     assert result.data.pr_url == pr_url
     assert result.data.branch_name == "astrolift/manifest-hello-app"
-    # GET probe + PUT file + POST PR — three calls in that order.
-    assert [r.get_method() for r in seen] == ["GET", "PUT", "POST"]
+    # GET the base branch's manifest for its [env] (#2411), GET probe,
+    # PUT file, POST PR — four calls in that order.
+    assert [r.get_method() for r in seen] == ["GET", "GET", "PUT", "POST"]
+    assert seen[0].full_url.endswith("/contents/astrolift.toml?ref=main")
 
 
 def test_push_with_explicit_branch_uses_it(permission_resolver, monkeypatch):

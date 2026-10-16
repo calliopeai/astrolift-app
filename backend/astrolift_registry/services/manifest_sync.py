@@ -655,8 +655,8 @@ def _reconcile_with_repo(
             changes=ResyncChanges(),
             error=(
                 "DB has unpushed staged drafts outside [env] that would be clobbered by "
-                "repo content. Push the draft to the repo, or use Pull from "
-                "repo on the app's Config page to discard it; app secrets in [env] are kept."
+                "repo content. Use Pull from repo on the app's Config page to replace them "
+                "with the repo's manifest; app secrets in [env] are kept."
             ),
         )
 
@@ -733,8 +733,8 @@ def _staged_after_sync(
     made again on ``base``; nothing is left staged once ``base`` already
     carries them. A draft that also edits anything else keeps those edits
     unless the sync discards them (Pull from repo), which still carries
-    its secrets, or the repo now holds exactly that draft (it was pushed,
-    secrets and all). A draft that can't be taken apart is all or nothing.
+    its secrets, or the repo now holds exactly that draft. A draft that
+    can't be taken apart is all or nothing.
     """
     if not staged.strip():
         return staged

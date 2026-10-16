@@ -19,6 +19,7 @@ from astrolift_manifest.env_edit import (
     redact_env_values,
     resolve_masked_env_values,
     set_app_env_keys,
+    with_app_env_from,
 )
 
 _BASE = """\
@@ -192,6 +193,45 @@ def test_reapply_app_env_edits_lands_on_a_new_base() -> None:
 def test_reapply_app_env_edits_leaves_a_base_that_carries_them_byte_for_byte() -> None:
     edits = AppEnvEdits(values={"LOG_LEVEL": "info"}, removed=frozenset({"GONE"}), other_changes=False)
     assert reapply_app_env_edits(_BASE, edits) == _BASE
+
+
+def test_with_app_env_from_swaps_in_the_other_documents_env_table() -> None:
+    """What Push to repo writes (#2411): the draft's edits, the repo's [env]."""
+    draft, _ = delete_app_env_key(
+        set_app_env_keys(_BASE.replace('kind = "service"', 'kind = "worker"'), {"API_KEY": "secret-k"}),
+        "LOG_LEVEL",
+    )
+    repo = _BASE.replace('LOG_LEVEL = "info"', 'LOG_LEVEL = "info"\nADDED_IN_REPO = "r"')
+
+    out = with_app_env_from(draft, repo)
+
+    assert "secret-k" not in out
+    parsed = tomllib.loads(out)
+    assert parsed["env"] == {"DATABASE_URL": "postgres://x", "LOG_LEVEL": "info", "ADDED_IN_REPO": "r"}
+    assert parsed["workloads"][0]["kind"] == "worker"
+
+
+def test_with_app_env_from_drops_env_when_the_other_document_has_no_table() -> None:
+    draft = set_app_env_keys(_BASE, {"API_KEY": "secret-k"})
+    without_env = tomllib.loads(_BASE)
+    del without_env["env"]
+    for other in ("", 'name = "hello"\n', "not = [valid toml", 'name = "hello"\nenv = "a string"\n'):
+        out = with_app_env_from(draft, other)
+        assert "env" not in tomllib.loads(out), other
+        assert tomllib.loads(out) == without_env
+    # An env the draft holds in some other shape goes too.
+    assert "env" not in tomllib.loads(with_app_env_from('name = "hello"\nenv = "API_KEY=secret-k"\n', ""))
+
+
+def test_with_app_env_from_keeps_a_draft_that_already_has_that_table_byte_for_byte() -> None:
+    commented = "# kept\n" + _BASE
+    assert with_app_env_from(commented, _BASE) == commented
+    no_env = 'name = "hello"  # kept\n'
+    assert with_app_env_from(no_env, "not = [valid toml") == no_env
+
+
+def test_with_app_env_from_refuses_a_draft_it_cannot_read() -> None:
+    assert with_app_env_from("not = [valid toml", _BASE) is None
 
 
 def test_parse_dotenv_basic() -> None:

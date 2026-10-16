@@ -31,6 +31,7 @@ from astrolift_services.schema.mutations.helpers import (
     _app_secret_target_from_input,
     _caller_org_id,
     _client_ip,
+    _lock_app,
     _maybe_create_proposal_for_write,
     _metadata_fields,
     _secret_write_payload,
@@ -132,29 +133,33 @@ class SecretMutations:
                     pending_proposal_id=GUID(str(proposal.guid)),
                 )
             )
-        source = app.manifest_raw_staged or app.manifest_raw or ""
-        new_text = set_app_env_keys(source, {input.key: input.value})
-        try:
-            staged = _stage_manifest(app, new_text, actor=_actor_user(info))
-        except ManifestError as exc:
-            return gql_failure(
-                ErrorCode.VALIDATION.value,
-                f"manifest parse failed after edit: {exc}",
-                field="rawManifest",
+        with transaction.atomic():
+            app = _lock_app(app)
+            if app is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+            source = app.manifest_raw_staged or app.manifest_raw or ""
+            new_text = set_app_env_keys(source, {input.key: input.value})
+            try:
+                staged = _stage_manifest(app, new_text, actor=_actor_user(info))
+            except ManifestError as exc:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"manifest parse failed after edit: {exc}",
+                    field="rawManifest",
+                )
+            # #677 / #678 / #752 — refresh sidecar metadata on every direct
+            # write.  The metadata row is keyed at the wildcard env scope ('')
+            # for set/rotate writes since the mutation itself isn't env-bound;
+            # operators add per-env overrides via setAppSecretMetadata.
+            _upsert_app_secret_metadata(
+                app=app,
+                key=input.key,
+                environment_name="",
+                expires_at=input.expires_at,
+                set_via=input.set_via,
+                scope=input.scope,
+                actor=_actor_user(info),
             )
-        # #677 / #678 / #752 — refresh sidecar metadata on every direct
-        # write.  The metadata row is keyed at the wildcard env scope ('')
-        # for set/rotate writes since the mutation itself isn't env-bound;
-        # operators add per-env overrides via setAppSecretMetadata.
-        _upsert_app_secret_metadata(
-            app=app,
-            key=input.key,
-            environment_name="",
-            expires_at=input.expires_at,
-            set_via=input.set_via,
-            scope=input.scope,
-            actor=_actor_user(info),
-        )
         return gql_success(
             _AppSecretWritePayload(
                 app_slug=app.slug,
@@ -228,26 +233,30 @@ class SecretMutations:
                     pending_proposal_id=GUID(str(proposal.guid)),
                 )
             )
-        source = app.manifest_raw_staged or app.manifest_raw or ""
-        new_text = set_app_env_keys(source, {input.key: input.value})
-        try:
-            staged = _stage_manifest(app, new_text, actor=_actor_user(info))
-        except ManifestError as exc:
-            return gql_failure(
-                ErrorCode.VALIDATION.value,
-                f"manifest parse failed after rotate: {exc}",
-                field="rawManifest",
+        with transaction.atomic():
+            app = _lock_app(app)
+            if app is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+            source = app.manifest_raw_staged or app.manifest_raw or ""
+            new_text = set_app_env_keys(source, {input.key: input.value})
+            try:
+                staged = _stage_manifest(app, new_text, actor=_actor_user(info))
+            except ManifestError as exc:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"manifest parse failed after rotate: {exc}",
+                    field="rawManifest",
+                )
+            # #677 / #678 / #752 — refresh sidecar metadata on rotate as well.
+            _upsert_app_secret_metadata(
+                app=app,
+                key=input.key,
+                environment_name="",
+                expires_at=input.expires_at,
+                set_via=input.set_via,
+                scope=input.scope,
+                actor=_actor_user(info),
             )
-        # #677 / #678 / #752 — refresh sidecar metadata on rotate as well.
-        _upsert_app_secret_metadata(
-            app=app,
-            key=input.key,
-            environment_name="",
-            expires_at=input.expires_at,
-            set_via=input.set_via,
-            scope=input.scope,
-            actor=_actor_user(info),
-        )
         return gql_success(
             _AppSecretWritePayload(
                 app_slug=app.slug,
@@ -307,25 +316,37 @@ class SecretMutations:
                     pending_proposal_id=GUID(str(proposal.guid)),
                 )
             )
-        new_text, _ = delete_app_env_key(source, input.key)
-        try:
-            staged = _stage_manifest(app, new_text, actor=_actor_user(info))
-        except ManifestError as exc:
-            return gql_failure(
-                ErrorCode.VALIDATION.value,
-                f"manifest parse failed after delete: {exc}",
-                field="rawManifest",
+        with transaction.atomic():
+            app = _lock_app(app)
+            if app is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+            new_text, removed = delete_app_env_key(
+                app.manifest_raw_staged or app.manifest_raw or "", input.key
             )
-        # #677 / #678 — soft-delete metadata rows for the removed key so
-        # a re-add later doesn't silently re-use stale expiry / source.
-        # Soft delete keeps the row available for the audit trail.
-        actor = _actor_user(info)
-        for row in AppSecretMetadata.objects.filter(
-            registered_app=app,
-            key=input.key,
-            deleted_at__isnull=True,
-        ):
-            row.soft_delete(by=actor)
+            if not removed:
+                return gql_failure(
+                    ErrorCode.NOT_FOUND.value,
+                    f"key {input.key!r} not present in [env]",
+                    field="key",
+                )
+            try:
+                staged = _stage_manifest(app, new_text, actor=_actor_user(info))
+            except ManifestError as exc:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"manifest parse failed after delete: {exc}",
+                    field="rawManifest",
+                )
+            # #677 / #678 — soft-delete metadata rows for the removed key so
+            # a re-add later doesn't silently re-use stale expiry / source.
+            # Soft delete keeps the row available for the audit trail.
+            actor = _actor_user(info)
+            for row in AppSecretMetadata.objects.filter(
+                registered_app=app,
+                key=input.key,
+                deleted_at__isnull=True,
+            ):
+                row.soft_delete(by=actor)
         return gql_success(
             _AppSecretWritePayload(
                 app_slug=app.slug,
@@ -511,29 +532,33 @@ class SecretMutations:
                     msg,
                     field="dotenvText",
                 )
-        source = app.manifest_raw_staged or app.manifest_raw or ""
-        new_text = set_app_env_keys(source, kvs)
-        try:
-            staged = _stage_manifest(app, new_text, actor=_actor_user(info))
-        except ManifestError as exc:
-            return gql_failure(
-                ErrorCode.VALIDATION.value,
-                f"manifest parse failed after bulk import: {exc}",
-                field="rawManifest",
-            )
-        # #678 — tag every imported key as `env_paste` so the secret-row
-        # tooltip can render "Set via .env paste on <date>".  Operators
-        # then bulk-rotate via the dedicated UI; the source flips on
-        # the next set/rotate.
-        actor = _actor_user(info)
-        for key in kvs:
-            _upsert_app_secret_metadata(
-                app=app,
-                key=key,
-                environment_name="",
-                set_via=AppSecretMetadata.Source.ENV_PASTE.value,
-                actor=actor,
-            )
+        with transaction.atomic():
+            app = _lock_app(app)
+            if app is None:
+                return gql_failure(ErrorCode.NOT_FOUND.value, "app not found")
+            source = app.manifest_raw_staged or app.manifest_raw or ""
+            new_text = set_app_env_keys(source, kvs)
+            try:
+                staged = _stage_manifest(app, new_text, actor=_actor_user(info))
+            except ManifestError as exc:
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    f"manifest parse failed after bulk import: {exc}",
+                    field="rawManifest",
+                )
+            # #678 — tag every imported key as `env_paste` so the secret-row
+            # tooltip can render "Set via .env paste on <date>".  Operators
+            # then bulk-rotate via the dedicated UI; the source flips on
+            # the next set/rotate.
+            actor = _actor_user(info)
+            for key in kvs:
+                _upsert_app_secret_metadata(
+                    app=app,
+                    key=key,
+                    environment_name="",
+                    set_via=AppSecretMetadata.Source.ENV_PASTE.value,
+                    actor=actor,
+                )
         return gql_success(
             _BulkImportPayload(
                 app_slug=app.slug,

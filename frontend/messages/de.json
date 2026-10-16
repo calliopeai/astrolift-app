@@ -423,7 +423,7 @@
     "divergedTitle": "Dieses Deployment nutzte das gespeicherte Manifest, nicht Ihr Repository",
     "fallbackTitle": "Dieses Deployment nutzte das zuletzt bekannte Manifest",
     "registrationBody": "Die Datei <code>astrolift.toml</code> konnte bei der Registrierung nicht gelesen werden, daher wurden keine Dienste daraus erstellt. Korrigieren Sie das Manifest und synchronisieren Sie neu, sonst hat das nächste Deployment nichts auszuliefern.",
-    "divergedBody": "Auf der Plattform liegt ein ungespeicherter Entwurf von <code>astrolift.toml</code>, daher blieb die Kopie in Ihrem Repository unberührt, um ihn nicht zu verwerfen. Pushen oder verwerfen Sie den Entwurf und deployen Sie erneut.",
+    "divergedBody": "Ein Entwurf von <code>astrolift.toml</code> auf der Plattform enthält Änderungen außerhalb von <code>[env]</code>, daher blieb die Kopie in Ihrem Repository unberührt, um sie nicht zu verwerfen. Übernehmen Sie mit „Aus Repository abrufen“ auf der Konfigurationsseite die Version aus dem Repository und deployen Sie erneut. App-Secrets in <code>[env]</code> bleiben erhalten.",
     "fallbackBody": "Das Manifest konnte nicht aus Ihrem Repository gelesen werden, daher wurde das vorherige verwendet. Alles, was Sie seit dem letzten erfolgreichen Lesen gepusht haben, ist nicht in diesem Rollout enthalten.",
     "reviewDraft": "Entwurf prüfen",
     "openManifest": "Manifest öffnen"
@@ -2857,7 +2857,7 @@
     },
     "secrets": {
       "title": "Geheimnisse",
-      "description": "App-weite [env]-Werte, angehängte Pakete und Verbindungsdaten verwalteter Dienste für {slug}. Setzen oder Löschen ändert den vorgemerkten Manifestentwurf; übertragen Sie ihn ins Repository, um die Änderung festzuhalten.",
+      "description": "App-weite [env]-Werte, angehängte Pakete und Verbindungsdaten verwalteter Dienste für {slug}. Setzen oder Löschen ändert den vorgemerkten Manifestentwurf auf der Plattform; beim Übertragen ins Repository bleiben [env]-Werte außen vor.",
       "bulkImport": "Massenimport",
       "newSecret": "Neues Geheimnis",
       "environment": "Umgebung",
@@ -2876,7 +2876,7 @@
       "delete": {
         "title": "{key} löschen?",
         "fallbackTitle": "Geheimnis löschen?",
-        "description": "Merkt die Änderung im Manifest der Plattform vor. Übertragen Sie den Entwurf auf der Konfigurationsseite ins Repository, um sie festzuhalten. Bis dahin lässt sie sich rückgängig machen.",
+        "description": "Merkt das Entfernen im Manifest der Plattform vor. App-Secrets in [env] bleiben auf der Plattform; beim Übertragen ins Repository wird die Änderung nicht mitgenommen.",
         "confirm": "Geheimnis löschen"
       },
       "setSheet": {
@@ -2884,7 +2884,7 @@
         "description": "Setzt einen Wert in der [env]-Tabelle der App. Die API gibt keinen Klartext zurück; nur dieses Absenden übermittelt den Wert an das Backend.",
         "keyLabel": "Schlüssel",
         "valueLabel": "Wert",
-        "valueHint": "Wird in manifest_raw_staged gespeichert. Übertragen Sie den Entwurf auf der Konfigurationsseite ins Repository, um die Änderung festzuhalten.",
+        "valueHint": "Wird auf der Plattform in manifest_raw_staged gespeichert. Der Wert gelangt nie ins Repository, auch nicht beim Übertragen ins Repository.",
         "submit": "Geheimnis speichern",
         "submitting": "Wird gespeichert…",
         "scope": "Geltungsbereich",
@@ -3404,6 +3404,7 @@
         "applied": "Angewendet",
         "applyFailed": "Anwenden fehlgeschlagen",
         "nothingToPush": "Keine vorgemerkten Änderungen zum Übertragen.",
+        "envOnly": "Vorgemerkt sind nur App-Secrets in [env]. Sie bleiben auf der Plattform und werden nicht ins Repository übertragen.",
         "prOpened": "PR geöffnet: {branch}",
         "pushed": "Übertragung abgeschlossen",
         "pushFailed": "Übertragung fehlgeschlagen",

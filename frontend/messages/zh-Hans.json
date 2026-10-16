@@ -423,7 +423,7 @@
     "divergedTitle": "此次部署使用的是已保存的清单，而非您的仓库",
     "fallbackTitle": "此次部署使用的是上次已知的清单",
     "registrationBody": "注册应用时无法读取其 <code>astrolift.toml</code>，因此未据此创建任何服务。请修复清单并重新同步，否则下次部署将没有任何内容可发布。",
-    "divergedBody": "平台上保存着未提交的 <code>astrolift.toml</code> 草稿，为避免丢弃该草稿，未使用您仓库中的副本。请推送或丢弃草稿，然后重新部署。",
+    "divergedBody": "平台上的 <code>astrolift.toml</code> 草稿包含 <code>[env]</code> 以外的修改，为避免丢弃这些修改，未使用您仓库中的副本。请在配置页面使用“从仓库拉取”获取仓库中的版本，然后重新部署。<code>[env]</code> 中的应用密钥会保留。",
     "fallbackBody": "无法从您的仓库读取清单，因此使用了上一个版本。自上次成功读取以来推送的内容不在此次发布中。",
     "reviewDraft": "查看草稿",
     "openManifest": "打开清单"
@@ -2863,7 +2863,7 @@
     },
     "secrets": {
       "title": "密钥",
-      "description": "{slug} 的应用级 [env] 字面值、附加密钥包及托管服务连接信息。设置或删除会更新暂存的清单；推送到仓库后才会提交更改。",
+      "description": "{slug} 的应用级 [env] 字面值、附加密钥包及托管服务连接信息。设置或删除会更新平台上暂存的清单；推送到仓库不会包含 [env] 的值。",
       "bulkImport": "批量导入",
       "newSecret": "新建密钥",
       "environment": "环境",
@@ -2882,7 +2882,7 @@
       "delete": {
         "title": "删除 {key}？",
         "fallbackTitle": "删除密钥？",
-        "description": "在平台清单中暂存更改。从配置页面推送到仓库后确认更改；推送前仍可恢复。",
+        "description": "在平台清单中暂存删除操作。[env] 中的应用密钥保留在平台上；推送到仓库不会包含此更改。",
         "confirm": "删除密钥"
       },
       "setSheet": {
@@ -2890,7 +2890,7 @@
         "description": "在应用的 [env] 表中设置字面值。API 不会返回明文；仅此提交会将值发送到后端。",
         "keyLabel": "键",
         "valueLabel": "值",
-        "valueHint": "存储在 manifest_raw_staged 中。在配置页面使用推送到仓库以提交更改。",
+        "valueHint": "存储在平台的 manifest_raw_staged 中。即使使用推送到仓库，也不会写入仓库。",
         "submit": "保存密钥",
         "submitting": "正在保存…",
         "scope": "适用范围",
@@ -3410,6 +3410,7 @@
         "applied": "已应用",
         "applyFailed": "应用失败",
         "nothingToPush": "没有可推送的已暂存更改。",
+        "envOnly": "暂存的只有 [env] 中的应用密钥。它们保留在平台上，不会推送到仓库。",
         "prOpened": "PR 已打开：{branch}",
         "pushed": "推送完成",
         "pushFailed": "推送失败",

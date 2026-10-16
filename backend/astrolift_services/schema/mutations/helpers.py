@@ -306,6 +306,18 @@ def _client_ip(info) -> str:
     return ""
 
 
+def _lock_app(app: RegisteredApp) -> RegisteredApp | None:
+    """``app`` read again under its row lock, None once it is gone. For a
+    write to the staged manifest buffer; call inside ``transaction.atomic()``.
+
+    The repo sync rewrites that buffer under the same lock
+    (``manifest_sync``), after a fetch that can take seconds. A secret
+    write that read the buffer before the sync committed and wrote it
+    after put back a draft built on the manifest the sync had just
+    replaced (#2411)."""
+    return RegisteredApp.objects.select_for_update(no_key=True).filter(pk=app.pk).first()
+
+
 def _stage_manifest(app, new_text: str, *, actor=None) -> str:
     """Validate the new TOML parses, then write to the staging
     buffer + clear it when it matches the source-of-truth.
