@@ -73,10 +73,11 @@ jobs:
           fetch-depth: 0
       # Everything that decides the migrated schema. A shard restores the
       # database dumped under this key instead of migrating from scratch.
+      # Bump v1 when the dump or restore steps below change.
       - name: Key the migrated test database
         id: testdb
         run: |
-          echo "key=testdb-pg16-${{ hashFiles('backend/**/migrations/**', 'backend/Pipfile.lock', 'backend/config/*.py', '.github/workflows/ci.yml') }}" >> "$GITHUB_OUTPUT"
+          echo "key=testdb-v1-pg16-${{ hashFiles('backend/**/migrations/**', 'backend/Pipfile.lock', 'backend/config/*.py') }}" >> "$GITHUB_OUTPUT"
       - name: Look up the migrated test database
         id: testdb-cached
         uses: actions/cache/restore@v4
