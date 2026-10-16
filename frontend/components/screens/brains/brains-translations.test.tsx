@@ -14,9 +14,10 @@ import pt from "@/messages/pt-BR.json";
 import zh from "@/messages/zh-Hans.json";
 
 import { brainMcpConfig } from "./brain-connection";
-import { BRAINS, CONNECTION } from "./brains.fixtures";
+import { BRAINS, CONNECTION, HOST_PROJECTS } from "./brains.fixtures";
 import { BRAINS_LIST } from "./brains-list";
 import { BrainsScreen } from "./BrainsScreen";
+import type { HostBrainAppValues } from "./HostBrainAppDialog";
 
 const catalogs = { en, es, fr, de, ja, ko, "zh-Hans": zh, "pt-BR": pt };
 
@@ -24,10 +25,16 @@ function Screen({
   rows = BRAINS,
   connection = null,
   onConnect = async () => {},
+  hostingSlug = null,
+  onHost = () => {},
+  onSubmitHost = async () => {},
 }: {
   rows?: typeof BRAINS;
   connection?: typeof CONNECTION | null;
   onConnect?: (slug: string) => Promise<void>;
+  hostingSlug?: string | null;
+  onHost?: (slug: string) => void;
+  onSubmitHost?: (values: HostBrainAppValues) => Promise<void>;
 }) {
   const list = useLocalListState(BRAINS_LIST);
   return (
@@ -43,6 +50,12 @@ function Screen({
       connecting={false}
       onConnect={onConnect}
       onDismissConnection={() => {}}
+      hostingSlug={hostingSlug}
+      hostProjects={HOST_PROJECTS}
+      hostSubmitting={false}
+      onHost={onHost}
+      onDismissHost={() => {}}
+      onSubmitHost={onSubmitHost}
     />
   );
 }
@@ -120,6 +133,61 @@ describe("semantic layers (#2320)", () => {
         selector: "div",
       })
     ).toHaveTextContent(CONNECTION.token);
+  });
+
+  it.each(locales)("%s renders the host dialog without falling back to English", (locale) => {
+    const onError = vi.fn();
+    const copy = catalogs[locale].brains;
+    render(
+      <NextIntlClientProvider
+        locale={locale}
+        messages={catalogs[locale]}
+        timeZone="UTC"
+        onError={onError}
+      >
+        <Screen hostingSlug="leo-brain" />
+      </NextIntlClientProvider>
+    );
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByText(copy.hostDialog.envHelp)).toBeInTheDocument();
+    expect(dialog.getByRole("button", { name: copy.hostDialog.create })).toBeDisabled();
+    if (locale !== "en")
+      expect(copy.hostDialog.description).not.toBe(en.brains.hostDialog.description);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("hosts an app on a served layer from the template", () => {
+    const onHost = vi.fn();
+    const onSubmitHost = vi.fn(async () => {});
+    const { rerender } = render(
+      <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
+        <Screen onHost={onHost} />
+      </NextIntlClientProvider>
+    );
+    const [served, notServed] = screen.getAllByRole("button", { name: en.brains.host });
+    expect(notServed).toBeDisabled();
+    fireEvent.click(served);
+    expect(onHost).toHaveBeenCalledWith("leo-brain");
+
+    rerender(
+      <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
+        <Screen hostingSlug="leo-brain" onSubmitHost={onSubmitHost} />
+      </NextIntlClientProvider>
+    );
+    const dialog = within(screen.getByRole("dialog"));
+    fireEvent.change(dialog.getByLabelText(en.brains.hostDialog.image), {
+      target: { value: " ghcr.io/acme/brain-chat:1.0 " },
+    });
+    fireEvent.change(dialog.getByLabelText(en.brains.hostDialog.port), {
+      target: { value: "3000" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: en.brains.hostDialog.create }));
+    expect(onSubmitHost).toHaveBeenCalledWith({
+      projectId: HOST_PROJECTS[0].id,
+      image: "ghcr.io/acme/brain-chat:1.0",
+      name: "",
+      port: 3000,
+    });
   });
 
   it("shows the empty state when nothing is readable", () => {

@@ -15518,6 +15518,26 @@
       "copyLabel": "{label} をコピー",
       "copied": "コピーしました",
       "done": "完了"
+    },
+    "host": "アプリをホスト",
+    "hostTitle": "このレイヤー上にアプリをホスト",
+    "hosted": "{slug} を作成しました。デプロイするとレイヤーの読み取りを開始します。",
+    "hostFailed": "アプリを作成できませんでした。",
+    "hostDialog": {
+      "title": "{slug} 上にアプリをホスト",
+      "description": "brain-app テンプレートからアプリを作成します。指定したイメージを実行する公開 Web ワークロードが 1 つです。デプロイのたびに、このレイヤーの MCP URL と読み取りトークンが渡されます。",
+      "project": "プロジェクト",
+      "selectProject": "プロジェクトを選択",
+      "noProjects": "プロジェクトがありません",
+      "image": "イメージ",
+      "imageHelp": "公開済みのイメージ参照。例: レジストリのパスとタグ。",
+      "name": "名前",
+      "namePlaceholder": "空欄なら自動生成",
+      "port": "ポート",
+      "envHelp": "アプリは BRAIN_MCP_URL、BRAIN_TOKEN、BRAIN_TOKEN_HEADER を読み取ります。トークンはデプロイごとに更新され、アプリを削除すると失効します。",
+      "cancel": "キャンセル",
+      "create": "アプリを作成",
+      "creating": "作成中…"
     }
   },
   "navModel": {

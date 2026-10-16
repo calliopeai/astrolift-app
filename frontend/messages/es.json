@@ -15521,6 +15521,26 @@
       "copyLabel": "Copiar {label}",
       "copied": "Copiado",
       "done": "Listo"
+    },
+    "host": "Alojar una app",
+    "hostTitle": "Alojar una app en esta capa",
+    "hosted": "Se creó {slug}. Despliégala para que empiece a leer la capa.",
+    "hostFailed": "No se pudo crear la app.",
+    "hostDialog": {
+      "title": "Alojar una app en {slug}",
+      "description": "Crea una app a partir de la plantilla brain-app: una carga web pública que ejecuta tu imagen. Cada despliegue le da la URL MCP de esta capa y un token de lectura para ella.",
+      "project": "Proyecto",
+      "selectProject": "Selecciona un proyecto",
+      "noProjects": "No hay proyectos",
+      "image": "Imagen",
+      "imageHelp": "Una referencia de imagen publicada, por ejemplo una ruta de registro y una etiqueta.",
+      "name": "Nombre",
+      "namePlaceholder": "Se genera si queda vacío",
+      "port": "Puerto",
+      "envHelp": "La app lee BRAIN_MCP_URL, BRAIN_TOKEN y BRAIN_TOKEN_HEADER. El token se renueva en cada despliegue y se revoca al eliminar la app.",
+      "cancel": "Cancelar",
+      "create": "Crear app",
+      "creating": "Creando…"
     }
   },
   "navModel": {

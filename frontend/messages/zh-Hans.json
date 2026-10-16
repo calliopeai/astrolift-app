@@ -15518,6 +15518,26 @@
       "copyLabel": "复制{label}",
       "copied": "已复制",
       "done": "完成"
+    },
+    "host": "托管应用",
+    "hostTitle": "在此层上托管应用",
+    "hosted": "已创建 {slug}。部署后即开始读取该层。",
+    "hostFailed": "无法创建应用。",
+    "hostDialog": {
+      "title": "在 {slug} 上托管应用",
+      "description": "使用 brain-app 模板创建应用：一个运行您镜像的公开 Web 工作负载。每次部署都会为其提供此层的 MCP URL 和读取令牌。",
+      "project": "项目",
+      "selectProject": "选择项目",
+      "noProjects": "没有项目",
+      "image": "镜像",
+      "imageHelp": "已推送的镜像引用，例如镜像仓库路径和标签。",
+      "name": "名称",
+      "namePlaceholder": "留空则自动生成",
+      "port": "端口",
+      "envHelp": "应用读取 BRAIN_MCP_URL、BRAIN_TOKEN 和 BRAIN_TOKEN_HEADER。令牌在每次部署时轮换，删除应用时吊销。",
+      "cancel": "取消",
+      "create": "创建应用",
+      "creating": "正在创建…"
     }
   },
   "navModel": {

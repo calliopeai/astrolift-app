@@ -3,7 +3,7 @@ import { expect, fn, userEvent, within } from "storybook/test";
 
 import { useLocalListState } from "@/components/list/use-list-state";
 
-import { BRAINS, CONNECTION, LONG_BRAIN } from "./brains.fixtures";
+import { BRAINS, CONNECTION, HOST_PROJECTS, LONG_BRAIN } from "./brains.fixtures";
 import { BRAINS_LIST } from "./brains-list";
 import { BrainsScreen, type BrainsScreenProps } from "./BrainsScreen";
 import type { BrainRow } from "./use-brains";
@@ -36,6 +36,12 @@ function Brains({
       connecting={false}
       onConnect={async () => {}}
       onDismissConnection={() => {}}
+      hostingSlug={null}
+      hostProjects={HOST_PROJECTS}
+      hostSubmitting={false}
+      onHost={() => {}}
+      onDismissHost={() => {}}
+      onSubmitHost={async () => {}}
       {...patch}
     />
   );
@@ -73,6 +79,28 @@ export const Connected: Story = {
     const body = within(canvasElement.ownerDocument.body);
     await expect(await body.findByText("https://brain.acme.example/mcp")).toBeInTheDocument();
     await expect(body.getByText(/X-Astrolift-Brain-Token/)).toBeInTheDocument();
+  },
+};
+
+/** Host an app opens the template dialog; a layer that is not served has nothing to read. */
+const onHost = fn((_slug: string) => {});
+export const HostAnApp: Story = {
+  render: () => <Brains onHost={onHost} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const [served, notServed] = await canvas.findAllByRole("button", { name: "Host an app" });
+    await expect(notServed).toBeDisabled();
+    await userEvent.click(served);
+    await expect(onHost).toHaveBeenCalledWith("leo-brain");
+  },
+};
+
+/** The template dialog for one layer. */
+export const Hosting: Story = {
+  render: () => <Brains hostingSlug="leo-brain" />,
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    await expect(await body.findByText("Host an app on leo-brain")).toBeInTheDocument();
   },
 };
 

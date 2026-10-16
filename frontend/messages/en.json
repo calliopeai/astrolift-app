@@ -15518,6 +15518,26 @@
       "copyLabel": "Copy {label}",
       "copied": "Copied",
       "done": "Done"
+    },
+    "host": "Host an app",
+    "hostTitle": "Host an app on this layer",
+    "hosted": "Created {slug}. Deploy it to start reading the layer.",
+    "hostFailed": "Could not create the app.",
+    "hostDialog": {
+      "title": "Host an app on {slug}",
+      "description": "Creates an app from the brain-app template: one public web workload running your image. Each deploy gives it this layer's MCP URL and a read token for it.",
+      "project": "Project",
+      "selectProject": "Select a project",
+      "noProjects": "No projects",
+      "image": "Image",
+      "imageHelp": "A pushed image reference, for example a registry path and tag.",
+      "name": "Name",
+      "namePlaceholder": "Generated when blank",
+      "port": "Port",
+      "envHelp": "The app reads BRAIN_MCP_URL, BRAIN_TOKEN and BRAIN_TOKEN_HEADER. The token rotates on every deploy and is revoked when the app is deleted.",
+      "cancel": "Cancel",
+      "create": "Create app",
+      "creating": "Creating…"
     }
   },
   "listDefinitions": {

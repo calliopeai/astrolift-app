@@ -15521,6 +15521,26 @@
       "copyLabel": "{label} kopieren",
       "copied": "Kopiert",
       "done": "Fertig"
+    },
+    "host": "App hosten",
+    "hostTitle": "Eine App auf dieser Ebene hosten",
+    "hosted": "{slug} wurde erstellt. Stellen Sie sie bereit, damit sie die Ebene liest.",
+    "hostFailed": "Die App konnte nicht erstellt werden.",
+    "hostDialog": {
+      "title": "Eine App auf {slug} hosten",
+      "description": "Erstellt eine App aus der Vorlage brain-app: ein öffentlicher Web-Workload mit Ihrem Image. Jede Bereitstellung gibt ihr die MCP-URL dieser Ebene und ein Lesetoken dafür.",
+      "project": "Projekt",
+      "selectProject": "Projekt auswählen",
+      "noProjects": "Keine Projekte",
+      "image": "Image",
+      "imageHelp": "Eine veröffentlichte Image-Referenz, zum Beispiel ein Registry-Pfad mit Tag.",
+      "name": "Name",
+      "namePlaceholder": "Wird erzeugt, wenn leer",
+      "port": "Port",
+      "envHelp": "Die App liest BRAIN_MCP_URL, BRAIN_TOKEN und BRAIN_TOKEN_HEADER. Das Token wechselt bei jeder Bereitstellung und wird widerrufen, wenn die App gelöscht wird.",
+      "cancel": "Abbrechen",
+      "create": "App erstellen",
+      "creating": "Wird erstellt…"
     }
   },
   "navModel": {
