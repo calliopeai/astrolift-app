@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import strawberry
 from django.db import transaction
 from django.db.models import Q
@@ -73,6 +75,8 @@ from core.decorators import tenant_scoped
 from core.mutations import AuditEntry, ErrorCode, emit_audit, mutation_audit
 from core.permissions import Permission, require_permission
 from core.tenancy import get_current_tenant
+
+log = logging.getLogger(__name__)
 
 
 @require_permission(
@@ -252,6 +256,44 @@ def _workflow_actor(info: Info):
         user_id=getattr(user, "pk", None) if user is not None else None,
         display=str(getattr(user, "email", "") or getattr(user, "username", "")),
     )
+
+
+def _is_cloud_operations(svc: ManagedService) -> bool:
+    from gcp.managed.observability_cloud_operations import KIND, VARIANT
+
+    return (str(svc.kind), str(svc.variant or "")) == (KIND, VARIANT)
+
+
+def _reconcile_identity_after_detach(info: Info, env: AppEnvironment) -> None:
+    """Reconcile the app's workload identity once the detach commits (#2099).
+
+    The detached Cloud Operations bundle's log view grant is taken off the
+    app's identity by that reconcile; without it the app went on reading the
+    bundle's logs until its next deploy. After the commit, so the reconcile
+    cannot read the attachment as still live. The detach has happened by
+    then, so a start that fails is logged rather than reported as a failed
+    detach, and the next deploy's reconcile still takes the grant back.
+    """
+    from astrolift_workflows.client import start_workflow
+    from astrolift_workflows.inputs import ReconcileWorkloadIdentityInput
+
+    payload = ReconcileWorkloadIdentityInput(
+        registered_app_id=env.registered_app_id,
+        app_environment_id=env.pk,
+        actor=_workflow_actor(info),
+    )
+
+    def start() -> None:
+        try:
+            start_workflow(
+                "ReconcileWorkloadIdentityWorkflow",
+                args=[payload],
+                workflow_id=f"ReconcileWorkloadIdentityWorkflow-{env.guid}",
+            )
+        except Exception:  # noqa: BLE001 - the detach is committed; the next deploy reconciles too
+            log.exception("could not start the workload identity reconcile after a detach from %s", env.guid)
+
+    transaction.on_commit(start)
 
 
 def _reviewed_enqueue(svc, workflow_name, payload, *, update=False):
@@ -724,6 +766,8 @@ class ManagedServiceMutations:
             _authorize_agent_consumer(row.agent_environment_spec.slug)
         payload = managed_service_attachment_to_type(row)
         row.soft_delete()
+        if row.app_environment_id and _is_cloud_operations(row.managed_service):
+            _reconcile_identity_after_detach(info, row.app_environment)
         return gql_success(payload)
 
     @strawberry.field

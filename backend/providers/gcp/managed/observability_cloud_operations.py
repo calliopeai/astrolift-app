@@ -37,10 +37,25 @@ from _sdk.managed_service import (
 from gcp._service_accounts import unlisted_service_account
 
 KIND = "observability"
+VARIANT = "cloud_operations"
 _LOGGING_ROOT = "https://logging.googleapis.com"
 _MONITORING_ROOT = "https://monitoring.googleapis.com"
 _BUNDLE_LABEL = "astrolift_io_observability_bundle"
 _RESOURCE_LABEL = "astrolift_io_observability_resource"
+#: The pod label Astrolift stamps on a workload whose container logs a bundle
+#: collects (#2099). GKE copies each pod label onto the workload's container
+#: entries as ``labels."k8s-pod/<key>"``, with every ``.`` in the key folded to
+#: ``_``; this key has neither ``.`` nor ``/``, so it reaches the entry as is.
+BUNDLE_POD_LABEL = _BUNDLE_LABEL
+_ENTRY_BUNDLE_LABEL = f'labels."k8s-pod/{BUNDLE_POD_LABEL}"'
+#: The binding env var naming the bundle's log bucket. The platform keeps a
+#: binding's env rows after a detach, which is how it finds the view to revoke.
+LOG_BUCKET_ENV = "GCP_LOG_BUCKET"
+_LOG_READ_MODES = frozenset({"read", "both", "logs"})
+_LOG_WRITE_MODES = frozenset({"write", "both", "logs"})
+_K8S_LABEL_VALUE = re.compile(r"[A-Za-z0-9](?:[-A-Za-z0-9_.]{0,61}[A-Za-z0-9])?")
+#: The view Cloud Logging creates in every bucket, showing all of its entries.
+_ALL_LOGS_VIEW = "_AllLogs"
 _SENSITIVE_CHANNEL_LABEL_PARTS = ("token", "password", "secret", "key", "credential")
 _CONFIG_KEYS = {
     "location",
@@ -686,10 +701,17 @@ class CloudOperationsDriver(ManagedServiceDriver):
                 "GCP_MONITORING_ENDPOINT": ValueRef(literal="https://monitoring.googleapis.com"),
                 "GCP_MONITORING_DASHBOARD": ValueRef(literal=dashboard_name),
             },
-            iam_grants=_binding_grants(self._config.project_id, cfg),
+            iam_grants=_binding_grants(bucket_name, cfg),
             notes=(
-                "Cloud Logging and Cloud Monitoring use Application Default Credentials through "
-                "Workload Identity; notification-channel secrets remain in Secret Manager."
+                "Nothing is granted on the project (#2099). Log reads: with access_mode read, both or "
+                "logs the workload holds roles/logging.viewAccessor on the _AllLogs view of the bundle's "
+                "own bucket and reads nothing else, through Application Default Credentials and Workload "
+                "Identity. Log writes: with write, both or logs Astrolift stamps the pod label "
+                f"{BUNDLE_POD_LABEL}=<GCP_CLOUD_OPERATIONS_BUNDLE> on the bound workload's pods, and the "
+                "bundle routes their GKE container stdout and stderr into its bucket and keeps them out of "
+                "_Default; the workload holds no log-write role. Metrics: no Cloud Monitoring role is "
+                "granted in any mode; metrics are read through Astrolift's scoped observability API, not "
+                "by the workload. Notification-channel secrets remain in Secret Manager."
             ),
         )
 
@@ -975,6 +997,8 @@ class CloudOperationsDriver(ManagedServiceDriver):
             desired,
             base_labels,
         )
+        for resource, route in _route_declarations(bundle_id, bucket_name):
+            self._reconcile_many(self._logging, resource, project, [route], bundle_id, desired, base_labels)
         for resource, parent in (
             (_SINK, project),
             (_LOG_METRIC, project),
@@ -990,6 +1014,7 @@ class CloudOperationsDriver(ManagedServiceDriver):
                 bundle_id,
                 desired,
                 base_labels,
+                transform=_bundle_confined(bundle_id, bucket_name) if resource in {_SINK, _LOG_METRIC} else None,
             )
 
         channel_names = self._reconcile_many(
@@ -2195,18 +2220,127 @@ def _set_body_path(body: dict[str, Any], path: str, value: str) -> None:
     current[parts[-1]] = value
 
 
-def _binding_grants(project_id: str, cfg: Mapping[str, Any]) -> list[Grant]:
-    mode = str(cfg.get("access_mode") or "both")
-    roles: list[str] = []
-    if mode in {"read", "both", "logs"}:
-        roles.append("roles/logging.viewer")
-    if mode in {"write", "both", "logs"}:
-        roles.append("roles/logging.logWriter")
-    if mode in {"read", "both", "metrics"}:
-        roles.append("roles/monitoring.viewer")
-    if mode in {"write", "both", "metrics"}:
-        roles.append("roles/monitoring.metricWriter")
-    return [Grant(resource=f"projects/{project_id}", actions=roles)] if roles else []
+def _binding_grants(bucket_name: str, cfg: Mapping[str, Any]) -> list[Grant]:
+    """Read on the bundle's own log view; nothing on the project (#2099).
+
+    ``roles/logging.viewer``, ``logWriter``, ``monitoring.viewer`` and
+    ``metricWriter`` all act on the whole project, so in a project several orgs
+    share they read every tenant's logs and metrics and write anywhere. A log
+    view is the one Cloud Logging resource IAM can scope a reader to. Writes
+    need no role: the bound workload's container logs reach the bucket through
+    the platform's pod label (``bundle_pod_labels``). Metrics are read through
+    Astrolift's own scoped API, so no Cloud Monitoring role is granted.
+    """
+    if bucket_name and _access_mode(cfg) in _LOG_READ_MODES:
+        return [Grant(resource=log_view_for_bucket(bucket_name), actions=["roles/logging.viewAccessor"])]
+    return []
+
+
+def _access_mode(cfg: Mapping[str, Any]) -> str:
+    return str(cfg.get("access_mode") or "both")
+
+
+def _has_bucket(cfg: Mapping[str, Any]) -> bool:
+    """Whether ``cfg`` gives the bundle a log bucket, decided where ``_reconcile`` decides it."""
+    return _bucket_declaration(cfg.get("log_bucket", True), "", 0) is not None
+
+
+def log_view_for_bucket(bucket_name: str) -> str:
+    """The view of ``bucket_name`` a binding reads through, or ``""`` for no bucket."""
+    return f"{bucket_name}/views/{_ALL_LOGS_VIEW}" if bucket_name else ""
+
+
+def binding_reads_logs(config: Mapping[str, Any] | None) -> bool:
+    """Whether a binding to a bundle with ``config`` is granted its log view (#2099)."""
+    cfg = config or {}
+    return _access_mode(cfg) in _LOG_READ_MODES and _has_bucket(cfg)
+
+
+def bundle_pod_labels(handle: str, config: Mapping[str, Any] | None) -> dict[str, str]:
+    """The pod label a workload bound to the bundle at ``handle`` carries, or ``{}`` (#2099).
+
+    It is the workload's whole log-write path: the bundle's route sink takes
+    the GKE container entries whose pod carries it into the bundle's bucket,
+    and the bundle's exclusion keeps them out of ``_Default``. Empty when the
+    binding writes no logs or the bundle has no bucket to route them into.
+    Only the platform may set it; whoever sets it picks the bucket a pod's
+    stdout and stderr land in.
+    """
+    _, bundle_id = _parse_handle(handle)
+    cfg = config or {}
+    if _access_mode(cfg) not in _LOG_WRITE_MODES or not _has_bucket(cfg):
+        return {}
+    if not _K8S_LABEL_VALUE.fullmatch(bundle_id):
+        raise CloudOperationsError(f"Cloud Operations bundle id {bundle_id!r} is not a Kubernetes label value")
+    return {BUNDLE_POD_LABEL: bundle_id}
+
+
+def _bundle_entries(bundle_id: str) -> str:
+    """The container entries of the pods carrying ``bundle_id``'s pod label.
+
+    GKE puts pod labels on the entry's ``labels``, never on ``resource.labels``,
+    which for ``k8s_container`` hold only the project, location, cluster,
+    namespace, pod and container names.
+    """
+    return f'resource.type="k8s_container" AND {_ENTRY_BUNDLE_LABEL}="{bundle_id}"'
+
+
+def _route_declarations(bundle_id: str, bucket_name: str) -> list[tuple[_ResourceKind, dict[str, Any]]]:
+    """The sink routing the bound workloads' container logs into the bundle's
+    bucket, and the exclusion keeping them out of ``_Default`` (#2099).
+
+    Both select the container entries of pods carrying the bundle's pod label,
+    which only the platform stamps, so a pod's stdout and stderr land in the
+    bucket of the bundle it is bound to and in no other. The ids carry a
+    period, which no tenant declaration id may, so neither can be declared
+    over. The destination is a bucket in the sink's own project, so the sink's
+    writer needs no grant.
+    """
+    if not bucket_name:
+        return []
+    entries = _bundle_entries(bundle_id)
+    return [
+        (
+            _SINK,
+            {
+                "id": f"{bundle_id}.route",
+                "unique_writer_identity": False,
+                "body": {"destination": f"logging.googleapis.com/{bucket_name}", "filter": entries},
+            },
+        ),
+        (_EXCLUSION, {"id": f"{bundle_id}.route", "body": {"filter": entries}}),
+    ]
+
+
+def _bundle_confined(
+    bundle_id: str,
+    bucket_name: str,
+) -> Callable[[dict[str, Any], dict[str, Any]], dict[str, Any]]:
+    """Keep a tenant's project-level sink or log metric off other bundles (#2099).
+
+    Sinks and log-based metrics select from every entry in the project, so one
+    bundle could copy another's container entries into its own bucket, or a
+    sink could write straight into another bundle's bucket, around the view
+    grant. The filter is narrowed to entries no other bundle's pod label marks,
+    and a Cloud Logging bucket destination must be the bundle's own.
+    """
+
+    def confine(declaration: dict[str, Any], body: dict[str, Any]) -> dict[str, Any]:
+        destination = str(body.get("destination") or "")
+        if (
+            destination.startswith("logging.googleapis.com/")
+            and "/buckets/" in destination
+            and destination != f"logging.googleapis.com/{bucket_name}"
+        ):
+            raise CloudOperationsError(
+                f"log sink {declaration['id']!r} may route to a Cloud Logging bucket only if it is the bundle's own",
+            )
+        own = f'(NOT {_ENTRY_BUNDLE_LABEL}:* OR {_ENTRY_BUNDLE_LABEL}="{bundle_id}")'
+        tenant_filter = str(body.get("filter") or "").strip()
+        body["filter"] = f"({tenant_filter}) AND {own}" if tenant_filter else own
+        return body
+
+    return confine
 
 
 def _console_url(project_id: str, dashboard_name: str) -> str:

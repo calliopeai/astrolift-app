@@ -682,6 +682,10 @@ async def render_manifests(deployment_id: int) -> dict[str, Any]:
 
     await sync_to_async(stamp_binding_revisions)(resources, env)
 
+    from astrolift_services.observability_pod_labels import stamp_observability_pod_labels
+
+    await sync_to_async(stamp_observability_pod_labels)(resources, env)
+
     from astrolift_services.rds_ca import inject_rds_ca, rds_binding_secret_names
 
     resources = inject_rds_ca(

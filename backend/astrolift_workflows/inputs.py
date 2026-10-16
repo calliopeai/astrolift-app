@@ -142,6 +142,15 @@ class DeprovisionManagedServiceInput:
 
 
 @dataclasses.dataclass(slots=True, frozen=True)
+class ReconcileWorkloadIdentityInput:
+    """The app environment whose workload identity is reconciled outside a deploy (#2099)."""
+
+    registered_app_id: int
+    app_environment_id: int
+    actor: Actor
+
+
+@dataclasses.dataclass(slots=True, frozen=True)
 class BuildPreviewInput:
     """Input for ``BuildPreviewWorkflow`` (#751).
 

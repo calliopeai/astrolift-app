@@ -1390,6 +1390,18 @@ def render_resources_for_deployment(
 
     stamp_binding_revisions(resources, env)
 
+    # A Cloud Operations bundle collects a workload's container logs only from
+    # pods carrying its label, and only the platform may set it (#2099).
+    from astrolift_services.observability_pod_labels import (
+        ObservabilityLabelError,
+        stamp_observability_pod_labels,
+    )
+
+    try:
+        stamp_observability_pod_labels(resources, env)
+    except ObservabilityLabelError as error:
+        raise AppDeployError(str(error)) from None
+
     from astrolift_registry.brain_apps import stamp_brain_key
 
     stamp_brain_key(resources, deployment)

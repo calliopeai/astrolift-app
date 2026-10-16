@@ -294,7 +294,7 @@ def test_full_bundle_reconciles_all_logging_and_monitoring_resources() -> None:
     assert result.ok is True
     assert result.ready is True
     assert result.handle == f"observability/global/astrolift-observability-operations--{_digest(MSID)}"
-    assert "17 resources" in result.message
+    assert "19 resources" in result.message
     channel = next(iter(monitoring.resources["notification_channels"].values()))
     assert channel["labels"]["service_key"] == "secret-routing-key"
     assert "secret-routing-key" not in repr(_full_config())
@@ -398,11 +398,11 @@ def test_log_sink_writer_identity_options_reconcile_through_api_query_params() -
     result = driver.provision(_spec(config))
 
     assert result.ok
-    create = next(call for call in logging.calls if call[0:2] == ("create", "log_sinks"))
+    create = next(call for call in logging.calls if call[0:2] == ("create", "log_sinks") and call[3] == "audit")
     assert create[5] == {
         "customWriterIdentity": "serviceAccount:logging@example.iam.gserviceaccount.com",
     }
-    sink = next(iter(logging.resources["log_sinks"].values()))
+    sink = logging.resources["log_sinks"]["projects/acme-prod/sinks/audit"]
     assert sink["writerIdentity"] == "serviceAccount:logging@example.iam.gserviceaccount.com"
 
 
@@ -1161,7 +1161,10 @@ def test_binding_emits_portable_values_and_least_privilege_modes() -> None:
         "projects/acme-prod/locations/global/buckets/",
     )
     assert "dashboards/builder" in str(binding.env_vars["DASHBOARD_URL"].literal)
-    assert binding.iam_grants[0].actions == ["roles/logging.viewer", "roles/logging.logWriter"]
+    bucket = binding.env_vars["GCP_LOG_BUCKET"].literal
+    assert [(grant.resource, grant.actions) for grant in binding.iam_grants] == [
+        (f"{bucket}/views/_AllLogs", ["roles/logging.viewAccessor"]),
+    ]
 
 
 def test_status_and_schema_contracts() -> None:
