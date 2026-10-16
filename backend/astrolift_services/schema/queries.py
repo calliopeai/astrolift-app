@@ -1342,6 +1342,7 @@ class ServicesQuery(
             guid = uuid.UUID(str(id))
         except (TypeError, ValueError, AttributeError):
             return None
+        # tenancy: _app_managed_service_rows pins registered_app__organization_id to the caller's org
         row = _managed_services_qs(app_slug=app_slug, environment_name=None).filter(guid=guid).first()
         return managed_service_to_type(row) if row is not None else None
 
