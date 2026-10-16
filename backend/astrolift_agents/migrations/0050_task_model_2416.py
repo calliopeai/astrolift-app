@@ -5,7 +5,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("astrolift_agents", "0047_dispatch_execution_2234"),
+        ("astrolift_agents", "0049_conversation_transfer_admission_1971"),
     ]
 
     operations = [
