@@ -20,6 +20,17 @@ _ACCOUNT_ID_RE = re.compile(r"^[a-z][a-z0-9-]{4,28}[a-z0-9]$")
 _ROLE_RE = re.compile(
     r"^(?:roles/[A-Za-z0-9_.]+|(?:projects|organizations)/[^/]+/roles/[A-Za-z0-9_.]+)$",
 )
+_LOG_VIEW_RE = re.compile(r"^projects/([^/]+)/locations/[^/]+/buckets/[^/]+/views/[^/]+$")
+_VIEW_ACCESSOR = "roles/logging.viewAccessor"
+#: Observability roles a binding once granted on the whole project (#2099). In
+#: a project several orgs share they read every tenant's logs and metrics, so
+#: one no binding still asks for is withdrawn from the identity on reconcile.
+_PROJECT_WIDE_OBSERVABILITY_ROLES = (
+    "roles/logging.viewer",
+    "roles/logging.logWriter",
+    "roles/monitoring.viewer",
+    "roles/monitoring.metricWriter",
+)
 
 
 def service_account_id_for(name: str) -> str:
@@ -87,6 +98,24 @@ class _ResourceManagerIAMClient:
         response = self._session.post(
             f"https://cloudresourcemanager.googleapis.com/v1/projects/{project_id}:setIamPolicy",
             json={"policy": policy, "updateMask": "bindings,etag,version"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        return dict(response.json())
+
+    def get_log_view_iam_policy(self, *, view: str) -> dict[str, Any]:
+        response = self._session.post(
+            f"https://logging.googleapis.com/v2/{view}:getIamPolicy",
+            json={"options": {"requestedPolicyVersion": 3}},
+            timeout=30,
+        )
+        response.raise_for_status()
+        return dict(response.json())
+
+    def set_log_view_iam_policy(self, *, view: str, policy: dict[str, Any]) -> dict[str, Any]:
+        response = self._session.post(
+            f"https://logging.googleapis.com/v2/{view}:setIamPolicy",
+            json={"policy": policy},
             timeout=30,
         )
         response.raise_for_status()
@@ -160,6 +189,7 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
         permissions: list[dict[str, Any]],
     ) -> str:
         roles = self._validated_roles(permissions)
+        view_grants = self._log_view_grants(permissions)
         account_id = service_account_id_for(name)
         email = self._sa_email(name=name)
         try:
@@ -178,6 +208,12 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
 
         for role in roles:
             self._add_project_role(sa_email=email, role=role)
+        for view, role in view_grants:
+            self._add_log_view_role(sa_email=email, view=view, role=role)
+        self._withdraw_project_roles(
+            sa_email=email,
+            roles=[role for role in _PROJECT_WIDE_OBSERVABILITY_ROLES if role not in roles],
+        )
         return email
 
     @driver_op(cloud="gcp", driver="identity", audit=True, sensitive_kind="identity.attach_policy")
@@ -205,8 +241,8 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
     def _sa_resource(self, *, name: str) -> str:
         return f"projects/-/serviceAccounts/{self._sa_email(name=name)}"
 
-    @staticmethod
-    def _validated_roles(permissions: list[dict[str, Any]]) -> list[str]:
+    def _validated_roles(self, permissions: list[dict[str, Any]]) -> list[str]:
+        """The project-level roles; grants on a log view are applied on the view."""
         roles: list[str] = []
         for permission in permissions:
             resource = permission.get("resource")
@@ -214,15 +250,87 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
                 isinstance(resource, str) and "/endpoints/" in resource
             ):
                 raise ValueError("Endpoint grants require owned resource-scoped GCP reconciliation")
+            if self._log_view(permission):
+                continue
             role = permission.get("role")
             if not isinstance(role, str) or not _ROLE_RE.fullmatch(role):
                 raise ValueError(
                     "GCP workload-identity permissions must contain a valid "
                     f"predefined or custom IAM role; received {role!r}",
                 )
+            if role == _VIEW_ACCESSOR:
+                # On the project it reads every log view there, so every
+                # tenant's logs in a shared project (#2099).
+                raise ValueError(f"{_VIEW_ACCESSOR} is granted on a log view, never on the project")
             if role not in roles:
                 roles.append(role)
         return roles
+
+    def _log_view(self, permission: dict[str, Any]) -> str:
+        """The log view ``permission`` is scoped to, or ``""`` for a project grant."""
+        resource = permission.get("resource")
+        match = _LOG_VIEW_RE.fullmatch(resource) if isinstance(resource, str) else None
+        if match is None:
+            return ""
+        if match.group(1) != self._config.project_id:
+            raise ValueError(f"log view {resource!r} is not in project {self._config.project_id!r}")
+        if permission.get("role") != _VIEW_ACCESSOR:
+            raise ValueError(f"a log view grants only {_VIEW_ACCESSOR}; received {permission.get('role')!r}")
+        return str(resource)
+
+    def _log_view_grants(self, permissions: list[dict[str, Any]]) -> list[tuple[str, str]]:
+        grants: list[tuple[str, str]] = []
+        for permission in permissions:
+            view = self._log_view(permission)
+            if view and (view, _VIEW_ACCESSOR) not in grants:
+                grants.append((view, _VIEW_ACCESSOR))
+        return grants
+
+    def _project_iam_client(self) -> Any:
+        if self._project_iam is None:
+            self._project_iam = _ResourceManagerIAMClient()
+        return self._project_iam
+
+    def _add_log_view_role(self, *, sa_email: str, view: str, role: str) -> None:
+        try:
+            client = self._project_iam_client()
+            policy = client.get_log_view_iam_policy(view=view)
+            updated = _with_member(policy, role=role, member=f"serviceAccount:{sa_email}")
+            if updated is not None:
+                client.set_log_view_iam_policy(view=view, policy=updated)
+        except Exception as exc:
+            raise map_api_error(exc) from exc
+
+    def _withdraw_project_roles(self, *, sa_email: str, roles: list[str]) -> None:
+        """Remove the identity from unconditional project bindings of ``roles``.
+
+        Idempotent: nothing is written when the identity holds none of them.
+        """
+        if not roles:
+            return
+        try:
+            client = self._project_iam_client()
+            policy = client.get_project_iam_policy(project_id=self._config.project_id)
+            member = f"serviceAccount:{sa_email}"
+            bindings: list[dict[str, Any]] = []
+            changed = False
+            for binding in policy.get("bindings") or []:
+                members = list(binding.get("members") or [])
+                if binding.get("role") in roles and not binding.get("condition") and member in members:
+                    members.remove(member)
+                    changed = True
+                    if not members:
+                        continue
+                    binding = {**binding, "members": members}
+                bindings.append(binding)
+            if not changed:
+                return
+            updated = dict(policy)
+            updated["bindings"] = bindings
+            updated["version"] = max(int(updated.get("version") or 1), 3)
+            client.set_project_iam_policy(project_id=self._config.project_id, policy=updated)
+        except Exception as exc:
+            raise map_api_error(exc) from exc
 
     def _add_project_role(self, *, sa_email: str, role: str) -> None:
         try:
@@ -252,6 +360,25 @@ class GCPWorkloadIdentityDriver(WorkloadIdentityDriver):
             )
         except Exception as exc:
             raise map_api_error(exc) from exc
+
+
+def _with_member(policy: dict[str, Any], *, role: str, member: str) -> dict[str, Any] | None:
+    """``policy`` with ``member`` in its unconditional ``role`` binding, or None when it already is."""
+    bindings = [dict(item) for item in policy.get("bindings") or []]
+    binding = next(
+        (item for item in bindings if item.get("role") == role and not item.get("condition")),
+        None,
+    )
+    if binding is not None and member in (binding.get("members") or []):
+        return None
+    if binding is None:
+        bindings.append({"role": role, "members": [member]})
+    else:
+        binding["members"] = [*(binding.get("members") or []), member]
+    updated = dict(policy)
+    updated["bindings"] = bindings
+    updated["version"] = max(int(updated.get("version") or 1), 3)
+    return updated
 
 
 __all__ = [

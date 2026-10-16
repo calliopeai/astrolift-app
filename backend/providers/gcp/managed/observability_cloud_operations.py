@@ -41,6 +41,8 @@ _LOGGING_ROOT = "https://logging.googleapis.com"
 _MONITORING_ROOT = "https://monitoring.googleapis.com"
 _BUNDLE_LABEL = "astrolift_io_observability_bundle"
 _RESOURCE_LABEL = "astrolift_io_observability_resource"
+#: The view Cloud Logging creates in every bucket, showing all of its entries.
+_ALL_LOGS_VIEW = "_AllLogs"
 _SENSITIVE_CHANNEL_LABEL_PARTS = ("token", "password", "secret", "key", "credential")
 _CONFIG_KEYS = {
     "location",
@@ -686,10 +688,15 @@ class CloudOperationsDriver(ManagedServiceDriver):
                 "GCP_MONITORING_ENDPOINT": ValueRef(literal="https://monitoring.googleapis.com"),
                 "GCP_MONITORING_DASHBOARD": ValueRef(literal=dashboard_name),
             },
-            iam_grants=_binding_grants(self._config.project_id, cfg),
+            iam_grants=_binding_grants(bucket_name, cfg),
             notes=(
-                "Cloud Logging and Cloud Monitoring use Application Default Credentials through "
-                "Workload Identity; notification-channel secrets remain in Secret Manager."
+                "Cloud Logging uses Application Default Credentials through Workload Identity; "
+                "notification-channel secrets remain in Secret Manager. Reads are confined to the "
+                "bundle's own log bucket through its _AllLogs view. Entries labelled "
+                f"{_BUNDLE_LABEL}=<GCP_CLOUD_OPERATIONS_BUNDLE> are routed only into that bucket. "
+                "No project-wide logging or monitoring role is granted (#2099): Cloud Logging "
+                "cannot confine a log writer, nor Cloud Monitoring a metric reader or writer, "
+                "to one bundle in a shared project."
             ),
         )
 
@@ -975,6 +982,8 @@ class CloudOperationsDriver(ManagedServiceDriver):
             desired,
             base_labels,
         )
+        for resource, route in _route_declarations(bundle_id, bucket_name):
+            self._reconcile_many(self._logging, resource, project, [route], bundle_id, desired, base_labels)
         for resource, parent in (
             (_SINK, project),
             (_LOG_METRIC, project),
@@ -2195,18 +2204,45 @@ def _set_body_path(body: dict[str, Any], path: str, value: str) -> None:
     current[parts[-1]] = value
 
 
-def _binding_grants(project_id: str, cfg: Mapping[str, Any]) -> list[Grant]:
+def _binding_grants(bucket_name: str, cfg: Mapping[str, Any]) -> list[Grant]:
+    """Read on the bundle's own log view; nothing on the project (#2099).
+
+    ``roles/logging.viewer``, ``logWriter``, ``monitoring.viewer`` and
+    ``metricWriter`` all act on the whole project, so in a project several orgs
+    share they read every tenant's logs and metrics and write anywhere. A log
+    view is the one Cloud Logging resource IAM can scope a reader to; no Cloud
+    Logging or Monitoring resource scopes a writer or a metric reader to a
+    bundle, so those modes grant nothing until one does.
+    """
     mode = str(cfg.get("access_mode") or "both")
-    roles: list[str] = []
-    if mode in {"read", "both", "logs"}:
-        roles.append("roles/logging.viewer")
-    if mode in {"write", "both", "logs"}:
-        roles.append("roles/logging.logWriter")
-    if mode in {"read", "both", "metrics"}:
-        roles.append("roles/monitoring.viewer")
-    if mode in {"write", "both", "metrics"}:
-        roles.append("roles/monitoring.metricWriter")
-    return [Grant(resource=f"projects/{project_id}", actions=roles)] if roles else []
+    if bucket_name and mode in {"read", "both", "logs"}:
+        return [Grant(resource=f"{bucket_name}/views/{_ALL_LOGS_VIEW}", actions=["roles/logging.viewAccessor"])]
+    return []
+
+
+def _route_declarations(bundle_id: str, bucket_name: str) -> list[tuple[_ResourceKind, dict[str, Any]]]:
+    """The sink routing the bundle's entries into its bucket, and the exclusion
+    keeping them out of ``_Default`` (#2099).
+
+    Both select entries by the bundle label, so what a workload writes under it
+    lands only in the bundle's bucket. The ids carry a period, which no tenant
+    declaration id may, so neither can be declared over. The destination is a
+    bucket in the sink's own project, so the sink's writer needs no grant.
+    """
+    if not bucket_name:
+        return []
+    entries = f'labels."{_BUNDLE_LABEL}"="{bundle_id}"'
+    return [
+        (
+            _SINK,
+            {
+                "id": f"{bundle_id}.route",
+                "unique_writer_identity": False,
+                "body": {"destination": f"logging.googleapis.com/{bucket_name}", "filter": entries},
+            },
+        ),
+        (_EXCLUSION, {"id": f"{bundle_id}.route", "body": {"filter": entries}}),
+    ]
 
 
 def _console_url(project_id: str, dashboard_name: str) -> str:
