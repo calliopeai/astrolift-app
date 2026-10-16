@@ -63,10 +63,12 @@ export function BuildSettingsView({
   }
 
   // The managed CI workflow keeps the paths it was rendered with until it is
-  // synced again; a platform build reads them at its next run.
+  // synced again; a platform build reads them at its next run. The command
+  // skips the secrets step, which would rotate the deploy token.
   const savedNotice = !saved ? null : buildMode === "ci_pushed" && hasRepository ? (
     <>
-      {t("resyncCi")} <code className="font-mono">astro ci setup {slug}</code>
+      {t("resyncCi")}{" "}
+      <code className="font-mono">astro ci setup {slug} --skip-webhook --skip-secrets</code>
     </>
   ) : buildMode === "platform_build" ? (
     t("platformBuild")
