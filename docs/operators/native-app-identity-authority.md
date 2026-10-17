@@ -146,12 +146,14 @@ with an unchanged unbound intent may record fixed failure metadata; it cannot
 bind a run or proceed to native effects.
 
 The registered first activity checks the private receipt, pure workflow input and
-current original authority before manifest, build or native effects. Valid native
-requests then fail explicitly with `NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED`.
+current original authority before manifest, build or native effects. An admitted
+native request answers `NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED`; histories from
+before the native pipeline refuse on it, and patched ones run the
+[Endpoint-only native steps](gcp-native-configuration-executor.md).
 Its failure activity writes only fixed Deployment status metadata, without Secret
 restoration or GitHub reflection. Patch markers preserve replay of older histories;
-older native histories do not acquire these new guarantees. This is staged source,
-not an available complete deployment capability or live cloud acceptance.
+older native histories do not acquire these new guarantees. Live cloud acceptance
+is separate.
 
 ## Deeper deployment consumers
 
@@ -203,11 +205,10 @@ locks EXPECTED; later checks read immutable EXPECTED/BOUND history without row
 locks, avoiding waits while source/preparation/IAM parents are held. Missing or
 inconsistent binding still refuses.
 
-These callbacks are optional for existing standalone private consumers and do
-not activate the staged deployment path. The actual native pipeline must wire
-them at every source, preparation/IAM, render/apply and runtime boundary, close
-its clients within the activity scope, and complete the remaining
-apply/runtime/inference chain before public activation.
+These callbacks are optional for existing standalone private consumers. The
+native Endpoint pipeline wires them at every source, preparation/IAM,
+render/apply and runtime boundary and closes its clients within the activity
+scope; token exchange and inference acceptance remain separate.
 
 
 ### Private native response acknowledgments
@@ -241,7 +242,6 @@ the future guarded executor must always enable strict acknowledgments. An IAM
 acknowledgment never certifies grant ownership: the current admitted policy
 readback and existing ownership reconciliation remain mandatory.
 
-These are private prerequisites only. The public native Deployment path remains
-`NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED`; configuration, accepted node-pool
-placement, runtime readiness, token identity and actual prediction acceptance
-must be composed and proved before activation.
+`DeployAppWorkflow` composes these for Endpoint-only apps; see
+[native Endpoint deployment](gcp-native-configuration-executor.md). Token
+identity and actual prediction acceptance are still separate.

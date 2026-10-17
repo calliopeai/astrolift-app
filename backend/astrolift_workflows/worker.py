@@ -215,6 +215,10 @@ from astrolift_workflows.activities.conversation_transfer import (
 from astrolift_workflows.activities.domain_app_route import reconcile_domain_app_route
 from astrolift_workflows.activities.install_cluster_agent import install_cluster_agent_attempt
 from astrolift_workflows.activities.install_cluster_log_collector import install_cluster_log_collector_attempt
+from astrolift_workflows.activities.native_endpoint_configuration import (
+    complete_native_endpoint_deployment,
+    configure_native_endpoint_deployment,
+)
 from astrolift_workflows.activities.pipeline_schedule_fire import create_scheduled_pipeline_run
 from astrolift_workflows.activities.scheduled import (
     apply_observability_retention,
@@ -462,6 +466,8 @@ ACTIVITIES = (
     ensure_static_dns,
     ensure_static_site_services,
     ensure_workload_identity,
+    configure_native_endpoint_deployment,
+    complete_native_endpoint_deployment,
     validate_deployment_identity_origin,
     mark_deployment_identity_refused,
     evaluate_alerts_tick,

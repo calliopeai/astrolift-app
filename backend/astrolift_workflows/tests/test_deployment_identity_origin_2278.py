@@ -6,17 +6,44 @@ from uuid import uuid4
 
 import pytest
 from asgiref.sync import sync_to_async
+from temporalio import activity
+from temporalio.exceptions import ApplicationError
 from temporalio.worker import Replayer, Worker
 
 from astrolift_lifecycle.tests.test_native_deployment_origin_2278 import start_public
 from astrolift_lifecycle.tests.test_native_deployment_origin_2278 import world as public_world
+from astrolift_workflows.activities import mark_deploying
 from astrolift_workflows.activities.deployment_identity_origin import (
     mark_deployment_identity_refused,
     validate_deployment_identity_origin,
 )
+from astrolift_workflows.inputs import DeployAppInput
 from astrolift_workflows.workflows.deploy_app import DeployAppWorkflow
 
 pytestmark = pytest.mark.django_db(transaction=True)
+
+STOPPED = "NATIVE_CONFIGURATION_REFUSED:FIXTURE_STOP_BEFORE_EFFECTS"
+
+
+@activity.defn(name="astrolift.app.configure_native_endpoint")
+def stop_native_configuration(input: DeployAppInput) -> None:
+    """Origin tests stop at the native boundary; configuration has its own suite."""
+    raise ApplicationError(STOPPED, non_retryable=True)
+
+
+ORIGIN_ACTIVITIES = [
+    validate_deployment_identity_origin,
+    mark_deployment_identity_refused,
+    mark_deploying,
+    stop_native_configuration,
+]
+#: An admitted native origin goes straight to the native steps, no legacy step.
+NATIVE_STOP_SCHEDULE = [
+    "validate_deployment_identity_origin",
+    "astrolift.deploy.mark_deploying",
+    "astrolift.app.configure_native_endpoint",
+    "mark_deployment_identity_refused",
+]
 
 
 @pytest.fixture
@@ -52,7 +79,7 @@ async def test_actual_start_and_worker_refuse_before_any_downstream_activity(
             temporal_env.client,
             task_queue=queue,
             workflows=[DeployAppWorkflow],
-            activities=[validate_deployment_identity_origin, mark_deployment_identity_refused],
+            activities=ORIGIN_ACTIVITIES,
             activity_executor=executor,
         ):
             handle = await temporal_env.client.start_workflow(
@@ -68,13 +95,17 @@ async def test_actual_start_and_worker_refuse_before_any_downstream_activity(
             outcome = await handle.result()
             history = await handle.fetch_history()
     assert not outcome.ok
-    assert ("NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED" in outcome.message) == (change == "none")
+    assert (outcome.message == STOPPED) == (change == "none")
     scheduled = [
         event.activity_task_scheduled_event_attributes.activity_type.name
         for event in history.events
         if event.HasField("activity_task_scheduled_event_attributes")
     ]
-    assert scheduled == ["validate_deployment_identity_origin", "mark_deployment_identity_refused"]
+    assert scheduled == (
+        NATIVE_STOP_SCHEDULE
+        if change == "none"
+        else ["validate_deployment_identity_origin", "mark_deployment_identity_refused"]
+    )
     assert world.headers["HTTP_AUTHORIZATION"].encode() not in history.to_json().encode()
     await Replayer(workflows=[DeployAppWorkflow]).replay_workflow(history)
     row = await sync_to_async(Deployment.objects.get)(pk=original.deployment_id)
@@ -83,7 +114,7 @@ async def test_actual_start_and_worker_refuse_before_any_downstream_activity(
     assert row.aborted_reason == (
         ""
         if change in ("retarget", "lost_reference")
-        else "NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED"
+        else STOPPED
         if change == "none"
         else "DEPLOYMENT_ORIGIN_REFUSED"
     )
@@ -91,9 +122,15 @@ async def test_actual_start_and_worker_refuse_before_any_downstream_activity(
 
 def test_both_actual_activities_are_registered_once():
     from astrolift_workflows import worker
+    from astrolift_workflows.activities.native_endpoint_configuration import (
+        complete_native_endpoint_deployment,
+        configure_native_endpoint_deployment,
+    )
 
     assert worker.ACTIVITIES.count(validate_deployment_identity_origin) == 1
     assert worker.ACTIVITIES.count(mark_deployment_identity_refused) == 1
+    assert worker.ACTIVITIES.count(configure_native_endpoint_deployment) == 1
+    assert worker.ACTIVITIES.count(complete_native_endpoint_deployment) == 1
 
 
 @pytest.mark.asyncio
@@ -154,7 +191,7 @@ async def test_actual_http_quorum_uses_canonical_start_and_real_worker(
             temporal_env.client,
             task_queue=queue,
             workflows=[DeployAppWorkflow],
-            activities=[validate_deployment_identity_origin, mark_deployment_identity_refused],
+            activities=ORIGIN_ACTIVITIES,
             activity_executor=executor,
         ):
             pk, workflow_id, run_id = await sync_to_async(request_and_approve)()
@@ -163,13 +200,13 @@ async def test_actual_http_quorum_uses_canonical_start_and_real_worker(
             )
             result = await handle.result()
             history = await handle.fetch_history()
-    assert not result.ok and "NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED" in result.message
+    assert not result.ok and result.message == STOPPED
     scheduled = [
         event.activity_task_scheduled_event_attributes.activity_type.name
         for event in history.events
         if event.HasField("activity_task_scheduled_event_attributes")
     ]
-    assert scheduled == ["validate_deployment_identity_origin", "mark_deployment_identity_refused"]
+    assert scheduled == NATIVE_STOP_SCHEDULE
     row = await sync_to_async(Deployment.objects.get)(pk=pk)
-    assert row.status == "failed" and row.aborted_reason == "NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED"
+    assert row.status == "failed" and row.aborted_reason == STOPPED
     await Replayer(workflows=[DeployAppWorkflow]).replay_workflow(history)

@@ -1,4 +1,13 @@
-"""Registered first gate; receipt-bound native execution is not installed yet."""
+"""Registered first gate for every DeployAppWorkflow history.
+
+An admitted native origin is reported as NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED,
+exactly as before: histories without the native pipeline patch refuse on it, and
+patched histories route to the Endpoint-only native steps (#2278). Keeping this
+activity's signature and outcomes unchanged means a worker of either release can
+run it, and no legacy step is ever reached by a native Deployment.
+"""
+
+import re
 
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
@@ -62,7 +71,9 @@ def mark_deployment_identity_refused(input: DeployAppInput, reason: str) -> None
             return
         row.status = Deployment.Status.FAILED.value
         row.aborted_reason = (
-            "NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED"
+            reason
+            if re.fullmatch(r"NATIVE_CONFIGURATION_REFUSED:[A-Z][A-Z0-9_]{2,63}", reason)
+            else "NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED"
             if "NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED" in reason
             else "DEPLOYMENT_EXECUTION_REFUSED"
             if "DEPLOYMENT_EXECUTION_REFUSED" in reason
