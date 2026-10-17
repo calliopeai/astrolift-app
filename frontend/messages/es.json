@@ -14786,6 +14786,8 @@
     "signIn": "Iniciar sesión",
     "noAccountTitle": "No hay una cuenta de Astrolift para este inicio de sesión",
     "noAccountBody": "Tu proveedor de identidad inició tu sesión, pero aquí no hay ninguna cuenta para esa identidad. Si te invitaron, inicia sesión con la dirección a la que se envió la invitación; si no, pide a un administrador que te invite.",
+    "emailUnverifiedTitle": "Dirección de correo no verificada",
+    "emailUnverifiedBody": "Tu proveedor de identidad inició tu sesión, pero no ha verificado tu dirección de correo, así que Astrolift no puede saber cuál es tu cuenta. Verifica la dirección con tu proveedor o pide ayuda a un administrador y vuelve a iniciar sesión.",
     "useDifferentAccount": "Usar otra cuenta"
   },
   "invitationAccept": {

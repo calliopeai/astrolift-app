@@ -14786,6 +14786,8 @@
     "signIn": "Se connecter",
     "noAccountTitle": "Aucun compte Astrolift pour cette connexion",
     "noAccountBody": "Votre fournisseur d’identité vous a connecté, mais aucun compte ici ne correspond à cette identité. Si vous avez été invité, connectez-vous avec l’adresse à laquelle l’invitation a été envoyée ; sinon, demandez à un administrateur de vous inviter.",
+    "emailUnverifiedTitle": "Adresse e-mail non vérifiée",
+    "emailUnverifiedBody": "Votre fournisseur d’identité vous a connecté, mais n’a pas vérifié votre adresse e-mail : Astrolift ne peut donc pas savoir quel compte est le vôtre. Faites vérifier l’adresse par votre fournisseur ou demandez à un administrateur, puis reconnectez-vous.",
     "useDifferentAccount": "Utiliser un autre compte"
   },
   "invitationAccept": {

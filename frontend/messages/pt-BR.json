@@ -14783,6 +14783,8 @@
     "signIn": "Entrar",
     "noAccountTitle": "Nenhuma conta do Astrolift para este acesso",
     "noAccountBody": "Seu provedor de identidade conectou você, mas não há nenhuma conta aqui para essa identidade. Se você foi convidado, entre com o endereço para o qual o convite foi enviado; caso contrário, peça a um administrador que convide você.",
+    "emailUnverifiedTitle": "Endereço de e-mail não verificado",
+    "emailUnverifiedBody": "Seu provedor de identidade conectou você, mas não verificou seu endereço de e-mail, então o Astrolift não consegue saber qual conta é a sua. Verifique o endereço com seu provedor ou peça ajuda a um administrador e entre novamente.",
     "useDifferentAccount": "Usar outra conta"
   },
   "invitationAccept": {

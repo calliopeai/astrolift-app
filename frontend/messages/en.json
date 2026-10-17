@@ -14783,6 +14783,8 @@
     "signIn": "Sign in",
     "noAccountTitle": "No Astrolift account for this sign-in",
     "noAccountBody": "Your identity provider signed you in, but no account here matches that identity. If you were invited, sign in with the address the invitation was sent to; otherwise ask an administrator to invite you.",
+    "emailUnverifiedTitle": "Email address not verified",
+    "emailUnverifiedBody": "Your identity provider signed you in but has not verified your email address, so Astrolift cannot tell which account is yours. Verify the address with your provider or ask an administrator, then sign in again.",
     "useDifferentAccount": "Use a different account"
   },
   "invitationAccept": {

@@ -57,9 +57,11 @@ __all__ = [
     "TextFormatter",
     "ECSFormatter",
     "SensitiveFieldRedactor",
+    "UrlSecretFilter",
     "build_logging_config",
     "get_request_id",
     "get_trace_context",
+    "redact_url_secrets",
     "TraceContext",
 ]
 
@@ -131,6 +133,61 @@ class SensitiveFieldRedactor:
 
 
 _DEFAULT_REDACTOR = SensitiveFieldRedactor()
+
+
+# A URL carries a credential in two places the request logs write down
+# (#2429). Each pattern matches the raw form and the form percent-encoded
+# once or twice, which is how a URL appears inside another URL's ``next``.
+#
+# * The value of a ``code`` (the sign-in hand-off's, an IdP's authorization
+#   code), ``token`` or ``*_token`` query parameter. The value ends at the
+#   next raw separator, so inside an encoded ``next`` everything after the
+#   key goes too.
+# * The token of an invitation link, ``/auth/invitation/<token>``.
+_SEP = r"(?:/|%2F|%252F)"
+_URL_SECRET_PARAM = re.compile(
+    r"((?:[?&;#]|%3F|%26|%3B|%23|%253F|%2526|%253B|%2523)"
+    r"(?:code|token|[a-z0-9_.-]*_token)"
+    r"(?:=|%3D|%253D))"
+    r"[^&;#\s\"'<>]*",
+    re.IGNORECASE,
+)
+_INVITATION_TOKEN = re.compile(rf"({_SEP}auth{_SEP}invitation{_SEP})[A-Za-z0-9_-]+", re.IGNORECASE)
+
+
+def redact_url_secrets(text: str) -> str:
+    """``text`` with the credentials any URL in it carries replaced."""
+    lowered = text.lower()
+    if "code" not in lowered and "token" not in lowered and "invitation" not in lowered:
+        return text
+    text = _URL_SECRET_PARAM.sub(rf"\g<1>{_REDACTED}", text)
+    return _INVITATION_TOKEN.sub(rf"\g<1>{_REDACTED}", text)
+
+
+class UrlSecretFilter(logging.Filter):
+    """Redact the credentials a logged URL carries (#2429).
+
+    uvicorn's access log writes every request's path and query; Django's
+    request log writes paths. Records on ``uvicorn.access`` keep their
+    argument tuple, which uvicorn's formatter unpacks, with the path
+    redacted. Any other record is rendered once and replaced by its
+    redacted message. Never drops a record.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        try:
+            args = record.args
+            if record.name == "uvicorn.access" and isinstance(args, tuple) and len(args) == 5:
+                if isinstance(args[2], str):
+                    record.args = (*args[:2], redact_url_secrets(args[2]), *args[3:])
+                return True
+            message = record.getMessage()
+            redacted = redact_url_secrets(message)
+            if redacted != message:
+                record.msg, record.args = redacted, ()
+        except Exception:  # noqa: BLE001 -- a record that cannot render is the handler's to report
+            pass
+        return True
 
 
 def _resolve_trace() -> TraceContext | None:
@@ -337,10 +394,12 @@ def build_logging_config(
         "version": 1,
         "disable_existing_loggers": False,
         "formatters": formatters,
+        "filters": {"url_secrets": {"()": "core.logging.UrlSecretFilter"}},
         "handlers": {
             "console": {
                 "class": "logging.StreamHandler",
                 "formatter": handler_formatter,
+                "filters": ["url_secrets"],
                 "stream": stream,
             },
         },

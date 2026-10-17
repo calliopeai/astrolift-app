@@ -14783,6 +14783,8 @@
     "signIn": "登录",
     "noAccountTitle": "此登录没有对应的 Astrolift 账户",
     "noAccountBody": "您的身份提供商已完成登录，但这里没有与该身份对应的账户。如果您受到了邀请，请使用接收邀请的地址登录；否则，请联系管理员邀请您。",
+    "emailUnverifiedTitle": "电子邮件地址未验证",
+    "emailUnverifiedBody": "您的身份提供商已完成登录，但尚未验证您的电子邮件地址，因此 Astrolift 无法确定哪个账户属于您。请在身份提供商处验证该地址或联系管理员，然后重新登录。",
     "useDifferentAccount": "使用其他账户"
   },
   "invitationAccept": {

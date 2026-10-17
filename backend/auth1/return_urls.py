@@ -1,10 +1,11 @@
 """Where a finished sign-in may send the browser.
 
-The IdP callback hands the frontend its new session as ``token=Session <key>``
-on the return address, so the address decides who receives the session. Two
-shapes qualify: a path on this host, or the frontend's ``/auth/callback`` on an
-origin this install serves its frontend from. Anything else is refused and the
-caller falls back to its default.
+The IdP callback hands the frontend a one-time code for its new session
+(``code=``, see :mod:`auth1.handoff`) on the return address, so the address
+decides who receives the sign-in. Two shapes qualify: a path on this host, or
+the frontend's ``/auth/callback`` on an origin this install serves its
+frontend from. Anything else is refused and the caller falls back to its
+default.
 
 Browsers read a URL by the WHATWG rules, not Python's: they drop tab and
 newline anywhere and treat ``\\`` as ``/``. A return address is plain ASCII
@@ -20,8 +21,9 @@ from django.conf import settings
 from django.utils.http import url_has_allowed_host_and_scheme
 
 FRONTEND_CALLBACK_PATH = "/auth/callback"
-# Query keys the callback writes itself; a return address may not bring them.
-CALLBACK_RESULT_KEYS = frozenset({"token", "error"})
+# Query keys the callback writes itself, or once wrote; a return address may
+# not bring them.
+CALLBACK_RESULT_KEYS = frozenset({"code", "token", "error"})
 _MAX_LENGTH = 2048
 _DEFAULT_PORTS = {"http": 80, "https": 443}
 

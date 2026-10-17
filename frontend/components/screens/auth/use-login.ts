@@ -23,7 +23,13 @@ export interface ActiveIdp {
 }
 
 /** Why the browser is back on the sign-in page, when the IdP round trip said. */
-export type LoginNotice = "noAccount";
+export type LoginNotice = "noAccount" | "emailUnverified";
+
+/** The callback's `error=` values, as notices. */
+const NOTICES = new Map<string, LoginNotice>([
+  ["no_account", "noAccount"],
+  ["email_unverified", "emailUnverified"],
+]);
 
 /** Everything the login screen does against the API: IdP detection and the two login paths. */
 export function useLogin() {
@@ -48,12 +54,14 @@ export function useLogin() {
       window.location.href = `${apiRoot}/app/auth1/dev-login?next=${encodeURIComponent(returnPath())}`;
       return;
     }
-    // The IdP vouched for an identity this install has no account for.
-    const noAccount = new URLSearchParams(window.location.search).get("error") === "no_account";
+    // The IdP vouched for an identity this install has no account for, or
+    // for an address it has not verified.
+    const error = new URLSearchParams(window.location.search).get("error");
+    const returned = (error && NOTICES.get(error)) || null;
     fetch(`${apiRoot}/app/auth1/active-idp.json`, { credentials: "include" })
       .then((r) => r.json())
       .then((value: ActiveIdp) => {
-        setNotice(noAccount ? "noAccount" : null);
+        setNotice(returned);
         setIdp(value);
       })
       .catch((err) => setLoadError(String(err)));
