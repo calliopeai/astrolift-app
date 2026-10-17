@@ -777,6 +777,19 @@ def _template_agent_message(envelope: EventEnvelope) -> NotificationTemplate | N
     access to the agent was checked when it was sent."""
     payload = envelope.payload or {}
     recipients = _coerce_id_list(payload.get("recipient_user_ids"))
+    from astrolift_agents.models import AgentMessage
+    from astrolift_agents.services.agent_messages import can_read_agent
+
+    message = AgentMessage.objects.filter(
+        guid=payload.get("message_id"), organization_id=envelope.organization_id
+    ).first()
+    if message is None:
+        return None
+    recipients = [
+        row.user_id
+        for row in message.recipients.filter(user_id__in=recipients).select_related("user")
+        if can_read_agent(row.user, message.organization_id, message.agent_definition_id)
+    ]
     if not recipients:
         return None
     agent = str(payload.get("agent_name", "") or payload.get("agent_slug", "") or "Agent")
@@ -896,6 +909,11 @@ def _dispatch_template(*, envelope: EventEnvelope, template: NotificationTemplat
 
     effective_kind = _effective_event_kind(envelope)
     excluded_device_ids = _excluded_device_ids_for(envelope)
+    from astrolift_operations.notification_quiet_hours import active_users
+
+    quiet = (
+        active_users(template.recipient_user_ids) if envelope.event_type == "agent.message.sent" else set()
+    )
 
     # Resolve the driver once per envelope -- the recipients in a
     # single fan-out share the same org (the template always pulls
@@ -913,6 +931,18 @@ def _dispatch_template(*, envelope: EventEnvelope, template: NotificationTemplat
         if user_id in seen:
             continue
         seen.add(user_id)
+
+        if user_id in quiet:
+            _audit_dispatch(
+                envelope=envelope,
+                user_id=user_id,
+                device_id=None,
+                token_last_4="",
+                status="quiet_hours",
+                detail="agent message suppressed; retained in inbox",
+                driver_name="",
+            )
+            continue
 
         # Per-user preference gate -- default tables in
         # NotificationPreference cover the canonical events.
@@ -1041,6 +1071,11 @@ def _dispatch_template_email(*, envelope: EventEnvelope, template: NotificationT
         return
 
     effective_kind = _effective_event_kind(envelope)
+    from astrolift_operations.notification_quiet_hours import active_users
+
+    quiet = (
+        active_users(template.recipient_user_ids) if envelope.event_type == "agent.message.sent" else set()
+    )
     html_body, text_body = _render_notice_email(template=template, envelope=envelope)
 
     from django.contrib.auth import get_user_model
@@ -1051,6 +1086,15 @@ def _dispatch_template_email(*, envelope: EventEnvelope, template: NotificationT
         if user_id in seen:
             continue
         seen.add(user_id)
+
+        if user_id in quiet:
+            _audit_email(
+                envelope=envelope,
+                user_id=user_id,
+                status="quiet_hours",
+                detail="agent message suppressed; retained in inbox",
+            )
+            continue
 
         if not is_enabled(user_id=user_id, channel="email", event_kind=effective_kind):
             continue

@@ -4499,6 +4499,20 @@ type AstroliftNotificationProfileMutationResult {
   data: AstroliftNotificationProfile
 }
 
+type AstroliftNotificationQuietHours {
+  enabled: Boolean!
+  timezone: String!
+  startMinute: Int!
+  endMinute: Int!
+  active: Boolean!
+}
+
+type AstroliftNotificationQuietHoursMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftNotificationQuietHours
+}
+
 enum AstroliftObservabilityPanelReason {
   OK
   NOT_CONFIGURED
@@ -10202,6 +10216,7 @@ type Mutation {
   """
   archiveBrain(input: ArchiveBrainInput!): AstroliftBrainMutationResult!
   setAppAccess(input: SetAppAccessInput!): AstroliftAppAccessMutationResult!
+  setNotificationQuietHours(input: SetNotificationQuietHoursInput!): AstroliftNotificationQuietHoursMutationResult!
   sendInstallAlertMailTest(input: SendInstallAlertMailTestInput!): InstallAlertMailTestMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
   updateWebhookSubscription(input: UpdateWebhookSubscriptionInput!): AstroliftWebhookSubscriptionMutationResult!
@@ -11183,6 +11198,7 @@ type Query {
   astroliftZentinelleUsage(since: DateTime = null, agentSlug: String = null, projectId: GUID = null, teamId: GUID = null): AstroliftZentinelleUsage!
   astroliftZentinellePolicies(agentSlug: String = null, projectId: GUID = null): [AstroliftZentinellePolicy!]!
   astroliftZentinelleAuditPage(since: DateTime = null, cursor: String = null, limit: Int! = 100, agentSlug: String = null, projectId: GUID = null, teamId: GUID = null): AstroliftZentinelleAuditPage!
+  astroliftMyNotificationQuietHours: AstroliftNotificationQuietHours!
   astroliftTopologyTraffic(appSlug: String!, start: DateTime!, end: DateTime!, environmentName: String = null): TopologyTraffic
   astroliftEvent(id: GUID!): AstroliftEvent
   astroliftAlertRule(id: GUID!): AstroliftAlertRule
@@ -12293,6 +12309,13 @@ input SetNotificationProfileInput {
   driver: String!
   config: JSON!
   retentionDeliveryDays: Int = null
+}
+
+input SetNotificationQuietHoursInput {
+  enabled: Boolean!
+  timezone: String!
+  startMinute: Int!
+  endMinute: Int!
 }
 
 input SetOrganizationModuleInput {
