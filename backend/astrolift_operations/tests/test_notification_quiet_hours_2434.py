@@ -149,8 +149,8 @@ def test_quiet_hours_suppress_personal_external_delivery_but_keep_the_inbox_and_
         assert [row["to"] for row in emails] == [[world.reader.email]]
         assert AgentMessageRecipient.objects.filter(message__guid=response.json()["id"]).count() == 2
         assert Event.objects.filter(event_type="agent.message.sent").count() == 1
-        assert AuditEvent.objects.filter(action="notification.push", extra__status="quiet_hours").exists()
-        assert AuditEvent.objects.filter(action="notification.email", extra__status="quiet_hours").exists()
+        assert AuditEvent.objects.filter(action="notification.push", data__status="quiet_hours").exists()
+        assert AuditEvent.objects.filter(action="notification.email", data__status="quiet_hours").exists()
         with messages._as(world) as info:
             result = schema.execute_sync(
                 "{ astroliftMyNotificationQuietHours { active } astroliftAgentMessages { items { body } } }",
