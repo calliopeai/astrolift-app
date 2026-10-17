@@ -91,7 +91,7 @@ export function PrincipalAccessPanel({
       cell: (row) => (
         <div className="flex min-w-0 items-center gap-1.5">
           <Badge variant="outline" className="text-2xs shrink-0 font-mono uppercase">
-            {scopes(row.scope.kind)}
+            {scopes.has(row.scope.kind) ? scopes(row.scope.kind) : row.scope.kind}
           </Badge>
           {row.scope.href ? (
             <Link
@@ -147,7 +147,9 @@ export function PrincipalAccessPanel({
           {row.coveredBy && (
             <span className="text-muted-foreground text-2xs [overflow-wrap:anywhere]">
               {t.rich("alsoGranted", {
-                kind: scopes(row.coveredBy.kind),
+                kind: scopes.has(row.coveredBy.kind)
+                  ? scopes(row.coveredBy.kind)
+                  : row.coveredBy.kind,
                 name: row.coveredBy.name,
                 mono: (chunks) => <span className="font-mono">{chunks}</span>,
               })}
@@ -172,7 +174,9 @@ export function PrincipalAccessPanel({
     },
   ];
 
-  const confirm = target ? describeRemove(target, holderLabel, t, (kind) => scopes(kind)) : null;
+  const confirm = target
+    ? describeRemove(target, holderLabel, t, (kind) => (scopes.has(kind) ? scopes(kind) : kind))
+    : null;
 
   return (
     <div className="flex min-w-0 flex-col gap-3">
