@@ -246,6 +246,34 @@ def nginx_auth_annotations(
     return annotations
 
 
+# How the nginx edge handles a request body (#2423). ingress-nginx's defaults
+# answer 413 to any body over 1m before the app sees it, spool the whole body
+# to the controller pod's disk before opening the upstream request, and drop
+# an upstream connection that sits 60s between reads or writes. Here a body
+# streams to the app as it arrives and has no size limit unless the app sets
+# ``[ingress] max_body_size``. The keys are ingress-nginx ConfigMap keys and,
+# under ``nginx.ingress.kubernetes.io/``, Ingress annotations: the controller
+# recipe sets them cluster-wide and every rendered Ingress carries them.
+NGINX_BODY_SETTINGS = {
+    "proxy-body-size": "0",
+    "proxy-request-buffering": "off",
+    "proxy-read-timeout": "3600",
+    "proxy-send-timeout": "3600",
+}
+
+
+def nginx_body_annotations(max_body_size: str = "") -> dict[str, str]:
+    """The body-handling annotations for an app's Ingress (#2423).
+
+    ``max_body_size`` is the app's ``[ingress] max_body_size``, already held
+    to nginx's size grammar by the manifest parser; empty keeps no limit.
+    """
+    settings = dict(NGINX_BODY_SETTINGS)
+    if max_body_size:
+        settings["proxy-body-size"] = max_body_size
+    return {f"nginx.ingress.kubernetes.io/{key}": value for key, value in settings.items()}
+
+
 @dataclass(frozen=True)
 class K8sIngressConfig:
     variant: str = "nginx_ingress"
@@ -276,6 +304,10 @@ class K8sIngressConfig:
     """The app's normalized ``[edge]`` block (#1733), rendered into the
     gate's fenced snippet. Without it this path stamped only the default
     header and an app reading its own names was refused every request."""
+
+    max_body_size: str = ""
+    """The app's ``[ingress] max_body_size`` (#2423). Empty renders no
+    limit."""
 
 
 class K8sIngressDriver(IngressDriver):
@@ -449,7 +481,7 @@ class K8sIngressDriver(IngressDriver):
         port: int = 80,
     ) -> list[Manifest]:
         """Generic Ingress shape works for nginx, traefik, kong."""
-        annotations: dict[str, str] = {}
+        annotations = nginx_body_annotations(self._config.max_body_size)
         if tls_strategy == "letsencrypt":
             annotations["cert-manager.io/cluster-issuer"] = self._config.cert_manager_issuer
         if self._config.oidc_auth is not None:

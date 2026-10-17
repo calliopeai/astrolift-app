@@ -844,6 +844,11 @@ def _render_app_ingresses_and_tls(
     # domain for real needs a first-party ``/oauth2/*`` endpoint on the
     # domain itself; see custom_domain_edge_auth_state.
     from core.app_deploy import custom_domain_edge_auth_state
+    from providers.k8s_native.ingress import nginx_body_annotations
+
+    # The body handling core.app_deploy's render gives the app (#2423), on
+    # every Ingress below, so an upload limit never depends on the path.
+    max_body_size = manifest.serialized.get("ingress_max_body_size", "")
 
     domains = CustomDomain.objects.filter(
         registered_app=d.registered_app,
@@ -868,7 +873,7 @@ def _render_app_ingresses_and_tls(
         host_slug = cd.hostname.replace(".", "-")
         secret_name = f"{d.registered_app.slug}-{host_slug}-tls"
         ingress_name = f"{d.registered_app.slug}-{host_slug}"
-        annotations: dict[str, str] = {}
+        annotations = nginx_body_annotations(max_body_size)
 
         # #1631: a domain that has opted in gets a **first-party** gate --
         # `auth-signin` points at this hostname's own `/oauth2/start`, not
@@ -1101,7 +1106,7 @@ def _render_app_ingresses_and_tls(
                     from providers.k8s_native.ingress import nginx_auth_annotations
 
                     all_hostnames = [wh.hostname for wh in computed]
-                    managed_annotations: dict[str, str] = {}
+                    managed_annotations = nginx_body_annotations(max_body_size)
                     # Route through the cluster's central auth host, same
                     # as K8sIngressDriver does on the other render path.
                     # These hostnames all sit under the auth host's

@@ -49,6 +49,7 @@ from _sdk.k8s_dynamic_client import KubernetesDynamicClient
 from _sdk.k8s_dynamic_client import NotFoundError as _NotFound
 from _sdk.k8s_dynamic_client import PreconditionFailedError as _PreconditionFailed
 from k8s_native.central_auth import central_auth_component
+from k8s_native.ingress import NGINX_BODY_SETTINGS
 from k8s_native.management import (
     ManagementBackend,
     cluster_rbac_withheld,
@@ -786,6 +787,10 @@ class K8sNativeClusterDriver(ClusterDriver):
                             # annotation; controller 1.12 lowers the default
                             # ceiling to High and would refuse it.
                             "annotations-risk-level": "Critical",
+                            # The body handling every app Ingress now carries
+                            # (#2423), cluster-wide, so an Ingress rendered
+                            # before it streams uploads past 1m as well.
+                            **NGINX_BODY_SETTINGS,
                         },
                         # The central auth gate stamps its gateway secret on
                         # each app through configuration-snippet (see
