@@ -25,6 +25,11 @@ const DISPLAY_KIND: Record<string, string> = {
 
 export type LoginScreenProps = ReturnType<typeof useLogin>;
 
+const NOTICE_COPY: Record<LoginNotice, { title: string; body: string }> = {
+  noAccount: { title: "noAccountTitle", body: "noAccountBody" },
+  emailUnverified: { title: "emailUnverifiedTitle", body: "emailUnverifiedBody" },
+};
+
 /** The sign-in page: whichever step of IdP detection the page is on, then the right CTA. */
 export function LoginScreen({
   devLogin,
@@ -94,8 +99,8 @@ function WithNotice({
         role="status"
         className="bg-warning-bg text-warning-fg border-warning-border w-full rounded-md border p-3 text-sm"
       >
-        <div className="font-medium">{t("noAccountTitle")}</div>
-        <p className="mt-1 break-words">{t("noAccountBody")}</p>
+        <div className="font-medium">{t(NOTICE_COPY[notice].title)}</div>
+        <p className="mt-1 break-words">{t(NOTICE_COPY[notice].body)}</p>
         {onSwitchAccount && (
           <Button variant="outline" size="sm" className="mt-3" onClick={onSwitchAccount}>
             {t("useDifferentAccount")}

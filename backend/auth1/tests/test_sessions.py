@@ -37,9 +37,9 @@ class SessionsTest(BaseTest):
         approval = "/app/cli/auth/device/pending-session/"
         self.assertEqual(Auth1SessionWorkflow._post_auth_next_url(approval, "secret-session"), approval)
 
-    def test_frontend_return_still_receives_session_token(self):
+    def test_frontend_return_receives_a_code_for_the_session_not_the_session(self):
         callback = "https://app.example/auth/callback"
-        self.assertEqual(
-            Auth1SessionWorkflow._post_auth_next_url(callback, "secret-session"),
-            "https://app.example/auth/callback?token=Session+secret-session",
-        )
+        url = Auth1SessionWorkflow._post_auth_next_url(callback, "secret-session")
+        self.assertTrue(url.startswith(f"{callback}?code="))
+        self.assertNotIn("secret-session", url)
+        self.assertNotIn("token=", url)

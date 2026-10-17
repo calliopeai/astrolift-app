@@ -189,6 +189,14 @@ from astrolift_workflows.activities.agent_task_callback import (
     deliver_agent_task_callback,
     reconcile_agent_task_callbacks,
 )
+from astrolift_workflows.activities.brain_create import (
+    brain_create_deploy,
+    brain_create_fail,
+    brain_create_observe,
+    brain_create_register,
+    brain_create_repo,
+    brain_create_scaffold,
+)
 from astrolift_workflows.activities.build_image import build_image
 from astrolift_workflows.activities.command_run_exec import (
     assert_no_concurrent,
@@ -283,6 +291,7 @@ from astrolift_workflows.workflows import (
     WorkflowDefinitionRunWorkflow,
     WorkflowRunReconcileTickWorkflow,
 )
+from astrolift_workflows.workflows.brain_create import BrainCreateWorkflow
 from astrolift_workflows.workflows.conversation_transfer import (
     ConversationTransferExpiryTickWorkflow,
     ValidateConversationTransferWorkflow,
@@ -292,6 +301,7 @@ from astrolift_workflows.workflows.install_cluster_agent import InstallClusterAg
 from astrolift_workflows.workflows.install_cluster_log_collector import InstallClusterLogCollectorWorkflow
 
 WORKFLOWS = (
+    BrainCreateWorkflow,
     ManagedDomainAppRouteWorkflow,
     InstallClusterAgentWorkflow,
     InstallClusterLogCollectorWorkflow,
@@ -366,6 +376,12 @@ WORKFLOWS = (
 )
 
 ACTIVITIES = (
+    brain_create_repo,
+    brain_create_scaffold,
+    brain_create_register,
+    brain_create_deploy,
+    brain_create_observe,
+    brain_create_fail,
     reconcile_domain_app_route,
     install_cluster_agent_attempt,
     install_cluster_log_collector_attempt,

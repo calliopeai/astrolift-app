@@ -14,27 +14,42 @@ import pt from "@/messages/pt-BR.json";
 import zh from "@/messages/zh-Hans.json";
 
 import { brainMcpConfig } from "./brain-connection";
+import type { BrainStatus } from "./brain-status-model";
+import {
+  BEHIND,
+  DEPLOY_FAILED,
+  HEALTHY,
+  NOT_DEPLOYED,
+  UNKNOWN_VALUES,
+} from "./brain-status.fixtures";
 import { BRAINS, CONNECTION, HOST_PROJECTS } from "./brains.fixtures";
 import { BRAINS_LIST } from "./brains-list";
 import { BrainsScreen } from "./BrainsScreen";
+import { type BrainStatusResult, BrainStatusCell } from "./BrainStatusCell";
 import type { HostBrainAppValues } from "./HostBrainAppDialog";
 
 const catalogs = { en, es, fr, de, ja, ko, "zh-Hans": zh, "pt-BR": pt };
 
+const ready = (status: BrainStatus | null): BrainStatusResult => ({ state: "ready", status });
+
 function Screen({
   rows = BRAINS,
+  statuses = { "leo-brain": ready(HEALTHY), "sales-brain": ready(NOT_DEPLOYED) },
   connection = null,
   onConnect = async () => {},
   hostingSlug = null,
   onHost = () => {},
   onSubmitHost = async () => {},
+  canCreate = true,
 }: {
   rows?: typeof BRAINS;
+  statuses?: Record<string, BrainStatusResult>;
   connection?: typeof CONNECTION | null;
   onConnect?: (slug: string) => Promise<void>;
   hostingSlug?: string | null;
   onHost?: (slug: string) => void;
   onSubmitHost?: (values: HostBrainAppValues) => Promise<void>;
+  canCreate?: boolean;
 }) {
   const list = useLocalListState(BRAINS_LIST);
   return (
@@ -46,6 +61,7 @@ function Screen({
       stale={false}
       error={null}
       onRetry={() => {}}
+      canCreate={canCreate}
       connection={connection}
       connecting={false}
       onConnect={onConnect}
@@ -56,11 +72,26 @@ function Screen({
       onHost={onHost}
       onDismissHost={() => {}}
       onSubmitHost={onSubmitHost}
+      statusCell={(row, part) => (
+        <BrainStatusCell
+          part={part}
+          result={statuses[row.slug] ?? ready(null)}
+          environment="production"
+        />
+      )}
     />
   );
 }
 
-describe("semantic layers (#2320)", () => {
+function inEnglish(ui: React.ReactElement) {
+  return render(
+    <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
+      {ui}
+    </NextIntlClientProvider>
+  );
+}
+
+describe("semantic layers list (#2320, #2427)", () => {
   it.each(locales)("%s renders every key without falling back to English", (locale) => {
     const onError = vi.fn();
     const copy = catalogs[locale].brains;
@@ -72,51 +103,75 @@ describe("semantic layers (#2320)", () => {
         timeZone="UTC"
         onError={onError}
       >
-        <Screen connection={CONNECTION} />
+        <Screen
+          connection={CONNECTION}
+          statuses={{
+            "leo-brain": ready(BEHIND),
+            "sales-brain": { state: "error", message: "HTTP 502" },
+          }}
+        />
       </NextIntlClientProvider>
     );
     expect(screen.getByText(copy.connectDialog.config)).toBeInTheDocument();
     expect(screen.getAllByText(copy.title).length).toBeGreaterThan(0);
-    expect(screen.getByText(copy.notServed)).toBeInTheDocument();
+    expect(screen.getByText(copy.columnHealth)).toBeInTheDocument();
+    expect(screen.getByText(copy.columnFreshness)).toBeInTheDocument();
+    expect(screen.getByText(copy.status.behind)).toBeInTheDocument();
+    expect(screen.getByText(copy.status.unavailable)).toBeInTheDocument();
     expect(screen.getByText(copy.notShared)).toBeInTheDocument();
     if (locale !== "en") expect(copy.context).not.toBe(en.brains.context);
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it("links each layer's endpoints, shares and access, and says when there are none", () => {
-    render(
-      <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
-        <Screen />
-      </NextIntlClientProvider>
-    );
-    const endpoint = screen.getByText("production: https://brain.acme.example");
-    expect(endpoint.closest("a")).toHaveAttribute("href", "https://brain.acme.example");
+  it("opens each layer's own page, and links its shares and the create flow", () => {
+    inEnglish(<Screen />);
+    const row = screen.getByRole("row", { name: /Leo's brain/ });
+    expect(within(row).getAllByRole("link")[0]).toHaveAttribute("href", "/brains/leo-brain");
     expect(screen.getByText("medops")).toHaveAttribute("title", "medops: viewer");
-    expect(screen.getAllByText(en.brains.manageAccess)[0].closest("a")).toHaveAttribute(
+    expect(screen.getByRole("link", { name: en.brains.new })).toHaveAttribute(
       "href",
-      "/apps/leo-brain/access"
+      "/brains/new"
     );
+  });
+
+  it("names the row link by name and slug, apart", () => {
+    inEnglish(<Screen />);
+    expect(screen.getByRole("link", { name: "Leo's brain leo-brain" })).toBeInTheDocument();
+  });
+
+  it("shows each row's health, last rebuild and freshness from its own status read", () => {
+    inEnglish(
+      <Screen
+        statuses={{ "leo-brain": ready(DEPLOY_FAILED), "sales-brain": ready(UNKNOWN_VALUES) }}
+      />
+    );
+    const failed = within(screen.getByRole("row", { name: /Leo's brain/ }));
+    expect(failed.getByText(en.apps.deployments.statuses.failed)).toBeInTheDocument();
+    expect(failed.getByText("b7e1d03")).toBeInTheDocument();
+    // Nothing runs after a failed first deploy, so there is no compile to read.
+    expect(failed.getByText(en.brains.overview.nothingRunning)).toBeInTheDocument();
+    // A status this build does not know reads as itself, never as a key.
+    const unknown = within(screen.getByRole("row", { name: /Sales brain/ }));
+    expect(unknown.getByText("paused_by_operator")).toBeInTheDocument();
+  });
+
+  it("says a row's environment does not exist rather than guessing its health", () => {
+    inEnglish(<Screen statuses={{}} />);
+    expect(screen.getAllByText("No production environment")).toHaveLength(2);
   });
 
   it("connects a served layer and not one that is not served", () => {
     const onConnect = vi.fn(async () => {});
-    render(
-      <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
-        <Screen onConnect={onConnect} />
-      </NextIntlClientProvider>
-    );
-    const [served, notServed] = screen.getAllByRole("button", { name: en.brains.connect });
-    expect(notServed).toBeDisabled();
-    fireEvent.click(served);
+    inEnglish(<Screen onConnect={onConnect} />);
+    const served = within(screen.getByRole("row", { name: /Leo's brain/ }));
+    const notServed = within(screen.getByRole("row", { name: /Sales brain/ }));
+    expect(notServed.getByRole("button", { name: en.brains.connect })).toBeDisabled();
+    fireEvent.click(served.getByRole("button", { name: en.brains.connect }));
     expect(onConnect).toHaveBeenCalledWith("leo-brain");
   });
 
   it("shows the issued token once as an MCP client config", () => {
-    render(
-      <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
-        <Screen connection={CONNECTION} />
-      </NextIntlClientProvider>
-    );
+    inEnglish(<Screen connection={CONNECTION} />);
     const dialog = within(screen.getByRole("alertdialog"));
     expect(dialog.getByText("https://brain.acme.example/mcp")).toBeInTheDocument();
     expect(JSON.parse(brainMcpConfig(CONNECTION))).toEqual({
@@ -159,14 +214,11 @@ describe("semantic layers (#2320)", () => {
   it("hosts an app on a served layer from the template", () => {
     const onHost = vi.fn();
     const onSubmitHost = vi.fn(async () => {});
-    const { rerender } = render(
-      <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
-        <Screen onHost={onHost} />
-      </NextIntlClientProvider>
-    );
-    const [served, notServed] = screen.getAllByRole("button", { name: en.brains.host });
-    expect(notServed).toBeDisabled();
-    fireEvent.click(served);
+    const { rerender } = inEnglish(<Screen onHost={onHost} />);
+    const served = within(screen.getByRole("row", { name: /Leo's brain/ }));
+    const notServed = within(screen.getByRole("row", { name: /Sales brain/ }));
+    expect(notServed.getByRole("button", { name: en.brains.host })).toBeDisabled();
+    fireEvent.click(served.getByRole("button", { name: en.brains.host }));
     expect(onHost).toHaveBeenCalledWith("leo-brain");
 
     rerender(
@@ -190,12 +242,16 @@ describe("semantic layers (#2320)", () => {
     });
   });
 
-  it("shows the empty state when nothing is readable", () => {
-    render(
-      <NextIntlClientProvider locale="en" messages={en} timeZone="UTC">
-        <Screen rows={[]} />
-      </NextIntlClientProvider>
-    );
+  it("offers neither create nor host without app.create; Connect stays", () => {
+    inEnglish(<Screen canCreate={false} />);
+    expect(screen.queryByRole("link", { name: en.brains.new })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: en.brains.host })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: en.brains.connect })).toHaveLength(2);
+  });
+
+  it("shows the empty state, with create when the viewer may", () => {
+    inEnglish(<Screen rows={[]} />);
     expect(screen.getByText(en.brains.emptyTitle)).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: en.brains.new }).length).toBeGreaterThan(0);
   });
 });
