@@ -699,6 +699,39 @@ def _edge_controllers_for_additive_run(
     return added
 
 
+OPERATOR_MANAGED_LABEL = ("astrolift.ai/managed-by", "operator")
+
+
+def _operator_managed_releases(
+    driver: Any, cluster_slug: str, namespace: str, cluster: Any, candidates: set[str]
+) -> set[str]:
+    """The cleanup candidates an operator-managed ingress cutover keeps (#2117).
+
+    Until the cluster records the cutover complete, a release named in its
+    ``preserved_ingress_releases`` or labelled ``astrolift.ai/managed-by=operator``
+    is never pruned: it still serves the hosts not yet moved to the Envoy edge.
+    A label that cannot be read keeps the release too.
+    """
+    if getattr(cluster, "ingress_cutover_completed_at", None) is not None:
+        return set()
+    kept = candidates & set(getattr(cluster, "preserved_ingress_releases", None) or [])
+    key, value = OPERATOR_MANAGED_LABEL
+    for name in sorted(candidates - kept):
+        try:
+            release = driver.get_manifest(
+                cluster_slug, namespace, "helm.toolkit.fluxcd.io/v2/HelmRelease", name
+            )
+        except Exception as exc:  # noqa: BLE001 - unreadable means kept, never pruned blind
+            log.warning("install_cluster_prereqs: keeping %s, its labels could not be read: %s", name, exc)
+            kept.add(name)
+            continue
+        if (((release or {}).get("metadata") or {}).get("labels") or {}).get(key) == value:
+            kept.add(name)
+    if kept:
+        log.info("install_cluster_prereqs: keeping operator-managed releases until cutover: %s", sorted(kept))
+    return kept
+
+
 def _install_cluster_prereqs_sync(
     cluster_id: int,
     selected_keys: list[str],
@@ -974,6 +1007,10 @@ def _install_cluster_prereqs_sync(
         if c.key not in selected_set and c.key not in withheld_keys and c.chart_repo_url
     ]
     to_delete_releases = set(deselected_releases) | _LEGACY_HELM_RELEASE_NAMES
+    if not additive:
+        to_delete_releases -= _operator_managed_releases(
+            driver, ctx.slug, target_namespace, cluster, to_delete_releases
+        )
     to_delete_repos = _LEGACY_HELM_REPO_NAMES
 
     stale_manifests: list[dict[str, Any]] = [

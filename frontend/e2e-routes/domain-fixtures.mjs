@@ -36,6 +36,8 @@ const initial = {
   verificationState: "pending",
   verifiedAt: null,
   provisionState: "mark_active",
+  provisionFailedStep: "",
+  provisionFailureReason: "",
   provisionNameservers: ["ns-0.awsdns-00.com", "ns-1.awsdns-01.net"],
   provisionValidationRecords: [],
   provisionError: null,
@@ -200,6 +202,8 @@ export function domainFixture(field, args, role, parent) {
       zone: domain.zone,
       verificationState: domain.verificationState,
       provisionState: domain.provisionState,
+      provisionFailedStep: domain.provisionFailedStep,
+      provisionFailureReason: domain.provisionFailureReason,
       provisionClusterId: domain.provisionClusterId,
       checkedAt: timestamp,
       checks: [

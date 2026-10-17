@@ -58,6 +58,9 @@ function provisionBadge(state: string): { label: string; className: string } {
   if (state === "") {
     return { label: "unprovisioned", className: "bg-foreground/5 text-muted-foreground" };
   }
+  if (state === "failed") {
+    return { label: "stalled", className: "bg-danger/10 text-danger-fg" };
+  }
   return { label: "provisioning", className: "bg-info/15 text-info-fg" };
 }
 
@@ -152,7 +155,7 @@ export function ManagedDomainsScreen({
           </div>
         ) : (
           <span className="text-muted-foreground text-xs">
-            {d.provisionState === "" ? "—" : t("provisioning")}
+            {d.provisionState === "" || d.provisionState === "failed" ? "—" : t("provisioning")}
           </span>
         ),
     },

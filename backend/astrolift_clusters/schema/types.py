@@ -205,6 +205,10 @@ class ManagedDomainType:
     # NS records the operator must point the registrar at, and the cert
     # DNS-01 validation CNAMEs for zones the platform does not host.
     provision_state: str
+    # Set with provision_state 'failed' (#2389): the step the run ended at and
+    # a bounded, credential-free reason. Revalidate starts a new run.
+    provision_failed_step: str
+    provision_failure_reason: str
     provision_nameservers: JSON
     provision_validation_records: JSON
     # Latest public-DNS delegation finding. Kept in dns_config so old rows
@@ -413,6 +417,8 @@ def domain_to_type(domain, *, provision_clusters=None) -> ManagedDomainType:
         is_wildcard_managed=domain.is_wildcard_managed,
         created_at=domain.created_at,
         provision_state=domain.provision_state,
+        provision_failed_step=domain.provision_failed_step,
+        provision_failure_reason=domain.provision_failure_reason,
         provision_nameservers=domain.provision_nameservers or [],
         provision_validation_records=domain.provision_validation_records or [],
         delegation_check=delegation_check,

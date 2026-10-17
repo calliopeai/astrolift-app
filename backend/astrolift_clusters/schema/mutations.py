@@ -183,6 +183,22 @@ def _zone_exists_in_provider(cluster, zone: str) -> bool:
         return False
 
 
+def _platform_creates_zone(domain) -> bool:
+    """Whether a restarted provisioning run should create ``domain``'s hosted
+    zone (#2389). A zone the platform created carries its nameservers or zone
+    id; a verified zone is the caller's; and a run that went past zone
+    creation without recording either was for a zone the caller owns.
+    Restarting one as platform-managed would create a hosted zone nobody asked for.
+    """
+    if domain.provision_nameservers or domain.provision_zone_id:
+        return True
+    if domain.verification_state == ManagedDomain.VerificationState.VERIFIED:
+        return False
+    if domain.provision_state == "failed":
+        return domain.provision_failed_step == "provision_dns_zone"
+    return not domain.provision_state
+
+
 def _require_operator_for_shared(info: Info, row, gate: Permission) -> None:
     """Writes to a shared (org-NULL) cluster or managed zone are the platform
     operator's (#1918, #1929).
@@ -352,6 +368,15 @@ class UpdateTenantClusterInput:
 @strawberry.input
 class ReconcileClusterIngressesInput:
     cluster_id: GUID
+
+
+@strawberry.input
+class SetIngressCutoverInput:
+    """``setIngressCutover`` input (#2117). Unset fields stay as they are."""
+
+    cluster_id: GUID
+    preserved_releases: list[str] | None = None
+    complete: bool | None = None
 
 
 @strawberry.input
@@ -549,6 +574,13 @@ class ReconcileClusterIngressesResult:
     reconciled_count: int
     skipped_count: int
     errors: list[str]
+
+
+@strawberry.type
+class IngressCutoverPayload:
+    cluster_id: GUID
+    preserved_releases: list[str]
+    completed_at: dt.datetime | None
 
 
 @strawberry.type
@@ -1067,6 +1099,61 @@ class ClustersMutation:
                 reconciled_count=int(result["reconciled"]),
                 skipped_count=int(result["skipped"]),
                 errors=list(result["errors"]),
+            )
+        )
+
+    @strawberry.field
+    @mutation_audit(action="cluster.ingress_cutover")
+    @require_permission(
+        Permission.CLUSTER_MANAGE, scope=cluster_org_scope(Permission.CLUSTER_MANAGE, "input.cluster_id")
+    )
+    @tenant_scoped()
+    def set_ingress_cutover(
+        self, info: Info, input: SetIngressCutoverInput
+    ) -> MutationResultType[IngressCutoverPayload]:
+        """Record an operator-managed ingress-nginx cutover to the Envoy edge
+        (#2117), platform operator only. Until ``complete`` is set, recipe
+        runs never prune the ``preserved_releases`` or any HelmRelease
+        labelled ``astrolift.ai/managed-by=operator``. Setting ``complete``
+        false again is the rollback: the releases are protected once more.
+        See docs/operators/ingress-nginx-cutover-2117.md."""
+        check_platform_operator(_caller(info), gate=Permission.CLUSTER_MANAGE)
+        tenant = get_current_tenant()
+        cluster = TenantCluster.objects.filter(
+            Q(organization_id=tenant.organization_id) | Q(organization_id__isnull=True),
+            guid=str(input.cluster_id),
+            deleted_at__isnull=True,
+        ).first()
+        if cluster is None:
+            return gql_failure(ErrorCode.NOT_FOUND.value, "cluster not found", field="clusterId")
+        if input.preserved_releases is not None:
+            import re
+
+            names = sorted(set(input.preserved_releases))
+            if not all(re.fullmatch(r"[a-z0-9]([-a-z0-9]{0,51}[a-z0-9])?", n) for n in names):
+                return gql_failure(
+                    ErrorCode.VALIDATION.value,
+                    "preservedReleases must be HelmRelease names (DNS-1123 labels)",
+                    field="preservedReleases",
+                )
+            cluster.preserved_ingress_releases = names
+        if input.complete is not None:
+            from django.utils import timezone
+
+            cluster.ingress_cutover_completed_at = timezone.now() if input.complete else None
+        cluster.save(
+            update_fields=[
+                "preserved_ingress_releases",
+                "ingress_cutover_completed_at",
+                "updated_at",
+                "version",
+            ]
+        )
+        return gql_success(
+            IngressCutoverPayload(
+                cluster_id=GUID(str(cluster.guid)),
+                preserved_releases=list(cluster.preserved_ingress_releases),
+                completed_at=cluster.ingress_cutover_completed_at,
             )
         )
 
@@ -1998,7 +2085,7 @@ class ClustersMutation:
                     ProvisionManagedDomainInput(
                         cluster_id=cluster.pk,
                         zone=zone,
-                        is_platform_managed_zone=True,
+                        is_platform_managed_zone=_platform_creates_zone(domain),
                         actor=_actor_from_request(info),
                     )
                 ],

@@ -158,6 +158,9 @@ class ManagedDomainCertificate:
     checked_at: dt.datetime
     status: str | None = None
     validation_records: int = 0
+    # The provisioning cluster serves the zone through the Envoy edge, which
+    # terminates TLS on its own certificate (#2389).
+    edge_terminated: bool = False
 
 
 @strawberry.type
@@ -185,6 +188,8 @@ class ManagedDomainDiagnostics:
     provision_state: str
     checked_at: dt.datetime
     checks: list[ManagedDomainDiagnosticCheck]
+    provision_failed_step: str = ""
+    provision_failure_reason: str = ""
     provider_zone: ManagedDomainProviderZone
     routes: list[ManagedDomainRoute]
     routes_truncated: bool

@@ -180,9 +180,18 @@ class Intervals(BaseEnumModel):
 
     def member_register(self):
         pay_period: bool = self.value.pay_period
+        days = list(self.date_range())
+        existing = Period.objects.filter(interval_id=self.identifier)
+        if (
+            existing.filter(lower_bound__lte=days[0]).exists()
+            and existing.filter(upper_bound__gte=days[-1]).exists()
+            and not existing.exclude(pay_period=pay_period).exists()
+        ):
+            # Already seeded for the whole range: skip the per-day rebuild (#2415).
+            return
         periods = defaultdict(set)
 
-        for day in self.date_range():
+        for day in days:
             first_date = truncate(day, self.value.unit, self.get_first_week_day())
             periods[first_date].add(day)
 

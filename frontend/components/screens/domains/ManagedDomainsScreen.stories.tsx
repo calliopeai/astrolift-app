@@ -8,6 +8,7 @@ import {
   DOMAIN_ACTIVE,
   DOMAIN_LONG,
   DOMAIN_PROVISIONING,
+  DOMAIN_STALLED,
   DNS_WITHHELD,
   DOMAIN_UNPROVISIONED,
   MANAGED_DOMAINS,
@@ -72,7 +73,7 @@ export const NotProvisioned: Story = {
   render: () => (
     <Screen
       {...MANAGED_DOMAINS}
-      domains={[DOMAIN_ACTIVE, DOMAIN_PROVISIONING, DOMAIN_UNPROVISIONED]}
+      domains={[DOMAIN_ACTIVE, DOMAIN_PROVISIONING, DOMAIN_STALLED, DOMAIN_UNPROVISIONED]}
       initial={{ view: "pending" }}
     />
   ),

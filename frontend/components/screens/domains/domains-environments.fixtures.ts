@@ -31,6 +31,8 @@ export const DOMAIN_ACTIVE: AstroliftManagedDomain = {
   organizationSlug: "acme",
   provisionClusterId: "c0ffee00-0000-4000-8000-000000000001",
   provisionState: "mark_active",
+  provisionFailedStep: "",
+  provisionFailureReason: "",
   provisionNameservers: nameservers([
     "ns-1024.awsdns-00.org",
     "ns-1536.awsdns-00.co.uk",
@@ -80,6 +82,19 @@ export const DOMAIN_UNPROVISIONED: AstroliftManagedDomain = {
   verificationState: "",
   verifiedAt: null,
   createdAt: "2026-08-15T09:00:00Z",
+};
+
+/** #2389: the run ended without activating the zone; Revalidate restarts it. */
+export const DOMAIN_STALLED: AstroliftManagedDomain = {
+  ...DOMAIN_ACTIVE,
+  id: "5d0c1a2e-0000-4000-8000-000000000005",
+  zone: "astro.acme.example",
+  defaultFor: "none",
+  provisionState: "failed",
+  provisionFailedStep: "configure_cert_policy",
+  provisionFailureReason:
+    "certificate not issued within 72 hours; check its DNS validation records",
+  createdAt: "2026-10-13T09:00:00Z",
 };
 
 export const DOMAIN_LONG: AstroliftManagedDomain = {
@@ -192,6 +207,7 @@ export const DOMAIN_DIAGNOSTICS: NonNullable<ManagedDomainDetailProps["diagnosti
     checkedAt: "2026-09-27T12:00:00Z",
     status: "ISSUED",
     validationRecords: 1,
+    edgeTerminated: false,
   },
   actions: {
     canCreate: true,

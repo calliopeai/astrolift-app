@@ -482,6 +482,51 @@ async def mark_managed_domain_active(cluster_id: int, zone: str) -> None:
     )
 
 
+_FAILURE_REASON_LIMIT = 300
+
+
+def _mark_provision_failed_sync(zone: str, step: str, reason: str) -> bool:
+    from astrolift_clusters.models import ManagedDomain
+
+    domain = ManagedDomain.objects.filter(zone=zone, deleted_at__isnull=True).first()
+    if domain is None:
+        return False
+    if len(reason) > _FAILURE_REASON_LIMIT:
+        reason = reason[: _FAILURE_REASON_LIMIT - 3] + "..."
+    domain.provision_state = "failed"
+    domain.provision_failed_step = step[:64]
+    domain.provision_failure_reason = reason
+    domain.save(
+        update_fields=[
+            "provision_state",
+            "provision_failed_step",
+            "provision_failure_reason",
+            "updated_at",
+            "version",
+        ]
+    )
+    return True
+
+
+@activity.defn(name="astrolift.managed_domain.mark_provision_failed")
+async def mark_managed_domain_provision_failed(cluster_id: int, zone: str, step: str, reason: str) -> bool:
+    """Record that the provisioning run ended at ``step`` without activating
+    the zone (#2389): ``provision_state='failed'`` plus a bounded reason the
+    workflow builds without exception text. Revalidate starts a new run."""
+    from asgiref.sync import sync_to_async
+
+    activity.heartbeat()
+    recorded = await sync_to_async(_mark_provision_failed_sync)(zone, step, reason)
+    log.info(
+        "mark_managed_domain_provision_failed zone=%s step=%s recorded=%s",
+        zone,
+        step,
+        recorded,
+        extra={"cluster_id": cluster_id},
+    )
+    return recorded
+
+
 def _reissue_cert_sync(
     cluster_id: int,
     zone: str,

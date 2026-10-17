@@ -50,6 +50,8 @@ export function domainDiagnosticReasonKey(reason: string) {
       return "publicAddressRequired";
     case "CERTIFICATE_NOT_RECORDED":
       return "certificateNotRecorded";
+    case "CERTIFICATE_TERMINATED_AT_EDGE":
+      return "certificateEdgeTerminated";
     case "CERTIFICATE_CLUSTER_UNAVAILABLE":
       return "certificateClusterUnavailable";
     case "CERTIFICATE_UNAVAILABLE":

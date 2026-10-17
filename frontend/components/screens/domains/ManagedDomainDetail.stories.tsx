@@ -9,6 +9,7 @@ import {
   DOMAIN_ACTIVE,
   DOMAIN_DIAGNOSTICS,
   DOMAIN_LONG,
+  DOMAIN_STALLED,
   DOMAIN_UNPROVISIONED,
   MANAGED_DOMAIN,
 } from "./domains-environments.fixtures";
@@ -46,6 +47,19 @@ export const Unprovisioned: Story = {
 };
 export const LongStrings: Story = {
   args: { ...MANAGED_DOMAIN, domain: DOMAIN_LONG, diagnostics: null },
+};
+/** #2389: the provisioning run ended at a step; the page says where, why, and what restarts it. */
+export const Stalled: Story = {
+  args: { ...MANAGED_DOMAIN, domain: DOMAIN_STALLED, diagnostics: null },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("Stalled")).toBeVisible();
+    await expect(
+      canvas.getByText(
+        "Stalled at configure_cert_policy: certificate not issued within 72 hours; check its DNS validation records; Revalidate restarts it."
+      )
+    ).toBeVisible();
+  },
 };
 /**
  * calliope-installer#447: DNS withheld on a zone pending verification. Verify
@@ -320,6 +334,30 @@ export const CertificatePending: Story = {
         status: "PENDING_VALIDATION",
       },
     },
+  },
+};
+/** #2389: the Envoy edge terminates the routes' TLS on its own certificate. */
+export const CertificateEdgeTerminated: Story = {
+  args: {
+    ...MANAGED_DOMAIN,
+    initialTab: "records",
+    diagnostics: {
+      ...DOMAIN_DIAGNOSTICS,
+      certificate: {
+        ...DOMAIN_DIAGNOSTICS.certificate!,
+        state: "UNKNOWN",
+        reason: "CERTIFICATE_PENDING_VALIDATION",
+        status: "PENDING_VALIDATION",
+        edgeTerminated: true,
+      },
+    },
+  },
+  play: async ({ canvasElement }) => {
+    await expect(
+      within(canvasElement).getByText(
+        "The Envoy edge terminates TLS for this zone's routes on its own certificate."
+      )
+    ).toBeVisible();
   },
 };
 export const CertificateHostMismatch: Story = {

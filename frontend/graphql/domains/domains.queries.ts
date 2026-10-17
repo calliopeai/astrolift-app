@@ -12,6 +12,8 @@ export const GET_MANAGED_DOMAIN = gql`
       organizationSlug
       createdAt
       provisionState
+      provisionFailedStep
+      provisionFailureReason
       provisionNameservers
       provisionValidationRecords
       provisionClusterId
@@ -128,6 +130,7 @@ export const MANAGED_DOMAIN_DIAGNOSTICS = gql`
         checkedAt
         status
         validationRecords
+        edgeTerminated
       }
       actions {
         canCreate
