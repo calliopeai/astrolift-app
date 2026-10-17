@@ -41,5 +41,12 @@ export function useWizardProjects() {
       );
     return project;
   };
-  return { allProjects, orgId, loading: query.loading, error: query.error, confirmDestination };
+  return {
+    allProjects,
+    orgId,
+    loading: query.loading,
+    error: query.error,
+    confirmDestination,
+    refetch: () => query.refetch(),
+  };
 }
