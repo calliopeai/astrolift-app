@@ -37,6 +37,10 @@ class ActionSafetyRule(BaseCoreModel):
     # largest quorum asked for wins.
     require_approval = models.BooleanField(null=True, blank=True)
     minimum_approvals = models.PositiveSmallIntegerField(null=True, blank=True)
+    # Whether an agent (an API token on the MCP surface) may run the action
+    # (#2424). Off by default; only the organization can turn it on, and any
+    # narrower scope can turn it back off.
+    allow_agents = models.BooleanField(null=True, blank=True)
 
     class Meta:
         constraints = [

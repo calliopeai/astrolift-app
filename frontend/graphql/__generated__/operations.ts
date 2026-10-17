@@ -257,6 +257,10 @@ export type ArchiveAppRegistryRepoInput = {
   archive: Scalars['Boolean']['input'];
 };
 
+export type ArchiveBrainInput = {
+  slug: Scalars['String']['input'];
+};
+
 export type AssertSessionInput = {
   assertion: Scalars['String']['input'];
   challenge: Scalars['String']['input'];
@@ -360,6 +364,8 @@ export type AstroliftActionPermission = {
 
 export type AstroliftActionSafetyRequirement = {
   action: Scalars['String']['output'];
+  agentGated: Scalars['Boolean']['output'];
+  allowAgents: Scalars['Boolean']['output'];
   allowSelfApproval: Scalars['Boolean']['output'];
   approvable: Scalars['Boolean']['output'];
   approval: Scalars['Boolean']['output'];
@@ -373,6 +379,7 @@ export type AstroliftActionSafetyRequirement = {
 
 export type AstroliftActionSafetyRule = {
   action: Scalars['String']['output'];
+  allowAgents?: Maybe<Scalars['Boolean']['output']>;
   allowSelfApproval?: Maybe<Scalars['Boolean']['output']>;
   enabled?: Maybe<Scalars['Boolean']['output']>;
   minimumApprovals?: Maybe<Scalars['Int']['output']>;
@@ -1791,12 +1798,16 @@ export type AstroliftAuditRetention = {
 
 export type AstroliftBrain = {
   environments: Array<AstroliftBrainEnvironment>;
+  /** Apps hosted on this brain that the caller can read. Filled by astroliftBrain; null in lists. */
+  hostedApps?: Maybe<Array<AstroliftBrainHostedApp>>;
   id: Scalars['GUID']['output'];
   kind: Scalars['String']['output'];
   name: Scalars['String']['output'];
   project: Scalars['String']['output'];
   sharedWith: Array<AstroliftBrainShare>;
   slug: Scalars['String']['output'];
+  /** The cell last applied and the resources it needs, without host reads (adopted and graduationNeeded are null here; astroliftBrainStatus reads them). Null in lists. */
+  substrate?: Maybe<AstroliftBrainSubstrate>;
   team: Scalars['String']['output'];
 };
 
@@ -1829,14 +1840,128 @@ export type AstroliftBrainConnectionMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftBrainCreation = {
+  /** The brain once registered and readable by the caller. */
+  app?: Maybe<AstroliftBrain>;
+  commitSha?: Maybe<Scalars['String']['output']>;
+  deploymentId?: Maybe<Scalars['GUID']['output']>;
+  error?: Maybe<MutationError>;
+  id: Scalars['GUID']['output'];
+  repo: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+  state: BrainCreationState;
+  templateRef: Scalars['String']['output'];
+};
+
+export type AstroliftBrainCreationMutationResult = {
+  data?: Maybe<AstroliftBrainCreation>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftBrainDeploymentState = {
+  commitSha: Scalars['String']['output'];
+  createdAt?: Maybe<Scalars['String']['output']>;
+  id: Scalars['GUID']['output'];
+  imageTag: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+};
+
 export type AstroliftBrainEnvironment = {
   name: Scalars['String']['output'];
   url: Scalars['String']['output'];
 };
 
+export type AstroliftBrainHostedApp = {
+  environment: Scalars['String']['output'];
+  slug: Scalars['String']['output'];
+};
+
+export type AstroliftBrainIngestRun = {
+  conclusion: Scalars['String']['output'];
+  createdAt: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  url: Scalars['String']['output'];
+};
+
+export type AstroliftBrainMutationResult = {
+  data?: Maybe<AstroliftBrain>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftBrainRebuild = {
+  deploymentId?: Maybe<Scalars['GUID']['output']>;
+  ingestRunUrl?: Maybe<Scalars['String']['output']>;
+  mode: Scalars['String']['output'];
+  /** What the deploy rebuilds, from the brain's substrate. */
+  rebuilds: Array<Scalars['String']['output']>;
+  runUrl?: Maybe<Scalars['String']['output']>;
+  slug: Scalars['String']['output'];
+};
+
+export type AstroliftBrainRebuildMutationResult = {
+  data?: Maybe<AstroliftBrainRebuild>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
+export type AstroliftBrainResource = {
+  detail: Scalars['String']['output'];
+  environment: Scalars['String']['output'];
+  kind: Scalars['String']['output'];
+  name: Scalars['String']['output'];
+  state: Scalars['String']['output'];
+};
+
 export type AstroliftBrainShare = {
   access: Scalars['String']['output'];
   team: Scalars['String']['output'];
+};
+
+export type AstroliftBrainSourceHead = {
+  branch: Scalars['String']['output'];
+  commitSha: Scalars['String']['output'];
+  committedAt?: Maybe<Scalars['String']['output']>;
+};
+
+export type AstroliftBrainStatus = {
+  /** Whether the running commit differs from the deploy branch head; null when unknown. */
+  behind?: Maybe<Scalars['Boolean']['output']>;
+  /** app/brain-manifest.json generated, read at the running commit; null when uncompiled. */
+  compiledAt?: Maybe<Scalars['String']['output']>;
+  /** The commit of the environment's running deployment; empty when none runs. */
+  deployedCommit: Scalars['String']['output'];
+  /** The environment's latest deployment, whatever its state. */
+  deployment?: Maybe<AstroliftBrainDeploymentState>;
+  environmentName: Scalars['String']['output'];
+  /** The newest knowledge-refresh.yml run; null when the repository has none. */
+  lastIngest?: Maybe<AstroliftBrainIngestRun>;
+  /** Whether any environment of the brain has a URL. */
+  served: Scalars['Boolean']['output'];
+  slug: Scalars['String']['output'];
+  sourceHead?: Maybe<AstroliftBrainSourceHead>;
+  substrate: AstroliftBrainSubstrate;
+  url: Scalars['String']['output'];
+  warnings: Array<Scalars['String']['output']>;
+};
+
+export type AstroliftBrainSubstrate = {
+  /** Whether the brain has adopted a store authority (brain.authority at the running commit); null when it could not be read. A non-files cell is in effect once adopted. */
+  adopted?: Maybe<Scalars['Boolean']['output']>;
+  adoptedStore: Scalars['String']['output'];
+  authority: Scalars['String']['output'];
+  blobs: Scalars['String']['output'];
+  /** The cell, as Mimwell names it. */
+  cell: Scalars['String']['output'];
+  /** app/brain-manifest.json substrate.graduation.needed at the running commit. */
+  graduationNeeded?: Maybe<Scalars['Boolean']['output']>;
+  graph: Scalars['String']['output'];
+  image: Scalars['String']['output'];
+  persistence: Array<Scalars['String']['output']>;
+  replicas: Scalars['Int']['output'];
+  resources: Array<AstroliftBrainResource>;
+  vectors: Scalars['String']['output'];
 };
 
 export type AstroliftBrief = {
@@ -6651,6 +6776,68 @@ export type BootstraprunrecordedpayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+/** Where canon lives (Mimwell substrate matrix). */
+export type BrainAuthority =
+  | 'D1'
+  | 'FILES'
+  | 'MONGO'
+  | 'MYSQL'
+  | 'POSTGRES'
+  | 'SQLITE';
+
+/** Where blobs live (Mimwell substrate matrix). */
+export type BrainBlobs =
+  | 'AZURE_BLOB'
+  | 'DB_BLOB'
+  | 'FS'
+  | 'S3';
+
+export type BrainCreationState =
+  | 'DEPLOYING'
+  | 'FAILED'
+  | 'PENDING'
+  | 'READY'
+  | 'REGISTERED'
+  | 'REPO_READY'
+  | 'SCAFFOLDED';
+
+/** Where the graph projection lives (Mimwell substrate matrix). */
+export type BrainGraph =
+  | 'AGE'
+  | 'EDGES_TABLE';
+
+/** Mimwell deploy.persistence; D1 and KV are the Worker path's. */
+export type BrainPersistence =
+  | 'D1'
+  | 'EFS'
+  | 'KV'
+  | 'NONE'
+  | 'POSTGRES'
+  | 'S3'
+  | 'SQLITE_VOLUME';
+
+export type BrainShareAccess =
+  | 'DEPLOYER'
+  | 'VIEWER';
+
+export type BrainSubstrateInput = {
+  authority: BrainAuthority;
+  blobs: BrainBlobs;
+  graph: BrainGraph;
+  image: InputMaybe<Scalars['String']['input']>;
+  persistence: Array<BrainPersistence>;
+  port: Scalars['Int']['input'];
+  replicas: Scalars['Int']['input'];
+  vectors: BrainVectors;
+};
+
+/** Where the vector index lives (Mimwell substrate matrix). */
+export type BrainVectors =
+  | 'EDGE_DB'
+  | 'EXTERNAL'
+  | 'IN_DB'
+  | 'LOCAL';
+
 export type BringClusterIntoManagementInputType = {
   clusterId: Scalars['GUID']['input'];
 };
@@ -7139,6 +7326,21 @@ export type CreateAppEnvironmentInput = {
   appSlug: Scalars['String']['input'];
   clusterSlug: InputMaybe<Scalars['String']['input']>;
   name: Scalars['String']['input'];
+};
+
+export type CreateBrainInput = {
+  deploy: Scalars['Boolean']['input'];
+  environmentName: Scalars['String']['input'];
+  name: InputMaybe<Scalars['String']['input']>;
+  projectId: Scalars['GUID']['input'];
+  repo: Scalars['String']['input'];
+  slug: Scalars['String']['input'];
+  sourceConnectionId: Scalars['GUID']['input'];
+  /** The Mimwell cell and persistence to host it on, checked against the matrix; the files cell with no persistence when omitted. The slug must be the client slug plus -brain. */
+  substrate: InputMaybe<BrainSubstrateInput>;
+  teamId: InputMaybe<Scalars['GUID']['input']>;
+  templateRef: InputMaybe<Scalars['String']['input']>;
+  visibility: RepoVisibility;
 };
 
 export type CreateClusterAuthGroupInput = {
@@ -9032,6 +9234,8 @@ export type Mutation = {
   approveSecretChange: AstroliftSecretChangeProposalMutationResult;
   archiveApp: AstroliftRegisteredAppMutationResult;
   archiveAppRegistryRepo: AstroliftCapabilityDeprovisionPayloadMutationResult;
+  /** Delete a semantic layer (#2424): archive it (scale to zero, stop deploys), drop it from the register and revoke every hosted app's binding and token. The repository is never touched; restoreApp brings the brain back, hosted apps are re-hosted. Asks for confirmation, a fresh verification and any approval rule (brain.delete). */
+  archiveBrain: AstroliftBrainMutationResult;
   archiveForm: AstroliftFormDefinitionMutationResult;
   assembleBrief: AstroliftAssembleBriefResultMutationResult;
   assertSession: AstroliftAttestationResultMutationResult;
@@ -9093,6 +9297,8 @@ export type Mutation = {
   createAlertRule: AstroliftAlertRuleMutationResult;
   createApiToken: AstroliftApiTokenPlaintextMutationResult;
   createAppEnvironment: AstroliftAppEnvironmentMutationResult;
+  /** Create a semantic layer (#2424): check the request, then scaffold the repository from the verified Mimwell edition in one commit, register it as a brain and deploy it, in the background. Poll astroliftBrainCreation; a retry for the same slug joins the running one. */
+  createBrain: AstroliftBrainCreationMutationResult;
   createClusterAuthGroup: AstroliftClusterAuthUserChangeMutationResult;
   createClusterAuthUser: AstroliftClusterAuthUserMutationResult;
   createDeployToken: DeployTokenSecretRevealMutationResult;
@@ -9279,6 +9485,8 @@ export type Mutation = {
   pushCiWorkflow: AstroliftScmPushCiWorkflowResultMutationResult;
   pushManifestToRepo: ManifestpushpayloadMutationResult;
   reapCloudOrphan: ReapCloudOrphanPayloadMutationResult;
+  /** Rebuild a semantic layer (#2424): redeploy the deploy branch head (a platform build starts a deployment, a CI-built brain dispatches its CI), or with ingest run the brain's knowledge-refresh workflow, whose commit then deploys through the normal push path. */
+  rebuildBrain: AstroliftBrainRebuildMutationResult;
   recheckDomainValidation: AstroliftAppDomainMutationResult;
   reconcileClusterIngresses: ReconcileClusterIngressesResultMutationResult;
   reconcileManagedDomainAppRoute: ManagedDomainAppRouteOperationMutationResult;
@@ -9407,6 +9615,8 @@ export type Mutation = {
   setZentinelleGatewayEnabled: AstroliftZentinelleClusterGatewayMutationResult;
   setZentinelleGatewayUrl: AstroliftZentinelleConnectionMutationResult;
   setZentinelleInstallGatewayUrl: AstroliftZentinelleConnectionMutationResult;
+  /** Share a semantic layer with a team (#2424): VIEWER reads it, DEPLOYER also edits and deploys it. Owners are managed on the app, never here. Asks for confirmation and a fresh verification in the browser (brain.share). */
+  shareBrain: AstroliftBrainMutationResult;
   /** Cancel a sign request. Sign requests are not available: this always refuses. */
   signRequestCancel: Scalars['Boolean']['output'];
   /** Sign a sign request. Sign requests are not available: this always refuses. */
@@ -9451,6 +9661,8 @@ export type Mutation = {
   unregisterTenantCluster: SoftdeletepayloadMutationResult;
   unregisterZentinelleCluster: AstroliftZentinelleClusterGatewayMutationResult;
   unregisterZentinelleSharedCluster: AstroliftZentinelleClusterGatewayMutationResult;
+  /** Stop sharing a semantic layer with a team (#2424). New read tokens stop at once; tokens already issued live out their 15 minutes. Never removes the home team or an owner. */
+  unshareBrain: AstroliftBrainMutationResult;
   updateAgentEnvironmentSpec: AstroliftAgentEnvironmentSpecMutationResult;
   updateAgentRunSpec: AstroliftAgentRunSpecMutationResult;
   updateAgentSecretBundle: AstroliftAgentSecretBundleMutationResult;
@@ -9458,6 +9670,8 @@ export type Mutation = {
   updateApp: AstroliftRegisteredAppMutationResult;
   updateAstroliftSecurityPolicy: AstroliftRegisteredAppMutationResult;
   updateBedrockModelConnection: ClusterModelDeploymentMutationResult;
+  /** Graduate a semantic layer's substrate (#2424, Mimwell's graduation): check the new cell against the matrix, write it into client.config.json and astrolift.toml in one commit and apply the manifest, which provisions what the cell needs; the push deploys it. Persistence that holds data (postgres, sqlite-volume, efs) is never dropped here. */
+  updateBrainSubstrate: AstroliftBrainMutationResult;
   updateClusterModel: ClusterModelDeploymentMutationResult;
   updateClusterModelRuntime: ClusterModelRuntimeSettingsMutationResult;
   updateEmailTemplate: AstroliftEmailTemplateMutationResult;
@@ -9600,6 +9814,11 @@ export type MutationArchiveAppArgs = {
 
 export type MutationArchiveAppRegistryRepoArgs = {
   input: ArchiveAppRegistryRepoInput;
+};
+
+
+export type MutationArchiveBrainArgs = {
+  input: ArchiveBrainInput;
 };
 
 
@@ -9912,6 +10131,11 @@ export type MutationCreateApiTokenArgs = {
 
 export type MutationCreateAppEnvironmentArgs = {
   input: CreateAppEnvironmentInput;
+};
+
+
+export type MutationCreateBrainArgs = {
+  input: CreateBrainInput;
 };
 
 
@@ -10729,6 +10953,11 @@ export type MutationReapCloudOrphanArgs = {
 };
 
 
+export type MutationRebuildBrainArgs = {
+  input: RebuildBrainInput;
+};
+
+
 export type MutationRecheckDomainValidationArgs = {
   input: RecheckDomainValidationInput;
 };
@@ -11354,6 +11583,11 @@ export type MutationSetZentinelleInstallGatewayUrlArgs = {
 };
 
 
+export type MutationShareBrainArgs = {
+  input: ShareBrainInput;
+};
+
+
 export type MutationSignRequestCancelArgs = {
   gid: Scalars['String']['input'];
   note: Scalars['String']['input'];
@@ -11554,6 +11788,11 @@ export type MutationUnregisterZentinelleSharedClusterArgs = {
 };
 
 
+export type MutationUnshareBrainArgs = {
+  input: UnshareBrainInput;
+};
+
+
 export type MutationUpdateAgentEnvironmentSpecArgs = {
   input: UpdateAgentEnvironmentSpecInput;
   slug: Scalars['String']['input'];
@@ -11591,6 +11830,11 @@ export type MutationUpdateAstroliftSecurityPolicyArgs = {
 
 export type MutationUpdateBedrockModelConnectionArgs = {
   input: UpdateBedrockModelConnectionInput;
+};
+
+
+export type MutationUpdateBrainSubstrateArgs = {
+  input: UpdateBrainSubstrateInput;
 };
 
 
@@ -12367,6 +12611,12 @@ export type Query = {
   astroliftAuditEventsPage: AstroliftAuditEventPage;
   astroliftAuditRetention: AstroliftAuditRetention;
   astroliftAvailableRepos: AstroliftRemoteRepoList;
+  /** One semantic layer the caller can read, by app slug (#2424), with the apps hosted on it. Null when it is not visible, archived or not a brain. */
+  astroliftBrain?: Maybe<AstroliftBrain>;
+  /** The progress of one createBrain request (#2424). Visible to the person who asked for it and to readers of the brain it created. */
+  astroliftBrainCreation?: Maybe<AstroliftBrainCreation>;
+  /** How fresh a semantic layer is in one environment (#2424): its latest deployment, the running commit against the deploy branch head, when it was compiled and its last ingest run. */
+  astroliftBrainStatus?: Maybe<AstroliftBrainStatus>;
   astroliftBrains: Array<AstroliftBrain>;
   astroliftBudgets: Array<AstroliftBudget>;
   astroliftCluster?: Maybe<AstroliftTenantCluster>;
@@ -13375,6 +13625,22 @@ export type QueryAstroliftAvailableReposArgs = {
   connectionId: Scalars['String']['input'];
   limit?: Scalars['Int']['input'];
   search?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QueryAstroliftBrainArgs = {
+  slug: Scalars['String']['input'];
+};
+
+
+export type QueryAstroliftBrainCreationArgs = {
+  id: Scalars['GUID']['input'];
+};
+
+
+export type QueryAstroliftBrainStatusArgs = {
+  environmentName?: Scalars['String']['input'];
+  slug: Scalars['String']['input'];
 };
 
 
@@ -15219,6 +15485,12 @@ export type ReapCloudOrphanPayloadMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type RebuildBrainInput = {
+  environmentName: Scalars['String']['input'];
+  ingest: Scalars['Boolean']['input'];
+  slug: Scalars['String']['input'];
+};
+
 export type RecheckDomainValidationInput = {
   id: Scalars['GUID']['input'];
 };
@@ -15397,6 +15669,11 @@ export type RemoveOrgSkillRepoInput = {
 export type RemoveOrganizationAllowlistDomainInput = {
   id: Scalars['GUID']['input'];
 };
+
+export type RepoVisibility =
+  | 'INTERNAL'
+  | 'PRIVATE'
+  | 'PUBLIC';
 
 export type ReprovisionManagedServiceInput = {
   expectedContextRevision: InputMaybe<Scalars['String']['input']>;
@@ -15727,6 +16004,7 @@ export type SendManagedServiceTestEmailInput = {
 
 export type SetActionSafetyRuleInput = {
   action: Scalars['String']['input'];
+  allowAgents: InputMaybe<Scalars['Boolean']['input']>;
   allowSelfApproval: InputMaybe<Scalars['Boolean']['input']>;
   enabled: InputMaybe<Scalars['Boolean']['input']>;
   minimumApprovals: InputMaybe<Scalars['Int']['input']>;
@@ -15876,6 +16154,12 @@ export type SetZentinelleGatewayEnabledInput = {
 
 export type SetZentinelleGatewayUrlInput = {
   gatewayUrl: InputMaybe<Scalars['String']['input']>;
+};
+
+export type ShareBrainInput = {
+  access: BrainShareAccess;
+  slug: Scalars['String']['input'];
+  teamSlug: Scalars['String']['input'];
 };
 
 export type SharedDirectoryType = {
@@ -16161,6 +16445,11 @@ export type UnregisterTenantClusterInput = {
   id: Scalars['GUID']['input'];
 };
 
+export type UnshareBrainInput = {
+  slug: Scalars['String']['input'];
+  teamSlug: Scalars['String']['input'];
+};
+
 export type UpdateAgentEnvironmentSpecInput = {
   agentType: InputMaybe<Scalars['String']['input']>;
   allowInstall: InputMaybe<Scalars['Boolean']['input']>;
@@ -16229,6 +16518,11 @@ export type UpdateBedrockModelConnectionInput = {
   name: Scalars['String']['input'];
   organizationId: Scalars['GUID']['input'];
   sharingMode: InputMaybe<ModelSharingMode>;
+};
+
+export type UpdateBrainSubstrateInput = {
+  slug: Scalars['String']['input'];
+  substrate: BrainSubstrateInput;
 };
 
 export type UpdateClusterModelInput = {

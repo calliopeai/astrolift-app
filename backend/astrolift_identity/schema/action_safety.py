@@ -15,6 +15,7 @@ from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
 from astrolift_identity.action_safety import (
     ACTIONS,
+    AGENT_GATED,
     APPROVABLE,
     MAX_APPROVALS,
     approver_permission,
@@ -48,6 +49,9 @@ class ActionSafetyRequirementType:
     approvable: bool
     approval: bool
     minimum_approvals: int
+    #: Whether a rule can let agents run this action at all (#2424).
+    agent_gated: bool
+    allow_agents: bool
     sources: list[str]
 
 
@@ -61,6 +65,8 @@ class SetActionSafetyRuleInput:
     allow_self_approval: bool | None = None
     require_approval: bool | None = None
     minimum_approvals: int | None = None
+    #: Let agents (API tokens on MCP) run a gated action (#2424); org only to turn on.
+    allow_agents: bool | None = None
 
 
 @strawberry.type(name="AstroliftActionSafetyRule")
@@ -75,6 +81,7 @@ class ActionSafetyRuleType:
     allow_self_approval: bool | None
     require_approval: bool | None
     minimum_approvals: int | None
+    allow_agents: bool | None = None
 
 
 @strawberry.type(name="AstroliftActionApprovalRequest")
@@ -143,6 +150,8 @@ def requirements_for_viewer(app_slug: str | None) -> list[ActionSafetyRequiremen
                 approvable=action in APPROVABLE,
                 approval=r.approval,
                 minimum_approvals=r.minimum_approvals,
+                agent_gated=action in AGENT_GATED,
+                allow_agents=r.allow_agents,
                 sources=list(r.sources),
             )
         )
@@ -187,6 +196,7 @@ def rules_for_org() -> list[ActionSafetyRuleType]:
                 allow_self_approval=r.allow_self_approval,
                 require_approval=r.require_approval,
                 minimum_approvals=r.minimum_approvals,
+                allow_agents=r.allow_agents,
             )
         )
     return out
@@ -277,6 +287,18 @@ class ActionSafetyMutations:
                 f"approval cannot be added to {input.action!r}{hint}",
                 field="requireApproval",
             )
+        if input.allow_agents is not None and input.action not in AGENT_GATED:
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                f"agents are not gated on {input.action!r}",
+                field="allowAgents",
+            )
+        if input.allow_agents and kind != "ORG":
+            return gql_failure(
+                ErrorCode.VALIDATION.value,
+                "only the organization can let agents run an action; a narrower scope can only turn it off",
+                field="allowAgents",
+            )
         if input.minimum_approvals is not None and not 1 <= input.minimum_approvals <= MAX_APPROVALS:
             return gql_failure(
                 ErrorCode.VALIDATION.value,
@@ -297,6 +319,7 @@ class ActionSafetyMutations:
                     "allow_self_approval": input.allow_self_approval,
                     "require_approval": input.require_approval,
                     "minimum_approvals": input.minimum_approvals,
+                    "allow_agents": input.allow_agents,
                 }.items()
                 if value is not None
             },
@@ -310,6 +333,7 @@ class ActionSafetyMutations:
                 allow_self_approval=row.allow_self_approval,
                 require_approval=row.require_approval,
                 minimum_approvals=row.minimum_approvals,
+                allow_agents=row.allow_agents,
             )
         )
 

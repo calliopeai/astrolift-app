@@ -234,6 +234,10 @@ input ArchiveAppRegistryRepoInput {
   archive: Boolean! = true
 }
 
+input ArchiveBrainInput {
+  slug: String!
+}
+
 input AssertSessionInput {
   assertion: String!
   challenge: String!
@@ -360,6 +364,8 @@ type AstroliftActionSafetyRequirement {
   approvable: Boolean!
   approval: Boolean!
   minimumApprovals: Int!
+  agentGated: Boolean!
+  allowAgents: Boolean!
   sources: [String!]!
 }
 
@@ -372,6 +378,7 @@ type AstroliftActionSafetyRule {
   allowSelfApproval: Boolean
   requireApproval: Boolean
   minimumApprovals: Int
+  allowAgents: Boolean
 }
 
 type AstroliftActionSafetyRuleMutationResult {
@@ -1870,6 +1877,16 @@ type AstroliftBrain {
   project: String!
   environments: [AstroliftBrainEnvironment!]!
   sharedWith: [AstroliftBrainShare!]!
+
+  """
+  Apps hosted on this brain that the caller can read. Filled by astroliftBrain; null in lists.
+  """
+  hostedApps: [AstroliftBrainHostedApp!]
+
+  """
+  The cell last applied and the resources it needs, without host reads (adopted and graduationNeeded are null here; astroliftBrainStatus reads them). Null in lists.
+  """
+  substrate: AstroliftBrainSubstrate
 }
 
 type AstroliftBrainApp {
@@ -1901,14 +1918,151 @@ type AstroliftBrainConnectionMutationResult {
   data: AstroliftBrainConnection
 }
 
+type AstroliftBrainCreation {
+  id: GUID!
+  slug: String!
+  state: BrainCreationState!
+
+  """The brain once registered and readable by the caller."""
+  app: AstroliftBrain
+  repo: String!
+  templateRef: String!
+  commitSha: String
+  deploymentId: GUID
+  error: MutationError
+}
+
+type AstroliftBrainCreationMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftBrainCreation
+}
+
+type AstroliftBrainDeploymentState {
+  id: GUID!
+  status: String!
+  imageTag: String!
+  commitSha: String!
+  createdAt: String
+}
+
 type AstroliftBrainEnvironment {
   name: String!
   url: String!
 }
 
+type AstroliftBrainHostedApp {
+  slug: String!
+  environment: String!
+}
+
+type AstroliftBrainIngestRun {
+  status: String!
+  conclusion: String!
+  url: String!
+  createdAt: String!
+}
+
+type AstroliftBrainMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftBrain
+}
+
+type AstroliftBrainRebuild {
+  slug: String!
+  mode: String!
+  deploymentId: GUID
+  runUrl: String
+  ingestRunUrl: String
+
+  """What the deploy rebuilds, from the brain's substrate."""
+  rebuilds: [String!]!
+}
+
+type AstroliftBrainRebuildMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftBrainRebuild
+}
+
+type AstroliftBrainResource {
+  kind: String!
+  name: String!
+  environment: String!
+  state: String!
+  detail: String!
+}
+
 type AstroliftBrainShare {
   team: String!
   access: String!
+}
+
+type AstroliftBrainSourceHead {
+  branch: String!
+  commitSha: String!
+  committedAt: String
+}
+
+type AstroliftBrainStatus {
+  slug: String!
+  environmentName: String!
+  url: String!
+
+  """Whether any environment of the brain has a URL."""
+  served: Boolean!
+
+  """The environment's latest deployment, whatever its state."""
+  deployment: AstroliftBrainDeploymentState
+
+  """
+  The commit of the environment's running deployment; empty when none runs.
+  """
+  deployedCommit: String!
+  sourceHead: AstroliftBrainSourceHead
+
+  """
+  Whether the running commit differs from the deploy branch head; null when unknown.
+  """
+  behind: Boolean
+
+  """
+  app/brain-manifest.json generated, read at the running commit; null when uncompiled.
+  """
+  compiledAt: String
+
+  """
+  The newest knowledge-refresh.yml run; null when the repository has none.
+  """
+  lastIngest: AstroliftBrainIngestRun
+  substrate: AstroliftBrainSubstrate!
+  warnings: [String!]!
+}
+
+type AstroliftBrainSubstrate {
+  authority: String!
+  blobs: String!
+  vectors: String!
+  graph: String!
+
+  """The cell, as Mimwell names it."""
+  cell: String!
+  persistence: [String!]!
+  replicas: Int!
+  image: String!
+
+  """
+  Whether the brain has adopted a store authority (brain.authority at the running commit); null when it could not be read. A non-files cell is in effect once adopted.
+  """
+  adopted: Boolean
+  adoptedStore: String!
+
+  """
+  app/brain-manifest.json substrate.graduation.needed at the running commit.
+  """
+  graduationNeeded: Boolean
+  resources: [AstroliftBrainResource!]!
 }
 
 type AstroliftBrief {
@@ -7100,6 +7254,75 @@ type BootstraprunrecordedpayloadMutationResult {
   data: Bootstraprunrecordedpayload
 }
 
+"""Where canon lives (Mimwell substrate matrix)."""
+enum BrainAuthority {
+  FILES
+  SQLITE
+  POSTGRES
+  MYSQL
+  MONGO
+  D1
+}
+
+"""Where blobs live (Mimwell substrate matrix)."""
+enum BrainBlobs {
+  FS
+  DB_BLOB
+  S3
+  AZURE_BLOB
+}
+
+enum BrainCreationState {
+  PENDING
+  REPO_READY
+  SCAFFOLDED
+  REGISTERED
+  DEPLOYING
+  READY
+  FAILED
+}
+
+"""Where the graph projection lives (Mimwell substrate matrix)."""
+enum BrainGraph {
+  EDGES_TABLE
+  AGE
+}
+
+"""Mimwell deploy.persistence; D1 and KV are the Worker path's."""
+enum BrainPersistence {
+  NONE
+  SQLITE_VOLUME
+  EFS
+  POSTGRES
+  S3
+  D1
+  KV
+}
+
+enum BrainShareAccess {
+  VIEWER
+  DEPLOYER
+}
+
+input BrainSubstrateInput {
+  authority: BrainAuthority! = FILES
+  blobs: BrainBlobs! = FS
+  vectors: BrainVectors! = LOCAL
+  graph: BrainGraph! = EDGES_TABLE
+  persistence: [BrainPersistence!]! = []
+  replicas: Int! = 1
+  image: String = null
+  port: Int! = 8080
+}
+
+"""Where the vector index lives (Mimwell substrate matrix)."""
+enum BrainVectors {
+  LOCAL
+  IN_DB
+  EDGE_DB
+  EXTERNAL
+}
+
 input BringClusterIntoManagementInputType {
   clusterId: GUID!
 }
@@ -7602,6 +7825,24 @@ input CreateAppEnvironmentInput {
   appSlug: String!
   name: String!
   clusterSlug: String = null
+}
+
+input CreateBrainInput {
+  projectId: GUID!
+  slug: String!
+  sourceConnectionId: GUID!
+  repo: String!
+  name: String = null
+  teamId: GUID = null
+  visibility: RepoVisibility! = PRIVATE
+  templateRef: String = null
+  environmentName: String! = "production"
+  deploy: Boolean! = true
+
+  """
+  The Mimwell cell and persistence to host it on, checked against the matrix; the files cell with no persistence when omitted. The slug must be the client slug plus -brain.
+  """
+  substrate: BrainSubstrateInput = null
 }
 
 input CreateClusterAuthGroupInput {
@@ -9788,6 +10029,36 @@ type Mutation {
   Create an app hosted on a brain the caller can read (#2243), from the brain-app template: one public web workload running ``image``. Each deploy gives it the brain's MCP URLs and a read token for that brain as env (BRAIN_*), rotated on every deploy and revoked when the app is deleted. Deploy it with startDeployment.
   """
   hostAppOnBrain(input: HostAppOnBrainInput!): AstroliftBrainAppMutationResult!
+
+  """
+  Create a semantic layer (#2424): check the request, then scaffold the repository from the verified Mimwell edition in one commit, register it as a brain and deploy it, in the background. Poll astroliftBrainCreation; a retry for the same slug joins the running one.
+  """
+  createBrain(input: CreateBrainInput!): AstroliftBrainCreationMutationResult!
+
+  """
+  Share a semantic layer with a team (#2424): VIEWER reads it, DEPLOYER also edits and deploys it. Owners are managed on the app, never here. Asks for confirmation and a fresh verification in the browser (brain.share).
+  """
+  shareBrain(input: ShareBrainInput!): AstroliftBrainMutationResult!
+
+  """
+  Stop sharing a semantic layer with a team (#2424). New read tokens stop at once; tokens already issued live out their 15 minutes. Never removes the home team or an owner.
+  """
+  unshareBrain(input: UnshareBrainInput!): AstroliftBrainMutationResult!
+
+  """
+  Rebuild a semantic layer (#2424): redeploy the deploy branch head (a platform build starts a deployment, a CI-built brain dispatches its CI), or with ingest run the brain's knowledge-refresh workflow, whose commit then deploys through the normal push path.
+  """
+  rebuildBrain(input: RebuildBrainInput!): AstroliftBrainRebuildMutationResult!
+
+  """
+  Graduate a semantic layer's substrate (#2424, Mimwell's graduation): check the new cell against the matrix, write it into client.config.json and astrolift.toml in one commit and apply the manifest, which provisions what the cell needs; the push deploys it. Persistence that holds data (postgres, sqlite-volume, efs) is never dropped here.
+  """
+  updateBrainSubstrate(input: UpdateBrainSubstrateInput!): AstroliftBrainMutationResult!
+
+  """
+  Delete a semantic layer (#2424): archive it (scale to zero, stop deploys), drop it from the register and revoke every hosted app's binding and token. The repository is never touched; restoreApp brings the brain back, hosted apps are re-hosted. Asks for confirmation, a fresh verification and any approval rule (brain.delete).
+  """
+  archiveBrain(input: ArchiveBrainInput!): AstroliftBrainMutationResult!
   setAppAccess(input: SetAppAccessInput!): AstroliftAppAccessMutationResult!
   sendInstallAlertMailTest(input: SendInstallAlertMailTestInput!): InstallAlertMailTestMutationResult!
   createWebhookSubscription(input: CreateWebhookSubscriptionInput!): WebhookSecretRevealMutationResult!
@@ -10809,6 +11080,21 @@ type Query {
   astroliftBrains(search: String = null): [AstroliftBrain!]!
 
   """
+  One semantic layer the caller can read, by app slug (#2424), with the apps hosted on it. Null when it is not visible, archived or not a brain.
+  """
+  astroliftBrain(slug: String!): AstroliftBrain
+
+  """
+  How fresh a semantic layer is in one environment (#2424): its latest deployment, the running commit against the deploy branch head, when it was compiled and its last ingest run.
+  """
+  astroliftBrainStatus(slug: String!, environmentName: String! = "production"): AstroliftBrainStatus
+
+  """
+  The progress of one createBrain request (#2424). Visible to the person who asked for it and to readers of the brain it created.
+  """
+  astroliftBrainCreation(id: GUID!): AstroliftBrainCreation
+
+  """
   Read-only APP_READ projection for an exact live app/environment. Expected cluster/provider GUIDs refuse reassignment. Persisted observations do not prove live health, TLS binding or renewal; mutation authority is unchanged.
   """
   astroliftAppDependencyContext(appId: GUID!, environmentId: GUID!, expectedClusterId: GUID = null, expectedProviderId: GUID = null): AppDependencyContext
@@ -11209,6 +11495,12 @@ type ReapCloudOrphanPayloadMutationResult {
   data: ReapCloudOrphanPayload
 }
 
+input RebuildBrainInput {
+  slug: String!
+  environmentName: String! = "production"
+  ingest: Boolean! = false
+}
+
 input RecheckDomainValidationInput {
   id: GUID!
 }
@@ -11389,6 +11681,12 @@ input RemoveOrgSkillRepoInput {
 
 input RemoveOrganizationAllowlistDomainInput {
   id: GUID!
+}
+
+enum RepoVisibility {
+  PRIVATE
+  INTERNAL
+  PUBLIC
 }
 
 input ReprovisionManagedServiceInput {
@@ -11729,6 +12027,7 @@ input SetActionSafetyRuleInput {
   allowSelfApproval: Boolean = null
   requireApproval: Boolean = null
   minimumApprovals: Int = null
+  allowAgents: Boolean = null
 }
 
 input SetActiveIdentityProviderInput {
@@ -11872,6 +12171,12 @@ input SetZentinelleGatewayEnabledInput {
 
 input SetZentinelleGatewayUrlInput {
   gatewayUrl: String = null
+}
+
+input ShareBrainInput {
+  slug: String!
+  teamSlug: String!
+  access: BrainShareAccess!
 }
 
 type SharedDirectoryType {
@@ -12123,6 +12428,11 @@ input UnregisterTenantClusterInput {
   id: GUID!
 }
 
+input UnshareBrainInput {
+  slug: String!
+  teamSlug: String!
+}
+
 input UpdateAgentEnvironmentSpecInput {
   name: String = null
   agentType: String = null
@@ -12191,6 +12501,11 @@ input UpdateBedrockModelConnectionInput {
   sharingMode: ModelSharingMode = null
   dedicatedAppId: GUID = null
   ifMatchDedicatedAppVersion: Int = null
+}
+
+input UpdateBrainSubstrateInput {
+  slug: String!
+  substrate: BrainSubstrateInput!
 }
 
 input UpdateClusterModelInput {
