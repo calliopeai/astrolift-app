@@ -15,7 +15,7 @@ import requests
 from authlib.integrations.django_client import OAuth
 from authlib.integrations.requests_client import OAuth2Session
 from django.conf import settings
-from django.contrib.auth import login
+from django.contrib.auth import login, logout
 from django.contrib.auth.models import User
 from django.core.exceptions import PermissionDenied
 from django.core.handlers.wsgi import WSGIRequest
@@ -29,6 +29,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
 
 from .models import Authentication, UserInfo
+from .return_urls import safe_return_url
 
 logger = logging.getLogger(__name__)
 
@@ -299,12 +300,31 @@ class Auth1SessionWorkflow:
         the caller (typically the Next.js frontend) after a successful login.
         """
         logger.debug("[Auth0] Django login requested")
-        next_url = request.GET.get("next", "")
+        # The callback sends the new session to this address, so only a path
+        # on this host or the frontend's own callback may be kept.
+        next_url = safe_return_url(request.GET.get("next", ""), cls._own_origins(request))
         if next_url:
             request.session["auth_next"] = next_url
+        else:
+            request.session.pop("auth_next", None)
         callback_url = request.build_absolute_uri(reverse("callback"))
         callback_url = cls._fix_proxy_pass(request, callback_url)
         return cls._client.auth0.authorize_redirect(request, callback_url)
+
+    @classmethod
+    def _own_origins(cls, request: WSGIRequest) -> tuple[str, ...]:
+        """This host as the browser reaches it, with and without the proxy fix."""
+        own = request.build_absolute_uri("/")
+        return own, cls._fix_proxy_pass(request, own)
+
+    @staticmethod
+    def _no_account_url(next_url: str | None) -> str:
+        """Back to sign-in, saying the IdP's identity has no account here."""
+        if next_url and urlsplit(next_url).netloc:
+            separator = "&" if "?" in next_url else "?"
+            return f"{next_url}{separator}error=no_account"
+        frontend_url = (getattr(settings, "FRONTEND_URL", "") or "").rstrip("/")
+        return f"{frontend_url}/auth/login?error=no_account"
 
     @staticmethod
     def _post_auth_next_url(next_url: str, session_key: str) -> str:
@@ -331,7 +351,18 @@ class Auth1SessionWorkflow:
         try:
             logger.debug("[Auth0] Auth0 Tenant callback received.")
             auth0_token = cls._client.auth0.authorize_access_token(request)
-            cls._register_remote_user(request, auth0_token)
+            authentication = cls._register_remote_user(request, auth0_token)
+            # Sessions stored before return addresses were checked are checked here.
+            next_url = safe_return_url(request.session.pop("auth_next", None), cls._own_origins(request))
+
+            if authentication.userinfo.internal_user is None:
+                # The IdP vouched for someone with no account here. A session
+                # token would only send every request back to sign-in, so say
+                # so instead; a session already open in this browser belongs
+                # to someone else and ends.
+                if getattr(request, "user", None) is not None and request.user.is_authenticated:
+                    logout(request)
+                return HttpResponseRedirect(cls._no_account_url(next_url))
 
             # Best-effort: if the user just authed and their email
             # domain is on the active org's allowlist, auto-create
@@ -345,7 +376,6 @@ class Auth1SessionWorkflow:
             except Exception:
                 logger.exception("[Auth0] auto_join hook failed — auth flow continues")
 
-            next_url = request.session.pop("auth_next", None)
             if next_url:
                 url = cls._post_auth_next_url(next_url, request.session.session_key)
             else:
@@ -524,6 +554,19 @@ class Auth1SessionWorkflow:
         auto = cls._maybe_autoprovision_user(user_info)
         if auto:
             return auto
+
+        # An invitation to this verified address is an administrator's say-so
+        # that it should have an account; create it so the invitee can accept.
+        if getattr(user_info, "email_verified", False) is True:
+            from astrolift_identity.invitees import invited_account
+
+            invited = invited_account(
+                user_info.email,
+                first_name=getattr(user_info, "given_name", "") or "",
+                last_name=getattr(user_info, "family_name", "") or "",
+            )
+            if invited:
+                return invited
 
         # TODO: Implement phone number lookup
         logger.warning(f"[Auth0] Could not find user by email: {repr(user_info.email)}", exc_info=True)

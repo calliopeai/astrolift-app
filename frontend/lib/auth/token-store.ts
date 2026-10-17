@@ -9,15 +9,19 @@ const TOKEN_KEY = "jwt";
 // lookup entirely in dev-login mode and let the cookie do its job.
 const DEV_LOGIN = process.env.NEXT_PUBLIC_DEV_LOGIN === "1";
 
-export async function getClientToken(): Promise<string | null> {
-  if (typeof window === "undefined") return null;
-  if (DEV_LOGIN) return null;
+// A 401 from getToken means this page has no session to find. Asking again
+// on every request only repeats it, one round trip per GraphQL operation, so
+// the answer holds until a sign-in stores a token (a new page load).
+let noSession = false;
+let pending: Promise<string | null> | null = null;
 
-  const stored = localStorage.getItem(TOKEN_KEY);
-  if (stored && stored !== "undefined" && stored !== "null") return stored;
-
+async function requestToken(): Promise<string | null> {
   try {
     const res = await fetch("/api/session/getToken", { method: "POST" });
+    if (res.status === 401) {
+      noSession = true;
+      return null;
+    }
     if (!res.ok) return null;
     const data = await res.json();
     const token: string | null = data.Authorization ?? null;
@@ -26,6 +30,21 @@ export async function getClientToken(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+export async function getClientToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  if (DEV_LOGIN) return null;
+
+  const stored = localStorage.getItem(TOKEN_KEY);
+  if (stored && stored !== "undefined" && stored !== "null") return stored;
+  if (noSession) return null;
+
+  // Requests issued together share one lookup.
+  pending ??= requestToken().finally(() => {
+    pending = null;
+  });
+  return pending;
 }
 
 export function clearToken(): void {

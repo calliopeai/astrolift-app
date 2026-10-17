@@ -3,13 +3,14 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect } from "react";
 
-import { deviceApprovalReturnPath } from "@/lib/auth/device-return";
+import { signInReturnPath } from "@/lib/auth/sign-in-return";
 
 /**
  * Finishes the IdP round-trip: stores the token (localStorage for client
  * Apollo, httpOnly cookie for server reads), then goes to the return path.
- * No token bounces to login. Reads search params, so its caller sits under
- * a Suspense boundary.
+ * No token bounces to login, keeping the return path and saying why when the
+ * backend did (an identity with no account). Reads search params, so its
+ * caller sits under a Suspense boundary.
  */
 export function useAuthCallback() {
   const router = useRouter();
@@ -17,8 +18,13 @@ export function useAuthCallback() {
 
   useEffect(() => {
     const token = searchParams.get("token");
+    const returnPath = signInReturnPath(searchParams.get("next"));
     if (!token) {
-      router.replace("/auth/login");
+      const login = new URLSearchParams();
+      if (searchParams.get("error") === "no_account") login.set("error", "no_account");
+      if (returnPath !== "/dashboard") login.set("next", returnPath);
+      const query = login.toString();
+      router.replace(query ? `/auth/login?${query}` : "/auth/login");
       return;
     }
 
@@ -31,7 +37,6 @@ export function useAuthCallback() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
     }).finally(() => {
-      const returnPath = deviceApprovalReturnPath(searchParams.get("next"));
       if (returnPath === "/dashboard") router.replace(returnPath);
       else window.location.replace(returnPath);
     });
