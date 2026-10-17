@@ -880,3 +880,82 @@ def test_an_agent_graduates_a_brain_over_mcp(world, repo):
         substrate={"authority": "d1"},
     )
     assert bad["isError"] is True and "unsupported cell" in json.dumps(bad)
+
+
+# ---------------------------------------------------------------------------
+# Review: no brain call reaches further than the caller's own grants
+# ---------------------------------------------------------------------------
+
+NO_DEPLOY = [Permission.APP_READ, Permission.APP_CREATE, Permission.APP_UPDATE]
+
+
+def _limited(world, suffix):
+    user = make_user(f"bm2424-{suffix}")
+    bind_role(user, permissions=NO_DEPLOY, kind="ORG", scope_id=world.org.pk, slug=f"bm-{suffix}")
+    return user
+
+
+def test_create_deploys_only_for_a_caller_who_may_deploy(world, host, started):
+    user = _limited(world, "nodeploy")
+    fields = {
+        "project_id": str(world.medops_project.guid),
+        "slug": "acme-brain",
+        "source_connection_id": str(world.connection.guid),
+        "repo": "acme/kb",
+    }
+    with _as(world, user=user) as info:
+        refused = RegistryMutation().create_brain(info, input=CreateBrainInput(**fields))
+        allowed = RegistryMutation().create_brain(info, input=CreateBrainInput(**fields, deploy=False))
+    assert refused.errors[0].code == "PERMISSION_DENIED"
+    assert allowed.ok, allowed.errors
+
+
+def test_share_as_deployer_needs_deploy(world):
+    app = _brain(world)
+    user = _limited(world, "noshare")
+    with _as(world, user=user) as info:
+        refused = RegistryMutation().share_brain(
+            info,
+            input=ShareBrainInput(
+                slug=app.slug, team_slug=world.platform.slug, access=BrainShareAccess.DEPLOYER
+            ),
+        )
+        viewer = RegistryMutation().share_brain(
+            info,
+            input=ShareBrainInput(
+                slug=app.slug, team_slug=world.platform.slug, access=BrainShareAccess.VIEWER
+            ),
+        )
+    assert refused.errors[0].code == "PERMISSION_DENIED"
+    assert viewer.ok, viewer.errors
+    assert AppTeamAccess.objects.get(registered_app=app, team=world.platform).access_level == "viewer"
+
+
+def test_rebuild_of_a_ci_built_brain_keeps_the_approval_policy(world, monkeypatch):
+    from astrolift_scm.services.workflows import WorkflowDispatchResult
+
+    app = _brain(world, build_mode="ci_pushed")
+    AppEnvironment.objects.filter(registered_app=app).update(required_approvals=1)
+    dispatched = []
+    monkeypatch.setattr(
+        "astrolift_scm.services.workflows.dispatch_astrolift_ci_workflow",
+        lambda a, branch=None, workflow_path=None: dispatched.append(workflow_path)
+        or WorkflowDispatchResult(ok=True, run_url="https://gh/runs"),
+    )
+    with _as(world) as info:
+        result = RegistryMutation().rebuild_brain(info, input=RebuildBrainInput(slug=app.slug))
+    assert result.errors[0].code == "PRECONDITION" and "approval" in result.errors[0].message
+    assert dispatched == []
+
+
+def test_graduating_needs_deploy_because_the_push_deploys(world, repo):
+    app = _brain(world)
+    user = _limited(world, "nograd")
+    from astrolift_registry.schema.mutations.brains import UpdateBrainSubstrateInput
+
+    with _as(world, user=user) as info:
+        result = RegistryMutation().update_brain_substrate(
+            info, input=UpdateBrainSubstrateInput(slug=app.slug, substrate=_substrate(persistence=[]))
+        )
+    assert result.errors[0].code == "PERMISSION_DENIED"
+    assert repo.commits == []

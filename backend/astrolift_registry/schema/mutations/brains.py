@@ -13,6 +13,7 @@ from strawberry.types import Info
 from astrolift_graphql import GUID, MutationResultType
 from astrolift_graphql import failure as gql_failure
 from astrolift_graphql import success as gql_success
+from astrolift_identity.operation_context import named_environment
 from astrolift_registry.schema.brain_types import (
     BrainCreationType,
     BrainRebuildType,
@@ -307,6 +308,18 @@ def _create_extras(result) -> dict:
     return out
 
 
+def _also_requires(permission: Permission, scope_factory, args: dict, why: str):
+    """A second permission the effect needs beyond the resolver's gate, with
+    the same token ceiling; the failure envelope when the caller lacks it."""
+    from core.permissions import PermissionDenied, check_permission
+
+    try:
+        check_permission(permission, scope=scope_factory(args))
+    except PermissionDenied:
+        return gql_failure(ErrorCode.PERMISSION_DENIED.value, why)
+    return None
+
+
 def _team_in_org(org_id: int, team_slug: str):
     from astrolift_identity.models import Team
 
@@ -437,6 +450,17 @@ class BrainManagementMutations:
             )
         if input.deploy:
             from astrolift_identity.action_safety import gate
+
+            # The first deploy is started by the workflow, not startDeployment,
+            # so its permission is checked here: app.create alone never deploys.
+            deny = _also_requires(
+                Permission.APP_DEPLOY,
+                registration_project_scope("project_id", permission=Permission.APP_DEPLOY),
+                {"project_id": input.project_id},
+                "deploying needs app.deploy on the project; create it with deploy false",
+            )
+            if deny is not None:
+                return deny
             from astrolift_lifecycle.schema.types import environment_kind
 
             if environment_kind(environment) == "production":
@@ -512,6 +536,16 @@ class BrainManagementMutations:
                 f"team {team.slug!r} owns this brain; change owners with astro app access",
                 field="teamSlug",
             )
+        if input.access == BrainShareAccess.DEPLOYER:
+            # Never grant more than the granter holds: deployer deploys.
+            deny = _also_requires(
+                Permission.APP_DEPLOY,
+                app_scope_by_slug("slug", permission=Permission.APP_DEPLOY),
+                {"slug": brain.slug},
+                "sharing as deployer needs app.deploy on the brain",
+            )
+            if deny is not None:
+                return deny
         deny = gate(info, "brain.share", app=brain, resolver_name="share_brain")
         if deny is not None:
             return deny
@@ -595,7 +629,9 @@ class BrainManagementMutations:
         },
     )
     @require_permission(
-        Permission.APP_DEPLOY, scope=app_scope_by_slug("input.slug", permission=Permission.APP_DEPLOY)
+        Permission.APP_DEPLOY,
+        scope=app_scope_by_slug("input.slug", permission=Permission.APP_DEPLOY),
+        operation=named_environment("input.slug"),
     )
     @tenant_scoped()
     def rebuild_brain(self, info: Info, input: RebuildBrainInput) -> MutationResultType[BrainRebuildType]:
@@ -619,26 +655,52 @@ class BrainManagementMutations:
         if input.ingest or brain.build_mode == RegisteredApp.BuildMode.CI_PUSHED:
             if not brain.source_repo:
                 return gql_failure(ErrorCode.PRECONDITION.value, "the brain has no source repository")
-            path = None
-            if input.ingest:
-                present, why = brain_manage.ingest_workflow_present(brain)
-                if not present:
-                    return gql_failure(ErrorCode.PRECONDITION.value, why, field="ingest")
-                path = brain_manage.INGEST_WORKFLOW
+            if not input.ingest:
+                # A CI-built brain deploys from its CI run: the decorated
+                # dispatch resolver keeps its approval refusal and checks
+                # app.deploy on every environment the run can reach.
+                from astrolift_graphql.results import MutationResultType as Result
+                from astrolift_lifecycle.schema.mutations.app_ops import AppOpsMutations
+                from astrolift_lifecycle.schema.mutations.deployments import _production_gate
+                from astrolift_lifecycle.schema.mutations.types import TriggerDeployWorkflowInput
+
+                env = AppEnvironment.objects.filter(
+                    registered_app=brain, name=environment, deleted_at__isnull=True
+                ).first()
+                deny = _production_gate(info, "deploy.production", brain, env, "rebuild_brain")
+                if deny is not None:
+                    return deny
+                fired = AppOpsMutations().trigger_astrolift_deploy_workflow(
+                    info, input=TriggerDeployWorkflowInput(app_slug=brain.slug)
+                )
+                if not fired.ok or fired.data is None:
+                    return Result(ok=False, errors=list(fired.errors or []), data=None)
+                return gql_success(
+                    BrainRebuildType(
+                        slug=brain.slug,
+                        mode="ci",
+                        deployment_id=None,
+                        run_url=fired.data.run_url or None,
+                        ingest_run_url=None,
+                        rebuilds=brain_manage.rebuild_projections(brain),
+                    )
+                )
+            present, why = brain_manage.ingest_workflow_present(brain)
+            if not present:
+                return gql_failure(ErrorCode.PRECONDITION.value, why, field="ingest")
             try:
-                result = dispatch_astrolift_ci_workflow(brain, workflow_path=path)
+                result = dispatch_astrolift_ci_workflow(brain, workflow_path=brain_manage.INGEST_WORKFLOW)
             except WorkflowDispatchError as exc:
                 return gql_failure(ErrorCode.PRECONDITION.value, exc.message)
             if not result.ok:
                 return gql_failure(ErrorCode.PRECONDITION.value, result.error_message or "dispatch failed")
-            mode = "ingest" if input.ingest else "ci"
             return gql_success(
                 BrainRebuildType(
                     slug=brain.slug,
-                    mode=mode,
+                    mode="ingest",
                     deployment_id=None,
                     run_url=result.run_url or None,
-                    ingest_run_url=(result.run_url or None) if input.ingest else None,
+                    ingest_run_url=result.run_url or None,
                     rebuilds=brain_manage.rebuild_projections(brain),
                 )
             )
@@ -702,6 +764,15 @@ class BrainManagementMutations:
         user = _actor()
         if user is None:
             return gql_failure(ErrorCode.PERMISSION_DENIED.value, "a substrate is changed by a person")
+        # The commit lands on the deploy branch and its push deploys.
+        deny = _also_requires(
+            Permission.APP_DEPLOY,
+            app_scope_by_slug("slug", permission=Permission.APP_DEPLOY),
+            {"slug": brain.slug},
+            "changing the substrate deploys the brain; it needs app.deploy",
+        )
+        if deny is not None:
+            return deny
         keep = brain_manage.current_selection(brain).image
         try:
             brain_manage.update_substrate(
