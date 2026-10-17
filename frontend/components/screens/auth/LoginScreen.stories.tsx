@@ -58,6 +58,20 @@ export const NoAccountLocal: Story = {
   },
 };
 
+/**
+ * Back from the IdP, which signed someone in without vouching for their
+ * address, so no account could be found or created by it (#2430).
+ */
+export const EmailUnverified: Story = {
+  args: { notice: "emailUnverified" },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("status")).toHaveTextContent("Email address not verified");
+    await userEvent.click(canvas.getByRole("button", { name: "Use a different account" }));
+    await expect(args.switchAccount).toHaveBeenCalled();
+  },
+};
+
 /** Waiting on active-idp.json. */
 export const Loading: Story = { args: { idp: null } };
 

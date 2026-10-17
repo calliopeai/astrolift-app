@@ -14613,34 +14613,139 @@
     }
   },
   "zentinelleScreen": {
-    "title": "防护 · Zentinelle",
-    "description": "AI 智能体 GRC：为 Astrolift 上运行的每个智能体工作负载提供治理、风险与合规。",
-    "tagline": "MIT 许可 · 可自托管 · Calliope AI 配套产品",
-    "intro": "Zentinelle 是 BROCS 技术栈中的 <strong>Control + Secure</strong> 支柱。它与 Astrolift 并行运行，提供 Astrolift 有意不承担的 AI 专属层：策略执行、内容扫描、合规框架，以及 AI 治理法规要求的完整交互审计记录。",
-    "statusTitle": "集成方案设计中",
-    "statusBody": "Astrolift 与 Zentinelle 之间的认证握手和租户委派正在设计中。可选方案包括：将 Zentinelle 作为嵌入式 Django 应用并把认证委托给 Astrolift，或作为通过令牌交换对接的独立服务。方案确定后，此页面将成为连接管理界面。",
-    "github": "GitHub 上的 Zentinelle",
-    "docs": "集成文档",
-    "addsTitle": "Zentinelle 为 Astrolift 带来的能力",
-    "capabilities": {
-      "governance": {
-        "title": "治理",
-        "description": "策略引擎：内容规则（PII、有害内容、越狱检测）、模型允许列表、令牌预算执行，以及带版本管理的系统提示词库。"
-      },
-      "risk": {
-        "title": "风险",
-        "description": "5×5 风险登记册、FMEA 分析、事件跟踪、异常检测，以及针对智能体行为漂移的自动告警。"
-      },
-      "compliance": {
-        "title": "合规",
-        "description": "SOC 2、GDPR、HIPAA、欧盟 AI 法案和 NIST RMF 控制映射。证据收集、差距分析和可直接用于审计的报告。"
-      },
-      "observability": {
-        "title": "可观测性",
-        "description": "完整的交互审计（提示词、响应和工具调用）、内容扫描结果、策略评估日志，以及按工作负载计量的令牌用量。"
+    "title": "安全 · Zentinelle",
+    "description": "将此组织连接到 Zentinelle,用于智能体治理、用量与成本、策略和审计。",
+    "noAccess": "无 Zentinelle 访问权限",
+    "noAccessBody": "你的角色在这里没有任何 Zentinelle 权限。请向组织管理员申请 Zentinelle 权限。",
+    "error": "无法读取 Zentinelle 连接",
+    "notConnected": "未连接到 Zentinelle",
+    "notConnectedBody": "组织管理员在此页面连接 Zentinelle。连接后会显示各个部分。",
+    "tabsLabel": "Zentinelle 各部分",
+    "writeFailed": "Zentinelle 未接受此更改",
+    "tabs": {
+      "overview": "概览",
+      "clusters": "集群",
+      "usage": "用量与成本",
+      "policies": "策略",
+      "audit": "审计"
+    },
+    "health": {
+      "healthy": "网关运行中",
+      "pending": "网关尚未部署",
+      "off": "网关已关闭",
+      "error": "网关出错"
+    },
+    "connect": {
+      "title": "连接到 Zentinelle",
+      "description": "粘贴 Zentinelle 的 URL 和在 Zentinelle 中生成的一次性注册码。Zentinelle 返回的凭据会作为密钥保存,且从不显示。",
+      "url": "Zentinelle 的 URL",
+      "code": "注册码",
+      "codeHelp": "在 Zentinelle 中生成;只能使用一次。",
+      "gatewayUrl": "网关 URL(可选)",
+      "gatewayUrlHelp": "集群网关访问 Zentinelle 的地址(如果不是上面的 URL),例如集群内的私有地址。",
+      "required": "请输入 Zentinelle 的 URL 和注册码。",
+      "connecting": "正在连接…",
+      "submit": "连接"
+    },
+    "connection": {
+      "title": "连接",
+      "status": "连接状态",
+      "connected": "已连接",
+      "revoked": "已被 Zentinelle 吊销",
+      "revokedBody": "Zentinelle 不再接受此连接:{reason}。请先断开,再用新的注册码重新连接。",
+      "url": "Zentinelle 的 URL",
+      "gatewayUrl": "网关 URL",
+      "sameAsUrl": "与 Zentinelle 的 URL 相同",
+      "installId": "Zentinelle 安装 ID",
+      "tenants": "Zentinelle 租户",
+      "none": "无",
+      "connectedAt": "连接时间",
+      "editGatewayUrl": "更改网关 URL",
+      "disconnect": "断开连接",
+      "save": "保存",
+      "cancel": "取消",
+      "gatewayUrlHelp": "留空则使用 Zentinelle 的 URL。正在运行的网关会重新部署。",
+      "disconnectTitle": "断开与 Zentinelle 的连接?",
+      "disconnectBody": "这会在 Zentinelle 中吊销此安装和每个已注册的集群,然后从集群中移除网关及其密钥。重新连接需要新的注册码。",
+      "disconnected": "已断开与 Zentinelle 的连接"
+    },
+    "overview": {
+      "degraded": "有集群网关需要处理。请查看下方的集群。",
+      "title": "运行状况",
+      "gateways": "运行中的网关",
+      "gatewaysValue": "{healthy} / {total} 个",
+      "agents": "本月观测到的智能体",
+      "requests": "模型请求(最近 24 小时)",
+      "spend": "本月支出",
+      "usageError": "无法从 Zentinelle 读取用量",
+      "clustersTitle": "各集群的网关状况",
+      "clustersDescription": "每个已注册集群的 Zentinelle 网关。",
+      "installOff": "此安装已关闭 Zentinelle 网关。已注册的集群保留其凭据;平台运维人员开启后会部署网关。",
+      "noClusters": "尚无集群注册到 Zentinelle。"
+    },
+    "clusters": {
+      "installOff": "此安装已关闭 Zentinelle 网关。注册集群会保存其凭据;平台运维人员开启网关后才会部署。",
+      "title": "已注册的集群",
+      "empty": "尚无集群注册到 Zentinelle。",
+      "never": "从未",
+      "registeredAt": "注册于 {when}",
+      "rotatedAt": "凭据轮换于 {when}",
+      "turnOff": "关闭网关",
+      "turnOn": "开启网关",
+      "rotate": "轮换凭据",
+      "unregister": "取消注册",
+      "registerTitle": "注册集群",
+      "registerDescription": "注册会把网关凭据写入集群并部署其网关。",
+      "search": "搜索集群",
+      "noChoices": "没有匹配的未注册集群。",
+      "register": "注册",
+      "unregisterTitle": "从 Zentinelle 取消注册 {cluster}?",
+      "unregisterBody": "这会在 Zentinelle 中吊销该集群,然后移除其网关和凭据密钥。该集群上的智能体流量将不再经过 Zentinelle。"
+    },
+    "filters": {
+      "window": "时间范围",
+      "scope": "范围",
+      "all": "我能看到的全部",
+      "agent": "单个智能体",
+      "projects": "项目",
+      "teams": "团队",
+      "agentSlug": "智能体标识",
+      "windows": {
+        "24h": "最近 24 小时",
+        "7d": "最近 7 天",
+        "30d": "最近 30 天",
+        "month": "本月"
       }
     },
-    "division": "<label>职责划分：</label>Astrolift 负责<em>运行时层</em>：容器编排、部署、Pod 健康状况和基础设施可观测性。Zentinelle 负责<em>AI 行为层</em>：智能体说了什么、做了什么，是否符合策略，以及监管机构要求的审计记录。在 <strong>OBSERVE › Agents</strong> 中，标有 <code>Astrolift</code> 的标签页现已可用；<code>Zentinelle</code> 标签页将在集成发布后启用。"
+    "usage": {
+      "error": "无法从 Zentinelle 读取用量",
+      "requests": "模型请求",
+      "tokens": "已用令牌",
+      "cost": "模型成本",
+      "title": "按智能体和模型",
+      "empty": "此时间范围内没有模型用量。",
+      "noAgent": "(无智能体)",
+      "requestCount": "{count, plural, other {# 次请求}}",
+      "tokenCount": "输入 {input},输出 {output}"
+    },
+    "policies": {
+      "error": "无法从 Zentinelle 读取策略",
+      "empty": "此处没有生效的 Zentinelle 策略。",
+      "meta": "范围 {scope},优先级 {priority}"
+    },
+    "audit": {
+      "export": {
+        "ndjson": "导出 NDJSON",
+        "csv": "导出 CSV"
+      },
+      "label": "Zentinelle 审计",
+      "error": "无法从 Zentinelle 读取审计流",
+      "loadMore": "加载更多",
+      "loadingMore": "正在加载…",
+      "empty": "此时间范围内没有审计事件",
+      "emptyBody": "Zentinelle 为你能看到的智能体记录的事件会显示在这里。",
+      "exported": "{count, plural, other {已导出 # 个事件}}"
+    }
   },
   "modelDeploy": {
     "title": "部署模型",
@@ -14783,6 +14888,8 @@
     "signIn": "登录",
     "noAccountTitle": "此登录没有对应的 Astrolift 账户",
     "noAccountBody": "您的身份提供商已完成登录，但这里没有与该身份对应的账户。如果您受到了邀请，请使用接收邀请的地址登录；否则，请联系管理员邀请您。",
+    "emailUnverifiedTitle": "电子邮件地址未验证",
+    "emailUnverifiedBody": "您的身份提供商已完成登录，但尚未验证您的电子邮件地址，因此 Astrolift 无法确定哪个账户属于您。请在身份提供商处验证该地址或联系管理员，然后重新登录。",
     "useDifferentAccount": "使用其他账户"
   },
   "invitationAccept": {
@@ -15524,14 +15631,11 @@
     "context": "你可以读取的托管语义层：提供 Semantic Context Ontology Layer 的应用。向团队授予其应用的访问权限即可共享。",
     "columnName": "语义层",
     "columnOwner": "团队 / 项目",
-    "columnEndpoints": "服务地址",
     "columnShared": "共享给",
-    "columnApp": "访问",
     "none": "无",
     "notServed": "尚未提供服务",
     "notShared": "仅所属团队",
     "shareTitle": "{team}：{access}",
-    "manageAccess": "管理访问",
     "emptyTitle": "没有语义层",
     "emptyDescription": "以 [app] kind = \"mimwell\" 声明且你可以读取的应用会显示在这里。",
     "columnConnect": "MCP 客户端",
@@ -15566,6 +15670,441 @@
       "cancel": "取消",
       "create": "创建应用",
       "creating": "正在创建…"
+    },
+    "columnHealth": "健康状态",
+    "columnRebuilt": "上次重新构建",
+    "columnFreshness": "新鲜度",
+    "new": "新建语义层",
+    "status": {
+      "unavailable": "不可用",
+      "unknown": "未知",
+      "never": "从未",
+      "noEnvironment": "没有 {environment} 环境",
+      "notDeployed": "未部署",
+      "compiled": "{age}编译",
+      "notCompiled": "未编译",
+      "behind": "落后于最新提交",
+      "ingest": {
+        "running": "正在采集",
+        "succeeded": "已采集",
+        "failed": "采集失败",
+        "other": "采集已停止"
+      },
+      "warnings": "{count, plural, one {# 次主机读取失败} other {# 次主机读取失败}}"
+    },
+    "wizard": {
+      "title": "新建语义层",
+      "listCrumb": "语义层",
+      "stepsLabel": "步骤",
+      "done": "已完成",
+      "back": "上一步",
+      "continue": "继续",
+      "create": "创建语义层",
+      "cancel": "取消",
+      "retry": "重试",
+      "deniedTitle": "你无法创建语义层",
+      "deniedDescription": "创建语义层会在项目中注册一个应用，这需要该项目的 app.create 权限。请联系管理该项目的人员。",
+      "backToList": "返回语义层列表",
+      "steps": {
+        "source": {
+          "label": "来源",
+          "description": "该层所在的仓库：Astrolift 会基于 Mimwell 发行版创建尚不存在的仓库，或填充空仓库。"
+        },
+        "details": {
+          "label": "详情",
+          "description": "该层的名称、拥有它的团队和项目，以及首次部署的目标环境。"
+        },
+        "substrate": {
+          "label": "底层存储",
+          "description": "该层存放权威数据、二进制对象、向量和图的位置（Mimwell 的单元），以及 Astrolift 为其附加的资源。"
+        },
+        "review": {
+          "label": "审核",
+          "description": "检查请求，然后创建该层。任务在后台运行，此页面会跟踪其进度。"
+        }
+      },
+      "connection": "源代码连接",
+      "connectionHelp": "此连接用于创建或填充仓库，脚手架提交的作者是你。",
+      "chooseConnection": "选择连接",
+      "noConnections": "目前没有可代表你操作的源代码连接。请先<link>连接账号</link>。",
+      "appInstallNote": "GitHub App 连接无法创建仓库。请先创建空仓库，或选择令牌或 OAuth 连接。",
+      "repo": "仓库",
+      "repoHelp": "owner/name。新仓库，或尚无任何提交的仓库。",
+      "visibility": "可见性",
+      "visibilityHelp": "在 Astrolift 创建仓库时生效。",
+      "visibilities": {
+        "PRIVATE": "私有",
+        "INTERNAL": "内部",
+        "PUBLIC": "公开"
+      },
+      "templateRef": "模板引用",
+      "templateRefHelp": "Mimwell 发行版的标签、分支或提交。留空则使用此安装固定的发行版。",
+      "pinnedEdition": "此安装固定的发行版",
+      "name": "名称",
+      "nameHelp": "显示在列表中。留空时使用标识符。",
+      "namePlaceholder": "平台知识",
+      "slug": "标识符",
+      "slugHelp": "该层的应用标识符：小写字母、数字和连字符。",
+      "team": "团队",
+      "teamHelp": "拥有该层的团队。",
+      "chooseTeam": "选择团队",
+      "noTeams": "没有团队",
+      "project": "项目",
+      "projectHelp": "语义层归属于其项目所在的团队。",
+      "chooseProject": "选择项目",
+      "teamFirst": "请先选择团队",
+      "environment": "环境",
+      "environmentHelp": "首次部署的目标环境。",
+      "deploy": "立即部署",
+      "deployHelp": "该层注册完成后立即部署脚手架提交。",
+      "deployDenied": "部署需要 app.deploy 权限，因此创建该层时不会进行首次部署。",
+      "deployYes": "是，注册完成后部署",
+      "deployNo": "否，稍后部署",
+      "cell": "单元",
+      "persistence": "持久化",
+      "noPersistence": "无",
+      "replicas": "副本数",
+      "image": "镜像",
+      "builtImage": "由发行版的门户 Dockerfile 构建",
+      "port": "端口",
+      "edit": "编辑",
+      "editPart": "编辑{part}",
+      "whatHappens": "“创建”会执行的操作",
+      "happensRepo": "仓库不存在时创建仓库，否则检查仓库是否为空。",
+      "happensScaffold": "以单次提交写入经过验证的 Mimwell 发行版和你的设置。",
+      "happensRegister": "在项目中将该层注册为类型为 mimwell 的应用。",
+      "happensDeploy": "将该提交部署到 {environment}。",
+      "productionStepUp": "部署到生产环境前需要先重新登录。",
+      "createFailed": "无法创建语义层。",
+      "problems": {
+        "required": "必填",
+        "repoFormat": "请使用 owner/name 格式，可包含字母、数字、点、连字符和下划线。",
+        "refFormat": "标签、分支或提交名称，不能包含空格或连续的两个点。",
+        "slugFormat": "小写字母、数字和连字符，须以字母开头、以字母或数字结尾，最多 63 个字符。",
+        "envFormat": "简短的小写名称：字母、数字和连字符，最多 32 个字符。",
+        "long": "最多 255 个字符。"
+      }
+    },
+    "substrate": {
+      "cell": "单元",
+      "cellHelp": "Mimwell 的四个存放位置。会组成 Mimwell 不支持的单元的选项已禁用，并注明原因。",
+      "axes": {
+        "authority": "权威源",
+        "blobs": "二进制对象",
+        "vectors": "向量",
+        "graph": "图"
+      },
+      "axisHelp": {
+        "authority": "权威数据存放的位置。使用 files 时，仓库即为权威数据。",
+        "blobs": "附件和其他二进制文件存放的位置。",
+        "vectors": "向量索引存放的位置。",
+        "graph": "图投影存放的位置。"
+      },
+      "supported": "Mimwell 支持：",
+      "reasons": {
+        "d1Authority": "d1 是投影目标，不能作为权威源。",
+        "dbBlobNeedsDatabase": "db-blob 将二进制对象保存在权威源的数据库中，而此权威源没有数据库。",
+        "inDbVectorsMongo": "in-db 向量是 SQL 向量列，而 mongo 没有这种列。",
+        "inDbVectorsNeedSql": "in-db 向量存放在权威源的数据库中，而此权威源没有数据库。",
+        "ageNeedsPostgres": "age 是 Postgres 扩展，因此需要 postgres 权威源。"
+      },
+      "persistence": "持久化",
+      "persistenceHelp": "Astrolift 为该层附加的资源。仓库始终存在。",
+      "persistenceKinds": {
+        "sqlite-volume": "位于 /data 的卷，供 SQLite 权威源使用。该层以 statefulset 方式运行。",
+        "efs": "位于 /shared 的共享卷，由每个副本挂载。",
+        "postgres": "托管的 Postgres。该层读取 DATABASE_URL。",
+        "s3": "用于存放二进制对象的对象存储。存储桶在清单之外绑定，因此在绑定存储桶之前，该层会将其报告为未绑定。"
+      },
+      "withAge": "附带 AGE 扩展，用于图。",
+      "neededBy": "{placement} 需要此项",
+      "heldData": "存有数据。弃用它需要在该层内执行切换，而不是更改底层存储。",
+      "replicas": "副本数",
+      "replicasHelp": "1 到 {max}。",
+      "replicasSqlite": "每个副本都会在各自的卷上重新构建 app/brain.db。",
+      "replicasRange": "1 到 {max} 之间的整数。",
+      "image": "镜像",
+      "imageHelp": "可选。留空则构建发行版的门户 Dockerfile。",
+      "imageFormat": "镜像引用不能包含空格。",
+      "imageKept": "该层保留当前运行的镜像。",
+      "port": "端口",
+      "portRange": "1 到 65535。",
+      "portGraduate": "API 不会报告当前端口：请保留该层正在使用的服务端口。"
+    },
+    "creation": {
+      "listCrumb": "语义层",
+      "crumb": "新建",
+      "progress": "进度",
+      "runningTitle": "正在创建 {slug}",
+      "readyTitle": "{name} 已就绪",
+      "failedTitle": "无法创建 {slug}",
+      "missingTitle": "没有此创建任务",
+      "missingDescription": "此链接没有创建任何你可以查看的内容。它可能属于其他人。",
+      "readFailed": "无法读取创建任务",
+      "pollFailed": "无法查询创建任务状态",
+      "retry": "重试",
+      "open": "打开语义层",
+      "failedReason": "创建已停止",
+      "noReason": "服务器未提供原因。",
+      "editAndRetry": "编辑后重试",
+      "startOver": "重新开始",
+      "leaveNote": "任务在服务器上运行：离开此页面不会停止任何操作。",
+      "steps": {
+        "REPO_READY": "仓库",
+        "SCAFFOLDED": "脚手架提交",
+        "REGISTERED": "已注册",
+        "DEPLOYING": "首次部署"
+      },
+      "stepHelp": {
+        "REPO_READY": "已创建，或确认为空。",
+        "SCAFFOLDED": "Mimwell 发行版和你的设置，以单次提交写入。",
+        "REGISTERED": "项目中类型为 mimwell 的应用。",
+        "DEPLOYING": "脚手架提交已部署并正在运行。"
+      },
+      "stepStates": {
+        "done": "已完成",
+        "current": "进行中",
+        "todo": "未开始",
+        "failed": "失败"
+      },
+      "repo": "仓库",
+      "templateRef": "模板引用",
+      "commit": "提交",
+      "deployment": "部署",
+      "notYet": "尚未",
+      "noDeploy": "未要求"
+    },
+    "tabs": {
+      "overview": "概览",
+      "substrate": "底层存储",
+      "sharing": "共享",
+      "apps": "应用",
+      "connect": "连接",
+      "settings": "设置"
+    },
+    "frame": {
+      "listCrumb": "语义层",
+      "sections": "语义层分区",
+      "served": "{count, plural, one {在 # 个环境中提供服务} other {在 # 个环境中提供服务}}",
+      "notServed": "尚未提供服务",
+      "none": "无",
+      "connect": "连接",
+      "connectFailed": "无法签发读取令牌。",
+      "moreActions": "更多操作",
+      "rebuild": "重新构建",
+      "hostApp": "托管应用",
+      "openApp": "打开应用",
+      "archive": "归档",
+      "loadFailed": "无法加载语义层",
+      "retry": "重试",
+      "unavailableTitle": "语义层不可用",
+      "notFoundTitle": "未找到语义层",
+      "noLayer": "没有名为 {slug} 的语义层",
+      "notFoundDescription": "你可读取的内容中没有此标识符。它可能不存在，或未共享给你的团队。",
+      "deniedTitle": "你无法读取此语义层",
+      "deniedDescription": "读取它需要其应用的 app.read 权限。请让其所属团队将它共享给你的团队。",
+      "backToList": "返回语义层列表",
+      "archivedTitle": "{name} 已归档",
+      "archivedHeading": "此语义层已归档",
+      "archivedAt": "于 {at} 归档。",
+      "archivedNoTime": "已归档。",
+      "archivedDescription": "其工作负载已缩容至零，并已从注册表中移除。其数据和仓库会保留。恢复会将其按归档前的运行状态还原；之前托管在其上的应用需要重新托管。",
+      "restore": "恢复",
+      "restoring": "恢复此语义层",
+      "restoreFailed": "无法恢复语义层。",
+      "restored": "已恢复 {slug}。"
+    },
+    "overview": {
+      "environments": "环境",
+      "environment": "环境",
+      "health": "健康状态",
+      "noEnvironment": "没有 {environment} 环境",
+      "notDeployed": "尚未部署",
+      "notDeployedDescription": "此环境尚未部署任何内容。重新构建会部署分支最新提交。",
+      "deployFailed": "最近一次部署失败",
+      "deployFailedReason": "该环境保留了之前运行的内容。部署详情中说明了原因。",
+      "openDeployment": "打开部署",
+      "latestDeploy": "最近部署",
+      "started": "开始时间",
+      "unknown": "未知",
+      "image": "镜像",
+      "noImage": "尚未构建",
+      "deployment": "部署",
+      "served": "提供服务",
+      "yes": "是",
+      "notServed": "尚未提供服务",
+      "notServedDescription": "尚无任何环境拥有 URL。环境首次部署后即会获得 URL。",
+      "revision": "修订版本",
+      "atHead": "已是最新提交",
+      "running": "运行中",
+      "nothingRunning": "没有运行中的提交",
+      "head": "分支最新提交",
+      "onBranch": "位于 {branch}",
+      "headUnknown": "无法读取",
+      "committed": "提交时间",
+      "freshness": "新鲜度",
+      "compiled": "编译时间",
+      "notCompiled": "运行中的提交尚未编译",
+      "lastIngest": "上次采集",
+      "openRun": "打开运行",
+      "noIngest": "仓库中没有知识刷新工作流",
+      "endpoints": "端点",
+      "mcp": "MCP 端点：{url}"
+    },
+    "substrateTab": {
+      "graduationNeeded": "Mimwell 提示此层已超出其单元的容量",
+      "graduationNeededDescription": "它在 {environment} 中的编译要求更大的底层存储。升级会提交并应用新的单元；推送后即会部署。",
+      "graduate": "升级",
+      "graduating": "升级此语义层",
+      "cell": "单元",
+      "noEnvironment": "没有 {environment} 环境",
+      "cellName": "单元",
+      "adoption": "权威源",
+      "filesCanon": "仓库即为权威数据",
+      "checking": "正在检查运行中的提交",
+      "adoptionUnknown": "未知：无法读取运行中的提交",
+      "adopted": "已采用：{store}",
+      "notAdopted": "已预配，尚未采用。由该层自身的知识存储切换来接管。",
+      "replicas": "副本数",
+      "image": "镜像",
+      "builtImage": "由发行版的门户 Dockerfile 构建",
+      "resources": "持久化与资源",
+      "persistence": "持久化",
+      "nothingAttached": "未附加任何资源",
+      "nothingAttachedDescription": "此单元不需要数据库、卷或存储桶：所有内容都保存在仓库中。",
+      "fromLayer": "读取状态失败，因此此处显示的是上次应用的单元，不含该层已采用的内容。",
+      "graduateTitle": "升级底层存储",
+      "graduateDescription": "选择该层要迁移到的单元。Astrolift 会将其提交到部署分支上的 client.config.json 和 astrolift.toml，预配所需资源，推送后即会部署。该层当前存有的数据仍保持附加。",
+      "cancel": "取消",
+      "graduateSubmit": "升级",
+      "graduateFailed": "无法升级底层存储。",
+      "graduated": "已为 {slug} 提交升级。推送后即会部署。"
+    },
+    "sharing": {
+      "sections": "共享分区",
+      "sectionLabels": {
+        "teams": "团队",
+        "history": "访问历史"
+      },
+      "levels": {
+        "viewer": "查看者",
+        "deployer": "编辑者",
+        "owner": "所有者"
+      },
+      "levelHelp": {
+        "viewer": "其成员可以读取该层并连接到它。",
+        "deployer": "其成员还可以编辑和部署该层。"
+      },
+      "team": "团队",
+      "teams": "团队",
+      "access": "访问权限",
+      "ownedBy": "由 <code>{team}</code> 拥有，该团队始终拥有访问权限。所有者需在应用上更改。",
+      "noTeam": "无团队",
+      "ownersLink": "打开应用的团队",
+      "shareTitle": "共享给团队",
+      "findTeam": "按名称或标识符查找团队",
+      "editorNeedsDeploy": "按编辑者级别共享需要此层的 app.deploy 权限。",
+      "share": "共享",
+      "homeTeamNote": "所属团队已拥有访问权限。",
+      "askVerification": "共享前需要先重新登录。",
+      "askApproval": "{count, plural, one {需要 # 位审批人批准。} other {需要 # 位审批人批准。}}",
+      "viewRequests": "查看审批请求",
+      "sharing": "共享此语义层",
+      "emptyTitle": "尚未共享",
+      "emptyDescription": "只有 {team} 可以读取它。将其共享给团队，即可让该团队的成员读取它，或对其进行编辑和部署。",
+      "makeViewer": "设为查看者",
+      "makeEditor": "设为编辑者",
+      "unshare": "停止共享",
+      "changeOnApp": "在应用上更改",
+      "shareConfirmTitle": "按 {level} 级别将 {name} 共享给 {team}？",
+      "unshareTitle": "停止与 {team} 共享？",
+      "unshareDescription": "将立即停止签发新的读取令牌。已签发的令牌在到期前仍可使用，并会在 15 分钟内到期。",
+      "alreadyShared": "已按 {level} 级别共享",
+      "shareFailed": "无法共享语义层。",
+      "shared": "已按 {level} 级别共享给 {team}。",
+      "unshareFailed": "无法停止共享。",
+      "unshared": "已停止与 {team} 共享。",
+      "readingHistory": "查看访问历史",
+      "history": "访问历史",
+      "historyDescription": "审计记录中此层的每一次共享和取消共享，包括被拒绝的操作。",
+      "historyEmpty": "尚无共享记录",
+      "historyKinds": {
+        "share": "共享了此层",
+        "unshare": "停止共享此层"
+      },
+      "refused": "已拒绝：{code}",
+      "failed": "未应用：{code}",
+      "viaAgent": "智能体令牌",
+      "nowShared": "此后共享给 {teams}",
+      "nowOwnerOnly": "此后仅限所属团队"
+    },
+    "apps": {
+      "title": "托管的应用",
+      "description": "基于 brain-app 模板创建、读取此层的应用。每次部署都会为其提供此层的 MCP URL 和新的读取令牌。",
+      "app": "应用",
+      "environments": "环境",
+      "noEnvironments": "没有环境",
+      "open": "打开",
+      "deployments": "部署",
+      "host": "托管应用",
+      "notServed": "尚未提供服务",
+      "emptyTitle": "没有托管的应用",
+      "emptyDescription": "托管应用后，每次部署时都会为其提供此层的 MCP URL 和读取令牌。",
+      "emptyNotServed": "该层开始提供服务后，即可在其上托管应用。"
+    },
+    "connectTab": {
+      "token": "读取令牌",
+      "tokenDescription": "“连接”会为你签发有效期 15 分钟的读取令牌并仅显示一次，同时附上可粘贴的 MCP 客户端配置。如需新令牌，请再次连接；关闭对话框即会丢弃该令牌。",
+      "connect": "连接",
+      "notServed": "尚未提供服务",
+      "notServedDescription": "客户端连接的是拥有 URL 的环境；首次部署后环境即会获得 URL。",
+      "endpoints": "MCP 端点",
+      "noEndpoints": "尚无端点",
+      "cli": "通过 CLI",
+      "cliDescription": "astro CLI 会输出带有新令牌的相同配置，或输出 Claude Code 可直接使用的配置。",
+      "apps": "用于应用",
+      "appsDescription": "托管在该层上的应用会在每次部署时获得 MCP URL 和令牌，因此不会持有长期有效的令牌。",
+      "appsLink": "托管应用"
+    },
+    "settings": {
+      "sections": "设置分区",
+      "sectionLabels": {
+        "rebuild": "重新构建",
+        "dangerZone": "危险操作"
+      },
+      "rebuildTitle": "重新构建",
+      "rebuildDescription": "重新部署部署分支的最新提交。启用采集时，会先运行知识刷新：其提交通过常规推送进行部署。",
+      "rebuilding": "重新构建此语义层",
+      "environment": "环境",
+      "ingest": "先采集",
+      "ingestHelp": "运行仓库中的 .github/workflows/knowledge-refresh.yml，仓库中必须包含该文件。",
+      "productionStepUp": "部署到生产环境前需要先重新登录。",
+      "rebuild": "重新构建",
+      "rebuildWithIngest": "采集并重新构建",
+      "rebuildFailed": "无法重新构建语义层。",
+      "rebuildStarted": "已开始重新构建。",
+      "ingestStarted": "知识刷新已开始。其提交合入后即会部署。",
+      "started": "已开始",
+      "mode": "模式",
+      "modes": {
+        "deploy": "分支最新提交的部署",
+        "ci": "分支最新提交的 CI 运行",
+        "ingest": "知识刷新，然后部署"
+      },
+      "deployment": "部署",
+      "run": "运行",
+      "openRun": "打开运行",
+      "rebuilds": "重新构建的内容",
+      "viewRequests": "查看审批请求",
+      "archiveTitle": "归档此语义层",
+      "archiveDescription": "将其缩容至零，从注册表中移除，并撤销托管在其上的应用的令牌。其数据库、卷、存储桶和仓库会保留，“恢复”可将其还原。",
+      "archiving": "归档此语义层",
+      "askVerification": "归档前需要先重新登录。",
+      "askApproval": "{count, plural, one {需要 # 位审批人批准。} other {需要 # 位审批人批准。}}",
+      "archive": "归档",
+      "archiveConfirmTitle": "归档 {name}？",
+      "archiveFailed": "无法归档语义层。",
+      "archived": "已归档 {slug}。"
     }
   },
   "navModel": {
@@ -15875,6 +16414,9 @@
       "search": "搜索名称和标识符…",
       "views": {
         "all": "全部"
+      },
+      "fields": {
+        "team": "团队"
       }
     },
     "commandRuns": {
@@ -16370,6 +16912,18 @@
       "notes": {
         "mine": "“我的”是指你创建的工作负载，或位于你创建的应用上的工作负载。在 Astrolift 开始记录创建者之前的工作负载仅显示在“全部”中。"
       }
+    },
+    "brainShares": {
+      "search": "搜索团队…",
+      "views": {
+        "all": "全部"
+      }
+    },
+    "brainApps": {
+      "search": "搜索应用…",
+      "views": {
+        "all": "全部"
+      }
     }
   },
   "relativeAge": {
@@ -16511,7 +17065,12 @@
     "workload": "工作负载",
     "workloads": "工作负载",
     "zentinelle": "Zentinelle",
-    "support": "支持"
+    "support": "支持",
+    "newSemanticLayer": "新建语义层",
+    "semanticLayer": "语义层",
+    "substrate": "底层存储",
+    "sharing": "共享",
+    "connect": "连接"
   },
   "support": {
     "title": "支持",

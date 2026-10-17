@@ -380,7 +380,14 @@ def test_a_new_invitee_signs_in_returns_to_the_invitation_and_accepts(monkeypatc
     query = parse_qs(location.query)
     assert query["next"] == [path]
     user = User.objects.get(email=INVITEE)
-    assert query["token"] == [f"Session {client.session.session_key}"]
+    # The frontend trades the one-time code for the session (#2429).
+    handoff = client.post(
+        f"/{django_settings.BASE_URL}auth1/handoff",
+        data=json.dumps({"code": query["code"][0]}),
+        content_type="application/json",
+        HTTP_X_PLATFORM="web",
+    )
+    assert handoff.json() == {"Authorization": f"Session {client.session.session_key}"}
     assert client.session["_auth_user_id"] == str(user.pk)
     assert UserInfo.objects.get(email=INVITEE).internal_user_id == user.pk
     invitation.refresh_from_db()

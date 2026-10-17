@@ -20065,12 +20065,91 @@ export type HostAppOnBrainMutationVariables = Exact<{
 
 export type HostAppOnBrainMutation = { hostAppOnBrain: { ok: boolean, errors: Array<{ field?: string | null, message: string, code: string }>, data?: { brainSlug: string, environmentName: string, app: { id: string, slug: string } } | null } };
 
+export type CreateBrainMutationVariables = Exact<{
+  input: CreateBrainInput;
+}>;
+
+
+export type CreateBrainMutation = { createBrain: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, approvalRequestId?: string | null, supportedMethods?: Array<string> | null }>, data?: { id: string, slug: string, state: BrainCreationState, repo: string, templateRef: string, commitSha?: string | null, deploymentId?: string | null, app?: { id: string, slug: string, name: string, kind: string, team: string, project: string, environments: Array<{ name: string, url: string }>, sharedWith: Array<{ team: string, access: string }> } | null, error?: { code: string, message: string, field?: string | null } | null } | null } };
+
+export type UpdateBrainSubstrateMutationVariables = Exact<{
+  input: UpdateBrainSubstrateInput;
+}>;
+
+
+export type UpdateBrainSubstrateMutation = { updateBrainSubstrate: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, slug: string, name: string, kind: string, team: string, project: string, substrate?: { authority: string, blobs: string, vectors: string, graph: string, cell: string, persistence: Array<string>, replicas: number, image: string, adopted?: boolean | null, adoptedStore: string, graduationNeeded?: boolean | null, resources: Array<{ kind: string, name: string, environment: string, state: string, detail: string }> } | null, environments: Array<{ name: string, url: string }>, sharedWith: Array<{ team: string, access: string }> } | null } };
+
+export type ShareBrainMutationVariables = Exact<{
+  input: ShareBrainInput;
+}>;
+
+
+export type ShareBrainMutation = { shareBrain: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, approvalRequestId?: string | null, supportedMethods?: Array<string> | null }>, data?: { id: string, slug: string, name: string, kind: string, team: string, project: string, environments: Array<{ name: string, url: string }>, sharedWith: Array<{ team: string, access: string }> } | null } };
+
+export type UnshareBrainMutationVariables = Exact<{
+  input: UnshareBrainInput;
+}>;
+
+
+export type UnshareBrainMutation = { unshareBrain: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { id: string, slug: string, name: string, kind: string, team: string, project: string, environments: Array<{ name: string, url: string }>, sharedWith: Array<{ team: string, access: string }> } | null } };
+
+export type RebuildBrainMutationVariables = Exact<{
+  input: RebuildBrainInput;
+}>;
+
+
+export type RebuildBrainMutation = { rebuildBrain: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, approvalRequestId?: string | null, supportedMethods?: Array<string> | null }>, data?: { slug: string, mode: string, deploymentId?: string | null, runUrl?: string | null, ingestRunUrl?: string | null, rebuilds: Array<string> } | null } };
+
+export type ArchiveBrainMutationVariables = Exact<{
+  input: ArchiveBrainInput;
+}>;
+
+
+export type ArchiveBrainMutation = { archiveBrain: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, approvalRequestId?: string | null, supportedMethods?: Array<string> | null }>, data?: { id: string, slug: string, name: string, kind: string, team: string, project: string, environments: Array<{ name: string, url: string }>, sharedWith: Array<{ team: string, access: string }> } | null } };
+
 export type ListBrainsQueryVariables = Exact<{
   search?: InputMaybe<Scalars['String']['input']>;
 }>;
 
 
 export type ListBrainsQuery = { astroliftBrains: Array<{ id: string, slug: string, name: string, kind: string, team: string, project: string, environments: Array<{ name: string, url: string }>, sharedWith: Array<{ team: string, access: string }> }> };
+
+export type BrainFieldsFragment = { id: string, slug: string, name: string, kind: string, team: string, project: string, environments: Array<{ name: string, url: string }>, sharedWith: Array<{ team: string, access: string }> };
+
+export type BrainSubstrateFieldsFragment = { authority: string, blobs: string, vectors: string, graph: string, cell: string, persistence: Array<string>, replicas: number, image: string, adopted?: boolean | null, adoptedStore: string, graduationNeeded?: boolean | null, resources: Array<{ kind: string, name: string, environment: string, state: string, detail: string }> };
+
+export type BrainStatusFieldsFragment = { slug: string, environmentName: string, url: string, served: boolean, deployedCommit: string, behind?: boolean | null, compiledAt?: string | null, warnings: Array<string>, deployment?: { id: string, status: string, imageTag: string, commitSha: string, createdAt?: string | null } | null, sourceHead?: { branch: string, commitSha: string, committedAt?: string | null } | null, lastIngest?: { status: string, conclusion: string, url: string, createdAt: string } | null, substrate: { authority: string, blobs: string, vectors: string, graph: string, cell: string, persistence: Array<string>, replicas: number, image: string, adopted?: boolean | null, adoptedStore: string, graduationNeeded?: boolean | null, resources: Array<{ kind: string, name: string, environment: string, state: string, detail: string }> } };
+
+export type BrainCreationFieldsFragment = { id: string, slug: string, state: BrainCreationState, repo: string, templateRef: string, commitSha?: string | null, deploymentId?: string | null, app?: { id: string, slug: string, name: string, kind: string, team: string, project: string, environments: Array<{ name: string, url: string }>, sharedWith: Array<{ team: string, access: string }> } | null, error?: { code: string, message: string, field?: string | null } | null };
+
+export type GetBrainQueryVariables = Exact<{
+  slug: Scalars['String']['input'];
+}>;
+
+
+export type GetBrainQuery = { astroliftBrain?: { id: string, slug: string, name: string, kind: string, team: string, project: string, hostedApps?: Array<{ slug: string, environment: string }> | null, substrate?: { authority: string, blobs: string, vectors: string, graph: string, cell: string, persistence: Array<string>, replicas: number, image: string, adopted?: boolean | null, adoptedStore: string, graduationNeeded?: boolean | null, resources: Array<{ kind: string, name: string, environment: string, state: string, detail: string }> } | null, environments: Array<{ name: string, url: string }>, sharedWith: Array<{ team: string, access: string }> } | null };
+
+export type GetBrainStatusQueryVariables = Exact<{
+  slug: Scalars['String']['input'];
+  environmentName?: Scalars['String']['input'];
+}>;
+
+
+export type GetBrainStatusQuery = { astroliftBrainStatus?: { slug: string, environmentName: string, url: string, served: boolean, deployedCommit: string, behind?: boolean | null, compiledAt?: string | null, warnings: Array<string>, deployment?: { id: string, status: string, imageTag: string, commitSha: string, createdAt?: string | null } | null, sourceHead?: { branch: string, commitSha: string, committedAt?: string | null } | null, lastIngest?: { status: string, conclusion: string, url: string, createdAt: string } | null, substrate: { authority: string, blobs: string, vectors: string, graph: string, cell: string, persistence: Array<string>, replicas: number, image: string, adopted?: boolean | null, adoptedStore: string, graduationNeeded?: boolean | null, resources: Array<{ kind: string, name: string, environment: string, state: string, detail: string }> } } | null };
+
+export type GetBrainCreationQueryVariables = Exact<{
+  id: Scalars['GUID']['input'];
+}>;
+
+
+export type GetBrainCreationQuery = { astroliftBrainCreation?: { id: string, slug: string, state: BrainCreationState, repo: string, templateRef: string, commitSha?: string | null, deploymentId?: string | null, app?: { id: string, slug: string, name: string, kind: string, team: string, project: string, environments: Array<{ name: string, url: string }>, sharedWith: Array<{ team: string, access: string }> } | null, error?: { code: string, message: string, field?: string | null } | null } | null };
+
+export type GetBrainArchiveStateQueryVariables = Exact<{
+  slug: Scalars['String']['input'];
+}>;
+
+
+export type GetBrainArchiveStateQuery = { astroliftApp?: { id: string, slug: string, name: string, appKind: string, isArchived: boolean, archivedAt?: string | null } | null };
 
 export type AppFieldsFragment = { id: string, slug: string, name: string, description: string, organizationSlug: string, teamSlug: string, teamId?: string | null, teamName: string, projectSlug: string, projectId?: string | null, projectName: string, sourceKind: string, sourceRepo: string, sourceUrl: string, manifestPath: string, defaultBranch: string, manifestHash: string, registryRepoUri: string, ecrRepoUri: string, ecrPushRoleArn: string, providerPluginSlug: string, k8sNamespace: string, subdomain: string, managedHostname: string, isActive: boolean, provisioningStatus: string, provisioningError: string, deployTokenLast4: string, logRetentionDays: number, previewMaxActive: number, previewEnabled: boolean, triggerMode: string, cronExpression: string, deployBranch: string, previewScreenshotUrl: string, rawManifest: string, rawManifestStaged: string, rawManifestStagedHash: string, lastSyncedHash: string, manifestSyncState: string, lastResyncAt?: string | null, manifestBootstrapStatus: string, manifestBootstrapError: string, sourceWebhookInstalledAt?: string | null, isArchived: boolean, archivedAt?: string | null, webhookDeploysPaused: boolean, webhookDeploysPausedAt?: string | null, webhookDeploysPausedByEmail?: string | null, webhookDeploysPauseReason: string, activePreviewCount: number, createdAt: string, updatedAt: string, deletedAt?: string | null, version: number, reprovision: { needsReprovision: boolean, state: string, reason: string, elapsedSeconds?: number | null }, provisioningProgress?: { currentStep: string, completed: Array<string>, totalSteps: Array<string> } | null, securityPolicy: { blockOnCriticalCves: boolean, blockOnMissingSignature: boolean, blockOnHighCveThreshold?: number | null } };
 
@@ -20869,3 +20948,115 @@ export type GetWorkflowInstanceDetailQueryVariables = Exact<{
 
 
 export type GetWorkflowInstanceDetailQuery = { astroliftWorkflowInstanceDetail?: { instance: { workflowId: string, workflowType: string, runId: string, status: string, startedAt: string, closedAt: string, durationSeconds?: number | null, taskQueue: string, triggeredBy: string }, history: Array<{ eventType: string, timestamp: string, payload: unknown, retryCount: number, decision: string }> } | null };
+
+export type ConnectZentinelleMutationVariables = Exact<{
+  input: ConnectZentinelleInput;
+}>;
+
+
+export type ConnectZentinelleMutation = { connectZentinelle: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean }> } | null } };
+
+export type SetZentinelleGatewayUrlMutationVariables = Exact<{
+  input: SetZentinelleGatewayUrlInput;
+}>;
+
+
+export type SetZentinelleGatewayUrlMutation = { setZentinelleGatewayUrl: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean }> } | null } };
+
+export type DisconnectZentinelleMutationVariables = Exact<{
+  input: DisconnectZentinelleInput;
+}>;
+
+
+export type DisconnectZentinelleMutation = { disconnectZentinelle: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { warnings: Array<string>, connection: { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean }> } } | null } };
+
+export type RegisterZentinelleClusterMutationVariables = Exact<{
+  input: ZentinelleClusterInput;
+}>;
+
+
+export type RegisterZentinelleClusterMutation = { registerZentinelleCluster: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean } | null } };
+
+export type SetZentinelleGatewayEnabledMutationVariables = Exact<{
+  input: SetZentinelleGatewayEnabledInput;
+}>;
+
+
+export type SetZentinelleGatewayEnabledMutation = { setZentinelleGatewayEnabled: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean } | null } };
+
+export type RotateZentinelleGatewayCredentialMutationVariables = Exact<{
+  input: RotateZentinelleGatewayCredentialInput;
+}>;
+
+
+export type RotateZentinelleGatewayCredentialMutation = { rotateZentinelleGatewayCredential: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean } | null } };
+
+export type UnregisterZentinelleClusterMutationVariables = Exact<{
+  input: ZentinelleClusterInput;
+}>;
+
+
+export type UnregisterZentinelleClusterMutation = { unregisterZentinelleCluster: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean } | null } };
+
+export type ExportZentinelleAuditMutationVariables = Exact<{
+  input: ExportZentinelleAuditInput;
+}>;
+
+
+export type ExportZentinelleAuditMutation = { exportZentinelleAudit: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, supportedMethods?: Array<string> | null }>, data?: { filename: string, content: string, contentType: string, rowCount: number } | null } };
+
+export type ZentinelleClusterFieldsFragment = { clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean };
+
+export type ZentinelleConnectionFieldsFragment = { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean }> };
+
+export type ZentinelleCapabilityQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ZentinelleCapabilityQuery = { astroliftZentinelleCapability: { connected: boolean } };
+
+export type ZentinelleConnectionQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ZentinelleConnectionQuery = { astroliftZentinelleConnection?: { id: string, baseUrl: string, gatewayUrl: string, status: string, zentinelleInstallId: string, tenantIds: Array<string>, connectedAt?: string | null, disconnectedAt?: string | null, lastError: string, gatewayFeatureEnabled: boolean, clusters: Array<{ clusterId: string, clusterSlug: string, zentinelleClusterId: string, gatewayName: string, gatewayEnabled: boolean, gatewayDeployed: boolean, status: string, registeredAt?: string | null, credentialRotatedAt?: string | null, lastError: string, unregistered: boolean }> } | null };
+
+export type ZentinelleUsageQueryVariables = Exact<{
+  since?: InputMaybe<Scalars['DateTime']['input']>;
+  agentSlug?: InputMaybe<Scalars['String']['input']>;
+  projectId?: InputMaybe<Scalars['GUID']['input']>;
+  teamId?: InputMaybe<Scalars['GUID']['input']>;
+}>;
+
+
+export type ZentinelleUsageQuery = { astroliftZentinelleUsage: { since: string, rows: Array<{ agentSlug: string, provider: string, model: string, requests: number, inputTokens: number, outputTokens: number, costUsd: number }> } };
+
+export type ZentinellePoliciesQueryVariables = Exact<{
+  agentSlug?: InputMaybe<Scalars['String']['input']>;
+  projectId?: InputMaybe<Scalars['GUID']['input']>;
+}>;
+
+
+export type ZentinellePoliciesQuery = { astroliftZentinellePolicies: Array<{ id: string, name: string, policyType: string, enforcement: string, scope: string, priority: number, description: string }> };
+
+export type ZentinelleAuditPageQueryVariables = Exact<{
+  since?: InputMaybe<Scalars['DateTime']['input']>;
+  cursor?: InputMaybe<Scalars['String']['input']>;
+  limit: Scalars['Int']['input'];
+  agentSlug?: InputMaybe<Scalars['String']['input']>;
+  projectId?: InputMaybe<Scalars['GUID']['input']>;
+  teamId?: InputMaybe<Scalars['GUID']['input']>;
+}>;
+
+
+export type ZentinelleAuditPageQuery = { astroliftZentinelleAuditPage: { nextCursor?: string | null, events: Array<{ id: string, occurredAt?: string | null, action: string, resourceType: string, resourceId: string, resourceName: string, agentSlug: string, agentId: string, actor: string }> } };
+
+export type ZentinelleScopeOptionsQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type ZentinelleScopeOptionsQuery = { astroliftProjectsPage: { items: Array<{ id: string, name: string }> }, astroliftTeamsPage: { items: Array<{ id: string, name: string }> } };
+
+export type ZentinelleClusterChoicesQueryVariables = Exact<{
+  search?: InputMaybe<Scalars['String']['input']>;
+}>;
+
+
+export type ZentinelleClusterChoicesQuery = { astroliftClustersPage: { items: Array<{ id: string, slug: string, name: string }> } };
