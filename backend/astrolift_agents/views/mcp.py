@@ -41,6 +41,7 @@ from astrolift_identity.api_tokens import (
     SCOPE_MCP_WRITE,
     has_scope,
 )
+from astrolift_registry.scopes import app_scope_by_slug, registration_project_scope
 from astrolift_services.scopes import (
     managed_service_attachment_scope,
     managed_service_scope_by_guid,
@@ -125,6 +126,15 @@ TOOL_SCOPES: dict[str, Any] = {
     "astrolift_list_brains": ANY_SCOPE,
     "astrolift_get_brain": ANY_SCOPE,
     "astrolift_connect_brain": ANY_SCOPE,
+    "astrolift_get_brain_status": app_scope_by_slug("slug", permission=Permission.APP_READ),
+    "astrolift_create_brain": registration_project_scope("project_id", permission=Permission.APP_CREATE),
+    "astrolift_get_brain_creation": ANY_SCOPE,
+    "astrolift_update_brain_substrate": app_scope_by_slug("slug", permission=Permission.APP_UPDATE),
+    "astrolift_rebuild_brain": app_scope_by_slug("slug", permission=Permission.APP_DEPLOY),
+    "astrolift_host_app_on_brain": registration_project_scope("project_id", permission=Permission.APP_CREATE),
+    "astrolift_unshare_brain": app_scope_by_slug("slug", permission=Permission.APP_UPDATE),
+    "astrolift_share_brain": app_scope_by_slug("slug", permission=Permission.APP_UPDATE),
+    "astrolift_delete_brain": app_scope_by_slug("slug", permission=Permission.APP_DELETE),
     "astrolift_list_agents": ANY_SCOPE,
     "astrolift_list_tasks": ANY_SCOPE,
     "astrolift_get_task_by_client_request_id": ANY_SCOPE,
@@ -376,6 +386,244 @@ def _connect_brain(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]
         return connection_descriptor(user=user, brain=app)
     except BrainTokenError as exc:
         raise McpCallError(str(exc), code="unavailable") from None
+
+
+def _unwrap_mutation(result):
+    """A resolver's MutationResult as data, or its first error as an MCP error."""
+    if result.ok:
+        return result.data
+    error = (result.errors or [None])[0]
+    if error is None:
+        raise McpCallError("the operation failed")
+    code = str(getattr(error.code, "value", error.code)).lower()
+    payload = (
+        {"approval_request_id": error.approval_request_id}
+        if getattr(error, "approval_request_id", None)
+        else None
+    )
+    raise McpCallError(error.message, code=code, result=payload)
+
+
+def _readable_brain(slug: Any):
+    from astrolift_registry.brain_manage import find_brain
+
+    app = find_brain(str(slug or ""))
+    if app is None:
+        raise McpCallError("brain not found", code="not_found")
+    return app
+
+
+def _creation_dict(row) -> dict[str, Any]:
+    from astrolift_registry.brain_manage import find_brain
+    from astrolift_registry.brains import describe_brain
+
+    brain = find_brain(row.registered_app.slug) if row.registered_app_id and row.registered_app else None
+    return {
+        "id": str(row.guid),
+        "slug": row.slug,
+        "state": row.state,
+        "repo": row.repo,
+        "template_ref": row.template_ref,
+        "commit_sha": row.commit_sha or None,
+        "deployment_id": str(row.deployment.guid) if row.deployment_id and row.deployment else None,
+        "brain": describe_brain(brain) if brain is not None else None,
+        "error": {"code": row.error_code, "message": row.error_message} if row.error_code else None,
+    }
+
+
+def _get_brain_status(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_registry.brain_manage import status
+
+    app = _readable_brain(args.get("slug"))
+    row = status(app, str(args.get("environment_name") or "production").strip())
+    if row is None:
+        raise McpCallError("environment not found", code="not_found")
+    return {"slug": app.slug, **row}
+
+
+def _create_brain(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_graphql import GUID
+    from astrolift_registry.brain_manage import surface, visible_creation
+    from astrolift_registry.schema.brain_types import RepoVisibility
+    from astrolift_registry.schema.mutations.brains import BrainManagementMutations, CreateBrainInput
+
+    with surface("mcp"):
+        result = BrainManagementMutations().create_brain(
+            _mutation_info(request),
+            input=CreateBrainInput(
+                project_id=GUID(_public_id(args.get("project_id"), "project_id")),
+                slug=str(args.get("slug") or ""),
+                source_connection_id=GUID(
+                    _public_id(args.get("source_connection_id"), "source_connection_id")
+                ),
+                repo=str(args.get("repo") or ""),
+                name=str(args["name"]) if "name" in args else None,
+                team_id=GUID(_public_id(args["team_id"], "team_id")) if "team_id" in args else None,
+                visibility=RepoVisibility(str(args.get("visibility") or "private")),
+                template_ref=str(args["template_ref"]) if "template_ref" in args else None,
+                environment_name=str(args.get("environment_name") or "production"),
+                deploy=bool(args.get("deploy", True)),
+                substrate=_substrate_input(args["substrate"]) if "substrate" in args else None,
+            ),
+        )
+    data = _unwrap_mutation(result)
+    return _creation_dict(visible_creation(str(data.id)))
+
+
+def _substrate_input(raw: dict[str, Any]):
+    """A ``BrainSubstrateInput`` from Mimwell's own names, as the tool takes them."""
+    from astrolift_registry.schema import brain_types as bt
+
+    try:
+        return bt.BrainSubstrateInput(
+            authority=bt.BrainAuthority(raw.get("authority", "files")),
+            blobs=bt.BrainBlobs(raw.get("blobs", "fs")),
+            vectors=bt.BrainVectors(raw.get("vectors", "local")),
+            graph=bt.BrainGraph(raw.get("graph", "edges-table")),
+            persistence=[bt.BrainPersistence(p) for p in raw.get("persistence") or []],
+            replicas=int(raw.get("replicas", 1)),
+            image=str(raw["image"]) if "image" in raw else None,
+            port=int(raw.get("port", 8080)),
+        )
+    except (ValueError, TypeError) as exc:
+        raise McpCallError(f"substrate: {exc}", code="invalid_arguments") from exc
+
+
+def _update_brain_substrate(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_registry.brain_manage import substrate_status, surface
+    from astrolift_registry.schema.mutations.brains import BrainManagementMutations, UpdateBrainSubstrateInput
+
+    brain = _readable_brain(args.get("slug"))
+    if not isinstance(args.get("substrate"), dict):
+        raise McpCallError("substrate must be an object", code="invalid_arguments")
+    with surface("mcp"):
+        result = BrainManagementMutations().update_brain_substrate(
+            _mutation_info(request),
+            input=UpdateBrainSubstrateInput(slug=brain.slug, substrate=_substrate_input(args["substrate"])),
+        )
+    _unwrap_mutation(result)
+    brain.refresh_from_db()
+    return {
+        "slug": brain.slug,
+        "substrate": substrate_status(brain, deployed_commit="", connection=None, warnings=[]),
+    }
+
+
+def _get_brain_creation(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_registry.brain_manage import visible_creation
+
+    row = visible_creation(_public_id(args.get("id"), "id"))
+    if row is None:
+        raise McpCallError("brain creation not found", code="not_found")
+    return _creation_dict(row)
+
+
+def _rebuild_brain(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_registry.brain_manage import surface
+    from astrolift_registry.schema.mutations.brains import BrainManagementMutations, RebuildBrainInput
+
+    with surface("mcp"):
+        result = BrainManagementMutations().rebuild_brain(
+            _mutation_info(request),
+            input=RebuildBrainInput(
+                slug=str(args.get("slug") or ""),
+                environment_name=str(args.get("environment_name") or "production"),
+                ingest=bool(args.get("ingest", False)),
+            ),
+        )
+    data = _unwrap_mutation(result)
+    return {
+        "slug": data.slug,
+        "mode": data.mode,
+        "deployment_id": str(data.deployment_id) if data.deployment_id else None,
+        "run_url": data.run_url,
+        "ingest_run_url": data.ingest_run_url,
+        "rebuilds": list(data.rebuilds),
+    }
+
+
+def _host_app_on_brain(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_graphql import GUID
+    from astrolift_registry.brain_manage import surface
+    from astrolift_registry.schema.mutations.brains import BrainMutations, HostAppOnBrainInput
+
+    with surface("mcp"):
+        result = BrainMutations().host_app_on_brain(
+            _mutation_info(request),
+            input=HostAppOnBrainInput(
+                brain_slug=str(args.get("brain_slug") or ""),
+                project_id=GUID(_public_id(args.get("project_id"), "project_id")),
+                image=str(args.get("image") or ""),
+                name=str(args["name"]) if "name" in args else None,
+                slug=str(args["slug"]) if "slug" in args else None,
+                port=int(args["port"]) if "port" in args else None,
+            ),
+        )
+    data = _unwrap_mutation(result)
+    return {
+        "app_slug": data.app.slug,
+        "brain_slug": data.brain_slug,
+        "template": data.template,
+        "environment_name": data.environment_name,
+        "env_keys": list(data.env_keys),
+    }
+
+
+def _brain_mutation(request: HttpRequest, name: str, action: str | None, input_obj) -> dict[str, Any]:
+    from astrolift_identity.action_safety import agent_refusal
+    from astrolift_registry.brain_manage import surface
+    from astrolift_registry.brains import describe_brain
+    from astrolift_registry.schema.mutations.brains import BrainManagementMutations
+
+    brain = _readable_brain(input_obj.slug)
+    if action is not None:
+        # Agents cannot step up: the organization's rule is the person asked.
+        refusal = agent_refusal(action, app=brain)
+        if refusal is not None:
+            raise McpCallError(refusal, code="permission_denied")
+    with surface("mcp"):
+        result = getattr(BrainManagementMutations(), name)(_mutation_info(request), input=input_obj)
+    _unwrap_mutation(result)
+    brain.refresh_from_db()
+    return describe_brain(brain)
+
+
+def _share_brain(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_registry.schema.brain_types import BrainShareAccess
+    from astrolift_registry.schema.mutations.brains import ShareBrainInput
+
+    return _brain_mutation(
+        request,
+        "share_brain",
+        "brain.share",
+        ShareBrainInput(
+            slug=str(args.get("slug") or ""),
+            team_slug=str(args.get("team_slug") or ""),
+            access=BrainShareAccess(str(args.get("access") or "")),
+        ),
+    )
+
+
+def _unshare_brain(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_registry.schema.mutations.brains import UnshareBrainInput
+
+    return _brain_mutation(
+        request,
+        "unshare_brain",
+        None,
+        UnshareBrainInput(slug=str(args.get("slug") or ""), team_slug=str(args.get("team_slug") or "")),
+    )
+
+
+def _delete_brain(request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
+    from astrolift_registry.schema.mutations.brains import ArchiveBrainInput
+
+    return {
+        **_brain_mutation(
+            request, "archive_brain", "brain.delete", ArchiveBrainInput(slug=str(args.get("slug") or ""))
+        ),
+        "archived": True,
+    }
 
 
 def _list_agents(_request: HttpRequest, args: dict[str, Any]) -> dict[str, Any]:
@@ -1093,6 +1341,15 @@ _HANDLERS: dict[str, ToolHandler] = {
     "astrolift_list_brains": _list_brains,
     "astrolift_get_brain": _get_brain,
     "astrolift_connect_brain": _connect_brain,
+    "astrolift_get_brain_status": _get_brain_status,
+    "astrolift_create_brain": _create_brain,
+    "astrolift_get_brain_creation": _get_brain_creation,
+    "astrolift_update_brain_substrate": _update_brain_substrate,
+    "astrolift_rebuild_brain": _rebuild_brain,
+    "astrolift_host_app_on_brain": _host_app_on_brain,
+    "astrolift_unshare_brain": _unshare_brain,
+    "astrolift_share_brain": _share_brain,
+    "astrolift_delete_brain": _delete_brain,
     "astrolift_list_agents": _list_agents,
     "astrolift_get_agent": _get_agent,
     "astrolift_get_task": _get_task,

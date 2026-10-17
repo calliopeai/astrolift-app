@@ -1,0 +1,149 @@
+import { composeStories, setProjectAnnotations } from "@storybook/react";
+import { cleanup, within } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+
+import { runStory } from "@/test/run-story";
+import * as preview from "../../../.storybook/preview";
+import {
+  DEGRADED_CONNECTION,
+  FULL_ACCESS,
+  HEALTHY_CONNECTION,
+  NO_ACCESS,
+} from "./zentinelle-fixtures";
+import {
+  gatewayHealth,
+  isDegraded,
+  scopeVariables,
+  visibleTabs,
+  windowStart,
+} from "./zentinelle-model";
+import * as stories from "./ZentinelleScreen.stories";
+
+setProjectAnnotations(preview);
+const s = composeStories(stories);
+
+async function render(Story: Parameters<typeof runStory>[0]) {
+  const canvas = document.createElement("div");
+  document.body.append(canvas);
+  await runStory(Story, canvas);
+  return { page: within(canvas), done: () => (cleanup(), canvas.remove()) };
+}
+
+async function check(
+  Story: Parameters<typeof runStory>[0],
+  assert: (page: ReturnType<typeof within>) => void
+) {
+  const { page, done } = await render(Story);
+  try {
+    assert(page);
+  } finally {
+    done();
+  }
+}
+
+describe("Zentinelle screen states (#1888)", () => {
+  it("offers the connect form to an admin when not connected, and no tabs", async () => {
+    await check(s.NotConnected, (page) => {
+      expect(page.getByLabelText("Enrollment code")).toBeEnabled();
+      expect(page.queryByRole("navigation", { name: "Zentinelle sections" })).toBeNull();
+    });
+  });
+
+  it("locks the form while connecting", async () => {
+    await check(s.Connecting, (page) => {
+      expect(page.getByLabelText("Enrollment code")).toBeDisabled();
+      expect(page.getByRole("button", { name: "Connecting…" })).toBeDisabled();
+    });
+  });
+
+  it("tells a viewer who cannot connect to ask an admin", async () => {
+    await check(s.NotConnectedViewer, (page) => {
+      expect(page.getByText("Not connected to Zentinelle")).toBeVisible();
+      expect(page.queryByLabelText("Enrollment code")).toBeNull();
+    });
+  });
+
+  it("shows health, every tab and the admin actions when connected", async () => {
+    await check(s.ConnectedHealthy, (page) => {
+      const tabs = page.getByRole("navigation", { name: "Zentinelle sections" });
+      expect(within(tabs).getAllByRole("link")).toHaveLength(5);
+      expect(page.getByText("2 of 2")).toBeVisible();
+      expect(page.getByRole("button", { name: "Disconnect" })).toBeVisible();
+      expect(page.queryByText(/need attention/)).toBeNull();
+    });
+  });
+
+  it("flags a degraded gateway with its error", async () => {
+    await check(s.GatewayDegraded, (page) => {
+      expect(page.getByText(/need attention/)).toBeVisible();
+      expect(page.getByText(/ImagePullBackOff/)).toBeVisible();
+    });
+  });
+
+  it("shows nothing to a viewer without a Zentinelle permission", async () => {
+    await check(s.NoPermission, (page) => {
+      expect(page.getByText("No Zentinelle access")).toBeVisible();
+      expect(page.queryByRole("button")).toBeNull();
+    });
+  });
+
+  it("shows the upstream error with a retry", async () => {
+    await check(s.UpstreamError, (page) => {
+      expect(page.getByText(/connection refused/)).toBeVisible();
+    });
+    await check(s.UsageUpstreamError, (page) => {
+      expect(page.getByText("Could not read usage from Zentinelle")).toBeVisible();
+    });
+  });
+
+  it("gives a developer usage and policies only, with no admin actions", async () => {
+    await check(s.DeveloperView, (page) => {
+      const tabs = page.getByRole("navigation", { name: "Zentinelle sections" });
+      expect(
+        within(tabs)
+          .getAllByRole("link")
+          .map((l) => l.textContent)
+      ).toEqual(["Overview", "Usage and cost", "Policies"]);
+      expect(page.queryByRole("button", { name: "Disconnect" })).toBeNull();
+    });
+  });
+
+  it("hides audit export without zentinelle.audit_export", async () => {
+    await check(s.AuditTab, (page) => {
+      expect(page.getByRole("button", { name: "Export CSV" })).toBeVisible();
+    });
+    await check(s.AuditNoExport, (page) => {
+      expect(page.queryByRole("button", { name: "Export CSV" })).toBeNull();
+    });
+  });
+});
+
+describe("Zentinelle model", () => {
+  it("shows only the overview until connected", () => {
+    expect(visibleTabs(FULL_ACCESS, false)).toEqual(["overview"]);
+    expect(visibleTabs(NO_ACCESS, true)).toEqual([]);
+    expect(visibleTabs({ ...NO_ACCESS, audit: true }, true)).toEqual(["audit"]);
+  });
+
+  it("reads each gateway's health", () => {
+    const [ok, broken, pending, off] = DEGRADED_CONNECTION.clusters;
+    expect(gatewayHealth(ok, true)).toBe("healthy");
+    expect(gatewayHealth(broken, true)).toBe("error");
+    expect(gatewayHealth(pending, true)).toBe("pending");
+    expect(gatewayHealth(off, true)).toBe("off");
+    expect(gatewayHealth(ok, false)).toBe("off");
+    expect(isDegraded(HEALTHY_CONNECTION)).toBe(false);
+    expect(isDegraded(DEGRADED_CONNECTION)).toBe(true);
+  });
+
+  it("names one scope at most and anchors windows", () => {
+    expect(scopeVariables({ kind: "team", id: "t" })).toEqual({
+      agentSlug: null,
+      projectId: null,
+      teamId: "t",
+    });
+    const now = new Date("2026-10-16T12:00:00Z");
+    expect(windowStart("month", now)).toBe("2026-10-01T00:00:00.000Z");
+    expect(windowStart("24h", now)).toBe("2026-10-15T12:00:00.000Z");
+  });
+});

@@ -873,6 +873,443 @@
       ]
     },
     {
+      "description": "How fresh one semantic layer is in an environment (#2424): its latest deployment, the running commit against the deploy branch head, compiled_at and the last ingest run.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "environment_name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_get_brain_status",
+      "required_permissions": [
+        "app.read"
+      ],
+      "required_scopes": [
+        "mcp:read",
+        "read:apps"
+      ]
+    },
+    {
+      "description": "Create a semantic layer (#2424): scaffold an empty or new repository from the verified Mimwell edition in one commit, register it as a brain and deploy it, in the background. Poll astrolift_get_brain_creation with the returned id.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "deploy": {
+            "type": "boolean"
+          },
+          "environment_name": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "project_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "repo": {
+            "description": "owner/name; missing or empty.",
+            "type": "string"
+          },
+          "slug": {
+            "maxLength": 63,
+            "minLength": 1,
+            "type": "string"
+          },
+          "source_connection_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "substrate": {
+            "additionalProperties": false,
+            "properties": {
+              "authority": {
+                "enum": [
+                  "files",
+                  "sqlite",
+                  "postgres",
+                  "mysql",
+                  "mongo",
+                  "d1"
+                ],
+                "type": "string"
+              },
+              "blobs": {
+                "enum": [
+                  "fs",
+                  "db-blob",
+                  "s3",
+                  "azure-blob"
+                ],
+                "type": "string"
+              },
+              "graph": {
+                "enum": [
+                  "edges-table",
+                  "age"
+                ],
+                "type": "string"
+              },
+              "image": {
+                "type": "string"
+              },
+              "persistence": {
+                "items": {
+                  "enum": [
+                    "none",
+                    "sqlite-volume",
+                    "efs",
+                    "postgres",
+                    "s3",
+                    "d1",
+                    "kv"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "port": {
+                "maximum": 65535,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "replicas": {
+                "maximum": 20,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "vectors": {
+                "enum": [
+                  "local",
+                  "in-db",
+                  "edge-db",
+                  "external"
+                ],
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "team_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "template_ref": {
+            "type": "string"
+          },
+          "visibility": {
+            "enum": [
+              "private",
+              "internal",
+              "public"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "project_id",
+          "slug",
+          "source_connection_id",
+          "repo"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_create_brain",
+      "required_permissions": [
+        "app.create"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "write:apps"
+      ]
+    },
+    {
+      "description": "Graduate a semantic layer's substrate (Mimwell's graduation): the full cell and persistence it should have, checked against the substrate matrix, written to its repo in one commit and applied. Never drops persistence that holds data.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "substrate": {
+            "additionalProperties": false,
+            "properties": {
+              "authority": {
+                "enum": [
+                  "files",
+                  "sqlite",
+                  "postgres",
+                  "mysql",
+                  "mongo",
+                  "d1"
+                ],
+                "type": "string"
+              },
+              "blobs": {
+                "enum": [
+                  "fs",
+                  "db-blob",
+                  "s3",
+                  "azure-blob"
+                ],
+                "type": "string"
+              },
+              "graph": {
+                "enum": [
+                  "edges-table",
+                  "age"
+                ],
+                "type": "string"
+              },
+              "image": {
+                "type": "string"
+              },
+              "persistence": {
+                "items": {
+                  "enum": [
+                    "none",
+                    "sqlite-volume",
+                    "efs",
+                    "postgres",
+                    "s3",
+                    "d1",
+                    "kv"
+                  ],
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "port": {
+                "maximum": 65535,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "replicas": {
+                "maximum": 20,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "vectors": {
+                "enum": [
+                  "local",
+                  "in-db",
+                  "edge-db",
+                  "external"
+                ],
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "slug",
+          "substrate"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_update_brain_substrate",
+      "required_permissions": [
+        "app.update"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "write:apps"
+      ]
+    },
+    {
+      "description": "The progress of one semantic layer creation, by the id astrolift_create_brain returned.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_get_brain_creation",
+      "required_permissions": [
+        "app.read"
+      ],
+      "required_scopes": [
+        "mcp:read",
+        "read:apps"
+      ]
+    },
+    {
+      "description": "Redeploy a semantic layer's deploy branch head, or with ingest=true run its knowledge-refresh workflow (whose commit then deploys).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "environment_name": {
+            "type": "string"
+          },
+          "ingest": {
+            "type": "boolean"
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_rebuild_brain",
+      "required_permissions": [
+        "app.deploy"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "write:apps"
+      ]
+    },
+    {
+      "description": "Create an app hosted on a semantic layer this identity can read (#2243): one public web workload running image, given the brain's MCP URL and a read token on every deploy.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "brain_slug": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "port": {
+            "maximum": 65535,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "project_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "brain_slug",
+          "project_id",
+          "image"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_host_app_on_brain",
+      "required_permissions": [
+        "app.create"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "write:apps"
+      ]
+    },
+    {
+      "description": "Stop sharing a semantic layer with a team. Never removes the home team or an owner.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string"
+          },
+          "team_slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "team_slug"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_unshare_brain",
+      "required_permissions": [
+        "app.update"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "write:apps",
+        "write:app-access"
+      ]
+    },
+    {
+      "description": "Share a semantic layer with a team as viewer or deployer. Refused for agents unless the organization's brain.share rule allows agents; then approval rules still apply.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "access": {
+            "enum": [
+              "viewer",
+              "deployer"
+            ],
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "team_slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "team_slug",
+          "access"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_share_brain",
+      "required_permissions": [
+        "app.update"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "write:apps",
+        "write:app-access"
+      ]
+    },
+    {
+      "description": "Archive a semantic layer: scale to zero, drop it from the register and revoke hosted apps' tokens; the repository is untouched. Refused for agents unless the organization's brain.delete rule allows agents; then approval rules still apply.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug"
+        ],
+        "type": "object"
+      },
+      "name": "astrolift_delete_brain",
+      "required_permissions": [
+        "app.delete"
+      ],
+      "required_scopes": [
+        "mcp:write",
+        "write:apps"
+      ]
+    },
+    {
       "description": "List registered agents and their source/package delivery state.",
       "inputSchema": {
         "additionalProperties": false,

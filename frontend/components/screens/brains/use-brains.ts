@@ -2,12 +2,13 @@
 
 import { useMutation, useQuery } from "@apollo/client/react";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { useListState } from "@/components/list/use-list-state";
+import { parseListState, useListState } from "@/components/list/use-list-state";
 import { useLocalizedList } from "@/components/list/use-localized-list";
+import { selectRows } from "@/components/list/select-rows";
 import { useWizardProjects } from "@/components/wizard/use-wizard-projects";
 import type {
   HostAppOnBrainMutation,
@@ -18,27 +19,57 @@ import type {
 } from "@/graphql/__generated__/operations";
 import { HOST_APP_ON_BRAIN, ISSUE_BRAIN_READ_TOKEN } from "@/graphql/registry/brains.mutations";
 import { LIST_BRAINS } from "@/graphql/registry/brains.queries";
+import { useMyPermissions } from "@/lib/permissions/use-my-permissions";
 
 import type { BrainConnection } from "./brain-connection";
-import { BRAINS_LIST } from "./brains-list";
+import { BRAINS_LIST, BRAINS_SELECT, brainTeams, withTeamOptions } from "./brains-list";
 import type { HostBrainAppValues } from "./HostBrainAppDialog";
 
-export type BrainRow = ListBrainsQuery["astroliftBrains"][number];
+export type { BrainRow } from "./brains-list";
 
 /**
  * The data half of BrainsScreen: the server's search over readable brains,
- * and Connect, which issues the caller a read token for one of them. The
- * token lives in this state only until the dialog is dismissed. Host an app
- * creates one from the brain-app template and opens it (#2243).
+ * filtered by team, sorted and paged from the rows in hand (the field takes
+ * no team, sort or page argument). Connect issues the caller a read token
+ * for one layer, held in this state only until the dialog is dismissed.
+ * Host an app creates one from the brain-app template and opens it (#2243).
  */
 export function useBrains() {
   const t = useTranslations("brains");
-  const list = useListState(useLocalizedList(BRAINS_LIST));
-  const search = list.state.q.trim();
+  const base = useLocalizedList(BRAINS_LIST);
+  // The search reaches the server, so it is read before the team options,
+  // which come from the rows the search returns.
+  const params = useSearchParams();
+  const search = parseListState(base, params?.toString() ?? "").q.trim();
   const { data, previousData, loading, error, refetch } = useQuery<ListBrainsQuery>(LIST_BRAINS, {
     variables: { search: search || null },
+    fetchPolicy: "cache-and-network",
   });
-  const rows = (data ?? previousData)?.astroliftBrains ?? [];
+  const all = (data ?? previousData)?.astroliftBrains;
+  const teams = brainTeams(all ?? []).join("\n");
+  const definition = React.useMemo(
+    () => withTeamOptions(base, teams ? teams.split("\n") : []),
+    [base, teams]
+  );
+  const list = useListState(definition);
+  const { state } = list;
+  const page = React.useMemo(
+    () =>
+      selectRows(
+        all ?? [],
+        {
+          filters: list.filters,
+          q: state.q,
+          sort: state.sort,
+          page: state.page,
+          pageSize: state.pageSize,
+        },
+        BRAINS_SELECT
+      ),
+    [all, list.filters, state.q, state.sort, state.page, state.pageSize]
+  );
+
+  const perms = useMyPermissions();
   const [connection, setConnection] = React.useState<BrainConnection | null>(null);
   // Kept out of the Apollo cache, so the token is held only by this state.
   const [issue, issueState] = useMutation<
@@ -53,14 +84,16 @@ export function useBrains() {
   );
   return {
     list,
-    rows,
-    totalCount: data ? rows.length : null,
-    loading: loading && !data && !previousData,
-    stale: loading && !!previousData,
-    error: error ? { message: error.message } : null,
+    rows: page.rows,
+    totalCount: all ? page.totalCount : null,
+    loading: loading && !all,
+    stale: loading && !!all,
+    error: error && !all ? { message: error.message } : null,
     onRetry: () => {
       void refetch().catch(() => {});
     },
+    /** `app.create` somewhere: the server checks the project the wizard picks. */
+    canCreate: perms.loading || perms.can("app.create"),
     connection,
     connecting: issueState.loading,
     onConnect: async (slug: string) => {
