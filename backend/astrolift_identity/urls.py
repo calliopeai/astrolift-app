@@ -1,8 +1,8 @@
 """URL routes owned by ``astrolift_identity``.
 
 Currently exposes the CLI / mobile device-flow surface (#475), the SCIM
-2.0 provisioning surface (#78, #91) and the SSO step-up re-auth flow
-(#526). The REST endpoints (``/api/cli/v1/auth/{start,complete,refresh,signout}``
+2.0 provisioning surface (#78, #91), the SSO step-up re-auth flow
+(#526) and the invitation page's signed-out preview. The REST endpoints (``/api/cli/v1/auth/{start,complete,refresh,signout}``
 and ``/api/scim/v2/*``) are mounted at the project root by
 ``config.urls``; the in-browser approval page and the SSO step-up
 endpoints live under the auth1-protected ``/app/`` prefix.
@@ -11,10 +11,12 @@ endpoints live under the auth1-protected ``/app/`` prefix.
 from __future__ import annotations
 
 from django.urls import path
+from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
 
-from astrolift_identity import device_flow_views, scim_group_views, scim_views, step_up_sso
+from astrolift_identity import device_flow_views, invitees, scim_group_views, scim_views, step_up_sso
 from astrolift_identity.scim import SCIM_RATE_LIMIT_PER_MIN
+from core.utils.browser_guard import require_ui_header_for_session
 
 app_name = "astrolift_identity"
 
@@ -107,5 +109,18 @@ app_urlpatterns = [
         "auth1/elevate-sso/callback/",
         step_up_sso.elevate_sso_callback,
         name="auth1-elevate-sso-callback",
+    ),
+    # The invitation page reads this before anyone signs in: the token in the
+    # body is the credential, and a session, if there is one, only says whose
+    # browser it is. Read-only, so no CSRF token; a cookie-carrying POST still
+    # needs the UI header.
+    path(
+        "auth1/invitation-preview",
+        csrf_exempt(
+            require_ui_header_for_session(
+                ratelimit(key="ip", rate="30/m", block=True)(invitees.invitation_preview)
+            )
+        ),
+        name="invitation-preview",
     ),
 ]

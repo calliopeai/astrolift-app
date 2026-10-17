@@ -4,7 +4,8 @@ import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 
-import { authCallbackUrl, deviceApprovalReturnPath } from "@/lib/auth/device-return";
+import { authCallbackUrl, signInReturnPath } from "@/lib/auth/sign-in-return";
+import { clearToken } from "@/lib/auth/token-store";
 
 // In dev (NEXT_PUBLIC_DEV_LOGIN=1) we honour the legacy dev-login
 // bypass and skip everything else. In any other build we read the
@@ -21,14 +22,18 @@ export interface ActiveIdp {
   hint?: string;
 }
 
+/** Why the browser is back on the sign-in page, when the IdP round trip said. */
+export type LoginNotice = "noAccount";
+
 /** Everything the login screen does against the API: IdP detection and the two login paths. */
 export function useLogin() {
   const router = useRouter();
   const [idp, setIdp] = React.useState<ActiveIdp | null>(null);
+  const [notice, setNotice] = React.useState<LoginNotice | null>(null);
   const [loadError, setLoadError] = React.useState<string | null>(null);
   const apiRoot = process.env.NEXT_PUBLIC_API_ROOT ?? "";
   const returnPath = () =>
-    deviceApprovalReturnPath(new URLSearchParams(window.location.search).get("next"));
+    signInReturnPath(new URLSearchParams(window.location.search).get("next"));
 
   React.useEffect(() => {
     if (useDevLogin) {
@@ -43,9 +48,14 @@ export function useLogin() {
       window.location.href = `${apiRoot}/app/auth1/dev-login?next=${encodeURIComponent(returnPath())}`;
       return;
     }
+    // The IdP vouched for an identity this install has no account for.
+    const noAccount = new URLSearchParams(window.location.search).get("error") === "no_account";
     fetch(`${apiRoot}/app/auth1/active-idp.json`, { credentials: "include" })
       .then((r) => r.json())
-      .then(setIdp)
+      .then((value: ActiveIdp) => {
+        setNotice(noAccount ? "noAccount" : null);
+        setIdp(value);
+      })
       .catch((err) => setLoadError(String(err)));
   }, [apiRoot]);
 
@@ -54,6 +64,12 @@ export function useLogin() {
     const loginPath = idp?.loginPath ?? "/app/auth1/login";
     const callback = authCallbackUrl(window.location.origin, returnPath());
     window.location.href = `${apiRoot}${loginPath}?next=${encodeURIComponent(callback)}`;
+  }
+
+  /** Signs out of the IdP too, so its next sign-in can be someone else. */
+  function switchAccount() {
+    clearToken();
+    window.location.href = `${apiRoot}/app/auth1/logout`;
   }
 
   /** kind=local: post the credentials, then go to the return path. Failures toast. */
@@ -81,5 +97,13 @@ export function useLogin() {
     }
   }
 
-  return { devLogin: useDevLogin, idp, loadError, continueWithIdp, submitLocal };
+  return {
+    devLogin: useDevLogin,
+    idp,
+    notice,
+    loadError,
+    continueWithIdp,
+    switchAccount,
+    submitLocal,
+  };
 }

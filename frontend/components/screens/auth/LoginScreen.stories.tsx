@@ -8,7 +8,12 @@ import { LoginScreen } from "./LoginScreen";
 const meta: Meta<typeof LoginScreen> = {
   title: "Screens/Auth/LoginScreen",
   component: LoginScreen,
-  args: { ...LOGIN, continueWithIdp: fn(), submitLocal: fn(async () => {}) },
+  args: {
+    ...LOGIN,
+    continueWithIdp: fn(),
+    switchAccount: fn(),
+    submitLocal: fn(async () => {}),
+  },
 };
 export default meta;
 
@@ -26,6 +31,30 @@ export const LocalForm: Story = {
     await userEvent.type(canvas.getByLabelText("Password"), "hunter2");
     await userEvent.click(canvas.getByRole("button", { name: "Sign in" }));
     await expect(args.submitLocal).toHaveBeenCalledWith("leo", "hunter2");
+  },
+};
+
+/**
+ * Back from the IdP, which vouched for someone with no account here. The
+ * IdP keeps its session, so the notice offers to sign out of it first.
+ */
+export const NoAccount: Story = {
+  args: { notice: "noAccount" },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("status")).toHaveTextContent("No Astrolift account");
+    await userEvent.click(canvas.getByRole("button", { name: "Use a different account" }));
+    await expect(args.switchAccount).toHaveBeenCalled();
+  },
+};
+
+/** The same notice over the local form: typing other credentials is the switch. */
+export const NoAccountLocal: Story = {
+  args: { notice: "noAccount", idp: IDP_LOCAL },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByRole("status")).toBeInTheDocument();
+    await expect(canvas.queryByRole("button", { name: "Use a different account" })).toBeNull();
   },
 };
 

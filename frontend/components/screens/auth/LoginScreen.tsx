@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 import { AuthSplash } from "./AuthSplash";
-import type { useLogin } from "./use-login";
+import type { LoginNotice, useLogin } from "./use-login";
 
 const DISPLAY_KIND: Record<string, string> = {
   auth0: "Auth0",
@@ -29,8 +29,10 @@ export type LoginScreenProps = ReturnType<typeof useLogin>;
 export function LoginScreen({
   devLogin,
   idp,
+  notice,
   loadError,
   continueWithIdp,
+  switchAccount,
   submitLocal,
 }: LoginScreenProps) {
   const t = useTranslations("loginScreen");
@@ -51,16 +53,57 @@ export function LoginScreen({
   }
 
   if (idp.kind === "local") {
-    return <LocalLoginForm onSubmit={submitLocal} />;
+    return (
+      <WithNotice notice={notice}>
+        <LocalLoginForm onSubmit={submitLocal} />
+      </WithNotice>
+    );
   }
 
   // External IdP: render a single CTA that kicks off the auth1 round-trip.
   return (
-    <ExternalIdpCard
-      kind={idp.kind ?? "external"}
-      displayName={idp.displayName}
-      onContinue={continueWithIdp}
-    />
+    <WithNotice notice={notice} onSwitchAccount={switchAccount}>
+      <ExternalIdpCard
+        kind={idp.kind ?? "external"}
+        displayName={idp.displayName}
+        onContinue={continueWithIdp}
+      />
+    </WithNotice>
+  );
+}
+
+/**
+ * The sign-in CTA, under a callout saying why the browser came back here.
+ * An IdP keeps its own session, so signing in again picks the same identity;
+ * `onSwitchAccount` signs out of it first.
+ */
+function WithNotice({
+  notice,
+  onSwitchAccount,
+  children,
+}: {
+  notice: LoginNotice | null;
+  onSwitchAccount?: () => void;
+  children: React.ReactNode;
+}) {
+  const t = useTranslations("loginScreen");
+  if (!notice) return <>{children}</>;
+  return (
+    <div className="flex w-full max-w-sm flex-col items-center gap-6">
+      <div
+        role="status"
+        className="bg-warning-bg text-warning-fg border-warning-border w-full rounded-md border p-3 text-sm"
+      >
+        <div className="font-medium">{t("noAccountTitle")}</div>
+        <p className="mt-1 break-words">{t("noAccountBody")}</p>
+        {onSwitchAccount && (
+          <Button variant="outline" size="sm" className="mt-3" onClick={onSwitchAccount}>
+            {t("useDifferentAccount")}
+          </Button>
+        )}
+      </div>
+      {children}
+    </div>
   );
 }
 

@@ -25,6 +25,8 @@ from django.http import HttpResponseRedirect, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
 
+from .return_urls import safe_relative_path
+
 
 def _enabled() -> bool:
     if settings.DEBUG:
@@ -68,6 +70,8 @@ def local_login(request):
 
     if not username or not password:
         return _bad("username + password required")
+    # Redirected to below, so it stays on this host.
+    next_url = safe_relative_path(next_url) or "/app/admin/"
 
     user = authenticate(request, username=username, password=password)
     if user is None or not user.is_active:

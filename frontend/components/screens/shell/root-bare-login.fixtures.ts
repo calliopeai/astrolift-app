@@ -1,4 +1,4 @@
-import type { InvitationAcceptProps } from "../auth/InvitationAccept";
+import type { InvitationAcceptProps, InvitationSummary } from "../auth/InvitationAccept";
 import type { LoginScreenProps } from "../auth/LoginScreen";
 import type { ActiveIdp } from "../auth/use-login";
 
@@ -63,15 +63,36 @@ export const IDP_NOT_READY: ActiveIdp = {
 export const LOGIN: LoginScreenProps = {
   devLogin: false,
   idp: IDP_EXTERNAL,
+  notice: null,
   loadError: null,
   continueWithIdp: noop,
+  switchAccount: noop,
   submitLocal: noopAsync,
 };
 
+export const INVITATION_SUMMARY: InvitationSummary = {
+  organizationName: "Acme Robotics",
+  inviterName: "Ada Lovelace",
+  roleName: "Developer",
+  emailHint: "n•••@acme.example",
+  expiresAt: "2026-10-23T18:30:00Z",
+};
+
+export const INVITATION_SUMMARY_LONG: InvitationSummary = {
+  organizationName:
+    "Platform Team Shared Enterprise Production Workloads Organization With A Deliberately Long Name",
+  inviterName: "Maximiliana Theodora Wolfeschlegelsteinhausenbergerdorff-Montgomery",
+  roleName: "Organization Administrator With Every Permission Except Billing Changes",
+  emailHint: "m•••@platform-team-shared-enterprise-production-workloads.example.com",
+  expiresAt: "2026-10-23T18:30:00Z",
+};
+
+/** Signed out, on a pending invitation: the state a fresh invitee lands in. */
 export const INVITATION: InvitationAcceptProps = {
-  loading: false,
-  ok: false,
-  errorMessage: null,
-  onAccept: noopAsync,
+  view: { kind: "signIn", invitation: INVITATION_SUMMARY },
+  onSignIn: noop,
+  onAccept: noop,
+  onSignOut: noop,
+  onRetry: noop,
   onGoToDashboard: noop,
 };
