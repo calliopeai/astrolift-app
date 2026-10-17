@@ -215,10 +215,19 @@ def test_the_setting_lists_loopback_and_each_address_or_range(raw, trusted):
 
 
 @pytest.mark.parametrize(
-    "raw", ["*", "0.0.0.0/0", "::/0", "10.0.0.0/33", "alb.internal", "10.0.0.1 10.0.0.2"]
+    ("raw", "reason"),
+    [
+        # uvicorn reads "*" as trust everyone; say why it is refused, not that it is malformed.
+        ("*", "every client could choose its own address"),
+        ("0.0.0.0/0", "every client could choose its own address"),
+        ("::/0", "every client could choose its own address"),
+        ("10.0.0.0/33", "is not an IP address or CIDR range"),
+        ("alb.internal", "is not an IP address or CIDR range"),
+        ("10.0.0.1 10.0.0.2", "is not an IP address or CIDR range"),
+    ],
 )
-def test_a_setting_that_trusts_everyone_or_cannot_be_read_stops_the_app(raw):
-    with pytest.raises(ImproperlyConfigured, match="ASTROLIFT_TRUSTED_PROXIES"):
+def test_a_setting_that_trusts_everyone_or_cannot_be_read_stops_the_app(raw, reason):
+    with pytest.raises(ImproperlyConfigured, match=f"ASTROLIFT_TRUSTED_PROXIES.*{reason}"):
         parse_trusted_proxies(raw)
 
 
