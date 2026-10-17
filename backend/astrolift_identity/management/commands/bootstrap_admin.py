@@ -4,19 +4,25 @@
 Brings a fresh production install to a usable state in one shot:
 
 * Organization (default slug ``acme`` — override per install)
-* User (the bootstrap admin)
-* Member row at ORG scope so TenantContextMiddleware resolves cleanly
-* RoleBinding(user, org_owner, ORG=org)
+* A pending FirstAdministrator naming the operator's email (installer #503)
+
+No user, password or role binding is created here. The first sign-in whose
+provider-verified email matches claims the administrator
+(``astrolift_identity.first_admin``): the account, its ``org_owner`` binding
+and its Member row are made then, and audited. Once claimed, later runs do
+nothing with the email: removing that administrator or changing the variable
+never re-creates or re-grants anyone. An organization that already has an
+owner (an install bootstrapped before the claim existed) is recorded as
+claimed for the same reason.
 
 The system roles (``org_owner``, ``org_admin``, ``team_developer``,
 ``app_viewer``, …) are already upserted by data migration
 ``astrolift_identity.0002_system_roles``; this command does NOT
-re-define roles, it just wires the first human into the platform's
-own RBAC.
+re-define roles; the claim binds the first human to ``org_owner``.
 
-Operators run this once after the initial migrate. Re-runnable: every
-step is upsert-style. No dev-mode dependency — works for OIDC, SAML,
-Cognito, and local-account installs.
+It runs on every container start. Re-runnable: every step is upsert-style.
+The claim needs a sign-in through the configured provider (OIDC, SAML,
+Cognito); a local-account install makes its first owner by hand.
 
 Inputs (CLI flag overrides env var):
 
@@ -24,9 +30,8 @@ Inputs (CLI flag overrides env var):
   --org          ASTROLIFT_ORG_SLUG          (default 'acme')
   --org-name     ASTROLIFT_ORG_NAME          (default = slug.title())
   --org-website  ASTROLIFT_ORG_WEBSITE       (optional; left blank if omitted)
-  --password     ASTROLIFT_ADMIN_PASSWORD    (optional; only used if the
-                                              local IdP is enabled)
-  --is-superuser ASTROLIFT_ADMIN_SUPERUSER   ('true'/'1' to enable)
+  --is-superuser ASTROLIFT_ADMIN_SUPERUSER   ('true'/'1' to enable; applied
+                                              at the claim)
 
 Why a flag *and* an env var: the env-var form makes this safe to
 invoke from a deploy script without baking secrets into shell
@@ -37,12 +42,13 @@ from __future__ import annotations
 
 import os
 
-from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.utils import timezone
 
+from astrolift_identity.first_admin import normalise
 from astrolift_identity.models import (
-    Member,
+    FirstAdministrator,
     Organization,
     Role,
     RoleBinding,
@@ -59,7 +65,7 @@ def _truthy(val: str | None) -> bool:
 
 
 class Command(BaseCommand):
-    help = "Bootstrap the first admin in a fresh install (org + user + role binding)."
+    help = "Bootstrap a fresh install: the org and its pending first administrator."
 
     def add_arguments(self, parser):
         parser.add_argument("--email", default=_env("ASTROLIFT_ADMIN_EMAIL"))
@@ -69,7 +75,6 @@ class Command(BaseCommand):
         parser.add_argument("--org", default=_env("ASTROLIFT_ORG_SLUG"))
         parser.add_argument("--org-name", default=_env("ASTROLIFT_ORG_NAME"))
         parser.add_argument("--org-website", default=_env("ASTROLIFT_ORG_WEBSITE"))
-        parser.add_argument("--password", default=_env("ASTROLIFT_ADMIN_PASSWORD"))
         parser.add_argument(
             "--is-superuser",
             action="store_true",
@@ -89,7 +94,6 @@ class Command(BaseCommand):
         org: str | None,
         org_name: str | None,
         org_website: str | None,
-        password: str | None,
         is_superuser: bool,
         **opts,
     ):
@@ -145,29 +149,6 @@ class Command(BaseCommand):
             if update_fields:
                 org_row.save(update_fields=[*update_fields, "updated_at", "version"])
 
-            User = get_user_model()
-            user, user_created = User.objects.get_or_create(
-                username=email,
-                defaults={
-                    "email": email,
-                    "is_staff": is_superuser,
-                    "is_superuser": is_superuser,
-                },
-            )
-            # Always reapply the staff/superuser flags so they track
-            # whatever the operator passed this run, not whatever was
-            # set at first creation.
-            user.is_staff = is_superuser or user.is_staff
-            user.is_superuser = is_superuser
-            if password:
-                user.set_password(password)
-            elif user_created:
-                # User created via OIDC will set their own credentials;
-                # leave the password unusable so plain-password login
-                # can't accidentally back-door the account.
-                user.set_unusable_password()
-            user.save()
-
             try:
                 org_owner = Role.objects.get(slug="org_owner", is_system=True, organization=None)
             except Role.DoesNotExist as exc:
@@ -175,26 +156,30 @@ class Command(BaseCommand):
                     "system role 'org_owner' missing — run `manage.py migrate` first."
                 ) from exc
 
-            binding, binding_created = RoleBinding.objects.get_or_create(
-                user=user,
-                role=org_owner,
-                scope_kind="ORG",
-                scope_id=org_row.id,
-            )
-
-            Member.objects.update_or_create(
-                user=user,
-                scope_kind="ORG",
-                scope_id=org_row.id,
-                defaults={"is_active": True, "lifecycle": "active"},
-            )
+            record = FirstAdministrator.objects.select_for_update().filter(organization=org_row).first()
+            if record is None:
+                owner = (
+                    RoleBinding.objects.filter(
+                        role=org_owner, scope_kind="ORG", scope_id=org_row.id, user__isnull=False
+                    )
+                    .order_by("id")
+                    .first()
+                )
+                record = FirstAdministrator.objects.create(
+                    organization=org_row,
+                    email=normalise(email),
+                    is_superuser=is_superuser,
+                    claimed_at=timezone.now() if owner else None,
+                    claimed_user_id=owner.user_id if owner else None,
+                )
+            elif record.claimed_at is None:
+                record.email = normalise(email)
+                record.is_superuser = is_superuser
+                record.save(update_fields=["email", "is_superuser"])
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"bootstrap admin wired: org={org_row.slug} "
-                f"user={user.username} "
-                f"org_created={org_created} user_created={user_created} "
-                f"binding_created={binding_created} "
-                f"superuser={is_superuser}"
+                f"bootstrap admin: org={org_row.slug} org_created={org_created} "
+                f"first_administrator={'claimed' if record.claimed_at else 'pending'}"
             )
         )
