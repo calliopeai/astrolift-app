@@ -288,6 +288,29 @@ def test_url_attachments_must_point_at_this_install(world):
     assert inside.status_code == 201
 
 
+@pytest.mark.parametrize(
+    "reference",
+    [
+        "//evil.example/x",
+        "///evil.example/x",
+        "/\\evil.example/x",
+        "https://astro.example.net/\\evil.example/x",
+    ],
+)
+def test_ambiguous_attachment_urls_cannot_be_interpreted_as_another_origin(world, reference):
+    task, key = _task(world)
+    response = _send(task, key, body="x", attachments=[{"kind": "url", "ref": reference}])
+    assert response.status_code == 400
+    assert not AgentMessage.objects.exists()
+
+
+def test_a_platform_preview_does_not_expose_a_truncated_private_key(world):
+    task, _ = _task(world)
+    task.result = {"output": "-----BEGIN PRIVATE KEY-----\n" + "A" * 3000 + "\n-----END PRIVATE KEY-----"}
+    agent_messages.signal_task_finished(task, AgentTask.Status.COMPLETED)
+    assert AgentMessage.objects.get().body == "[redacted]"
+
+
 def test_the_runs_mcp_server_sends_as_the_run(world):
     task, key = _task(world)
     url = f"/api/dispatch/v1/agents/{task.guid}/mcp/"
@@ -606,7 +629,7 @@ def test_a_full_size_reply_reaches_the_live_run_without_truncation(world):
 
 @pytest.mark.parametrize("status", [AgentTask.Status.COMPLETED, AgentTask.Status.CANCELLED])
 @pytest.mark.parametrize("consumed", [False, True])
-def test_a_run_ending_preserves_unconsumed_replies_for_the_next_run(world, status, consumed):
+def test_a_run_ending_preserves_unconsumed_replies_for_the_next_run(world, status, consumed, audit):
     from astrolift_agents.services.agent_task_input import claim_pending_input
 
     task, key = _task(world)
@@ -619,13 +642,18 @@ def test_a_run_ending_preserves_unconsumed_replies_for_the_next_run(world, statu
     task.transition_to(status)
 
     row = AgentMessageReply.objects.get(guid=str(result.data.id))
+    recovery_audits = [entry for entry in audit if entry.action == "agent.message.reply.requeued"]
     later, _ = _task(world)
     collected = agent_messages.claim_queued_replies(later)
     if consumed:
+        assert recovery_audits == []
         assert row.route == AgentMessageReply.Route.LIVE_RUN
         assert row.input_message.delivered_at is not None
         assert collected == []
     else:
+        assert len(recovery_audits) == 1
+        assert recovery_audits[0].actor_user_id is None
+        assert recovery_audits[0].extra["reply_author_user_id"] == world.user.pk
         assert row.route == AgentMessageReply.Route.QUEUED
         assert row.input_message.deleted_at is not None
         assert claim_pending_input(task) == []

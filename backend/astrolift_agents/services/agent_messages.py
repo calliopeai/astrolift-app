@@ -62,7 +62,7 @@ _CREDENTIALS = re.compile(
     r"|xox[abposr]-[A-Za-z0-9-]{10,}"
     r"|sk-[A-Za-z0-9_\-]{20,}"
     r"|eyJ[A-Za-z0-9_\-]{8,}\.eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,}"
-    r"|-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----"
+    r"|-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|\Z)"
 )
 
 
@@ -253,8 +253,9 @@ def _attachments(raw: Any, task: AgentTask | None) -> list[dict[str, str]]:
         ref = _text(item["ref"], "attachments", 1000, required=True)
         if kind == "url":
             parsed = urlparse(ref)
-            on_install = (not parsed.scheme and not parsed.netloc and ref.startswith("/")) or (
-                parsed.scheme == "https" and (parsed.hostname or "").lower() in _install_hosts()
+            on_install = "\\" not in ref and (
+                (not parsed.scheme and not parsed.netloc and ref.startswith("/") and not ref.startswith("//"))
+                or (parsed.scheme == "https" and (parsed.hostname or "").lower() in _install_hosts())
             )
             if not on_install:
                 raise AgentMessageError(
@@ -1100,7 +1101,8 @@ def requeue_undelivered_replies(task: AgentTask) -> int:
         _audit(
             "agent.message.reply.requeued",
             row.message,
-            actor_user_id=row.author_id,
+            actor_user_id=None,
+            reply_author_user_id=row.author_id,
             reply_id=str(row.guid),
             reason="run_ended_before_input_consumed",
         )
