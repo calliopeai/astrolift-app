@@ -258,6 +258,16 @@ SES_EVENTS_SNS_TOPIC_ARN = env_str("ASTROLIFT_SES_EVENTS_SNS_TOPIC_ARN", "")
 # "Hook url is not supported because it isn't reachable over the
 # public Internet (localhost)".
 APP_BASE_URL = os.environ.get("APP_BASE_URL", "").rstrip("/")
+# The Mimwell edition a new semantic layer is scaffolded from (#2424): an
+# ``owner/name`` repository, the ref a create uses when it names none, and the
+# archive URL template (``{repo}`` and ``{ref}``). An air-gapped install points
+# the URL at its mirror. Every file is checked against the edition's own
+# ``edition.json`` sha256 list; Astrolift never runs template code.
+BRAIN_TEMPLATE_REPO = env_str("ASTROLIFT_BRAIN_TEMPLATE_REPO", "ConflictHQ/mimwell")
+BRAIN_TEMPLATE_REF = env_str("ASTROLIFT_BRAIN_TEMPLATE_REF", "main")
+BRAIN_TEMPLATE_ARCHIVE_URL = env_str(
+    "ASTROLIFT_BRAIN_TEMPLATE_ARCHIVE_URL", "https://codeload.github.com/{repo}/zip/{ref}"
+)
 # Operator-provisioned Cloudflare OAuth client; never returned via GraphQL.
 # Use exact read scope IDs from Cloudflare's OAuth scopes catalogue.
 ASTROLIFT_CLOUDFLARE_OAUTH_CLIENT_ID = env_str("ASTROLIFT_CLOUDFLARE_OAUTH_CLIENT_ID", "")
