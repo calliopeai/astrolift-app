@@ -38,8 +38,9 @@ logger = logging.getLogger(__name__)
 
 def _claim_is_true(value: object) -> bool:
     """A boolean claim as the IdP meant it: ``true``, or the string ``"true"``
-    that Cognito sends for a mapped attribute. ``"false"`` is a non-empty
-    string, so reading the claim for truth took it as verified."""
+    that Cognito sends for a mapped attribute. Reading the claim for truth
+    passed any non-empty string: ``"False"`` signed in an unverified address,
+    and ``"true"`` or ``"false"`` failed the BooleanField's save."""
     return value is True or (isinstance(value, str) and value.strip().lower() == "true")
 
 
