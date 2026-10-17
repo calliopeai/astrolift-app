@@ -14783,6 +14783,8 @@
     "signIn": "로그인",
     "noAccountTitle": "이 로그인에 해당하는 Astrolift 계정이 없습니다",
     "noAccountBody": "ID 제공업체에서 로그인했지만 이 ID에 해당하는 계정이 여기에 없습니다. 초대를 받았다면 초대를 받은 주소로 로그인하세요. 그렇지 않다면 관리자에게 초대를 요청하세요.",
+    "emailUnverifiedTitle": "이메일 주소가 확인되지 않았습니다",
+    "emailUnverifiedBody": "ID 제공업체에서 로그인했지만 이메일 주소가 확인되지 않아 Astrolift가 어떤 계정이 본인의 것인지 알 수 없습니다. 제공업체에서 주소를 확인하거나 관리자에게 문의한 다음 다시 로그인하세요.",
     "useDifferentAccount": "다른 계정 사용"
   },
   "invitationAccept": {

@@ -17,15 +17,25 @@ For production, use ``daphne`` or ``uvicorn`` against this same
 ``application`` callable.
 """
 
+import logging
 import os
 from importlib import import_module
 
 from django.core.asgi import get_asgi_application
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
 # Initialize Django before importing anything that touches models.
 django_application = get_asgi_application()
+
+from django.conf import settings  # noqa: E402
+
+from core.logging import UrlSecretFilter  # noqa: E402
+
+# uvicorn's access log writes every request's path and query, which carry
+# sign-in codes and invitation tokens (#2429).
+logging.getLogger("uvicorn.access").addFilter(UrlSecretFilter())
 
 
 def _build_websocket_app():
@@ -78,7 +88,7 @@ def _websocket_origin_ok(scope) -> bool:
     return websocket_origin_allowed(_header_from_scope(scope, "origin"), _header_from_scope(scope, "host"))
 
 
-async def application(scope, receive, send):
+async def _route(scope, receive, send):
     global _websocket_app
     if scope["type"] == "websocket":
         path = scope.get("path", "")
@@ -98,3 +108,11 @@ async def application(scope, receive, send):
 
     # HTTP / lifespan → Django.
     return await django_application(scope, receive, send)
+
+
+# The client address and scheme the proxies in front report, believed only
+# from the peers settings.TRUSTED_PROXIES names (#2431). uvicorn runs with
+# its own proxy handling off (startup.py), so this is the one place that
+# decides. It rewrites the scope in place: REMOTE_ADDR, so every key="ip"
+# limit, and uvicorn's access log see the client, not the load balancer.
+application = ProxyHeadersMiddleware(_route, trusted_hosts=list(settings.TRUSTED_PROXIES))

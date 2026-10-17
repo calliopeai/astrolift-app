@@ -70,7 +70,8 @@ def test_successful_migration_preserves_bootstrap_and_server(startup, monkeypatc
         "python manage.py bootstrap_idp"
     )
     assert startup.commands[-1] == "python manage.py sync_licence_modules"
-    expected = "uvicorn config.asgi:application --host 0.0.0.0 --port 8000"
+    # Proxy headers are config.asgi's to read, from the trusted proxies only (#2431).
+    expected = "uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --no-proxy-headers"
     assert startup.system_calls == ["service cron start", expected + (" --reload" if reload else "")]
 
 
@@ -81,7 +82,10 @@ def test_non_migration_failure_keeps_existing_optional_command_behavior(startup,
     startup.results[optional_command] = 9
     startup.run()
     assert startup.commands[-1] == "python manage.py sync_licence_modules"
-    assert startup.system_calls[-1] == "uvicorn config.asgi:application --host 0.0.0.0 --port 8000"
+    assert (
+        startup.system_calls[-1]
+        == "uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --no-proxy-headers"
+    )
 
 
 def test_successful_migration_preserves_runserver_fallback_without_uvicorn(startup, monkeypatch):

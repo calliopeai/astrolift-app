@@ -1134,6 +1134,15 @@ RATELIMIT_RETRY_AFTER_SECONDS = int(env_str("RATELIMIT_RETRY_AFTER_SECONDS", "60
 RATELIMIT_GRAPHQL_RATE = env_str("RATELIMIT_GRAPHQL_RATE", "600/m")
 RATELIMIT_GRAPHQL_AUTH_RATE = env_str("RATELIMIT_GRAPHQL_AUTH_RATE", "30/m")
 
+# The proxies whose X-Forwarded-For and X-Forwarded-Proto config.asgi believes
+# (#2431): loopback (the nginx sidecar) plus ASTROLIFT_TRUSTED_PROXIES,
+# comma-separated addresses or CIDR ranges such as the load balancer's
+# subnets. Without the balancer's ranges every request has the balancer's
+# address, and each per-IP limit above counts all of its clients as one.
+from config.proxies import parse_trusted_proxies  # noqa: E402
+
+TRUSTED_PROXIES = parse_trusted_proxies(env_str("ASTROLIFT_TRUSTED_PROXIES", ""))
+
 # Temporal — durable workflow runtime
 TEMPORAL_ADDRESS = env_str("TEMPORAL_ADDRESS", "localhost:7233")
 TEMPORAL_NAMESPACE = env_str("TEMPORAL_NAMESPACE", "default")

@@ -14786,6 +14786,8 @@
     "signIn": "Anmelden",
     "noAccountTitle": "Kein Astrolift-Konto für diese Anmeldung",
     "noAccountBody": "Ihr Identitätsanbieter hat Sie angemeldet, aber hier gibt es kein Konto für diese Identität. Wenn Sie eingeladen wurden, melden Sie sich mit der Adresse an, an die die Einladung gesendet wurde; andernfalls bitten Sie einen Administrator, Sie einzuladen.",
+    "emailUnverifiedTitle": "E-Mail-Adresse nicht bestätigt",
+    "emailUnverifiedBody": "Ihr Identitätsanbieter hat Sie angemeldet, Ihre E-Mail-Adresse aber nicht bestätigt, daher kann Astrolift Ihr Konto nicht zuordnen. Bestätigen Sie die Adresse bei Ihrem Anbieter oder wenden Sie sich an einen Administrator, und melden Sie sich dann erneut an.",
     "useDifferentAccount": "Anderes Konto verwenden"
   },
   "invitationAccept": {

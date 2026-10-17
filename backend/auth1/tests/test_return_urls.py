@@ -1,8 +1,9 @@
 """A finished sign-in sends its session only to this host or the frontend callback.
 
-The callback appends ``token=Session <key>`` to the stored return address, so
-before this a ``/app/auth1/login?next=https://elsewhere/`` link handed
-``elsewhere`` the session of whoever signed in through it.
+The callback appended ``token=Session <key>`` to the stored return address
+(a one-time code since #2429), so before this a
+``/app/auth1/login?next=https://elsewhere/`` link handed ``elsewhere`` the
+session of whoever signed in through it.
 """
 
 import uuid
@@ -65,7 +66,7 @@ def test_a_path_on_this_host_passes_as_given(frontend, value):
         (f"{FRONTEND}/auth/callback#fragment", f"{FRONTEND}/auth/callback"),
         # The callback writes these itself; a link may not pre-seed them.
         (
-            f"{FRONTEND}/auth/callback?token=Session+x&error=y&next=%2Fdashboard",
+            f"{FRONTEND}/auth/callback?token=Session+x&code=c&error=y&next=%2Fdashboard",
             f"{FRONTEND}/auth/callback?next=%2Fdashboard",
         ),
     ],
@@ -191,5 +192,5 @@ def test_callback_ignores_a_return_address_stored_before_the_check(frontend, mon
 
     location = urlsplit(response["Location"])
     assert (location.scheme, location.netloc, location.path) == ("https", "astro.example", "/auth/callback")
-    assert parse_qs(location.query)["token"][0].startswith("Session ")
+    assert set(parse_qs(location.query)) == {"code"}
     assert "evil.example" not in response["Location"]

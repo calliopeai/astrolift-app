@@ -95,12 +95,16 @@ for command in ON_STARTUP:
 # restarts the worker on any source change, which kills live websocket /
 # exec / VNC streams. Mirror settings.py's dev detection (Dev + Local*)
 # so production (prd/int/stg) runs uvicorn without it.
+#
+# --no-proxy-headers: config.asgi reads X-Forwarded-For and -Proto from the
+# proxies ASTROLIFT_TRUSTED_PROXIES names (#2431). uvicorn's own handling
+# would decide first, from FORWARDED_ALLOW_IPS, where "*" trusts everyone.
 _configuration = os.getenv("DJANGO_CONFIGURATION", "Dev").lower()
 _reload_flag = " --reload" if _configuration in ("dev", "local", "localpg", "localverbose") else ""
 try:
     import uvicorn  # noqa: F401
 
-    os.system(f"uvicorn config.asgi:application --host 0.0.0.0 --port 8000{_reload_flag}")
+    os.system(f"uvicorn config.asgi:application --host 0.0.0.0 --port 8000 --no-proxy-headers{_reload_flag}")
 except ImportError:
     os.system("python manage.py runserver 0.0.0.0:8000")
 
