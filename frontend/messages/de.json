@@ -16312,7 +16312,8 @@
     "semanticLayer": "Semantische Schicht",
     "substrate": "Substrat",
     "sharing": "Freigabe",
-    "connect": "Verbinden"
+    "connect": "Verbinden",
+    "agentInbox": "Posteingang"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17179,5 +17180,42 @@
     "reasonPermission": "Dafür fehlt Ihnen die Berechtigung.",
     "reasonStepUp": "Dafür ist eine erneute Anmeldung nötig.",
     "reasonRateLimited": "Zu viele Versuche. Warten Sie eine Minute und versuchen Sie es erneut."
+  },
+  "agentInbox": {
+    "title": "Posteingang",
+    "description": "{count, plural, =0 {Nachrichten deiner Agenten. Nichts ungelesen.} one {Nachrichten deiner Agenten. # ungelesen.} other {Nachrichten deiner Agenten. # ungelesen.}}",
+    "buttonUnread": "Posteingang, {count} ungelesen",
+    "unreadOnly": "Nur ungelesene",
+    "emptyTitle": "Noch keine Nachrichten",
+    "emptyUnreadTitle": "Nichts ungelesen",
+    "emptyDescription": "Wenn ein Agent dir ein Update, eine Frage oder ein Ergebnis schickt, landet es hier.",
+    "pickThread": "Wähle eine Unterhaltung aus, um sie zu lesen.",
+    "threads": "Unterhaltungen",
+    "thread": "Unterhaltung",
+    "unknownAgent": "Entfernter Agent",
+    "more": "Mehr laden",
+    "earlier": "Frühere Nachrichten laden",
+    "openRun": "Lauf öffnen",
+    "markRead": "Als gelesen markieren",
+    "replyToAgent": "Dem Agenten antworten",
+    "answer": "Deine Antwort",
+    "reason": "Begründung (optional)",
+    "allow": "Erlauben",
+    "deny": "Ablehnen",
+    "send": "Senden",
+    "expires": "Läuft ab {when}",
+    "kind": {
+      "update": "Aktualisierung",
+      "question": "Frage",
+      "approval": "Freigabe",
+      "result": "Ergebnis",
+      "alert": "Warnung"
+    },
+    "route": {
+      "live_run": "an den laufenden Agenten gesendet",
+      "gate": "hat die Anfrage des Agenten beantwortet",
+      "woke": "hat den Agenten gestartet",
+      "queued": "wartet auf den nächsten Lauf des Agenten"
+    }
   }
 }

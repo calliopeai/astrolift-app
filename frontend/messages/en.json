@@ -17073,7 +17073,8 @@
     "semanticLayer": "Semantic layer",
     "substrate": "Substrate",
     "sharing": "Sharing",
-    "connect": "Connect"
+    "connect": "Connect",
+    "agentInbox": "Inbox"
   },
   "support": {
     "title": "Support",
@@ -17176,5 +17177,42 @@
     "reasonPermission": "You do not have permission for this.",
     "reasonStepUp": "This needs a fresh sign-in.",
     "reasonRateLimited": "Too many attempts. Wait a minute and try again."
+  },
+  "agentInbox": {
+    "title": "Inbox",
+    "description": "{count, plural, =0 {Messages from your agents. Nothing unread.} one {Messages from your agents. # unread.} other {Messages from your agents. # unread.}}",
+    "buttonUnread": "Inbox, {count} unread",
+    "unreadOnly": "Unread only",
+    "emptyTitle": "No messages yet",
+    "emptyUnreadTitle": "Nothing unread",
+    "emptyDescription": "When an agent sends you an update, a question or a result, it lands here.",
+    "pickThread": "Pick a conversation to read it.",
+    "threads": "Conversations",
+    "thread": "Conversation",
+    "unknownAgent": "Removed agent",
+    "more": "Load more",
+    "earlier": "Load earlier messages",
+    "openRun": "Open the run",
+    "markRead": "Mark read",
+    "replyToAgent": "Reply to the agent",
+    "answer": "Your answer",
+    "reason": "Reason (optional)",
+    "allow": "Allow",
+    "deny": "Deny",
+    "send": "Send",
+    "expires": "Expires {when}",
+    "kind": {
+      "update": "Update",
+      "question": "Question",
+      "approval": "Approval",
+      "result": "Result",
+      "alert": "Alert"
+    },
+    "route": {
+      "live_run": "sent to the running agent",
+      "gate": "answered the agent's request",
+      "woke": "started the agent",
+      "queued": "waits for the agent's next run"
+    }
   }
 }

@@ -379,6 +379,11 @@ class AgentTask(BaseCoreModel):
                 revoke_run(task, CANCELLED if new_status == self.Status.CANCELLED else ENDED)
             for field in fields:
                 setattr(self, field, getattr(task, field))
+        if new_status in {self.Status.COMPLETED, self.Status.FAILED, self.Status.TIMED_OUT}:
+            # Finished and failed runs reach the person who launched them as a message (#2434).
+            from astrolift_agents.services.agent_messages import signal_task_finished
+
+            transaction.on_commit(lambda: signal_task_finished(self, new_status))
         try:
             from astrolift_operations.zentinelle_bridge import emit_agent_task_transition
 

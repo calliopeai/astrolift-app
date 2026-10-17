@@ -16312,7 +16312,8 @@
     "semanticLayer": "Couche sémantique",
     "substrate": "Substrat",
     "sharing": "Partage",
-    "connect": "Connexion"
+    "connect": "Connexion",
+    "agentInbox": "Boîte de réception"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -17179,5 +17180,42 @@
     "reasonPermission": "Vous n'avez pas l'autorisation pour cela.",
     "reasonStepUp": "Cela nécessite une nouvelle connexion.",
     "reasonRateLimited": "Trop de tentatives. Attendez une minute et réessayez."
+  },
+  "agentInbox": {
+    "title": "Boîte de réception",
+    "description": "{count, plural, =0 {Messages de vos agents. Rien de non lu.} one {Messages de vos agents. # non lu.} other {Messages de vos agents. # non lus.}}",
+    "buttonUnread": "Boîte de réception, {count} non lus",
+    "unreadOnly": "Non lus uniquement",
+    "emptyTitle": "Aucun message pour l'instant",
+    "emptyUnreadTitle": "Rien de non lu",
+    "emptyDescription": "Quand un agent vous envoie une mise à jour, une question ou un résultat, il arrive ici.",
+    "pickThread": "Choisissez une conversation pour la lire.",
+    "threads": "Discussions",
+    "thread": "Discussion",
+    "unknownAgent": "Agent supprimé",
+    "more": "Charger plus",
+    "earlier": "Charger les messages précédents",
+    "openRun": "Ouvrir l'exécution",
+    "markRead": "Marquer comme lu",
+    "replyToAgent": "Répondre à l'agent",
+    "answer": "Votre réponse",
+    "reason": "Motif (facultatif)",
+    "allow": "Autoriser",
+    "deny": "Refuser",
+    "send": "Envoyer",
+    "expires": "Expire {when}",
+    "kind": {
+      "update": "Mise à jour",
+      "question": "Question posée",
+      "approval": "Approbation",
+      "result": "Résultat",
+      "alert": "Alerte"
+    },
+    "route": {
+      "live_run": "envoyé à l'agent en cours",
+      "gate": "a répondu à la demande de l'agent",
+      "woke": "a démarré l'agent",
+      "queued": "attend la prochaine exécution de l'agent"
+    }
   }
 }

@@ -17076,7 +17076,8 @@
     "semanticLayer": "Capa semántica",
     "substrate": "Sustrato",
     "sharing": "Acceso compartido",
-    "connect": "Conectar"
+    "connect": "Conectar",
+    "agentInbox": "Bandeja de entrada"
   },
   "support": {
     "title": "Soporte",
@@ -17179,5 +17180,42 @@
     "reasonPermission": "No tiene permiso para esto.",
     "reasonStepUp": "Esto requiere volver a iniciar sesión.",
     "reasonRateLimited": "Demasiados intentos. Espere un minuto e inténtelo de nuevo."
+  },
+  "agentInbox": {
+    "title": "Bandeja de entrada",
+    "description": "{count, plural, =0 {Mensajes de tus agentes. Nada sin leer.} one {Mensajes de tus agentes. # sin leer.} other {Mensajes de tus agentes. # sin leer.}}",
+    "buttonUnread": "Bandeja de entrada, {count} sin leer",
+    "unreadOnly": "Solo sin leer",
+    "emptyTitle": "Aún no hay mensajes",
+    "emptyUnreadTitle": "Nada sin leer",
+    "emptyDescription": "Cuando un agente te envía una actualización, una pregunta o un resultado, aparece aquí.",
+    "pickThread": "Elige una conversación para leerla.",
+    "threads": "Conversaciones",
+    "thread": "Conversación",
+    "unknownAgent": "Agente eliminado",
+    "more": "Cargar más",
+    "earlier": "Cargar mensajes anteriores",
+    "openRun": "Abrir la ejecución",
+    "markRead": "Marcar como leído",
+    "replyToAgent": "Responder al agente",
+    "answer": "Tu respuesta",
+    "reason": "Motivo (opcional)",
+    "allow": "Permitir",
+    "deny": "Denegar",
+    "send": "Enviar",
+    "expires": "Vence {when}",
+    "kind": {
+      "update": "Actualización",
+      "question": "Pregunta",
+      "approval": "Aprobación",
+      "result": "Resultado",
+      "alert": "Alerta"
+    },
+    "route": {
+      "live_run": "enviado al agente en ejecución",
+      "gate": "respondió la solicitud del agente",
+      "woke": "inició el agente",
+      "queued": "espera la próxima ejecución del agente"
+    }
   }
 }
