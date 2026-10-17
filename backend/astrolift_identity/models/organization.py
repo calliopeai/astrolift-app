@@ -187,7 +187,7 @@ class Organization(NamedBaseCoreModel):
     # Temporary apps (#2433): {"max_ttl_seconds", "temporary_only_for_members",
     # "ttl_required_surfaces", "data_grace_days"}. Empty means the defaults in
     # ``astrolift_registry.expiry``; validated by the mutation that writes it.
-    temporary_app_policy = models.JSONField(default=dict, blank=True)
+    temporary_app_policy = models.JSONField(default=dict, blank=True, db_default={})
 
     # House theme for the operator UI (#135). The appearance axes — ground,
     # accent, density, corners — are per-person by default; this is the org's

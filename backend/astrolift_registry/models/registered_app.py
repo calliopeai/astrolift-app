@@ -212,11 +212,11 @@ class RegisteredApp(NamedBaseCoreModel):
     # ``delete_data_on_expiry``. ``expiry_fired_at`` is set once, when the
     # timer fires; nothing changes the expiry after that.
     expires_at = models.DateTimeField(null=True, blank=True, db_index=True)
-    delete_data_on_expiry = models.BooleanField(default=False)
-    expiry_warnings_sent = models.JSONField(default=list, blank=True)
+    delete_data_on_expiry = models.BooleanField(default=False, db_default=False)
+    expiry_warnings_sent = models.JSONField(default=list, blank=True, db_default=[])
     expiry_fired_at = models.DateTimeField(null=True, blank=True)
     data_retained_until = models.DateTimeField(null=True, blank=True)
-    expiry_cleanup = models.JSONField(default=list, blank=True, editable=False)
+    expiry_cleanup = models.JSONField(default=list, blank=True, editable=False, db_default=[])
 
     webhook_deploys_paused = models.BooleanField(default=False)
     webhook_deploys_paused_at = models.DateTimeField(null=True, blank=True)
