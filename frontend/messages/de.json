@@ -14634,6 +14634,7 @@
     },
     "health": {
       "healthy": "Gateway läuft",
+      "stale": "Gateway meldet sich nicht",
       "pending": "Gateway noch nicht bereitgestellt",
       "off": "Gateway aus",
       "error": "Gateway-Fehler"
@@ -14684,7 +14685,20 @@
       "clustersTitle": "Gateway-Zustand je Cluster",
       "clustersDescription": "Das Zentinelle-Gateway jedes registrierten Clusters.",
       "installOff": "Zentinelle-Gateways sind für diese Installation ausgeschaltet. Registrierte Cluster behalten ihre Zugangsdaten; Gateways werden bereitgestellt, sobald der Plattformbetreiber sie einschaltet.",
-      "noClusters": "Noch keine Cluster bei Zentinelle registriert."
+      "noClusters": "Noch keine Cluster bei Zentinelle registriert.",
+      "serverVersion": "Zentinelle-Version",
+      "blocks": "Blockierungen, letzte 24 Stunden",
+      "approvals": "Offene Freigaben",
+      "budget": "Budget in diesem Monat",
+      "budgetValue": "{percent} % genutzt",
+      "budgetFooter": "{spend} von {limit} ({name})",
+      "noBudget": "Kein Budget festgelegt",
+      "notAvailable": "Nicht verfügbar",
+      "countsError": "Zustand konnte nicht aus Zentinelle gelesen werden",
+      "reportNotAvailable": "Version und letzte Meldung nicht verfügbar",
+      "neverReported": "Noch nicht gemeldet",
+      "versionUnknown": "Version unbekannt",
+      "reported": "{version}, zuletzt gesehen {seen}"
     },
     "clusters": {
       "installOff": "Zentinelle-Gateways sind für diese Installation ausgeschaltet. Beim Registrieren wird die Zugangsberechtigung des Clusters gespeichert; das Gateway wird bereitgestellt, sobald der Plattformbetreiber Gateways einschaltet.",

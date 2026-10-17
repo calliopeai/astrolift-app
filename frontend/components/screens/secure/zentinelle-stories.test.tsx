@@ -7,20 +7,25 @@ import * as preview from "../../../.storybook/preview";
 import {
   DEGRADED_CONNECTION,
   FULL_ACCESS,
+  HEALTH_COUNTS,
   HEALTHY_CONNECTION,
   NO_ACCESS,
+  STALE_CONNECTION,
 } from "./zentinelle-fixtures";
 import {
   gatewayHealth,
   isDegraded,
   scopeVariables,
+  tightestBudget,
   visibleTabs,
   windowStart,
 } from "./zentinelle-model";
+import * as overviewStories from "./ZentinelleOverview.stories";
 import * as stories from "./ZentinelleScreen.stories";
 
 setProjectAnnotations(preview);
 const s = composeStories(stories);
+const o = composeStories(overviewStories);
 
 async function render(Story: Parameters<typeof runStory>[0]) {
   const canvas = document.createElement("div");
@@ -70,6 +75,34 @@ describe("Zentinelle screen states (#1888)", () => {
       expect(page.getByText("2 of 2")).toBeVisible();
       expect(page.getByRole("button", { name: "Disconnect" })).toBeVisible();
       expect(page.queryByText(/need attention/)).toBeNull();
+    });
+  });
+
+  it("shows Zentinelle's version, blocks, open approvals and the tightest budget (#2436)", async () => {
+    await check(s.ConnectedHealthy, (page) => {
+      expect(page.getByText("1.5.0")).toBeVisible();
+      expect(page.getByText("37")).toBeVisible();
+      expect(page.getByText("Open approvals")).toBeVisible();
+      expect(page.getByText("82% used")).toBeVisible();
+      expect(page.getByText(/\$412\.40 of \$500\.00 \(Monthly model budget\)/)).toBeVisible();
+      expect(page.getAllByText(/^0\.9\.1, seen /)).toHaveLength(2);
+    });
+  });
+
+  it("says not available, rather than failing, for an older Zentinelle", async () => {
+    await check(o.OlderZentinelle, (page) => {
+      expect(page.getAllByText("Not available")).toHaveLength(4);
+      expect(page.getAllByText("Version and last seen not available")).toHaveLength(2);
+      expect(page.queryByText(/Could not read/)).toBeNull();
+      expect(page.queryByText(/need attention/)).toBeNull();
+    });
+  });
+
+  it("flags a gateway Zentinelle has not heard from", async () => {
+    await check(o.StaleGateway, (page) => {
+      expect(page.getByText(/need attention/)).toBeVisible();
+      expect(page.getByText("Gateway not heard from")).toBeVisible();
+      expect(page.getByText("Not reported yet")).toBeVisible();
     });
   });
 
@@ -134,6 +167,26 @@ describe("Zentinelle model", () => {
     expect(gatewayHealth(ok, false)).toBe("off");
     expect(isDegraded(HEALTHY_CONNECTION)).toBe(false);
     expect(isDegraded(DEGRADED_CONNECTION)).toBe(true);
+  });
+
+  it("reads a deployed gateway not heard from in five minutes as stale", () => {
+    const [ok] = HEALTHY_CONNECTION.clusters;
+    const now = Date.parse("2026-10-17T12:00:00Z");
+    const seen = (minutes: number) => ({
+      ...ok,
+      lastSeenAt: new Date(now - minutes * 60_000).toISOString(),
+    });
+    expect(gatewayHealth(seen(4), true, now)).toBe("healthy");
+    expect(gatewayHealth(seen(6), true, now)).toBe("stale");
+    // Nothing reported (an older Zentinelle) stays as before.
+    expect(gatewayHealth({ ...ok, lastSeenAt: null }, true, now)).toBe("healthy");
+    expect(gatewayHealth({ ...seen(60), gatewayDeployed: false }, true, now)).toBe("pending");
+    expect(isDegraded(STALE_CONNECTION)).toBe(true);
+  });
+
+  it("picks the budget closest to its limit", () => {
+    expect(tightestBudget(HEALTH_COUNTS.budgets ?? [])?.name).toBe("Monthly model budget");
+    expect(tightestBudget([])).toBeNull();
   });
 
   it("names one scope at most and anchors windows", () => {

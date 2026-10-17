@@ -1,4 +1,4 @@
-"""Zentinelle usage, policy and audit reads, and whether Zentinelle is connected (#1888).
+"""Zentinelle usage, policy, audit and health reads, and whether Zentinelle is connected (#1888, #2436).
 
 Each read is gated on its ``zentinelle.*`` permission at any scope, then
 narrowed here to the agent workloads the caller holds that permission on:
@@ -136,6 +136,39 @@ class ZentinelleUsageRowType:
     input_tokens: int
     output_tokens: int
     cost_usd: float
+
+
+@strawberry.type(name="AstroliftZentinelleBudget")
+class ZentinelleBudgetType:
+    """A Zentinelle budget in effect for the agents read, this month."""
+
+    id: str
+    name: str
+    scope: str
+    limit_usd: float
+    spend_usd: float
+    percent: float
+    level: str
+    """Empty, ``threshold`` (at or past its alert threshold) or ``exceeded``."""
+
+
+@strawberry.type(name="AstroliftZentinelleHealth")
+class ZentinelleHealthType:
+    """The health card's Zentinelle counts (#2436), cached briefly, never stored."""
+
+    available: bool
+    """False when this Zentinelle has no health read yet (an older release);
+    every other field is then null."""
+
+    window_hours: int | None
+    blocks: int | None
+    """Evaluations refused in the last ``windowHours``; a call held for a
+    human counts under ``openApprovals`` instead."""
+
+    open_approvals: int | None
+    """Held calls still waiting on a human."""
+
+    budgets: list[ZentinelleBudgetType] | None
 
 
 @strawberry.type(name="AstroliftZentinelleUsage")
@@ -309,6 +342,45 @@ class ZentinelleReadsQuery:
                     cost_usd=r.cost_usd,
                 )
                 for r in rows
+            ],
+        )
+
+    @strawberry.field
+    @require_permission(Permission.ZENTINELLE_STATUS_VIEW, any_scope=True)
+    @tenant_scoped()
+    def astrolift_zentinelle_health(self, info: Info) -> ZentinelleHealthType:
+        """Blocks in the last 24 hours, open approvals and budgets, from Zentinelle,
+        for the agents the caller holds ``zentinelle.status_view`` on. Answers
+        ``available: false`` from a Zentinelle without the read rather than failing."""
+        try:
+            slugs = _agent_slugs(Permission.ZENTINELLE_STATUS_VIEW)
+            connection = _connection()
+            if slugs == []:
+                result = zentinelle_reads.Health(available=True)
+            else:
+                result = zentinelle_reads.health(connection, agent_slugs=slugs)
+        except (_ReadError, ZentinelleConnectError) as exc:
+            raise _graphql_error(exc) from None
+        if not result.available:
+            return ZentinelleHealthType(
+                available=False, window_hours=None, blocks=None, open_approvals=None, budgets=None
+            )
+        return ZentinelleHealthType(
+            available=True,
+            window_hours=result.window_hours,
+            blocks=result.blocks,
+            open_approvals=result.open_approvals,
+            budgets=[
+                ZentinelleBudgetType(
+                    id=b.id,
+                    name=b.name,
+                    scope=b.scope,
+                    limit_usd=b.limit_usd,
+                    spend_usd=b.spend_usd,
+                    percent=b.percent,
+                    level=b.level,
+                )
+                for b in result.budgets
             ],
         )
 

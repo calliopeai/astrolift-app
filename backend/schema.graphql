@@ -7029,6 +7029,16 @@ type AstroliftZentinelleAuditPage {
   nextCursor: String
 }
 
+type AstroliftZentinelleBudget {
+  id: String!
+  name: String!
+  scope: String!
+  limitUsd: Float!
+  spendUsd: Float!
+  percent: Float!
+  level: String!
+}
+
 type AstroliftZentinelleCapability {
   connected: Boolean!
 }
@@ -7045,6 +7055,8 @@ type AstroliftZentinelleClusterGateway {
   credentialRotatedAt: DateTime
   lastError: String!
   unregistered: Boolean!
+  gatewayVersion: String
+  lastSeenAt: DateTime
 }
 
 type AstroliftZentinelleClusterGatewayMutationResult {
@@ -7065,6 +7077,7 @@ type AstroliftZentinelleConnection {
   lastError: String!
   gatewayFeatureEnabled: Boolean!
   clusters: [AstroliftZentinelleClusterGateway!]!
+  serverVersion: String
 }
 
 type AstroliftZentinelleConnectionMutationResult {
@@ -7082,6 +7095,14 @@ type AstroliftZentinelleDisconnectMutationResult {
   ok: Boolean!
   errors: [MutationError!]!
   data: AstroliftZentinelleDisconnect
+}
+
+type AstroliftZentinelleHealth {
+  available: Boolean!
+  windowHours: Int
+  blocks: Int
+  openApprovals: Int
+  budgets: [AstroliftZentinelleBudget!]
 }
 
 type AstroliftZentinellePolicy {
@@ -11076,6 +11097,7 @@ type Query {
   installAlertMailTestsPage(eventKind: String! = "deploy.failed", after: String = null, limit: Int! = 25): InstallAlertMailTestPage!
   astroliftZentinelleCapability: AstroliftZentinelleCapability!
   astroliftZentinelleUsage(since: DateTime = null, agentSlug: String = null, projectId: GUID = null, teamId: GUID = null): AstroliftZentinelleUsage!
+  astroliftZentinelleHealth: AstroliftZentinelleHealth!
   astroliftZentinellePolicies(agentSlug: String = null, projectId: GUID = null): [AstroliftZentinellePolicy!]!
   astroliftZentinelleAuditPage(since: DateTime = null, cursor: String = null, limit: Int! = 100, agentSlug: String = null, projectId: GUID = null, teamId: GUID = null): AstroliftZentinelleAuditPage!
   astroliftTopologyTraffic(appSlug: String!, start: DateTime!, end: DateTime!, environmentName: String = null): TopologyTraffic
