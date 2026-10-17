@@ -394,6 +394,29 @@ export const ARCHIVE_APP = gql`
 `;
 
 /**
+ * Set, extend, shorten or clear a temporary app's expiry (#2433). The header's
+ * one-click extend sends `extendBy: "1d"`.
+ */
+export const SET_APP_EXPIRY = gql`
+  mutation SetAppExpiry($input: SetAppExpiryInput!) {
+    setAppExpiry(input: $input) {
+      ok
+      errors {
+        code
+        message
+        field
+      }
+      data {
+        id
+        slug
+        expiresAt
+        deleteDataOnExpiry
+      }
+    }
+  }
+`;
+
+/**
  * Restore an archived app to its pre-archive replica counts (#743).
  */
 export const RESTORE_APP = gql`

@@ -2,14 +2,14 @@
 
 import { useApolloClient, useMutation, useQuery } from "@apollo/client/react";
 import { usePathname, useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type { MutationResult } from "@/graphql/identity/identity.types";
 import { START_DEPLOYMENT } from "@/graphql/lifecycle/lifecycle.mutations";
 import { LIST_DEPLOYMENTS, LIST_ENVIRONMENTS } from "@/graphql/lifecycle/lifecycle.queries";
 import type { AstroliftDeployment } from "@/graphql/lifecycle/lifecycle.types";
-import { SOFT_DELETE_APP } from "@/graphql/registry/registry.mutations";
+import { SET_APP_EXPIRY, SOFT_DELETE_APP } from "@/graphql/registry/registry.mutations";
 import { GET_APP, LIST_APPS, LIST_WORKLOADS } from "@/graphql/registry/registry.queries";
 import type { AstroliftRegisteredApp, AstroliftWorkload } from "@/graphql/registry/registry.types";
 import { permissionMatches } from "@/lib/permissions/astrolift-permissions";
@@ -68,6 +68,11 @@ export function useAppFrame(slug: string): Omit<AppFrameProps, "children"> {
     softDeleteApp: MutationResult<{ id: string; deleted: boolean }>;
   }>(SOFT_DELETE_APP);
   const archive = useArchiveApp(slug);
+  const tExpiry = useTranslations("apps.expiry");
+  const format = useFormatter();
+  const [setExpiry, { loading: extending }] = useMutation<{
+    setAppExpiry: MutationResult<{ expiresAt: string | null }>;
+  }>(SET_APP_EXPIRY);
 
   const a = appQ.data?.astroliftApp ?? null;
   const envs = envsQ.data?.astroliftEnvironments ?? [];
@@ -91,8 +96,33 @@ export function useAppFrame(slug: string): Omit<AppFrameProps, "children"> {
         moreEnvironments: Math.max(0, envs.length - 1),
         appUrl: host ? `https://${host}` : null,
         repoUrl: a.sourceUrl || null,
+        expiresAt: a.expiresAt ?? null,
       }
     : null;
+
+  /** One click: a day more for a temporary app (#2433). */
+  async function onExtend() {
+    let data;
+    try {
+      ({ data } = await setExpiry({ variables: { input: { appSlug: slug, extendBy: "1d" } } }));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : tExpiry("extendFailed"));
+      return;
+    }
+    const result = data?.setAppExpiry;
+    if (result?.ok && result.data?.expiresAt) {
+      toast.success(
+        tExpiry("extended", {
+          when: format.dateTime(new Date(result.data.expiresAt), {
+            dateStyle: "medium",
+            timeStyle: "short",
+          }),
+        })
+      );
+    } else {
+      toast.error(result?.errors?.[0]?.message ?? tExpiry("extendFailed"));
+    }
+  }
 
   async function onDeploy() {
     if (!latest) return;
@@ -183,6 +213,8 @@ export function useAppFrame(slug: string): Omit<AppFrameProps, "children"> {
     archiving: archive.archiving || archive.restoring,
     onArchive: archive.onArchive,
     onRestore: archive.onRestore,
+    onExtend,
+    extending,
     canDelete: allow("app.delete"),
     deleting,
     onDelete,

@@ -1457,6 +1457,7 @@
         "mine": "Les miennes",
         "failing": "En échec",
         "archived": "Archivées",
+        "temporary": "Temporaires",
         "mineNote": "Les miennes regroupe les applications sur lesquelles vous avez un rôle, directement ou via leur projet, équipe ou organisation, tant que les applications ne consignent pas leur propriétaire."
       },
       "bulk": {
@@ -4052,6 +4053,20 @@
       "legendDescription": "Types de nœuds et ce qu’ils représentent.",
       "legendTitle": "Légende",
       "title": "{name} · Topologie"
+    },
+    "expiry": {
+      "expiresIn": "Expire dans {remaining}",
+      "expired": "Expirée",
+      "remaining": {
+        "days": "{days} j {hours} h",
+        "hours": "{hours} h {minutes} min",
+        "minutes": "{minutes} min"
+      },
+      "title": "App temporaire : supprimée le {when}",
+      "extend": "+1 jour",
+      "extendLabel": "Prolonger d’un jour",
+      "extended": "Prolongée jusqu’au {when}",
+      "extendFailed": "Impossible de prolonger l’app"
     }
   },
   "sourceProviders": {
@@ -4666,7 +4681,8 @@
         "deploy_failure": "Échec du déploiement",
         "error_spike": "Pic d’erreurs",
         "preview_created": "Aperçu créé",
-        "preview_destroyed": "Aperçu supprimé"
+        "preview_destroyed": "Aperçu supprimé",
+        "app_expiring": "App temporaire bientôt expirée"
       },
       "toggleLabel": "{kind} pour {app}",
       "unsubscribeAll": "Tout désabonner",

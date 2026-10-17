@@ -1463,6 +1463,7 @@
         "mine": "我的",
         "failing": "出现故障",
         "archived": "已归档",
+        "temporary": "临时",
         "mineNote": "在应用记录所有者之前，“我的”包含您直接或通过其项目、团队或组织拥有角色的应用。"
       },
       "bulk": {
@@ -4058,6 +4059,20 @@
       "legendDescription": "节点类型及其含义。",
       "legendTitle": "图例",
       "title": "{name} · 拓扑"
+    },
+    "expiry": {
+      "expiresIn": "{remaining} 后过期",
+      "expired": "已过期",
+      "remaining": {
+        "days": "{days} 天 {hours} 小时",
+        "hours": "{hours} 小时 {minutes} 分钟",
+        "minutes": "{minutes} 分钟"
+      },
+      "title": "临时应用：将于 {when} 拆除",
+      "extend": "+1 天",
+      "extendLabel": "延长一天",
+      "extended": "已延长至 {when}",
+      "extendFailed": "无法延长该应用"
     }
   },
   "sourceProviders": {
@@ -4672,7 +4687,8 @@
         "deploy_failure": "部署失败",
         "error_spike": "错误激增",
         "preview_created": "预览已创建",
-        "preview_destroyed": "预览已销毁"
+        "preview_destroyed": "预览已销毁",
+        "app_expiring": "临时应用即将过期"
       },
       "toggleLabel": "{app} 的{kind}",
       "unsubscribeAll": "全部取消订阅",

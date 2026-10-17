@@ -1463,6 +1463,7 @@
         "mine": "Meus",
         "failing": "Com falha",
         "archived": "Arquivados",
+        "temporary": "Temporários",
         "mineNote": "Meus inclui os aplicativos nos quais você tem uma função, diretamente ou pelo projeto, equipe ou organização, enquanto os aplicativos ainda não registram seus proprietários."
       },
       "bulk": {
@@ -4058,6 +4059,20 @@
       "legendDescription": "Tipos de nó e o que representam.",
       "legendTitle": "Legenda",
       "title": "{name} · Topologia"
+    },
+    "expiry": {
+      "expiresIn": "Expira em {remaining}",
+      "expired": "Expirado",
+      "remaining": {
+        "days": "{days} d {hours} h",
+        "hours": "{hours} h {minutes} min",
+        "minutes": "{minutes} min"
+      },
+      "title": "App temporário: removido em {when}",
+      "extend": "+1 dia",
+      "extendLabel": "Estender por um dia",
+      "extended": "Estendido até {when}",
+      "extendFailed": "Não foi possível estender o app"
     }
   },
   "sourceProviders": {
@@ -4672,7 +4687,8 @@
         "deploy_failure": "Falha no deploy",
         "error_spike": "Pico de erros",
         "preview_created": "Preview criado",
-        "preview_destroyed": "Preview removido"
+        "preview_destroyed": "Preview removido",
+        "app_expiring": "App temporário expirando"
       },
       "toggleLabel": "{kind} para {app}",
       "unsubscribeAll": "Cancelar todas",

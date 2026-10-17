@@ -4,6 +4,7 @@ Managing semantic layers (#2424): create, share, rebuild and delete them."""
 
 from __future__ import annotations
 
+import datetime as dt
 import inspect
 import re
 
@@ -62,6 +63,15 @@ class HostAppOnBrainInput:
     name: str | None = None
     slug: str | None = None
     port: int | None = None
+    # Temporary apps (#2433), as on registerApp.
+    expires_in: str | None = strawberry.field(
+        default=None,
+        description="Make the app temporary: torn down this long after creation (30m, 4h, 7d, 6w, 3mo).",
+    )
+    expires_at: dt.datetime | None = strawberry.field(
+        default=None, description="Make the app temporary: torn down at this time."
+    )
+    delete_data_on_expiry: bool = False
 
 
 @strawberry.type(name="AstroliftBrainApp")
@@ -207,6 +217,9 @@ class BrainMutations:
                 manifest_raw=brain_apps.brain_app_manifest(
                     slug=app_slug, brain_slug=slug, image=image, port=port
                 ),
+                expires_in=input.expires_in,
+                expires_at=input.expires_at,
+                delete_data_on_expiry=input.delete_data_on_expiry,
             ),
         )
         if not registered.ok or registered.data is None:
@@ -369,6 +382,13 @@ class BrainManagementMutations:
         )
         if project is None:
             return gql_failure(ErrorCode.NOT_FOUND.value, "project not found", field="projectId")
+        # A semantic layer is permanent; refuse up front where the
+        # organization requires temporary apps (#2433), not at its register step.
+        from astrolift_registry.expiry import permanent_refusal
+
+        refusal = permanent_refusal(Organization.objects.get(pk=org_id))
+        if refusal is not None:
+            return gql_failure(ErrorCode.PERMISSION_DENIED.value, refusal)
         if input.team_id is not None:
             team = Team.objects.filter(
                 guid=str(input.team_id), organization_id=org_id, deleted_at__isnull=True

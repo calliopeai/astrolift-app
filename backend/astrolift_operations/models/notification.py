@@ -25,6 +25,7 @@ class Notification(BaseCoreModel):
         WEBHOOK_DELIVERY_FAILED = "webhook_delivery_failed"
         SYSTEM = "system"
         ACTION_APPROVAL = "action_approval"
+        APP_EXPIRING = "app_expiring"
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,

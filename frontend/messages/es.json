@@ -1457,6 +1457,7 @@
         "mine": "Mías",
         "failing": "Con fallos",
         "archived": "Archivadas",
+        "temporary": "Temporales",
         "mineNote": "Mías incluye las aplicaciones en las que tienes un rol, directamente o a través de su proyecto, equipo u organización, hasta que las aplicaciones registren a sus propietarios."
       },
       "bulk": {
@@ -4052,6 +4053,20 @@
       "legendDescription": "Tipos de nodo y lo que representan.",
       "legendTitle": "Leyenda",
       "title": "{name} · Topología"
+    },
+    "expiry": {
+      "expiresIn": "Caduca en {remaining}",
+      "expired": "Caducada",
+      "remaining": {
+        "days": "{days} d {hours} h",
+        "hours": "{hours} h {minutes} min",
+        "minutes": "{minutes} min"
+      },
+      "title": "App temporal: se desmonta el {when}",
+      "extend": "+1 día",
+      "extendLabel": "Ampliar un día",
+      "extended": "Ampliada hasta el {when}",
+      "extendFailed": "No se pudo ampliar la app"
     }
   },
   "sourceProviders": {
@@ -4666,7 +4681,8 @@
         "deploy_failure": "Despliegue fallido",
         "error_spike": "Pico de errores",
         "preview_created": "Vista previa creada",
-        "preview_destroyed": "Vista previa eliminada"
+        "preview_destroyed": "Vista previa eliminada",
+        "app_expiring": "App temporal a punto de caducar"
       },
       "toggleLabel": "{kind} para {app}",
       "unsubscribeAll": "Cancelar todas",

@@ -62,6 +62,7 @@ from astrolift_registry.schema.types import (
     RegisteredAppPageType,
     RegisteredAppType,
     RenderedManifestType,
+    TemporaryAppPolicyType,
     WorkloadActionTargetType,
     WorkloadManifestType,
     WorkloadScalingStatus,
@@ -532,6 +533,7 @@ _APPS_FILTERS: dict[str, FilterField] = {
     "project": FilterField(q=lambda v: _iexact_any("project__slug", v) | _iexact_any("project__name", v)),
     "team": FilterField("team__slug"),
     "app_kind": FilterField("app_kind"),
+    "temporary": FilterField(q=lambda v: Q(expires_at__isnull=not v)),
     # ``archived`` is a tri-state the resolver applies, ``kind`` is Python.
 }
 
@@ -1182,6 +1184,17 @@ class AppKindType:
 
 @strawberry.type
 class RegistryQuery:
+    @strawberry.field(
+        description="The organization's rules for temporary apps (#2433): limits a create form or client applies."
+    )
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @tenant_scoped()
+    def astrolift_temporary_app_policy(self, info: Info) -> TemporaryAppPolicyType:
+        from astrolift_identity.models import Organization
+        from astrolift_registry.schema.types import policy_to_type
+
+        return policy_to_type(Organization.objects.get(pk=_caller_org_id()))
+
     @strawberry.field
     @require_permission(Permission.APP_READ, any_scope=True)
     @tenant_scoped()

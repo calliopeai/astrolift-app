@@ -207,7 +207,7 @@ class DeregisterAppWorkflow:
         # forever and the stuck rows would never finalize. A resume has no
         # accidental first click to undo, so it proceeds straight to the
         # idempotent fan-out.
-        if not already_tearing_down:
+        if not already_tearing_down and not input.skip_grace:
             try:
                 await workflow.wait_condition(
                     lambda: self._cancel_requested,
@@ -298,6 +298,10 @@ class DeregisterAppWorkflow:
             ms_ids = []
             ms_failed = True
             ms_results.append({"ok": False, "message": str(exc)})
+        if input.keep_managed_services:
+            # Kept for the expiry's grace period (#2433); its timer deletes them.
+            ms_results = [{"ok": True, "managed_service_id": ms_id, "message": "kept"} for ms_id in ms_ids]
+            ms_ids = []
 
         for ms_id in ms_ids:
             # ``list_app_managed_service_ids`` returns EVERY non-soft-deleted
