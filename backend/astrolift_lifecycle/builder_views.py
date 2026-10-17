@@ -942,6 +942,12 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
         from astrolift_registry import expiry
         from astrolift_registry.brain_manage import surface
 
+        delete_data_on_expiry = body.get("delete_data_on_expiry", False)
+        if not isinstance(delete_data_on_expiry, bool):
+            return JsonResponse(
+                {"detail": "delete_data_on_expiry must be a boolean", "field": "delete_data_on_expiry"},
+                status=400,
+            )
         try:
             raw_at = body.get("expires_at")
             expires_at = expiry.resolve(
@@ -1006,13 +1012,14 @@ def promote_dev_environment(request: HttpRequest, guid: str) -> JsonResponse:
         app = RegisteredApp.objects.create(
             organization=org,
             team=team,
+            created_by_id=token.user_id,
             name=app_name,
             slug=app_slug,
             source_kind=RegisteredApp.SourceKind.DIRECT_UPLOAD,
             provisioning_status=RegisteredApp.ProvisioningStatus.PENDING,
             default_tenant_cluster=cluster,
             expires_at=expires_at,
-            delete_data_on_expiry=bool(body.get("delete_data_on_expiry", False)),
+            delete_data_on_expiry=delete_data_on_expiry,
         )
         if expires_at is not None:
             from astrolift_registry import expiry

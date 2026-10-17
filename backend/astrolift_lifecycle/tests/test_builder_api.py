@@ -622,6 +622,56 @@ def test_promote_with_explicit_slug_and_environment(org, cluster, user, team, au
     assert env.name == "staging"
 
 
+def test_temporary_promote_records_owner_and_preserves_expiry_on_reship(
+    org, cluster, user, team, auth_headers, workflow_starts
+):
+    from astrolift_registry.expiry import warning_recipients
+
+    dev = _running_dev_env(org, cluster, user)
+    client = Client()
+    url = f"/api/builder/v1/dev-environments/{dev.guid}/promote/"
+    first = _post_json(
+        client,
+        url,
+        {"app_name": "Temporary Builder", "expires_in": "2h", "delete_data_on_expiry": False},
+        auth_headers,
+    )
+    assert first.status_code == 202, first.content
+    app = RegisteredApp.objects.get(guid=first.json()["app_guid"])
+    original_expiry = app.expires_at
+    assert original_expiry is not None and first.json()["expires_at"] == original_expiry.isoformat()
+    assert app.created_by_id == user.pk and user.pk in warning_recipients(app)
+    assert app.delete_data_on_expiry is False
+    dev.refresh_from_db()
+    dev.status = DevEnvironment.Status.RUNNING
+    dev.save(update_fields=["status", "updated_at", "version"])
+    second = _post_json(
+        client,
+        url,
+        {"app_name": "Temporary Builder", "expires_in": "7d", "delete_data_on_expiry": True},
+        auth_headers,
+    )
+    assert second.status_code == 202, second.content
+    app.refresh_from_db()
+    assert app.expires_at == original_expiry and app.delete_data_on_expiry is False
+
+
+@pytest.mark.parametrize("value", ["false", 0, None, []])
+def test_temporary_promote_refuses_ambiguous_data_deletion_choice(
+    org, cluster, user, team, auth_headers, workflow_starts, value
+):
+    dev = _running_dev_env(org, cluster, user)
+    response = _post_json(
+        Client(),
+        f"/api/builder/v1/dev-environments/{dev.guid}/promote/",
+        {"app_name": "Ambiguous Deletion", "expires_in": "2h", "delete_data_on_expiry": value},
+        auth_headers,
+    )
+    assert response.status_code == 400 and response.json()["field"] == "delete_data_on_expiry"
+    assert not RegisteredApp.objects.filter(slug="ambiguous-deletion").exists()
+    assert not workflow_starts
+
+
 def test_promote_same_slug_again_updates_the_app_in_place(
     org, cluster, user, team, auth_headers, workflow_starts
 ):
