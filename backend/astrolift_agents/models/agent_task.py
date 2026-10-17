@@ -371,9 +371,11 @@ class AgentTask(BaseCoreModel):
                 self.Status.TIMED_OUT,
                 self.Status.CANCELLED,
             }:
+                from astrolift_agents.services.agent_messages import requeue_undelivered_replies
                 from astrolift_agents.services.task_completion_callbacks import freeze_callback
                 from astrolift_registry.brain_runs import CANCELLED, ENDED, revoke_run
 
+                requeue_undelivered_replies(task)
                 freeze_callback(task)
                 # The run's brain tokens stop verifying with it (#2432).
                 revoke_run(task, CANCELLED if new_status == self.Status.CANCELLED else ENDED)

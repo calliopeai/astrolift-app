@@ -1058,6 +1058,55 @@ def claim_queued_replies(task: AgentTask, *, limit: int = 20) -> list[AgentMessa
     return rows
 
 
+@transaction.atomic
+def requeue_undelivered_replies(task: AgentTask) -> int:
+    """Keep answers when a run ends before consuming its input channel."""
+    from django.db.models import F
+
+    from astrolift_agents.models import AgentTaskInputMessage
+
+    if task.status not in AgentTask.TERMINAL_STATUSES:
+        return 0
+    replies = AgentMessageReply.objects.filter(
+        organization_id=task.organization_id,
+        message__agent_task_id=task.pk,
+        route=AgentMessageReply.Route.LIVE_RUN,
+        delivered_at__isnull=True,
+    )
+    # The runner claims these same input rows under a lock. Whichever path
+    # wins owns delivery: consumed input stays live; abandoned input moves
+    # to the next run and cannot also be claimed by a late old callback.
+    inputs = list(
+        AgentTaskInputMessage.objects.select_for_update()
+        .filter(
+            agent_task=task,
+            delivered_at__isnull=True,
+            pk__in=replies.values("input_message_id"),
+        )
+        .order_by("pk")
+    )
+    if not inputs:
+        return 0
+    ids = [row.pk for row in inputs]
+    moved = list(replies.filter(input_message_id__in=ids).select_related("message"))
+    now = timezone.now()
+    AgentTaskInputMessage.objects.filter(pk__in=ids).update(
+        deleted_at=now, updated_at=now, version=F("version") + 1
+    )
+    count = AgentMessageReply.objects.filter(pk__in=[row.pk for row in moved]).update(
+        route=AgentMessageReply.Route.QUEUED, updated_at=now, version=F("version") + 1
+    )
+    for row in moved:
+        _audit(
+            "agent.message.reply.requeued",
+            row.message,
+            actor_user_id=row.author_id,
+            reply_id=str(row.guid),
+            reason="run_ended_before_input_consumed",
+        )
+    return count
+
+
 # ---------------------------------------------------------------------------
 # Retention
 # ---------------------------------------------------------------------------

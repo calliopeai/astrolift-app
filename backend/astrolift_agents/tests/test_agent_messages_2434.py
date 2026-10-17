@@ -604,6 +604,67 @@ def test_a_full_size_reply_reaches_the_live_run_without_truncation(world):
     assert AgentTaskInputMessage.objects.get(agent_task=task).body == body
 
 
+@pytest.mark.parametrize("status", [AgentTask.Status.COMPLETED, AgentTask.Status.CANCELLED])
+@pytest.mark.parametrize("consumed", [False, True])
+def test_a_run_ending_preserves_unconsumed_replies_for_the_next_run(world, status, consumed):
+    from astrolift_agents.services.agent_task_input import claim_pending_input
+
+    task, key = _task(world)
+    message_id = _send(task, key, kind="question", body="Next step?").json()["id"]
+    result = _reply(world, world.user, message_id, body="Review this tomorrow")
+    assert result.ok
+    if consumed:
+        assert len(claim_pending_input(task)) == 1
+
+    task.transition_to(status)
+
+    row = AgentMessageReply.objects.get(guid=str(result.data.id))
+    later, _ = _task(world)
+    collected = agent_messages.claim_queued_replies(later)
+    if consumed:
+        assert row.route == AgentMessageReply.Route.LIVE_RUN
+        assert row.input_message.delivered_at is not None
+        assert collected == []
+    else:
+        assert row.route == AgentMessageReply.Route.QUEUED
+        assert row.input_message.deleted_at is not None
+        assert claim_pending_input(task) == []
+        assert [reply.body for reply in collected] == ["Review this tomorrow"]
+        assert agent_messages.claim_queued_replies(later) == []
+
+
+@pytest.mark.django_db(transaction=True)
+def test_terminal_transition_and_live_consume_deliver_a_reply_on_one_path(world):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    from django.db import close_old_connections
+
+    from astrolift_agents.services.agent_task_input import claim_pending_input
+
+    task, key = _task(world)
+    message_id = _send(task, key, kind="question", body="Next step?").json()["id"]
+    assert _reply(world, world.user, message_id, body="Review this tomorrow").ok
+    ready = Barrier(2)
+
+    def operate(consume):
+        close_old_connections()
+        try:
+            ready.wait(timeout=10)
+            if consume:
+                return len(claim_pending_input(task))
+            task.transition_to(AgentTask.Status.COMPLETED)
+            return 0
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        consumed, _ = list(pool.map(operate, [True, False]))
+    later, _ = _task(world)
+    queued = agent_messages.claim_queued_replies(later)
+    assert consumed + len(queued) == 1
+
+
 def test_a_token_revoked_during_subscription_stops_receiving(world):
     from astrolift_identity.api_tokens import SCOPE_READ_APPS
     from astrolift_identity.models import ApiToken
