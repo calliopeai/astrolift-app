@@ -56,6 +56,9 @@ def normalize(
     # Same rule for ``[ingress.access]`` (#2132).
     if raw.ingress_access is not None:
         serialized["ingress_access"] = raw.ingress_access
+    # And for ``[ingress] max_body_size`` (#2423).
+    if raw.ingress_max_body_size:
+        serialized["ingress_max_body_size"] = raw.ingress_max_body_size
     # Only when declared, so a generic app's hash is unchanged (#2332).
     if raw.app_kind:
         serialized["app_kind"] = raw.app_kind

@@ -19,7 +19,8 @@ deliberate change must be accounted for explicitly; #1922 must not change it.
 The HPA ownership correction omits web Deployment spec.replicas and adds its
 explicit replica-owner annotation. Assert both changes separately, then restore
 those historical fields for the original namespace/resource digest so unrelated
-changes remain detectable.
+changes remain detectable. The upload body handling (#2423) adds four
+annotations to every nginx Ingress, asserted and removed the same way.
 """
 
 from __future__ import annotations
@@ -304,4 +305,16 @@ def test_an_existing_environment_renders_byte_for_byte_as_before(placed):
         assert "replicas" not in deployment["spec"]
         assert deployment["metadata"].pop("annotations") == {"astrolift.dev/replica-owner": "hpa"}
         deployment["spec"]["replicas"] = 2
+    # Every nginx Ingress now streams uploads with no body limit (#2423).
+    body = {
+        "nginx.ingress.kubernetes.io/proxy-body-size": "0",
+        "nginx.ingress.kubernetes.io/proxy-request-buffering": "off",
+        "nginx.ingress.kubernetes.io/proxy-read-timeout": "3600",
+        "nginx.ingress.kubernetes.io/proxy-send-timeout": "3600",
+    }
+    ingresses = [r for resources in resource_sets for r in resources if r["kind"] == "Ingress"]
+    assert len(ingresses) == 3
+    for ingress in ingresses:
+        annotations = ingress["metadata"]["annotations"]
+        assert {key: annotations.pop(key, None) for key in body} == body
     assert _digest(doc) == _GOLDEN_SHA256
