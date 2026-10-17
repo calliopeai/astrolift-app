@@ -58,6 +58,7 @@ const UNCHANGED = {
   allowSelfApproval: null,
   requireApproval: null,
   minimumApprovals: null,
+  allowAgents: null,
 };
 
 export type ApprovalVerb = "approve" | "reject" | "cancel";

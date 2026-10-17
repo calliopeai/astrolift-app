@@ -14614,33 +14614,138 @@
   },
   "zentinelleScreen": {
     "title": "Proteger · Zentinelle",
-    "description": "GRC de agentes de IA: governança, risco e conformidade para cada workload de agente no Astrolift.",
-    "tagline": "Licença MIT · Auto-hospedável · Produto complementar da Calliope AI",
-    "intro": "Zentinelle é o pilar <strong>Control + Secure</strong> do stack BROCS. Ele roda ao lado do Astrolift e fornece a camada específica de IA que o Astrolift deliberadamente não assume: aplicação de políticas, varredura de conteúdo, frameworks de conformidade e a trilha de auditoria completa de interações exigida pelas regulamentações de governança de IA.",
-    "statusTitle": "Integração em desenvolvimento",
-    "statusBody": "O handshake de autenticação e a delegação de tenants entre o Astrolift e o Zentinelle estão sendo projetados. As opções incluem o Zentinelle como app Django embutido delegando a autenticação ao Astrolift, ou um serviço separado com troca de tokens. Quando o formato for decidido, esta página se tornará a interface de gerenciamento da conexão.",
-    "github": "Zentinelle no GitHub",
-    "docs": "Documentação de integração",
-    "addsTitle": "O que o Zentinelle acrescenta ao Astrolift",
-    "capabilities": {
-      "governance": {
-        "title": "Governança",
-        "description": "Motor de políticas: regras de conteúdo (PII, toxicidade, detecção de jailbreak), listas de modelos permitidos, aplicação de orçamento de tokens e biblioteca versionada de prompts de sistema."
-      },
-      "risk": {
-        "title": "Risco",
-        "description": "Registro de riscos 5×5, análise FMEA, acompanhamento de incidentes, detecção de anomalias e alertas automáticos sobre desvios no comportamento do agente."
-      },
-      "compliance": {
-        "title": "Conformidade",
-        "description": "Mapeamento de controles SOC 2, GDPR, HIPAA, Lei de IA da UE e NIST RMF. Coleta de evidências, análise de lacunas e relatórios prontos para auditoria."
-      },
-      "observability": {
-        "title": "Observabilidade",
-        "description": "Auditoria completa de interações (prompts, respostas e chamadas de ferramentas), resultados da varredura de conteúdo, logs de avaliação de políticas e medição do uso de tokens por workload."
+    "description": "Conecte esta organização ao Zentinelle para governança de agentes, uso e custo, políticas e auditoria.",
+    "noAccess": "Sem acesso ao Zentinelle",
+    "noAccessBody": "Suas funções não concedem nada no Zentinelle aqui. Peça uma permissão do Zentinelle a um administrador da organização.",
+    "error": "Não foi possível ler a conexão com o Zentinelle",
+    "notConnected": "Sem conexão com o Zentinelle",
+    "notConnectedBody": "Um administrador da organização conecta o Zentinelle nesta página. As seções aparecem depois da conexão.",
+    "tabsLabel": "Seções do Zentinelle",
+    "writeFailed": "O Zentinelle não aceitou a alteração",
+    "tabs": {
+      "overview": "Visão geral",
+      "clusters": "Clusters",
+      "usage": "Uso e custo",
+      "policies": "Políticas",
+      "audit": "Auditoria"
+    },
+    "health": {
+      "healthy": "Gateway em execução",
+      "pending": "Gateway ainda não implantado",
+      "off": "Gateway desligado",
+      "error": "Erro no gateway"
+    },
+    "connect": {
+      "title": "Conectar ao Zentinelle",
+      "description": "Cole a URL do Zentinelle e um código de inscrição de uso único gerado no Zentinelle. A credencial que o Zentinelle devolve é guardada como segredo e nunca exibida.",
+      "url": "URL do Zentinelle",
+      "code": "Código de inscrição",
+      "codeHelp": "Gerado no Zentinelle; funciona uma única vez.",
+      "gatewayUrl": "URL do gateway (opcional)",
+      "gatewayUrlHelp": "Onde os gateways dos clusters alcançam o Zentinelle quando não é a URL acima, como um endereço privado dentro do cluster.",
+      "required": "Informe a URL do Zentinelle e o código de inscrição.",
+      "connecting": "Conectando…",
+      "submit": "Conectar"
+    },
+    "connection": {
+      "title": "Conexão",
+      "status": "Estado da conexão",
+      "connected": "Conectado",
+      "revoked": "Revogada pelo Zentinelle",
+      "revokedBody": "O Zentinelle não aceita mais esta conexão: {reason}. Desconecte e conecte de novo com um novo código de inscrição.",
+      "url": "URL do Zentinelle",
+      "gatewayUrl": "URL do gateway",
+      "sameAsUrl": "Igual à URL do Zentinelle",
+      "installId": "ID da instalação no Zentinelle",
+      "tenants": "Locatários do Zentinelle",
+      "none": "Nenhum",
+      "connectedAt": "Conectado em",
+      "editGatewayUrl": "Alterar URL do gateway",
+      "disconnect": "Desconectar",
+      "save": "Salvar",
+      "cancel": "Cancelar",
+      "gatewayUrlHelp": "Deixe em branco para usar a URL do Zentinelle. Os gateways em execução são reimplantados.",
+      "disconnectTitle": "Desconectar do Zentinelle?",
+      "disconnectBody": "Isso revoga a instalação e cada cluster registrado no Zentinelle e depois remove os gateways e seus segredos dos clusters. Para conectar de novo é preciso um novo código de inscrição.",
+      "disconnected": "Desconectado do Zentinelle"
+    },
+    "overview": {
+      "degraded": "Um ou mais gateways de cluster precisam de atenção. Veja os clusters abaixo.",
+      "title": "Saúde",
+      "gateways": "Gateways em execução",
+      "gatewaysValue": "{healthy} de {total}",
+      "agents": "Agentes observados neste mês",
+      "requests": "Requisições ao modelo, últimas 24 horas",
+      "spend": "Gasto neste mês",
+      "usageError": "Não foi possível ler o uso do Zentinelle",
+      "clustersTitle": "Saúde do gateway por cluster",
+      "clustersDescription": "O gateway do Zentinelle de cada cluster registrado.",
+      "installOff": "Os gateways do Zentinelle estão desligados nesta instalação. Os clusters registrados mantêm as credenciais; os gateways são implantados quando o operador da plataforma os liga.",
+      "noClusters": "Nenhum cluster está registrado no Zentinelle ainda."
+    },
+    "clusters": {
+      "installOff": "Os gateways do Zentinelle estão desligados nesta instalação. Registrar um cluster guarda a credencial; o gateway é implantado quando o operador da plataforma liga os gateways.",
+      "title": "Clusters registrados",
+      "empty": "Nenhum cluster está registrado no Zentinelle ainda.",
+      "never": "nunca",
+      "registeredAt": "Registrado {when}",
+      "rotatedAt": "credencial trocada {when}",
+      "turnOff": "Desligar gateway",
+      "turnOn": "Ligar gateway",
+      "rotate": "Trocar credencial",
+      "unregister": "Cancelar registro",
+      "registerTitle": "Registrar um cluster",
+      "registerDescription": "O registro grava a credencial do gateway no cluster e implanta o gateway.",
+      "search": "Buscar clusters",
+      "noChoices": "Nenhum cluster não registrado corresponde.",
+      "register": "Registrar",
+      "unregisterTitle": "Cancelar o registro de {cluster} no Zentinelle?",
+      "unregisterBody": "Isso revoga o cluster no Zentinelle e depois remove o gateway e o segredo da credencial. O tráfego de agentes nele deixa de passar pelo Zentinelle."
+    },
+    "filters": {
+      "window": "Período",
+      "scope": "Escopo",
+      "all": "Tudo o que posso ver",
+      "agent": "Um agente",
+      "projects": "Projetos",
+      "teams": "Equipes",
+      "agentSlug": "Slug do agente",
+      "windows": {
+        "24h": "Últimas 24 horas",
+        "7d": "Últimos 7 dias",
+        "30d": "Últimos 30 dias",
+        "month": "Este mês"
       }
     },
-    "division": "<label>Divisão de responsabilidades:</label> o Astrolift cuida da <em>camada de execução</em>: orquestração de contêineres, implantações, saúde dos pods e observabilidade da infraestrutura. O Zentinelle cuida da <em>camada de comportamento da IA</em>: o que o agente diz e faz, se cumpre as políticas e a trilha de auditoria exigida pelos reguladores. Em <strong>OBSERVE › Agents</strong>, as abas marcadas com <code>Astrolift</code> já estão ativas; as abas <code>Zentinelle</code> serão ativadas quando a integração for lançada."
+    "usage": {
+      "error": "Não foi possível ler o uso do Zentinelle",
+      "requests": "Requisições ao modelo",
+      "tokens": "Tokens usados",
+      "cost": "Custo de modelos",
+      "title": "Por agente e modelo",
+      "empty": "Nenhum uso de modelo neste período.",
+      "noAgent": "(sem agente)",
+      "requestCount": "{count, plural, one {# requisição} other {# requisições}}",
+      "tokenCount": "{input} de entrada, {output} de saída"
+    },
+    "policies": {
+      "error": "Não foi possível ler as políticas do Zentinelle",
+      "empty": "Nenhuma política do Zentinelle está em vigor aqui.",
+      "meta": "Escopo {scope}, prioridade {priority}"
+    },
+    "audit": {
+      "export": {
+        "ndjson": "Exportar NDJSON",
+        "csv": "Exportar CSV"
+      },
+      "label": "Auditoria do Zentinelle",
+      "error": "Não foi possível ler o fluxo de auditoria do Zentinelle",
+      "loadMore": "Carregar mais",
+      "loadingMore": "Carregando…",
+      "empty": "Nenhum evento de auditoria neste período",
+      "emptyBody": "Os eventos aparecem aqui à medida que o Zentinelle os registra para os agentes que você pode ver.",
+      "exported": "{count, plural, one {# evento exportado} other {# eventos exportados}}"
+    }
   },
   "modelDeploy": {
     "title": "Implantar modelo",
@@ -14783,6 +14888,8 @@
     "signIn": "Entrar",
     "noAccountTitle": "Nenhuma conta do Astrolift para este acesso",
     "noAccountBody": "Seu provedor de identidade conectou você, mas não há nenhuma conta aqui para essa identidade. Se você foi convidado, entre com o endereço para o qual o convite foi enviado; caso contrário, peça a um administrador que convide você.",
+    "emailUnverifiedTitle": "Endereço de e-mail não verificado",
+    "emailUnverifiedBody": "Seu provedor de identidade conectou você, mas não verificou seu endereço de e-mail, então o Astrolift não consegue saber qual conta é a sua. Verifique o endereço com seu provedor ou peça ajuda a um administrador e entre novamente.",
     "useDifferentAccount": "Usar outra conta"
   },
   "invitationAccept": {
@@ -15524,14 +15631,11 @@
     "context": "Camadas semânticas hospedadas que você pode ler: apps que servem uma Semantic Context Ontology Layer. Compartilhe uma dando a uma equipe acesso ao app dela.",
     "columnName": "Camada",
     "columnOwner": "Equipe / projeto",
-    "columnEndpoints": "Servida em",
     "columnShared": "Compartilhada com",
-    "columnApp": "Acesso",
     "none": "nenhum",
     "notServed": "Ainda não servida",
     "notShared": "Somente a equipe proprietária",
     "shareTitle": "{team}: {access}",
-    "manageAccess": "Gerenciar acesso",
     "emptyTitle": "Nenhuma camada semântica",
     "emptyDescription": "Apps declarados com [app] kind = \"mimwell\" que você pode ler aparecem aqui.",
     "columnConnect": "Clientes MCP",
@@ -15566,6 +15670,441 @@
       "cancel": "Cancelar",
       "create": "Criar app",
       "creating": "Criando…"
+    },
+    "columnHealth": "Integridade",
+    "columnRebuilt": "Última recompilação",
+    "columnFreshness": "Atualidade",
+    "new": "Nova camada semântica",
+    "status": {
+      "unavailable": "Indisponível",
+      "unknown": "Desconhecido",
+      "never": "Nunca",
+      "noEnvironment": "Sem ambiente {environment}",
+      "notDeployed": "Não implantada",
+      "compiled": "Compilada {age}",
+      "notCompiled": "Não compilada",
+      "behind": "Atrás do head",
+      "ingest": {
+        "running": "Em ingestão",
+        "succeeded": "Ingestão concluída",
+        "failed": "Falha na ingestão",
+        "other": "Ingestão interrompida"
+      },
+      "warnings": "{count, plural, one {# leitura do host falhou} other {# leituras do host falharam}}"
+    },
+    "wizard": {
+      "title": "Nova camada semântica",
+      "listCrumb": "Camadas semânticas",
+      "stepsLabel": "Etapas",
+      "done": "concluído",
+      "back": "Voltar",
+      "continue": "Continuar",
+      "create": "Criar camada semântica",
+      "cancel": "Cancelar",
+      "retry": "Tentar novamente",
+      "deniedTitle": "Você não pode criar camadas semânticas",
+      "deniedDescription": "Criar uma registra um app em um projeto, o que exige app.create nele. Peça a alguém que gerencie o projeto.",
+      "backToList": "Voltar para as camadas semânticas",
+      "steps": {
+        "source": {
+          "label": "Origem",
+          "description": "O repositório onde a camada fica: o Astrolift o cria quando ele não existe, ou preenche um vazio, a partir da edição do Mimwell."
+        },
+        "details": {
+          "label": "Detalhes",
+          "description": "Como a camada se chama, a equipe e o projeto aos quais ela pertence e para onde vai a primeira implantação."
+        },
+        "substrate": {
+          "label": "Substrato",
+          "description": "Onde a camada guarda o cânone, os blobs, os vetores e o grafo (a célula do Mimwell) e o que o Astrolift anexa para ela."
+        },
+        "review": {
+          "label": "Revisão",
+          "description": "Confira a solicitação e depois crie a camada. O trabalho roda em segundo plano e esta página o acompanha."
+        }
+      },
+      "connection": "Conexão de origem",
+      "connectionHelp": "Ela cria ou preenche o repositório, e o commit do esqueleto fica em seu nome.",
+      "chooseConnection": "Escolha uma conexão",
+      "noConnections": "Nenhuma conexão de origem pode agir em seu nome ainda. <link>Conecte uma conta</link> primeiro.",
+      "appInstallNote": "Uma conexão do GitHub App não pode criar repositórios. Crie o repositório vazio primeiro ou escolha uma conexão por token ou OAuth.",
+      "repo": "Repositório",
+      "repoHelp": "owner/name. Um novo, ou um ainda sem commits.",
+      "visibility": "Visibilidade",
+      "visibilityHelp": "Vale quando o Astrolift cria o repositório.",
+      "visibilities": {
+        "PRIVATE": "Privado",
+        "INTERNAL": "Interno",
+        "PUBLIC": "Público"
+      },
+      "templateRef": "Referência do modelo",
+      "templateRefHelp": "Uma tag, branch ou commit da edição do Mimwell. Deixe em branco para usar a edição fixada nesta instalação.",
+      "pinnedEdition": "A edição fixada nesta instalação",
+      "name": "Nome",
+      "nameHelp": "Exibido nas listas. Em branco, usa o slug.",
+      "namePlaceholder": "Conhecimento da plataforma",
+      "slug": "Slug",
+      "slugHelp": "O slug do app da camada: letras minúsculas, dígitos e hifens.",
+      "team": "Equipe",
+      "teamHelp": "A equipe proprietária da camada.",
+      "chooseTeam": "Escolha uma equipe",
+      "noTeams": "Nenhuma equipe",
+      "project": "Projeto",
+      "projectHelp": "Uma camada pertence à equipe do seu projeto.",
+      "chooseProject": "Escolha um projeto",
+      "teamFirst": "Escolha uma equipe primeiro",
+      "environment": "Ambiente",
+      "environmentHelp": "Para onde vai a primeira implantação.",
+      "deploy": "Implantar agora",
+      "deployHelp": "Implantar o commit do esqueleto assim que a camada for registrada.",
+      "deployDenied": "Implantar exige app.deploy, então a camada é criada sem uma primeira implantação.",
+      "deployYes": "Sim, após o registro",
+      "deployNo": "Não, implantar depois",
+      "cell": "Célula",
+      "persistence": "Persistência",
+      "noPersistence": "Nenhuma",
+      "replicas": "Réplicas",
+      "image": "Imagem",
+      "builtImage": "Compilada a partir do Dockerfile do portal da edição",
+      "port": "Porta",
+      "edit": "Editar",
+      "editPart": "Editar {part}",
+      "whatHappens": "O que acontece ao criar",
+      "happensRepo": "Cria o repositório quando ele não existe ou verifica se está vazio.",
+      "happensScaffold": "Faz commit da edição verificada do Mimwell com suas configurações, em um único commit.",
+      "happensRegister": "Registra a camada no projeto como um app do tipo mimwell.",
+      "happensDeploy": "Implanta esse commit em {environment}.",
+      "productionStepUp": "Para implantar em produção, você precisa entrar de novo primeiro.",
+      "createFailed": "Não foi possível criar a camada semântica.",
+      "problems": {
+        "required": "Obrigatório",
+        "repoFormat": "Use owner/name: letras, dígitos, pontos, hifens e sublinhados.",
+        "refFormat": "Um nome de tag, branch ou commit, sem espaços nem pontos seguidos.",
+        "slugFormat": "Letras minúsculas, dígitos e hifens, começando com letra e terminando com letra ou dígito, até 63 caracteres.",
+        "envFormat": "Um nome curto em minúsculas: letras, dígitos e hifens, até 32 caracteres.",
+        "long": "Até 255 caracteres."
+      }
+    },
+    "substrate": {
+      "cell": "Célula",
+      "cellHelp": "Os quatro posicionamentos do Mimwell. As opções que formariam uma célula incompatível com o Mimwell ficam desativadas, com o motivo.",
+      "axes": {
+        "authority": "Autoridade",
+        "blobs": "Blobs",
+        "vectors": "Vetores",
+        "graph": "Grafo"
+      },
+      "axisHelp": {
+        "authority": "Onde fica o cânone. Com files, o repositório é o cânone.",
+        "blobs": "Onde ficam os anexos e outros binários.",
+        "vectors": "Onde fica o índice vetorial.",
+        "graph": "Onde fica a projeção do grafo."
+      },
+      "supported": "Compatível com o Mimwell:",
+      "reasons": {
+        "d1Authority": "d1 é um destino de projeção, nunca uma autoridade.",
+        "dbBlobNeedsDatabase": "db-blob guarda os blobs no banco de dados da autoridade, e esta autoridade não tem um.",
+        "inDbVectorsMongo": "Os vetores in-db são colunas vetoriais SQL, e o mongo não tem nenhuma.",
+        "inDbVectorsNeedSql": "Os vetores in-db ficam no banco de dados da autoridade, e esta autoridade não tem um.",
+        "ageNeedsPostgres": "age é uma extensão do Postgres, então exige a autoridade postgres."
+      },
+      "persistence": "Persistência",
+      "persistenceHelp": "O que o Astrolift anexa à camada. O repositório sempre está lá.",
+      "persistenceKinds": {
+        "sqlite-volume": "Um volume em /data para a autoridade SQLite. A camada roda como statefulset.",
+        "efs": "Um volume compartilhado em /shared, montado por todas as réplicas.",
+        "postgres": "Um Postgres gerenciado. A camada lê DATABASE_URL.",
+        "s3": "Armazenamento de objetos para blobs. Os buckets são vinculados fora do manifesto, então a camada o informa como não vinculado até que um seja vinculado."
+      },
+      "withAge": "Com a extensão AGE, para o grafo.",
+      "neededBy": "Exigido por {placement}",
+      "heldData": "Contém dados. Deixar de usá-lo é uma migração na camada, não uma mudança de substrato.",
+      "replicas": "Réplicas",
+      "replicasHelp": "De 1 a {max}.",
+      "replicasSqlite": "Cada réplica recompila app/brain.db no próprio volume.",
+      "replicasRange": "Um número inteiro de 1 a {max}.",
+      "image": "Imagem",
+      "imageHelp": "Opcional. Em branco, compila o Dockerfile do portal da edição.",
+      "imageFormat": "Uma referência de imagem não tem espaços.",
+      "imageKept": "A camada mantém a imagem que executa.",
+      "port": "Porta",
+      "portRange": "De 1 a 65535.",
+      "portGraduate": "A API não informa a porta atual: mantenha aquela em que a camada atende."
+    },
+    "creation": {
+      "listCrumb": "Camadas semânticas",
+      "crumb": "Nova",
+      "progress": "Progresso",
+      "runningTitle": "Criando {slug}",
+      "readyTitle": "{name} está pronta",
+      "failedTitle": "Não foi possível criar {slug}",
+      "missingTitle": "Criação não encontrada",
+      "missingDescription": "Nada que você possa ver foi criado com este link. Talvez pertença a outra pessoa.",
+      "readFailed": "Não foi possível ler a criação",
+      "pollFailed": "Não foi possível acompanhar a criação",
+      "retry": "Tentar novamente",
+      "open": "Abrir camada semântica",
+      "failedReason": "A criação parou",
+      "noReason": "O servidor não informou o motivo.",
+      "editAndRetry": "Editar e tentar de novo",
+      "startOver": "Recomeçar",
+      "leaveNote": "O trabalho roda no servidor: sair desta página não interrompe nada.",
+      "steps": {
+        "REPO_READY": "Repositório",
+        "SCAFFOLDED": "Commit do esqueleto",
+        "REGISTERED": "Registro",
+        "DEPLOYING": "Primeira implantação"
+      },
+      "stepHelp": {
+        "REPO_READY": "Criado ou encontrado vazio.",
+        "SCAFFOLDED": "A edição do Mimwell e suas configurações, em um único commit.",
+        "REGISTERED": "Um app do tipo mimwell no projeto.",
+        "DEPLOYING": "O commit do esqueleto, implantado e em execução."
+      },
+      "stepStates": {
+        "done": "concluído",
+        "current": "em andamento",
+        "todo": "não iniciado",
+        "failed": "com falha"
+      },
+      "repo": "Repositório",
+      "templateRef": "Referência do modelo",
+      "commit": "Commit",
+      "deployment": "Implantação",
+      "notYet": "Ainda não",
+      "noDeploy": "Não solicitada"
+    },
+    "tabs": {
+      "overview": "Visão geral",
+      "substrate": "Substrato",
+      "sharing": "Compartilhamento",
+      "apps": "Aplicativos",
+      "connect": "Conectar",
+      "settings": "Configurações"
+    },
+    "frame": {
+      "listCrumb": "Camadas semânticas",
+      "sections": "Seções da camada semântica",
+      "served": "{count, plural, one {Servida em # ambiente} other {Servida em # ambientes}}",
+      "notServed": "Ainda não servida",
+      "none": "nenhum",
+      "connect": "Conectar",
+      "connectFailed": "Não foi possível emitir um token de leitura.",
+      "moreActions": "Mais ações",
+      "rebuild": "Recompilar",
+      "hostApp": "Hospedar um app",
+      "openApp": "Abrir o app",
+      "archive": "Arquivar",
+      "loadFailed": "Não foi possível carregar a camada semântica",
+      "retry": "Tentar novamente",
+      "unavailableTitle": "Camada semântica indisponível",
+      "notFoundTitle": "Camada semântica não encontrada",
+      "noLayer": "Nenhuma camada semântica chamada {slug}",
+      "notFoundDescription": "Nada que você possa ler tem este slug. Talvez ela não exista ou não esteja compartilhada com suas equipes.",
+      "deniedTitle": "Você não pode ler esta camada semântica",
+      "deniedDescription": "Para lê-la, é preciso app.read no app dela. Peça à equipe proprietária que a compartilhe com a sua.",
+      "backToList": "Voltar para as camadas semânticas",
+      "archivedTitle": "{name} está arquivada",
+      "archivedHeading": "Esta camada semântica está arquivada",
+      "archivedAt": "Arquivada em {at}.",
+      "archivedNoTime": "Arquivada.",
+      "archivedDescription": "As cargas de trabalho dela foram reduzidas a zero e ela está fora do registro. Os dados e o repositório dela são mantidos. Restaurar a traz de volta como rodava; os apps hospedados nela precisam ser hospedados de novo.",
+      "restore": "Restaurar",
+      "restoring": "Restaurar esta camada semântica",
+      "restoreFailed": "Não foi possível restaurar a camada semântica.",
+      "restored": "{slug} foi restaurada."
+    },
+    "overview": {
+      "environments": "Ambientes",
+      "environment": "Ambiente",
+      "health": "Integridade",
+      "noEnvironment": "Sem ambiente {environment}",
+      "notDeployed": "Ainda não implantada",
+      "notDeployedDescription": "Nada foi implantado neste ambiente. Recompilar implanta o head da branch.",
+      "deployFailed": "A última implantação falhou",
+      "deployFailedReason": "O ambiente manteve o que rodava antes. A implantação mostra o motivo.",
+      "openDeployment": "Abrir a implantação",
+      "latestDeploy": "Última implantação",
+      "started": "Início",
+      "unknown": "Desconhecido",
+      "image": "Imagem",
+      "noImage": "Ainda não compilada",
+      "deployment": "Implantação",
+      "served": "Servida",
+      "yes": "Sim",
+      "notServed": "Ainda não servida",
+      "notServedDescription": "Nenhum ambiente tem URL ainda. A primeira implantação de cada ambiente lhe dá uma.",
+      "revision": "Revisão",
+      "atHead": "No head",
+      "running": "Em execução",
+      "nothingRunning": "Nada em execução",
+      "head": "Head da branch",
+      "onBranch": "em {branch}",
+      "headUnknown": "Não foi possível ler",
+      "committed": "Data do commit",
+      "freshness": "Atualidade",
+      "compiled": "Compilação",
+      "notCompiled": "Não compilada no commit em execução",
+      "lastIngest": "Última ingestão",
+      "openRun": "Abrir a execução",
+      "noIngest": "Nenhum workflow knowledge-refresh no repositório",
+      "endpoints": "Endpoints",
+      "mcp": "Endpoint MCP: {url}"
+    },
+    "substrateTab": {
+      "graduationNeeded": "O Mimwell indica que esta camada ficou grande demais para a célula",
+      "graduationNeededDescription": "A compilação em {environment} pede um substrato maior. Ampliar faz commit da nova célula e a aplica; o push a implanta.",
+      "graduate": "Ampliar",
+      "graduating": "Ampliar esta camada semântica",
+      "cell": "Célula",
+      "noEnvironment": "Sem ambiente {environment}",
+      "cellName": "Célula",
+      "adoption": "Autoridade",
+      "filesCanon": "O repositório é o cânone",
+      "checking": "Verificando o commit em execução",
+      "adoptionUnknown": "Desconhecida: não foi possível ler o commit em execução",
+      "adopted": "Adotada: {store}",
+      "notAdopted": "Provisionada, ainda não adotada. A camada a adota na migração do próprio armazenamento de conhecimento.",
+      "replicas": "Réplicas",
+      "image": "Imagem",
+      "builtImage": "Compilada a partir do Dockerfile do portal da edição",
+      "resources": "Persistência e recursos",
+      "persistence": "Persistência",
+      "nothingAttached": "Nada anexado",
+      "nothingAttachedDescription": "Esta célula não precisa de banco de dados, volume nem bucket: o repositório guarda tudo.",
+      "fromLayer": "A leitura do status falhou, então esta é a última célula aplicada, sem o que a camada já adotou.",
+      "graduateTitle": "Ampliar o substrato",
+      "graduateDescription": "Escolha a célula para a qual a camada vai. O Astrolift faz commit dela na branch de implantação em client.config.json e astrolift.toml, provisiona o que ela precisa e o push a implanta. Os dados que ela guarda agora continuam anexados.",
+      "cancel": "Cancelar",
+      "graduateSubmit": "Ampliar",
+      "graduateFailed": "Não foi possível ampliar o substrato.",
+      "graduated": "Ampliação de {slug} registrada em commit. O push a implanta."
+    },
+    "sharing": {
+      "sections": "Seções de compartilhamento",
+      "sectionLabels": {
+        "teams": "Equipes",
+        "history": "Histórico de acesso"
+      },
+      "levels": {
+        "viewer": "Leitor",
+        "deployer": "Editor",
+        "owner": "Proprietário"
+      },
+      "levelHelp": {
+        "viewer": "Os membros da equipe podem ler a camada e se conectar a ela.",
+        "deployer": "Os membros da equipe também podem editar e implantar a camada."
+      },
+      "team": "Equipe",
+      "teams": "Equipes",
+      "access": "Acesso",
+      "ownedBy": "Pertence a <code>{team}</code>, que sempre tem acesso. Os proprietários são alterados no app.",
+      "noTeam": "nenhuma equipe",
+      "ownersLink": "Abrir as equipes do app",
+      "shareTitle": "Compartilhar com uma equipe",
+      "findTeam": "Buscar uma equipe por nome ou slug",
+      "editorNeedsDeploy": "Compartilhar como editor exige app.deploy nesta camada.",
+      "share": "Compartilhar",
+      "homeTeamNote": "A equipe proprietária já tem acesso.",
+      "askVerification": "Para compartilhar, você precisa entrar de novo primeiro.",
+      "askApproval": "{count, plural, one {Precisa da aprovação de # aprovador.} other {Precisa da aprovação de # aprovadores.}}",
+      "viewRequests": "Ver solicitações de aprovação",
+      "sharing": "Compartilhar esta camada semântica",
+      "emptyTitle": "Ainda não compartilhada",
+      "emptyDescription": "Somente {team} pode lê-la. Compartilhe-a com uma equipe para que os membros dela possam lê-la ou editá-la e implantá-la.",
+      "makeViewer": "Tornar leitor",
+      "makeEditor": "Tornar editor",
+      "unshare": "Encerrar compartilhamento",
+      "changeOnApp": "Alterar no app",
+      "shareConfirmTitle": "Compartilhar {name} com {team} como {level}?",
+      "unshareTitle": "Encerrar o compartilhamento com {team}?",
+      "unshareDescription": "Novos tokens de leitura deixam de ser emitidos na hora. Os tokens já emitidos funcionam até expirar, em até 15 minutos.",
+      "alreadyShared": "Compartilhada como {level}",
+      "shareFailed": "Não foi possível compartilhar a camada semântica.",
+      "shared": "Compartilhada com {team} como {level}.",
+      "unshareFailed": "Não foi possível encerrar o compartilhamento.",
+      "unshared": "Compartilhamento com {team} encerrado.",
+      "readingHistory": "Ler o histórico de acesso",
+      "history": "Histórico de acesso",
+      "historyDescription": "Todos os compartilhamentos e encerramentos de compartilhamento desta camada na trilha de auditoria, inclusive os recusados.",
+      "historyEmpty": "Nenhum compartilhamento ainda",
+      "historyKinds": {
+        "share": "compartilhou a camada",
+        "unshare": "encerrou o compartilhamento"
+      },
+      "refused": "Recusado: {code}",
+      "failed": "Não aplicado: {code}",
+      "viaAgent": "token de agente",
+      "nowShared": "Depois, compartilhada com {teams}",
+      "nowOwnerOnly": "Depois, somente a equipe proprietária"
+    },
+    "apps": {
+      "title": "Apps hospedados",
+      "description": "Apps do modelo brain-app que leem esta camada. Cada implantação lhes fornece a URL MCP da camada e um token de leitura novo.",
+      "app": "Aplicativo",
+      "environments": "Ambientes",
+      "noEnvironments": "Nenhum ambiente",
+      "open": "Abrir",
+      "deployments": "Implantações",
+      "host": "Hospedar um app",
+      "notServed": "Ainda não servida",
+      "emptyTitle": "Nenhum app hospedado",
+      "emptyDescription": "Hospede um app para que ele receba a URL MCP desta camada e um token de leitura a cada implantação.",
+      "emptyNotServed": "Quando a camada for servida, apps poderão ser hospedados nela."
+    },
+    "connectTab": {
+      "token": "Token de leitura",
+      "tokenDescription": "Conectar emite para você um token de leitura válido por 15 minutos e o mostra uma única vez, com uma configuração de cliente MCP para colar. Conecte novamente para obter outro; fechar a caixa de diálogo o descarta.",
+      "connect": "Conectar",
+      "notServed": "Ainda não servida",
+      "notServedDescription": "Um cliente se conecta a um ambiente com URL; a primeira implantação lhe dá uma.",
+      "endpoints": "Endpoints MCP",
+      "noEndpoints": "Nenhum endpoint ainda",
+      "cli": "Pela CLI",
+      "cliDescription": "A CLI astro imprime a mesma configuração com um token novo, ou uma que o Claude Code aceita como está.",
+      "apps": "Para um app",
+      "appsDescription": "Um app hospedado na camada recebe a URL MCP e um token a cada implantação, então nunca guarda um de longa duração.",
+      "appsLink": "Hospedar um app"
+    },
+    "settings": {
+      "sections": "Seções de configurações",
+      "sectionLabels": {
+        "rebuild": "Recompilação",
+        "dangerZone": "Zona de perigo"
+      },
+      "rebuildTitle": "Recompilação",
+      "rebuildDescription": "Reimplanta o head da branch de implantação. Com ingestão, executa primeiro a atualização de conhecimento: o commit dela é implantado pelo push normal.",
+      "rebuilding": "Recompilar esta camada semântica",
+      "environment": "Ambiente",
+      "ingest": "Ingerir primeiro",
+      "ingestHelp": "Executa .github/workflows/knowledge-refresh.yml no repositório, que precisa tê-lo.",
+      "productionStepUp": "Para implantar em produção, você precisa entrar de novo primeiro.",
+      "rebuild": "Recompilar",
+      "rebuildWithIngest": "Ingerir e recompilar",
+      "rebuildFailed": "Não foi possível recompilar a camada semântica.",
+      "rebuildStarted": "Recompilação iniciada.",
+      "ingestStarted": "Atualização de conhecimento iniciada. O commit dela é implantado quando chegar.",
+      "started": "Iniciado",
+      "mode": "Modo",
+      "modes": {
+        "deploy": "Implantação do head da branch",
+        "ci": "Execução de CI do head da branch",
+        "ingest": "Atualização de conhecimento e depois uma implantação"
+      },
+      "deployment": "Implantação",
+      "run": "Execução",
+      "openRun": "Abrir a execução",
+      "rebuilds": "Recompilações",
+      "viewRequests": "Ver solicitações de aprovação",
+      "archiveTitle": "Arquivar esta camada semântica",
+      "archiveDescription": "Reduz a camada a zero, a tira do registro e revoga os tokens dos apps hospedados nela. Os bancos de dados, volumes, buckets e o repositório dela são mantidos, e Restaurar a traz de volta.",
+      "archiving": "Arquivar esta camada semântica",
+      "askVerification": "Para arquivar, você precisa entrar de novo primeiro.",
+      "askApproval": "{count, plural, one {Precisa da aprovação de # aprovador.} other {Precisa da aprovação de # aprovadores.}}",
+      "archive": "Arquivar",
+      "archiveConfirmTitle": "Arquivar {name}?",
+      "archiveFailed": "Não foi possível arquivar a camada semântica.",
+      "archived": "{slug} foi arquivada."
     }
   },
   "navModel": {
@@ -15762,7 +16301,12 @@
     "workload": "Carga de trabalho",
     "workloads": "Cargas de trabalho",
     "zentinelle": "Zentinelle",
-    "support": "Suporte"
+    "support": "Suporte",
+    "newSemanticLayer": "Nova camada semântica",
+    "semanticLayer": "Camada semântica",
+    "substrate": "Substrato",
+    "sharing": "Compartilhamento",
+    "connect": "Conectar"
   },
   "listDefinitions": {
     "agentBoxes": {
@@ -16016,6 +16560,9 @@
       "search": "Buscar nomes e slugs…",
       "views": {
         "all": "Todas"
+      },
+      "fields": {
+        "team": "Equipe"
       }
     },
     "commandRuns": {
@@ -16510,6 +17057,18 @@
       },
       "notes": {
         "mine": "Minhas mostra as cargas de trabalho que você criou ou que estão em aplicativos criados por você. As cargas de trabalho criadas antes de o Astrolift passar a registrar quem as cria aparecem apenas em Todas."
+      }
+    },
+    "brainShares": {
+      "search": "Buscar equipes…",
+      "views": {
+        "all": "Todas"
+      }
+    },
+    "brainApps": {
+      "search": "Buscar apps…",
+      "views": {
+        "all": "Todos"
       }
     }
   },

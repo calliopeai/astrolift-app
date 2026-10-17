@@ -9,7 +9,7 @@ import os
 import time
 import uuid
 from http import HTTPStatus
-from urllib.parse import quote_plus, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote_plus, urlencode, urlsplit, urlunsplit
 
 import requests
 from authlib.integrations.django_client import OAuth
@@ -24,14 +24,24 @@ from django.db.models import Q
 from django.http import HttpResponse, HttpResponseNotAllowed, HttpResponseRedirect
 from django.shortcuts import redirect
 from django.urls import path, reverse
-from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.csrf import csrf_exempt
 from django_ratelimit.decorators import ratelimit
 
+from core.utils.browser_guard import require_ui_header_for_session
+
+from . import handoff
 from .models import Authentication, UserInfo
-from .return_urls import safe_return_url
+from .return_urls import CALLBACK_RESULT_KEYS, FRONTEND_CALLBACK_PATH, safe_return_url
 
 logger = logging.getLogger(__name__)
+
+
+def _claim_is_true(value: object) -> bool:
+    """A boolean claim as the IdP meant it: ``true``, or the string ``"true"``
+    that Cognito sends for a mapped attribute. Reading the claim for truth
+    passed any non-empty string: ``"False"`` signed in an unverified address,
+    and ``"true"`` or ``"false"`` failed the BooleanField's save."""
+    return value is True or (isinstance(value, str) and value.strip().lower() == "true")
 
 
 # Use https://<your-auth0-domain>/.well-known/openid-configuration to get endpoints information
@@ -318,24 +328,37 @@ class Auth1SessionWorkflow:
         return own, cls._fix_proxy_pass(request, own)
 
     @staticmethod
-    def _no_account_url(next_url: str | None) -> str:
-        """Back to sign-in, saying the IdP's identity has no account here."""
+    def _sign_in_error_url(next_url: str | None, error: str) -> str:
+        """Back to sign-in, saying why the IdP's identity did not sign in here."""
         if next_url and urlsplit(next_url).netloc:
             separator = "&" if "?" in next_url else "?"
-            return f"{next_url}{separator}error=no_account"
+            return f"{next_url}{separator}error={error}"
         frontend_url = (getattr(settings, "FRONTEND_URL", "") or "").rstrip("/")
-        return f"{frontend_url}/auth/login?error=no_account"
+        return f"{frontend_url}/auth/login?error={error}"
 
     @staticmethod
     def _post_auth_next_url(next_url: str, session_key: str) -> str:
-        device_path = f"/{settings.BASE_URL.strip('/')}/cli/auth/device/"
-        if next_url.startswith(device_path) and url_has_allowed_host_and_scheme(
-            next_url, allowed_hosts=set()
-        ):
+        """``next_url``, plus a one-time code for the session when it is the
+        frontend callback (#2429). A page on this host, such as the CLI device
+        approval, reads the session cookie this response sets and gets nothing.
+        """
+        parts = urlsplit(next_url)
+        if parts.path != FRONTEND_CALLBACK_PATH:
             return next_url
-        token = f"Session {session_key}"
-        separator = "&" if "?" in next_url else "?"
-        return f"{next_url}{separator}token={quote_plus(token)}"
+        query = [
+            (key, value)
+            for key, value in parse_qsl(parts.query, keep_blank_values=True)
+            if key not in CALLBACK_RESULT_KEYS
+        ]
+        query.append(("code", handoff.issue(session_key)))
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), ""))
+
+    @staticmethod
+    def _logout_other_session(request: WSGIRequest) -> None:
+        """The IdP's identity reached no account here, so a session already open
+        in this browser belongs to someone else, and ends."""
+        if getattr(request, "user", None) is not None and request.user.is_authenticated:
+            logout(request)
 
     @classmethod
     @transaction.atomic
@@ -344,9 +367,9 @@ class Auth1SessionWorkflow:
         Callback entrypoint from the Auth0 Tenant with the token authentication.
 
         When a ?next= URL was stored by login(), redirect there. The frontend
-        callback receives a session token so it can store it without accessing
-        the Django cookie; the same-origin CLI approval page uses that cookie
-        directly and must not receive the token in its URL.
+        callback receives a one-time code it trades for the session at
+        ``/app/auth1/handoff``, so no session key is ever in a URL; the
+        same-origin CLI approval page uses the session cookie directly.
         """
         try:
             logger.debug("[Auth0] Auth0 Tenant callback received.")
@@ -357,12 +380,10 @@ class Auth1SessionWorkflow:
 
             if authentication.userinfo.internal_user is None:
                 # The IdP vouched for someone with no account here. A session
-                # token would only send every request back to sign-in, so say
-                # so instead; a session already open in this browser belongs
-                # to someone else and ends.
-                if getattr(request, "user", None) is not None and request.user.is_authenticated:
-                    logout(request)
-                return HttpResponseRedirect(cls._no_account_url(next_url))
+                # would only send every request back to sign-in, so say so
+                # instead.
+                cls._logout_other_session(request)
+                return HttpResponseRedirect(cls._sign_in_error_url(next_url, "no_account"))
 
             # Best-effort: if the user just authed and their email
             # domain is on the active org's allowlist, auto-create
@@ -376,25 +397,25 @@ class Auth1SessionWorkflow:
             except Exception:
                 logger.exception("[Auth0] auto_join hook failed — auth flow continues")
 
+            frontend_url = (getattr(settings, "FRONTEND_URL", "") or "").rstrip("/")
             if next_url:
                 url = cls._post_auth_next_url(next_url, request.session.session_key)
+            elif frontend_url:
+                url = cls._post_auth_next_url(
+                    f"{frontend_url}{FRONTEND_CALLBACK_PATH}", request.session.session_key
+                )
             else:
-                # If FRONTEND_URL is set, redirect there with the session token
-                # so the frontend can complete its auth flow
-                from django.conf import settings
-
-                frontend_url = getattr(settings, "FRONTEND_URL", None)
-                if frontend_url:
-                    token = f"Session {request.session.session_key}"
-                    url = f"{frontend_url}/auth/callback?token={quote_plus(token)}"
-                else:
-                    url = request.build_absolute_uri(reverse(cls.landing))
-                    url = cls._fix_proxy_pass(request, url)
+                url = request.build_absolute_uri(reverse(cls.landing))
+                url = cls._fix_proxy_pass(request, url)
 
             return HttpResponseRedirect(url)
         except EmailNotVerifiedException as e:
-            logger.warning(f"[Auth0] {e} redirecting to verify-email", exc_info=True)
-            return HttpResponseRedirect(request.build_absolute_uri("/verify-email"))
+            # The address would decide the account, and nobody vouched for it
+            # (#2430). Nothing was written; the browser goes back to sign-in.
+            logger.warning("[Auth0] Sign-in refused: %s", e)
+            next_url = safe_return_url(request.session.pop("auth_next", None), cls._own_origins(request))
+            cls._logout_other_session(request)
+            return HttpResponseRedirect(cls._sign_in_error_url(next_url, "email_unverified"))
 
     @classmethod
     def logout(cls, request: WSGIRequest):
@@ -456,9 +477,11 @@ class Auth1SessionWorkflow:
         - logout: logout entrypoint
         - callback: tenant callback entrypoint
         - session: retired direct-claims endpoint (HTTP 410).
+        - handoff: trades the callback's one-time code for its session.
         """
         _rl_login = ratelimit(key="ip", rate="10/m", block=True)(cls.login)
         _rl_session = ratelimit(key="ip", rate="5/m", method="POST", block=True)(cls.session)
+        _rl_handoff = ratelimit(key="ip", rate="30/m", block=True)(handoff.handoff)
         from auth1.active_idp import active_idp
         from auth1.dev_login import dev_login
         from auth1.local_login import local_login
@@ -480,6 +503,11 @@ class Auth1SessionWorkflow:
             path("logout", cls.logout, name="logout"),
             path("callback", cls.callback, name="callback"),
             path("session", csrf_exempt(_rl_session), name="session"),
+            # The frontend has no CSRF token for this host; the code and the
+            # session cookie it is bound to are the credential, and a cookie
+            # POST needs the UI header, so a page on another origin cannot
+            # spend a code it learned.
+            path("handoff", csrf_exempt(require_ui_header_for_session(_rl_handoff)), name="handoff"),
             path("dev-login", dev_login, name="dev-login"),
             path("local-login", local_login, name="local-login"),
             path("active-idp.json", active_idp, name="active-idp"),
@@ -651,29 +679,28 @@ class Auth1SessionWorkflow:
         _raw_userinfo = auth0_token.get("userinfo") or {}
         _filtered = {k: v for k, v in _raw_userinfo.items() if k in _userinfo_fields}
 
-        # Provider-shape fallbacks. Auth0 supplies `updated_at` on every
-        # userinfo response and propagates `email_verified=true` for
-        # IdP-verified logins; Cognito does neither for users federated
-        # in through Google Workspace — `updated_at` is absent and
-        # `email_verified=false` even though the upstream IdP verified
-        # the email. Filling sensible defaults here keeps UserInfo's
-        # NOT NULL constraints happy and lets the IdP's own verification
-        # gate the auth flow.
+        # Provider-shape fallback. Auth0 supplies `updated_at` on every
+        # userinfo response; Cognito omits it for users federated in through
+        # Google Workspace. Filling it keeps UserInfo's NOT NULL constraint
+        # happy.
         from django.utils import timezone as _tz
 
         if "updated_at" not in _filtered or _filtered.get("updated_at") in (None, ""):
             _filtered["updated_at"] = _tz.now()
-        # If the IdP itself asserted the email (federated through Google
-        # Workspace via Cognito, or any other IdP-attested flow), trust
-        # that. The federated IdP is the source of truth for email
-        # verification, not Cognito's own user pool view of it.
-        iss = _filtered.get("iss") or ""
-        if iss.startswith("https://cognito-idp."):
-            _filtered["email_verified"] = True
+        # Only the IdP's own claim says the address is verified (#2430): the
+        # address decides which account an identity gets, by email match,
+        # auto-signup or invitation. Every Cognito issuer used to count as
+        # verified, so on a pool with open sign-up anyone could register
+        # someone else's address and sign in as them. A pool that federates
+        # (Google, SAML) must map `email_verified` from the upstream
+        # provider; without the mapping Cognito sends false.
+        _filtered["email_verified"] = _claim_is_true(_raw_userinfo.get("email_verified"))
 
         user_info = UserInfo(**_filtered)
         if not user_info.email_verified:
-            raise EmailNotVerifiedException("Email is not verified.")
+            raise EmailNotVerifiedException(
+                f"the identity provider ({user_info.iss or 'unknown issuer'}) has not verified this email address"
+            )
 
         # A known external subject keeps its existing account authority.
         # In particular, a former email must not unlink an anonymous user

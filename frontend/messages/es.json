@@ -14617,33 +14617,138 @@
   },
   "zentinelleScreen": {
     "title": "Proteger · Zentinelle",
-    "description": "GRC de agentes de IA: gobernanza, riesgo y cumplimiento para cada workload de agente en Astrolift.",
-    "tagline": "Licencia MIT · Autoalojable · Producto complementario de Calliope AI",
-    "intro": "Zentinelle es el pilar <strong>Control + Secure</strong> del stack BROCS. Se ejecuta junto a Astrolift y aporta la capa específica de IA que Astrolift deliberadamente no asume: aplicación de políticas, análisis de contenido, marcos de cumplimiento y el registro de auditoría completo de interacciones que exigen las normativas de gobernanza de IA.",
-    "statusTitle": "Integración en diseño",
-    "statusBody": "Se está diseñando el handshake de autenticación y la delegación de tenants entre Astrolift y Zentinelle. Las opciones incluyen Zentinelle como app Django integrada que delega la autenticación en Astrolift, o un servicio separado con intercambio de tokens. Cuando se decida la forma, esta página será la interfaz de gestión de la conexión.",
-    "github": "Zentinelle en GitHub",
-    "docs": "Documentación de integración",
-    "addsTitle": "Qué aporta Zentinelle a Astrolift",
-    "capabilities": {
-      "governance": {
-        "title": "Gobernanza",
-        "description": "Motor de políticas: reglas de contenido (PII, toxicidad, detección de jailbreak), listas de modelos permitidos, aplicación de presupuestos de tokens y biblioteca versionada de prompts de sistema."
-      },
-      "risk": {
-        "title": "Riesgo",
-        "description": "Registro de riesgos 5×5, análisis FMEA, seguimiento de incidentes, detección de anomalías y alertas automáticas ante desviaciones en el comportamiento del agente."
-      },
-      "compliance": {
-        "title": "Cumplimiento",
-        "description": "Mapeo de controles de SOC 2, RGPD, HIPAA, Ley de IA de la UE y NIST RMF. Recopilación de evidencias, análisis de brechas e informes listos para auditoría."
-      },
-      "observability": {
-        "title": "Observabilidad",
-        "description": "Auditoría completa de interacciones (prompts, respuestas y llamadas a herramientas), resultados del análisis de contenido, registros de evaluación de políticas y medición del uso de tokens por workload."
+    "description": "Conecte esta organización a Zentinelle para la gobernanza de agentes, el uso y el coste, las políticas y la auditoría.",
+    "noAccess": "Sin acceso a Zentinelle",
+    "noAccessBody": "Sus roles no conceden nada sobre Zentinelle aquí. Pida un permiso de Zentinelle a un administrador de la organización.",
+    "error": "No se pudo leer la conexión con Zentinelle",
+    "notConnected": "Sin conexión con Zentinelle",
+    "notConnectedBody": "Un administrador de la organización conecta Zentinelle desde esta página. Sus secciones aparecen una vez conectada.",
+    "tabsLabel": "Secciones de Zentinelle",
+    "writeFailed": "Zentinelle no aceptó el cambio",
+    "tabs": {
+      "overview": "Resumen",
+      "clusters": "Clústeres",
+      "usage": "Uso y coste",
+      "policies": "Políticas",
+      "audit": "Auditoría"
+    },
+    "health": {
+      "healthy": "Pasarela en marcha",
+      "pending": "Pasarela aún no desplegada",
+      "off": "Pasarela desactivada",
+      "error": "Error de la pasarela"
+    },
+    "connect": {
+      "title": "Conectar con Zentinelle",
+      "description": "Pegue la URL de Zentinelle y un código de inscripción de un solo uso generado en Zentinelle. La credencial que devuelve Zentinelle se guarda como secreto y nunca se muestra.",
+      "url": "URL de Zentinelle",
+      "code": "Código de inscripción",
+      "codeHelp": "Se genera en Zentinelle; sirve una sola vez.",
+      "gatewayUrl": "URL de la pasarela (opcional)",
+      "gatewayUrlHelp": "Dónde llegan a Zentinelle las pasarelas de los clústeres cuando no es la URL de arriba, como una dirección privada dentro del clúster.",
+      "required": "Introduzca la URL de Zentinelle y el código de inscripción.",
+      "connecting": "Conectando…",
+      "submit": "Conectar"
+    },
+    "connection": {
+      "title": "Conexión",
+      "status": "Estado de la conexión",
+      "connected": "Conectado",
+      "revoked": "Revocada por Zentinelle",
+      "revokedBody": "Zentinelle ya no acepta esta conexión: {reason}. Desconecte y vuelva a conectar con un código de inscripción nuevo.",
+      "url": "URL de Zentinelle",
+      "gatewayUrl": "URL de la pasarela",
+      "sameAsUrl": "La misma que la URL de Zentinelle",
+      "installId": "ID de instalación en Zentinelle",
+      "tenants": "Inquilinos de Zentinelle",
+      "none": "Ninguno",
+      "connectedAt": "Conectado el",
+      "editGatewayUrl": "Cambiar la URL de la pasarela",
+      "disconnect": "Desconectar",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "gatewayUrlHelp": "Déjela vacía para usar la URL de Zentinelle. Las pasarelas en marcha se vuelven a desplegar.",
+      "disconnectTitle": "¿Desconectar de Zentinelle?",
+      "disconnectBody": "Esto revoca la instalación y cada clúster registrado en Zentinelle y después retira las pasarelas y sus secretos de los clústeres. Para volver a conectar hace falta un código de inscripción nuevo.",
+      "disconnected": "Desconectado de Zentinelle"
+    },
+    "overview": {
+      "degraded": "Una o más pasarelas de clúster necesitan atención. Consulte los clústeres más abajo.",
+      "title": "Salud",
+      "gateways": "Pasarelas en marcha",
+      "gatewaysValue": "{healthy} de {total}",
+      "agents": "Agentes observados este mes",
+      "requests": "Solicitudes al modelo, últimas 24 horas",
+      "spend": "Gasto de este mes",
+      "usageError": "No se pudo leer el uso desde Zentinelle",
+      "clustersTitle": "Salud de la pasarela por clúster",
+      "clustersDescription": "La pasarela de Zentinelle de cada clúster registrado.",
+      "installOff": "Las pasarelas de Zentinelle están desactivadas en esta instalación. Los clústeres registrados conservan sus credenciales; las pasarelas se despliegan cuando el operador de la plataforma las activa.",
+      "noClusters": "Todavía no hay clústeres registrados en Zentinelle."
+    },
+    "clusters": {
+      "installOff": "Las pasarelas de Zentinelle están desactivadas en esta instalación. Registrar un clúster guarda su credencial; la pasarela se despliega cuando el operador de la plataforma activa las pasarelas.",
+      "title": "Clústeres registrados",
+      "empty": "Todavía no hay clústeres registrados en Zentinelle.",
+      "never": "nunca",
+      "registeredAt": "Registrado {when}",
+      "rotatedAt": "credencial rotada {when}",
+      "turnOff": "Desactivar la pasarela",
+      "turnOn": "Activar la pasarela",
+      "rotate": "Rotar la credencial",
+      "unregister": "Dar de baja",
+      "registerTitle": "Registrar un clúster",
+      "registerDescription": "Al registrarlo se escribe la credencial de la pasarela en el clúster y se despliega su pasarela.",
+      "search": "Buscar clústeres",
+      "noChoices": "Ningún clúster sin registrar coincide.",
+      "register": "Registrar",
+      "unregisterTitle": "¿Dar de baja {cluster} en Zentinelle?",
+      "unregisterBody": "Esto revoca el clúster en Zentinelle y después retira su pasarela y el secreto de su credencial. El tráfico de agentes en él deja de pasar por Zentinelle."
+    },
+    "filters": {
+      "window": "Periodo",
+      "scope": "Alcance",
+      "all": "Todo lo que puedo ver",
+      "agent": "Un agente",
+      "projects": "Proyectos",
+      "teams": "Equipos",
+      "agentSlug": "Slug del agente",
+      "windows": {
+        "24h": "Últimas 24 horas",
+        "7d": "Últimos 7 días",
+        "30d": "Últimos 30 días",
+        "month": "Este mes"
       }
     },
-    "division": "<label>Reparto de responsabilidades:</label> Astrolift se encarga de la <em>capa de ejecución</em>: orquestación de contenedores, despliegues, salud de los pods y observabilidad de la infraestructura. Zentinelle se encarga de la <em>capa de comportamiento de la IA</em>: lo que el agente dice y hace, si cumple las políticas y el registro de auditoría que exigen los reguladores. En <strong>OBSERVE › Agents</strong>, las pestañas marcadas con <code>Astrolift</code> ya están activas; las de <code>Zentinelle</code> se activarán cuando se publique la integración."
+    "usage": {
+      "error": "No se pudo leer el uso desde Zentinelle",
+      "requests": "Solicitudes al modelo",
+      "tokens": "Tokens usados",
+      "cost": "Coste de modelos",
+      "title": "Por agente y modelo",
+      "empty": "No hay uso de modelos en este periodo.",
+      "noAgent": "(sin agente)",
+      "requestCount": "{count, plural, one {# solicitud} other {# solicitudes}}",
+      "tokenCount": "{input} de entrada, {output} de salida"
+    },
+    "policies": {
+      "error": "No se pudieron leer las políticas desde Zentinelle",
+      "empty": "Aquí no hay políticas de Zentinelle en vigor.",
+      "meta": "Alcance {scope}, prioridad {priority}"
+    },
+    "audit": {
+      "export": {
+        "ndjson": "Exportar NDJSON",
+        "csv": "Exportar CSV"
+      },
+      "label": "Auditoría de Zentinelle",
+      "error": "No se pudo leer el flujo de auditoría desde Zentinelle",
+      "loadMore": "Cargar más",
+      "loadingMore": "Cargando…",
+      "empty": "No hay eventos de auditoría en este periodo",
+      "emptyBody": "Los eventos aparecen aquí a medida que Zentinelle los registra para los agentes que puede ver.",
+      "exported": "{count, plural, one {# evento exportado} other {# eventos exportados}}"
+    }
   },
   "modelDeploy": {
     "title": "Desplegar modelo",
@@ -14786,6 +14891,8 @@
     "signIn": "Iniciar sesión",
     "noAccountTitle": "No hay una cuenta de Astrolift para este inicio de sesión",
     "noAccountBody": "Tu proveedor de identidad inició tu sesión, pero aquí no hay ninguna cuenta para esa identidad. Si te invitaron, inicia sesión con la dirección a la que se envió la invitación; si no, pide a un administrador que te invite.",
+    "emailUnverifiedTitle": "Dirección de correo no verificada",
+    "emailUnverifiedBody": "Tu proveedor de identidad inició tu sesión, pero no ha verificado tu dirección de correo, así que Astrolift no puede saber cuál es tu cuenta. Verifica la dirección con tu proveedor o pide ayuda a un administrador y vuelve a iniciar sesión.",
     "useDifferentAccount": "Usar otra cuenta"
   },
   "invitationAccept": {
@@ -15527,14 +15634,11 @@
     "context": "Capas semánticas alojadas que puedes leer: aplicaciones que sirven una Semantic Context Ontology Layer. Comparte una dando a un equipo acceso a su aplicación.",
     "columnName": "Capa",
     "columnOwner": "Equipo / proyecto",
-    "columnEndpoints": "Servida en",
     "columnShared": "Compartida con",
-    "columnApp": "Acceso",
     "none": "ninguno",
     "notServed": "Aún no se sirve",
     "notShared": "Solo el equipo propietario",
     "shareTitle": "{team}: {access}",
-    "manageAccess": "Gestionar acceso",
     "emptyTitle": "No hay capas semánticas",
     "emptyDescription": "Aquí aparecen las aplicaciones declaradas con [app] kind = \"mimwell\" que puedes leer.",
     "columnConnect": "Clientes MCP",
@@ -15569,6 +15673,441 @@
       "cancel": "Cancelar",
       "create": "Crear app",
       "creating": "Creando…"
+    },
+    "columnHealth": "Estado",
+    "columnRebuilt": "Última reconstrucción",
+    "columnFreshness": "Frescura",
+    "new": "Nueva capa semántica",
+    "status": {
+      "unavailable": "No disponible",
+      "unknown": "Desconocido",
+      "never": "Nunca",
+      "noEnvironment": "No hay entorno {environment}",
+      "notDeployed": "Sin desplegar",
+      "compiled": "Compilada {age}",
+      "notCompiled": "Sin compilar",
+      "behind": "Por detrás de la rama",
+      "ingest": {
+        "running": "Ingesta en curso",
+        "succeeded": "Ingesta completada",
+        "failed": "Ingesta fallida",
+        "other": "Ingesta detenida"
+      },
+      "warnings": "{count, plural, one {# lectura del host falló} other {# lecturas del host fallaron}}"
+    },
+    "wizard": {
+      "title": "Nueva capa semántica",
+      "listCrumb": "Capas semánticas",
+      "stepsLabel": "Pasos",
+      "done": "completado",
+      "back": "Atrás",
+      "continue": "Continuar",
+      "create": "Crear capa semántica",
+      "cancel": "Cancelar",
+      "retry": "Reintentar",
+      "deniedTitle": "No puedes crear capas semánticas",
+      "deniedDescription": "Al crear una, se registra una app en un proyecto, lo que requiere app.create en él. Consulta a alguien que gestione el proyecto.",
+      "backToList": "Volver a las capas semánticas",
+      "steps": {
+        "source": {
+          "label": "Origen",
+          "description": "El repositorio en el que reside la capa: Astrolift lo crea si no existe, o rellena uno vacío, a partir de la edición de Mimwell."
+        },
+        "details": {
+          "label": "Detalles",
+          "description": "Cómo se llama la capa, el equipo y el proyecto a los que pertenece, y adónde va su primer despliegue."
+        },
+        "substrate": {
+          "label": "Sustrato",
+          "description": "Dónde guarda la capa su canon, blobs, vectores y grafo (la celda de Mimwell), y qué adjunta Astrolift para ella."
+        },
+        "review": {
+          "label": "Revisión",
+          "description": "Revisa la solicitud y luego crea la capa. El trabajo se ejecuta en segundo plano y esta página lo sigue."
+        }
+      },
+      "connection": "Conexión de origen",
+      "connectionHelp": "Crea o rellena el repositorio, y el commit inicial es tuyo.",
+      "chooseConnection": "Elige una conexión",
+      "noConnections": "Aún no hay ninguna conexión de origen que pueda actuar por ti. Primero <link>conecta una cuenta</link>.",
+      "appInstallNote": "Una conexión de GitHub App no puede crear repositorios. Crea primero el repositorio vacío o elige una conexión con token u OAuth.",
+      "repo": "Repositorio",
+      "repoHelp": "owner/name. Uno nuevo, o uno que aún no tenga commits.",
+      "visibility": "Visibilidad",
+      "visibilityHelp": "Se aplica cuando Astrolift crea el repositorio.",
+      "visibilities": {
+        "PRIVATE": "Privado",
+        "INTERNAL": "Interno",
+        "PUBLIC": "Público"
+      },
+      "templateRef": "Referencia de plantilla",
+      "templateRefHelp": "Una etiqueta, rama o commit de la edición de Mimwell. Déjalo vacío para usar la edición que fija esta instalación.",
+      "pinnedEdition": "La edición que fija esta instalación",
+      "name": "Nombre",
+      "nameHelp": "Se muestra en las listas. Si queda vacío, se usa el slug.",
+      "namePlaceholder": "Conocimiento de la plataforma",
+      "slug": "Slug",
+      "slugHelp": "El slug de la app de la capa: letras minúsculas, dígitos y guiones.",
+      "team": "Equipo",
+      "teamHelp": "El equipo propietario de la capa.",
+      "chooseTeam": "Elige un equipo",
+      "noTeams": "No hay equipos",
+      "project": "Proyecto",
+      "projectHelp": "Una capa pertenece al equipo de su proyecto.",
+      "chooseProject": "Elige un proyecto",
+      "teamFirst": "Elige primero un equipo",
+      "environment": "Entorno",
+      "environmentHelp": "Adónde va el primer despliegue.",
+      "deploy": "Desplegar ahora",
+      "deployHelp": "Despliega el commit inicial en cuanto se registre la capa.",
+      "deployDenied": "Desplegar requiere app.deploy, así que la capa se crea sin un primer despliegue.",
+      "deployYes": "Sí, una vez registrada",
+      "deployNo": "No, desplegarla más tarde",
+      "cell": "Celda",
+      "persistence": "Persistencia",
+      "noPersistence": "Ninguna",
+      "replicas": "Réplicas",
+      "image": "Imagen",
+      "builtImage": "Compilada con el Dockerfile del portal de la edición",
+      "port": "Puerto",
+      "edit": "Editar",
+      "editPart": "Editar {part}",
+      "whatHappens": "Qué hace «Crear»",
+      "happensRepo": "Crea el repositorio si no existe, o comprueba que esté vacío.",
+      "happensScaffold": "Hace un solo commit con la edición verificada de Mimwell y tu configuración.",
+      "happensRegister": "Registra la capa como una app de tipo mimwell en el proyecto.",
+      "happensDeploy": "Despliega ese commit en {environment}.",
+      "productionStepUp": "Desplegar en producción te pide iniciar sesión de nuevo antes.",
+      "createFailed": "No se pudo crear la capa semántica.",
+      "problems": {
+        "required": "Obligatorio",
+        "repoFormat": "Usa owner/name, con letras, dígitos, puntos, guiones y guiones bajos.",
+        "refFormat": "Un nombre de etiqueta, rama o commit, sin espacios ni puntos consecutivos.",
+        "slugFormat": "Letras minúsculas, dígitos y guiones, empezando por una letra y terminando por una letra o un dígito, hasta 63 caracteres.",
+        "envFormat": "Un nombre corto en minúsculas: letras, dígitos y guiones, hasta 32 caracteres.",
+        "long": "Hasta 255 caracteres."
+      }
+    },
+    "substrate": {
+      "cell": "Celda",
+      "cellHelp": "Las cuatro ubicaciones de Mimwell. Las opciones que darían una celda no compatible con Mimwell están desactivadas, con el motivo.",
+      "axes": {
+        "authority": "Autoridad",
+        "blobs": "Blobs",
+        "vectors": "Vectores",
+        "graph": "Grafo"
+      },
+      "axisHelp": {
+        "authority": "Dónde reside el canon. Con files, el repositorio es el canon.",
+        "blobs": "Dónde residen los adjuntos y otros binarios.",
+        "vectors": "Dónde reside el índice vectorial.",
+        "graph": "Dónde reside la proyección del grafo."
+      },
+      "supported": "Compatible con Mimwell:",
+      "reasons": {
+        "d1Authority": "d1 es un destino de proyección, nunca una autoridad.",
+        "dbBlobNeedsDatabase": "db-blob guarda los blobs en la base de datos de la autoridad, y esta autoridad no tiene ninguna.",
+        "inDbVectorsMongo": "Los vectores in-db son columnas vectoriales SQL, y mongo no tiene ninguna.",
+        "inDbVectorsNeedSql": "Los vectores in-db residen en la base de datos de la autoridad, y esta autoridad no tiene ninguna.",
+        "ageNeedsPostgres": "age es una extensión de Postgres, así que necesita la autoridad postgres."
+      },
+      "persistence": "Persistencia",
+      "persistenceHelp": "Lo que Astrolift adjunta a la capa. El repositorio siempre está presente.",
+      "persistenceKinds": {
+        "sqlite-volume": "Un volumen en /data para la autoridad SQLite. La capa se ejecuta como statefulset.",
+        "efs": "Un volumen compartido en /shared, que montan todas las réplicas.",
+        "postgres": "Un Postgres gestionado. La capa lee DATABASE_URL.",
+        "s3": "Almacenamiento de objetos para blobs. Los buckets se vinculan fuera del manifiesto, así que la capa indica que no está vinculado hasta que se vincule uno."
+      },
+      "withAge": "Con la extensión AGE, para el grafo.",
+      "neededBy": "Requerido por {placement}",
+      "heldData": "Contiene datos. Dejarlo es una migración dentro de la capa, no un cambio de sustrato.",
+      "replicas": "Réplicas",
+      "replicasHelp": "De 1 a {max}.",
+      "replicasSqlite": "Cada réplica reconstruye app/brain.db en su propio volumen.",
+      "replicasRange": "Un número entero de 1 a {max}.",
+      "image": "Imagen",
+      "imageHelp": "Opcional. Si queda vacío, se compila el Dockerfile del portal de la edición.",
+      "imageFormat": "Una referencia de imagen no tiene espacios.",
+      "imageKept": "La capa conserva la imagen que ejecuta.",
+      "port": "Puerto",
+      "portRange": "De 1 a 65535.",
+      "portGraduate": "La API no informa del puerto actual: mantén el puerto en el que sirve la capa."
+    },
+    "creation": {
+      "listCrumb": "Capas semánticas",
+      "crumb": "Nueva",
+      "progress": "Progreso",
+      "runningTitle": "Creando {slug}",
+      "readyTitle": "{name} está lista",
+      "failedTitle": "No se pudo crear {slug}",
+      "missingTitle": "Esa creación no existe",
+      "missingDescription": "Con este enlace no se creó nada que puedas ver. Puede que pertenezca a otra persona.",
+      "readFailed": "No se pudo leer la creación",
+      "pollFailed": "No se pudo comprobar cómo va la creación",
+      "retry": "Reintentar",
+      "open": "Abrir la capa semántica",
+      "failedReason": "La creación se detuvo",
+      "noReason": "El servidor no indicó ningún motivo.",
+      "editAndRetry": "Editar y volver a intentarlo",
+      "startOver": "Empezar de nuevo",
+      "leaveNote": "El trabajo se ejecuta en el servidor: salir de esta página no detiene nada.",
+      "steps": {
+        "REPO_READY": "Repositorio",
+        "SCAFFOLDED": "Commit inicial",
+        "REGISTERED": "Registrada",
+        "DEPLOYING": "Primer despliegue"
+      },
+      "stepHelp": {
+        "REPO_READY": "Creado, o encontrado vacío.",
+        "SCAFFOLDED": "La edición de Mimwell y tu configuración, en un solo commit.",
+        "REGISTERED": "Una app de tipo mimwell en el proyecto.",
+        "DEPLOYING": "El commit inicial, desplegado y en ejecución."
+      },
+      "stepStates": {
+        "done": "completado",
+        "current": "en curso",
+        "todo": "sin iniciar",
+        "failed": "fallido"
+      },
+      "repo": "Repositorio",
+      "templateRef": "Referencia de plantilla",
+      "commit": "Commit",
+      "deployment": "Despliegue",
+      "notYet": "Todavía no",
+      "noDeploy": "No solicitado"
+    },
+    "tabs": {
+      "overview": "Resumen",
+      "substrate": "Sustrato",
+      "sharing": "Acceso compartido",
+      "apps": "Aplicaciones",
+      "connect": "Conectar",
+      "settings": "Configuración"
+    },
+    "frame": {
+      "listCrumb": "Capas semánticas",
+      "sections": "Secciones de la capa semántica",
+      "served": "{count, plural, one {Servida en # entorno} other {Servida en # entornos}}",
+      "notServed": "Aún no se sirve",
+      "none": "ninguno",
+      "connect": "Conectar",
+      "connectFailed": "No se pudo emitir un token de lectura.",
+      "moreActions": "Más acciones",
+      "rebuild": "Reconstruir",
+      "hostApp": "Alojar una app",
+      "openApp": "Abrir la app",
+      "archive": "Archivar",
+      "loadFailed": "No se pudo cargar la capa semántica",
+      "retry": "Reintentar",
+      "unavailableTitle": "Capa semántica no disponible",
+      "notFoundTitle": "No se encontró la capa semántica",
+      "noLayer": "No hay ninguna capa semántica llamada {slug}",
+      "notFoundDescription": "Nada de lo que puedes leer tiene este slug. Puede que no exista o que no esté compartida con tus equipos.",
+      "deniedTitle": "No puedes leer esta capa semántica",
+      "deniedDescription": "Para leerla necesitas app.read en su app. Pide a su equipo propietario que la comparta con el tuyo.",
+      "backToList": "Volver a las capas semánticas",
+      "archivedTitle": "{name} está archivada",
+      "archivedHeading": "Esta capa semántica está archivada",
+      "archivedAt": "Archivada el {at}.",
+      "archivedNoTime": "Archivada.",
+      "archivedDescription": "Sus cargas de trabajo están reducidas a cero y está fuera del registro. Se conservan sus datos y su repositorio. «Restaurar» la devuelve tal como se ejecutaba; las apps que estaban alojadas en ella deben volver a alojarse.",
+      "restore": "Restaurar",
+      "restoring": "Restaurar esta capa semántica",
+      "restoreFailed": "No se pudo restaurar la capa semántica.",
+      "restored": "Se ha restaurado {slug}."
+    },
+    "overview": {
+      "environments": "Entornos",
+      "environment": "Entorno",
+      "health": "Estado",
+      "noEnvironment": "No hay entorno {environment}",
+      "notDeployed": "Aún no se ha desplegado",
+      "notDeployedDescription": "No se ha desplegado nada en este entorno. «Reconstruir» despliega el último commit de la rama.",
+      "deployFailed": "El último despliegue falló",
+      "deployFailedReason": "El entorno conservó lo que ejecutaba antes. El despliegue indica por qué.",
+      "openDeployment": "Abrir el despliegue",
+      "latestDeploy": "Último despliegue",
+      "started": "Inicio",
+      "unknown": "Desconocido",
+      "image": "Imagen",
+      "noImage": "Aún sin compilar",
+      "deployment": "Despliegue",
+      "served": "Servida",
+      "yes": "Sí",
+      "notServed": "Aún no se sirve",
+      "notServedDescription": "Ningún entorno tiene URL todavía. Su primer despliegue le da una.",
+      "revision": "Revisión",
+      "atHead": "Al día con la rama",
+      "running": "En ejecución",
+      "nothingRunning": "Nada en ejecución",
+      "head": "Último commit de la rama",
+      "onBranch": "en {branch}",
+      "headUnknown": "No se pudo leer",
+      "committed": "Fecha del commit",
+      "freshness": "Frescura",
+      "compiled": "Compilación",
+      "notCompiled": "Sin compilar en el commit en ejecución",
+      "lastIngest": "Última ingesta",
+      "openRun": "Abrir la ejecución",
+      "noIngest": "No hay ningún flujo knowledge-refresh en el repositorio",
+      "endpoints": "Endpoints",
+      "mcp": "Endpoint MCP: {url}"
+    },
+    "substrateTab": {
+      "graduationNeeded": "Mimwell indica que a esta capa se le ha quedado pequeña su celda",
+      "graduationNeededDescription": "Su compilación en {environment} pide un sustrato mayor. Ampliar hace commit de la nueva celda y la aplica; el push la despliega.",
+      "graduate": "Ampliar",
+      "graduating": "Ampliar esta capa semántica",
+      "cell": "Celda",
+      "noEnvironment": "No hay entorno {environment}",
+      "cellName": "Celda",
+      "adoption": "Autoridad",
+      "filesCanon": "El repositorio es el canon",
+      "checking": "Comprobando el commit en ejecución",
+      "adoptionUnknown": "Desconocida: no se pudo leer el commit en ejecución",
+      "adopted": "Adoptada: {store}",
+      "notAdopted": "Aprovisionada, aún sin adoptar. La adopta la migración del almacén de conocimiento de la propia capa.",
+      "replicas": "Réplicas",
+      "image": "Imagen",
+      "builtImage": "Compilada con el Dockerfile del portal de la edición",
+      "resources": "Persistencia y recursos",
+      "persistence": "Persistencia",
+      "nothingAttached": "Nada adjunto",
+      "nothingAttachedDescription": "Esta celda no necesita base de datos, volumen ni bucket: el repositorio lo contiene todo.",
+      "fromLayer": "No se pudo leer el estado, así que esta es la última celda aplicada, sin lo que la capa ha adoptado.",
+      "graduateTitle": "Ampliar el sustrato",
+      "graduateDescription": "Elige la celda a la que pasa la capa. Astrolift hace commit de ella en la rama de despliegue, en client.config.json y astrolift.toml, aprovisiona lo que necesita, y el push la despliega. Los datos que contiene ahora siguen adjuntos.",
+      "cancel": "Cancelar",
+      "graduateSubmit": "Ampliar",
+      "graduateFailed": "No se pudo ampliar el sustrato.",
+      "graduated": "Se hizo commit de la ampliación de {slug}. Su push la despliega."
+    },
+    "sharing": {
+      "sections": "Secciones de acceso compartido",
+      "sectionLabels": {
+        "teams": "Equipos",
+        "history": "Historial de acceso"
+      },
+      "levels": {
+        "viewer": "Lector",
+        "deployer": "Editor",
+        "owner": "Propietario"
+      },
+      "levelHelp": {
+        "viewer": "Sus miembros pueden leer la capa y conectarse a ella.",
+        "deployer": "Sus miembros también pueden editar y desplegar la capa."
+      },
+      "team": "Equipo",
+      "teams": "Equipos",
+      "access": "Acceso",
+      "ownedBy": "Propiedad de <code>{team}</code>, que siempre tiene acceso. Los propietarios se cambian en la app.",
+      "noTeam": "ningún equipo",
+      "ownersLink": "Abrir los equipos de la app",
+      "shareTitle": "Compartir con un equipo",
+      "findTeam": "Buscar un equipo por nombre o slug",
+      "editorNeedsDeploy": "Compartir como editor requiere app.deploy en esta capa.",
+      "share": "Compartir",
+      "homeTeamNote": "El equipo propietario ya tiene acceso.",
+      "askVerification": "Compartir te pide iniciar sesión de nuevo antes.",
+      "askApproval": "{count, plural, one {Necesita la aprobación de # aprobador.} other {Necesita la aprobación de # aprobadores.}}",
+      "viewRequests": "Ver solicitudes de aprobación",
+      "sharing": "Compartir esta capa semántica",
+      "emptyTitle": "Aún no se ha compartido",
+      "emptyDescription": "Solo {team} puede leerla. Compártela con un equipo para que sus miembros puedan leerla, o editarla y desplegarla.",
+      "makeViewer": "Cambiar a lector",
+      "makeEditor": "Cambiar a editor",
+      "unshare": "Dejar de compartir",
+      "changeOnApp": "Cambiar en la app",
+      "shareConfirmTitle": "¿Compartir {name} con {team} como {level}?",
+      "unshareTitle": "¿Dejar de compartir con {team}?",
+      "unshareDescription": "Se dejan de emitir tokens de lectura nuevos al instante. Los tokens ya emitidos funcionan hasta que caducan, en un máximo de 15 minutos.",
+      "alreadyShared": "Compartida como {level}",
+      "shareFailed": "No se pudo compartir la capa semántica.",
+      "shared": "Compartida con {team} como {level}.",
+      "unshareFailed": "No se pudo dejar de compartir.",
+      "unshared": "Se dejó de compartir con {team}.",
+      "readingHistory": "Leer el historial de acceso",
+      "history": "Historial de acceso",
+      "historyDescription": "Todas las veces que se compartió o se dejó de compartir esta capa, según el registro de auditoría, incluidas las denegadas.",
+      "historyEmpty": "Todavía no hay accesos compartidos",
+      "historyKinds": {
+        "share": "la compartió",
+        "unshare": "dejó de compartirla"
+      },
+      "refused": "Denegado: {code}",
+      "failed": "No aplicado: {code}",
+      "viaAgent": "token de agente",
+      "nowShared": "Quedó compartida con {teams}",
+      "nowOwnerOnly": "Quedó solo para el equipo propietario"
+    },
+    "apps": {
+      "title": "Aplicaciones alojadas",
+      "description": "Apps de la plantilla brain-app que leen esta capa. Cada despliegue les da su URL de MCP y un token de lectura nuevo.",
+      "app": "Aplicación",
+      "environments": "Entornos",
+      "noEnvironments": "Sin entornos",
+      "open": "Abrir",
+      "deployments": "Despliegues",
+      "host": "Alojar una app",
+      "notServed": "Aún no se sirve",
+      "emptyTitle": "No hay apps alojadas",
+      "emptyDescription": "Aloja una app para darle la URL de MCP de esta capa y un token de lectura en cada despliegue.",
+      "emptyNotServed": "Cuando la capa se sirva, se podrán alojar apps en ella."
+    },
+    "connectTab": {
+      "token": "Token de lectura",
+      "tokenDescription": "«Conectar» te emite un token de lectura de 15 minutos y lo muestra una sola vez, con una configuración de cliente MCP para pegar. Vuelve a conectar para obtener otro; al cerrar el diálogo se descarta.",
+      "connect": "Conectar",
+      "notServed": "Aún no se sirve",
+      "notServedDescription": "Un cliente se conecta a un entorno que tenga URL; el primer despliegue le da una.",
+      "endpoints": "Endpoints MCP",
+      "noEndpoints": "Aún no hay endpoints",
+      "cli": "Desde la CLI",
+      "cliDescription": "La CLI astro imprime la misma configuración con un token nuevo, o una que Claude Code acepta tal cual.",
+      "apps": "Para una app",
+      "appsDescription": "Una app alojada en la capa recibe la URL de MCP y un token en cada despliegue, así que nunca guarda uno de larga duración.",
+      "appsLink": "Alojar una app"
+    },
+    "settings": {
+      "sections": "Secciones de configuración",
+      "sectionLabels": {
+        "rebuild": "Reconstrucción",
+        "dangerZone": "Zona de peligro"
+      },
+      "rebuildTitle": "Reconstrucción",
+      "rebuildDescription": "Vuelve a desplegar el último commit de la rama de despliegue. Con ingesta, primero ejecuta la actualización de conocimiento: su commit se despliega con el push habitual.",
+      "rebuilding": "Reconstruir esta capa semántica",
+      "environment": "Entorno",
+      "ingest": "Ingerir primero",
+      "ingestHelp": "Ejecuta .github/workflows/knowledge-refresh.yml en el repositorio, que debe tenerlo.",
+      "productionStepUp": "Desplegar en producción te pide iniciar sesión de nuevo antes.",
+      "rebuild": "Reconstruir",
+      "rebuildWithIngest": "Ingerir y reconstruir",
+      "rebuildFailed": "No se pudo reconstruir la capa semántica.",
+      "rebuildStarted": "Reconstrucción iniciada.",
+      "ingestStarted": "Actualización de conocimiento iniciada. Su commit se desplegará cuando llegue.",
+      "started": "Iniciada",
+      "mode": "Modo",
+      "modes": {
+        "deploy": "Despliegue del último commit de la rama",
+        "ci": "Ejecución de CI del último commit de la rama",
+        "ingest": "Actualización de conocimiento y luego un despliegue"
+      },
+      "deployment": "Despliegue",
+      "run": "Ejecución",
+      "openRun": "Abrir la ejecución",
+      "rebuilds": "Reconstrucciones",
+      "viewRequests": "Ver solicitudes de aprobación",
+      "archiveTitle": "Archivar esta capa semántica",
+      "archiveDescription": "La reduce a cero, la saca del registro y revoca los tokens de las apps alojadas en ella. Se conservan sus bases de datos, volúmenes, buckets y repositorio, y «Restaurar» la recupera.",
+      "archiving": "Archivar esta capa semántica",
+      "askVerification": "Archivar te pide iniciar sesión de nuevo antes.",
+      "askApproval": "{count, plural, one {Necesita la aprobación de # aprobador.} other {Necesita la aprobación de # aprobadores.}}",
+      "archive": "Archivar",
+      "archiveConfirmTitle": "¿Archivar {name}?",
+      "archiveFailed": "No se pudo archivar la capa semántica.",
+      "archived": "Se ha archivado {slug}."
     }
   },
   "navModel": {
@@ -15878,6 +16417,9 @@
       "search": "Buscar nombres e identificadores…",
       "views": {
         "all": "Todas"
+      },
+      "fields": {
+        "team": "Equipo"
       }
     },
     "commandRuns": {
@@ -16373,6 +16915,18 @@
       "notes": {
         "mine": "Mías muestra las cargas de trabajo que creaste o que están en aplicaciones que creaste. Las cargas de trabajo anteriores a que Astrolift registrara quién las creaba solo aparecen en Todas."
       }
+    },
+    "brainShares": {
+      "search": "Buscar equipos…",
+      "views": {
+        "all": "Todos"
+      }
+    },
+    "brainApps": {
+      "search": "Buscar aplicaciones…",
+      "views": {
+        "all": "Todas"
+      }
     }
   },
   "relativeAge": {
@@ -16514,7 +17068,12 @@
     "workload": "Carga de trabajo",
     "workloads": "Cargas de trabajo",
     "zentinelle": "Zentinelle",
-    "support": "Soporte"
+    "support": "Soporte",
+    "newSemanticLayer": "Nueva capa semántica",
+    "semanticLayer": "Capa semántica",
+    "substrate": "Sustrato",
+    "sharing": "Acceso compartido",
+    "connect": "Conectar"
   },
   "support": {
     "title": "Soporte",

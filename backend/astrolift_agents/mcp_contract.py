@@ -13,6 +13,8 @@ from astrolift_identity.api_tokens import (
     SCOPE_READ_APPS,
     SCOPE_WORKFLOW_TRIGGER,
     SCOPE_WORKFLOW_WRITE,
+    SCOPE_WRITE_APP_ACCESS,
+    SCOPE_WRITE_APPS,
 )
 from core.permissions import Permission
 
@@ -31,6 +33,28 @@ def _schema(properties: dict[str, Any], *, required: tuple[str, ...] = ()) -> di
         "additionalProperties": False,
     }
 
+
+#: A Mimwell cell plus what the host attaches (docs/design/substrate-matrix.md).
+_SUBSTRATE: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "authority": {"type": "string", "enum": ["files", "sqlite", "postgres", "mysql", "mongo", "d1"]},
+        "blobs": {"type": "string", "enum": ["fs", "db-blob", "s3", "azure-blob"]},
+        "vectors": {"type": "string", "enum": ["local", "in-db", "edge-db", "external"]},
+        "graph": {"type": "string", "enum": ["edges-table", "age"]},
+        "persistence": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": ["none", "sqlite-volume", "efs", "postgres", "s3", "d1", "kv"],
+            },
+        },
+        "replicas": {"type": "integer", "minimum": 1, "maximum": 20},
+        "image": {"type": "string"},
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+    },
+}
 
 WORKFLOW_TOOL_NAMES = frozenset(
     {
@@ -411,6 +435,138 @@ MCP_TOOL_META: dict[str, dict[str, Any]] = {
         "scope": SCOPE_MCP_READ,
         "additional_scopes": (SCOPE_READ_APPS,),
         "permission": Permission.APP_READ,
+        "inputSchema": _schema({"slug": {"type": "string"}}, required=("slug",)),
+    },
+    "astrolift_get_brain_status": {
+        "description": (
+            "How fresh one semantic layer is in an environment (#2424): its latest deployment, the "
+            "running commit against the deploy branch head, compiled_at and the last ingest run."
+        ),
+        "scope": SCOPE_MCP_READ,
+        "additional_scopes": (SCOPE_READ_APPS,),
+        "permission": Permission.APP_READ,
+        "inputSchema": _schema(
+            {"slug": {"type": "string"}, "environment_name": {"type": "string"}}, required=("slug",)
+        ),
+    },
+    "astrolift_create_brain": {
+        "description": (
+            "Create a semantic layer (#2424): scaffold an empty or new repository from the verified "
+            "Mimwell edition in one commit, register it as a brain and deploy it, in the background. "
+            "Poll astrolift_get_brain_creation with the returned id."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WRITE_APPS,),
+        "permission": Permission.APP_CREATE,
+        "inputSchema": _schema(
+            {
+                "project_id": {"type": "string", "format": "uuid"},
+                "slug": {"type": "string", "minLength": 1, "maxLength": 63},
+                "source_connection_id": {"type": "string", "format": "uuid"},
+                "repo": {"type": "string", "description": "owner/name; missing or empty."},
+                "name": {"type": "string"},
+                "team_id": {"type": "string", "format": "uuid"},
+                "visibility": {"type": "string", "enum": ["private", "internal", "public"]},
+                "template_ref": {"type": "string"},
+                "environment_name": {"type": "string"},
+                "deploy": {"type": "boolean"},
+                "substrate": _SUBSTRATE,
+            },
+            required=("project_id", "slug", "source_connection_id", "repo"),
+        ),
+    },
+    "astrolift_update_brain_substrate": {
+        "description": (
+            "Graduate a semantic layer's substrate (Mimwell's graduation): the full cell and persistence "
+            "it should have, checked against the substrate matrix, written to its repo in one commit "
+            "and applied. Never drops persistence that holds data."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WRITE_APPS,),
+        "permission": Permission.APP_UPDATE,
+        "inputSchema": _schema(
+            {"slug": {"type": "string"}, "substrate": _SUBSTRATE}, required=("slug", "substrate")
+        ),
+    },
+    "astrolift_get_brain_creation": {
+        "description": "The progress of one semantic layer creation, by the id astrolift_create_brain returned.",
+        "scope": SCOPE_MCP_READ,
+        "additional_scopes": (SCOPE_READ_APPS,),
+        "permission": Permission.APP_READ,
+        "inputSchema": _schema({"id": {"type": "string", "format": "uuid"}}, required=("id",)),
+    },
+    "astrolift_rebuild_brain": {
+        "description": (
+            "Redeploy a semantic layer's deploy branch head, or with ingest=true run its "
+            "knowledge-refresh workflow (whose commit then deploys)."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WRITE_APPS,),
+        "permission": Permission.APP_DEPLOY,
+        "inputSchema": _schema(
+            {
+                "slug": {"type": "string"},
+                "environment_name": {"type": "string"},
+                "ingest": {"type": "boolean"},
+            },
+            required=("slug",),
+        ),
+    },
+    "astrolift_host_app_on_brain": {
+        "description": (
+            "Create an app hosted on a semantic layer this identity can read (#2243): one public web "
+            "workload running image, given the brain's MCP URL and a read token on every deploy."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WRITE_APPS,),
+        "permission": Permission.APP_CREATE,
+        "inputSchema": _schema(
+            {
+                "brain_slug": {"type": "string"},
+                "project_id": {"type": "string", "format": "uuid"},
+                "image": {"type": "string"},
+                "name": {"type": "string"},
+                "slug": {"type": "string"},
+                "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+            },
+            required=("brain_slug", "project_id", "image"),
+        ),
+    },
+    "astrolift_unshare_brain": {
+        "description": "Stop sharing a semantic layer with a team. Never removes the home team or an owner.",
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WRITE_APPS, SCOPE_WRITE_APP_ACCESS),
+        "permission": Permission.APP_UPDATE,
+        "inputSchema": _schema(
+            {"slug": {"type": "string"}, "team_slug": {"type": "string"}}, required=("slug", "team_slug")
+        ),
+    },
+    "astrolift_share_brain": {
+        "description": (
+            "Share a semantic layer with a team as viewer or deployer. Refused for agents unless the "
+            "organization's brain.share rule allows agents; then approval rules still apply."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WRITE_APPS, SCOPE_WRITE_APP_ACCESS),
+        "permission": Permission.APP_UPDATE,
+        "inputSchema": _schema(
+            {
+                "slug": {"type": "string"},
+                "team_slug": {"type": "string"},
+                "access": {"type": "string", "enum": ["viewer", "deployer"]},
+            },
+            required=("slug", "team_slug", "access"),
+        ),
+    },
+    "astrolift_delete_brain": {
+        "description": (
+            "Archive a semantic layer: scale to zero, drop it from the register and revoke hosted "
+            "apps' tokens; the repository is untouched. Refused for agents unless the organization's "
+            "brain.delete rule allows agents; then approval rules still apply."
+        ),
+        "scope": SCOPE_MCP_WRITE,
+        "additional_scopes": (SCOPE_WRITE_APPS,),
+        "permission": Permission.APP_DELETE,
         "inputSchema": _schema({"slug": {"type": "string"}}, required=("slug",)),
     },
     "astrolift_list_agents": {

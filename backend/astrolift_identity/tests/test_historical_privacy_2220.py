@@ -164,9 +164,10 @@ def test_verified_first_idp_registration_keeps_existing_and_new_user_flows(stock
     before_count = get_user_model().objects.count()
     monkeypatch.setenv("ASTROLIFT_AUTO_SIGNUP_DOMAINS", "controlled-signup.test")
     request = callback_request()
-    # Keep the released Cognito verified-email/updated-at fallbacks.
+    # Keep the Cognito updated-at fallback. Its verified-email fallback is
+    # gone (#2430): a pool that maps email_verified sends it as "true".
     claims = remote_claims(
-        existing, email=email, issuer="https://cognito-idp.controlled.test/pool", verified=False
+        existing, email=email, issuer="https://cognito-idp.controlled.test/pool", verified="true"
     )
     claims["userinfo"].pop("updated_at")
     result = Auth1SessionWorkflow._register_remote_user(request, claims)

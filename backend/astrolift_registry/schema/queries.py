@@ -37,6 +37,14 @@ from astrolift_registry.dependency_context import (
     read_dependency_context,
 )
 from astrolift_registry.models import AppTeamAccess, Container, RegisteredApp, Workload
+from astrolift_registry.schema.brain_types import (
+    BrainCreationType,
+    BrainStatusType,
+    BrainType,
+    brain_status_to_type,
+    brain_to_type,
+    creation_to_type,
+)
 from astrolift_registry.schema.types import (
     STALE_DEPLOY_WINDOW_DAYS,
     AppDoctorReportType,
@@ -1172,32 +1180,6 @@ class AppKindType:
     description: str
 
 
-@strawberry.type(name="AstroliftBrainEnvironment")
-class BrainEnvironmentType:
-    name: str
-    url: str
-
-
-@strawberry.type(name="AstroliftBrainShare")
-class BrainShareType:
-    team: str
-    access: str
-
-
-@strawberry.type(name="AstroliftBrain")
-class BrainType:
-    """A hosted brain the caller can read (#2320): an app of a brain kind."""
-
-    id: GUID
-    slug: str
-    name: str
-    kind: str
-    team: str
-    project: str
-    environments: list[BrainEnvironmentType]
-    shared_with: list[BrainShareType]
-
-
 @strawberry.type
 class RegistryQuery:
     @strawberry.field
@@ -1219,24 +1201,56 @@ class RegistryQuery:
     def astrolift_brains(self, info: Info, search: str | None = None) -> list[BrainType]:
         """Hosted brains the caller can read (#2320), with the same tenancy,
         team shares and token ceiling as apps. Sharing a brain is sharing its app."""
-        from astrolift_registry.brains import describe_brain, visible_brains
+        from astrolift_registry.brains import visible_brains
 
-        out = []
-        for app in visible_brains(search=search or "")[:200]:
-            row = describe_brain(app)
-            out.append(
-                BrainType(
-                    id=GUID(row["id"]),
-                    slug=row["slug"],
-                    name=row["name"],
-                    kind=row["kind"],
-                    team=row["team"],
-                    project=row["project"],
-                    environments=[BrainEnvironmentType(**e) for e in row["environments"]],
-                    shared_with=[BrainShareType(**x) for x in row["shared_with"]],
-                )
-            )
-        return out
+        return [brain_to_type(app) for app in visible_brains(search=search or "")[:200]]
+
+    @strawberry.field(
+        description=(
+            "One semantic layer the caller can read, by app slug (#2424), with the apps hosted on it. "
+            "Null when it is not visible, archived or not a brain."
+        )
+    )
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("slug", permission=Permission.APP_READ))
+    @tenant_scoped()
+    def astrolift_brain(self, info: Info, slug: str) -> BrainType | None:
+        from astrolift_registry.brain_manage import find_brain
+
+        app = find_brain(slug)
+        return brain_to_type(app, hosted=True) if app is not None else None
+
+    @strawberry.field(
+        description=(
+            "How fresh a semantic layer is in one environment (#2424): its latest deployment, the "
+            "running commit against the deploy branch head, when it was compiled and its last ingest run."
+        )
+    )
+    @require_permission(Permission.APP_READ, scope=app_scope_by_slug("slug", permission=Permission.APP_READ))
+    @tenant_scoped()
+    def astrolift_brain_status(
+        self, info: Info, slug: str, environment_name: str = "production"
+    ) -> BrainStatusType | None:
+        from astrolift_registry import brain_manage
+
+        app = brain_manage.find_brain(slug)
+        if app is None:
+            return None
+        row = brain_manage.status(app, (environment_name or "production").strip())
+        return brain_status_to_type(app.slug, row) if row is not None else None
+
+    @strawberry.field(
+        description=(
+            "The progress of one createBrain request (#2424). Visible to the person who asked for it "
+            "and to readers of the brain it created."
+        )
+    )
+    @require_permission(Permission.APP_READ, any_scope=True)
+    @tenant_scoped()
+    def astrolift_brain_creation(self, info: Info, id: GUID) -> BrainCreationType | None:
+        from astrolift_registry.brain_manage import visible_creation
+
+        row = visible_creation(str(id))
+        return creation_to_type(row) if row is not None else None
 
     @strawberry.field(
         description="Read-only APP_READ projection for an exact live app/environment. Expected cluster/provider GUIDs refuse reassignment. Persisted observations do not prove live health, TLS binding or renewal; mutation authority is unchanged."
