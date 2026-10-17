@@ -345,3 +345,93 @@ def test_expiry_never_guesses_registry_name_or_deletes_shared_repo(native, world
     with pytest.raises(CapabilityDeprovisionError, match="another app uses"):
         _deprovision_registry_repo_sync(registered_app_id=native.app.pk, archive=False)
     assert calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.django_db(transaction=True)
+async def test_real_temporal_deregister_retries_native_runtime_and_keeps_original_data(native, temporal_env):
+    """Production workflow/activity/driver, committed PG and a transient SDK failure."""
+    import asyncio
+
+    from asgiref.sync import sync_to_async
+    from temporalio import activity
+    from temporalio.worker import Replayer, UnsandboxedWorkflowRunner, Worker
+
+    from astrolift_workflows.activities.app_expiry import retire_expired_app_runtime
+    from astrolift_workflows.inputs import Actor, DeregisterAppInput
+    from astrolift_workflows.workflows import deregister_app
+
+    n = native
+    retained = {
+        key: value["metadata"]["uid"]
+        for key, value in n.objects.objects.items()
+        if key[0] in ("Namespace", "PersistentVolumeClaim", "postgresql.cnpg.io/v1/Cluster")
+    }
+    # These unrelated provider operations have no external endpoints in this
+    # fixture. Native runtime retirement keeps its production implementation.
+    results = {
+        "mark_app_tearing_down": True,
+        "abort_in_flight_deploys": [],
+        "list_app_managed_service_ids": [],
+        "delete_static_dns_records": {"deleted": []},
+        "deprovision_app_registry_repo": {"skipped": True},
+        "deprovision_app_identity_role": {"skipped": True},
+        "list_app_secret_targets": [],
+        "revoke_app_secret_bundle_refs": 0,
+        "delete_app_source_webhook": {"status": "not_installed", "hook_id": ""},
+        "revoke_app_deploy_tokens": 0,
+        "soft_delete_app_records": {"registered_app": 1},
+        "mark_app_deregistered": None,
+    }
+    platform_observations = []
+
+    def provider_activity(attr, result):
+        definition = activity._Definition.must_from_callable(getattr(deregister_app, attr))
+
+        @activity.defn(name=definition.name)
+        async def run(*args):
+            if attr == "soft_delete_app_records":
+                platform_observations.append(deepcopy(n.objects.objects))
+            return result
+
+        return run
+
+    activities = [retire_expired_app_runtime]
+    activities.extend(provider_activity(attr, result) for attr, result in results.items())
+    n.objects.fail_once = True
+    queue = f"native-expiry-retention-{uuid4()}"
+    async with Worker(
+        temporal_env.client,
+        task_queue=queue,
+        workflows=[deregister_app.DeregisterAppWorkflow],
+        activities=activities,
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ):
+        handle = await temporal_env.client.start_workflow(
+            deregister_app.DeregisterAppWorkflow.run,
+            DeregisterAppInput(
+                registered_app_id=n.app.pk,
+                actor=Actor(kind="system", display="app expiry"),
+                delete_data=False,
+                keep_managed_services=True,
+                skip_grace=True,
+            ),
+            id=f"DeregisterAppWorkflow-{n.app.guid}",
+            task_queue=queue,
+        )
+        result = await asyncio.wait_for(handle.result(), timeout=60)
+        history = await handle.fetch_history()
+    await Replayer(
+        workflows=[deregister_app.DeregisterAppWorkflow], workflow_runner=UnsandboxedWorkflowRunner()
+    ).replay_workflow(history)
+    assert result.ok and not result.data["still_live_resources"]
+    assert any(event.activity_task_started_event_attributes.attempt == 2 for event in history.events)
+    assert n.objects.deletes.count(n.objects.deletes[0]) == 2
+    assert platform_observations and not any(kind == "Namespace" for kind, *_ in n.objects.deletes)
+    assert all(n.objects.objects[key]["metadata"]["uid"] == uid for key, uid in retained.items())
+    assert ("Secret", n.namespace, n.literal_name) not in platform_observations[0]
+    await sync_to_async(n.app.refresh_from_db)()
+    assert (
+        n.app.expiry_cleanup[0]["namespace"]["metadata"]["uid"] == retained[("Namespace", None, n.namespace)]
+    )
+    assert "private-temporary-app-fixture" not in history.to_json()
