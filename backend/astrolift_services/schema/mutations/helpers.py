@@ -293,17 +293,10 @@ def _actor_user(info):
 
 
 def _client_ip(info) -> str:
-    """Best-effort caller-IP for the audit row. Honours
-    X-Forwarded-For first (left-most hop) then REMOTE_ADDR."""
-    request = getattr(info.context, "request", None)
-    if request is None:
-        return ""
-    fwd = request.META.get("HTTP_X_FORWARDED_FOR", "") if hasattr(request, "META") else ""
-    if fwd:
-        return fwd.split(",")[0].strip()
-    if hasattr(request, "META"):
-        return request.META.get("REMOTE_ADDR", "") or ""
-    return ""
+    """The caller's IP for the audit row (:func:`config.proxies.client_address`, #2440)."""
+    from config.proxies import client_address
+
+    return client_address(getattr(info.context, "request", None)) or ""
 
 
 def _lock_app(app: RegisteredApp) -> RegisteredApp | None:

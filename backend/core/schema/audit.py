@@ -524,11 +524,10 @@ class MutationAuditExtension(SchemaExtension):
 
 
 def _get_client_ip(request) -> str | None:
-    """Extract client IP from Django request."""
-    xff = request.META.get("HTTP_X_FORWARDED_FOR")
-    if xff:
-        return xff.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR")
+    """The client's IP (:func:`config.proxies.client_address`, #2440)."""
+    from config.proxies import client_address
+
+    return client_address(request)
 
 
 class PermissionDeniedExtension(SchemaExtension):

@@ -51,3 +51,18 @@ def parse_trusted_proxies(raw: str | None) -> tuple[str, ...]:
         except ValueError:
             raise ImproperlyConfigured(f"{SETTING}: {entry!r} is not an IP address or CIDR range.") from None
     return tuple(dict.fromkeys(trusted))
+
+
+def client_address(request) -> str | None:
+    """The client's address: ``REMOTE_ADDR``, or None when it is not an address (#2440).
+
+    ``config.asgi`` sets it from ``X-Forwarded-For`` as the trusted proxies
+    report it, so the audit trail, session tracking, ABAC and the rate limits
+    all see one client. The raw header is never read: its left-most entries
+    are whatever the client wrote.
+    """
+    meta = getattr(request, "META", None) or {}
+    try:
+        return str(ipaddress.ip_address(meta.get("REMOTE_ADDR") or ""))
+    except ValueError:
+        return None

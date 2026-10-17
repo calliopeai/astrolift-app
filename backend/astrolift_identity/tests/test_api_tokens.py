@@ -8,8 +8,8 @@ Covers:
   plaintext, is what hits Postgres.
 * ``touch_token`` writes ``last_used_*`` triplet without clobbering
   other row state.
-* ``client_ip_from_request`` returns the left-most X-Forwarded-For
-  hop, falls back to REMOTE_ADDR, returns None on garbage input.
+* ``client_ip_from_request`` returns REMOTE_ADDR, never the raw
+  X-Forwarded-For (#2440), and None on garbage input.
 * ``ApiTokenAuthMiddleware`` authenticates a valid bearer, swaps
   ``request.user``, stamps the row; rejects revoked / expired with
   401; noops on session-cookie / non-prefix bearers.
@@ -321,13 +321,14 @@ def test_touch_token_truncates_long_agent():
 # ---- client_ip_from_request -----------------------------------------
 
 
-def test_client_ip_prefers_first_xff_hop():
+def test_client_ip_ignores_the_raw_xff_header():
+    # config.asgi already resolved the trusted chain into REMOTE_ADDR (#2440).
     request = RequestFactory().get(
         "/",
         HTTP_X_FORWARDED_FOR="203.0.113.5, 10.0.0.1, 10.0.0.2",
         REMOTE_ADDR="10.0.0.3",
     )
-    assert client_ip_from_request(request) == "203.0.113.5"
+    assert client_ip_from_request(request) == "10.0.0.3"
 
 
 def test_client_ip_falls_back_to_remote_addr():
@@ -614,7 +615,7 @@ def test_middleware_authenticates_valid_token_and_stamps_row():
     request = RequestFactory().get(
         "/",
         HTTP_AUTHORIZATION=f"Bearer {plaintext}",
-        HTTP_X_FORWARDED_FOR="203.0.113.99",
+        REMOTE_ADDR="203.0.113.99",
         HTTP_USER_AGENT="astrolift-cli/1.2.3",
     )
     request.user = AnonymousUser()
