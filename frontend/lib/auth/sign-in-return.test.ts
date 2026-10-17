@@ -30,7 +30,7 @@ describe("sign-in return address", () => {
     "/\t/evil.example/auth/invitation/abc",
     "\t/auth/invitation/abc",
     "/auth/invitation/abc/",
-    "/auth/invitation/abc?exp=1792797839",
+    "/auth/invitation/abc?exp=1790000000",
     "/auth/invitation/abc#x",
     "/auth/invitation/abc%2F..%2F..%2Fdashboard",
     "/auth/invitation/../dashboard",
