@@ -114,6 +114,20 @@ def native(world, monkeypatch):
             literals={"PRIVATE_MARKER": "private-temporary-app-fixture"},
         )
     )
+    from astrolift_registry.brain_apps import brain_secret_name
+
+    brain_secret = objects.put(
+        {
+            "apiVersion": "v1",
+            "kind": "Secret",
+            "metadata": {
+                "name": brain_secret_name(app.slug, env.name),
+                "namespace": namespace,
+                "labels": {"astrolift.io/managed-by": "astrolift", "astrolift.io/brain-for": app.slug},
+            },
+            "stringData": {"BRAIN_TOKEN": "private-temporary-app-fixture"},
+        }
+    )
     for version, kind, name in (
         ("postgresql.cnpg.io/v1", "Cluster", "database"),
         ("v1", "PersistentVolumeClaim", "database-1"),
@@ -139,6 +153,7 @@ def native(world, monkeypatch):
         namespace=namespace,
         driver=driver,
         literal_name=literal["metadata"]["name"],
+        brain_secret_name=brain_secret["metadata"]["name"],
     )
 
 
@@ -151,6 +166,7 @@ def test_runtime_teardown_keeps_native_cnpg_and_pvc_until_grace(native):
     n.app.refresh_from_db()
     assert n.app.expiry_cleanup[0]["namespace"]["metadata"]["uid"]
     assert ("Secret", n.namespace, n.literal_name) not in n.objects.objects
+    assert ("Secret", n.namespace, n.brain_secret_name) not in n.objects.objects
     assert "private-temporary-app-fixture" not in str(n.app.expiry_cleanup)
     RegisteredApp.objects.filter(pk=n.app.pk).update(deleted_at=timezone.now())
     AppEnvironment.objects.filter(pk=n.env.pk).update(deleted_at=timezone.now())
@@ -430,6 +446,7 @@ async def test_real_temporal_deregister_retries_native_runtime_and_keeps_origina
     assert platform_observations and not any(kind == "Namespace" for kind, *_ in n.objects.deletes)
     assert all(n.objects.objects[key]["metadata"]["uid"] == uid for key, uid in retained.items())
     assert ("Secret", n.namespace, n.literal_name) not in platform_observations[0]
+    assert ("Secret", n.namespace, n.brain_secret_name) not in platform_observations[0]
     await sync_to_async(n.app.refresh_from_db)()
     assert (
         n.app.expiry_cleanup[0]["namespace"]["metadata"]["uid"] == retained[("Namespace", None, n.namespace)]

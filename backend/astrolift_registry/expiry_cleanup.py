@@ -123,6 +123,7 @@ def _owned_runtime(app, namespace, ref, actual):
         "astrolift.io/app-id",
         "astrolift.io/app-env-secrets",
         "astrolift.io/bindings-for",
+        "astrolift.io/brain-for",
     )
     if not any(
         expected_labels.get(key) in (app.slug, str(app.guid)) and labels.get(key) == expected_labels[key]
@@ -217,6 +218,7 @@ def retire_runtime(app_id):
                 render_resources_for_deployment(deploy, include_managed_filesystems=False) if deploy else []
             )
             resources.extend(_stale_runtime(app, driver, ctx.slug, namespace))
+            from astrolift_registry.brain_apps import brain_secret_name
             from astrolift_registry.models import Workload
             from astrolift_workflows.activities.app_lifecycle import (
                 _app_env_secret_name,
@@ -226,6 +228,7 @@ def retire_runtime(app_id):
             secret_names = {
                 (_app_env_secret_name(app.slug, env.name), "astrolift.io/app-env-secrets"),
                 (_bindings_secret_name(app.slug), "astrolift.io/bindings-for"),
+                (brain_secret_name(app.slug, env.name), "astrolift.io/brain-for"),
                 *(
                     (_bindings_secret_name(app.slug, name), "astrolift.io/bindings-for")
                     for name in Workload.all_objects.filter(registered_app_id=app.pk).values_list(
