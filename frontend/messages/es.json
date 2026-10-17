@@ -14634,6 +14634,7 @@
     },
     "health": {
       "healthy": "Pasarela en marcha",
+      "stale": "Gateway sin señal",
       "pending": "Pasarela aún no desplegada",
       "off": "Pasarela desactivada",
       "error": "Error de la pasarela"
@@ -14684,7 +14685,20 @@
       "clustersTitle": "Salud de la pasarela por clúster",
       "clustersDescription": "La pasarela de Zentinelle de cada clúster registrado.",
       "installOff": "Las pasarelas de Zentinelle están desactivadas en esta instalación. Los clústeres registrados conservan sus credenciales; las pasarelas se despliegan cuando el operador de la plataforma las activa.",
-      "noClusters": "Todavía no hay clústeres registrados en Zentinelle."
+      "noClusters": "Todavía no hay clústeres registrados en Zentinelle.",
+      "serverVersion": "Versión de Zentinelle",
+      "blocks": "Bloqueos, últimas 24 horas",
+      "approvals": "Aprobaciones pendientes",
+      "budget": "Presupuesto de este mes",
+      "budgetValue": "{percent} % usado",
+      "budgetFooter": "{spend} de {limit} ({name})",
+      "noBudget": "Sin presupuesto definido",
+      "notAvailable": "No disponible",
+      "countsError": "No se pudo leer el estado desde Zentinelle",
+      "reportNotAvailable": "Versión y última señal no disponibles",
+      "neverReported": "Aún sin informes",
+      "versionUnknown": "versión desconocida",
+      "reported": "{version}, visto {seen}"
     },
     "clusters": {
       "installOff": "Las pasarelas de Zentinelle están desactivadas en esta instalación. Registrar un clúster guarda su credencial; la pasarela se despliega cuando el operador de la plataforma activa las pasarelas.",

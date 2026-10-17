@@ -16,6 +16,8 @@ export const ZENTINELLE_CLUSTER_FIELDS = gql`
     credentialRotatedAt
     lastError
     unregistered
+    gatewayVersion
+    lastSeenAt
   }
 `;
 
@@ -31,6 +33,7 @@ export const ZENTINELLE_CONNECTION_FIELDS = gql`
     disconnectedAt
     lastError
     gatewayFeatureEnabled
+    serverVersion
     clusters {
       ...ZentinelleClusterFields
     }
@@ -55,6 +58,27 @@ export const ZENTINELLE_CONNECTION = gql`
     }
   }
   ${ZENTINELLE_CONNECTION_FIELDS}
+`;
+
+/** The health card's counts from Zentinelle (zentinelle.status_view, #2436). */
+export const ZENTINELLE_HEALTH = gql`
+  query ZentinelleHealth {
+    astroliftZentinelleHealth {
+      available
+      windowHours
+      blocks
+      openApprovals
+      budgets {
+        id
+        name
+        scope
+        limitUsd
+        spendUsd
+        percent
+        level
+      }
+    }
+  }
 `;
 
 export const ZENTINELLE_USAGE = gql`
