@@ -7,7 +7,7 @@ import strawberry
 from astrolift_registry.schema.mutations.app_settings import AppSettingMutations
 from astrolift_registry.schema.mutations.apps import AppMutations
 from astrolift_registry.schema.mutations.archive import ArchiveMutations
-from astrolift_registry.schema.mutations.brains import BrainMutations
+from astrolift_registry.schema.mutations.brains import BrainManagementMutations, BrainMutations
 from astrolift_registry.schema.mutations.helpers import (  # noqa: F401
     _actor,
     _bootstrap_app_environments,
@@ -70,5 +70,6 @@ class RegistryMutation(
     AppSettingMutations,
     ArchiveMutations,
     BrainMutations,
+    BrainManagementMutations,
 ):
     """Root mutation type — inherits fields from each domain mixin."""

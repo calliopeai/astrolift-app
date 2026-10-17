@@ -52,13 +52,21 @@ ACTIONS: dict[str, str] = {
     "secret.change": "Change a secret",
     "deploy.production": "Deploy to production",
     "rollback.production": "Roll back production",
+    "brain.share": "Share a semantic layer",
+    "brain.delete": "Delete a semantic layer",
 }
+
+#: The actions an agent on the MCP surface is refused unless the organization
+#: allows agents (#2424). Agents cannot step up, so the person who would have
+#: been asked is the organization's rule.
+AGENT_GATED: frozenset[str] = frozenset({"brain.share", "brain.delete"})
 
 #: The actions a rule can add approval to, and the kind of target each binds to.
 APPROVABLE: dict[str, str] = {
     "app.deregister": "app",
     "cluster.decommission": "cluster",
     "managed_service.deprovision": "managed_service",
+    "brain.delete": "app",
 }
 
 #: How long a request stays open, pending or approved, before it expires.
@@ -75,6 +83,8 @@ class Requirements:
     allow_self_approval: bool = True
     approval: bool = False
     minimum_approvals: int = 1
+    #: Whether an agent may run it at all (``AGENT_GATED`` actions only).
+    allow_agents: bool = False
     #: Which rows shaped the answer, as "ORG", "TEAM:<id>", "APP:<id>", "USER:<id>".
     sources: tuple[str, ...] = field(default_factory=tuple)
 
@@ -107,11 +117,13 @@ def effective(
     scopes += [("USER", user_id)] if user_id else []
     rows = _rows(organization_id, action, scopes)
     enabled, self_approval, sources = DEFAULT_ON, True, []
+    agents = False
     org = next((r for r in rows if r.scope_kind == "ORG"), None)
     if org is not None:
         sources.append("ORG")
         if org.enabled is not None:
             enabled = org.enabled
+        agents = action in AGENT_GATED and org.allow_agents is True
     for row in rows:
         if row.scope_kind != "ORG":
             sources.append(f"{row.scope_kind}:{row.scope_id}")
@@ -120,6 +132,9 @@ def effective(
                 enabled = True
         if row.allow_self_approval is False:
             self_approval = False
+        # Strictest wins: a narrower scope can turn agents back off, never on.
+        if row.scope_kind != "ORG" and row.allow_agents is False:
+            agents = False
     asking = [r for r in rows if r.require_approval] if action in APPROVABLE else []
     quorum = max((r.minimum_approvals or 1 for r in asking), default=1)
     return Requirements(
@@ -130,8 +145,32 @@ def effective(
         allow_self_approval=self_approval,
         approval=bool(asking),
         minimum_approvals=min(quorum, MAX_APPROVALS),
+        allow_agents=agents,
         sources=tuple(sources),
     )
+
+
+def agent_refusal(action: str, *, app: Any = None) -> str | None:
+    """Why an agent may not run ``action`` here, or ``None`` when the
+    organization allows agents to (approval rules still apply then)."""
+    from core.tenancy import get_current_tenant
+
+    if action not in AGENT_GATED:
+        return None
+    tenant = get_current_tenant()
+    if tenant is None or tenant.organization_id is None:
+        return "no active organization"
+    requirements = effective(
+        tenant.organization_id,
+        action,
+        team_id=getattr(app, "team_id", None),
+        app_id=getattr(app, "pk", None),
+        user_id=tenant.actor_user_id,
+    )
+    if requirements.allow_agents:
+        return None
+    command = {"brain.share": "astro brain share", "brain.delete": "astro brain delete"}[action]
+    return f"this action needs a person: run `{command}` or use the Brains screen"
 
 
 def session_needs_step_up(
@@ -294,7 +333,7 @@ def approver_permission(row: Any):
 
     org = PermissionScope(kind=ScopeKind.ORG, id=row.organization_id)
     app = PermissionScope(kind=ScopeKind.APP, id=row.registered_app_id) if row.registered_app_id else None
-    if row.action == "app.deregister":
+    if row.action in ("app.deregister", "brain.delete"):
         return Permission.APP_DELETE, app or org
     if row.action == "cluster.decommission":
         return Permission.CLUSTER_UNREGISTER, org
