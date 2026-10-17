@@ -14614,33 +14614,138 @@
   },
   "zentinelleScreen": {
     "title": "Proteger · Zentinelle",
-    "description": "GRC de agentes de IA: governança, risco e conformidade para cada workload de agente no Astrolift.",
-    "tagline": "Licença MIT · Auto-hospedável · Produto complementar da Calliope AI",
-    "intro": "Zentinelle é o pilar <strong>Control + Secure</strong> do stack BROCS. Ele roda ao lado do Astrolift e fornece a camada específica de IA que o Astrolift deliberadamente não assume: aplicação de políticas, varredura de conteúdo, frameworks de conformidade e a trilha de auditoria completa de interações exigida pelas regulamentações de governança de IA.",
-    "statusTitle": "Integração em desenvolvimento",
-    "statusBody": "O handshake de autenticação e a delegação de tenants entre o Astrolift e o Zentinelle estão sendo projetados. As opções incluem o Zentinelle como app Django embutido delegando a autenticação ao Astrolift, ou um serviço separado com troca de tokens. Quando o formato for decidido, esta página se tornará a interface de gerenciamento da conexão.",
-    "github": "Zentinelle no GitHub",
-    "docs": "Documentação de integração",
-    "addsTitle": "O que o Zentinelle acrescenta ao Astrolift",
-    "capabilities": {
-      "governance": {
-        "title": "Governança",
-        "description": "Motor de políticas: regras de conteúdo (PII, toxicidade, detecção de jailbreak), listas de modelos permitidos, aplicação de orçamento de tokens e biblioteca versionada de prompts de sistema."
-      },
-      "risk": {
-        "title": "Risco",
-        "description": "Registro de riscos 5×5, análise FMEA, acompanhamento de incidentes, detecção de anomalias e alertas automáticos sobre desvios no comportamento do agente."
-      },
-      "compliance": {
-        "title": "Conformidade",
-        "description": "Mapeamento de controles SOC 2, GDPR, HIPAA, Lei de IA da UE e NIST RMF. Coleta de evidências, análise de lacunas e relatórios prontos para auditoria."
-      },
-      "observability": {
-        "title": "Observabilidade",
-        "description": "Auditoria completa de interações (prompts, respostas e chamadas de ferramentas), resultados da varredura de conteúdo, logs de avaliação de políticas e medição do uso de tokens por workload."
+    "description": "Conecte esta organização ao Zentinelle para governança de agentes, uso e custo, políticas e auditoria.",
+    "noAccess": "Sem acesso ao Zentinelle",
+    "noAccessBody": "Suas funções não concedem nada no Zentinelle aqui. Peça uma permissão do Zentinelle a um administrador da organização.",
+    "error": "Não foi possível ler a conexão com o Zentinelle",
+    "notConnected": "Sem conexão com o Zentinelle",
+    "notConnectedBody": "Um administrador da organização conecta o Zentinelle nesta página. As seções aparecem depois da conexão.",
+    "tabsLabel": "Seções do Zentinelle",
+    "writeFailed": "O Zentinelle não aceitou a alteração",
+    "tabs": {
+      "overview": "Visão geral",
+      "clusters": "Clusters",
+      "usage": "Uso e custo",
+      "policies": "Políticas",
+      "audit": "Auditoria"
+    },
+    "health": {
+      "healthy": "Gateway em execução",
+      "pending": "Gateway ainda não implantado",
+      "off": "Gateway desligado",
+      "error": "Erro no gateway"
+    },
+    "connect": {
+      "title": "Conectar ao Zentinelle",
+      "description": "Cole a URL do Zentinelle e um código de inscrição de uso único gerado no Zentinelle. A credencial que o Zentinelle devolve é guardada como segredo e nunca exibida.",
+      "url": "URL do Zentinelle",
+      "code": "Código de inscrição",
+      "codeHelp": "Gerado no Zentinelle; funciona uma única vez.",
+      "gatewayUrl": "URL do gateway (opcional)",
+      "gatewayUrlHelp": "Onde os gateways dos clusters alcançam o Zentinelle quando não é a URL acima, como um endereço privado dentro do cluster.",
+      "required": "Informe a URL do Zentinelle e o código de inscrição.",
+      "connecting": "Conectando…",
+      "submit": "Conectar"
+    },
+    "connection": {
+      "title": "Conexão",
+      "status": "Estado da conexão",
+      "connected": "Conectado",
+      "revoked": "Revogada pelo Zentinelle",
+      "revokedBody": "O Zentinelle não aceita mais esta conexão: {reason}. Desconecte e conecte de novo com um novo código de inscrição.",
+      "url": "URL do Zentinelle",
+      "gatewayUrl": "URL do gateway",
+      "sameAsUrl": "Igual à URL do Zentinelle",
+      "installId": "ID da instalação no Zentinelle",
+      "tenants": "Locatários do Zentinelle",
+      "none": "Nenhum",
+      "connectedAt": "Conectado em",
+      "editGatewayUrl": "Alterar URL do gateway",
+      "disconnect": "Desconectar",
+      "save": "Salvar",
+      "cancel": "Cancelar",
+      "gatewayUrlHelp": "Deixe em branco para usar a URL do Zentinelle. Os gateways em execução são reimplantados.",
+      "disconnectTitle": "Desconectar do Zentinelle?",
+      "disconnectBody": "Isso revoga a instalação e cada cluster registrado no Zentinelle e depois remove os gateways e seus segredos dos clusters. Para conectar de novo é preciso um novo código de inscrição.",
+      "disconnected": "Desconectado do Zentinelle"
+    },
+    "overview": {
+      "degraded": "Um ou mais gateways de cluster precisam de atenção. Veja os clusters abaixo.",
+      "title": "Saúde",
+      "gateways": "Gateways em execução",
+      "gatewaysValue": "{healthy} de {total}",
+      "agents": "Agentes observados neste mês",
+      "requests": "Requisições ao modelo, últimas 24 horas",
+      "spend": "Gasto neste mês",
+      "usageError": "Não foi possível ler o uso do Zentinelle",
+      "clustersTitle": "Saúde do gateway por cluster",
+      "clustersDescription": "O gateway do Zentinelle de cada cluster registrado.",
+      "installOff": "Os gateways do Zentinelle estão desligados nesta instalação. Os clusters registrados mantêm as credenciais; os gateways são implantados quando o operador da plataforma os liga.",
+      "noClusters": "Nenhum cluster está registrado no Zentinelle ainda."
+    },
+    "clusters": {
+      "installOff": "Os gateways do Zentinelle estão desligados nesta instalação. Registrar um cluster guarda a credencial; o gateway é implantado quando o operador da plataforma liga os gateways.",
+      "title": "Clusters registrados",
+      "empty": "Nenhum cluster está registrado no Zentinelle ainda.",
+      "never": "nunca",
+      "registeredAt": "Registrado {when}",
+      "rotatedAt": "credencial trocada {when}",
+      "turnOff": "Desligar gateway",
+      "turnOn": "Ligar gateway",
+      "rotate": "Trocar credencial",
+      "unregister": "Cancelar registro",
+      "registerTitle": "Registrar um cluster",
+      "registerDescription": "O registro grava a credencial do gateway no cluster e implanta o gateway.",
+      "search": "Buscar clusters",
+      "noChoices": "Nenhum cluster não registrado corresponde.",
+      "register": "Registrar",
+      "unregisterTitle": "Cancelar o registro de {cluster} no Zentinelle?",
+      "unregisterBody": "Isso revoga o cluster no Zentinelle e depois remove o gateway e o segredo da credencial. O tráfego de agentes nele deixa de passar pelo Zentinelle."
+    },
+    "filters": {
+      "window": "Período",
+      "scope": "Escopo",
+      "all": "Tudo o que posso ver",
+      "agent": "Um agente",
+      "projects": "Projetos",
+      "teams": "Equipes",
+      "agentSlug": "Slug do agente",
+      "windows": {
+        "24h": "Últimas 24 horas",
+        "7d": "Últimos 7 dias",
+        "30d": "Últimos 30 dias",
+        "month": "Este mês"
       }
     },
-    "division": "<label>Divisão de responsabilidades:</label> o Astrolift cuida da <em>camada de execução</em>: orquestração de contêineres, implantações, saúde dos pods e observabilidade da infraestrutura. O Zentinelle cuida da <em>camada de comportamento da IA</em>: o que o agente diz e faz, se cumpre as políticas e a trilha de auditoria exigida pelos reguladores. Em <strong>OBSERVE › Agents</strong>, as abas marcadas com <code>Astrolift</code> já estão ativas; as abas <code>Zentinelle</code> serão ativadas quando a integração for lançada."
+    "usage": {
+      "error": "Não foi possível ler o uso do Zentinelle",
+      "requests": "Requisições ao modelo",
+      "tokens": "Tokens usados",
+      "cost": "Custo de modelos",
+      "title": "Por agente e modelo",
+      "empty": "Nenhum uso de modelo neste período.",
+      "noAgent": "(sem agente)",
+      "requestCount": "{count, plural, one {# requisição} other {# requisições}}",
+      "tokenCount": "{input} de entrada, {output} de saída"
+    },
+    "policies": {
+      "error": "Não foi possível ler as políticas do Zentinelle",
+      "empty": "Nenhuma política do Zentinelle está em vigor aqui.",
+      "meta": "Escopo {scope}, prioridade {priority}"
+    },
+    "audit": {
+      "export": {
+        "ndjson": "Exportar NDJSON",
+        "csv": "Exportar CSV"
+      },
+      "label": "Auditoria do Zentinelle",
+      "error": "Não foi possível ler o fluxo de auditoria do Zentinelle",
+      "loadMore": "Carregar mais",
+      "loadingMore": "Carregando…",
+      "empty": "Nenhum evento de auditoria neste período",
+      "emptyBody": "Os eventos aparecem aqui à medida que o Zentinelle os registra para os agentes que você pode ver.",
+      "exported": "{count, plural, one {# evento exportado} other {# eventos exportados}}"
+    }
   },
   "modelDeploy": {
     "title": "Implantar modelo",

@@ -14613,34 +14613,139 @@
     }
   },
   "zentinelleScreen": {
-    "title": "防护 · Zentinelle",
-    "description": "AI 智能体 GRC：为 Astrolift 上运行的每个智能体工作负载提供治理、风险与合规。",
-    "tagline": "MIT 许可 · 可自托管 · Calliope AI 配套产品",
-    "intro": "Zentinelle 是 BROCS 技术栈中的 <strong>Control + Secure</strong> 支柱。它与 Astrolift 并行运行，提供 Astrolift 有意不承担的 AI 专属层：策略执行、内容扫描、合规框架，以及 AI 治理法规要求的完整交互审计记录。",
-    "statusTitle": "集成方案设计中",
-    "statusBody": "Astrolift 与 Zentinelle 之间的认证握手和租户委派正在设计中。可选方案包括：将 Zentinelle 作为嵌入式 Django 应用并把认证委托给 Astrolift，或作为通过令牌交换对接的独立服务。方案确定后，此页面将成为连接管理界面。",
-    "github": "GitHub 上的 Zentinelle",
-    "docs": "集成文档",
-    "addsTitle": "Zentinelle 为 Astrolift 带来的能力",
-    "capabilities": {
-      "governance": {
-        "title": "治理",
-        "description": "策略引擎：内容规则（PII、有害内容、越狱检测）、模型允许列表、令牌预算执行，以及带版本管理的系统提示词库。"
-      },
-      "risk": {
-        "title": "风险",
-        "description": "5×5 风险登记册、FMEA 分析、事件跟踪、异常检测，以及针对智能体行为漂移的自动告警。"
-      },
-      "compliance": {
-        "title": "合规",
-        "description": "SOC 2、GDPR、HIPAA、欧盟 AI 法案和 NIST RMF 控制映射。证据收集、差距分析和可直接用于审计的报告。"
-      },
-      "observability": {
-        "title": "可观测性",
-        "description": "完整的交互审计（提示词、响应和工具调用）、内容扫描结果、策略评估日志，以及按工作负载计量的令牌用量。"
+    "title": "安全 · Zentinelle",
+    "description": "将此组织连接到 Zentinelle,用于智能体治理、用量与成本、策略和审计。",
+    "noAccess": "无 Zentinelle 访问权限",
+    "noAccessBody": "你的角色在这里没有任何 Zentinelle 权限。请向组织管理员申请 Zentinelle 权限。",
+    "error": "无法读取 Zentinelle 连接",
+    "notConnected": "未连接到 Zentinelle",
+    "notConnectedBody": "组织管理员在此页面连接 Zentinelle。连接后会显示各个部分。",
+    "tabsLabel": "Zentinelle 各部分",
+    "writeFailed": "Zentinelle 未接受此更改",
+    "tabs": {
+      "overview": "概览",
+      "clusters": "集群",
+      "usage": "用量与成本",
+      "policies": "策略",
+      "audit": "审计"
+    },
+    "health": {
+      "healthy": "网关运行中",
+      "pending": "网关尚未部署",
+      "off": "网关已关闭",
+      "error": "网关出错"
+    },
+    "connect": {
+      "title": "连接到 Zentinelle",
+      "description": "粘贴 Zentinelle 的 URL 和在 Zentinelle 中生成的一次性注册码。Zentinelle 返回的凭据会作为密钥保存,且从不显示。",
+      "url": "Zentinelle 的 URL",
+      "code": "注册码",
+      "codeHelp": "在 Zentinelle 中生成;只能使用一次。",
+      "gatewayUrl": "网关 URL(可选)",
+      "gatewayUrlHelp": "集群网关访问 Zentinelle 的地址(如果不是上面的 URL),例如集群内的私有地址。",
+      "required": "请输入 Zentinelle 的 URL 和注册码。",
+      "connecting": "正在连接…",
+      "submit": "连接"
+    },
+    "connection": {
+      "title": "连接",
+      "status": "连接状态",
+      "connected": "已连接",
+      "revoked": "已被 Zentinelle 吊销",
+      "revokedBody": "Zentinelle 不再接受此连接:{reason}。请先断开,再用新的注册码重新连接。",
+      "url": "Zentinelle 的 URL",
+      "gatewayUrl": "网关 URL",
+      "sameAsUrl": "与 Zentinelle 的 URL 相同",
+      "installId": "Zentinelle 安装 ID",
+      "tenants": "Zentinelle 租户",
+      "none": "无",
+      "connectedAt": "连接时间",
+      "editGatewayUrl": "更改网关 URL",
+      "disconnect": "断开连接",
+      "save": "保存",
+      "cancel": "取消",
+      "gatewayUrlHelp": "留空则使用 Zentinelle 的 URL。正在运行的网关会重新部署。",
+      "disconnectTitle": "断开与 Zentinelle 的连接?",
+      "disconnectBody": "这会在 Zentinelle 中吊销此安装和每个已注册的集群,然后从集群中移除网关及其密钥。重新连接需要新的注册码。",
+      "disconnected": "已断开与 Zentinelle 的连接"
+    },
+    "overview": {
+      "degraded": "有集群网关需要处理。请查看下方的集群。",
+      "title": "运行状况",
+      "gateways": "运行中的网关",
+      "gatewaysValue": "{healthy} / {total} 个",
+      "agents": "本月观测到的智能体",
+      "requests": "模型请求(最近 24 小时)",
+      "spend": "本月支出",
+      "usageError": "无法从 Zentinelle 读取用量",
+      "clustersTitle": "各集群的网关状况",
+      "clustersDescription": "每个已注册集群的 Zentinelle 网关。",
+      "installOff": "此安装已关闭 Zentinelle 网关。已注册的集群保留其凭据;平台运维人员开启后会部署网关。",
+      "noClusters": "尚无集群注册到 Zentinelle。"
+    },
+    "clusters": {
+      "installOff": "此安装已关闭 Zentinelle 网关。注册集群会保存其凭据;平台运维人员开启网关后才会部署。",
+      "title": "已注册的集群",
+      "empty": "尚无集群注册到 Zentinelle。",
+      "never": "从未",
+      "registeredAt": "注册于 {when}",
+      "rotatedAt": "凭据轮换于 {when}",
+      "turnOff": "关闭网关",
+      "turnOn": "开启网关",
+      "rotate": "轮换凭据",
+      "unregister": "取消注册",
+      "registerTitle": "注册集群",
+      "registerDescription": "注册会把网关凭据写入集群并部署其网关。",
+      "search": "搜索集群",
+      "noChoices": "没有匹配的未注册集群。",
+      "register": "注册",
+      "unregisterTitle": "从 Zentinelle 取消注册 {cluster}?",
+      "unregisterBody": "这会在 Zentinelle 中吊销该集群,然后移除其网关和凭据密钥。该集群上的智能体流量将不再经过 Zentinelle。"
+    },
+    "filters": {
+      "window": "时间范围",
+      "scope": "范围",
+      "all": "我能看到的全部",
+      "agent": "单个智能体",
+      "projects": "项目",
+      "teams": "团队",
+      "agentSlug": "智能体标识",
+      "windows": {
+        "24h": "最近 24 小时",
+        "7d": "最近 7 天",
+        "30d": "最近 30 天",
+        "month": "本月"
       }
     },
-    "division": "<label>职责划分：</label>Astrolift 负责<em>运行时层</em>：容器编排、部署、Pod 健康状况和基础设施可观测性。Zentinelle 负责<em>AI 行为层</em>：智能体说了什么、做了什么，是否符合策略，以及监管机构要求的审计记录。在 <strong>OBSERVE › Agents</strong> 中，标有 <code>Astrolift</code> 的标签页现已可用；<code>Zentinelle</code> 标签页将在集成发布后启用。"
+    "usage": {
+      "error": "无法从 Zentinelle 读取用量",
+      "requests": "模型请求",
+      "tokens": "已用令牌",
+      "cost": "模型成本",
+      "title": "按智能体和模型",
+      "empty": "此时间范围内没有模型用量。",
+      "noAgent": "(无智能体)",
+      "requestCount": "{count, plural, other {# 次请求}}",
+      "tokenCount": "输入 {input},输出 {output}"
+    },
+    "policies": {
+      "error": "无法从 Zentinelle 读取策略",
+      "empty": "此处没有生效的 Zentinelle 策略。",
+      "meta": "范围 {scope},优先级 {priority}"
+    },
+    "audit": {
+      "export": {
+        "ndjson": "导出 NDJSON",
+        "csv": "导出 CSV"
+      },
+      "label": "Zentinelle 审计",
+      "error": "无法从 Zentinelle 读取审计流",
+      "loadMore": "加载更多",
+      "loadingMore": "正在加载…",
+      "empty": "此时间范围内没有审计事件",
+      "emptyBody": "Zentinelle 为你能看到的智能体记录的事件会显示在这里。",
+      "exported": "{count, plural, other {已导出 # 个事件}}"
+    }
   },
   "modelDeploy": {
     "title": "部署模型",

@@ -14617,33 +14617,138 @@
   },
   "zentinelleScreen": {
     "title": "Proteger · Zentinelle",
-    "description": "GRC de agentes de IA: gobernanza, riesgo y cumplimiento para cada workload de agente en Astrolift.",
-    "tagline": "Licencia MIT · Autoalojable · Producto complementario de Calliope AI",
-    "intro": "Zentinelle es el pilar <strong>Control + Secure</strong> del stack BROCS. Se ejecuta junto a Astrolift y aporta la capa específica de IA que Astrolift deliberadamente no asume: aplicación de políticas, análisis de contenido, marcos de cumplimiento y el registro de auditoría completo de interacciones que exigen las normativas de gobernanza de IA.",
-    "statusTitle": "Integración en diseño",
-    "statusBody": "Se está diseñando el handshake de autenticación y la delegación de tenants entre Astrolift y Zentinelle. Las opciones incluyen Zentinelle como app Django integrada que delega la autenticación en Astrolift, o un servicio separado con intercambio de tokens. Cuando se decida la forma, esta página será la interfaz de gestión de la conexión.",
-    "github": "Zentinelle en GitHub",
-    "docs": "Documentación de integración",
-    "addsTitle": "Qué aporta Zentinelle a Astrolift",
-    "capabilities": {
-      "governance": {
-        "title": "Gobernanza",
-        "description": "Motor de políticas: reglas de contenido (PII, toxicidad, detección de jailbreak), listas de modelos permitidos, aplicación de presupuestos de tokens y biblioteca versionada de prompts de sistema."
-      },
-      "risk": {
-        "title": "Riesgo",
-        "description": "Registro de riesgos 5×5, análisis FMEA, seguimiento de incidentes, detección de anomalías y alertas automáticas ante desviaciones en el comportamiento del agente."
-      },
-      "compliance": {
-        "title": "Cumplimiento",
-        "description": "Mapeo de controles de SOC 2, RGPD, HIPAA, Ley de IA de la UE y NIST RMF. Recopilación de evidencias, análisis de brechas e informes listos para auditoría."
-      },
-      "observability": {
-        "title": "Observabilidad",
-        "description": "Auditoría completa de interacciones (prompts, respuestas y llamadas a herramientas), resultados del análisis de contenido, registros de evaluación de políticas y medición del uso de tokens por workload."
+    "description": "Conecte esta organización a Zentinelle para la gobernanza de agentes, el uso y el coste, las políticas y la auditoría.",
+    "noAccess": "Sin acceso a Zentinelle",
+    "noAccessBody": "Sus roles no conceden nada sobre Zentinelle aquí. Pida un permiso de Zentinelle a un administrador de la organización.",
+    "error": "No se pudo leer la conexión con Zentinelle",
+    "notConnected": "Sin conexión con Zentinelle",
+    "notConnectedBody": "Un administrador de la organización conecta Zentinelle desde esta página. Sus secciones aparecen una vez conectada.",
+    "tabsLabel": "Secciones de Zentinelle",
+    "writeFailed": "Zentinelle no aceptó el cambio",
+    "tabs": {
+      "overview": "Resumen",
+      "clusters": "Clústeres",
+      "usage": "Uso y coste",
+      "policies": "Políticas",
+      "audit": "Auditoría"
+    },
+    "health": {
+      "healthy": "Pasarela en marcha",
+      "pending": "Pasarela aún no desplegada",
+      "off": "Pasarela desactivada",
+      "error": "Error de la pasarela"
+    },
+    "connect": {
+      "title": "Conectar con Zentinelle",
+      "description": "Pegue la URL de Zentinelle y un código de inscripción de un solo uso generado en Zentinelle. La credencial que devuelve Zentinelle se guarda como secreto y nunca se muestra.",
+      "url": "URL de Zentinelle",
+      "code": "Código de inscripción",
+      "codeHelp": "Se genera en Zentinelle; sirve una sola vez.",
+      "gatewayUrl": "URL de la pasarela (opcional)",
+      "gatewayUrlHelp": "Dónde llegan a Zentinelle las pasarelas de los clústeres cuando no es la URL de arriba, como una dirección privada dentro del clúster.",
+      "required": "Introduzca la URL de Zentinelle y el código de inscripción.",
+      "connecting": "Conectando…",
+      "submit": "Conectar"
+    },
+    "connection": {
+      "title": "Conexión",
+      "status": "Estado de la conexión",
+      "connected": "Conectado",
+      "revoked": "Revocada por Zentinelle",
+      "revokedBody": "Zentinelle ya no acepta esta conexión: {reason}. Desconecte y vuelva a conectar con un código de inscripción nuevo.",
+      "url": "URL de Zentinelle",
+      "gatewayUrl": "URL de la pasarela",
+      "sameAsUrl": "La misma que la URL de Zentinelle",
+      "installId": "ID de instalación en Zentinelle",
+      "tenants": "Inquilinos de Zentinelle",
+      "none": "Ninguno",
+      "connectedAt": "Conectado el",
+      "editGatewayUrl": "Cambiar la URL de la pasarela",
+      "disconnect": "Desconectar",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "gatewayUrlHelp": "Déjela vacía para usar la URL de Zentinelle. Las pasarelas en marcha se vuelven a desplegar.",
+      "disconnectTitle": "¿Desconectar de Zentinelle?",
+      "disconnectBody": "Esto revoca la instalación y cada clúster registrado en Zentinelle y después retira las pasarelas y sus secretos de los clústeres. Para volver a conectar hace falta un código de inscripción nuevo.",
+      "disconnected": "Desconectado de Zentinelle"
+    },
+    "overview": {
+      "degraded": "Una o más pasarelas de clúster necesitan atención. Consulte los clústeres más abajo.",
+      "title": "Salud",
+      "gateways": "Pasarelas en marcha",
+      "gatewaysValue": "{healthy} de {total}",
+      "agents": "Agentes observados este mes",
+      "requests": "Solicitudes al modelo, últimas 24 horas",
+      "spend": "Gasto de este mes",
+      "usageError": "No se pudo leer el uso desde Zentinelle",
+      "clustersTitle": "Salud de la pasarela por clúster",
+      "clustersDescription": "La pasarela de Zentinelle de cada clúster registrado.",
+      "installOff": "Las pasarelas de Zentinelle están desactivadas en esta instalación. Los clústeres registrados conservan sus credenciales; las pasarelas se despliegan cuando el operador de la plataforma las activa.",
+      "noClusters": "Todavía no hay clústeres registrados en Zentinelle."
+    },
+    "clusters": {
+      "installOff": "Las pasarelas de Zentinelle están desactivadas en esta instalación. Registrar un clúster guarda su credencial; la pasarela se despliega cuando el operador de la plataforma activa las pasarelas.",
+      "title": "Clústeres registrados",
+      "empty": "Todavía no hay clústeres registrados en Zentinelle.",
+      "never": "nunca",
+      "registeredAt": "Registrado {when}",
+      "rotatedAt": "credencial rotada {when}",
+      "turnOff": "Desactivar la pasarela",
+      "turnOn": "Activar la pasarela",
+      "rotate": "Rotar la credencial",
+      "unregister": "Dar de baja",
+      "registerTitle": "Registrar un clúster",
+      "registerDescription": "Al registrarlo se escribe la credencial de la pasarela en el clúster y se despliega su pasarela.",
+      "search": "Buscar clústeres",
+      "noChoices": "Ningún clúster sin registrar coincide.",
+      "register": "Registrar",
+      "unregisterTitle": "¿Dar de baja {cluster} en Zentinelle?",
+      "unregisterBody": "Esto revoca el clúster en Zentinelle y después retira su pasarela y el secreto de su credencial. El tráfico de agentes en él deja de pasar por Zentinelle."
+    },
+    "filters": {
+      "window": "Periodo",
+      "scope": "Alcance",
+      "all": "Todo lo que puedo ver",
+      "agent": "Un agente",
+      "projects": "Proyectos",
+      "teams": "Equipos",
+      "agentSlug": "Slug del agente",
+      "windows": {
+        "24h": "Últimas 24 horas",
+        "7d": "Últimos 7 días",
+        "30d": "Últimos 30 días",
+        "month": "Este mes"
       }
     },
-    "division": "<label>Reparto de responsabilidades:</label> Astrolift se encarga de la <em>capa de ejecución</em>: orquestación de contenedores, despliegues, salud de los pods y observabilidad de la infraestructura. Zentinelle se encarga de la <em>capa de comportamiento de la IA</em>: lo que el agente dice y hace, si cumple las políticas y el registro de auditoría que exigen los reguladores. En <strong>OBSERVE › Agents</strong>, las pestañas marcadas con <code>Astrolift</code> ya están activas; las de <code>Zentinelle</code> se activarán cuando se publique la integración."
+    "usage": {
+      "error": "No se pudo leer el uso desde Zentinelle",
+      "requests": "Solicitudes al modelo",
+      "tokens": "Tokens usados",
+      "cost": "Coste de modelos",
+      "title": "Por agente y modelo",
+      "empty": "No hay uso de modelos en este periodo.",
+      "noAgent": "(sin agente)",
+      "requestCount": "{count, plural, one {# solicitud} other {# solicitudes}}",
+      "tokenCount": "{input} de entrada, {output} de salida"
+    },
+    "policies": {
+      "error": "No se pudieron leer las políticas desde Zentinelle",
+      "empty": "Aquí no hay políticas de Zentinelle en vigor.",
+      "meta": "Alcance {scope}, prioridad {priority}"
+    },
+    "audit": {
+      "export": {
+        "ndjson": "Exportar NDJSON",
+        "csv": "Exportar CSV"
+      },
+      "label": "Auditoría de Zentinelle",
+      "error": "No se pudo leer el flujo de auditoría desde Zentinelle",
+      "loadMore": "Cargar más",
+      "loadingMore": "Cargando…",
+      "empty": "No hay eventos de auditoría en este periodo",
+      "emptyBody": "Los eventos aparecen aquí a medida que Zentinelle los registra para los agentes que puede ver.",
+      "exported": "{count, plural, one {# evento exportado} other {# eventos exportados}}"
+    }
   },
   "modelDeploy": {
     "title": "Desplegar modelo",
