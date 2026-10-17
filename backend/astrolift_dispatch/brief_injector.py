@@ -58,6 +58,15 @@ def brief_env_vars(task: AgentTask) -> list[dict[str, str]]:
         [
             {"name": "AGENT_CALLBACK_URL", "value": _agent_callback_url(task)},
             {"name": "ASTROLIFT_CLUSTER_KEY", "value": callback_key},
+            # The run messages people with the same key (#2434): REST and MCP.
+            {
+                "name": "ASTROLIFT_MESSAGES_URL",
+                "value": _agent_callback_url(task).replace("/callback/", "/messages/"),
+            },
+            {
+                "name": "ASTROLIFT_RUN_MCP_URL",
+                "value": _agent_callback_url(task).replace("/callback/", "/mcp/"),
+            },
         ]
     )
     env.extend(conversation_transfer_env_vars(task))

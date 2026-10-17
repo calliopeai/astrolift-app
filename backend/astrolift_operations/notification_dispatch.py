@@ -772,7 +772,33 @@ def _template_cert_event(envelope: EventEnvelope, *, renewal_failed: bool) -> No
     )
 
 
+def _template_agent_message(envelope: EventEnvelope) -> NotificationTemplate | None:
+    """An agent's message (#2434) -> the people it was addressed to, whose
+    access to the agent was checked when it was sent."""
+    payload = envelope.payload or {}
+    recipients = _coerce_id_list(payload.get("recipient_user_ids"))
+    if not recipients:
+        return None
+    agent = str(payload.get("agent_name", "") or payload.get("agent_slug", "") or "Agent")
+    title = str(payload.get("title", "") or "") or str(payload.get("kind", "") or "message")
+    thread_id = str(payload.get("thread_id", "") or "")
+    return NotificationTemplate(
+        title=_truncate(f"{agent}: {title}", PUSH_TITLE_MAX),
+        body=_truncate(str(payload.get("summary", "") or ""), PUSH_BODY_MAX),
+        action_url=_truncate(
+            f"astrolift://inbox/{thread_id}" if thread_id else "astrolift://inbox", PUSH_DATA_VALUE_MAX
+        ),
+        recipient_user_ids=tuple(sorted(set(recipients))),
+        extra_data={
+            "message_id": _truncate(str(payload.get("message_id", "") or ""), PUSH_DATA_VALUE_MAX),
+            "thread_id": _truncate(thread_id, PUSH_DATA_VALUE_MAX),
+            "kind": _truncate(str(payload.get("kind", "") or ""), PUSH_DATA_VALUE_MAX),
+        },
+    )
+
+
 NOTIFICATION_TEMPLATES = {
+    "agent.message.sent": _template_agent_message,
     "deploy.approved": lambda env: _template_deploy_event(env, "approved"),
     "deploy.rejected": lambda env: _template_deploy_event(env, "rejected"),
     "deploy.failed": lambda env: _template_deploy_event(env, "failed"),

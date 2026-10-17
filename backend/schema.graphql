@@ -614,6 +614,99 @@ type AstroliftAgentLiveStatus {
   deploymentReady: Boolean
 }
 
+type AstroliftAgentMessage {
+  id: GUID!
+  threadId: GUID!
+  kind: String!
+  source: String!
+  title: String!
+  body: String!
+  options: [AstroliftAgentMessageOption!]!
+  attachments: [AstroliftAgentMessageAttachment!]!
+  agentSlug: String
+  agentName: String
+  taskId: GUID
+  taskStatus: String
+  replyToId: GUID
+  requestSequence: Int
+  expiresAt: DateTime
+  createdAt: DateTime!
+  deliveredAt: DateTime
+  readAt: DateTime
+  replies: [AstroliftAgentMessageReply!]!
+
+  """
+  A question or approval this person may still answer: not expired and not answered by them.
+  """
+  answerable: Boolean!
+}
+
+type AstroliftAgentMessageAttachment {
+  kind: String!
+  ref: String!
+  label: String
+}
+
+type AstroliftAgentMessageOption {
+  id: String!
+  label: String!
+  description: String
+}
+
+type AstroliftAgentMessagePage {
+  items: [AstroliftAgentMessage!]!
+  nextCursor: String
+  totalCount: Int
+  unreadCount: Int!
+}
+
+type AstroliftAgentMessageReply {
+  id: GUID!
+  messageId: GUID!
+  authorLabel: String!
+  body: String!
+  choices: [String!]!
+  decision: String
+  route: String!
+  deliveredAt: DateTime
+  wakeTaskId: GUID
+  createdAt: DateTime!
+}
+
+type AstroliftAgentMessageReplyMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAgentMessageReply
+}
+
+type AstroliftAgentMessageThread {
+  threadId: GUID!
+  agentSlug: String
+  agentName: String
+  taskId: GUID
+  taskStatus: String
+  lastMessage: AstroliftAgentMessage!
+  lastMessageAt: DateTime!
+  messageCount: Int!
+  unreadCount: Int!
+}
+
+type AstroliftAgentMessageThreadPage {
+  items: [AstroliftAgentMessageThread!]!
+  nextCursor: String
+  unreadCount: Int!
+}
+
+type AstroliftAgentMessagesMarked {
+  marked: Int!
+}
+
+type AstroliftAgentMessagesMarkedMutationResult {
+  ok: Boolean!
+  errors: [MutationError!]!
+  data: AstroliftAgentMessagesMarked
+}
+
 type AstroliftAgentQuarantine {
   id: GUID!
   targetKind: String!
@@ -5379,6 +5472,16 @@ type AstroliftRenderedManifest {
   errorPath: String
   errorLine: Int
   errorColumn: Int
+}
+
+input AstroliftReplyToAgentMessageInput {
+  messageId: GUID!
+  body: String = null
+  choices: [String!] = null
+
+  """allow or deny, for an approval."""
+  decision: String = null
+  clientRequestId: String = null
 }
 
 type AstroliftRerunOnboardingPayload {
@@ -10370,6 +10473,8 @@ type Mutation {
   verifyConversationTransfer(input: ConversationTransferRecordInput!): AstroliftConversationTransferMutationResult!
   commitConversationTransfer(input: ConversationTransferRecordInput!): AstroliftConversationTransferMutationResult!
   abortConversationTransfer(input: ConversationTransferRecordInput!): AstroliftConversationTransferMutationResult!
+  markAgentMessagesRead(ids: [GUID!] = null, threadId: GUID = null): AstroliftAgentMessagesMarkedMutationResult!
+  replyToAgentMessage(input: AstroliftReplyToAgentMessageInput!): AstroliftAgentMessageReplyMutationResult!
 
   """
   Start the exact reviewed definition with declared inputs and an actor-scoped requestId; retry the same request after an uncertain response.
@@ -11399,6 +11504,8 @@ type Query {
   agentUpcomingRuns(orgId: ID!, search: String = null, project: [String!] = null, agent: [String!] = null, perAgent: Int! = 1, withinHours: Int = null, page: Int = null, pageSize: Int = null): AstroliftAgentUpcomingRunPage!
   agentRuntimes: [AstroliftAgentRuntime!]!
   dispatchers: [AstroliftDispatcherInstance!]!
+  astroliftAgentMessages(threadId: GUID = null, unreadOnly: Boolean! = false, after: String = null, first: Int! = 50): AstroliftAgentMessagePage!
+  astroliftAgentMessageThreads(unreadOnly: Boolean! = false, after: String = null, first: Int! = 25): AstroliftAgentMessageThreadPage!
 
   """Get a workflow instance by ID."""
   workflowInstance(id: ID!): WorkflowInstanceType
@@ -12335,6 +12442,7 @@ type Subscription {
   formSubmissionReceived(slug: String!): String!
   astroliftOnAppLog(appSlug: String!, podName: String!, workloadSlug: String = null, container: String = null, follow: Boolean! = true, tailLines: Int! = 100, previewId: GUID = null, expectedEnvironmentId: GUID = null, ifMatchPreviewVersion: Int = null, ifMatchEnvironmentVersion: Int = null): AstroliftAppLogLine!
   astroliftOnAppLogs(appSlug: String!, environmentName: String = null, workloadSlug: String = null, container: String = null, follow: Boolean! = true, tailLines: Int! = 100, previewId: GUID = null, expectedEnvironmentId: GUID = null, ifMatchPreviewVersion: Int = null, ifMatchEnvironmentVersion: Int = null): AstroliftAppLogLine!
+  astroliftAgentMessageReceived: AstroliftAgentMessage!
 }
 
 type SwitchUserResult {
