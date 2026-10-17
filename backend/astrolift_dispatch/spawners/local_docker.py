@@ -50,8 +50,19 @@ class LocalDockerSpawner(ContainerSpawner):
         # UUIDv7 prefixes contain only time; truncating them collides across parallel tasks.
         container_name = f"agent-task-{str(task.guid).replace('-', '')}"
 
+        # The brains the run reads (#2432), checked again now.
+        from astrolift_registry.brain_runs import BrainRunError, spawn_wiring
+
+        try:
+            brains = spawn_wiring(task)
+        except BrainRunError as exc:
+            return SpawnResult(external_id=container_name, ok=False, error=exc.message)
+
         # Brief identity + (for VNC tasks) the snapshot PUT URL env vars.
         env_vars = brief_env_vars(task) + snapshot_env_vars(task)
+        if brains is not None:
+            env_vars += [{"name": name, "value": value} for name, value in brains.env]
+            env_vars += [{"name": name, "value": token} for name, token in brains.secrets.items()]
         env_args = []
         for ev in env_vars:
             env_args += ["-e", f"{ev['name']}={ev['value']}"]
@@ -77,7 +88,9 @@ class LocalDockerSpawner(ContainerSpawner):
             logger.info("local_docker_spawner: started container %s (%s)", container_name, container_id[:12])
             return SpawnResult(external_id=container_name)
         except Exception as exc:
-            return SpawnResult(external_id=container_name, ok=False, error=str(exc))
+            # A timeout's message quotes the command, brain tokens and all.
+            error = brains.redact(str(exc)) if brains is not None else str(exc)
+            return SpawnResult(external_id=container_name, ok=False, error=error)
 
     def status(self, external_id: str) -> TaskStatus:
         try:

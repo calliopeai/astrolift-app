@@ -173,7 +173,7 @@ def _apply(applied: list[str], key: str, value: str) -> str:
 
 
 def _workload_dict(w: WorkloadManifest) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "name": w.name,
         "kind": w.kind,
         "is_public": w.is_public,
@@ -247,6 +247,12 @@ def _workload_dict(w: WorkloadManifest) -> dict[str, Any]:
         "faas_output_dir": w.faas_output_dir,
         "containers": [_container_dict(c) for c in w.containers],
     }
+    # Only when declared (#2432), so a workload without them hashes as before.
+    if w.brains:
+        out["brains"] = list(w.brains)
+    if w.brains_allowed is not None:
+        out["brains_allowed"] = list(w.brains_allowed)
+    return out
 
 
 def _container_dict(c: ContainerManifest) -> dict[str, Any]:

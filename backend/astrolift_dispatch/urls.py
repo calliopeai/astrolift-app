@@ -7,6 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 
 from astrolift_dispatch.managed_runtime_views import validate_managed_runtime
 from astrolift_dispatch.views import (
+    agent_brains,
     agent_callback,
     agent_checkin,
     agent_transfer,
@@ -41,6 +42,8 @@ urlpatterns = [
     path("api/dispatch/v1/agents/<str:task_id>/callback/", agent_callback, name="agent-callback"),
     # Paused admission of a moved conversation (#1971)
     path("api/dispatch/v1/agents/<str:task_id>/transfer/", agent_transfer, name="agent-transfer"),
+    # Fresh read tokens for the brains a run reads (#2432)
+    path("api/dispatch/v1/agents/<str:task_id>/brains/", agent_brains, name="agent-brains"),
     # Log streaming and metering (#51, #56)
     path("api/dispatch/v1/tasks/<str:task_id>/logs/", csrf_exempt(ingest_task_logs), name="task-logs-ingest"),
     path(

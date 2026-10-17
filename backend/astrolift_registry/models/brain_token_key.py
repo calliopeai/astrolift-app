@@ -8,6 +8,10 @@ for a day so tokens it signed (15 minutes at most) still verify.
 A key with a ``binding`` signs only the tokens of one app hosted on a brain
 (#2243), one per deploy of an environment; it is published while its binding,
 app and brain are live, which is how deleting any of them revokes it.
+
+A key with a ``run_binding`` signs only the tokens one agent run reads one
+brain with (#2432); it is published while the run is in flight and the
+binding and brain are live.
 """
 
 from __future__ import annotations
@@ -36,6 +40,13 @@ class BrainTokenKey(BaseCoreModel):
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
+    )
+    run_binding = models.ForeignKey(
+        "astrolift_registry.BrainRunBinding",
+        related_name="keys",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
     )
 
     def __str__(self) -> str:

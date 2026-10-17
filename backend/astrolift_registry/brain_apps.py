@@ -280,7 +280,11 @@ def bind(*, app: RegisteredApp, brain: RegisteredApp, granted_by: Any) -> BrainA
 def revoke_app(registered_app_id: int) -> int:
     """Revoke every binding ``registered_app_id`` holds or is the brain of:
     soft-delete the bindings and delete their keys, so no token of theirs
-    verifies again."""
+    verifies again. The agent runs reading it as a brain are revoked too
+    (#2432); the count is of app bindings."""
+    from astrolift_registry.brain_runs import revoke_brain
+
+    revoke_brain(registered_app_id)
     now = timezone.now()
     rows = list(
         BrainAppBinding.objects.filter(

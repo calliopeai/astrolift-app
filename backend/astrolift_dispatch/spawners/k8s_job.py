@@ -280,6 +280,26 @@ class K8sJobSpawner(ContainerSpawner):
         # at the same merged per-task Secret.
         _dedupe_job_container_env(job_manifest)
 
+        # The brains the run reads (#2432), checked again now and written over
+        # every other source. Before the gateway key, so a refusal here never
+        # leaves one behind; the tokens go into the per-task Secret only.
+        from astrolift_registry.brain_runs import BrainRunError, spawn_wiring
+
+        try:
+            brains = spawn_wiring(task)
+        except BrainRunError as exc:
+            logger.warning("k8s_job_spawner: brains refused Job %s: %s", job_name, exc.message)
+            return SpawnResult(external_id=job_name, ok=False, error=exc.message)
+        if brains is not None:
+            secret_manifest = _wire_brains(
+                job_manifest,
+                secret_manifest,
+                brains,
+                secret_name=task_secret_name(job_name),
+                namespace=self._namespace,
+                task_guid=str(task.guid),
+            )
+
         # Minted last, just before the apply, so a refusal above never leaves
         # a live key behind. The key goes into the per-task Secret only.
         gateway_key = None
@@ -428,22 +448,26 @@ class K8sJobSpawner(ContainerSpawner):
             result = driver.apply_manifests(ctx.slug, self._namespace, manifests)
             if not getattr(result, "ok", False):
                 error = result.summary() if hasattr(result, "summary") else "apply failed"
-                error = redact(str(error), gateway_key)
+                error = _redact_brains(redact(str(error), gateway_key), brains)
                 logger.warning("k8s_job_spawner: apply failed for Job %s: %s", job_name, error)
                 self._cleanup_failed_spawn(job_name)
                 return SpawnResult(external_id=job_name, ok=False, error=error)
             logger.info("k8s_job_spawner: created Job %s for task %s", job_name, task.guid)
             return SpawnResult(external_id=job_name)
         except Exception as exc:
-            if gateway_key is None:
+            if gateway_key is None and brains is None:
                 logger.exception("k8s_job_spawner: failed to create Job %s", job_name)
             else:
-                # No traceback: its message could carry the Secret's key.
+                # No traceback: its message could carry a key or token from the Secret.
                 logger.warning(
-                    "k8s_job_spawner: failed to create Job %s: %s", job_name, redact(repr(exc), gateway_key)
+                    "k8s_job_spawner: failed to create Job %s: %s",
+                    job_name,
+                    _redact_brains(redact(repr(exc), gateway_key), brains),
                 )
             self._cleanup_failed_spawn(job_name)
-            return SpawnResult(external_id=job_name, ok=False, error=redact(str(exc), gateway_key))
+            return SpawnResult(
+                external_id=job_name, ok=False, error=_redact_brains(redact(str(exc), gateway_key), brains)
+            )
 
     def _cleanup_failed_spawn(self, job_name: str) -> None:
         """Best-effort cleanup after a non-atomic multi-manifest apply.
@@ -838,6 +862,38 @@ def _inject_resolved_secret_env(job_manifest: dict, *, secret_name: str, env_nam
 
     refs = [{"env_var": name, "uri": ""} for name in env_names]
     container.setdefault("env", []).extend(secret_env_entries(secret_name, refs))
+
+
+def _wire_brains(
+    job_manifest: dict,
+    secret_manifest: dict | None,
+    brains,
+    *,
+    secret_name: str,
+    namespace: str,
+    task_guid: str,
+) -> dict:
+    """Write the run's brain env over every other source (#2432): the plain
+    values on the container, each token through the per-task Secret, which
+    is made when the run had no other secret. Returns that Secret."""
+    from astrolift_dispatch.agent_secrets import build_task_secret_manifest, secret_env_entries
+
+    container = job_manifest["spec"]["template"]["spec"]["containers"][0]
+    owned = {name for name, _value in brains.env} | set(brains.secrets)
+    env = [entry for entry in container.get("env", []) if entry.get("name") not in owned]
+    env += [{"name": name, "value": value} for name, value in brains.env]
+    env += secret_env_entries(secret_name, [{"env_var": name, "uri": ""} for name in brains.secrets])
+    container["env"] = env
+    if secret_manifest is None:
+        secret_manifest = build_task_secret_manifest(
+            secret_name=secret_name, namespace=namespace, task_guid=task_guid, resolved={}
+        )
+    secret_manifest.setdefault("stringData", {}).update(brains.secrets)
+    return secret_manifest
+
+
+def _redact_brains(text: str, brains) -> str:
+    return brains.redact(text) if brains is not None else text
 
 
 def _image_pull_policy(image: str) -> str:

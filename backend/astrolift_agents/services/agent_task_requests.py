@@ -219,4 +219,8 @@ def reply_to_request(*, task, sequence, response, author=None, author_label="", 
     )
     task.event_bytes += size
     task.save(update_fields=["event_bytes", "updated_at", "version"])
+    # A gate answer checks again that the run may still read its brains (#2432).
+    from astrolift_registry.brain_runs import recheck
+
+    recheck(task)
     return reply

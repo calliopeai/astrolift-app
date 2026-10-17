@@ -1457,6 +1457,14 @@
           "agent_slug": {
             "type": "string"
           },
+          "brain_slugs": {
+            "description": "Brains the run reads as the token's owner, besides its agent's own: each one the token can read and, when the agent declares brains_allowed, one it accepts.",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 10,
+            "type": "array"
+          },
           "client_request_id": {
             "description": "Persist a UUID before dispatch. Reusing it with the same request returns the same task for this organization and requester; changed inputs conflict.",
             "format": "uuid",

@@ -109,6 +109,12 @@ class WorkloadManifest:
     # "leave whatever the model default or an operator already set".
     run_mode: str = ""
     run_cron_expression: str = ""
+    # Brains an agent's runs read (#2432). ``brains``: every run a person
+    # launches reads these. ``brains_allowed``: the brains a launch may add;
+    # ``None`` (not declared) accepts any brain the launcher can read, ``()``
+    # accepts none. Only meaningful when ``kind == "agent"``.
+    brains: tuple[str, ...] = ()
+    brains_allowed: tuple[str, ...] | None = None
     # Temporal worker config (#796). Only meaningful when
     # ``kind == "workflow"`` — the renderer stamps a
     # ``astrolift.dev/workload-kind: workflow`` pod annotation and injects

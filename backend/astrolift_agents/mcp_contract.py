@@ -639,6 +639,15 @@ MCP_TOOL_META: dict[str, dict[str, Any]] = {
                         "the same task for this organization and requester; changed inputs conflict."
                     ),
                 },
+                "brain_slugs": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "maxItems": 10,
+                    "description": (
+                        "Brains the run reads as the token's owner, besides its agent's own: each one the "
+                        "token can read and, when the agent declares brains_allowed, one it accepts."
+                    ),
+                },
             },
             required=("agent_slug",),
         ),

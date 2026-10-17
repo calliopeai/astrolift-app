@@ -79,7 +79,7 @@ def signing_key(*, now: dt.datetime | None = None) -> BrainTokenKey:
     with transaction.atomic():
         live = list(
             BrainTokenKey.objects.select_for_update()
-            .filter(retired_at__isnull=True, binding__isnull=True)
+            .filter(retired_at__isnull=True, binding__isnull=True, run_binding__isnull=True)
             .order_by("-created_at")
         )
         current = live[0] if live and live[0].created_at > now - KEY_SIGNING_LIFETIME else None
@@ -92,19 +92,21 @@ def signing_key(*, now: dt.datetime | None = None) -> BrainTokenKey:
 
 def jwks(*, now: dt.datetime | None = None) -> dict[str, Any]:
     """The public keys the edge verifies against: the live ones and those
-    retired within ``KEY_PUBLISHED_AFTER_RETIREMENT``, and the keys of every
-    live hosted-app binding (#2243)."""
+    retired within ``KEY_PUBLISHED_AFTER_RETIREMENT``, the keys of every
+    live hosted-app binding (#2243), and those of every agent run's live
+    binding to a brain (#2432)."""
     from django.db.models import Q
 
     from astrolift_registry.brain_apps import live_binding_keys
+    from astrolift_registry.brain_runs import live_run_keys
 
     now = now or timezone.now()
-    caller_keys = Q(binding__isnull=True) & (
+    caller_keys = Q(binding__isnull=True, run_binding__isnull=True) & (
         Q(retired_at__isnull=True) | Q(retired_at__gt=now - KEY_PUBLISHED_AFTER_RETIREMENT)
     )
-    rows = BrainTokenKey.objects.filter(caller_keys | Q(pk__in=live_binding_keys().values("pk"))).order_by(
-        "-created_at"
-    )
+    rows = BrainTokenKey.objects.filter(
+        caller_keys | Q(pk__in=live_binding_keys().values("pk")) | Q(pk__in=live_run_keys().values("pk"))
+    ).order_by("-created_at")
     return {"keys": [dict(row.public_jwk) for row in rows]}
 
 
@@ -114,20 +116,33 @@ class BrainReadToken:
     expires_at: dt.datetime
 
 
-def issue(*, user: Any, brain: RegisteredApp, now: dt.datetime | None = None) -> BrainReadToken:
+def issue(
+    *,
+    user: Any,
+    brain: RegisteredApp,
+    now: dt.datetime | None = None,
+    key: BrainTokenKey | None = None,
+    claims: dict[str, str] | None = None,
+) -> BrainReadToken:
     """A token for ``user`` to read ``brain``. The caller has already checked
-    that ``visible_brains()`` admits ``brain``; this does not."""
+    that ``visible_brains()`` admits ``brain``; this does not.
+
+    ``key`` signs instead of the install's key, and ``claims`` are added to
+    the token: an agent run's tokens carry its ``agent_task`` and are signed
+    by the key of its binding to the brain (``brain_runs``, #2432)."""
     from core.secrets import EncryptedSecret, decrypt
 
     now = now or timezone.now()
-    key = signing_key(now=now)
+    key = key or signing_key(now=now)
     pem = decrypt(
         EncryptedSecret(
             backend_kind=key.private_key_backend_kind, backend_ref=bytes(key.private_key_ciphertext)
         )
     )
     expires = now + TOKEN_TTL
-    claims = {
+    payload = {
+        # First, so no extra claim can stand in for one the edge checks.
+        **(claims or {}),
         "iss": issuer(),
         "aud": str(brain.guid),
         "sub": str(getattr(user, "guid", "") or user.pk),
@@ -137,7 +152,7 @@ def issue(*, user: Any, brain: RegisteredApp, now: dt.datetime | None = None) ->
         "exp": int(expires.timestamp()),
         "jti": secrets.token_hex(12),
     }
-    token = jwt.encode(claims, pem, algorithm=ALGORITHM, headers={"kid": key.kid})
+    token = jwt.encode(payload, pem, algorithm=ALGORITHM, headers={"kid": key.kid})
     return BrainReadToken(token=token, expires_at=expires)
 
 

@@ -257,6 +257,15 @@ class RunAstroliftAgentInput:
     contains the key itself. ``correlation_id`` is returned unchanged and
     is limited to 128 characters. ``callback_mode`` defaults to FULL;
     NOTIFY omits the result so callers can fetch it through ``agentTask``.
+
+    ``brain_slugs`` (#2432) names brains the run reads besides its agent's
+    own (``brains`` in its manifest), at most 10 in all. Each must be one the
+    caller can read (another org's, or one the caller cannot see, is
+    NOT_FOUND) and, when the agent declares ``brains_allowed``, one it
+    accepts (VALIDATION). The run reads them as the caller: per brain it gets
+    ``BRAIN_<SLUG>_MCP_URL``, ``BRAIN_<SLUG>_TOKEN_HEADER`` and
+    ``BRAIN_<SLUG>_TOKEN``, plus a ``BRAINS`` JSON index; ``agentTask.brains``
+    lists them.
     """
 
     agent_slug: str
@@ -271,6 +280,15 @@ class RunAstroliftAgentInput:
     callback_secret_ref: str | None = None
     correlation_id: str | None = None
     callback_mode: AgentTaskCallbackMode = AgentTaskCallbackMode.FULL
+    # None-defaulted like ``trigger_payload``: the SDL printer cannot render an
+    # empty-list default. None is no brains.
+    brain_slugs: list[str] | None = strawberry.field(
+        default=None,
+        description=(
+            "Brains the run reads as the caller, besides its agent's own (#2432): at most 10 in all, each "
+            "one the caller can read and, when the agent declares brains_allowed, one it accepts."
+        ),
+    )
 
 
 @strawberry.input
@@ -593,6 +611,14 @@ def _dispatch_actor(info: Info):
     if tenant and tenant.actor_user_id:
         return Actor(kind="user", user_id=tenant.actor_user_id, display="")
     return Actor(kind="system", display="system")
+
+
+def _run_extras(result) -> dict | None:
+    """The brains a dispatched run reads, for its audit row (#2432)."""
+    data = getattr(result, "data", None)
+    if data is None:
+        return None
+    return {"agent_task": str(data.id), "brains": [brain.slug for brain in data.brains]}
 
 
 def _box_owner(info: Info):
@@ -2416,6 +2442,7 @@ class AgentsMutation:
     @mutation_audit(
         action="agents.agent.dispatch",
         target=lambda self, info, input: ("workload", input.agent_slug),
+        extras=_run_extras,
     )
     @require_permission(
         Permission.AGENT_DISPATCH,
@@ -2493,6 +2520,7 @@ class AgentsMutation:
                 callback_secret_ref=input.callback_secret_ref,
                 correlation_id=input.correlation_id,
                 callback_mode=input.callback_mode.value,
+                brain_slugs=input.brain_slugs,
             )
         except AgentDispatchError as exc:
             code = {
@@ -2512,6 +2540,7 @@ class AgentsMutation:
                     "callback_secret_ref": "callbackSecretRef",
                     "correlation_id": "correlationId",
                     "callback_mode": "callbackMode",
+                    "brain_slugs": "brainSlugs",
                 }.get(exc.field),
             )
 
@@ -2521,6 +2550,7 @@ class AgentsMutation:
     @mutation_audit(
         action="agents.task.retry",
         target=lambda self, info, id: ("AgentTask", str(id)),
+        extras=_run_extras,
     )
     @require_permission(
         Permission.AGENT_DISPATCH,
@@ -2535,7 +2565,8 @@ class AgentsMutation:
         the original's frozen Agent Package (its Brief, not the agent's
         current one), environment spec, trigger payload and timeout, and the
         original's project and team, so it is visible to whoever could see
-        the run it repeats. The caller is its initiator.
+        the run it repeats. The caller is its initiator, and the brains the
+        original asked for are asked for again, as the caller (#2432).
 
         Refused (PRECONDITION) while the original is still in flight, when
         it did not run a registered agent (a Brief-only ``launchTask``), when
@@ -2592,6 +2623,7 @@ class AgentsMutation:
             dispatch_registered_agent,
         )
         from astrolift_identity.api_tokens import get_current_api_token
+        from astrolift_registry.brain_runs import requested_slugs
 
         api_token = get_current_api_token()
         try:
@@ -2609,6 +2641,7 @@ class AgentsMutation:
                 brief=brief,
                 owner_project_id=task.project_id,
                 owner_team_id=task.team_id,
+                brain_slugs=requested_slugs(task),
             )
         except AgentDispatchError as exc:
             code = {

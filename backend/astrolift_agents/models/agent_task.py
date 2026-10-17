@@ -372,8 +372,11 @@ class AgentTask(BaseCoreModel):
                 self.Status.CANCELLED,
             }:
                 from astrolift_agents.services.task_completion_callbacks import freeze_callback
+                from astrolift_registry.brain_runs import CANCELLED, ENDED, revoke_run
 
                 freeze_callback(task)
+                # The run's brain tokens stop verifying with it (#2432).
+                revoke_run(task, CANCELLED if new_status == self.Status.CANCELLED else ENDED)
             for field in fields:
                 setattr(self, field, getattr(task, field))
         try:

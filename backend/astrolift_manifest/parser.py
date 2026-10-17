@@ -79,6 +79,8 @@ _VALID_RUN_MODES = {"once", "loop", "schedule", "trigger", "persistent"}
 # nothing until the workload did not behave. A manifest is a contract.
 _WORKLOAD_KEYS = frozenset(
     {
+        "brains",
+        "brains_allowed",
         "concurrency",
         "concurrency_policy",
         "containers",
@@ -133,6 +135,13 @@ _WORKLOAD_KEYS = frozenset(
     }
 )
 _VALID_AGENT_RUN_FAMILY = {"task", "service"}
+
+# An app slug, which is what a brain is named by (#2432).
+_BRAIN_SLUG_RE = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\Z")
+# Every brain a run reads gets a key, a token and its own env; the allow-list
+# only names candidates.
+MAX_AGENT_BRAINS = 10
+MAX_AGENT_BRAINS_ALLOWED = 100
 
 
 _TOML_POS_RE = __import__("re").compile(r"line\s+(\d+),\s+column\s+(\d+)")
@@ -330,6 +339,44 @@ def _parse_brain(value: Any, path: str) -> str:
     if not isinstance(slug, str) or not slug.strip():
         raise ManifestError("brain.slug must be the slug of a hosted brain", path=f"{path}.slug")
     return slug.strip()
+
+
+def _parse_agent_brains(
+    d: dict[str, Any], path: str, kind: str
+) -> tuple[tuple[str, ...], tuple[str, ...] | None]:
+    """An agent's ``brains`` and ``brains_allowed`` (#2432), by slug.
+
+    ``brains`` are read by every run a person launches. ``brains_allowed`` is
+    what a launch may add with ``brainSlugs``: absent accepts any brain the
+    launcher can read, ``[]`` accepts none. Whether the launcher may read a
+    brain is decided at launch, not here.
+    """
+    if "brains" not in d and "brains_allowed" not in d:
+        return (), None
+    if kind != "agent":
+        raise ManifestError(
+            f"brains / brains_allowed apply to agent workloads only, got kind={kind!r}", path=f"{path}.brains"
+        )
+    brains = _brain_slugs(d.get("brains", []), f"{path}.brains", limit=MAX_AGENT_BRAINS)
+    if "brains_allowed" not in d:
+        return brains, None
+    return brains, _brain_slugs(d["brains_allowed"], f"{path}.brains_allowed", limit=MAX_AGENT_BRAINS_ALLOWED)
+
+
+def _brain_slugs(value: Any, path: str, *, limit: int) -> tuple[str, ...]:
+    if not isinstance(value, list):
+        raise ManifestError("must be a list of brain slugs", path=path)
+    if len(value) > limit:
+        raise ManifestError(f"names {len(value)} brains; at most {limit}", path=path)
+    slugs: list[str] = []
+    for i, item in enumerate(value):
+        slug = item.strip() if isinstance(item, str) else ""
+        if not _BRAIN_SLUG_RE.match(slug):
+            raise ManifestError("must be the slug of a hosted brain", path=f"{path}[{i}]")
+        if slug in slugs:
+            raise ManifestError(f"brain {slug!r} is listed twice", path=f"{path}[{i}]")
+        slugs.append(slug)
+    return tuple(slugs)
 
 
 def _parse_ingress_access(value: Any, path: str) -> dict[str, list[str]] | None:
@@ -782,6 +829,8 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
                 path=f"{path}.run_cron_expression",
             ) from exc
 
+    brains, brains_allowed = _parse_agent_brains(d, path, kind)
+
     # Static-site (#1010). A static_site serves built assets from object
     # storage + a CDN — it has no container/pod, so declaring containers is
     # a mistake (they would be silently ignored). ``static_output_dir`` is
@@ -889,6 +938,8 @@ def _parse_workload(d: dict[str, Any], path: str) -> WorkloadManifest:
         run_family=run_family,
         run_mode=run_mode,
         run_cron_expression=run_cron_expression,
+        brains=brains,
+        brains_allowed=brains_allowed,
         # Temporal worker config (#796). Required pair validated above for
         # ``kind == "workflow"``; other kinds carry the empty/default
         # values and ignore them. Read unconditionally so a manifest that
