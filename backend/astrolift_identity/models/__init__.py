@@ -3,6 +3,7 @@ from astrolift_identity.models.action_safety_rule import ActionSafetyRule
 from astrolift_identity.models.api_token import ApiToken
 from astrolift_identity.models.attestation_challenge import AttestationChallenge
 from astrolift_identity.models.device_flow_session import DeviceFlowSession
+from astrolift_identity.models.first_administrator import FirstAdministrator
 from astrolift_identity.models.group_role_mapping import GroupRoleMapping
 from astrolift_identity.models.identity_provider import IdentityProvider
 from astrolift_identity.models.invitation import Invitation
@@ -48,6 +49,7 @@ __all__ = [
     "AttestationTrustLevel",
     "ClientKind",
     "DeviceFlowSession",
+    "FirstAdministrator",
     "GroupRoleMapping",
     "IdentityProvider",
     "Invitation",
