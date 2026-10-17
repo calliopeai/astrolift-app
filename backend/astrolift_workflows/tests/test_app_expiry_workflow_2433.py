@@ -169,6 +169,79 @@ async def test_reschedule_wakes_the_timer(temporal_env):
     assert script.step_times[1] - script.step_times[0] < timedelta(days=1)
 
 
+async def test_reschedule_during_row_read_invalidates_the_old_sleep(temporal_env):
+    script = Script([])
+    reading, release = asyncio.Event(), asyncio.Event()
+
+    @activity.defn(name="astrolift.app.expiry_next_step")
+    async def held_read(app_id: int) -> dict[str, Any]:
+        script.step_times.append(activity.info().current_attempt_scheduled_time)
+        if len(script.step_times) == 1:
+            reading.set()
+            await release.wait()
+            return {"action": "sleep", "seconds": 30 * DAY}
+        return {"action": "done"}
+
+    activities = [held_read, *script.activities()[1:]]
+    queue = f"expiry-{uuid.uuid4()}"
+    async with Worker(
+        temporal_env.client,
+        task_queue=queue,
+        workflows=[AppExpiryWorkflow],
+        activities=activities,
+        workflow_runner=UnsandboxedWorkflowRunner(),
+    ):
+        handle = await temporal_env.client.start_workflow(
+            AppExpiryWorkflow.run,
+            AppExpiryInput(registered_app_id=7),
+            id=f"AppExpiryWorkflow-{queue}",
+            task_queue=queue,
+        )
+        await asyncio.wait_for(reading.wait(), timeout=10)
+        await handle.signal(AppExpiryWorkflow.reschedule)
+        release.set()
+        assert (await asyncio.wait_for(handle.result(), timeout=60)).ok
+    assert len(script.step_times) == 2
+    assert script.step_times[1] - script.step_times[0] < timedelta(days=1)
+
+
+async def test_atomic_arm_preserves_running_timer_and_restarts_completed(temporal_env, monkeypatch):
+    from asgiref.sync import sync_to_async
+
+    from astrolift_registry.expiry import arm
+    from astrolift_workflows import client
+
+    async def current_client():
+        return temporal_env.client
+
+    monkeypatch.setattr(client, "_get_client_async", current_client)
+    monkeypatch.setattr(client, "_temporal_enabled", lambda: True)
+    queue = f"expiry-{uuid.uuid4()}"
+    monkeypatch.setattr(client, "_task_queue", lambda: queue)
+    script = Script([{"action": "sleep", "seconds": 30 * DAY}, {"action": "done"}])
+    async with _worker(temporal_env, queue, script):
+        # Reserve the first run before any worker can finish it.
+        handle = await temporal_env.client.start_workflow(
+            AppExpiryWorkflow.run,
+            AppExpiryInput(registered_app_id=7),
+            id=f"AppExpiryWorkflow-{queue}",
+            task_queue=queue,
+        )
+        for _ in range(100):
+            if script.step_times:
+                break
+            await asyncio.sleep(0.05)
+        original = await handle.describe()
+        await sync_to_async(arm)(7, queue)
+        assert (await handle.describe()).run_id == original.run_id
+        assert (await asyncio.wait_for(handle.result(), timeout=60)).ok
+        # A permanent app's completed timer can later become temporary again.
+        await sync_to_async(arm)(7, queue)
+        replacement = temporal_env.client.get_workflow_handle(handle.id, result_type=WorkflowResult)
+        assert (await replacement.describe()).run_id != original.run_id
+        assert (await asyncio.wait_for(replacement.result(), timeout=60)).ok
+
+
 async def test_a_worker_restart_mid_timer_keeps_it(temporal_env):
     script = Script(
         [{"action": "sleep", "seconds": 3 * DAY}, {"action": "fire"}, TEARDOWN, {"action": "done"}]

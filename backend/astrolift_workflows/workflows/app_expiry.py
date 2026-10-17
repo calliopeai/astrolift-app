@@ -56,7 +56,6 @@ class AppExpiryWorkflow:
         self._wake = True
 
     async def _sleep(self, seconds: float) -> None:
-        self._wake = False
         try:
             await workflow.wait_condition(lambda: self._wake, timeout=timedelta(seconds=seconds))
         except TimeoutError:
@@ -66,6 +65,8 @@ class AppExpiryWorkflow:
     async def run(self, input: AppExpiryInput) -> WorkflowResult:
         app_id = input.registered_app_id
         while True:
+            # A signal received during the row read must invalidate its answer.
+            self._wake = False
             step: dict[str, Any] = await workflow.execute_activity(
                 app_expiry_next_step,
                 app_id,
