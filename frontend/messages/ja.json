@@ -1463,6 +1463,7 @@
         "mine": "自分のアプリ",
         "failing": "失敗中",
         "archived": "アーカイブ済み",
+        "temporary": "一時",
         "mineNote": "「自分のアプリ」には、アプリの所有者が記録されるまで、直接、またはプロジェクト、チーム、組織を通じてロールを持つアプリが表示されます。"
       },
       "bulk": {
@@ -4058,6 +4059,20 @@
       "legendDescription": "ノードの種類とその意味。",
       "legendTitle": "凡例",
       "title": "{name} · トポロジー"
+    },
+    "expiry": {
+      "expiresIn": "残り {remaining}",
+      "expired": "期限切れ",
+      "remaining": {
+        "days": "{days}日 {hours}時間",
+        "hours": "{hours}時間 {minutes}分",
+        "minutes": "{minutes}分"
+      },
+      "title": "一時アプリ: {when} に削除されます",
+      "extend": "+1日",
+      "extendLabel": "1日延長",
+      "extended": "{when} まで延長しました",
+      "extendFailed": "アプリを延長できませんでした"
     }
   },
   "sourceProviders": {
@@ -4672,7 +4687,8 @@
         "deploy_failure": "デプロイ失敗",
         "error_spike": "エラー急増",
         "preview_created": "プレビュー作成",
-        "preview_destroyed": "プレビュー削除"
+        "preview_destroyed": "プレビュー削除",
+        "app_expiring": "一時アプリの期限切れ間近"
       },
       "toggleLabel": "{app} の{kind}",
       "unsubscribeAll": "すべて購読解除",

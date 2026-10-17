@@ -1457,6 +1457,7 @@
         "mine": "Meine",
         "failing": "Fehlerhaft",
         "archived": "Archiviert",
+        "temporary": "Temporär",
         "mineNote": "Meine umfasst Apps, für die Sie direkt oder über Projekt, Team oder Organisation eine Rolle besitzen, solange Apps ihre Eigentümer noch nicht erfassen."
       },
       "bulk": {
@@ -4052,6 +4053,20 @@
       "legendDescription": "Knotentypen und ihre Bedeutung.",
       "legendTitle": "Legende",
       "title": "{name} · Topologie"
+    },
+    "expiry": {
+      "expiresIn": "Läuft ab in {remaining}",
+      "expired": "Abgelaufen",
+      "remaining": {
+        "days": "{days} T {hours} Std.",
+        "hours": "{hours} Std. {minutes} Min.",
+        "minutes": "{minutes} Min."
+      },
+      "title": "Temporäre App: wird am {when} abgebaut",
+      "extend": "+1 Tag",
+      "extendLabel": "Um einen Tag verlängern",
+      "extended": "Verlängert bis {when}",
+      "extendFailed": "Die App konnte nicht verlängert werden"
     }
   },
   "sourceProviders": {
@@ -4666,7 +4681,8 @@
         "deploy_failure": "Deploy fehlgeschlagen",
         "error_spike": "Fehlerspitze",
         "preview_created": "Vorschau erstellt",
-        "preview_destroyed": "Vorschau entfernt"
+        "preview_destroyed": "Vorschau entfernt",
+        "app_expiring": "Temporäre App läuft ab"
       },
       "toggleLabel": "{kind} für {app}",
       "unsubscribeAll": "Alle abbestellen",

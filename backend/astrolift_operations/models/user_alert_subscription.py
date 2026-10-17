@@ -26,6 +26,7 @@ class UserAlertSubscription(BaseCoreModel):
         PREVIEW_CREATED = "preview_created", "Preview created"
         PREVIEW_DESTROYED = "preview_destroyed", "Preview destroyed"
         CERT_RENEWAL_FAILED = "cert_renewal_failed", "Cert renewal failed"
+        APP_EXPIRING = "app_expiring", "Temporary app expiring"
 
     class Channel(models.TextChoices):
         EMAIL = "email", "Email"

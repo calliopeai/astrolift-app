@@ -283,6 +283,7 @@ def parse_raw(toml_text: str) -> RawManifest:
     ingress_access = _parse_ingress_access(data.get("ingress"), "ingress")
     ingress_max_body_size = _parse_ingress_max_body_size(data.get("ingress"), "ingress")
     app_kind = _parse_app_kind(data.get("app"))
+    app_expires_in = _parse_app_expires_in(data.get("app"))
     brain = _parse_brain(data.get("brain"), "brain")
 
     if workloads:
@@ -304,6 +305,7 @@ def parse_raw(toml_text: str) -> RawManifest:
         ingress_access=ingress_access,
         ingress_max_body_size=ingress_max_body_size,
         app_kind=app_kind,
+        app_expires_in=app_expires_in,
         brain=brain,
         raw=data,
     )
@@ -320,6 +322,23 @@ def _parse_app_kind(app_table: Any) -> str:
         return resolve_app_kind(app_table.get("kind"))
     except ValueError as exc:
         raise ManifestError(str(exc), path="app.kind") from exc
+
+
+def _parse_app_expires_in(app_table: Any) -> str:
+    """``[app] expires_in`` (#2433): the app is temporary and lives this long
+    from registration (``30m``, ``4h``, ``7d``, ``6w``, ``3mo``). Read when the
+    app is registered; the organization's limits apply then."""
+    if not isinstance(app_table, dict) or app_table.get("expires_in") is None:
+        return ""
+    from astrolift_registry.expiry import ExpiryError, format_duration, parse_duration
+
+    value = app_table["expires_in"]
+    if not isinstance(value, str):
+        raise ManifestError('[app] expires_in must be a string such as "7d"', path="app.expires_in")
+    try:
+        return format_duration(parse_duration(value))
+    except ExpiryError as exc:
+        raise ManifestError(str(exc), path="app.expires_in") from exc
 
 
 def _parse_brain(value: Any, path: str) -> str:

@@ -62,6 +62,8 @@ def normalize(
     # Only when declared, so a generic app's hash is unchanged (#2332).
     if raw.app_kind:
         serialized["app_kind"] = raw.app_kind
+    if raw.app_expires_in:
+        serialized["app_expires_in"] = raw.app_expires_in
     if raw.brain:
         serialized["brain"] = raw.brain
     return NormalizedManifest(

@@ -101,6 +101,8 @@ export const APPS_LIST: ListDefinition = {
     [
       { key: "failing", label: "Failing", filters: { failing: "1" } },
       { key: "archived", label: "Archived", filters: { archived: "1" } },
+      // Apps with an expiry (#2433).
+      { key: "temporary", label: "Temporary", filters: { temporary: "1" } },
     ],
     {
       mineNote:
@@ -153,6 +155,7 @@ export function appsCrumbs(tail?: Crumb): Crumb[] {
 export interface AppsListFilter {
   archived?: boolean;
   failing?: boolean;
+  temporary?: boolean;
   status?: string[];
   deploy?: string[];
   kind?: string[];
@@ -192,6 +195,7 @@ export function appsPageVariables({
   const filter: AppsListFilter = {};
   if (filters.archived) filter.archived = true;
   if (filters.failing) filter.failing = true;
+  if (filters.temporary) filter.temporary = true;
   if (filters.status) filter.status = [filters.status.toUpperCase()];
   if (filters.deploy) filter.deploy = [filters.deploy.toUpperCase()];
   for (const key of ["kind", "cluster", "project", "appKind"] as const)

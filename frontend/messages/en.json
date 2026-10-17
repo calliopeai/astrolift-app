@@ -1400,6 +1400,7 @@
         "mine": "Mine",
         "failing": "Failing",
         "archived": "Archived",
+        "temporary": "Temporary",
         "mineNote": "Mine means apps you hold a role on, directly or through their project, team or organization, until apps record who owns them."
       },
       "bulk": {
@@ -3995,6 +3996,20 @@
         "failed": "Failed",
         "deleted": "Deleted"
       }
+    },
+    "expiry": {
+      "expiresIn": "Expires in {remaining}",
+      "expired": "Expired",
+      "remaining": {
+        "days": "{days}d {hours}h",
+        "hours": "{hours}h {minutes}m",
+        "minutes": "{minutes}m"
+      },
+      "title": "Temporary app: torn down at {when}",
+      "extend": "+1 day",
+      "extendLabel": "Extend by one day",
+      "extended": "Extended to {when}",
+      "extendFailed": "Could not extend the app"
     }
   },
   "lists": {
@@ -5388,7 +5403,8 @@
         "deploy_failure": "Deploy failure",
         "error_spike": "Error spike",
         "preview_created": "Preview created",
-        "preview_destroyed": "Preview destroyed"
+        "preview_destroyed": "Preview destroyed",
+        "app_expiring": "Temporary app expiring"
       },
       "toggleLabel": "{kind} for {app}",
       "unsubscribeAll": "Unsubscribe all",

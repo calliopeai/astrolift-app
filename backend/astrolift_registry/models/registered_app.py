@@ -205,6 +205,18 @@ class RegisteredApp(NamedBaseCoreModel):
         on_delete=models.SET_NULL,
     )
 
+    # Temporary apps (#2433). ``expires_at`` set makes the app temporary: the
+    # AppExpiryWorkflow warns 24 h and 1 h before (``expiry_warnings_sent``
+    # records which, for this expiry), then tears it down and archives the
+    # record. Managed services are kept until ``data_retained_until`` unless
+    # ``delete_data_on_expiry``. ``expiry_fired_at`` is set once, when the
+    # timer fires; nothing changes the expiry after that.
+    expires_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    delete_data_on_expiry = models.BooleanField(default=False)
+    expiry_warnings_sent = models.JSONField(default=list, blank=True)
+    expiry_fired_at = models.DateTimeField(null=True, blank=True)
+    data_retained_until = models.DateTimeField(null=True, blank=True)
+
     webhook_deploys_paused = models.BooleanField(default=False)
     webhook_deploys_paused_at = models.DateTimeField(null=True, blank=True)
     webhook_deploys_paused_by = models.ForeignKey(

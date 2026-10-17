@@ -93,6 +93,10 @@ export function useBrainApps(framed: FramedBrainValue): BrainAppsTabProps {
             name: values.name || null,
             slug: null,
             port: values.port,
+            // A permanent app; the CLI and MCP make temporary ones (#2433).
+            expiresIn: null,
+            expiresAt: null,
+            deleteDataOnExpiry: false,
           },
         },
       }).catch(() => ({ data: null }));
