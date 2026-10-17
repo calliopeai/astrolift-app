@@ -280,12 +280,13 @@ def _metadata(metadata: Any, identity: PreparedGCPIdentity) -> dict[str, Any]:
     return metadata
 
 
-def validate_prepared_resources(resources, identity):
-    if (
-        type(identity) is not PreparedGCPIdentity
-        or not isinstance(resources, list)
-        or not 1 <= len(resources) <= 256
-    ):
+def validate_prepared_workload_shapes(resources):
+    """Pure static render checks before native identity exists; never authority.
+
+    The full prepared renderer additionally verifies its actual protected identity,
+    namespace, service account, owner labels and accepted fingerprint.
+    """
+    if not isinstance(resources, list) or not 1 <= len(resources) <= 256:
         _refuse("PREPARED_RENDER_RESOURCE_BOUND_INVALID")
     controllers = []
     physical = set()
@@ -294,29 +295,17 @@ def validate_prepared_resources(resources, identity):
             _refuse("PREPARED_RENDER_SPEC_INVALID")
         _hash(resource)
         kind = resource.get("kind")
-        metadata = _metadata(resource.get("metadata"), identity)
+        metadata = resource.get("metadata")
+        if not isinstance(metadata, dict):
+            _refuse("PREPARED_RENDER_METADATA_INVALID")
         name = metadata.get("name")
         _name(name)
         if (kind, name) in physical:
             _refuse("PREPARED_RENDER_RESOURCE_DUPLICATE")
         physical.add((kind, name))
-        if kind == "Namespace":
-            if (
-                resource.get("apiVersion") != "v1"
-                or name != identity.namespace
-                or metadata.get("uid", identity.namespace_uid) != identity.namespace_uid
-            ):
-                _refuse("PREPARED_RENDER_NAMESPACE_CONFLICT")
-            continue
-        if metadata.get("namespace", identity.namespace) != identity.namespace:
-            _refuse("PREPARED_RENDER_NAMESPACE_CONFLICT")
-        if kind == "ServiceAccount":
-            if (
-                resource.get("apiVersion") != "v1"
-                or name != identity.service_account_name
-                or metadata.get("uid", identity.service_account_uid) != identity.service_account_uid
-            ):
-                _refuse("PREPARED_RENDER_SERVICE_ACCOUNT_CONFLICT")
+        if kind in {"Namespace", "ServiceAccount"}:
+            if resource.get("apiVersion") != "v1":
+                _refuse("PREPARED_RENDER_RESOURCE_UNSUPPORTED")
             continue
         if kind in {"HorizontalPodAutoscaler", "Job", "CronJob", "ReplicaSet", "Pod"}:
             _refuse("PREPARED_RENDER_WORKLOAD_UNSUPPORTED")
@@ -338,27 +327,61 @@ def validate_prepared_resources(resources, identity):
         if kind == "DaemonSet" and "replicas" in spec:
             _refuse("PREPARED_RENDER_REPLICAS_UNSUPPORTED")
         template = spec["template"]
-        _metadata(template.get("metadata", {}), identity)
+        template_metadata = template.get("metadata", {})
+        if not isinstance(template_metadata, dict) or not isinstance(
+            template_metadata.get("labels", {}), dict
+        ):
+            _refuse("PREPARED_RENDER_METADATA_INVALID")
         pod = template.get("spec")
         if not isinstance(pod, dict) or not isinstance(spec.get("selector"), dict) or not spec["selector"]:
             _refuse("PREPARED_RENDER_WORKLOAD_INVALID")
-        if (
-            pod.get("serviceAccountName", identity.service_account_name) != identity.service_account_name
-            or "serviceAccount" in pod
-            or pod.get("hostNetwork", False) is not False
-        ):
+        if "serviceAccount" in pod or pod.get("hostNetwork", False) is not False:
             _refuse("PREPARED_RENDER_SERVICE_ACCOUNT_CONFLICT")
         from gcp.gke_identity_runtime import GKEObservationError, _select, _selector
 
         try:
             selector = _selector(json.dumps(spec["selector"], sort_keys=True, separators=(",", ":")))
-            if not _select(selector, template.get("metadata", {}).get("labels", {})):
+            if not _select(selector, template_metadata.get("labels", {})):
                 _refuse("PREPARED_RENDER_SELECTOR_MISMATCH")
         except GKEObservationError:
             _refuse("PREPARED_RENDER_SELECTOR_UNSUPPORTED")
         controllers.append(resource)
     if not 1 <= len(controllers) <= 16:
         _refuse("PREPARED_RENDER_CONTROLLER_BOUND_INVALID")
+
+
+def validate_prepared_resources(resources, identity):
+    if type(identity) is not PreparedGCPIdentity:
+        _refuse("PREPARED_RENDER_RESOURCE_BOUND_INVALID")
+    validate_prepared_workload_shapes(resources)
+    for resource in resources:
+        kind = resource["kind"]
+        metadata = _metadata(resource["metadata"], identity)
+        name = metadata["name"]
+        if kind == "Namespace":
+            if (
+                name != identity.namespace
+                or metadata.get("uid", identity.namespace_uid) != identity.namespace_uid
+            ):
+                _refuse("PREPARED_RENDER_NAMESPACE_CONFLICT")
+            continue
+        if metadata.get("namespace", identity.namespace) != identity.namespace:
+            _refuse("PREPARED_RENDER_NAMESPACE_CONFLICT")
+        if kind == "ServiceAccount":
+            if (
+                name != identity.service_account_name
+                or metadata.get("uid", identity.service_account_uid) != identity.service_account_uid
+            ):
+                _refuse("PREPARED_RENDER_SERVICE_ACCOUNT_CONFLICT")
+            continue
+        if kind in _SUPPORTED:
+            template = resource["spec"]["template"]
+            _metadata(template.get("metadata", {}), identity)
+            if (
+                template["spec"].get("serviceAccountName", identity.service_account_name)
+                != identity.service_account_name
+            ):
+                _refuse("PREPARED_RENDER_SERVICE_ACCOUNT_CONFLICT")
 
 
 def inject_prepared_identity(resources, identity):

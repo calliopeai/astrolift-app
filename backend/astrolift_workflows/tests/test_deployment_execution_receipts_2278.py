@@ -20,10 +20,14 @@ from astrolift_lifecycle.models import Deployment, DeploymentExecutionReceipt
 from astrolift_lifecycle.tests.test_native_deployment_origin_2278 import start_public
 from astrolift_lifecycle.tests.test_native_deployment_origin_2278 import world as public_world
 from astrolift_workflows.activities.deployment_identity_origin import (
-    mark_deployment_identity_refused,
     validate_deployment_identity_origin,
 )
 from astrolift_workflows.inputs import DeployAppInput, WorkflowResult
+from astrolift_workflows.tests.test_deployment_identity_origin_2278 import (
+    NATIVE_STOP_SCHEDULE,
+    ORIGIN_ACTIVITIES,
+    STOPPED,
+)
 from astrolift_workflows.workflows.deploy_app import DeployAppWorkflow
 
 pytestmark = pytest.mark.django_db(transaction=True)
@@ -151,7 +155,7 @@ async def test_actual_worker_binds_exact_intent_only(world, client, temporal_env
             temporal_env.client,
             task_queue=queue,
             workflows=[DeployAppWorkflow],
-            activities=[validate_deployment_identity_origin, mark_deployment_identity_refused],
+            activities=ORIGIN_ACTIVITIES,
             activity_executor=executor,
         ):
             handle = await temporal_env.client.start_workflow(
@@ -164,7 +168,7 @@ async def test_actual_worker_binds_exact_intent_only(world, client, temporal_env
             history = await handle.fetch_history()
     assert not result.ok
     assert result.message == (
-        "NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED"
+        STOPPED
         if change == "none"
         else "DEPLOYMENT_ORIGIN_REFUSED"
         if change == "withdrawn"
@@ -182,7 +186,11 @@ async def test_actual_worker_binds_exact_intent_only(world, client, temporal_env
         event.activity_task_scheduled_event_attributes.activity_type.name
         for event in history.events
         if event.HasField("activity_task_scheduled_event_attributes")
-    ] == ["validate_deployment_identity_origin", "mark_deployment_identity_refused"]
+    ] == (
+        NATIVE_STOP_SCHEDULE
+        if change == "none"
+        else ["validate_deployment_identity_origin", "mark_deployment_identity_refused"]
+    )
     row = await sync_to_async(Deployment.objects.get)(pk=original.deployment_id)
     assert row.status == ("failed" if change in ("none", "withdrawn") else "pending")
     await Replayer(workflows=[DeployAppWorkflow]).replay_workflow(history)
@@ -224,7 +232,7 @@ async def test_first_activity_before_mirror_and_new_run_refusal(world, client, t
             temporal_env.client,
             task_queue=queue,
             workflows=[DeployAppWorkflow],
-            activities=[validate_deployment_identity_origin, mark_deployment_identity_refused],
+            activities=ORIGIN_ACTIVITIES,
             activity_executor=executor,
         ):
             result = await sync_to_async(start_public)(world, client)
@@ -237,7 +245,7 @@ async def test_first_activity_before_mirror_and_new_run_refusal(world, client, t
                 run_id=row.workflow_run.run_id,
                 result_type=WorkflowResult,
             )
-            assert (await first.result()).message == "NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED"
+            assert (await first.result()).message == STOPPED
             await Replayer(workflows=[DeployAppWorkflow]).replay_workflow(await first.fetch_history())
             assert observed == [row.workflow_run.run_id]
 
@@ -385,7 +393,7 @@ async def test_actual_sdk_enqueue_reply_loss_retains_intent_and_original_bound_r
             temporal_env.client,
             task_queue=queue,
             workflows=[DeployAppWorkflow],
-            activities=[validate_deployment_identity_origin, mark_deployment_identity_refused],
+            activities=ORIGIN_ACTIVITIES,
             activity_executor=executor,
         ):
             result = await sync_to_async(start_public)(world, client)
@@ -397,7 +405,7 @@ async def test_actual_sdk_enqueue_reply_loss_retains_intent_and_original_bound_r
             )
             outcome = await handle.result()
             history = await handle.fetch_history()
-    assert outcome.message == "NATIVE_IDENTITY_PIPELINE_NOT_CONFIGURED"
+    assert outcome.message == STOPPED
     expected = await sync_to_async(DeploymentExecutionReceipt.objects.get)(kind="EXPECTED")
     bound = await sync_to_async(DeploymentExecutionReceipt.objects.get)(kind="BOUND")
     row = await sync_to_async(Deployment.objects.get)(pk=expected.deployment_id)

@@ -2,9 +2,10 @@
 
 The private `gcp.gke_app_apply` port and
 `astrolift_services.gcp_gke_app_apply_journal` adapter stage receipt-bound app
-configuration. They are not activated by the ordinary deployment workflow and
-do not report a deployed, ready, or inference-capable app. Existing AWS, Azure,
-local, and legacy GCP render/apply paths are unchanged.
+configuration. `DeployAppWorkflow` uses them for Endpoint-only native apps (see
+[native Endpoint deployment](gcp-native-configuration-executor.md)); on their own
+they do not report a deployed, ready, or inference-capable app. Existing AWS,
+Azure, local, and legacy GCP render/apply paths are unchanged.
 
 ## Required caller boundaries
 
@@ -136,8 +137,7 @@ counts to that observed target. A count or controller change during observation
 cannot become success from an earlier sample.
 
 This handoff can feed the existing read-only runtime observer, which checks
-current owned Pods and Nodes. It does not activate the production executor,
-prove token exchange, workload impersonation, Endpoint inference or successful
+current owned Pods and Nodes. It does not prove token exchange, workload impersonation, Endpoint inference or successful
 production workflow orchestration. Capacity/HPA/zero-replica support and the
 other staged limits above remain open.
 

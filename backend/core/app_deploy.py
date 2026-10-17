@@ -1171,7 +1171,9 @@ def gpu_quota_refusal(deployment, manifest) -> str | None:
     return None
 
 
-def deployment_env_from(deployment: Deployment) -> tuple[list[str], dict]:
+def deployment_env_from(
+    deployment: Deployment, *, prepared_literal_snapshot: dict[str, str] | None = None
+) -> tuple[list[str], dict]:
     """``(envFrom Secret names, per-workload envFrom)`` for this deployment.
 
     The one source for both the applied render and the ``render_manifests``
@@ -1195,7 +1197,11 @@ def deployment_env_from(deployment: Deployment) -> tuple[list[str], dict]:
     app = deployment.registered_app
     env = deployment.app_environment
     env_from: list[str] = []
-    if snapshot_literal_secrets(deployment):
+    if (
+        snapshot_literal_secrets(deployment)
+        if prepared_literal_snapshot is None
+        else prepared_literal_snapshot
+    ):
         env_from.append(_app_env_secret_name(app.slug, env.name))
     env_from += sorted(
         AppSecretBundleRef.objects.filter(
@@ -1224,6 +1230,7 @@ def render_resources_for_deployment(
     cluster_override: TenantCluster | None = None,
     include_managed_filesystems: bool = True,
     prepared_gcp_identity: PreparedGCPIdentity | None = None,
+    prepared_literal_snapshot: dict[str, str] | None = None,
 ) -> list[dict[str, Any]]:
     """Re-render the deployment's manifests against the stored TOML.
 
@@ -1242,6 +1249,10 @@ def render_resources_for_deployment(
     from astrolift_manifest.parser import parse_raw
     from astrolift_manifest.render import render_manifests as _render
 
+    if prepared_literal_snapshot is not None and (
+        prepared_gcp_identity is None or prepared_literal_snapshot != {}
+    ):
+        raise AppDeployError("PREPARED_LITERAL_SECRET_DELIVERY_UNSUPPORTED")
     app = deployment.registered_app
     env = deployment.app_environment
     if not (app.manifest_raw or "").strip():
@@ -1276,8 +1287,14 @@ def render_resources_for_deployment(
     from astrolift_services.secret_literals import snapshot_literal_secrets
     from astrolift_workflows.activities.app_lifecycle import _bindings_secret_name
 
-    env_from, workload_env_from = deployment_env_from(deployment)
-    literals = snapshot_literal_secrets(deployment)
+    env_from, workload_env_from = deployment_env_from(
+        deployment, prepared_literal_snapshot=prepared_literal_snapshot
+    )
+    literals = (
+        snapshot_literal_secrets(deployment)
+        if prepared_literal_snapshot is None
+        else prepared_literal_snapshot
+    )
     has_managed = _bindings_secret_name(app.slug) in env_from
 
     resources = _render(
