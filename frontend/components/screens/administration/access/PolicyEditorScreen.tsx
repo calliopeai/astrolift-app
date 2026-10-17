@@ -443,7 +443,10 @@ function Summary({ draft }: { draft: PolicyDraft }) {
           term: t("slug"),
           description: <span className="font-mono [overflow-wrap:anywhere]">{draft.slug}</span>,
         },
-        { term: t("appliesAcross"), description: scopes(draft.scopeLevel) },
+        {
+          term: t("appliesAcross"),
+          description: scopes.has(draft.scopeLevel) ? scopes(draft.scopeLevel) : draft.scopeLevel,
+        },
         {
           term: t("conditions"),
           description: (
