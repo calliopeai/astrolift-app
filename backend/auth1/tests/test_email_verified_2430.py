@@ -99,23 +99,25 @@ def _assert_refused(response, client, next_url=f"{FRONTEND}/auth/callback"):
     assert "_auth_user_id" not in client.session
 
 
+@pytest.mark.parametrize("issuer", [COGNITO, "https://issuer.test"])
 @pytest.mark.parametrize("verified", [False, "false", "False", None, "", "yes", 1, "1"])
-def test_an_unverified_address_does_not_sign_in_as_its_owner(monkeypatch, verified):
+def test_an_unverified_address_does_not_sign_in_as_its_owner(monkeypatch, verified, issuer):
     victim = _victim()
     client = Client()
 
-    response = _sign_in(client, monkeypatch, _claims(victim.email, verified))
+    response = _sign_in(client, monkeypatch, _claims(victim.email, verified, issuer=issuer))
 
     _assert_refused(response, client)
     assert not UserInfo.objects.filter(internal_user=victim).exists()
 
 
+@pytest.mark.parametrize("issuer", [COGNITO, "https://issuer.test"])
 @pytest.mark.parametrize("verified", [True, "true", "TRUE"])
-def test_a_verified_address_still_signs_in_as_its_owner(monkeypatch, verified):
+def test_a_verified_address_still_signs_in_as_its_owner(monkeypatch, verified, issuer):
     victim = _victim()
     client = Client()
 
-    response = _sign_in(client, monkeypatch, _claims(victim.email, verified))
+    response = _sign_in(client, monkeypatch, _claims(victim.email, verified, issuer=issuer))
 
     assert set(parse_qs(urlsplit(response["Location"]).query)) == {"code"}
     assert client.session["_auth_user_id"] == str(victim.pk)
