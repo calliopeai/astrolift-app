@@ -20,6 +20,7 @@ of rules:
 
 from __future__ import annotations
 
+import contextvars
 import datetime as dt
 import logging
 import re
@@ -210,6 +211,8 @@ def _options(raw: Any, task: AgentTask | None) -> list[dict[str, str]]:
         key = item["id"]
         if not isinstance(key, str) or not _OPTION_ID.fullmatch(key) or key in seen:
             raise AgentMessageError("validation", "option ids must be valid and unique", "options")
+        if redact(key, task) != key:
+            raise AgentMessageError("validation", "option ids must not contain credentials", "options")
         seen.add(key)
         out.append(
             {
@@ -412,6 +415,7 @@ def _create(
     return message
 
 
+@transaction.atomic
 def send_agent_message(task: AgentTask, payload: Any) -> tuple[AgentMessage, bool]:
     """A run's own message, authorised by the run's identity (its callback key).
 
@@ -536,6 +540,16 @@ def send_agent_message(task: AgentTask, payload: Any) -> tuple[AgentMessage, boo
             raise AgentMessageError("not_found", "reply_to names no message of this agent", "reply_to", 404)
         thread_id = thread_id or reply_to.thread_id
 
+    from astrolift_registry.models import Workload
+
+    # All runs of one agent share its rate allowance. Serialize admission
+    # before counting, including concurrent sends with different run keys.
+    if not Workload.objects.select_for_update().filter(pk=task.agent_definition_id).first():
+        raise AgentMessageError("precondition", "the run's agent is no longer available", status=409)
+    if request_id is not None:
+        previous = AgentMessage.all_objects.filter(agent_task=task, client_request_id=request_id).first()
+        if previous is not None:
+            return previous, False
     since = timezone.now() - dt.timedelta(minutes=1)
     sent = AgentMessage.objects.filter(
         agent_definition_id=task.agent_definition_id, source=AgentMessage.Source.AGENT, created_at__gte=since
@@ -625,7 +639,14 @@ def send_platform_message(
                 source=AgentMessage.Source.PLATFORM,
                 title=redact(title[:MAX_TITLE_CHARS], task),
                 body=redact(body[:MAX_BODY_CHARS], task),
-                options=options or [],
+                options=[
+                    {
+                        "id": option["id"],
+                        "label": redact(option["label"], task),
+                        "description": redact(option.get("description") or "", task),
+                    }
+                    for option in options or []
+                ],
                 attachments=[{"kind": "url", "ref": f"/agents/runs/{task.guid}", "label": "Run"}],
                 thread_id=None,
                 reply_to=None,
@@ -796,9 +817,16 @@ def _reply_text(message: AgentMessage, body: str, choices: list[str], decision: 
         parts.append(f"Choice: {picked}")
     if body:
         parts.append(body)
-    return "\n".join(parts)[:4000]
+    content = "\n".join(parts[1:])
+    if len(content) > MAX_REPLY_CHARS:
+        raise AgentMessageError("validation", "body and choices exceed the live-run input limit", "body")
+    # Keep every accepted answer character. The input row carries its
+    # author separately when a full-size answer leaves no room for a header.
+    header_budget = MAX_REPLY_CHARS - len(content) - 1
+    return f"{parts[0][:header_budget]}\n{content}" if header_budget > 0 else content
 
 
+@transaction.atomic
 def reply(
     message: AgentMessage,
     user,
@@ -813,6 +841,14 @@ def reply(
     from astrolift_agents.services.agent_task_input import AgentTaskInputError, queue_agent_task_input
     from astrolift_agents.services.agent_task_requests import TaskInputRequestError, reply_to_request
 
+    # Serialize retries with both delivery and reply persistence. A failed
+    # reply insert must roll back its gate answer or queued input as well.
+    message = AgentMessage.objects.select_for_update().get(pk=message.pk)
+    if not visible_recipient_rows(user, message.organization_id).filter(message=message).exists():
+        raise AgentMessageError("not_found", "message not found", "messageId", 404)
+    if not can_read_agent(user, message.organization_id, message.agent_definition_id):
+        raise AgentMessageError("not_found", "message not found", "messageId", 404)
+
     choices = list(choices or [])
     body = _text(body, "body", MAX_REPLY_CHARS)
     decision = (decision or "").strip().lower()
@@ -824,16 +860,21 @@ def reply(
             raise AgentMessageError(
                 "validation", "clientRequestId must be a UUID", "clientRequestId"
             ) from exc
-        previous = AgentMessageReply.objects.filter(
+        previous = AgentMessageReply.all_objects.filter(
             message=message, author=user, client_request_id=request_id
         ).first()
         if previous is not None:
+            if (
+                previous.deleted_at is not None
+                or previous.body != redact(body, message.agent_task)
+                or previous.choices != choices
+                or previous.decision != decision
+            ):
+                raise AgentMessageError(
+                    "precondition", "clientRequestId has already been used", "clientRequestId", 409
+                )
             return previous
 
-    if not AgentMessageRecipient.objects.filter(message=message, user=user).exists():
-        raise AgentMessageError("not_found", "message not found", "messageId", 404)
-    if not can_read_agent(user, message.organization_id, message.agent_definition_id):
-        raise AgentMessageError("not_found", "message not found", "messageId", 404)
     if message.expires_at is not None and message.expires_at <= timezone.now():
         raise AgentMessageError("precondition", "this question has expired", status=409)
     option_ids = {o["id"] for o in message.options or []}
@@ -848,7 +889,12 @@ def reply(
         raise AgentMessageError("validation", "say something: a body, a choice or a decision", "body")
 
     label = getattr(user, "username", "") or getattr(user, "email", "") or ""
-    task = message.agent_task
+    task = (
+        AgentTask.objects.select_for_update().get(pk=message.agent_task_id)
+        if message.agent_task_id is not None
+        else None
+    )
+    body = redact(body, task)
     fields: dict[str, Any] = {}
     if message.request_sequence is not None and task is not None:
         # The run's own gate: the existing reply path and, for an allow, its
@@ -856,12 +902,11 @@ def reply(
         if message.kind == AgentMessage.Kind.APPROVAL:
             from astrolift_agents.visibility import agent_tasks
 
-            with _as_person(user.pk, message.organization_id):
-                controller = (
-                    agent_tasks(message.organization_id, Permission.AGENT_TASK_SEND_INPUT)
-                    .filter(pk=task.pk)
-                    .exists()
-                )
+            controller = (
+                agent_tasks(message.organization_id, Permission.AGENT_TASK_SEND_INPUT)
+                .filter(pk=task.pk)
+                .exists()
+            )
             if not controller:
                 raise AgentMessageError(
                     "refused", "approving needs agent_task.send_input on this run", "decision", status=403
@@ -925,7 +970,11 @@ def reply(
         read_at=timezone.now()
     )
     if row.route == AgentMessageReply.Route.QUEUED:
-        _wake(row, user)
+        # The workflow must see the committed reply and task; never launch
+        # it while this transaction could still roll back. Preserve the
+        # caller's token ceiling if an outer transaction owns the commit.
+        wake_context = contextvars.copy_context()
+        transaction.on_commit(lambda: wake_context.run(_wake, row, user))
     return row
 
 

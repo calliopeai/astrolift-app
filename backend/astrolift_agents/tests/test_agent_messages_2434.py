@@ -422,27 +422,32 @@ def test_a_reply_reaches_a_live_run_on_its_input_channel(world):
     assert page.items[0].replies[0].delivered_at is not None
 
 
-def test_a_reply_after_the_run_ended_wakes_the_agent(world, started):
+def test_a_reply_after_the_run_ended_wakes_the_agent(world, started, django_capture_on_commit_callbacks):
     task, key = _task(world)
     message_id = _send(task, key, kind="question", body="Retry tonight?").json()["id"]
     AgentTask.objects.filter(pk=task.pk).update(status=AgentTask.Status.COMPLETED, callback_token_hash="")
 
-    result = _reply(world, world.user, message_id, body="yes")
+    with django_capture_on_commit_callbacks(execute=True):
+        result = _reply(world, world.user, message_id, body="yes")
 
     assert result.ok, result.errors
-    assert result.data.route == "woke" and result.data.wake_task_id is not None
-    woken = AgentTask.objects.get(guid=str(result.data.wake_task_id))
+    persisted = AgentMessageReply.objects.get(guid=str(result.data.id))
+    assert persisted.route == "woke" and persisted.wake_task_id is not None
+    woken = persisted.wake_task
     assert woken.dispatch_input["agent_message_reply"]["body"] == "yes"
     assert woken.triggered_by_user_id == world.user.pk
     assert len(started) == 1
 
 
-def test_a_reply_the_person_cannot_run_waits_for_the_agents_next_run(world, started):
+def test_a_reply_the_person_cannot_run_waits_for_the_agents_next_run(
+    world, started, django_capture_on_commit_callbacks
+):
     task, key = _task(world)
     message_id = _send(task, key, body="FYI", to=[world.reader.email]).json()["id"]
     AgentTask.objects.filter(pk=task.pk).update(status=AgentTask.Status.COMPLETED, callback_token_hash="")
 
-    result = _reply(world, world.reader, message_id, body="thanks")
+    with django_capture_on_commit_callbacks(execute=True):
+        result = _reply(world, world.reader, message_id, body="thanks")
 
     assert result.ok and result.data.route == "queued" and started == []
     later, later_key = _task(world)
@@ -503,6 +508,192 @@ def test_expired_questions_take_no_answer(world):
     result = _reply(world, world.user, message_id, body="late")
 
     assert not result.ok and result.errors[0].code == "PRECONDITION"
+
+
+def test_a_read_only_token_cannot_approve_for_a_controller(world):
+    from astrolift_identity.api_tokens import SCOPE_READ_APPS
+    from astrolift_identity.models import ApiToken
+
+    task, key = _task(world)
+    AgentTaskEvent.objects.create(
+        organization=world.org,
+        agent_task=task,
+        sequence=1,
+        turn_id="t1",
+        message_id="m1",
+        kind=AgentTaskEvent.Kind.APPROVAL_REQUIRED,
+        text="deploy",
+        request={"version": 1, "kind": "approval", "tool": {"name": "deploy", "input": {}}},
+    )
+    AgentTask.objects.filter(pk=task.pk).update(event_sequence=1)
+    message_id = _send(task, key, kind="approval", body="May I deploy?", request_sequence=1).json()["id"]
+    token = ApiToken.objects.create(
+        user=world.user,
+        organization=world.org,
+        name="read-only",
+        token_hash=uuid.uuid4().hex,
+        scopes=[SCOPE_READ_APPS],
+    )
+
+    with _as(world, token=token) as info:
+        result = AgentMessagesMutation().reply_to_agent_message(
+            info, input=ReplyToAgentMessageInput(message_id=message_id, decision="allow")
+        )
+
+    assert not result.ok and result.errors[0].code == "PERMISSION_DENIED"
+    assert not AgentTaskInputReply.objects.filter(request_event__agent_task=task).exists()
+    assert not AgentMessageReply.objects.exists()
+
+
+@pytest.mark.parametrize("gate", [False, True])
+def test_a_failed_reply_insert_rolls_back_delivery(world, monkeypatch, gate):
+    task, key = _task(world)
+    payload = {"kind": "question", "body": "Continue?"}
+    if gate:
+        AgentTaskEvent.objects.create(
+            organization=world.org,
+            agent_task=task,
+            sequence=1,
+            turn_id="t1",
+            message_id="m1",
+            kind=AgentTaskEvent.Kind.APPROVAL_REQUIRED,
+            text="deploy",
+            request={"version": 1, "kind": "approval", "tool": {"name": "deploy", "input": {}}},
+        )
+        AgentTask.objects.filter(pk=task.pk).update(event_sequence=1)
+        payload.update(kind="approval", request_sequence=1)
+    message_id = _send(task, key, **payload).json()["id"]
+
+    def fail(**kwargs):
+        raise RuntimeError("reply persistence failed")
+
+    monkeypatch.setattr(AgentMessageReply.objects, "create", fail)
+    with pytest.raises(RuntimeError, match="reply persistence failed"):
+        _reply(world, world.user, message_id, body="continue", decision="allow" if gate else None)
+    assert not AgentTaskInputMessage.objects.filter(agent_task=task).exists()
+    assert not AgentTaskInputReply.objects.filter(request_event__agent_task=task).exists()
+
+
+def test_a_retried_reply_delivers_one_redacted_input(world):
+    task, key = _task(world)
+    message_id = _send(task, key, kind="question", body="Continue?").json()["id"]
+    request_id = str(uuid.uuid4())
+    body = "continue alft_at_abcdefghijklmnop"
+
+    first = _reply(world, world.user, message_id, body=body, client_request_id=request_id)
+    second = _reply(world, world.user, message_id, body=body, client_request_id=request_id)
+
+    assert first.ok and second.ok
+    assert first.data.id == second.data.id
+    queued = AgentTaskInputMessage.objects.get(agent_task=task)
+    assert "alft_at_" not in queued.body and "[redacted]" in queued.body
+    assert "alft_at_" not in AgentMessageReply.objects.get().body
+    conflict = _reply(world, world.user, message_id, body="a different answer", client_request_id=request_id)
+    assert not conflict.ok and conflict.errors[0].code == "PRECONDITION"
+    assert AgentTaskInputMessage.objects.filter(agent_task=task).count() == 1
+
+
+def test_a_full_size_reply_reaches_the_live_run_without_truncation(world):
+    task, key = _task(world)
+    message_id = _send(task, key, kind="question", body="Continue?").json()["id"]
+    body = "z" * 4000
+
+    result = _reply(world, world.user, message_id, body=body)
+
+    assert result.ok, result.errors
+    assert AgentTaskInputMessage.objects.get(agent_task=task).body == body
+
+
+def test_a_token_revoked_during_subscription_stops_receiving(world):
+    from astrolift_identity.api_tokens import SCOPE_READ_APPS
+    from astrolift_identity.models import ApiToken
+
+    token = ApiToken.objects.create(
+        user=world.user,
+        organization=world.org,
+        name="inbox",
+        token_hash=uuid.uuid4().hex,
+        scopes=[SCOPE_READ_APPS],
+    )
+    tenant = TenantContext(organization_id=world.org.pk, actor_user_id=world.user.pk)
+    attributes = RequestAttributes(actor_user_id=world.user.pk)
+    _, watermark = _new_for_identity(tenant, token, attributes, None)
+    task, key = _task(world)
+    _send(task, key, body="waiting")
+    ApiToken.objects.filter(pk=token.pk).update(is_revoked=True)
+
+    items, unchanged = _new_for_identity(tenant, token, attributes, watermark)
+
+    assert items is None and unchanged == watermark
+
+
+def test_agent_messaging_is_advertised_by_the_public_handshake():
+    from config.schema_public import schema_public
+
+    result = schema_public.execute_sync("{ astroliftServerInfo { capabilities } }")
+
+    assert not result.errors
+    assert "agents.messages" in result.data["astroliftServerInfo"]["capabilities"]
+
+
+def test_platform_question_options_redact_credentials(world):
+    task, key = _task(world)
+    credential = "alft_at_abcdefghijklmnop"
+    event = AgentTaskEvent.objects.create(
+        organization=world.org,
+        agent_task=task,
+        sequence=1,
+        turn_id="t1",
+        message_id="m1",
+        kind=AgentTaskEvent.Kind.INPUT_REQUIRED,
+        request={
+            "version": 1,
+            "kind": "question",
+            "questions": [
+                {
+                    "id": "q1",
+                    "text": "Continue?",
+                    "multiple": False,
+                    "options": [{"label": credential, "description": credential}],
+                }
+            ],
+        },
+    )
+
+    agent_messages.signal_gate_requests(task, [event])
+
+    message = AgentMessage.objects.get()
+    assert message.options == [{"id": "o0", "label": "[redacted]", "description": "[redacted]"}]
+    response = _send(task, key, kind="question", body="?", options=[{"id": credential, "label": "Pick"}])
+    assert response.status_code == 400
+    assert AgentMessage.objects.count() == 1
+
+
+@pytest.mark.django_db(transaction=True)
+def test_concurrent_runs_share_one_agent_rate_allowance(world, settings):
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+
+    from django.db import close_old_connections
+
+    settings.AGENT_MESSAGE_RATE_PER_MINUTE = 1
+    runs = [_task(world) for _ in range(4)]
+    ready = Barrier(len(runs))
+
+    def send(run):
+        close_old_connections()
+        try:
+            ready.wait(timeout=10)
+            task, key = run
+            return _send(task, key, body="update").status_code
+        finally:
+            close_old_connections()
+
+    with ThreadPoolExecutor(max_workers=len(runs)) as pool:
+        statuses = sorted(pool.map(send, runs))
+
+    assert statuses == [201, 429, 429, 429]
+    assert AgentMessage.objects.count() == 1
 
 
 # ---------------------------------------------------------------------------

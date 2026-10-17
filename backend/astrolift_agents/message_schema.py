@@ -279,9 +279,11 @@ class AgentMessagesQuery:
         more = len(picked) > limit
         picked = picked[:limit]
         latest = {}
-        for row in _with_message(
-            rows.filter(message__thread_id__in=[item["message__thread_id"] for item in picked])
-        ).order_by("message__thread_id", "-created_at", "-pk"):
+        for row in (
+            _with_message(rows.filter(message__thread_id__in=[item["message__thread_id"] for item in picked]))
+            .order_by("message__thread_id", "-created_at", "-pk")
+            .distinct("message__thread_id")
+        ):
             latest.setdefault(row.message.thread_id, row)
         now = dt.datetime.now(dt.UTC)
         items = []
