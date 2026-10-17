@@ -7,7 +7,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ("astrolift_identity", "0048_organizationmodule_source"),
+        ("astrolift_identity", "0049_brain_management"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

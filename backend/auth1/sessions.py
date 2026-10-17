@@ -711,13 +711,11 @@ class Auth1SessionWorkflow:
             raise PermissionDenied("Remote identity issuer does not match.")
         linked = observed.internal_user_id if observed is not None else None
         resolved = User.objects.get(pk=linked) if linked is not None else cls._lookup_user(user_info)
-        # The pending first administrator (installer #503) is claimed only on
-        # the IdP's own email_verified claim, never the Cognito default above.
+        # The pending first administrator (installer #503) is claimed on the
+        # address verified above (#2430); an unverified one never gets here.
         from astrolift_identity.first_admin import claim
 
-        resolved = claim(
-            resolved, user_info.sub, user_info.email, _raw_userinfo.get("email_verified") in (True, "true")
-        )
+        resolved = claim(resolved, user_info.sub, user_info.email, user_info.email_verified)
         if resolved is not None:
             resolved = User.objects.select_for_update().get(pk=resolved.pk)
             if not resolved.is_active:

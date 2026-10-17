@@ -109,12 +109,12 @@ def test_bootstrap_leaves_a_pending_administrator_and_grants_nothing(system_role
 def test_an_unverified_email_does_not_claim(system_role_catalog, monkeypatch):
     org = _bootstrap()
 
-    # Cognito: auth1 treats every Cognito email as verified (#2430), so the
-    # claim reads the IdP's own claim, not that default.
+    # auth1 refuses an address the IdP has not verified, Cognito's included
+    # (#2430), before the claim is reached.
     cognito = "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_test"
     client, response = _sign_in(monkeypatch, _claims(ADMIN, verified=False, iss=cognito))
 
-    assert response["Location"] == f"{FRONTEND}/auth/callback?error=no_account"
+    assert response["Location"] == f"{FRONTEND}/auth/callback?error=email_unverified"
     assert "_auth_user_id" not in client.session
     assert FirstAdministrator.objects.get(organization=org).claimed_at is None
     assert not User.objects.filter(email__iexact=ADMIN).exists()
@@ -151,6 +151,22 @@ def test_a_matching_verified_sign_in_claims_once_and_is_audited(system_role_cata
     _sign_in(monkeypatch, _claims(ADMIN, sub="sub-first"))
     assert not _owner_bindings(org).exists()
     assert AuditEvent.objects.filter(action="identity.first_admin.claimed").count() == 1
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("verified", ["true", "TRUE"])
+def test_the_claim_takes_auth1s_reading_of_email_verified(system_role_catalog, monkeypatch, verified):
+    """Cognito sends a mapped attribute as a string. An address auth1 signs in
+    as verified (#2430) claims; the claim does not read the raw claim again."""
+    org = _bootstrap()
+
+    client, response = _sign_in(monkeypatch, _claims(ADMIN, verified=verified, sub="sub-string"))
+
+    user = User.objects.get(email__iexact=ADMIN)
+    assert client.session["_auth_user_id"] == str(user.pk)
+    assert "error=" not in response["Location"]
+    assert FirstAdministrator.objects.get(organization=org).claimed_user_id == user.pk
+    assert list(_owner_bindings(org).values_list("user_id", flat=True)) == [user.pk]
 
 
 @pytest.mark.django_db
