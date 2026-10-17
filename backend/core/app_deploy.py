@@ -2182,6 +2182,7 @@ def _render_managed_subdomain_ingress(
                 cert_manager_issuer="letsencrypt-prod",
                 oidc_auth=oidc_auth,
                 edge=_edge_config(app),
+                max_body_size=manifest.serialized.get("ingress_max_body_size", ""),
             )
         )
         tls_strategy = "letsencrypt" if not cert_arn else "provided"

@@ -313,6 +313,10 @@ class RawManifest:
     # central auth, as ``{"groups": [...], "users": [...]}``. ``None`` when
     # the manifest does not declare it.
     ingress_access: dict[str, list[str]] | None = None
+    # ``[ingress] max_body_size`` (#2423): the largest request body the edge
+    # passes to the app, as nginx writes a size (``"100m"``; ``"0"`` is no
+    # limit). ``""`` when the manifest does not declare it.
+    ingress_max_body_size: str = ""
     # ``[app] kind`` (#2332): a registered app kind, ``""`` for a generic app.
     app_kind: str = ""
     # ``[brain] slug`` (#2243): the hosted brain this app reads, ``""`` for none.

@@ -204,6 +204,14 @@ def test_upload_byo_cert_clears_prior_failure(
 
 # ---- _render_app_ingresses_and_tls ----------------------------------------
 
+# Every Ingress an app gets streams its uploads with no body limit (#2423).
+_BODY_ANNOTATIONS = {
+    "nginx.ingress.kubernetes.io/proxy-body-size": "0",
+    "nginx.ingress.kubernetes.io/proxy-request-buffering": "off",
+    "nginx.ingress.kubernetes.io/proxy-read-timeout": "3600",
+    "nginx.ingress.kubernetes.io/proxy-send-timeout": "3600",
+}
+
 
 def _make_manifest(port: int = 8080):
     """Smallest NormalizedManifest with one public deployment worker."""
@@ -316,7 +324,7 @@ def test_render_ingress_active_platform_managed(app, deployment):
     assert ing["metadata"]["name"] == "hello-app-api-acme-com"
     assert ing["metadata"]["labels"]["astrolift.dev/cert-source"] == "auto"
     # Platform-managed: cluster's cert plumbing owns the Secret.
-    assert ing["metadata"]["annotations"] == {}
+    assert ing["metadata"]["annotations"] == _BODY_ANNOTATIONS
     assert ing["spec"]["tls"][0] == {
         "hosts": ["api.acme.com"],
         "secretName": "hello-app-api-acme-com-tls",
@@ -343,6 +351,7 @@ def test_render_ingress_active_external_zone(app, deployment):
     out = _render_app_ingresses_and_tls(deployment.pk, "ns", _make_manifest())
     ing = next(r for r in out if r["kind"] == "Ingress")
     assert ing["metadata"]["annotations"] == {
+        **_BODY_ANNOTATIONS,
         "cert-manager.io/cluster-issuer": "letsencrypt-prod",
     }
 
@@ -751,9 +760,53 @@ def test_render_managed_subdomain_nginx(app, cluster, managed_domain_no_cert):
     assert ing["metadata"]["labels"]["astrolift.dev/managed-subdomain"] == "true"
     # No cert ARN → cert-manager handles issuance
     assert ing["metadata"]["annotations"].get("cert-manager.io/cluster-issuer") == "letsencrypt-prod"
+    assert ing["metadata"]["annotations"].items() >= _BODY_ANNOTATIONS.items()
     # Hostname in rules: {app}.{base-zone} (org slug excluded)
     rule_hosts = [r["host"] for r in ing["spec"]["rules"]]
     assert "hello-app.apps.example.com" in rule_hosts
+
+
+@pytest.mark.django_db
+def test_render_nginx_ingresses_take_the_manifest_max_body_size(app, cluster, managed_domain_no_cert):
+    """The twin of core.app_deploy's render (#2423): the managed subdomain and
+    a custom domain both carry the app's own body size, with streaming kept."""
+    import dataclasses
+
+    from astrolift_lifecycle.models import Deployment
+
+    env_nginx = AppEnvironment.objects.create(
+        registered_app=app,
+        tenant_cluster=cluster,
+        managed_domain=managed_domain_no_cert,
+        name="prod",
+        url="https://hello.example.com",
+        required_approvals=0,
+    )
+    deployment = Deployment.objects.create(
+        registered_app=app,
+        app_environment=env_nginx,
+        triggered_by_user_id=None,
+        trigger_kind="manual",
+        status=Deployment.Status.PENDING.value,
+        image_tag="v1",
+    )
+    CustomDomain.objects.create(
+        registered_app=app,
+        hostname="checkout.acme.com",
+        validation_status=CustomDomain.ValidationStatus.VALIDATED,
+        certificate_state=CustomDomain.CertificateState.ACTIVE,
+        is_platform_managed_zone=True,
+        is_active=True,
+    )
+    manifest = dataclasses.replace(_make_manifest(), serialized={"ingress_max_body_size": "100m"})
+
+    out = _render_app_ingresses_and_tls(deployment.pk, "test-ns", manifest)
+
+    expected = {**_BODY_ANNOTATIONS, "nginx.ingress.kubernetes.io/proxy-body-size": "100m"}
+    ingresses = [r for r in out if r["kind"] == "Ingress"]
+    assert len(ingresses) == 2
+    for ing in ingresses:
+        assert ing["metadata"]["annotations"].items() >= expected.items()
 
 
 @pytest.mark.django_db

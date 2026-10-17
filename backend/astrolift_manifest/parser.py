@@ -272,6 +272,7 @@ def parse_raw(toml_text: str) -> RawManifest:
     skills = _parse_skills(data.get("skills", []), "skills")
     edge = _parse_edge(data.get("edge"), "edge")
     ingress_access = _parse_ingress_access(data.get("ingress"), "ingress")
+    ingress_max_body_size = _parse_ingress_max_body_size(data.get("ingress"), "ingress")
     app_kind = _parse_app_kind(data.get("app"))
     brain = _parse_brain(data.get("brain"), "brain")
 
@@ -292,6 +293,7 @@ def parse_raw(toml_text: str) -> RawManifest:
         skills=skills,
         edge=edge,
         ingress_access=ingress_access,
+        ingress_max_body_size=ingress_max_body_size,
         app_kind=app_kind,
         brain=brain,
         raw=data,
@@ -334,8 +336,8 @@ def _parse_ingress_access(value: Any, path: str) -> dict[str, list[str]] | None:
     """``[ingress.access]``: who may enter the app behind central auth (#2132).
 
     ``groups`` are the identity provider's groups, ``users`` are emails.
-    Absent is ``None``; the rest of ``[ingress]`` (class, the auth mirror)
-    is the platform's to write and is not read here.
+    Absent is ``None``. ``class`` and the auth mirror elsewhere in
+    ``[ingress]`` are the platform's to write and are not read here.
     """
     if not isinstance(value, dict) or "access" not in value:
         return None
@@ -357,6 +359,35 @@ def _parse_ingress_access(value: Any, path: str) -> dict[str, list[str]] | None:
             raise ManifestError("ingress.access.users must be email addresses", path=f"{path}.access.users")
         out[key] = sorted({i.strip().lower() if key == "users" else i.strip() for i in items})
     return out
+
+
+# A size as nginx reads one: a byte count with an optional k, m or g, in
+# either case. Nineteen digits is the most an off_t holds.
+_NGINX_SIZE_RE = re.compile(r"([0-9]{1,19})([kKmMgG]?)")
+_NGINX_SIZE_SCALE = {"": 1, "k": 1024, "m": 1024**2, "g": 1024**3}
+_NGINX_MAX_SIZE = 2**63 - 1
+
+
+def _parse_ingress_max_body_size(value: Any, path: str) -> str:
+    """``[ingress] max_body_size``: the largest request body the edge passes (#2423).
+
+    The value becomes the app Ingress's ``proxy-body-size``, so it is held to
+    what nginx accepts. ingress-nginx drops or refuses a malformed size, and
+    one too large for nginx fails the configuration test of the whole
+    controller, every app's. ``"0"`` is no limit. Absent is ``""``, which
+    also renders no limit.
+    """
+    if not isinstance(value, dict) or "max_body_size" not in value:
+        return ""
+    raw = value["max_body_size"]
+    match = _NGINX_SIZE_RE.fullmatch(raw.strip()) if isinstance(raw, str) else None
+    if match is None or int(match[1]) > _NGINX_MAX_SIZE // _NGINX_SIZE_SCALE[match[2].lower()]:
+        raise ManifestError(
+            'ingress.max_body_size must be a size like "100m" (bytes, with an optional k, m or g), '
+            'or "0" for no limit',
+            path=f"{path}.max_body_size",
+        )
+    return match[0]
 
 
 # The gate identities an app may ask to have forwarded, and the

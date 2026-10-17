@@ -110,3 +110,31 @@ def test_managed_nginx_deploy_includes_configured_logout():
         in annotations["nginx.ingress.kubernetes.io/configuration-snippet"]
     )
     assert annotations["nginx.ingress.kubernetes.io/auth-url"].endswith("/oauth2/auth")
+
+
+def _nginx_annotations(manifest_toml: str) -> dict[str, str]:
+    deployment, _, md, cluster = _scenario()
+    cluster.ingress_class = "nginx"
+    manifest = normalize(parse_raw(manifest_toml), defaults=NormalizationDefaults())
+    [ing] = _render_managed_subdomain_ingress(
+        deployment, manifest, namespace="acme-hello-web", managed_domain=md, cluster=cluster
+    )
+    return ing["metadata"]["annotations"]
+
+
+def test_managed_nginx_ingress_streams_uploads_with_no_body_limit():
+    """#2423: ingress-nginx answers 413 to a body over 1m unless the Ingress
+    says otherwise, and this is the Ingress the deploy applies."""
+    annotations = _nginx_annotations(_MANIFEST)
+
+    assert annotations["nginx.ingress.kubernetes.io/proxy-body-size"] == "0"
+    assert annotations["nginx.ingress.kubernetes.io/proxy-request-buffering"] == "off"
+    assert annotations["nginx.ingress.kubernetes.io/proxy-read-timeout"] == "3600"
+    assert annotations["nginx.ingress.kubernetes.io/proxy-send-timeout"] == "3600"
+
+
+def test_managed_nginx_ingress_takes_the_manifest_max_body_size():
+    annotations = _nginx_annotations(_MANIFEST + '\n[ingress]\nmax_body_size = "100m"\n')
+
+    assert annotations["nginx.ingress.kubernetes.io/proxy-body-size"] == "100m"
+    assert annotations["nginx.ingress.kubernetes.io/proxy-request-buffering"] == "off"
