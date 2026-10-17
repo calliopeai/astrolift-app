@@ -4694,6 +4694,25 @@
       "subscribeFailed": "購読に失敗しました",
       "unsubscribed": "{app} の購読を解除しました",
       "unsubscribeFailed": "購読解除に失敗しました"
+    },
+    "quietHours": {
+      "title": "通知を控える時間帯",
+      "description": "この毎日の時間帯は、エージェントメッセージの個人向けプッシュ通知とメールを停止します。メッセージは受信トレイに残ります。組織のWebhookには影響しません。",
+      "enabled": "通知を控える時間帯を有効にする",
+      "timezone": "タイムゾーン（IANA）",
+      "start": "開始",
+      "end": "終了",
+      "active": "現在、通知を控える時間帯です",
+      "inactive": "現在、通知を控える時間帯ではありません",
+      "save": "保存",
+      "saved": "通知を控える時間帯を保存しました",
+      "loading": "通知設定を読み込み中…",
+      "error": "通知設定を読み込めませんでした。",
+      "retry": "再試行",
+      "saveError": "通知を控える時間帯を保存できませんでした。",
+      "invalidTime": "有効な時刻を入力してください。",
+      "timezoneRequired": "IANAタイムゾーンを入力してください。",
+      "differentTimes": "開始時刻と終了時刻は別の時刻にしてください。"
     }
   },
   "securitySettings": {

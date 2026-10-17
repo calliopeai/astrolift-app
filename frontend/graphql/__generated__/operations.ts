@@ -4264,6 +4264,20 @@ export type AstroliftNotificationProfileMutationResult = {
   ok: Scalars['Boolean']['output'];
 };
 
+export type AstroliftNotificationQuietHours = {
+  active: Scalars['Boolean']['output'];
+  enabled: Scalars['Boolean']['output'];
+  endMinute: Scalars['Int']['output'];
+  startMinute: Scalars['Int']['output'];
+  timezone: Scalars['String']['output'];
+};
+
+export type AstroliftNotificationQuietHoursMutationResult = {
+  data?: Maybe<AstroliftNotificationQuietHours>;
+  errors: Array<MutationError>;
+  ok: Scalars['Boolean']['output'];
+};
+
 export type AstroliftObservabilityPanelReason =
   | 'ERROR'
   | 'NOT_CONFIGURED'
@@ -9732,6 +9746,7 @@ export type Mutation = {
   setModelConnectionRestriction: ModelConnectionPolicyMutationResult;
   setNotificationPreference: AstroliftNotificationPreferenceMutationResult;
   setNotificationProfile: AstroliftNotificationProfileMutationResult;
+  setNotificationQuietHours: AstroliftNotificationQuietHoursMutationResult;
   /** Turn a per-organization module on or off for the active organization (org admins: ``org.update``). ``key`` is ``chat_studio_integration``, ``agent_live_attach`` or ``chat_studio_agent_runs``. Turning on a module the install admin has forced off (``astroliftServerInfo.featureFlags``, ``modules.*_allowed``) is refused with MODULE_DISABLED_BY_INSTALL, and one the install's licence withholds with MODULE_NOT_LICENSED; turning one off always succeeds. */
   setOrganizationModule: AstroliftOrganizationModuleMutationResult;
   setPipelineSecret: AstroliftPipelineSecretChangeMutationResult;
@@ -11667,6 +11682,11 @@ export type MutationSetNotificationProfileArgs = {
 };
 
 
+export type MutationSetNotificationQuietHoursArgs = {
+  input: SetNotificationQuietHoursInput;
+};
+
+
 export type MutationSetOrganizationModuleArgs = {
   input: SetOrganizationModuleInput;
 };
@@ -12875,6 +12895,7 @@ export type Query = {
   astroliftMyDevices: Array<AstroliftDeviceRegistration>;
   astroliftMyMobileDevices: Array<AstroliftDeviceRegistration>;
   astroliftMyNotificationPreferences: Array<AstroliftNotificationPreference>;
+  astroliftMyNotificationQuietHours: AstroliftNotificationQuietHours;
   astroliftMyNotifications: Array<AstroliftNotification>;
   astroliftMyPermissions: Array<Scalars['String']['output']>;
   astroliftMyProfile?: Maybe<AstroliftMyProfile>;
@@ -16292,6 +16313,13 @@ export type SetNotificationProfileInput = {
   config: Scalars['JSON']['input'];
   driver: Scalars['String']['input'];
   retentionDeliveryDays: InputMaybe<Scalars['Int']['input']>;
+};
+
+export type SetNotificationQuietHoursInput = {
+  enabled: Scalars['Boolean']['input'];
+  endMinute: Scalars['Int']['input'];
+  startMinute: Scalars['Int']['input'];
+  timezone: Scalars['String']['input'];
 };
 
 export type SetOrganizationModuleInput = {
@@ -19889,6 +19917,18 @@ export type SendInstallAlertMailTestMutationVariables = Exact<{
 
 
 export type SendInstallAlertMailTestMutation = { sendInstallAlertMailTest: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null, currentVersion?: number | null }>, data?: { id: string, requestId: string, version: number, eventKind: string, transport: string, sender: string, recipient: string, status: string, reasonCode?: string | null, createdAt: string, acceptedAt?: string | null, deliveryObserved: boolean } | null } };
+
+export type SetMyNotificationQuietHoursMutationVariables = Exact<{
+  input: SetNotificationQuietHoursInput;
+}>;
+
+
+export type SetMyNotificationQuietHoursMutation = { setNotificationQuietHours: { ok: boolean, errors: Array<{ code: string, message: string, field?: string | null }>, data?: { enabled: boolean, timezone: string, startMinute: number, endMinute: number, active: boolean } | null } };
+
+export type MyNotificationQuietHoursQueryVariables = Exact<{ [key: string]: never; }>;
+
+
+export type MyNotificationQuietHoursQuery = { astroliftMyNotificationQuietHours: { enabled: boolean, timezone: string, startMinute: number, endMinute: number, active: boolean } };
 
 export type CreateWebhookMutationVariables = Exact<{
   input: CreateWebhookSubscriptionInput;

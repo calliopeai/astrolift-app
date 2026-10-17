@@ -4688,6 +4688,25 @@
       "subscribeFailed": "Error al suscribirse",
       "unsubscribed": "Suscripción a {app} cancelada",
       "unsubscribeFailed": "Error al cancelar la suscripción"
+    },
+    "quietHours": {
+      "title": "Horario de silencio",
+      "description": "Pausa las notificaciones personales y el correo de mensajes de agentes durante este horario diario. Los mensajes permanecen en la bandeja de entrada. Los webhooks de la organización no se ven afectados.",
+      "enabled": "Activar horario de silencio",
+      "timezone": "Zona horaria (IANA)",
+      "start": "Inicio",
+      "end": "Fin",
+      "active": "El horario de silencio está activo",
+      "inactive": "El horario de silencio está inactivo",
+      "save": "Guardar",
+      "saved": "Horario de silencio guardado",
+      "loading": "Cargando preferencias de notificación…",
+      "error": "No se pudieron cargar las preferencias de notificación.",
+      "retry": "Reintentar",
+      "saveError": "No se pudo guardar el horario de silencio.",
+      "invalidTime": "Introduce una hora válida.",
+      "timezoneRequired": "Introduce una zona horaria IANA.",
+      "differentTimes": "Las horas de inicio y fin deben ser diferentes."
     }
   },
   "securitySettings": {

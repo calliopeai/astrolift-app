@@ -4688,6 +4688,25 @@
       "subscribeFailed": "Échec de l’abonnement",
       "unsubscribed": "Désabonné de {app}",
       "unsubscribeFailed": "Échec du désabonnement"
+    },
+    "quietHours": {
+      "title": "Heures calmes",
+      "description": "Suspend les notifications personnelles et les e-mails des agents pendant cette plage quotidienne. Les messages restent dans votre boîte de réception. Les webhooks de l’organisation ne sont pas affectés.",
+      "enabled": "Activer les heures calmes",
+      "timezone": "Fuseau horaire (IANA)",
+      "start": "Début",
+      "end": "Fin",
+      "active": "Les heures calmes sont actives",
+      "inactive": "Les heures calmes sont inactives",
+      "save": "Enregistrer",
+      "saved": "Heures calmes enregistrées",
+      "loading": "Chargement des préférences de notification…",
+      "error": "Impossible de charger les préférences de notification.",
+      "retry": "Réessayer",
+      "saveError": "Impossible d’enregistrer les heures calmes.",
+      "invalidTime": "Saisissez une heure valide.",
+      "timezoneRequired": "Saisissez un fuseau horaire IANA.",
+      "differentTimes": "Les heures de début et de fin doivent être différentes."
     }
   },
   "securitySettings": {

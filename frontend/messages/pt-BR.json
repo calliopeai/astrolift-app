@@ -4694,6 +4694,25 @@
       "subscribeFailed": "Falha ao inscrever",
       "unsubscribed": "Inscrição em {app} cancelada",
       "unsubscribeFailed": "Falha ao cancelar a inscrição"
+    },
+    "quietHours": {
+      "title": "Horário de silêncio",
+      "description": "Pausa as notificações pessoais e os e-mails de mensagens de agentes durante este período diário. As mensagens permanecem na caixa de entrada. Os webhooks da organização não são afetados.",
+      "enabled": "Ativar horário de silêncio",
+      "timezone": "Fuso horário (IANA)",
+      "start": "Início",
+      "end": "Fim",
+      "active": "O horário de silêncio está ativo",
+      "inactive": "O horário de silêncio está inativo",
+      "save": "Salvar",
+      "saved": "Horário de silêncio salvo",
+      "loading": "Carregando preferências de notificação…",
+      "error": "Não foi possível carregar as preferências de notificação.",
+      "retry": "Tentar novamente",
+      "saveError": "Não foi possível salvar o horário de silêncio.",
+      "invalidTime": "Digite um horário válido.",
+      "timezoneRequired": "Digite um fuso horário IANA.",
+      "differentTimes": "Os horários de início e fim devem ser diferentes."
     }
   },
   "securitySettings": {

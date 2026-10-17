@@ -4688,6 +4688,25 @@
       "subscribeFailed": "Abonnieren fehlgeschlagen",
       "unsubscribed": "{app} abbestellt",
       "unsubscribeFailed": "Abbestellen fehlgeschlagen"
+    },
+    "quietHours": {
+      "title": "Ruhezeiten",
+      "description": "Pausiert persönliche Push- und E-Mail-Benachrichtigungen für Agentennachrichten in diesem täglichen Zeitraum. Nachrichten bleiben im Posteingang. Webhooks der Organisation sind nicht betroffen.",
+      "enabled": "Ruhezeiten aktivieren",
+      "timezone": "Zeitzone (IANA)",
+      "start": "Beginn",
+      "end": "Ende",
+      "active": "Ruhezeiten sind aktiv",
+      "inactive": "Ruhezeiten sind inaktiv",
+      "save": "Speichern",
+      "saved": "Ruhezeiten gespeichert",
+      "loading": "Benachrichtigungseinstellungen werden geladen…",
+      "error": "Benachrichtigungseinstellungen konnten nicht geladen werden.",
+      "retry": "Erneut versuchen",
+      "saveError": "Ruhezeiten konnten nicht gespeichert werden.",
+      "invalidTime": "Gültige Uhrzeit eingeben.",
+      "timezoneRequired": "IANA-Zeitzone eingeben.",
+      "differentTimes": "Beginn und Ende müssen unterschiedlich sein."
     }
   },
   "securitySettings": {

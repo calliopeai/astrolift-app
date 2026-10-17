@@ -5410,6 +5410,25 @@
       "subscribeFailed": "Subscribe failed",
       "unsubscribed": "Unsubscribed from {app}",
       "unsubscribeFailed": "Unsubscribe failed"
+    },
+    "quietHours": {
+      "title": "Quiet hours",
+      "description": "Pause personal push and email for agent messages during this daily window. Messages stay in your inbox. Organization webhooks are unaffected.",
+      "enabled": "Enable quiet hours",
+      "timezone": "Time zone (IANA)",
+      "start": "Starts",
+      "end": "Ends",
+      "active": "Quiet hours are active",
+      "inactive": "Quiet hours are inactive",
+      "save": "Save",
+      "saved": "Quiet hours saved",
+      "loading": "Loading notification preferences…",
+      "error": "Notification preferences could not be loaded.",
+      "retry": "Try again",
+      "saveError": "Quiet hours could not be saved.",
+      "invalidTime": "Enter a valid time.",
+      "timezoneRequired": "Enter an IANA time zone.",
+      "differentTimes": "Start and end times must be different."
     }
   },
   "securitySettings": {
